@@ -300,7 +300,8 @@
     lista.innerHTML = '';
     const ieri = i && i.ieri;
     const mese = i && i.mese;
-    const nomeMese = (m) => MESI[Number(String(m || '').slice(5, 7)) - 1] || 'questo mese';
+    // Senza risposta il mese è quello di oggi, qui: è lo stesso che il main avrebbe chiesto.
+    const nomeMese = (m) => MESI[m ? Number(String(m).slice(5, 7)) - 1 : new Date().getMonth()] || MESI[new Date().getMonth()];
     const quando = ieri ? giornoBreve(ieri.giorno) : 'ieri';
     lista.append(
       riquadroInstallazioni(ieri, (n) => `${n === 1 ? 'installazione attiva' : 'installazioni attive'} ieri`,

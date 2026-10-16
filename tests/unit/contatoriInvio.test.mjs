@@ -259,3 +259,46 @@ test('il cancello conta ogni chiamata e non si ferma se il contatore si rompe', 
   assert.equal((await gate(metaRotto).stream({ action: A.FILO_CHAT, messages: [], onDelta: () => {} })).text, 'ciao mondo');
   delete globalThis.SN_PROVIDERS;
 });
+
+test('l’owner conta gli pseudonimi distinti, pagina dopo pagina, chiedendo solo lo pseudonimo', async () => {
+  const chieste = [];
+  const pagine = { giorno: [['a', 'b', 'a']], mese: [Array.from({ length: 1000 }, (_, i) => `p${i % 700}`), ['p1', 'nuovo']] };
+  const s = Servizio.crea({
+    contatori: C,
+    storage: { getRaw: async (k, d) => d, setRaw: async () => {} },
+    impostazioni: async () => ({}),
+    inIncognito: () => false,
+    runNormale: (fn) => fn(),
+    adesso: () => new Date(2026, 10, 1, 10, 0, 0).getTime(),
+    rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    fetch: async (url, opt) => {
+      const q = JSON.parse(opt.body).structuredQuery;
+      chieste.push({ url, auth: opt.headers.Authorization, q });
+      const campo = q.where.fieldFilter.field.fieldPath;
+      const pagina = pagine[campo][q.startAt ? 1 : 0] || [];
+      const righe = pagina.map((p, i) => ({ document: { name: `${BASE}/${C.COLLEZIONE}/${campo}${q.startAt ? 'b' : 'a'}${i}`, fields: { pseudonimo: { stringValue: p } } } }));
+      return { ok: true, status: 200, json: async () => (righe.length ? righe : [{ readTime: 'x' }]) };
+    },
+  });
+  const r = await s.installazioni({ idToken: 'tok' });
+  // Il primo del mese: «ieri» è l'ultimo giorno del mese prima, il mese in corso è quello nuovo.
+  assert.deepEqual(r, { ieri: { giorno: '2026-10-31', n: 2, completo: true }, mese: { mese: '2026-11', n: 701, completo: true } });
+  assert.ok(chieste.every((c) => c.url === `${BASE}:runQuery?key=K` && c.auth === 'Bearer tok'));
+  assert.ok(chieste.every((c) => JSON.stringify(c.q.select) === JSON.stringify({ fields: [{ fieldPath: 'pseudonimo' }] })), 'si chiede solo lo pseudonimo');
+  const seconda = chieste.find((c) => c.q.startAt);
+  assert.equal(seconda.q.startAt.values[0].referenceValue, `${BASE}/${C.COLLEZIONE}/mesea999`);
+  await assert.rejects(s.installazioni({}), /Sessione scaduta/);
+});
+
+test('a Filo si chiede a parole: «contatori» e i suoi sinonimi accendono e spengono l’interruttore, con conferma', () => {
+  require(join(ROOT, 'src', 'shared', 'preferences.js'));
+  const P = globalThis.SN_PREF;
+  for (const chiave of ['contatori', 'contatori anonimi', 'telemetria', 'statistiche d\'uso']) {
+    const r = P.buildPreferencePartial(chiave, 'no');
+    assert.deepEqual(r && r.partial, { contatori: { attivi: false } }, chiave);
+    assert.equal(r.costo, 2);
+    assert.ok(r.risk);
+  }
+  assert.deepEqual(P.buildPreferencePartial('contatori', 'sì').partial, { contatori: { attivi: true } });
+  assert.deepEqual(globalThis.SN_CONST.DEFAULT_SETTINGS.contatori, { attivi: true }, 'accesi di serie (D52)');
+});

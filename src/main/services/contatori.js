@@ -140,11 +140,13 @@ function crea(dip = {}) {
   // dettatura coi suoi ripieghi. L'attesa parte da quando è partito l'uso, non dall'ultima chiamata.
   async function unUso(action, fn) {
     const funzione = C.funzioneDi(action);
-    if (!funzione || inIncognito() || usoCorrente.getStore()?.funzione === funzione) return fn();
-    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0 };
+    const fuori = usoCorrente.getStore();
+    if (!funzione || inIncognito() || (fuori && !fuori.chiuso && fuori.funzione === funzione)) return fn();
+    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0, chiuso: false };
     try {
       return await usoCorrente.run(uso, fn);
     } finally {
+      uso.chiuso = true;
       if (uso.chiamate > 0) registra(funzione, uso.visto, uso.errori).catch(() => {});
     }
   }
@@ -155,8 +157,9 @@ function crea(dip = {}) {
     try {
       const funzione = C.funzioneDi(action);
       if (!funzione || inIncognito()) return MUTO;
+      // Un lavoro partito dentro un uso e arrivato dopo la sua fine conta da sé.
       const uso = usoCorrente.getStore();
-      if (uso && uso.funzione === funzione) {
+      if (uso && !uso.chiuso && uso.funzione === funzione) {
         uso.chiamate += 1;
         return {
           visto() { if (uso.visto == null) uso.visto = adesso() - uso.t0; },

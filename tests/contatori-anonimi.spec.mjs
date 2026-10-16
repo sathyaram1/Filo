@@ -4,7 +4,6 @@
 // La forma del documento e la spedizione: tests/unit/contatoriInvio.test.mjs; le regole: contatoriRegole.motore-vero.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
@@ -153,7 +152,7 @@ test('Preferenze: i contatori sono accesi di serie, spenti buttano quello che as
   await expect(pref.locator('body')).toContainText('Manda i contatori anonimi');
 });
 
-test('«spegni i contatori» in chat: Filo chiede conferma, poi li spegne, e le Preferenze aperte seguono', async ({ app, shell, openTab }) => {
+test('«spegni i contatori» in chat li spegne, butta quello che aspettava, e le Preferenze aperte seguono', async ({ app, shell, openTab }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
@@ -167,7 +166,7 @@ test('«spegni i contatori» in chat: Filo chiede conferma, poi li spegne, e le 
     });
     const giri = [
       { toolCalls: [{ id: 'c1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'contatori', valore: false }) }] },
-      { text: 'Te lo chiedo prima.' },
+      { text: 'Spenti.' },
     ];
     let n = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta, onToolCall }) => {
@@ -189,10 +188,9 @@ test('«spegni i contatori» in chat: Filo chiede conferma, poi li spegne, e le 
   await chat.bringToFront();
   await chat.locator('#input').fill('spegni i contatori anonimi');
   await chat.locator('#sendBtn').click();
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Te lo chiedo prima.' })).toBeVisible({ timeout: 10_000 });
-  await expect.poll(async () => (await confirmState(chat))?.text || '', { timeout: 5_000 }).toContain('Contatori anonimi');
-  expect((await impostazioni(app)).contatori.attivi, 'spenti prima dell’OK').toBe(true);
-  await clickConfirm(chat, 'ok');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Spenti.' })).toBeVisible({ timeout: 10_000 });
+  // Chiesto in chiaro da chi usa Filo, dentro la sua richiesta: Filo lo fa, e lo dice sotto il messaggio.
+  await expect(chat.locator('body')).toContainText('Ha cambiato un\'impostazione', { timeout: 5_000 });
   await expect.poll(async () => (await impostazioni(app)).contatori.attivi, { timeout: 5_000 }).toBe(false);
   await expect.poll(async () => Object.keys((await statoContatori(app)).giorni).length, { timeout: 5_000 }).toBe(0);
   await expect(pref.locator('#contatoriAttivi')).not.toBeChecked({ timeout: 5_000 });
@@ -244,6 +242,8 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
     await page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Rileggi' }).click();
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-valore')).toHaveText('—', { timeout: 5_000 });
     await expect(riquadri.nth(1).locator('.sn-wallet-numero-nota')).toHaveText('non letti');
+    const meseDiOggi = new Date().toLocaleDateString('it-IT', { month: 'long' });
+    await expect(riquadri.nth(1).locator('.sn-wallet-numero-nome')).toHaveText(`installazioni attive a ${meseDiOggi}`);
     await expect(riquadri.nth(1)).toHaveAttribute('title', /npm run regole:pubblica/);
     await page.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { theme: 'dark' } }));
     await page.reload();
