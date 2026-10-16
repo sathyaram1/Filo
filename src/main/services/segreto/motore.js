@@ -199,8 +199,9 @@ function leggiTesta(carico) {
   return t;
 }
 
+// `x` (file rovinato) sempre scritto, 0 o 1: segnarlo non cambia la lunghezza della tabella, che si riscrive sul posto.
 function serializzaTabella(tabella) {
-  const f = [...tabella].map(([n, v]) => (v.x ? { n, d: v.d, c: v.c, m: v.m, e: v.e, x: 1 } : { n, d: v.d, c: v.c, m: v.m, e: v.e }));
+  const f = [...tabella].map(([n, v]) => ({ n, d: v.d, c: v.c, m: v.m, e: v.e, x: v.x ? 1 : 0 }));
   return Buffer.from(JSON.stringify({ f }), 'utf8');
 }
 
