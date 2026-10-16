@@ -522,6 +522,26 @@ export function fermoDopoLaProva(prova) {
     + '  Riallinea il ramo (git merge origin/main, o rebase), fai tornare verdi i test elencati sopra e rilancia npm run finish.';
 }
 
+/**
+ * La parte dell'app che arriva a pratica chiusa dalla parte del server, mentre del server c'è ancora un ramo fuori da
+ * main: lasciata chiusa, la pratica rifiuterebbe quel ramo. Si riapre prima di chiedere la fusione, che così la lascia
+ * aperta per lui (#938). `of`: owner-feedback.mjs. → la riga da stampare, '' se non c'era niente da fare.
+ */
+export async function riapriPerIlServer({ id, ramo, pendingParts = [] }, { of, ora = Date.now() } = {}) {
+  if (!id || !pendingParts.length) return '';
+  const letta = await of.partiDellaPratica(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e).slice(0, 200) }));
+  if (!letta.ok) return `  ! la pratica non si legge (${letta.motivo}): se è chiusa, il ramo del server la troverà chiusa`;
+  if (letta.status !== 'done') return '';
+  const t = parteTardiva({ status: letta.status, parti: letta.parti, parte: 'app', ramo, locale: letta.locale, ora });
+  if (!t.ok) return '';
+  const rami = pendingParts.map((p) => p.branch).join(', ');
+  const perche = `l'aveva chiusa la fusione della parte del server (${new Date(t.at).toISOString()}), ma ${rami} del server non è su main. Le parti già su main ripartono da zero.`;
+  const riaperta = await of.scrivi(id, 'todo', `Riaperta da finish su ${ramo}: ${perche}`);
+  if (!riaperta.ok) return `  ! la pratica non si è riaperta (${riaperta.motivo}): ${rami} la troverà chiusa`;
+  const presa = await of.annotaPratica(id, '');
+  return `  pratica riaperta${presa.ok ? ' («In lavorazione»)' : ''}: ${perche}`;
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});

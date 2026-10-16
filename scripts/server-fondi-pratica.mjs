@@ -332,9 +332,7 @@ export async function esegui(argv, deps = {}) {
     const solo = a.soloServer && !ultima && !tardiva;
     const chiude = !tardiva && (ultima || solo);
     const quando = tardiva || riapertaDa ? new Date((tardiva || riapertaDa).at).toISOString() : '';
-    const notaRiapertura = riapertaDa
-      ? `Riaperta da server:fondi su ${a.ramo}: l'aveva chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), ma ${ramiApp.join(', ')} dell'app è legato a questa pratica e non è su main. Le parti già su main ripartono da zero.`
-      : '';
+    const perche = `l'aveva chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), ma ${ramiApp.join(', ')} dell'app è legato a questa pratica e non è su main. Le parti già su main ripartono da zero.`;
     const numero = chi.replace(/^#/, '');
     const chiudeApp = `la chiude la fusione di ${ramiApp.length ? ramiApp.join(', ') : 'quella parte'} (npm run finish -- --feedback ${numero})`;
     const soloComando = `npm run server:fondi -- ${a.ramo} --feedback ${numero} --solo-server`;
@@ -367,9 +365,9 @@ export async function esegui(argv, deps = {}) {
       log(`Pratica ${chi}: l'ha chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), meno di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore fa: vale per quest'ultima parte.`);
     } else {
       if (riapertaDa) {
-        const riaperta = await of.scrivi(r.id, 'todo', notaRiapertura, { bearer });
+        const riaperta = await of.scrivi(r.id, 'todo', `Riaperta da server:fondi su ${a.ramo}: ${perche}`, { bearer });
         if (!riaperta.ok) { err(`La pratica ${chi} non si è riaperta (${riaperta.motivo}): non porto il ramo su main senza.`); return 1; }
-        log(`Pratica ${chi} riaperta: ${notaRiapertura.replace(/^Riaperta da server:fondi su \S+: /, '')}`);
+        log(`Pratica ${chi} riaperta: ${perche}`);
       }
       const presa = await of.annotaPratica(r.id, notaInizio(a.ramo), { bearer });
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
