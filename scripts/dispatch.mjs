@@ -83,7 +83,7 @@ import {
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
-  testoPuliziaFuoriNumero,
+  ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
@@ -1301,6 +1301,7 @@ export function verifierReplyText(reply, id = '<id>') {
       derivati.length ? daTogliere : null,
       derivati.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
       'Una prova del giro ancora rossa non si toglie e non si cambia mai: la consegna la rilancia com\'era e si ferma. Si toglie solo verde, insieme alla prova durevole che la sostituisce.',
+      ROSSO_ATTESO_CHIUSO,
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       '',
