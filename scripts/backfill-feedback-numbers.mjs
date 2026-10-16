@@ -5,7 +5,7 @@
 //
 // Ordina per createdAt crescente, così i numeri rispecchiano l'ordine storico
 // di arrivo. I documenti che hanno già `seq` restano intatti; la numerazione
-// dei nuovi parte dal max esistente + 1.
+// dei nuovi parte dopo il contatore (vedi ultimoNumeroBuono).
 //
 // USO:
 //   node scripts/backfill-feedback-numbers.mjs            applica
