@@ -1,5 +1,5 @@
 // Verifica #905, giro 2, rilievo 2: la chiave di Safe Browsing e la password del proxy vanno sul disco in chiaro
-// anche col portachiavi, e senza portachiavi l'avviso non parte se sono le sole chiavi salvate.
+// anche col portachiavi, e senza portachiavi nessun avviso lo dice.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync, readFileSync } from 'node:fs';
