@@ -267,9 +267,10 @@ sito, il primo chiude il nostro e il secondo arriva al sito. La regola generale:
 **prima di aspettare di vedere chi ha usato un tasto, assicurati che i tuoi lo
 ricevano.** Prove in `tests/esc-sito-che-si-tiene-il-tasto.spec.mjs`, col
 sito che ferma l'Esc con `stopPropagation` e con `stopImmediatePropagation`.
-Resta fuori l'ascolto di un riquadro su un suo elemento interno (non su
-finestra o documento): non viene anticipato, e oggi nessun riquadro chiude
-l'Esc solo così.
+Resta fuori l'ascolto di un riquadro su un suo elemento (non su finestra o
+documento): non viene anticipato. Oggi chiude l'Esc solo così il pannello del
+canale red-team, che ascolta sulla sua radice; chi scrive un riquadro nuovo
+ascolti l'Esc in cattura sul documento, come tutti gli altri.
 
 **L'attesa non è una scadenza per chi risponde.** Una pagina che ha i pezzi di
 Filo dentro risponde sempre, in tutti e due i versi: se il tasto era suo lo
