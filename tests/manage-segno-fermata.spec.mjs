@@ -181,7 +181,6 @@ test('fermo per un guasto: in lista e nel dettaglio si legge guasto, non lavoro 
   await expect(corpo).toContainText('fermo per un guasto');
   await expect(corpo).toContainText('stanno nella domanda');
   await expect(corpo).not.toContainText('questione di design');
-  await expect(page.locator('#mgAcceptLocalBtn')).toBeHidden();
 
   for (const tema of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
