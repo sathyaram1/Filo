@@ -1232,6 +1232,9 @@
         appendActionLog(`${label}: link non trovato`);
         return false;
       }
+    } else if (page.op === 'save_page' && !paginaDaSalvare()) {
+      appendActionLog(`${label}: le pagine di Filo non si salvano per dopo`);
+      return false;
     }
 
     // Senza risposta dal main si chiede: il caso prudente.
