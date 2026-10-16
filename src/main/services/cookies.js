@@ -26,7 +26,7 @@
 'use strict';
 
 const { session } = require('electron');
-const Sito = require('./stessoSito');
+const Sito = require('../../shared/stessoSito');
 const Google = require('./dominiGoogle');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
@@ -142,7 +142,7 @@ function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
 
-// Il sito dei cookie è quello di services/stessoSito.js: un blog su wordpress.com resta con wordpress.com.
+// Il sito dei cookie è quello di shared/stessoSito.js: un blog su wordpress.com resta con wordpress.com.
 function registrableOf(url) {
   return Sito.sitoDi(url);
 }

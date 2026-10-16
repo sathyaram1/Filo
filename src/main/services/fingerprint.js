@@ -21,7 +21,7 @@
 // In una finestra in incognito, a qualunque livello acceso, il seme nasce e muore con la finestra (#800).
 
 const crypto = require('node:crypto');
-const Sito = require('./stessoSito');
+const Sito = require('../../shared/stessoSito');
 
 const MODES = { OFF: 'off', DEFAULT: 'default', PRIVACY: 'privacy' };
 const SECRET_KEY = '__fpMasterSecret';
@@ -104,7 +104,7 @@ function seedForOrigin(origin, ambito = '') {
   return h.readUInt32BE(0) >>> 0;
 }
 
-// Un sito, un rumore: lo stesso sito dei cookie (services/stessoSito.js), così uno script presente su due pagine di
+// Un sito, un rumore: lo stesso sito dei cookie (shared/stessoSito.js), così uno script presente su due pagine di
 // github.io le vede come due browser diversi. Le esenzioni stanno in configForHref, non qui.
 function seedForHref(href, ambito = '') {
   return seedForOrigin(Sito.sitoDi(href) || String(href || ''), ambito);

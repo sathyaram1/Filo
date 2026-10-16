@@ -5,7 +5,7 @@
 'use strict';
 
 const { getDomainInfo } = require('./safebrowse/psl');
-const Sito = require('./stessoSito');
+const Sito = require('../../shared/stessoSito');
 
 const SITO_GOOGLE = 'google.com';
 // Il suffisso di un dominio di Google: .com, il nazionale (.it, .co.uk, .com.br) e .cat. Un google.<piattaforma>

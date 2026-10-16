@@ -1,4 +1,4 @@
-// «Stesso sito» ha una definizione sola (src/main/services/stessoSito.js): il rumore anti-impronta e i cookie la
+// «Stesso sito» ha una definizione sola (src/shared/stessoSito.js): il rumore anti-impronta e i cookie la
 // chiamano entrambi, così uno script presente su alice.github.io e bob.github.io vede due browser diversi.
 
 import { test } from 'node:test';
@@ -9,7 +9,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const Sito = require('../../src/main/services/stessoSito.js');
+const Sito = require('../../src/shared/stessoSito.js');
 const FP = require('../../src/main/services/fingerprint.js');
 const Cookies = require('../../src/main/services/cookies.js');
 

@@ -6,7 +6,7 @@
 
 const { session } = require('electron');
 const R = require('./cookieIncorporatiRegole');
-const Sito = require('./stessoSito');
+const Sito = require('../../shared/stessoSito');
 const Google = require('./dominiGoogle');
 require('../../shared/authPopup');
 

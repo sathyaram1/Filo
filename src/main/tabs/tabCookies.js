@@ -3,7 +3,7 @@
 // il menu che lo mostra è quello del tasto destro sulla scheda (src/renderer/shell.js).
 
 const Cookies = require('../services/cookies');
-const Sito = require('../services/stessoSito');
+const Sito = require('../../shared/stessoSito');
 
 // Chiavi della memoria della pagina che i CMP usano per ricordarsi la risposta (stessa idea di isConsentName),
 // più quelle che il clic sul banner ha creato. La stessa regola la applica il preload (takeCookieWipe).
