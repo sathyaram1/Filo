@@ -49,7 +49,7 @@
     highlightId = readHighlightId();
     if (highlightId && useCategoryView) {
       const target = allPages.find((p) => p.id === highlightId);
-      if (target) currentCategoryId = target.categoryId || '';
+      if (target) currentCategoryId = categoriaDi(target);
     }
 
     render();
@@ -86,15 +86,22 @@
 
     if (!fuoco && !fuocoSu) return;
     const voci = [...grid.children];
-    const stessa = fuocoId ? voci.find((el) => el.dataset.pageId === fuocoId) : null;
+    const rimessa = fuocoSu && allPages.find((p) => p.id === fuocoSu);
+    const stessa = (fuocoId && voci.find((el) => el.dataset.pageId === fuocoId))
+      || (rimessa && voci.find((el) => el.dataset.categoryId === categoriaDi(rimessa)));
     const dopo = stessa || voci[Math.min(Math.max(fuocoIdx, 0), voci.length - 1)];
     const fallback = !$('search').hidden ? $('search') : null;
     try { (dopo || fallback)?.focus(); } catch (_) {}
   }
 
+  // Una pagina che punta a una categoria che non c'è più sta fra le non categorizzate: un gruppo senza categoria
+  // non ha riquadro, e lì la pagina non si vedrebbe da nessuna parte.
+  function categoriaDi(p) {
+    return p.categoryId && categories.some((c) => c.id === p.categoryId) ? p.categoryId : '';
+  }
+
   function filterByCurrentCategory() {
-    if (currentCategoryId === '') return allPages.filter((p) => !p.categoryId);
-    return allPages.filter((p) => p.categoryId === currentCategoryId);
+    return allPages.filter((p) => categoriaDi(p) === currentCategoryId);
   }
 
   function nomeCategoria(id) {
@@ -114,7 +121,7 @@
     const lastSavedAt = new Map();
     const lastThumb = new Map();
     for (const p of allPages) {
-      const k = p.categoryId || '';
+      const k = categoriaDi(p);
       counts.set(k, (counts.get(k) || 0) + 1);
       const t = p.savedAt || '';
       if (!lastSavedAt.has(k) || t > lastSavedAt.get(k)) {
@@ -281,11 +288,11 @@
     dom.appendChild(date);
     body.appendChild(dom);
 
-    if (useCategoryView && page.category) {
+    if (useCategoryView && categoriaDi(page)) {
       const tag = document.createElement('div');
       tag.className = 'sn-muted';
       tag.style.fontSize = '11px';
-      tag.textContent = page.category;
+      tag.textContent = nomeCategoria(categoriaDi(page));
       body.appendChild(tag);
     }
 
@@ -446,12 +453,11 @@
   // Il secondo livello si apre nello stesso punto, come «Sposta in gruppo…» dei Mazzi.
   function apriMenuSposta(x, y, page) {
     const altre = categories
-      .filter((c) => c.id !== page.categoryId)
-      .slice()
+      .filter((c) => c.id !== categoriaDi(page))
       .sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }))
       .map((c) => ({ label: c.name, run: () => sposta(page, { categoryId: c.id }) }));
     // Da una categoria si torna anche fra le non categorizzate, che nei riquadri hanno il loro.
-    if (page.categoryId) altre.push({ label: I18n.t('category_default'), run: () => sposta(page, { categoryId: null }) });
+    if (categoriaDi(page)) altre.push({ label: I18n.t('category_default'), run: () => sposta(page, { categoryId: null }) });
     altre.push({ label: I18n.t('home_menu_new_category'), run: () => apriCampoCategoria(x, y, page) });
     openMenuAt(x, y, altre);
   }
@@ -469,7 +475,9 @@
       const nome = campo.value.trim();
       if (!nome) return;
       closeCtxMenu();
-      sposta(page, { nome });
+      // Il nome del gruppo delle non categorizzate porta lì: due riquadri con lo stesso nome non si distinguono.
+      const nonCategorizzate = nome.toLocaleLowerCase('it') === I18n.t('category_default').toLocaleLowerCase('it');
+      sposta(page, nonCategorizzate ? { categoryId: null } : { nome });
     });
     openMenuAt(x, y, [], { campo });
     try { campo.focus(); } catch (_) {}

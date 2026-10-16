@@ -34,8 +34,9 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   const RICETTE = { id: 'c-ricette', name: 'Ricette' };
   const url = { a: testServer.html('<title>A</title><p>A</p>'), b: testServer.html('<title>B</title><p>B</p>'), c: testServer.html('<title>C</title><p>C</p>') };
   const home = await openTab(HOME);
+  // «d» punta a una categoria eliminata: sta fra le non categorizzate invece di sparire.
   await semina(home, {
-    pagine: [voce('a', url.a, 1), voce('b', url.b, 2, VIDEO), voce('c', url.c, 3)],
+    pagine: [voce('a', url.a, 1), voce('b', url.b, 2, VIDEO), voce('c', url.c, 3), voce('d', 'https://altro.example/d', 4, { id: 'c-sparita', name: 'Sparita' })],
     categorie: [VIDEO, RICETTE],
     categorizza: true,
   });
@@ -47,7 +48,7 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   await expect(home.locator('.sn-menu:visible')).toHaveCount(0);
 
   await riquadro(home, 'Da vedere').click();
-  await expect(home.locator('#grid .sn-card')).toHaveCount(2);
+  await expect(home.locator('#grid .sn-card')).toHaveCount(3);
 
   await scheda(home, 'a').click({ button: 'right' });
   await expect(home.locator('.home-ctxmenu')).toBeVisible();
@@ -70,7 +71,7 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   await expect(scheda(home, 'c')).toBeVisible();
   await home.locator('#back').click();
   await expect(riquadro(home, 'Video da guardare').locator('.sn-cat-tile-count')).toHaveText('2');
-  await expect(riquadro(home, 'Da vedere').locator('.sn-cat-tile-count')).toHaveText('1');
+  await expect(riquadro(home, 'Da vedere').locator('.sn-cat-tile-count')).toHaveText('2');
 
   // Nuova categoria… → si scrive il nome, Invio: nasce il riquadro con la pagina dentro.
   await riquadro(home, 'Video da guardare').click();
@@ -99,12 +100,24 @@ test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuov
   const annulla = home.locator('.home-annulla');
   await expect(annulla).toBeVisible();
   await expect(annulla).toContainText('«Pagina A» rimossa.');
+  await expect(annulla).toHaveCSS('opacity', '1');
   await home.screenshot({ path: 'tests/.shots/home-annulla.png' }).catch(() => {});
   await annulla.locator('.home-annulla-btn').click();
   await expect(riquadro(home, 'Da leggere').locator('.sn-cat-tile-count')).toHaveText('1');
   const rimessa = await salvate(home);
-  expect(rimessa.map((p) => p.id)).toEqual(['a', 'b', 'c']);
+  expect(rimessa.map((p) => p.id)).toEqual(['a', 'b', 'c', 'd']);
   expect(rimessa[0]).toEqual(prima);
+
+  // Una «Nuova categoria…» col nome delle non categorizzate porta lì, senza un secondo riquadro uguale.
+  await riquadro(home, 'Video da guardare').click();
+  await scheda(home, 'b').click({ button: 'right' });
+  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Sposta in…' }).click();
+  await home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Nuova categoria…' }).click();
+  await home.locator('.home-ctxmenu .home-campo').fill('da vedere');
+  await home.locator('.home-ctxmenu .home-campo').press('Enter');
+  await expect(riquadro(home, 'Video da guardare')).toHaveCount(0);
+  await expect(riquadro(home, 'Da vedere')).toHaveCount(1);
+  await expect(riquadro(home, 'Da vedere').locator('.sn-cat-tile-count')).toHaveText('3');
 
   // Apri e tienila in lista → la pagina si apre in una scheda e resta fra le salvate.
   await riquadro(home, 'Da leggere').click();
@@ -144,6 +157,7 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   await home.keyboard.press('Enter');
   await expect(scheda(home, 'a')).toHaveCount(0);
   await expect(scheda(home, 'b')).toBeFocused();
+  await expect(home.locator('.home-annulla')).toHaveCSS('opacity', '1');
   await home.screenshot({ path: 'tests/.shots/home-annulla-scuro.png' }).catch(() => {});
 
   // «Annulla» è a due Tab (il «Rimuovi» della scheda, poi l'avviso): Invio la rimette e le dà il fuoco.
