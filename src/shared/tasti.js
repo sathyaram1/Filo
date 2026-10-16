@@ -953,6 +953,8 @@
       const car = [...ultimo].length === 1 ? ultimo.toLowerCase() : k;
       code = codiceDelCarattere(car, layout);
       if (!code) return { rifiuto: { tipo: 'senzaTastoProprio', nome: car } };
+      // Con Shift quel tasto scrive un altro simbolo, che la tastiera non dice: solo premendolo si sa quale (e se è dello zoom).
+      if (mod.includes('s')) return { rifiuto: { tipo: 'simbolo', nome: etichettaScritta(testo, esplicita), modificatore: 'Shift' } };
     }
     const tasto = `${mod}|${code}`;
     return { tasto, nome: nomeTastoFisico(tasto, layout) };
