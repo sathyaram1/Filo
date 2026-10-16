@@ -25,6 +25,10 @@ const ZERO = Buffer.alloc(CARICO);
 const TESTA_FISSA = 32;
 const TABELLA_IN_TESTA = CARICO - TESTA_FISSA;
 const ESTENSIONI_MAX = Math.floor(TABELLA_IN_TESTA / 8);
+// La tabella fuori dalla testa ha due copie in gruppi diversi: perso il suo gruppo, si perderebbero tutti i file.
+const COPIE_TABELLA = 2;
+// Se nessuna copia si legge, i blocchi del segreto restano tutti a questa voce nascosta: mai liberati né cancellati.
+const RISERVA = '';
 
 // Letture a vuoto prima di dare persa una copia, almeno il doppio della catena più lunga trovata: data per persa presto,
 // si rifà al primo posto, magari di un segreto scansato. Oltre un quarto del contenitore, si legge tutto di fila.
