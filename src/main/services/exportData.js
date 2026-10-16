@@ -140,6 +140,9 @@ const VOCE_FILO = 'filo/eventi.jsonl';
 const PROXY_CON_CREDENZIALI = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i;
 const CAMPI_PROXY = ['datacenter', 'residential'];
 const pieno = (v) => typeof v === 'string' && v.trim() !== '';
+// Una chiave incollata in chat o copiata negli appunti è nell'archivio quanto quella delle Opzioni: si toglie ovunque.
+const SEGRETO_MIN = 12;
+const SEGRETO_TOLTO = '[chiave tolta dall’esportazione]';
 
 // I posti dei segreti nelle impostazioni, come [oggetto, campo].
 function campiSegreti(settings) {
@@ -149,6 +152,8 @@ function campiSegreti(settings) {
   if (isPlainObject(settings.proxy)) {
     for (const k of CAMPI_PROXY) if (pieno(settings.proxy[k]) && PROXY_CON_CREDENZIALI.test(settings.proxy[k].trim())) out.push([settings.proxy, k]);
   }
+  const sb = isPlainObject(settings.security) && settings.security.safeBrowse;
+  if (isPlainObject(sb) && 'safeBrowsingKey' in sb) out.push([sb, 'safeBrowsingKey']);
   return out;
 }
 
@@ -156,18 +161,39 @@ function haSegreti(storageData) {
   return campiSegreti(storageData && storageData.settings).some(([o, k]) => pieno(o[k]));
 }
 
-// Toglie i segreti da una copia dei dati: un campo assente all'importazione lascia quello di chi importa.
-function togliSegreti(dati) {
+function sostituisci(testo, segreti) {
+  let t = testo;
+  for (const s of segreti) if (t.includes(s)) t = t.split(s).join(SEGRETO_TOLTO);
+  return t;
+}
+
+function oscura(nodo, segreti) {
+  if (Array.isArray(nodo) || isPlainObject(nodo)) {
+    for (const k of Object.keys(nodo)) {
+      if (typeof nodo[k] === 'string') nodo[k] = sostituisci(nodo[k], segreti);
+      else oscura(nodo[k], segreti);
+    }
+  }
+}
+
+// Toglie i segreti da una copia dei dati, e dal filo. Il campo va via, non diventa vuoto: all'importazione un campo
+// assente lascia quello di chi importa.
+function togliSegreti(dati, filo) {
   const s = dati && dati.settings;
-  for (const [o, k] of campiSegreti(s)) delete o[k];
-  if (isPlainObject(s) && isPlainObject(s.apiKeys)) delete s.apiKeys;
-  return dati;
+  const campi = campiSegreti(s);
+  const segreti = [...new Set(campi.map(([o, k]) => o[k]).filter((v) => pieno(v) && v.trim().length >= SEGRETO_MIN).map((v) => v.trim()))];
+  for (const [o, k] of campi) delete o[k];
+  if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
+  if (!segreti.length) return filo;
+  oscura(dati, segreti);
+  if (!filo || !filo.length) return filo;
+  return Buffer.from(sostituisci(Buffer.isBuffer(filo) ? filo.toString('utf8') : String(filo), segreti), 'utf8');
 }
 
 // Costruisce il Buffer ZIP a partire dallo storage Filo e, se c'è, dal filo. `chiavi`: anche i segreti.
-function buildExportZip(storageData, { filo = null, chiavi = false } = {}) {
+function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } = {}) {
   const clone = JSON.parse(JSON.stringify(storageData ?? {}));
-  if (!chiavi) togliSegreti(clone);
+  const filo = chiavi ? filoDato : togliSegreti(clone, filoDato);
   const images = [];
   extractImages(clone, images);
 
