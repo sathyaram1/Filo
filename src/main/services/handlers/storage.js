@@ -124,10 +124,9 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.EXPORT_DATA, async (msg, sender, origin) => {
-    // Esporta TUTTI i dati di Filo in un unico .zip (data.json + immagini
-    // copiate estratte come file). L'utente sceglie dove salvarlo. Solo dalle
-    // pagine interne (Opzioni): una pagina web non deve poter innescare un dump
-    // completo dei dati utente (incluse le chiavi API) né aprire un file dialog.
+    // Esporta i dati di Filo in un unico .zip (data.json + immagini copiate estratte come file); le chiavi solo con
+    // `chiavi: true` (#905). Solo dalle pagine interne: una pagina web non deve poter innescare un dump dei dati utente
+    // né aprire un file dialog.
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     try {
       const { dialog } = require('electron');
