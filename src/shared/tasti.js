@@ -1025,5 +1025,6 @@
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
     AZIONI_FILO, usaScorciatoieFilo, usaScorciatoieModuli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
     scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,
+    tastoValido, tastoFisicoDaEvento, tastoFisicoDaScritta, nomeTastoFisico, combaciaFisico, pressioneFisica, rifiutoFisico,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
