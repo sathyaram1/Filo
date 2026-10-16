@@ -1014,8 +1014,8 @@
     const id = el.dataset && el.dataset.id;
     if (!id) return null;
     // Distingue le textarea con stesso data-id (es. note) dalla classe.
-    const cls = el.classList && el.classList.contains('fb-notes') ? 'fb-notes'
-      : (el.classList && el.classList.contains('fb-usernote') ? 'fb-usernote' : null);
+    // Anche il tasto della frase: Esc gli rende il fuoco, e un ridisegno dal vivo non deve toglierglielo.
+    const cls = ['fb-notes', 'fb-usernote', 'fb-usernote-toggle'].find((c) => el.classList && el.classList.contains(c)) || null;
     if (!cls) return null;
     return {
       cls,
