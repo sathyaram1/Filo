@@ -202,6 +202,12 @@ test('dall\'Aiuto «salvala per dopo» fa la voce del menu, senza l\'Aiuto nella
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('pagina salvata in «Aperti per dopo»: chiudo la scheda', { timeout: 15_000 });
   await expect(page.locator('.sn-save-confirm')).toBeVisible();
   await expect(page.locator('.sn-save-confirm-cta')).toHaveCount(1);
+  // La conferma sta a sinistra dell'Aiuto, non sopra la sua casella.
+  await expect(page.locator('.sn-save-confirm.sn-save-confirm-visible')).toBeVisible();
+  const conferma = await page.locator('.sn-save-confirm').boundingBox();
+  const casella = await page.locator('.sn-sidebar-input').boundingBox();
+  expect(conferma.x + conferma.width).toBeLessThanOrEqual(casella.x);
+  await page.waitForTimeout(400);
   await page.screenshot({ path: 'tests/.shots/salvate-aiuto-conferma.png' });
   await chiusa;
 
