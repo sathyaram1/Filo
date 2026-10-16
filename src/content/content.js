@@ -1783,6 +1783,25 @@
     };
   }
 
+  // #843 — spegne Filo sul sito della scheda (anche dal menu di un riquadro: «questo sito» è quello che si sta visitando).
+  // Solo dove c'è un sito con un nome: una pagina di Filo, un IP o «localhost» non entrano nell'elenco.
+  function buildSpegniFiloItem() {
+    if (PAGINA_DI_FILO || !self.SN_NOMI_SITO) return null;
+    let host = '';
+    try {
+      const u = new URL(pageUrl || location.href);
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.hostname;
+    } catch (_) { host = ''; }
+    if (!self.SN_NOMI_SITO.daScritto(host)) return null;
+    return {
+      type: 'item',
+      label: I18n.t('menu_spegni_filo'),
+      onClick: () => {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
+      },
+    };
+  }
+
   // #405 — i pannelli a tutta superficie (feedback, red-team, sidebar Aiuto)
   // appartengono alla pagina: aperti dentro un riquadro incorporato starebbero
   // dentro un rettangolo di poche centinaia di pixel, tagliati. Dal riquadro
