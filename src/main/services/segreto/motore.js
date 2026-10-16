@@ -35,6 +35,9 @@ const BLOCCHI_PER_LETTURA = 256;
 const LETTURE_INSIEME = 8;
 const GRUPPI_PER_LOTTO = 64;
 const ETICHETTE_MAX = 0xffff;
+// Il motore gira nel processo della finestra: ogni tanti blocchi cifrati, decifrati o collocati le lascia il turno.
+const BLOCCHI_PER_CEDERE = 512;
+const GRUPPI_PER_CEDERE = 16;
 
 const NESSUNO = Object.freeze({ esito: 'nessuno', messaggio: 'Nessun segreto con questo nome.' });
 
@@ -509,7 +512,9 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
     }
     if (!lotto.size) break;
     const blocchi = await leggiPosizioni(ctx, [...lotto.keys()]);
+    let aperti = 0;
     for (const [p, chi] of lotto) {
+      if (++aperti % BLOCCHI_PER_CEDERE === 0) await cedi();
       const pre = leggiPrefisso(apriBlocco(S.cifra, p, blocchi.get(p)));
       if (pre) registra(ctx, S, p, pre);
       else {
@@ -708,8 +713,8 @@ function colloca(ctx, S, i) {
 }
 
 async function scriviSigillati(ctx, S, voci) {
-  for (let x = 0; x < voci.length; x += 1024) {
-    const fetta = voci.slice(x, x + 1024);
+  for (let x = 0; x < voci.length; x += BLOCCHI_PER_CEDERE) {
+    const fetta = voci.slice(x, x + BLOCCHI_PER_CEDERE);
     await scriviPosizioni(ctx, fetta.map((v) => ({ p: v.p, buf: sigilla(S.cifra, v.p, v.chiaro) })));
     for (const v of fetta) {
       S.pos[v.i] = v.p;
@@ -721,9 +726,18 @@ async function scriviSigillati(ctx, S, voci) {
   }
 }
 
+async function scriviCasuali(ctx, posti) {
+  for (let x = 0; x < posti.length; x += BLOCCHI_PER_CEDERE) {
+    const fetta = posti.slice(x, x + BLOCCHI_PER_CEDERE);
+    const casuali = crypto.randomBytes(fetta.length * BLOCCO);
+    await scriviPosizioni(ctx, fetta.map((p, y) => ({ p, buf: casuali.subarray(y * BLOCCO, (y + 1) * BLOCCO) })));
+    await cedi();
+  }
+}
+
 async function distruggi(ctx, S, ids) {
   const vive = ids.filter((i) => S.pos[i] >= 0);
-  await scriviPosizioni(ctx, vive.map((i) => ({ p: S.pos[i], buf: crypto.randomBytes(BLOCCO) })));
+  await scriviCasuali(ctx, vive.map((i) => S.pos[i]));
   for (const i of vive) {
     libera(ctx, S.pos[i]);
     S.pos[i] = -1;
@@ -735,17 +749,20 @@ async function distruggi(ctx, S, ids) {
 async function distruggiSpazzatura(ctx, S) {
   const posti = [...S.spazzatura].filter((p) => !ctx.mappa.occ[p]);
   S.spazzatura.clear();
-  await scriviPosizioni(ctx, posti.map((p) => ({ p, buf: crypto.randomBytes(BLOCCO) })));
+  await scriviCasuali(ctx, posti);
 }
 
 // Riscrive gruppi interi con una versione nuova. Prima le copie che vanno in posti nuovi, poi quelle sopra la versione
-// vecchia, poi via quelle in più: a ogni interruzione resta decodificabile la versione vecchia o la nuova.
-async function riscriviGruppi(ctx, S, voci, { sincronizza = false } = {}) {
+// vecchia, poi via quelle in più, col disco sincronizzato fra una fase e l'altra: il disco può tenere un sottoinsieme
+// qualsiasi delle scritture non sincronizzate, e a ogni taglio di corrente resta decodificabile la vecchia o la nuova.
+async function riscriviGruppi(ctx, S, voci) {
   for (let x = 0; x < voci.length; x += GRUPPI_PER_LOTTO) {
     const fase1 = [];
     const fase2 = [];
     const via = [];
+    let fatti = 0;
     for (const { g, carichi } of voci.slice(x, x + GRUPPI_PER_LOTTO)) {
+      if (++fatti % GRUPPI_PER_CEDERE === 0) await cedi();
       const pieni = carichi.map(pieno);
       const k = pieni.length;
       const v = ++S.contatore;
@@ -765,9 +782,10 @@ async function riscriviGruppi(ctx, S, voci, { sincronizza = false } = {}) {
       S.gruppi[g] = { v, k };
     }
     await scriviSigillati(ctx, S, fase1);
-    // Solo sopra il posto, in qualunque ordine arrivino al disco, una delle due versioni ha sempre la maggioranza.
-    if (sincronizza && fase1.length && fase2.length) await ctx.fh.datasync();
+    // Con le copie nei posti nuovi già sul disco, sopra il posto vince sempre una delle due versioni.
+    if (fase1.length && fase2.length) await ctx.fh.datasync();
     await scriviSigillati(ctx, S, fase2);
+    if (via.length && fase1.length + fase2.length) await ctx.fh.datasync();
     await distruggi(ctx, S, via);
   }
 }
@@ -829,7 +847,7 @@ async function scriviTestaGruppo(ctx, S, { nuovi = new Map(), bytes = serializza
   carichi[0] = scriviTesta({
     L: S.L, creato: S.creato, aperto: S.aperto, contatore: S.contatore + 1, bytes, blocchiTabella: S.blocchiTabella,
   });
-  await riscriviGruppi(ctx, S, [{ g: 0, carichi }], { sincronizza: true });
+  await riscriviGruppi(ctx, S, [{ g: 0, carichi }]);
   await ctx.fh.datasync();
 }
 
@@ -893,6 +911,7 @@ async function crescita(ctx, S, L2) {
   const posti = [];
   dimensiona(S, L2);
   for (let i = 2 * S.L; i < 2 * L2; i++) {
+    if (i % (8 * BLOCCHI_PER_CEDERE) === 0) await cedi();
     if (S.pos[i] >= 0) continue;
     const p = colloca(ctx, S, i);
     if (p < 0) {
@@ -1165,7 +1184,8 @@ class Segreto {
       const f = S.tabella.get(n);
       if (!f) throw errore('NESSUN_FILE', 'Nel segreto non c’è un file con questo nome.');
       if (f.x) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
-      const out = Buffer.alloc(f.d);
+      // Senza azzerare: azzerare centinaia di MB di memoria riusata ferma il processo, e ogni byte lo riempie un blocco.
+      const out = Buffer.allocUnsafeSlow(f.d);
       const blocchi = daEstensioni(f.e);
       const dove = new Map(blocchi.map((j, x) => [j, x]));
       for (const lotto of aLotti([...new Set(blocchi.map((j) => Math.floor(j / GRUPPO)))])) {
