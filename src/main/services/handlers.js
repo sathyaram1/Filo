@@ -3608,6 +3608,54 @@ async function paginePerChat(query) {
   return out.filter((p) => p.url);
 }
 
+// #845 — «Aperti per dopo» per CERCA_SALVATE: per titolo, indirizzo e categoria, coi tre passi della ricerca nel filo.
+// Al modello vanno le più recenti fino al tetto, e il numero vero: le altre le dice, non le tace.
+const MAX_SALVATE_CHAT = 30;
+async function salvatePerChat(query) {
+  const CA = ChatArchive;
+  const pagine = (await SavedPages.list()).filter((p) => p && p.id && p.url);
+  let categorie = [];
+  try { categorie = await Categorizer.listCategories(); } catch (_) {}
+  const categoria = (p) => (p.categoryId && (categorie.find((c) => c.id === p.categoryId) || {}).name) || p.category || '';
+  const { results, termini, allargata } = CA.searchWide(pagine, query, {
+    testo: (p) => `${p.title || ''} ${p.url} ${categoria(p)}`,
+  });
+  return {
+    cercato: query,
+    cercatoCon: termini,
+    allargata,
+    totale: pagine.length,
+    trovate: results.length,
+    pagine: results.slice(0, MAX_SALVATE_CHAT).map((p) => ({
+      id: p.id, title: p.title || '', url: p.url, categoria: categoria(p), savedAt: p.savedAt || null,
+    })),
+  };
+}
+
+// La pagina salvata che la chat apre (lo strumento o il bottone sotto la risposta) fa quello del clic sulla lista:
+// si apre davanti con l'indirizzo che ha in elenco e, salvo `tieni`, esce dalla lista. `porta`: il bottone passa
+// dalla porta delle uscite come i collegamenti delle pagine di Filo; lo strumento ci è già passato prima del gate.
+async function apriPaginaSalvata(id, { win = null, wc = null, tieni = false, porta = true, confermato = false } = {}) {
+  const voce = (await SavedPages.list()).find((p) => p && p.id === String(id || '').trim());
+  if (!voce || !/^https?:\/\//i.test(String(voce.url || ''))) return { ok: false, trovata: false };
+  const tm = win && win._filoTabs;
+  if (!tm || typeof tm.openTab !== 'function') return { ok: false, trovata: true, error: 'no_window' };
+  let tabId = null;
+  if (porta) {
+    const r = await apriDaFilo(voce.url, { wc, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
+    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+  } else {
+    tabId = tm.openTab(voce.url, { activate: true });
+  }
+  if (!tabId) {
+    let d = null;
+    try { d = require('./siteBlock').shouldBlockNavigation(voce.url); } catch (_) {}
+    return { ok: false, trovata: true, blocked: 'site', host: (d && d.host) || '', reason: (d && d.reason) || '', url: voce.url };
+  }
+  if (!tieni) await SavedPages.consume(voce.id);
+  return { ok: true, trovata: true, tolta: !tieni, tabId, id: voce.id, titolo: voce.title || '', url: voce.url };
+}
+
 // I cambi di impostazioni, aspetto, sveglie e zoom (#867) che combaciano: si annullano con ANNULLA_CAMBIO e l'id.
 async function cambiPerChat(query) {
   const CA = ChatArchive;
