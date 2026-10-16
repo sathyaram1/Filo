@@ -148,7 +148,7 @@ test('un file bloccato per sempre non tiene la richiesta in vita oltre tre avvii
   let esito;
   for (let i = 0; i < 3; i++) esito = C.allAvvio(appFinta(dir));
   assert.equal(esito.riprova, false);
-  assert.match(C.fraseEsito(esito), /cancellali a mano/);
+  assert.ok(C.fraseEsito(esito).endsWith(`Cancellalo a mano da ${dir}.`), C.fraseEsito(esito));
   assert.ok(!fs.existsSync(join(dir, C.SEGNO)));
 });
 
