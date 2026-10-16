@@ -23,6 +23,21 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
   });
 
+  // #965 — i link della pagina della scheda (un riquadro no: i suoi link si giudicano al clic). Un link lunghissimo resta
+  // fuori dall'esame anticipato, non dall'avviso: al clic si giudica comunque.
+  on(MSG.SAFEBROWSE_LINKS, async (msg, sender) => {
+    const win = winOf(sender);
+    const tabId = sender?.tab?.id;
+    const top = sender?.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+    const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+    if (!win || !win._filoTabs || !tabId || !suo) return { ok: false };
+    const urls = msg && Array.isArray(msg.urls) ? msg.urls : null;
+    if (!urls) return { ok: false, error: 'formato' };
+    const max = globalThis.SN_SAFEBROWSE?.links?.LOTTO_MAX || 500;
+    if (urls.length > max) return { ok: false, error: 'troppi', max };
+    return win._filoTabs.safebrowseLinks(tabId, urls.filter((u) => typeof u === 'string' && u.length <= 16384));
+  });
+
   // Un campo password o carta a schermo, nella pagina o in un suo riquadro: vale per la pagina della scheda, che dà il
   // main (sender.url), mai il riquadro. Chi si dichiara delicato può solo mandare meno ai modelli (#1004).
   on(MSG.CAMPI_DELICATI, async (msg, sender) => {
