@@ -1,6 +1,6 @@
-// Una pagina che si riscrive (document.open) cancella gli ascoltatori della finestra e del documento, e con la testa i fogli di stile di Filo.
-// Qui il mondo isolato di Filo si segna i propri ascoltatori e li rimette appena la radice cambia, con i segni di Filo sulla radice.
-// Va installato prima di ogni altro ascoltatore. Regole: patterns/un-documento-riscritto-non-spegne-filo.md.
+// Il mondo isolato di Filo si segna i propri ascoltatori su finestra e documento: li rimette quando la pagina si riscrive
+// (document.open) e sa consegnare loro un tasto prima degli script del sito (anticipa, #859). Va installato prima di ogni
+// altro ascoltatore. Regole: patterns/un-documento-riscritto-non-spegne-filo.md, patterns/esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md.
 
 // I segni che Filo tiene sulla radice (tema, moduli pronti); quelli dello zoom
 // descrivono una modalità che col documento vecchio si è chiusa.
