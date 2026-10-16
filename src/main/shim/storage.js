@@ -224,7 +224,7 @@ const CHIAVE_IN_CHIARO = 'avvisoChiaviInChiaro';
 let inChiaroInCorso = false;
 
 function testoChiaviInChiaro() {
-  const base = 'Filo non trova un portachiavi di sistema, quindi salva le tue chiavi API in chiaro nella sua cartella dei dati: chi può aprire i tuoi file può leggerle.';
+  const base = 'Filo non trova un portachiavi di sistema, quindi salva le tue chiavi API in chiaro nella sua cartella dei dati. Chi può aprire i tuoi file può leggerle.';
   let backend = '';
   try { backend = safeStorage.getSelectedStorageBackend?.() || ''; } catch (_) {}
   const consiglio = require('../portachiavi').consiglioPortachiavi({ platform: process.platform, backend, perChe: 'Per cifrarle' });
