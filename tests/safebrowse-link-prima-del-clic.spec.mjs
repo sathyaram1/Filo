@@ -463,6 +463,25 @@ test('un collegamento aperto da una pagina di Filo o dall\'assistente sopra una 
   await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
   expect(await schedeWeb(app)).toEqual([]);
 
+  // Un collegamento in una risposta della chat di Filo, dalla stessa pagina.
+  const r = await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    return globalThis.__filoHandlers.handleMessage(
+      { type: globalThis.SN_MSG.MSG.FILO_APRI_PROPOSTA, url: 'https://paypa1.com/dalla-chat', parole: [] },
+      { url: t.view.webContents.getURL(), tab: { id: t.id }, wc: t.view.webContents, win: w },
+    );
+  });
+  expect(r.aperto).toBe(true);
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
+  expect(await schedeWeb(app)).toEqual([]);
+  await avviso.getByPlaceholder('confermo').fill('confermo');
+  await avviso.getByRole('button', { name: 'Procedi comunque' }).click();
+  await expect.poll(() => schedeWeb(app)).toEqual(['https://paypa1.com/dalla-chat']);
+  await verdettiFiniti(app);
+  expect((await copertura(app)).coperta).toBe(false);
+
   // Il collegamento che l'assistente scrive sopra una pagina web passa dal main: l'avviso compare su quella pagina.
   const pagina = await testServer.openReady(openTab, '<title>Articolo</title><p>testo</p>');
   await fuocoAllaPagina(app);
