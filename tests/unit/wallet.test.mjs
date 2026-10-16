@@ -370,10 +370,10 @@ test('un movimento del portafoglio si legge in italiano, anche con l’id attacc
 // la usano sia la pagina (per disegnare i campi) sia il main (per rifiutare un
 // numero storto prima di scriverlo): se divergessero, il main accetterebbe
 // quello che la pagina rifiuta.
-test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () => {
-  assert.equal(W.OWNER_KNOBS.length, 7);
+test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => {
+  assert.equal(W.OWNER_KNOBS.length, 8);
   assert.deepEqual(W.OWNER_KNOB_KEYS, [
-    'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses',
+    'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses', 'invitesRemaining',
     'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackClosed',
   ]);
   for (const k of W.OWNER_KNOBS) {
