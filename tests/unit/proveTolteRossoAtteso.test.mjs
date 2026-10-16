@@ -216,6 +216,29 @@ test('in locale chi corregge il rilievo di una prova segnata e le toglie il segn
   }
 });
 
+// I tre incidenti venivano da prove segnate su rilievi ancora da registrare: il quando lo dice la ricetta, una volta, per
+// ogni ambito; il compito locale ci rimanda senza dire altro, e nessun testo propone più il segno come ripiego.
+test('quando si segna un rosso atteso lo dice la ricetta, e il compito locale non dice altro', async () => {
+  const { readRoleInstructions } = await import('../../scripts/dispatch.mjs');
+  const { buildVerifierBrief } = await import('../../scripts/verify-local.mjs');
+  const REGOLA = /il segno di rosso\s+atteso \(`test\.fail`\) va solo su quella di un rilievo messo da parte che resta\s+nel ramo, mai su una di un rilievo che registri/g;
+  for (const scope of ['pieno', 'chiusura', 'riallineamento']) {
+    const ricetta = readRoleInstructions('verifier', { scope });
+    assert.equal((ricetta.match(REGOLA) || []).length, 1, `ambito ${scope}`);
+    assert.match(ricetta, /se passa \(«Expected to fail, but passed»\) la\s+porta è chiusa e le togli il segno/);
+  }
+  const ricetta = readRoleInstructions('verifier');
+  const brief = buildVerifierBrief({ request: 'fai X', branch: RAMO, recipe: ricetta, history: [] });
+  const compito = brief.slice(0, brief.indexOf(ricetta)).replace(/\s+/g, ' ');
+  assert.match(compito, /non va mai sulla prova di un rilievo che stai per registrare, e quando va lo dice la recipe/);
+  const { readdirSync } = await import('node:fs');
+  const testi = [
+    ...readdirSync(resolve(ROOT, 'routines', 'roles')).map((n) => resolve(ROOT, 'routines', 'roles', n)),
+    resolve(ROOT, 'patterns', 'le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md'),
+  ].map((f) => readFileSync(f, 'utf8'));
+  for (const t of testi) assert.doesNotMatch(t.replace(/\s+/g, ' '), /ripiego del rosso atteso/);
+});
+
 test('la risposta alla critica, in cloud e in locale, dice come si tratta una prova segnata che adesso passa', async () => {
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
   const { codaText } = await import('../../scripts/verify-local.mjs');
