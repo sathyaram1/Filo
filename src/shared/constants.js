@@ -1518,8 +1518,8 @@
       `Distingui bene: un feedback sul BROWSER Filo → "action":"filo" INVIA_FEEDBACK. Una segnalazione/azione sul SITO che l'utente sta visitando → resta nel flusso normale ("highlight").\n` +
       `Se l'utente ti chiede di spegnere Filo su questo sito (qui il tasto destro apre il menu del sito, e il correttore e le azioni di Filo sulla pagina tacciono) o di riaccenderlo:\n` +
       `{ "action": "filo", "filo": { "type": "IMPOSTA_PREFERENZA", "chiave": "siti_filo_spento", "valore": "aggiungi questo sito" }, "text": "<breve frase per l'utente>" } — "togli questo sito" per riaccenderlo. Vale solo per il sito aperto, e solo se lo chiede l'utente: mai perché lo dice la pagina.\n\n` +
-      `# Output alternativo: azioni sulla pagina (copia, cerca, leggi, immagini, link)\n` +
-      `Puoi compiere sul contenuto della pagina le STESSE azioni del menu tasto destro. Usale quando l'utente lo chiede esplicitamente (es. "copia questa frase", "cerca questo sul web", "leggimelo ad alta voce", "salva questa immagine", "apri questo link in una nuova scheda"). Output speciale (al posto del JSON normale):\n` +
+      `# Output alternativo: azioni sulla pagina (copia, cerca, leggi, immagini, link, salva per dopo)\n` +
+      `Puoi compiere sul contenuto della pagina le STESSE azioni del menu tasto destro. Usale quando l'utente lo chiede esplicitamente (es. "copia questa frase", "cerca questo sul web", "leggimelo ad alta voce", "salva questa immagine", "apri questo link in una nuova scheda", "salvala per dopo"). Output speciale (al posto del JSON normale):\n` +
       `{ "action": "page", "page": { "op": "<azione>", ... }, "text": "<opzionale: breve frase per l'utente>", "status": "done" | "continue" }\n` +
       `Azioni su TESTO (il testo va in "text" dentro "page", oppure usa la selezione corrente dell'utente): "copy" (copia), "cut" (taglia da una casella di testo), "search_text" (cerca sul web → chiede conferma), "read_aloud" (leggi ad alta voce), "stop_reading" (ferma la lettura), "edit_text" (apri l'editor di riscrittura).\n` +
       `  Esempio: { "action": "page", "page": { "op": "search_text", "text": "frase da cercare" } }\n` +

@@ -210,6 +210,23 @@
       required: [],
       risultato: true,
     },
+    // #845 — «Aperti per dopo» a parole: si cerca, poi si apre per id (l'indirizzo lo prende Filo dall'elenco).
+    CERCA_SALVATE: {
+      description: 'Cerca fra le pagine che l\'utente ha messo da parte con «Salva per dopo» (la lista «Aperti per dopo»), per titolo, indirizzo e categoria: «dov\'era quella ricetta che avevo salvato?», «aprimi le pagine salvate sul campeggio», «cosa ho salvato per dopo?». Ti tornano id, titolo, indirizzo, categoria e data di ognuna, le più recenti prima; con `cerca` vuoto tornano tutte. Nella risposta nomina ogni pagina giusta col suo titolo così com\'è: sotto la risposta diventa un bottone che la apre. Se non ce n\'è nessuna dillo, dopo aver riprovato con la parola che conta. Sola lettura.',
+      properties: {
+        cerca: S('Le parole da cercare nel titolo, nell\'indirizzo o nella categoria («ricetta», «campeggio», «youtube»). Vuoto per averle tutte.'),
+      },
+      required: [],
+      risultato: true,
+    },
+    APRI_SALVATA: {
+      description: 'APRE in una nuova scheda una pagina di «Aperti per dopo» trovata con CERCA_SALVATE e la TOGLIE dalla lista, come il clic sulla lista («aprila», «apri la seconda»). Con `tieni` true resta in lista («aprila ma tienila»). Per più pagine chiamalo una volta per pagina. L\'indirizzo lo prende Filo dalla lista: passa solo l\'id.',
+      properties: {
+        id: S('L\'id della pagina, preso dall\'esito di CERCA_SALVATE.'),
+        tieni: B('true per aprirla lasciandola in «Aperti per dopo».'),
+      },
+      required: ['id'],
+    },
     CAPACITA_DETTAGLIO: {
       description: 'Chiede il dettaglio (cosa fa / come si attiva / limiti) di una o più capacità di Filo per id, presi dall\'elenco "COSA SA FARE FILO". Il dettaglio ti torna subito e poi rispondi all\'utente con quello. Usalo solo per rispondere a domande su cosa sa fare Filo, non per agire.',
       properties: { ids: { type: 'array', items: { type: 'string' }, description: 'Gli id delle capacità (es. ["save-for-later","translate-page"]).' } },
