@@ -199,7 +199,7 @@ function leggiTesta(carico) {
   const est = [];
   for (let x = 0; x < n; x++) est.push([carico.readUInt32BE(TESTA_FISSA + 8 * x), carico.readUInt32BE(TESTA_FISSA + 8 * x + 4)]);
   t.blocchiTabella = daEstensioni(est);
-  if (t.blocchiTabella.length !== Math.ceil(lunghezza / CARICO) || t.blocchiTabella.some((j) => j < 1 || j >= L)) return null;
+  if (t.blocchiTabella.length !== carico[1] * Math.ceil(lunghezza / CARICO) || t.blocchiTabella.some((j) => j < 1 || j >= L)) return null;
   return t;
 }
 
@@ -209,6 +209,8 @@ function serializzaTabella(tabella) {
   return Buffer.from(JSON.stringify({ f }), 'utf8');
 }
 
+// Una voce che non torna rende illeggibile la tabella intera: i blocchi di un file tolto dall'elenco sembrerebbero
+// liberi, e la riparazione li cancellerebbe.
 function leggiTabella(bytes, L) {
   let o;
   try {
@@ -219,13 +221,22 @@ function leggiTabella(bytes, L) {
   if (!o || !Array.isArray(o.f)) return null;
   const t = new Map();
   for (const v of o.f) {
-    if (!v || typeof v.n !== 'string' || !v.n || !Number.isSafeInteger(v.d) || v.d < 0 || !Array.isArray(v.e)) continue;
+    if (!v || typeof v.n !== 'string' || (!v.n && !v.x) || !Number.isSafeInteger(v.d) || v.d < 0 || !Array.isArray(v.e)) return null;
     const blocchi = v.e.reduce((n, x) => n + (Array.isArray(x) ? x[1] : 0), 0);
     const dentro = v.e.every((x) => Array.isArray(x) && Number.isInteger(x[0]) && Number.isInteger(x[1]) && x[0] >= 1 && x[1] >= 1 && x[0] + x[1] <= L);
-    if (!dentro || blocchi !== Math.ceil(v.d / CARICO)) continue;
+    if (!dentro || blocchi !== Math.ceil(v.d / CARICO)) return null;
     t.set(v.n, { d: v.d, c: Number(v.c) || 0, m: Number(v.m) || 0, e: v.e.map((x) => [x[0], x[1]]), x: v.x ? 1 : 0 });
   }
   return t;
+}
+
+// I carichi della tabella per blocco logico, di tutte le copie: chi riscrive un gruppo perso ci rimette questi, non zeri.
+function caricoTabella(S) {
+  const out = new Map();
+  if (!S.bytesTabella || !S.blocchiTabella.length) return out;
+  const t = Math.ceil(S.bytesTabella.length / CARICO);
+  S.blocchiTabella.forEach((j, x) => out.set(j, S.bytesTabella.subarray((x % t) * CARICO, (x % t + 1) * CARICO)));
+  return out;
 }
 
 function blocchiUsati(L, tabella, blocchiTabella) {
