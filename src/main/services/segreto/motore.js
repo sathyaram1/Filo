@@ -26,9 +26,8 @@ const TESTA_FISSA = 32;
 const TABELLA_IN_TESTA = CARICO - TESTA_FISSA;
 const ESTENSIONI_MAX = Math.floor(TABELLA_IN_TESTA / 8);
 
-// Letture andate a vuoto prima di dare persa una copia, e almeno il doppio della catena più lunga già trovata: una
-// copia data per persa troppo presto si rifà al primo posto, che può essere di un segreto scansato alla scrittura.
-// Oltre un quarto del contenitore in letture a vuoto costa meno leggerlo tutto di fila.
+// Letture a vuoto prima di dare persa una copia, almeno il doppio della catena più lunga trovata: data per persa presto,
+// si rifà al primo posto, magari di un segreto scansato. Oltre un quarto del contenitore, si legge tutto di fila.
 const TENTATIVI_A_VUOTO = 32;
 const SCANSIONE_OLTRE = 1 / 4;
 const CATENA_MAX = 1 << 16;
