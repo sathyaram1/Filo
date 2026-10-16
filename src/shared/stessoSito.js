@@ -233,7 +233,7 @@
   }
 
   const api = {
-    getDomainInfo, isIpAddress, hostDi, sitoDi, stessoSito, piattaforma, sitoDellaVoce, sitiDelleVociIn, voceSalvata,
+    getDomainInfo, isIpAddress, hostDi, sitoDi, stessoSito, piattaforma, condiviso, sitoDellaVoce, sitiDelleVociIn, voceSalvata,
     ElencoSiti, S3, PRIVATE_AVVISO, DEL_MARCHIO,
   };
   global.SN_STESSO_SITO = api;
