@@ -201,6 +201,8 @@ module.exports = function register(on, ctx) {
         // chiude la porta a duplicati anche se la creazione del feedback qui
         // sotto fallisce a metà.
         await FB.castReopenRequest(id, uid, { idToken });
+        // Dall'owner parte con la sua prova come dal riquadro (#953), mai col ripiego anonimo.
+        const firmato = Mittente.firma(`uid:${uid}`);
         created = await FB.submit({
           // Un id d'invio STABILE per questa coppia (fix, persona): se la
           // risposta si perde per strada ma il documento è nato lo stesso, un
