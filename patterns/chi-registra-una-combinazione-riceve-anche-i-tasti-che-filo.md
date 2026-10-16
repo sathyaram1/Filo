@@ -20,6 +20,12 @@ essere rifiutato col perché, e Alt+T faceva partire la traduzione a chi voleva 
   l'ascolto.
 - **Lettura e controlli stanno in `SN_TASTI`** (`scorciatoiaDaEvento`, `rifiutoScorciatoiaFilo`): la stessa regola
   della chat, che il main riapplica in `applySettingsUpdate` prima di salvare.
+- **Il campo dell'Editor è un campo di testo**: registra solo le combinazioni con Ctrl, Cmd o Alt, e le lettere si
+  scrivono, perché la scorciatoia si può anche scrivere a mano. Salva il tasto fisico (`tastoFisicoDaEvento`,
+  `rifiutoFisico`): ogni tasto di Filo si confronta col tasto che lo produce su quella tastiera.
+- **Non si fermano**: i tasti del sistema operativo (Alt+Tab, il tasto Windows, Cmd+Tab) e, su Mac, le voci della
+  barra dei menu fatte con un `role` (Cmd+Q, Cmd+H, Cmd+M, Cmd+C…), che `oRegistra` non vede.
 
-Prove: `tests/scorciatoie-personalizzate.spec.mjs`, `tests/unit/scorciatoieFilo.test.mjs`. Vicino:
+Prove: `tests/scorciatoie-personalizzate.spec.mjs`, `tests/unit/scorciatoieFilo.test.mjs`,
+`tests/editor-scorciatoie-tasto-fisico.spec.mjs`, `tests/unit/tastoFisico.test.mjs`. Vicino:
 [Lo zoom lo tiene Filo, non la pagina](lo-zoom-lo-tiene-filo-non-la-pagina.md).
