@@ -121,6 +121,25 @@ test('pagina Feedback: aperta resta aperta quando la lista si ridisegna, e cambi
   await expect(casella(page, 'fc-tre')).toBeHidden();
 });
 
+test('pagina Feedback: se il salvataggio fallisce a frase chiusa, la casella si riapre', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK);
+  await apriCoda(page);
+  page.on('dialog', (d) => d.accept());
+  await page.evaluate(() => {
+    const orig = window.filo.message;
+    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update' && typeof msg.userNote === 'string')
+      ? { ok: false, error: 'rete giù' } : orig(msg);
+  });
+
+  await tasto(page, 'fc-uno').click();
+  await casella(page, 'fc-uno').fill('Non arriverà.');
+  await casella(page, 'fc-uno').press('Escape');
+  // Un errore dentro una casella chiusa non lo vedrebbe nessuno: torna aperta, su quello che c'è davvero.
+  await expect(casella(page, 'fc-uno')).toBeVisible();
+  await expect(casella(page, 'fc-uno')).toHaveValue('');
+  await expect(tasto(page, 'fc-uno')).not.toHaveClass(/fb-usernote-piena/);
+});
+
 test('Gestione: Esc nella frase la richiude, rende il fuoco al tasto e salva', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');
