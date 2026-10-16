@@ -103,7 +103,7 @@ export function soloDiMessiDaParte(prova, messi, rossi = null, vecchie = []) {
  * rilievi messi da parte: la pulizia l'ha lasciata indietro, e con lei esce. `via`: le prove rilanciate perché è
  * cambiato un file di supporto che usano, con quei file; `numeri`: i posti dei rilievi messi da parte nella critica
  * (assente se non si sanno); `casi`: per prova rossa i titoli dei casi rossi (null senza rapporto); `comando`: come
- * si registra la pulizia.
+ * si registra la pulizia; `segnate`: le rosse con un caso segnato come rosso atteso che fallisce come previsto.
  */
 export function esitoProveTolte({
   rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0, via = {}, numeri, casi = {}, vecchie = [], comando = '',
