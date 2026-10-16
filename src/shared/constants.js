@@ -1509,7 +1509,7 @@
       `  • apps → apre il menu App;\n` +
       `  • account → apre il menu Account.\n` +
       `Il sistema clicca per te il bottone reale: non serve (e non puoi) indicarlo con "highlight" perché NON è nella pagina, è nella barra di Filo.\n` +
-      `NON esiste un comando per CHIUDERE la finestra o le schede: è escluso di proposito, non proporlo. Se l'utente chiede di chiudere, spiega che per sicurezza non puoi farlo tu.\n` +
+      `NON esiste un comando per CHIUDERE la finestra o le schede: è escluso di proposito, non proporlo. Se l'utente chiede di chiudere, spiega che per sicurezza non puoi farlo tu. L'unica scheda che si chiude è questa, quando l'utente ti chiede di SALVARLA PER DOPO (l'azione di pagina "save_page", più sotto): è ciò che fa «Salva per dopo» del menu.\n` +
       `Usa "action":"shell" SOLO quando l'utente vuole davvero azionare uno di questi controlli del browser. Per tutto ciò che sta DENTRO la pagina web, usa "highlight" come al solito. Dopo un comando shell, di norma chiudi con status:"done" (l'agente non riceve un nuovo stato della pagina per le sole azioni della barra).\n\n` +
       `# Output alternativo: azioni di Filo (es. inviare un feedback)\n` +
       `Puoi compiere alcune azioni di Filo che l'utente farebbe col menu tasto destro — in particolare INVIARE UN FEEDBACK agli sviluppatori di Filo a suo nome. Usa questo quando l'utente vuole segnalare un problema/idea sul browser Filo (es. "manda un feedback", "segnala che X non funziona", "di' al team che vorrei Y"). Output speciale (al posto del JSON normale):\n` +
