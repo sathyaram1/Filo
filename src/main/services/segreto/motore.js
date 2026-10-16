@@ -921,6 +921,8 @@ async function liberaEStringi(ctx, S, prima) {
     voci.push({ g, carichi: Array.from({ length: ke }, (_, s) => (ora[GRUPPO * g + s] && vecchi[s]) || ZERO) });
   }
   await riscriviGruppi(ctx, S, voci);
+  // I liberati del gruppo 0 li ha già azzerati la testa nuova: un'altra testa serve solo se il segreto si accorcia.
+  if (L3 >= Lprima) return;
   const oltre = [];
   for (let i = 2 * GRUPPO * Math.max(G3, 1); i < 2 * Lprima; i++) if (S.pos[i] >= 0) oltre.push(i);
   await distruggi(ctx, S, oltre);
