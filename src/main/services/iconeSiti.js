@@ -10,7 +10,8 @@ const IconaScheda = require('./iconaScheda');
 const MAX_COPIE = 3;
 // Un sito che non ha dato un'icona si richiede dopo dieci minuti, non a ogni giro della home.
 const RIPROVA_MS = 10 * 60 * 1000;
-const MAX_RICORDATE = 1000;
+// Una home e le chat riaperte mostrano qualche decina di siti; oltre i cinquecento si dimenticano i più vecchi.
+const MAX_RICORDATE = 500;
 const IN_PARALLELO = 6;
 
 const DATO_RE = /^data:image\//i;
