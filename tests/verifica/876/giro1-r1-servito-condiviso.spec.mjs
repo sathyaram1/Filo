@@ -1,60 +1,19 @@
 // #876 giro 1 — fra i programmi fidati Filo non deve proporre come «sito preciso» un host che serve i file di chiunque:
-// dopo un programma scaricato da una release GitHub, chi scrive githubusercontent.com non deve sentirsi dire di scrivere
-// release-assets.githubusercontent.com (fidarsi di lui = fidarsi delle release di tutti).
+// dopo un programma da una release GitHub (pagina github.com, file servito da release-assets.githubusercontent.com), chi
+// scrive githubusercontent.com non deve sentirsi dire di scrivere l'host delle release di tutti.
+// github.com è nella lista HSTS: non lo si serve in http dal mini server, quindi i siti scaricati si passano come la
+// pagina Sicurezza li riceve dall'elenco dei download (sito e servito da).
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { createServer } from 'node:http';
-import { mkdirSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const SHOTS = join(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..'), 'tests', '.shots');
-
-test.use({ hostInPiu: ['github.com', 'release-assets.githubusercontent.com'] });
-
-test('r1 dopo una release GitHub, chi scrive githubusercontent.com non si sente proporre l\'host delle release di tutti', async ({ shell, openTab }) => {
-  test.setTimeout(120_000);
-  let porta = 0;
-  const srv = createServer((req, res) => {
-    const p = String(req.url || '').split('?')[0];
-    if (p === '/alice/tool/releases') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(`<!doctype html><html><body><a id="dl" href="http://github.com:${porta}/alice/tool/releases/download/v1/tool.exe">tool.exe</a></body></html>`);
-      return;
-    }
-    if (p === '/alice/tool/releases/download/v1/tool.exe') {
-      res.writeHead(302, { Location: `http://release-assets.githubusercontent.com:${porta}/github-production-release-asset/1/tool.exe` });
-      res.end();
-      return;
-    }
-    if (p.endsWith('/tool.exe')) {
-      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="tool.exe"' });
-      res.end(Buffer.from('TVoBAgME', 'base64'));
-      return;
-    }
-    res.writeHead(404); res.end();
-  });
-  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  porta = srv.address().port;
-  try {
-    const page = await openTab(`http://github.com:${porta}/alice/tool/releases`);
-    await page.locator('#dl').click();
-    const voce = async () => ((await shell.evaluate(() => window.filoShell.downloads.list()))?.items || [])
-      .find((it) => it.filename === 'tool.exe') || null;
-    await expect.poll(async () => (await voce())?.servedBy ?? null, { timeout: 20_000 }).toBe('release-assets.githubusercontent.com');
-
-    const sec = await openTab('filo://security/');
-    const casella = sec.locator('#sec-dl-trusted');
-    await casella.fill('githubusercontent.com');
-    await casella.press('Tab');
-    const errore = sec.locator('#sec-dl-trusted-error');
-    await expect(errore).toBeVisible({ timeout: 10_000 });
-    await expect(errore).toContainText('«githubusercontent.com» raccoglie i siti di chiunque');
-    mkdirSync(SHOTS, { recursive: true });
-    await sec.locator('#sec-dl-exe-sub').screenshot({ path: join(SHOTS, 'verifica876-githubusercontent.png') });
-    await expect(errore).not.toContainText('release-assets.githubusercontent.com');
-  } finally {
-    try { srv.closeAllConnections?.(); } catch (_) {}
-    await new Promise((r) => srv.close(r));
-  }
+test('r1 dopo una release GitHub, chi scrive githubusercontent.com non si sente proporre l\'host delle release di tutti', async ({ openTab }) => {
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('#sec-dl-trusted', { state: 'attached', timeout: 10_000 });
+  const frase = await sec.evaluate(() => window.SN_ESEGUIBILI.testoPiattaforma('githubusercontent.com',
+    ['github.com', 'release-assets.githubusercontent.com']));
+  expect(frase).toContain('«githubusercontent.com» raccoglie i siti di chiunque');
+  expect(frase).not.toContain('release-assets.githubusercontent.com');
+  // E scritto a mano, quell'host non diventa un sito fidato come un altro.
+  const v = await sec.evaluate(() => window.SN_ESEGUIBILI.sitoFidabile('release-assets.githubusercontent.com'));
+  expect(v && v.sito).toBeFalsy();
 });
