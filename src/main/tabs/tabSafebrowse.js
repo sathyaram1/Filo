@@ -721,16 +721,22 @@ const safebrowseMethods = {
     return { ok: true };
   },
 
-  // L'utente ha scelto «Continua» sul "sospetto": non riproporlo per questo dominio in questa scheda.
+  // «Continua» sul "sospetto" (#967): il sito entra fra quelli di cui l'utente si fida, in ogni scheda e dopo i riavvii.
+  // La scheda lo tace subito, senza aspettare la scrittura; in incognito vale solo per lei.
   safebrowseDismiss(tabId, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
     if (!tab) return { ok: false };
     this._sbState(tab);
-    try {
-      const key = SB && SB.scopeOf(url);
-      if (key) tab.sbDismissed.add(key);
-    } catch (_) {}
+    let key = null;
+    try { key = SB && SB.scopeOf(url); } catch (_) {}
+    if (key) {
+      tab.sbDismissed.add(key);
+      const a = tab.sbAvviso;
+      if (a && a.level === 'sospetto') tab._sbTaciuto = { scope: key, verdict: { level: 'sospetto', message: a.message || null } };
+      require('../services/sitiFidati').fidati(key, { win: this.win, incognito: !!this.incognito })
+        .catch((e) => console.warn('[Filo] sito fidato non salvato', e && e.message));
+    }
     this._sbMostra(tab, url, { level: 'safe', message: null });
     return { ok: true };
   },
