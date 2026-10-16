@@ -637,8 +637,9 @@
     options_security_safebrowse_desc:
       'Ti avvisa quando un sito imita un marchio noto, è nella lista nera di Google per phishing o malware, ' +
       'ha un certificato che non torna o ti chiede la password su una connessione non protetta. L\'avviso ' +
-      'copre la pagina finché non scegli. Su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
-      '«confermo». La scelta vale per quel sito in quella scheda, finché resta aperta. Spento, Filo non ' +
+      'copre la pagina finché non scegli. Su un sito sospetto «Continua» lo mette fra i siti di cui ti fidi, e ' +
+      'lì l\'avviso sospetto non torna. Su uno pericoloso scrivi «confermo», e vale solo per quel sito in quella ' +
+      'scheda, finché resta aperta. Spento, Filo non ' +
       'chiede più niente fuori dal computer, ma ti avvisa ancora sui sosia e sulle password chieste senza ' +
       'connessione protetta, che riconosce da solo.',
     options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
@@ -718,6 +719,11 @@
       'lo togli, in "Privacy massima" Filo butta via ' +
       'quello che aveva salvato.',
     options_cookies_whitelist_placeholder: 'es. google.com',
+    options_security_fidati_title: 'Siti di cui ti fidi',
+    options_security_fidati_desc:
+      'Su questi siti Filo non mostra più l\'avviso «sospetto» e non ti chiede se l\'indirizzo esiste. L\'avviso ' +
+      '«pericoloso», come quello per un sito nella lista nera di Google, compare sempre.',
+    options_security_fidati_remove: 'Togli',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
@@ -762,6 +768,8 @@
     menu_spegni_filo: 'Spegni Filo su questo sito',
     menu_riaccendi_filo: 'Riaccendi Filo su questo sito',
     filo_spento_fatto: 'Filo è spento su %s.',
+    siti_fidati_fatto: '%s è fra i siti di cui ti fidi, in Sicurezza: Filo non lo mette più in dubbio.',
+    siti_fidati_annulla: 'Annulla',
     filo_riacceso_fatto: 'Filo è di nuovo acceso su %s.',
     filo_spento_annulla: 'Annulla',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
