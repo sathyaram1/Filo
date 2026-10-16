@@ -4,7 +4,7 @@
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare } = ctx;
+  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, sitoDaConfermare } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
   on('_tabs:create', async (msg, sender) => {
