@@ -127,19 +127,33 @@ test('una prova segnata che fallisce ancora, tolta, ferma la consegna e il rifiu
   }
 });
 
-test('in una prova di più casi conta il caso: il segno tolto da quello corretto passa, quello di uno aperto no', () => {
+test('in una prova di più casi ogni caso conta per il suo corpo: un caso segnato ancora aperto la tiene rossa', () => {
   const file = `${CARTELLA}/giro1-r1-r2-pausa.spec.mjs`;
-  const t = giro({ [file]: `${caso('r1 la frase resta', 'a', SEGNO)}${caso('r2 il tasto risponde', 'b', SEGNO)}` });
+  const t = giro({ [file]: `${caso('r1 la frase resta', 'a', SEGNO)}${caso('r2 il tasto risponde', 'b', SEGNO)}` },
+    'Provato il pannello.\n[2i] Il pannello cancella la frase della pausa.\n[2i] Il tasto della pausa non risponde.');
   try {
     t.scrivi('stato-a.txt', 'corretto\n');
     t.scrivi(file, `${caso('r1 la frase resta', 'a')}${caso('r2 il tasto risponde', 'b', SEGNO)}`);
-    t.commit('corretto r1');
-    assert.deepEqual(t.consegna(), { ferma: false, testo: '' });
-    t.scrivi(file, caso('r1 la frase resta', 'a'));
-    t.commit('tolto anche r2, ancora aperto');
+    t.commit('corretto r1, tolto il suo segno');
     const e = t.consegna();
-    assert.equal(e.ferma, true, 'il caso di r2, com\'era, fallisce ancora');
-    assert.match(e.testo, /giro1-r1-r2-pausa\.spec\.mjs/);
+    assert.equal(e.ferma, true, 'com\'era, il caso di r2 fallisce ancora: Playwright lo dà verde, ma la porta è aperta');
+    assert.match(e.testo, /ancora rosso \(giro1-r1-r2-pausa\.spec\.mjs\)/);
+    t.scrivi('stato-b.txt', 'corretto\n');
+    t.commit('corretto anche r2');
+    assert.deepEqual(t.consegna(), { ferma: false, testo: '' });
+  } finally {
+    togliCartella(t.dir);
+  }
+});
+
+test('una prova segnata accanto a un caso verde: tolto il segno dopo la correzione, la consegna passa', () => {
+  const file = `${CARTELLA}/giro1-r1-pausa-e-tasto.spec.mjs`;
+  const t = giro({ [file]: `${caso('r1 la frase resta', 'a', SEGNO)}${caso('il tasto risponde', 'c')}`, 'stato-c.txt': 'corretto\n' });
+  try {
+    t.scrivi('stato-a.txt', 'corretto\n');
+    t.scrivi(file, `${caso('r1 la frase resta', 'a')}${caso('il tasto risponde', 'c')}`);
+    t.commit('corretto r1, tolto il segno');
+    assert.deepEqual(t.consegna(), { ferma: false, testo: '' });
   } finally {
     togliCartella(t.dir);
   }
