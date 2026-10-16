@@ -1213,7 +1213,8 @@ async function cancellaDentro(ctx, S, nome) {
 async function apriOCrea(opzioni, crea) {
   const { contenitore, dimensione, sale, nome, dichiarati = [], parametriChiave } = opzioni || {};
   const proprio = normalizzaNome(nome);
-  const altri = [...new Set((Array.isArray(dichiarati) ? dichiarati : [])
+  const elenco = Array.isArray(dichiarati) ? dichiarati : (typeof dichiarati === 'string' ? [dichiarati] : []);
+  const altri = [...new Set(elenco
     .map((x) => (typeof x === 'string' ? x.normalize('NFC').trim() : ''))
     .filter((x) => x && x !== proprio))];
   if (altri.length > ETICHETTE_MAX - 2) throw errore('DICHIARATI', `Si possono dichiarare fino a ${ETICHETTE_MAX - 2} altri segreti.`);
