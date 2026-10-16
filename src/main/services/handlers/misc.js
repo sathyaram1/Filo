@@ -5,6 +5,7 @@ const { safeFetch } = require('../safe-fetch');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const Foto = require('../fotoDellaPagina');
 const auth = require('../../auth/google-auth');
+const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
 const identitaInvio = require('../../auth/identita-invio');
