@@ -1563,6 +1563,9 @@
       else if (lista.querySelector('.sn-clip-gone')) renderClipboard(vociCorrenti, { forza: true });
     });
     $('sec-export-btn').addEventListener('click', () => exportData());
+    for (const id of CASELLE_CHIAVI) {
+      $(id).addEventListener('change', (e) => { for (const altra of CASELLE_CHIAVI) $(altra).checked = e.currentTarget.checked; });
+    }
     $('sec-import-btn').addEventListener('click', importData);
     $('sec-wipe-btn').addEventListener('click', apriCancellaTutto);
     $('sec-wipe-export').addEventListener('click', () => exportData({
