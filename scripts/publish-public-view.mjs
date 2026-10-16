@@ -151,15 +151,17 @@ export async function publishPublicView({ dryRun = false } = {}) {
     for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken: bearer });
   }
 
-  // Il contatore dei numeri: se manca lo crea, se è indietro lo allinea.
-  const maxSeq = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
+  // Il contatore dei numeri: si alza solo fino a un numero con la prova del
+  // mittente (#923); il massimo di tutti fa da pavimento per riportarlo giù,
+  // e solo se li abbiamo letti TUTTI.
+  const maxSeq = FB.maxSeqProvato(feedbacks);
+  const pavimento = tuttiLetti ? feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0) : 0;
   let counter = null;
-  // `allowLower` solo se abbiamo letto TUTTI i feedback: un contatore più alto
-  // del massimo `seq` esistente l'ha gonfiato qualcuno (farlo avanzare di uno è
-  // alla portata di chiunque) e va riportato in pari.
-  if (maxSeq > 0 && !dryRun) counter = await FB.ensureSeqCounter(maxSeq, { idToken: bearer, allowLower: tuttiLetti });
+  if ((maxSeq > 0 || pavimento > 0) && !dryRun) {
+    counter = await FB.ensureSeqCounter(maxSeq, { idToken: bearer, pavimento });
+  }
 
-  return { letti: feedbacks.length, complete, tuttiLetti, plan, maxSeq, counter, dryRun };
+  return { letti: feedbacks.length, complete, tuttiLetti, plan, maxSeq, pavimento, counter, dryRun };
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
