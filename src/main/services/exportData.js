@@ -591,9 +591,18 @@ function unisciSveglie(local, imported, prossima, adesso) {
 
 // `opzioni`: { tettoPagine, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche contano le sezioni di primo
 // livello; `restano` sono quelle del backup che non si importano perché sono stato.
+// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905).
+function senzaSegretiVuoti(dati) {
+  if (!isPlainObject(dati.settings)) return dati;
+  const settings = JSON.parse(JSON.stringify(dati.settings));
+  if (isPlainObject(settings.apiKeys)) for (const k of Object.keys(settings.apiKeys)) if (!pieno(settings.apiKeys[k])) delete settings.apiKeys[k];
+  if (isPlainObject(settings.proxy)) for (const k of CAMPI_PROXY) if (k in settings.proxy && !pieno(settings.proxy[k])) delete settings.proxy[k];
+  return { ...dati, settings };
+}
+
 function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
-  const imp = require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {});
+  const imp = senzaSegretiVuoti(require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {}));
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = { added: 0, updated: 0, unchanged: 0, restano: 0, pagineFuori: 0, pagineMieFuori: 0 };
