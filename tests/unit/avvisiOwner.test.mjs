@@ -51,7 +51,7 @@ test('il tetto: niente sotto l’80%, un marcatore oltre l’80% e due oltre il 
   assert.deepEqual(caso(W.avvisiOwner(vista({ dati: 79999 })), 'tetto').marcatori, []);
   const ottanta = caso(W.avvisiOwner(vista({ dati: 87000 })), 'tetto');
   assert.deepEqual(ottanta.marcatori, ['tetto:80']);
-  assert.equal(ottanta.testo, 'I crediti regalati sono all’87% del tetto: 87.000 su 100.000. Alza il tetto nella pagina Inviti e utenti, o la quota del giorno e i nuovi ingressi verranno rifiutati.'.replace('’', "'"));
+  assert.equal(ottanta.testo, "I crediti regalati sono all'87% del tetto: 87.000 su 100.000. Alza il tetto nella pagina Inviti e utenti, o la quota del giorno e i nuovi ingressi verranno rifiutati.");
   const novanta = caso(W.avvisiOwner(vista({ dati: 96000 })), 'tetto');
   assert.deepEqual(novanta.marcatori, ['tetto:80', 'tetto:95']);
   assert.match(novanta.testo, /^I crediti regalati sono al 96% del tetto: 96\.000 su 100\.000\./);
