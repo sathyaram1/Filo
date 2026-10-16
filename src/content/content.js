@@ -463,6 +463,8 @@
       document.addEventListener(tipo, (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
     }
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      // Spento sul sito tacciono le azioni sulla pagina; lo stato (impostazioni, schermo intero) si segue lo stesso.
+      if (isBlocked() && AZIONI_DA_FUORI.has(msg?.type)) return;
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
