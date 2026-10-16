@@ -396,8 +396,8 @@ test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => 
 
 // #854 — il main rifà il controllo della pagina con la stessa tabella: un numero storto per gli ingressi
 // non arriva a config/credits nemmeno se la pagina venisse saltata.
-test('gli ingressi con invito si rifiutano come le altre manopole: negativi, decimali e parole no', async () => {
-  await import('../../src/shared/campoNumero.js');
+test('gli ingressi con invito si rifiutano come le altre manopole: negativi, decimali e parole no', () => {
+  require('../../src/shared/campoNumero.js');
   const CN = globalThis.SN_CAMPO_NUMERO;
   const k = W.knobOf('invitesRemaining');
   const regole = { min: k.min, max: k.max, intero: true, etichetta: k.etichetta };
