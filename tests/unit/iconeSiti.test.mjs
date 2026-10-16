@@ -30,37 +30,37 @@ function sessione(risposte = {}) {
 
 test('una scheda aperta sullo stesso sito dà la sua icona senza nessuna richiesta, anche col www di differenza', async () => {
   const ses = sessione();
-  const { iconaDi } = I.crea();
+  const { cercaIconaSito } = I.crea();
   const schede = [{ url: 'https://www.esempio.it/pagina', favicon: DATO }];
-  assert.equal(await iconaDi('https://esempio.it/', { ses, schede }), DATO);
+  assert.equal(await cercaIconaSito('https://esempio.it/', { ses, schede }), DATO);
   assert.deepEqual(ses.chiesti, []);
 });
 
 test('una scheda di un altro sito, o di un\'altra porta, non presta la sua icona', async () => {
   const ses = sessione();
-  const { iconaDi } = I.crea();
+  const { cercaIconaSito } = I.crea();
   const schede = [{ url: 'https://altro.it/', favicon: DATO }, { url: 'http://127.0.0.1:9000/', favicon: DATO }];
-  assert.equal(await iconaDi('http://127.0.0.1:8000/x', { ses, schede }), '');
+  assert.equal(await cercaIconaSito('http://127.0.0.1:8000/x', { ses, schede }), '');
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['http://127.0.0.1:8000/favicon.ico']);
 });
 
 test('senza schede: prima l\'icona dichiarata da una pagina salvata o archiviata, poi /favicon.ico, sempre senza cookie', async () => {
   const ses = sessione({ 'https://cdn.esempio.it/logo.png': PNG });
-  const { iconaDi } = I.crea();
+  const { cercaIconaSito } = I.crea();
   const voci = async () => [
     { url: 'https://altro.it/', favicon: 'https://altro.it/a.png' },
     { url: 'https://esempio.it/salvata', favicon: 'https://esempio.it/vecchia.png' },
     { url: 'https://www.esempio.it/archiviata', favicon: 'https://cdn.esempio.it/logo.png' },
   ];
-  assert.equal(await iconaDi('https://esempio.it/', { ses, voci }), DATO);
+  assert.equal(await cercaIconaSito('https://esempio.it/', { ses, voci }), DATO);
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['https://esempio.it/vecchia.png', 'https://cdn.esempio.it/logo.png']);
   assert.ok(ses.chiesti.every((c) => c.init.credentials === 'omit'), 'a un sito che non hai aperto non vanno i cookie');
 });
 
 test('/favicon.ico del sito stesso, con lo schema e la porta del suggerimento', async () => {
   const ses = sessione({ 'http://esempio.it:8080/favicon.ico': PNG });
-  const { iconaDi } = I.crea();
-  assert.equal(await iconaDi('http://esempio.it:8080/a?b=c', { ses }), DATO);
+  const { cercaIconaSito } = I.crea();
+  assert.equal(await cercaIconaSito('http://esempio.it:8080/a?b=c', { ses }), DATO);
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['http://esempio.it:8080/favicon.ico']);
 });
 
@@ -76,9 +76,9 @@ test('le copie dichiarate si fermano a tre, e un indirizzo che non è un\'immagi
 
 test('un indirizzo che non è un sito web non chiede niente', async () => {
   const ses = sessione();
-  const { iconaDi } = I.crea();
+  const { cercaIconaSito } = I.crea();
   for (const u of ['', 'filo://options/options.html', 'file:///C:/x.html', 'javascript:alert(1)', 'non un indirizzo', null]) {
-    assert.equal(await iconaDi(u, { ses }), '');
+    assert.equal(await cercaIconaSito(u, { ses }), '');
   }
   assert.deepEqual(ses.chiesti, []);
 });
@@ -86,35 +86,35 @@ test('un indirizzo che non è un sito web non chiede niente', async () => {
 test('un\'icona trovata non si richiede; una mancata si riprova solo dopo dieci minuti', async () => {
   let ora = 0;
   const ses = sessione({ 'https://ok.it/favicon.ico': PNG });
-  const { iconaDi } = I.crea({ adesso: () => ora });
-  await iconaDi('https://ok.it/', { ses });
-  await iconaDi('https://ok.it/altra', { ses });
-  await iconaDi('https://manca.it/', { ses });
-  await iconaDi('https://manca.it/', { ses });
+  const { cercaIconaSito } = I.crea({ adesso: () => ora });
+  await cercaIconaSito('https://ok.it/', { ses });
+  await cercaIconaSito('https://ok.it/altra', { ses });
+  await cercaIconaSito('https://manca.it/', { ses });
+  await cercaIconaSito('https://manca.it/', { ses });
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['https://ok.it/favicon.ico', 'https://manca.it/favicon.ico']);
   ora += I.RIPROVA_MS + 1;
-  await iconaDi('https://manca.it/', { ses });
-  await iconaDi('https://ok.it/', { ses });
+  await cercaIconaSito('https://manca.it/', { ses });
+  await cercaIconaSito('https://ok.it/', { ses });
   assert.deepEqual(ses.chiesti.map((c) => c.url).slice(2), ['https://manca.it/favicon.ico']);
 });
 
 test('due richieste insieme per lo stesso sito ne fanno una; in incognito non si ricorda niente', async () => {
   const ses = sessione({ 'https://ok.it/favicon.ico': PNG });
-  const { iconaDi } = I.crea();
-  const [a, b] = await Promise.all([iconaDi('https://ok.it/', { ses }), iconaDi('https://ok.it/x', { ses })]);
+  const { cercaIconaSito } = I.crea();
+  const [a, b] = await Promise.all([cercaIconaSito('https://ok.it/', { ses }), cercaIconaSito('https://ok.it/x', { ses })]);
   assert.equal(a, DATO);
   assert.equal(b, DATO);
   assert.equal(ses.chiesti.length, 1);
   const inc = sessione({ 'https://ok.it/favicon.ico': PNG });
-  await iconaDi('https://ok.it/', { ses: inc, incognito: true });
-  await iconaDi('https://ok.it/', { ses: inc, incognito: true });
+  await cercaIconaSito('https://ok.it/', { ses: inc, incognito: true });
+  await cercaIconaSito('https://ok.it/', { ses: inc, incognito: true });
   assert.equal(inc.chiesti.length, 2);
 });
 
 test('una pagina 404 in html non è un\'icona: resta il ripiego della home', async () => {
   const ses = sessione();
-  const { iconaDi } = I.crea();
-  assert.equal(await iconaDi('https://senza.it/', { ses, voci: async () => { throw new Error('archivio rotto'); } }), '');
+  const { cercaIconaSito } = I.crea();
+  assert.equal(await cercaIconaSito('https://senza.it/', { ses, voci: async () => { throw new Error('archivio rotto'); } }), '');
   assert.deepEqual(ses.chiesti.map((c) => c.url), ['https://senza.it/favicon.ico']);
 });
 

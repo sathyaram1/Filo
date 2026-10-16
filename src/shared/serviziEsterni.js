@@ -231,7 +231,7 @@
       riceve: 'la richiesta dell’icona, senza cookie',
       frase: 'Filo usa quella che ha già scaricato per una scheda aperta',
       dove: ['src/main/services/iconeSiti.js', 'src/main/services/handlers/tabs.js'],
-      via: 'iconaDi', prova: ['/favicon.ico', '.iconaDi('],
+      via: 'cercaIconaSito', prova: ['/favicon.ico', '.cercaIconaSito('],
     },
     {
       id: 'aggiornamenti', nome: 'GitHub, per gli aggiornamenti',

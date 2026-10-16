@@ -156,7 +156,7 @@ module.exports = function register(on, ctx) {
     }
     const voci = async () => [...await globalThis.SN_SAVED_PAGES.list(), ...await ArchivedTabs.list()];
     const ses = (sender && sender.wc && sender.wc.session) || session.defaultSession;
-    const dato = await require('../iconeSiti').iconaDi(msg && msg.url, { ses, schede, voci, incognito });
+    const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito });
     return { ok: true, dato };
   }));
 

@@ -63,7 +63,7 @@ function crea({ adesso = () => Date.now(), iconaPer = IconaScheda.iconaPer } = {
 
   // `schede`: quelle aperte nelle finestre dello stesso tipo; `voci()`: salvate e archiviate, lette solo se servono.
   // In incognito (`incognito: true`) non si ricorda niente: finita la finestra, non resta traccia dei siti chiesti.
-  async function iconaDi(url, { ses = null, schede = [], voci = async () => [], incognito = false } = {}) {
+  async function cercaIconaSito(url, { ses = null, schede = [], voci = async () => [], incognito = false } = {}) {
     const sito = sitoDi(url);
     if (!sito) return '';
     const vista = copiaInScheda(sito, schede);
@@ -91,7 +91,7 @@ function crea({ adesso = () => Date.now(), iconaPer = IconaScheda.iconaPer } = {
     return giro;
   }
 
-  return { iconaDi };
+  return { cercaIconaSito };
 }
 
 module.exports = { crea, sitoDi, candidati, copiaInScheda, ...crea(), MAX_COPIE, RIPROVA_MS };
