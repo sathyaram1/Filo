@@ -15,7 +15,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -45,6 +46,15 @@ test('ogni ruolo riceve un testo intero, senza richiami rimasti dentro', () => {
     assert.match(testo, /## Stai riprendendo un lavoro fermo/, ruolo);
     assert.ok(!/<!--\s*includi:/i.test(testo), `richiamo non espanso nella ripresa di ${ruolo}`);
   }
+});
+
+// #1203: la ripresa vive nel pezzo condiviso del ruolo che riparte, e il giro stretto è stato tolto.
+// Le prove li possono nominare per dire che non tornano; nessun altro file li nomina.
+test('fuori dalle prove nessun file nomina il giro stretto, la verifica di chiusura o il vecchio ruolo della ripresa', () => {
+  const tracciati = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' }).split('\0')
+    .filter((f) => f && !f.startsWith('tests/') && /\.(m?js|md|html|css|json|txt)$/.test(f) && existsSync(join(ROOT, f)));
+  const spia = /giroStretto|giro stretto|giri stretti|verifier-chiusura|resolver-ripresa|FIXER_CASE_FILE/i;
+  assert.deepEqual(tracciati.filter((f) => spia.test(readFileSync(join(ROOT, f), 'utf8'))), []);
 });
 
 // Il giro dopo un riallineamento cambia il PERIMETRO, non il metro: livelli,

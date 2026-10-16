@@ -522,7 +522,6 @@ test('in locale la pulizia si registra, e la consegna dopo non rilancia la prova
     const c = vl('corretto', REPORT);
     assert.equal(c.status, 0, c.testo);
     assert.equal(c.entry.verdict, 'fixed');
-    assert.equal(c.entry.chiusura.shaPrima, pulizia, 'la verifica dopo guarda la correzione, non la pulizia');
   } finally {
     togliCartella(dir);
   }
