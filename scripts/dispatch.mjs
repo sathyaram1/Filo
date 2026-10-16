@@ -408,21 +408,62 @@ export function secauditPassato(verdict) {
 export { MAX_LIVELLO_CHARS, leggiTestoLivello };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
+// Le opzioni dei --record-* e i comandi che le leggono. Si tolgono tutte PRIMA di leggere comando,
+// identificativo e testo, come il biglietto: rimaste fra i posizionali, la frase finiva nel report e
+// il suo nome faceva da identificativo (#879).
+export const OPZIONI_REGISTRAZIONE = {
+  '--segnala': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
+  '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
+  '--frase': { tipo: 'testo', comandi: ['--record-fixed'] },
+  '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
+};
+const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
+
 /**
- * Toglie `--<nome> <file>` dagli argomenti, come stripTicketArg col biglietto.
- * PURA. `error` è la frase da stampare (opzione senza file dopo, o un flag al
- * posto del file, o l'opzione ripetuta).
+ * Toglie le opzioni dei --record-* in qualunque posizione, anche come `--opzione=valore` (la forma del
+ * canale). PURA. `valori` per nome (`true` per una bandiera); `error` è la frase da stampare: valore
+ * mancante, un flag al posto del valore, opzione ripetuta, o un'opzione che il comando non legge.
+ * @returns {{ args: string[], valori: Record<string, string|true>, error: string }}
  */
-export function stripFileArg(list, nome) {
-  const args = Array.isArray(list) ? [...list] : [];
-  const flag = `--${nome}`;
-  const i = args.indexOf(flag);
-  if (i === -1) return { args, file: '', error: '' };
-  const v = String(args[i + 1] ?? '').trim();
-  args.splice(i, 2);
-  if (!v || SEMBRA_OPZIONE(v)) return { args, file: '', error: `${flag} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.` };
-  if (args.includes(flag)) return { args, file: '', error: `${flag} va passato una volta sola: non ho consegnato niente.` };
-  return { args, file: v, error: '' };
+export function leggiOpzioniRegistrazione(list) {
+  const lista = Array.isArray(list) ? list.map((a) => String(a ?? '')) : [];
+  const args = [];
+  const valori = {};
+  const no = (error) => ({ args: lista, valori: {}, error });
+  for (let i = 0; i < lista.length; i++) {
+    const a = lista[i];
+    const nome = Object.keys(OPZIONI_REGISTRAZIONE).find((n) => a === n || a.startsWith(`${n}=`));
+    if (!nome) { args.push(a); continue; }
+    const { tipo } = OPZIONI_REGISTRAZIONE[nome];
+    if (tipo === 'bandiera') {
+      if (a !== nome) return no(`${nome} non vuole un valore: non ho consegnato niente.`);
+      valori[nome] = true;
+      continue;
+    }
+    if (nome in valori) return no(`${nome} va passato una volta sola: non ho consegnato niente.`);
+    const v = a === nome ? lista[++i] : a.slice(nome.length + 1);
+    if (tipo === 'file') {
+      const file = String(v ?? '').trim();
+      if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`);
+      valori[nome] = file;
+    } else {
+      // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
+      // l'identificativo sparivano dalla riga.
+      if (v === undefined || sembraOpzioneNelReport(v)) return no(`${nome} vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.`);
+      valori[nome] = v;
+    }
+  }
+  const comando = args[0];
+  for (const nome of Object.keys(valori)) {
+    const { comandi } = OPZIONI_REGISTRAZIONE[nome];
+    if (comandi.includes(comando)) continue;
+    const qui = Object.entries(OPZIONI_REGISTRAZIONE).filter(([, o]) => o.comandi.includes(comando))
+      .map(([n, o]) => `${n}${FORMA_OPZIONE[o.tipo]}`);
+    return no(String(comando || '').startsWith('--record-')
+      ? `${nome} non vale con ${comando}: ${qui.length ? `qui ci sono solo ${qui.join(', ')}` : 'qui non ci sono opzioni'}. Niente è stato toccato.`
+      : `${nome} vale solo con ${comandi.join(' e ')}. Niente è stato toccato.`);
+  }
+  return { args, valori, error: '' };
 }
 
 /**
