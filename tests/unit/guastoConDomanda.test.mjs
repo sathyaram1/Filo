@@ -54,6 +54,16 @@ test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge 
   }
 });
 
+// Due worker sullo stesso guasto devono scrivere lo stesso gruppo: un nome fisso per i noti, causa da una lista chiusa per gli altri.
+test('il gruppo di un guasto non dipende dalle parole di chi cade', () => {
+  const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'));
+  for (const nome of ['filo-security', 'github', 'npm', 'electron']) assert.ok(pezzo.includes(`\`guasto: ${nome}\``), nome);
+  assert.match(pezzo, /`guasto: <causa> <nome>`: la causa è una di `credenziali`, `clone`, `rete`, `servizio`, `strumento`, `permessi`/);
+  assert.doesNotMatch(pezzo, /come la nomina il messaggio/);
+  const server = piatto(readFileSync(join(RUOLI, '_lavoro-server.md'), 'utf8'));
+  assert.ok(server.includes('`guasto: filo-security`'), 'il lavoro server usa lo stesso nome della lista');
+});
+
 test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando in locale), e il rimando non vieta più il server', () => {
   const pezzo = readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8');
   assert.match(piatto(pezzo), /«Non posso perché è rotto» è un guasto/);
