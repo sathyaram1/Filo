@@ -533,7 +533,7 @@ const ROLE_FILE = {
 // Dopo la risposta dell'owner riparte il ruolo che si era fermato (#1203): la
 // ripresa è un pezzo in più del suo testo, non un ruolo a sé.
 const RIPRESA_FILE = '_ripresa.md';
-const RUOLI_CON_RIPRESA = ['new-work', 'resolver', 'verifier', 'fixer'];
+const RUOLI_CON_RIPRESA = ['new-work', 'verifier', 'fixer'];
 
 // Il contratto comune dei worker (testo di ritorno non è un canale,
 // rifiuto ≠ guasto): UNA copia, accodata qui a ogni ruolo lavorante — prima
