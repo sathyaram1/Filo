@@ -349,6 +349,7 @@
           .replace('%1', String(prev.pagineFuori))
           .replace('%2', String(prev.tettoPagine || ''))
           + (prev.pagineMieFuori ? ' ' + I18n.t('security_import_pages_out_mine').replace('%1', String(prev.pagineMieFuori)) : '') : '',
+        prev.chiavi === false ? I18n.t('security_import_senza_chiavi') : '',
       ].filter(Boolean);
       const text = I18n.t('security_import_confirm_text')
         .replace('%6', I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
