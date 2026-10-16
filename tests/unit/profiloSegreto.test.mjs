@@ -292,10 +292,18 @@ describe('segreti dichiarati', () => {
     const { disponibili } = d.spazio();
     // 512 blocchi: 2 per la testa di D, 2·76 per C (testa e 75 blocchi), due copie per ogni blocco di D.
     assert.equal(disponibili, Math.floor((512 - 2 - 2 * 76) / 2) * F.CARICO);
-    await d.scriviFile('tutto', randomBytes(disponibili));
+    const tutto = randomBytes(disponibili);
+    await d.scriviFile('tutto', tutto);
     await assert.rejects(d.scriviFile('uno di più', 'x'), (e) => e.codice === 'SPAZIO' && e.disponibili === 0 && e.servono === 1);
     await d.chiudi();
     assert.equal(persi(prima, await impronta(piccolo, 'C')), 0);
+    // Riaperto senza dichiarare C, D ha copie in fondo a catene che passano sui blocchi di C: le ritrova tutte (anche
+    // leggendo il contenitore intero) e quindi non ne rifà nessuna sopra C.
+    const r = await apri(piccolo, 'D');
+    assert.ok((await r.segreto.leggiFile('tutto')).equals(tutto));
+    await r.segreto.chiudi();
+    assert.equal(persi(prima, await impronta(piccolo, 'C')), 0);
+    assert.ok(integra(await impronta(piccolo, 'D')));
     rmSync(piccolo.contenitore, { force: true });
   });
 });
