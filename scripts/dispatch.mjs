@@ -2194,12 +2194,9 @@ if (isMainModule) {
 
   try {
     if (flag === '--record-verifier') {
-      // `--segnala <file>` si toglie PRIMA di leggere i posizionali, come il
-      // biglietto: il resto è la critica, un testo solo.
-      const seg = stripFileArg(conBiglietto(argv), 'segnala');
-      if (seg.error) { console.error(seg.error); process.exit(1); }
-      const [, id, ...rest] = seg.args;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, con livello e sede davanti: [2i] …>"'); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--segnala <file.md>')); process.exit(1); }
       // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
       // più: veniva buttata via in silenzio, e senza rilievi la verifica
       // risulta superata — chi scriveva `fail` per bocciare registrava una
