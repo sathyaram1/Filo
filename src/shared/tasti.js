@@ -966,17 +966,18 @@
 
   // La pressione di quel tasto su questa tastiera, con il key e il code che vede chi ascolta: così i controlli di sempre
   // dicono se la prenderebbero. Un tasto di Filo si confronta col tasto che lo produce. `car`: il carattere visto premendolo.
+  function keyDelCodice(code, layout) {
+    let m;
+    if ((m = /^Digit([0-9])$/.exec(code))) return carattereDelTasto(code, layout) || m[1];
+    if ((m = /^Key([A-Z])$/.exec(code))) return carattereDelTasto(code, layout) || m[1].toLowerCase();
+    if (CODICI_NOMINATI[code]) return code === 'Space' ? ' ' : code;
+    if (TASTO_FUNZIONE.test(code.toLowerCase())) return code;
+    return TASTIERINO[code] || carattereDelTasto(code, layout);
+  }
   function pressioneFisica(tasto, layout, esplicita, car) {
     const t = leggiTasto(tasto);
     if (!t) return null;
-    let key = car && [...car].length === 1 ? car : '';
-    let m;
-    if (key) { /* il carattere vero */ }
-    else if ((m = /^Digit([0-9])$/.exec(t.code))) key = carattereDelTasto(t.code, layout) || m[1];
-    else if ((m = /^Key([A-Z])$/.exec(t.code))) key = carattereDelTasto(t.code, layout) || m[1].toLowerCase();
-    else if (CODICI_NOMINATI[t.code]) key = t.code === 'Space' ? ' ' : t.code;
-    else if (TASTO_FUNZIONE.test(t.code.toLowerCase())) key = t.code;
-    else key = TASTIERINO[t.code] || carattereDelTasto(t.code, layout);
+    const key = car && [...car].length === 1 ? car : keyDelCodice(t.code, layout);
     const [c, cm, mac] = [t.mod.includes('c'), t.mod.includes('m'), suMac(esplicita)];
     return {
       ctrlKey: cm || (c && !mac), metaKey: cm || (c && mac),
