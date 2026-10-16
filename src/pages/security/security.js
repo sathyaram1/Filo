@@ -1467,6 +1467,7 @@
       if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) {
         const p = JSON.stringify(msg.settings.proxy || {});
         if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
+        mostraCaselleChiavi(msg.settings);
         riallinea(msg.settings);
         loadDelicateCampi();
       }
