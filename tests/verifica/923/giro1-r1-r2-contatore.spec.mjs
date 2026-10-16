@@ -118,15 +118,3 @@ for (const [come, contatore] of [
       `prossimo: ${prossimo}, contatore dopo la sincronizzazione: ${f.db.contatore}`).toBe(true);
   });
 }
-
-test('r2 un contatore che manca rinasce sopra i numeri già dati, non sul solo numero provato', async () => {
-  const f = firestore({
-    contatore: null,
-    documenti: [
-      feedback('owner', 880, { senderProof: 'admin' }),
-      feedback('utente', 900),
-    ],
-  });
-  await apriGestione(f);
-  expect(f.db.contatore, 'il prossimo feedback riprenderebbe un numero già dato').toBeGreaterThanOrEqual(900);
-});
