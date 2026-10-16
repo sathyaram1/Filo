@@ -391,7 +391,7 @@ function nuovoStato(chiavi, etichetta, N) {
     etichetta, cifra: chiavi.cifra, posto: chiavi.posto, inc: null, L: 0, contatore: 0, vmax: 0,
     pos: new Float64Array(0), ver: new Uint32Array(0), kk: new Uint8Array(0), zero: new Uint8Array(0),
     gruppi: [], tabella: new Map(), blocchiTabella: [], creato: 0, aperto: 0, apertoPrima: 0,
-    letti: new Uint8Array(N), vuote: 0, catena: 0, scansionato: false, spazzatura: new Set(), candidati: null,
+    letti: new Uint8Array(N), vuote: 0, catena: 0, scansionato: false, spazzatura: new Set(), candidati: null, caseVecchie: null,
   };
 }
 
@@ -1042,6 +1042,7 @@ async function liberaEStringi(ctx, S, prima) {
 // Un segreto dichiarato si rimette com'era: copie mancanti al loro posto, stessa versione. Un gruppo perso resta
 // com'è, così il suo proprietario se ne accorge alla prossima apertura invece di trovarci zeri.
 async function riparaDichiarato(ctx, D) {
+  await segnaCaseVecchie(ctx, D);
   const daRestaurare = [];
   for (let g = 0; g < D.gruppi.length; g++) {
     const info = D.gruppi[g];
@@ -1060,6 +1061,7 @@ async function riparaDichiarato(ctx, D) {
 
 // Niente qui restituisce o registra cosa è stato riparato: un «riparati N blocchi» direbbe che esistono altri segreti.
 async function riparaProprio(ctx, S) {
+  await segnaCaseVecchie(ctx, S);
   // Prima si segnano i file rovinati, poi i loro blocchi si riscrivono a zero: nell'ordine opposto un'interruzione
   // lascerebbe file che si leggono a zeri senza dirlo.
   const persi = [];
@@ -1335,6 +1337,7 @@ async function apriOCrea(opzioni, crea) {
       for (const d of D) chiudiSessioniDi(chiave, d.inc);
       chiudiSessioniDi(chiave, S.inc);
       S.letti = new Uint8Array(0);
+      S.caseVecchie = null;
       S.candidati = null;
       const stato = { chiave, percorso: contenitore, dimensione, N: ctx.N, mappa: ctx.mappa, S, chiuso: false };
       if (!sessioni.has(chiave)) sessioni.set(chiave, new Set());

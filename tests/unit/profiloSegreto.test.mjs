@@ -402,8 +402,10 @@ describe('da fuori', () => {
     const prima = await impronta(base, 'Alfa');
     await (await apri(base, 'Alfa')).segreto.chiudi();
     const dopo = await impronta(base, 'Alfa');
-    const t0 = prima.copie.get(0);
-    const t1 = dopo.copie.get(0);
+    // Beta, scritto senza dichiarare Alfa, può averne coperto qualche copia della testa: si guarda una rimasta.
+    const i = [...prima.copie.keys()].find((x) => x < 2 * F.GRUPPO && dopo.copie.has(x));
+    const t0 = prima.copie.get(i);
+    const t1 = dopo.copie.get(i);
     assert.ok(t1.v > t0.v, 'la testa non è stata riscritta');
     assert.equal(t1.p, t0.p, 'la testa riscritta sta nello stesso posto');
     assert.notDeepEqual(t1.nonce, t0.nonce);
