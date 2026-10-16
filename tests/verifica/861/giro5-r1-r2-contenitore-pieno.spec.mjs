@@ -13,7 +13,8 @@ const MB = 1 << 20;
 const GB = 1024 * MB;
 const impronta = (b) => createHash('sha256').update(b).digest('hex');
 
-test.describe.configure({ mode: 'serial', timeout: 8 * 60_000 });
+// Ogni prova scrive mezzo GB: rifarla non cambia l'esito e triplica l'attesa.
+test.describe.configure({ retries: 0, timeout: 8 * 60_000 });
 
 let dir;
 test.beforeAll(() => { dir = cartellaTemporanea('verifica-861-'); });
