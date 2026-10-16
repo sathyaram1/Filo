@@ -294,14 +294,10 @@
   function nomiSito() {
     return global.SN_NOMI_SITO || (typeof require === 'function' ? require('./nomiSito.js') : null);
   }
+  // La riduzione delle pagine (Sicurezza, Altro): «https://www.Sito.it/x» → «sito.it» (#843).
   function dominioDa(raw) {
-    let s = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
-    if (!s) return '';
-    // Come la pagina Sicurezza: URL scrive un nome accentato (münchen.de) nella forma ASCII con cui il sito si confronta.
-    try { s = new URL(s.includes('://') ? s : `http://${s}`).hostname; } catch (_) { if (s.includes('://')) return ''; }
-    s = s.split('/')[0].split('?')[0].split(':')[0].replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
     const N = nomiSito();
-    return N && N.valido(s) ? s : '';
+    return N ? N.daScritto(raw) : '';
   }
   function opElenco(v) {
     const s = String(v == null ? '' : v).trim();
