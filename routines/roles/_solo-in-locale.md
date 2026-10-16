@@ -2,8 +2,8 @@
 
 Da qui non puoi fare un deploy (funzioni, regole), usare un segreto o le
 credenziali dell'owner, toccare le automazioni GitHub del server, né provare
-qualcosa sulla sua macchina. Il codice del server si tocca in un lavoro server,
-che riceve istruzioni sue: fuori da lì conta come queste. Se il feedback ha
+qualcosa sulla sua macchina. Il codice del server si tocca solo in un lavoro
+server, che riceve istruzioni sue: fuori da lì è una di queste cose. Se il feedback ha
 bisogno di una di queste cose per stare in piedi, non aggirarla e non aprire un
 feedback per una sessione locale (le routine non ne aprono): rimandalo nei
 Ricevuti. Lì l'owner lo approva come lavoro locale, o lo passa nei Lavori

@@ -40,7 +40,7 @@ test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge 
     const t = readRoleInstructions(ruolo, opts);
     const chi = `${ruolo} ${JSON.stringify(opts)}`;
     assert.ok(t.includes(SEZIONE), `${chi}: manca la sezione del guasto`);
-    assert.match(t, /node scripts\/domanda\.mjs chiedi /, `${chi}: la domanda passa da domanda.mjs`);
+    assert.match(piatto(t), /node scripts\/domanda\.mjs chiedi <file\.json>/, `${chi}: la domanda passa da domanda.mjs`);
     assert.match(piatto(t), /release <biglietto> --role <il tuo ruolo> --guasto "<gruppo>, D-<n>/, `${chi}: il rilascio porta --guasto`);
   }
   for (const [ruolo, opts] of CHI_RISOLVE) {
@@ -152,5 +152,5 @@ test('se il server rifiuta la domanda, chi chiede legge il motivo esatto: è que
   assert.match(r.stderr, /RIFIUTATO dal server: ruolo_non_ammesso: questo biglietto non apre domande/);
   assert.equal(arrivate.length, 1);
   const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'));
-  assert.match(pezzo, /con `RIFIUTATO dal server: …` nella nota e nel rilascio va quel messaggio esatto, al posto del numero/);
+  assert.match(pezzo, /con `RIFIUTATO dal server: …`, al posto del numero va quel messaggio esatto/);
 });
