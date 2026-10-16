@@ -1,6 +1,6 @@
 // Il motore del profilo segreto: segreti senza indice dentro un contenitore di byte casuali, aperti, creati, letti,
-// scritti, riparati e cancellati partendo solo dal nome. Non scrive log, non tiene nomi, non dice cosa ha riparato.
-// Formato e perché: patterns/il-profilo-segreto-non-ha-indice.md; prove in tests/unit/profiloSegreto.test.mjs.
+// scritti, riparati e cancellati partendo solo dal nome. Chi lo usa non salva né mostra nomi o conteggi di riparazioni:
+// anche un numero direbbe che esistono altri segreti. Prove e regole fisse in tests/unit/profiloSegreto.test.mjs.
 
 'use strict';
 
