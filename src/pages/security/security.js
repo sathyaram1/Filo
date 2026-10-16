@@ -881,7 +881,7 @@
     // Il testo lasciato nella casella dei fidati torna lì: un sito valido è già nell'elenco, il resto con l'avviso.
     const bozza = typeof cookies.bozza === 'string' ? cookies.bozza : '';
     $('cookie-wl-input').value = bozza;
-    setWhitelistError(bozza.trim() && !cleanDomain(bozza) ? I18n.t('options_cookies_whitelist_invalid') : '');
+    setWhitelistError(bozza.trim() && !sitoFidato(bozza) ? avvisoFidato(bozza) : '');
     loadCookieDone();
     syncCookieMode();
 
@@ -945,9 +945,14 @@
   // "https://www.Mail.Google.com/x" → "mail.google.com", '' se non è un sito: la riduzione di tutti gli elenchi (#843).
   const cleanDomain = window.SN_NOMI_SITO.daScritto;
   // Il sito che la voce tiene connesso: «https://mail.google.com/mail/u/0/» è google.com, come lo usa il main (#876).
+  // Una piattaforma (github.io, co.uk) non è il sito di nessuno: non entra, come fra i programmi fidati.
   function sitoFidato(raw) {
     const d = cleanDomain(raw);
-    return d ? Sito.sitoDellaVoce(d) || d : '';
+    return d && !Sito.piattaforma(d) ? Sito.sitoDellaVoce(d) || d : '';
+  }
+  function avvisoFidato(raw) {
+    const d = cleanDomain(raw);
+    return d ? Eseguibili.testoPiattaforma(d) : I18n.t('options_cookies_whitelist_invalid');
   }
 
   function renderWhitelist() {
@@ -1120,9 +1125,9 @@
     if (!raw) { setWhitelistError(''); return; }
     const domain = sitoFidato(raw);
     if (!domain) {
-      // Input non vuoto ma non è un dominio valido: avvisa invece di svuotare
+      // Input non vuoto ma non è un sito: avvisa invece di svuotare
       // in silenzio. Lascia il testo nel campo così l'utente può correggerlo.
-      setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
+      setWhitelistError(avvisoFidato(raw));
       if (!(opts && opts.fuoco === false)) input.focus();
       return;
     }
@@ -1329,7 +1334,7 @@
   caselle.registra('fidato', (avvisi) => spedisciFidato(avvisi));
   function spedisciFidato(avvisi) {
     const raw = String($('cookie-wl-input').value || '').trim();
-    if (avvisi && raw && !cleanDomain(raw)) setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
+    if (avvisi && raw && !sitoFidato(raw)) setWhitelistError(avvisoFidato(raw));
     saveCookies();
   }
 

@@ -311,6 +311,8 @@
   const RIDUZIONI = {
     'security.cookies.trustedSites': (d) => {
       const S = stessoSito();
+      const E = eseguibili();
+      if (S && E && S.piattaforma(d)) return { piattaforma: d, rifiuto: E.testoPiattaforma(d) };
       return { sito: (S && S.sitoDellaVoce(d)) || d };
     },
     'security.downloads.trustedSites': (d) => {
