@@ -732,6 +732,31 @@
     return { ...piano, detti: [...restano, ...elenco.flatMap((c) => c.marcatori)] };
   }
 
+  // Il piano sulle notifiche: `mem` è SN_FILO_MEMORY nel main, un finto negli unit test. I marcatori da salvare li
+  // restituisce: li scrive chi chiama, dopo le notifiche, così una scrittura fallita si rifà alla lettura dopo.
+  async function applicaAvvisiOwner(mem, detti, overview) {
+    const piano = avvisiOwnerPiano(detti, avvisiOwner(overview));
+    const vive = ((await mem.listNotifications()) || []).filter((n) => n && n.action && n.action.tipo === AVVISO_OWNER);
+    const delCaso = (caso) => vive.filter((n) => n.action.caso === caso);
+    let cambiato = false;
+    const togli = async (caso) => {
+      for (const n of delCaso(caso)) { await mem.dismissNotification(n.id); cambiato = true; }
+    };
+    for (const caso of piano.togli) await togli(caso);
+    for (const c of piano.scrivi) {
+      await togli(c.caso);
+      await mem.addNotification({
+        kind: 'alert', text: c.testo,
+        action: { tipo: AVVISO_OWNER, caso: c.caso, marcatori: c.marcatori, apri: PAGINA_OWNER, etichetta: 'Apri Inviti e utenti' },
+      });
+      cambiato = true;
+    }
+    for (const c of piano.riscrivi) {
+      for (const n of delCaso(c.caso)) { if (await mem.setNotificationText(n.id, c.testo)) cambiato = true; }
+    }
+    return { detti: piano.detti, cambiato };
+  }
+
   global.SN_WALLET = {
     USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
