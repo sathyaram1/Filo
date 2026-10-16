@@ -1485,7 +1485,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    load().catch(() => {}).finally(portaAlTasto);
+    load().catch((e) => console.warn('[Sicurezza] caricamento:', e)).finally(portaAlTasto);
     // Tornando su questa scheda si rilegge, a meno che l'utente non abbia qui modifiche non salvate:
     // un'altra pagina Sicurezza può aver cambiato le liste nel frattempo.
     document.addEventListener('visibilitychange', () => {
