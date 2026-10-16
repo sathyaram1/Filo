@@ -1,0 +1,581 @@
+// #861 — il motore del profilo segreto: segreti senza indice in un contenitore di byte casuali, ritrovati dal solo nome,
+// che reggono a chi scrive senza dichiararli e da fuori non si distinguono dal vuoto. Argon2id gira coi parametri bassi
+// di PROVA, tranne dove si provano quelli veri; `impronta` guarda il disco col solo nome, senza passare dal motore.
+
+import { test, describe, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { readFileSync, openSync, writeSync, closeSync, rmSync, writeFileSync } from 'node:fs';
+import { randomBytes, createHash } from 'node:crypto';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+
+const require = createRequire(import.meta.url);
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const M = require(join(ROOT, 'src', 'main', 'services', 'segreto', 'motore.js'));
+const K = require(join(ROOT, 'src', 'main', 'services', 'segreto', 'chiave.js'));
+const RS = require(join(ROOT, 'src', 'main', 'services', 'segreto', 'reedSolomon.js'));
+const F = M._formato;
+
+const PROVA = { passate: 1, memoriaKiB: 1024, parallelismo: 1 };
+const MB = 1 << 20;
+const SALE = Buffer.alloc(16, 0x5a);
+const NESSUNO = { esito: 'nessuno', messaggio: 'Nessun segreto con questo nome.' };
+
+let dir;
+before(() => { dir = cartellaTemporanea('segreto-'); });
+after(() => togliCartella(dir));
+
+let quanti = 0;
+async function contenitore(dimensione) {
+  const percorso = join(dir, `c${++quanti}.bin`);
+  await M.creaContenitore(percorso, dimensione);
+  return { contenitore: percorso, dimensione, sale: SALE, parametriChiave: PROVA };
+}
+const apri = (base, nome, dichiarati) => M.apriSegreto({ ...base, nome, dichiarati });
+const crea = async (base, nome, dichiarati) => (await M.creaSegreto({ ...base, nome, dichiarati })).segreto;
+const blocco = (buf, p) => buf.subarray(p * F.BLOCCO, (p + 1) * F.BLOCCO);
+const impronta1 = (buf) => createHash('sha256').update(buf).digest('hex');
+
+async function impronta(base, nome) {
+  const k = await K.derivaChiavi(F.normalizzaNome(nome), base.sale, PROVA);
+  const buf = readFileSync(base.contenitore);
+  const copie = new Map();
+  let L = 0;
+  for (let p = 0; p < buf.length / F.BLOCCO; p++) {
+    const pre = F.leggiPrefisso(F.apriBlocco(k.cifra, p, blocco(buf, p)));
+    if (!pre) continue;
+    const i = 2 * pre.j + pre.c;
+    const prima = copie.get(i);
+    if (prima && prima.v >= pre.v) continue;
+    copie.set(i, { p, v: pre.v, k: pre.k, nonce: Buffer.from(blocco(buf, p).subarray(0, F.NONCE)) });
+    if (i === 0) L = F.leggiTesta(pre.carico).L;
+  }
+  return { copie, L, chiavi: k };
+}
+
+// Tutta la ridondanza: ogni copia di ogni blocco logico c'è, e quelle di un gruppo hanno la stessa versione.
+function integra({ copie, L }) {
+  if (!L) return false;
+  for (let g = 0; g * F.GRUPPO < L; g++) {
+    const ke = Math.min(F.GRUPPO, L - F.GRUPPO * g);
+    const versioni = new Set();
+    for (let i = 2 * F.GRUPPO * g; i < 2 * F.GRUPPO * g + 2 * ke; i++) {
+      const c = copie.get(i);
+      if (!c || c.k !== ke) return false;
+      versioni.add(c.v);
+    }
+    if (versioni.size !== 1) return false;
+  }
+  return true;
+}
+
+function persi(prima, dopo) {
+  let n = 0;
+  for (const [i, c] of prima.copie) {
+    const d = dopo.copie.get(i);
+    if (!d || d.p !== c.p || d.v !== c.v) n++;
+  }
+  return n;
+}
+
+// Il caso peggiore che la ridondanza regge: per ogni gruppo, quante copie restano rispetto alle k che servono.
+function gruppiReggono(prima, dopo) {
+  const perGruppo = new Map();
+  for (const [i, c] of prima.copie) {
+    const g = Math.floor((i >> 1) / F.GRUPPO);
+    const d = dopo.copie.get(i);
+    const v = perGruppo.get(g) || { k: c.k, vive: 0 };
+    if (d && d.p === c.p && d.v === c.v) v.vive++;
+    perGruppo.set(g, v);
+  }
+  return [...perGruppo.values()].every((v) => v.vive >= v.k);
+}
+
+function sporca(base, posizioni) {
+  const fd = openSync(base.contenitore, 'r+');
+  try {
+    for (const p of posizioni) writeSync(fd, randomBytes(F.BLOCCO), 0, F.BLOCCO, p * F.BLOCCO);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+describe('chiave: Argon2id nel thread a parte', () => {
+  test('i parametri veri sono questi e non cambiano: cambiarli renderebbe illeggibili i segreti che esistono', () => {
+    assert.deepEqual({ ...K.ARGON2 }, { passate: 3, memoriaKiB: 262144, parallelismo: 1 });
+    assert.ok(Object.isFrozen(K.ARGON2));
+  });
+
+  test('il vettore noto di Argon2id esce uguale (riferimento phc-winner-argon2: password, somesalt, t=2, m=64 MiB)', async () => {
+    const h = await K.argon2id(Buffer.from('password'), Buffer.from('somesalt'), { passate: 2, memoriaKiB: 65536, parallelismo: 1 });
+    assert.equal(h.toString('hex'), '09316115d5cf24ed5a15a31a3ba326e5cf32edc24702987c02b6566f61913cf7');
+  });
+
+  test('coi parametri veri la derivazione tiene il thread per un tempo da forza bruta cara, e non il processo', async (t) => {
+    let giri = 0;
+    const battito = setInterval(() => { giri++; }, 20);
+    const t0 = Date.now();
+    const a = await K.derivaChiavi('un nome', SALE);
+    const ms = Date.now() - t0;
+    clearInterval(battito);
+    t.diagnostic(`Argon2id t=3 m=256 MiB p=1: ${ms} ms`);
+    assert.ok(ms > 100, `troppo veloce per parametri alti: ${ms} ms`);
+    assert.ok(giri >= Math.floor(ms / 20) / 2, `il processo si è fermato durante la derivazione (${giri} battiti in ${ms} ms)`);
+    assert.equal(a.cifra.length, 32);
+    assert.notDeepEqual(a.cifra, a.posto);
+  });
+
+  test('stesso nome e sale danno le stesse chiavi; un sale diverso o un nome diverso no; un sale corto si rifiuta', async () => {
+    const a = await K.derivaChiavi('nome', SALE, PROVA);
+    const b = await K.derivaChiavi('nome', Buffer.from(SALE), PROVA);
+    const c = await K.derivaChiavi('nome', Buffer.alloc(16, 1), PROVA);
+    const d = await K.derivaChiavi('nomf', SALE, PROVA);
+    assert.deepEqual(a, b);
+    assert.notDeepEqual(a.cifra, c.cifra);
+    assert.notDeepEqual(a.cifra, d.cifra);
+    await assert.rejects(K.derivaChiavi('nome', Buffer.alloc(8), PROVA));
+  });
+});
+
+describe('Reed-Solomon 10+10', () => {
+  const dati = (k, len) => Array.from({ length: k }, () => new Uint8Array(randomBytes(len)));
+  const combinazioni = (n, k, fn, scelti = [], da = 0) => {
+    if (scelti.length === k) return fn(scelti);
+    for (let x = da; x < n; x++) combinazioni(n, k, fn, [...scelti, x], x + 1);
+  };
+
+  test('fino a k = 6 ogni scelta di k blocchi fra dati e parità ricostruisce il gruppo', () => {
+    for (let k = 1; k <= 6; k++) {
+      const d = dati(k, 32);
+      const tutti = [...d, ...RS.parita(d)];
+      combinazioni(2 * k, k, (scelti) => {
+        const r = RS.ricostruisci(k, new Map(scelti.map((i) => [i, tutti[i]])));
+        assert.deepEqual(r.map((x) => Buffer.from(x)), d.map((x) => Buffer.from(x)), `k=${k}, scelti ${scelti}`);
+      });
+    }
+  });
+
+  test('con k = 10 bastano 10 blocchi qualsiasi dei 20 (2000 scelte a caso), con 9 non si ricostruisce', () => {
+    const d = dati(10, 64);
+    const tutti = [...d, ...RS.parita(d)];
+    for (let x = 0; x < 2000; x++) {
+      const scelti = [...Array(20).keys()].sort(() => Math.random() - 0.5).slice(0, 10);
+      const r = RS.ricostruisci(10, new Map(scelti.map((i) => [i, tutti[i]])));
+      assert.deepEqual(r.map((y) => Buffer.from(y)), d.map((y) => Buffer.from(y)), `scelti ${scelti}`);
+    }
+    assert.equal(RS.ricostruisci(10, new Map([...Array(9).keys()].map((i) => [i + 11, tutti[i + 11]]))), null);
+  });
+});
+
+describe('due segreti nello stesso contenitore', () => {
+  let base;
+  const foto = randomBytes(300_000);
+  const pezzi = Array.from({ length: 4 }, () => randomBytes(5 * MB));
+  const scritti = [];
+  before(async () => {
+    // 256 MB, non 64: in 64 MB venti MB scritti da un altro coprono più di metà dei blocchi e nessuna ridondanza 2×
+    // regge. Qui la proporzione è quella che la spec dà per 1 GB (decine di MB scritti da altri fra due aperture).
+    base = await contenitore(256 * MB);
+  });
+  after(() => rmSync(base.contenitore, { force: true }));
+
+  test('il secondo, senza dichiarare il primo, scrive 20 MB; il primo si riapre intero e torna con tutta la ridondanza', async () => {
+    const a = await crea(base, 'Alfa');
+    await a.scriviFile('nota.txt', 'ciao 🌍, <b>non è markup</b>');
+    await a.scriviFile('foto.bin', foto);
+    await a.scriviFile('vuoto', '');
+    await a.chiudi();
+    const prima = await impronta(base, 'Alfa');
+    assert.ok(integra(prima));
+
+    const b = await crea(base, 'Beta');
+    for (let x = 0; x < pezzi.length; x++) await b.scriviFile(`pezzo${x}`, pezzi[x]);
+    await b.chiudi();
+    const dopoB = await impronta(base, 'Alfa');
+    const n = persi(prima, dopoB);
+    assert.ok(n > 0, 'il secondo segreto non ha toccato il primo: la prova non prova niente');
+    assert.ok(gruppiReggono(prima, dopoB), 'un gruppo ha perso più della metà delle copie');
+
+    const r = await apri(base, 'Alfa');
+    assert.equal(r.esito, 'aperto');
+    assert.deepEqual(r.segreto.elencaFile().map((f) => [f.nome, f.dimensione, f.danneggiato]),
+      [['nota.txt', 34, false], ['foto.bin', 300_000, false], ['vuoto', 0, false]]);
+    assert.equal((await r.segreto.leggiFile('nota.txt')).toString(), 'ciao 🌍, <b>non è markup</b>');
+    assert.ok((await r.segreto.leggiFile('foto.bin')).equals(foto));
+    assert.equal((await r.segreto.leggiFile('vuoto')).length, 0);
+    await r.segreto.chiudi();
+    assert.ok(integra(await impronta(base, 'Alfa')), 'dopo la riparazione mancano copie');
+    scritti.push('Alfa');
+  });
+
+  test('anche il secondo, toccato dalla riparazione del primo, si riapre intero e si ripara', async () => {
+    const r = await apri(base, 'Beta');
+    for (let x = 0; x < pezzi.length; x++) assert.ok((await r.segreto.leggiFile(`pezzo${x}`)).equals(pezzi[x]), `pezzo${x}`);
+    await r.segreto.chiudi();
+    assert.ok(integra(await impronta(base, 'Beta')));
+  });
+
+  test('aprire o creare non stampa niente: nemmeno un segno di ciò che è stato riparato', async () => {
+    const prima = await impronta(base, 'Alfa');
+    sporca(base, [...prima.copie.values()].filter((_, x) => x % 3 === 0).map((c) => c.p));
+    const voci = [];
+    const originali = {};
+    for (const m of ['log', 'info', 'warn', 'error', 'debug', 'trace']) {
+      originali[m] = console[m];
+      console[m] = (...a) => voci.push([m, a]);
+    }
+    let riparato;
+    let pulito;
+    try {
+      riparato = await apri(base, 'Alfa');
+      pulito = await apri(base, 'Alfa');
+    } finally {
+      Object.assign(console, originali);
+    }
+    assert.deepEqual(voci, []);
+    assert.ok(integra(await impronta(base, 'Alfa')), 'la riparazione non è avvenuta');
+    assert.deepEqual(Object.keys(riparato), ['esito', 'segreto']);
+    assert.deepEqual(Object.keys(pulito), ['esito', 'segreto']);
+    assert.equal(riparato.esito, pulito.esito);
+    assert.deepEqual(Object.keys(riparato.segreto), []);
+    assert.equal(JSON.stringify(riparato.segreto), '{}');
+    assert.deepEqual(Object.getOwnPropertyNames(Object.getPrototypeOf(riparato.segreto)), Object.getOwnPropertyNames(Object.getPrototypeOf(pulito.segreto)));
+    assert.deepEqual(Object.keys(riparato.segreto.info === undefined ? {} : { info: 1 }), ['info']);
+    await pulito.segreto.chiudi();
+  });
+});
+
+describe('segreti dichiarati', () => {
+  let base;
+  before(async () => { base = await contenitore(256 * MB); });
+  after(() => rmSync(base.contenitore, { force: true }));
+
+  test('chi dichiara l’altro nome mentre scrive 20 MB non gli tocca nemmeno un blocco', async () => {
+    const g = await crea(base, 'Gamma');
+    await g.scriviFile('diario.txt', 'cose mie '.repeat(5000));
+    await g.chiudi();
+    const prima = await impronta(base, 'Gamma');
+    const d = await crea(base, 'Delta', ['Gamma']);
+    for (let x = 0; x < 4; x++) await d.scriviFile(`d${x}`, randomBytes(5 * MB));
+    await d.chiudi();
+    const dopo = await impronta(base, 'Gamma');
+    assert.equal(persi(prima, dopo), 0);
+  });
+
+  test('aprire dichiarando un nome ripara quel segreto senza aprirlo', async () => {
+    const prima = await impronta(base, 'Gamma');
+    const e = await crea(base, 'Epsilon');
+    for (let x = 0; x < 4; x++) await e.scriviFile(`e${x}`, randomBytes(5 * MB));
+    await e.chiudi();
+    const dopoE = await impronta(base, 'Gamma');
+    assert.ok(persi(prima, dopoE) > 0, 'Epsilon non ha toccato Gamma: la prova non prova niente');
+    assert.ok(gruppiReggono(prima, dopoE));
+    const r = await apri(base, 'Epsilon', ['Gamma', '  Gamma  ', '', 'Epsilon', 'nome che non c’è']);
+    await r.segreto.chiudi();
+    assert.ok(integra(await impronta(base, 'Gamma')));
+    const gg = await apri(base, 'Gamma');
+    assert.equal((await gg.segreto.leggiFile('diario.txt')).toString(), 'cose mie '.repeat(5000));
+    await gg.segreto.chiudi();
+  });
+
+  test('lo spazio conta il proprio segreto e quelli dichiarati: riempito il contenitore fino all’ultimo byte, il dichiarato è intatto', async () => {
+    const piccolo = await contenitore(2 * MB);
+    const c = await crea(piccolo, 'C');
+    await c.scriviFile('c', randomBytes(300_000));
+    await c.chiudi();
+    const prima = await impronta(piccolo, 'C');
+    const d = await crea(piccolo, 'D', ['C']);
+    const { disponibili } = d.spazio();
+    // 512 blocchi: 2 per la testa di D, 2·76 per C (testa e 75 blocchi), due copie per ogni blocco di D.
+    assert.equal(disponibili, Math.floor((512 - 2 - 2 * 76) / 2) * F.CARICO);
+    await d.scriviFile('tutto', randomBytes(disponibili));
+    await assert.rejects(d.scriviFile('uno di più', 'x'), (e) => e.codice === 'SPAZIO' && e.disponibili === 0 && e.servono === 1);
+    await d.chiudi();
+    assert.equal(persi(prima, await impronta(piccolo, 'C')), 0);
+    rmSync(piccolo.contenitore, { force: true });
+  });
+});
+
+describe('da fuori', () => {
+  let base;
+  let vuoto;
+  before(async () => {
+    vuoto = await contenitore(16 * MB);
+    base = await contenitore(16 * MB);
+    const a = await crea(base, 'Alfa');
+    // Testo e zeri: il contenuto più riconoscibile possibile deve uscire come rumore.
+    await a.scriviFile('zeri', Buffer.alloc(3 * MB));
+    await a.scriviFile('MARCATORE-IN-CHIARO.txt', 'MARCATORE-IN-CHIARO '.repeat(20000));
+    await a.chiudi();
+    const b = await crea(base, 'Beta');
+    await b.scriviFile('b', Buffer.alloc(MB, 0x41));
+    await b.chiudi();
+  });
+  after(() => { rmSync(base.contenitore, { force: true }); rmSync(vuoto.contenitore, { force: true }); });
+
+  const chi = (buf) => {
+    const conta = new Float64Array(256);
+    for (let x = 0; x < buf.length; x++) conta[buf[x]]++;
+    const atteso = buf.length / 256;
+    return conta.reduce((s, c) => s + ((c - atteso) ** 2) / atteso, 0);
+  };
+
+  test('un contenitore con segreti e uno vuoto non si distinguono dai byte: né in tutto, né blocco per blocco', () => {
+    for (const c of [vuoto, base]) {
+      const buf = readFileSync(c.contenitore);
+      assert.ok(chi(buf) < 255 + 6 * Math.sqrt(2 * 255), `istogramma dei byte non uniforme: ${chi(buf)}`);
+      const perBlocco = [];
+      for (let p = 0; p < buf.length / F.BLOCCO; p++) perBlocco.push(chi(blocco(buf, p)));
+      const media = perBlocco.reduce((s, x) => s + x, 0) / perBlocco.length;
+      assert.ok(Math.abs(media - 255) < 3, `media dei blocchi fuori posto: ${media}`);
+      assert.ok(Math.max(...perBlocco) < 430, `un blocco non sembra casuale: ${Math.max(...perBlocco)}`);
+    }
+  });
+
+  test('nessun marcatore e nessuna intestazione in chiaro: né nomi né contenuti né il formato', () => {
+    const buf = readFileSync(base.contenitore);
+    for (const s of ['MARCATORE-IN-CHIARO', 'filo-segreto', 'Alfa', 'zeri', '{"f":']) assert.equal(buf.indexOf(Buffer.from(s)), -1, s);
+    assert.equal(buf.indexOf(Buffer.alloc(64)), -1, 'una fila di zeri');
+  });
+
+  test('nome sbagliato e contenitore vuoto danno la stessa risposta, e aprire un nome che non c’è non scrive niente', async () => {
+    const primaVuoto = impronta1(readFileSync(vuoto.contenitore));
+    const prima = impronta1(readFileSync(base.contenitore));
+    const nelVuoto = await apri(vuoto, 'Alfa');
+    const sbagliato = await apri(base, 'Alfx');
+    const inesistente = await apri(base, 'mai creato');
+    assert.deepEqual(nelVuoto, NESSUNO);
+    assert.deepEqual(sbagliato, nelVuoto);
+    assert.deepEqual(inesistente, nelVuoto);
+    assert.deepEqual(Object.keys(sbagliato), Object.keys(nelVuoto));
+    assert.equal(impronta1(readFileSync(vuoto.contenitore)), primaVuoto);
+    assert.equal(impronta1(readFileSync(base.contenitore)), prima);
+  });
+
+  test('due scritture dello stesso blocco logico hanno nonce diversi', async () => {
+    const prima = await impronta(base, 'Alfa');
+    (await apri(base, 'Alfa')).segreto.chiudi();
+    const dopo = await impronta(base, 'Alfa');
+    const t0 = prima.copie.get(0);
+    const t1 = dopo.copie.get(0);
+    assert.ok(t1.v > t0.v, 'la testa non è stata riscritta');
+    assert.equal(t1.p, t0.p, 'la testa riscritta sta nello stesso posto');
+    assert.notDeepEqual(t1.nonce, t0.nonce);
+    const nonces = new Set([...dopo.copie.values()].map((c) => c.nonce.toString('hex')));
+    assert.equal(nonces.size, dopo.copie.size, 'due blocchi con lo stesso nonce');
+  });
+});
+
+describe('cancellazione', () => {
+  test('dopo la cancellazione il nome non apre più niente, ogni blocco del segreto è cambiato e l’altro è intatto', async () => {
+    const base = await contenitore(16 * MB);
+    const a = await crea(base, 'Alfa');
+    await a.scriviFile('a', randomBytes(2 * MB));
+    await a.chiudi();
+    const b = await crea(base, 'Beta');
+    await b.scriviFile('b', 'resto io');
+    await b.chiudi();
+    const prima = await impronta(base, 'Alfa');
+    const primaB = await impronta(base, 'Beta');
+    const buf0 = readFileSync(base.contenitore);
+    const r = await apri(base, 'Alfa');
+    await r.segreto.cancella();
+    assert.throws(() => r.segreto.elencaFile(), (e) => e.codice === 'CHIUSO');
+    assert.deepEqual(await apri(base, 'Alfa'), NESSUNO);
+    const buf1 = readFileSync(base.contenitore);
+    for (const { p } of prima.copie.values()) assert.ok(!blocco(buf0, p).equals(blocco(buf1, p)), `blocco ${p} rimasto uguale`);
+    assert.equal((await impronta(base, 'Alfa')).copie.size, 0, 'col nome si legge ancora qualcosa');
+    assert.equal(persi(primaB, await impronta(base, 'Beta')), 0);
+    const rb = await apri(base, 'Beta');
+    assert.equal((await rb.segreto.leggiFile('b')).toString(), 'resto io');
+    await rb.segreto.chiudi();
+    const nuovo = await M.creaSegreto({ ...base, nome: 'Alfa' });
+    assert.equal(nuovo.esito, 'creato');
+    assert.deepEqual(nuovo.segreto.elencaFile(), []);
+    await nuovo.segreto.chiudi();
+    rmSync(base.contenitore, { force: true });
+  });
+});
+
+describe('spazio: rifiutato dicendo quanto serve e quanto c’è, mai troncato', () => {
+  test('una scrittura che non ci sta si rifiuta coi numeri; scrivere esattamente quello che c’è riesce', async () => {
+    const base = await contenitore(2 * MB);
+    const s = await crea(base, 'S');
+    const capienza = Math.floor((512 - 2) / 2) * F.CARICO;
+    assert.deepEqual(s.spazio(), { usati: 0, disponibili: capienza });
+    const a = randomBytes(600_000);
+    await s.scriviFile('a', a);
+    let rifiuto;
+    await assert.rejects(s.scriviFile('b', randomBytes(600_000)), (e) => { rifiuto = e; return e.codice === 'SPAZIO'; });
+    assert.equal(rifiuto.servono, 600_000);
+    assert.ok(rifiuto.disponibili > 0 && rifiuto.disponibili < 600_000);
+    assert.ok(rifiuto.message.includes('600000') && rifiuto.message.includes(String(rifiuto.disponibili)));
+    assert.deepEqual(s.elencaFile().map((f) => f.nome), ['a']);
+    const b = randomBytes(rifiuto.disponibili);
+    await s.scriviFile('b', b);
+    await assert.rejects(s.scriviFile('c', 'x'), (e) => e.codice === 'SPAZIO' && e.disponibili === 0);
+    await s.chiudi();
+    const r = await apri(base, 'S');
+    assert.ok((await r.segreto.leggiFile('a')).equals(a));
+    assert.ok((await r.segreto.leggiFile('b')).equals(b));
+    await r.segreto.chiudi();
+    rmSync(base.contenitore, { force: true });
+  });
+
+  test('sostituire un file conta lo spazio che il vecchio lascia; se nemmeno così ci sta, il vecchio resta com’era', async () => {
+    const base = await contenitore(2 * MB);
+    const s = await crea(base, 'S');
+    const capienza = Math.floor((512 - 2) / 2) * F.CARICO;
+    await s.scriviFile('a', randomBytes(600_000));
+    const nuovo = randomBytes(900_000);
+    await s.scriviFile('a', nuovo);
+    assert.ok((await s.leggiFile('a')).equals(nuovo));
+    await assert.rejects(s.scriviFile('a', randomBytes(capienza + 1)), (e) => e.codice === 'SPAZIO' && e.disponibili === capienza);
+    assert.ok((await s.leggiFile('a')).equals(nuovo));
+    await s.chiudi();
+    rmSync(base.contenitore, { force: true });
+  });
+});
+
+describe('usato male', () => {
+  let base;
+  before(async () => { base = await contenitore(16 * MB); });
+  after(() => rmSync(base.contenitore, { force: true }));
+
+  test('il nome: vuoto o di soli spazi si rifiuta; spazi ai lati, NFD del Mac ed emoji aprono lo stesso segreto', async () => {
+    for (const n of ['', '   ', null, undefined, 42]) await assert.rejects(apri(base, n), (e) => e.codice === 'NOME_VUOTO');
+    const s = await crea(base, 'Café 🔒 <script>');
+    await s.scriviFile('x', 'y');
+    await s.chiudi();
+    for (const n of ['Café 🔒 <script>', '  Café 🔒 <script>\n', 'Café 🔒 <script>']) {
+      const r = await apri(base, n);
+      assert.equal(r.esito, 'aperto', JSON.stringify(n));
+      await r.segreto.chiudi();
+    }
+    assert.deepEqual(await apri(base, 'café 🔒 <script>'), NESSUNO);
+  });
+
+  test('creare un nome che esiste lo apre, non lo svuota', async () => {
+    const r = await M.creaSegreto({ ...base, nome: 'Café 🔒 <script>' });
+    assert.equal(r.esito, 'aperto');
+    assert.equal((await r.segreto.leggiFile('x')).toString(), 'y');
+    await r.segreto.chiudi();
+  });
+
+  test('i file: nomi strani, vuoti, lunghissimi, trecento file (la tabella esce dalla testa), sovrascritture, in fretta', async () => {
+    const s = await crea(base, 'Molti');
+    await assert.rejects(s.scriviFile('  ', 'x'), (e) => e.codice === 'NOME_FILE');
+    await assert.rejects(s.scriviFile('n', 42), (e) => e.codice === 'DATI');
+    const lungo = 'é'.repeat(5000);
+    await s.scriviFile(lungo, 'lungo');
+    await s.scriviFile('<img src=x onerror=alert(1)>', new Uint8Array([1, 2, 3]));
+    await s.scriviFile('🙂', new Uint8Array([9, 9]).buffer);
+    const attesi = new Map();
+    await Promise.all(Array.from({ length: 300 }, (_, x) => {
+      const d = randomBytes(x * 37);
+      attesi.set(`f${x}`, d);
+      return s.scriviFile(`f${x}`, d);
+    }));
+    await s.scriviFile('f7', 'sovrascritto');
+    attesi.set('f7', Buffer.from('sovrascritto'));
+    assert.equal(await s.cancellaFile('f8'), true);
+    assert.equal(await s.cancellaFile('f8'), false);
+    attesi.delete('f8');
+    await assert.rejects(s.leggiFile('f8'), (e) => e.codice === 'NESSUN_FILE');
+    await s.chiudi();
+    const r = await apri(base, 'Molti');
+    const elenco = new Map(r.segreto.elencaFile().map((f) => [f.nome, f]));
+    assert.equal(elenco.size, 300 - 1 + 3);
+    for (const [n, d] of attesi) assert.ok((await r.segreto.leggiFile(n)).equals(d), n);
+    assert.equal((await r.segreto.leggiFile(lungo)).toString(), 'lungo');
+    assert.deepEqual([...(await r.segreto.leggiFile('<img src=x onerror=alert(1)>'))], [1, 2, 3]);
+    assert.deepEqual([...(await r.segreto.leggiFile('🙂'))], [9, 9]);
+    await r.segreto.chiudi();
+    assert.ok(integra(await impronta(base, 'Molti')));
+  });
+
+  test('cancellare tutti i file riaccorcia il segreto: lo spazio torna tutto', async () => {
+    const s = await crea(base, 'Corto');
+    const vuoto = s.spazio().disponibili;
+    for (let x = 0; x < 30; x++) await s.scriviFile(`f${x}`, randomBytes(20_000));
+    assert.ok(s.spazio().disponibili < vuoto);
+    for (let x = 0; x < 30; x++) await s.cancellaFile(`f${x}`);
+    assert.equal(s.spazio().disponibili, vuoto);
+    await s.chiudi();
+    const imp = await impronta(base, 'Corto');
+    assert.equal(imp.L, 1);
+    assert.equal(imp.copie.size, 2);
+  });
+
+  test('riaprire lo stesso segreto chiude la sessione vecchia, e due aperture insieme non si pestano', async () => {
+    const a = (await apri(base, 'Molti')).segreto;
+    const [b, c] = await Promise.all([apri(base, 'Molti'), apri(base, 'Café 🔒 <script>')]);
+    assert.throws(() => a.elencaFile(), (e) => e.codice === 'CHIUSO');
+    await assert.rejects(a.leggiFile('f1'), (e) => e.codice === 'CHIUSO');
+    assert.ok((await b.segreto.leggiFile('f1')).length === 37);
+    assert.equal((await c.segreto.leggiFile('x')).toString(), 'y');
+    await b.segreto.chiudi();
+    await c.segreto.chiudi();
+  });
+
+  test('il contenitore: si crea solo se non c’è, e uno assente o della dimensione sbagliata si rifiuta', async () => {
+    await assert.rejects(M.creaContenitore(base.contenitore, 16 * MB), (e) => e.codice === 'CONTENITORE');
+    await assert.rejects(M.creaContenitore(join(dir, 'storto.bin'), 5000), (e) => e.codice === 'CONTENITORE');
+    await assert.rejects(apri({ ...base, dimensione: 8 * MB }, 'Molti'), (e) => e.codice === 'CONTENITORE');
+    await assert.rejects(apri({ ...base, contenitore: join(dir, 'non-c-e.bin') }, 'Molti'), (e) => e.codice === 'CONTENITORE');
+    await assert.rejects(apri({ ...base, sale: Buffer.alloc(4) }, 'Molti'), (e) => e.codice === 'SALE');
+    const corto = join(dir, 'corto.bin');
+    writeFileSync(corto, randomBytes(16 * MB - F.BLOCCO));
+    await assert.rejects(apri({ ...base, contenitore: corto }, 'Molti'), (e) => e.codice === 'CONTENITORE');
+  });
+});
+
+describe('danni', () => {
+  test('metà delle copie di ogni gruppo sparite: il segreto si riapre intero (e la scansione le ritrova)', async () => {
+    const base = await contenitore(4 * MB);
+    const s = await crea(base, 'Fragile');
+    const d = randomBytes(150_000);
+    await s.scriviFile('d', d);
+    await s.chiudi();
+    const prima = await impronta(base, 'Fragile');
+    const via = [];
+    for (let g = 0; g * F.GRUPPO < prima.L; g++) {
+      const ke = Math.min(F.GRUPPO, prima.L - F.GRUPPO * g);
+      for (let s2 = 0; s2 < ke; s2++) via.push(prima.copie.get(2 * (F.GRUPPO * g + s2) + (s2 % 2)).p);
+    }
+    sporca(base, via);
+    const r = await apri(base, 'Fragile');
+    assert.ok((await r.segreto.leggiFile('d')).equals(d));
+    await r.segreto.chiudi();
+    assert.ok(integra(await impronta(base, 'Fragile')));
+    rmSync(base.contenitore, { force: true });
+  });
+
+  test('un gruppo perso davvero: quel file risulta rovinato e lo dice, gli altri si leggono, e lo si può togliere', async () => {
+    const base = await contenitore(4 * MB);
+    const s = await crea(base, 'Rotto');
+    await s.scriviFile('sano', 'sto bene');
+    const grande = randomBytes(40 * F.CARICO);
+    await s.scriviFile('grande', grande);
+    await s.chiudi();
+    const prima = await impronta(base, 'Rotto');
+    const g = 3;
+    sporca(base, Array.from({ length: 11 }, (_, x) => prima.copie.get(2 * F.GRUPPO * g + x).p));
+    const r = await apri(base, 'Rotto');
+    const elenco = Object.fromEntries(r.segreto.elencaFile().map((f) => [f.nome, f.danneggiato]));
+    assert.deepEqual(elenco, { sano: false, grande: true });
+    await assert.rejects(r.segreto.leggiFile('grande'), (e) => e.codice === 'DANNEGGIATO');
+    assert.equal((await r.segreto.leggiFile('sano')).toString(), 'sto bene');
+    await r.segreto.chiudi();
+    const ancora = await apri(base, 'Rotto');
+    assert.equal(ancora.segreto.elencaFile().find((f) => f.nome === 'grande').danneggiato, true);
+    assert.equal(await ancora.segreto.cancellaFile('grande'), true);
+    await ancora.segreto.scriviFile('grande', grande);
+    assert.ok((await ancora.segreto.leggiFile('grande')).equals(grande));
+    await ancora.segreto.chiudi();
+    assert.ok(integra(await impronta(base, 'Rotto')));
+    rmSync(base.contenitore, { force: true });
+  });
+});
