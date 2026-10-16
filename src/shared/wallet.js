@@ -772,6 +772,6 @@
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
     // Gli avvisi all'owner nella home (#855)
-    AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano,
+    AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano, applicaAvvisiOwner,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
