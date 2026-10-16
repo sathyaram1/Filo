@@ -779,6 +779,7 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     'li tiene chiusi (se non ne scrive una, la prova del giro resta). Una prova del giro ancora rossa non si toglie e non si',
     'cambia mai: la consegna la rilancia com\'era e si ferma. Restano anche le prove dei rilievi che fermano il lavoro: le',
     'tratta chi riprende.',
+    ROSSO_ATTESO_CHIUSO,
     '',
     testo,
   );
