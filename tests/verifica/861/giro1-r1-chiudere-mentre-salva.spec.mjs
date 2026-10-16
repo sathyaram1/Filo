@@ -41,6 +41,24 @@ test('r1 chiudere a metà salvataggio non lascia nel contenitore niente che si a
   }
 });
 
+test('r1 chiudere mentre un file si legge non lo dà per rovinato: la lettura finisce col contenuto giusto', async () => {
+  test.setTimeout(180_000);
+  const dir = cartellaTemporanea('v861-r1-');
+  try {
+    const base = await contenitore(dir, 128 * MB);
+    const s = (await M.creaSegreto({ ...base, nome: 'Alfa' })).segreto;
+    await s.scriviFile('grande', TESTO);
+    const leggi = s.leggiFile('grande');
+    await new Promise((ok) => setTimeout(ok, 5));
+    await s.chiudi();
+    const [esito] = await Promise.allSettled([leggi]);
+    expect(esito.status, esito.reason && String(esito.reason.message)).toBe('fulfilled');
+    expect(esito.value.equals(TESTO)).toBe(true);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 test('r1 chiudere a metà salvataggio non perde il file: riaperto il segreto, c’è intero', async () => {
   test.setTimeout(180_000);
   const dir = cartellaTemporanea('v861-r1-');
