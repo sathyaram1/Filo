@@ -265,7 +265,8 @@
     //   OpenRouter non ha risposto. Senza il campo la pagina dice che il conto non è letto.
     WALLET_OWNER_OVERVIEW: 'wallet_owner_overview',
     // WALLET_OWNER_ALARM_PENDING (#820): gli allarmi del conto OpenRouter da dire all'owner all'avvio, una volta
-    //   finché la situazione resta quella. Chi non è owner non fa partire nessuna lettura.
+    //   finché la situazione resta quella. Chi non è owner non fa partire nessuna lettura. La risposta arriva quando
+    //   gli avvisi della home nati dalla stessa lettura (#855) sono già fra le notifiche.
     //   { } → { ok, alarm: { title, text } | null }
     WALLET_OWNER_ALARM_PENDING: 'wallet_owner_alarm_pending',
     // WALLET_OWNER_GRANT: alza il tetto di un utente. { pseudonym, credits, why } → { ok, result }

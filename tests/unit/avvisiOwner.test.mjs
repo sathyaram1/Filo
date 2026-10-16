@@ -51,10 +51,10 @@ test('il tetto: niente sotto l’80%, un marcatore oltre l’80% e due oltre il 
   assert.deepEqual(caso(W.avvisiOwner(vista({ dati: 79999 })), 'tetto').marcatori, []);
   const ottanta = caso(W.avvisiOwner(vista({ dati: 87000 })), 'tetto');
   assert.deepEqual(ottanta.marcatori, ['tetto:80']);
-  assert.equal(ottanta.testo, "I crediti regalati sono all'87% del tetto: 87.000 su 100.000. Alza il tetto nella pagina Inviti e utenti, o la quota del giorno e i nuovi ingressi verranno rifiutati.");
+  assert.equal(ottanta.testo, "I crediti regalati sono all'87% del tetto, 87.000 su 100.000. Alza il tetto nella pagina Inviti e utenti, o il server rifiuterà la quota del giorno e i nuovi ingressi.");
   const novanta = caso(W.avvisiOwner(vista({ dati: 96000 })), 'tetto');
   assert.deepEqual(novanta.marcatori, ['tetto:80', 'tetto:95']);
-  assert.match(novanta.testo, /^I crediti regalati sono al 96% del tetto: 96\.000 su 100\.000\./);
+  assert.match(novanta.testo, /^I crediti regalati sono al 96% del tetto, 96\.000 su 100\.000\./);
   // Esatto sulla soglia conta, e un 29% non diventa 28 per l'arrotondamento dei decimali.
   assert.deepEqual(caso(W.avvisiOwner(vista({ dati: 80000 })), 'tetto').marcatori, ['tetto:80']);
   assert.equal(caso(W.avvisiOwner(vista({ dati: 29, tetto: 100 })), 'tetto').numero, 29);
@@ -64,7 +64,7 @@ test('tetto raggiunto o superato, e tetto a zero: il testo dice che i rifiuti ci
   for (const v of [vista({ dati: 100000 }), vista({ dati: 120000 }), vista({ dati: 0, tetto: 0 })]) {
     const t = caso(W.avvisiOwner(v), 'tetto');
     assert.deepEqual(t.marcatori, ['tetto:80', 'tetto:95']);
-    assert.match(t.testo, /^I crediti regalati hanno raggiunto il tetto: .* vengono rifiutati finché non alzi il tetto nella pagina Inviti e utenti\.$/);
+    assert.match(t.testo, /^I crediti regalati hanno raggiunto il tetto, .*\. Il server rifiuta la quota del giorno e i nuovi ingressi finché non alzi il tetto nella pagina Inviti e utenti\.$/);
   }
 });
 
@@ -82,19 +82,19 @@ test('la giornaliera che ha rifiutato delle quote, e lo scarto della riconciliaz
   assert.deepEqual(caso(W.avvisiOwner(vista({ rifiutate: 0 })), 'giornaliera').marcatori, []);
   const g = caso(W.avvisiOwner(vista({ rifiutate: 3 })), 'giornaliera');
   assert.deepEqual(g.marcatori, ['giornaliera:rifiuti']);
-  assert.equal(g.testo, "L'ultima quota del giorno non è arrivata a 3 persone: il tetto dei crediti elargibili era pieno. Alza il tetto nella pagina Inviti e utenti.");
-  assert.match(caso(W.avvisiOwner(vista({ rifiutate: 1 })), 'giornaliera').testo, /a 1 persona:/);
+  assert.equal(g.testo, "L'ultima quota del giorno non è arrivata a 3 persone perché il tetto dei crediti elargibili era pieno. Alza il tetto nella pagina Inviti e utenti.");
+  assert.match(caso(W.avvisiOwner(vista({ rifiutate: 1 })), 'giornaliera').testo, /a 1 persona perché/);
 
   assert.deepEqual(caso(W.avvisiOwner(vista()), 'scarto').marcatori, []);
   const s = caso(W.avvisiOwner(vista({ segnati: ['bbbb000000000002', 'aaaa000000000001'] })), 'scarto');
   assert.deepEqual(s.marcatori, ['scarto:aaaa000000000001', 'scarto:bbbb000000000002']);
-  assert.equal(s.testo, "La riconciliazione ha trovato uno scarto su 2 portafogli (aaaa000000000001, bbbb000000000002): qualcuno consuma senza scrivere il registro d'uso. Le righe segnate sono nella pagina Inviti e utenti.");
+  assert.equal(s.testo, "La riconciliazione ha trovato uno scarto su 2 portafogli (aaaa000000000001, bbbb000000000002). Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate nella pagina Inviti e utenti.");
   const tanti = caso(W.avvisiOwner(vista({ segnati: ['aaaa000000000001', 'bbbb000000000002', 'cccc000000000003', 'dddd000000000004', 'eeee000000000005'] })), 'scarto');
   assert.match(tanti.testo, /su 5 portafogli \(aaaa000000000001, bbbb000000000002, cccc000000000003 e altri 2\)/);
   // Senza le righe per persona vale il conto del riassunto.
   const soloRiassunto = caso(W.avvisiOwner({ reconcile: { summary: { flagged: 1 } } }), 'scarto');
   assert.deepEqual(soloRiassunto.marcatori, ['scarto:?']);
-  assert.match(soloRiassunto.testo, /su 1 portafoglio: qualcuno consuma/);
+  assert.match(soloRiassunto.testo, /su 1 portafoglio\. Qualcuno consuma/);
 });
 
 test('quello che la vista non dice non è un caso, e una vista che non c’è non dà avvisi', () => {

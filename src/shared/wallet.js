@@ -675,8 +675,8 @@
         caso: 'tetto', numero: p,
         marcatori: SOGLIE_TETTO.filter((s) => cento >= s).map((s) => `tetto:${s}`),
         testo: p >= 100
-          ? `I crediti regalati hanno raggiunto il tetto: ${quanti}. La quota del giorno e i nuovi ingressi vengono rifiutati finché non alzi il tetto ${DOVE}.`
-          : `I crediti regalati sono ${alPercento(p)} del tetto: ${quanti}. Alza il tetto ${DOVE}, o la quota del giorno e i nuovi ingressi verranno rifiutati.`,
+          ? `I crediti regalati hanno raggiunto il tetto, ${quanti}. Il server rifiuta la quota del giorno e i nuovi ingressi finché non alzi il tetto ${DOVE}.`
+          : `I crediti regalati sono ${alPercento(p)} del tetto, ${quanti}. Alza il tetto ${DOVE}, o il server rifiuterà la quota del giorno e i nuovi ingressi.`,
       });
     }
 
@@ -686,7 +686,7 @@
       casi.push({
         caso: 'giornaliera', numero: r,
         marcatori: r > 0 ? ['giornaliera:rifiuti'] : [],
-        testo: `L'ultima quota del giorno non è arrivata a ${r === 1 ? '1 persona' : `${r} persone`}: il tetto dei crediti elargibili era pieno. Alza il tetto ${DOVE}.`,
+        testo: `L'ultima quota del giorno non è arrivata a ${r === 1 ? '1 persona' : `${r} persone`} perché il tetto dei crediti elargibili era pieno. Alza il tetto ${DOVE}.`,
       });
     }
 
@@ -697,7 +697,7 @@
         caso: 'inviti', numero: n,
         marcatori: n <= INVITI_POCHI ? [`inviti:${INVITI_POCHI}`] : [],
         testo: n === 0
-          ? `Gli ingressi con invito sono finiti: chi riceve un invito adesso non riesce a entrare. Aggiungine ${DOVE}.`
+          ? `Gli ingressi con invito sono finiti, e chi riceve un invito adesso non riesce a entrare. Aggiungine ${DOVE}.`
           : `${n === 1 ? 'Resta 1 ingresso' : `Restano ${n} ingressi`} con invito, poi chi riceve un invito non riesce più a entrare. Aggiungine ${DOVE}.`,
       });
     }
@@ -714,7 +714,7 @@
       casi.push({
         caso: 'scarto', numero: n,
         marcatori: segnati.length ? segnati.map((p) => `scarto:${p}`) : (n > 0 ? ['scarto:?'] : []),
-        testo: `La riconciliazione ha trovato uno scarto su ${n === 1 ? '1 portafoglio' : `${n} portafogli`}${segnati.length ? ` (${elencoBreve(segnati)})` : ''}: qualcuno consuma senza scrivere il registro d'uso. Le righe segnate sono ${DOVE}.`,
+        testo: `La riconciliazione ha trovato uno scarto su ${n === 1 ? '1 portafoglio' : `${n} portafogli`}${segnati.length ? ` (${elencoBreve(segnati)})` : ''}. Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate ${DOVE}.`,
       });
     }
     return casi;

@@ -144,7 +144,7 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
     try {
       const home = await homeDellAvvio(app);
       await diventaOwner(app, home);
-      const carta = carte(home).filter({ hasText: 'I crediti regalati sono all\'85% del tetto: 85.000 su 100.000' });
+      const carta = carte(home).filter({ hasText: 'I crediti regalati sono all\'85% del tetto, 85.000 su 100.000' });
       await expect(carta).toHaveCount(1, { timeout: 15_000 });
       await expect(carte(home)).toHaveCount(1);
       await expect(carta.locator('.dash-carta-az.principale')).toHaveText('Apri Inviti e utenti');
@@ -173,7 +173,7 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
     try {
       const home = await homeDellAvvio(app);
       await diventaOwner(app, home);
-      await expect(carte(home).filter({ hasText: 'I crediti regalati sono al 96% del tetto: 96.000 su 100.000' })).toHaveCount(1, { timeout: 15_000 });
+      await expect(carte(home).filter({ hasText: 'I crediti regalati sono al 96% del tetto, 96.000 su 100.000' })).toHaveCount(1, { timeout: 15_000 });
       await expect(carte(home)).toHaveCount(1);
       const [nuovo] = await avvisiOwner(app);
       expect(nuovo.id).not.toBe(primo.id);
@@ -197,7 +197,7 @@ test('i quattro casi insieme: una carta ciascuno col numero, «Apri Inviti e ute
   await expect(carte(home)).toHaveCount(4, { timeout: 15_000 });
   // Il più grave in cima, ognuno col suo titolo.
   await expect(carte(home).locator('.dash-carta-tit')).toHaveText(['Tetto dei regali', 'Quota del giorno', 'Ingressi con invito', 'Registro d’uso']);
-  await expect(carte(home).filter({ hasText: 'al 97% del tetto: 97.000 su 100.000' })).toHaveCount(1);
+  await expect(carte(home).filter({ hasText: 'al 97% del tetto, 97.000 su 100.000' })).toHaveCount(1);
   await expect(carte(home).filter({ hasText: 'Resta 1 ingresso con invito' })).toHaveCount(1);
   await expect(carte(home).filter({ hasText: 'L\'ultima quota del giorno non è arrivata a 3 persone' })).toHaveCount(1);
   await expect(carte(home).filter({ hasText: 'scarto su 2 portafogli (aaaa000000000001, cccc000000000003)' })).toHaveCount(1);
