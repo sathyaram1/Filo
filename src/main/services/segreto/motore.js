@@ -958,8 +958,18 @@ async function riparaDichiarato(ctx, D) {
 async function riparaProprio(ctx, S) {
   const G = Math.ceil(S.L / GRUPPO);
   const usati = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
-  const tabella = new Map(S.tabella);
+  // Prima si segnano i file rovinati, poi i loro blocchi si riscrivono a zero: nell'ordine opposto un'interruzione
+  // lascerebbe file che si leggono a zeri senza dirlo.
   const persi = [];
+  for (let g = 1; g < G; g++) {
+    const info = S.gruppi[g];
+    for (let s = info ? Math.min(info.k, kAtteso(S, g)) : 0; s < kAtteso(S, g); s++) if (usati[GRUPPO * g + s]) persi.push(GRUPPO * g + s);
+  }
+  const tabella = new Map(S.tabella);
+  if (persi.length && marcaDanneggiati(tabella, persi)) {
+    // Stessa lunghezza, stessi blocchi: la tabella segnata si scrive dove sta, anche a contenitore pieno.
+    await transazione(ctx, S, { tabella, bytes: serializzaTabella(tabella), blocchiTabella: S.blocchiTabella, L2: S.L }, new Map());
+  }
   const parziali = [];
   const intere = [];
   for (let g = 1; g < G; g++) {
@@ -967,7 +977,6 @@ async function riparaProprio(ctx, S) {
     const info = S.gruppi[g];
     const blocchi = Array.from({ length: ke }, (_, s) => GRUPPO * g + s);
     if (!info) {
-      persi.push(...blocchi.filter((j) => usati[j]));
       intere.push({ g, carichi: blocchi.map(() => ZERO) });
       continue;
     }
@@ -978,24 +987,14 @@ async function riparaProprio(ctx, S) {
       continue;
     }
     const vecchi = await carichiGruppo(ctx, S, g);
-    intere.push({
-      g,
-      carichi: blocchi.map((j, s) => {
-        if (usati[j] && !vecchi[s]) persi.push(j);
-        return (usati[j] && vecchi[s]) || ZERO;
-      }),
-    });
+    const coperti = Math.min(info.k, ke);
+    if (blocchi.some((j, s) => s < coperti && usati[j] && !vecchi[s])) throw errore('LETTURA', 'Il contenitore non si legge più come un attimo fa.');
+    intere.push({ g, carichi: blocchi.map((j, s) => (usati[j] && vecchi[s]) || ZERO) });
   }
   await restauraMancanti(ctx, S, parziali);
   await riscriviGruppi(ctx, S, intere);
   await distruggiSpazzatura(ctx, S);
   await ctx.fh.datasync();
-  if (persi.length && marcaDanneggiati(tabella, persi)) {
-    // Stessa lunghezza, stessi blocchi: la tabella segnata si scrive dove sta, anche a contenitore pieno.
-    const piano = { tabella, bytes: serializzaTabella(tabella), blocchiTabella: S.blocchiTabella, L2: S.L };
-    await transazione(ctx, S, piano, new Map());
-    return;
-  }
   await scriviTestaGruppo(ctx, S);
 }
 
