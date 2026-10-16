@@ -61,6 +61,12 @@ se lo scriviamo noi, dobbiamo saperlo rileggere noi.
   tema, sicurezza, cookie e fingerprint del backup valgono subito senza
   riavviare. E si riscrivono **solo le chiavi davvero cambiate**: rimettere a
   posto valori identici sveglia per niente i listener `onChanged`.
+- **I segreti escono solo se chi esporta lo chiede (#905).** Un archivio si
+  manda in giro facilmente. Le chiavi (`SN_CONST.campiSegreti`: chiavi API,
+  Safe Browsing, proxy con utente e password) restano fuori, e il loro valore
+  si toglie anche da appunti, chat e filo, a meno che l'utente spunti «Includi
+  le chiavi». Il campo va via, non diventa vuoto, e all'importazione una chiave
+  vuota non cancella quella di qui. Prova: `tests/unit/esportaSenzaChiavi.test.mjs`.
 - **Stesso confine d'origine dell'export**: `filo://` soltanto — una pagina web
   non deve poter aprire un file dialog né riscrivere lo storage.
 - **Dove:** `readExportZip` / `mergeImportedData` in

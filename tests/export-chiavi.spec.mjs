@@ -41,7 +41,7 @@ async function apriSicurezza(app) {
 test('Esporta: senza la spunta le chiavi restano fuori dall\'archivio, con la spunta entrano', async () => {
   const userData = cartellaTemporanea('filo-chiavi-exp-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({
-    settings: { apiKeys: { openrouter: CHIAVE, tavily: '' } },
+    settings: { theme: 'dark', apiKeys: { openrouter: CHIAVE, tavily: '' } },
     clipboardHistory: [{ type: 'text', text: CHIAVE, ts: 1 }],
     filo_memory: { PROFILO: 'Chi esporta' },
   }), 'utf8');
@@ -136,7 +136,8 @@ const avvisiInChiaro = (app) => app.evaluate(() => globalThis.__filoStorage.stat
 
 test('senza portachiavi: alla prima chiave salvata Filo dice che resta in chiaro, una volta sola', async () => {
   const userData = cartellaTemporanea('filo-chiavi-chiaro-');
-  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light' } }), 'utf8');
+  // Coi modelli di Filo la casella della chiave non si vede: qui l'utente usa la sua.
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light', useDefaultModels: false } }), 'utf8');
   let app = await avvia(userData);
   try {
     await senzaPortachiavi(app);
