@@ -68,19 +68,20 @@ async function scarica(ses, url, cookie) {
 }
 
 // Una pagina web può dichiarare come icona un indirizzo qualunque: file: e i protocolli interni non si seguono.
-function bytesDi(ses, url, { interna }) {
+function bytesDi(ses, url, { interna, cookie }) {
   const schema = /^([a-z][a-z0-9+.-]*):/i.exec(url)?.[1]?.toLowerCase() || '';
   if (schema === 'data') return Promise.resolve(bytesDaDataUrl(url));
-  if (schema === 'http' || schema === 'https' || (schema === 'filo' && interna)) return scarica(ses, url);
+  if (schema === 'http' || schema === 'https' || (schema === 'filo' && interna)) return scarica(ses, url, cookie);
   return Promise.resolve(null);
 }
 
 // `candidati`: gli indirizzi di page-favicon-updated, nell'ordine della pagina. Torna il primo che è davvero un'immagine.
-async function iconaPer(ses, candidati, { interna = false, vivo = () => true } = {}) {
+// `cookie: false` per chi chiede l'icona senza avere il sito aperto: a quel sito non si dice chi la vuole.
+async function iconaPer(ses, candidati, { interna = false, vivo = () => true, cookie = true } = {}) {
   const lista = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u).slice(0, MAX_CANDIDATI);
   for (const url of lista) {
     if (!vivo()) break;
-    const buf = await bytesDi(ses, url, { interna });
+    const buf = await bytesDi(ses, url, { interna, cookie });
     const tipo = buf && buf.length <= TETTO_BYTE ? tipoImmagine(buf) : '';
     if (tipo) return { url, dato: `data:${tipo};base64,${buf.toString('base64')}` };
   }
