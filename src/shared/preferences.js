@@ -344,7 +344,8 @@
     const r = riduci(d);
     return (r && r.sito) || d;
   }
-  function opElenco(v, riduci) {
+  // `voceDi`: come un pezzo scritto diventa la voce dell'elenco ('' se non è un sito).
+  function opElenco(v, riduci, voceDi = dominioDa) {
     const s = String(v == null ? '' : v).trim();
     if (!s) return null;
     if (SVUOTA.test(s)) return { op: 'sostituisci', voci: [] };
