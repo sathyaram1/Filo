@@ -149,29 +149,31 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   await expect(home.locator('.home-ctxmenu')).toHaveCount(0);
   await expect(scheda(home, 'a')).toBeFocused();
 
-  // Tasto Menu, Fine → «Rimuovi», Invio: la scheda va via e il fuoco passa a quella dopo.
+  // Tasto Menu, Fine → «Rimuovi», Invio: la scheda va via e il fuoco passa ad «Annulla».
   await home.keyboard.press('ContextMenu');
   await expect(home.locator('.home-ctxmenu')).toBeVisible();
   await home.keyboard.press('End');
   await expect(home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Rimuovi' })).toBeFocused();
   await home.keyboard.press('Enter');
   await expect(scheda(home, 'a')).toHaveCount(0);
-  await expect(scheda(home, 'b')).toBeFocused();
+  await expect(home.locator('.home-annulla-btn')).toBeFocused();
   await expect(home.locator('.home-annulla')).toHaveCSS('opacity', '1');
   await home.screenshot({ path: 'tests/.shots/home-annulla-scuro.png' }).catch(() => {});
 
-  // «Annulla» è a due Tab (il «Rimuovi» della scheda, poi l'avviso): Invio la rimette e le dà il fuoco.
-  await home.keyboard.press('Tab');
-  await home.keyboard.press('Tab');
-  await expect(home.locator('.home-annulla-btn')).toBeFocused();
+  // Invio su «Annulla» la rimette e le dà il fuoco.
   await home.keyboard.press('Enter');
   await expect(scheda(home, 'a')).toBeFocused();
   expect((await salvate(home)).map((p) => p.id)).toEqual(['a', 'b']);
 
-  // Invio sul «Rimuovi» della scheda rimuove, non apre.
+  // Invio sul «Rimuovi» della scheda rimuove, non apre; Esc lascia l'avviso e torna all'elenco.
   await scheda(home, 'b').locator('.sn-card-action').focus();
   await home.keyboard.press('Enter');
   await expect(scheda(home, 'b')).toHaveCount(0);
+  await expect(home.locator('.home-annulla-btn')).toBeFocused();
+  await home.keyboard.press('Escape');
+  await expect(scheda(home, 'a')).toBeFocused();
+  await expect(home.locator('.home-annulla')).toHaveCount(0);
+  expect((await salvate(home)).map((p) => p.id)).toEqual(['a']);
   await expect.poll(async () => shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.some((t) => t.url === u), url.b)).toBe(false);
 
   // «Apri» dal menu: come il clic, la apre e la toglie dalla lista. La lettera A porta alla prima voce con la A.
