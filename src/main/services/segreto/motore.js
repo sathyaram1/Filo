@@ -723,7 +723,8 @@ async function riscriviGruppi(ctx, S, voci, { sincronizza = false } = {}) {
       S.gruppi[g] = { v, k };
     }
     await scriviSigillati(ctx, S, fase1);
-    if (sincronizza && fase2.length) await ctx.fh.datasync();
+    // Solo sopra il posto, in qualunque ordine arrivino al disco, una delle due versioni ha sempre la maggioranza.
+    if (sincronizza && fase1.length && fase2.length) await ctx.fh.datasync();
     await scriviSigillati(ctx, S, fase2);
     await distruggi(ctx, S, via);
   }
