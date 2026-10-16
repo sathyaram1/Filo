@@ -54,7 +54,7 @@ function collegaScorciatoie(wc, finestra) {
   if (!wc || typeof wc.on !== 'function') return;
   wc.on('before-input-event', (event, input) => {
     if (staRegistrandoTasti(wc)) return;
-    if (tastoSchermoIntero(event, input, finestra)) return;
+    if (tastoSchermoIntero(wc, event, input, finestra)) return;
     const command = comandoDaTasto(input);
     if (!command) return;
     event.preventDefault();
