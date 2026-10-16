@@ -21,7 +21,7 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
 <!-- includi: _domanda-fine-sessione.md -->
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`): il ruolo firma il rapporto di
-  fine sessione che il rilascio allega da solo, e senza il rapporto esce anonimo;
+  fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
 - un guasto che ti impedisce di lavorare → una domanda e il rilascio con
   `--guasto`, come nella sezione qui sotto: è così che il server smette di dare
   lavoro per questo giro. Non "riportarlo" a parole: registralo.
