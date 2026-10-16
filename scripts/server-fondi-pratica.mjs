@@ -8,7 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { estraiOpzioneFeedback, risolviFeedback } from './lib/pratica-locale.mjs';
 import { argomentiDaNpm } from './lib/argomenti.mjs';
-import { FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, RAMO_RE, parteTardiva } from './lib/parti-lavoro.mjs';
+import { FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, RAMO_RE, parteTardiva, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { cartellaDelServer } from './lib/ramo-server.mjs';
 
 export { cartellaDelServer };
