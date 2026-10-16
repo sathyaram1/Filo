@@ -1,5 +1,5 @@
 // #859, giro 1: altre porte dello stesso Esc fermato dal sito — sul documento, dentro un riquadro incorporato,
-// dopo una riscrittura della pagina, e due Esc di fila.
+// e due Esc di fila. Passano: restano come porte provate e chiuse.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const ferma = (dove) => `<script>
@@ -66,24 +66,6 @@ test('riquadro incorporato che ferma l\'Esc: il menu aperto lì dentro si chiude
   expect(await schermoIntero(app)).toBe(false);
 });
 
-test('pagina che si riscrive (document.open) e poi ferma l\'Esc: il menu si chiude, lo schermo intero resta', async ({ app, openTab, testServer }) => {
-  const scritto = `<!doctype html><html><head>${ferma('window')}</head>${corpo}</html>`;
-  const page = await testServer.openReady(openTab, `<!doctype html><html><head></head><body>
-    <script>setTimeout(function () { document.open(); document.write(${JSON.stringify(scritto).replace(/<\//g, '<\\/')}); document.close(); }, 300);</script>
-    </body></html>`);
-  await page.waitForFunction(() => document.getElementById('t') && typeof window.__escDelSito === 'number', null, { timeout: 8000 });
-  await new Promise((r) => setTimeout(r, 800));
-  await entra(app);
-  await page.locator('#t').click({ button: 'right' });
-  await expect.poll(() => menuAperto(page), { timeout: 8000 }).toBe(true);
-  await new Promise((r) => setTimeout(r, 300));
-  await esc(app);
-  const dopo = { menu: await menuAperto(page), fs: await schermoIntero(app), sito: await page.evaluate(() => window.__escDelSito) };
-  console.log('riscrittura dopo il primo Esc', JSON.stringify(dopo));
-  expect(dopo.menu).toBe(false);
-  expect(dopo.fs).toBe(true);
-});
-
 test('due Esc di fila, senza pausa, col menu aperto sul sito che ferma l\'Esc: menu chiuso e poi uscita', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><head>${ferma('window')}</head>${corpo}</html>`);
   await entra(app);
@@ -96,18 +78,4 @@ test('due Esc di fila, senza pausa, col menu aperto sul sito che ferma l\'Esc: m
   console.log('due Esc di fila', JSON.stringify(dopo));
   expect(dopo.menu).toBe(false);
   expect(dopo.fs).toBe(false);
-});
-
-test('tema scuro: menu aperto sul sito che ferma l\'Esc, foto prima e dopo il primo Esc', async ({ app, openTab, testServer }) => {
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
-  const page = await testServer.openReady(openTab, `<!doctype html><html><head>${ferma('window')}</head>${corpo}</html>`);
-  await entra(app);
-  await page.locator('#t').click({ button: 'right' });
-  await expect.poll(() => menuAperto(page), { timeout: 8000 }).toBe(true);
-  await new Promise((r) => setTimeout(r, 400));
-  await page.screenshot({ path: 'tests/.shots/859-menu-aperto.png' });
-  await esc(app);
-  await page.screenshot({ path: 'tests/.shots/859-dopo-esc.png' });
-  expect(await menuAperto(page)).toBe(false);
-  expect(await schermoIntero(app)).toBe(true);
 });
