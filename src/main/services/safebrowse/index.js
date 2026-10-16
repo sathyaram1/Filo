@@ -530,11 +530,13 @@ const API = {
       ct: !!providers.ct,
       llm: !!providers.llm,
       sandbox: !!providers.sandbox,
+      destinazione: !!providers.destinazione,
     };
   },
   // cache (per test / invalidazione)
   DEEP_BUDGET,
-  _caches: { ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed },
+  PRE_PER_ORA,
+  _caches: { ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed, preCache, preBudget },
   _settled: settled,
   _gsbLookup: gsbLookup,
   // sotto-moduli (per test)
