@@ -94,7 +94,7 @@
   // Anche i nomi italiani e i simboli del Mac: un modificatore che non si
   // riconosce sparirebbe dalla forma e la scorciatoia scatterebbe senza (#545.1).
   const CTRL = /^(ctrl|control|controllo|cmd|command|comando|meta|\u2318|\u2303)$/;
-  // Scritti INSIEME sono due tasti (Control e Cmd del Mac): Ctrl+Cmd+F non \u00e8 Cmd+F.
+  // Scritti INSIEME sono due tasti, Control e Cmd del Mac: Ctrl+Cmd+F non è Cmd+F.
   const CONTROL = /^(ctrl|control|controllo|\u2303)$/;
   const COMANDO = /^(cmd|command|comando|meta|\u2318)$/;
   function conControlECmd(modificatori) {
