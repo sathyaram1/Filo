@@ -1145,7 +1145,8 @@
       // bottone è come si risponde.
       const anche = aspettaUtente(a)
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || sceltaAutonomia(a);
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || sceltaAutonomia(a)
+        || salvateDaMostrare(a).length > 0;
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -1794,6 +1795,7 @@
       return btn;
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
+    if (type === 'CERCA_SALVATE') return bottoniSalvate(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
