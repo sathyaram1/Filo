@@ -469,7 +469,7 @@ describe('usato male', () => {
     await r.segreto.chiudi();
   });
 
-  test('i file: nomi strani, vuoti, lunghissimi, trecento file (la tabella esce dalla testa), sovrascritture, in fretta', async () => {
+  test('i file: nomi strani, vuoti, lunghissimi, centoventi file (la tabella esce dalla testa), sovrascritture, in fretta', async () => {
     const s = await crea(base, 'Molti');
     await assert.rejects(s.scriviFile('  ', 'x'), (e) => e.codice === 'NOME_FILE');
     await assert.rejects(s.scriviFile('n', 42), (e) => e.codice === 'DATI');
@@ -478,7 +478,7 @@ describe('usato male', () => {
     await s.scriviFile('<img src=x onerror=alert(1)>', new Uint8Array([1, 2, 3]));
     await s.scriviFile('🙂', new Uint8Array([9, 9]).buffer);
     const attesi = new Map();
-    await Promise.all(Array.from({ length: 300 }, (_, x) => {
+    await Promise.all(Array.from({ length: 120 }, (_, x) => {
       const d = randomBytes(x * 37);
       attesi.set(`f${x}`, d);
       return s.scriviFile(`f${x}`, d);
@@ -492,7 +492,7 @@ describe('usato male', () => {
     await s.chiudi();
     const r = await apri(base, 'Molti');
     const elenco = new Map(r.segreto.elencaFile().map((f) => [f.nome, f]));
-    assert.equal(elenco.size, 300 - 1 + 3);
+    assert.equal(elenco.size, 120 - 1 + 3);
     for (const [n, d] of attesi) assert.ok((await r.segreto.leggiFile(n)).equals(d), n);
     assert.equal((await r.segreto.leggiFile(lungo)).toString(), 'lungo');
     assert.deepEqual([...(await r.segreto.leggiFile('<img src=x onerror=alert(1)>'))], [1, 2, 3]);

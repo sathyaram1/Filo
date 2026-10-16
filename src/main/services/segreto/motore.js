@@ -165,6 +165,7 @@ function scriviTesta({ L, creato, aperto, contatore, bytes, blocchiTabella }) {
   b.writeUInt32BE(contatore, 24);
   b.writeUInt32BE(bytes.length, 28);
   if (!blocchiTabella.length) {
+    if (bytes.length > TABELLA_IN_TESTA) throw new RangeError('la tabella dei file non sta nella testa');
     bytes.copy(b, TESTA_FISSA);
     return b;
   }
