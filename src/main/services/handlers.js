@@ -1578,6 +1578,16 @@ function segnaLinkDaConfermare(url, motivo) {
   LINK_DA_CONFERMARE.set(k, String(motivo || ''));
   while (LINK_DA_CONFERMARE.size > MAX_LINK_DA_CONFERMARE) LINK_DA_CONFERMARE.delete(LINK_DA_CONFERMARE.keys().next().value);
 }
+// Un sito con un collegamento in attesa di OK: la sua icona non si chiede alla rete, il dato può stare nel nome (#848).
+function sitoDaConfermare(url) {
+  let host = '';
+  try { host = new URL(String(url || '')).host.toLowerCase(); } catch (_) { return false; }
+  if (!host) return false;
+  for (const k of LINK_DA_CONFERMARE.keys()) {
+    try { if (new URL(k).host.toLowerCase() === host) return true; } catch (_) {}
+  }
+  return false;
+}
 // Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
 const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
 
@@ -5882,6 +5892,7 @@ const handlerCtx = {
   executeFiloAction,
   controllaUscita,
   apriDaFilo,
+  sitoDaConfermare,
   SCHEMI_USCITA,
   ricordaLettoDallAiuto,
   ricordaLettoInChat,
