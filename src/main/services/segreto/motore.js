@@ -521,6 +521,7 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
         const a = attivi.get(i);
         if (!a) continue;
         if (S.pos[i] >= 0) {
+          if (S.pos[i] === p) S.catena = Math.max(S.catena, a.vuoti);
           attivi.delete(i);
           continue;
         }
