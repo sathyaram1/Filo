@@ -200,7 +200,7 @@ export function descriviEsitoServer(esito) {
   const e = esito || {};
   const frase = fraseDellEsito(e);
   // Chi legge deve distinguere un singhiozzo da un server giù: quanti tentativi, in quanto tempo.
-  return e.tentativi > 1 ? `${frase} Così anche al ${e.tentativi}° tentativo, dopo ${e.attesaS || 0} s di attese.` : frase;
+  return e.tentativi > 1 && e.stato !== 'ok' ? `${frase} Esito del ${e.tentativi}° tentativo, dopo ${e.attesaS || 0} s di attese.` : frase;
 }
 
 function fraseDellEsito(e) {
