@@ -592,7 +592,7 @@ describe('danni', () => {
     const b = randomBytes(20 * F.CARICO);
     await s.scriviFile('b', b);
     const prima = await impronta(base, 'Aperto');
-    // Il gruppo 2 (blocchi 20-29) tiene la coda di «b» e i blocchi dove andrà «c»: 11 copie su 20 sparite.
+    // Il gruppo 2 (blocchi 20-25, k = 6) tiene la coda di «b» e accanto andrà «c»: spariscono 11 delle sue 12 copie.
     sporca(base, Array.from({ length: 11 }, (_, x) => prima.copie.get(2 * F.GRUPPO * 2 + x).p));
     await assert.rejects(s.scriviFile('c', randomBytes(2 * F.CARICO)), (e) => e.codice === 'RIAPRI');
     assert.throws(() => s.elencaFile(), (e) => e.codice === 'CHIUSO');
