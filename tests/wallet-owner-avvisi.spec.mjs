@@ -6,7 +6,7 @@
 import { createServer } from 'node:http';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { _electron as electron } from '@playwright/test';
 import { test, expect, aspettaFinestra, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
