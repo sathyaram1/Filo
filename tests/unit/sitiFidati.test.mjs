@@ -125,6 +125,15 @@ test('due «Continua» di fila entrano tutti e due: le scritture sono in fila', 
   assert.deepEqual(disco.security.safeBrowse.trustedSites, ['area-riservata.it']);
 });
 
+test('in Sicurezza un solo elenco si chiama «Siti di cui ti fidi»', () => {
+  require('../../src/shared/i18n.js');
+  const T = globalThis.SN_I18N.t;
+  assert.equal(T('options_security_fidati_title'), 'Siti di cui ti fidi');
+  for (const k of ['options_security_downloads_trusted_label', 'options_cookies_whitelist_title']) {
+    assert.ok(!T(k).startsWith(T('options_security_fidati_title')), `${k} ha lo stesso nome dell'elenco dei siti fidati`);
+  }
+});
+
 test('dalla chat: aggiungere costa 3 e vuole la parola «conferma» a ogni livello, togliere costa 1 e parte subito', () => {
   const azione = (valore) => ({ type: 'IMPOSTA_PREFERENZA', chiave: 'siti_di_cui_ti_fidi', valore });
   const add = P.buildPreferencePartial('siti di cui ti fidi', 'aggiungi https://login.team.com/x');
