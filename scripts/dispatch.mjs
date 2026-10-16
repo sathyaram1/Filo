@@ -716,18 +716,18 @@ export function perimetroNote(scope, perimetro) {
   return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l));
 }
 
-export function readRoleInstructions(role, { scope, caso } = {}) {
-  const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope]
-    : role === 'fixer' ? (Object.hasOwn(FIXER_CASE_FILE, String(caso || '')) ? FIXER_CASE_FILE[String(caso)] : ROLE_FILE.fixer)
-      : ROLE_FILE[role];
+export function readRoleInstructions(role, { scope, ripresa = false } = {}) {
+  const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope] : ROLE_FILE[role];
   if (!name) return '';
-  const f = resolve(ROLES_DIR, name);
-  const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
+  const leggi = (n) => {
+    const f = resolve(ROLES_DIR, n);
+    return existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
+  };
+  const base = leggi(name);
   if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
-  const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
   // Il contratto ha pezzi in comune con halt (la domanda di fine sessione): si espande come i ruoli.
-  const contract = existsSync(c) ? espandiInclusioni(readFileSync(c, 'utf8'), ROLES_DIR) : '';
-  const testo = contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
+  const pezzi = [base, ripresa && RUOLI_CON_RIPRESA.includes(role) ? leggi(RIPRESA_FILE) : '', leggi(WORKER_CONTRACT_FILE)];
+  const testo = pezzi.filter(Boolean).map((p, i, tutti) => (i < tutti.length - 1 ? p.replace(/\s+$/, '') : p)).join('\n\n');
   // Le ricette dicono `node scripts/…`, che dalla cartella di lavoro porta agli
   // strumenti DEL RAMO. Quando gli strumenti sono la copia fissata, il percorso
   // va riscritto in assoluto qui, nel momento della consegna: è l'unico punto
