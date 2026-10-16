@@ -1959,11 +1959,17 @@
     return fields;
   }
 
+  // Una pratica chiusa che torna aperta riparte col registro delle parti vuoto (#938): le parti già su main erano del
+  // giro chiuso, e lette nel giro nuovo lo chiuderebbero prima del tempo o ne rifiuterebbero le parti.
+  function riapre(statusPublicPrima, statusDopo) {
+    return statusPublicPrima === 'closed' && statusToPublic(statusDopo) === 'open';
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -2080,6 +2086,8 @@
       }
       mask.push('localApproval');
     }
+    // Il registro delle parti dall'app si toglie e basta, alla riapertura: lo scrivono il server e server:fondi.
+    if (localMerges === null) mask.push('localMerges');
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
@@ -2355,6 +2363,8 @@
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
     // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.
     statusToPublic,
+    // La riapertura svuota il registro delle parti (#938).
+    riapre,
     // Voti di verifica (DB4): substrato letto da board (DC*) e archiviazione (DC3).
     castVote,
     clearVote,

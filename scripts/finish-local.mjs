@@ -70,7 +70,7 @@ import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaF
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
-import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
+import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
@@ -522,6 +522,26 @@ export function fermoDopoLaProva(prova) {
     + '  Riallinea il ramo (git merge origin/main, o rebase), fai tornare verdi i test elencati sopra e rilancia npm run finish.';
 }
 
+/**
+ * La parte dell'app (o un suo seguito) che arriva a pratica chiusa, mentre del server c'è ancora un ramo fuori da
+ * main: lasciata chiusa, la pratica rifiuterebbe l'una o l'altro (regola: riaperturaConAltraInArrivo). Si riapre prima di chiedere la fusione, che così la lascia
+ * aperta per lui (#938). `of`: owner-feedback.mjs. → la riga da stampare, '' se non c'era niente da fare.
+ */
+export async function riapriPerIlServer({ id, ramo, pendingParts = [] }, { of, ora = Date.now() } = {}) {
+  if (!id || !pendingParts.length) return '';
+  const letta = await of.partiDellaPratica(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e).slice(0, 200) }));
+  if (!letta.ok) return `  ! la pratica non si legge (${letta.motivo}): se è chiusa, il ramo del server la troverà chiusa`;
+  if (letta.status !== 'done') return '';
+  const t = riaperturaConAltraInArrivo({ status: letta.status, parti: letta.parti, parte: 'app', ramo, locale: letta.locale, ora });
+  if (!t.ok) return '';
+  const rami = pendingParts.map((p) => p.branch).join(', ');
+  const perche = `l'aveva chiusa la fusione della parte ${NOME_PARTE[t.chiusaDa]} (${new Date(t.at).toISOString()}), ma ${rami} del server non è su main. Le parti già su main ripartono da zero.`;
+  const riaperta = await of.scrivi(id, 'todo', `Riaperta da finish su ${ramo}: ${perche}`);
+  if (!riaperta.ok) return `  ! la pratica non si è riaperta (${riaperta.motivo}): ${rami} la troverà chiusa`;
+  const presa = await of.annotaPratica(id, '');
+  return `  pratica riaperta${presa.ok ? ' («In lavorazione»)' : ''}: ${perche}`;
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});
@@ -822,6 +842,10 @@ async function main() {
   //    lega al main su cui sono girati.
   // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
   const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
+  if (pendingParts.length) {
+    const riga = await riapriPerIlServer({ id: pratica.id, ramo: branch, pendingParts }, { of: await import('./owner-feedback.mjs') });
+    if (riga) console.log(riga);
+  }
   // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
   for (const riga of await registraNelRegistro({ ramo: branch, sha: cur, feedbackId: pratica ? pratica.id : '' })) console.log(`  ${riga}`);
   const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
