@@ -56,10 +56,14 @@
       categoryConfidence: page.categoryConfidence || null,
     };
     pages.unshift(entry);
+    await scriviNelTetto(pages);
+    return entry;
+  }
+
+  async function scriviNelTetto(pages) {
     const fuori = pages.length > SAVED_PAGES_LIMIT ? pages.splice(SAVED_PAGES_LIMIT) : [];
     await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
     if (fuori.length) dichiaraUscite(fuori);
-    return entry;
   }
 
   // L'elenco vive in storage.json, che si riscrive intero: il tetto resta, ma chi esce lo si dice (#1088).
