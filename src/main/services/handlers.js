@@ -2816,6 +2816,22 @@ async function eseguiAzioneFilo(action, {
           return { executed: false, kept: true, output: { chatSearch: query, results: [], error: e?.message || String(e) } };
         }
       }
+      case 'CERCA_SALVATE': {
+        const cercato = String(action.cerca ?? action.query ?? action.testo ?? '').trim();
+        try {
+          return { executed: true, kept: true, output: await salvatePerChat(cercato) };
+        } catch (e) {
+          return { executed: false, kept: true, output: { cercato, pagine: [], errore: e?.message || String(e) } };
+        }
+      }
+      case 'APRI_SALVATA': {
+        // La porta delle uscite l'ha già guardata prima del gate, con l'indirizzo dell'elenco.
+        const r = await apriPaginaSalvata(action.id, { win: winOf(sender), tieni: action.tieni === true, porta: false });
+        if (!r.ok) {
+          return { executed: false, kept: true, output: { aperta: false, trovata: r.trovata !== false, ...(r.blocked ? { blocked: r.blocked, host: r.host, reason: r.reason, url: r.url } : {}) } };
+        }
+        return { executed: true, kept: true, output: { aperta: true, tolta: r.tolta, id: r.id, titolo: r.titolo, url: r.url } };
+      }
       case 'LEGGI_FILE': {
         // #379.5 — lettura ON-DEMAND del contenuto completo di un file
         // dell'editor. Filo vede solo i riassunti; quando decide che vale la pena
