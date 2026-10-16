@@ -20,11 +20,15 @@ async function owner(app) {
   }, TOKEN);
 }
 
-const conferma = (app, url) => app.evaluate(async (_e, url) => globalThis.SN_HANDLE_MESSAGE({
-  type: globalThis.SN_MSG.MSG.FILO_CONFIRM_ACTION,
-  assistente: true,
-  action: { type: 'INVIA_FEEDBACK', testo: 'Testo scritto dall’Aiuto dopo aver letto la pagina', titolo: 'Dal sito' },
-}, { url }), url);
+// Come l'Aiuto: la proposta (che apre il popup e lascia il permesso di confermare), poi l'OK dell'owner.
+const conferma = (app, url) => app.evaluate(async (_e, url) => {
+  const { MSG } = globalThis.SN_MSG;
+  const action = () => ({ type: 'INVIA_FEEDBACK', testo: 'Testo scritto dall’Aiuto dopo aver letto la pagina', titolo: 'Dal sito' });
+  const sender = { url };
+  const prima = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_RUN_ACTION, assistente: true, action: action() }, sender);
+  if (!prima.needsConfirm) return { prima };
+  return globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_CONFIRM_ACTION, assistente: true, action: action() }, sender);
+}, url);
 
 test('r1 dall’Aiuto di un sito la segnalazione confermata dall’owner non parte col suo nome di owner', async ({ app }) => {
   await owner(app);
