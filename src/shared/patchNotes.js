@@ -11,6 +11,7 @@
     {
       version: '0.2.242', date: '2026-10-16',
       features: [
+        'Puoi spegnere Filo su un sito col tasto destro sulla pagina, «Spegni Filo su questo sito», o chiedendolo a Filo («spegni Filo su docs.google.com»). Lì il tasto destro lascia il clic al sito, e dove il sito non ha un suo menu trovi «Riaccendi Filo su questo sito». Le schede già aperte cambiano subito, senza ricaricare. Nella pagina Altro, sotto «Siti dove Filo è spento», puoi incollare un indirizzo intero e Filo lo riduce al nome del sito. Prima un indirizzo incollato lì non spegneva niente.',
         'Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto adesso le scegli tu. In Preferenze, nelle impostazioni avanzate, clicchi la combinazione e premi i tasti nuovi, oppure lo chiedi a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl). Se quei tasti li usa già Filo o il sistema, Filo te lo dice e tiene quelli di prima. Il menu del tasto destro e l\'elenco in Opzioni → Altro mostrano i tasti che hai scelto.',
       ],
       fixes: [

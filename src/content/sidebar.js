@@ -1106,9 +1106,10 @@
   // suo perché, come nel diario della chat: «non riuscita» e basta non dice cosa
   // cambiare (#592).
   function esitoAzione(label, done, r) {
-    if (done) return `${label}: fatto`;
     const o = r && r.output;
-    const perche = o && o.rifiuto && typeof o.error === 'string' ? o.error.trim() : '';
+    // Una preferenza cambiata si dice col suo nome e il valore («Filo spento su docs.google.com», #843).
+    if (done) return o && typeof o.etichetta === 'string' && o.etichetta.trim() ? o.etichetta.trim() : `${label}: fatto`;
+    const perche = o && (o.rifiuto || o.invariato) && typeof o.error === 'string' ? o.error.trim() : '';
     return perche ? `${label}: non applicata, ${perche}` : `${label}: non riuscita`;
   }
 

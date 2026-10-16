@@ -424,16 +424,10 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) {
-      self.__snFiloSpento = true;
-      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
-      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
-      });
-      return;
-    }
-
-    SpellCheck.init(settings);
+    // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
+    // isBlocked() quando scatta. Il ponte del tasto destro lo legge da qui, prima di dare l'evento al menu.
+    seguiSpento();
+    SpellCheck.init(isBlocked() ? { ...settings, featureFlags: { ...(settings.featureFlags || {}), spellcheck: false } } : settings);
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
@@ -456,7 +450,7 @@
       if (typeof self.__snSetMenuDelSitoPrima === 'function') self.__snSetMenuDelSitoPrima(menuDelSitoPrima);
     } else {
       window.addEventListener('contextmenu', (e) => {
-        if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
+        if (e.defaultPrevented || isBlocked()) return; // la pagina interna ha il SUO menu
         onContextMenu(e);
       });
     }
@@ -469,6 +463,8 @@
       document.addEventListener(tipo, (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
     }
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      // Spento sul sito tacciono le azioni sulla pagina; lo stato (impostazioni, schermo intero) si segue lo stesso.
+      if (isBlocked() && AZIONI_DA_FUORI.has(msg?.type)) return;
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
@@ -556,6 +552,17 @@
 
     // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+  }
+
+  // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+
+  // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
+  // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
+  function seguiSpento() {
+    const spento = isBlocked();
+    if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
+    self.__snFiloSpento = spento;
   }
 
   function isBlocked() {
@@ -1776,6 +1783,25 @@
     };
   }
 
+  // #843 — spegne Filo sul sito della scheda (anche dal menu di un riquadro: «questo sito» è quello che si sta visitando).
+  // Solo dove c'è un sito con un nome: una pagina di Filo, un IP o «localhost» non entrano nell'elenco.
+  function buildSpegniFiloItem() {
+    if (PAGINA_DI_FILO || !self.SN_NOMI_SITO) return null;
+    let host = '';
+    try {
+      const u = new URL(pageUrl || location.href);
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.hostname;
+    } catch (_) { host = ''; }
+    if (!self.SN_NOMI_SITO.daScritto(host)) return null;
+    return {
+      type: 'item',
+      label: I18n.t('menu_spegni_filo'),
+      onClick: () => {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
+      },
+    };
+  }
+
   // #405 — i pannelli a tutta superficie (feedback, red-team, sidebar Aiuto)
   // appartengono alla pagina: aperti dentro un riquadro incorporato starebbero
   // dentro un rettangolo di poche centinaia di pixel, tagliati. Dal riquadro
@@ -1858,6 +1884,8 @@
     // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
+    const spegni = buildSpegniFiloItem();
+    if (spegni) items.push(spegni);
     // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
     refreshRedteamVisibile();
     if (redteamVisibile) items.push(buildRedteamAttackItem());
@@ -2325,6 +2353,7 @@
     }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
+      seguiSpento();
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
       self.SN_AVVISI?.imposta(settings.notifications);
@@ -2341,7 +2370,9 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
+      // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
+      if (isBlocked()) return;
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }

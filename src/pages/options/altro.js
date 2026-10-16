@@ -1,6 +1,5 @@
-// Logica pagina "Altro" — opzioni secondarie spostate qui da Opzioni:
-// domini esclusi (blocklist) e gestione categorie, più le scorciatoie alle
-// app (Aperti per dopo, Cronologia AI, Correttore). Niente «Salva»: le caselle passano da SN_CASELLE.
+// Logica pagina "Altro" — opzioni secondarie spostate qui da Opzioni: i siti dove Filo è spento (blocklist,
+// #843) e le categorie, più le scorciatoie alle app. Niente «Salva»: le caselle passano da SN_CASELLE.
 
 (function () {
   'use strict';
@@ -8,6 +7,8 @@
   const { MSG } = window.SN_MSG;
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
+  // Quello che si incolla («https://www.Sito.it/x») si riduce come in Sicurezza, e si mostra ridotto.
+  const Siti = window.SN_NOMI_SITO;
 
   function $(id) { return document.getElementById(id); }
 
@@ -16,6 +17,7 @@
     $('title').textContent = I18n.t('options_other');
     $('backToModels').textContent = I18n.t('options_back_to_models');
     $('h-blocklist').textContent = I18n.t('options_blocklist');
+    $('blocklistDesc').textContent = I18n.t('options_blocklist_desc');
     $('h-categories').textContent = I18n.t('options_categories');
     $('h-shortcuts').textContent = I18n.t('options_shortcuts');
     $('savedHint').textContent = I18n.t('options_saved');
@@ -51,7 +53,7 @@
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
     disegnaScorciatoie(settings);
-    $('blocklist').value = (settings.blocklist || []).join('\n');
+    $('blocklist').value = Siti.testoDaElenco(settings.blocklist);
     mostrato = $('blocklist').value;
     await renderCategories();
   }
@@ -185,15 +187,37 @@
     mostraSalvato._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  // L'elenco come la pagina l'ha letto o scritto l'ultima volta: un cambio arrivato da altrove (la chat)
-  // si mostra solo se qui non si sta scrivendo (#949).
+  // L'elenco come la pagina l'ha letto o scritto l'ultima volta: un cambio arrivato da altrove (la chat, il tasto
+  // destro) si mostra solo se qui non si sta scrivendo (#949). Le righe che non sono siti restano al loro posto.
   let mostrato = null;
+  let scartate = [];
 
-  async function save() {
+  function avvisoRighe(righe) {
+    const el = $('blocklistError');
+    el.textContent = righe.length ? I18n.t('options_blocklist_invalid', righe.join(', ')) : '';
+    el.hidden = !righe.length;
+  }
+
+  // `riscrivi`: a gesto finito (uscita, incolla) la casella mostra i siti ridotti e dice le righe scartate; mentre
+  // si scrive no, perché «faceb» è una riga a metà e il cursore non deve saltare.
+  async function save({ riscrivi = false } = {}) {
     caselle.spedita('blocklist');
-    mostrato = $('blocklist').value;
-    const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist } });
+    const el = $('blocklist');
+    const letto = Siti.elencoDaTesto(el.value);
+    scartate = letto.scartate;
+    if (riscrivi) {
+      const testo = Siti.testoDaElenco(letto.valid, letto.scartate);
+      if (el.value !== testo) {
+        const inFondo = el.selectionEnd === el.value.length;
+        el.value = testo;
+        if (inFondo || document.activeElement === el) el.setSelectionRange(testo.length, testo.length);
+      }
+      avvisoRighe(letto.invalid);
+    } else if (!letto.invalid.length) {
+      avvisoRighe([]);
+    }
+    mostrato = el.value;
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist: letto.valid }, mentreScrive: !riscrivi });
     mostraSalvato();
   }
 
@@ -205,25 +229,31 @@
       for (const [input, cat] of caselleCategorie) if (!input.value.trim()) input.value = cat.name;
     },
   });
-  caselle.registra('blocklist', () => save());
+  caselle.registra('blocklist', (avvisi) => save({ riscrivi: avvisi === true }));
 
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) disegnaScorciatoie(msg.settings);
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || mostrato === null) return;
       const el = $('blocklist');
-      const scritti = el.value.split('\n').map((x) => x.trim()).filter(Boolean);
+      const scritti = Siti.elencoDaTesto(el.value).valid;
       // Uno stesso elenco con altre righe vuote non si riscrive: chi scrive perderebbe l'a capo appena battuto.
       if (el.value !== mostrato || JSON.stringify(scritti) === JSON.stringify(msg.settings.blocklist || [])) return;
-      const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings);
+      const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings, {
+        elenco: (_id, lista) => Siti.testoDaElenco(lista, scartate),
+      });
       if (toccati.length) mostrato = el.value;
     });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    $('blocklist').addEventListener('input', (e) => caselle.cambiato('blocklist', e));
-    $('blocklist').addEventListener('change', () => save());
+    // Un indirizzo incollato è un gesto finito: si riduce subito, come all'uscita.
+    $('blocklist').addEventListener('input', (e) => {
+      if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') { save({ riscrivi: true }); return; }
+      caselle.cambiato('blocklist', e);
+    });
+    $('blocklist').addEventListener('change', () => save({ riscrivi: true }));
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
     // riportata a fuoco invece di duplicarla.

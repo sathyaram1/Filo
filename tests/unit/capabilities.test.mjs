@@ -450,6 +450,8 @@ function menuVoiceLabels() {
   pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
   // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
+  // E il menu di riserva, che il tasto destro apre dove quello di Filo non parte (Filo spento sul sito, #843).
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'main', 'menuDiRiserva.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);

@@ -446,3 +446,24 @@ test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è 
   assert.deepEqual(build('avviso_crediti', 'spento').partial, { avvisoCrediti: { attivo: false } });
   assert.deepEqual(build('spiegazione_anticipata', 'no').partial, { spiegaAnticipata: { enabled: false } });
 });
+
+test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla volta, la risposta nomina il sito', () => {
+  const spegni = build('siti_filo_spento', 'aggiungi https://www.Docs.Google.com/document/d/x');
+  assert.equal(spegni.costo, 1);
+  assert.equal(spegni.allenta, false);
+  assert.deepEqual(spegni.elenco, { percorso: 'blocklist', op: 'aggiungi', voci: ['docs.google.com'], nome: 'Siti dove Filo è spento' });
+  assert.match(spegni.label, /docs\.google\.com/);
+  const riaccendi = build('domini_esclusi', 'togli docs.google.com');
+  assert.equal(riaccendi.costo, 1);
+  assert.equal(riaccendi.elenco.op, 'togli');
+  assert.match(riaccendi.label, /riacceso su docs\.google\.com/);
+  for (const intero of ['solo esempio.it', 'svuota']) {
+    const no = build('siti_filo_spento', intero);
+    assert.ok(no.rifiuto, `«${intero}» riscriverebbe l'elenco intero a costo 1`);
+    assert.match(no.perModello, /aggiungi|togli/);
+  }
+  const giro = P.applicaElenco(spegni.elenco, { blocklist: ['banca.it'] });
+  assert.deepEqual(giro.partial, { blocklist: ['banca.it', 'docs.google.com'] }, 'si aggiunge senza togliere gli altri');
+  assert.deepEqual(P.applicaElenco(riaccendi.elenco, { blocklist: ['banca.it', 'docs.google.com'] }).partial, { blocklist: ['banca.it'] });
+  assert.match(build('siti_filo_spento', 'aggiungi localhost').rifiuto, /localhost/);
+});

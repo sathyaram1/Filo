@@ -831,23 +831,8 @@
     $('sec-riquadri-modello').disabled = !conta;
   }
 
-  // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
-  // www. e porta, lascia il bare host minuscolo. "https://www.Gmail.com/x" →
-  // "gmail.com". Ritorna '' se non estraibile.
-  function cleanDomain(raw) {
-    // Come la lista nel main: «*.sito.it», «.sito.it» e «sito.it.» valgono «sito.it». Prima di
-    // leggere l'indirizzo, perché il browser scrive la stella come «%2A».
-    let s = String(raw || '').trim().toLowerCase().replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
-    if (!s) return '';
-    try {
-      if (s.includes('://')) s = new URL(s).hostname;
-      else s = new URL('http://' + s).hostname;
-    } catch (_) {
-      s = s.split('/')[0].split('?')[0];
-    }
-    s = s.replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
-    return window.SN_NOMI_SITO.valido(s) ? s : '';
-  }
+  // "https://www.Gmail.com/x" → "gmail.com", '' se non è un sito: la riduzione di tutti gli elenchi di siti (#843).
+  const cleanDomain = window.SN_NOMI_SITO.daScritto;
 
   function renderWhitelist() {
     const list = $('cookie-wl-list');
@@ -1190,41 +1175,9 @@
     }
   }
 
-  // Normalizza e valida ogni riga della blacklist come il campo "siti fidati":
-  // scarta schema/path/www, minuscolo, e tiene solo domini con estensione
-  // (niente IP o nomi a etichetta singola come "facebook"). Ritorna i domini
-  // validi (deduplicati) e le righe scartate così com'erano, per l'avviso; `scartate` le tiene
-  // col posto (quanti domini validi le precedevano), per ridarle dove l'utente le aveva scritte.
-  function parseBlacklist(raw) {
-    const valid = [];
-    const seen = new Set();
-    const invalid = [];
-    const scartate = [];
-    for (const line of String(raw || '').split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const domain = cleanDomain(trimmed);
-      if (!domain) { invalid.push(trimmed); scartate.push({ riga: trimmed, dopo: valid.length }); continue; }
-      if (seen.has(domain)) continue;
-      seen.add(domain);
-      valid.push(domain);
-    }
-    return { valid, invalid, scartate };
-  }
-
-  function righe(validi, scartate) {
-    const v = (Array.isArray(validi) ? validi : []).filter((r) => typeof r === 'string' && r.trim());
-    const s = (Array.isArray(scartate) ? scartate : [])
-      .map((x) => (typeof x === 'string' ? { riga: x, dopo: v.length } : x))
-      .filter((x) => x && typeof x.riga === 'string' && x.riga.trim());
-    const posto = (x) => Math.max(0, Math.min(v.length, Math.floor(Number(x.dopo)) || 0));
-    const out = [];
-    for (let i = 0; i <= v.length; i++) {
-      for (const x of s) if (posto(x) === i) out.push(x.riga);
-      if (i < v.length) out.push(leggibile(v[i]));
-    }
-    return out.join('\n');
-  }
+  // Ogni riga ridotta come i siti fidati (niente IP né nomi senza estensione): i validi e le righe scartate col loro posto.
+  const parseBlacklist = window.SN_NOMI_SITO.elencoDaTesto;
+  const righe = window.SN_NOMI_SITO.testoDaElenco;
 
   // Le caselle di testo della pagina non hanno un «Salva» (#590.2): ognuna si iscrive qui e ne eredita pausa e uscite.
   // L'uscita vera accende gli avvisi anche se il testo è già partito col Ctrl di Ctrl+Tab, e il sito lasciato

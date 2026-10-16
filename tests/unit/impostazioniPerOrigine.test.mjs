@@ -133,8 +133,32 @@ test('sentinella: ogni azione di Filo che la barra d\'aiuto chiede è fra quelle
   const siti = scriptDeiSiti().map((x) => x.src).join('\n');
   const mandate = [...siti.matchAll(/runFiloAction\(\s*\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
   assert.ok(mandate.includes('NAVIGA'), 'la sentinella non vede più le azioni che la barra manda da sé');
-  assert.deepEqual([...descritte, ...mandate].filter((t) => !W.AZIONI_WEB.has(t)), [], 'azioni della barra d\'aiuto non ammesse dai siti');
+  // #843 — IMPOSTA_PREFERENZA passa solo nella forma stretta del prompt (Filo spento sul sito stesso): la prova sotto.
+  assert.deepEqual([...descritte, ...mandate].filter((t) => !W.AZIONI_WEB.has(t) && t !== 'IMPOSTA_PREFERENZA'), [], 'azioni della barra d\'aiuto non ammesse dai siti');
+  for (const m of src.matchAll(/"filo":\s*(\{\s*"type":\s*"IMPOSTA_PREFERENZA"[^}]*\})/g)) {
+    const esempio = JSON.parse(m[1]);
+    assert.equal(W.azioneAmmessaDa(esempio, 'https://docs.esempio.it/d/1'), true, `l'esempio del prompt non passa da un sito: ${m[1]}`);
+  }
   for (const t of W.AZIONI_WEB) assert.ok(globalThis.SN_ACTION_LEVELS.costoFor({ type: t }), `azione ammessa inesistente: ${t}`);
+});
+
+test('#843 — da un sito si spegne o si riaccende Filo solo su quel sito, mai su un altro né un\'altra impostazione', () => {
+  require(join(ROOT, 'src', 'shared', 'preferences.js'));
+  const da = 'https://www.Docs.Esempio.it/documento/1';
+  const imposta = (chiave, valore) => W.azioneAmmessaDa({ type: 'IMPOSTA_PREFERENZA', chiave, valore }, da);
+  assert.equal(imposta('siti_filo_spento', 'aggiungi questo sito'), true);
+  assert.equal(imposta('siti_filo_spento', 'togli questo sito'), true);
+  assert.equal(imposta('domini_esclusi', 'aggiungi docs.esempio.it'), true);
+  assert.equal(imposta('siti_filo_spento', 'togli esempio.it'), true, 'riaccendere toglie anche la voce che copre il sito');
+  assert.equal(imposta('siti_filo_spento', 'aggiungi esempio.it'), false, 'spegnere Filo sul dominio padre spegne anche gli altri suoi siti');
+  assert.equal(imposta('siti_filo_spento', 'aggiungi altro.example'), false);
+  assert.equal(imposta('siti_filo_spento', 'togli altro.example'), false);
+  assert.equal(imposta('siti_filo_spento', 'aggiungi questo sito, altro.example'), false);
+  assert.equal(imposta('siti_filo_spento', 'svuota'), false);
+  assert.equal(imposta('siti_filo_spento', 'aggiungi scheda: Posta'), false);
+  assert.equal(imposta('siti_bloccati', 'aggiungi questo sito'), false);
+  assert.equal(imposta('limite_spesa', '9999'), false);
+  assert.equal(W.azioneAmmessaDa({ type: 'IMPOSTA_PREFERENZA', chiave: 'siti_filo_spento', valore: 'aggiungi questo sito' }, 'http://127.0.0.1:8080/'), false);
 });
 
 test('un campo nuovo non elencato non raggiunge i siti (lista di ammessi, non di esclusi)', () => {

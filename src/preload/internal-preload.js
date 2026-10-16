@@ -315,6 +315,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»
   safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro
   safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
   safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
