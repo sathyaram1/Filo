@@ -469,7 +469,7 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
         }
         if (S.letti[q]) {
           a.r++;
-          if (++a.vuoti > TENTATIVI_A_VUOTO) break;
+          if (++a.vuoti > tetto(i)) break;
           continue;
         }
         p = q;
