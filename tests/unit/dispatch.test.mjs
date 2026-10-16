@@ -731,7 +731,7 @@ test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni
     if (payload.history) assert.match(ruolo, /Avvertenza di serie/);
     // Quello che è uscito dalla stampa sta tutto nei file citati.
     const nei = Object.values(j.payload.fileEsterni || {}).map((f) => readFileSync(f, 'utf8')).join('\n');
-    if (payload.history) assert.ok(nei.includes(critica) || JSON.stringify(j.payload).includes(critica.slice(0, 200)));
+    if (payload.history) assert.ok(nei.includes(critica) || j.payload.history.some((h) => h.critique === critica));
     if (payload.decisioni) assert.ok(nei.includes('domanda 29') || JSON.stringify(j.payload).includes('domanda 29'));
   }
 });
