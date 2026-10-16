@@ -4273,37 +4273,40 @@
     if (t.prende) return t.prende(e);
     return t.tasti.some((k) => TASTI.combacia(e, ['Ctrl', ...(t.shift ? ['Shift'] : []), k].join('+')));
   }
-  function tastoEditorDi(sc) {
-    const e = TASTI.pressioneScritta(sc);
-    return (e && TASTI_EDITOR.find((t) => prendeIlTasto(t, e))) || null;
-  }
   // Perché una scorciatoia non partirebbe mai su questo modulo per i tasti dell'Editor o di un altro modulo ('' = va bene).
-  function motivoScorciatoiaPresa(sc, m) {
-    if (!sc) return '';
-    const nome = TASTI.etichettaScritta(sc);
-    const t = tastoEditorDi(sc);
+  // Il tasto si prova con la pressione che fa su questa tastiera: sulla francese Ctrl+6 scrive «-», ed è lo zoom.
+  function motivoScorciatoiaPresa(c, m) {
+    const e = pressioneDi(c);
+    if (!e) return '';
+    const nome = TASTI.etichettaScritta(c.nome, TASTI.piattaforma());
+    const t = TASTI_EDITOR.find((x) => prendeIlTasto(x, e));
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
-    const e = TASTI.pressioneScritta(sc);
-    const altro = e && doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
+    const altro = doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && candidatoDi(x.data) && stessoTasto(c, candidatoDi(x.data)));
     if (altro) {
       const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
       return `${nome} è già la scorciatoia di «${etich}», e partirebbe solo quello`;
     }
     return '';
   }
-  // Perché una scorciatoia scritta non si salva su questo modulo, o null. La
+  // Perché una scorciatoia (un candidato, vedi `candidatoDi`) non si salva su questo modulo, o null. La
   // stessa regola rifiuta al salvataggio, avvisa all'apertura e sceglie gli
   // esempi degli avvisi: un esempio che poi si rifiuta non esce (#545).
-  function rifiuto(sc, m) {
-    if (!sc) return null;
-    const comune = TASTI.rifiutoScritta(sc, TASTI.piattaforma());
+  function rifiuto(c, m) {
+    if (!c) return null;
+    const plat = TASTI.piattaforma();
+    const comune = c.tasto
+      ? TASTI.rifiutoFisico(c.tasto, layoutTastiera, plat, { car: c.car, nome: TASTI.etichettaScritta(c.nome, plat) })
+      : TASTI.rifiutoScritta(c.nome, plat);
     if (comune) return comune;
-    const motivo = motivoScorciatoiaPresa(sc, m);
+    const motivo = motivoScorciatoiaPresa(c, m);
     return motivo ? { tipo: 'presa', motivo } : null;
   }
   function testoRifiuto(r, m) {
     const libera = scorciatoiaLibera(m);
     const perEsempio = libera ? `, per esempio ${libera}` : '';
+    if (r.tipo === 'senzaTastoProprio') return `Su questa tastiera «${r.nome}» non ha un tasto suo: premi la combinazione invece di scriverla.`;
+    if (r.tipo === 'macControl') return `Su Mac le scorciatoie dei moduli si fanno con ${tasto('Ctrl')}: Control da solo non lo distinguo.`;
+    if (r.tipo === 'win') return `Il tasto ${TASTI.suMac() ? 'Cmd' : 'Windows'} lo usa il sistema: usa ${tasto('Ctrl')} o Alt.`;
     if (r.tipo === 'modificatore') {
       return `Non riconosco «${r.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc)${libera ? `, es. ${libera}` : ''}.`;
     }
