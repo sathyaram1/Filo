@@ -42,9 +42,6 @@ test('dalla chat: la ricetta salvata torna col suo bottone, che la apre e la tog
 
     // Un bottone solo: la pagina che la risposta nomina, non l'altra «ricetta» trovata (il sapone).
     const bottone = page.locator('.dash-bubble-actions .dash-salvata-btn');
-    await page.waitForTimeout(6000);
-    console.log('DEBUG', JSON.stringify(await page.locator('#bubbles, .dash-bubble').allTextContents()).slice(0, 3000));
-    console.log('DEBUG2', JSON.stringify(await chiamateAlModello(app)).slice(-3000));
     await expect(bottone).toHaveCount(1, { timeout: 20_000 });
     await expect(bottone).toContainText('Pasta alla carbonara classica romana');
     await expect(bottone).toHaveAttribute('data-url', RICETTA);
