@@ -58,7 +58,16 @@ test.describe('con la home già pronta', () => {
   test.use({ riservaNuovaScheda: true });
 
   test('una scheda nuova: torna la home appena aperta, non quella dell\'avvio né la riserva', async ({ app, openTab }) => {
+    // La riserva caricata è una Page che c'era già prima dell'apertura: diventa la scheda, e openTab deve tornare lei.
+    const riservaPronta = () => app.evaluate(({ BrowserWindow }) => {
+      const r = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riserva;
+      const wc = r && r.webContents();
+      return wc && wc.getURL() === 'filo://newtab/' && !wc.isLoading() ? r.id : null;
+    });
+    let riserva = null;
+    await expect.poll(async () => (riserva = await riservaPronta()), { timeout: 20_000, message: 'la riserva non è pronta' }).toBeTruthy();
     const home = await openTab('filo://newtab/');
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId)).toBe(riserva);
     await segna(home, 'home nuova');
     expect(await segnoDellaSchedaAttiva(app)).toBe('home nuova');
     const altra = await openTab('filo://newtab/');
