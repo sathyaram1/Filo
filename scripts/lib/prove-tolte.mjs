@@ -538,7 +538,8 @@ function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, pr
       const rapporto = perCaso ? join(rapporti, `${i}.json`) : '';
       const env = perCaso ? { ...(l.env || process.env), PLAYWRIGHT_JSON_OUTPUT_FILE: rapporto } : l.env;
       const r = lancia(l.cmd, l.args, { cwd: base, stdio: 'inherit', shell: process.platform === 'win32', ...(env ? { env } : {}) });
-      esiti.set(p, { rossa: !r || r.status !== 0, casi: perCaso ? casiDalReport(leggiJson(rapporto)) : null });
+      const e = esitoDelRilancio(r ? r.status : null, perCaso ? leggiJson(rapporto) : null);
+      esiti.set(p, { rossa: e.rossa, casi: perCaso ? e.casi : null, attesi: e.attesi });
     });
     return { esiti, motivo: '' };
   } catch (e) {
