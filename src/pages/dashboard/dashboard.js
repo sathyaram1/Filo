@@ -581,13 +581,24 @@
     ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
   }, true);
 
-  function faviconUrl(rawUrl) {
-    if (!rawUrl) return '';
+  // L'icona di un sito la cerca il main, mai un servizio di terzi (#848). Si ricorda solo quella trovata:
+  // un sito che non ha risposto si richiede al giro dopo, e lì decide il main quando riprovare.
+  const iconeSiti = new Map();
+  function iconaDelSito(rawUrl) {
+    let host = '';
     try {
-      const u = new URL(rawUrl);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(u.hostname)}&sz=64`;
-    } catch (_) { return ''; }
+      const u = new URL(String(rawUrl || ''));
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.host.toLowerCase();
+    } catch (_) {}
+    if (!host) return Promise.resolve('');
+    if (!iconeSiti.has(host)) {
+      const dimentica = () => { iconeSiti.delete(host); return ''; };
+      iconeSiti.set(host, send({ type: MSG.ICONA_SITO, url: String(rawUrl) }).then((r) => {
+        const dato = r && r.ok && typeof r.dato === 'string' && /^data:image\//.test(r.dato) ? r.dato : '';
+        return dato || dimentica();
+      }, dimentica));
+    }
+    return iconeSiti.get(host);
   }
 
   // I suggerimenti sono UNA carta fra le altre (#870): li disegna la parte delle carte.
