@@ -4625,8 +4625,9 @@ function fileNominatiDallaRisposta(textReply, azioni) {
 }
 
 // #845 — le pagine trovate con CERCA_SALVATE che la risposta nomina diventano bottoni sotto la risposta, nell'ordine in
-// cui le nomina (`_output.nominate`). Nominata vuol dire il titolo, un suo pezzo di almeno due parole fra « - » o « | »
-// (il nome del sito da solo no: lo hanno tutte le sue pagine), o l'indirizzo; non scartata («non X»), né già aperta.
+// cui le nomina (`_output.nominate`). Nominata vuol dire il titolo, un suo pezzo di almeno due parole fra « - », « | » o
+// «: », l'indirizzo o una parola lunga del titolo che le altre trovate non hanno (i modelli accorciano e raccontano);
+// non scartata («non X»), né già aperta. Una sola trovata, e una risposta che non dice di no: è lei.
 function nomiDellaSalvata(p, piano) {
   const titolo = piano(p.title);
   const nomi = titolo.length >= 4 ? [titolo] : [];
