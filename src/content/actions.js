@@ -1058,7 +1058,7 @@
     const finish = (openList) => {
       if (done) return;
       done = true;
-      if (chiudiScheda) salvataggioInCorso = false;
+      if (chiudiScheda) salvataggioInCorso = null;
       if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
