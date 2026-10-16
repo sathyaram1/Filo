@@ -754,25 +754,27 @@ async function riscriviGruppi(ctx, S, voci, { sincronizza = false } = {}) {
 
 // Le copie mancanti di un gruppo integro altrove, con la stessa versione e lo stesso contenuto di prima.
 async function restauraMancanti(ctx, S, gruppi) {
-  const voci = [];
-  for (const g of gruppi) {
-    const info = S.gruppi[g];
-    const dati = await decodificaGruppo(ctx, S, g);
-    if (!dati) continue;
-    const par = RS.parita(dati);
-    const base = 2 * GRUPPO * g;
-    for (let s = 0; s < Math.min(info.k, kAtteso(S, g)); s++) {
-      for (const c of [0, 1]) {
-        const i = base + 2 * s + c;
-        if (valida(S, g, i)) continue;
+  for (const lotto of aLotti(gruppi)) {
+    const decodificati = await decodificaGruppi(ctx, S, lotto);
+    const voci = [];
+    for (const g of lotto) {
+      const info = S.gruppi[g];
+      const dati = decodificati.get(g);
+      if (!dati) continue;
+      const base = 2 * GRUPPO * g;
+      const n = Math.min(info.k, kAtteso(S, g));
+      const mancanti = [];
+      for (let i = base; i < base + 2 * n; i++) if (!valida(S, g, i)) mancanti.push(i);
+      const par = RS.parita(dati, mancanti.filter((i) => i & 1).map((i) => (i >> 1) - GRUPPO * g));
+      for (const i of mancanti) {
         const p = S.pos[i] >= 0 ? S.pos[i] : colloca(ctx, S, i);
         if (p < 0) continue;
-        voci.push({ p, i, chiaro: componi({ k: info.k, c, j: i >> 1, v: info.v, inc: S.inc }, c ? par[s] : dati[s]), v: info.v, k: info.k });
+        const s = (i >> 1) - GRUPPO * g;
+        voci.push({ p, i, chiaro: componi({ k: info.k, c: i & 1, j: i >> 1, v: info.v, inc: S.inc }, i & 1 ? par[s] : dati[s]), v: info.v, k: info.k });
       }
     }
-    if (voci.length >= 1024) await scriviSigillati(ctx, S, voci.splice(0));
+    await scriviSigillati(ctx, S, voci);
   }
-  await scriviSigillati(ctx, S, voci);
 }
 
 function marcaDanneggiati(tabella, blocchi) {
