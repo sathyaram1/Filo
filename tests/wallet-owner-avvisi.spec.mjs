@@ -191,6 +191,10 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
       await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.OPEN_URL, url: 'filo://credits/owner.html' }));
       await home.waitForTimeout(3000);
       console.log('DEBUG2', JSON.stringify(await adm()), stato.letture);
+      const ow = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'x');
+      const t0 = Date.now();
+      const st = await ow.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_STATE }).then((r) => JSON.stringify(r).slice(0, 600), (e) => 'ERR ' + e.message));
+      console.log('DEBUG3', Date.now() - t0, st);
       await expect.poll(() => avvisiOwner(app), { timeout: 15_000 }).toEqual([]);
       await expect(carte(home)).toHaveCount(0, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
