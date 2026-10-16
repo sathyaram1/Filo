@@ -649,20 +649,12 @@
     return max;
   }
 
-  // Rimette il contatore in pari. Solo owner: serve il token admin. Torna il
-  // valore in vigore alla fine. Due numeri che non si scambiano (#923):
-  //   · `provato` lo ALZA (lo crea, se manca): un `seq` con la prova del
-  //     mittente (maxSeqProvato) o assegnato da chi chiama. Mai il massimo di
-  //     tutti: un documento anonimo a un milione porterebbe il contatore oltre
-  //     il tetto delle regole, e da lì nessun feedback avrebbe più un numero.
-  //   · `opts.pavimento` lo ABBASSA: il `seq` più alto di TUTTI, esatto
-  //     (SN_FEEDBACK.maxSeq). Farlo avanzare di uno lo può chiunque, e senza
-  //     questo un contatore gonfiato resterebbe gonfiato; sotto il pavimento
-  //     non si scende, o si riuserebbero numeri già dati. Mai il massimo dei
-  //     soli feedback caricati.
-  // Anche col pavimento vero resta una corsa (un invio fra la nostra lettura e
-  // la nostra scrittura): si scende solo oltre SEQ_LOWER_MARGIN, perché un
-  // numero saltato vale meno di due numeri uguali.
+  // Rimette il contatore in pari; solo owner (token admin). Torna il valore in vigore.
+  // `provato` lo ALZA (o lo crea): un seq con la prova del mittente o assegnato da chi chiama, mai il
+  // massimo di tutti, che un anonimo porta a un milione, oltre il tetto delle regole (#923).
+  // `opts.pavimento` lo ABBASSA, contro chi lo gonfia di uno in uno: il seq più alto di TUTTI, esatto
+  // (maxSeq; mai i soli caricati), perché sotto si riuserebbero numeri già dati. Si scende solo oltre
+  // SEQ_LOWER_MARGIN: un invio fra lettura e scrittura è una corsa, e un numero saltato vale meno di due uguali.
   const SEQ_LOWER_MARGIN = 10;
 
   async function ensureSeqCounter(provato, opts = {}) {
