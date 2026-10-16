@@ -1216,6 +1216,7 @@
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
+            tastoCopia(bubble.wrap, daMostrare);
           }
           notaRipiego(bubble.text, m.keyFallback);
           notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
