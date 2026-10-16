@@ -988,7 +988,7 @@
         renderWhitelist();
         saveCookies();
       });
-      li.appendChild(span);
+      li.appendChild(voce);
       li.appendChild(btn);
       list.appendChild(li);
     }
