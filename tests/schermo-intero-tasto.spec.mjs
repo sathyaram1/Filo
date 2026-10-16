@@ -123,6 +123,14 @@ test('il nome del tasto si legge nel suggerimento della barra laterale e fra le 
   await premi(app, 'scheda', 'F11');
   await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 5000 }).toBe(false);
 
+  // Passandoci sopra a barra aperta il suggerimento che compare è quello col tasto.
+  await comandaBarra(app, 'clic');
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
+  await pannelloFermo(barra);
+  await ico.hover();
+  await expect.poll(() => suggerimentoVisibile(app), { timeout: 4000 }).toBe('Schermo intero (F11)');
+  await comandaBarra(app, 'chiudi');
+
   const altro = await openTab('filo://options/altro.html');
   await expect(altro.locator('#shortcutsList')).toContainText('F11 — Metti e togli lo schermo intero');
 });
