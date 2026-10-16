@@ -25,13 +25,14 @@ conoscere chi lo usa, e prova a capire cosa vuole prima che lo dica.
 Oggi Filo gira sul computer, su Windows, Mac e Linux: è un browser con l'AI
 dentro. Più avanti sarà un sistema solo, condiviso fra computer, telefono e TV.
 
-Le scelte sono spiegate per esteso. In [`transparency/`](transparency/) ci
-sono i modelli che Filo usa e perché, cosa resta sul computer e cosa esce,
-verso chi, e come si cercano i problemi di sicurezza. In
-[`SECURITY.md`](SECURITY.md) c'è come protegge dati e account, misura per
-misura, separando quelle già attive da quelle in arrivo. Cosa sa fare oggi lo
-elenca voce per voce [`src/shared/capabilities.js`](src/shared/capabilities.js),
-la stessa lista che Filo legge per rispondere a «puoi farlo?».
+Le scelte sono spiegate per esteso. I documenti in
+[`transparency/`](transparency/) dicono quali modelli usa Filo e perché, cosa
+resta sul computer e cosa esce, verso chi, e come si cercano i problemi di
+sicurezza. [`SECURITY.md`](SECURITY.md) spiega come protegge dati e account,
+misura per misura, e quali misure sono già attive e quali in arrivo. Cosa sa
+fare oggi lo elenca voce per voce
+[`src/shared/capabilities.js`](src/shared/capabilities.js): è la stessa lista
+che Filo legge per rispondere a «puoi farlo?».
 
 ## Quick start
 
@@ -79,7 +80,7 @@ Preferenze, la versione nuova arriva solo quando premi «Installa».
 
 ```
 src/
-├── main/         processo main di Electron: finestra, schede, protocollo filo://, IPC, scorciatoie, aggiornamenti
+├── main/         processo main di Electron: finestra, schede, filo://, IPC, scorciatoie, aggiornamenti
 │   ├── services/ servizi, handler dei messaggi per dominio, provider dei modelli
 │   └── shim/     le API chrome.* ricreate per il codice nato nell'estensione
 ├── preload/      i preload della shell, delle pagine filo://, delle pagine web e delle finestrelle native
@@ -88,7 +89,7 @@ src/
 ├── content/      gli script nelle pagine web (tasto destro, popup, barra laterale, evidenziatore…)
 ├── shared/       i moduli condivisi fra main e pagine, registrati su globalThis
 ├── styles/       i CSS condivisi
-└── vendor/       codice e dati di terzi, inclusi così come sono
+└── vendor/       codice e dati di terzi
 tests/            unit test in tests/unit/, spec Playwright in tests/*.spec.mjs
 scripts/          strumenti di sviluppo, rilascio e routine
 transparency/     i documenti di trasparenza, sorgente unica
