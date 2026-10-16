@@ -34,7 +34,7 @@ require('../shared/tabColor');
 const { compareRainbow } = globalThis.SN_TAB_COLOR;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
-const { collegaScorciatoie } = require('./shortcuts');
+const { collegaScorciatoie, staRegistrandoTasti } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
@@ -2476,6 +2476,7 @@ class TabManager {
       // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
       // dentro quel giro che la pagina chiede.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      if (staRegistrandoTasti(wc)) return;
       // La barra laterale prima di tutto: il suo tasto, e l'Esc che la chiude prima della modalità.
       if (this.barra.tasto(input)) {
         event.preventDefault();

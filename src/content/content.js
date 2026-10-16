@@ -186,6 +186,8 @@
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
     self.SN_AVVISI?.imposta(settings.notifications);
+    // I tasti di Spiega e Aiuto scelti dall'utente: il menu li scrive accanto alle voci (#842).
+    Tasti.usaScorciatoieFilo(settings.scorciatoie);
 
     // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
     // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
@@ -1938,7 +1940,7 @@
     return {
       type: 'item',
       label: I18n.t('menu_help'),
-      shortcut: Tasti.etichetta('Alt+H'),
+      shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
       onClick: () => openSurface('help', () => openHelpSidebar()),
     };
   }
@@ -2326,6 +2328,7 @@
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
       self.SN_AVVISI?.imposta(settings.notifications);
+      Tasti.usaScorciatoieFilo(settings.scorciatoie);
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.

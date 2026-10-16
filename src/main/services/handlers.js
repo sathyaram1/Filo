@@ -1067,6 +1067,26 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   if (partial && partial.themeTokens && globalThis.SN_THEME_TOKENS) {
     partial = { ...partial, themeTokens: globalThis.SN_THEME_TOKENS.sanitize(partial.themeTokens).clean };
   }
+  // Una scorciatoia di Filo che non partirebbe mai non si salva: chi scrive (Preferenze, chat) l'ha già rifiutata col
+  // perché, questo è il confine per tutte le altre strade (#842).
+  if (partial && partial.scorciatoie && typeof partial.scorciatoie === 'object' && globalThis.SN_TASTI) {
+    const T = globalThis.SN_TASTI;
+    const tocca = (id) => Object.prototype.hasOwnProperty.call(partial.scorciatoie, id);
+    // Si confrontano con la mappa che risulterà (un backup può scambiarne due), non con quella di adesso.
+    const dopo = Object.fromEntries(T.AZIONI_FILO.map((a) => {
+      const v = tocca(a.id) ? partial.scorciatoie[a.id] : T.scorciatoiaFilo(a.id);
+      return [a.id, typeof v === 'string' && v ? v : a.serie];
+    }));
+    const buone = {};
+    for (const a of T.AZIONI_FILO) {
+      if (!tocca(a.id)) continue;
+      // Arriva già nella forma salvata (Ctrl vale Cmd anche su Mac): non si rilegge come una frase detta.
+      const v = partial.scorciatoie[a.id] || a.serie;
+      if (typeof v === 'string' && v.length <= 80 && !T.rifiutoScorciatoiaFilo(a.id, v, undefined, dopo)) buone[a.id] = T.valoreDaSalvare(a.id, v);
+      else console.warn('[Filo] scorciatoia non salvata', a.id, String(v).slice(0, 40));
+    }
+    partial = { ...partial, scorciatoie: buone };
+  }
   // La chiave OpenRouter propria si mette e si toglie da due posti
   // (Impostazioni e pagina Crediti, #629): se cambia, il rifiuto registrato
   // per quella di prima non vale più, e la pagina Crediti aperta accanto si
@@ -1081,6 +1101,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
   }
   try { require('../movimento').segui(merged); } catch (_) {}
+  try { require('../shortcuts').configura(merged); } catch (_) {}
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   avvisaSeLaProntezzaCambia().catch(() => {});
   try {

@@ -29,6 +29,7 @@
     GET_SETTINGS: 'get_settings',
     UPDATE_SETTINGS: 'update_settings',           // { settings }
     RESET_SETTINGS: 'reset_settings',             // → riporta TUTTE le impostazioni ai predefiniti
+    REGISTRA_TASTI: 'registra_tasti',             // { attivo } → i tasti premuti arrivano alla pagina (Preferenze, #842)
     EXPORT_DATA: 'export_data',                   // → salva tutti i dati come .zip
     // Reimportazione del .zip di EXPORT_DATA, in due passi: prima si sceglie e
     // si LEGGE il file (anteprima con quante sezioni/immagini contiene), poi si

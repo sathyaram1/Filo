@@ -17,7 +17,7 @@
 //     title:    'Titolo per l’utente',  // breve, in italiano
 //     category: 'una di CATEGORIES',
 //     desc:     'Cosa fa, in termini utente. Niente nomi di file/funzioni.',
-//     invoke:   'Come si attiva (shortcut / voce di menu / pagina).',
+//     invoke:   'Come si attiva (shortcut / voce di menu / pagina).', // {tasto:<azione>}: il tasto scelto (#842)
 //     doesNot:  'Confine: cosa NON fa (opzionale, ma prezioso per F4).',
 //     cancello: 'redteam',              // opzionale: la voce esiste solo per chi ha quel cancello aperto
 //   }
@@ -148,13 +148,13 @@
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
-      invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Con Alt+E (Ctrl+Alt+E su Mac), o con la freccia accanto alla spiegazione, ne apri una più estesa in un riquadro sopra la selezione.',
+      invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Con {tasto:explain-selection}, o con la freccia accanto alla spiegazione, ne apri una più estesa in un riquadro sopra la selezione.',
       doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando. In incognito non prepara la spiegazione mentre selezioni: parte quando apri il tasto destro. Fuori dall’incognito la prepara solo se la selezione l’hai fatta tu (mouse, tastiera o dito) e non supera i 2000 caratteri; quella fatta da uno script del sito, o più lunga, parte anche lei dal tasto destro. Da una scheda partono al massimo 120 spiegazioni preparate al minuto: oltre, Filo le ferma e te lo dice.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
       desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro.',
-      invoke: 'Seleziona il testo e usa Alt+T (Ctrl+Alt+T su Mac): la traduzione compare in un riquadro sopra la selezione. Il menu del tasto destro non ha una voce per questo. La sua icona "Traduci" traduce tutta la pagina.',
+      invoke: 'Seleziona il testo e usa {tasto:translate-selection}: la traduzione compare in un riquadro sopra la selezione. Il menu del tasto destro non ha una voce per questo. La sua icona "Traduci" traduce tutta la pagina.',
       doesNot: 'Non traduce il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando.',
     },
     {
@@ -312,7 +312,7 @@
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
-      invoke: 'Alt+S (Ctrl+Alt+S su Mac), oppure menu del tasto destro → "Salva per dopo".',
+      invoke: '{tasto:save-for-later}, oppure menu del tasto destro → "Salva per dopo".',
       doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla. Ne tiene al massimo 1000: oltre, la più vecchia esce dall’elenco e un avviso nella finestra dice quale.',
     },
     {
@@ -379,7 +379,7 @@
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Sa quando hai aperto la scheda e quando ci è arrivata la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo. I passi che fai con lui, per ora, non escono dal tuo computer. Ogni conversazione resta sul tuo computer come una riga nel filo della home, e Filo la ritrova quando gliene chiedi.',
-      invoke: 'Alt+H (Ctrl+Alt+H su Mac), oppure la voce «Aiuto» del tasto destro sulla pagina o sulla linguetta della scheda (su Mac anche dalla barra dei menu, Aiuto → Assistente laterale). È acceso di serie. Lo spegni e lo riaccendi in Preferenze → Impostazioni avanzate → «Funzioni», o chiedendolo a Filo («spegni l’Aiuto»). Da spento la voce sparisce dai menu, un pannello già aperto si chiude, e la scorciatoia dice che è spento invece di aprirlo.',
+      invoke: '{tasto:open-help-sidebar}, oppure la voce «Aiuto» del tasto destro sulla pagina o sulla linguetta della scheda (su Mac anche dalla barra dei menu, Aiuto → Assistente laterale). È acceso di serie. Lo spegni e lo riaccendi in Preferenze → Impostazioni avanzate → «Funzioni», o chiedendolo a Filo («spegni l’Aiuto»). Da spento la voce sparisce dai menu, un pannello già aperto si chiude, e la scorciatoia dice che è spento invece di aprirlo.',
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
     },
     {
@@ -408,7 +408,7 @@
       id: 'filo-assistant', title: 'Chiedi a Filo (assistente)', category: 'assistant',
       desc: 'L’assistente conversazionale di Filo: gli scrivi a parole cosa ti serve e ti risponde, tenendo conto di ciò che gli hai detto in passato. Conosce anche i tuoi documenti dell’editor (appunti inclusi) tramite un breve riassunto di ciascuno, sempre aggiornato: così sa di cosa parlano senza doverli tenere tutti aperti, e quando per risponderti gli serve un documento per intero lo legge al momento. Oltre a rispondere può fare cose per te — aprire pagine, cercare sul web, impostare timer, prendere appunti, regolare preferenze — chiedendoti conferma per le azioni delicate. Mentre lavora, sopra la risposta corre un filo verticale: accanto scorre piccolo il suo ragionamento, e ogni volta che compie delle azioni il filo fa un nodo col nome di quello che sta facendo («Cerco sul web…», poi «Cercato sul web · orari treni»); le azioni chiamate insieme fanno un nodo solo, e un passo non riuscito lascia il cappio aperto. Quando comincia a rispondere il filo si avvolge in un gomitolo con il riassunto e la durata («Ha cercato sul web e letto un documento · 40 s»); un clic lo srotola, e aprendo un nodo si leggono il ragionamento che ci ha portato e gli esiti delle azioni con la loro icona. Mentre lavora il tasto d’invio diventa un quadrato (anche Invio) che lo ferma subito: il lavoro fatto resta visibile, e lo stesso tasto poi offre di riprendere senza rifare le azioni già compiute. Se fa molti passi senza arrivare a una risposta lo dice in chat, col numero dei passi, e il tasto «Continua» sotto la frase lo fa ripartire da lì. Se una risposta arriva al tetto di lunghezza si ferma e lo dice, con lo stesso «Continua» che la fa finire. Opacità del ragionamento che scorre e durate delle animazioni si cambiano nelle impostazioni avanzate o chiedendolo a Filo.',
       invoke: 'Apri una nuova scheda (la sua pagina iniziale è l’assistente) e scrivi nel campo "Chiedi qualsiasi cosa"; in alternativa filo://dashboard/dashboard.html.',
-      doesNot: 'Non interviene sulla pagina web che stai guardando: per farti assistere SU una pagina aperta usa l’assistente laterale (Alt+H, Ctrl+Alt+H su Mac). Le risposte si basano sui tuoi dati locali, non condivide nulla all’esterno senza chiedertelo.',
+      doesNot: 'Non interviene sulla pagina web che stai guardando: per farti assistere SU una pagina aperta usa l’assistente laterale ({tasto:open-help-sidebar}). Le risposte si basano sui tuoi dati locali, non condivide nulla all’esterno senza chiedertelo.',
     },
     {
       id: 'read-user-documents', title: 'Filo legge i tuoi documenti, anche PDF', category: 'assistant',
@@ -449,7 +449,7 @@
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
       desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, dare un nome sensato ai tuoi file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, disporre le carte della home, archiviare schede, persino inviare un feedback a tuo nome.',
-      invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
+      invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina ({tasto:open-help-sidebar}).',
       doesNot: 'Quanto fa da solo dipende dal livello di autonomia che scegli (vedi «Livelli di autonomia»): quello che non fa da solo te lo descrive e parte solo col tuo OK, e per le cose più delicate chiede di digitare "conferma". Non esegue nulla di nascosto: ogni azione fatta resta scritta nel blocco di attività della risposta. Alcune cose non le fa mai, a nessun livello: far uscire password, codici o chiavi, cancellare dati in modo definitivo, cambiare da sé il proprio livello di autonomia. Non fa mai uscire un segreto: se un link, una ricerca, un comando, un feedback, un collegamento (anche di posta, anche nelle risposte dell’assistente di pagina) o un suggerimento che apri o scarichi con un clic o dal menu del tasto destro, o il testo che l’assistente di pagina propone per un campo, conterrebbe una chiave che Filo custodisce, oppure un codice monouso o di recupero, una password, una chiave, una carta o un IBAN letti da una pagina, un documento, una ricerca o un comando (e non scritti da te in chat), l’azione non parte a nessun livello, nemmeno col tuo OK, e in chat compare cosa è stato fermato. Se vuoi mandarlo davvero, lo fai tu a mano.',
     },
     {
@@ -663,6 +663,12 @@
       doesNot: 'Non invia mai URL, testo delle conversazioni o dati personali: solo una nota generica sulla funzione mancante.',
     },
     {
+      id: 'filo-shortcuts', title: 'Scorciatoie da tastiera di Filo', category: 'settings',
+      desc: 'I tasti di Spiega, Traduci, Salva per dopo e Aiuto si cambiano. Una combinazione che Filo usa già (le schede, lo zoom, copia e incolla, il microfono delle chat, le altre tre azioni, un modulo dell\'Editor in qualunque documento) o che si prende il sistema viene rifiutata col motivo, senza salvarla. Il tasto vecchio torna alla pagina, e quelli nuovi valgono subito, su ogni pagina, anche dopo aver chiuso e riaperto Filo. Il menu del tasto destro e l\'elenco di Opzioni → Altro mostrano i tasti scelti; su Mac, coi tasti del Mac.',
+      invoke: 'Preferenze → Impostazioni avanzate → «Scorciatoie da tastiera»: clicca la combinazione e premi i tasti nuovi (Esc lascia quella di prima); ↺ su una riga o «Ripristina i tasti di serie» le rimettono com\'erano. Oppure chiedilo a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl), «rimetti le scorciatoie di serie».',
+      doesNot: 'Le scorciatoie delle schede e della finestra (nuova scheda, chiudi, ricarica, indirizzo, salto di scheda, indietro e avanti) restano quelle fisse.',
+    },
+    {
       id: 'theme', title: 'Tema chiaro / scuro', category: 'settings',
       desc: 'Sceglie l’aspetto chiaro, scuro o automatico per le pagine di Filo.',
       invoke: 'Preferenze → Tema.',
@@ -705,7 +711,26 @@
   // l'agente non la propone e non la racconta (#896). Senza `aperti` i cancelli sono chiusi.
 
   function visibili(aperti) {
-    return CAPABILITIES.filter((c) => !c.cancello || (aperti && aperti[c.cancello] === true));
+    return CAPABILITIES.filter((c) => !c.cancello || (aperti && aperti[c.cancello] === true)).map(conTasti);
+  }
+
+  // I tasti di Spiega, Traduci, Salva per dopo e Aiuto li sceglie l'utente (#842): nei testi stanno come
+  // {tasto:<azione>}, e chi legge il manifesto riceve quelli in uso, col nome su Windows e Linux e su Mac.
+  function tastoInUso(id) {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    const T = global.SN_TASTI;
+    const accel = T ? T.scorciatoiaFilo(id) : '';
+    if (!accel) return '';
+    const pc = T.etichettaFilo(accel, 'win32');
+    const mac = T.etichettaFilo(accel, 'darwin');
+    return pc === mac ? pc : `${pc} (${mac} su Mac)`;
+  }
+  function conTasti(c) {
+    const out = { ...c };
+    for (const k of ['desc', 'invoke', 'doesNot']) {
+      if (typeof c[k] === 'string') out[k] = c[k].replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id));
+    }
+    return out;
   }
 
   // Indice COMPATTO (id + titolo + categoria), pensato per stare sempre in

@@ -200,6 +200,67 @@
     return null;
   }
 
+  // Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto (#842), come le cambiano le Preferenze: lettura e
+  // controlli stanno in SN_TASTI. «Traduci: Ctrl+Maiusc+Y», «Aiuto: di serie», «tutte di serie».
+  const NOMI_AZIONE_FILO = {
+    'explain-selection': ['spiega', 'spiegazione', 'spiegare', 'approfondisci', 'approfondimento'],
+    'translate-selection': ['traduci', 'traduzione', 'tradurre'],
+    'save-for-later': ['salva per dopo', 'salvare per dopo', 'salva'],
+    'open-help-sidebar': ['aiuto', 'assistente laterale', 'barra dell aiuto'],
+  };
+  const DI_SERIE = /^(?:(?:tutte|tutti|le scorciatoie|scorciatoie)\s+)?(?:di serie|come di serie|predefinit[aeio]|default|originali?|standard|come prima|ripristina(?:te)?|azzera(?:te)?|reset)$/;
+  function azioneFiloDetta(testo) {
+    const t = pianoChiave(testo).replace(/[«»"']/g, ' ').replace(/\s+/g, ' ').trim();
+    const trovate = Object.keys(NOMI_AZIONE_FILO).filter((id) => NOMI_AZIONE_FILO[id].some((n) => (` ${t} `).includes(` ${n} `)));
+    return trovate.length === 1 ? trovate[0] : null;
+  }
+  function tastiDiFilo() {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    return global.SN_TASTI;
+  }
+  function scorciatoiaFiloDetta(v) {
+    const T = tastiDiFilo();
+    const testo = String(v == null ? '' : v).trim();
+    if (!T || !testo || testo.length > 200) return null;
+    const nomeDi = (id) => T.AZIONI_FILO.find((a) => a.id === id).nome;
+    if (DI_SERIE.test(pianoChiave(testo)) || VOCE_AUTOMATICA.test(pianoChiave(testo))) {
+      // Quella il cui tasto di serie è ormai di un modulo dell'Editor resta com'è, e si dice perché.
+      const serie = Object.fromEntries(T.AZIONI_FILO.map((a) => [a.id, a.serie]));
+      const no = T.AZIONI_FILO.map((a) => [a, T.rifiutoScorciatoiaFilo(a.id, a.serie, undefined, serie)]).filter(([, r]) => r);
+      const buone = T.AZIONI_FILO.filter((a) => !no.some(([x]) => x === a));
+      if (!buone.length) return { rifiuto: no.map(([a, r]) => `«${a.nome}»: ${T.testoRifiutoFilo(r)}`).join(' ') };
+      const tranne = no.length ? ` (tranne ${no.map(([a, r]) => `«${a.nome}»: ${T.testoRifiutoFilo(r)}`).join(' ')})` : '';
+      return {
+        partial: { scorciatoie: Object.fromEntries(buone.map((a) => [a.id, ''])) },
+        label: `Scorciatoie di ${buone.map((a) => a.nome).join(', ').replace(/, ([^,]*)$/, ' e $1')} → di serie${tranne}`,
+      };
+    }
+    const sep = testo.search(/[:=→]/);
+    if (sep <= 0) return null;
+    const id = azioneFiloDetta(testo.slice(0, sep));
+    if (!id) {
+      return {
+        rifiuto: 'non capisco di quale azione cambiare la scorciatoia',
+        perModello: `Le azioni sono ${T.AZIONI_FILO.map((a) => `«${a.nome}»`).join(', ')}: scrivi "<azione>: <combinazione>".`,
+      };
+    }
+    const combo = testo.slice(sep + 1).replace(/^>/, '').trim();
+    if (DI_SERIE.test(pianoChiave(combo)) || VOCE_AUTOMATICA.test(pianoChiave(combo))) {
+      const serie = T.AZIONI_FILO.find((a) => a.id === id).serie;
+      const presa = T.rifiutoScorciatoiaFilo(id, serie);
+      if (presa) return { rifiuto: T.testoRifiutoFilo(presa) };
+      return { partial: { scorciatoie: { [id]: '' } }, label: `Scorciatoia di «${nomeDi(id)}» → ${T.etichettaFilo(serie)}, quella di serie` };
+    }
+    const d = T.scorciatoiaDaScritta(combo);
+    if (!d) return null;
+    const no = d.rifiuto || T.rifiutoScorciatoiaFilo(id, d.accel);
+    if (no) return { rifiuto: T.testoRifiutoFilo(no) };
+    return {
+      partial: { scorciatoie: { [id]: T.valoreDaSalvare(id, d.accel) } },
+      label: `Scorciatoia di «${nomeDi(id)}» → ${T.etichettaFilo(d.accel)}`,
+    };
+  }
+
   // «predefinito», «di serie», «come prima»: torna al valore dei Modelli predefiniti.
   function predefinito(v) {
     if (v === null) return true;
@@ -1044,6 +1105,18 @@
           modelloFunzione: { action: r.action, refs: r.refs, nome: r.nome },
         };
       },
+    },
+    {
+      scrive: ['scorciatoie.explain-selection', 'scorciatoie.translate-selection', 'scorciatoie.save-for-later', 'scorciatoie.open-help-sidebar'],
+      aiuto: () => {
+        const T = tastiDiFilo();
+        const esempio = T ? T.etichettaFilo('Ctrl+Shift+Y') : '';
+        return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. "Traduci: ${esempio}"); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
+      },
+      keys: ['scorciatoia', 'scorciatoie', 'scorciatoia da tastiera', 'scorciatoie da tastiera', 'tasto di scelta rapida',
+        'scorciatoia di spiega', 'scorciatoia di traduci', 'scorciatoia di salva per dopo', 'scorciatoia di aiuto'],
+      costo: 1,
+      build: scorciatoiaFiloDetta,
     },
     {
       scrive: ['openWeightsOnly'],

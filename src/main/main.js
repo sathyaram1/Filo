@@ -241,6 +241,9 @@ app.whenReady().then(async () => {
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
+    // Le scorciatoie scelte dall'utente (#842) valgono dal primo tasto premuto.
+    try { require('./shortcuts').configura(s); } catch (_) {}
+    require('./shortcuts').seguiModuliEditor().catch(() => {});
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}

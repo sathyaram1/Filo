@@ -2816,6 +2816,9 @@
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
+    // #842 — i tasti di Spiega, Traduci, Salva per dopo e Aiuto scelti dall'utente, per id dell'azione; '' o assente
+    // vale il tasto di serie (SN_TASTI.AZIONI_FILO).
+    scorciatoie: {},
     // #818 — l'avviso prima che i crediti finiscano: quando la proiezione dice che durano al più `giorni`, o il saldo
     // scende sotto `percento` dei crediti d'ingresso. Le soglie sono ipotesi della spec: si cambiano da qui.
     avvisoCrediti: { attivo: true, giorni: 2, percento: 10 },

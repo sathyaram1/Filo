@@ -27,6 +27,61 @@
   <script src="filo://shared/lunghezzaRisposte.js"></script>
   <script src="filo://shared/creditiAvviso.js"></script>
   <style>
+    /* Le scorciatoie di Filo (#842): i tasti hanno la forma di tasti veri, e la riga in ascolto si accende. */
+    .sc-lista { display: flex; flex-direction: column; gap: 2px; max-width: 620px; }
+    .sc-riga {
+      display: grid;
+      grid-template-columns: 150px auto 28px;
+      justify-content: start;
+      align-items: center;
+      column-gap: 10px;
+      padding: 4px 0;
+    }
+    .sc-nome { color: var(--sn-fg); }
+    .sc-riga.sc-cambiata .sc-nome { color: var(--sn-accent); font-weight: 600; }
+    .sc-tasti {
+      justify-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 30px;
+      padding: 3px 8px;
+      border: 1px solid var(--sn-border);
+      border-radius: var(--sn-radius);
+      background: var(--sn-bg);
+      color: var(--sn-fg);
+      font: inherit;
+      cursor: pointer;
+      transition: border-color calc(120ms * var(--sn-motion, 1)), background calc(120ms * var(--sn-motion, 1)), box-shadow calc(120ms * var(--sn-motion, 1));
+    }
+    .sc-tasti:hover, .sc-tasti:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
+    .sc-kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      padding: 1px 7px;
+      border: 1px solid var(--sn-border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--sn-hover);
+    }
+    .sc-piu { color: var(--sn-muted); font-size: 11px; }
+    .sc-riga.sc-registra .sc-tasti {
+      border-color: var(--sn-accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-accent) 22%, transparent);
+    }
+    .sc-attesa { color: var(--sn-muted); font-style: italic; }
+    .sc-ripristina {
+      background: transparent;
+      border: none;
+      color: var(--sn-muted);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      padding: 3px 5px;
+      border-radius: 4px;
+    }
+    .sc-ripristina:hover { color: var(--sn-fg); background: var(--sn-hover); }
+    .sc-errore { grid-column: 2 / -1; color: var(--sn-error); font-size: 12px; margin-top: 2px; }
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
     .onb-conv > summary {
@@ -407,6 +462,16 @@
         <input type="number" id="barraAttesa" min="100" max="3000" step="50" style="width:120px;" />
         <label for="barraUscita" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dopo quanto si chiude quando il mouse esce (millisecondi, da 100 a 5.000)</label>
         <input type="number" id="barraUscita" min="100" max="5000" step="50" style="width:120px;" />
+      </section>
+
+      <!-- #842 — i tasti di Spiega, Traduci, Salva per dopo e Aiuto: le righe le scrive preferences.js. -->
+      <section id="sec-scorciatoie">
+        <h2>Scorciatoie da tastiera</h2>
+        <div id="scorciatoieFilo" class="sc-lista" role="group" aria-label="Scorciatoie di Filo"></div>
+        <div class="sn-row" style="margin-top:12px;">
+          <button class="sn-btn sn-btn-secondary" id="scorciatoieRipristina" type="button">Ripristina i tasti di serie</button>
+          <span id="scorciatoieHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+        </div>
       </section>
 
       <section id="sec-tokens">

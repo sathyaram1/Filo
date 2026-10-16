@@ -36,6 +36,19 @@
     return l && l !== k ? l : 'una funzione';
   }
   const NOMI_CHIAVI = { openrouter: 'OpenRouter', tavily: 'Tavily' };
+  function tastiDiFilo() {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    return global.SN_TASTI;
+  }
+  function nomeAzioneFilo(k) {
+    const T = tastiDiFilo();
+    const azione = T && T.AZIONI_FILO ? T.AZIONI_FILO.find((x) => x.id === k) : null;
+    return azione ? azione.nome : 'un\'azione di Filo';
+  }
+  function scorciatoiaLeggibile(v) {
+    const T = tastiDiFilo();
+    return v ? (T ? T.etichettaFilo(v) : String(v)) : 'quella di serie';
+  }
 
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
@@ -111,6 +124,7 @@
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
+    'scorciatoie.*': { nome: (k) => `scorciatoia di «${nomeAzioneFilo(k)}»`, valore: scorciatoiaLeggibile, livello: 1 },
     'modelliScelti.*': { nome: (k) => `modello scelto da te per «${etichettaFunzione(k)}»`, valore: (v) => v || 'quello predefinito', livello: 2 },
     'modelRegistry.*': { nome: (k) => `modello «${k}»`, valore: (v) => (v && v.model ? v.model : 'non c\'è'), livello: 2 },
     monthlyLimitEur: {

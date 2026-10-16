@@ -9,6 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.242', date: '2026-10-16',
+      features: [
+        'Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto adesso le scegli tu. In Preferenze, nelle impostazioni avanzate, clicchi la combinazione e premi i tasti nuovi, oppure lo chiedi a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl). Se quei tasti li usa già Filo o il sistema, Filo te lo dice e tiene quelli di prima. Il menu del tasto destro e l\'elenco in Opzioni → Altro mostrano i tasti che hai scelto.',
+      ],
+      fixes: [
+        'Nell\'Editor Ctrl+Shift+T, W, L e R non si possono più dare a un modulo: Filo ti dice che aprono una scheda, la chiudono, portano alla home o ricaricano la pagina. Prima si salvavano senza avvisi e alla pressione facevano quello invece del modulo.',
+      ],
+    },
+    {
       version: '0.2.241', date: '2026-10-15',
       features: [
         'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',

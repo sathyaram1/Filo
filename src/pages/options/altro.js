@@ -22,32 +22,27 @@
     $('openHome').textContent = 'Aperti per dopo';
     $('openHistory').textContent = 'Cronologia AI';
     $('openSpellcheck').textContent = 'Gestisci correttore';
+  }
 
-    // Lista scorciatoie da tastiera. Su Mac le stesse si premono con altri
-    // tasti (vedi src/shared/tasti.js): l'elenco deve dire quello che funziona
-    // DAVVERO sulla macchina di chi lo sta leggendo, quindi i nomi si chiedono
-    // alla regola invece di scriverli.
+  // Le scorciatoie come valgono adesso: le quattro di Filo le sceglie l'utente in Preferenze (#842), e su Mac
+  // si premono con altri tasti: i nomi si chiedono a SN_TASTI, mai scritti qui.
+  function disegnaScorciatoie(settings) {
     const sc = $('shortcutsList');
-    sc.innerHTML = '';
     const T = window.SN_TASTI;
-    const tasti = (accel) => (T ? T.etichetta(accel) : accel);
-    [
-      [tasti('Alt+E'), I18n.t('options_action_explain')],
-      [tasti('Alt+T'), I18n.t('options_action_translate_sel')],
-      [tasti('Alt+S'), 'Salva per dopo'],
-      [tasti('Alt+H'), I18n.t('options_action_help') + ' (Fase 2)'],
-      [
-        T ? T.etichettaSaltoScheda() : 'Alt+cifra',
-        T ? T.descrizioneSaltoScheda() : 'Vai alla scheda in quella posizione (0 = la decima)',
-      ],
-      [T ? T.etichettaIndietro() : 'Alt+\u2190', 'Torna alla pagina precedente'],
-      [T ? T.etichettaAvanti() : 'Alt+\u2192', 'Vai alla pagina successiva'],
-      [T ? T.etichettaBarra() : 'Ctrl+Shift+B', 'Apri e chiudi la barra laterale'],
-    ].forEach(([k, v]) => {
+    T.usaScorciatoieFilo(settings && settings.scorciatoie);
+    sc.textContent = '';
+    const righe = [
+      ...T.scorciatoieFilo().map((s) => [s.etichetta, s.nome]),
+      [T.etichettaSaltoScheda(), T.descrizioneSaltoScheda()],
+      [T.etichettaIndietro(), 'Torna alla pagina precedente'],
+      [T.etichettaAvanti(), 'Vai alla pagina successiva'],
+      [T.etichettaBarra(), 'Apri e chiudi la barra laterale'],
+    ];
+    for (const [k, v] of righe) {
       const li = document.createElement('li');
       li.textContent = `${k} — ${v}`;
       sc.appendChild(li);
-    });
+    }
   }
 
   async function load() {
@@ -55,6 +50,7 @@
     const settings = await Storage.getSettings();
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
+    disegnaScorciatoie(settings);
     $('blocklist').value = (settings.blocklist || []).join('\n');
     mostrato = $('blocklist').value;
     await renderCategories();
@@ -213,6 +209,7 @@
 
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) disegnaScorciatoie(msg.settings);
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || mostrato === null) return;
       const el = $('blocklist');
       const scritti = el.value.split('\n').map((x) => x.trim()).filter(Boolean);
@@ -241,6 +238,9 @@
     });
     $('openSpellcheck').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://spellcheck/spellcheck.html' });
+    });
+    $('cambiaScorciatoie').addEventListener('click', () => {
+      chrome.tabs.create({ url: 'filo://preferences/preferences.html#sec-scorciatoie' });
     });
   });
 })();

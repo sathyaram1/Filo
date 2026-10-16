@@ -67,7 +67,10 @@
         correttoreAcceso: 'featureFlags.spellcheck',
         categorieAutomatiche: 'featureFlags.categorize',
       },
-      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti' },
+      gruppi: {
+        tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti',
+        scorciatoieFilo: 'scorciatoie.*',
+      },
       altrove: { documentiCercate: 'cartelleCercate' },
       fuori: {},
       messaggi: {
@@ -83,6 +86,7 @@
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
         OPEN_URL: 'apre una pagina collegata: non salva niente',
+        REGISTRA_TASTI: 'lascia arrivare alla pagina i tasti premuti mentre si registra una scorciatoia: dalla chat la combinazione si scrive (scorciatoia)',
       },
     },
     security: {
@@ -194,13 +198,18 @@
   function jolly(percorso) {
     return String(percorso).endsWith('.*');
   }
-  // Le voci di un percorso jolly: i token estetici, i sei parametri del colore delle tab.
+  // Le voci di un percorso jolly: i token estetici, i sei parametri del colore delle tab, le quattro scorciatoie di Filo.
   function espandi(percorso) {
     if (!jolly(percorso)) return [percorso];
     const base = percorso.slice(0, -2);
     if (base === 'themeTokens') {
       const T = global.SN_THEME_TOKENS;
       return T && T.names ? T.names().map((n) => `themeTokens.${n}`) : [];
+    }
+    if (base === 'scorciatoie') {
+      if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+      const T = global.SN_TASTI;
+      return T && T.AZIONI_FILO ? T.AZIONI_FILO.map((a) => `scorciatoie.${a.id}`) : [];
     }
     if (base === 'tabColor') {
       const TC = global.SN_TAB_COLOR;
@@ -355,6 +364,12 @@
       return `${l.length} ${l.length === 1 ? 'voce' : 'voci'}${trovati ? `${trovati}; elenco` : ''}: ${l.slice(0, MAX_ELENCO).join(', ')}${altri}`;
     }
     if (voce && voce.testo) return String(v || '').trim() ? `«${String(v).trim()}»` : 'nessuno';
+    // Una scorciatoia di Filo vuota è quella di serie: si dice quale, coi tasti di chi chiede (#842).
+    if (percorso.startsWith('scorciatoie.') && global.SN_TASTI) {
+      const T = global.SN_TASTI;
+      const a = T.AZIONI_FILO.find((x) => `scorciatoie.${x.id}` === percorso);
+      if (a) return typeof v === 'string' && v ? T.etichettaFilo(v, sistema || undefined) : `${T.etichettaFilo(a.serie, sistema || undefined)} (di serie)`;
+    }
     if (percorso === 'terminal.shell' && sistema && sistema !== 'win32' && !['bash', 'sh'].includes(v)) return 'shell di sistema (sh)';
     if (percorso === 'aggiornamenti.installa') {
       const A = global.SN_AGGIORNAMENTI;

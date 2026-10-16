@@ -30,6 +30,7 @@ module.exports = function register(on, ctx) {
     chiaviStoragePerOrigine, scritturaStorageAmmessa, scritturaImpostazioniAmmessa,
   } = require('../impostazioniPerOrigine');
   const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
+  const { soloFilo } = require('./origine');
   const AppuntiDaiSiti = require('../appuntiDaiSiti');
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
@@ -89,6 +90,15 @@ module.exports = function register(on, ctx) {
     const merged = await applySettingsUpdate(incoming, { mentreScrive: msg.mentreScrive === true });
     return { ok: true, settings: impostazioniPerOrigine(merged, origin, indirizziDelMittente(sender)) };
   });
+
+  // Le Preferenze registrano una scorciatoia (#842): finché dura, i tasti che Filo prende prima della pagina arrivano
+  // a lei. Da un sito no (gli toglierebbe le scorciatoie di Filo), e solo dal frame principale della scheda che chiede.
+  on(MSG.REGISTRA_TASTI, soloFilo(async (msg, sender) => {
+    const wc = sender && sender.wc;
+    if (!wc || (sender.frame && wc.mainFrame && sender.frame !== wc.mainFrame)) return { ok: false, error: 'forbidden' };
+    require('../../shortcuts').registraTasti(wc, msg.attivo === true);
+    return { ok: true };
+  }));
 
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
