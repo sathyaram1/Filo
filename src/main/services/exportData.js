@@ -642,6 +642,7 @@ module.exports = {
   unzip,
   readExportZip,
   mergeImportedData,
+  haSegreti,
   REGOLE_IMPORT,
   REGOLE_ALTRE_CHIAVI,
   regolaImport,
