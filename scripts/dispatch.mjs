@@ -83,7 +83,7 @@ import {
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
-  testoPuliziaFuoriNumero,
+  ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
