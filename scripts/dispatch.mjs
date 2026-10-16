@@ -2022,11 +2022,10 @@ async function finalizeBucket(bucket, fromServer) {
   // momento in cui il server viene a sapere su quale ramo si sta lavorando —
   // prima lo scopriva solo alla consegna, cioè ore dopo, e per tutto quel tempo
   // il recupero degli arenati era cieco.
-  // Anche chi riprende un lavoro fermo dopo la risposta dell'owner lo dichiara:
-  // il feedback è tornato `todo`, e senza questo passaggio la dashboard direbbe
-  // «in coda» per tutta la lavorazione.
-  const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa);
-  if (bucket.id && (bucket.role === 'new-work' || (bucket.role === 'fixer' && ripresa))) {
+  // Anche chi riprende un lavoro fermo dopo la risposta dell'owner lo dichiara,
+  // qualunque sia il suo ruolo: il feedback è tornato `todo`, e senza questo
+  // passaggio la dashboard direbbe «in coda» per tutta la lavorazione.
+  if (bucket.id && (bucket.role === 'new-work' || (ripresa && RUOLI_CON_RIPRESA.includes(bucket.role)))) {
     await deliverToChannel('status', { status: 'working', branch: bucket.branch || '' });
   }
 
