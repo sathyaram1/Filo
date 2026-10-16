@@ -68,7 +68,8 @@ test('dalla chat: la ricetta salvata torna col suo bottone, che la apre e la tog
     await expect.poll(() => salvate(app), { timeout: 10_000 }).toEqual(['p2', 'p3']);
     await expect(bottone).toHaveClass(/dash-salvata-aperta/);
     await page.bringToFront();
-    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+    await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+    await page.mouse.move(5, 5);
     await page.waitForTimeout(600);
     await page.screenshot({ path: 'tests/.shots/salvate-chat-bottone-scuro.png' });
   } finally {
