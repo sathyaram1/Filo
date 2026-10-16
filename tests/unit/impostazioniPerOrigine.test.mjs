@@ -103,7 +103,8 @@ test('da un sito si chiedono solo le azioni della barra d\'aiuto, confermate o n
   const web = 'https://sito.example/';
   assert.equal(W.azioneAmmessaDa({ type: 'INVIA_FEEDBACK', testo: 'x' }, web), true);
   assert.equal(W.azioneAmmessaDa({ type: 'invia_feedback' }, web), true);
-  for (const type of ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'SALVA_LEZIONE', 'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', '', undefined]) {
+  // Le pagine salvate per dopo non arrivano a un sito (#589.12, #845): né cercarle né aprirle.
+  for (const type of ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'SALVA_LEZIONE', 'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'CERCA_SALVATE', 'APRI_SALVATA', '', undefined]) {
     assert.equal(W.azioneAmmessaDa({ type }, web), false, String(type));
     assert.equal(W.azioneAmmessaDa({ type }, 'filo://newtab/'), true, String(type));
   }
