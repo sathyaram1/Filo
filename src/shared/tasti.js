@@ -304,6 +304,19 @@
   }
   function etichettaBarra(esplicita) { return etichetta(ACCEL_BARRA, esplicita); }
 
+  // ── Lo schermo intero ─────────────────────────────────────────────────────
+  // Il tasto abituale di ogni sistema, quindi un tasto DIVERSO e non una riscrittura: F11 su Windows e
+  // Linux, Control+Cmd+F su Mac (lì F11 è del sistema e Cmd+F è la ricerca). Valido anche come acceleratore.
+  function etichettaSchermoIntero(esplicita) { return suMac(esplicita) ? 'Ctrl+Cmd+F' : 'F11'; }
+  function comandoSchermoIntero(ev, esplicita) {
+    if (!ev || modificatore(ev, 'alt') || modificatore(ev, 'shift')) return false;
+    const [ctrl, meta] = [modificatore(ev, 'ctrl'), modificatore(ev, 'meta')];
+    const code = String(ev.code || '');
+    const key = String(ev.key || '');
+    if (suMac(esplicita)) return ctrl && meta && (code ? code === 'KeyF' : key.toLowerCase() === 'f');
+    return !ctrl && !meta && (code === 'F11' || key === 'F11');
+  }
+
   function etichettaIndietro(esplicita) { return etichetta('Alt+\u2190', esplicita); }
   function etichettaAvanti(esplicita) { return etichetta('Alt+\u2192', esplicita); }
 
