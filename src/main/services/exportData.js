@@ -164,24 +164,44 @@ function oscura(nodo, segreti) {
   }
 }
 
+// Del proxy il segreto è utente e password, non l'indirizzo: senza, l'archivio rimesso altrove perdeva il proxy (#905.1).
+const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)([^/@\s]+)@/i;
+const proxySenzaCredenziali = (v) => v.trim().replace(CREDENZIALI_PROXY, '$1');
+const haCredenziali = (v) => pieno(v) && CREDENZIALI_PROXY.test(v.trim());
+
 // Toglie i segreti da una copia dei dati, e dal filo. Il campo va via, non diventa vuoto: all'importazione un campo
-// assente lascia quello di chi importa.
+// assente lascia quello di chi importa. `proxy`: i campi del proxy rimasti col solo indirizzo.
 function togliSegreti(dati, filo) {
   const s = dati && dati.settings;
   const campi = campiSegreti(s);
-  const segreti = [...new Set(campi.map(([o, k]) => o[k]).filter((v) => pieno(v) && v.trim().length >= SEGRETO_MIN).map((v) => v.trim()))];
-  for (const [o, k] of campi) delete o[k];
+  const segreti = new Set();
+  const proxy = [];
+  for (const [o, k] of campi) {
+    if (!pieno(o[k])) { delete o[k]; continue; }
+    const v = o[k].trim();
+    segreti.add(v);
+    const m = isPlainObject(s) && o === s.proxy ? CREDENZIALI_PROXY.exec(v) : null;
+    if (!m) { delete o[k]; continue; }
+    segreti.add(m[2]);
+    const password = m[2].slice(m[2].indexOf(':') + 1);
+    if (m[2].includes(':')) segreti.add(password);
+    o[k] = proxySenzaCredenziali(v);
+    proxy.push(k);
+  }
   if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
-  if (!segreti.length) return filo;
-  oscura(dati, segreti);
-  if (!filo || !filo.length) return filo;
-  return Buffer.from(sostituisci(Buffer.isBuffer(filo) ? filo.toString('utf8') : String(filo), segreti), 'utf8');
+  const daTogliere = [...segreti].filter((v) => v.length >= SEGRETO_MIN);
+  if (!daTogliere.length || !filo || !filo.length) {
+    if (daTogliere.length) oscura(dati, daTogliere);
+    return { filo, proxy };
+  }
+  oscura(dati, daTogliere);
+  return { filo: Buffer.from(sostituisci(Buffer.isBuffer(filo) ? filo.toString('utf8') : String(filo), daTogliere), 'utf8'), proxy };
 }
 
 // Costruisce il Buffer ZIP a partire dallo storage Filo e, se c'è, dal filo. `chiavi`: anche i segreti.
 function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } = {}) {
   const clone = JSON.parse(JSON.stringify(storageData ?? {}));
-  const filo = chiavi ? filoDato : togliSegreti(clone, filoDato);
+  const { filo, proxy } = chiavi ? { filo: filoDato, proxy: [] } : togliSegreti(clone, filoDato);
   const images = [];
   extractImages(clone, images);
 
@@ -191,6 +211,7 @@ function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } =
     imageCount: images.length,
     filo: !!(filo && filo.length),
     chiavi: haSegreti(clone),
+    ...(proxy.length ? { proxySenzaCredenziali: proxy } : {}),
     note: 'Esportazione dati Filo. data.json contiene le impostazioni e i '
       + 'contenuti (le chiavi API solo se «chiavi» è true); le immagini copiate/salvate sono nella cartella images/; '
       + 'le chat con Filo e le pagine visitate stanno in filo/eventi.jsonl, un evento per riga.',
