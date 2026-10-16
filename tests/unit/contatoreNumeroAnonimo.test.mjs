@@ -142,3 +142,16 @@ test('un numero con la prova del mittente oltre il contatore lo alza ancora, e s
   assert.equal(f.db.contatore, 950);
   assert.equal(await FB.nextSeq(), 951);
 });
+
+test('un contatore gonfiato di uno in uno torna ancora giù, fino al numero più alto in uso', async () => {
+  const f = firestore({
+    contatore: 5000,
+    documenti: [
+      feedback('owner', 880, { senderProof: 'admin' }),
+      feedback('utente', 900),
+    ],
+  });
+  await apriGestione(f);
+  assert.equal(f.db.contatore, 900);
+  assert.equal(await FB.nextSeq(), 901);
+});

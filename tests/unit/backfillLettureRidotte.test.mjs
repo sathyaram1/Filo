@@ -94,7 +94,7 @@ test('tutte già numerate: due conteggi e una domanda sul contatore — la colle
     'chi lancia il comando vede il costo sullo schermo, non in fattura');
 });
 
-test('quando c\'è da numerare, la scansione chiede i quattro campi che usa', async () => {
+test('quando c\'è da numerare, la scansione chiede i soli campi che usa', async () => {
   const documenti = [doc('a', 1, '2026-01-01T00:00:00Z'), doc('b', 0, '2026-01-02T00:00:00Z')];
   const finto = firestoreFinto({ totale: 2, numerati: 1, documenti });
   const { r, dette } = await conFetch(finto, () => backfillNumbers('tok', { dry: true, copiaDir: cartellaTemporanea('backfill-2-') }));
