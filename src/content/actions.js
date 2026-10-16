@@ -951,13 +951,29 @@
     };
   }
 
-  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
-  let salvataggioInCorso = false;
+  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per
+  // chiudersi, e chi chiede riceve lo stesso esito (la voce salvata, o null).
+  let salvataggioInCorso = null;
   const confermeMostrate = new Set();
 
-  async function savePage() {
-    if (salvataggioInCorso) return;
-    salvataggioInCorso = true;
+  function savePage() {
+    if (!salvataggioInCorso) {
+      salvataggioInCorso = salva().then((entry) => {
+        if (!entry) salvataggioInCorso = null;
+        return entry;
+      });
+    }
+    return salvataggioInCorso;
+  }
+
+  // La miniatura è della pagina: l'Aiuto aperto sopra non ci finisce dentro.
+  function nascondiPannelli() {
+    const aperti = [...document.querySelectorAll('.sn-sidebar')].filter((el) => el.style.visibility !== 'hidden');
+    for (const el of aperti) el.style.visibility = 'hidden';
+    return () => { for (const el of aperti) el.style.visibility = ''; };
+  }
+
+  async function salva() {
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
     // della miniatura attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
