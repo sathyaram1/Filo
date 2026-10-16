@@ -365,14 +365,18 @@
     // si spezzerebbe in ["Ctrl"] e sparirebbe dalla lista.
     const testo = String(accel || '').trim().replace(/\+\s*\+$/, '+Plus');
     const parti = pezzi(testo);
+    // Un tasto funzione da solo è una combinazione intera: F11 è lo schermo intero.
+    if (parti.length === 1 && TASTO_FUNZIONE.test(parti[0].toLowerCase())) return `|${parti[0].toLowerCase()}`;
     if (parti.length < 2) return '';
     const finale = parti[parti.length - 1].toLowerCase();
     const mods = parti.slice(0, -1).map((m) => m.toLowerCase());
     const c = mods.some((m) => CTRL.test(m)) ? 'c' : '';
-    const a = mods.some((m) => ALT.test(m)) ? 'a' : '';
-    const s = mods.some((m) => SHIFT.test(m)) ? 's' : '';
-    return `${c}${a}${s}|${tastoCanonico(finale)}`;
+    const m = conControlECmd(mods) ? 'm' : '';
+    const a = mods.some((x) => ALT.test(x)) ? 'a' : '';
+    const s = mods.some((x) => SHIFT.test(x)) ? 's' : '';
+    return `${c}${m}${a}${s}|${tastoCanonico(finale)}`;
   }
+  const TASTO_FUNZIONE = /^f([1-9]|1[0-9]|2[0-4])$/;
 
   // Scritti in forma canonica (Windows): `riservato` confronta per forma, e
   // Cmd vale Ctrl, quindi valgono anche scritti col tasto del Mac. Accanto a
