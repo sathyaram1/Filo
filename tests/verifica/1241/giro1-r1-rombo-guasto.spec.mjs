@@ -1,4 +1,5 @@
-// Esplorazione del giro 1 di #1241: cosa legge l'owner aprendo il rombo di un feedback fermo per un guasto.
+// Giro 1 di #1241, rilievo 1: un feedback fermo per un guasto ha in lista il rombo «la domanda dice cosa fare»,
+// e nel dettaglio lo stesso rombo deve dire la stessa cosa (quale domanda), non «Nessuna segnalazione».
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
@@ -14,7 +15,7 @@ const GUASTO = {
   notes: "Report.\n\n--- Aggiornamento dell'agente del 16/10/26, 12:58 ---\nGuasto, non lavoro locale: guasto: filo-security. Domanda D-9.",
 };
 
-test('esplora il rombo del guasto', async ({ openTab }) => {
+test('r1 fermo per un guasto: il rombo del dettaglio dice il guasto e la domanda, come il segno in lista', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
@@ -30,16 +31,17 @@ test('esplora il rombo del guasto', async ({ openTab }) => {
   });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate((fbs) => window.__mgTest.setData(fbs), [GUASTO]);
+  await expect(page.locator('.mg-item', { hasText: 'Fermo sul clone' }).locator('.mg-segno-fermata'))
+    .toHaveAttribute('title', /guasto/i);
+
   await page.evaluate((id) => window.__mgTest.openDetail(id), GUASTO._id);
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
-  await expect(rombo).toBeVisible();
-  console.log('ROMBO title', await rombo.getAttribute('title'), 'class', await rombo.getAttribute('class'));
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  await expect(rombo).toHaveAttribute('title', /guasto/i);
   await rombo.click();
-  await page.waitForTimeout(300);
-  console.log('SIDE TITLE', await page.locator('#mgSideTitle').innerText().catch(() => '?'));
-  console.log('SIDE BODY', (await page.locator('#mgSideBody').innerText().catch(() => '?')).slice(0, 800));
-  const bottoni = await page.locator('button:visible').evaluateAll((els) => els.map((e) => e.textContent.trim()).filter(Boolean));
-  console.log('BOTTONI', JSON.stringify(bottoni));
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).not.toContainText('Nessuna segnalazione');
+  await expect(corpo).toContainText('D-9');
   for (const tema of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
     await page.waitForTimeout(150);
