@@ -604,12 +604,15 @@
 
   // La lista cambia anche da altre strade (la chat che apre o cerca una pagina, «Salva per dopo» in un'altra scheda):
   // tornando su questa scheda si rilegge, così un clic non apre una pagina che non c'è più.
-  document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState !== 'visible') return;
+  async function rileggi() {
     await leggiElenco();
     closeCtxMenu();
     render();
-  });
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rileggi(); });
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => { if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) rileggi(); });
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
