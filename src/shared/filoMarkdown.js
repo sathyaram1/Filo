@@ -118,21 +118,21 @@
     return t;
   }
 
-  // Renderer a blocchi: paragrafi, titoli, elenchi puntati/numerati, blocchi di
-  // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
-  function render(text) {
-    if (!text) return '';
+  // I blocchi del testo (paragrafi, titoli, elenchi, codice ```), con le righe GIA' escapate. Li leggono sia
+  // render sia testo: «Copia» copia la stessa lettura che si vede a schermo (#846).
+  function blocchi(text) {
+    if (!text) return [];
     const lines = escapeHtml(text).split('\n');
     const out = [];
-    let listType = null;
+    let lista = null;
     let para = [];
     let inCode = false;
     let codeBuf = [];
     const flushPara = () => {
-      if (para.length) { out.push('<p>' + para.map(inlineMd).join('<br>') + '</p>'); para = []; }
+      if (para.length) { out.push({ k: 'p', righe: para }); para = []; }
     };
     const flushList = () => {
-      if (listType) { out.push('</' + listType + '>'); listType = null; }
+      if (lista) { out.push(lista); lista = null; }
     };
     // Il tipo di voce d'elenco di una riga, o null.
     const tipoVoce = (s) => (/^[-*]\s+\S/.test(s) ? 'ul' : /^\d+\.\s+\S/.test(s) ? 'ol' : null);
@@ -140,7 +140,7 @@
       const raw = lines[i];
       if (raw.trim().startsWith('```')) {
         if (inCode) {
-          out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
+          out.push({ k: 'code', righe: codeBuf });
           codeBuf = []; inCode = false;
         } else { flushPara(); flushList(); inCode = true; }
         continue;
@@ -152,34 +152,60 @@
         // Voci staccate da righe vuote restano un elenco solo: chiuso qui, «1.» «2.» «3.» ripartivano tutte da 1 (#703).
         let j = i + 1;
         while (j < lines.length && lines[j].trim() === '') j++;
-        if (!listType || j >= lines.length || tipoVoce(lines[j].trim()) !== listType) flushList();
+        if (!lista || j >= lines.length || tipoVoce(lines[j].trim()) !== lista.k) flushList();
         continue;
       }
       let m;
       if ((m = trimmed.match(/^(#{1,6})\s+(.+)$/))) {
         flushPara(); flushList();
-        const level = Math.min(m[1].length + 2, 6);
-        out.push('<h' + level + '>' + inlineMd(m[2]) + '</h' + level + '>');
+        out.push({ k: 'h', livello: Math.min(m[1].length + 2, 6), riga: m[2] });
       } else if ((m = trimmed.match(/^[-*]\s+(.+)$/))) {
         flushPara();
-        if (listType !== 'ul') { flushList(); out.push('<ul>'); listType = 'ul'; }
-        out.push('<li>' + inlineMd(m[1]) + '</li>');
+        if (!lista || lista.k !== 'ul') { flushList(); lista = { k: 'ul', voci: [] }; }
+        lista.voci.push(m[1]);
       } else if ((m = trimmed.match(/^(\d+)\.\s+(.+)$/))) {
         flushPara();
-        if (listType !== 'ol') {
-          flushList();
-          // Il numero scritto vale: un elenco spezzato da un paragrafo riprende da dove era, non da 1.
-          const da = Math.min(Number(m[1]), 1e6);
-          out.push(da === 1 ? '<ol>' : '<ol start="' + da + '">');
-          listType = 'ol';
-        }
-        out.push('<li>' + inlineMd(m[2]) + '</li>');
+        // Il numero scritto vale: un elenco spezzato da un paragrafo riprende da dove era, non da 1.
+        if (!lista || lista.k !== 'ol') { flushList(); lista = { k: 'ol', da: Math.min(Number(m[1]), 1e6), voci: [] }; }
+        lista.voci.push(m[2]);
       } else { flushList(); para.push(trimmed); }
     }
-    if (inCode) out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
+    if (inCode) out.push({ k: 'code', righe: codeBuf });
     flushPara();
     flushList();
+    return out;
+  }
+
+  // Renderer a blocchi: paragrafi, titoli, elenchi puntati/numerati, blocchi di
+  // codice ``` e formattazione inline. Escape dell'HTML PRIMA di trasformare.
+  function render(text) {
+    const out = [];
+    for (const b of blocchi(text)) {
+      if (b.k === 'p') out.push('<p>' + b.righe.map(inlineMd).join('<br>') + '</p>');
+      else if (b.k === 'h') out.push('<h' + b.livello + '>' + inlineMd(b.riga) + '</h' + b.livello + '>');
+      else if (b.k === 'code') out.push('<pre><code>' + b.righe.join('\n') + '</code></pre>');
+      else {
+        out.push(b.k === 'ol' && b.da !== 1 ? '<ol start="' + b.da + '">' : '<' + b.k + '>');
+        for (const v of b.voci) out.push('<li>' + inlineMd(v) + '</li>');
+        out.push('</' + b.k + '>');
+      }
+    }
     return out.join('\n');
+  }
+
+  // Il testo semplice di una risposta, per gli appunti: quello che si legge a schermo, senza asterischi, cancelletti
+  // né parentesi dei link (resta la parola del link). Le voci d'elenco tengono il pallino o il numero che si vedono.
+  const DISESCAPE = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+  const disescapa = (s) => s.replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => DISESCAPE[e]);
+  // Il testo entra escapato, quindi gli unici < rimasti sono i tag messi da inlineMd.
+  const inlineTesto = (riga) => disescapa(inlineMd(riga).replace(/<[^>]*>/g, ''));
+  function testo(text) {
+    return blocchi(text).map((b) => {
+      if (b.k === 'p') return b.righe.map(inlineTesto).join('\n');
+      if (b.k === 'h') return inlineTesto(b.riga);
+      if (b.k === 'code') return disescapa(b.righe.join('\n'));
+      return b.voci.map((v, i) => (b.k === 'ol' ? (b.da + i) + '. ' : '• ') + inlineTesto(v)).join('\n');
+    }).join('\n\n');
   }
 
   // Aggancio comune per il click sui link renderizzati. Ogni superficie passa il
@@ -201,5 +227,5 @@
     return () => { try { rootEl.removeEventListener('click', onClick); } catch (_) {} };
   }
 
-  global.SN_MARKDOWN = { render, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
+  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
