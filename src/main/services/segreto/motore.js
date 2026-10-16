@@ -848,7 +848,7 @@ async function crescita(ctx, S, L2) {
         libera(ctx, S.pos[q]);
         S.pos[q] = -1;
       }
-      throw errore('SPAZIO', 'Nel contenitore non resta un posto per i blocchi nuovi.', { servono: 0, disponibili: 0 });
+      throw errore('SPAZIO', 'Nel contenitore non resta un posto per i blocchi nuovi.', { servono: 0, disponibili: 0, prima: true });
     }
     posti.push(i);
   }
