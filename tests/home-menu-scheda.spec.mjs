@@ -27,6 +27,8 @@ async function semina(home, { pagine, categorie = [], categorizza = false, tema 
 const salvate = (home) => home.evaluate(async () => (await chrome.storage.local.get('savedPages')).savedPages || []);
 const vociMenu = (home) => home.locator('.home-ctxmenu .sn-select-option').allTextContents();
 const scheda = (home, id) => home.locator(`#grid .sn-card[data-page-id="${id}"]`);
+// Un avviso chiuso resta nel documento il tempo della dissolvenza.
+const annullaVivo = (home) => home.locator('.home-annulla:not([data-sn-closing]) .home-annulla-btn');
 const riquadro = (home, nome) => home.locator('#grid .sn-cat-tile', { hasText: nome });
 
 test('tasto destro con le categorie: copia link, sposta, nuova categoria, rimuovi e Annulla, apri e tienila', async ({ app, shell, openTab, testServer }) => {
@@ -156,7 +158,7 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   await expect(home.locator('.home-ctxmenu .sn-select-option', { hasText: 'Rimuovi' })).toBeFocused();
   await home.keyboard.press('Enter');
   await expect(scheda(home, 'a')).toHaveCount(0);
-  await expect(home.locator('.home-annulla-btn')).toBeFocused();
+  await expect(annullaVivo(home)).toBeFocused();
   await expect(home.locator('.home-annulla')).toHaveCSS('opacity', '1');
   await home.screenshot({ path: 'tests/.shots/home-annulla-scuro.png' }).catch(() => {});
 
@@ -169,7 +171,7 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   await scheda(home, 'b').locator('.sn-card-action').focus();
   await home.keyboard.press('Enter');
   await expect(scheda(home, 'b')).toHaveCount(0);
-  await expect(home.locator('.home-annulla-btn')).toBeFocused();
+  await expect(annullaVivo(home)).toBeFocused();
   await home.keyboard.press('Escape');
   await expect(scheda(home, 'a')).toBeFocused();
   await expect(home.locator('.home-annulla')).toHaveCount(0);
@@ -184,4 +186,30 @@ test('da tastiera: Maiusc+F10 e il tasto Menu aprono il menu, le frecce scelgono
   await home.keyboard.press('Enter');
   await expect.poll(async () => shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.some((t) => t.url === u), url.a), { timeout: 8_000 }).toBe(true);
   await expect.poll(async () => (await salvate(home)).length).toBe(0);
+});
+
+test('in una lista lunga «Annulla» è sotto le dita di chi usa la tastiera e non scade finché ha il fuoco; col mouse il fuoco resta dov’era', async ({ openTab }) => {
+  const home = await openTab(HOME);
+  const pagine = Array.from({ length: 12 }, (_, i) => voce(`p${i + 1}`, `https://esempio${i + 1}.example/x`, i + 1));
+  await semina(home, { pagine });
+  await expect(home.locator('#grid .sn-card')).toHaveCount(12);
+
+  await scheda(home, 'p1').focus();
+  await home.keyboard.press('Shift+F10');
+  await home.keyboard.press('End');
+  await home.keyboard.press('Enter');
+  await expect(scheda(home, 'p1')).toHaveCount(0);
+  await expect(annullaVivo(home)).toBeFocused();
+  // Oltre i sette secondi dell'avviso: col fuoco sopra resta.
+  await home.waitForTimeout(8_000);
+  await expect(annullaVivo(home)).toBeFocused();
+  await home.keyboard.press('Enter');
+  await expect(scheda(home, 'p1')).toBeFocused();
+  expect((await salvate(home)).map((p) => p.id)).toEqual(pagine.map((p) => p.id));
+
+  await home.locator('#search').focus();
+  await scheda(home, 'p3').locator('.sn-card-action').click();
+  await expect(scheda(home, 'p3')).toHaveCount(0);
+  await expect(home.locator('.home-annulla:not([data-sn-closing])')).toBeVisible();
+  await expect(annullaVivo(home)).not.toBeFocused();
 });
