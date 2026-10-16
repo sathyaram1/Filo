@@ -1144,7 +1144,14 @@
     copy_link:  { target: 'link', costo: 1, label: 'copia link' },
     save_link:  { target: 'link', costo: 1, label: 'salva link per dopo' },
     share_link: { target: 'link', costo: 2, label: 'condividi link' },
+    // la pagina intera: la stessa strada di «Salva per dopo» del menu, che poi chiude la scheda (niente passo dopo).
+    save_page: { target: 'none', costo: 1, label: 'salva la pagina per dopo', chiude: true },
   };
+
+  // Come Alt+S: le pagine di Filo non si mettono da parte, tranne quella d'errore, che salva il sito non caricato.
+  function paginaDaSalvare() {
+    try { return location.protocol !== 'filo:' || location.href.startsWith('filo://error/'); } catch (_) { return false; }
+  }
 
   // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
   function resolveActionText(page) {
