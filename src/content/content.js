@@ -424,16 +424,10 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) {
-      self.__snFiloSpento = true;
-      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
-      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
-      });
-      return;
-    }
-
-    SpellCheck.init(settings);
+    // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
+    // isBlocked() quando scatta. Il ponte del tasto destro lo legge da qui, prima di dare l'evento al menu.
+    seguiSpento();
+    SpellCheck.init(isBlocked() ? { ...settings, featureFlags: { ...(settings.featureFlags || {}), spellcheck: false } } : settings);
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
