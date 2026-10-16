@@ -93,7 +93,8 @@
   max-width: 100%;
   word-wrap: break-word;
 }
-.sn-msg-assistant { justify-content: flex-start; }
+/* In colonna: sotto la risposta c'è la riga dei suoi comandi (Copia). */
+.sn-msg-assistant { flex-direction: column; align-items: flex-start; }
 .sn-msg-assistant .sn-msg-text {
   background: transparent;
   color: var(--sn-fg);
