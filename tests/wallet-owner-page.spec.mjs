@@ -154,6 +154,12 @@ test('i moduli dell’owner rifiutano con parole di Filo zero codici, crediti co
   await expect(msg).toHaveText('Quanti crediti? Un numero intero, almeno 1.');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('ownerGrantCredits');
   expect(seen.grants.length).toBe(0);
+  // Scritta alla italiana (#854): con il sistema in inglese il campo buttava via la virgola e regalava 25.
+  await page.fill('#ownerGrantCredits', '');
+  await page.locator('#ownerGrantCredits').pressSequentially('2,5');
+  await page.click('#ownerGrantBtn');
+  await expect(msg).toHaveText('Quanti crediti? Un numero intero, almeno 1.');
+  expect(seen.grants.length).toBe(0);
 
   // Con un intero il regalo parte e la conferma arriva.
   await page.fill('#ownerGrantCredits', '10');
