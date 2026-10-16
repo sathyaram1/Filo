@@ -2537,6 +2537,9 @@
     // predefiniti" attivo (cioè con i crediti di Filo): è una scelta di chi usa
     // Filo, non una preferenza che la config condivisa può scavalcare.
     openWeightsOnly: false,
+    // #962 — con una chiave OpenRouter propria, le richieste pagate con lei partono senza la lista dei fornitori
+    // esclusi. Spento di serie: chi ha messo la chiave solo per non consumare i crediti resta coperto.
+    ownKeyAllProviders: false,
     apiKeys: {
       openrouter: '',
       // Tavily: provider di web search "LLM-friendly" usato dalla sidebar
