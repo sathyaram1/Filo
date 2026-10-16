@@ -8,6 +8,8 @@ const { pageHints } = require('../../content/safebrowseHints.js');
 const LINK_IN_CODA = 4;
 const LINK_SEGNALATI_MAX = 10000;
 let avvisiDiLink = 0;
+// Il mondo dei content script della pagina (src/content/safebrowseLinks.js).
+const MONDO_SCRIPT = 999;
 
 // In un riquadro di un altro sito la pagina sopra non si legge: se è lei a nasconderlo (trasparente, ritagliato,
 // coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.
@@ -148,11 +150,12 @@ const safebrowseMethods = {
 
   // Il verdetto di un link al clic: quello pronto dall'esame, o lo stesso esame adesso per un link nato dopo (o un
   // indirizzo scritto da uno script). Vale quello che l'utente ha già confermato o chiuso in questa scheda.
-  _sbVerdettoLink(tab, url) {
+  // `nome`: il nome con cui arriva un file scaricato, che conta come il suo indirizzo.
+  _sbVerdettoLink(tab, url, nome = '') {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!SB || typeof SB.checkLink !== 'function') return null;
     let v = (tab._sbLink && tab._sbLink.get(url)) || null;
-    if (!v) { try { v = SB.checkLink(url); } catch (_) { v = null; } }
+    if (!v) { try { v = SB.checkLink(url, nome); } catch (_) { v = null; } }
     if (!v) return null;
     const a = this._sbApplyState(tab, v);
     return a && (a.level === 'pericoloso' || a.level === 'sospetto') ? a : null;
@@ -160,11 +163,12 @@ const safebrowseMethods = {
 
   // #965 — Un link da avviso non si apre prima dell'avviso: compare sulla pagina da cui parte, e «Procedi» o «Continua»
   // fanno l'apertura che era stata chiesta (`apri(segna)`, che segna la conferma sulla scheda dove il sito si apre).
-  // Solo dalle pagine web; l'avviso della pagina stessa, se c'è, resta il suo.
-  _sbPrimaDelClic(tab, url, apri) {
-    if (!tab || tab.isInternal !== false || !/^https?:\/\//i.test(String(url || ''))) return false;
+  // Dalle pagine web; da una pagina di Filo solo un collegamento che Filo apre per lei (`daFilo`), mai il suo indirizzo. L'avviso
+  // della pagina stessa, se c'è, resta il suo. `nome`: vedi _sbVerdettoLink.
+  _sbPrimaDelClic(tab, url, apri, { nome = '', daFilo = false } = {}) {
+    if (!tab || (tab.isInternal !== false && !daFilo) || !/^https?:\/\//i.test(String(url || ''))) return false;
     if (tab.sbAvviso && !tab.sbAvviso.prima) return false;
-    const v = this._sbVerdettoLink(tab, url);
+    const v = this._sbVerdettoLink(tab, url, nome);
     if (!v) return false;
     // Ogni clic è un avviso nuovo, da ridisegnare da capo (conferma vuota, «Continua» da riarmare); lo stesso link
     // chiesto di nuovo mentre è a schermo no.
@@ -173,6 +177,31 @@ const safebrowseMethods = {
     tab.sbAvviso = { level: v.level, message: v.message || null, url: String(url), prima: { apri, n } };
     if (tab.id === this.activeId) this.layout();
     return true;
+  },
+
+  // Uno scaricamento chiesto da una pagina senza navigare (link con «download», uno script): si giudica l'indirizzo
+  // cliccato col nome del file, e confermato riparte dalla pagina. Vero se l'avviso l'ha fermato.
+  _sbScaricamento(tab, item) {
+    const wc = tab.view && tab.view.webContents;
+    if (!wc || wc.isDestroyed()) return false;
+    let url = '';
+    try { const c = item.getURLChain(); url = (Array.isArray(c) && c[0]) || item.getURL(); } catch (_) { url = ''; }
+    let nome = '';
+    try { nome = item.getFilename() || ''; } catch (_) {}
+    return this._sbPrimaDelClic(tab, url, (segna) => {
+      segna(tab);
+      try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {}
+    }, { nome });
+  },
+
+  // Un invio di modulo (POST) fermato dall'avviso e confermato si rifà dalla pagina coi suoi dati, che l'indirizzo da solo
+  // perderebbe; senza un invio da rifare, `altrimenti` apre l'indirizzo. Il modulo lo tiene il content script.
+  _sbRifaiInvio(tab, url, altrimenti) {
+    const wc = tab.view && tab.view.webContents;
+    const code = `(() => { const f = globalThis.SN_RIFAI_INVIO; return typeof f === 'function' ? f(${JSON.stringify(String(url))}) : false; })()`;
+    let p = null;
+    try { p = wc && !wc.isDestroyed() ? wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]) : null; } catch (_) { p = null; }
+    Promise.resolve(p).then((fatto) => { if (fatto !== true) altrimenti(); }, () => altrimenti());
   },
 
   // Le scelte sull'avviso di un link non ancora aperto: «Non aprire» lo toglie e basta, la conferma apre.
@@ -511,6 +540,17 @@ function stessoSito(a, b) {
 // Installa i metodi sul prototype di TabManager (mixin). `this` resta l'istanza.
 function installSafebrowse(TabManager) {
   Object.assign(TabManager.prototype, safebrowseMethods);
+  // Lo chiama il servizio degli scaricamenti (will-download), che non conosce le schede.
+  globalThis.SN_SB_SCARICAMENTO = (item, wc) => {
+    if (!wc) return false;
+    const { BrowserWindow } = require('electron');
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      const tab = tm && tm.tabs.find((t) => t.view && t.view.webContents === wc);
+      if (tab) return tm._sbScaricamento(tab, item);
+    }
+    return false;
+  };
 }
 
 module.exports = { installSafebrowse };

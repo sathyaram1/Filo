@@ -144,7 +144,12 @@ module.exports = function register(on, ctx) {
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
-      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo) }); },
+      apri: () => {
+        if (!tm) return;
+        // #965 — l'avviso di un sito da avviso compare sulla pagina da cui parte il collegamento, prima di aprirlo.
+        const daScheda = tm.tabs.find((t) => t.id === sender?.tab?.id && t.view && t.view.webContents === sender.wc) || null;
+        tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda });
+      },
     });
     return { ok: true, ...r, avvisato };
   });

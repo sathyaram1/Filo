@@ -122,6 +122,49 @@
     } catch (_) {}
   }
 
+  // L'ultimo invio di un modulo, coi dati come li ha costruiti la pagina («formdata» passa anche da form.submit()): se
+  // l'avviso ferma la pagina che ne nasce, confermato lo si rifà uguale. Un clic su un link dopo lo dimentica.
+  let invio = null;
+  let chiNomina = null;
+  document.addEventListener('submit', (e) => { chiNomina = { form: e.target, el: e.submitter || null }; }, true);
+  document.addEventListener('formdata', (e) => {
+    const form = e.target;
+    const el = chiNomina && chiNomina.form === form ? chiNomina.el : null;
+    chiNomina = null;
+    const da = (attr, prop) => (el && el.hasAttribute(attr) ? el[prop] : form[prop]);
+    invio = { dati: e.formData, action: da('formaction', 'action'), metodo: String(da('formmethod', 'method')).toLowerCase(),
+      enctype: da('formenctype', 'enctype'), charset: form.acceptCharset || '' };
+  }, true);
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.closest && e.target.closest('a[href], area[href]')) invio = null;
+  }, true);
+
+  const senzaAncora = (u) => { try { const x = new URL(u, location.href); x.hash = ''; return x.href; } catch (_) { return ''; } };
+  global.SN_RIFAI_INVIO = (url) => {
+    const i = invio;
+    if (!i || i.metodo !== 'post' || !url || senzaAncora(i.action) !== senzaAncora(url)) return false;
+    invio = null;
+    const f = document.createElement('form');
+    f.method = 'post';
+    f.action = i.action;
+    f.enctype = i.enctype;
+    if (i.charset) f.acceptCharset = i.charset;
+    f.target = '_self';
+    f.style.display = 'none';
+    for (const [k, v] of i.dati) {
+      const input = document.createElement('input');
+      input.name = k;
+      if (typeof v === 'string') { input.type = 'hidden'; input.value = v; } else {
+        input.type = 'file';
+        try { const dt = new DataTransfer(); if (v && v.name) dt.items.add(v); input.files = dt.files; } catch (_) {}
+      }
+      f.appendChild(input);
+    }
+    (document.body || document.documentElement).appendChild(f);
+    HTMLFormElement.prototype.submit.call(f);
+    return true;
+  };
+
   osserva();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', raccogli, { once: true });
   else raccogli();
