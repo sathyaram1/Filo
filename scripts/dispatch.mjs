@@ -757,6 +757,10 @@ function conDecisioni(ctx) {
 function conImmagini(ctx) {
   return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
 }
+// Domanda, risposta e rilievi fermi viaggiano col ruolo che riparte, o si richiede quello che l'owner ha deciso.
+function conRipresa(ctx) {
+  return ctx && ctx.ripresa && typeof ctx.ripresa === 'object' ? { ripresa: ctx.ripresa } : {};
+}
 
 // Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
 function testoDiffVuoto({ commitPropri = null } = {}) {
