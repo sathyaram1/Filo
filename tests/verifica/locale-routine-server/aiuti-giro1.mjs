@@ -12,8 +12,9 @@ const secrets = require(join(funzioni, 'src', 'routine', 'secrets'));
 const throttle = require(join(funzioni, 'src', 'routine', 'throttle'));
 const channel = require(join(funzioni, 'src', 'routine', 'channel'));
 const pm = require(join(funzioni, 'src', 'routine', 'pacemaker'));
-// I log del server vanno su stdout: qui serve solo il risultato.
-console.log = () => {};
+// I log del server vanno su stdout: si tengono a parte, il risultato è l'ultima riga.
+const logs = [];
+console.log = (...a) => { logs.push(a.join(' ')); };
 console.info = () => {};
 console.warn = () => {};
 console.error = () => {};
@@ -87,7 +88,7 @@ function preparaCoda() {
   });
   current.docs.set('config/routines', {
     enabled: true, maxSessions: 5, lavoriServer: true, proberWhenIdle: false,
-    routineId: 'rA', routineIdB: 'rB', routineIdServer: 'rS', priorityAccount: 'B', accountAOff: true,
+    routineId: 'rA', routineIdB: 'rB', routineIdServer: porta === 'non-configurata' ? '' : 'rS', priorityAccount: 'B', accountAOff: true,
   });
   current.docs.set('routine-state/pacemaker', { lastSweepMs: NOW });
   current.docs.set('feedback/srv', {
@@ -108,6 +109,12 @@ const fetchFinta = async (url) => {
 };
 
 preparaCoda();
+if (porta === 'non-configurata') {
+  current.docs.set('feedback/srv', { ...current.docs.get('feedback/srv'), status: 'todo', branch: '' });
+  const r = await pm.runPacemaker({ nowMs: NOW, fetchImpl: fetchFinta });
+  process.stdout.write(`\n${JSON.stringify({ esito: r, accensioni, logs })}\n`);
+  process.exit(0);
+}
 const biglietti = [];
 // Sei ore di pacemaker, un tick ogni dieci minuti; a ogni accensione la sessione nasce, sonda e chiede il biglietto.
 for (let k = 0; k < 36; k++) {
