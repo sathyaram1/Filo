@@ -35,7 +35,10 @@ let ultimaCifratura = { chiaro: null, blob: null };
 function impostazioniPerDisco(s) {
   try {
     if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return s;
-    if (!canEncrypt()) return s; // niente keyring OS → resta com'era (no perdita dati)
+    if (!canEncrypt()) { // niente keyring OS → resta com'era (no perdita dati), e l'utente lo sa
+      if (Object.values(s.apiKeys).some((v) => typeof v === 'string' && v.trim())) chiaviInChiaro();
+      return s;
+    }
     const chiaro = JSON.stringify(s.apiKeys);
     if (chiaro !== ultimaCifratura.chiaro) {
       ultimaCifratura = { chiaro, blob: safeStorage.encryptString(chiaro).toString('base64') };
