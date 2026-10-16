@@ -25,6 +25,25 @@ export function cartellaConsegna(root, base = tmpdir()) {
   return join(base, `filo-consegna-${h}`);
 }
 
+// Il ruolo sta nella cartella della consegna: la consegna dopo lo cancella insieme ai pezzi del payload.
+export function fileRuolo(root, base) {
+  return join(cartellaConsegna(root, base), '00-ruolo.md');
+}
+
+export function scriviRuolo(file, testo) {
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(file, testo, { encoding: 'utf8', mode: 0o600 });
+  return file;
+}
+
+// Al posto del ruolo, in stampa: il suo titolo e dove sta tutto il resto.
+export function rimandoAlRuolo(testo, file) {
+  const t = String(testo || '');
+  const titolo = (t.split('\n').find((r) => r.trim()) || '').trim();
+  return `${titolo}\n\nIl testo intero del tuo ruolo (${t.length} caratteri) non sta in questa stampa: è nel file ${file}. `
+    + 'Leggilo tutto, senza intervalli di righe, prima di fare qualunque altra cosa: sono le tue istruzioni, come se fossero scritte qui.';
+}
+
 // Il server riconosce il tipo dai primi byte (contratto #900); l'estensione fa aprire il file come immagine.
 const ESTENSIONE_IMMAGINE = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 
