@@ -1,14 +1,13 @@
 // Rete finta con nomi veri per gli spec della lista dei siti bloccati (#590): un server
-// locale risponde per nome e percorso agli host mappati qui (www.bing.com, blocked.test…).
+// locale risponde per nome e percorso agli host mappati qui (www.ecosia.org, blocked.test…).
 // Non parla con la rete vera; ogni host nuovo va aggiunto a HOSTS.
 
 import { createServer } from 'node:http';
-import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from '@playwright/test';
 import { test as filoTest, expect, chiudiApp } from '../fixtures/electron.mjs';
-import { cartellaTemporanea } from './percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from './percorsi.mjs';
 import { argomentiScala } from './scala.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -16,9 +15,12 @@ const APP_ROOT = resolve(__dirname, '..', '..');
 
 export const HOSTS = [
   'blocked.test', 'www.blocked.test', 'sito.test', 'accorcia.test', 'tracker.test', 'articolo.test',
-  'libero.test', 'www.bing.com',
+  // Un motore di ricerca vero che Chromium lascia in http: bing.com da Electron 44 si apre solo in https.
+  'libero.test', 'www.ecosia.org',
   // Nomi internazionali nella forma che arriva alla rete: münchen.de e сайт.рф.
   'xn--mnchen-3ya.de', 'xn--80aswg.xn--p1ai',
+  // Le due schede dello stesso sito dell'Aiuto di una scheda (#826).
+  'example.org',
 ];
 
 export const test = filoTest.extend({
@@ -46,23 +48,23 @@ export const test = filoTest.extend({
     try { server.closeAllConnections?.(); } catch (_) {}
     await new Promise((r) => server.close(r));
   },
-  app: async ({ rete }, use) => {
+  app: async ({ rete, accoglienzaFatta }, use) => {
     const userData = cartellaTemporanea('filo-test-');
-    const app = await avviaFilo(rete, userData);
+    const app = await avviaFilo(rete, userData, { accolto: accoglienzaFatta });
     await use(app);
     await chiudiApp(app);
-    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+    try { togliCartella(userData); } catch (_) {}
   },
 });
 
 // Filo sulla rete finta con una cartella dati scelta da chi chiama: due avvii sulla stessa
-// cartella sono una riapertura di Filo.
-export function avviaFilo(rete, userData) {
+// cartella sono una riapertura di Filo. Come nella fixture, parte già accolto se non chiede il profilo nuovo.
+export function avviaFilo(rete, userData, { accolto = true } = {}) {
   const rules = HOSTS.map((h) => `MAP ${h} 127.0.0.1:${rete.port}`).join(', ');
   return electron.launch({
     args: [...argomentiScala, `--host-resolver-rules=${rules}`, '.'],
     cwd: APP_ROOT,
-    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test', FILO_TEST_ACCOLTO: accolto ? '1' : '0' },
   });
 }
 

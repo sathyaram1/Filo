@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync, readdirSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { writeFileSync, readdirSync, mkdirSync, readFileSync } from 'node:fs';
 import * as zlib from 'node:zlib';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -67,7 +67,7 @@ test('rinomina: tiene l\'estensione, non sovrascrive, dice il nome vero', async 
     const [x] = await Nomi.rimetti([{ attuale: r.a, prima: 'scan_00231.pdf' }]);
     assert.equal(x.ok, true);
     assert.deepEqual(readdirSync(dir).sort(), ['Bolletta.pdf', 'scan_00231.pdf']);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { togliCartella(dir); }
 });
 
 test('rinomina: vuoto, cartelle, file spariti, estensione cambiata o nome con una barra si fermano dicendolo', async () => {
@@ -85,7 +85,7 @@ test('rinomina: vuoto, cartelle, file spariti, estensione cambiata o nome con un
     assert.equal(r.ok, true);
     assert.equal(r.nome, 'fuori.pdf');
     assert.equal(dirname(r.a), dir);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { togliCartella(dir); }
 });
 
 test('un documento Word e uno LibreOffice si leggono per proporre il nome; il modello riceve il testo imbustato', async () => {
@@ -120,7 +120,7 @@ test('un documento Word e uno LibreOffice si leggono per proporre il nome; il mo
     assert.match(visti[1].find((m) => m.role === 'user').content, /Verbale assemblea\nCondominio Aurora/);
   } finally {
     Nomi.collega({ chiamaModello: null });
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -142,7 +142,7 @@ test('proposta: un modello che non sa dare un nome, o che non risponde, lascia s
     assert.equal(c.errore, 'tipo');
   } finally {
     Nomi.collega({ chiamaModello: null });
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -157,7 +157,7 @@ test('l\'inizio del testo ha un tetto fisso: il costo della proposta non cresce 
     assert.ok(lunghezza < Nomi.TESTO_MAX + 1500, `il modello ha ricevuto ${lunghezza} caratteri`);
   } finally {
     Nomi.collega({ chiamaModello: null });
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -203,7 +203,7 @@ test('un PDF oltre il tetto della lettura intera prende un nome lo stesso: per i
     const t = join(dir, 'export_0001.csv');
     writeFileSync(t, `Estratto conto Banca Rossi;marzo 2026\n${'1;2;3\n'.repeat(5 * 1024 * 1024)}`);
     assert.match((await Nomi.contenuto(t)).testo || '', /^Estratto conto Banca Rossi/);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { togliCartella(dir); }
 });
 
 test('una scansione in bianco e nero (1 bit, o maschera) arriva come immagine in grigi, non come pagina vuota', async () => {
@@ -220,5 +220,5 @@ test('una scansione in bianco e nero (1 bit, o maschera) arriva come immagine in
       assert.equal(img.data[5 * 40 + 3], 255, `${nome}: il foglio è bianco`);
       assert.equal(img.data[10 * 40 + 3], 0, `${nome}: la riga è nera`);
     }
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { togliCartella(dir); }
 });

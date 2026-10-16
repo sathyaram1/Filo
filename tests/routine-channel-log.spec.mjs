@@ -12,6 +12,7 @@
 // (la sezione non esiste, quindi non contiene nessuna riga).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -29,7 +30,7 @@ test('i rifiuti del canale compaiono all owner, col motivo in chiaro e la routin
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
   // La scheda va aperta: il blocco vive dentro il pannello "Log".
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   await page.evaluate(({ rej, cmp }) => window.__mgTest.renderChannelLog(rej, cmp), { rej: REJECTIONS, cmp: COMPARISONS });
 
@@ -57,7 +58,7 @@ test('i confronti dicono quando le due strade scelgono lo stesso lavoro e quando
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
   // La scheda va aperta: il blocco vive dentro il pannello "Log".
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   await page.evaluate(({ rej, cmp }) => window.__mgTest.renderChannelLog(rej, cmp), { rej: [], cmp: COMPARISONS });
 
@@ -85,7 +86,7 @@ test('senza rifiuti e senza confronti il blocco lo dice, invece di restare vuoto
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
   // La scheda va aperta: il blocco vive dentro il pannello "Log".
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   await page.evaluate(() => window.__mgTest.renderChannelLog([], []));
 
@@ -110,7 +111,7 @@ test('le fusioni senza prova degli unit compaiono all owner, e quando sono frequ
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   await page.evaluate((prove) => window.__mgTest.renderChannelLog([], [], prove), PROVE);
   const rows = page.locator('#mgChannelList .mg-log-row');

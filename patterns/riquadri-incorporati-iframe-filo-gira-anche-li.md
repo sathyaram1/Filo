@@ -53,12 +53,16 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   principale. **Il riquadro va svegliato**: per il costo pigro lì dentro non c'è
   ancora niente di montato, quindi il messaggio che lo comanda deve far partire
   `ensureContentScripts()` e farsi consegnare dopo (stesso cammino delle
-  scorciatoie). **Chi non risponde entra nell'avviso**: un riquadro chiuso a
-  chiave dal `sandbox` non ha script e non risponderà mai, e il conto dei
+  scorciatoie). **Chi non risponde entra nell'avviso**: un riquadro in cui il
+  nostro script non risponde resta in lingua originale, e il conto dei
   riquadri che si VEDONO (grandi abbastanza da starci del testo) meno quelli che
   si sono fatti vivi è ciò che fa dire "una parte è rimasta fuori" invece di
   "fatto". E se si può tradurre lì dentro si deve poter tornare indietro lì
   dentro: il ritorno all'originale passa parola con lo stesso giro.
+  Il `sandbox` senza allow-scripts invece NON ferma Filo: dal #1122 il suo mondo
+  isolato ha una CSP propria, e Chromium esenta un mondo così dal divieto di
+  script del `sandbox`, come i content script delle estensioni. Lì dentro Filo
+  traduce; negli spec il riquadro muto si fa con `senzaFilo`.
   **In un riquadro SENZA indirizzo il preload non entra affatto**, e questo si
   scopre solo provandolo: un `iframe` vuoto riempito dalla pagina stessa
   (`about:blank`, `srcdoc`) resta senza Filo dentro, e quasi tutti i riquadri

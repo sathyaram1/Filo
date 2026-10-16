@@ -37,6 +37,7 @@
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
+  let rispondi = null;
 
   // Lo stato lo tiene il main (una chiave sola): all'apertura chiediamo se
   // l'intervista è aperta e, se sì, ricomponiamo la conversazione com'era.
@@ -74,7 +75,15 @@
     for (const m of thread) {
       const role = m.role === 'filo' ? 'filo' : 'user';
       pushHistory({ role, text: m.text });
-      bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
+      const bolla = makeBubble({ role, text: m.text, markdown: role === 'filo' });
+      bubblesEl.appendChild(bolla);
+      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia() : null;
+      if (scelta) {
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-bubble-actions';
+        wrap.appendChild(scelta);
+        bolla.appendChild(wrap);
+      }
     }
     const ultimo = thread[thread.length - 1];
     if (state.fermato && ultimo && ultimo.role !== 'filo' && segnaFermato) segnaFermato();
@@ -112,6 +121,126 @@
     // butterebbe via il blocco di attività e i bottoni delle azioni.
     if (giaAschermo && giaAschermo(state)) return;
     renderOnboardingThread(state);
+  }
+
+  // ── La scelta dell'autonomia (#1188) ──────────────────────────────────────
+  // Filo la mostra sotto la sua domanda, il livello lo sceglie l'utente con le regole di Preferenze (alzarlo vuole
+  // «conferma»). Finché la domanda è in sospeso il clic è anche la risposta, e la conversazione va avanti.
+  async function livelloSalvato() {
+    try {
+      const s = await global.SN_STORAGE.getSettings();
+      return (s && s.autonomia && s.autonomia.livello) || '';
+    } catch (_) { return ''; }
+  }
+
+  function mostraFrase(box, id) {
+    const A = global.SN_AUTONOMIA;
+    const frase = box.querySelector('.dash-autonomia-frase');
+    if (frase) frase.textContent = A.infoLivello(id || box.dataset.livello).frase;
+  }
+
+  function segnaLivello(box, livello) {
+    box.dataset.livello = livello;
+    for (const b of box.querySelectorAll('.dash-autonomia-livello')) {
+      const scelto = b.dataset.livello === livello;
+      b.classList.toggle('scelto', scelto);
+      b.setAttribute('aria-pressed', scelto ? 'true' : 'false');
+    }
+    if (!box.matches(':hover') && !box.contains(document.activeElement)) mostraFrase(box);
+  }
+
+  function aggiornaSceltaAutonomia(livello) {
+    const A = global.SN_AUTONOMIA;
+    if (!A) return;
+    for (const box of document.querySelectorAll('.dash-autonomia-scelta')) segnaLivello(box, A.livelloAttivo(livello));
+  }
+
+  // Solo se è ancora la domanda in sospeso: dopo un messaggio dell'utente il clic cambia il livello e basta.
+  function rispondiConScelta(box, livello) {
+    if (!onboardingActive || isSending() || box.dataset.risposto === '1' || !rispondi) return;
+    const dopo = [...bubblesEl.querySelectorAll('.dash-bubble-user')]
+      .some((u) => box.compareDocumentPosition(u) & Node.DOCUMENT_POSITION_FOLLOWING);
+    if (dopo) return;
+    if (rispondi(`Scelgo ${global.SN_AUTONOMIA.infoLivello(livello).nome}.`)) box.dataset.risposto = '1';
+  }
+
+  async function scegliLivello(box, nuovo) {
+    const A = global.SN_AUTONOMIA;
+    if (box.dataset.occupato === '1') return;
+    box.dataset.occupato = '1';
+    try {
+      const attuale = A.livelloAttivo((await livelloSalvato()) || box.dataset.livello);
+      const serve = A.richiestaCambioLivello(attuale, nuovo);
+      if (serve === 'no') return;
+      if (serve === 'conferma') {
+        const Ui = global.SN_CONFIRM_UI;
+        if (!Ui || !(await Ui.confirmTyped(A.confermaAlzata(nuovo)))) return;
+      }
+      if (nuovo !== attuale) {
+        const r = await send({ type: MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: nuovo } } });
+        if (!r || r.ok === false) return;
+      }
+      aggiornaSceltaAutonomia(nuovo);
+      rispondiConScelta(box, nuovo);
+    } catch (_) {
+    } finally {
+      delete box.dataset.occupato;
+    }
+  }
+
+  function sceltaAutonomia(livello) {
+    const A = global.SN_AUTONOMIA;
+    if (!A) return null;
+    const box = document.createElement('div');
+    box.className = 'dash-autonomia-scelta';
+    const gruppo = document.createElement('div');
+    gruppo.className = 'dash-autonomia-livelli';
+    gruppo.setAttribute('role', 'group');
+    gruppo.setAttribute('aria-label', 'Quanto Filo fa da solo');
+    const livelli = A.livelliSelezionabili();
+    livelli.forEach((l, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-autonomia-livello';
+      b.dataset.livello = l.id;
+      const tacche = document.createElement('span');
+      tacche.className = 'dash-autonomia-tacche';
+      tacche.setAttribute('aria-hidden', 'true');
+      for (let j = 0; j < livelli.length; j++) {
+        const t = document.createElement('span');
+        t.className = `dash-autonomia-tacca${j <= i ? ' piena' : ''}`;
+        tacche.appendChild(t);
+      }
+      const nome = document.createElement('span');
+      nome.textContent = l.nome;
+      b.append(tacche, nome);
+      b.addEventListener('click', () => { scegliLivello(box, l.id); });
+      b.addEventListener('mouseenter', () => mostraFrase(box, l.id));
+      b.addEventListener('focus', () => mostraFrase(box, l.id));
+      b.addEventListener('mouseleave', () => mostraFrase(box));
+      b.addEventListener('blur', () => mostraFrase(box));
+      gruppo.appendChild(b);
+    });
+    // Il posto della frase misura già la più lunga: se cambiasse altezza al passaggio del cursore, la chat in fondo
+    // salterebbe, il pulsante scivolerebbe via da sotto il cursore e il clic andrebbe a vuoto.
+    const posto = document.createElement('div');
+    posto.className = 'dash-autonomia-frase-posto';
+    for (const l of livelli) {
+      const misura = document.createElement('span');
+      misura.className = 'dash-autonomia-frase-misura';
+      misura.setAttribute('aria-hidden', 'true');
+      misura.textContent = A.infoLivello(l.id).frase;
+      posto.appendChild(misura);
+    }
+    const frase = document.createElement('div');
+    frase.className = 'dash-autonomia-frase';
+    frase.setAttribute('aria-live', 'polite');
+    posto.appendChild(frase);
+    box.append(gruppo, posto);
+    segnaLivello(box, A.livelloAttivo(livello));
+    // Quello dell'azione può essere di qualche istante fa: vale quello salvato.
+    livelloSalvato().then((lv) => { if (lv) segnaLivello(box, A.livelloAttivo(lv)); });
+    return box;
   }
 
   // ── La via d'uscita che non passa dal modello ─────────────────────────────
@@ -171,6 +300,17 @@
   // adesso c'è: la apriamo, ma solo se l'utente è ancora sulla home e non sta
   // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
   // che aspettare la prossima scheda.
+  // Una home preparata nascosta (#1128) non prende la ripresa del turno rimasto a metà: la chiede arrivando davanti.
+  async function riprendiAllaComparsa() {
+    if (!onboardingActive || isSending()) return;
+    const state = await fetchOnboarding();
+    const thread = (state && state.thread) || [];
+    const last = thread[thread.length - 1];
+    if (!state || !state.resume || !onboardingActive || isSending() || !last || last.role !== 'user') return;
+    beginSending();
+    await runTurnAndContinue({ userMessage: last.text });
+  }
+
   async function maybeOpenOnboardingLater() {
     if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
@@ -333,6 +473,7 @@
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
+    rispondi = deps.rispondi || null;
   }
 
   global.SN_DASH_ONBOARDING = {
@@ -344,8 +485,11 @@
     onboardingClosing,
     onboardingDone,
     maybeOpenOnboardingLater,
+    riprendiAllaComparsa,
     refreshOnboardingNotice,
     hideOnboardingNotice,
     makeSkipOnboardingBtn,
+    sceltaAutonomia,
+    aggiornaSceltaAutonomia,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -38,7 +38,7 @@ async function apriModelli(page) {
       return orig(msg);
     };
   }, CATALOGO);
-  await page.evaluate(() => window.__mgTest.setTab('models'));
+  await page.evaluate(() => window.__mgTest.setTab('automation'));
   await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), MODELS);
   await expect(page.locator('#mgSmEditor')).toBeVisible();
 }
@@ -213,7 +213,7 @@ test('slot svuotato in Gestione: la ricerca non parte su un modello e l\'errore 
     return { errore, chiamato };
   });
   expect(esito.chiamato).toBe(false);
-  expect(esito.errore).toContain('Gestione → Modelli di supporto');
+  expect(esito.errore).toContain('Gestione → Automazioni, fra i Modelli di supporto');
 });
 
 test('senza catalogo il campo «Modello OpenRouter» propone i modelli delle altre righe, non il testo che stai scrivendo', async ({ openTab }) => {
@@ -227,7 +227,7 @@ test('senza catalogo il campo «Modello OpenRouter» propone i modelli delle alt
       return orig(msg);
     };
   });
-  await page.evaluate(() => window.__mgTest.setTab('models'));
+  await page.evaluate(() => window.__mgTest.setTab('automation'));
   await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), MODELS);
   await expect(page.locator('#mgSmEditor')).toBeVisible();
 

@@ -1,15 +1,19 @@
-// #786 — «Installa gli aggiornamenti da solo»: spenta, Filo non scarica né installa la versione nuova e mette in
-// home una carta con «Installa»; premuto, la scarica mostrando a che punto è e la installa alla chiusura. La stessa
-// scelta si fa dalle Preferenze o chiedendola a Filo, che chiede conferma spiegando il rischio. L'aggiornatore vero
-// gira solo nelle build installate: qui ce n'è uno finto nel main, guidato dalla prova. Foto in tests/.shots/.
+// #786 — «Installa gli aggiornamenti da solo» spenta: niente parte da sola, la carta in home ha «Installa», che scarica
+// e installa quando il sistema lo prevede. Si sceglie anche in Preferenze o in chat, con conferma. L'aggiornatore è
+// finto, nel main; foto in tests/.shots/. Regola della piattaforma: patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
-// Su Windows alla chiusura non si installa niente, di serie (#1039): la versione nuova si installa all'apertura dopo.
-const ALLA_CHIUSURA = process.platform !== 'win32';
+// La piattaforma la sceglie la prova, mai quella che la esegue: così il caso Windows (installa all'apertura dopo,
+// #1039) gira anche dove gira la suite, e non diventa rosso solo sulla macchina dell'owner (#1171).
+const SISTEMI = [
+  { nome: 'Linux', piattaforma: 'linux', allaChiusura: true },
+  { nome: 'Windows', piattaforma: 'win32', allaChiusura: false },
+];
+const suSistema = (app, s) => app.evaluate((_e, p) => { globalThis.__filoUpdater.perProva({ piattaforma: p }); }, s.piattaforma);
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
@@ -27,9 +31,10 @@ const finto = (app) => app.evaluate(() => {
   return { scaricamenti: u.scaricamenti, autoDownload: u.autoDownload, autoInstallOnAppQuit: u.autoInstallOnAppQuit };
 });
 
-// L'aggiornatore finto: trova la `versione` sul feed; lo scaricamento si ferma al 37% finché la prova non lo finisce.
-async function aggiornatoreFinto(app, { automatici, versione = '9.9.9' }) {
-  await app.evaluate(async (_e, { automatici: auto, versione: v }) => {
+// L'aggiornatore finto: trova la `versione` sul feed, nella release `etichetta`; lo scaricamento si ferma al 37%
+// finché la prova non lo finisce.
+async function aggiornatoreFinto(app, { automatici, versione = '9.9.9', etichetta = `v${versione}` }) {
+  await app.evaluate(async (_e, { automatici: auto, versione: v, etichetta: t }) => {
     const ascolta = {};
     const u = {
       autoDownload: true,
@@ -38,7 +43,7 @@ async function aggiornatoreFinto(app, { automatici, versione = '9.9.9' }) {
       on(e, f) { (ascolta[e] ||= []).push(f); return u; },
       emit(e, ...a) { for (const f of ascolta[e] || []) f(...a); },
       async checkForUpdates() {
-        u.emit('update-available', { version: v });
+        u.emit('update-available', { version: v, tag: t });
         return { downloadPromise: u.autoDownload ? u.downloadUpdate() : null };
       },
       checkForUpdatesAndNotify() { return u.checkForUpdates(); },
@@ -54,7 +59,7 @@ async function aggiornatoreFinto(app, { automatici, versione = '9.9.9' }) {
     await globalThis.__filoUpdater.avviaAggiornatore(u, {
       automatici: auto, annuncia: () => globalThis.__filoHandlers.broadcastLiveUpdate(),
     });
-  }, { automatici, versione });
+  }, { automatici, versione, etichetta });
 }
 
 async function tema(page, t) {
@@ -62,16 +67,19 @@ async function tema(page, t) {
   await expect(page.locator('html')).toHaveAttribute('data-sn-theme', t);
 }
 
-test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la scarica, mostra a che punto è e la installa alla chiusura', async ({ app, shell }) => {
+for (const s of SISTEMI) test(`spenta: la versione nuova non parte da sola; «Installa» sulla carta la scarica, mostra a che punto è e la installa quando il sistema lo prevede (${s.nome})`, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await homeDi(app);
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: false });
+  const quando = s.allaChiusura ? 'quando chiudi Filo' : 'la prossima volta che apri Filo';
 
   const carta = home.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' });
   await expect(carta).toBeVisible({ timeout: 8_000 });
   await expect(carta.locator('.dash-carta-tit')).toHaveText('Aggiornamento');
   await expect(carta.locator('.dash-carta-stato')).toContainText('C\'è la versione 9.9.9 di Filo.');
+  await expect(carta).toContainText(`si installa ${quando}`);
   await expect(carta.locator('.dash-carta-az.principale')).toHaveText('Installa');
   await expect(carta.locator('.dash-carta-az.secondaria')).toHaveText('Chiudi');
   expect(await finto(app)).toEqual({ scaricamenti: 0, autoDownload: false, autoInstallOnAppQuit: false });
@@ -83,14 +91,15 @@ test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la s
   await expect(menu.locator('.dash-menu-voce', { hasText: 'Installa' })).toHaveCount(1);
   await expect(menu.locator('.dash-menu-voce', { hasText: 'Preferenze sugli aggiornamenti' })).toHaveCount(1);
   mkdirSync(SHOTS, { recursive: true });
-  await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-menu.png` });
+  const foto = (nome) => `${SHOTS}/aggiornamenti-carta-${nome}-${s.piattaforma}.png`;
+  await home.screenshot({ path: foto('menu') });
   await home.keyboard.press('Escape');
 
   for (const t of ['light', 'dark']) {
     await tema(home, t);
     await home.mouse.move(640, 300);
     await home.waitForTimeout(250);
-    await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-${t}.png` });
+    await home.screenshot({ path: foto(t) });
   }
   await tema(home, 'light');
 
@@ -98,12 +107,12 @@ test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la s
   await expect(carta.locator('.dash-carta-stato')).toHaveText('Scarico la versione 9.9.9: 37%', { timeout: 5_000 });
   await expect(carta.locator('.dash-carta-avanza')).toBeVisible();
   await expect(carta.locator('.dash-carta-az.principale')).toHaveCount(0);
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: ALLA_CHIUSURA });
-  await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-scarica.png` });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: s.allaChiusura });
+  await home.screenshot({ path: foto('scarica') });
 
   await app.evaluate(() => globalThis.__aggFinto.finisci());
-  await expect(carta.locator('.dash-carta-stato')).toHaveText(`La versione 9.9.9 è pronta. Si installa ${ALLA_CHIUSURA ? 'quando chiudi Filo' : 'la prossima volta che apri Filo'}.`, { timeout: 5_000 });
-  await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-pronta.png` });
+  await expect(carta.locator('.dash-carta-stato')).toHaveText(`La versione 9.9.9 è pronta. Si installa ${quando}.`, { timeout: 5_000 });
+  await home.screenshot({ path: foto('pronta') });
   // Chiusa, la carta di questa versione non torna a un nuovo controllo.
   await carta.hover();
   await carta.locator('.dash-carta-togli').click();
@@ -113,17 +122,19 @@ test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la s
   await expect(home.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' })).toHaveCount(0);
 });
 
-test('accesa: tutto come prima, la versione nuova si scarica da sola e in home non compare niente', async ({ app, shell }) => {
+for (const s of SISTEMI) test(`accesa: tutto come prima, la versione nuova si scarica da sola e in home non compare niente (${s.nome})`, async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await homeDi(app);
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: true });
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: true, autoInstallOnAppQuit: ALLA_CHIUSURA });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: s.allaChiusura });
   await home.waitForTimeout(500);
   await expect(home.locator('#accade .dash-carta[data-tipo="avviso"]')).toHaveCount(0);
 });
 
-test('Preferenze, Impostazioni avanzate: l\'opzione è accesa di serie, spenta vale subito e si riaccende', async ({ app, shell, openTab }) => {
+for (const s of SISTEMI) test(`Preferenze, Impostazioni avanzate: l'opzione è accesa di serie, spenta vale subito e si riaccende (${s.nome})`, async ({ app, shell, openTab }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: true });
   const pref = await openTab('filo://preferences/preferences.html');
   const casella = pref.locator('#sec-advanced #sec-aggiornamenti #aggiornamentiAutomatici');
@@ -138,13 +149,13 @@ test('Preferenze, Impostazioni avanzate: l\'opzione è accesa di serie, spenta v
   mkdirSync(SHOTS, { recursive: true });
   for (const t of ['light', 'dark']) {
     await tema(pref, t);
-    await pref.locator('#sec-aggiornamenti').screenshot({ path: `${SHOTS}/aggiornamenti-preferenze-${t}.png` });
+    await pref.locator('#sec-aggiornamenti').screenshot({ path: `${SHOTS}/aggiornamenti-preferenze-${t}-${s.piattaforma}.png` });
   }
   await tema(pref, 'light');
 
   await casella.check();
   await expect.poll(async () => (await impostazioni(app)).aggiornamenti?.automatici).toBe(true);
-  expect((await finto(app)).autoInstallOnAppQuit).toBe(ALLA_CHIUSURA);
+  expect((await finto(app)).autoInstallOnAppQuit).toBe(s.allaChiusura);
 });
 
 test('la voce del tasto destro della carta porta alla preferenza, anche in fondo alla pagina', async ({ app, shell }) => {
@@ -165,7 +176,6 @@ test('la voce del tasto destro della carta porta alla preferenza, anche in fondo
 async function modelloFinto(app, giri) {
   await app.evaluate(async (_e, g) => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -173,7 +183,9 @@ async function modelloFinto(app, giri) {
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     let n = 0;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta, onToolCall }) => {
+    globalThis.__chiamateFinte = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
+      globalThis.__chiamateFinte.push(JSON.parse(JSON.stringify(messages)));
       const giro = g[Math.min(n, g.length - 1)];
       n += 1;
       const calls = giro.toolCalls || [];
@@ -223,10 +235,11 @@ test('«non aggiornarti da solo» in chat: la conferma spiega il rischio, e solo
   await expect(pref.locator('#aggiornamentiAutomatici')).not.toBeChecked({ timeout: 5_000 });
 });
 
-test('«aggiornati» in chat, anche con la carta chiusa: la versione nuova si scarica e si installerà alla chiusura', async ({ app, shell }) => {
+for (const s of SISTEMI) test(`«aggiornati» in chat, anche con la carta chiusa: la versione nuova si scarica e si installerà quando il sistema lo prevede (${s.nome})`, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: false });
   const carta = chat.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' });
   await expect(carta).toBeVisible({ timeout: 8_000 });
@@ -241,8 +254,35 @@ test('«aggiornati» in chat, anche con la carta chiusa: la versione nuova si sc
   await chat.locator('#input').fill('installa la versione nuova');
   await chat.locator('#sendBtn').click();
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'si installa quando chiudi Filo' })).toBeVisible({ timeout: 10_000 });
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: ALLA_CHIUSURA });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: s.allaChiusura });
   // La riga del diario, nella parte compressa «Come ha lavorato», dice la versione.
   await expect(chat.getByText('Scarico la versione 9.9.9', { exact: false }).first()).toBeAttached({ timeout: 5_000 });
   expect((await impostazioni(app)).aggiornamenti.automatici, 'installare una versione non riaccende l\'opzione').toBe(false);
+});
+
+// #1119 — La «latest» spostata su una release vecchia, col numero gonfiato nel suo latest.yml: per Filo non c'è.
+test('una release col numero diverso dalla sua etichetta non si scarica, non fa carte, e «aggiornati» lo dice', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  const s = SISTEMI[0];
+  await suSistema(app, s);
+  await aggiornatoreFinto(app, { automatici: true, etichetta: 'v0.2.100' });
+  expect(await finto(app)).toEqual({ scaricamenti: 0, autoDownload: false, autoInstallOnAppQuit: s.allaChiusura });
+
+  await aggiornatoreFinto(app, { automatici: false, etichetta: 'v0.2.100' });
+  await chat.waitForTimeout(500);
+  await expect(chat.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' })).toHaveCount(0);
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'r1', name: 'INSTALLA_AGGIORNAMENTO', arguments: '{}' }] },
+    { text: 'Quella versione non la installo.' },
+  ]);
+  await chat.bringToFront();
+  await chat.locator('#input').fill('aggiornati');
+  await chat.locator('#sendBtn').click();
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Quella versione non la installo.' })).toBeVisible({ timeout: 10_000 });
+  const esito = JSON.stringify((await app.evaluate(() => globalThis.__chiamateFinte)).at(-1));
+  expect(esito).toContain('non supera il controllo di sicurezza e non la scarico');
+  expect((await finto(app)).scaricamenti).toBe(0);
 });

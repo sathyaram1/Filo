@@ -13,13 +13,13 @@ const SCRIPTS = join(ROOT, 'scripts');
 const ID = 'fbRegoleVecchie';
 
 // Regole di produzione prima della pubblicazione: una PATCH che scrive `updatedAt` viene respinta.
-async function conRegoleVecchie(fn) {
+async function conRegoleVecchie(fn, campi = {}) {
   const realFetch = globalThis.fetch;
   const patch = [];
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url);
     if ((init.method || 'GET') === 'GET') {
-      return new Response(JSON.stringify({ name: `x/feedback/${ID}`, fields: { statusPublic: { stringValue: 'open' } } }), { status: 200 });
+      return new Response(JSON.stringify({ name: `x/feedback/${ID}`, fields: { statusPublic: { stringValue: 'open' }, ...campi } }), { status: 200 });
     }
     patch.push({ url: u, body: JSON.parse(String(init.body || '{}')) });
     if (u.includes('updatedAt')) return new Response('{"error":{"code":403}}', { status: 403 });
@@ -30,16 +30,21 @@ async function conRegoleVecchie(fn) {
 
 test('con le regole vecchie la scrittura dello script passa, senza la firma', async () => {
   const of = await import(pathToFileURL(join(SCRIPTS, 'owner-feedback.mjs')).href);
+  // Togliere il segno locale: una scrittura dello script che passa da patchFirmato (#1148 ha tolto la pre-approvazione).
+  const segno = {
+    clientId: { stringValue: 'local:claude' }, status: { stringValue: 'todo' },
+    localOnly: { mapValue: { fields: { by: { stringValue: 'owner' }, at: { integerValue: '1' } } } },
+  };
   await conRegoleVecchie(async (patch) => {
-    const r = await of.segnaPreapprovazione(ID, false, { bearer: 'finto' });
+    const r = await of.segnaLocale(ID, false, { bearer: 'finto' });
     assert.equal(r.ok, true, r.motivo);
     assert.equal(patch.length, 2);
     assert.match(patch[0].url, /updateMask\.fieldPaths=updatedAt/);
     assert.ok(patch[0].body.fields.updatedAt);
     assert.doesNotMatch(patch[1].url, /updatedAt/);
     assert.equal('updatedAt' in patch[1].body.fields, false);
-    assert.match(patch[1].url, /updateMask\.fieldPaths=mergePreapproved/);
-  });
+    assert.match(patch[1].url, /updateMask\.fieldPaths=localOnly/);
+  }, segno);
 });
 
 test('la riprova tiene il resto della domanda, e non riparte se il rifiuto non riguarda la firma', async () => {

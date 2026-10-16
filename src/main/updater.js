@@ -16,6 +16,7 @@ const ETICHETTA_PULSANTE = 'Riavvia e aggiorna';
 const ARGOMENTI_INSTALLATORE = ['--updated', '--force-run'];
 // La carta della versione nuova che aspetta «Installa», con «Installa gli aggiornamenti da solo» spento (#786).
 const TIPO_DISPONIBILE = 'aggiornamento-disponibile';
+const FRASE_RIFIUTATA = 'C\'è una versione nuova pubblicata, ma non supera il controllo di sicurezza e non la scarico.';
 
 function electronApp() { return require('electron').app; }
 
@@ -55,6 +56,8 @@ function nuovoStato() {
     chiesto: false,       // l'utente ha premuto «Installa»: si installa anche da spento
     chiesta: null,        // la versione di quel «Installa», ricordata fra un avvio e l'altro
     versioneTrovata: null,
+    info: null,           // l'UpdateInfo dell'ultima versione trovata, se electron-updater non dice la sua
+    rifiutata: null,      // la versione dell'ultimo controllo, scartata perché il numero non è quello dell'etichetta
     scaricamento: null,   // { versione, percento } finché scarica
     pronta: null,         // la versione scaricata
     agganciata: false,    // electron-updater la installerà alla chiusura (vedi regola)
@@ -211,19 +214,41 @@ function regola() {
   const u = updater;
   if (!u) return;
   try {
-    u.autoDownload = stato.automatici;
+    // Lo scaricamento lo chiede sempre Filo, dopo il confronto fra numero ed etichetta (#1119): da solo
+    // electron-updater partirebbe prima che Filo veda la versione.
+    u.autoDownload = false;
     u.autoInstallOnAppQuit = siInstalla() && R.piano(dip.piattaforma(), stato.modo).allaChiusura;
     // electron-updater aggancia l'installazione alla chiusura solo a scaricamento finito: una versione già pronta
     // quando l'installazione si riaccende va riagganciata. Richiedere lo scaricamento di una versione già scaricata
     // la ritrova in cache e rifà l'aggancio, senza rete.
     if (u.autoInstallOnAppQuit && stato.pronta && !stato.agganciata && typeof u.downloadUpdate === 'function') {
       stato.agganciata = true;
-      Promise.resolve().then(() => u.downloadUpdate()).catch((e) => {
+      Promise.resolve().then(() => scaricaVerificata(u)).catch((e) => {
         stato.agganciata = false;
         console.error('[updater] aggancio alla chiusura fallito:', e?.message || e);
       });
     }
   } catch (_) {}
+}
+
+// L'unica strada verso downloadUpdate (sentinella in tests/unit/aggiornamentoEtichetta.test.mjs). electron-updater
+// scarica l'ultima versione che ha trovato: si guarda quella, e non parte se il numero non è quello dell'etichetta.
+function scaricaVerificata(u) {
+  const interna = u && u.updateInfoAndProvider;
+  const info = interna && interna.info ? interna.info : stato.info;
+  // Rifiutata dal cancello, la release non diventa «l'ultima trovata»: si ferma qui una trovata prima (#1119).
+  if (!R.releaseCoerente(info) || stato.rifiutata) {
+    rifiuta(info);
+    return Promise.reject(new Error('versione rifiutata: il numero non è quello della sua etichetta'));
+  }
+  return u.downloadUpdate();
+}
+
+// Nessun canale verso il server porta un allarme dall'app: resta la riga di log.
+function rifiuta(info) {
+  const dato = (v) => String(JSON.stringify(v === undefined ? null : v)).slice(0, 120);
+  console.error(`[updater] versione rifiutata (#1119): latest.yml dice ${dato(info && info.version)}, `
+    + `l'etichetta della release ${dato(info && info.tag)}`);
 }
 
 // Una preferenza cambiata a sessione aperta vale subito: chi spegne dopo lo scaricamento dell'avvio non se lo
@@ -294,12 +319,78 @@ function segnalaPronto() {
   avvisaPronto(testo, versione);
 }
 
+// Il cancello sta dove electron-updater legge la release e il suo provider: ogni strada (controllo, «Installa», da soli)
+// ci passa prima di decidere e scaricare. Un errore e non «aggiornato»: la release più recente non è nostra.
+// Un finto delle prove non passa dal motore di electron-updater e non scarica niente: il cancello serve solo al vero.
+// Se la libreria non esporta più la sua classe base, ogni aggiornatore conta come vero.
+function dalMotore(au) {
+  let AppUpdater;
+  try { ({ AppUpdater } = require('electron-updater')); } catch (_) { return false; }
+  return typeof AppUpdater !== 'function' || au instanceof AppUpdater;
+}
+
+// Una release rifiutata non è un guasto di rete: per chi usa Filo la versione non c'è, e «Installa» e la chat lo dicono (#1119).
+function rifiutoDelCancello(messaggio, info) {
+  return Object.assign(new Error(messaggio), { rifiutata: String((info && info.version) || '?') });
+}
+
+function soloTagDiRilascio(au) {
+  if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
+  if (!dalMotore(au)) return;
+  // Un electron-updater che ha rinominato quel punto lascerebbe passare tutto: senza cancello niente aggiornamenti.
+  if (typeof au.getUpdateInfoAndProvider !== 'function') {
+    const fermo = async () => { throw new Error('aggiornamenti fermi: electron-updater non ha getUpdateInfoAndProvider'); };
+    for (const m of ['checkForUpdates', 'checkForUpdatesAndNotify', 'doCheckForUpdates', 'downloadUpdate']) au[m] = fermo;
+    return;
+  }
+  const originale = au.getUpdateInfoAndProvider;
+  const cancello = async function (...args) {
+    const r = await originale.apply(this, args);
+    const info = r && r.info;
+    if (!R.tagAccettato(info)) {
+      throw rifiutoDelCancello(`release ${info.tag} rifiutata: il tag non è v${info.version}`, info);
+    }
+    const opz = r.provider && r.provider.options;
+    if (opz && opz.provider === 'github') {
+      // electron-updater lascia che il «tag:» di latest.yml copra quello vero: si richiede a GitHub, come fa lui.
+      // Una release di prova, che Filo non pubblica, non è sotto /latest e viene rifiutata.
+      if (typeof r.provider.getLatestTagName !== 'function') {
+        throw new Error('aggiornamenti fermi: il provider GitHub di electron-updater non ha getLatestTagName');
+      }
+      const { CancellationToken } = require('electron-updater');
+      const vero = await r.provider.getLatestTagName(new CancellationToken());
+      if (!R.tagDiGitHubAccettato(vero, info.version)) {
+        throw rifiutoDelCancello(`release ${vero} rifiutata: il tag non è v${info.version}`, info);
+      }
+      const urls = r.provider.resolveFiles(info)
+        .flatMap((f) => [f.url && f.url.href, f.packageInfo && f.packageInfo.path])
+        .filter(Boolean);
+      if (!R.fileDiRilascio({ versione: info.version, urls, owner: opz.owner, repo: opz.repo, host: opz.host || 'github.com' })) {
+        throw rifiutoDelCancello(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`, info);
+      }
+    }
+    return r;
+  };
+  cancello.filoTag = true;
+  au.getUpdateInfoAndProvider = cancello;
+}
+
 function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO } = {}) {
   updater = au;
+  soloTagDiRilascio(au);
   Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo });
   regola();
   au.on('checking-for-update', () => { if (stato.fase !== 'pronto') stato.fase = 'controllo'; });
   au.on('update-available', (info) => {
+    stato.info = info || null;
+    // Per chi usa Filo la versione non c'è: niente carta, niente scaricamento.
+    if (!R.releaseCoerente(info)) {
+      rifiuta(info);
+      stato.rifiutata = String((info && info.version) || '?');
+      if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
+      return;
+    }
+    stato.rifiutata = null;
     stato.versione = info?.version || null;
     stato.versioneTrovata = info?.version || null;
     console.log('[updater] update disponibile:', info?.version);
@@ -313,6 +404,12 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
     if (stato.fase !== 'pronto' && siInstalla()) { stato.fase = 'scarica'; stato.percentuale = 0; }
     if (!stato.automatici) avvisaVersioneNuova(stato.versioneTrovata);
     else togliCarte((n) => n.action.versione !== stato.versioneTrovata);
+    // Da acceso parte qui, come partiva da sé in electron-updater: a controllo finito.
+    if (stato.automatici) {
+      Promise.resolve().then(() => stato.automatici && scaricaVerificata(au)).catch((e) => {
+        console.error('[updater] scaricamento fallito:', e?.message || e);
+      });
+    }
   });
   au.on('download-progress', (p) => {
     const n = Number(p?.percent);
@@ -323,6 +420,7 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
     if (!prima || prima.percento !== percento) stato.annuncia();
   });
   au.on('update-not-available', () => {
+    stato.rifiutata = null;
     if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
     console.log('[updater] già aggiornato');
     if (stato.chiesta) dimenticaRichiesta();
@@ -332,9 +430,14 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
   // Un errore PRIMA di aver trovato un aggiornamento (rete assente) non riguarda l'utente: lo filtra l'avviso.
   au.on('error', (err) => {
     console.error('[updater] errore', err ? (err.stack || err).toString() : 'sconosciuto');
+    if (err && err.rifiutata) {
+      stato.rifiutata = err.rifiutata;
+      if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
+      return;
+    }
     if (stato.fase !== 'pronto') stato.fase = 'errore';
     // Dove l'installazione si ferma da sé l'avviso di Mac e Linux, che dice cosa fare, prende il posto della carta.
-    if (AGGIORNAMENTO_BLOCCATO[process.platform] && stato.versioneTrovata) {
+    if (AGGIORNAMENTO_BLOCCATO[dip.piattaforma()] && stato.versioneTrovata) {
       stato.scaricamento = null;
       dimenticaRichiesta();
       togliCarte(() => true);
@@ -390,6 +493,11 @@ async function installaAggiornamento() {
   const versione = stato.pronta || stato.versioneTrovata;
   if (!trovata) {
     if (stato.errore) return { ok: true, versione: null, stato: 'errore', errore: stato.errore };
+    if (stato.rifiutata) {
+      stato.errore = FRASE_RIFIUTATA;
+      stato.annuncia();
+      return { ok: true, versione: null, stato: 'rifiutata' };
+    }
     // La carta di una versione che il controllo non trova più dice perché «Installa» non parte.
     stato.errore = 'Adesso non trovo la versione nuova. Riprova fra poco.';
     stato.annuncia();
@@ -405,6 +513,7 @@ async function trova() {
   if (stato.versioneTrovata || stato.pronta) return true;
   try { await updater.checkForUpdates(); } catch (e) {
     console.error('[updater] controllo update fallito:', e?.message || e);
+    if (e && e.rifiutata) return false;
     stato.errore = 'Adesso non riesco a controllare se c\'è una versione nuova. Riprova fra poco.';
     stato.annuncia();
     return false;
@@ -425,7 +534,7 @@ async function scarica() {
     stato.scaricamento = { versione: stato.versioneTrovata, percento: 0 };
     if (stato.fase !== 'pronto') { stato.fase = 'scarica'; stato.percentuale = 0; }
     stato.annuncia();
-    await u.downloadUpdate();
+    await scaricaVerificata(u);
   } catch (e) {
     console.error('[updater] scaricamento fallito:', e?.message || e);
     scaricamentoFallito();
@@ -560,16 +669,16 @@ function controllaAdesso(tettoMs = 20000) {
       resolve(esito);
     };
     const ascolti = [
-      ['update-available', (info) => fine({ esito: 'nuova', versione: info?.version || null })],
+      ['update-available', (info) => fine(R.releaseCoerente(info) ? { esito: 'nuova', versione: info.version } : { esito: 'rifiutata' })],
       ['update-not-available', () => fine({ esito: 'nessuna' })],
-      ['error', (e) => fine({ esito: 'errore', messaggio: e?.message || String(e || '') })],
+      ['error', (e) => fine(e && e.rifiutata ? { esito: 'rifiutata' } : { esito: 'errore', messaggio: e?.message || String(e || '') })],
     ];
     for (const [ev, fn] of ascolti) updater.on(ev, fn);
     const timer = setTimeout(() => fine({ esito: 'tempo' }), tettoMs);
     // null: l'updater non gira (un AppImage estratto, uno snap) e nessun evento arriverà.
     Promise.resolve().then(() => updater.checkForUpdates())
       .then((r) => { if (r == null) fine({ esito: 'inattivo' }); })
-      .catch((e) => fine({ esito: 'errore', messaggio: e?.message || String(e || '') }));
+      .catch((e) => fine(e && e.rifiutata ? { esito: 'rifiutata' } : { esito: 'errore', messaggio: e?.message || String(e || '') }));
   });
 }
 
@@ -593,6 +702,7 @@ async function aggiornaDaChat({ riavvio = true } = {}) {
   const inUso = versioneInUso() || '?';
   const aggiornato = { eseguito: true, esito: 'aggiornato', frase: `Filo è aggiornato: la ${inUso} è l'ultima versione.` };
   const senzaRete = { eseguito: false, esito: 'errore', frase: `Non sono riuscito a controllare se c'è una versione nuova (ora hai la ${inUso}): forse manca la rete. Riprova fra poco.` };
+  const rifiutata = { eseguito: false, esito: 'rifiutata', frase: `${FRASE_RIFIUTATA} Resti sulla ${inUso}.` };
   if (!stato.attivo) {
     return { eseguito: false, esito: 'spento', frase: `Questa copia di Filo (${inUso}) non si aggiorna da qui: è una versione di sviluppo o di prova. L'ultima versione si scarica da filo.red.` };
   }
@@ -611,6 +721,7 @@ async function aggiornaDaChat({ riavvio = true } = {}) {
   if (!siInstalla()) {
     const r = await installaAggiornamento();
     if (r.stato === 'errore') return senzaRete;
+    if (r.stato === 'rifiutata') return rifiutata;
     if (r.stato === 'aggiornato') return aggiornato;
     return { ...esitoScarica(r.versione), aggiornamento: r.stato };
   }
@@ -618,6 +729,7 @@ async function aggiornaDaChat({ riavvio = true } = {}) {
   const c = await controllaAdesso();
   if (c.esito === 'nuova' && c.versione) return esitoScarica(c.versione);
   if (c.esito === 'nessuna') return aggiornato;
+  if (c.esito === 'rifiutata') return rifiutata;
   if (c.esito === 'inattivo') {
     return { eseguito: false, esito: 'a-mano', frase: `Qui Filo non riesce ad aggiornarsi da solo: l'ultima versione si scarica da ${PAGINA_DOWNLOAD.replace('https://', '')}.` };
   }
@@ -760,7 +872,7 @@ async function scriviAvviso(caso, versione) {
 
 // Solo dove l'installazione automatica può fermarsi (Mac e Linux), e solo se una versione nuova esiste davvero.
 async function avvisaSeAggiornamentoBloccato(versione) {
-  const caso = AGGIORNAMENTO_BLOCCATO[process.platform];
+  const caso = AGGIORNAMENTO_BLOCCATO[dip.piattaforma()];
   if (!caso || !versione) return;
   await scriviAvviso(caso, versione);
 }
@@ -827,9 +939,11 @@ function togliAvvisiSuperati(inUso) {
 // Solo nelle prove: un autoUpdater finto guidato dallo spec, e lancio/uscita registrati invece di eseguiti.
 function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null, cartella = null, avvisoVero = true } = {}) {
   const { EventEmitter } = require('node:events');
-  const registro = { lanciati: [], chiusure: 0, uscite: 0, riaperture: [], installazioni: 0, controlli: 0, risposta: null, avvisi: [] };
+  const registro = { lanciati: [], chiusure: 0, uscite: 0, riaperture: [], installazioni: 0, controlli: 0, scaricamenti: 0, risposta: null, avvisi: [] };
   const finto = new EventEmitter();
   finto.install = () => { registro.installazioni++; return true; };
+  // Resta a scaricare finché lo spec non emette «update-downloaded».
+  finto.downloadUpdate = () => { registro.scaricamenti++; return new Promise(() => {}); };
   finto.checkForUpdates = async () => {
     registro.controlli++;
     const r = registro.risposta;

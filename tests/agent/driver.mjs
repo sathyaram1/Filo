@@ -23,7 +23,9 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
+import { primaFinestra } from '../helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
@@ -32,6 +34,7 @@ export const SHELL_HEIGHT = 88;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {} } = {}) {
+  assicuraMotore({ radice: APP_ROOT });
   // Cartella canonica e con uno spazio nel nome, come per ogni altra partenza:
   // tests/helpers/percorsi.mjs.
   const userData = cartellaTemporanea(userDataPrefix);
@@ -43,7 +46,7 @@ export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {}
   // accesa, e non lo diceva: chi la usava per rivedere un rosso da 125% vedeva
   // un'immagine che non c'entrava niente.
   const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env });
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   await sleep(1200); // attendi prima tab + paint
   app._filoUserData = userData;
@@ -58,7 +61,7 @@ export async function closeFilo(app) {
 
 export async function bringToFront(app) {
   await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (!win) return;
     win.show(); win.moveTop(); win.focus();
   });
@@ -67,7 +70,7 @@ export async function bringToFront(app) {
 
 export async function contentBounds(app) {
   return app.evaluate(async ({ BrowserWindow, screen }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const b = win.getContentBounds();
     const d = screen.getDisplayMatching(b);
     return { ...b, scale: d.scaleFactor || 1 };
@@ -318,7 +321,7 @@ function resolveExecutable(name) {
 // Trova la Page della tab attiva interrogando il main per l'URL attivo.
 export async function activeView(app, shell) {
   const activeUrl = await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const tabs = win._filoTabs;
     if (!tabs) return null;
     const t = tabs.tabs.find((x) => x.id === tabs.activeId);

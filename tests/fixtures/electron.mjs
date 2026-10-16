@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
+import { primaFinestra } from '../helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
@@ -53,6 +54,18 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   else { try { process.kill(-pid, 'SIGKILL'); } catch (_) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} } }
 }
 
+// Una finestra arriva quando arriva: con la macchina carica ci mette più di dieci secondi (#1212). L'attesa la
+// ferma il tetto del test, non un tempo suo, e il rosso dice quale finestra mancava.
+export async function aspettaFinestra(app, trova, perche) {
+  let win = null;
+  const cerca = () => {
+    win = app.windows().find((w) => { try { return trova(w); } catch (_) { return false; } }) || null;
+    return Boolean(win);
+  };
+  await expect.poll(cerca, { message: perche, timeout: 0, intervals: [100] }).toBe(true);
+  return win;
+}
+
 // Quello che l'app scrive su stdout/stderr (in test le righe render-process-gone e did-fail-load)
 // Playwright non lo mostra: senza, un rosso che c'è solo in GitHub non si spiega (#639).
 const TETTO_RIGHE_APP = 20_000;
@@ -82,12 +95,24 @@ function registraUsciteApp(app) {
   ].join('\n');
 }
 
+// Chi apre Filo in una prova è già stato accolto (FILO_TEST_ACCOLTO, da playwright.config.js). Una prova
+// dell'accoglienza parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
+// `argomentiInPiu` vanno dopo la manopola della scala: una prova che fissa il suo fattore lo tiene anche con FILO_TEST_SCALE.
 export const test = base.extend({
-  app: async ({}, use, testInfo) => {
+  accoglienzaFatta: [true, { option: true }],
+  // La home nascosta pronta per la scheda nuova (#1128) nelle prove è spenta (playwright.config.js): chi la prova la
+  // riaccende con `test.use({ riservaNuovaScheda: true })`.
+  riservaNuovaScheda: [false, { option: true }],
+  argomentiInPiu: [[], { option: true }],
+  // Nomi in più portati al loopback, per le prove che vogliono un sito col suo nome (example.org, #823).
+  hostInPiu: [[], { option: true }],
+
+  app: async ({ accoglienzaFatta, riservaNuovaScheda, argomentiInPiu, hostInPiu }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
     const userData = cartellaTemporanea('filo-test-');
+    if (typeof accoglienzaFatta !== 'boolean') throw new Error(`accoglienzaFatta vuole true o false, non ${JSON.stringify(accoglienzaFatta)}`);
     const app = await electron.launch({
       // host-resolver-rules:
       //  • "blocked.test" al loopback, così l'e2e del blocco siti
@@ -106,13 +131,16 @@ export const test = base.extend({
       //    la pagina con un nome da internet (testServer.html(…, { pubblico: true })).
       args: [
         ...argomentiScala,
-        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1',
+        ...argomentiInPiu,
+        `--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1${hostInPiu.map((h) => `, MAP ${h} 127.0.0.1`).join('')}`,
         '.',
       ],
       cwd: APP_ROOT,
       env: {
         ...process.env,
         FILO_USER_DATA: userData,
+        FILO_TEST_ACCOLTO: accoglienzaFatta ? '1' : '0',
+        ...(riservaNuovaScheda ? { FILO_RISERVA_NUOVA_SCHEDA: '1' } : {}),
         // I download ("Salva immagine come…") finiscono qui SENZA dialogo
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.
@@ -141,7 +169,7 @@ export const test = base.extend({
   // Pagina della shell del browser (tab bar + barra indirizzi). È la prima
   // window che Filo apre.
   shell: async ({ app }, use) => {
-    const win = await app.firstWindow();
+    const win = await primaFinestra(app);
     await win.waitForLoadState('domcontentloaded');
     await use(win);
   },
@@ -149,15 +177,7 @@ export const test = base.extend({
   // La vista che disegna sopra la pagina gli avvisi della barra (#588.5); nasce al primo avviso.
   // La pila nella shell è solo il modello, nascosto: quello che l'utente vede e clicca sta qui.
   avvisi: async ({ app }, use) => {
-    await use(async () => {
-      const scadenza = Date.now() + 10_000;
-      while (Date.now() < scadenza) {
-        const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
-        if (p) return p;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      throw new Error('avvisi: la vista degli avvisi non è nata');
-    });
+    await use(() => aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'avvisi: la vista degli avvisi non è nata'));
   },
 
   // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
@@ -168,17 +188,7 @@ export const test = base.extend({
     const fn = async (url) => {
       const target = new URL(url).hostname;
       await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      const deadline = Date.now() + 10_000;
-      let page = null;
-      while (Date.now() < deadline) {
-        page = app.windows().find((w) => {
-          try { return new URL(w.url()).hostname === target; }
-          catch (_) { return false; }
-        });
-        if (page) break;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      if (!page) throw new Error(`openTab: nessuna window per ${url}`);
+      const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === target, `openTab: nessuna window per ${url}`);
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       return page;
     };
@@ -202,17 +212,18 @@ export const test = base.extend({
         res.end(asset.body);
         return;
       }
-      const html = pages.get(id);
-      if (!html) { res.writeHead(404); res.end('not found'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      const page = pages.get(id);
+      if (!page) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, { ...page.headers, 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(page.body);
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;
     const api = {
-      html(body, { pubblico = false } = {}) {
+      // `headers`: intestazioni della risposta, per i siti che le usano per stringere la pagina (CSP).
+      html(body, { pubblico = false, headers = {} } = {}) {
         const id = String(++nextId);
-        pages.set(id, body);
+        pages.set(id, { body, headers });
         return `${pubblico ? this.originPubblico : this.origin}/${id}`;
       },
       /** Serve dei byte a un indirizzo di questo server e torna la URL. */

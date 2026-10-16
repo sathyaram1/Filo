@@ -44,8 +44,10 @@
     if (!testo) return { ok: false, motivo: MOTIVI.VUOTO };
     // La virgola è come si scrivono i decimali in italiano: si legge come un
     // punto invece di buttarla via (1,5 non è 15). Un decimale dove serve un
-    // intero viene rifiutato dopo, con la frase giusta.
-    const n = Number(testo.replace(',', '.'));
+    // intero viene rifiutato dopo, con la frase giusta. Dove serve un intero,
+    // «10.000» o «10,000» sono diecimila: letti da decimale diventavano 10.
+    const migliaia = intero && /^[+-]?[1-9]\d{0,2}([.,]\d{3})+$/.test(testo);
+    const n = Number(migliaia ? testo.replace(/[.,]/g, '') : testo.replace(',', '.'));
     if (!Number.isFinite(n)) return { ok: false, motivo: MOTIVI.NON_NUMERO };
     if (intero && !Number.isInteger(n)) return { ok: false, motivo: MOTIVI.NON_INTERO };
     if (min != null && n < min) return { ok: false, motivo: MOTIVI.SOTTO };
@@ -54,7 +56,7 @@
   }
 
   function numeroLeggibile(n) {
-    try { return new Intl.NumberFormat('it-IT').format(n); } catch (_) { return String(n); }
+    try { return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(n); } catch (_) { return String(n); }
   }
 
   /**
@@ -111,6 +113,20 @@
 
   // ── La parte con il DOM ────────────────────────────────────────────────────
 
+  // Un campo numerico con la lingua del sistema in inglese butta via la virgola mentre la si scrive o incolla:
+  // «2,5» diventava 25 e si salvava (#854). Qui la virgola entra come punto, e `leggi` la tratta da decimale.
+  function virgolaComePunto(input) {
+    if (!input || input.__snVirgola) return;
+    input.__snVirgola = true;
+    input.addEventListener('beforeinput', (ev) => {
+      const t = ev.data != null ? ev.data : (ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '');
+      if (!t || !t.includes(',')) return;
+      ev.preventDefault();
+      const doc = input.ownerDocument || (typeof document !== 'undefined' ? document : null);
+      if (doc) doc.execCommand('insertText', false, t.replace(/,/g, '.'));
+    });
+  }
+
   /**
    * Cuce campo, pulsante «Salva», pulsante «Rimetti com'era» e riga d'esito.
    *
@@ -134,6 +150,8 @@
     // niente da disfare.
     let precedente = null;
     let inCorso = false;
+    // Un salvataggio chiesto mentre un altro è in viaggio (Invio e subito una ricarica): parte appena quello torna.
+    let ancora = false;
 
     // I limiti li sa solo chi collega: scriverli anche nell'HTML li fa
     // divergere. Servono al passo delle frecce e ai lettori di schermo, non
@@ -180,9 +198,10 @@
     }
 
     async function scrivi(valore, { comeRipristino = false } = {}) {
-      if (inCorso) return;
+      if (inCorso) { ancora = true; return; }
       inCorso = true;
       const prima = attuale;
+      const scritto = String(input.value);
       if (o.salvaBtn) o.salvaBtn.disabled = true;
       if (rimetti) rimetti.disabled = true;
       dillo('Salvo…', null);
@@ -198,11 +217,15 @@
       if (!r || !r.ok) {
         dillo(`Non salvato: ${(r && r.errore) || 'il server non ha risposto'}.`, 'is-error');
         aggiornaRimetti();
+        // Lo stesso numero appena rifiutato non si rimanda da solo: si rimanda quello scritto dopo.
+        riparti(scritto);
         return;
       }
       // Il campo mostra quello che il server ha, non quello che era stato
-      // digitato.
-      mostra(r.valore == null ? valore : r.valore);
+      // digitato. Tranne se nel frattempo ci si è scritto altro: resta lì, da spedire.
+      const letto = r.valore == null ? valore : r.valore;
+      if (String(input.value) === scritto) mostra(letto);
+      else attuale = String(letto);
       // Se prima non c'era niente sul server, non c'è un «com'era» a cui
       // tornare: rimetterlo vorrebbe dire scrivere uno zero che nessuno ha mai
       // messo.
@@ -210,6 +233,13 @@
       aggiornaRimetti();
       dillo(comeRipristino ? 'Rimesso com’era.' : 'Salvato.', 'is-ok');
       if (typeof onSalva === 'function') { try { onSalva(); } catch (_) {} }
+      riparti(attuale);
+    }
+
+    function riparti(giaFatto) {
+      if (!ancora) return;
+      ancora = false;
+      if (String(input.value) !== giaFatto) salvaOra({ riprendiIlFuoco: false }).catch(() => {});
     }
 
     // `riprendiIlFuoco`: chi ha premuto Salva vuole il cursore nel campo da
@@ -248,6 +278,7 @@
       return scrivi(Number(precedente), { comeRipristino: true });
     }
 
+    virgolaComePunto(input);
     input.addEventListener('input', () => {
       dillo('', null);
       aggiornaRimetti();
@@ -290,5 +321,5 @@
     return { mostra, salvaOra, rimettiOra, dillo, stato };
   }
 
-  global.SN_CAMPO_NUMERO = { MOTIVI, leggi, frase, controlla, controllaCampo, collega };
+  global.SN_CAMPO_NUMERO = { MOTIVI, leggi, frase, controlla, controllaCampo, collega, virgolaComePunto };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

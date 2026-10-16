@@ -14,6 +14,7 @@
 //   difetto è esistito, perché quella funzione non si era mai rotta: mancava
 //   chi la chiamava.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -24,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import { beatIsLive, readBeat, startBeat, stopBeat, beatFile } from '../../scripts/lib/routine-beat.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -120,6 +122,35 @@ test('un marcatore vecchio di giorni non fa ammazzare un estraneo', () => {
   } finally {
     process.kill = killVero;
     togliCartella(casa);
+  }
+});
+
+test('worker in parallelo (#1157): il battito nominato da un marcatore di un\'ALTRA cartella non si spegne', () => {
+  // Due clone, due biglietti. Il marcatore finito nel clone B nomina il battito
+  // vivo di A (un clone fatto per copia se lo porta dietro): accendere quello di
+  // B non deve spegnere quello di A.
+  const a = casaFinta();
+  const b = casaFinta();
+  const uccisi = [];
+  const killVero = process.kill.bind(process);
+  process.kill = (pid, sig) => { uccisi.push(pid); if (sig === 0) return killVero(pid, sig); };
+  try {
+    startBeat(a, 'b-a', { spawnImpl: () => ({ pid: 6001, unref() {} }), alive: () => true });
+    assert.equal(readBeat(a).root, resolve(a), 'il marcatore dice di quale cartella è');
+    scriviMarcatore(b, readBeat(a));
+    const r = startBeat(b, 'b-b', { spawnImpl: () => ({ pid: 6002, unref() {} }), alive: () => true });
+    assert.equal(r.started, true);
+    assert.deepEqual(uccisi, [], 'il battito di A resta acceso');
+    assert.equal(readBeat(a).pid, 6001);
+    assert.equal(readBeat(b).pid, 6002);
+
+    // Nella stessa cartella, invece, un biglietto nuovo spegne ancora quello vecchio.
+    startBeat(b, 'b-b2', { spawnImpl: () => ({ pid: 6003, unref() {} }), alive: () => true });
+    assert.deepEqual(uccisi, [6002]);
+  } finally {
+    process.kill = killVero;
+    togliCartella(a);
+    togliCartella(b);
   }
 });
 
@@ -325,13 +356,10 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
       p.on('close', fine);
     });
 
-    // Il battito è staccato: vive oltre dispatch, quindi lo si aspetta.
-    const scadenza = Date.now() + 15000;
-    while (Date.now() < scadenza && !arrivati.some((u) => u.includes('routineHeartbeat'))) {
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    assert.ok(arrivati.some((u) => u.includes('routineHeartbeat')),
-      `nessun battito è arrivato al server (chiamate viste: ${arrivati.join(', ') || 'nessuna'})`);
+    // Il battito è staccato: vive oltre dispatch, quindi lo si aspetta finché arriva (#1063).
+    await aspettaChe(() => arrivati.some((u) => u.includes('routineHeartbeat')), {
+      ogniMs: 200, cosa: () => `nessun battito è arrivato al server (chiamate viste: ${arrivati.join(', ') || 'nessuna'})`,
+    });
   } finally {
     // Il processo è staccato apposta: se non lo si ferma resta a battere.
     const m = readBeat(casa);

@@ -27,6 +27,7 @@
 
 const { session } = require('electron');
 const Sito = require('./stessoSito');
+const Google = require('./dominiGoogle');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -154,15 +155,23 @@ function baseDelSito(reg) {
   return 'filo-priv-' + String(reg || '').replace(/[^a-z0-9.-]/gi, '_');
 }
 
+// I domini di Google sono un sito solo per la fiducia: ne basta uno nell'elenco (#1123).
+function fidatoIn(sito, trusted) {
+  if (Sito.voceSalvata(sito, trusted)) return true;
+  return Google.diGoogle(sito) && Google.googleNellElenco(trusted);
+}
+
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
   // 'persist:' → jar isolato per-sito ma persistente (resta connesso). È del sito anche quando la voce fidata è un
   // suffisso (co.uk, gov.it): un jar per voce metterebbe tutti i siti sotto di lei insieme (#796).
   // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
-  const base = baseDelSito(reg);
-  if (Sito.voceSalvata(url, trusted instanceof Set ? trusted : null)) return 'persist:' + base;
-  sitoDelJar.set(base, reg);
+  // Google e YouTube stanno in un jar solo: l'accesso fatto su uno vale sull'altro (#1123).
+  const sito = Google.sitoDelContenitore(reg);
+  const base = baseDelSito(sito);
+  if (fidatoIn(url, trusted instanceof Set ? trusted : null)) return 'persist:' + base;
+  sitoDelJar.set(base, sito);
   const g = jarGen.get(base);
   return g && g.n ? `${base}~${g.n}` : base;
 }
@@ -284,6 +293,9 @@ function ensureSiteSession(partition, { gpc } = {}) {
     try { registerFiloProtocolForSession(ses); } catch (_) {}
     siteSessions.set(partition, ses);
     if (!partition.startsWith('persist:')) seguiUscite(partition, ses);
+    if (partition.replace(/^persist:/, '').split('~')[0] === baseDelSito(Google.SITO_GOOGLE)) {
+      try { require('./accessoGoogle').osserva(ses, partition); } catch (_) {}
+    }
   }
   const on = gpc !== false;
   applyGpc(ses, on);
@@ -400,14 +412,35 @@ function spazzaFidatiOrfani(trusted) {
   for (const nome of nomi) {
     if (jarFidato(nome, trusted)) continue;
     const partition = 'persist:' + nome;
-    if (fidatiDaButtare.has(partition)) continue;
-    dimenticaFidato(nome.slice('filo-priv-'.length), partition);
+    if (fidatiDaButtare.has(partition) || inMigrazione.has(partition)) continue;
+    const sito = nome.slice('filo-priv-'.length);
+    if (Google.diGoogle(sito) && Google.googleNellElenco(trusted)) {
+      inMigrazione.add(partition);
+      portaNelJarDiGoogle(partition).finally(() => { inMigrazione.delete(partition); dimenticaFidato(sito, partition); });
+      continue;
+    }
+    dimenticaFidato(sito, partition);
   }
+}
+
+// Chi era entrato su YouTube con YouTube fra i fidati resta dentro: i cookie del suo jar vanno in quello di Google.
+const inMigrazione = new Set();
+async function portaNelJarDiGoogle(partition) {
+  let lista = [];
+  try { lista = await session.fromPartition(partition).cookies.get({}); } catch (_) { return; }
+  if (!lista.length) return;
+  const dest = ensureSiteSession('persist:' + baseDelSito(Google.SITO_GOOGLE), { gpc: _cached.mode !== MODES.MANUAL });
+  let presenti = [];
+  try { presenti = await dest.cookies.get({}); } catch (_) {}
+  const chiavi = new Set(presenti.map((c) => `${c.domain}|${c.path}|${c.name}`));
+  for (const c of lista) if (!chiavi.has(`${c.domain}|${c.path}|${c.name}`)) await copiaCookie(c, dest);
 }
 
 // Il jar persistente di un sito resta finché una voce fidata copre il sito (la sua, o un suffisso salvato prima).
 function jarFidato(nome, trusted) {
   const sito = String(nome).replace(/^filo-priv-/, '');
+  // Il jar di un dominio di Google che non è quello comune viene da prima di #1123: se ne va, i cookie passano là.
+  if (Google.diGoogle(sito)) return sito === Google.SITO_GOOGLE && Google.googleNellElenco(trusted);
   return Boolean(Sito.voceSalvata(sito, trusted)) || [...trusted].some((d) => baseDelSito(d) === nome);
 }
 
@@ -463,17 +496,20 @@ async function passaRiquadri(ses, nuova) {
   try { lista = (await ses.cookies.get({})).filter((c) => delServizio(c, servizi)); } catch (_) { return; }
   if (!lista.length) return;
   const dest = ensureSiteSession(nuova, { gpc: _cached.mode !== MODES.MANUAL });
-  const ora = Date.now() / 1000;
-  for (const c of lista) {
-    if (c.expirationDate && c.expirationDate < ora) continue;
-    try {
-      await dest.cookies.set({
-        url: cookieUrl(c), name: c.name, value: c.value, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly,
-        sameSite: c.sameSite, ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
-        ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
-      });
-    } catch (_) {}
-  }
+  for (const c of lista) await copiaCookie(c, dest);
+}
+
+// Lo stesso cookie in un altro jar: scadenza, dominio e attributi compresi. Uno già scaduto non si copia.
+async function copiaCookie(c, dest) {
+  if (c.expirationDate && c.expirationDate < Date.now() / 1000) return false;
+  try {
+    await dest.cookies.set({
+      url: cookieUrl(c), name: c.name, value: c.value, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly,
+      sameSite: c.sameSite, ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
+      ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
+    });
+    return true;
+  } catch (_) { return false; }
 }
 
 let jarWipe = null;
@@ -558,7 +594,14 @@ function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? 
 // In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
 function keepsSiteData(site) {
   if (_cached.mode !== MODES.PRIVACY) return true;
-  return !!Sito.voceSalvata(String(site || '').toLowerCase(), _cached.trustedSites);
+  return fidatoIn(String(site || '').toLowerCase(), _cached.trustedSites);
+}
+
+// La sessione che avrebbe adesso una scheda nuova su `url`, nel profilo normale.
+function sessioneDelleSchede(url) {
+  if (_cached.mode !== MODES.PRIVACY) return session.defaultSession;
+  const { partition } = partitionForTab(url, { mode: MODES.PRIVACY, trusted: _cached.trustedSites });
+  return partition ? siteSessions.get(partition) || session.fromPartition(partition) : session.defaultSession;
 }
 
 // I nomi che il sito ha dato alla sua risposta, visti dopo il clic sul banner: li tiene tabs/tabCookies.js.
@@ -592,7 +635,12 @@ function configureFromSettings(settings) {
     const prima = new Set(prevTrusted.split('\n').map((d) => d.toLowerCase()).filter(Boolean));
     const adesso = trustedSetOf(settings);
     if (_configured) {
-      for (const site of prima) if (!adesso.has(site) && !jarFidato(baseDelSito(site), adesso)) dimenticaFidato(site);
+      const via = new Set();
+      for (const site of prima) {
+        const s = Google.sitoDelContenitore(site);
+        if (!adesso.has(site) && !jarFidato(baseDelSito(s), adesso)) via.add(s);
+      }
+      for (const s of via) dimenticaFidato(s);
       tieniFidati(adesso);
     }
     spazzaFidatiOrfani(adesso);
@@ -701,6 +749,8 @@ module.exports = {
   chiudiHost,
   permettiRichieste,
   ensureSiteSession,
+  sessioneDelleSchede,
+  copiaCookie,
   configureForMode,
   configureFromSettings,
   wipeTrackerCookies,

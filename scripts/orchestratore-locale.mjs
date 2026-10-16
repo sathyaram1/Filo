@@ -1,6 +1,7 @@
 // L'orchestratore dei lavori locali (#956): worktree, lavoratore, verificatori, chiusura e deploy, senza una sessione in mezzo.
 // La sessione resta per le decisioni: legge `stato` e risponde con `riprendi`. Logica e regole in scripts/lib/orchestratore.mjs.
 // Uso: npm run orchestra -- aggiungi <N>… | avvia [opzioni] [--dry-run] | stato | riprendi <N> ["risposta"] | togli <N>
+//      | fusioni-server [--dry-run] (i lavori server passati in cloud: fusione e deploy dal PC, #1159; li fa anche avvia)
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import {
@@ -10,15 +11,19 @@ import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
+  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, oraLocale, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { fusioniServer } from './lib/fusioni-server.mjs';
+import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
+import { ensureCommentChar } from './lib/carattere-commento.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
   + '                          avvia [--paralleli N] [--tetto N] [--derivati non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>]\n'
   + '                                [--ore-istanza <ore>] [--cpu-max <%>] [--cpu-chiusura <%>] [--dry-run [<N>…]]\n'
-  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N>';
+  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N> | fusioni-server [--dry-run]';
 
 // Un lettore solo per ogni comando (#1027): un argomento che non torna ferma tutto prima di qualsiasi lavoro, mai preso per buono o saltato.
 const TESTO = { atteso: 'un testo', leggi: (v) => v.trim() || undefined };
@@ -49,6 +54,7 @@ export const OPZIONI_DI = Object.freeze({
   stato: {},
   riprendi: {},
   togli: {},
+  'fusioni-server': { '--dry-run': SI },
 });
 // Il trattino lungo è quello che un correttore automatico fa di «--».
 const TRATTINI = '\u2010-\u2015\u2212';
@@ -174,13 +180,18 @@ export function frontmatter(testo) {
   return out;
 }
 
-export function modelloDelRuolo(ruolo, root = ROOT) {
+/** Modello e sforzo di un ruolo: quelli che il server ha deciso per il lavoro (#1189), campo per campo, se ci sono; altrimenti il frontmatter. */
+export function modelloDelRuolo(ruolo, root = ROOT, dalServer = null) {
   const nome = AGENTE_DEL_RUOLO[ruolo];
   const f = join(root, '.claude', 'agents', `${nome}.md`);
   if (!existsSync(f)) throw new Error(`manca ${f}: modello e sforzo del ${ruolo} si leggono da lì`);
   const fm = frontmatter(readFileSync(f, 'utf8'));
   if (!fm.model || !fm.effort) throw new Error(`${f} senza model o effort nel frontmatter`);
-  return { model: fm.model, effort: fm.effort };
+  const d = dalServer || {};
+  // Un valore che non conosciamo non ripiega in silenzio sul frontmatter: sarebbe un'istanza col modello sbagliato.
+  if (d.model && !MODELLI.includes(d.model)) throw new Error(`modello deciso dal server sconosciuto: «${d.model}» (noti: ${MODELLI.join(', ')})`);
+  if (d.effort && !SFORZI.includes(d.effort)) throw new Error(`sforzo deciso dal server sconosciuto: «${d.effort}» (noti: ${SFORZI.join(', ')})`);
+  return { model: d.model || fm.model, effort: d.effort || fm.effort };
 }
 
 const confrontaVersioni = (a, b) => {
@@ -233,9 +244,12 @@ export function leggiUscitaClaude(stdout, stderr = '', code = 0) {
 
 // Le variabili della sessione che lancia: un'istanza figlia che le eredita si crede dentro di lei (e CLAUDE_EFFORT batte --effort).
 const DELLA_SESSIONE = /^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_ID|HOST_SESSION_ID|CHILD_SESSION|SESSION_ATTENDED|ENTRYPOINT|EXECPATH|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH))$/;
-/** L'ambiente di un'istanza figlia. PURA. */
-export function envFiglio(env) {
-  return Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
+/** L'ambiente di un'istanza figlia: senza la sessione che lancia, ma col suo biglietto (#1148). */
+export function envFiglio(env, { cwd = process.cwd() } = {}) {
+  const out = Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
+  const biglietto = percorsoDiChiLancia({ env: env || {}, cwd });
+  if (biglietto) out[ENV_BIGLIETTO] = biglietto;
+  return out;
 }
 
 /** `claude auth status` → l'istanza figlia avrà un accesso suo? PURA. */
@@ -334,6 +348,28 @@ function pubblicaDavvero(P) {
   return esegui('npm', ['run', 'server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
 }
 
+/** L'automazione `file` è su main di filo-security: deploy.yml pubblica ogni spinta, regole.yml le regole ogni ora (#1159 fase 2). In dubbio no. */
+async function automazioneSuMain(P, file) {
+  if (!P.serverRadice) return false;
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.serverRadice });
+  if (f.code !== 0) return false;
+  return (await esegui('git', ['cat-file', '-e', `refs/remotes/origin/main:.github/workflows/${file}`], { cwd: P.serverRadice })).code === 0;
+}
+
+/**
+ * main di Filo appena letto da origin, in una cartella sua fuori dal repo (un worktree staccato): le prove di server:fondi
+ * lo leggono con le parti dell'app appena fuse (#1222). → { dir, togli() } | null.
+ */
+async function filoDiMain(P) {
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.radice });
+  if (f.code !== 0) return null;
+  const dir = join(P.note, `filo-main-${Date.now()}`);
+  mkdirSync(P.note, { recursive: true });
+  const w = await esegui('git', ['worktree', 'add', '--detach', '--quiet', dir, 'refs/remotes/origin/main'], { cwd: P.radice });
+  if (w.code !== 0) return null;
+  return { dir, togli: () => esegui('git', ['worktree', 'remove', '--force', dir], { cwd: P.radice }) };
+}
+
 function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
@@ -345,9 +381,13 @@ function depVere(P, opz, log) {
   return {
     store: negozio(join(P.note, 'stato.json')),
     esegui,
-    async claude({ ruolo, prompt, cwd, addDirs, nome }) {
+    async claude({ ruolo, prompt, cwd, addDirs, nome, dalServer }) {
+      let scelta;
+      try { scelta = dalServer ? modelloDelRuolo(ruolo, ROOT, dalServer) : ruoli[ruolo]; } catch (e) {
+        return { ok: false, testo: '', costo: 0, errore: e.message };
+      }
       for (const d of addDirs || []) mkdirSync(d, { recursive: true });
-      const r = await esegui(bin, argomentiClaude({ ...ruoli[ruolo], nome, addDirs, budget: opz.budgetIstanza }), {
+      const r = await esegui(bin, argomentiClaude({ ...scelta, nome, addDirs, budget: opz.budgetIstanza }), {
         cwd, input: prompt, env, timeoutMs: opz.oreIstanza * 60 * 60_000,
       });
       const f = join(P.note, 'log', `${nome.replace(/[^a-z0-9]+/gi, '-')}-${new Date().toISOString().replace(/[:.]/g, '')}.json`);
@@ -359,6 +399,8 @@ function depVere(P, opz, log) {
       return { ...verifyLocal.verdictForCurrentBranch(wt), dirty: verifyLocal.isDirty(wt) };
     },
     pubblica: () => pubblicaDavvero(P),
+    pubblicaGitHub: () => automazioneSuMain(P, 'deploy.yml'),
+    regoleGitHub: () => automazioneSuMain(P, 'regole.yml'),
     carico,
     dormi: (ms) => new Promise((ok) => setTimeout(ok, ms)),
     log,
@@ -392,8 +434,8 @@ function depAVuoto(P, stato, log) {
       const r = finto(cmd, args, cwd);
       return { ...r, stdout: r.out };
     },
-    claude: async ({ ruolo, cwd, nome }) => {
-      log(`[a vuoto] claude -p (${ruolo}, ${JSON.stringify(modelloDelRuolo(ruolo))}) «${nome}» in ${cwd}`);
+    claude: async ({ ruolo, cwd, nome, dalServer }) => {
+      log(`[a vuoto] claude -p (${ruolo}, ${JSON.stringify(modelloDelRuolo(ruolo, ROOT, dalServer))}) «${nome}» in ${cwd}`);
       if (ruolo === 'verificatore') giri.set(cwd, 'superata');
       return { ok: true, testo: 'fatto', costo: 0 };
     },
@@ -404,6 +446,8 @@ function depAVuoto(P, stato, log) {
       return {};
     },
     pubblica: async () => { log(`[a vuoto] (${join(P.serverRadice, 'functions')}) npm run server:pubblica`); return { code: 0, out: '' }; },
+    pubblicaGitHub: async () => false,
+    regoleGitHub: async () => false,
     carico: async () => ({ cpu: 0, liberaGB: 99 }),
     dormi: () => new Promise((ok) => setImmediate(ok)),
     log,
@@ -476,6 +520,9 @@ async function main(argv) {
     const pid = inCorso();
     console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
     if (!(s.coda || []).length) console.log('Coda vuota.');
+    // Le domande le scrivono i lavoratori, che leggono testo d'utente: chi le legge si sporca prima (#1148).
+    const conDomande = (s.coda || []).filter((n) => s.pratiche[n] && s.pratiche[n].fermo && s.pratiche[n].fermo.domanda);
+    if (conDomande.length) console.log(await rigaSporco(`stato dei lavori locali (${conDomande.map((n) => `#${n}`).join(', ')})`, ['domande scritte dai lavoratori']));
     for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
     return 0;
   }
@@ -531,10 +578,27 @@ async function main(argv) {
     return 0;
   }
 
+  // I lavori server passati in cloud aspettano il PC (#1159): prima la parte dell'app, poi il server, poi il deploy.
+  const depFusioni = (log) => ({
+    attese: () => attesePcConStato(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P),
+    fondiApp: (id) => fondiApp(id), filoDiMain: () => filoDiMain(P), log, radice: P.radice,
+  });
+  const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
+
+  if (cmd === 'fusioni-server') {
+    const { opz, posizionali } = leggiArgomenti('fusioni-server', rest);
+    if (posizionali.length) throw erroreDiUso(`fusioni-server: argomento non capito «${posizionali[0]}»`);
+    const pid = inCorso();
+    if (pid) throw new Error(`un orchestratore è in corso (pid ${pid}): le fusioni del server le fa lui all’avvio, o rilancia quando ha finito`);
+    const esito = await fusioniServer(depFusioni((r) => console.log(r)), { prova: opz.dryRun === true });
+    for (const r of righeFerme(esito)) console.error(r);
+    return esito.ferme.length ? 2 : 0;
+  }
+
   if (cmd === 'avvia') {
     const opz = opzioniDa(rest);
     const log = (riga) => {
-      const r = `${ora().slice(0, 19)} ${riga}`;
+      const r = `${oraLocale(ora(), { conData: true })} ${riga}`;
       console.log(r);
       if (!opz.dryRun) try { mkdirSync(P.note, { recursive: true }); writeFileSync(join(P.note, 'orchestratore.log'), `${r}\n`, { flag: 'a' }); } catch (_) { /* il log non ferma il giro */ }
     };
@@ -555,6 +619,15 @@ async function main(argv) {
     if (existsSync(lock) && vivo(Number(readFileSync(lock, 'utf8')))) throw new Error(`un orchestratore è già in corso (pid ${readFileSync(lock, 'utf8').trim()})`);
     writeFileSync(lock, String(process.pid));
     try {
+      // Prima i lavori server passati in cloud: un guasto qui (callable non pubblicata, rete) non ferma i lavori locali.
+      try {
+        const esito = await fusioniServer(depFusioni(log));
+        for (const r of righeFerme(esito)) log(r);
+      } catch (e) {
+        log(`lavori server in attesa del PC non letti: ${String((e && e.message) || e).slice(0, 200)}`);
+      }
+      // Le worktree dei lavori nascono qui sotto e leggono la config del principale.
+      for (const radice of [P.radice, P.serverRadice].filter(Boolean)) ensureCommentChar(radice);
       const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
       // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.

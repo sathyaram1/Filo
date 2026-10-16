@@ -422,11 +422,17 @@
       || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
   }
 
-  // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
-  // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
+  // Cache "il comando shell esiste?" (shell + token → bool), per non rifare lo
+  // spawn di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
   // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
+  // Tiene solo risposte certe: un controllo scaduto (macchina carica) resta senza
+  // colore e si ritenta passati RIPROVA_INCERTO_MS, alla prossima battitura (#1176).
   const shellCmdCache = new Map();
+  const shellCmdIncerti = new Map(); // chiave → quando non ha saputo rispondere
+  const shellCmdInVolo = new Set();
+  const RIPROVA_INCERTO_MS = 20000;
   let whichTimer = null;
+  const chiaveShell = (cmd) => `${getShell() || ''}\u0000${cmd}`;
 
   // Cache "il dominio /sito.tld esiste?" (host → bool). Evita di rifare il
   // lookup DNS a ogni tasto; popolata sia dalla verifica live sia da quella
@@ -439,6 +445,7 @@
   //   'shell'   → comando shell esistente (modalità terminale) → azzurro
   //   'unknown' → inizia con "/" ma non è un comando riconosciuto → rosso
   //   'pending' → modalità terminale, esistenza del comando ancora da verificare
+  //   'incerto' → modalità terminale, il controllo non ha saputo rispondere → neutro
   //   'none'    → testo normale (va all'LLM)
   function classifyInput(value) {
     const t = value.trim();
@@ -454,9 +461,11 @@
     }
     if (isTerminalMode()) {
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
-      const cmd = firstToken.slice(1);
+      const cmd = programmaDi(t);
       if (!cmd) return 'none';
-      if (shellCmdCache.has(cmd)) return shellCmdCache.get(cmd) ? 'shell' : 'unknown';
+      const chiave = chiaveShell(cmd);
+      if (shellCmdCache.has(chiave)) return shellCmdCache.get(chiave) ? 'shell' : 'unknown';
+      if (Date.now() - (shellCmdIncerti.get(chiave) ?? -Infinity) < RIPROVA_INCERTO_MS) return 'incerto';
       return 'pending'; // verifica in corso (vedi scheduleShellWhich)
     }
     // Modalità normale: un "/comando" che non è interno né un sito non verrà
@@ -478,6 +487,12 @@
     );
   }
 
+  // Il programma di un "/comando": un percorso fra virgolette (#968) è uno solo, anche con gli spazi.
+  function programmaDi(t) {
+    const V = global.SN_VIRGOLETTE;
+    return V ? V.primoComando(t.slice(1)) : (t.split(/\s+/)[0] || '').slice(1);
+  }
+
   // Verifica (con debounce) se il primo token è un comando shell esistente e
   // poi ricolora. Debounce così il controllo parte solo quando l'utente si
   // ferma: digitando di getto "/git" i prefissi non vengono mai controllati e
@@ -485,15 +500,22 @@
   function scheduleShellWhich(value) {
     clearTimeout(whichTimer);
     whichTimer = setTimeout(async () => {
-      const firstToken = value.trim().split(/\s+/)[0];
-      const cmd = firstToken.slice(1);
-      if (!cmd || shellCmdCache.has(cmd)) { updateInputClass(); return; }
-      let exists = false;
+      const cmd = programmaDi(value.trim());
+      if (!cmd) { updateInputClass(); return; }
+      const chiave = chiaveShell(cmd);
+      // Lo stesso comando già in controllo non ne lancia un secondo (sotto carico ogni spawn in più allunga gli
+      // altri): ricolora quello in volo, quando risponde.
+      if (shellCmdInVolo.has(chiave)) return;
+      if (shellCmdCache.has(chiave)) { updateInputClass(); return; }
+      shellCmdInVolo.add(chiave);
+      let exists = null;
       try {
         const r = await window.filo?.shellWhich?.({ command: cmd, shell: getShell(), cwd: getCwd() });
-        exists = !!(r && r.exists);
-      } catch (_) { exists = false; }
-      shellCmdCache.set(cmd, exists);
+        if (r && typeof r.exists === 'boolean') exists = r.exists;
+      } catch (_) { exists = null; }
+      shellCmdInVolo.delete(chiave);
+      if (exists === null) shellCmdIncerti.set(chiave, Date.now());
+      else { shellCmdCache.set(chiave, exists); shellCmdIncerti.delete(chiave); }
       updateInputClass(); // ricolora sullo stato attuale dell'input
     }, 250);
   }
@@ -573,17 +595,17 @@
 
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
-    // 'pending' (terminale, esistenza del comando ancora da verificare) viene
-    // mostrato GIÀ in rosso: aggiungere caratteri a un "/comando" non deve far
-    // lampeggiare il colore tornando a neutro a ogni tasto mentre il controllo
-    // è in corso. Quando il check risolve, il comando diventa azzurro (esiste)
-    // o resta rosso (non esiste), senza flicker intermedi.
-    const showUnknown = kind === 'unknown' || kind === 'pending';
-    inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
-    inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
-    inputEl.classList.toggle('is-cmd-unknown', showUnknown);
-    // In attesa del controllo "esiste?": rosso (vedi sopra) e avvia il check.
-    if (kind === 'pending') scheduleShellWhich(inputEl.value);
+    // 'pending' (controllo "esiste?" in corso) tiene il colore che c'era: aggiungere
+    // caratteri a un "/comando" non fa lampeggiare il rosso a ogni tasto, e un comando
+    // incollato non diventa rosso prima che il controllo dica «non esiste» (#1176).
+    if (kind === 'pending') {
+      inputEl.classList.remove('is-cmd-filo');
+      scheduleShellWhich(inputEl.value);
+    } else {
+      inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
+      inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
+      inputEl.classList.toggle('is-cmd-unknown', kind === 'unknown');
+    }
     // Sito (arancione) non ancora verificato: avvia il lookup DNS (debounce)
     // così, se il dominio non esiste, l'input diventa rosso.
     const t = inputEl.value.trim();

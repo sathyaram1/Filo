@@ -20,6 +20,8 @@ const LATO_MAX = 768;
 
 let riattivati = new Set();
 let chiamaModello = null;
+// Spento in Sicurezza, nessuna foto parte verso un modello: restano le regole e il tasto destro (#1084).
+let modelloAcceso = true;
 const proposte = new Map();   // gettone → { wcId, ftn, servizio, ospite, nome, url, origin, segno }
 const visti = new Set();      // riquadri già proposti o già guardati: una volta per riquadro
 const rifiutate = new Set();  // servizio|ospite a cui l'utente ha detto no, per questa sessione di Filo
@@ -185,7 +187,7 @@ function chiaveFunziona(c) { return `${senzaFrammento(c.urlTop)}|${senzaFramment
 const FOTO_MANCATA = { fotoMancata: true };
 
 async function guarda(c, segno) {
-  if (typeof chiamaModello !== 'function') return null;
+  if (!modelloAcceso || typeof chiamaModello !== 'function') return null;
   const quando = funziona.get(chiaveFunziona(c));
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
   if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
@@ -346,6 +348,8 @@ function avvisaRiquadri() {
 let firma = '';
 function configureFromSettings(settings) {
   try { if (require('../shim/storage').inIncognito()) return; } catch (_) {}
+  modelloAcceso = !(settings && settings.security && settings.security.riquadriRotti
+    && settings.security.riquadriRotti.modello === false);
   riattivati = new Set(Cookies().getEmbedSites(settings));
   const ora = `${Cookies().getMode(settings)}|${[...riattivati].join(',')}`;
   if (firma && ora !== firma) avvisaRiquadri();

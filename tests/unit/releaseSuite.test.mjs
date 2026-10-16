@@ -14,7 +14,7 @@ const YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'release.yml'), '
 const SUITE_YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'suite.yml'), 'utf8');
 const SCEGLI_JS = readFileSync(resolve(ROOT, 'scripts', 'ultima-suite-verde.mjs'), 'utf8');
 const { PASSI, casella } = await import('../../scripts/release-platform-alarm.mjs');
-const { CHIAVE_FERMO, SOGLIA_ORE } = await import('../../scripts/ultima-suite-verde.mjs');
+const { CHIAVE_FERMO, SOGLIA_ORE, LAVORO_UNIT_WINDOWS } = await import('../../scripts/ultima-suite-verde.mjs');
 
 // I commenti raccontano: si guardano solo le righe di comando/configurazione.
 const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
@@ -174,6 +174,67 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
   });
 });
 
+// #1184: il cancello di pubblicazione rifà gli unit su Windows; se la suite non li prova, il «verde» scelto può essere
+// un commit che il cancello rifiuta a ogni giro, e la pubblicazione si ferma per giorni.
+describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubblicazione', () => {
+  const lavoro = senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML));
+  const elenco = passi(lavoro);
+  const unit = elenco.find((p) => p.id === 'unit');
+
+  test('il lavoro ha il nome che la scelta del verde chiede alle corse, e gira su Windows', () => {
+    assert.match(lavoro, /runs-on:\s*windows-latest/);
+    assert.doesNotMatch(lavoro, /^ {4}name:/m, 'nelle corse un lavoro si chiama come la sua chiave: rinominato, la scelta non lo troverebbe');
+    assert.match(lavoro, /timeout-minutes:\s*\d+/);
+  });
+
+  test('niente lo salta o lo tollera: rosso lui, rossa la corsa', () => {
+    assert.doesNotMatch(lavoro, /^ {4}if:/m, 'saltato, la corsa sarebbe verde senza averlo passato');
+    assert.doesNotMatch(lavoro, /^ {4}continue-on-error:/m, 'tollerato, la corsa sarebbe verde a unit rossi');
+  });
+
+  test('prova il commit della spinta, con lo stesso comando e lo stesso Node del cancello', () => {
+    assert.match(lavoro, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
+    assert.match(lavoro, /fetch-depth:\s*0/, 'l\'avviso elenca i commit dopo l\'ultimo verde');
+    const cancello = passi(senzaCommenti(job('release'))).find((p) => p.id === 'gate');
+    const comando = 'node scripts/unit-con-riprova.mjs --registro unit.log';
+    assert.ok(cancello.corpo.includes(comando), 'il cancello di pubblicazione è cambiato: questo lavoro va allineato');
+    assert.ok(unit?.corpo.includes(comando));
+    assert.doesNotMatch(`${cancello.corpo}\n${unit.corpo}`, /npm run test:unit/,
+      'senza la riprova un flaky su Windows butta un verde, o un giro di pubblicazione');
+    assert.match(unit.corpo, /continue-on-error:\s*true/, 'il passo dopo deve poter aprire il feedback');
+    const node = (t) => (t.match(/node-version:\s*(\S+)/) || [])[1];
+    assert.equal(node(lavoro), node(senzaCommenti(job('release'))));
+    assert.match(lavoro, /node scripts\/npm-ci-ritenta\.mjs/);
+  });
+
+  test('un rosso su main apre un feedback con le chiavi del cancello; su un ramo la corsa resta rossa', () => {
+    const allarme = elenco.find((p) => /build-alarm\.mjs/.test(p.corpo));
+    assert.ok(allarme, 'un rosso che non diventa un feedback ferma la pubblicazione in silenzio');
+    assert.match(allarme.corpo, /if:[^\n]*github\.ref == 'refs\/heads\/main'[^\n]*steps\.unit\.outcome == 'failure' \|\| failure\(\)/,
+      'anche un npm ci rosso prima degli unit deve diventare un feedback');
+    assert.match(allarme.corpo, /--chiavi-unit unit\.log/, 'le chiavi del cancello: lo stesso rosso visto qui e là apre un feedback solo');
+    assert.match(allarme.corpo, /--chiave unit-windows:non-partiti/);
+    assert.match(allarme.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
+    assert.match(allarme.corpo, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
+    assert.match(allarme.corpo, /node scripts\/ultima-suite-verde\.mjs --stampa/);
+    assert.match(allarme.corpo, /head -80/);
+    assert.match(allarme.corpo, /N_TUTTE - 80/);
+    assert.match(allarme.corpo, /exit 1/);
+    for (const p of elenco.filter((x) => /secrets\./.test(x.corpo))) {
+      assert.match(p.corpo, /github\.ref == 'refs\/heads\/main'/, `il passo «${p.nome}» porta una credenziale fuori da main`);
+    }
+    const ramo = elenco.find((p) => /github\.ref != 'refs\/heads\/main'/.test(p.corpo));
+    assert.ok(ramo);
+    assert.match(ramo.corpo, /steps\.unit\.outcome == 'failure' \|\| failure\(\)/);
+    assert.match(ramo.corpo, /exit 1/);
+  });
+
+  test('la scelta del verde chiede alle corse se questo lavoro è passato', () => {
+    assert.ok(SCEGLI_JS.includes('/actions/runs/${r.id}/jobs'), 'senza chiedere i lavori, un verde di prima del lavoro passerebbe');
+    assert.match(SCEGLI_JS, /scegliUltimoVerde\(runs, primoGenitore, valida\)/);
+  });
+});
+
 describe('release.yml: si pubblica il commit più nuovo di main con la suite verde', () => {
   const release = () => senzaCommenti(job('release'));
   const scegli = senzaCommenti(job('scegli'));
@@ -300,7 +361,7 @@ describe('ogni allarme dice al server cosa è rotto', () => {
         assert.match(p.corpo, /--chiav/, `${nome}: il passo «${p.nome}» apre un allarme senza chiavi`);
       }
     }
-    assert.equal(chiamate, 2, 'le chiamate dirette sono due: il cancello unit e la suite rossa');
+    assert.equal(chiamate, 3, 'le chiamate dirette sono tre: il cancello unit, la suite rossa e gli unit rossi su Windows');
     assert.match(senzaCommenti(job('release')), /build-alarm\.mjs [^\n]*--chiavi-unit unit\.log/, 'il cancello unit dà una chiave per file di test');
   });
 
@@ -319,20 +380,19 @@ describe('ogni allarme dice al server cosa è rotto', () => {
 
 // Nel contenitore delle routine (Linux, senza schermo, da root) un comando
 // con xvfb-run ma senza la sandbox spenta non fa partire Electron: un testo
-// che lo scrive a metà è la trappola che ogni giro riscopriva.
+// che lo scrive a metà è la trappola che ogni giro riscopriva. Dal #739
+// `npx playwright test` se lo prepara da solo e i testi non lo chiedono più:
+// dove resta scritto (i comandi fuori da Playwright), è intero.
 describe('il comando del contenitore è scritto intero, dovunque compaia', () => {
   test('ogni riga con `xvfb-run -a` in CLAUDE.md, nei ruoli e nei rossi noti porta anche ELECTRON_DISABLE_SANDBOX=1', () => {
     const files = ['CLAUDE.md', 'tests/rossi-noti.json',
       ...readdirSync(resolve(ROOT, 'routines', 'roles')).filter((n) => n.endsWith('.md')).map((n) => `routines/roles/${n}`)];
-    let trovate = 0;
     for (const f of files) {
       for (const riga of readFileSync(resolve(ROOT, f), 'utf8').split(/\r?\n/)) {
         if (!/xvfb-run -a/.test(riga)) continue;
-        trovate += 1;
         assert.match(riga, /ELECTRON_DISABLE_SANDBOX=1/, `${f}: «${riga.trim().slice(0, 120)}» — metà comando`);
       }
     }
-    assert.ok(trovate >= 3, 'il comando del contenitore deve stare scritto in CLAUDE.md, nei ruoli e nei rossi noti');
   });
 });
 
@@ -485,6 +545,58 @@ describe('rimettere i file di una piattaforma su una versione già uscita', () =
       const occorrenze = (passiJob.match(/needs\.release\.outputs\.version/g) || []).length;
       assert.equal(occorrenze, 1,
         'la versione del lavoro Windows va letta una volta sola, nel passo che la sceglie: negli altri passi sarebbe vuota sulla strada a mano');
+    });
+  }
+});
+
+// ─── #785: la sezione «Verifica» con commit, corsa e SHA-256 di ogni file ───
+// Le regole della sezione stanno in tests/unit/releaseImpronte.test.mjs; qui il posto del passo nei tre lavori.
+describe('ogni metà scrive le impronte dei suoi file nella pagina della versione', () => {
+  const CORSA = /CORSA: \$\{\{ github\.server_url \}\}\/\$\{\{ github\.repository \}\}\/actions\/runs\/\$\{\{ github\.run_id \}\}[\s\S]*--corsa "\$CORSA"/;
+  // I valori arrivano dall'ambiente: scritti nel comando con ${{ }}, una versione battuta a mano diventerebbe codice.
+  const SENZA_ESPRESSIONI_NEL_COMANDO = (corpo) => assert.doesNotMatch(corpo.slice(corpo.indexOf('run: |')).replace(/\$\{\{ runner\.temp \}\}/g, ''), /\$\{\{/);
+
+  test('Windows: dopo il controllo della bozza e prima che diventi pubblica, con lo strumento di questa corsa', () => {
+    const r = senzaCommenti(job('release'));
+    const elenco = passi(r);
+    const iControllo = elenco.findIndex((p) => /I file per Windows sono davvero nella bozza/.test(p.nome));
+    const iImpronte = elenco.findIndex((p) => /release-impronte\.mjs"? --piattaforma Windows/.test(p.corpo));
+    const iPubblica = elenco.findIndex((p) => /gh release edit[^\n]*--draft=false/.test(p.corpo));
+    assert.ok(iImpronte > iControllo && iImpronte < iPubblica,
+      'le impronte vanno nella bozza dopo il controllo dei file e prima che diventi pubblica: una versione non esce senza «Verifica»');
+    const p = elenco[iImpronte].corpo;
+    assert.match(p, /if:\s*steps\.check\.outputs\.should_release == 'true'/);
+    assert.match(p, /GH_TOKEN:\s*\$\{\{\s*steps\.app\.outputs\.token\s*\|\|\s*secrets\.GITHUB_TOKEN\s*\}\}/, 'la bozza si scrive con il token che l\'ha creata');
+    // Il commit provato può essere più vecchio dello script: lo strumento si prende dal commit di questa corsa.
+    assert.match(p, /git show "\$\{GITHUB_SHA\}:scripts\/release-impronte\.mjs" > "\$\{RUNNER_TEMP\}\/release-impronte\.mjs"/);
+    assert.doesNotMatch(p, /node scripts\/release-impronte\.mjs/, 'lo strumento della copia di lavoro può non esserci');
+    assert.match(p, /VERSIONE: \$\{\{ steps\.bump\.outputs\.version \}\}[\s\S]*--versione "\$VERSIONE"/);
+    assert.match(p, /COMMIT: \$\{\{ steps\.applica\.outputs\.sha \}\}[\s\S]*--commit "\$COMMIT"/, 'il commit è quello costruito');
+    assert.match(p, CORSA);
+    SENZA_ESPRESSIONI_NEL_COMANDO(p);
+    assert.match(p, /--cartella dist\b/);
+  });
+
+  for (const [nomeJob, piattaforma] of [['release-mac', 'Mac'], ['release-linux', 'Linux']]) {
+    test(`${nomeJob}: dopo il controllo dei file e prima dell'allarme, con lo strumento al riparo`, () => {
+      const testo = senzaCommenti(job(nomeJob));
+      const elenco = passi(testo);
+      const trovati = elenco.filter((x) => /release-impronte\.mjs"? --piattaforma/.test(x.corpo));
+      assert.equal(trovati.length, 1, 'un passo solo scrive le impronte');
+      const p = trovati[0];
+      assert.equal(p.id, 'impronte', 'l\'allarme deve poter dire che si è fermato lì');
+      const i = elenco.indexOf(p);
+      assert.ok(i > elenco.findIndex((x) => x.id === 'controllo'), 'le righe si scrivono solo per file che sono davvero nella release');
+      assert.ok(i < elenco.findIndex((x) => x.id === 'allarme'), 'un guasto qui deve aprire il feedback');
+      assert.match(p.corpo, new RegExp(`--piattaforma ${piattaforma} --cartella dist\\b`));
+      assert.match(p.corpo, /node "\$\{\{ runner\.temp \}\}\/strumenti\/release-impronte\.mjs"/, 'su un tag vecchio lo script della copia di lavoro non c\'è');
+      assert.match(elenco.find((x) => x.id === 'riparo').corpo, /cp [^\n]*scripts\/release-impronte\.mjs "\$\{\{ runner\.temp \}\}\/strumenti\/"/);
+      assert.match(p.corpo, /VERSIONE: \$\{\{ steps\.bersaglio\.outputs\.versione \}\}[\s\S]*--versione "\$VERSIONE"/);
+      SENZA_ESPRESSIONI_NEL_COMANDO(p.corpo);
+      assert.match(p.corpo, /--commit "\$\(git rev-parse HEAD\)"/, 'il commit è quello che la guardia ha appena controllato');
+      assert.match(p.corpo, CORSA);
+      assert.match(p.corpo, /--verifica-dopo \d+/, 'Mac e Linux scrivono in parallelo: senza rilettura uno cancella le righe dell\'altro');
+      assert.match(p.corpo, /GH_TOKEN:\s*\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}/);
     });
   }
 });

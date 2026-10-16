@@ -64,7 +64,6 @@
     return global.SN_ESTERNO;
   }
 
-  const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
   const LONG_NUM_RE = /\b\d{6,}\b/g;
   // Un IBAN e un codice fiscale non sono fatti di sole cifre: due lettere e due
   // cifre davanti al primo, lettere e cifre alternate nel secondo. La regola
@@ -193,6 +192,50 @@
       .replace(/PERCORSI_CONDIVISI/gi, 'percorsi-condivisi');
   }
 
+  // Gli indirizzi email, cercati partendo dalle chiocciole. Scritta come
+  // espressione (`[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}`, i) la regola
+  // riprovava da ogni lettera e costava il quadrato della lunghezza: un
+  // elemento da trentamila caratteri, un secondo nel processo principale
+  // (#1173). Dà lo stesso testo dell'espressione: una sentinella le confronta.
+  function lettera(c) { return (c >= 65 && c <= 90) || (c >= 97 && c <= 122); }
+  function cifra(c) { return c >= 48 && c <= 57; }
+  function carattereDominio(c) { return lettera(c) || cifra(c) || c === 46 || c === 45; }
+  function carattereLocale(c) { return carattereDominio(c) || c === 95 || c === 37 || c === 43; }
+
+  function redigiEmail(testo) {
+    let chiocciola = testo.indexOf('@');
+    if (chiocciola === -1) return testo;
+    const n = testo.length;
+    let out = '';
+    let da = 0;
+    while (chiocciola !== -1) {
+      let inizio = chiocciola;
+      while (inizio > da && carattereLocale(testo.charCodeAt(inizio - 1))) inizio--;
+      let fine = -1;
+      if (inizio < chiocciola) {
+        let coda = chiocciola + 1;
+        while (coda < n && carattereDominio(testo.charCodeAt(coda))) coda++;
+        // L'ultimo punto seguito da due lettere, con almeno un carattere fra
+        // la chiocciola e lui: è quello che l'espressione trova tornando indietro.
+        for (let p = coda - 3; p >= chiocciola + 2; p--) {
+          if (testo.charCodeAt(p) === 46 && lettera(testo.charCodeAt(p + 1)) && lettera(testo.charCodeAt(p + 2))) {
+            fine = p + 3;
+            while (fine < n && lettera(testo.charCodeAt(fine))) fine++;
+            break;
+          }
+        }
+      }
+      if (fine === -1) {
+        chiocciola = testo.indexOf('@', chiocciola + 1);
+      } else {
+        out += testo.slice(da, inizio) + '[EMAIL]';
+        da = fine;
+        chiocciola = testo.indexOf('@', fine);
+      }
+    }
+    return out + testo.slice(da);
+  }
+
   // Cancella i dati personali da un testo diretto alla raccolta pubblica.
   //
   // Passa di qui OGNI campo che esce dal computer di chi naviga: gli elementi
@@ -210,8 +253,7 @@
   // nessuno.
   function redigiDatiPersonali(testo) {
     if (typeof testo !== 'string' || !testo) return '';
-    return testo
-      .replace(EMAIL_RE, '[EMAIL]')
+    return redigiEmail(testo)
       .replace(IBAN_RE, '[IBAN]')
       .replace(CF_RE, '[CODICE]')
       .replace(LONG_NUM_RE, '[NUMERO]')
@@ -219,14 +261,49 @@
       .replace(SOPRANNOME_RE, (_m, prima) => `${prima}[ID]`);
   }
 
+  // Di un campo si pulisce un pezzo poco più lungo di quello che può restarne, non
+  // tutto: elementi da centinaia di migliaia di caratteri fermavano l'Aiuto (#1173).
+  // Se la pulizia lo accorcia sotto il tetto il pezzo cresce: la coda (quale
+  // pulsante, dove si va) arriva come prima, fino a otto volte il tetto: oltre,
+  // un campo che è quasi tutto dati da cancellare non vale il costo di cinquanta
+  // documenti ostili. Il taglio non lascia in fondo mezza forma (email, codice,
+  // numero). Prove: tests/unit/percorsiLunghi.test.mjs.
+  const FORMA_MAX = 320; // un indirizzo email non supera i 254 caratteri
+  const CRESCITA_MAX = 8;
+
+  function aTetto(testo, max, taglia, pulisci) {
+    for (let tetto = max * 2 + FORMA_MAX; ; tetto *= 4) {
+      const pezzo = taglia(testo, tetto);
+      const out = pulisci(pezzo);
+      if (pezzo === testo || out.length >= max + FORMA_MAX || tetto >= max * CRESCITA_MAX) return out.slice(0, max);
+    }
+  }
+
+  function tagliaPrimaDiPulire(testo, tetto) {
+    if (testo.length <= tetto) return testo;
+    let fine = tetto;
+    const nellaForma = (c) => carattereLocale(c) || c === 64;
+    while (fine > tetto - FORMA_MAX && nellaForma(testo.charCodeAt(fine - 1))) fine--;
+    const c = testo.charCodeAt(fine - 1);
+    if (c >= 0xD800 && c <= 0xDBFF) fine--;
+    return testo.slice(0, fine);
+  }
+
+  // Un indirizzo si taglia a una barra: un pezzo spezzato può non decodificarsi
+  // più, e la pulizia lo leggerebbe cifrato (`%40` al posto della chiocciola).
+  // Al posto di quello che non si guarda resta il segnaposto, come per un codice.
+  function tagliaPercorsoPrimaDiPulire(path, tetto) {
+    if (path.length <= tetto) return path;
+    const barra = path.lastIndexOf('/', tetto);
+    return barra === -1 ? '' : `${path.slice(0, barra + 1)}[ID]`;
+  }
+
   // Un elemento toccato, pronto per la raccolta: senza dati personali, senza
   // niente che imiti la struttura del prompt, e dentro al tetto.
   function redactSelector(selector) {
     if (typeof selector !== 'string' || !selector) return '';
-    let s = redigiDatiPersonali(selector);
-    s = neutralizzaMarcature(s).trim();
-    if (s.length > MAX_SELECTOR_LEN) s = s.slice(0, MAX_SELECTOR_LEN);
-    return s;
+    return aTetto(selector, MAX_SELECTOR_LEN, tagliaPrimaDiPulire,
+      (pezzo) => neutralizzaMarcature(redigiDatiPersonali(pezzo)).trim());
   }
 
   function sanitizeSteps(rawSteps) {
@@ -243,6 +320,16 @@
     return out;
   }
 
+  // Un ciclo e non `/^[…]+|[…]+$/g`: quella riprova la coda da ogni carattere
+  // di una fila in mezzo al testo, e il costo cresce col quadrato (#1173).
+  function togliAiBordi(s, caratteri) {
+    let a = 0;
+    let b = s.length;
+    while (a < b && caratteri.includes(s[a])) a++;
+    while (b > a && caratteri.includes(s[b - 1])) b--;
+    return s.slice(a, b);
+  }
+
   // L'intento è UNA riga: la produce un LLM e la rilegge un altro LLM dentro il
   // prompt di un'altra persona. Togliamo il wrapping markdown, teniamo la prima
   // riga, tagliamo a MAX_INTENT_LEN.
@@ -250,12 +337,10 @@
     if (typeof text !== 'string') return '';
     // La frase la scrive un modello, ma leggendo gli elementi toccati e la
     // sezione di partenza: quello che ha visto lì può ricopiarlo qui dentro.
-    let s = neutralizzaMarcature(redigiDatiPersonali(text)).trim();
-    if (!s) return '';
-    s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
-    s = s.replace(/^[*_]+|[*_]+$/g, '').trim();
-    if (s.length > MAX_INTENT_LEN) s = s.slice(0, MAX_INTENT_LEN);
-    return s.trim();
+    return aTetto(text, MAX_INTENT_LEN, tagliaPrimaDiPulire, (pezzo) => {
+      const s = neutralizzaMarcature(redigiDatiPersonali(pezzo)).trim();
+      return togliAiBordi(togliAiBordi(s, '"\'`').trim(), '*_').trim();
+    }).trim();
   }
 
   function parseUrl(rawUrl) {
@@ -611,9 +696,8 @@
   function normalizedPath(rawUrl) {
     const u = parseUrl(rawUrl);
     if (!u) return '';
-    let path = redigiPercorso(u.pathname || '/', u.hostname) || '/';
-    if (path.length > MAX_URL_LEN) path = path.slice(0, MAX_URL_LEN);
-    return path;
+    return aTetto(u.pathname || '/', MAX_URL_LEN, tagliaPercorsoPrimaDiPulire,
+      (pezzo) => redigiPercorso(pezzo, u.hostname)) || '/';
   }
 
   function sanitizeDomain(raw) {
@@ -632,9 +716,10 @@
     const s = String(raw || '').trim();
     if (!s) return '/';
     if (/^https?:\/\//i.test(s)) return normalizedPath(s) || '/';
-    const ripulito = neutralizzaMarcature(s).trim().replace(/\s+/g, '');
-    if (!ripulito.startsWith('/')) return '/';
-    return redigiPercorso(ripulito, domain || '').slice(0, MAX_URL_LEN) || '/';
+    return aTetto(s, MAX_URL_LEN, tagliaPercorsoPrimaDiPulire, (pezzo) => {
+      const ripulito = neutralizzaMarcature(pezzo).trim().replace(/\s+/g, '');
+      return ripulito.startsWith('/') ? redigiPercorso(ripulito, domain || '') : '';
+    }) || '/';
   }
 
   // LA pulizia: quella che il client applica prima di inviare e che il server
@@ -703,23 +788,21 @@
   function formatKnownPathsForPrompt(rawPaths) {
     if (!Array.isArray(rawPaths) || !rawPaths.length) return '';
     const seen = new Set();
-    const dedup = [];
-    for (const p of rawPaths) {
-      if (!p || typeof p !== 'object') continue;
-      const k = clusterKey(p);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      dedup.push(p);
-    }
     const blocchi = [];
     let chars = 0;
-    for (const p of dedup) {
+    for (const p of rawPaths) {
+      if (!p || typeof p !== 'object') continue;
       const steps = sanitizeSteps(p.steps);
       // Un percorso senza passi non insegna niente: sarebbe solo una frase di
       // ignoto autore dentro il prompt di qualcun altro.
       if (!steps.length) continue;
-      const intent = sanitizeIntent(p.intent) || '(intento ignoto)';
       const init = sanitizeInitialUrl(p.initialUrl, p.domain);
+      // I doppioni si cercano su quello che il prompt vedrà: la chiave sul
+      // documento grezzo copiava e confrontava campi interi da un mega (#1173).
+      const k = clusterKey({ initialUrl: init, steps });
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const intent = sanitizeIntent(p.intent) || '(intento ignoto)';
       const header = `## "${intent}" (da ${init})`;
       const stepLines = steps.map((s, i) =>
         `  ${i + 1}. ${s.action} su ${s.selector}${s.retracted ? ' [poi corretto]' : ''}`);
@@ -774,6 +857,7 @@
       domainOf, normalizedPath, sanitizeDomain, sanitizeInitialUrl, clusterKey,
       redigiPercorso, redigiSegmento, INVISIBILI_RE, SUFFISSI_PRIVATI, normalizzaHost,
       sembraNomeDiPersona, redigiNellaZona, parolaDiSezione, PAROLE_DI_SEZIONE,
+      redigiEmail, togliAiBordi, tagliaPrimaDiPulire, tagliaPercorsoPrimaDiPulire, FORMA_MAX,
     },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

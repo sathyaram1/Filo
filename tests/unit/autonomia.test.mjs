@@ -175,6 +175,11 @@ test('sopra la tabella (d): abbassare una difesa vuole «conferma» a ogni livel
   assert.equal(A.selezionabile('yolo'), false, 'yolo esiste come valore ma aspetta il guardiano dei registri');
   assert.ok(A.livelloValido('yolo'));
   assert.deepEqual(A.livelliSelezionabili().map((l) => l.id), ['conservativo', 'default', 'automatico']);
+  // Il riquadro dell'alzata è uno solo, per Preferenze e per l'intervista di benvenuto (#1188).
+  const r = A.confermaAlzata('automatico');
+  assert.equal(r.title, 'Autonomia: Automatico');
+  assert.ok(r.text.includes(A.infoLivello('automatico').frase));
+  assert.equal(r.avviso, 'Così Filo si fida di più.');
 });
 
 test('un backup che rientra, o un ripristino, non alzano l\'autonomia: vince la più stretta', () => {

@@ -10,13 +10,16 @@ import { PassThrough } from 'node:stream';
 import fs, { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { cartellaTemporanea, nomeSuDisco, nomiVeri } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, nomeSuDisco, nomiVeri, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { execFileSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
 const SORGENTE = readFileSync(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'), 'utf8');
+require(join(ROOT, 'src', 'shared', 'sistema.js'));
+const SIS = globalThis.SN_SISTEMA;
 
 function albero(file, sistema) {
   const radice = cartellaTemporanea('filo-sysfs-');
@@ -48,7 +51,7 @@ test('Linux, portatile: due batterie pesate sulla capacità, il mouse non conta,
     assert.deepEqual(L.batteriaLinux(r), { livello: 65, inCarica: true, collegata: true });
     writeFileSync(join(r, 'sys/class/power_supply/BAT0/status'), 'Not charging\n');
     assert.deepEqual(L.batteriaLinux(r), { livello: 65, inCarica: false, collegata: true });
-  } finally { rmSync(r, { recursive: true, force: true }); }
+  } finally { togliCartella(r); }
 });
 
 test('Linux: senza «capacity» la carica si conta da energia o carica; un fisso non ha batteria', () => {
@@ -58,7 +61,7 @@ test('Linux: senza «capacity» la carica si conta da energia o carica; un fisso
   });
   try {
     assert.deepEqual(L.batteriaLinux(r), { livello: 50, inCarica: false, collegata: true });
-  } finally { rmSync(r, { recursive: true, force: true }); }
+  } finally { togliCartella(r); }
   // I «:» di un sysfs vero Windows non li scrive (#961): la strada codificata gira anche qui, o si rompe e lo vede solo il cancello di pubblicazione (#1000).
   const USBC = 'sys/class/power_supply/ucsi-source-psy-USBC000:001';
   for (const sistema of new Set([process.platform, 'win32'])) {
@@ -76,8 +79,8 @@ test('Linux: senza «capacity» la carica si conta da energia o carica; un fisso
       assert.deepEqual(L.batteriaLinux(portatile), { livello: 40, inCarica: false, collegata: true }, `${sistema}: «collegata» lo dice solo l'alimentatore coi «:»`);
     } finally {
       ripristina.reverse().forEach((f) => f());
-      rmSync(fisso, { recursive: true, force: true });
-      rmSync(portatile, { recursive: true, force: true });
+      togliCartella(fisso);
+      togliCartella(portatile);
     }
   }
 });
@@ -108,7 +111,7 @@ test('Linux: la rotta predefinita dice da dove si esce, e la cartella dell\'inte
     assert.equal(letto.batteria, null);
     assert.equal(letto.bluetooth, null);
     assert.ok(!chiesti.includes('nmcli'), 'con iw che risponde non serve chiedere a NetworkManager');
-  } finally { rmSync(r, { recursive: true, force: true }); }
+  } finally { togliCartella(r); }
 });
 
 test('Linux: solo IPv6, oppure nessuna rotta: l\'interfaccia la dice ipv6_route, o non c\'è', () => {
@@ -122,8 +125,8 @@ test('Linux: solo IPv6, oppure nessuna rotta: l\'interfaccia la dice ipv6_route,
     assert.equal(L.interfacciaVersoFuori(v6), 'enp0s3');
     assert.equal(L.interfacciaVersoFuori(niente), null);
   } finally {
-    rmSync(v6, { recursive: true, force: true });
-    rmSync(niente, { recursive: true, force: true });
+    togliCartella(v6);
+    togliCartella(niente);
   }
 });
 
@@ -167,9 +170,9 @@ test('Linux: senza BlueZ resta l\'interruttore radio; acceso, spento, o nessuna 
     assert.deepEqual(letto.bluetooth, { acceso: true, dispositivi: null }, 'busctl assente: si ripiega sulla radio');
     const conBus = await L.leggiLinux(r, async (f) => (f === 'busctl' ? BLUEZ(true, [['Cuffie', true]]) : null));
     assert.deepEqual(conBus.bluetooth, { acceso: true, dispositivi: ['Cuffie'] });
-    rmSync(join(r, 'sys/class/rfkill/rfkill1'), { recursive: true, force: true });
+    assert.ok(togliCartella(join(r, 'sys/class/rfkill/rfkill1')));
     assert.equal(L.bluetoothDaRfkill(r), null);
-  } finally { rmSync(r, { recursive: true, force: true }); }
+  } finally { togliCartella(r); }
 });
 
 test('Mac: pmset in carica, scarica, carica completa, alimentatore senza carica, Mac senza batteria', () => {
@@ -239,7 +242,7 @@ test('#874 — Linux: il volume da wpctl, pactl o amixer, e la radio del Wi-Fi d
     assert.deepEqual(L.wifiDaRfkill(r), { acceso: false });
     writeFileSync(join(r, 'sys/class/rfkill/rfkill0/soft'), '0\n');
     assert.deepEqual(L.wifiDaRfkill(r), { acceso: true });
-  } finally { rmSync(r, { recursive: true, force: true }); }
+  } finally { togliCartella(r); }
   assert.equal(L.wifiDaRfkill('/inesistente'), null);
 });
 
@@ -248,7 +251,7 @@ test('#874 — Linux: il volume da wpctl, pactl o amixer, e la radio del Wi-Fi d
 test('Windows: una riga del PowerShell diventa una lettura; una riga storta non cancella quella buona', () => {
   const riga = JSON.stringify({
     batteria: { livello: 73, inCarica: true, collegata: true },
-    rete: { tipo: 'wifi', nome: 'Caffè' },
+    rete: { profili: [{ id: '0f8a6b4f-1c2d-4e5f-8a9b-0c1d2e3f4a5b', livello: 3, iana: 71 }], connessioni: [{ id: null, internet: true, nome: 'Caffè' }] },
     bluetooth: { acceso: true, dispositivi: ['Cuffie'] },
   });
   assert.deepEqual(L.datiDaWindows(riga), {
@@ -292,7 +295,8 @@ test('Windows: un processo solo, nascosto, che scrive a pezzi; il lettore aspett
   assert.ok(args[args.length - 1].includes('$genitore = 4242'), 'il PowerShell esce quando Filo non c\'è più');
   const pronto = w.pronto(5000);
   // La riga arriva spezzata, e la «è» a metà fra due pezzi non si perde.
-  const riga = Buffer.from('{"batteria":{"livello":55,"inCarica":false,"collegata":false},"rete":{"tipo":"wifi","nome":"Caffè"},"bluetooth":null}\n', 'utf8');
+  const rete = { profili: [{ id: '0f8a6b4f-1c2d-4e5f-8a9b-0c1d2e3f4a5b', livello: 3, iana: 71 }], connessioni: [{ id: null, internet: true, nome: 'Caffè' }] };
+  const riga = Buffer.from(`${JSON.stringify({ batteria: { livello: 55, inCarica: false, collegata: false }, rete, bluetooth: null })}\n`, 'utf8');
   const taglio = riga.indexOf(0xc3) + 1;
   f.stdout.write(riga.subarray(0, taglio));
   f.stdout.write(riga.subarray(taglio));
@@ -406,20 +410,111 @@ test('nessuna strada verso fuori vuol dire offline anche se Chromium dice online
     assert.deepEqual(L.componi(parti, true).rete, { online: false });
     assert.deepEqual(L.componi(await L.leggiLinux(muto, async () => null), true).rete, { online: true, tipo: null, nome: null });
   } finally {
-    rmSync(ponte, { recursive: true, force: true });
-    rmSync(muto, { recursive: true, force: true });
+    togliCartella(ponte);
+    togliCartella(muto);
   }
   // Mac: `route` risponde senza interfaccia (nessuna rotta predefinita); se non risponde affatto, non si sa.
   const mac = (route) => L.leggiMac(async (file) => ({ pmset: '', route, defaults: null })[file] ?? null);
   assert.deepEqual(L.componi(await mac(''), true).rete, { online: false });
   assert.deepEqual(L.componi(await mac(null), true).rete, { online: true, tipo: null, nome: null });
-  // Windows: lo script scrive {uscita:false} quando nessuna connessione ha Internet o un gateway.
-  assert.deepEqual(L.componi(L.datiDaWindows('{"batteria":null,"rete":{"uscita":false},"bluetooth":null}'), true).rete, { online: false });
-  assert.deepEqual(L.componi(L.datiDaWindows('{"batteria":null,"rete":{"tipo":"cavo","nome":null},"bluetooth":null}'), true).rete,
-    { online: true, tipo: 'cavo', nome: null });
-  // Le connessioni senza Internet e senza gateway (gli adattatori virtuali lato computer) non si scelgono.
+  // Windows: nessuna connessione con Internet o un gateway (gli adattatori virtuali lato computer non ne hanno).
   assert.match(L.SCRIPT_WINDOWS, /GatewayAddresses/);
-  assert.match(L.SCRIPT_WINDOWS, /IsConnectedToInternet\) -and \(-not \$uscite/);
+  const veth = 'a1b2c3d4-0000-4000-8000-00000000abcd';
+  const cavo = '5e6f7a8b-1111-4222-8333-444455556666';
+  const vEthernet = { id: veth, tipo: 'Ethernet', gateway: false };
+  const solaVeth = { schede: [vEthernet], profili: [{ id: veth, livello: 1, iana: 6 }], principale: null, connessioni: [] };
+  assert.deepEqual(L.componi(L.datiDaWindows(JSON.stringify({ rete: solaVeth })), true).rete, { online: false });
+  assert.deepEqual(L.reteDaWindows({ ...solaVeth, profili: null, connessioni: [{ id: veth, internet: false, nome: 'Rete non identificata' }] }), { uscita: false });
+  const conCavo = { schede: [vEthernet, { id: cavo, tipo: 'Ethernet', gateway: true }], profili: [...solaVeth.profili, { id: cavo, livello: 3, iana: 6 }], principale: cavo, connessioni: [] };
+  assert.deepEqual(L.componi(L.datiDaWindows(JSON.stringify({ rete: conCavo })), true).rete, { online: true, tipo: 'cavo', nome: null });
+});
+
+// ── Windows: quale connessione e come esce (#1114) ──
+// Una riga come la scrive il PowerShell: gli adattatori accesi, i profili di Windows, quello che usa per Internet
+// e le connessioni del gestore delle reti (coi nomi).
+
+const WIFI = '0f8a6b4f-1c2d-4e5f-8a9b-0c1d2e3f4a5b';
+const VETH = 'a1b2c3d4-0000-4000-8000-00000000abcd';
+const CAVO = '5e6f7a8b-1111-4222-8333-444455556666';
+const VPN = '99999999-aaaa-4bbb-8ccc-dddddddddddd';
+const schedaWifi = { id: WIFI, tipo: 'Wireless80211', gateway: true };
+const schedaVeth = { id: VETH, tipo: 'Ethernet', gateway: false };
+const rigaWindows = (rete) => JSON.stringify({ batteria: { livello: 43, inCarica: false, collegata: false }, rete, bluetooth: { acceso: true, dispositivi: [] }, volume: { livello: 62, muto: false }, wifi: { acceso: true } });
+
+test('#1114 Windows: col Guid del gestore delle reti illeggibile la home dice il Wi-Fi col suo nome, non il globo', () => {
+  // Il caso della segnalazione: portatile sul Wi-Fi con l'adattatore virtuale di Hyper-V, e un gestore delle reti
+  // che via PowerShell non dice l'adattatore delle sue connessioni. Prima la riga dava il globo.
+  const riga = rigaWindows({
+    schede: [schedaWifi, schedaVeth],
+    profili: [{ id: WIFI, livello: 3, iana: 71 }, { id: VETH, livello: 1, iana: 6 }],
+    principale: WIFI,
+    connessioni: [{ id: null, internet: true, nome: 'Caffè' }, { id: null, internet: false, nome: 'Rete non identificata' }],
+  });
+  const stato = SIS.normalizza(L.componi(L.datiDaWindows(riga), true));
+  assert.deepEqual(stato.rete, { online: true, tipo: 'wifi', nome: 'Caffè' });
+  const voce = SIS.descrivi(stato).rete;
+  assert.equal(voce.icona, 'wifi');
+  assert.equal(voce.testo, 'Caffè');
+  assert.equal(voce.hover, 'Wi-Fi');
+  // Staccato il Wi-Fi resta solo l'adattatore virtuale: offline, anche se Chromium dice online.
+  const staccato = rigaWindows({ schede: [schedaVeth], profili: [{ id: VETH, livello: 1, iana: 6 }], principale: null, connessioni: [{ id: null, internet: false, nome: 'Rete non identificata' }] });
+  assert.deepEqual(L.componi(L.datiDaWindows(staccato), true).rete, { online: false });
+});
+
+test('Windows: senza i profili di Windows decide il gestore delle reti, legato all\'adattatore dal suo Guid', () => {
+  const conGuid = { schede: [schedaWifi, schedaVeth], profili: null, connessioni: [
+    { id: `{${VETH.toUpperCase()}}`, internet: false, nome: 'Rete non identificata' },
+    { id: `{${WIFI.toUpperCase()}}`, internet: true, nome: 'Casa' },
+  ] };
+  assert.deepEqual(L.reteDaWindows(conGuid), { tipo: 'wifi', nome: 'Casa' });
+  // Senza né profili né Guid si sa che si esce, non come: il globo, senza un nome preso a caso.
+  const senza = { ...conGuid, connessioni: conGuid.connessioni.map((c) => ({ ...c, id: 'System.__ComObject' })) };
+  assert.deepEqual(L.reteDaWindows(senza), { tipo: null, nome: null });
+  // Nessuna delle due letture riuscita: la piattaforma non sa niente, decide Chromium.
+  assert.equal(L.reteDaWindows({ schede: [schedaWifi], profili: null, connessioni: null }), null);
+  assert.deepEqual(L.datiDaWindows(rigaWindows(null)).rete, null);
+});
+
+test('Windows: fra due uscite vince chi ha Internet, poi chi sa come esce, poi quella che Windows usa', () => {
+  const schedaCavo = { id: CAVO, tipo: 'Ethernet', gateway: true };
+  const schedaVpn = { id: VPN, tipo: 'Ppp', gateway: true };
+  const entrambe = { schede: [schedaWifi, schedaCavo], profili: [{ id: WIFI, livello: 3, iana: 71 }, { id: CAVO, livello: 3, iana: 6 }], connessioni: [] };
+  assert.equal(L.reteDaWindows({ ...entrambe, principale: CAVO }).tipo, 'cavo');
+  assert.equal(L.reteDaWindows({ ...entrambe, principale: WIFI }).tipo, 'wifi');
+  // Una VPN che Windows usa per Internet non nasconde il Wi-Fi sotto; il nome, con due reti su Internet, si dice
+  // solo se il gestore lega la connessione all'adattatore o se lo porta il profilo del Wi-Fi.
+  const vpn = { schede: [schedaWifi, schedaVpn], profili: [{ id: VPN, livello: 3, iana: 23 }, { id: WIFI, livello: 3, iana: 71 }], principale: VPN };
+  const nomi = [{ id: null, internet: true, nome: 'Ufficio VPN' }, { id: null, internet: true, nome: 'Casa' }];
+  assert.deepEqual(L.reteDaWindows({ ...vpn, connessioni: nomi }), { tipo: 'wifi', nome: null });
+  assert.deepEqual(L.reteDaWindows({ ...vpn, connessioni: [{ ...nomi[0], id: VPN }, { ...nomi[1], id: WIFI }] }), { tipo: 'wifi', nome: 'Casa' });
+  const conNomeProfilo = { ...vpn, profili: [{ id: VPN, livello: 3, iana: 23, nome: 'Ufficio VPN' }, { id: WIFI, livello: 3, iana: 71, nome: 'Casa' }] };
+  assert.deepEqual(L.reteDaWindows({ ...conNomeProfilo, connessioni: nomi }), { tipo: 'wifi', nome: 'Casa' });
+  assert.match(L.SCRIPT_WINDOWS, /\$pr\.ProfileName/);
+  // Un portale da accettare (Internet limitata) è comunque una strada fuori: Wi-Fi, non offline.
+  assert.equal(L.reteDaWindows({ schede: [schedaWifi], profili: [{ id: WIFI, livello: 2, iana: 71 }], connessioni: [] }).tipo, 'wifi');
+  // Un adattatore Wi-Fi che si presenta senza il numero IANA lo dice il suo tipo.
+  assert.equal(L.reteDaWindows({ schede: [schedaWifi], profili: [{ id: WIFI, livello: 3, iana: 0 }], connessioni: [] }).tipo, 'wifi');
+});
+
+test('Windows: profili vuoti e gestore che vede Internet, elenchi alla PowerShell 5.1 e Guid storti', () => {
+  // Se i profili non dicono niente ma il gestore vede una connessione con Internet, non si dice offline.
+  assert.deepEqual(L.reteDaWindows({ schede: [schedaWifi], profili: [], connessioni: [{ id: WIFI, internet: true, nome: 'Casa' }] }), { tipo: 'wifi', nome: 'Casa' });
+  const r = L.reteDaWindows({
+    schede: { value: [schedaWifi], Count: 1 },
+    profili: { value: [{ id: `{${WIFI}}`, livello: 3, iana: 71 }, { id: 'eth0', livello: 3, iana: 6 }, null, 'x'], Count: 4 },
+    connessioni: { value: [{ id: null, internet: true, nome: '  ' }], Count: 1 },
+  });
+  assert.deepEqual(r, { tipo: 'wifi', nome: null }, 'un nome vuoto non si inventa');
+});
+
+test('Windows: lo script raccoglie i fatti della rete, e un dato che non arriva non si porta via gli altri', () => {
+  const s = L.SCRIPT_WINDOWS;
+  for (const pezzo of ['GetConnectionProfiles', 'GetInternetConnectionProfile', 'NetworkAdapterId', 'IanaInterfaceType', 'GetNetworkConnectivityLevel', 'GetNetworkConnections', 'GetAdapterId']) {
+    assert.ok(s.includes(pezzo), pezzo);
+  }
+  assert.match(s, /try \{ \$a = \(\[string\]\$c\.GetAdapterId\(\)\)[^\n]*\} catch \{\}/, 'il Guid illeggibile di una connessione non cancella la lettura');
+  assert.match(s, /try \{ \$nome = \[string\]\$c\.GetNetwork\(\)\.GetName\(\) \} catch \{\}/);
+  assert.match(s, /\(\$null -ne \$rete\.profili\) -or \(\$null -ne \$rete\.connessioni\)/, 'un elenco vuoto è una lettura (offline), non un dato mancante');
 });
 
 test('online lo decide Chromium: offline toglie tipo e nome, online tiene quello che la piattaforma sa', () => {
@@ -439,20 +534,28 @@ test('ogni piattaforma ha il suo ramo, scritto intero', () => {
 });
 
 // Il monitor gira in un Node a parte, con la piattaforma e l'avviso del caricatore finti: qui il contenitore è Linux.
+// Il tempo del figlio è finto e passa a passi di 10 ms: i giri, le letture e la validità dell'avviso si contano in tick,
+// e una macchina carica non sposta niente (#1063).
 function simula(corpo) {
   const MODULO = JSON.stringify(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
   const codice = `
 const { EventEmitter } = require('node:events');
 const Module = require('node:module');
+const { mock } = require('node:test');
+mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.now() });
 const pm = new EventEmitter();
 const vero = Module._load;
 Module._load = function (r, ...a) { return r === 'electron' ? { powerMonitor: pm, app: { on() {} }, net: { isOnline: () => true } } : vero.call(this, r, ...a); };
-const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
+const svuota = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
+const attesa = async (ms) => {
+  for (let fatto = 0; fatto < ms; fatto += 10) { await svuota(); mock.timers.tick(Math.min(10, ms - fatto)); }
+  await svuota();
+};
 const storia = [];
 const MODULO = ${MODULO};
 const nota = (S) => storia.push(S.stato() && S.stato().batteria ? S.stato().batteria.collegata : null);
 ${corpo}`;
-  return JSON.parse(execFileSync(process.execPath, ['-e', codice], { encoding: 'utf8', timeout: 20_000 }).trim().split('\n').pop());
+  return JSON.parse(execFileSync(process.execPath, ['-e', codice], { encoding: 'utf8', timeout: TETTO_ATTESA_MS }).trim().split('\n').pop());
 }
 
 test('staccando il caricatore la voce non torna «collegata» per una lettura fatta prima dell\'avviso (Windows e Mac)', () => {

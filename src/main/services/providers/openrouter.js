@@ -5,7 +5,8 @@
 // (/audio/speech), dettatura (/audio/transcriptions) e indicizzazione
 // (/embeddings). Stessa chiave, stessa lista di esclusione dei fornitori, e —
 // dove il router non lo dice nella risposta — lo stesso riscontro su chi ha
-// davvero servito, chiesto a posteriori (lookupServedBy).
+// davvero servito, chiesto a posteriori (lookupServedBy). I classificatori
+// (decisioni a domande chiuse) hanno il loro endpoint: `decisions`.
 
 (function (global) {
   'use strict';
@@ -15,6 +16,8 @@
   const SPEECH_ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
   const TRANSCRIPTIONS_ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
   const EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
+  // I classificatori (Jev) non passano dalla chat: hanno un endpoint loro, ancora in alfa sul router.
+  const DECISIONS_ENDPOINT = 'https://openrouter.ai/api/alpha/decisions';
   const GENERATION_ENDPOINT = 'https://openrouter.ai/api/v1/generation';
   const AUTH_KEY_ENDPOINT = 'https://openrouter.ai/api/v1/auth/key';
   const CREDITS_ENDPOINT = 'https://openrouter.ai/api/v1/credits';
@@ -337,11 +340,17 @@
     }));
   }
 
-  async function complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
+  // Il tetto della risposta (#1097.3): un modello che si incarta si ferma lì, e `finish_reason: 'length'` lo dice.
+  function maxTokensField(maxTokens) {
+    const n = Math.round(Number(maxTokens));
+    return Number.isFinite(n) && n > 0 ? { max_tokens: n } : {};
+  }
+
+  async function complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
     // personale (#598). Senza, il costo si stima dal listino.
-    const body = { model, messages, stream: false, usage: { include: true }, ...toolsFields(tools, toolChoice) };
+    const body = { model, messages, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting, model, { tools: !!body.tools });
@@ -349,7 +358,7 @@
     const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res, { tools: !!body.tools });
+    if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens, apiKey, model, providerRouting });
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
@@ -376,8 +385,8 @@
   // onReasoning(chunk) per il ragionamento, onToolCall({ id, name }) appena si
   // conosce il nome di una chiamata a uno strumento. Ritorna
   // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
-  async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    const reqBody = { model, messages, stream: true, usage: { include: true }, ...toolsFields(tools, toolChoice) };
+  async function streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    const reqBody = { model, messages, stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
@@ -388,7 +397,7 @@
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
     const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal);
-    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools });
+    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens, apiKey, model, providerRouting });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -457,6 +466,13 @@
         }
       }
     }
+    // Fermato da un errore prima di scrivere qualcosa: è un guasto del servizio, che si riprova o passa al ripiego.
+    if (finishReason === 'error' && !fullText && !calls.list().length) {
+      const err = new Error('OpenRouter 502: il fornitore si è fermato a metà flusso');
+      err.status = 502;
+      err.provider = 'openrouter';
+      throw err;
+    }
     return {
       text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy,
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
@@ -468,25 +484,119 @@
   // personale c'è stato e ha fallito (fetchWithKey li lascia sulla risposta):
   // un 402 «la tua chiave» e un 402 «anche i crediti di Filo» sono due frasi
   // diverse per l'utente.
-  async function httpError(res, { tools = false } = {}) {
+  // Quanto chiede di aspettare un 429 o un 5xx: Retry-After in secondi o come data, o l'istante in cui il tetto riparte.
+  function attesaChiesta(res, ora = Date.now()) {
+    const h = (n) => { try { return res && res.headers && typeof res.headers.get === 'function' ? res.headers.get(n) : null; } catch (_) { return null; } };
+    const ra = String(h('retry-after') || '').trim();
+    if (/^\d+(\.\d+)?$/.test(ra)) return Math.round(Number(ra) * 1000);
+    if (ra) { const t = Date.parse(ra); if (Number.isFinite(t)) return Math.max(0, t - ora); }
+    const reset = Number(h('x-ratelimit-reset'));
+    if (Number.isFinite(reset) && reset > 0) return Math.max(0, (reset < 1e12 ? reset * 1000 : reset) - ora);
+    return null;
+  }
+
+  // Un rifiuto per il tetto della risposta: nessun host ammesso regge quel `max_tokens`. Si dice, col numero (#1097.3).
+  const RIFIUTO_TETTO = /max[_ ]?(?:new[_ ])?tokens|max(?:imum)?[_ ](?:output|completion)[_ ]tokens|output token limit/i;
+  const CONTESTO = /maximum context|context[ _-]?(?:length|window)|tokens? limit exceeded/i;
+  const numeroIn = (s, re) => {
+    const m = re.exec(s);
+    const n = m ? Number(String(m[1]).replace(/[.,]/g, '')) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  // Finestra sforata da testo più tetto: { finestra, testo } quando il rifiuto ne dice le misure, null se è un altro errore.
+  function sforoDiFinestra(errText, maxTokens) {
+    const s = String(errText || '');
+    if (!CONTESTO.test(s)) return null;
+    const finestra = numeroIn(s, /maximum context (?:length|window) (?:is|of) ([\d.,]+)/i)
+      || numeroIn(s, /limit exceeded:?\s*[\d.,]+\s*>\s*([\d.,]+)/i);
+    const chiesti = numeroIn(s, /requested (?:about )?([\d.,]+)/i) || numeroIn(s, /limit exceeded:?\s*([\d.,]+)\s*>/i);
+    const testo = numeroIn(s, /([\d.,]+) (?:tokens )?of (?:text )?input/i) || (chiesti && chiesti > maxTokens ? chiesti - maxTokens : null);
+    return { finestra, testo };
+  }
+  // Il tetto è la causa quando ne prende più di metà finestra, o quando il testo da solo ci starebbe: un rifiuto per
+  // un testo che da solo non ci sta resta di contesto. `stringibile`: la chat può anche accorciare la conversazione.
+  function causaTetto(status, errText, maxTokens) {
+    if (!maxTokens || ![400, 404, 413, 422].includes(status)) return null;
+    const s = String(errText || '');
+    if (/unsupported (?:parameter|value)/i.test(s)) return null;
+    const sforo = sforoDiFinestra(s, maxTokens);
+    if (!sforo) return RIFIUTO_TETTO.test(s) ? {} : null;
+    const { finestra, testo } = sforo;
+    if (finestra && maxTokens > finestra / 2) return { finestra };
+    if (finestra && testo && testo < finestra) return { finestra, stringibile: true };
+    return null;
+  }
+
+  // Un «nessun host per i parametri chiesti» con gli strumenti e un tetto: gli host dichiarati dicono quale dei due manca.
+  // false: nessun host ammesso regge gli strumenti, il tetto non c'entra; true: li reggono, ma nessuno fino a quel
+  // tetto; null: non si sa, e la frase li nomina tutti e due.
+  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools }) {
+    let hosts = null;
+    try { hosts = await modelHosts({ apiKey, model }); } catch (_) { hosts = null; }
+    if (!Array.isArray(hosts) || !hosts.length) return null;
+    const C = global.SN_CONST;
+    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
+    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    const ammessi = C && typeof C.hostPolicyViolation === 'function'
+      ? hosts.filter((h) => !C.hostPolicyViolation(h, model, excluded)) : hosts;
+    if (ammessi.some((h) => h.tools == null || h.maxOut == null)) return null;
+    const utili = tools ? ammessi.filter((h) => h.tools) : ammessi;
+    if (!utili.length) return tools ? false : null;
+    return utili.every((h) => h.maxOut < maxTokens) ? true : (tools ? null : false);
+  }
+
+  async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    const attesa = attesaChiesta(res);
+    if (attesa != null) err.retryAfterMs = attesa;
+    if (res.keySource) err.keySource = res.keySource;
+    if (res.keyFallback) err.keyFallback = res.keyFallback;
+    if (res.status === 404 && model && await nessunHostAmmesso(err, { apiKey, model, providerRouting })) return err;
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
-    if (refusal === 'PARAMS') { if (tools) err.code = 'NO_TOOL_HOST'; } else if (refusal) err.code = refusal;
-    if (res.keySource) err.keySource = res.keySource;
-    if (res.keyFallback) err.keyFallback = res.keyFallback;
+    const perTetto = causaTetto(res.status, errText, maxTokens);
+    if (perTetto && refusal !== 'PARAMS') {
+      err.code = 'TETTO_RISPOSTA';
+      err.maxTokens = maxTokens;
+      if (perTetto.finestra) err.finestra = perTetto.finestra;
+      if (perTetto.stringibile) err.stringibile = true;
+    } else if (refusal === 'PARAMS') {
+      // Il tetto è uno dei parametri che il router fa reggere agli host: il suo «nessun host» può venire da lì.
+      const colpa = maxTokens ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools }) : false;
+      if (tools) err.code = 'NO_TOOL_HOST';
+      else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
+      if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
+    } else if (refusal) err.code = refusal;
     return err;
+  }
+
+  // Un 404 del router su un modello che servono solo host esclusi (#828). Lo dicono gli host dichiarati, non il testo
+  // dell'errore, che il router può cambiare; e vince sugli altri motivi del 404, perché strumenti e tetto non contano più.
+  async function nessunHostAmmesso(err, { apiKey, model, providerRouting }) {
+    let v = null;
+    try { v = await hostVerdict({ apiKey, model, providerRouting }); } catch (_) { v = null; }
+    if (!v || v.ok || v.reason !== 'excluded') return false;
+    console.warn(`[Filo policy] "${model}" lo servono solo host esclusi (${v.excluded.join(', ')}): ${err.message}`);
+    const CE = global.SN_CHAT_ERRORS;
+    err.dettaglio = err.message;
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo: CE.motivoHostEsclusi(v.excluded) }) : `NO_ALLOWED_HOST ${model}`;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'excluded';
+    err.model = model;
+    err.hosts = v.excluded;
+    return true;
   }
 
   // ─── Chi può servire un modello, prima di chiamarlo ───────────────────────
   // Sugli endpoint audio il router ignora il blocco `provider` (#713): l'esclusione si applica qui, sugli host
   // dichiarati. Regole: patterns/voce-dettatura-e-vettori-passano-dal-router-come-le-chat.md.
   const HOSTS_FRESH_MS = 60 * 60 * 1000;
-  const HOSTS_RETRY_MS = 5 * 60 * 1000;
+  // Host ignoti fermano la voce (#1141): si rilegge presto, ma non a ogni frase di una dettatura.
+  const HOSTS_RETRY_MS = 15 * 1000;
   const HOSTS_TIMEOUT_MS = 10 * 1000;
   const HOSTS_MAX_MODELS = 500;
   const hostsCache = new Map(); // id → { until, hosts, pending }
@@ -510,13 +620,21 @@
     for (const e of list) {
       const name = e && typeof e.provider_name === 'string' ? e.provider_name.trim() : '';
       const tag = e && typeof e.tag === 'string' ? e.tag.trim() : '';
-      if (name || tag) hosts.push({ name, tag });
+      // Strumenti e tetto della risposta che l'host regge: dicono perché il router non ne ha trovato uno (#1097.3).
+      const params = e && Array.isArray(e.supported_parameters) ? e.supported_parameters : null;
+      const max = Number(e && e.max_completion_tokens);
+      if (name || tag) {
+        hosts.push({
+          name, tag,
+          tools: params ? params.includes('tools') : null,
+          maxOut: Number.isFinite(max) && max > 0 ? max : (e && e.max_completion_tokens === null ? Infinity : null),
+        });
+      }
     }
     return hosts;
   }
 
-  // [{ name, tag }] o null se non si sa. Un elenco scaduto si usa mentre si rilegge;
-  // una lettura fallita si ritenta dopo qualche minuto, non a ogni frase dettata.
+  // [{ name, tag }] o null se non si sa. Un elenco scaduto si usa mentre si rilegge.
   async function modelHosts({ apiKey, model } = {}) {
     const key = String(model == null ? '' : model).trim();
     if (!key) return null;
@@ -549,27 +667,49 @@
     return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
   }
 
-  async function ensureAllowedHost({ apiKey, model, providerRouting }) {
-    const C = global.SN_CONST;
-    if (!C || typeof C.hostPolicyViolation !== 'function') return;
-    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
-    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
-    if (!excluded.length && !C.producerOnlyRule(model)) return;
-    const hosts = await modelHosts({ apiKey, model });
-    if (!Array.isArray(hosts) || !hosts.length) return;
-    if (hosts.some((h) => !C.hostPolicyViolation(h, model, excluded))) return;
+  function uniqueNames(hosts) {
     const names = [];
     for (const h of hosts) {
       const n = h.name || h.tag;
       if (!names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
     }
+    return names;
+  }
+
+  // Voce e dettatura partono solo se chi serve il modello è noto e TUTTO ammesso (#1141): con host misti il
+  // router sceglie per prezzo e può dare l'audio proprio a quello escluso.
+  // { ok: true } | { ok: false, reason: 'unknown' | 'mixed' | 'excluded', excluded: [nomi] }
+  async function hostVerdict({ apiKey, model, providerRouting }) {
+    const C = global.SN_CONST;
+    if (!C || typeof C.hostPolicyViolation !== 'function') return { ok: true };
+    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
+    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    if (!excluded.length && !C.producerOnlyRule(model)) return { ok: true };
+    const hosts = await modelHosts({ apiKey, model });
+    if (!Array.isArray(hosts) || !hosts.length) return { ok: false, reason: 'unknown', excluded: [] };
+    const bad = hosts.filter((h) => C.hostPolicyViolation(h, model, excluded));
+    if (!bad.length) return { ok: true };
+    return { ok: false, reason: bad.length === hosts.length ? 'excluded' : 'mixed', excluded: uniqueNames(bad) };
+  }
+
+  const NO_HOST_KEYS = {
+    unknown: ['err_audio_hosts_unknown', 'err_audio_hosts_unknown'],
+    mixed: ['err_audio_mixed_host', 'err_audio_mixed_host_many'],
+    excluded: ['err_audio_no_allowed_host', 'err_audio_no_allowed_host_many'],
+  };
+
+  async function ensureAllowedHost({ apiKey, model, providerRouting }) {
+    const v = await hostVerdict({ apiKey, model, providerRouting });
+    if (v.ok) return;
     const I18n = global.SN_I18N;
-    const chiave = names.length > 1 ? 'err_audio_no_allowed_host_many' : 'err_audio_no_allowed_host';
-    const err = new Error(I18n ? I18n.t(chiave, model, joinNames(names)) : `NO_ALLOWED_HOST ${model}`);
+    const [one, many] = NO_HOST_KEYS[v.reason];
+    const chiave = v.excluded.length > 1 ? many : one;
+    const err = new Error(I18n ? I18n.t(chiave, model, joinNames(v.excluded)) : `NO_ALLOWED_HOST ${model}`);
     err.code = 'NO_ALLOWED_HOST';
+    err.reason = v.reason;
     err.provider = 'openrouter';
     err.model = model;
-    err.hosts = names;
+    err.hosts = v.excluded;
     throw err;
   }
 
@@ -659,7 +799,7 @@
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({
       method: 'POST', headers: buildHeaders(key), body: payload, signal,
     }));
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { apiKey, model, providerRouting });
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
     rows.sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
@@ -676,6 +816,43 @@
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: 0,
+        cachedPromptTokens: 0,
+        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        keySource, keyFallback,
+      },
+    };
+  }
+
+  // ─── Decisioni (classificatori) ───────────────────────────────────────────
+  // Un classificatore non scrive: a ogni domanda chiusa di `questions` (per nome) risponde con una probabilità,
+  // dopo aver letto `state`. Le risposte tornano per nome in `answers`, tali e quali; il costo lo dice il router.
+  // `retryAfterMs` sull'errore è l'attesa chiesta da un 429, per chi rimette la richiesta in coda.
+  async function decisions({ apiKey, model, state, questions, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
+    const body = { model, state, questions };
+    const pb = providerBlock(providerRouting, model);
+    if (pb) body.provider = pb;
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(DECISIONS_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
+    if (!res.ok) {
+      const err = await httpError(res);
+      const attesa = Number(res.headers && typeof res.headers.get === 'function' ? res.headers.get('retry-after') : NaN);
+      if (Number.isFinite(attesa) && attesa >= 0) err.retryAfterMs = attesa * 1000;
+      throw err;
+    }
+    const data = (await res.json()) || {};
+    const usage = data.usage || {};
+    const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    return {
+      answers: data.answers && typeof data.answers === 'object' ? data.answers : {},
+      model: typeof data.model === 'string' && data.model ? data.model : model,
+      servedBy: extractServedBy(data),
+      keyUsed, keyFallback,
+      usage: {
+        promptTokens: num(usage.input_tokens != null ? usage.input_tokens : usage.prompt_tokens),
+        completionTokens: num(usage.output_tokens != null ? usage.output_tokens : usage.completion_tokens),
         cachedPromptTokens: 0,
         costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
         keySource, keyFallback,
@@ -744,9 +921,10 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
-    modelHosts, forgetModelHosts, forgetReasoningRefusals,
-    createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
+    modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals,
+    createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
+    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
+    GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -109,10 +109,12 @@ test('l\'aggancio dei test della home non cambia forma', () => {
   // Gli spec della chat (filo-action-levels, filo-open-background-tab,
   // dashboard-command, audit-notes-visibility…) disegnano azioni da qui senza
   // pilotare l'LLM: è la superficie che la divisione doveva lasciare identica.
+  // `ricompenseAvvio` la aspetta feedback-resolved-reward al posto di un tempo fisso (#1212);
+  // `allarmeOwnerChiesto` wallet-owner-conto, prima di far diventare owner chi c'è (#820).
   const hook = dashJs.match(/window\.__filoDashActions = \{([\s\S]*?)\};/)?.[1];
   assert.ok(hook, 'non trovo window.__filoDashActions in dashboard.js');
   const chiavi = [...hook.matchAll(/^\s*(\w+)[,:]/gm)].map((m) => m[1]).sort();
-  assert.deepEqual(chiavi, ['applyCommandCwd', 'getCwd', 'refreshAccountControl', 'renderActions'],
+  assert.deepEqual(chiavi, ['allarmeOwnerChiesto', 'applyCommandCwd', 'getCwd', 'refreshAccountControl', 'renderActions', 'ricompenseAvvio'],
     'la superficie dell\'aggancio è cambiata: gli spec che la usano si romperebbero tutti insieme');
 });
 

@@ -87,12 +87,12 @@
   // una versione rilasciata), 'archived' Archiviati.
   const TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
-    local: 'Nessun lavoro locale.',
+    local: 'Nessun lavoro server.',
     waiting: 'Nessun feedback aspetta un altro.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
@@ -802,6 +802,12 @@
       // esposti alle pagine — vedi SECURITY.md §3).
       const r = await sendToMain({ type: 'feedback_update', id, ...payload });
       if (!r || r.ok === false) throw new Error(r?.error || 'aggiornamento rifiutato');
+      // Il sì come lavoro locale, dato leggendo il testo, è anche fiducia (#1148, come nella gemella): la scrive il server.
+      if (payload.localApproval === true && item.fiducia !== 'fidato') {
+        const f = await sendToMain({ type: (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna', feedbackId: id }).catch((err) => ({ ok: false, error: err?.message }));
+        if (f && f.ok) item.fiducia = 'fidato';
+        else alert(`Nei Lavori server, ma non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}. Alla fusione ti chiederà il via libera.`);
+      }
       return true;
     } catch (e) {
       Object.assign(item, prev);
@@ -820,7 +826,7 @@
   // dashboard di gestione legge la stessa tabella, quindi sulla stessa
   // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
   // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
@@ -2265,6 +2271,8 @@
     pollNow() { return live ? live.giro({ force: true }) : Promise.resolve({ changed: 0 }); },
     liveMessage(m) { return live ? live.applicaEsito(m) : Promise.resolve({ changed: 0 }); },
     isLiveOn() { return !!(live && live.acceso()); },
+    // Quello che la pagina sa dal main: gli spec aspettano questo invece di un tempo fisso (#1212).
+    inVista() { return !!(live && live.inVista()); },
     liveArrivate() { return live ? Array.from(live.arrivate) : []; },
     caricaFusioni: (gia) => caricaFusioni(gia),
     fusioni: () => fusioni,

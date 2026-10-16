@@ -4,7 +4,9 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, utimesSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const Permessi = require('../../src/main/services/permessiPagine.js');
@@ -154,13 +156,17 @@ test('quello che Chrome concede passa, quello che chiede si chiede, quello che F
     assert.deepEqual(chiedi(ses, wc, p), [true], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), true, p);
   }
-  const tipi = { midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi' };
+  const tipi = {
+    midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi',
+    'geolocation-approximate': 'posizione', 'local-network-access': 'rete', 'local-network': 'rete', 'loopback-network': 'rete',
+  };
   for (const [p, tipo] of Object.entries(tipi)) {
     assert.deepEqual(chiedi(ses, wc, p), [], p);
     assert.equal(ses.avvisi.at(-1).dati.tipo, tipo, p);
   }
   assert.equal(ses.controllo(wc, 'idle-detection', 'https://video.example', {}), false, 'chi sa che sei al computer lo sa solo col sì');
-  for (const p of ['display-capture', 'unknown', 'hid', 'serial', 'usb']) {
+  for (const p of ['display-capture', 'unknown', 'hid', 'serial', 'usb', 'captured-surface-control', 'smart-card', 'nfc', 'ar', 'vr',
+    'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync', 'system-wake-lock']) {
     assert.deepEqual(chiedi(ses, wc, p), [false], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), false, p);
   }
@@ -240,8 +246,8 @@ test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una 
     for (const m of union.matchAll(/'([^']+)'/g)) nomi.add(m[1]);
   }
   assert.ok(nomi.size > 15);
-  const regole = new Set([...Object.keys(Permessi.TIPI), ...Permessi.INNOCUI, ...Permessi.NON_DISPONIBILI,
-    ...Permessi.COL_GESTO_SENZA_DOMANDA, 'openExternal']);
+  const regole = new Set([...Object.keys(Permessi.TIPI), ...Object.keys(Permessi.SECONDO_L_ACCESSO), ...Permessi.INNOCUI,
+    ...Permessi.NON_DISPONIBILI, ...Permessi.COL_GESTO_SENZA_DOMANDA, 'openExternal']);
   assert.deepEqual([...nomi].filter((n) => !regole.has(n)), []);
 });
 
@@ -322,6 +328,186 @@ test('le notifiche si leggono «da chiedere» finché l\'utente non decide; il n
   assert.equal(Permessi.statoNotifiche(ses, 'filo://options/'), 'default');
 });
 
+// #737.1 — col blocco dei popup una pagina apre una finestra solo dopo un gesto vero dell'utente, una per gesto.
+test('una finestra la apre solo un gesto vero di adesso, uno per finestra, anche dentro un riquadro', () => {
+  let ora = 1_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/');
+    wc.mainFrame = { parent: null };
+    Permessi.seguiGesti(wc);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessun gesto');
+    wc.emetti('input-event', {}, { type: 'mouseMove' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il puntatore che passa non è un gesto');
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'l\'input visto dal main non sa ancora se è caduto su Filo');
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    ora += 50;
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'la seconda finestra dello stesso clic');
+
+    ora += 300;
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il clic vero nel riquadro di un altro sito');
+
+    ora += 300;
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
+    ora += Permessi.GESTO_MS + 1;
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'un gesto di cinque secondi fa non vale più');
+
+    Permessi.gestoDellaPagina(wc, wc.mainFrame, { key: 'Enter' });
+    wc.emetti('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il gesto non passa alla pagina dove porta');
+  } finally { orologio.mock.restore(); }
+});
+
+// #737.1 giro 2 — il rilascio dello stesso clic o il carattere dello stesso tasto non aprono una seconda finestra.
+test('un gesto apre una finestra sola: la pressione la apre, il rilascio dello stesso clic no', async () => {
+  let ora = 2_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/');
+    wc.mainFrame = { parent: null };
+    Permessi.seguiGesti(wc);
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'alla pressione');
+    ora += 150;
+    wc.emetti('input-event', {}, { type: 'mouseUp' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'al rilascio dello stesso clic');
+
+    ora += 400;
+    wc.emetti('input-event', {}, { type: 'rawKeyDown', key: 'a' });
+    wc.emetti('before-input-event', { defaultPrevented: false }, { type: 'keyDown', key: 'a' });
+    await new Promise((r) => setImmediate(r));
+    Permessi.gestoDellaPagina(wc, wc.mainFrame, { key: 'a' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'al tasto');
+    ora += 80;
+    wc.emetti('input-event', {}, { type: 'char', key: 'a' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il carattere dello stesso tasto');
+    ora += 20;
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
+    ora += 300;
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'un clic nuovo è un gesto nuovo');
+  } finally { orologio.mock.restore(); }
+});
+
+test('il clic che Filo dà da sé a una pagina non è un gesto, nemmeno riferito dal riquadro; i tasti dell\'utente sì', async () => {
+  let ora = 3_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://blog.example/');
+    wc.mainFrame = { parent: null };
+    Permessi.seguiGesti(wc);
+    Permessi.clicDiFilo(wc);
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    wc.emetti('input-event', {}, { type: 'mouseUp' });
+    ora += 300;
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessuna finestra dal clic di Filo');
+    Permessi.gestoDellaPagina(wc, wc.mainFrame, { key: 'x' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il tasto premuto intanto dall\'utente');
+    ora += 2000;
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'passato il clic di Filo, il clic dell\'utente torna a valere');
+  } finally { orologio.mock.restore(); }
+});
+
+test('un modificatore da solo o una scorciatoia di Filo non sono un gesto dato alla pagina (#737.1)', async () => {
+  require('../../src/shared/tasti.js');
+  const tasto = (key, mods = {}) => ({ type: 'rawKeyDown', key, control: false, alt: false, shift: false, meta: false, ...mods });
+  for (const k of ['Control', 'Shift', 'Alt', 'Meta', 'Escape']) assert.equal(Permessi.tastoPerLaPagina(tasto(k)), false, k);
+  assert.equal(Permessi.tastoPerLaPagina(tasto('t', { control: true })), false, 'nuova scheda');
+  assert.equal(Permessi.tastoPerLaPagina(tasto('w', { control: true })), false, 'chiudi scheda');
+  assert.equal(Permessi.tastoPerLaPagina(tasto('a')), true, 'una lettera scritta nella pagina');
+  assert.equal(Permessi.tastoPerLaPagina(tasto('Enter')), true);
+  assert.equal(Permessi.tastoPerLaPagina({ type: 'mouseDown' }), true);
+
+  const wc = wcFinto('https://sito.test/');
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, tasto('Control', { control: true }));
+  wc.emetti('before-input-event', { defaultPrevented: false }, { ...tasto('x'), type: 'keyDown' });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il main da solo non dà finestre: lo dice il preload');
+  // Dal preload, con i nomi del DOM: un tasto riservato che arriva alla pagina non è suo.
+  Permessi.gestoDellaPagina(wc, null, { key: 'Control', ctrlKey: true });
+  Permessi.gestoDellaPagina(wc, null, { key: 't', code: 'KeyT', ctrlKey: true });
+  assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessun tasto è della pagina');
+  Permessi.gestoDellaPagina(wc, null, { key: 'x', code: 'KeyX' });
+  assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il tasto scritto nella pagina sì');
+});
+
+test('il riquadro di un altro sito scarta gli stessi tasti della pagina', () => {
+  const preload = readFileSync(new URL('../../src/preload/page-preload.js', import.meta.url), 'utf8');
+  const m = /const SENZA_GESTO = new Set\((\[[^\]]*\])\)/.exec(preload);
+  assert.ok(m, 'la lista nel preload del riquadro');
+  assert.deepEqual(JSON.parse(m[1].replace(/'/g, '"')), [...Permessi.TASTI_SENZA_GESTO]);
+});
+
+// #737.1 giro 3 — il gesto vale per il frame che l'ha ricevuto e i suoi antenati, non per i riquadri di altri siti.
+test('il clic sulla pagina non apre la finestra che chiede un riquadro di un altro sito; il clic nel riquadro sì', () => {
+  let ora = 4_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/articolo');
+    wc.mainFrame = { parent: null, origin: 'https://notizie.example', url: 'https://notizie.example/articolo' };
+    const pubblicita = { parent: wc.mainFrame, origin: 'https://pubblicita.example', url: 'https://pubblicita.example/b' };
+    Permessi.seguiGesti(wc);
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/', policy: 'strict-origin-when-cross-origin' }), false, 'il riquadro non l\'ha avuto');
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/articolo' }), true, 'la pagina sì, una volta');
+
+    ora += 400;
+    Permessi.gestoDellaPagina(wc, pubblicita);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/' }), true, 'il clic dentro il riquadro');
+    ora += 400;
+    Permessi.gestoDellaPagina(wc, pubblicita);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/' }), true, 'come in Chromium il gesto sale alla pagina che lo contiene');
+
+    ora += 400;
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    ora += 20;
+    Permessi.gestoDellaPagina(wc, pubblicita);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/' }), true, 'lo stesso clic visto da tutti e due è un gesto solo, del riquadro');
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/' }), false, 'e apre una finestra sola');
+
+    ora += 400;
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: '' }), true, 'chi nasconde da dove chiede resta «la scheda»');
+  } finally { orologio.mock.restore(); }
+});
+
+test('il gesto dato all\'interfaccia di Filo non apre finestre alla pagina; l\'apertura scelta dall\'utente passa una volta, anche a gesto speso', () => {
+  let ora = 1_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  const wc = wcFinto('https://sito.example/');
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'la pagina che chiede prima che il preload dica di chi è il clic');
+  Permessi.gestoDiFilo(wc);
+  wc.emetti('input-event', {}, { type: 'mouseUp' });
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'il clic sul menu di Filo non è della pagina');
+
+  Permessi.aperturaScelta(wc, 'https://sito.example/articolo');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/articolo', 'https://sito.example/'), true, 'la voce scelta si apre');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/articolo', 'https://sito.example/'), false, 'una volta sola');
+
+  ora += 1000;
+  Permessi.gestoDellaPagina(wc, null);
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), true, 'la pubblicità spende il clic sul link');
+  Permessi.aperturaScelta(wc, 'https://sito.example/link');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/link', 'https://sito.example/'), true, 'il link cliccato si apre lo stesso');
+
+  ora += 1000;
+  Permessi.gestoDellaPagina(wc, null);
+  Permessi.aperturaScelta(wc, 'https://sito.example/altro');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/altro', 'https://sito.example/'), true);
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'il link spende anche il gesto: niente pubblicità dopo');
+  orologio.mock.restore();
+});
+
 test('un sito usa-e-getta della Privacy buttato all\'uscita dimentica le risposte; una sessione su disco no', () => {
   const effimera = sessioneFinta();
   effimera.isPersistent = () => false;
@@ -339,4 +525,123 @@ test('un sito usa-e-getta della Privacy buttato all\'uscita dimentica le rispost
   const prima = Permessi.scelteRicordate().length;
   Permessi.dimenticaSessione(disco);
   assert.equal(Permessi.scelteRicordate().length, prima);
+});
+
+// #1069 — la cartella scelta per farla leggere non diventa scrivibile senza un sì. Electron manda `fileSystem` per la
+// lettura di una cartella scelta, per requestPermission e per la scrittura su un file aperto; il salvataggio no.
+const cartella = (accesso, filePath = '/home/anna/foto da caricare', isDirectory = true) => ({ fileAccessType: accesso, filePath, isDirectory });
+
+test('leggere la cartella o il file scelti nel selettore passa senza domanda: la scelta è il consenso', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://carica-foto.example/');
+  assert.equal(Permessi.INNOCUI.has('fileSystem'), false);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable')), [true]);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable', '/home/anna/nota.txt', false)), [true]);
+  assert.equal(ses.avvisi.length, 0);
+  assert.equal(ses.controllo(wc, 'fileSystem', 'https://carica-foto.example', cartella('readable')), true, 'il controllo non chiude la lettura');
+  // Da Electron 39 il controllo è lo stato del file: un sì qui scriverebbe senza domanda.
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', cartella('writable')), false);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', {}), false);
+});
+
+test('scrivere nella cartella data da leggere si chiede col nome della cartella; il no resta per il sito, la lettura no', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://carica-foto.example/album');
+  wc.session = ses;
+  const esiti = chiedi(ses, wc, 'fileSystem', cartella('writable'));
+  assert.deepEqual(esiti, [], 'nessuna scrittura prima della risposta');
+  const domanda = ses.avvisi.find((a) => a.evento === 'chiedi').dati;
+  assert.equal(domanda.tipo, 'file');
+  assert.deepEqual(domanda.parti, ['file']);
+  assert.equal(domanda.host, 'carica-foto.example');
+  assert.deepEqual(domanda.oggetto, { nome: 'foto da caricare', percorso: '/home/anna/foto da caricare', cartella: true });
+  Permessi.rispondi(domanda.id, false);
+  assert.deepEqual(esiti, [false]);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/Documenti')), [false], 'il no vale per il sito');
+  assert.equal(ses.avvisi.filter((a) => a.evento === 'chiedi').length, 1);
+  assert.equal(ses.controllo(wc, 'fileSystem', 'https://carica-foto.example', { fileAccessType: 'writable' }), false);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable')), [true], 'leggere resta concesso');
+  assert.deepEqual(Permessi.scelteDi(wc).scelte, [{ parte: 'file', si: false }]);
+  assert.deepEqual(Permessi.dimentica(wc), { tolte: 1, ricarica: false });
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('writable')), [], 'azzerato: si richiede');
+});
+
+test('il sì alla scrittura vale per il sito; due richieste insieme fanno una domanda sola; un altro sito chiede di nuovo', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://editor.example/');
+  const a = chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/progetto'));
+  const b = chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/progetto/nuovo.txt', false));
+  assert.equal(ses.avvisi.filter((x) => x.evento === 'chiedi').length, 1);
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.deepEqual([a, b], [[true], [true]]);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/altro')), [true]);
+  assert.equal(ses.controllo(wc, 'fileSystem', 'https://editor.example', { fileAccessType: 'writable' }), true);
+  assert.deepEqual(chiedi(ses, wcFinto('https://altro.example/'), 'fileSystem', cartella('writable')), []);
+});
+
+test('la scrittura su un file aperto per leggerlo si chiede col nome del file; senza dettagli si chiede lo stesso', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://appunti.example/');
+  chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/nota.txt', false));
+  assert.deepEqual(ses.avvisi.at(-1).dati.oggetto, { nome: 'nota.txt', percorso: '/home/anna/nota.txt', cartella: false });
+  const wc2 = wcFinto('https://vago.example/');
+  assert.deepEqual(chiedi(ses, wc2, 'fileSystem', {}), [], 'un accesso che non dice cos\'è non passa da lettura');
+  assert.deepEqual(ses.avvisi.at(-1).dati.oggetto, { nome: '', percorso: '', cartella: false });
+  assert.deepEqual(chiedi(ses, wcFinto('filo://editor/'), 'fileSystem', cartella('writable')), [true], 'Filo stesso non si chiede');
+});
+
+test('dalla chat la risposta sulla modifica dei file si toglie come le altre', async () => {
+  Permessi._usaDisco({ get: async () => ({}), set: async () => {} });
+  const disco = sessioneFinta();
+  disco.isPersistent = () => true;
+  const wc = wcFinto('https://www.carica-foto.example/');
+  chiedi(disco, wc, 'fileSystem', cartella('writable'));
+  Permessi.rispondi(disco.avvisi.at(-1).dati.id, false);
+  assert.ok(Permessi.righeRicordate().some((r) => /carica-foto\.example · modifica dei file: negato|carica-foto\.example · file: negato/.test(r)));
+  const r = Permessi.togliPerChat('carica-foto.example', 'cartelle');
+  assert.equal(r.tolte.length, 1);
+  assert.deepEqual(chiedi(disco, wc, 'fileSystem', cartella('writable')), [], 'tolta: si richiede');
+});
+
+// Electron 39+ non manda più la richiesta di scrittura su una maniglia che il sito ha già: la fa partire la pagina.
+test('la pagina chiede di scrivere sulla cartella appena controllata: dopo un gesto vero, col suo nome, e il sì apre il controllo', async () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://carica-foto.example/album');
+  wc.session = ses;
+  Permessi.seguiGesti(wc);
+  assert.equal(await Permessi.chiediScrittura(wc), null, 'nessun file controllato: niente domanda');
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', cartella('writable')), false);
+  assert.equal(await Permessi.chiediScrittura(wc), null, 'senza un gesto vero niente domanda');
+  assert.equal(ses.avvisi.length, 0);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  const esito = Permessi.chiediScrittura(wc);
+  const domanda = ses.avvisi.find((a) => a.evento === 'chiedi').dati;
+  assert.deepEqual(domanda.oggetto, { nome: 'foto da caricare', percorso: '/home/anna/foto da caricare', cartella: true });
+  Permessi.rispondi(domanda.id, true);
+  assert.equal(await esito, true);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', cartella('writable')), true);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://altro.example/', cartella('writable')), false, 'il sì vale per quel sito');
+});
+
+test('il file scelto in «Salva con nome» si scrive senza domanda, anche dopo un no; un file con dentro qualcosa no', (t) => {
+  const dir = cartellaTemporanea('filo-test-salva-');
+  t.after(() => togliCartella(dir));
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://editor.example/');
+  chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/progetto'));
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, false);
+  const salvato = join(dir, 'disegno.svg');
+  writeFileSync(salvato, '');
+  const pieno = join(dir, 'nota.txt');
+  writeFileSync(pieno, 'testo');
+  const vecchio = join(dir, 'vuoto.txt');
+  writeFileSync(vecchio, '');
+  utimesSync(vecchio, new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
+  const controlla = (p) => ses.controllo(null, 'fileSystem', 'https://editor.example/', cartella('writable', p, false));
+  assert.equal(controlla(salvato), true);
+  writeFileSync(salvato, '<svg/>');
+  assert.equal(controlla(salvato), true, 'resta scrivibile dopo la prima scrittura');
+  assert.equal(controlla(pieno), false);
+  assert.equal(controlla(vecchio), false);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://editor.example/', cartella('writable', dir, true)), false, 'una cartella non è un salvataggio');
 });

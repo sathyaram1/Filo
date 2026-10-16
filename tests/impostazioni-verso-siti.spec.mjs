@@ -148,9 +148,10 @@ test('a un sito non arriva l\'intervista di benvenuto, e da un sito non si riscr
       const tutto = await chrome.storage.local.get(null);
       // …e quelle che fa davvero continuano a funzionare.
       const dettatura = await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { models: { transcribe_audio: 'whisper' } } });
-      await chrome.storage.local.set({ sn_feedback_draft_text: 'bozza-589' });
-      const bozza = await chrome.storage.local.get(['sn_feedback_draft_text']);
-      return JSON.stringify({ proxy, tetto, letta, chiaviTutto: Object.keys(tutto), dettatura: dettatura && dettatura.ok, bozza: bozza.sn_feedback_draft_text });
+      const chiave = 'sn_feedback_draft_text@' + location.origin;
+      await chrome.storage.local.set({ [chiave]: 'bozza-589' });
+      const bozza = await chrome.storage.local.get([chiave]);
+      return JSON.stringify({ proxy, tetto, letta, chiaviTutto: Object.keys(tutto), dettatura: dettatura && dettatura.ok, bozza: bozza[chiave] });
     })()
   `));
   expect(esiti.proxy?.ok).toBe(false);

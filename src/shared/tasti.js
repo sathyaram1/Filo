@@ -35,8 +35,8 @@
 //
 // QUELLO CHE UNA PAGINA NON PUÒ AVERE
 //   `riservato()` dice se una combinazione arriva mai a una pagina. Serve a chi
-//   fa scegliere una scorciatoia all'utente (le scorciatoie dei moduli
-//   dell'Editor): senza, la scorciatoia si salva, sembra valida e non parte mai
+//   fa scegliere una scorciatoia all'utente (i moduli dell'Editor, le quattro
+//   azioni di Filo): senza, la scorciatoia si salva, sembra valida e non parte mai
 //   — su Mac perché la barra dei menu la intercetta prima, ovunque perché è un
 //   tasto che Filo si tiene per sé.
 
@@ -268,6 +268,21 @@
     return null;
   }
 
+  // L'altra metà della convenzione del Mac: Cmd+freccia. Dentro un campo di
+  // testo quel tasto porta il cursore a inizio o fine riga, quindi naviga solo
+  // se la pagina non l'ha usata e non ci si scrive: lo dice la pagina stessa
+  // (src/preload/cmd-freccia.js). Per questo è una funzione a parte e l'etichetta resta Cmd+[.
+  function comandoNavigazioneFuoriDalCampo(ev, esplicita) {
+    if (!ev || !suMac(esplicita)) return null;
+    if (modificatore(ev, 'shift')) return null;
+    if (!(modificatore(ev, 'meta') && !modificatore(ev, 'ctrl') && !modificatore(ev, 'alt'))) return null;
+    const code = String(ev.code || '');
+    const key = String(ev.key || '');
+    if (code === 'ArrowLeft' || key === 'ArrowLeft') return 'indietro';
+    if (code === 'ArrowRight' || key === 'ArrowRight') return 'avanti';
+    return null;
+  }
+
   // ── La barra laterale ─────────────────────────────────────────────────────
   // Ctrl+Shift+B (Cmd+Shift+B su Mac), non Ctrl+B: quello è il grassetto di ogni
   // editor, Filo compreso. Tasto fisico prima del carattere, come sopra.
@@ -352,49 +367,66 @@
   }
 
   // Scritti in forma canonica (Windows): `riservato` confronta per forma, e
-  // Cmd vale Ctrl, quindi valgono anche scritti col tasto del Mac.
+  // Cmd vale Ctrl, quindi valgono anche scritti col tasto del Mac. Accanto a
+  // ognuno quello che fa: lo legge chi si vede rifiutare la combinazione.
   const PRESI_OVUNQUE = [
-    // La shell del browser se li prende prima della pagina (src/main/tabs.js).
-    'Ctrl+T', 'Ctrl+W', 'Ctrl+L', 'Ctrl+R',
+    // La shell del browser se li prende prima della pagina, con Shift o senza (src/main/tabs.js, #545.5).
+    ['Ctrl+T', 'apre una scheda nuova'], ['Ctrl+Shift+T', 'apre una scheda nuova'],
+    ['Ctrl+W', 'chiude la scheda'], ['Ctrl+Shift+W', 'chiude la scheda'],
+    ['Ctrl+L', 'porta alla home per scrivere un indirizzo'], ['Ctrl+Shift+L', 'porta alla home per scrivere un indirizzo'],
+    ['Ctrl+R', 'ricarica la pagina'], ['Ctrl+Shift+R', 'ricarica la pagina'],
     // Indietro e avanti: Alt+freccia qui, Cmd+[ e Cmd+] su Mac (la riscrittura
     // la fa `etichetta`, e con lei il fatto che su Mac Alt+freccia resti libera
     // per il movimento del cursore).
-    'Alt+\u2190', 'Alt+\u2192',
+    ['Alt+\u2190', 'torna alla pagina precedente'], ['Alt+\u2192', 'va alla pagina successiva'],
     // La barra laterale (src/main/barraLaterale.js), da qualunque vista abbia il fuoco.
-    ACCEL_BARRA,
+    [ACCEL_BARRA, 'apre e chiude la barra laterale'],
   ];
   const PRESI_SU_MAC = [
     // Le voci della barra dei menu (src/main/menu.js), anche col tasto che un role di Electron
     // si porta da sé: su Mac «Incolla senza formato» è Cmd+Alt+Shift+V, il menu Aiuto Cmd+?.
-    'Ctrl+Z', 'Ctrl+Shift+Z',
-    'Ctrl+Plus', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
-    'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Alt+Shift+V', 'Ctrl+A',
-    'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H', 'Ctrl+?',
+    ['Ctrl+Z', 'annulla'], ['Ctrl+Shift+Z', 'ripete'],
+    ['Ctrl+Plus', 'ingrandisce la pagina'], ['Ctrl+=', 'ingrandisce la pagina'],
+    ['Ctrl+-', 'rimpicciolisce la pagina'], ['Ctrl+0', 'riporta la pagina al 100%'],
+    ['Ctrl+X', 'taglia'], ['Ctrl+C', 'copia'], ['Ctrl+V', 'incolla'],
+    ['Ctrl+Alt+Shift+V', 'incolla senza formato'], ['Ctrl+A', 'seleziona tutto'],
+    ['Ctrl+Q', 'chiude Filo'], ['Ctrl+M', 'riduce a icona la finestra'], ['Ctrl+H', 'nasconde Filo'],
+    ['Ctrl+Alt+H', 'nasconde le altre app'], ['Ctrl+?', 'apre il menu Aiuto'],
+    // Cmd+freccia: indietro e avanti fuori dai campi di testo (`comandoNavigazioneFuoriDalCampo`).
+    ['Ctrl+\u2190', 'torna alla pagina precedente'], ['Ctrl+\u2192', 'va alla pagina successiva'],
   ];
-  // Spiega, Traduci, Salva, Aiuto (src/main/shortcuts.js): con Filo davanti se
-  // li prende lui prima della pagina.
-  const DI_FILO = ['Alt+E', 'Alt+T', 'Alt+S', 'Alt+H'];
 
-  // Tutte le combinazioni che su questo sistema non raggiungono una pagina,
-  // nella forma con cui l'utente le vedrebbe scritte.
-  function tastiRiservati(esplicita) {
-    const mac = suMac(esplicita);
+  // Le combinazioni che su questo sistema non raggiungono una pagina, nella forma
+  // con cui l'utente le vedrebbe scritte, con quello che fanno. `senzaFilo`: senza
+  // le quattro azioni di Filo, che chi ne sceglie una confronta da sé.
+  function presi(esplicita, { senzaFilo = false } = {}) {
     const lista = [
       ...PRESI_OVUNQUE,
-      ...(mac ? PRESI_SU_MAC : []),
-      ...DI_FILO.map((g) => etichetta(g, esplicita)),
+      ...(suMac(esplicita) ? PRESI_SU_MAC : []),
       // Il salto di scheda: Alt+cifra qui, Cmd+cifra su Mac.
-      ...'0123456789'.split('').map((d) => etichetta(`Alt+${d}`, esplicita)),
-    ];
-    // Su Mac le voci canoniche vanno mostrate col nome del Mac.
-    return [...new Set(lista.map((a) => etichetta(a, esplicita)))];
+      ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
+    ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
+    if (!senzaFilo) {
+      for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
+    }
+    return lista;
+  }
+
+  function tastiRiservati(esplicita) {
+    return [...new Set(presi(esplicita).map(([a]) => a))];
+  }
+
+  // Quello che fa la combinazione che Filo si prende prima della pagina, o ''.
+  function chiLaPrende(accel, esplicita, opzioni) {
+    const f = forma(accel);
+    if (!f) return '';
+    const preso = presi(esplicita, opzioni).find(([a]) => forma(a) === f);
+    return preso ? preso[1] : '';
   }
 
   // La combinazione arriva mai a una pagina su questo sistema?
   function riservato(accel, esplicita) {
-    const f = forma(accel);
-    if (!f) return false;
-    return tastiRiservati(esplicita).some((a) => forma(a) === f);
+    return !!chiLaPrende(accel, esplicita);
   }
 
   // ── Una scorciatoia scelta dall'utente ─────────────────────────────────────
@@ -509,13 +541,283 @@
     return lista.some((a) => forma(a) === f);
   }
 
+  // ── Una scorciatoia scelta dall'utente: perché non partirebbe ─────────────
+  // La regola comune a chi fa scegliere un tasto (i moduli dell'Editor, le quattro
+  // azioni di Filo): chi la usa aggiunge solo i tasti suoi. Torna { tipo, … } o null.
+  function rifiutoDiForma(testo, esplicita) {
+    const ignoto = pezzoSconosciuto(testo);
+    if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
+    const conReale = testo.split(/[+\s-]+/).some((p) => ['ctrl', 'alt'].includes(tipoModificatore(p)));
+    if (conReale && soloModificatori(testo)) {
+      return { tipo: 'senzaTasto', nome: etichettaScritta(testo.replace(/[+\s-]+$/, ''), esplicita) };
+    }
+    // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive (Shift da solo scrive la maiuscola).
+    const p = pressioneScritta(testo);
+    if (!p || !(p.ctrlKey || p.metaKey || p.altKey) || tipoModificatore(p.key)) return { tipo: 'senzaModificatore' };
+    if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
+    return null;
+  }
+
+  // Tasti che Filo ascolta nelle chat di ogni pagina, sue o no: arrivano alla pagina, ma una scorciatoia lì sopra ne perde una delle due.
+  const USATI_NELLE_CHAT = [['Ctrl+Shift+Spazio', 'apre il microfono delle chat']];
+
+  function rifiutoScritta(sc, esplicita, opzioni) {
+    const testo = String(sc == null ? '' : sc).trim();
+    if (!testo) return null;
+    const r = rifiutoDiForma(testo, esplicita);
+    if (r) return r;
+    const nome = etichettaScritta(testo, esplicita);
+    if (delSistema(testo, esplicita)) return { tipo: 'sistema', nome };
+    const f = forma(testo);
+    const cosa = chiLaPrende(testo, esplicita, opzioni) || (USATI_NELLE_CHAT.find(([x]) => forma(x) === f) || [])[1];
+    if (cosa) return { tipo: 'presa', nome, cosa };
+    // Dopo i tasti presi: la pressione che il nome descrive non è quella vera.
+    const cambia = modificatoreCheCambiaSimbolo(testo, esplicita);
+    if (cambia) return { tipo: 'simbolo', nome, modificatore: cambia };
+    // AltGr su Windows è Ctrl+Alt: con la E scrive €, con la Q @ su molte tastiere.
+    const mods = f.slice(0, f.indexOf('|'));
+    if (piattaforma(esplicita) === 'win32' && mods.includes('c') && mods.includes('a') && [...f.slice(f.indexOf('|') + 1)].length === 1) {
+      return { tipo: 'altgr', nome };
+    }
+    return null;
+  }
+
+  // ── Le quattro azioni di Filo ─────────────────────────────────────────────
+  // Spiega, Traduci, Salva per dopo e Aiuto: di serie Alt+lettera, e l'utente le
+  // cambia (settings.scorciatoie, #842). Le ascolta src/main/shortcuts.js; ogni
+  // contesto che legge le impostazioni passa la scelta a `usaScorciatoieFilo`.
+  // Regole: tests/unit/scorciatoieFilo.test.mjs.
+  const AZIONI_FILO = Object.freeze([
+    Object.freeze({ id: 'explain-selection', nome: 'Spiega', serie: 'Alt+E' }),
+    Object.freeze({ id: 'translate-selection', nome: 'Traduci', serie: 'Alt+T' }),
+    Object.freeze({ id: 'save-for-later', nome: 'Salva per dopo', serie: 'Alt+S' }),
+    Object.freeze({ id: 'open-help-sidebar', nome: 'Aiuto', serie: 'Alt+H' }),
+  ]);
+
+  // Tasti che Filo usa dentro le sue pagine e in ogni campo di testo: arrivano alla
+  // pagina (non sono `riservato`), ma un'azione di Filo li prenderebbe prima di lei, ovunque.
+  const USATI_NELLE_PAGINE = [
+    ['Ctrl+Z', 'annulla'], ['Ctrl+Y', 'ripete'], ['Ctrl+Shift+Z', 'ripete'],
+    ['Ctrl+X', 'taglia'], ['Ctrl+C', 'copia'], ['Ctrl+V', 'incolla'],
+    ['Ctrl+Shift+V', 'incolla senza formattazione'], ['Ctrl+A', 'seleziona tutto'],
+    ['Ctrl+B', 'mette il grassetto'], ['Ctrl+I', 'mette il corsivo'], ['Ctrl+U', 'sottolinea'],
+    ['Ctrl+S', 'salva il documento nell\'Editor'], ['Ctrl+F', 'porta alla ricerca dell\'Editor'],
+    ['Ctrl+\\', 'mostra e nasconde la barra laterale dell\'Editor'],
+    ['Ctrl+Plus', 'ingrandisce la pagina'], ['Ctrl+-', 'rimpicciolisce la pagina'],
+    ['Ctrl+_', 'rimpicciolisce la pagina'], ['Ctrl+0', 'riporta la pagina al 100%'],
+  ];
+
+  // I nomi con cui Filo SALVA un tasto: italiani, e riletti da `forma` come gli altri.
+  const NOMI_TASTO = {
+    space: 'Spazio', enter: 'Invio', escape: 'Esc', tab: 'Tab', backspace: 'Backspace', delete: 'Canc',
+    insert: 'Ins', home: 'Inizio', end: 'Fine', pageup: 'PagSu', pagedown: 'PagGi\u00f9',
+    contextmenu: 'Menu', pause: 'Pausa', printscreen: 'Stamp', '+': 'Plus',
+  };
+  function daForma(f) {
+    if (!f) return '';
+    const mods = f.slice(0, f.indexOf('|'));
+    const t = f.slice(f.indexOf('|') + 1);
+    const nome = NOMI_TASTO[t] || (/^[a-z]$|^f\d+$/.test(t) ? t.toUpperCase() : t);
+    return [mods.includes('c') && 'Ctrl', mods.includes('a') && 'Alt', mods.includes('s') && 'Shift', nome]
+      .filter(Boolean).join('+');
+  }
+
+  let sceltaFilo = {};
+
+  // La scelta salvata (settings.scorciatoie): una voce vuota o illeggibile vale il tasto di serie.
+  function usaScorciatoieFilo(mappa) {
+    const nuova = {};
+    for (const a of AZIONI_FILO) {
+      const v = mappa && typeof mappa === 'object' ? mappa[a.id] : null;
+      if (typeof v !== 'string' || v.length > 80 || !tastoRiconosciuto(v) || rifiutoDiForma(v.trim())) continue;
+      nuova[a.id] = daForma(forma(v));
+    }
+    sceltaFilo = nuova;
+  }
+
+  function scorciatoiaFilo(id) {
+    const a = AZIONI_FILO.find((x) => x.id === id);
+    return a ? (sceltaFilo[id] || a.serie) : '';
+  }
+
+  // Il nome di una scorciatoia di Filo sulla tastiera di chi legge: i tasti che
+  // `combaciaFilo` aspetta. Su Mac Ctrl si preme Cmd, e Alt senza Ctrl prende il
+  // Control davanti (Opzione da sola scrive gli accenti).
+  function etichettaFilo(accel, esplicita) {
+    const f = forma(accel);
+    if (!f) return String(accel || '');
+    const testo = daForma(f);
+    if (!suMac(esplicita)) return testo;
+    const mods = f.slice(0, f.indexOf('|'));
+    if (mods.includes('a') && !mods.includes('c')) return `Ctrl+${testo}`;
+    return testo.replace(/^Ctrl\+/, 'Cmd+');
+  }
+
+  // Le quattro come le mostra chi le elenca: { id, nome, serie, accel, etichetta, diSerie }.
+  function scorciatoieFilo(esplicita) {
+    return AZIONI_FILO.map((a) => {
+      const accel = scorciatoiaFilo(a.id);
+      return { id: a.id, nome: a.nome, serie: a.serie, accel, etichetta: etichettaFilo(accel, esplicita), diSerie: forma(accel) === forma(a.serie) };
+    });
+  }
+
+  // Quello che si scrive in settings.scorciatoie: '' per il tasto di serie.
+  function valoreDaSalvare(id, accel) {
+    const a = AZIONI_FILO.find((x) => x.id === id);
+    if (!a) return '';
+    const f = forma(accel);
+    return !f || f === forma(a.serie) ? '' : daForma(f);
+  }
+
+  // Il tasto premuto con il nome che `forma` gli dà: lo stesso per chi registra e chi
+  // ascolta. Cifre e lettere dal tasto fisico quando il carattere non dice niente
+  // (Shift+1 è «!», Opzione compone, una tastiera non latina scrive altro).
+  function tastoDaPressione(ev) {
+    const key = String(ev.key || '');
+    const code = String(ev.code || '');
+    let m;
+    if ((m = /^(?:Digit|Numpad)(\d)$/.exec(code))) return m[1];
+    if (key.length === 1 && key > ' ' && key < '\u007f') return tastoCanonico(key.toLowerCase());
+    if ((m = /^Key([A-Z])$/.exec(code))) return m[1].toLowerCase();
+    if (code === 'Space' || key === ' ') return 'space';
+    if ([...key].length === 1 && key > '\u00a0') return key.toLowerCase();
+    const t = tastoCanonico(key);
+    return TASTI_CON_NOME.has(t) || /^f([1-9]|1[0-9]|2[0-4])$/.test(t) || /^[\u2190-\u2193]$/.test(t) ? t : '';
+  }
+
+  const SOLO_MODIFICATORI = new Set(['Control', 'Alt', 'AltGraph', 'Shift', 'Meta', 'OS', 'Super', 'Hyper', 'Fn', 'CapsLock']);
+
+  // La combinazione premuta (evento del DOM) nella forma che Filo salva: { accel },
+  // { attesa } finché sono premuti solo modificatori, { rifiuto } se Filo non la
+  // riconoscerebbe alla pressione.
+  function scorciatoiaDaEvento(ev, esplicita) {
+    if (!ev) return null;
+    if (SOLO_MODIFICATORI.has(String(ev.key || ''))) return { attesa: true };
+    const tasto = tastoDaPressione(ev);
+    if (!tasto) return { rifiuto: { tipo: 'tasto', nome: String(ev.key || ev.code || '?').slice(0, 20) } };
+    const [ctrl, meta, alt] = [!!ev.ctrlKey, !!ev.metaKey, !!ev.altKey];
+    let c;
+    if (suMac(esplicita)) {
+      if (ctrl && meta) return { rifiuto: { tipo: 'macDue' } };
+      if (ctrl && !alt) return { rifiuto: { tipo: 'macControl' } };
+      if (alt && !ctrl && !meta) return { rifiuto: { tipo: 'macOpzione' } };
+      c = meta;
+    } else {
+      if (meta) return { rifiuto: { tipo: 'win' } };
+      c = ctrl;
+    }
+    // Un simbolo si salva col carattere che esce: lo Shift che l'ha fatto è già lì dentro.
+    const s = !!ev.shiftKey && !simbolo(tasto);
+    return { accel: daForma(`${c ? 'c' : ''}${alt ? 'a' : ''}${s ? 's' : ''}|${tasto}`) };
+  }
+
+  // Una combinazione detta a parole («Ctrl+Maiusc+Y») nella forma che Filo salva:
+  // { accel } o { rifiuto }. Su Mac «Ctrl» insieme ad Alt è il tasto Control, il
+  // nome che `etichettaFilo` dà alla forma di serie; da solo vale Cmd, come ovunque.
+  function scorciatoiaDaScritta(scritta, esplicita) {
+    const testo = String(scritta == null ? '' : scritta).trim().replace(/\+\s*\+$/, '+Plus');
+    if (!testo) return null;
+    if (testo.length > 80) return { rifiuto: { tipo: 'tasto', nome: `${testo.slice(0, 20)}…` } };
+    const r = rifiutoDiForma(testo, esplicita);
+    if (r) return { rifiuto: r };
+    const f = forma(testo);
+    const mods = pezzi(testo).slice(0, -1).map((m) => m.toLowerCase());
+    const cmd = mods.some((m) => /^(cmd|command|comando|meta|\u2318)$/.test(m));
+    const control = mods.some((m) => /^(ctrl|control|controllo|\u2303)$/.test(m));
+    if (suMac(esplicita) && control && !cmd && f.slice(0, f.indexOf('|')).includes('a')) return { accel: daForma(f.replace(/^c/, '')) };
+    return { accel: daForma(f) };
+  }
+
+  // Perché `accel` (nella forma salvata) non può diventare la scorciatoia
+  // dell'azione `id`, o null. `altre`: le scorciatoie delle altre azioni da
+  // confrontare (id → combinazione), se non sono quelle in uso.
+  function rifiutoScorciatoiaFilo(id, accel, esplicita, altre) {
+    const r = rifiutoScritta(accel, esplicita, { senzaFilo: true });
+    if (r) return { ...r, nome: etichettaFilo(accel, esplicita) };
+    const f = forma(accel);
+    const nome = etichettaFilo(accel, esplicita);
+    const di = (x) => (altre && typeof altre[x] === 'string' ? altre[x] : scorciatoiaFilo(x));
+    const altra = AZIONI_FILO.find((a) => a.id !== id && forma(di(a.id)) === f);
+    if (altra) return { tipo: 'filo', nome, azione: altra.nome };
+    const usata = [...USATI_NELLE_PAGINE, ...moduliPresi].find(([x]) => forma(x) === f);
+    if (usata) return { tipo: 'presa', nome, cosa: usata[1] };
+    return null;
+  }
+
+  // Le combinazioni date ai moduli dell'Editor, in tutti i documenti: le quattro le prenderebbero prima del modulo.
+  // Chi controlla una delle quattro passa qui la collezione dell'Editor (filo.editor.collection) e i suoi cambi.
+  let moduliPresi = [];
+  function usaScorciatoieModuli(collezione) {
+    const lista = [];
+    const files = collezione && Array.isArray(collezione.files) ? collezione.files : [];
+    for (const file of files) {
+      for (const m of (file && Array.isArray(file.modules) ? file.modules : [])) {
+        const sc = m && m.data && typeof m.data.shortcut === 'string' ? m.data.shortcut.trim() : '';
+        if (!sc || sc.length > 80 || !forma(sc)) continue;
+        const titolo = String((file.meta && file.meta.title) || 'Documento senza titolo').slice(0, 60);
+        lista.push([sc, `la usa un modulo dell'Editor nel documento «${titolo}»`]);
+      }
+    }
+    moduliPresi = lista;
+  }
+
+  // La frase che l'utente legge per un rifiuto di `rifiutoScorciatoiaFilo` o di `scorciatoiaDa*`.
+  function testoRifiutoFilo(r, esplicita) {
+    if (!r) return '';
+    const ctrl = etichetta('Ctrl', esplicita);
+    const altra = 'scegline un\'altra';
+    switch (r.tipo) {
+      case 'modificatore': return `Non riconosco «${r.nome}» come tasto da tenere premuto: usa ${ctrl}, Alt o Shift.`;
+      case 'senzaTasto': return `Manca il tasto da premere insieme a ${r.nome}.`;
+      case 'senzaModificatore': return `Tieni premuto anche ${ctrl} o Alt, così il tasto non scatta mentre scrivi.`;
+      case 'tasto': return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un tasto come Spazio, Invio, F1.`;
+      case 'sistema': return `${r.nome} se la prende il sistema operativo: ${altra}.`;
+      case 'presa': return `${r.nome} è già in uso (${r.cosa}): ${altra}.`;
+      case 'simbolo': return r.modificatore === 'Shift'
+        ? `Con Shift quel simbolo diventa un altro, quindi ${r.nome} non partirebbe mai: ${altra}.`
+        : `Con ${r.modificatore === 'Alt' ? 'Opzione' : etichetta(r.modificatore, esplicita)} quel simbolo diventa un altro, quindi ${r.nome} non partirebbe mai: ${altra}.`;
+      case 'altgr': return `${r.nome} su Windows è anche AltGr, che scrive caratteri come € e @: ${altra}.`;
+      case 'filo': return `${r.nome} è già la scorciatoia di «${r.azione}»: ${altra}.`;
+      case 'macControl': return 'Su Mac le scorciatoie si fanno con Cmd, oppure con Control e Opzione insieme.';
+      case 'macOpzione': return 'Su Mac Opzione da sola scrive un carattere: tieni premuto anche Cmd o Control.';
+      case 'macDue': return 'Cmd e Control insieme non li uso: tienine premuto uno solo.';
+      case 'win': return 'Il tasto Windows lo usa il sistema: usa Ctrl o Alt.';
+      default: return `Questa combinazione non va bene: ${altra}.`;
+    }
+  }
+
+  // Il tasto premuto (evento del DOM o di before-input-event) è quella scorciatoia
+  // di Filo? Modificatori esatti: AltGr su Windows è Ctrl+Alt, Alt+Shift è un'altra
+  // combinazione, e su Mac valgono i tasti che dice `etichettaFilo`.
+  function combaciaFilo(ev, accel, esplicita) {
+    const f = forma(accel);
+    if (!ev || !f) return false;
+    const mods = f.slice(0, f.indexOf('|'));
+    const tasto = f.slice(f.indexOf('|') + 1);
+    const c = mods.includes('c');
+    const a = mods.includes('a');
+    const s = mods.includes('s');
+    const mac = suMac(esplicita);
+    const vuole = { ctrl: mac ? a && !c : c, alt: a, meta: mac ? c : false };
+    if (['ctrl', 'alt', 'meta'].some((q) => modificatore(ev, q) !== vuole[q])) return false;
+    if (simbolo(tasto) ? s && !modificatore(ev, 'shift') : modificatore(ev, 'shift') !== s) return false;
+    return tastoDaPressione(ev) === tasto;
+  }
+
+  function azioneFiloDaTasto(ev, esplicita) {
+    const a = AZIONI_FILO.find((x) => combaciaFilo(ev, scorciatoiaFilo(x.id), esplicita));
+    return a ? a.id : null;
+  }
+
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
-    comandoNavigazione, etichettaIndietro, etichettaAvanti,
+    comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
     comandoBarra, etichettaBarra, ACCEL_BARRA,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
-    modificatoreCheCambiaSimbolo,
+    modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
+    AZIONI_FILO, usaScorciatoieFilo, usaScorciatoieModuli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
+    scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

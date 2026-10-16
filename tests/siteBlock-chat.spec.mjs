@@ -252,6 +252,36 @@ test('assistente sulla pagina: la pagina che dà il fuoco a «Apri comunque», l
   });
 });
 
+// #592.16: un sito uscito dalla lista nel frattempo «Apri comunque» lo apre subito; lo preme solo l'utente.
+test('assistente sulla pagina: «Apri comunque» premuto dal codice della pagina non fa niente, dall\'utente riporta la notifica', async ({ app, shell, rete, avvisi }) => {
+  test.setTimeout(60_000);
+  await lista(shell, ['blocked.test']);
+  const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
+  const { tab, naviga: apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1>'), 'sito.test');
+  expect(await apri(bersaglio)).toBe(false);
+  const bottone = tab.locator('.sn-sidebar button', { hasText: 'Apri comunque blocked.test' });
+  await expect(bottone).toBeVisible();
+  const notifica = shell.locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  const aSchermo = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
+  await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
+  await aSchermo.first().locator('.shell-notif-close').click();
+  await expect(notifica).toHaveCount(0, { timeout: 3000 });
+
+  await tab.evaluate(([trova]) => {
+    const b = new Function(`return (${trova})()`)();
+    b.focus();
+    b.click();
+    b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, detail: 1 }));
+  }, [bottoneDellaPagina.toString()]);
+  await tab.waitForTimeout(1500);
+  await expect(aSchermo).toHaveCount(0);
+  expect(await suBloccato(app)).toEqual([]);
+
+  await bottone.click();
+  await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
+  expect(await suBloccato(app)).toEqual([]);
+});
+
 test('assistente sulla pagina: la pagina aperta che dopo qualche secondo si sposta da sé sul sito della lista cambia il diario', async ({ app, shell, rete }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);

@@ -105,17 +105,3 @@ test('le quattro scorciatoie scattano col tasto giusto su ogni sistema', () => {
   assert.equal(comandoDaTasto(null, 'win32'), null);
 });
 
-// I tasti premuti nel visore dei PDF vanno agli ascolti della scheda, tranne quelli
-// che la barra dei menu esegue già da sé: su Mac Cmd+W chiuderebbe due schede.
-test('dal visore si inoltra solo quello che la barra dei menu non fa già', () => {
-  const { tastoDellaBarra } = require(join(ROOT, 'src', 'main', 'menu.js'));
-  const k = (key, mods = {}) => ({ key, meta: false, control: false, alt: false, shift: false, ...mods });
-  for (const l of ['w', 't', 'l', 'r']) assert.equal(tastoDellaBarra(k(l, { meta: true }), 'darwin'), true, `Cmd+${l} su Mac`);
-  assert.equal(tastoDellaBarra(k('[', { meta: true }), 'darwin'), true, 'Cmd+[ su Mac');
-  assert.equal(tastoDellaBarra(k('1', { meta: true }), 'darwin'), false, 'Cmd+1 su Mac non è nella barra');
-  assert.equal(tastoDellaBarra(k('s', { control: true, alt: true }), 'darwin'), false, 'Ctrl+Alt+S su Mac');
-  for (const l of ['w', 't', 'l', 'r']) assert.equal(tastoDellaBarra(k(l, { control: true }), 'win32'), false, `Ctrl+${l} su Windows`);
-  assert.equal(tastoDellaBarra(k('ArrowLeft', { alt: true }), 'win32'), false, 'Alt+freccia su Windows');
-  for (const l of ['e', 't', 's', 'h']) assert.equal(tastoDellaBarra(k(l, { alt: true }), 'linux'), false, `Alt+${l} su Linux`);
-  assert.equal(tastoDellaBarra(null, 'win32'), false);
-});

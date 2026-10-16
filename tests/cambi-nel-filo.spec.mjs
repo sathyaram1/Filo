@@ -25,8 +25,6 @@ const homeDi = (app) => trovaPagina(app, (u) => u.startsWith('filo://newtab') &&
 async function configura(app, extra = {}) {
   await app.evaluate(async (_e, ex) => {
     const C = globalThis.SN_CONST;
-    // L'intervista di benvenuto ha una chat sua: qui serve la chat di tutti i giorni.
-    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -534,5 +532,28 @@ test('N — il clic sul segno apre e richiude la pastiglia; da tastiera il fuoco
   await expect(pop.locator('.dash-cambi-annulla')).toBeFocused();
   await page.waitForTimeout(900);
   await expect(pop).toHaveCSS('opacity', '1');
+  await ripristina(app);
+});
+
+test('O — tema e accento chiesti com\'erano già: le righe lo dicono coi nomi delle Preferenze, mai «chiave = valore» (#557)', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app, { theme: 'dark', themeTokens: { accent: '#3a7d44' } });
+  await modelloFinto(app, [
+    {
+      toolCalls: [
+        { id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' },
+        { id: 't2', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"accent","valore":"#3a7d44"}' },
+      ],
+    },
+    { text: 'Era già così.' },
+  ]);
+  await scrivi(page, 'tema scuro e accento verde', 'Era già così.');
+  await page.locator('.dash-activity-head').click();
+  await expect(page.locator('.dash-activity-row', { hasText: 'Già così · Tema → Scuro' })).toHaveCount(1);
+  await expect(page.locator('.dash-activity-row', { hasText: 'Aspetto già così · Colore d\'accento: #3a7d44' })).toHaveCount(1);
+  await expect(page.locator('.dash-activity-row', { hasText: '=' })).toHaveCount(0);
+  await expect(page.locator('.dash-activity-row', { hasText: 'accent:' })).toHaveCount(0);
   await ripristina(app);
 });

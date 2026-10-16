@@ -74,21 +74,20 @@ test('cronologia AI: ricerca/filtro senza risultati non dicono "nessuna interazi
   await expect(empty).toBeVisible();
   await expect(empty).toHaveText('Nessun risultato per la ricerca.');
 
-  // Il menu "filtra per tipo" offre SOLO i tipi realmente presenti in
-  // cronologia: con la sola voce "explain" NON esiste un'opzione "help", quindi
-  // l'utente non può nemmeno filtrare fino a svuotare la lista mostrando un
-  // messaggio fuorviante. È proprio questa la garanzia contro lo stato vuoto
-  // ingannevole del filtro.
+  // Il menu "filtra per tipo" offre SOLO i nomi dei tipi presenti (le opzioni
+  // sono per etichetta, #481): con la sola voce "explain" non c'è il nome di
+  // "help", quindi nessun filtro può svuotare la lista col messaggio sbagliato.
   await history.fill('#search', '');
-  const filterValues = await history.locator('#filter option').evaluateAll(
-    (opts) => opts.map((o) => o.value),
+  const [spiega, aiuto] = await history.evaluate(
+    () => ['explain', 'help'].map((a) => window.SN_CONST.actionLabel(a)),
   );
-  expect(filterValues).toContain('explain');
-  expect(filterValues).not.toContain('help');
+  const filterLabels = (await history.locator('#filter option').allTextContents()).slice(1);
+  expect(filterLabels).toEqual([spiega]);
+  expect(filterLabels).not.toContain(aiuto);
 
   // Filtrando per un tipo che ESISTE, la sua voce resta visibile (nessun falso
   // "cronologia vuota").
-  await history.selectOption('#filter', 'explain');
+  await history.selectOption('#filter', { label: spiega });
   await expect(history.locator('.sn-history-item')).toHaveCount(1);
   await expect(empty).toBeHidden();
 

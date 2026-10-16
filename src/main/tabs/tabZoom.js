@@ -4,6 +4,7 @@
 
 const { clipboard } = require('electron');
 require('../../shared/zoomPagina');
+const { staRegistrandoTasti } = require('../shortcuts');
 
 function installZoom(wc) {
   const Z = globalThis.SN_ZOOM;
@@ -14,7 +15,7 @@ function installZoom(wc) {
   // Col campo della percentuale aperto, anche le cifre: il fuoco non conta.
   let campo = false;
   wc.on('before-input-event', (event, input) => {
-    if (input.type !== 'keyDown') return;
+    if (input.type !== 'keyDown' || staRegistrandoTasti(wc)) return;
     const verso = Z.tastoZoom(input);
     if (verso) {
       event.preventDefault();
@@ -25,9 +26,8 @@ function installZoom(wc) {
     if (!perCampo) return;
     event.preventDefault();
     if (perCampo === 'incolla') {
-      let testo = '';
-      try { testo = String(clipboard.readText() || ''); } catch (_) {}
-      try { wc.send('filo:zoom-campo-tasto', { incolla: testo }); } catch (_) {}
+      Promise.resolve().then(() => clipboard.readText()).then((t) => String(t || ''), () => '')
+        .then((testo) => { try { wc.send('filo:zoom-campo-tasto', { incolla: testo }); } catch (_) {} });
       return;
     }
     const key = String(input.key || '');

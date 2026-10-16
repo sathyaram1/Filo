@@ -75,6 +75,19 @@ test('conta anche un segreto corto con lettere e cifre, e ciò che è letto nei 
   assert.equal(livello('https://x.example/?i=IT60X0542811101000000123456', storia), 2);
 });
 
+test('#778 — VEDI_SCHERMO seguito da un NAVIGA che contiene un pezzo del testo letto: costo 2', () => {
+  const testo = 'Microsoft Word\nImpossibile aprire Bilancio_riservato_2026.xlsx: accesso negato.\nCodice pratica 7QX4-PL92-RTW8-ZZ31';
+  const vista = { type: 'VEDI_SCHERMO', finestra: 'Errore di Word', _output: { finestra: 'Errore di Word', tipo: 'finestra', testo } };
+  const pezzo = 'Impossibile aprire Bilancio_riservato_2026.xlsx: accesso negato';
+  const url = `https://raccolta.example/?d=${encodeURIComponent(pezzo)}`;
+  assert.equal(livello(url, [vista]), 2);
+  assert.equal(livelloRicerca(pezzo, [vista]), 2, 'anche una ricerca che lo porta fuori');
+  // Senza la finestra guardata lo stesso indirizzo resta 1: è quello che il modello ha letto a farlo salire.
+  assert.equal(livello(url, []), 1);
+  // Spenta o in attesa dell'OK non ha letto niente.
+  assert.equal(livello(url, [{ type: 'VEDI_SCHERMO', finestra: 'Word', _output: { spenta: true } }]), 1);
+});
+
 test('link normali dopo un comando: nessun OK in più', () => {
   const ls = cat('Documenti\nScaricati\nMusica\nImmagini\nfoto_vacanze_2025\n');
   for (const url of [
@@ -146,4 +159,45 @@ test('il motivo nel popup non ripete il dato letto', () => {
   const v = E.valutaNaviga(`https://x.example/?d=${encodeURIComponent(FILE.slice(0, 40))}`, { azioni: [cat(FILE)] });
   assert.equal(v.exfil, true);
   assert.doesNotMatch(v.reason, /correcthorse|gestionale/);
+});
+
+// #845 — le pagine di «Aperti per dopo» lette con CERCA_SALVATE (o aperte con APRI_SALVATA): una si riapre tale e
+// quale, come i risultati di una ricerca; i suoi pezzi dentro un altro indirizzo chiedono l'OK.
+test('#845 — una pagina salvata si riapre com\'è, un link che ne porta pezzi altrove chiede l\'OK', () => {
+  const ricetta = 'https://www.cucina.example/ricette/pasta-alla-carbonara-classica-romana-77812';
+  const lago = 'https://campeggi.example/lazio/bolsena-piazzole-sul-lago';
+  const salvate = {
+    type: 'CERCA_SALVATE', cerca: 'ricetta',
+    _output: {
+      cercato: 'ricetta', totale: 2, trovate: 2,
+      pagine: [
+        { id: 'p1', title: 'Pasta alla carbonara classica romana', url: ricetta, categoria: 'Cucina' },
+        { id: 'p2', title: 'Campeggio sul lago di Bolsena: le piazzole', url: lago, categoria: '' },
+      ],
+    },
+  };
+  assert.equal(livello(ricetta, [salvate]), 1, 'la pagina trovata, tale e quale');
+  assert.equal(livello(`${ricetta}#ingredienti`, [salvate]), 1, 'il frammento non cambia la pagina');
+  assert.equal(livello(lago, [salvate]), 1);
+  assert.equal(livello(`https://raccolta.example/?u=${encodeURIComponent(ricetta)}`, [salvate]), 2, 'l\'indirizzo salvato dentro un altro');
+  assert.equal(livello(`https://raccolta.example/p/${encodeURIComponent('Campeggio sul lago di Bolsena')}`, [salvate]), 2, 'un titolo salvato dentro un altro');
+  // Senza la ricerca fra le salvate lo stesso link non porta fuori niente che il modello abbia letto.
+  assert.equal(livello(`https://raccolta.example/?u=${encodeURIComponent(ricetta)}`, []), 1);
+  // I titoli li scrivono i siti: dopo averli letti un blocco opaco chiede l'OK.
+  assert.equal(livello('https://raccolta.example/c?x=Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZg', [salvate]), 2);
+  const aperta = { type: 'APRI_SALVATA', id: 'p1', _output: { aperta: true, tolta: true, id: 'p1', titolo: 'Pasta alla carbonara classica romana', url: ricetta } };
+  assert.equal(livello(ricetta, [aperta]), 1, 'quella appena aperta si riapre');
+  assert.equal(livello(`https://raccolta.example/?u=${encodeURIComponent(ricetta)}`, [aperta]), 2);
+});
+
+test('#845 — gli indirizzi delle pagine salvate non diventano testo di fuori: un codice nel loro indirizzo non le ferma', () => {
+  const ctx = E.contestoDaAzioni([{
+    type: 'CERCA_SALVATE',
+    _output: { cercato: '', totale: 1, trovate: 1, pagine: [{ id: 'p1', title: 'Il mio ordine', url: 'https://negozio.example/ordine?codice=482913', categoria: 'Acquisti' }] },
+  }]);
+  assert.equal(ctx.nonFidato, true);
+  assert.ok(ctx.linkNoti.has('https://negozio.example/ordine?codice=482913'));
+  assert.ok(!ctx.esterni.some((x) => x.testo.includes('482913')), 'l\'indirizzo è fra i testi di fuori');
+  assert.ok(ctx.esterni.some((x) => x.testo.includes('Il mio ordine') && /salvate/.test(x.fonte)));
+  assert.equal(ctx.letto, '', 'le pagine salvate non sono fra i dati letti dal computer: fermerebbero sé stesse');
 });

@@ -9,14 +9,16 @@
 // (#334), e la conferma la mostra la scheda rimasta davanti.
 //
 // Electron e ./services/handlers sono stubati via Module._load, così il test
-// gira in ms senza aprire nessuna finestra.
+// gira in ms senza aprire nessuna finestra. Orologio finto: le ricevute a un
+// millisecondo arrivano prima dei tempi limite anche a macchina carica (#1063).
 
-import { test } from 'node:test';
+import { test, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import Module from 'node:module';
+import { scorri, finoA } from '../helpers/orologio.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -62,6 +64,9 @@ process.on('exit', () => { Module._load = origLoad; });
 globalThis.SN_SAVED_PAGES = { setThumbnail: async (id, thumbnail) => { thumb = { id, thumbnail }; return { id }; } };
 
 const { dispatch, consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
+
+beforeEach(() => mock.timers.enable({ apis: ['setTimeout', 'Date'] }));
+afterEach(() => mock.timers.reset());
 
 // Costruisce una finta finestra con una sola tab attiva.
 function makeWin(tab) {
@@ -111,7 +116,7 @@ test('Alt+S su pagina interna filo:// non salva e non chiude la tab', async () =
   saved = null; closed = null;
   const tab = makeTab({ url: 'filo://newtab/', isInternal: true, title: 'Nuova scheda' });
   dispatch('save-for-later', makeWin(tab));
-  await new Promise((r) => setTimeout(r, 10)); // lascia svolgere l'eventuale promise
+  await scorri(10); // lascia svolgere l'eventuale promise
   assert.equal(saved, null, 'una pagina interna NON deve finire in "Aperti per dopo"');
   assert.equal(closed, null, 'la tab interna NON deve essere chiusa');
   assert.equal(tab.ricevuti.length, 0, 'alla pagina interna non arriva niente');
@@ -121,7 +126,7 @@ test('Alt+S su pagina interna (solo url filo://, isInternal assente) è comunque
   saved = null; closed = null;
   const tab = makeTab({ url: 'filo://history/', isInternal: false });
   dispatch('save-for-later', makeWin(tab));
-  await new Promise((r) => setTimeout(r, 10));
+  await scorri(10);
   assert.equal(saved, null, 'lo schema filo:// da solo basta a bloccare il salvataggio');
   assert.equal(closed, null, 'la tab interna NON deve essere chiusa');
 });
@@ -130,7 +135,7 @@ test('Alt+S su pagina web con Filo dentro: lo fa la pagina, come la voce del men
   saved = null; thumb = null; closed = null;
   const tab = makeTab({ url: 'https://news.example.com/articolo', title: 'Articolo' }, 'presa');
   dispatch('save-for-later', makeWin(tab));
-  await new Promise((r) => setTimeout(r, 20));
+  await scorri(20);
   assert.deepEqual(tab.ricevuti.map((m) => [m.canale, m.payload.command]), [['shortcut:triggered', 'save-for-later']]);
   assert.ok(tab.ricevuti[0].payload.ricevuta, 'la consegna porta la ricevuta da restituire');
   assert.equal(saved, null, 'il main non salva una seconda volta: salva la pagina, con la sua conferma');
@@ -146,7 +151,7 @@ test('Alt+S su pagina web senza Filo: il main salva, allega la miniatura e chiud
   win._filoTabs.tabs.push(makeTab({ id: 'T2' }, 'presa'));
   win._filoTabs.closeTab = (id) => { closed = id; win._filoTabs.activeId = 'T2'; };
   dispatch('save-for-later', win);
-  await new Promise((r) => setTimeout(r, 30));
+  await scorri(30);
   assert.ok(saved, 'una pagina web DEVE essere salvata in "Aperti per dopo"');
   assert.equal(saved.url, 'https://news.example.com/articolo');
   assert.equal(saved.title, 'Articolo');
@@ -163,7 +168,7 @@ test('Alt+S su una pagina che non risponde: la conferma la mostra la scheda rima
   win._filoTabs.tabs.push(davanti);
   win._filoTabs.closeTab = (id) => { closed = id; win._filoTabs.activeId = 'T2'; };
   dispatch('save-for-later', win);
-  await new Promise((r) => setTimeout(r, 30));
+  await scorri(30);
   assert.equal(closed, 'T1');
   assert.deepEqual(davanti.ricevuti.map((m) => [m.canale, m.payload.command, m.payload.context && m.payload.context.entry && m.payload.context.entry.id]),
     [['shortcut:triggered', 'save-for-later-confirm', 'E1']], 'la scheda davanti riceve la conferma della voce appena salvata');
@@ -171,7 +176,7 @@ test('Alt+S su una pagina che non risponde: la conferma la mostra la scheda rima
 
 test('senza risposta dalla pagina la consegna si arrende, e una ricevuta da un\'altra scheda non vale', async () => {
   const muta = makeTab({}, null);
-  assert.equal(await consegnaConRicevuta(muta, 'save-for-later', 20), false);
+  assert.equal(await finoA(consegnaConRicevuta(muta, 'save-for-later', 20), { passo: 1 }), false);
 
   const tab = makeTab({}, null);
   const esito = consegnaConRicevuta(tab, 'save-for-later', 50);
@@ -191,7 +196,7 @@ test('la conferma di ripiego si riprova finché una pagina la prende: la scheda 
     if (nuova.ricevuti.length > 1) setTimeout(() => riceviRicevuta(payload.ricevuta, nuova.id, true), 1);
   };
   const win = makeWin(nuova);
-  const esito = await confermaSullaSchedaDavanti(win, { id: 'E9', category: null }, { tentativoMs: 20, totaleMs: 2000 });
+  const esito = await finoA(confermaSullaSchedaDavanti(win, { id: 'E9', category: null }, { tentativoMs: 20, totaleMs: 2000 }), { passo: 1 });
   assert.equal(esito, true);
   assert.equal(nuova.ricevuti.length, 2, 'riprovata una volta, poi basta');
   assert.deepEqual(nuova.ricevuti.map((m) => [m.payload.command, m.payload.context.entry.id]), [['save-for-later-confirm', 'E9'], ['save-for-later-confirm', 'E9']]);
@@ -203,11 +208,11 @@ test('la conferma di ripiego segue la scheda che l\'utente ha davanti, e si arre
   const win = makeWin(prima);
   win._filoTabs.tabs.push(dopo);
   setTimeout(() => { win._filoTabs.activeId = 'B'; }, 30);
-  assert.equal(await confermaSullaSchedaDavanti(win, { id: 'E7' }, { tentativoMs: 20, totaleMs: 2000 }), true);
+  assert.equal(await finoA(confermaSullaSchedaDavanti(win, { id: 'E7' }, { tentativoMs: 20, totaleMs: 2000 }), { passo: 1 }), true);
   assert.equal(dopo.ricevuti.length, 1);
 
   const muta = makeTab({ id: 'M' }, null);
-  assert.equal(await confermaSullaSchedaDavanti(makeWin(muta), { id: 'E8' }, { tentativoMs: 10, totaleMs: 500 }), false);
+  assert.equal(await finoA(confermaSullaSchedaDavanti(makeWin(muta), { id: 'E8' }, { tentativoMs: 10, totaleMs: 500 }), { passo: 1 }), false);
   assert.ok(muta.ricevuti.length >= 2, 'nel frattempo ha riprovato');
 });
 
@@ -221,13 +226,13 @@ test('le scorciatoie vanno alla finestra di Filo a fuoco (anche l\'incognito), n
   try {
     dispatch('save-for-later', principale);
     dispatch('explain-selection', principale);
-    await new Promise((r) => setTimeout(r, 20));
+    await scorri(20);
     assert.equal(dietro.ricevuti.length, 0, 'alla finestra dietro non arriva niente');
     assert.deepEqual(davanti.ricevuti.map((m) => m.payload.command), ['save-for-later', 'explain-selection']);
     // Una finestra senza schede a fuoco (un menu a comparsa) non conta: resta la finestra di Filo di prima.
     BrowserWindowStub.getFocusedWindow = () => ({ isDestroyed: () => false });
     dispatch('explain-selection', principale);
-    await new Promise((r) => setTimeout(r, 5));
+    await scorri(5);
     assert.equal(dietro.ricevuti.length, 1);
   } finally {
     delete BrowserWindowStub.getFocusedWindow;
@@ -236,11 +241,11 @@ test('le scorciatoie vanno alla finestra di Filo a fuoco (anche l\'incognito), n
 
 test('ogni conferma di ripiego porta un\'etichetta sua, uguale in tutti i tentativi', async () => {
   const muta = makeTab({ id: 'M2' }, null);
-  await confermaSullaSchedaDavanti(makeWin(muta), { id: 'E5' }, { tentativoMs: 10, totaleMs: 200 });
+  await finoA(confermaSullaSchedaDavanti(makeWin(muta), { id: 'E5' }, { tentativoMs: 10, totaleMs: 200 }), { passo: 1 });
   const etichette = new Set(muta.ricevuti.map((m) => m.payload.context.conferma));
   assert.equal(etichette.size, 1, 'la pagina riconosce i tentativi dello stesso salvataggio');
   const altra = makeTab({ id: 'M3' }, null);
-  await confermaSullaSchedaDavanti(makeWin(altra), { id: 'E5' }, { tentativoMs: 10, totaleMs: 50 });
+  await finoA(confermaSullaSchedaDavanti(makeWin(altra), { id: 'E5' }, { tentativoMs: 10, totaleMs: 50 }), { passo: 1 });
   assert.notEqual(altra.ricevuti[0].payload.context.conferma, [...etichette][0], 'un salvataggio nuovo della stessa voce si conferma di nuovo');
 });
 
@@ -252,12 +257,12 @@ test('un secondo Alt+S sulla scheda che aspetta ancora la pagina non avvia un se
   win._filoTabs.closeTab = (id) => { closed = id; chiusure++; };
   dispatch('save-for-later', win);
   dispatch('save-for-later', win);
-  await new Promise((r) => setTimeout(r, 30));
+  await scorri(30);
   assert.equal(tab.ricevuti.filter((m) => m.payload.command === 'save-for-later').length, 1, 'un salvataggio per scheda alla volta');
   assert.equal(chiusure, 1);
   // Finito quello, la stessa scheda (se è ancora lì) si può salvare di nuovo.
   dispatch('save-for-later', win);
-  await new Promise((r) => setTimeout(r, 30));
+  await scorri(30);
   assert.equal(tab.ricevuti.filter((m) => m.payload.command === 'save-for-later').length, 2);
 });
 

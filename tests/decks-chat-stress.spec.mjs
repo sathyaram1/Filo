@@ -72,6 +72,8 @@ async function mockProvider(app) {
     globalThis.__failNext = false;
     globalThis.__trattieni = null;   // se armata, il provider resta "a pensare"
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La home aperta scrive il suo saluto col modello: non è una chiamata della chat dei mazzi.
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       globalThis.__chatCalls.push(messages);
       if (globalThis.__failNext) { globalThis.__failNext = false; throw new Error('provider giù'); }
       // "Mentre il provider pensa" dev'essere un FATTO, non una speranza: con

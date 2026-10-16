@@ -163,7 +163,9 @@ function readFreshMarker(root, now = Date.now()) {
  * fresco, ISO), o '' senza marcatore. Serve al rapporto di fine sessione per
  * contare solo quello che è successo da allora.
  */
-export function readTicketSince(root, { now = Date.now() } = {}) {
+export function readTicketSince(root, { now = Date.now(), ticket = '' } = {}) {
   const marker = readFreshMarker(root, now);
+  // Il marcatore di un altro biglietto (un worker morto prima di dispatch) farebbe ricontare il giro di prima.
+  if (marker && ticket && marker.ticket !== String(ticket).trim()) return '';
   return marker && typeof marker.since === 'string' ? marker.since : '';
 }

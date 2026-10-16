@@ -14,7 +14,7 @@
   box-shadow: var(--sn-shadow);
   padding: 4px 0;
   user-select: none;
-  animation: sn-fade-in 100ms ease-out;
+  animation: sn-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
   backdrop-filter: blur(4px);
 }
 
@@ -439,9 +439,32 @@
   font-size: 16px;
   line-height: 1;
 }
-.sn-menu-history-remove:hover {
+.sn-menu-history-remove:hover:not(:disabled) {
   color: var(--sn-fg);
   background: rgba(var(--sn-accent-rgb), 0.35);
+}
+/* Voce già tolta: resta al suo posto barrata finché il sotto-menu è aperto,
+   così le righe sotto non salgono di una posizione sotto la mano. */
+.sn-menu-history-gone {
+  opacity: 0.45;
+}
+.sn-menu-history-gone .sn-menu-label {
+  text-decoration: line-through;
+}
+.sn-menu-history-gone .sn-menu-history-paste,
+.sn-menu-history-gone .sn-menu-history-remove {
+  cursor: default;
+  pointer-events: none;
+}
+/* Miniatura di un'immagine copiata: due schermate copiate in fila si
+   distinguono guardandole, non leggendo due volte "Immagine". */
+.sn-menu-history-thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 3px;
+  border: 1px solid var(--sn-border);
 }
 .sn-menu-history-clear {
   flex: 0 0 auto;
@@ -495,7 +518,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: sn-fade-in 120ms ease-out;
+  animation: sn-fade-in calc(120ms * var(--sn-motion, 1)) ease-out;
 }
 .sn-editbox {
   background: var(--sn-overlay-bg);
@@ -699,7 +722,7 @@
   font-family: var(--sn-font);
   font-size: 18px;
   transform: scale(1.08);
-  transition: transform 80ms ease-out;
+  transition: transform calc(80ms * var(--sn-motion, 1)) ease-out;
 }
 
 .sn-tooltip {
@@ -718,7 +741,7 @@
   white-space: nowrap;
   max-width: 240px;
   backdrop-filter: blur(4px);
-  animation: sn-fade-in 80ms ease-out;
+  animation: sn-fade-in calc(80ms * var(--sn-motion, 1)) ease-out;
 }
 
 .sn-editbox-original,

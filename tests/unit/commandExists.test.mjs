@@ -17,24 +17,27 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const { commandExists, existenceProbes } = require(
+const { commandExists, existenceProbes, esitoDeiProbe } = require(
   join(__dirname, '..', '..', 'src', 'main', 'services', 'shell.js'),
 );
 
 const SHELL = process.platform === 'win32' ? 'powershell' : undefined;
+// La risposta vera del sistema, non i dieci secondi del prodotto: con la macchina carica non bastano (#1063).
+const SISTEMA = { shell: SHELL, attesaMs: TETTO_ATTESA_MS };
 
 test('riconosce un eseguibile sempre presente (node)', async () => {
-  assert.equal(await commandExists({ shell: SHELL, command: 'node' }), true);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'node' }), true);
 });
 
 test('riconosce uno shim npm (npm) — guard regressione "firebase rosso"', async () => {
   // npm è sempre installato (serve a far girare l'app). Sul vecchio resolver
   // PowerShell via Get-Command tornava false per questo shim: questo assert è
   // proprio ciò che diventa rosso senza il fix.
-  assert.equal(await commandExists({ shell: SHELL, command: 'npm' }), true);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'npm' }), true);
 });
 
 // `where.exe` e Get-Command sono programmi di Windows: fuori da lì il resolver
@@ -58,20 +61,20 @@ test('il probe veloce (where.exe) viene PRIMA di Get-Command — guard "firebase
 
 test('NON riconosce un nome palesemente inventato', async () => {
   assert.equal(
-    await commandExists({ shell: SHELL, command: 'questocomandononesistedavvero_xyz123' }),
+    await commandExists({ ...SISTEMA, command: 'questocomandononesistedavvero_xyz123' }),
     false,
   );
 });
 
 test('input vuoto o solo spazi → non esiste', async () => {
-  assert.equal(await commandExists({ shell: SHELL, command: '' }), false);
-  assert.equal(await commandExists({ shell: SHELL, command: '   ' }), false);
-  assert.equal(await commandExists({ shell: SHELL, command: undefined }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: '' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: '   ' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: undefined }), false);
 });
 
 test('un nome con newline/null (tentativo di iniezione) → non esiste', async () => {
-  assert.equal(await commandExists({ shell: SHELL, command: 'node\necho hacked' }), false);
-  assert.equal(await commandExists({ shell: SHELL, command: 'node\0' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'node\necho hacked' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'node\0' }), false);
 });
 
 test('un token che sembra codice NON viene eseguito (niente RCE nel controllo)', async () => {
@@ -87,8 +90,36 @@ test('un token che sembra codice NON viene eseguito (niente RCE nel controllo)',
   const payload = process.platform === 'win32'
     ? `node;[IO.File]::WriteAllText('${sentinel.replace(/\\/g, '/')}','x')`
     : `node;touch '${sentinel}'`;
-  await commandExists({ shell: SHELL, command: payload });
+  await commandExists({ ...SISTEMA, command: payload });
   const executed = fs.existsSync(sentinel);
   try { fs.unlinkSync(sentinel); } catch (_) { /* ok */ }
   assert.equal(executed, false, 'il controllo di esistenza NON deve eseguire il token');
+});
+
+// #1176 — con la macchina carica il controllo scade, e uno scaduto finiva come «non esiste»: rosso su un comando valido.
+// Qui i probe sono processi veri con un esito noto, così la regola si prova senza dipendere dal carico.
+const esce = (codice) => ({ file: process.execPath, args: ['-e', `process.exit(${codice})`] });
+const restaAppeso = { file: process.execPath, args: ['-e', 'setInterval(() => {}, 1 << 30)'] };
+const nonParte = { file: 'filo-programma-che-non-esiste-1176', args: [] };
+// Il probe appeso lo fa scadere la prova stessa: è il tempo dato al codice, non una guardia contro l'appeso.
+const SCADE_SUBITO_MS = 300;
+
+test('#1176: un probe scaduto non è un «non esiste»', async () => {
+  assert.equal(await esitoDeiProbe([restaAppeso], undefined, SCADE_SUBITO_MS), null);
+});
+
+test('#1176: un probe che non parte non è un «non esiste»', async () => {
+  assert.equal(await esitoDeiProbe([nonParte], undefined, TETTO_ATTESA_MS), null);
+});
+
+test('#1176: il «no» del secondo probe non basta se il primo non ha risposto', async () => {
+  // È il caso di PowerShell: `where.exe` scaduto, poi Get-Command che sbaglia sugli shim npm.
+  assert.equal(await esitoDeiProbe([nonParte, esce(1)], undefined, TETTO_ATTESA_MS), null);
+  assert.equal(await esitoDeiProbe([esce(1), restaAppeso], undefined, SCADE_SUBITO_MS), null);
+});
+
+test('#1176: un probe che conferma basta anche dopo uno incerto, e solo tutti «no» fanno un «non esiste»', async () => {
+  assert.equal(await esitoDeiProbe([nonParte, esce(0)], undefined, TETTO_ATTESA_MS), true);
+  assert.equal(await esitoDeiProbe([esce(1), esce(1)], undefined, TETTO_ATTESA_MS), false);
+  assert.equal(await esitoDeiProbe([esce(2)], undefined, TETTO_ATTESA_MS), false);
 });

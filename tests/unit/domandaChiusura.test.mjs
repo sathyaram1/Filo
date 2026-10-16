@@ -2,6 +2,7 @@
 // domanda/risposta), lo strumento dell'owner (routine-domanda.mjs) e i testi di ruolo.
 // Il server può non avere ancora l'endpoint: allora si chiude comunque (exit 2).
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -18,6 +19,9 @@ const TK = 'bigliettodiprova0123';
 const canale = await import('../../scripts/routine-channel.mjs');
 const owner = await import('../../scripts/routine-domanda.mjs');
 const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
+const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
+
+const { senzaSessione } = await import('../helpers/sessione.mjs');
 
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 const piano = { sleep: async () => {} };
@@ -155,7 +159,7 @@ function fintoServer(status, risposta) {
 
 // spawn ASINCRONO: il server finto vive in questo processo.
 function cli(port, args, stdin = '') {
-  const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+  const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
   return new Promise((risolvi) => {
     const p = spawn(process.execPath, [CANALE, ...args], { env });
     let stdout = ''; let stderr = '';
@@ -323,8 +327,13 @@ test('i testi di ruolo chiedono la domanda, e il comando viene riscritto col per
   const orch = absolutizeRecipe(readFileSync(resolve(ROOT, 'routines', 'roles', 'orchestrator.md'), 'utf8'), '/strumenti', '/progetto');
   assert.ok(orch.includes(`node "${base}/scripts/routine-channel.mjs" domanda`), 'orchestratore: domanda');
   assert.ok(orch.includes(`node "${base}/scripts/routine-channel.mjs" risposta "<parola-d-ordine>" <id> <<'FINE'`), 'orchestratore: risposta');
-  const worker = absolutizeRecipe(readFileSync(resolve(ROOT, 'routines', 'roles', '_contratto-worker.md'), 'utf8'), '/strumenti', '/progetto');
-  assert.ok(worker.includes(`node "${base}/scripts/routine-channel.mjs" domanda --biglietto <biglietto>`), 'worker: domanda');
-  // Prima del rilascio: col biglietto già morto la domanda non si può più chiedere.
-  assert.ok(worker.indexOf('domanda --biglietto') < worker.indexOf('release <biglietto> --role'), 'worker: la domanda viene prima del rilascio');
+  const ruoli = resolve(ROOT, 'routines', 'roles');
+  const testo = (f) => absolutizeRecipe(espandiInclusioni(readFileSync(resolve(ruoli, f), 'utf8'), ruoli), '/strumenti', '/progetto');
+  // halt non riceve il contratto, ma la domanda sì (#1205): è proprio la sessione andata storta.
+  for (const [chi, f] of [['worker', '_contratto-worker.md'], ['halt', 'halt.md']]) {
+    const t = testo(f);
+    assert.ok(t.includes(`node "${base}/scripts/routine-channel.mjs" domanda --biglietto <biglietto>`), `${chi}: domanda`);
+    // Prima del rilascio: col biglietto già morto la domanda non si può più chiedere.
+    assert.ok(t.indexOf('domanda --biglietto') < t.indexOf('release <biglietto> --role'), `${chi}: la domanda viene prima del rilascio`);
+  }
 });

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
-for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito',
+for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito', 'tasti',
   'ttsVoices', 'filoMemory', 'preferences', 'cambi', 'actionLevels', 'actionTools', 'capabilities', 'vociImpostazioni']) {
   require(`../../src/shared/${m}.js`);
 }
@@ -49,7 +49,7 @@ function foglie(o, base = '', out = []) {
 }
 const CAMPIONI = ['scuro', 'grande', 'sì', 'no', '12', '0,5', '1', 'privacy', 'automatico', 'off', 'openrouter',
   'sk-or-v1-abcdefgh1234', '20 euro', 'più vivaci', 'delicata', 'media', 'powershell', 'Rispondi breve.', 'automatica',
-  'aggiungi esempio.it', 'nessuno'];
+  'aggiungi esempio.it', 'nessuno', 'Chat con Filo: deepseek'];
 function percorsiScrittiDa(setter) {
   const out = new Set();
   for (const v of CAMPIONI) {
@@ -180,7 +180,9 @@ test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e
     assert.ok(descr.includes(`• ${s.keys[0]}: `), `${s.keys[0]}: non compare nella descrizione di IMPOSTA_PREFERENZA`);
     const scritti = percorsiScrittiDa(s);
     for (const p of s.scrive || []) {
-      assert.ok(scritti.has(p), `${s.keys[0]} dichiara ${p} ma non lo scrive`);
+      // Un percorso jolly (`models.*`, una chiave per funzione) vale scritto se ne è scritta una foglia.
+      const jolly = p.endsWith('.*') ? p.slice(0, -1) : '';
+      assert.ok(scritti.has(p) || (jolly && [...scritti].some((x) => x.startsWith(jolly))), `${s.keys[0]} dichiara ${p} ma non lo scrive`);
       const voce = K.voce(p);
       assert.ok(voce, `${p}: nessuna frase per il suo evento in src/shared/cambi.js`);
       if (!voce.segreto) assert.equal(voce.livello, s.costo, `${p}: l'annullo chiede un livello diverso dal costo del cambio (${voce.livello} contro ${s.costo})`);

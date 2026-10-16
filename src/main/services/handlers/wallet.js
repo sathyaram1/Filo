@@ -53,10 +53,6 @@ module.exports = function register(on, ctx) {
     } catch (_) { /* la home resta com'è: non è un motivo per fallire un riscatto */ }
   }
 
-  // Il conteggio locale già dichiarato al server a un riscatto (per non
-  // portarlo due volte). Sopravvive al riscatto e all'annullamento dell'identità.
-  const DECLARED_KEY = 'walletLocalDeclared';
-
   // Ultimi parametri del server (euro per credito, cambio, quota): servono a
   // scalare i crediti nelle righe del registro e a comporre i messaggi.
   let lastServer = null;
@@ -244,6 +240,7 @@ module.exports = function register(on, ctx) {
   async function readState() {
     const state = await leggiStato();
     ultimaLettura = { at: Date.now(), state };
+    try { globalThis.SN_AVVISO_CREDITI_MAIN?.dopoLettura(state); } catch (_) {}
     return state;
   }
   async function leggiStato() {
@@ -266,6 +263,8 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       out.identity.error = String(e?.message || e);
       out.identity.lost = e && e.code === 'identity_lost';
+      out.identity.unreadable = e && e.code === 'identity_unreadable';
+      out.identity.unreachable = e && e.code === 'servizio_non_raggiungibile';
       out.identity.offline = e && e.code === 'offline';
       // Offline (o identità che non si rinnova) con la chiave personale qui:
       // l'ultimo stato letto vale anche adesso. Il campo dell'invito e il
@@ -385,9 +384,17 @@ module.exports = function register(on, ctx) {
     return { ok: true, status, message: 'Nuova chiave pronta: i tuoi crediti si usano di nuovo da qui.', state: await readState() };
   }));
 
-  on(MSG.WALLET_RESET_IDENTITY, filoOnly(async () => {
+  // Il cancello sta qui e non nella pagina: senza un'identità persa o illeggibile ricominciare
+  // staccherebbe un portafoglio vivo, e senza il sì esplicito non si tocca niente.
+  on(MSG.WALLET_RESET_IDENTITY, filoOnly(async (msg) => {
+    let motivo = '';
+    try { await identity.getIdToken(); } catch (e) { motivo = (e && e.code) || ''; }
+    if (motivo !== 'identity_lost' && motivo !== 'identity_unreadable') {
+      return { ok: false, status: motivo ? 'not_reachable' : 'identity_ok', state: await readState() };
+    }
+    if (!msg || msg.confermato !== true) return { ok: false, status: 'needs_confirm' };
     identity.resetIdentity();
-    walletStore.clear();
+    walletStore.metteDaParte();
     lastServer = null;
     ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
@@ -415,20 +422,9 @@ module.exports = function register(on, ctx) {
     if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
-    // I crediti del vecchio conteggio locale si portano sul server: chi li
-    // aveva guadagnati non deve perderli passando al portafoglio (entro un
-    // tetto che sta in configurazione lato server).
-    // Si dichiarano una volta sola: quanto è già stato dichiarato a un riscatto
-    // precedente (identità annullata e nuovo invito) non si ripresenta, il
-    // conteggio locale resta com'è e paga solo la parte guadagnata dopo.
-    let localCredits = 0;
-    let balanceNow = 0;
-    try {
-      const pub = await globalThis.SN_CREDITS?.getPublic?.();
-      balanceNow = Number(pub && (pub.balanceExact != null ? pub.balanceExact : pub.balance)) || 0;
-      const declared = Number(await globalThis.SN_STORAGE.getRaw(DECLARED_KEY, 0)) || 0;
-      localCredits = Math.max(0, Math.floor(balanceNow - declared));
-    } catch (_) { localCredits = 0; }
+    // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
+    // di crediti dichiarati dal PC, e al riscatto si entra coi soli crediti d'ingresso.
+    const localCredits = 0;
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
     // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
     // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
@@ -448,7 +444,7 @@ module.exports = function register(on, ctx) {
     }
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
-    if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
+    try { await globalThis.SN_AVVISO_CREDITI_MAIN?.ricordaIngresso(r.entryCredits != null ? r.entryCredits : r.credits); } catch (_) {}
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
     // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato, e
     // la home si rifà: da adesso Filo risponde.
@@ -645,9 +641,48 @@ module.exports = function register(on, ctx) {
   // ── Owner ─────────────────────────────────────────────────────────────────
   const ownerOnly = (fn) => filoOnly(async (msg) => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
-    try { return { ok: true, ...(await fn(msg)) }; } catch (e) { return { ok: false, error: String(e?.message || e) }; }
+    try { return { ok: true, ...(await fn(msg)) }; } catch (e) {
+      // Il codice di rete dice se la richiesta è partita: la pagina lo usa per sapere se un regalo può essere arrivato.
+      const rete = e && e.cause && e.cause.code ? ` (${e.cause.code})` : '';
+      return { ok: false, error: String(e?.message || e) + rete };
+    }
   });
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
+
+  // L'allarme del conto all'avvio (#820). Ogni home che si apre lo chiede: la lettura del server vale un quarto d'ora,
+  // e gli allarmi già detti stanno su disco, così una situazione che resta quella non si ridice a ogni avvio.
+  const ALLARMI_DETTI_KEY = 'walletOwnerAllarmiDetti';
+  const CONTO_VALE_MS = 15 * 60 * 1000;
+  let contoLetto = null;
+  let filaAllarmi = Promise.resolve();
+  async function leggiContoOwner() {
+    if (contoLetto && Date.now() - contoLetto.at < CONTO_VALE_MS) return contoLetto.conto;
+    const overview = await callable('walletOverview', {}, { asOwner: true });
+    const conto = W.contoOwner(overview);
+    contoLetto = { at: Date.now(), conto };
+    return conto;
+  }
+  on(MSG.WALLET_OWNER_ALARM_PENDING, filoOnly(async () => {
+    if (!ctx.isAdmin()) return { ok: true, alarm: null };
+    const turno = filaAllarmi.then(async () => {
+      let conto = null;
+      try { conto = await leggiContoOwner(); } catch (e) {
+        console.warn('[wallet] allarme del conto: vista non arrivata', String(e?.message || e));
+        return null;
+      }
+      let detti = [];
+      try { detti = await globalThis.SN_STORAGE.getRaw(ALLARMI_DETTI_KEY, []); } catch (_) {}
+      const esito = W.allarmiDaDire(detti, conto);
+      try { await globalThis.SN_STORAGE.setRaw(ALLARMI_DETTI_KEY, esito.detti); } catch (_) {}
+      if (!esito.dire.length) return null;
+      const title = esito.dire.some((a) => a.kind === 'vivi_oltre_conto')
+        ? 'Il conto OpenRouter non regge'
+        : 'Il tetto dei regali supera il conto OpenRouter';
+      return { title, text: esito.dire.map((a) => a.testo).join('\n\n') };
+    });
+    filaAllarmi = turno.catch(() => {});
+    return { ok: true, alarm: await turno };
+  }));
   on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
     // Se il regalo è alla propria installazione, la pagina Crediti aperta
@@ -799,6 +834,7 @@ module.exports = function register(on, ctx) {
       credits: W.creditsForUsd(costUsd, { eurPerCredit: fx.eurPerCredit, eurUsd: fx.eurUsd }),
     });
     if (!row) return;
+    try { globalThis.SN_AVVISO_CREDITI_MAIN?.registraConsumo({ action, credits: row.credits, usage }); } catch (_) {}
     queue.push(row);
     if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
     await saveQueue();
@@ -853,11 +889,21 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
+  // La tariffa dei crediti dell'ultimo stato letto (euro per credito, cambio): le stime di costo (#819) scalano con
+  // la stessa del registro d'uso. Mai letta: valgono i valori di ripiego di SN_WALLET.creditsPerUsd.
+  function tariffaCrediti() {
+    let b = lastServer && lastServer.balance;
+    if (!b) { try { const disco = walletStore.lastServer(); b = disco && disco.balance; } catch (_) { b = null; } }
+    return { eurPerCredit: b && b.eurPerCredit, eurUsd: b && b.eurUsd };
+  }
+
   globalThis.SN_WALLET_MAIN = {
-    recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    recordUsage, outOfCreditsNotice, flush, readState, keySource, tariffaCrediti,
     // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
     // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
     haPortafoglio, saldoPerChat,
+    // L'avviso prima che i crediti finiscano (#818) legge l'ultimo stato senza chiederne uno nuovo.
+    ultimaLettura: () => ultimaLettura,
     redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },
     // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
     // rete): lo scrive chi manda un feedback, così il server sa a chi

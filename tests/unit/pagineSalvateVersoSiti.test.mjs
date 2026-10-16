@@ -79,7 +79,7 @@ test('nessun canale delle pagine salvate risponde a un sito con indirizzo, titol
 });
 
 test('un sito non toglie, non sposta e non rinomina le voci salvate', async () => {
-  for (const tipo of [MSG.REMOVE_SAVED_PAGE, MSG.CONSUME_SAVED_PAGE, MSG.DELETE_CATEGORY, MSG.RENAME_CATEGORY, MSG.MOVE_PAGE_CATEGORY, MSG.MERGE_CATEGORIES]) {
+  for (const tipo of [MSG.REMOVE_SAVED_PAGE, MSG.RESTORE_SAVED_PAGE, MSG.CONSUME_SAVED_PAGE, MSG.APRI_PAGINA_SALVATA, MSG.DELETE_CATEGORY, MSG.RENAME_CATEGORY, MSG.MOVE_PAGE_CATEGORY, MSG.MERGE_CATEGORIES]) {
     const { stato, registro } = montaHandler();
     const r = await registro.get(tipo)({ type: tipo, ...richiestaDelSito }, daSitoB, SITO_B);
     assert.deepEqual(r, { ok: false, error: 'forbidden' }, tipo);

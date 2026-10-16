@@ -42,7 +42,6 @@ test('lo stile confermato in chat compare nella pagina aperta e resta dopo un ri
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
-    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
   });
   // A Conservativo lo stile (costo 2) passa dal popup anche a compito pulito (#530).
   await livelloAutonomia(app, 'conservativo');

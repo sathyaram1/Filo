@@ -199,11 +199,12 @@ test('npm run feedback:apri --aspetta: il feedback nasce con le attese; un numer
 });
 
 import { spawnSync } from 'node:child_process';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 test('npm run feedback senza stato: un\'opzione in più si rifiuta prima delle credenziali, non si perde in silenzio', () => {
   const lancia = (...args) => spawnSync(process.execPath, [join(ROOT, 'scripts', 'owner-feedback.mjs'), 'fid', ...args, '--dry-run'],
-    { encoding: 'utf8', timeout: 60000, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: '' } });
-  for (const attesa of [['--aspetta', '676'], ['--aspetta-niente'], ['--frase', 'ciao'], ['--preapprova'], ['--solo-locale'], ['--serve-locale', 'perché']]) {
+    { encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: '' } });
+  for (const attesa of [['--aspetta', '676'], ['--aspetta-niente'], ['--frase', 'ciao'], ['--solo-locale'], ['--serve-locale', 'perché']]) {
     for (const [altra, atteso] of [[['--branch', 'claude/x'], /--branch vale solo insieme a uno stato/], [['--reason', 'm'], /--reason vale solo/],
       [['--come-routine'], /--come-routine vale solo/], [['--starred'], /--starred vale solo/]]) {
       const r = lancia(...attesa, ...altra);
@@ -211,8 +212,8 @@ test('npm run feedback senza stato: un\'opzione in più si rifiuta prima delle c
       assert.match(r.stderr, atteso);
     }
   }
-  for (const [a, b] of [[['--aspetta', '676'], ['--frase', 'ciao']], [['--aspetta-niente'], ['--solo-locale']], [['--frase', 'ciao'], ['--preapprova']],
-    [['--serve-locale', 'perché'], ['--frase', 'ciao']], [['--chiedi-prima'], ['--non-locale']]]) {
+  for (const [a, b] of [[['--aspetta', '676'], ['--frase', 'ciao']], [['--aspetta-niente'], ['--solo-locale']], [['--frase', 'ciao'], ['--non-locale']],
+    [['--serve-locale', 'perché'], ['--frase', 'ciao']], [['--aspetta', '676'], ['--non-locale']]]) {
     const r = lancia(...a, ...b);
     assert.equal(r.status, 1, `${a.join(' ')} ${b.join(' ')}: ${r.stdout}${r.stderr}`);
     assert.match(r.stderr, /sono due comandi: lancia un comando per ciascuno — non ho toccato niente/);

@@ -22,8 +22,8 @@
   border: 2px solid var(--sn-accent, #c45a3b);
   border-radius: 4px;
   box-shadow: 0 0 0 4px rgba(var(--sn-accent-rgb, 196, 90, 59), 0.18);
-  transition: top 200ms ease, left 200ms ease, width 200ms ease, height 200ms ease;
-  animation: sn-highlight-pulse 2.4s ease-in-out infinite;
+  transition: top calc(200ms * var(--sn-motion, 1)) ease, left calc(200ms * var(--sn-motion, 1)) ease, width calc(200ms * var(--sn-motion, 1)) ease, height calc(200ms * var(--sn-motion, 1)) ease;
+  animation: sn-highlight-pulse calc(2.4s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 
 /* Pulsazione leggera del bagliore esterno: si nota ma non disturba. */
@@ -59,7 +59,7 @@
   -webkit-mask-composite: xor;
           mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
           mask-composite: exclude;
-  animation: sn-highlight-shimmer 3.6s linear infinite;
+  animation: sn-highlight-shimmer calc(3.6s * var(--sn-motion, 1)) linear infinite;
   pointer-events: none;
 }
 
@@ -81,7 +81,7 @@
   font-family: var(--sn-font);
   font-size: 12px;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, calc(0.22 * var(--sn-ombra, 1)));
   max-width: 360px;
   word-break: break-word;
   display: flex;

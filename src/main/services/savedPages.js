@@ -56,9 +56,24 @@
       categoryConfidence: page.categoryConfidence || null,
     };
     pages.unshift(entry);
-    if (pages.length > SAVED_PAGES_LIMIT) pages.length = SAVED_PAGES_LIMIT;
-    await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
+    await scriviNelTetto(pages);
     return entry;
+  }
+
+  async function scriviNelTetto(pages) {
+    const fuori = pages.length > SAVED_PAGES_LIMIT ? pages.splice(SAVED_PAGES_LIMIT) : [];
+    await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
+    if (fuori.length) dichiaraUscite(fuori);
+  }
+
+  // L'elenco vive in storage.json, che si riscrive intero: il tetto resta, ma chi esce lo si dice (#1088).
+  // In fondo stanno le più vecchie: save() mette in cima e l'importazione ordina per data.
+  function dichiaraUscite(fuori) {
+    const nome = (p) => `«${String((p && (p.title || p.url)) || '').slice(0, 80)}»`;
+    const testo = fuori.length === 1
+      ? `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. ${nome(fuori[0])}, la più vecchia, è uscita dall’elenco.`
+      : `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. Le ${fuori.length} più vecchie sono uscite dall’elenco.`;
+    try { require('./avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'pagine-salvate-tetto' }); } catch (_) {}
   }
 
   // Aggiorna SOLO la miniatura di una scheda già salvata (per id). Serve al
@@ -76,11 +91,45 @@
     return entry;
   }
 
+  // Le voci appena tolte restano qui per l'«Annulla»: la pagina chiede solo l'id, e la voce (miniatura compresa)
+  // torna da qui, non da quello che manda la pagina (#839).
+  const rimosse = new Map();
+  const RIMOSSE_TETTO = 200;
+
   async function remove(id) {
     const pages = await list();
+    const indice = pages.findIndex((p) => p.id === id);
+    if (indice < 0) return pages;
+    rimosse.delete(id);
+    rimosse.set(id, { entry: pages[indice], indice });
+    while (rimosse.size > RIMOSSE_TETTO) rimosse.delete(rimosse.keys().next().value);
     const filtered = pages.filter((p) => p.id !== id);
     await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: filtered });
     return filtered;
+  }
+
+  // Rimette una voce tolta dov'era, con la sua data e la sua categoria (se nel frattempo quella categoria è
+  // stata eliminata, la voce torna fra le non categorizzate invece di finire in un gruppo che non si vede).
+  async function rimetti(id, categorie) {
+    const tolta = rimosse.get(id);
+    const pages = await list();
+    if (!tolta) return { pages, entry: null };
+    rimosse.delete(id);
+    // Risalvata nel frattempo: resta quella più nuova, senza doppioni.
+    if (pages.some((p) => p.id === id || p.url === tolta.entry.url)) return { pages, entry: null };
+    const entry = { ...tolta.entry };
+    if (entry.categoryId && Array.isArray(categorie)) {
+      const cat = categorie.find((c) => c.id === entry.categoryId);
+      entry.categoryId = cat ? cat.id : null;
+      entry.category = cat ? cat.name : null;
+    }
+    // L'elenco va dal più recente: si rientra davanti alla prima più vecchia, così due «Annulla» di fila
+    // rimettono anche l'ordine fra loro.
+    let i = entry.savedAt ? pages.findIndex((p) => (p.savedAt || '') < entry.savedAt) : Math.min(tolta.indice, pages.length);
+    if (i < 0) i = pages.length;
+    pages.splice(i, 0, entry);
+    await scriviNelTetto(pages);
+    return { pages, entry };
   }
 
   // "Consuma": rimuove dalla lista. Usato quando l'utente apre una scheda.
@@ -88,5 +137,5 @@
     return remove(id);
   }
 
-  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, consume, rimpicciolisciMiniature: require('./miniature').rimpicciolisciSalvate };
+  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, rimetti, consume, rimpicciolisciMiniature: require('./miniature').rimpicciolisciSalvate };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

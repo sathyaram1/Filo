@@ -16,8 +16,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Mock del modulo 'electron': net.fetch legge davvero dal file system locale
 // (la risorsa risolta è un file://), così il test verifica l'intero percorso.
+const schemiRegistrati = [];
 const electronMock = {
-  protocol: { registerSchemesAsPrivileged() {}, handle() {} },
+  protocol: { registerSchemesAsPrivileged(schemi) { schemiRegistrati.push(...schemi); }, handle() {} },
   net: {
     async fetch(href) {
       const p = toPath(href);
@@ -35,7 +36,7 @@ Module._load = function (request, parent, isMain) {
   return origLoad.call(this, request, parent, isMain);
 };
 
-const { filoHandler, relIsUnsafe, FILO_PAGE_CSP } = require(
+const { filoHandler, relIsUnsafe, FILO_PAGE_CSP, registerProtocolSchemes } = require(
   join(__dirname, '..', '..', 'src', 'main', 'protocol.js'),
 );
 Module._load = origLoad;
@@ -86,4 +87,14 @@ test('relIsUnsafe riconosce i segmenti .. e lascia passare i path leciti', () =>
 test('una richiesta legittima a un asset esistente passa', async () => {
   const res = await filoHandler({ url: 'filo://shared/constants.js' });
   assert.equal(res.status, 200);
+});
+
+// Per Electron codeCache vale solo su uno schema standard (#1091): il perché del privilegio sta accanto alla sua dichiarazione.
+test('lo schema filo chiede la cache del codice V8, insieme a standard', () => {
+  schemiRegistrati.length = 0;
+  registerProtocolSchemes();
+  const filo = schemiRegistrati.find((s) => s.scheme === 'filo');
+  assert.ok(filo, 'lo schema filo non è registrato coi privilegi');
+  assert.equal(filo.privileges.codeCache, true);
+  assert.equal(filo.privileges.standard, true);
 });

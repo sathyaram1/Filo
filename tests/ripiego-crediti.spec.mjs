@@ -22,6 +22,10 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+
+// Sui siti spiegazione e Modifica stanno in uno shadow root chiuso (#1071): si leggono dal mondo dei content script.
+const testoDi = async (app, page, sel) => (await statoDi(app, page, sel))?.testo || '';
 
 const OWN_KEY = 'sk-or-v1-own-key-123456';
 const PERSONAL_KEY = 'sk-or-v1-test-personal';
@@ -81,9 +85,19 @@ test.beforeAll(async () => {
         // (la home si rigenera con la conversazione dentro), e quelle non sono
         // il turno di chat.
         const msgs = Array.isArray(body.messages) ? body.messages : [];
+        // Il saluto della home non arriva, come a rete giù: non è una chiamata di queste prove, e non deve né
+        // pagare coi crediti né far ricordare o dimenticare un rifiuto della chiave propria.
+        if (JSON.stringify(msgs).includes('preparare la dashboard')) { req.socket.destroy(); return; }
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
+        // In streaming OpenRouter apre subito la risposta e la tiene viva con dei commenti finché il modello non
+        // scrive: il ritardo sta nel corpo, a ripiego già avvenuto. Senza streaming la risposta arriva tutta alla fine.
+        const aperta = body.stream === true && status === 200;
+        if (aperta) {
+          res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          res.write(': OPENROUTER PROCESSING\n\n');
+        }
         if (personalDelayMs && bearer === PERSONAL_KEY) await new Promise((r) => setTimeout(r, personalDelayMs));
         // Il 403 è quello della moderazione, come lo scrive OpenRouter: non è la chiave.
         if (status === 403) return json(res, 403, { error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } });
@@ -93,7 +107,6 @@ test.beforeAll(async () => {
         if (body.stream !== true) {
           return json(res, 200, { id: 'gen-1', provider: 'Fake', choices: [{ message: { content: `Ciao: ${who}.` }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.00021 } });
         }
-        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         res.write(`data: ${JSON.stringify({ id: 'gen-1', provider: 'Fake', choices: [{ delta: { content: `Ciao: ${who}.` } }] })}\n\n`);
         res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.00021 } })}\n\n`);
         res.write('data: [DONE]\n\n');
@@ -575,17 +588,16 @@ test('(I) «spiega» su una pagina con la chiave propria rifiutata: il riquadro,
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  const popup = page.locator('.sn-popup');
-  await expect(popup).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
-  const nota = popup.locator('.sn-key-fallback');
-  await expect(nota).toHaveText('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
+  await expect.poll(() => testoDi(app, page, '.sn-popup'), { timeout: 30000 }).toContain('RISPOSTA-DALLA-PERSONALE');
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-key-fallback'))
+    .toBe('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
   await page.screenshot({ path: 'tests/.shots/662-spiega-riquadro.png' }).catch(() => {});
   // Una domanda dopo, nello stesso riquadro: anche lei pagata così, anche lei lo dice.
-  await popup.locator('.sn-popup-input').fill('e poi?');
-  await popup.locator('.sn-popup-input').press('Enter');
-  await expect(popup.locator('.sn-key-fallback')).toHaveCount(2, { timeout: 30000 });
-  await popup.locator('.sn-popup-close').click();
-  await expect(popup).toHaveCount(0);
+  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e poi?');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => conta(app, page, '.sn-popup .sn-key-fallback'), { timeout: 30000 }).toBe(2);
+  await clicca(app, page, '.sn-popup .sn-popup-close');
+  await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
 
   // Il tasto destro: la spiegazione nel menu (col tema scuro, da guardare nella foto).
   await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
@@ -608,8 +620,8 @@ test('(I) «spiega» su una pagina con la chiave propria rifiutata: il riquadro,
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  await expect(popup).toContainText('RISPOSTA-DALLA-PROPRIA', { timeout: 30000 });
-  await expect(popup.locator('.sn-key-fallback')).toHaveCount(0);
+  await expect.poll(() => testoDi(app, page, '.sn-popup'), { timeout: 30000 }).toContain('RISPOSTA-DALLA-PROPRIA');
+  expect(await conta(app, page, '.sn-popup .sn-key-fallback')).toBe(0);
 });
 
 test('(I2) il riquadro di modifica del testo: la proposta pagata coi crediti di Filo lo dice, e la riga sparisce con la proposta dopo', async ({ app, shell, openTab, testServer }) => {
@@ -627,16 +639,16 @@ test('(I2) il riquadro di modifica del testo: la proposta pagata coi crediti di 
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible({ timeout: 10000 });
   await menu.locator('.sn-menu-item', { hasText: 'Modifica' }).click();
-  const box = page.locator('.sn-editbox');
-  await expect(box).toBeVisible({ timeout: 10000 });
-  await box.locator('button[data-sc="fix"]').click();
-  await expect(box.locator('.sn-editbox-proposed')).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
-  await expect(box.locator('.sn-key-fallback')).toHaveText('OpenRouter ha rifiutato la tua chiave (non la riconosce): ho usato i crediti di Filo.');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox'))?.visibile, { timeout: 10000 }).toBe(true);
+  await clicca(app, page, '.sn-editbox button[data-sc="fix"]');
+  await expect.poll(() => testoDi(app, page, '.sn-editbox-proposed'), { timeout: 30000 }).toContain('RISPOSTA-DALLA-PERSONALE');
+  await expect.poll(() => testoDi(app, page, '.sn-editbox .sn-key-fallback'))
+    .toBe('OpenRouter ha rifiutato la tua chiave (non la riconosce): ho usato i crediti di Filo.');
   await page.screenshot({ path: 'tests/.shots/662-modifica.png' }).catch(() => {});
   ownKeyStatus = 200;
-  await box.locator('button[data-sc="formal"]').click();
-  await expect(box.locator('.sn-editbox-proposed')).toContainText('RISPOSTA-DALLA-PROPRIA', { timeout: 30000 });
-  await expect(box.locator('.sn-key-fallback')).toHaveCount(0);
+  await clicca(app, page, '.sn-editbox button[data-sc="formal"]');
+  await expect.poll(() => testoDi(app, page, '.sn-editbox-proposed'), { timeout: 30000 }).toContain('RISPOSTA-DALLA-PROPRIA');
+  expect(await conta(app, page, '.sn-editbox .sn-key-fallback')).toBe(0);
 });
 
 test('(J) il ripiego che non produce niente (la personale risponde 500): Crediti ricorda il rifiuto ma non dice che Filo ha usato i crediti; quando il ripiego risponde, sì', async ({ app, shell, openTab }) => {
@@ -841,11 +853,10 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  const popup = page.locator('.sn-popup');
-  await expect(popup.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 30000 });
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-key-fallback'), { timeout: 30000 }).toBe(RIGA);
   await page.waitForTimeout(1500);
   expect((await avvisi()).split(RIGA).length - 1).toBe(1);
-  await popup.locator('.sn-popup-close').click();
+  await clicca(app, page, '.sn-popup .sn-popup-close');
 });
 
 // La riga sotto la risposta e l'avviso sono la stessa frase: le chiamate che accompagnano la
@@ -970,22 +981,27 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
     await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 10_000 }).toContain(PERSONAL_KEY);
   };
 
+  // «spiega» chiuso mentre la risposta pagata arriva: OpenRouter ha già aperto lo stream con la chiave personale, il
+  // riquadro chiuso ferma la sua chiamata, e l'avviso deve venire da lei. Selezione da script, senza gesto: nessuna
+  // spiegazione anticipata (#1070) che lo dica al posto suo (#1071.4).
+  let prima = seen.completions.length;
   await page.evaluate(() => {
     const r = document.createRange();
     r.selectNodeContents(document.querySelector('#t'));
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
   });
-  let prima = seen.completions.length;
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  const popup = page.locator('.sn-popup');
-  await expect(popup).toBeVisible({ timeout: 10000 });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup'))?.visibile, { timeout: 10000 }).toBe(true);
   await allaPersonale(prima);
-  await popup.locator('.sn-popup-close').click();
-  await expect(popup).toHaveCount(0);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('walletOwnKeyRefusal', null))?.usedCredits === true),
+    { timeout: 10_000 }).toBe(true);
+  await clicca(app, page, '.sn-popup .sn-popup-close');
+  await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+  expect(seen.completions.slice(prima).filter((c) => c.lastText.includes('ha selezionato un testo'))).toEqual([]);
 
   // Il riquadro di modifica, chiuso con Esc prima della proposta. L'avviso sopra ha già parlato:
   // si riparte da una chiave nuova, come chi la cambia, per sentirlo di nuovo.
@@ -997,13 +1013,12 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible({ timeout: 10000 });
   await menu.locator('.sn-menu-item', { hasText: 'Modifica' }).click();
-  const box = page.locator('.sn-editbox');
-  await expect(box).toBeVisible({ timeout: 10000 });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox'))?.visibile, { timeout: 10000 }).toBe(true);
   prima = seen.completions.length;
-  await box.locator('button[data-sc="fix"]').click();
+  await clicca(app, page, '.sn-editbox button[data-sc="fix"]');
   await allaPersonale(prima);
   await page.keyboard.press('Escape');
-  await expect(box).toHaveCount(0);
+  await expect.poll(() => conta(app, page, '.sn-editbox')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
 
   // «spiega» chiuso appena compare la risposta: la riga è stata a schermo un istante, non letta.
@@ -1019,8 +1034,8 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  await expect(popup.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 30_000 });
-  await popup.locator('.sn-popup-close').click();
-  await expect(popup).toHaveCount(0);
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-key-fallback'), { timeout: 30_000 }).toBe(RIGA);
+  await clicca(app, page, '.sn-popup .sn-popup-close');
+  await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
 });

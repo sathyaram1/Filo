@@ -9,18 +9,17 @@
 //     finché l'utente non digita espressamente la parola ("conferma").
 //
 // Esc o click fuori dal box = annulla. Una sola conferma alla volta.
+// `coprePagina`: la domanda è sulla pagina stessa (sito pericoloso) — la
+// copre, rispondono solo i bottoni, e i tasti non tornano alla pagina.
+// `segnale` (AbortSignal) ritira la domanda: risolve false.
 //
-// SICUREZZA (#249): il dialogo vive in uno Shadow DOM in modalità CLOSED,
-// agganciato a un host neutro (.sn-confirm-host). Il DOM del documento è
-// condiviso tra il mondo isolato del preload (dove gira questo codice sulle
-// pagine web esterne) e il mondo principale della pagina: senza shadow root
-// chiuso, uno script ostile della pagina poteva trovare il bottone OK via
-// querySelector/MutationObserver e auto-cliccarlo, confermando azioni di
-// livello 2 senza alcun consenso reale. Con lo shadow root chiuso i nodi
-// interni (bottoni, testo, input) NON sono raggiungibili da fuori: la pagina
-// vede solo l'host vuoto. Il riferimento al root resta privato di questo
-// modulo (e degli hook _test, che sulle pagine esterne vivono anch'essi nel
-// mondo isolato, quindi fuori dalla portata della pagina).
+// SICUREZZA: su una pagina web il popup NON sta nel documento del sito, che
+// potrebbe nasconderlo e disegnarci sopra un testo diverso (#592.6): lo
+// disegna il main in una vista sopra la scheda (src/main/confermeSopraPagina.js),
+// e da qui parte solo la domanda. Dove il documento è di Filo il popup sta
+// nella pagina, in uno Shadow DOM CHIUSO (#249): il bottone OK non si trova
+// né si clicca da uno script. Regole:
+// patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
 
 (function (global) {
   'use strict';
@@ -35,6 +34,8 @@
   background: rgba(0, 0, 0, 0.35);
   font-family: var(--sn-font);
 }
+/* Avviso sulla pagina stessa: finché non si sceglie, la pagina non si vede. */
+.sn-confirm-overlay.sn-confirm-copre { background: rgba(28, 14, 8, 0.92); }
 .sn-confirm-box {
   width: min(440px, calc(100vw - 48px));
   padding: 20px;
@@ -152,7 +153,8 @@
 
   // Dialogo attivo (uno alla volta): il root CHIUSO è raggiungibile solo da
   // questo modulo. `active` serve a done() e agli hook di test qui sotto.
-  let active = null; // { host, root }
+  let active = null; // { host, root, done }
+  let aperteFuori = 0;
 
   // Chi batteva un carattere in un campo un attimo fa sta scrivendo: un popup che
   // si apre in quel momento gli lascia i tasti nel suo campo (#592). L'Invio che
@@ -160,7 +162,7 @@
   let ultimoTasto = -Infinity;
   try {
     global.document.addEventListener('keydown', (e) => {
-      if (!e.isTrusted || active || !scrivibile(e.target)) return;
+      if (!e.isTrusted || active || aperteFuori || !scrivibile(e.target)) return;
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) ultimoTasto = -Infinity;
       else if (e.key && (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete')) ultimoTasto = performance.now();
     }, true);
@@ -170,25 +172,27 @@
 
   // Costruisce host+shadow(closed)+overlay+box e ritorna { overlay, box, done }
   // dove done(result) smonta tutto e risolve la Promise una sola volta.
-  function buildOverlay(resolve) {
+  // `ospite` c'è solo nella vista sopra la scheda: il campo di chi scriveva sta
+  // nella pagina sotto, e i tasti gli arrivano da `ospite.tasto`.
+  function buildOverlay(resolve, ospite, opzioni = {}) {
     const doc = global.document;
+    const copre = !!(opzioni && opzioni.coprePagina);
 
     // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il
     // posizionamento a tutto viewport (inline, così non serve CSS nel documento).
     const host = doc.createElement('div');
     host.className = 'sn-confirm-host';
-    // Su una pagina web l'host finisce dentro il <body> del sito: marcarlo
-    // tiene fuori il riquadro da chi cammina sulla pagina (la traduzione).
+    // Marcato: chi cammina sulla pagina (la traduzione, l'Esc a tutto schermo) lo sa di Filo.
     global.SN_FILO_UI?.mark(host);
     host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;';
 
-    const root = host.attachShadow({ mode: 'closed' });
+    const root = global.SN_FILO_UI?.ombra ? global.SN_FILO_UI.ombra(host) : host.attachShadow({ mode: 'closed' });
     const style = doc.createElement('style');
     style.textContent = CSS;
     root.appendChild(style);
 
     const overlay = doc.createElement('div');
-    overlay.className = 'sn-confirm-overlay';
+    overlay.className = copre ? 'sn-confirm-overlay sn-confirm-copre' : 'sn-confirm-overlay';
     const box = doc.createElement('div');
     box.className = 'sn-confirm-box';
     overlay.appendChild(box);
@@ -196,18 +200,14 @@
 
     // Il popup si apre anche mentre l'utente scrive in chat: quello che batte
     // finisce nel suo campo, non nel vuoto, e alla chiusura il fuoco torna lì.
-    const prima = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+    // Non se la domanda è sulla pagina: la password che si batteva non deve finire nel sito dell'avviso.
+    const prima = ospite ? null : campoAttivo(doc);
+    const inoltra = copre ? null : ospite ? (ospite.campo && ospite.tasto) || null : (scrivibile(prima) ? (t) => applicaTasto(prima, t) : null);
     box.addEventListener('keydown', (e) => {
-      if (e.target !== box || !scrivibile(prima) || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
-      const s = prima.selectionStart;
-      const f = prima.selectionEnd;
-      try {
-        if (e.key.length === 1) prima.setRangeText(e.key, s, f, 'end');
-        else if (e.key === 'Backspace' && (s > 0 || f > s)) prima.setRangeText('', s === f ? s - 1 : s, f, 'end');
-        else return;
-      } catch (_) { return; }
+      if (e.target !== box || !inoltra || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      if (e.key.length !== 1 && e.key !== 'Backspace') return;
+      if (inoltra(e.key) === false) return;
       e.preventDefault();
-      prima.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
     let settled = false;
@@ -221,14 +221,22 @@
       if (prima && prima.isConnected) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
       resolve(result);
     }
+    // Sulla pagina stessa entrambe le risposte fanno qualcosa (resta o esce): le danno solo i bottoni.
     function onKey(e) {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+      if (e.key === 'Escape' && !copre) { e.preventDefault(); e.stopPropagation(); done(false); }
     }
     doc.addEventListener('keydown', onKey, true);
-    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done(false); });
+    // Un clic sul velo di un avviso non toglie il fuoco al campo della parola.
+    overlay.addEventListener('mousedown', (e) => {
+      if (e.target !== overlay) return;
+      if (copre) e.preventDefault();
+      else done(false);
+    });
+    const segnale = opzioni && opzioni.segnale;
+    if (segnale && typeof segnale.addEventListener === 'function') segnale.addEventListener('abort', () => done(false), { once: true });
 
     doc.body.appendChild(host);
-    active = { host, root };
+    active = { host, root, done };
 
     // Un popup si apre anche da solo, sotto un gesto già partito per altro (#592):
     // per mezzo secondo da quando si vede un clic o un invio veri non valgono come
@@ -248,7 +256,7 @@
     active.pronto = () => !troppoPresto({ isTrusted: true });
     // Chi stava scrivendo continua a scrivere nel suo campo: il fuoco va al
     // riquadro, che gli gira i tasti, e non al bottone o al campo del popup.
-    const scriveva = scrivibile(prima) && performance.now() - ultimoTasto < STA_SCRIVENDO_MS;
+    const scriveva = !copre && (ospite ? !!ospite.scriveva : staScrivendo(prima));
     const fuoco = (bersaglio) => {
       const el = scriveva ? box : bersaglio;
       if (el === box) box.tabIndex = -1;
@@ -270,6 +278,56 @@
     p.textContent = text || '';
     box.appendChild(p);
   }
+
+  function campoAttivo(doc) {
+    return doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : null;
+  }
+
+  function staScrivendo(campo) {
+    return scrivibile(campo) && performance.now() - ultimoTasto < STA_SCRIVENDO_MS;
+  }
+
+  // Un tasto dato al popup entra nel campo di chi scriveva; false se non c'entra.
+  function applicaTasto(campo, tasto) {
+    const s = campo.selectionStart;
+    const f = campo.selectionEnd;
+    try {
+      if (tasto.length === 1) campo.setRangeText(tasto, s, f, 'end');
+      else if (tasto === 'Backspace' && (s > 0 || f > s)) campo.setRangeText('', s === f ? s - 1 : s, f, 'end');
+      else return false;
+    } catch (_) { return false; }
+    const ev = new Event('input', { bubbles: true });
+    campo.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+    return true;
+  }
+
+  // Su una pagina web il preload dà SN_CONFERMA_FUORI: la domanda va al main, che
+  // la disegna sopra la scheda; qui restano il campo di chi scriveva e il suo fuoco.
+  function fuori(tipo, opts) {
+    const doc = global.document;
+    const segnale = opts && opts.segnale;
+    if (segnale && segnale.aborted) return Promise.resolve(false);
+    const copre = !!(opts && opts.coprePagina);
+    const prima = campoAttivo(doc);
+    const campo = !copre && scrivibile(prima);
+    const richiesta = { tipo, scriveva: !copre && staScrivendo(prima), campo };
+    for (const k of ['title', 'text', 'okLabel', 'cancelLabel', 'word', 'avviso']) {
+      if (opts && opts[k] != null) richiesta[k] = String(opts[k]);
+    }
+    for (const k of BANDIERE) if (opts && opts[k] === true) richiesta[k] = true;
+    const suTasto = (t) => { if (campo && prima.isConnected && typeof t === 'string') applicaTasto(prima, t); };
+    aperteFuori++;
+    let attesa;
+    try { attesa = Promise.resolve(global.SN_CONFERMA_FUORI(richiesta, suTasto, segnale)); } catch (_) { attesa = Promise.resolve(false); }
+    return attesa.then((ok) => ok === true, () => false).then((ok) => {
+      aperteFuori--;
+      if (prima && prima.isConnected) { try { prima.focus({ preventScroll: true }); } catch (_) {} }
+      return ok;
+    });
+  }
+
+  const daFuori = (ospite) => !ospite && typeof global.SN_CONFERMA_FUORI === 'function';
+  const BANDIERE = ['coprePagina', 'reversibile'];
 
   function scrivibile(el) {
     if (!el || el.disabled || el.readOnly) return false;
@@ -294,7 +352,7 @@
     }
     // Il clic su OK prima della fine porta avanti il testo di una pagina: un
     // bottone che non risponde sembra rotto, e il perché stava solo nel title.
-    const avanti = () => el.scrollBy({ top: Math.max(el.clientHeight - 24, 24), behavior: 'smooth' });
+    const avanti = () => el.scrollBy({ top: Math.max(el.clientHeight - 24, 24), behavior: globalThis.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
     return { visto: visto_, avanti };
   }
 
@@ -321,9 +379,11 @@
   }
 
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
-  function confirm({ title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = {}) {
+  function confirm(opts = {}, ospite = null) {
+    if (daFuori(ospite)) return fuori('confirm', opts);
+    const { title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = opts || {};
     return new Promise((resolve) => {
-      const { box, done, troppoPresto } = buildOverlay(resolve);
+      const { box, done, troppoPresto } = buildOverlay(resolve, ospite, opts);
       header(box, { title, text });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
@@ -346,12 +406,14 @@
   // Livello 3 — l'utente deve digitare la parola (default "conferma") per
   // sbloccare il bottone. Per azioni irreversibili.
   // `avviso` sostituisce la frase sull'irreversibilità quando a chiedere la parola è altro (una difesa abbassata).
-  function confirmTyped({ title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla', avviso = '' } = {}) {
+  function confirmTyped(opts = {}, ospite = null) {
+    if (daFuori(ospite)) return fuori('typed', opts);
+    const { title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla', avviso = '' } = opts || {};
     return new Promise((resolve) => {
       const doc = global.document;
-      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
-      const perche = String(avviso || '').trim() || 'Questa azione non è reversibile.';
-      header(box, { title, text: `${text}\n\n${perche} Scrivi “${word}” per procedere.` });
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
+      const perche = String(avviso || '').trim() || (opts && opts.reversibile ? '' : 'Questa azione non è reversibile.');
+      header(box, { title, text: `${text}\n\n${perche ? `${perche} ` : ''}Scrivi “${word}” per procedere.` });
 
       const input = doc.createElement('input');
       input.type = 'text';
@@ -389,9 +451,11 @@
 
   // Avviso a un solo bottone — comunica qualcosa senza chiedere una scelta
   // (es. "Hai ricevuto N crediti in regalo 🎁"). Risolve quando l'utente chiude.
-  function notify({ title = '', text = '', okLabel = 'OK' } = {}) {
+  function notify(opts = {}, ospite = null) {
+    if (daFuori(ospite)) return fuori('notify', opts);
+    const { title = '', text = '', okLabel = 'OK' } = opts || {};
     return new Promise((resolve) => {
-      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve);
+      const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
       header(box, { title, text });
       const row = buttonRow(box);
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
@@ -402,10 +466,9 @@
 
   // ── Hook di TEST (tests/helpers/confirm.mjs) ─────────────────────────────
   // Il root chiuso rende il dialogo invisibile ai locator Playwright: gli spec
-  // sulle pagine filo:// (contextIsolation:false) passano da qui via
-  // page.evaluate. Sulle pagine web esterne SN_CONFIRM_UI vive nel mondo
-  // isolato del preload: la pagina NON può chiamare questi hook, quindi non
-  // riaprono la falla del feedback #249.
+  // passano da qui via page.evaluate, sulle pagine filo:// e nella vista sopra
+  // la scheda. Nessun sito li raggiunge: sulle pagine web il modulo vive nel
+  // mondo isolato del preload, e il dialogo non è nel loro documento.
   const _test = {
     // Stato del dialogo aperto, o null se non ce n'è uno.
     state() {
@@ -426,6 +489,9 @@
         okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
         textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),
+        copre: !!q('.sn-confirm-copre'),
+        okLabel: (okBtn && okBtn.textContent) || '',
+        cancelLabel: (q('.sn-confirm-btn-cancel') && q('.sn-confirm-btn-cancel').textContent) || '',
         // Un clic o un tasto veri adesso varrebbero: il primo fotogramma può
         // arrivare ben dopo che il riquadro sta nel DOM (#592.11).
         pronto: !!(active.pronto && active.pronto()),
@@ -472,5 +538,11 @@
     },
   };
 
-  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify, _test };
+  // Toglie il popup aperto come un Annulla: la vista sopra la scheda lo fa quando
+  // la domanda a schermo cambia o la sua scheda va dietro.
+  function chiudi() {
+    if (active) active.done(false);
+  }
+
+  global.SN_CONFIRM_UI = { confirm, confirmTyped, notify, chiudi, _test };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

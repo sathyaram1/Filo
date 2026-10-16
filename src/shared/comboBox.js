@@ -22,12 +22,13 @@
   // o scegliere dalla lista; digitando, la lista si filtra. Ritorna close().
   //
   // opts:
-  //   readOptions: () => [{ value, label }]   sorgente di verità (letta a ogni build)
+  //   readOptions: () => [{ value, label, extra? }]   sorgente di verità (letta a ogni build); `extra` va in coda
   //   onPick:      (value) => void            invocata alla scelta dalla tendina
   //   validate:    (value) => { ok, reason }  opzionale: opzioni non valide disabilitate
   //   popClass:    string                     classe extra sul popup (posizionamento)
   //   valueClass:  string                     classe dello span del valore (default .sn-combo-opt-name)
   //   labelClass:  string                     classe dello span dell'etichetta (default .sn-combo-opt-label)
+  //   extraClass:  string                     classe dello span di `extra` (default .sn-combo-opt-extra)
   //   sizeInput:   bool                        tieni input.size = lunghezza testo (pillole catena)
   function attach(host, input, opts) {
     const o = opts || {};
@@ -36,6 +37,7 @@
     const validate = typeof o.validate === 'function' ? o.validate : null;
     const valueClass = o.valueClass || 'sn-combo-opt-name';
     const labelClass = o.labelClass || 'sn-combo-opt-label';
+    const extraClass = o.extraClass || 'sn-combo-opt-extra';
 
     const pop = document.createElement('div');
     pop.className = 'sn-select-pop' + (o.popClass ? ` ${o.popClass}` : '');
@@ -92,6 +94,12 @@
           el.appendChild(l);
         } else {
           el.textContent = opt.value;
+        }
+        if (opt.extra) {
+          const x = document.createElement('span');
+          x.className = extraClass;
+          x.textContent = opt.extra;
+          el.appendChild(x);
         }
         if (opt.value === current) {
           el.classList.add('sn-selected');

@@ -47,9 +47,9 @@
   background: var(--sn-overlay-bg, var(--sn-bg));
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius, 6px);
-  box-shadow: var(--sn-shadow, 0 4px 16px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--sn-shadow, 0 4px 16px rgba(0, 0, 0, calc(0.16 * var(--sn-ombra, 1))));
   backdrop-filter: blur(4px);
-  animation: sn-spell-fade-in 100ms ease-out;
+  animation: sn-spell-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
   overflow: hidden;
 }
 
@@ -134,7 +134,7 @@
   background: var(--sn-accent, #3b82f6);
   color: #ffffff;
   white-space: nowrap;
-  transition: filter 80ms;
+  transition: filter calc(80ms * var(--sn-motion, 1));
 }
 
 .sn-spell-popup-btn:hover {

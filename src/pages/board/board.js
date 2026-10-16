@@ -101,7 +101,7 @@
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
   // #678.2 — un accesso partito dalla bacheca dice sempre com'è andato: mentre
-  // aspetta il browser, e se non riesce il perché, su ogni scheda che aspettava
+  // aspetta la pagina di Google, e se non riesce il perché, su ogni scheda che aspettava
   // (in testa se partito da «Accedi»). Un gesto fatto durante l'attesa si unisce
   // agli altri: partono tutti appena l'account è dentro, da dovunque ci entri.
   // Un gesto per tipo e scheda: ripremere il pollice cambia il voto, ma il voto e
@@ -162,8 +162,8 @@
     }
     bdSignIn.hidden = false;
     if (inCorso) {
-      bdAuthMsg.textContent = 'Completa l\'accesso nel browser che si è aperto.';
-      bdSignIn.textContent = 'Riapri il browser';
+      bdAuthMsg.textContent = 'Completa l\'accesso nella pagina di Google che si è aperta.';
+      bdSignIn.textContent = 'Torna all\'accesso';
     } else if (fallito) {
       bdAuthMsg.textContent = fallito;
       bdSignIn.textContent = 'Riprova';
@@ -173,15 +173,15 @@
     }
   }
 
-  // Un gesto durante l'attesa non apre un altro browser (un doppio clic ne
-  // aprirebbe due): lo riapre solo «Riapri il browser».
+  // Un gesto durante l'attesa non apre un'altra pagina d'accesso (un doppio clic
+  // ne aprirebbe due): la riporta davanti solo «Torna all'accesso».
   function accedi(id, tipo, dopo, poi) {
     const nuova = !attesa;
     if (nuova) attesa = { gesti: new Map(), testa: false };
     if (id) {
       attesa.gesti.set(`${tipo}:${id}`, { id, dopo, poi });
       const promesse = [...attesa.gesti.values()].filter((g) => g.id === id).map((g) => g.dopo);
-      avvisi.set(id, { testo: `Completa l'accesso nel browser: ${promesse.join(', ')}.`, code: 'accesso' });
+      avvisi.set(id, { testo: `Completa l'accesso: ${promesse.join(', ')}.`, code: 'accesso' });
     } else {
       attesa.testa = true;
     }
@@ -191,8 +191,8 @@
     if (nuova) chiediAccesso();
   }
 
-  // Il main tiene un accesso solo: chiederlo di nuovo riapre il browser sulla
-  // stessa pagina e restituisce lo stesso esito.
+  // Il main tiene un accesso solo: chiederlo di nuovo riporta davanti la stessa
+  // pagina e restituisce lo stesso esito.
   function chiediAccesso() {
     const a = attesa;
     sendToMain({ type: 'auth_signin' })
@@ -223,7 +223,7 @@
     else accedi(null);
   });
 
-  // Chi ha chiuso il browser senza accedere non deve aspettare il tetto del main.
+  // Chi ha lasciato la pagina d'accesso senza entrare non deve aspettare il tetto del main.
   bdAuthLascia.addEventListener('click', () => {
     const a = attesa;
     if (!a) return;
@@ -656,6 +656,8 @@
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const reduce = !!(window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      // Token `motion`: moltiplica le durate; a 0 l'etichetta resta ferma il tempo di leggerla.
+      const k = window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionFactor(document) : 1;
 
       const r = originRect && originRect.width
         ? originRect
@@ -684,14 +686,16 @@
       });
       layer.appendChild(label);
       try {
-        label.animate(
-          [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(-22px)', opacity: 0 }],
-          { duration: 900, easing: 'ease-out', fill: 'forwards' }
-        );
+        if (k) {
+          label.animate(
+            [{ transform: 'translateY(0)', opacity: 1 }, { transform: 'translateY(-22px)', opacity: 0 }],
+            { duration: 900 * k, easing: 'ease-out', fill: 'forwards' }
+          );
+        }
       } catch (_) {}
 
-      let maxEnd = 900;
-      if (!reduce) {
+      let maxEnd = k ? 900 * k : 1000;
+      if (!reduce && k) {
         const coinSvg = (window.SN_ICONS?.credits?.(20)) || '●';
         const count = Math.min(7, Math.max(4, n));
         for (let i = 0; i < count; i++) {
@@ -707,8 +711,8 @@
           const sy = oy + (Math.random() - 0.5) * 20;
           const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 60;
           const my = Math.min(sy, ty) - 40 - Math.random() * 40;
-          const delay = i * 40;
-          const dur = 650 + i * 50 + Math.random() * 120;
+          const delay = i * 40 * k;
+          const dur = (650 + i * 50 + Math.random() * 120) * k;
           maxEnd = Math.max(maxEnd, delay + dur);
           try {
             c.animate([

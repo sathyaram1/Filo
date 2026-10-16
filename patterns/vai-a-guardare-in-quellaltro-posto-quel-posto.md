@@ -39,6 +39,10 @@ stata scritta.
   quando non c'è niente da mostrare.
 - **Se l'elenco non è cambiato, non si tocca la pagina**: un avviso che si
   ridisegna sotto le dita (magari con "Confermi?" già armato) è rumore.
+- **Il posto nominato si sposta, il testo che ci manda no.** Quando la pagina
+  cambia, chi la nomina resta indietro in silenzio (#761: «l'avviso in cima ai
+  Ricevuti» due settimane dopo che era stato tolto). Il nome sta in una costante
+  e una sentinella lo confronta con la pagina vera.
 - **Dove:** `src/main/services/mergeApprovalSignal.js` (campanello + decisione
   con l'I/O iniettato), `broadcastToFiloPages` in
   `src/main/services/handlers.js`, `MSG.MERGE_APPROVALS_CHANGED`. Test:

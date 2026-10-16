@@ -851,6 +851,7 @@
     const i = trash.findIndex((e) => e.id === entryId);
     if (i < 0) return null;
     const [entry] = trash.splice(i, 1);
+    if (entry && entry.file && entry.file.id) dimenticaNelFilo({ prefisso: `${entry.file.id}:` });
     // Lo storico arriva dall'archivio in modo asincrono: aspetta che sia
     // caricato, altrimenti una pulizia fatta troppo presto verrebbe riscritta
     // dal caricamento e lascerebbe lo storico di un file che non esiste più.
@@ -1116,6 +1117,7 @@
     }
     writeCollection();
     renderDocSwitcher();
+    rinominaNelFilo(id, f && f.meta && f.meta.title);
   }
 
   // ── Titolo automatico dal contenuto (#379.4) ──────────────────────────
@@ -1197,6 +1199,7 @@
     }
     writeCollection();
     renderDocSwitcher();
+    rinominaNelFilo(id, f && f.meta && f.meta.title);
     return true;
   }
 
@@ -1430,9 +1433,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
     titleMenuEl = menu;
+    document.addEventListener('keydown', onTitleMenuKeydown, true);
     setTimeout(() => {
+      if (titleMenuEl !== menu) return;
       document.addEventListener('mousedown', onTitleMenuOutside, true);
-      document.addEventListener('keydown', onTitleMenuKeydown, true);
       window.addEventListener('scroll', closeTitleMenu, true);
       window.addEventListener('resize', closeTitleMenu);
     }, 0);
@@ -3217,7 +3221,7 @@
       // portano da nessuna parte. La sezione si riapre da sé, poi la vista ci
       // arriva sopra (feedback #385).
       revealCollapsedFor(node, { temporary: true });
-      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      node.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
     };
     if (opts && opts.immediate) go();
     else findRevealTimer = setTimeout(go, FIND_REVEAL_DELAY_MS);
@@ -3807,8 +3811,17 @@
       for (const msg of m.data.messages) {
         const b = document.createElement('div');
         b.className = 'ed-chat-msg ' + (msg.role === 'user' ? 'user' : 'assistant');
-        b.textContent = msg.content;
+        // La riga «interrotta» sta nel testo salvato (il modello la rilegge), ma si mostra come nota, non come risposta.
+        const parti = String(msg.content || '').split('\n\n');
+        const interrotta = msg.role !== 'user' && parti.length > 1 && window.SN_CHAT_ERRORS?.eFraseInterrotta?.(parti[parti.length - 1]);
+        b.textContent = interrotta ? parti.slice(0, -1).join('\n\n') : msg.content;
         log.appendChild(b);
+        if (interrotta) {
+          const n = document.createElement('div');
+          n.className = 'ed-chat-note';
+          n.textContent = parti[parti.length - 1];
+          log.appendChild(n);
+        }
         const nota = noteRipiego.get(msg);
         if (nota) {
           const n = document.createElement('div');
@@ -3816,6 +3829,18 @@
           n.textContent = nota;
           log.appendChild(n);
         }
+      }
+      // L'ultima risposta finisce con la riga «interrotta»: «Continua» chiede il seguito, come nelle altre chat.
+      const ultimo = m.data.messages[m.data.messages.length - 1];
+      const CE = window.SN_CHAT_ERRORS;
+      if (ultimo && ultimo.role !== 'user' && CE?.eFraseInterrotta?.(String(ultimo.content || '').split('\n\n').pop())) {
+        const tasto = document.createElement('button');
+        tasto.type = 'button';
+        tasto.className = 'ed-chat-continua';
+        tasto.textContent = 'Continua';
+        tasto.title = 'Continua la risposta da dove si è interrotta';
+        tasto.addEventListener('click', (e) => { e.stopPropagation(); input.value = CE.CHIEDI_SEGUITO; send(); });
+        log.appendChild(tasto);
       }
       log.scrollTop = log.scrollHeight;
     };
@@ -3826,6 +3851,9 @@
       input.value = '';
       m.data.messages.push({ role: 'user', content: text });
       renderLog();
+      // Il documento si fissa alla domanda: la risposta resta sua anche se intanto se ne apre un altro.
+      const conv = conversazioneDelModulo(m);
+      annotaNelFilo(conv, 'user', text);
       const thinking = { role: 'assistant', content: '…' };
       m.data.messages.push(thinking);
       renderLog();
@@ -3859,6 +3887,10 @@
           } else {
             thinking.content = raw;
           }
+          // Fermata al tetto di lunghezza (#1097.3): lo si legge sotto, e il modello lo vede al giro dopo.
+          const interrotta = window.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);
+          if (interrotta) thinking.content = `${thinking.content}\n\n${interrotta}`;
+          annotaNelFilo(conv, 'filo', thinking.content);
         }
       } catch (e) {
         thinking.content = erroreInChat({ error: e && e.message, code: e && e.code }, 'nessuna risposta');
@@ -3873,6 +3905,29 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
+  }
+
+  // La chat di un modulo entra nel filo come riga ripiegata (#974): documento e modulo dicono quale conversazione.
+  function conversazioneDelModulo(m) {
+    if (!doc || !m) return null;
+    return {
+      rif: `${doc.id}:${m.id}`,
+      soggetto: (doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE,
+      dove: `filo://editor/editor.html?file=${encodeURIComponent(doc.id)}`,
+    };
+  }
+  function annotaNelFilo(conv, role, text) {
+    if (!conv || !String(text || '').trim()) return;
+    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP, app: 'editor', ...conv, messaggi: [{ role, text }] });
+  }
+  // Il documento rinominato (a mano o dal titolo automatico): le righe delle sue chat dicono il nome nuovo.
+  function rinominaNelFilo(id, title) {
+    if (!id) return;
+    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP_RINOMINA, app: 'editor', prefisso: `${id}:`, soggetto: title || STORE.DEFAULT_TITLE });
+  }
+  // Una chat che l'Editor butta via davvero se ne va anche dal filo.
+  function dimenticaNelFilo(campi) {
+    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP_DIMENTICA, app: 'editor', ...campi });
   }
 
   function sendMessage(msg) {
@@ -3951,6 +4006,7 @@
     if (deletable) $('cfgDelete').addEventListener('click', () => {
       // Guardia difensiva: un modulo appuntato non è mai eliminabile.
       if (isPinned(m)) { closeOverlay(); return; }
+      if (m.type === 'chat') dimenticaNelFilo({ rif: `${doc.id}:${m.id}` });
       doc.modules = doc.modules.filter((x) => x.id !== m.id);
       closeOverlay(); renderGrid(); markDirty();
     });
@@ -3984,6 +4040,8 @@
       if (rawShortcut && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
       const r = rifiuto(rawShortcut, m);
       if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
+      // Le scorciatoie di Filo la confrontano con quelle dei moduli salvati: un attimo dopo sarebbe già tardi (#842).
+      const nuovaScorciatoia = (m.data.shortcut || '') !== rawShortcut;
       m.data.shortcut = rawShortcut;
       if (m.type === 'word-count') m.data.count = $('cfgCount').value;
       if (m.type === 'switch') {
@@ -3991,6 +4049,7 @@
         overlayBox.querySelectorAll('[data-picon]').forEach((sel) => { m.data.pages[Number(sel.dataset.picon)].icon = sel.value; });
       }
       closeOverlay(); renderGrid(); markDirty();
+      if (nuovaScorciatoia) save(false);
     });
     // Invio in un campo conferma come «Salva», come Esc annulla (#545).
     overlayBox.querySelectorAll('input[type="text"]').forEach((inp) => inp.addEventListener('keydown', (e) => {
@@ -4001,18 +4060,13 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  // Nome scritto e tasto premuto si leggono SOLO con SN_TASTI: ogni lettura fatta
-  // qui in casa divergeva («Ctrl+Minus», «Ctrl++») e salvava tasti morti (#545).
+  // Nome scritto, tasto premuto e controlli comuni (tasti di Filo e del sistema, nomi sconosciuti, simboli che
+  // cambiano) stanno in SN_TASTI, la stessa regola delle scorciatoie di Filo: qui solo l'Editor e i suoi moduli (#545, #842).
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
     const p = TASTI.pressioneScritta(sc);
     return !!p && (p.ctrlKey || p.metaKey || p.altKey);
-  }
-  // Valida: un modificatore reale e un tasto finale, così non coincide con la
-  // digitazione di una lettera.
-  function isValidShortcut(sc) {
-    return shortcutHasRealModifier(sc) && !TASTI.tipoModificatore(TASTI.pressioneScritta(sc).key);
   }
   function isEditableTarget(t) {
     if (!t) return false;
@@ -4059,17 +4113,10 @@
     const e = TASTI.pressioneScritta(sc);
     return (e && TASTI_EDITOR.find((t) => prendeIlTasto(t, e))) || null;
   }
-  // Perché una scorciatoia non partirebbe mai su questo modulo ('' = va bene).
+  // Perché una scorciatoia non partirebbe mai su questo modulo per i tasti dell'Editor o di un altro modulo ('' = va bene).
   function motivoScorciatoiaPresa(sc, m) {
     if (!sc) return '';
-    const nome = TASTI ? TASTI.etichettaScritta(sc) : sc;
-    if (TASTI && TASTI.riservato(sc)) {
-      return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
-    }
-    // Prima dei tasti dell'Editor: la pressione che descrive non è quella vera.
-    const cambia = TASTI.modificatoreCheCambiaSimbolo(sc);
-    if (cambia === 'Shift') return `Con Shift il simbolo cambia, quindi ${nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift)`;
-    if (cambia) return `Con ${tasto(cambia)} il simbolo cambia, quindi ${nome} non partirebbe mai`;
+    const nome = TASTI.etichettaScritta(sc);
     const t = tastoEditorDi(sc);
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
     const e = TASTI.pressioneScritta(sc);
@@ -4085,14 +4132,8 @@
   // esempi degli avvisi: un esempio che poi si rifiuta non esce (#545).
   function rifiuto(sc, m) {
     if (!sc) return null;
-    const ignoto = TASTI.pezzoSconosciuto(sc);
-    if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
-    const conReale = sc.split(/[+\s-]+/).some((p) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(p)));
-    if (conReale && TASTI.soloModificatori(sc)) return { tipo: 'senzaTasto', nome: TASTI.etichettaScritta(sc.replace(/[+\s-]+$/, '')) };
-    // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive.
-    if (!isValidShortcut(sc)) return { tipo: 'senzaModificatore' };
-    if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
-    if (TASTI.delSistema(sc)) return { tipo: 'sistema', nome: TASTI.etichettaScritta(sc) };
+    const comune = TASTI.rifiutoScritta(sc, TASTI.piattaforma());
+    if (comune) return comune;
     const motivo = motivoScorciatoiaPresa(sc, m);
     return motivo ? { tipo: 'presa', motivo } : null;
   }
@@ -4108,7 +4149,14 @@
       return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1…${conNome ? ` (es. ${conNome})` : ''}.`;
     }
     if (r.tipo === 'sistema') return `${r.nome} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra${perEsempio}.`;
-    return `${r.motivo}: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'altgr') return `${r.nome} su Windows è anche AltGr, che scrive caratteri come € e @: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'simbolo') {
+      return r.modificatore === 'Shift'
+        ? `Con Shift il simbolo cambia, quindi ${r.nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift): scegline un'altra${perEsempio}.`
+        : `Con ${tasto(r.modificatore)} il simbolo cambia, quindi ${r.nome} non partirebbe mai: scegline un'altra${perEsempio}.`;
+    }
+    const motivo = r.cosa ? `${r.nome} è già di Filo (${r.cosa}) e non arriverebbe mai a questo modulo` : r.motivo;
+    return `${motivo}: scegline un'altra${perEsempio}.`;
   }
   // Gli esempi escono coi nomi dei tasti di chi legge; '' se sono tutti presi.
   const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => tasto(`${mods}+${d}`)));
@@ -4200,6 +4248,7 @@
   // si crederebbe in overflow e resterebbe con la barra di scorrimento addosso
   // per sempre (due soli avvisi mostravano la scrollbar).
   let edToastOverflowTimer = null;
+  const motionMs = (ms) => (window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionMs(ms) : ms);
   function syncEdToastOverflow() {
     clearTimeout(edToastOverflowTimer);
     edToastOverflowTimer = setTimeout(() => {
@@ -4207,7 +4256,7 @@
       const scrollable = host.scrollHeight - host.clientHeight > 2;
       host.classList.toggle('scrolling', scrollable);
       if (scrollable) host.scrollTop = host.scrollHeight;
-    }, 260); // > della transizione di entrata/uscita (0.18s / 0.22s)
+    }, motionMs(260)); // > della transizione di entrata/uscita (0.18s / 0.22s)
   }
   function removeEdToast(el, immediate) {
     if (!el || el.dataset.closing === '1') return;
@@ -4219,7 +4268,7 @@
     el.classList.remove('show');
     const via = () => { try { el.remove(); } catch (_) {} edToastTempi.lascia(el); syncEdToastOverflow(); };
     if (immediate) { via(); return; }
-    setTimeout(via, 220);
+    setTimeout(via, motionMs(220));
   }
   // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).
@@ -4427,6 +4476,8 @@
     try {
       const settings = await (window.SN_STORAGE?.getSettings?.());
       if (!settings) return;
+      // I tasti di Spiega, Traduci, Salva e Aiuto li sceglie l'utente: la vecchia si libera per i moduli, la nuova è presa (#842).
+      TASTI.usaScorciatoieFilo(settings.scorciatoie);
       window.SN_PAGE_THEME = settings.theme || 'system';
       let theme = settings.theme || 'system';
       if (theme === 'system') theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

@@ -4,7 +4,9 @@
 :root {
   --sn-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --sn-radius: 6px;
-  --sn-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  --sn-shadow: 0 4px 16px rgba(0, 0, 0, var(--sn-shadow-opacity, 0.18));
+  /* Le ombre scritte a mano moltiplicano il loro alfa per questo rapporto: seguono il token `shadow`. */
+  --sn-ombra: calc(var(--sn-shadow-opacity, 0.18) / 0.18);
   /* Token specifici (registro in src/shared/themeTokens.js): ereditano dalla categoria via var(), così
      un override di categoria si propaga da solo; quello del token specifico esce più specifico e vince. */
   --sn-btn-bg: var(--sn-fg);
@@ -109,6 +111,10 @@
 .sn-select-button:focus-visible {
   border-color: var(--sn-accent);
 }
+.sn-select-wrap > select:disabled + .sn-select-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .sn-select-value {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -118,7 +124,7 @@
   flex: 0 0 auto;
   color: var(--sn-muted);
   font-size: 11px;
-  transition: transform 120ms ease;
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-select-wrap.sn-open .sn-select-chevron {
   transform: rotate(180deg);
@@ -200,7 +206,7 @@
   border-radius: var(--sn-radius);
   font: inherit;
   outline: none;
-  transition: border-color 0.12s ease;
+  transition: border-color calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .sn-rinomina-campo:focus { border-color: var(--sn-accent); }
 .sn-rinomina-campo:disabled { opacity: 0.6; }
@@ -212,7 +218,7 @@
   border-radius: var(--sn-radius);
   font: inherit;
   cursor: pointer;
-  transition: opacity 0.12s ease, background 0.12s ease;
+  transition: opacity calc(0.12s * var(--sn-motion, 1)) ease, background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .sn-rinomina-ok { background: var(--sn-btn-bg); color: var(--sn-btn-fg); border: 1px solid transparent; }
 .sn-rinomina-ok:hover:not(:disabled) { opacity: 0.85; }
@@ -230,7 +236,7 @@
   border: 2px solid var(--sn-border);
   border-top-color: var(--sn-accent);
   border-radius: 50%;
-  animation: sn-rinomina-gira 0.8s linear infinite;
+  animation: sn-rinomina-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
 }
 @keyframes sn-rinomina-gira { to { transform: rotate(360deg); } }
 
@@ -258,8 +264,8 @@
   height: 0;
 }
 
-/* theme.css è iniettato anche nelle pagine esterne, dove l'<html> del sito non ha [data-sn-theme]: qui il
-   prefisso sono i contenitori Filo. Riafferma le icone outline contro un `svg { fill: currentColor }` del sito. */
+/* Gira anche sui siti, dove content.js mette [data-sn-theme] sull'<html>: il prefisso sono i contenitori Filo.
+   Riafferma le icone outline contro un `svg { fill: currentColor }` del sito. */
 .sn-menu svg,
 .sn-popup svg,
 .sn-sidebar svg,

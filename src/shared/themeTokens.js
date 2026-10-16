@@ -157,6 +157,22 @@
       dashCss: ['--dash-radius'],
       default: '6px',
     },
+    // Moltiplica OGNI durata di transition/animation (sentinella: tests/unit/motionSentinella.test.mjs).
+    motion: {
+      label: 'Durata delle animazioni',
+      type: 'factor',
+      css: '--sn-motion',
+      shellCss: ['--sn-motion'],
+      default: '1',
+    },
+    // Alfa dell'ombra di menu e popup; le altre ombre ne seguono la proporzione (--sn-ombra in theme.css).
+    shadow: {
+      label: 'Intensità delle ombre',
+      type: 'opacity',
+      css: '--sn-shadow-opacity',
+      shellCss: ['--sn-shadow-opacity'],
+      default: '0.18',
+    },
 
     // ── token specifici (ereditano dalla categoria) ────────────────────────
     'button.bg': {
@@ -176,6 +192,15 @@
       type: 'color',
       css: '--sn-link',
       category: 'accent',
+    },
+    // Senza override i link ereditano il font di chi li contiene (quindi `font`); con l'override esce anche
+    // `regola`, solo sulle pagine di Filo (data-sn-pagina lo mette pageBootstrap, i siti non ce l'hanno).
+    'link.font': {
+      label: 'Font dei link',
+      type: 'font',
+      css: '--sn-link-font',
+      category: 'font',
+      regola: 'html[data-sn-pagina] a { font-family: var(--sn-link-font); }',
     },
     'selection.color': {
       label: 'Colore della selezione',
@@ -225,11 +250,26 @@
   const RE_FONT = /^[\w\s,'"-]{1,200}$/;
   // Durate: millisecondi interi o secondi, fino a dieci secondi. Zero spegne l'animazione.
   const RE_TIME = /^(\d{1,5})ms$|^(\d{1,2}(?:\.\d{1,3})?)s$/;
+  // Moltiplicatore senza unità: finisce dentro calc(), quindi solo cifre e un punto.
+  const RE_FACTOR = /^(?:\d(?:\.\d{1,3})?|\.\d{1,3})$/;
+  const FACTOR_MAX = 3;
+
+  // I numeri si scrivono come li scrive un italiano («1,5») o arrivano come numero dalla chat: la forma
+  // canonica col punto è l'unica che si salva e finisce nel CSS.
+  const NUMERICI = new Set(['opacity', 'factor']);
+  function normalize(name, value) {
+    const t = TOKENS[name];
+    if (t && NUMERICI.has(t.type)) {
+      if (typeof value === 'number') return Number.isFinite(value) ? String(value) : value;
+      if (typeof value === 'string') return value.trim().replace(/^(\d*),(\d+)$/, '$1.$2');
+    }
+    return typeof value === 'string' ? value.trim() : value;
+  }
 
   function validate(name, value) {
     const t = TOKENS[name];
-    if (!t || typeof value !== 'string') return false;
-    const v = value.trim();
+    const v = normalize(name, value);
+    if (!t || typeof v !== 'string') return false;
     if (!v) return false;
     switch (t.type) {
       case 'color': return RE_HEX.test(v) || RE_RGB.test(v);
@@ -246,8 +286,42 @@
         const ms = m[1] !== undefined ? Number(m[1]) : Number(m[2]) * 1000;
         return ms >= 0 && ms <= 10000;
       }
+      case 'factor': return RE_FACTOR.test(v) && Number(v) <= FACTOR_MAX;
       default: return false;
     }
+  }
+
+  // L'errore puntuale per un valore rifiutato: lo mostrano le Preferenze e lo legge la chat.
+  function errorMessage(name) {
+    const t = TOKENS[name];
+    switch (t && t.type) {
+      case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
+      case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
+      case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
+      case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
+      case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
+      case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX}, es. 0 (nessuna animazione), 1 (normale) o 1,5.`;
+      default: return t ? 'Valore non valido.' : 'Token sconosciuto.';
+    }
+  }
+
+  // Il moltiplicatore delle durate in vigore su un documento, per le animazioni fatte in JS.
+  function motionFactor(doc) {
+    try {
+      const d = doc || (typeof document !== 'undefined' ? document : null);
+      if (!d || !d.documentElement || typeof getComputedStyle !== 'function') return 1;
+      const raw = getComputedStyle(d.documentElement).getPropertyValue('--sn-motion').trim();
+      if (!raw) return 1;
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.min(FACTOR_MAX, Math.max(0, n)) : 1;
+    } catch (_) { return 1; }
+  }
+  function motionMs(ms, doc) {
+    return Math.round(Number(ms) * motionFactor(doc)) || 0;
+  }
+  // Lo scorrimento morbido è un'animazione anche lui: con le animazioni tolte si salta.
+  function scrollBehavior(doc) {
+    return motionFactor(doc) ? 'smooth' : 'auto';
   }
 
   // Tiene solo gli override validi: { clean, rejected: [nomi] }.
@@ -255,7 +329,7 @@
     const clean = {};
     const rejected = [];
     for (const [name, value] of Object.entries(overrides || {})) {
-      if (validate(name, value)) clean[name] = String(value).trim();
+      if (validate(name, value)) clean[name] = normalize(name, value);
       else rejected.push(name);
     }
     return { clean, rejected };
@@ -277,8 +351,8 @@
     const t = TOKENS[name];
     if (!t) return undefined;
     const o = overrides || {};
-    if (validate(name, o[name])) return String(o[name]).trim();
-    if (t.category && validate(t.category, o[t.category])) return String(o[t.category]).trim();
+    if (validate(name, o[name])) return normalize(name, o[name]);
+    if (t.category && validate(t.category, o[t.category])) return normalize(t.category, o[t.category]);
     return defaultValue(name, theme);
   }
 
@@ -359,7 +433,7 @@
   // sfondo chiaro sia "rendi lo sfondo nero" con testo già scuro.
   function illegibleAfter(name, value, overrides, theme) {
     const next = { ...(overrides || {}) };
-    if (validate(name, value)) next[name] = String(value).trim();
+    if (validate(name, value)) next[name] = normalize(name, value);
     else if (name in next) delete next[name];
     for (const [fg, bg] of LEGIBILITY_PAIRS) {
       const r = contrastRatio(
@@ -409,7 +483,9 @@
   // CSS per le superfici a tema --sn-* (pagine filo:// e pagine web esterne).
   function pageCss(overrides) {
     const decls = declsFor(overrides);
-    return decls.length ? `html[data-sn-theme] {\n  ${decls.join('\n  ')}\n}` : '';
+    if (!decls.length) return '';
+    const regole = Object.keys(sanitize(overrides).clean).map((n) => TOKENS[n].regola).filter(Boolean);
+    return [`html[data-sn-theme] {\n  ${decls.join('\n  ')}\n}`, ...regole].join('\n');
   }
 
   // CSS per la shell del browser (palette propria, variabili senza prefisso).
@@ -441,6 +517,12 @@
     names,
     get,
     validate,
+    normalize,
+    errorMessage,
+    motionFactor,
+    motionMs,
+    scrollBehavior,
+    FACTOR_MAX,
     sanitize,
     defaultValue,
     effectiveValue,

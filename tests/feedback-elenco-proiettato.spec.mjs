@@ -204,8 +204,8 @@ test('rispondere a un chiarimento non cancella il report della lavorazione', asy
 
   await page.locator('.mg-item[data-id="fb678"]').click();
   // Subito, senza aspettare che il dettaglio arrivi.
-  await page.locator('#mgClarifyText').fill('Prendi la seconda.');
-  await page.locator('#mgClarifyBtn').click();
+  await page.locator('#mgSideRispostaText').fill('Prendi la seconda.');
+  await page.locator('#mgSideRispostaBtn').click();
 
   await expect.poll(async () => (await page.evaluate(() => window.__inviati)).length, { timeout: 15_000 })
     .toBeGreaterThan(0);
@@ -454,9 +454,9 @@ test('riaprire un fix uscito porta con sé il motivo, anche scritto durante l_at
 
 test('la risposta a un chiarimento scritta durante l_attesa resta nella casella', async ({ openTab }) => {
   const page = await gestionePronta(openTab, IN_CHIARIMENTO_2);
-  await page.locator('#mgClarifyText').fill('Prendi la seconda strada.');
+  await page.locator('#mgSideRispostaText').fill('Prendi la seconda strada.');
   await page.waitForTimeout(LENTO_MS + 1000);
-  await expect(page.locator('#mgClarifyText')).toHaveValue('Prendi la seconda strada.');
+  await expect(page.locator('#mgSideRispostaText')).toHaveValue('Prendi la seconda strada.');
 });
 
 test('la frase per chi ha segnalato scritta durante l_attesa resta nella riga', async ({ openTab }) => {
@@ -489,11 +489,11 @@ test('il commento della revisione scritto durante l_attesa arriva al server', as
 // la conversazione arriva, invece di restare per sempre su «Caricamento…».
 test('finita la bozza, la conversazione arriva lo stesso', async ({ openTab }) => {
   const page = await gestionePronta(openTab, IN_CHIARIMENTO_2);
-  await page.locator('#mgClarifyText').fill('bozza');
+  await page.locator('#mgSideRispostaText').fill('bozza');
   await page.waitForTimeout(LENTO_MS + 800);
   await expect(page.locator('#mgThread')).toContainText('Caricamento della conversazione');
   // Bozza cancellata e cursore altrove: non c'è più niente da perdere.
-  await page.locator('#mgClarifyText').fill('');
+  await page.locator('#mgSideRispostaText').fill('');
   await page.locator('#mgThread').click();
   await expect(page.locator('#mgThread')).toContainText('Report della lavorazione.', { timeout: 10_000 });
 });
@@ -587,9 +587,9 @@ test('la lettura che non è tornata non si ricompra a ogni clic', async ({ openT
 
 test('con la conversazione non letta, «Invia risposta» non la sostituisce: lo dice', async ({ openTab }) => {
   const page = await gestioneDettaglioRotto(openTab, ROTTA, 'sparito');
-  await page.locator('#mgClarifyText').fill('Prendi la seconda strada.');
-  await page.locator('#mgClarifyBtn').click();
-  await expect(page.locator('#mgClarifyMsg')).toContainText('non è arrivata', { timeout: 10_000 });
+  await page.locator('#mgSideRispostaText').fill('Prendi la seconda strada.');
+  await page.locator('#mgSideRispostaBtn').click();
+  await expect(page.locator('#mgSideRispostaMsg')).toContainText('non è arrivata', { timeout: 10_000 });
   const inviati = await page.evaluate(() => window.__inviati);
   expect(inviati, `non deve partire nessuna scrittura: ${JSON.stringify(inviati)}`).toEqual([]);
 });
@@ -612,12 +612,12 @@ test('con la conversazione non letta, «Conferma riapertura» non la sostituisce
 test('«Riprova» non porta via quello che l_owner sta scrivendo', async ({ openTab }) => {
   const page = await gestioneDettaglioRotto(openTab, { ...ROTTA, _id: 'fb677z' }, 'poi-ok');
   await expect(page.locator('#mgThread')).toContainText('non è arrivato', { timeout: 10_000 });
-  await page.locator('#mgClarifyText').fill('Prendi la seconda strada.');
+  await page.locator('#mgSideRispostaText').fill('Prendi la seconda strada.');
   await page.locator('#mgRiprovaDettaglio').click();
   await page.waitForTimeout(1500);
-  await expect(page.locator('#mgClarifyText')).toHaveValue('Prendi la seconda strada.');
+  await expect(page.locator('#mgSideRispostaText')).toHaveValue('Prendi la seconda strada.');
   // E finita la bozza la conversazione arriva lo stesso.
-  await page.locator('#mgClarifyText').fill('');
+  await page.locator('#mgSideRispostaText').fill('');
   await page.locator('#mgThread').click();
   await expect(page.locator('#mgThread')).toContainText('Report della lavorazione', { timeout: 10_000 });
 });

@@ -32,7 +32,7 @@
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
 //   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
-//   accessoCambiato()                                       — l'owner è rientrato: riprova le voci col token rifiutato
+//   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
 
 (function (global) {
@@ -51,6 +51,7 @@
   let queue = [];        // mirror in memoria del persistito
   let loaded = false;
   let flushing = false;
+  let ancora = false;    // chiesto un giro mentre un altro era in corso
   let timer = null;
   let auto = true;       // scheduling automatico (disattivabile nei test)
   let prepareFn = null;  // async (payload) -> name (titolo generato al momento dell'invio)
@@ -178,17 +179,24 @@
 
   // #912: col token rifiutato ogni giro consumava un numero del contatore comune e ricaricava gli allegati, ogni
   // mezzo minuto e per sempre. Si riprova solo quando l'owner rientra o al riavvio (il segno non si salva).
+  // Chi rientra non aspetta il giro del backoff già fissato, che può cadere mezzo minuto dopo (#1212).
   function accessoCambiato() {
     for (const it of queue) it.tokenRifiutato = false;
-    if (queue.length) scheduleFlush(0);
+    if (!queue.length) return;
+    if (timer) { clearTimeout(timer); timer = null; }
+    backoff = backoffMin;
+    scheduleFlush(0);
   }
 
   // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
   // dopo il tentativo. Su fallimento (offline) le voci restano in coda e, se
   // `auto`, viene pianificato un nuovo tentativo con backoff crescente.
   async function flush() {
-    if (flushing) return queue.length === 0;
+    // Il giro in corso ha già scelto le voci e letto il token: chi arriva adesso (un invio, un rientro) ne vuole
+    // un altro appena finisce, o resterebbe fermo fino al prossimo invio.
+    if (flushing) { ancora = true; return queue.length === 0; }
     flushing = true;
+    ancora = false;
     let anyFail = false;
     try {
       await load();
@@ -268,7 +276,11 @@
     } finally {
       flushing = false;
     }
-    if (anyFail && queue.length) {
+    if (ancora && queue.length) {
+      ancora = false;
+      if (timer) { clearTimeout(timer); timer = null; }
+      scheduleFlush(0);
+    } else if (anyFail && queue.length) {
       const d = backoff;
       backoff = Math.min(backoffMax, Math.round(backoff * 1.7));
       scheduleFlush(d);
@@ -286,7 +298,7 @@
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
-      queue = []; loaded = false; flushing = false; auto = true;
+      queue = []; loaded = false; flushing = false; ancora = false; auto = true;
       prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; onAttesaOwnerFn = null; onScadutaFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },

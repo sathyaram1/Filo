@@ -806,3 +806,31 @@ test('su Mac l\'avviso nomina la combinazione che hai scritto', async ({ openTab
     await expect(page.locator('#cfgShortcutTaken'), scritto).toHaveText(atteso);
   }
 });
+
+// #842: i tasti di Spiega, Traduci, Salva e Aiuto li sceglie l'utente. Cambiata Traduci, la combinazione vecchia
+// torna libera per un modulo e la nuova è presa; #545.5: Ctrl+Shift+T è della shell come Ctrl+T.
+test('una scorciatoia di modulo segue i tasti scelti per le azioni di Filo', async ({ app, openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#doc')).toBeVisible();
+  const r = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'scorciatoia', valore: 'Traduci: Ctrl+Shift+Y' }, { sender: null }));
+  expect(r.executed).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.SN_TASTI.scorciatoiaFilo('translate-selection'))).toBe('Ctrl+Shift+Y');
+
+  await enterSettingsMode(page);
+  await page.locator('.ed-module[data-type="word-count"]').click();
+  for (const [scritto, atteso] of [
+    ['Ctrl+Shift+Y', /«Traduci»/],
+    ['Ctrl+Shift+T', /già di Filo \(apre una scheda nuova\)/],
+    ['Ctrl+Shift+R', /ricarica la pagina/],
+  ]) {
+    await page.fill('#cfgShortcut', scritto);
+    await page.click('#cfgSave');
+    await expect(page.locator('#cfgShortcutTaken'), scritto).toBeVisible();
+    await expect(page.locator('#cfgShortcutTaken'), scritto).toHaveText(atteso);
+  }
+  await page.fill('#cfgShortcut', 'Alt+T');
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+});

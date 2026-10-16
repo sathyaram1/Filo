@@ -44,7 +44,7 @@
     .fb-imgs img.fb-img-loading {
       width: 140px; height: 100px; object-fit: contain; cursor: default;
       background: var(--sn-surface-2, rgba(127,127,127,.08));
-      animation: fbImgPulse 1.2s ease-in-out infinite;
+      animation: fbImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes fbImgPulse { 0%,100% { opacity: .55; } 50% { opacity: .85; } }
     .fb-img-broken {
@@ -101,7 +101,7 @@
     .fb-act--busy { position: relative; }
     .fb-act--busy::after {
       content: '…'; margin-left: 6px;
-      animation: fb-pulse 900ms ease-in-out infinite;
+      animation: fb-pulse calc(900ms * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes fb-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
     .fb-card--decisa { opacity: 0.55; }
@@ -194,7 +194,7 @@
     .fb-attach-thumb img.fb-img-loading {
       object-fit: contain; cursor: default;
       background: var(--sn-surface-2, rgba(127,127,127,.08));
-      animation: fbImgPulse 1.2s ease-in-out infinite;
+      animation: fbImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     .fb-attach-thumb .fb-img-broken {
       width: 64px; height: 64px; font-size: 10px; line-height: 1.2;
@@ -273,6 +273,7 @@
     .fb-segno--spam    { color: #e08e0b; }
     .fb-segno--design  { color: #2e9e5b; }
     .fb-segno--aligned { color: #5b6ee0; }
+    .fb-segno--locale  { color: #26c9fc; }
     .fb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
     .fb-badge {
       font-size: 11px; padding: 1px 7px; border-radius: 999px;
@@ -308,7 +309,7 @@
     .fb-dot {
       width: 13px; height: 13px; padding: 0; border-radius: 50%;
       border: 1px solid var(--sn-muted); background: transparent;
-      cursor: pointer; box-sizing: border-box; transition: background 0.1s, border-color 0.1s;
+      cursor: pointer; box-sizing: border-box; transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
     }
     .fb-dot:hover { border-color: var(--sn-accent); }
     .fb-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }
@@ -365,7 +366,7 @@
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
       <button type="button" class="fb-tab" data-tab="queue">In coda</button>
-      <button type="button" class="fb-tab" data-tab="local">Lavori locali</button>
+      <button type="button" class="fb-tab" data-tab="local">Lavori server</button>
       <button type="button" class="fb-tab" data-tab="waiting">Aspettano</button>
       <button type="button" class="fb-tab" data-tab="resolved">Risolti</button>
       <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>
