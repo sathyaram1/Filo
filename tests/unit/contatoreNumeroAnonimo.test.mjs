@@ -1,12 +1,14 @@
 // #923: il numero scelto da chi manda un feedback senza account non arriva al
 // contatore. Il giro di Gestione gira davvero (src/main/services/handlers/auth.js)
-// contro un Firestore in memoria che applica le regole del contatore.
+// contro un Firestore in memoria che applica le regole del contatore. Le altre
+// due porte (backfill, vista pubblica) stanno nei loro file di prova.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
@@ -83,8 +85,7 @@ function firestore({ contatore, documenti }) {
     throw new Error(`domanda non prevista: ${metodo} ${u.pathname}`);
   };
 
-  let giroFinito = null;
-  const finito = new Promise((r) => { giroFinito = r; });
+  const giro = { finito: false };
   FB.list = async () => db.documenti.map((d) => ({ ...d }));
   FB.listResolved = async () => [];
   FB.listAllPublic = async () => [];
@@ -94,11 +95,11 @@ function firestore({ contatore, documenti }) {
   FB.publishPublicCard = async () => true;
   FB.unpublishPublicCard = async () => true;
   // Quello vero, con un segnale di fine: è l'ultimo passo del giro.
-  FB.ensureSeqCounter = async (...a) => { try { return await ensureVero(...a); } finally { giroFinito(); } };
+  FB.ensureSeqCounter = async (...a) => { try { return await ensureVero(...a); } finally { giro.finito = true; } };
 
   const porte = new Map();
   register((tipo, h) => porte.set(tipo, h), { MSG, broadcastToTabs: () => {}, broadcastToFiloPages: () => {} });
-  return { db, porta: porte.get(MSG.FEEDBACK_FETCH), finito };
+  return { db, porta: porte.get(MSG.FEEDBACK_FETCH), giro };
 }
 
 const feedback = (id, seq, extra = {}) => ({
@@ -109,8 +110,7 @@ const feedback = (id, seq, extra = {}) => ({
 async function apriGestione(f) {
   const r = await f.porta({ op: 'list', pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA }, null, 'filo://manage/manage.html');
   assert.equal(r.ok, true);
-  const esito = await Promise.race([f.finito.then(() => 'fatto'), new Promise((r2) => setTimeout(() => r2('scaduto'), 10_000))]);
-  assert.equal(esito, 'fatto', 'il giro di Gestione non è arrivato al contatore');
+  await aspettaChe(() => f.giro.finito, { cosa: 'il giro di Gestione non è arrivato al contatore' });
 }
 
 test('un feedback anonimo a 1.000.000 non sposta il contatore, e il feedback dopo prende il 901', async () => {
