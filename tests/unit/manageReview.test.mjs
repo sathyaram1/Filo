@@ -1424,20 +1424,18 @@ test('livelli L3: grigio senza segnalazione, verde con il testo di chi ha lavora
   assert.match(righe, /2026-09-12/);
 });
 
-test('livelli L3: fermo per un guasto, arenato o in loop, il rombo dice quello che dice il segno in lista', () => {
+test('livelli L3: fermo per un guasto, arenato o in loop, il rombo (grigio: nessuna risposta da dare qui) dice quello che dice il segno in lista', () => {
   require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
   for (const motivo of ['guasto', 'arenato', 'loop']) {
     const fb = { status: 'design', statusReason: motivo, notes: 'Report.\n\n[Filo]\nGuasto, non lavoro locale: guasto: filo-security. Domanda D-9.' };
     const l3 = MR.livelloL3(fb);
     const segno = MR.segnoFermata(fb);
-    assert.notEqual(l3.vuoto, true, motivo);
     assert.equal(l3.titolo, segno.testo, `${motivo}: stesso testo in lista e nel dettaglio`);
-    assert.equal(l3.colore, MR.REASONS.design.color, motivo);
+    assert.equal(l3.esito, 'fermo', motivo);
     assert.match(l3.pannello.testo, /D-9/, `${motivo}: l'ultima nota di chi ci lavorava`);
     assert.doesNotMatch(l3.pannello.testo, /Nessuna segnalazione/, motivo);
     assert.match(MR.livelloL3({ status: 'design', statusReason: motivo }).pannello.testo, new RegExp(segno.testo.slice(0, 12)));
   }
-  assert.equal(MR.livelloL3({ status: 'design', statusReason: 'locale' }).classe, 'locale');
   assert.equal(MR.livelloL3({ status: 'design', statusReason: 'judges' }).esito, 'nessuna');
 });
 

@@ -1516,8 +1516,8 @@
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
     if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
-    // Fermo al livello 3 senza una scelta da fare (guasto, arenato, loop): il rombo dice quello che dice il segno in
-    // lista, con l'ultima nota di chi ci lavorava (per un guasto, il numero della domanda). Mai «Nessuna segnalazione».
+    // Fermo al livello 3 senza una scelta da fare (guasto, arenato, loop): il rombo resta grigio (il verde è la casella
+    // della risposta) ma dice quello che dice il segno in lista, con l'ultima nota (per un guasto, il numero della domanda).
     const fermo = !attesa && !segnalato ? fermoAlLivello3(fb) : null;
     // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
     if (!letto) {
@@ -1526,7 +1526,7 @@
     if (fermo) {
       const nota = ultimaDomanda(fb);
       const cifrata = valueUnreadable(fb && fb.notes);
-      return forma('l3', 'rombo', fermo.testo, fermo.classe, 'fermo', {
+      return forma('l3', 'rombo', fermo.testo, null, 'fermo', {
         titolo: fermo.testo,
         righe: (nota && nota.ts) ? [riga('Quando', istanteDelTurno(nota.ts))] : [],
         testo: cifrata ? TESTO_CIFRATO : ((nota && nota.body) || fermo.testo),

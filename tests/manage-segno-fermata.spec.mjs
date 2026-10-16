@@ -184,7 +184,6 @@ test('fermo per un guasto: in lista e nel dettaglio si legge guasto, non lavoro 
 
   // Il rombo del dettaglio dice la stessa cosa del segno in lista, e quale domanda aprire.
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
-  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
   await expect(rombo).toHaveAttribute('title', /guasto/i);
   await rombo.click();
   await expect(corpo).not.toContainText('Nessuna segnalazione');
