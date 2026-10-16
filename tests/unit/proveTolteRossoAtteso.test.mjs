@@ -221,5 +221,6 @@ test('la fase 2, in cloud e in locale, dice come si tratta una prova segnata che
   const { codaText } = await import('../../scripts/verify-local.mjs');
   const risposta = verifierReplyText({ outcome: 'fix', phase2: { findings: [{ level: 2, text: 'rotto', n: 1 }], derived: [] } });
   const coda = codaText({ findings: [{ level: 2, text: 'rotto', n: 1 }], derived: [], external: [], budgets: {}, branch: RAMO });
+  assert.match(ROSSO_ATTESO_CHIUSO, /Expected to fail, but passed/);
   for (const testo of [risposta, coda]) assert.ok(testo.includes(ROSSO_ATTESO_CHIUSO));
 });
