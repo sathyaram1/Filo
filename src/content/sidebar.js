@@ -1664,7 +1664,7 @@
         const ok = await runPageAction(parsed.page);
         // Se l'agente vuole concatenare passi (status:"continue") e l'azione è
         // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
-        if (parsed.status === 'continue' && ok) {
+        if (parsed.status === 'continue' && ok && !PAGE_ACTIONS[parsed.page.op].chiude) {
           const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
           setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
         } else {
