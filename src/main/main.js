@@ -276,7 +276,8 @@ app.whenReady().then(async () => {
 
   // Configura il rilevatore di siti pericolosi con chiave GSB/LLM/rete/sandbox
   // dalle impostazioni. Non blocca: senza chiavi resta solo l'analisi locale.
-  try { require('./services/handlers').wireSafebrowse().catch(() => {}); } catch (_) {}
+  // Le impostazioni già lette: i siti fidati (#967) devono valere prima che si apra la prima scheda.
+  try { require('./services/handlers').wireSafebrowse(impostazioniAvvio).catch(() => {}); } catch (_) {}
 
   // #410.1 — intercetta gli scaricamenti della navigazione (clic su un link a
   // un file) sulla sessione predefinita: carica la cronologia persistita e
