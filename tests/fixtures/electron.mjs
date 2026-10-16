@@ -3,7 +3,7 @@
 // Lancia l'app via _electron.launch e fornisce ai test:
 //   - app:        l'istanza ElectronApplication
 //   - shell:      Page object della shell (BrowserWindow primary)
-//   - openTab:    apre una URL come nuovo tab e ritorna la Page del WebContentsView
+//   - openTab:    apre una URL come nuovo tab e ritorna la Page della sua vista
 //   - testServer: mini HTTP server locale per pagine di test (i content
 //                 script Filo si caricano via preload anche su http://127.0.0.1)
 //
