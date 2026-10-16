@@ -175,7 +175,9 @@
     hint.classList.toggle('sn-show', !!testo);
   }
 
-  async function apriCancellaTutto() {
+  async function apriCancellaTutto(e) {
+    // Un doppio clic aprirebbe e richiuderebbe subito: conta il primo.
+    if (e && e.detail > 1) return;
     const box = $('sec-wipe-box');
     if (!box.hidden) { chiudiCancellaTutto(); return; }
     box.hidden = false;

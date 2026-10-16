@@ -4,9 +4,9 @@
 
 import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, lstatSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,7 +45,15 @@ async function chiaviPosate(app, userData) {
 
 function fileSotto(dir) {
   const out = [];
-  const giro = (d) => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) giro(p); else out.push(p); } };
+  // I segni di Chromium (SingletonCookie…) sono collegamenti che non puntano a un file: si saltano.
+  const giro = (d) => {
+    for (const n of readdirSync(d)) {
+      const p = join(d, n);
+      const st = lstatSync(p);
+      if (st.isDirectory()) giro(p);
+      else if (st.isFile()) out.push(p);
+    }
+  };
   giro(dir);
   return out;
 }
@@ -125,9 +133,11 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
   const vergine = cartellaTemporanea('filo-vergine-');
   const userData = cartellaTemporanea('filo-cancella-');
   const zip = join(cartellaTemporanea('filo-cancella-zip-'), 'prima.zip');
+  let app = null;
+  let shell = null;
   try {
     // Il metro: un Filo appena installato, lasciato posare.
-    let { app, shell } = await avvia(vergine);
+    ({ app, shell } = await avvia(vergine));
     await expect(shell.locator('body')).toBeAttached();
     await new Promise((r) => setTimeout(r, 1500));
     const appenaInstallato = await chiaviPosate(app, vergine);
@@ -160,28 +170,27 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
     await aspettaUscita(app);
 
     ({ app, shell } = await avvia(userData));
-    try {
-      await expect.poll(() => chiaviPosate(app, userData), { timeout: 15_000 }).toEqual(appenaInstallato);
-      expect(contengono(userData, 'ZQX')).toEqual([]);
-      expect(existsSync(join(userData, 'cancella-tutto.json'))).toBe(false);
-      expect(readdirSync(userData).some((n) => n.startsWith('identity.bin'))).toBe(true);
-      await nienteInVista(app, shell);
-      // E lo dice nella finestra: l'avviso vive nella vista sopra la pagina, col modello nella shell.
-      const avvisi = async () => (await Promise.all(app.windows().map((w) => w.evaluate(() => document.body?.textContent || '').catch(() => '')))).join('\n');
-      await expect.poll(avvisi, { timeout: 15_000 }).toContain('Ho cancellato tutti i dati di Filo');
-    } finally {
-      await chiudiApp(app);
-    }
+    await expect.poll(() => chiaviPosate(app, userData), { timeout: 15_000 }).toEqual(appenaInstallato);
+    expect(contengono(userData, 'ZQX')).toEqual([]);
+    expect(existsSync(join(userData, 'cancella-tutto.json'))).toBe(false);
+    expect(readdirSync(userData).some((n) => n.startsWith('identity.bin'))).toBe(true);
+    await nienteInVista(app, shell);
+    // E lo dice nella finestra: l'avviso vive nella vista sopra la pagina, col modello nella shell.
+    const avvisi = async () => (await Promise.all(app.windows().map((w) => w.evaluate(() => document.body?.textContent || '').catch(() => '')))).join('\n');
+    await expect.poll(avvisi, { timeout: 15_000 }).toContain('Ho cancellato tutti i dati di Filo');
   } finally {
-    for (const d of [vergine, userData, dirname(zip)]) rmSync(d, { recursive: true, force: true });
+    if (app) await chiudiApp(app);
+    for (const d of [vergine, userData, dirname(zip)]) togliCartella(d);
   }
 });
 
 test('con la scelta spuntata se ne va anche l\'identità dei crediti', async () => {
   test.setTimeout(120_000);
   const userData = cartellaTemporanea('filo-cancella-');
+  let app = null;
+  let shell = null;
   try {
-    let { app, shell } = await avvia(userData);
+    ({ app, shell } = await avvia(userData));
     await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Marta' }));
     writeFileSync(join(userData, 'identity.bin'), 'identità finta');
     writeFileSync(join(userData, 'wallet.bin'), 'chiave finta');
@@ -193,15 +202,12 @@ test('con la scelta spuntata se ne va anche l\'identità dei crediti', async () 
     await page.locator('#sec-wipe-word').press('Enter');
     await aspettaUscita(app);
     ({ app, shell } = await avvia(userData));
-    try {
-      await app.evaluate(() => globalThis.__filoStorage.whenSettled());
-      expect(readdirSync(userData).filter((n) => n.startsWith('identity.bin') || n.startsWith('wallet'))).toEqual([]);
-      expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO || '')).toBe('');
-    } finally {
-      await chiudiApp(app);
-    }
+    await app.evaluate(() => globalThis.__filoStorage.whenSettled());
+    expect(readdirSync(userData).filter((n) => n.startsWith('identity.bin') || n.startsWith('wallet'))).toEqual([]);
+    expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getMemory()).PROFILO || '')).toBe('');
   } finally {
-    rmSync(userData, { recursive: true, force: true });
+    if (app) await chiudiApp(app);
+    togliCartella(userData);
   }
 });
 
