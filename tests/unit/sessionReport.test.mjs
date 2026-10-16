@@ -158,6 +158,51 @@ test('una versione che il listino non conosce per nome lascia la nota, col costo
   ]) assert.equal(famigliaPrezzo(model).known, true, model);
 });
 
+// #883: un turno veloce contato a tariffa normale faceva dire al rapporto la metà del costo vero.
+const UN_MILIONE = (speed) => ({
+  input_tokens: 1e6, cache_creation_input_tokens: 2e6,
+  cache_creation: { ephemeral_5m_input_tokens: 1e6, ephemeral_1h_input_tokens: 1e6 },
+  cache_read_input_tokens: 1e6, output_tokens: 1e6, ...(speed === undefined ? {} : { speed }),
+});
+
+test('un turno in modalità veloce costa la sua tariffa: il doppio su Opus 5.5, Opus 5 e Opus 4.8, senza nota', async () => {
+  for (const [model, normale] of [['claude-opus-5-5', 37.2], ['claude-opus-5-5[1m]', 37.2], ['claude-opus-5', 46.75], ['claude-opus-4-8', 46.75]]) {
+    const veloce = await analizzaRighe([assistant('v', model, UN_MILIONE('fast'), [], T('00:00'))]);
+    assert.equal(veloce.costUsd, normale * 2, model);
+    assert.deepEqual(veloce.notes, [], model);
+    for (const speed of ['standard', undefined]) {
+      const rep = await analizzaRighe([assistant('n', model, UN_MILIONE(speed), [], T('00:00'))]);
+      assert.equal(rep.costUsd, normale, `${model} ${speed}`);
+      assert.deepEqual(rep.notes, [], `${model} ${speed}`);
+    }
+  }
+  const misto = await analizzaRighe([
+    assistant('a', 'claude-opus-5-5', UN_MILIONE('standard'), [], T('00:00')),
+    assistant('b', 'claude-opus-5-5', UN_MILIONE('fast'), [], T('00:01')),
+  ]);
+  assert.equal(misto.costUsd, 111.6, 'in una sessione mista raddoppia solo il turno veloce');
+  assert.match(riassunto(misto)[3], /costo stimato: \$111\.6000/);
+});
+
+test('modalità veloce che il listino non conosce per quel modello: il doppio, e la nota come per un modello sconosciuto', async () => {
+  for (const [model, tariffa, normale] of [
+    ['claude-opus-4-7', 'Opus 5', 46.75], ['claude-sonnet-5-5', 'Sonnet 5', 18.7], ['claude-haiku-4-5', 'Haiku 4.5', 9.35],
+    ['claude-fable-5-1', 'Fable 5.1', 92.75], ['claude-opus-6', 'Opus 5', 46.75],
+  ]) {
+    const rep = await analizzaRighe([
+      assistant('v', model, UN_MILIONE('fast'), [], T('00:00')),
+      assistant('w', model, UN_MILIONE('fast'), [], T('00:01')),
+    ]);
+    assert.equal(rep.costUsd, normale * 4, model);
+    assert.ok(rep.notes.includes(`velocità «fast» non a listino per «${model}»: 2 turni calcolati a 2× la tariffa ${tariffa}`), `${model}: ${JSON.stringify(rep.notes)}`);
+  }
+  const ignota = await analizzaRighe([assistant('t', 'claude-opus-5-5', UN_MILIONE('Turbo'), [], T('00:00'))]);
+  assert.equal(ignota.costUsd, 37.2, 'una velocità che il listino non ha affatto resta a tariffa normale');
+  assert.deepEqual(ignota.notes, ['velocità «turbo» non a listino per «claude-opus-5-5»: 1 turno calcolato a tariffa Opus 5.5']);
+  assert.match(riassunto(ignota)[4], /note: velocità «turbo»/);
+  assert.equal(valutaUso(UN_MILIONE(42), 'claude-opus-5-5').costo, 37.2, 'un campo che non è testo non è una velocità');
+});
+
 // L'orchestratore delle routine gira su Haiku 5.5: prezzato come Haiku 4.5, il suo costo usciva dieci volte tanto.
 test('Haiku 5.5 e Sonnet 5.5 si riconoscono per nome, ognuno col suo listino e senza nota', async () => {
   for (const [model, key] of [
