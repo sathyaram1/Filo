@@ -431,6 +431,7 @@
       // Il salto di scheda: Alt+cifra qui, Cmd+cifra su Mac.
       ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
     ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
+    lista.push([etichettaSchermoIntero(esplicita), 'mette e toglie lo schermo intero']);
     if (!senzaFilo) {
       for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
     }
