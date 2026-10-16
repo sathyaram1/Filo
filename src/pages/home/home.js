@@ -389,9 +389,10 @@
     avviso(I18n.t('home_moved', nomeCategoria(r.page?.categoryId)));
   }
 
-  // L'«Annulla» resta più di un avviso semplice, si ferma col puntatore sopra e non lo sfratta un avviso nuovo:
-  // per quella scheda è l'unica strada per tornare indietro.
-  function offriAnnulla(page) {
+  // L'«Annulla» resta più di un avviso semplice, si ferma col puntatore o col fuoco sopra e non lo sfratta un avviso
+  // nuovo: per quella scheda è l'unica strada per tornare indietro. Da tastiera il fuoco ci va da sé (in fondo ai Tab,
+  // dietro tutte le schede, non lo si raggiungerebbe in tempo); Esc lo riporta all'elenco.
+  function offriAnnulla(page, { daTastiera = false } = {}) {
     const P = window.SN_POPUP;
     if (!P?.mountToast) return;
     const el = document.createElement('div');
