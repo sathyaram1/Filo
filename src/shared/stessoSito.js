@@ -155,11 +155,21 @@
     return !!sito && sitoDi(b, opz) === sito;
   }
 
+  // Qui sotto nessun nome è il sito di qualcuno: sono gli indirizzi che servono i file di tutti per percorso
+  // (release-assets.githubusercontent.com dà le release di ogni utente GitHub). Solo per il giudizio, mai per i cookie.
+  const CONDIVISI = ['githubusercontent.com', 'googleusercontent.com', 'dropboxusercontent.com',
+    'github-production-release-asset-2e65be.s3.amazonaws.com'];
+  function condiviso(voce) {
+    const host = hostDi(voce).replace(/\.+$/, '');
+    return !!host && CONDIVISI.some((c) => host === c || host.endsWith(`.${c}`));
+  }
+
   // Una voce che non è il sito di nessuno: un suffisso pubblico (co.uk) o una piattaforma che ospita i siti di chiunque
-  // (github.io), sotto cui ogni nome è di qualcun altro.
+  // (github.io), sotto cui ogni nome è di qualcun altro; per il giudizio anche un indirizzo che serve i file di tutti.
   function piattaforma(voce, opz) {
     const host = hostDi(voce).replace(/\.+$/, '');
     if (!host || isIpAddress(host)) return false;
+    if (opz && opz.tutteLePiattaforme && condiviso(host)) return true;
     const sito = sitoDi(host, opz);
     return !!sito && sitoDi(`x.${host}`, opz) !== sito;
   }
