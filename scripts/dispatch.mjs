@@ -1799,8 +1799,13 @@ export function tornaAllaLineaPrincipale() {
  *
  * @returns {{ok:true, branch:string}|{ok:false, kind:string, message:string}}
  */
-function positionOnBranch(bucket) {
-  const isNew = bucket.role === 'new-work';
+// Un primo lavoro nasce su un ramo nuovo; quello che riparte dopo una sua segnalazione ha già il ramo, e il server lo dice (#1203). PURA.
+export function suRamoNuovo(bucket, ripresa) {
+  return bucket.role === 'new-work' && !(ripresa && String(bucket.branch || ''));
+}
+
+function positionOnBranch(bucket, { ripresa = false } = {}) {
+  const isNew = suRamoNuovo(bucket, ripresa);
   const prev = readState(bucket.id);
   // Il ramo lo dice il BIGLIETTO: lo stato locale è un residuo di questa
   // macchina e può descrivere un tentativo precedente. Con la precedenza
