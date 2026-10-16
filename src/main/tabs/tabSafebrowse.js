@@ -433,13 +433,14 @@ const safebrowseMethods = {
     }
   },
 
-  _sbVociMenu() {
+  _sbVociMenu(tab) {
+    const prima = !!(tab && tab.sbAvviso && tab.sbAvviso.prima);
     return [
       { label: 'Chiedi a Filo di questo sito', icon: 'help', action: 'avviso-sito:chiedi' },
       { label: 'Segnala un falso allarme', icon: 'feedback', action: 'avviso-sito:segnala' },
       { type: 'separator' },
       { label: 'Copia l\'indirizzo', icon: 'duplicate', action: 'avviso-sito:copia' },
-      { label: 'Torna indietro', icon: 'back', action: 'avviso-sito:indietro' },
+      { label: prima ? 'Non aprire' : 'Torna indietro', icon: 'back', action: 'avviso-sito:indietro' },
     ];
   },
 
