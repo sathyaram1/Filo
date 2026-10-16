@@ -88,10 +88,8 @@ export function ordinaPerArrivo(docs) {
 // era il conto di Firestore di settembre 2026 (#680).
 export const CAMPI_NUMERAZIONE = ['name', 'createdAt', 'seq', 'subSeq', 'senderProof'];
 
-// Da dove partono i numeri nuovi: oltre il contatore (ogni numero dato da un
-// invio ne è uscito) e oltre ogni numero con la prova del mittente. Non oltre
-// il massimo di tutti: un numero anonimo lo sceglie chi manda, fino a un
-// milione, e il contatore portato lassù non numererebbe più nessuno (#923).
+// I numeri nuovi partono oltre il contatore (ogni numero dato da un invio ne è uscito) e oltre i
+// numeri provati; non oltre il massimo di tutti, che un anonimo porta a un milione (#923).
 function ultimoNumeroBuono(contatore, docs) {
   const provato = FB.maxSeqProvato(docs.map((d) => ({ seq: intField(d, 'seq'), senderProof: strField(d, 'senderProof') })));
   return Math.max(Number.isInteger(contatore) ? contatore : 0, provato);
