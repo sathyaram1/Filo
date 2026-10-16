@@ -4,6 +4,7 @@
 
 module.exports = function register(on, ctx) {
   const { MSG, maybeCategorizeAsync } = ctx;
+  const { CATEGORY_NAME_MAX } = globalThis.SN_CONST;
   const SavedPages = globalThis.SN_SAVED_PAGES;
   const Categorizer = globalThis.SN_CATEGORIZER;
   const { dallaScheda } = require('../miniature');
