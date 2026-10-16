@@ -10,37 +10,37 @@ const guastoFetch = (code) => Object.assign(new TypeError('fetch failed'), { cau
 const json = (corpo, status = 200) => new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json' } });
 const CHIAVI = { ok: true, apiKeys: { tavily: 't' }, safeBrowsingKey: 'g' };
 
-// Ogni voce è una risposta (o un errore da lanciare) per il tentativo di quel numero.
+// Una voce per tentativo (una risposta, o un errore da lanciare); l'ultima vale per tutti quelli dopo.
 function finto(copione) {
   const chiamate = [];
-  const attese = [];
+  const pause = [];
   return {
     chiamate,
-    attese,
+    pause,
     fetchImpl: async (url, init) => {
       chiamate.push({ url, init });
       const passo = copione[Math.min(chiamate.length - 1, copione.length - 1)];
       if (passo instanceof Error) throw passo;
       return passo();
     },
-    sleep: async (ms) => { attese.push(ms); },
+    sleep: async (ms) => { pause.push(ms); },
   };
 }
 
 test('un singhiozzo di rete costa un tentativo, non la piattaforma', async () => {
   const f = finto([guastoFetch('EAI_AGAIN'), () => json(CHIAVI)]);
-  const r = await fetchRemoteKeys('giusta', f);
+  const r = await fetchRemoteKeys('giusta', { fetchImpl: f.fetchImpl, sleep: f.sleep });
   assert.equal(r.esito.stato, 'ok');
   assert.equal(r.apiKeys.tavily, 't');
   assert.equal(r.apiKeys.safeBrowsing, 'g');
   assert.equal(f.chiamate.length, 2);
-  assert.deepEqual(f.attese, [ATTESE_SERVER_MS[0]]);
+  assert.deepEqual(f.pause, [ATTESE_SERVER_MS[0]]);
 });
 
 test('un server che inciampa (5xx, 429, 408) si riprova', async () => {
   for (const status of [500, 502, 503, 429, 408]) {
     const f = finto([() => json({ ok: false }, status), () => json(CHIAVI)]);
-    const r = await fetchRemoteKeys('giusta', f);
+    const r = await fetchRemoteKeys('giusta', { fetchImpl: f.fetchImpl, sleep: f.sleep });
     assert.equal(r.esito.stato, 'ok', `HTTP ${status}`);
     assert.equal(f.chiamate.length, 2, `HTTP ${status}`);
   }
@@ -55,19 +55,19 @@ test('un rifiuto non guarisce aspettando: un tentativo solo', async () => {
     () => json({ ok: true, apiKeys: {} }),
   ]) {
     const f = finto([passo, () => json(CHIAVI)]);
-    const r = await fetchRemoteKeys('sbagliata', f);
+    const r = await fetchRemoteKeys('sbagliata', { fetchImpl: f.fetchImpl, sleep: f.sleep });
     assert.notEqual(r.esito.stato, 'ok');
     assert.equal(f.chiamate.length, 1, r.esito.stato);
-    assert.deepEqual(f.attese, []);
+    assert.deepEqual(f.pause, []);
     assert.equal(r.esito.tentativi, undefined);
   }
 });
 
 test('rete giù davvero: si arrende dopo tutti i tentativi e lo dice, con la causa vera', async () => {
   const f = finto([guastoFetch('EAI_AGAIN')]);
-  const r = await fetchRemoteKeys('giusta', f);
+  const r = await fetchRemoteKeys('giusta', { fetchImpl: f.fetchImpl, sleep: f.sleep });
   assert.equal(f.chiamate.length, ATTESE_SERVER_MS.length + 1);
-  assert.deepEqual(f.attese, ATTESE_SERVER_MS);
+  assert.deepEqual(f.pause, ATTESE_SERVER_MS);
   assert.equal(r.esito.stato, 'rete');
   const frase = descriviEsitoServer(r.esito);
   assert.match(frase, /EAI_AGAIN/, 'il «fetch failed» da solo non dice cosa è successo');
@@ -77,13 +77,13 @@ test('rete giù davvero: si arrende dopo tutti i tentativi e lo dice, con la cau
 
 test('ogni tentativo ha un tetto di tempo: un server muto non tiene fermo il lavoro', async () => {
   const f = finto([() => json(CHIAVI)]);
-  await fetchRemoteKeys('giusta', f);
+  await fetchRemoteKeys('giusta', { fetchImpl: f.fetchImpl, sleep: f.sleep });
   assert.ok(f.chiamate[0].init.signal instanceof AbortSignal);
 });
 
 test('senza parola d’ordine non si chiama nessuno', async () => {
   const f = finto([() => json(CHIAVI)]);
-  const r = await fetchRemoteKeys('', f);
+  const r = await fetchRemoteKeys('', { fetchImpl: f.fetchImpl, sleep: f.sleep });
   assert.equal(r.esito.stato, 'passphrase-assente');
   assert.equal(f.chiamate.length, 0);
 });
