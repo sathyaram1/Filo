@@ -75,13 +75,17 @@ function argon2idNelThread(password, sale, p) {
   });
 }
 
+function argon2id(password, sale, parametri = ARGON2) {
+  return conPosto(() => argon2idNelThread(password, Buffer.from(sale), parametri));
+}
+
 // `nome` già normalizzato da chi chiama. Due chiavi separate, per cifrare e per scegliere le posizioni.
 async function derivaChiavi(nome, sale, parametri = ARGON2) {
   if (!Buffer.isBuffer(sale) && !(sale instanceof Uint8Array)) throw new TypeError('il sale è una sequenza di byte');
   if (sale.length < SALE_MIN) throw new RangeError(`il sale ha almeno ${SALE_MIN} byte`);
   const password = Buffer.from(String(nome), 'utf8');
   try {
-    const radice = await conPosto(() => argon2idNelThread(password, Buffer.from(sale), parametri));
+    const radice = await argon2id(password, sale, parametri);
     const sotto = (uso) => Buffer.from(crypto.hkdfSync('sha256', radice, Buffer.alloc(0), `filo/segreto/1/${uso}`, LUNGHEZZA));
     const chiavi = { cifra: sotto('cifra'), posto: sotto('posto') };
     radice.fill(0);
