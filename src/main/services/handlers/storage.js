@@ -144,7 +144,7 @@ module.exports = function register(on, ctx) {
       const mie = Mie ? await Mie.elenco() : null;
       if (mie && mie.length) allData[Mie.CHIAVE_BACKUP] = mie;
       const filo = await require('../ilFilo').esporta();
-      const zip = buildExportZip(allData, { filo });
+      const zip = buildExportZip(allData, { filo, chiavi: !!msg && msg.chiavi === true });
 
       const win = winOf(sender);
       const stamp = new Date().toISOString().slice(0, 10);
