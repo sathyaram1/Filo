@@ -116,7 +116,9 @@
       if (!intera) continue;
       // Più siti incollati su una riga («a.it, b.com», «a.it b.com») valgono uno per uno, come in chat;
       // una riga che è già un sito intero (un indirizzo con virgole nei parametri) resta una.
-      const pezzi = daScritto(intera) ? [intera] : intera.split(/[\s,;]+/).filter(Boolean);
+      // Una riga dove nessun pezzo è un sito («studio rossi») è una riga sola, e scartata torna com'era scritta.
+      const divisa = intera.split(/[\s,;]+/).filter(Boolean);
+      const pezzi = daScritto(intera) || !divisa.some((p) => daScritto(p)) ? [intera] : divisa;
       for (const riga of pezzi) {
         const scritto = daScritto(riga);
         const sito = scritto && typeof riduci === 'function' ? riduci(scritto) : scritto;
