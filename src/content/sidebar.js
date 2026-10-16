@@ -245,6 +245,7 @@
       root.style.bottom = bassoPer(startBottom, rect.left, rect.width);
       root.style.right = 'auto';
       root.style.top = 'auto';
+      root.dataset.spostata = '1';
       e.preventDefault();
     });
     window.addEventListener('mousemove', (e) => {
@@ -288,6 +289,7 @@
     root.style.right = 'auto';
     root.style.top = 'auto';
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
+    root.dataset.spostata = '1';
   }
 
   // ---------- Rendering conv ----------
