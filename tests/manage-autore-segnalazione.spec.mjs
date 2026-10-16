@@ -46,7 +46,8 @@ test('in lista l’icona dice per conto di chi ha scritto Filo', async ({ openTa
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate((fbs) => { window.__mgTest.setData(fbs); }, FBS);
+  // Senza verdetto dei giudici: stanno nei Ricevuti, la sezione con cui la pagina si apre.
+  await page.evaluate((fbs) => { window.__mgTest.setData(fbs); }, FBS.map((fb) => ({ ...fb, status: 'unlabeled' })));
   const titolo = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`).first().getAttribute('title');
   await expect.poll(() => titolo('och')).toBe('Scritto da: Owner (scritto da Filo)');
   expect(await titolo('oau')).toBe('Scritto da: Filo (per conto dell\'owner)');
