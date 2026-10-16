@@ -582,19 +582,56 @@ function leggiJson(file) {
   try { return JSON.parse(readFileSync(file, 'utf8')); } catch (_) { return null; }
 }
 
-/** Dal rapporto JSON di Playwright, `{ titolo: ok }` per ogni caso (describe compresi, il file no); null senza. PURA. */
-export function casiDalReport(rapporto) {
-  if (!rapporto || typeof rapporto !== 'object' || !Array.isArray(rapporto.suites)) return null;
-  const casi = {};
+const valido = (rapporto) => !!rapporto && typeof rapporto === 'object' && Array.isArray(rapporto.suites);
+
+function visitaCasi(rapporto, fai) {
   const visita = (suite, sopra) => {
-    for (const s of Array.isArray(suite?.specs) ? suite.specs : []) {
-      const t = [...sopra, String(s?.title ?? '')].join(' › ');
-      casi[t] = casi[t] !== false && s?.ok !== false;
-    }
+    for (const s of Array.isArray(suite?.specs) ? suite.specs : []) fai([...sopra, String(s?.title ?? '')].join(' › '), s);
     for (const figlia of Array.isArray(suite?.suites) ? suite.suites : []) visita(figlia, [...sopra, String(figlia?.title ?? '')]);
   };
   for (const file of rapporto.suites) visita(file, []);
+}
+
+const corse = (s) => (Array.isArray(s?.tests) ? s.tests.filter((t) => t && typeof t === 'object') : []);
+const segnata = (t) => t.expectedStatus === 'failed';
+const corpoPassato = (t) => t.status === 'skipped' || (Array.isArray(t.results) ? t.results : []).some((r) => r?.status === 'passed');
+
+// Playwright rovescia l'esito di un caso segnato come rosso atteso (test.fail): per il giro conta quello che fa il corpo (#932).
+function casoVerde(s) {
+  const l = corse(s);
+  if (!l.length) return s?.ok !== false;
+  return l.every((t) => (segnata(t) ? corpoPassato(t) : (t.status ? t.status !== 'unexpected' : s?.ok !== false)));
+}
+
+/** Dal rapporto JSON di Playwright, `{ titolo: verde }` per ogni caso (describe compresi, il file no); null senza. PURA. */
+export function casiDalReport(rapporto) {
+  if (!valido(rapporto)) return null;
+  const casi = {};
+  visitaCasi(rapporto, (t, s) => { casi[t] = casi[t] !== false && casoVerde(s); });
   return casi;
+}
+
+/**
+ * L'esito di un rilancio: `rossa`, `casi` (casiDalReport) e `attesi`, i casi segnati come rosso atteso col corpo ancora
+ * rosso. Un'uscita diversa da 0 che spiegano solo rossi attesi col corpo verde non è un rosso: è una porta chiusa. PURA.
+ */
+export function esitoDelRilancio(status, rapporto) {
+  const casi = casiDalReport(rapporto);
+  const attesi = new Set();
+  let inattese = 0;
+  let chiuse = 0;
+  if (casi) {
+    visitaCasi(rapporto, (titolo, s) => {
+      for (const t of corse(s)) {
+        if (segnata(t) && !corpoPassato(t)) attesi.add(titolo);
+        if (t.status === 'unexpected') { inattese += 1; if (segnata(t) && corpoPassato(t)) chiuse += 1; }
+      }
+    });
+  }
+  const errori = valido(rapporto) && Array.isArray(rapporto.errors) && rapporto.errors.length > 0;
+  const spiegata = inattese > 0 && inattese === chiuse && !errori;
+  const rossa = typeof status !== 'number' || errori || (!!casi && Object.values(casi).includes(false)) || (status !== 0 && !spiegata);
+  return { rossa, casi, attesi: [...attesi] };
 }
 
 const ultimo = (t) => String(t).split(' › ').pop();
