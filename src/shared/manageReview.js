@@ -1516,8 +1516,8 @@
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
     if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
-    // Fermo al livello 3 senza una scelta da fare (guasto, arenato, loop): il rombo resta grigio (il verde è la casella
-    // della risposta) ma dice quello che dice il segno in lista, con l'ultima nota (per un guasto, il numero della domanda).
+    // Fermo al livello 3 senza una scelta da fare qui (guasto, arenato, loop): il rombo dice quello che dice il segno in
+    // lista, con l'ultima nota; verde solo se una domanda aperta aspetta l'owner (il guasto), grigio per gli altri.
     const fermo = !attesa && !segnalato ? fermoAlLivello3(fb) : null;
     // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
     if (!letto) {
@@ -1526,7 +1526,7 @@
     if (fermo) {
       const nota = ultimaDomanda(fb);
       const cifrata = valueUnreadable(fb && fb.notes);
-      return forma('l3', 'rombo', fermo.testo, null, 'fermo', {
+      return forma('l3', 'rombo', fermo.testo, fermo.domanda ? fermo.classe : null, 'fermo', {
         titolo: fermo.testo,
         righe: (nota && nota.ts) ? [riga('Quando', istanteDelTurno(nota.ts))] : [],
         testo: cifrata ? TESTO_CIFRATO : ((nota && nota.body) || fermo.testo),
@@ -1778,7 +1778,7 @@
     decisione:{ forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo su una scelta che spetta a te: aspetta una tua risposta' },
     loop:     { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La verifica ha trovato un difetto che non si corregge più da soli' },
     arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
-    guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare' },
+    guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
   };
 
