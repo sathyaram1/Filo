@@ -62,9 +62,6 @@
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
-  const mgGiroStretto       = document.getElementById('mgGiroStretto');
-  const mgGiroStrettoSwitch = document.getElementById('mgGiroStrettoSwitch');
-  const mgGiroStrettoMsg    = document.getElementById('mgGiroStrettoMsg');
   // Come partono le sessioni delle routine: quante insieme, da quale account
   // per prima, quali account sono esclusi.
   const mgMaxSessions     = document.getElementById('mgMaxSessions');
@@ -694,10 +691,9 @@
     if (mgRoutinesSwitch) mgRoutinesSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     // Solo l'essere owner decide: nessuna impostazione dipende da un'altra
     // accesa, perché si preparano prima di riaccendere (richiesta owner).
-    if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
-      mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
+      mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgLavoriServer, mgMaxSessions, mgMaxSessionsSave,
       mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
       if (el) el.disabled = !isAdmin;
     }
@@ -750,14 +746,12 @@
     // riesce, quello che dice il server vale anche quando un campo MANCA: la
     // cache locale serve solo a chi non ha potuto leggere.
     let lettoDalServer = false;
-    let giroStrettoRemoto = false;
     try {
       const r = await sendToMain({ type: CAPS_GET });
       if (r && r.ok) {
         lettoDalServer = true;
         for (const k of Object.keys(CAP_FIELDS)) if (r[k] != null) remote[k] = r[k];
         if (typeof r.fixInstructions === 'string') remote.fixInstructions = r.fixInstructions;
-        giroStrettoRemoto = r.giroStretto === true;
       }
     } catch (_) {}
     for (const [field, f] of Object.entries(CAP_FIELDS)) {
@@ -780,13 +774,6 @@
       else if (val !== null) setCapMsg(field, '', null);
     }
     if (mgFixInstructions && typeof remote.fixInstructions === 'string') mgFixInstructions.value = remote.fixInstructions;
-    if (mgGiroStretto && lettoDalServer) mgGiroStretto.checked = giroStrettoRemoto;
-    // Non letto: l'interruttore resta com'era, e l'owner deve sapere che non è la parola del server.
-    if (mgGiroStrettoMsg && isAdmin) {
-      mgGiroStrettoMsg.textContent = lettoDalServer ? '' : 'Non letto dal server: lo stato vero può essere diverso.';
-      mgGiroStrettoMsg.classList.toggle('mg-err', !lettoDalServer);
-      mgGiroStrettoMsg.classList.remove('mg-ok');
-    }
   }
 
   async function saveCap(field) {
@@ -858,30 +845,6 @@
         saveCap(field);
       });
     }
-  }
-  // Il giro stretto: stessa strada dei bilanci (config/routines via main). Un
-  // salvataggio fallito rimette l'interruttore dov'era, e lo dice.
-  if (mgGiroStretto) {
-    mgGiroStretto.addEventListener('change', async () => {
-      const want = mgGiroStretto.checked;
-      const esito = (text, kind) => {
-        if (!mgGiroStrettoMsg) return;
-        mgGiroStrettoMsg.textContent = text;
-        mgGiroStrettoMsg.classList.toggle('mg-ok', kind === 'ok');
-        mgGiroStrettoMsg.classList.toggle('mg-err', kind === 'err');
-      };
-      esito('', null);
-      try {
-        const r = await sendToMain({ type: CAPS_SET, giroStretto: want });
-        if (!r || !r.ok) throw new Error(r?.error || 'errore sconosciuto');
-        mgGiroStretto.checked = r.giroStretto === true;
-        esito('Salvato.', 'ok');
-      } catch (err) {
-        mgGiroStretto.checked = !want;
-        esito('Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
-        console.error('[manage] salvataggio giro stretto fallito:', err);
-      }
-    });
   }
   if (mgFixInstructionsSave) mgFixInstructionsSave.addEventListener('click', saveFixInstructions);
   if (mgFixInstructions) mgFixInstructions.addEventListener('input', () => setCapMsg('fixInstructions', '', null));

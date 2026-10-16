@@ -1,5 +1,5 @@
-// Le impostazioni del giro (bilanci, giro stretto) non lette dal server non si
-// fingono lette: «spento» e «non impostato» devono essere parole del server.
+// Le impostazioni del giro (bilanci, istruzioni per chi corregge) non lette dal
+// server non si fingono lette: «non impostato» deve essere una parola del server.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +18,7 @@ async function conFetch(finto, fn) {
   try { return await fn(); } finally { global.fetch = vero; }
 }
 
-test('senza rete la lettura fallisce dichiarandolo, non risponde «giro stretto spento»', async () => {
+test('senza rete la lettura fallisce dichiarandolo, non risponde coi bilanci vuoti', async () => {
   await conFetch(async () => { throw new Error('offline'); }, async () => {
     await assert.rejects(() => Defaults.getRoutineCaps('tok'), /non raggiungibili/);
   });
@@ -27,14 +27,10 @@ test('senza rete la lettura fallisce dichiarandolo, non risponde «giro stretto 
   });
 });
 
-test('un documento che c’è ma senza il campo vale spento, e un true esplicito vale acceso', async () => {
-  await conFetch(async () => risposta({ cap2: { integerValue: '3' } }), async () => {
-    const r = await Defaults.getRoutineCaps('tok');
-    assert.equal(r.giroStretto, false);
-    assert.equal(r.cap2, 3);
-  });
-  await conFetch(async () => risposta({ giroStretto: { booleanValue: true } }), async () => {
-    assert.equal((await Defaults.getRoutineCaps('tok')).giroStretto, true);
+// Il giro stretto è stato tolto (#1203), ma il suo campo può restare nel documento del server.
+test('un bilancio che manca resta vuoto, e un campo tolto rimasto nel documento non torna nella risposta', async () => {
+  await conFetch(async () => risposta({ cap2: { integerValue: '3' }, giroStretto: { booleanValue: true } }), async () => {
+    assert.deepEqual(await Defaults.getRoutineCaps('tok'), { fixInstructions: '', cap3: null, cap2: 3, cap1: null, cap0: null });
   });
 });
 
@@ -44,11 +40,13 @@ test('scritto ma non riletto: il salvataggio riuscito torna col valore scritto, 
     if ((opts.method || 'GET') === 'PATCH') { scritture.push(String(url)); return risposta({}); }
     throw new Error('offline');
   }, async () => {
-    const r = await Defaults.setRoutineCaps({ giroStretto: true }, 'tok');
-    assert.equal(r.giroStretto, true);
-    const c = await Defaults.setRoutineCaps({ cap2: 4 }, 'tok');
+    const i = await Defaults.setRoutineCaps({ fixInstructions: 'Correggi la causa.' }, 'tok');
+    assert.equal(i.fixInstructions, 'Correggi la causa.');
+    const c = await Defaults.setRoutineCaps({ cap2: 4, giroStretto: true }, 'tok');
     assert.equal(c.cap2, 4);
+    assert.ok(!('giroStretto' in c));
   });
   assert.equal(scritture.length, 2);
-  assert.match(scritture[0], /giroStretto/);
+  assert.match(scritture[0], /fixInstructions/);
+  assert.doesNotMatch(scritture[1], /giroStretto/, 'un campo tolto non si scrive più');
 });

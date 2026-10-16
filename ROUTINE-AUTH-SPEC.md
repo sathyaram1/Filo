@@ -215,21 +215,22 @@ diventa un **muro**.
 **L'ambito della verifica.** Il payload del `verifier` porta `scope`, deciso dal
 server:
 
-- `pieno` (o assente): la verifica larga, col testo `verifier.md`;
-- `chiusura`, con `perimetro: { rilievi: [...], shaPrima? }`: il giro prima è
-  stato corretto e l'owner ha acceso `giroStretto` in `config/routines`
-  (Gestione → Automazioni, spento di serie). `rilievi` sono i rilievi corretti
-  in quel giro, `shaPrima` il commit su cui era stata scritta la critica;
+- `pieno` (o assente): la verifica larga, col testo `verifier.md`. Dopo una
+  correzione si fa sempre questa (#1203), in cloud e in locale;
 - `riallineamento`, con `perimetro: { shaVerificato?, reportRebase? }`: il
   lavoro era verificato e un conflitto di fusione è stato risolto a mano.
 
-dispatch sceglie il testo del ruolo dall'ambito (`verifier-chiusura.md`,
-`verifier-riallineamento.md`) e scrive il perimetro in coda al compito, come
-testo. Nei due giri stretti il diff dal commit del perimetro a `HEAD` si
-guarda: è l'unica eccezione alla riga qui sopra. Un ambito sconosciuto vale
-`pieno`, con un avviso nel log: un valore storto non deve mai dare meno
-verifica. In locale `verify-local.mjs start` fa lo stesso per la `chiusura`,
-leggendo `giroStretto` insieme ai bilanci.
+dispatch sceglie il testo del ruolo dall'ambito (`verifier-riallineamento.md`)
+e scrive il perimetro in coda al compito, come testo. Dopo un riallineamento il
+diff dal commit del perimetro a `HEAD` si guarda: è l'unica eccezione alla riga
+qui sopra. Un ambito sconosciuto vale `pieno`, con un avviso nel log: un valore
+storto non deve mai dare meno verifica.
+
+**La ripresa.** Quando l'owner risponde a una domanda che aveva fermato il
+lavoro, riparte il ruolo che si era fermato (#1203): il payload porta
+`ripresa: { domanda, risposta, rilievi, ruolo, caso }` e dispatch accoda al
+testo del ruolo il pezzo condiviso `_ripresa.md`. Un primo lavoro fermato dopo
+aver consegnato riprende il suo ramo, che il server scrive nella busta.
 
 La riga che conta è `secaudit`: **il controllo di sicurezza non deve leggere
 testo scritto da sconosciuti**, o il testo può convincerlo. Senza chiave sulla
