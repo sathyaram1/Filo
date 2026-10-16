@@ -85,6 +85,24 @@ test('fuori dallo schermo intero, sul sito che ferma l\'Esc, il menu si chiude l
   expect(await page.evaluate(() => window.__escDelSito)).toBe(prima + 1);
 });
 
+// Un'altra famiglia di riquadri, aperta da una voce del menu: la regola non conosce il riquadro.
+test('sito che ferma l\'Esc: il QR della pagina si chiude col primo Esc, lo schermo intero resta', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, sito('tutto'));
+  await entra(app);
+  await apriMenu(page);
+  const qr = page.locator('[data-sn-icon-id="qrCode"]');
+  if (await qr.count() === 0) await page.locator('.sn-menu-row-overflow').first().click();
+  await qr.first().click();
+  await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 8000 });
+  await new Promise((r) => setTimeout(r, 300));
+
+  await esc(app);
+  await expect(page.locator('.sn-qr-overlay')).toHaveCount(0);
+  expect(await schermoIntero(app), 'il primo Esc ha portato via lo schermo intero').toBe(true);
+  await esc(app);
+  expect(await schermoIntero(app)).toBe(false);
+});
+
 test('pagina senza gestore dell\'Esc: il menu si chiude col primo, la modalità esce col secondo', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<html><body style="margin:0;height:1200px"><p id="t">parola dentro una frase</p></body></html>');
   await entra(app);
