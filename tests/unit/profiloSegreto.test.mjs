@@ -226,24 +226,25 @@ describe('due segreti nello stesso contenitore', () => {
       originali[m] = console[m];
       console[m] = (...a) => voci.push([m, a]);
     }
+    const forma = (r) => ({
+      chiavi: Object.keys(r), esito: r.esito, proprie: Object.keys(r.segreto), json: JSON.stringify(r.segreto),
+      metodi: Object.getOwnPropertyNames(Object.getPrototypeOf(r.segreto)),
+      info: Object.keys(r.segreto.info()), file: r.segreto.elencaFile().map((f) => Object.keys(f)),
+    });
     let riparato;
     let pulito;
     try {
-      riparato = await apri(base, 'Alfa');
-      pulito = await apri(base, 'Alfa');
+      riparato = forma(await apri(base, 'Alfa'));
+      pulito = forma(await apri(base, 'Alfa'));
     } finally {
       Object.assign(console, originali);
     }
     assert.deepEqual(voci, []);
     assert.ok(integra(await impronta(base, 'Alfa')), 'la riparazione non è avvenuta');
-    assert.deepEqual(Object.keys(riparato), ['esito', 'segreto']);
-    assert.deepEqual(Object.keys(pulito), ['esito', 'segreto']);
-    assert.equal(riparato.esito, pulito.esito);
-    assert.deepEqual(Object.keys(riparato.segreto), []);
-    assert.equal(JSON.stringify(riparato.segreto), '{}');
-    assert.deepEqual(Object.getOwnPropertyNames(Object.getPrototypeOf(riparato.segreto)), Object.getOwnPropertyNames(Object.getPrototypeOf(pulito.segreto)));
-    assert.deepEqual(Object.keys(riparato.segreto.info === undefined ? {} : { info: 1 }), ['info']);
-    await pulito.segreto.chiudi();
+    assert.deepEqual(riparato, pulito);
+    assert.deepEqual(riparato.chiavi, ['esito', 'segreto']);
+    assert.deepEqual(riparato.proprie, []);
+    assert.equal(riparato.json, '{}');
   });
 });
 
