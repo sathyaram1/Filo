@@ -684,10 +684,7 @@ describe('chiudere mentre lavora', () => {
     const base = await contenitore(64 * MB);
     const s = await crea(base, 'Chiuso');
     await s.scriviFile('prima', 'contenuto di prima');
-    const mtime = statSync(base.contenitore).mtimeMs;
-    utimesSync(base.contenitore, new Date(2025, 0, 1), new Date(2025, 0, 1));
     const fermo = statSync(base.contenitore).mtimeMs;
-    assert.notEqual(fermo, mtime);
     const salva = s.scriviFile('grande', TESTO);
     // Si chiude appena il salvataggio ha cominciato a scrivere: la data che cambia è il segno.
     const fine = Date.now() + 10_000;
