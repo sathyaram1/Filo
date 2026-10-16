@@ -234,6 +234,13 @@ function blocchiUsati(L, tabella, blocchiTabella) {
   return u;
 }
 
+// I blocchi dei file già segnati rovinati: a loro manca il contenuto per definizione, e non è un motivo per fermarsi.
+function blocchiRovinati(L, tabella) {
+  const u = new Uint8Array(L);
+  for (const f of tabella.values()) if (f.x) for (const [s, n] of f.e) for (let x = 0; x < n; x++) if (s + x < L) u[s + x] = 1;
+  return u;
+}
+
 // ── Contenitore ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 function controllaDimensione(dimensione) {
