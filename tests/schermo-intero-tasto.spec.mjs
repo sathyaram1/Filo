@@ -107,14 +107,19 @@ test('F11 tenuto premuto entra una volta sola, e due colpi di fila tornano dove 
   expect((await stato(app)).schermoIntero).toBe(true);
 });
 
-test('un video a schermo pieno col suo pulsante si tiene F11, ed Esc ne esce come prima', async ({ app, openTab, testServer }) => {
-  await testServer.openReady(openTab, PAGINA);
+// La strada del pulsante di un lettore video: requestFullscreen della pagina, con un gesto.
+async function schermoPienoDelSito(app) {
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
     return wc.executeJavaScript('document.getElementById("box").requestFullscreen().catch(()=>{}); true', true);
   });
   await expect.poll(async () => (await stato(app)).dellaPagina, { timeout: 8000 }).toBe(true);
+}
+
+test('un video a schermo pieno col suo pulsante si tiene F11, ed Esc ne esce come prima', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, PAGINA);
+  await schermoPienoDelSito(app);
 
   await premi(app, 'scheda', 'F11');
   await pausa(800);
@@ -122,8 +127,10 @@ test('un video a schermo pieno col suo pulsante si tiene F11, ed Esc ne esce com
 
   await premi(app, 'scheda', 'Escape');
   await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 8000 }).toBe(false);
+});
 
-  // Il tasto è della pagina solo premuto lì: dalla barra in alto F11 esce, e il video esce con lei.
+test('il video si tiene F11 solo premuto su di lui: dalla barra in alto esce, e il video con lei', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, PAGINA);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
