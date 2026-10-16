@@ -434,9 +434,9 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
   const occ = ctx.mappa.occ;
   let calcoli = 0;
   while (attivi.size && !S.scansionato) {
-    if (pota && S.candidati.length) {
-      const kMax = Math.max(...S.candidati.map((c) => c.k));
-      for (const i of attivi.keys()) if ((i >> 1) >= kMax) attivi.delete(i);
+    if (pota) {
+      const kMax = S.candidati.reduce((m, c) => (c.j < GRUPPO ? Math.max(m, c.k) : m), 0);
+      if (kMax) for (const i of attivi.keys()) if ((i >> 1) >= kMax) attivi.delete(i);
       if (!attivi.size) break;
     }
     if (S.vuote > ctx.N * SCANSIONE_OLTRE) {
