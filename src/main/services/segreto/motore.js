@@ -636,15 +636,9 @@ async function caricaTabella(ctx, S, testa) {
   S.blocchiTabella = [];
   let bytes = testa.inTesta;
   if (!bytes) {
-    const pezzi = [];
-    const perGruppo = new Map();
-    for (const j of testa.blocchiTabella) {
-      const g = Math.floor(j / GRUPPO);
-      if (!perGruppo.has(g)) perGruppo.set(g, await carichiGruppo(ctx, S, g));
-      const c = perGruppo.get(g)[j - GRUPPO * g];
-      if (!c) return;
-      pezzi.push(c);
-    }
+    const letti = await carichiGruppi(ctx, S, [...new Set(testa.blocchiTabella.map((j) => Math.floor(j / GRUPPO)))]);
+    const pezzi = testa.blocchiTabella.map((j) => letti.get(Math.floor(j / GRUPPO))[j % GRUPPO]);
+    if (pezzi.some((c) => !c)) return;
     bytes = Buffer.concat(pezzi).subarray(0, testa.lunghezza);
   }
   const t = leggiTabella(bytes, S.L);
