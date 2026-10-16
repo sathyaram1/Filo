@@ -444,14 +444,12 @@
       const nome = ICONA_SUGGERIMENTO[s.icon] || propria || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
       ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
     };
-    if (url) {
-      const img = el('img');
-      img.src = url;
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      img.onerror = () => { img.remove(); generica(); };
-      ico.appendChild(img);
-    } else generica();
+    if (tipo !== 'NAVIGA') { generica(); return ico; }
+    const img = el('img');
+    img.alt = '';
+    img.onerror = () => { img.remove(); generica(); };
+    ico.appendChild(img);
+    d.iconaDelSito(s.action.url).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 
