@@ -38,6 +38,13 @@ test('ogni ruolo riceve un testo intero, senza richiami rimasti dentro', () => {
     assert.ok(testo.length > 400, `il ruolo ${ruolo} riceve un testo vuoto`);
     assert.ok(!/<!--\s*includi:/i.test(testo), `richiamo non espanso nel testo del ruolo ${ruolo}`);
   }
+  // Chi riparte dopo la risposta dell'owner (#1203): il suo testo intero, più il pezzo della ripresa.
+  for (const ruolo of ['new-work', 'fixer', 'verifier']) {
+    const testo = readRoleInstructions(ruolo, { ripresa: true });
+    assert.ok(testo.startsWith(readRoleInstructions(ruolo).slice(0, 200)), `il ruolo ${ruolo} che riparte non ha più il suo testo`);
+    assert.match(testo, /## Stai riprendendo un lavoro fermo/, ruolo);
+    assert.ok(!/<!--\s*includi:/i.test(testo), `richiamo non espanso nella ripresa di ${ruolo}`);
+  }
 });
 
 // I giri stretti (chiusura, riallineamento) cambiano il PERIMETRO, non il metro:
