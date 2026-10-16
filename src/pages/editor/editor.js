@@ -4028,6 +4028,16 @@
       cfgShortcutNota.hidden = true;
     }
     cfgShortcut.addEventListener('input', () => { registrata = null; primaDellAttesa = null; pulisci(); });
+    // Una combinazione premuta (o quella salvata) è un pezzo solo: Backspace e Canc la tolgono tutta.
+    cfgShortcut.addEventListener('keydown', (e) => {
+      if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const v = cfgShortcut.value;
+      if (!v || !((registrata && v === registrata.mostrata) || (giaSalvata && v === mostrata))) return;
+      e.preventDefault();
+      cfgShortcut.value = '';
+      registrata = null;
+      pulisci();
+    });
     function mostraAvviso(testo) {
       cfgShortcut.classList.add('ed-field-invalid');
       cfgShortcutTaken.textContent = testo;
