@@ -64,6 +64,18 @@ function collegaScorciatoie(wc, finestra) {
   });
 }
 
+// Lo schermo intero da tastiera, la stessa commutazione della voce di menu, da qualunque vista abbia il fuoco.
+// Se lo schermo pieno l'ha chiesto la pagina col suo pulsante (un video), il tasto resta suo, come l'Esc.
+function tastoSchermoIntero(event, input, finestra) {
+  if (!input || input.type !== 'keyDown' || !globalThis.SN_TASTI.comandoSchermoIntero(input)) return false;
+  const tabs = finestraDiFilo(typeof finestra === 'function' ? finestra() : finestra)?._filoTabs;
+  if (!tabs || tabs.pageFullscreen) return false;
+  event.preventDefault();
+  // Tenuto premuto non lampeggia: entra una volta sola.
+  if (!input.isAutoRepeat) tabs.toggleContentFullscreen();
+  return true;
+}
+
 // Una tab è "interna" (pagina filo://) se il flag isInternal è settato oppure
 // se l'URL usa lo schema filo://. Controlliamo entrambi perché isInternal è il
 // campo canonico ma l'URL è la difesa definitiva contro tab in stati di
