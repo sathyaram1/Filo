@@ -95,4 +95,4 @@ async function derivaChiavi(nome, sale, parametri = ARGON2) {
   }
 }
 
-module.exports = { ARGON2, SALE_MIN, derivaChiavi };
+module.exports = { ARGON2, SALE_MIN, argon2id, derivaChiavi };
