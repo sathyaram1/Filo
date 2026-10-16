@@ -135,31 +135,19 @@ function extractImages(node, images) {
 
 const VOCE_FILO = 'filo/eventi.jsonl';
 
-// I segreti dell'utente entrano nell'archivio solo se chi esporta lo chiede (#905): chi riceve il file li userebbe.
-// Un proxy con utente e password nell'indirizzo vale quanto una chiave API.
-const PROXY_CON_CREDENZIALI = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i;
-const CAMPI_PROXY = ['datacenter', 'residential'];
-const pieno = (v) => typeof v === 'string' && v.trim() !== '';
+// I segreti dell'utente (SN_CONST.campiSegreti) entrano nell'archivio solo se chi esporta lo chiede (#905).
 // Una chiave incollata in chat o copiata negli appunti è nell'archivio quanto quella delle Opzioni: si toglie ovunque.
 const SEGRETO_MIN = 12;
 const SEGRETO_TOLTO = '[chiave tolta dall’esportazione]';
+const CAMPI_PROXY = ['datacenter', 'residential'];
+const pieno = (v) => typeof v === 'string' && v.trim() !== '';
 
-// I posti dei segreti nelle impostazioni, come [oggetto, campo].
-function campiSegreti(settings) {
-  const out = [];
-  if (!isPlainObject(settings)) return out;
-  if (isPlainObject(settings.apiKeys)) for (const k of Object.keys(settings.apiKeys)) out.push([settings.apiKeys, k]);
-  if (isPlainObject(settings.proxy)) {
-    for (const k of CAMPI_PROXY) if (pieno(settings.proxy[k]) && PROXY_CON_CREDENZIALI.test(settings.proxy[k].trim())) out.push([settings.proxy, k]);
-  }
-  const sb = isPlainObject(settings.security) && settings.security.safeBrowse;
-  if (isPlainObject(sb) && 'safeBrowsingKey' in sb) out.push([sb, 'safeBrowsingKey']);
-  return out;
+function costanti() {
+  if (!globalThis.SN_CONST) require('../../shared/constants.js');
+  return globalThis.SN_CONST;
 }
-
-function haSegreti(storageData) {
-  return campiSegreti(storageData && storageData.settings).some(([o, k]) => pieno(o[k]));
-}
+const campiSegreti = (settings) => costanti().campiSegreti(settings);
+const haSegreti = (storageData) => costanti().haSegreti(storageData && storageData.settings);
 
 function sostituisci(testo, segreti) {
   let t = testo;
