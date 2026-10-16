@@ -195,6 +195,8 @@ test('i quattro casi insieme: una carta ciascuno col numero, «Apri Inviti e ute
   const home = await homeDellAvvio(app);
   await diventaOwner(app, home);
   await expect(carte(home)).toHaveCount(4, { timeout: 15_000 });
+  // Il più grave in cima, ognuno col suo titolo.
+  await expect(carte(home).locator('.dash-carta-tit')).toHaveText(['Tetto dei regali', 'Quota del giorno', 'Ingressi con invito', 'Registro d’uso']);
   await expect(carte(home).filter({ hasText: 'al 97% del tetto: 97.000 su 100.000' })).toHaveCount(1);
   await expect(carte(home).filter({ hasText: 'Resta 1 ingresso con invito' })).toHaveCount(1);
   await expect(carte(home).filter({ hasText: 'L\'ultima quota del giorno non è arrivata a 3 persone' })).toHaveCount(1);

@@ -648,23 +648,29 @@ module.exports = function register(on, ctx) {
     }
   });
   // La vista fa leggere al server tutti i portafogli: chi non la vuole fresca (home, controllo da solo) si accontenta di
-  // una lettura di meno di un quarto d'ora, chi arriva mentre una è in volo aspetta quella, e ogni lettura riuscita
-  // rifà gli avvisi della home (#855), che così non costano letture loro.
+  // una lettura di meno di un quarto d'ora o di quella in volo; la pagina dell'owner rilegge sempre. Ogni lettura
+  // riuscita rifà gli avvisi della home (#855), che così non costano letture loro; una partita prima e arrivata dopo
+  // un'altra non la scavalca.
   const VISTA_VALE_MS = 15 * 60 * 1000;
   let vistaLetta = null;
   let vistaInVolo = null;
+  let voli = 0;
+  let ultimoVolo = 0;
   function vistaOwner({ fresca = false } = {}) {
     if (!fresca && vistaLetta && Date.now() - vistaLetta.at < VISTA_VALE_MS) return Promise.resolve(vistaLetta.overview);
-    if (!vistaInVolo) {
-      vistaInVolo = callable('walletOverview', {}, { asOwner: true }).then((overview) => {
-        if (overview && typeof overview === 'object') {
-          vistaLetta = { at: Date.now(), overview };
-          rifaiAvvisiOwner(overview);
-        }
-        return overview;
-      }).finally(() => { vistaInVolo = null; });
-    }
-    return vistaInVolo;
+    if (!fresca && vistaInVolo) return vistaInVolo;
+    const n = ++voli;
+    const volo = callable('walletOverview', {}, { asOwner: true }).then((overview) => {
+      if (overview && typeof overview === 'object' && n > ultimoVolo) {
+        ultimoVolo = n;
+        vistaLetta = { at: Date.now(), overview };
+        rifaiAvvisiOwner(overview);
+      }
+      return overview;
+    });
+    vistaInVolo = volo;
+    volo.finally(() => { if (vistaInVolo === volo) vistaInVolo = null; }).catch(() => {});
+    return volo;
   }
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await vistaOwner({ fresca: true }) })));
 

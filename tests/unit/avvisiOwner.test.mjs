@@ -102,6 +102,7 @@ test('quello che la vista non dice non è un caso, e una vista che non c’è no
   assert.deepEqual(W.avvisiOwner('rotta'), []);
   assert.deepEqual(W.avvisiOwner({}), []);
   assert.deepEqual(W.avvisiOwner(vista()).map((c) => c.caso), ['tetto', 'inviti', 'scarto']);
+  assert.deepEqual(W.avvisiOwner(vista({ rifiutate: 0 })).map((c) => c.caso), ['tetto', 'giornaliera', 'inviti', 'scarto']);
   assert.deepEqual(W.avvisiOwner({ totals: { grantedCredits: 5 } }), [], 'senza tetto non si sa a che punto si è');
 });
 
@@ -114,7 +115,8 @@ test('la sequenza della segnalazione: 85% una carta, riletta uguale nessuna in p
   const prima = mem.vive()[0];
   assert.equal(prima.kind, 'alert');
   assert.deepEqual(prima.action, {
-    tipo: 'crediti-owner', caso: 'tetto', marcatori: ['tetto:80'], apri: 'filo://credits/owner.html', etichetta: 'Apri Inviti e utenti',
+    tipo: 'crediti-owner', caso: 'tetto', marcatori: ['tetto:80'], titolo: 'Tetto dei regali',
+    apri: 'filo://credits/owner.html', etichetta: 'Apri Inviti e utenti',
   });
   assert.match(prima.text, /all'85% del tetto/);
 
@@ -159,7 +161,9 @@ test('i quattro casi insieme sono quattro carte; un portafoglio segnato in più 
   const mem = memoria();
   const disco = { detti: [] };
   await controllo(mem, disco, vista({ dati: 97000, inviti: 1, rifiutate: 2, segnati: ['aaaa000000000001'] }));
-  assert.deepEqual(mem.vive().map((n) => n.action.caso).sort(), ['giornaliera', 'inviti', 'scarto', 'tetto']);
+  // Il più grave in cima, ognuno col suo titolo.
+  assert.deepEqual(mem.vive().map((n) => n.action.caso), ['tetto', 'giornaliera', 'inviti', 'scarto']);
+  assert.deepEqual(mem.vive().map((n) => n.action.titolo), ['Tetto dei regali', 'Quota del giorno', 'Ingressi con invito', 'Registro d’uso']);
   const scarto = mem.vive().find((n) => n.action.caso === 'scarto');
 
   await controllo(mem, disco, vista({ dati: 97000, inviti: 1, rifiutate: 2, segnati: ['aaaa000000000001', 'cccc000000000003'] }));
