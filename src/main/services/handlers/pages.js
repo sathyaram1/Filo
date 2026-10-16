@@ -4,7 +4,6 @@
 
 module.exports = function register(on, ctx) {
   const { MSG, maybeCategorizeAsync } = ctx;
-  const { CATEGORY_NAME_MAX } = globalThis.SN_CONST;
   const SavedPages = globalThis.SN_SAVED_PAGES;
   const Categorizer = globalThis.SN_CATEGORIZER;
   const { dallaScheda } = require('../miniature');
@@ -55,8 +54,9 @@ module.exports = function register(on, ctx) {
     let categoryId = msg.categoryId || null;
     if (msg.nome !== undefined) {
       const nome = String(msg.nome || '').trim();
+      const max = globalThis.SN_CONST.CATEGORY_NAME_MAX;
       if (!nome) return { ok: false, error: 'empty_name' };
-      if (nome.length > CATEGORY_NAME_MAX) return { ok: false, error: 'name_too_long', max: CATEGORY_NAME_MAX };
+      if (nome.length > max) return { ok: false, error: 'name_too_long', max };
       // Senza la pagina non si crea niente: una categoria vuota resterebbe nelle Opzioni senza averla chiesta.
       if (!(await SavedPages.list()).some((p) => p.id === msg.pageId)) return { ok: false, error: 'not_found' };
       categoryId = (await Categorizer.ensureCategory({ name: nome })).id;
