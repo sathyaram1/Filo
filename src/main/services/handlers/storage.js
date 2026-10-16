@@ -124,10 +124,9 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.EXPORT_DATA, async (msg, sender, origin) => {
-    // Esporta TUTTI i dati di Filo in un unico .zip (data.json + immagini
-    // copiate estratte come file). L'utente sceglie dove salvarlo. Solo dalle
-    // pagine interne (Opzioni): una pagina web non deve poter innescare un dump
-    // completo dei dati utente (incluse le chiavi API) né aprire un file dialog.
+    // Esporta i dati di Filo in un unico .zip (data.json + immagini copiate estratte come file); le chiavi solo con
+    // `chiavi: true` (#905). Solo dalle pagine interne: una pagina web non deve poter innescare un dump dei dati utente
+    // né aprire un file dialog.
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     try {
       const { dialog } = require('electron');
@@ -145,7 +144,7 @@ module.exports = function register(on, ctx) {
       const mie = Mie ? await Mie.elenco() : null;
       if (mie && mie.length) allData[Mie.CHIAVE_BACKUP] = mie;
       const filo = await require('../ilFilo').esporta();
-      const zip = buildExportZip(allData, { filo });
+      const zip = buildExportZip(allData, { filo, chiavi: !!msg && msg.chiavi === true });
 
       const win = winOf(sender);
       const stamp = new Date().toISOString().slice(0, 10);
@@ -232,9 +231,9 @@ module.exports = function register(on, ctx) {
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
       const filo = contaFilo(parsed);
-      const { mergeImportedData, regolaImport } = require('../exportData');
+      const { mergeImportedData, regolaImport, haSegreti, proxyDaCompletare } = require('../exportData');
       const dati = datiDaFondere(parsed.data);
-      const { stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
+      const { merged, stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
       return {
         ok: true,
         token,
@@ -249,6 +248,8 @@ module.exports = function register(on, ctx) {
         tettoPagine: SN_CONST.SAVED_PAGES_LIMIT,
         chats: filo.chats,
         pagine: filo.pagine,
+        chiavi: haSegreti(parsed.data),
+        proxySenzaCredenziali: proxyDaCompletare(merged, parsed.proxySenzaCredenziali).length > 0,
       };
     } catch (e) {
       // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"

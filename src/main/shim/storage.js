@@ -35,7 +35,10 @@ let ultimaCifratura = { chiaro: null, blob: null };
 function impostazioniPerDisco(s) {
   try {
     if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return s;
-    if (!canEncrypt()) return s; // niente keyring OS → resta com'era (no perdita dati)
+    if (!canEncrypt()) { // niente keyring OS → resta com'era (no perdita dati), e l'utente lo sa
+      if (Object.values(s.apiKeys).some((v) => typeof v === 'string' && v.trim())) chiaviInChiaro();
+      return s;
+    }
     const chiaro = JSON.stringify(s.apiKeys);
     if (chiaro !== ultimaCifratura.chiaro) {
       ultimaCifratura = { chiaro, blob: safeStorage.encryptString(chiaro).toString('base64') };
@@ -206,13 +209,36 @@ function loadIfNeeded() {
 const CHIAVE_LETTURA = 'dati-letti';
 const CHIAVE_SALVATAGGIO = 'dati-non-salvati';
 
-function avvisa(testo, chiave, durataSec = 0) {
+function avvisa(testo, chiave, durataSec = 0, detto) {
   STATE.avvisi.push({ testo, chiave });
   try {
     const A = require('../services/avvisoFinestra');
     if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec });
-    else A.avvisoQuandoPronta(testo, { chiave });
+    else A.avvisoQuandoPronta(testo, { chiave, detto });
   } catch (_) {}
+}
+
+// Senza portachiavi le chiavi API vanno sul disco in chiaro: lo si dice una volta per installazione (#905), e
+// la volta conta solo se una finestra l'ha mostrato. Il segno sta nello storage, così «Cancella tutto» lo porta via.
+const CHIAVE_IN_CHIARO = 'avvisoChiaviInChiaro';
+let inChiaroInCorso = false;
+
+function testoChiaviInChiaro() {
+  const base = 'Filo non trova un portachiavi di sistema, quindi salva le tue chiavi API in chiaro nella sua cartella dei dati. Chi può aprire i tuoi file può leggerle.';
+  let backend = '';
+  try { backend = safeStorage.getSelectedStorageBackend?.() || ''; } catch (_) {}
+  const consiglio = require('../portachiavi').consiglioPortachiavi({ platform: process.platform, backend, perChe: 'Per cifrarle' });
+  return consiglio ? `${base} ${consiglio}` : base;
+}
+
+function chiaviInChiaro() {
+  // Prima di `ready` il portachiavi risulta assente anche dove c'è.
+  if (inChiaroInCorso || STATE.data[CHIAVE_IN_CHIARO] || (typeof app.isReady === 'function' && !app.isReady())) return;
+  inChiaroInCorso = true;
+  // Fuori dal giro di serializzazione in corso, e sul disco anche se la scrittura era partita da un incognito.
+  setImmediate(() => avvisa(testoChiaviInChiaro(), 'chiavi-in-chiaro', 0, () => {
+    runNormale(() => set({ [CHIAVE_IN_CHIARO]: Date.now() })).catch(() => {});
+  }));
 }
 
 function quando(ms) {

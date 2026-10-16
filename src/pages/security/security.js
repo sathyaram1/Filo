@@ -108,6 +108,10 @@
     $('sec-clip-clear').textContent = I18n.t('menu_paste_clear');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
+    for (const p of ['sec-export-keys', 'sec-wipe-export-keys']) {
+      $(`${p}-label`).textContent = I18n.t('security_export_keys_label');
+      $(`${p}-desc`).textContent = I18n.t('security_export_keys_desc');
+    }
     $('sec-import-btn').textContent = I18n.t('security_import_btn');
     $('sec-import-desc').textContent = I18n.t('security_import_desc');
     $('sec-wipe-btn').textContent = I18n.t('security_wipe_btn');
@@ -126,12 +130,23 @@
     $('savedHint').textContent = I18n.t('options_saved');
   }
 
+  // Le chiavi escono solo con la spunta (#905), che vale anche dalla conferma di «Cancella tutto»: è la stessa scelta.
+  const CASELLE_CHIAVI = ['sec-export-keys', 'sec-wipe-export-keys'];
+  function mostraCaselleChiavi(settings) {
+    const ci = !!window.SN_CONST.haSegreti(settings);
+    for (const id of CASELLE_CHIAVI) {
+      $(`${id}-row`).hidden = !ci;
+      if (!ci) $(id).checked = false;
+    }
+  }
+
   // `resta`: l'esito non sparisce (nella conferma di «Cancella tutto» dice che l'archivio c'è già).
   async function exportData({ btn = $('sec-export-btn'), hint = $('sec-export-hint'), fatto = 'security_export_done', resta = false } = {}) {
     btn.disabled = true;
     let riuscito = false;
     try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA });
+      const chiavi = CASELLE_CHIAVI.some((id) => !$(`${id}-row`).hidden && $(id).checked);
+      const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA, chiavi });
       if (res && res.ok) {
         riuscito = true;
         hint.textContent = I18n.t(fatto);
@@ -157,7 +172,7 @@
   // Il tasto apre sotto di sé la conferma: prima l'esportazione, poi cosa sparisce, e il sì solo con la parola scritta.
   // Il cancello vero sta nel main (cancellaTutto.js), che rifà lo stesso controllo sulla parola.
   const PAROLA_CANCELLA = 'conferma';
-  const CONTROLLI_CANCELLA = ['sec-wipe-btn', 'sec-wipe-export', 'sec-wipe-identity', 'sec-wipe-word', 'sec-wipe-cancel'];
+  const CONTROLLI_CANCELLA = ['sec-wipe-btn', 'sec-wipe-export', 'sec-wipe-export-keys', 'sec-wipe-identity', 'sec-wipe-word', 'sec-wipe-cancel'];
   let cancellazioneInCorso = false;
 
   const parolaScritta = () => $('sec-wipe-word').value.trim().toLowerCase() === PAROLA_CANCELLA;
@@ -334,6 +349,8 @@
           .replace('%1', String(prev.pagineFuori))
           .replace('%2', String(prev.tettoPagine || ''))
           + (prev.pagineMieFuori ? ' ' + I18n.t('security_import_pages_out_mine').replace('%1', String(prev.pagineMieFuori)) : '') : '',
+        prev.chiavi === false ? I18n.t('security_import_senza_chiavi') : '',
+        prev.proxySenzaCredenziali ? I18n.t('security_import_proxy_senza_credenziali') : '',
       ].filter(Boolean);
       const text = I18n.t('security_import_confirm_text')
         .replace('%6', I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
@@ -822,6 +839,7 @@
     const settings = await Storage.getSettings();
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
+    mostraCaselleChiavi(settings);
     const sec = settings.security || {};
     lastProxy = JSON.stringify(settings.proxy || {});
     renderProxyBox();
@@ -1451,6 +1469,7 @@
       if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) {
         const p = JSON.stringify(msg.settings.proxy || {});
         if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
+        mostraCaselleChiavi(msg.settings);
         riallinea(msg.settings);
         loadDelicateCampi();
       }
@@ -1546,6 +1565,9 @@
       else if (lista.querySelector('.sn-clip-gone')) renderClipboard(vociCorrenti, { forza: true });
     });
     $('sec-export-btn').addEventListener('click', () => exportData());
+    for (const id of CASELLE_CHIAVI) {
+      $(id).addEventListener('change', (e) => { for (const altra of CASELLE_CHIAVI) $(altra).checked = e.currentTarget.checked; });
+    }
     $('sec-import-btn').addEventListener('click', importData);
     $('sec-wipe-btn').addEventListener('click', apriCancellaTutto);
     $('sec-wipe-export').addEventListener('click', () => exportData({

@@ -21,11 +21,14 @@ function avvisoNellaFinestra(testo, { chiave, durataSec = 0 } = {}) {
 }
 
 // Per chi avvisa prima che esista una finestra (la lettura dei dati all'avvio): riprova finché una cornice ascolta.
-function avvisoQuandoPronta(testo, { chiave, entroMs = 5 * 60 * 1000 } = {}) {
-  if (avvisoNellaFinestra(testo, { chiave })) return;
+// `detto` si chiama solo quando una cornice l'ha ricevuto: chi avvisa una volta sola segna lì la volta.
+function avvisoQuandoPronta(testo, { chiave, entroMs = 5 * 60 * 1000, detto } = {}) {
+  const ok = () => { try { detto?.(); } catch (_) {} };
+  if (avvisoNellaFinestra(testo, { chiave })) { ok(); return; }
   const inizio = Date.now();
   const t = setInterval(() => {
-    if (avvisoNellaFinestra(testo, { chiave }) || Date.now() - inizio > entroMs) clearInterval(t);
+    if (avvisoNellaFinestra(testo, { chiave })) { clearInterval(t); ok(); }
+    else if (Date.now() - inizio > entroMs) clearInterval(t);
   }, 1000);
   t.unref?.();
 }
