@@ -4248,6 +4248,15 @@ function toolResultText({ action, res, rendered }, giro = null) {
   }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
+  if (type === 'APRI_SALVATA' && res.output && !res.needsConfirm) {
+    const o = res.output;
+    if (o.trovata === false) return 'Nessuna pagina con quell\'id in «Aperti per dopo»: forse è già stata aperta o tolta. Se serve rifai CERCA_SALVATE e usa un id preso da lì, mai inventato.';
+    if (o.blocked === 'site') return `Pagina NON aperta: ${o.host || 'quel sito'} è fra i siti bloccati, ed è rimasta in «Aperti per dopo». Diglielo in una riga.`;
+    if (!o.aperta) return 'Pagina NON aperta, ed è rimasta in «Aperti per dopo». Diglielo in una riga.';
+    const E = globalThis.SN_ESTERNO;
+    return `Aperta in una scheda nuova${o.tolta ? ' e tolta da «Aperti per dopo»' : ', ed è rimasta in «Aperti per dopo»'}:\n`
+      + `${E.imbusta({ tipo: 'DATI_PAGINA', testo: `${E.neutralizza(o.titolo || '(senza titolo)', { unaRiga: true })}\n${o.url || ''}` })}\nDillo all'utente in una riga.`;
+  }
   // #950 — i nomi vengono dal disco e da un modello che ha letto i file: tornano recintati.
   if (type === 'RINOMINA_FILE') {
     const E = globalThis.SN_ESTERNO;
