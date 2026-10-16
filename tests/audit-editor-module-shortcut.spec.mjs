@@ -807,7 +807,7 @@ test('su Mac l\'avviso nomina la combinazione che hai scritto', async ({ openTab
   await page.locator('.ed-module[data-type="comment"]').click();
   for (const [scritto, atteso] of [
     ['Alt+1', /^Alt\+1 è già la scorciatoia di «Conteggio parole»/],
-    ['Alt+-', /quindi Alt\+- non partirebbe mai/],
+    ['Alt+Shift+-', /quindi Alt\+Shift\+- scritta così non partirebbe mai/],
     ['Ctrl+S', /^Cmd\+S nell'Editor salva il documento/],
   ]) {
     await page.fill('#cfgShortcut', scritto);
