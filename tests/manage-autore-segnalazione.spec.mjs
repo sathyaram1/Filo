@@ -35,4 +35,23 @@ test('la prima bolla dice lo stesso autore della testata, per ogni mittente', as
   expect(visti.ses).toBe('Claude (sessione locale)');
   expect(visti.ute).toBe('Utente');
   expect(visti.npr).not.toBe('Owner');
+  expect(visti.och).toBe('Owner (scritto da Filo)');
+  expect(visti.oau).toBe('Filo (per conto dell\'owner)');
+  expect(visti.fil).toBe('Filo (per conto di un utente)');
+  expect(visti.fch).toBe('Filo (per conto di un utente)');
+  expect(visti.fin).toBe('Utente');
+});
+
+test('in lista l’icona dice per conto di chi ha scritto Filo', async ({ openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate((fbs) => { window.__mgTest.setData(fbs); }, FBS);
+  const titolo = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`).first().getAttribute('title');
+  await expect.poll(() => titolo('och')).toBe('Scritto da: Owner (scritto da Filo)');
+  expect(await titolo('oau')).toBe('Scritto da: Filo (per conto dell\'owner)');
+  expect(await titolo('fil')).toBe('Scritto da: Filo (per conto di un utente)');
+  await page.evaluate(() => window.__mgTest.openDetail('och'));
+  await expect(page.locator('#senderLink')).toHaveText('👑 Owner (scritto da Filo)');
+  await page.screenshot({ path: 'tests/.shots/953-gestione-autore.png' });
 });
