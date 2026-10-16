@@ -141,8 +141,8 @@ test('Windows, tastiera italiana: Ctrl+@ registrato con AltGr+ò parte quando si
   await expect(page.locator('#overlay h3', { hasText: 'Statistiche' })).toBeVisible();
 
   // Scritto a mano «@» non ha un tasto suo: lo si preme.
-  await page.click('#cfgCancel').catch(() => {});
   await page.keyboard.press('Escape');
+  await expect(page.locator('#overlay')).toBeHidden();
   await modulo(page, 'word-count');
   await page.fill('#cfgShortcut', 'Ctrl+@');
   await page.click('#cfgSave');
