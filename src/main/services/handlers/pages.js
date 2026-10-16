@@ -55,7 +55,9 @@ module.exports = function register(on, ctx) {
     if (msg.nome !== undefined) {
       const nome = String(msg.nome || '').trim();
       if (!nome) return { ok: false, error: 'empty_name' };
-      if (nome.length > NOME_CATEGORIA_MAX) return { ok: false, error: 'name_too_long', max: NOME_CATEGORIA_MAX };
+      if (nome.length > CATEGORY_NAME_MAX) return { ok: false, error: 'name_too_long', max: CATEGORY_NAME_MAX };
+      // Senza la pagina non si crea niente: una categoria vuota resterebbe nelle Opzioni senza averla chiesta.
+      if (!(await SavedPages.list()).some((p) => p.id === msg.pageId)) return { ok: false, error: 'not_found' };
       categoryId = (await Categorizer.ensureCategory({ name: nome })).id;
     }
     const p = await Categorizer.movePageToCategory(msg.pageId, categoryId);
