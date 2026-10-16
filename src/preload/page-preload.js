@@ -944,6 +944,7 @@ function vediCampiDelicati() {
 function startSafebrowse() {
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+  try { require(path.join(CONTENT_DIR, 'safebrowseLinks.js')); } catch (e) { console.error('[Filo CS] safebrowseLinks', e); } // #965
 }
 
 if (!IS_SUBFRAME) {
