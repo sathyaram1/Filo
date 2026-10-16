@@ -675,7 +675,13 @@
       throw new Error(`firestore contatore non leggibile (${res.status})`);
     }
     let value = null;
-    if (alza > 0 && current < alza) value = alza;
+    if (current < 0) {
+      // Un contatore che manca rinasce oltre ogni numero in uso: dal solo provato i prossimi invii riprenderebbero
+      // numeri già dati a chi non ha la prova (#923). Senza il massimo vero non lo si crea.
+      const tetto = pavimento !== null ? pavimento : await maxSeq({ idToken: opts.idToken || '' });
+      value = Math.max(alza, Number.isInteger(tetto) ? tetto : 0);
+      if (!(value > 0)) return current;
+    } else if (alza > 0 && current < alza) value = alza;
     else if (pavimento !== null && current - pavimento >= SEQ_LOWER_MARGIN) value = pavimento;
     if (value === null) return current;
     const w = await fetch(`${docUrl}?updateMask.fieldPaths=value&key=${API_KEY}`, {
