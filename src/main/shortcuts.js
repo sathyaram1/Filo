@@ -1,4 +1,4 @@
-// Le quattro scorciatoie di Filo (Spiega, Traduci, Salva per dopo, Aiuto), sui tasti scelti dall'utente (#842):
+// Le quattro scorciatoie di Filo (Spiega, Traduci, Salva per dopo, Aiuto), sui tasti scelti dall'utente (#842), e lo schermo intero:
 // valgono solo con Filo in primo piano, mai come scorciatoie di sistema (#838). Tasti e nomi: src/shared/tasti.js.
 // Sentinelle: tests/unit/scorciatoieSoloInFilo.test.mjs, tests/unit/scorciatoieFilo.test.mjs.
 
