@@ -268,7 +268,7 @@
     refreshLive: () => refreshLive(),
     onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url) => iconaDelSito(url),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
     chatCorrente: () => chatId,
