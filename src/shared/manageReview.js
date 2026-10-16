@@ -1782,6 +1782,15 @@
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
   };
 
+  /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
+  function fermoAlLivello3(fb) {
+    if (!fb || statusUnreadable(fb)) return null;
+    const { status, statusReason } = normalizeStatus(fb);
+    const motivo = String(statusReason || '');
+    const s = status === 'design' && Object.hasOwn(SEGNO_DESIGN, motivo) ? SEGNO_DESIGN[motivo] : null;
+    return s && s.livello === 'l3' && s.classe === 'design' && !MOTIVI_RISPOSTA.includes(motivo) ? s : null;
+  }
+
   /**
    * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio
    * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null fuori
