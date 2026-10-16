@@ -125,6 +125,27 @@ test('Importa: un archivio senza chiavi lascia quelle di questo computer, e la c
   }
 });
 
+test('Importa: il proxy con password arriva col solo indirizzo, e la conferma dice di riscriverlo (#905.1)', async () => {
+  const userData = cartellaTemporanea('filo-chiavi-proxy-');
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light' } }), 'utf8');
+  const zipPath = join(userData, 'backup-proxy.zip');
+  writeFileSync(zipPath, buildExportZip({ settings: { theme: 'dark', proxy: { datacenter: 'http://mario:password-del-proxy@gate.example.com:8080' } } }));
+  const app = await avvia(userData);
+  try {
+    await app.evaluate(({ dialog }, p) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] }); }, zipPath);
+    const page = await apriSicurezza(app);
+    await page.locator('#sec-import-btn').click();
+    await expect.poll(() => confirmText(page), { timeout: 10000 }).toContain('backup-proxy.zip');
+    expect(await confirmText(page)).toContain('Il proxy arriva senza utente e password');
+    await clickConfirm(page, 'ok');
+    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).proxy?.datacenter), { timeout: 10000 })
+      .toBe('http://gate.example.com:8080');
+  } finally {
+    try { await app.close(); } catch (_) {}
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
 // Il portachiavi si spegne a comando, come in auth-accesso-non-ricordato.spec.mjs.
 async function senzaPortachiavi(app) {
   await app.evaluate(({ safeStorage }) => {

@@ -231,9 +231,9 @@ module.exports = function register(on, ctx) {
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
       const filo = contaFilo(parsed);
-      const { mergeImportedData, regolaImport, haSegreti } = require('../exportData');
+      const { mergeImportedData, regolaImport, haSegreti, proxyDaCompletare } = require('../exportData');
       const dati = datiDaFondere(parsed.data);
-      const { stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
+      const { merged, stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
       return {
         ok: true,
         token,
@@ -249,6 +249,7 @@ module.exports = function register(on, ctx) {
         chats: filo.chats,
         pagine: filo.pagine,
         chiavi: haSegreti(parsed.data),
+        proxySenzaCredenziali: proxyDaCompletare(merged, parsed.proxySenzaCredenziali).length > 0,
       };
     } catch (e) {
       // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"

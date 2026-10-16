@@ -625,8 +625,8 @@ function unisciSveglie(local, imported, prossima, adesso) {
 
 // `opzioni`: { tettoPagine, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche contano le sezioni di primo
 // livello; `restano` sono quelle del backup che non si importano perché sono stato.
-// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); lo stesso proxy
-// arrivato senza utente e password lascia quello di qui, che li ha.
+// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); un proxy arrivato
+// senza utente e password non prende il posto di quello di qui che li ha.
 function senzaSegretiVuoti(dati, cur) {
   if (!isPlainObject(dati.settings)) return dati;
   const settings = JSON.parse(JSON.stringify(dati.settings));
@@ -637,7 +637,7 @@ function senzaSegretiVuoti(dati, cur) {
   if (isPlainObject(settings.proxy)) {
     for (const k of CAMPI_PROXY) {
       const v = settings.proxy[k];
-      if (pieno(v) && !haCredenziali(v) && haCredenziali(proxyQui[k]) && proxySenzaCredenziali(proxyQui[k]) === v.trim()) delete settings.proxy[k];
+      if (pieno(v) && !haCredenziali(v) && haCredenziali(proxyQui[k])) delete settings.proxy[k];
     }
   }
   via(isPlainObject(settings.security) ? settings.security.safeBrowse : null, ['safeBrowsingKey']);

@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 globalThis.self = globalThis;
 require(join(ROOT, 'src', 'shared', 'constants.js'));
-const { buildExportZip, readExportZip, mergeImportedData, unzip } = require(join(ROOT, 'src', 'main', 'services', 'exportData.js'));
+const { buildExportZip, readExportZip, mergeImportedData, proxyDaCompletare, unzip } = require(join(ROOT, 'src', 'main', 'services', 'exportData.js'));
 const C = globalThis.SN_CONST;
 
 const CHIAVE = 'sk-or-v1-0123456789abcdef0123456789abcdef';
@@ -42,7 +42,7 @@ test('di serie l\'archivio non contiene nessuna chiave, da nessuna parte', () =>
   }
   const { data, filo } = readExportZip(zip);
   assert.equal('apiKeys' in data.settings, false, 'il campo va via, non diventa vuoto');
-  assert.equal('datacenter' in data.settings.proxy, false);
+  assert.equal(data.settings.proxy.datacenter, 'socks5://gate.example.com:7000', 'del proxy esce utente e password, l\'indirizzo resta');
   assert.equal(data.settings.proxy.residential, 'http://gate2.example.com:8000', 'un proxy senza credenziali non è un segreto');
   assert.equal(data.settings.proxy.defaultCountry, 'fr');
   assert.equal('safeBrowsingKey' in data.settings.security.safeBrowse, false);
@@ -53,6 +53,26 @@ test('di serie l\'archivio non contiene nessuna chiave, da nessuna parte', () =>
   assert.equal(data.clipboardHistory[1].text, 'ciao');
   assert.match(filo.toString('utf8'), /imposta la chiave openrouter \[chiave tolta/, 'la chiave scritta in chat esce');
   assert.equal(JSON.parse(voce(zip, 'manifest.json')).chiavi, false);
+  assert.deepEqual(JSON.parse(voce(zip, 'manifest.json')).proxySenzaCredenziali, ['datacenter']);
+});
+
+test('il proxy senza utente e password torna dove non c\'era, e non cancella quello di qui che li ha (#905.1)', () => {
+  const parsed = readExportZip(buildExportZip(sorgente()));
+  assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
+
+  const altrove = mergeImportedData({ settings: {} }, parsed.data).merged;
+  assert.equal(altrove.settings.proxy.datacenter, 'socks5://gate.example.com:7000');
+  assert.deepEqual(proxyDaCompletare(altrove, parsed.proxySenzaCredenziali), ['datacenter'], 'la conferma deve dirlo');
+
+  const qui = mergeImportedData({ settings: { proxy: { datacenter: PROXY } } }, parsed.data).merged;
+  assert.equal(qui.settings.proxy.datacenter, PROXY, 'lo stesso proxy, qui con la password, resta com\'è');
+  assert.deepEqual(proxyDaCompletare(qui, parsed.proxySenzaCredenziali), []);
+
+  const diverso = mergeImportedData({ settings: { proxy: { datacenter: 'http://u:p@altro.example.com:1' } } }, parsed.data).merged;
+  assert.equal(diverso.settings.proxy.datacenter, 'http://u:p@altro.example.com:1', 'senza la password il backup non cancella quella di qui');
+
+  const senza = readExportZip(buildExportZip({ settings: { proxy: { residential: 'http://gate2.example.com:8000' } } }));
+  assert.deepEqual(senza.proxySenzaCredenziali, [], 'un proxy che non aveva credenziali non va completato');
 });
 
 test('una chiave scritta in memoria dopo un portachiavi illeggibile (apiKeysEnc) non esce nemmeno cifrata', () => {
