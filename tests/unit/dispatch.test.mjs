@@ -766,8 +766,11 @@ test('emit: un ruolo che col payload già fuori passa ancora la soglia esce inte
   assert.ok(ruolo.length > 30000 - 2000, `il ruolo è intero (${ruolo.length} caratteri)`);
   assert.match(ruolo, /^# Ruolo: verifier[\s\S]*Contratto comune dei worker[\s\S]*Lavoro server: anche filo-security[\s\S]*Avvertenza di serie/);
   assert.ok(!/<!--\s*includi:/.test(ruolo));
-  assert.ok(JSON.stringify(j.payload).includes(critica.slice(0, 200)) || Object.values(j.payload.fileEsterni || {}).some((f) => readFileSync(f, 'utf8') === critica),
-    'col ruolo fuori, il payload resta tutto da leggere');
+  const esterni = j.payload.fileEsterni || {};
+  j.payload.history.forEach((h, i) => {
+    const letta = h.critique === critica ? h.critique : readFileSync(esterni[`history.${i}.critique`], 'utf8');
+    assert.equal(letta, critica, 'col ruolo fuori, il payload resta tutto da leggere');
+  });
 
   // Il ruolo dopo non eredita il file di quello prima, e un ruolo che sta in stampa non porta il rimando.
   const dopo = JSON.parse(stampa({ role: 'prober' }, {}));
