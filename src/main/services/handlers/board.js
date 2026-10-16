@@ -12,6 +12,7 @@
 // quanto il renderer vede di sé via AUTH_STATUS.
 
 const auth = require('../../auth/google-auth');
+const Mittente = require('../feedbackMittente');
 // #583 — queste tre porte non sono del proprietario: valgono per chiunque
 // abbia fatto l'accesso, e su una macchina con una sessione aperta «hai una
 // sessione?» è sempre sì. Senza guardare da dove arriva la richiesta, una
