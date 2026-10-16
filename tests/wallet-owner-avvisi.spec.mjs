@@ -84,8 +84,11 @@ test.afterAll(async () => {
 
 test.beforeEach(() => { stato = INIZIO(); });
 
-// Due avvii sulla stessa cartella dati sono una riapertura di Filo.
+// Due avvii sulla stessa cartella dati sono una riapertura di Filo. La sessione dell'owner finto non si tiene: dove il
+// sistema sa cifrarla, all'avvio dopo Filo la rinnoverebbe col servizio vero prima che la prova lo sostituisca, e
+// la perderebbe. Ogni avvio parte da non-owner e lo diventa, come il primo.
 function avvia(userData) {
+  for (const f of ['auth.bin', 'accesso-owner-caduto']) rmSync(join(userData, f), { force: true });
   return electron.launch({
     args: [...argomentiScala, '.'],
     cwd: APP_ROOT,
