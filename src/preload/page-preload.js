@@ -160,12 +160,11 @@ try {
 
 // Un tasto scritto in un riquadro chiuso di Filo lo prende Filo prima di ogni script del sito, anche in cattura (#1071):
 // per questo l'ascolto nasce qui, a document_start. Lo smista SN_FILO_UI.tastoNelRiquadro (src/shared/filoUi.js).
-// L'Esc invece va prima a tutti gli ascolti di Filo: un sito che lo ferma dalla sua cattura sulla finestra arrivava prima
-// del riquadro aperto, che restava lì mentre lo schermo intero se ne andava (#859). Se un riquadro lo usa, il sito non lo vede.
 try {
   for (const tipo of ['keydown', 'keypress', 'keyup']) {
     const ascolto = (e) => {
       const UI = globalThis.SN_FILO_UI;
+      // L'Esc va prima a ogni ascolto di Filo: un sito che lo ferma sulla finestra lasciava aperto il riquadro (#859).
       if (tipo === 'keydown' && e.key === 'Escape') { escPrimaAFilo(e, ascolto, UI); return; }
       if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
     };
