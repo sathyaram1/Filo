@@ -42,6 +42,7 @@ test('rete e lavori: chiamano la callable coi valori giusti; un valore sbagliato
     const { lancia, chiamate } = fintoServer(dir);
     let r = await lancia('lavori', 'server-1', 'server');
     assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /node scripts\/routine-keys\.mjs rete server-1 limitata/, 'la chiave nasce a rete aperta: il passo che manca si ricorda');
     r = await lancia('rete', 'server-1', 'limitata');
     assert.equal(r.code, 0, r.err);
     r = await lancia('lavori', 'notturna', 'normali');
