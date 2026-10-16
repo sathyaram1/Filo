@@ -494,14 +494,18 @@ export function toccateDalRamo(prove, shaPrima, root, principale = riferimentoPr
 
 /**
  * Rilancia le prove tolte, ciascuna nella sua cartella com'era a `shaPrima` e col codice di adesso.
- * `{ rosse, motivo, casi }`: `motivo` non vuoto = non si è potuto rilanciare, e non è un via libera; `casi`, per
- * prova rossa, i titoli dei casi rossi (null senza rapporto): dicono di quale rilievo è il rosso.
+ * `{ rosse, motivo, casi, segnate }`: `motivo` non vuoto = non si è potuto rilanciare, e non è un via libera; `casi`, per
+ * prova rossa, i titoli dei casi rossi (null senza rapporto): dicono di quale rilievo è il rosso; `segnate`, le rosse
+ * che hanno un caso segnato come rosso atteso col corpo ancora rosso (Playwright quel caso lo dà verde).
  */
 export function rilanciaProveTolte(prove, shaPrima, root, opzioni = {}) {
   const r = corriCome(prove, shaPrima, root, { perCaso: true, ...opzioni });
   const rosse = prove.filter((p) => r.esiti.get(p)?.rossa);
   const rossiDi = (c) => (c ? Object.keys(c).filter((t) => c[t] === false) : null);
-  return { rosse, motivo: r.motivo, casi: Object.fromEntries(rosse.map((p) => [p, rossiDi(r.esiti.get(p)?.casi)])) };
+  return {
+    rosse, motivo: r.motivo, casi: Object.fromEntries(rosse.map((p) => [p, rossiDi(r.esiti.get(p)?.casi)])),
+    segnate: rosse.filter((p) => r.esiti.get(p)?.attesi?.length),
+  };
 }
 
 // Ogni prova nella sua cartella com'era a `sha`, col codice di adesso: `{ esiti: Map<prova, { rossa, casi }>, motivo }`.
