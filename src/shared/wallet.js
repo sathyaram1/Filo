@@ -459,6 +459,8 @@
     { chiave: 'dailyCredits', etichetta: 'Crediti al giorno', min: 0, max: 1000000, aiuto: 'La quota che arriva ogni notte a chi ha un portafoglio.' },
     { chiave: 'invitesPerUser', etichetta: 'Inviti per persona', min: 0, max: 1000, aiuto: 'Quanti codici riceve chi entra, da dare ad altri.' },
     { chiave: 'invitesMaxUses', etichetta: 'Persone per invito', min: 1, max: 1000, aiuto: 'Quante persone possono entrare con lo stesso codice. Vale anche per i link già in giro.' },
+    // Il server lo scala di uno a ogni riscatto: è un contatore, ma lo decide l'owner (#854).
+    { chiave: 'invitesRemaining', etichetta: 'Ingressi con invito rimasti', min: 0, max: 10000000, aiuto: 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
