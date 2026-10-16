@@ -180,7 +180,8 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
       const l0 = stato.letture;
       const rr = await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.OPEN_URL, url: 'filo://credits/owner.html' }));
       await home.waitForTimeout(4000);
-      console.log('DEBUG', JSON.stringify(rr), l0, stato.letture, JSON.stringify(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => { try { return w.webContents.getURL(); } catch (_) { return ''; } }))));
+      console.log('DEBUG', JSON.stringify(rr), l0, stato.letture, JSON.stringify(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => w._filoTabs).flatMap((w) => w._filoTabs.tabs.map((t) => `${t.url} | ${t.view ? t.view.webContents.getURL() : ''}`)))));
+      for (const p of app.windows()) console.log('WIN', p.url());
       await expect.poll(() => avvisiOwner(app), { timeout: 15_000 }).toEqual([]);
       await expect(carte(home)).toHaveCount(0, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
