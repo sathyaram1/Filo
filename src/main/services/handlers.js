@@ -4064,6 +4064,7 @@ const CAMPI_SALVATI = {
   ANNULLA_CAMBIO: ['_fraseCambio'],
   BLUETOOTH: ['_nomeSistema'],
   WIFI: ['_nomeSistema'],
+  APRI_SALVATA: ['_titolo'],
 };
 
 // I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
