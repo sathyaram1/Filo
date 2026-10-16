@@ -2289,10 +2289,8 @@ if (isMainModule) {
       console.log(s.files.map((f) => `  · ${f}`).join('\n'));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
-      // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.
-      const nota = stripFileArg(conBiglietto(argv), 'nota');
-      if (nota.error) { console.error(nota.error); process.exit(1); }
-      const [, id, verdict, ...avanzo] = nota.args;
+      const [, id, verdict, ...avanzo] = conBiglietto(argv);
+      if (id && SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--nota <file.md>')); process.exit(1); }
       if (!id || !SECAUDIT_VERDICTS.includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail> --nota <file.md>'); process.exit(1); }
       // Qui non c'è altro da dire: un argomento in più veniva ignorato in
       // silenzio e il verdetto partiva lo stesso (feedback #565).
