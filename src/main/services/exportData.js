@@ -503,7 +503,7 @@ const REGOLE_IMPORT = {
   AUTOMATION_CAP1: 'stato',
   AUTOMATION_CAP0: 'stato',
 };
-// Fuori da STORAGE_KEYS, per chiave: code e segni del portafoglio, bandierine di migrazione.
+// Fuori da STORAGE_KEYS, per chiave: code e segni del portafoglio, avvisi già dati, bandierine di migrazione.
 const REGOLE_ALTRE_CHIAVI = {
   walletLocalDeclared: 'stato',
   walletOwnKeyRefusal: 'stato',
