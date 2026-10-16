@@ -91,7 +91,7 @@
         break;
       }
       const soloAvviso = !soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate) || GCS.test(candidate)
-        || AZURE_ZONA.test(candidate));
+        || AZURE_ZONA.test(candidate) || AWS_REGIONE.test(candidate));
       const psl = PRIVATE_PSL.has(candidate) && (soloPsl || !DEL_MARCHIO.has(candidate));
       if (i > 0 && (psl || S3.test(candidate) || soloAvviso)) {
         suffixLabels = labels.length - i;
