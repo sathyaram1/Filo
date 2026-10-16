@@ -183,7 +183,7 @@ function scriviTesta({ L, creato, aperto, contatore, bytes, blocchiTabella }) {
 }
 
 function leggiTesta(carico) {
-  if (!carico || carico.length < CARICO || carico[0] !== 1 || carico[1] > 1) return null;
+  if (!carico || carico.length < CARICO || carico[0] !== 1 || carico[1] > COPIE_TABELLA) return null;
   const L = carico.readUInt32BE(4);
   const lunghezza = carico.readUInt32BE(28);
   if (L < 1) return null;
