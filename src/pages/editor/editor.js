@@ -4089,7 +4089,7 @@
       if (scritta && registrata && scritta === registrata.mostrata) c = registrata.c;
       else if (scritta && giaSalvata && scritta === mostrata) c = giaSalvata;
       else if (scritta) {
-        const v = daScritta(scritta);
+        const v = daScritta(scritta, m);
         if (v.rifiuto) { mostraRifiuto(v.rifiuto); cfgShortcut.focus(); return; }
         c = v.c;
       }
