@@ -2151,9 +2151,13 @@ if (isMainModule) {
   // a un --record-* finiva «argomento non riconosciuto», #724.1, #545) e un codice storto o doppio si ferma qui.
   const mano = stripTicketArg(process.argv.slice(2));
   if (mano.error) { console.error(`${mano.errore} Niente è stato toccato.`); process.exit(1); }
-  const argv = mano.args;
+  // Con la stessa regola le opzioni dei --record-* (#879); chi chiede aiuto lo riceve comunque.
+  const reg = leggiOpzioniRegistrazione(mano.args);
+  const argv = reg.args;
+  const opz = reg.valori;
   const bigliettoAMano = mano.ticket;
   const flag = argv[0];
+  if (reg.error && flag !== '--help' && flag !== '-h') { console.error(reg.error); process.exit(1); }
   if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale')) {
     console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
     process.exit(1);
