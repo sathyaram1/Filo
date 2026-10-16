@@ -1959,11 +1959,25 @@
     return fields;
   }
 
+  // Una pratica chiusa che torna aperta riparte col registro delle parti vuoto (#938): le parti già su main erano del
+  // giro chiuso, e lette nel giro nuovo lo chiuderebbero prima del tempo o ne rifiuterebbero le parti.
+  function riapre(statusPublicPrima, statusDopo) {
+    return statusPublicPrima === 'closed' && statusToPublic(statusDopo) === 'open';
+  }
+
+  // Questa scrittura di `status` riapre una pratica che ha il registro delle parti? Lo dice il documento com'è adesso,
+  // non la copia di chi chiama: vale per ogni pagina che scrive lo stato.
+  async function partiDaAzzerare(id, status, { idToken = '' } = {}) {
+    if (!id || status === undefined || statusToPublic(status) !== 'open') return false;
+    const [ora] = await getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
+    return !!(ora && ora.localMerges && riapre(ora.statusPublic, status));
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
