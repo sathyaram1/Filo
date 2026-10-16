@@ -239,7 +239,10 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
   }
   const withSeq = docs.filter((d) => intField(d, 'seq') > 0);
   const missing = docs.filter((d) => intField(d, 'seq') === 0);
-  let next = withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0) + 1;
+  // Il contatore si legge DOPO la scansione: più tardi, meno numeri presi nel frattempo da chi invia.
+  const contatore = await FB.submissionCount({ idToken: bearer || '' });
+  letture.aggiungi(1, 'contatore');
+  let next = ultimoNumeroBuono(contatore, withSeq) + 1;
 
   console.log(`${docs.length} feedback totali: ${withSeq.length} già numerati, ${missing.length} da numerare (si parte da #${next}).`);
   let failures = 0;
