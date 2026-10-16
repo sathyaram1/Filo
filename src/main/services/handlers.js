@@ -4656,7 +4656,7 @@ function segnaSalvateNominate(textReply, azioni) {
         const k = posizioneDelNome(testo, nome);
         if (k >= 0 && (i < 0 || k < i)) i = k;
       }
-      if (i >= 0) trovate.push({ id: p.id, i });
+      if (i >= 0) { trovate.push({ id: p.id, i }); giaMostrate.add(p.id); }
     }
     x._output.nominate = trovate.sort((a, b) => a.i - b.i).map((t) => t.id);
   }
