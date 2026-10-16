@@ -4,7 +4,7 @@ Guasto è ciò che da qui dovrebbe funzionare e non va, e ti ferma: credenziali,
 clone, rete, servizio giù, strumento che manca, permessi della sessione. «Non
 posso perché è rotto» è un guasto; «dalla cloud non si fa, per regola»
 (segreti, deploy, automazioni GitHub del server, prove sulla macchina
-dell'owner) è il rimando in locale, che l'owner legge come lavoro da approvare.
+dell'owner) è il rimando in locale, dove l'owner legge un lavoro da approvare.
 Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
 
 1. La domanda, coi campi di SPEC-DOMANDE § 3.1 in un JSON fuori dal repo:
