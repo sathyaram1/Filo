@@ -4335,7 +4335,7 @@
   const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => tasto(`${mods}+${d}`)));
   const ESEMPI_CON_NOME = ['Ctrl+Shift+Spazio', 'Ctrl+Alt+Spazio', 'Ctrl+Shift+Invio', 'Ctrl+Alt+Invio'].map((a) => tasto(a));
   function primaLibera(candidati, m) {
-    return candidati.find((sc) => { const v = daScritta(sc); return !!v.c && !rifiuto(v.c, m); }) || '';
+    return candidati.find((sc) => { const v = daScritta(sc, m); return !!v.c && !rifiuto(v.c, m); }) || '';
   }
   function scorciatoiaLibera(m) { return primaLibera(ESEMPI_LIBERI, m); }
 
