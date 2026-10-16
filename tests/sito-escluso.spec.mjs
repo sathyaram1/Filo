@@ -108,6 +108,19 @@ test('la pagina Altro accetta un indirizzo incollato, lo mostra ridotto al sito,
   }
 });
 
+test('la pagina Altro accetta più siti incollati sulla stessa riga e li mostra uno per riga', async ({ app, openTab }) => {
+  const altro = await openTab('filo://options/altro.html');
+  const casella = altro.locator('#blocklist');
+  await expect(casella).toHaveValue('', { timeout: 8000 });
+  await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), `${DOCS}, ${ALTRO}`);
+  await casella.click();
+  await altro.keyboard.press('Control+V');
+  await altro.locator('#h-blocklist').click();
+  await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual([DOCS, ALTRO]);
+  await expect(casella).toHaveValue(`${DOCS}\n${ALTRO}`);
+  await expect(altro.locator('#blocklistError')).toBeHidden();
+});
+
 test('dalla home: «spegni Filo su …» lo aggiunge senza togliere gli altri e «riaccendi» lo toglie; la pagina Altro aperta segue', async ({ app, shell, openTab }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8000 });
