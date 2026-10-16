@@ -410,7 +410,7 @@ function scopeOf(url) {
 const API = {
   checkSync,
   // #965 — il verdetto locale di un link non ancora aperto ({ url, level, message, scope } o null), e i link a fette.
-  checkLink: (url) => links.esaminaLink(url, checkSync),
+  checkLink: (url, nome) => links.esaminaLink(url, checkSync, nome),
   checkLinks: (urls, opts = {}) => links.esaminaAFette(urls, { ...opts, checkSync }),
   scopeOf,
   ownerOf,
