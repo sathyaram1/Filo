@@ -390,11 +390,12 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
     if (adesso !== primo) { primo = adesso; dal = ora; }
     if (primo === null || ora - dal < tetto) return null;
     dal = ora;
-    if (chiusiSenzaFine) return { tutto: true };
+    if (chiusiSenzaFine && (chiusi.has(primo) || partenza.size > partitiAllaChiusura)) return { tutto: true };
     const muta = ultimaFine === null || ora - ultimaFine >= tetto;
     const file = muta ? inCorso.filter((f) => f === primo || ora - partenza.get(f) >= tetto) : [primo];
     for (const f of file) chiusi.add(f);
     chiusiSenzaFine = true;
+    partitiAllaChiusura = partenza.size;
     return { file };
   };
 }
