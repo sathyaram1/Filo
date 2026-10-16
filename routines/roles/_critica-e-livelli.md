@@ -134,18 +134,13 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   titolo preso dalla prima frase.
 - **Le prove restano nel ramo**, in
   `tests/verifica/<numero>/giro<k>-r<n>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
-  fixture del repo, come ogni spec). In un giro locale la cartella te la dice
-  il compito ricevuto. Sono la memoria del giro, e a rilanciarle sei solo tu,
-  in partenza. Si committano rosse, come le trovi: il segno di rosso atteso
-  (`test.fail(true, '<motivo>')`) va solo sulla prova di un rilievo messo da
-  parte che resta nel ramo, mai su quella di un rilievo che stai per
-  registrare: la sua porta è aperta, e chi la chiude deve vederla passare da
-  rossa a verde. Una prova segnata conta per quello che fa il corpo, anche per
-  la pulizia e la consegna: se fallisce ancora la porta è aperta come prima, e
-  non è un rilievo nuovo; se passa («Expected to fail, but passed») la porta è
-  chiusa, e le togli il segno nel commit delle tue prove. Una prova che era
-  solo esplorazione (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche quella di un rilievo
-  **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
+  fixture del repo, come ogni spec), e si committano rosse: il segno di rosso
+  atteso (`test.fail`) va solo su quella di un rilievo messo da parte che resta
+  nel ramo, mai su una di un rilievo che registri. Segnata, conta il corpo: se
+  fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
+  porta è chiusa e le togli il segno. Una prova che era solo esplorazione
+  (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
+  quella di un rilievo **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
   suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
   rispiegare per sempre.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
