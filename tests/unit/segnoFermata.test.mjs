@@ -97,7 +97,7 @@ test('fermo per un guasto: segno, frase e motivo dicono guasto, non lavoro local
     assert.match(testo, /guasto/i, testo);
     assert.doesNotMatch(testo, /giudici|lavoro locale/i, testo);
   }
-  assert.equal(MR.chiedeLavoroLocale ? MR.chiedeLavoroLocale(fb) : false, false);
+  assert.equal(MR.chiedeLavoroLocale(fb), false);
 });
 
 test('richiede lavoro locale: nel dettaglio il rombo è azzurro e dice perché, anche prima del documento intero', () => {
