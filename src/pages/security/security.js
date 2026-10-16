@@ -837,6 +837,7 @@
     const settings = await Storage.getSettings();
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
+    mostraCaselleChiavi(settings);
     const sec = settings.security || {};
     lastProxy = JSON.stringify(settings.proxy || {});
     renderProxyBox();
