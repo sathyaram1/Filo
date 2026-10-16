@@ -681,6 +681,7 @@
     originOf,
     authorKind,
     senderOf,
+    filoPerConto,
     // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
     // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
     // possano divergere su una stringa copiata a mano.
