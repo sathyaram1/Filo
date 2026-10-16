@@ -1907,9 +1907,12 @@
     try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(b, attuali) : false; } catch (_) { allenta = true; }
     let chiede = false;
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
+    // `costoDi`: un elenco che costa diverso nei due versi (#967); senza, il costo dichiarato.
+    let costo = setter.costo;
+    try { if (typeof setter.costoDi === 'function') costo = setter.costoDi(b); } catch (_) { costo = 3; }
     return {
       ...b,
-      costo: setter.costo,
+      costo,
       allenta,
       ...(chiede ? { chiede: true } : {}),
       elencoFisso: setter.elencoFisso || '',
