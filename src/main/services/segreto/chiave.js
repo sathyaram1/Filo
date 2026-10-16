@@ -1,6 +1,6 @@
 // Le chiavi di un segreto: Argon2id(nome, sale del dispositivo) in un thread a parte, perché tiene la CPU per un secondo
 // buono e il processo principale non deve fermarsi. hash-wasm è WASM puro: stesso risultato su Windows, Mac e Linux.
-// I parametri non si cambiano (renderebbero illeggibili i segreti che esistono): li tiene tests/unit/profiloSegreto.test.mjs.
+// Parametri fissi (cambiarli rende illeggibili i segreti che esistono): li tiene tests/unit/profiloSegreto.test.mjs.
 
 'use strict';
 
