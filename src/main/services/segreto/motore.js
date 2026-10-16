@@ -896,15 +896,14 @@ async function transazione(ctx, S, piano, dati) {
   const Lprima = S.L;
   const gruppi = [...new Set([...dati.keys()].filter((j) => j >= GRUPPO).map((j) => Math.floor(j / GRUPPO)))].sort((a, b) => a - b);
   // Prima di scrivere: il contenuto vecchio che deve restare accanto ai blocchi nuovi.
+  const servono = (g) => Array.from({ length: Math.max(0, Math.min(GRUPPO, Lprima - GRUPPO * g)) }, (_, s) => s)
+    .filter((s) => !dati.has(GRUPPO * g + s) && prima[GRUPPO * g + s]);
   const vecchi = new Map();
-  for (const g of gruppi) {
-    if (GRUPPO * g >= Lprima) continue;
-    const servono = [];
-    for (let s = 0; s < Math.min(GRUPPO, Lprima - GRUPPO * g); s++) if (!dati.has(GRUPPO * g + s) && prima[GRUPPO * g + s]) servono.push(s);
-    if (!servono.length) continue;
-    const c = await carichiGruppo(ctx, S, g);
-    if (servono.some((s) => !c[s])) throw daRiaprire();
-    vecchi.set(g, c);
+  for (const lotto of aLotti(gruppi.filter((g) => servono(g).length))) {
+    for (const [g, c] of await carichiGruppi(ctx, S, lotto)) {
+      if (servono(g).some((s) => !c[s])) throw daRiaprire();
+      vecchi.set(g, c);
+    }
   }
   if (L2 > S.L) await crescita(ctx, S, L2);
   for (let x = 0; x < gruppi.length; x += GRUPPI_PER_LOTTO) {
