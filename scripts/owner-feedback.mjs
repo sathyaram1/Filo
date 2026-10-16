@@ -662,6 +662,9 @@ export async function scrivi(id, to, nota, opts = {}) {
   set('status', fine);
   set('statusPublic', statusToPublic ? statusToPublic(to) : 'open');
   set('workingSince', to === 'working' ? new Date().toISOString() : '');
+  // Riaperta, la pratica riparte col registro delle parti vuoto (#938, regola: SN_FEEDBACK.riapre). Maschera senza
+  // campo: per Firestore vuol dire «via».
+  if (doc.fields?.localMerges && globalThis.SN_FEEDBACK?.riapre?.(statusToPublic(from), to)) mask.push('localMerges');
 
   // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8): il report per te viaggia
   // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
