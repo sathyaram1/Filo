@@ -796,6 +796,7 @@ export function buildPayload(bucket, ctx = {}) {
         feedback: ctx.feedback || null,
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
+        ...conRipresa(ctx),
         history: Array.isArray(ctx.history) ? ctx.history : [],
         historyDropped: Number(ctx.historyDropped) || 0,
         scope: verifierScope(ctx.scope).scope,
