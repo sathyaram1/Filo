@@ -23,7 +23,7 @@
   // Dipendenze dalla pagina, riempite da init().
   let send = null;
   let allegaFile = null;
-  let faviconUrl = () => '';
+  let iconaDelSito = () => Promise.resolve('');
   let applyCommandCwd = () => {};
   let paroleUtente = () => [];
   let apriProposta = () => {};
@@ -1511,6 +1511,16 @@
     btn.classList.add('dash-salvata-aperta');
     btn.title = `Riapri ${p.title || p.url} · non è più in «Aperti per dopo»`;
   }
+  // Il posto dell'icona resta finché il main la cerca; se non la trova resta il solo nome, come quando non si caricava.
+  function iconaSitoEl(url) {
+    const img = document.createElement('img');
+    img.className = 'dash-action-favicon';
+    img.alt = '';
+    img.onerror = () => img.remove();
+    iconaDelSito(url).then((dato) => { if (dato) img.src = dato; else img.remove(); });
+    return img;
+  }
+
   function bottoneSalvata(p) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1519,16 +1529,7 @@
     btn.dataset.pageId = String(p.id || '');
     btn.dataset.url = String(p.url || '');
     btn.title = `Apri ${p.title || p.url} e toglila da «Aperti per dopo»`;
-    const favUrl = faviconUrl(p.url);
-    if (favUrl) {
-      const img = document.createElement('img');
-      img.className = 'dash-action-favicon';
-      img.src = favUrl;
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      img.onerror = () => img.remove();
-      btn.appendChild(img);
-    }
+    btn.appendChild(iconaSitoEl(p.url));
     let sito = '';
     try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}
     const titolo = pulito(p.title) || sito || p.url;
@@ -1790,16 +1791,7 @@
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
       if (a._callId) btn.dataset.callId = String(a._callId);
-      const favUrl = faviconUrl(a.url);
-      if (favUrl) {
-        const img = document.createElement('img');
-        img.className = 'dash-action-favicon';
-        img.src = favUrl;
-        img.alt = '';
-        img.referrerPolicy = 'no-referrer';
-        img.onerror = () => img.remove();
-        btn.appendChild(img);
-      }
+      btn.appendChild(iconaSitoEl(a.url));
       btn.appendChild(document.createTextNode(bgTabId ? `▸ ${label}` : `↗ ${label}`));
       return btn;
     }
@@ -2106,7 +2098,7 @@
   function init(deps) {
     send = deps.send;
     if (deps.allegaFile) allegaFile = deps.allegaFile;
-    if (deps.faviconUrl) faviconUrl = deps.faviconUrl;
+    if (deps.iconaDelSito) iconaDelSito = deps.iconaDelSito;
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
     if (deps.apriProposta) apriProposta = deps.apriProposta;
