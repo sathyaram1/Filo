@@ -82,6 +82,23 @@ test('l’uscita di git senza token: in chiaro, codificato, e ogni credenziale i
   assert.equal(senzaToken('To https://github.com/sathyaram1/filo-security.git\n', TOKEN), 'To https://github.com/sathyaram1/filo-security.git\n');
 });
 
+test('chi ha respinto git: il proxy della sessione non si scambia per GitHub', () => {
+  const casi = [
+    ['remote: Invalid username or token. Password authentication is not supported for Git operations.\nfatal: Authentication failed\n', 'github'],
+    ['remote: Permission to sathyaram1/filo-security.git denied to filo-lavori[bot].\nfatal: unable to access \'x\': The requested URL returned error: 403\n', 'github'],
+    ['remote: Write access to repository not granted.\n', 'github'],
+    ['fatal: unable to access \'x\': Received HTTP code 403 from proxy after CONNECT\n', 'proxy'],
+    ['fatal: unable to access \'x\': The requested URL returned error: 407\n', 'proxy'],
+    ['remote: blocked by agent proxy policy\nfatal: Authentication failed for \'x\'\n', 'proxy'],
+    ['fatal: Authentication failed for \'x\'\n', 'ignoto'],
+    ['fatal: could not read Username for \'https://github.com\': terminal prompts disabled\n', 'ignoto'],
+    ['error: failed to push some refs\n ! [rejected] worker/f1 -> worker/f1 (non-fast-forward)\n', ''],
+    ['', ''],
+  ];
+  for (const [stderr, atteso] of casi) assert.equal(chiHaRespinto(stderr), atteso, stderr);
+  assert.equal(chiHaRespinto(undefined), '');
+});
+
 test('piano di git-server: azioni, cartella fuori da Filo, rami ammessi, mai main', () => {
   const root = resolve('/progetti/Filo');
   const fuori = resolve('/progetti/filo-security');
