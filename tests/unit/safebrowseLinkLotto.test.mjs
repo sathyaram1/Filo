@@ -91,3 +91,18 @@ test('una fetta scaduta fa comunque un link, e una scheda chiusa ferma l\'esame'
 test('il lotto ha un tetto largo e dichiarato', () => {
   assert.ok(LOTTO_MAX >= 200, `tetto: ${LOTTO_MAX}`);
 });
+
+test('il testo cercato non è un file: una ricerca di «fattura.pdf.exe» apre i risultati; un file in un parametro o in un rimando sì', () => {
+  const { checkLink } = SB;
+  for (const u of [
+    'https://forum.example.it/search.php?keywords=documento.pdf.exe',
+    'https://cerca.example.com/?q=fattura.pdf.exe',
+    'https://example.com/risultati?query=foto.jpg.scr&pagina=2',
+  ]) assert.equal(checkLink(u), null, u);
+  const per = (u, nome) => { const v = checkLink(u, nome); return v && v.message.body.match(/«([^»]+)»/)[1]; };
+  assert.equal(per('https://scarica.example.org/dl?file=Fattura%20marzo.pdf.exe&x=1'), 'Fattura marzo.pdf.exe');
+  assert.equal(per('https://example.com/vai?to=https%3A%2F%2Faltro.example.net%2Ff%2Fbolletta.pdf.exe'), 'bolletta.pdf.exe');
+  // Il nome con cui arriva il file conta come il suo indirizzo (un link «scarica», un nome dato dal sito).
+  assert.equal(per('https://example.com/get/123'), null);
+  assert.equal(per('https://example.com/get/123', 'ricevuta.jpg.scr'), 'ricevuta.jpg.scr');
+});

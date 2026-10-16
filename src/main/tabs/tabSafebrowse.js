@@ -179,8 +179,19 @@ const safebrowseMethods = {
     return true;
   },
 
-  // Uno scaricamento chiesto da una pagina senza navigare (link con «download», uno script): si giudica l'indirizzo
-  // cliccato col nome del file, e confermato riparte dalla pagina. Vero se l'avviso l'ha fermato.
+  // Il clic su un link «scarica» (attributo download), chiesto dal preload prima che lo scaricamento parta: vero se
+  // l'avviso lo ferma. Confermato, il link si riclicca nella pagina, che dà al file il suo nome.
+  _sbScaricamentoScelto(tab, url, nome) {
+    const wc = tab.view && tab.view.webContents;
+    if (!wc || wc.isDestroyed()) return false;
+    return this._sbPrimaDelClic(tab, url, (segna) => {
+      segna(tab);
+      this._sbRifaiDallaPagina(tab, 'SN_RISCARICA', url, () => { try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {} });
+    }, { nome });
+  },
+
+  // Uno scaricamento partito senza passare di lì (uno script, un nome dato dal sito): si giudica l'indirizzo cliccato
+  // col nome del file, e confermato riparte. Vero se l'avviso l'ha fermato.
   _sbScaricamento(tab, item) {
     const wc = tab.view && tab.view.webContents;
     if (!wc || wc.isDestroyed()) return false;
@@ -194,11 +205,12 @@ const safebrowseMethods = {
     }, { nome });
   },
 
-  // Un invio di modulo (POST) fermato dall'avviso e confermato si rifà dalla pagina coi suoi dati, che l'indirizzo da solo
-  // perderebbe; senza un invio da rifare, `altrimenti` apre l'indirizzo. Il modulo lo tiene il content script.
-  _sbRifaiInvio(tab, url, altrimenti) {
+  // Un gesto della pagina fermato dall'avviso e confermato si rifà dalla pagina, uguale: l'invio di un modulo coi suoi
+  // dati (SN_RIFAI_INVIO), il link «scarica» col nome del suo file (SN_RISCARICA), che l'indirizzo da solo perderebbe.
+  // Se la pagina non ha più il gesto da rifare, `altrimenti`. Chi li tiene: il preload e src/content/safebrowseLinks.js.
+  _sbRifaiDallaPagina(tab, funzione, url, altrimenti) {
     const wc = tab.view && tab.view.webContents;
-    const code = `(() => { const f = globalThis.SN_RIFAI_INVIO; return typeof f === 'function' ? f(${JSON.stringify(String(url))}) : false; })()`;
+    const code = `(() => { const f = globalThis.${funzione}; return typeof f === 'function' ? f(${JSON.stringify(String(url))}) : false; })()`;
     let p = null;
     try { p = wc && !wc.isDestroyed() ? wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]) : null; } catch (_) { p = null; }
     Promise.resolve(p).then((fatto) => { if (fatto !== true) altrimenti(); }, () => altrimenti());

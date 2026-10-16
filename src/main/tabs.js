@@ -2542,7 +2542,7 @@ class TabManager {
         return;
       }
       // #965 — un link da avviso non si apre prima dell'avviso, che compare qui, sulla pagina da cui parte.
-      if (this._sbPrimaDelClic(tab, url, (segna) => { segna(tab); this._sbRifaiInvio(tab, url, () => this.navigate(tab.id, url)); })) {
+      if (this._sbPrimaDelClic(tab, url, (segna) => { segna(tab); this._sbRifaiDallaPagina(tab, 'SN_RIFAI_INVIO', url, () => this.navigate(tab.id, url)); })) {
         event.preventDefault();
         return;
       }

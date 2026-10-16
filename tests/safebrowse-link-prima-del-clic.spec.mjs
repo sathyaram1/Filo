@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
 import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:http';
 
 // L'aspetto si guarda: le foto restano in tests/.shots/, fuori dal repo.
 async function foto(avviso, nome) {
@@ -327,5 +328,153 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
   await clicFermato(app, '#giu');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
+  expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
+});
+
+// Un sito vero su 127.0.0.1 con le sue strade: serve file e moduli, e conta come gli arrivano le richieste.
+async function sitoProprio(pagine) {
+  const richieste = [];
+  const server = createServer((req, res) => {
+    let corpo = '';
+    req.on('data', (c) => { corpo += c; });
+    req.on('end', () => {
+      richieste.push({ metodo: req.method, url: req.url, corpo });
+      const path = req.url.split('?')[0];
+      if (path.endsWith('.exe') || path.startsWith('/allegato/')) {
+        const nome = path.startsWith('/allegato/') ? 'fattura.pdf.exe' : path.split('/').pop();
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': 4, 'Content-Disposition': `attachment; filename="${nome}"` });
+        res.end('MZ00');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(pagine[path] || '<title>Arrivato</title><p id="arrivato">arrivato</p>');
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  return {
+    origin, richieste,
+    verso: (inizio) => richieste.filter((r) => r.url.startsWith(inizio)),
+    chiudi: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }),
+  };
+}
+
+// Gli scaricamenti che la scheda attiva chiede, col nome e con chi li ha fermati prima che scendessero.
+const contaScaricamenti = (app) => app.evaluate(({ BrowserWindow }) => {
+  globalThis.__scaricamenti = [];
+  const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+  const ses = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.session;
+  ses.on('will-download', (e, item) => { globalThis.__scaricamenti.push({ nome: item.getFilename(), fermato: e.defaultPrevented }); });
+});
+const scaricamenti = (app) => app.evaluate(() => globalThis.__scaricamenti);
+
+async function apriSito(openTab, url) {
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  return page;
+}
+
+test('un link «scarica» a un file travestito: al clic l\'avviso, il file non parte; «Continua» lo scarica col suo nome', async ({ app, openTab }) => {
+  const s = await sitoProprio({
+    '/': '<title>Archivio</title><a id="file" download href="/documenti/fattura.pdf.exe">la tua fattura</a>'
+      + '<a id="nominato" download="ricevuta.jpg.scr" href="/scarica/42">la ricevuta</a>',
+  });
+  try {
+    await apriSito(openTab, s.origin + '/');
+    await fuocoAllaPagina(app);
+    await contaScaricamenti(app);
+    await clicFermato(app, '#file');
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+    await expect.poll(() => copertura(app)).toEqual(COPERTA);
+    expect(await scaricamenti(app)).toEqual([]);
+    const continua = avviso.getByRole('button', { name: 'Continua' });
+    await expect(continua).toBeEnabled({ timeout: 5_000 });
+    await continua.click();
+    await expect.poll(() => scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: false }]);
+    await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+
+    // Il nome che conta è quello del file, anche quando l'indirizzo non lo dice. In una scheda nuova: «Continua» vale
+    // per il sito nella sua scheda.
+    await apriSito(openTab, s.origin + '/');
+    await fuocoAllaPagina(app);
+    await contaScaricamenti(app);
+    await clicFermato(app, '#nominato');
+    await expect(avviso.getByText(/«ricevuta\.jpg\.scr»/)).toBeVisible();
+    await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+    expect(await scaricamenti(app)).toEqual([]);
+  } finally { await s.chiudi(); }
+});
+
+test('un file travestito che il sito nomina solo rispondendo: l\'avviso lo ferma prima che scenda', async ({ app, openTab }) => {
+  const s = await sitoProprio({ '/': '<title>Posta</title><a id="allegato" href="/allegato/7">apri l\'allegato</a>' });
+  try {
+    await apriSito(openTab, s.origin + '/');
+    await fuocoAllaPagina(app);
+    await contaScaricamenti(app);
+    await clicFermato(app, '#allegato');
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(/«fattura\.pdf\.exe»/)).toBeVisible();
+    await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+    expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
+  } finally { await s.chiudi(); }
+});
+
+test('un modulo verso un indirizzo da avviso: confermato, il sito riceve i dati, nella scheda e in una scheda nuova', async ({ app, openTab }) => {
+  const modulo = (id, extra) => `<form id="${id}" method="post" action="/invio/${id}.pdf.exe?x=1" ${extra}>`
+    + '<input name="nome" value="Mario"><input name="action" value="campo"><button name="scelta" value="si">Invia</button></form>';
+  const s = await sitoProprio({ '/': '<title>Modulo</title>' + modulo('qui', '') + modulo('altrove', 'target="_blank"') });
+  try {
+    await apriSito(openTab, s.origin + '/');
+    await fuocoAllaPagina(app);
+    await contaScaricamenti(app);
+    await clicFermato(app, '#qui button');
+    const avviso = await vistaAvviso(app);
+    await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+    expect(s.verso('/invio/')).toEqual([]);
+    await expect(avviso.getByRole('button', { name: 'Continua' })).toBeEnabled({ timeout: 5_000 });
+    await avviso.getByRole('button', { name: 'Continua' }).click();
+    await expect.poll(() => s.verso('/invio/qui').map((r) => `${r.metodo} ${r.corpo}`)).toEqual(['POST nome=Mario&action=campo&scelta=si']);
+
+    await apriSito(openTab, s.origin + '/');
+    await fuocoAllaPagina(app);
+    await clicFermato(app, '#altrove button');
+    await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+    await expect(avviso.getByRole('button', { name: 'Continua' })).toBeEnabled({ timeout: 5_000 });
+    await avviso.getByRole('button', { name: 'Continua' }).click();
+    await expect.poll(() => s.verso('/invio/altrove').map((r) => `${r.metodo} ${r.corpo}`)).toEqual(['POST nome=Mario&action=campo&scelta=si']);
+  } finally { await s.chiudi(); }
+});
+
+test('un collegamento aperto da una pagina di Filo o dall\'assistente sopra una pagina: l\'avviso compare prima di aprire', async ({ app, openTab, testServer }) => {
+  await contaLaRete(app, {});
+  await openTab('filo://security/');
+  await fuocoAllaPagina(app);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.executeJavaScript('window.open("https://paypa1.com/da-filo")');
+  });
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  expect(await schedeWeb(app)).toEqual([]);
+  expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
+  await avviso.getByRole('button', { name: 'Non aprire' }).click();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  expect(await schedeWeb(app)).toEqual([]);
+
+  // Il collegamento che l'assistente scrive sopra una pagina web passa dal main: l'avviso compare su quella pagina.
+  const pagina = await testServer.openReady(openTab, '<title>Articolo</title><p>testo</p>');
+  await fuocoAllaPagina(app);
+  const articolo = pagina.url();
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.executeJavaScriptInIsolatedWorld(999, [{
+      code: 'chrome.runtime.sendMessage({ type: "apri_collegamento_filo", url: "https://paypa1.com/da-assistente" }, () => {})',
+    }]);
+  });
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
+  expect(await schedeWeb(app)).toEqual([articolo]);
   expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
 });
