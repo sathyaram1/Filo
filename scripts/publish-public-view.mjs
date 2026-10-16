@@ -191,7 +191,7 @@ if (isMain) {
     console.log(`${prefisso}Schede da togliere: ${r.plan.remove.length}`);
     for (const id of r.plan.remove) console.log(`  - ${id}`);
     if (r.counter !== null) console.log(`Contatore dei numeri: ${r.counter}`);
-    else if (dryRun) console.log(`Contatore dei numeri: sarebbe allineato a ${r.maxSeq}`);
+    else if (dryRun) console.log(`Contatore dei numeri: si alzerebbe al più a ${r.maxSeq}${r.pavimento ? `, si abbasserebbe al più a ${r.pavimento}` : ''}`);
   } catch (e) {
     console.error(`RIFIUTATO: ${e?.message || e}`);
     process.exit(1);
