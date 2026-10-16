@@ -2,7 +2,7 @@
 // il testo come si legge, senza marcature e coi numeri già calcolati; mentre la risposta arriva il comando non c'è.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { nelMondoDiFilo, statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
 
 const PRIMA = '**The cat** is on the *roof*.\nIt costs [[calc: 1200*1.5]] euros, see [the page](https://example.com).';
 const PRIMA_PULITA = 'The cat is on the roof.\nIt costs 1800 euros, see the page.';
@@ -10,7 +10,7 @@ const SECONDA = 'Two forms:\n\n- **first**\n- `second`';
 const SECONDA_PULITA = 'Two forms:\n\n• first\n• second';
 
 const pagina = '<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:40px;font:16px sans-serif">'
-  + '<p id="parola" style="font-size:20px">gatto</p>'
+  + '<p style="font-size:20px">Il <span id="parola">gatto</span> dorme.</p>'
   + '<textarea id="campo" style="margin-top:320px;width:420px;height:90px"></textarea></body></html>';
 
 // Provider finto nel main: la prima risposta si ferma a metà finché la prova non la libera.
@@ -94,19 +94,18 @@ test('Alt+T: Copia mette negli appunti la traduzione pulita, coi numeri risolti;
   await scrivi(app, page, '.sn-popup-input', 'and the plural?');
   await page.keyboard.press('Enter');
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(2);
-  await nelloStessoRiquadro(app, page);
+  await cliccaUltimo(app, page, '.sn-msg-copia');
   await expect.poll(() => appunti(app)).toBe(SECONDA_PULITA);
 });
 
-// Clic vero sul secondo «Copia» (l'helper `clicca` prende il primo).
-async function nelloStessoRiquadro(app, page) {
-  const { nelMondoDiFilo } = await import('./helpers/riquadri.mjs');
-  const r = await nelMondoDiFilo(app, page, () => {
+// Clic vero sull'ultimo nodo che risponde a `sel` (l'helper `clicca` prende il primo).
+async function cliccaUltimo(app, page, sel) {
+  const r = await nelMondoDiFilo(app, page, (s) => {
     const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
-    const tutti = T ? T.trovaTutti('.sn-msg-copia') : document.querySelectorAll('.sn-msg-copia');
+    const tutti = T ? T.trovaTutti(s) : document.querySelectorAll(s);
     const b = tutti[tutti.length - 1].getBoundingClientRect();
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-  });
+  }, sel);
   await page.mouse.click(r.x, r.y);
 }
 
