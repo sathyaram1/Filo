@@ -908,6 +908,42 @@
     return base;
   }
 
+  // La chiave OpenRouter scritta da chi usa Filo (Opzioni o Crediti), non quella dei crediti. PURA.
+  function hasOwnOpenrouterKey(settings) {
+    const k = settings && settings.apiKeys && settings.apiKeys.openrouter;
+    return typeof k === 'string' && k.trim() !== '';
+  }
+
+  // La lista delle richieste pagate con la chiave propria (#962), dalle impostazioni SALVATE: a interruttore acceso
+  // resta solo quella che aggiunge «solo pesi aperti», che vale comunque; null quando vale la lista intera. PURA.
+  function ownKeyExcludedProviders(settings, openWeightsOnly) {
+    if (!settings || settings.ownKeyAllProviders !== true || !hasOwnOpenrouterKey(settings)) return null;
+    return effectiveExcludedProviders([], openWeightsOnly);
+  }
+
+  // La lista che vale per una richiesta pagata con `keySource` ('own' | 'personal' | 'factory' | ''): quella della
+  // chiave propria solo se c'è; i crediti di Filo, anche dopo un ripiego, hanno sempre l'intera. PURA.
+  function excludedProvidersForKey(settings, keySource) {
+    const s = settings || {};
+    if (keySource === 'own' && Array.isArray(s.excludedProvidersOwnKey)) return s.excludedProvidersOwnKey;
+    return Array.isArray(s.excludedProviders) ? s.excludedProviders : [];
+  }
+
+  // Le istruzioni di routing per OpenRouter dalle impostazioni effettive: chi NON deve servire, l'ordinamento e, con
+  // l'interruttore della chiave propria, la lista per quella chiave (`ownKeyIgnore`, la sceglie il provider dalla
+  // chiave con cui parte davvero). null se non c'è niente da dire. PURA.
+  function providerRoutingFor(settings) {
+    const s = settings || {};
+    const ignore = providerIgnoreList(s.excludedProviders || []);
+    const sort = typeof s.providerSort === 'string' ? s.providerSort : '';
+    if (!ignore.length && !sort) return null;
+    const routing = {};
+    if (ignore.length) routing.ignore = ignore;
+    if (sort) routing.sort = sort;
+    if (Array.isArray(s.excludedProvidersOwnKey)) routing.ownKeyIgnore = providerIgnoreList(s.excludedProvidersOwnKey);
+    return routing;
+  }
+
   // Chiavi dei fornitori con «usa modelli predefiniti» acceso. PURA. Per ogni servizio vince la
   // chiave scritta da chi usa Filo (#598, #1107): è il suo conto; quella di fabbrica è il ripiego.
   function effectiveApiKeys(utente, personale, fabbrica) {
