@@ -32,10 +32,17 @@ function corri(args, sistema) {
   });
 }
 
+// Ogni caso rosso col suo blocco TAP (messaggio, atteso, ottenuto); un processo caduto prima dei casi, con la sua coda.
 function perché(out) {
   const righe = out.split('\n');
-  const rossi = righe.filter((r) => /^\s*not ok\b|^\s+(error|location):/.test(r));
-  return (rossi.length ? rossi : righe.slice(-20)).join('\n');
+  const rossi = [];
+  let dentro = false;
+  for (const r of righe) {
+    if (/^\s*not ok\b/.test(r)) dentro = true;
+    if (dentro) rossi.push(r);
+    if (dentro && /^\s*\.\.\.$/.test(r)) dentro = false;
+  }
+  return rossi.length ? rossi.join('\n') : `(ultime 20 righe)\n${righe.slice(-20).join('\n')}`;
 }
 
 test('le prove dell\'aggiornatore si trovano: rinominate, la guardia non guarderebbe niente', () => {
