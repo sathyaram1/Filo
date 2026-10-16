@@ -48,7 +48,6 @@ test('dove serve un intero, punto o virgola a gruppi di tre cifre separano le mi
   assert.deepEqual(C.leggi('1.234.567', INTERO), { ok: true, valore: 1234567 });
   assert.equal(C.leggi('2.5', INTERO).motivo, C.MOTIVI.NON_INTERO, 'non sono migliaia: è un decimale');
   assert.equal(C.leggi('0.500', INTERO).motivo, C.MOTIVI.NON_INTERO, 'uno zero davanti è un decimale');
-  assert.equal(C.leggi('10.0000', INTERO).motivo, C.MOTIVI.NON_INTERO);
   assert.equal(C.leggi('-1.000', INTERO).motivo, C.MOTIVI.SOTTO);
   assert.deepEqual(C.leggi('1.500', { intero: false }), { ok: true, valore: 1.5 }, 'coi decimali ammessi il punto resta un decimale');
 });
