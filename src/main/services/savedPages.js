@@ -137,5 +137,5 @@
     return remove(id);
   }
 
-  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, consume, rimpicciolisciMiniature: require('./miniature').rimpicciolisciSalvate };
+  global.SN_SAVED_PAGES = { list, save, setThumbnail, remove, rimetti, consume, rimpicciolisciMiniature: require('./miniature').rimpicciolisciSalvate };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
