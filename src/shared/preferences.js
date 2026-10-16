@@ -1914,7 +1914,7 @@
   }
 
   // Il rifiuto dell'interruttore dei fornitori esclusi chiesto senza una chiave propria (#962): lo legge l'utente.
-  const SENZA_CHIAVE_PROPRIA = 'serve una tua chiave OpenRouter, da mettere nella pagina Crediti: senza, le richieste '
+  const SENZA_CHIAVE_PROPRIA = 'serve una tua chiave OpenRouter, da mettere nella pagina Crediti. Senza, le richieste '
     + 'le pagano i crediti di Filo, e lì i fornitori esclusi restano esclusi';
 
   global.SN_PREF = {

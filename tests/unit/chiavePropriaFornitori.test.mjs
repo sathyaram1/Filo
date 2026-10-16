@@ -203,3 +203,14 @@ test('il cancello giudica chi ha servito con la chiave che ha pagato', async () 
   const r2 = await gate.call({ action: 'tts', attempt: a, method: 'synthesizeSpeech', args: { text: 'ciao' } });
   assert.equal(r2.violation, true);
 });
+
+test('nessun host ammesso con la chiave propria a interruttore spento: la frase dice anche di accenderlo', () => {
+  require('../../src/shared/chatErrors.js');
+  const CE = globalThis.SN_CHAT_ERRORS;
+  const err = { keySource: 'own' };
+  const spento = CE.rimedioNessunHost('opzioni', err, effettive({ toggle: false }));
+  assert.match(spento, /Opzioni → Modelli per azione\./);
+  assert.match(spento, /«Con la mia chiave, usa anche i fornitori esclusi» in Opzioni/);
+  assert.equal(CE.rimedioNessunHost('opzioni', { keySource: 'personal' }, effettive({ toggle: false })), CE.RIMEDI_NESSUN_HOST.opzioni, 'coi crediti no');
+  assert.equal(CE.rimedioNessunHost('predefiniti', err, effettive({ toggle: true, openWeightsOnly: true })), CE.RIMEDI_NESSUN_HOST.predefiniti, 'già acceso');
+});

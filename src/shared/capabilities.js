@@ -548,7 +548,7 @@
       id: 'options-models', title: 'Modelli e chiavi AI', category: 'settings',
       desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile, che ferma ogni chiamata ai modelli: anche quelle che Filo fa da solo, come il controllo dei siti pericolosi o il riconoscimento dei blocchi geografici, e le prove delle Opzioni. Puoi anche affidarti ai modelli predefiniti di Filo.',
       invoke: 'Menu del tasto destro → "Opzioni Filo", oppure filo://options/options.html. Il modello di una funzione si cambia anche chiedendolo a Filo ("usa claude per la chat"), se usi i tuoi modelli e non quelli predefiniti.',
-      doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo. Lo stesso se il modello lo servono solo fornitori che Filo esclude: la funzione, o il «Prova» della sua riga, dice quale modello è e dove sceglierne un altro. Con i modelli predefiniti il modello di ogni funzione lo sceglie Filo, e dalla chat non si cambia.',
+      doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo. Lo stesso se il modello lo servono solo fornitori che Filo esclude: la funzione, o il «Prova» della sua riga, dice quale modello è e dove sceglierne un altro, e se paghi con la tua chiave anche l’interruttore che li ammette. Con i modelli predefiniti il modello di ogni funzione lo sceglie Filo, e dalla chat non si cambia.',
     },
     {
       id: 'model-cost-estimate', title: 'Quanto costa un modello', category: 'settings',
@@ -564,7 +564,7 @@
     },
     {
       id: 'own-key-all-providers', title: 'Fornitori esclusi con la tua chiave', category: 'settings',
-      desc: 'Con una tua chiave OpenRouter, messa nella pagina Crediti, nelle Opzioni compare l’interruttore «Con la mia chiave, usa anche i fornitori esclusi», spento di serie. Acceso, le richieste pagate con la tua chiave partono senza la lista dei fornitori che Filo esclude coi suoi crediti: così funzionano anche modelli come Gemini o Grok, che servono solo i loro produttori. Filo continua a registrare chi ha servito ogni risposta, senza segnalarlo come errore.',
+      desc: 'Con una tua chiave OpenRouter, messa nella pagina Crediti, nelle Opzioni compare l’interruttore «Con la mia chiave, usa anche i fornitori esclusi», spento di serie. Acceso, le richieste pagate con la tua chiave partono senza la lista dei fornitori che Filo esclude coi suoi crediti. Così funzionano anche modelli come Gemini o Grok, che servono solo i loro produttori. Filo continua a registrare chi ha servito ogni risposta, senza segnalarlo come errore.',
       invoke: 'Opzioni → «Con la mia chiave, usa anche i fornitori esclusi», oppure chiedendolo a Filo ("con la mia chiave usa anche i fornitori esclusi").',
       doesNot: 'Senza una tua chiave non compare e non ha effetto, e Filo dalla chat non lo accende. Se OpenRouter rifiuta la tua chiave e Filo passa ai suoi crediti, l’esclusione torna a valere per intero. Non tocca «Solo modelli a pesi aperti», che vale comunque.',
     },

@@ -39,7 +39,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
   // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.
   funzioneDi: (action) => (action === ACTIONS.PROVIDER_TEST ? '' : actionLabelForSettings(action)),
-  rimedioDi: (s, action) => globalThis.SN_CHAT_ERRORS.RIMEDI_NESSUN_HOST[doveSiSceglieIlModello(s, action)],
+  rimedioDi: (s, action, err) => globalThis.SN_CHAT_ERRORS.rimedioNessunHost(doveSiSceglieIlModello(s, action), err, s),
 });
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;

@@ -110,7 +110,7 @@
       let funzione = '';
       let rimedio = '';
       try { funzione = funzioneDi(action) || ''; } catch (_) {}
-      try { rimedio = rimedioDi(s, action) || ''; } catch (_) {}
+      try { rimedio = rimedioDi(s, action, err) || ''; } catch (_) {}
       err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoHostEsclusi(err.hosts), rimedio });
       return err;
     }
