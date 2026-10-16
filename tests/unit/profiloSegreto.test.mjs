@@ -360,7 +360,7 @@ describe('da fuori', () => {
 
   test('due scritture dello stesso blocco logico hanno nonce diversi', async () => {
     const prima = await impronta(base, 'Alfa');
-    (await apri(base, 'Alfa')).segreto.chiudi();
+    await (await apri(base, 'Alfa')).segreto.chiudi();
     const dopo = await impronta(base, 'Alfa');
     const t0 = prima.copie.get(0);
     const t1 = dopo.copie.get(0);
