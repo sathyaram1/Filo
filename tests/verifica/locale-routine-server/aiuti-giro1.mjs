@@ -127,4 +127,4 @@ for (let k = 0; k < 36; k++) {
     biglietti.push({ sonda: sonda.work === true, lavoro: b.work === true });
   }
 }
-process.stdout.write(`${JSON.stringify({ accensioniServer: accensioni.filter((a) => a === 'rS').length, biglietti })}\n`);
+process.stdout.write(`\n${JSON.stringify({ accensioniServer: accensioni.filter((a) => a === 'rS').length, biglietti })}\n`);
