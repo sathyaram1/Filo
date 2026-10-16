@@ -389,7 +389,7 @@ function nuovoStato(chiavi, etichetta, N) {
     etichetta, cifra: chiavi.cifra, posto: chiavi.posto, inc: null, L: 0, contatore: 0, vmax: 0,
     pos: new Float64Array(0), ver: new Uint32Array(0), kk: new Uint8Array(0), zero: new Uint8Array(0),
     gruppi: [], tabella: new Map(), blocchiTabella: [], creato: 0, aperto: 0, apertoPrima: 0,
-    letti: new Uint8Array(N), vuote: 0, scansionato: false, spazzatura: new Set(), candidati: null,
+    letti: new Uint8Array(N), vuote: 0, catena: 0, scansionato: false, spazzatura: new Set(), candidati: null,
   };
 }
 
