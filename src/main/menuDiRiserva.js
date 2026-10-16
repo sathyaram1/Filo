@@ -23,7 +23,8 @@ function t(chiave, riserva) {
   try { return globalThis.SN_I18N.t(chiave) || riserva; } catch (_) { return riserva; }
 }
 
-function voci(params, wc, conSchede) {
+// `spento`: Filo è spento su questo sito (#843), e la prima voce lo riaccende.
+function voci(params, wc, conSchede, spento = false) {
   const f = params.editFlags || {};
   const out = [];
   if (params.isEditable) {
@@ -47,11 +48,32 @@ function voci(params, wc, conSchede) {
   if (h && h.canGoBack()) out.push({ label: t('menu_back', 'Indietro'), action: 'indietro' });
   if (h && h.canGoForward()) out.push({ label: t('menu_forward', 'Avanti'), action: 'avanti' });
   out.push({ label: t('menu_reload', 'Ricarica'), action: 'ricarica' });
-  return out;
+  if (!spento) return out;
+  return [{ label: t('menu_riaccendi_filo', 'Riaccendi Filo su questo sito'), action: 'riaccendi' }, { type: 'separator' }, ...out];
 }
 
-function esegui(azione, params, wc, schede, tab) {
+// Gli indirizzi su cui il content script decide se Filo è spento: la scheda e il riquadro cliccato.
+function indirizzi(wc, frame) {
+  let pagina = '';
+  try { pagina = String(wc.getURL() || ''); } catch (_) { pagina = ''; }
+  return [pagina, String(frame || '')].filter(Boolean);
+}
+
+async function spentoQui(wc, frame) {
+  try {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return require('./services/handlers/filoSpento').vociCheSpengono(s.blocklist, indirizzi(wc, frame)).length > 0;
+  } catch (_) { return false; }
+}
+
+function esegui(azione, params, wc, schede, tab, { win = null, frame = '', incognito = false } = {}) {
   if (wc.isDestroyed()) return;
+  if (azione === 'riaccendi') {
+    const R = require('./services/registroCambi');
+    const run = () => R.con({ via: 'pagina' }, () => require('./services/handlers/filoSpento').riaccendi(win, indirizzi(wc, frame)));
+    Promise.resolve(incognito ? require('./shim/storage').runIncognito(run) : run()).catch(() => {});
+    return;
+  }
   if (['cut', 'copy', 'paste', 'selectAll'].includes(azione)) { wc[azione](); return; }
   if (azione === 'link-copia') { clipboard.writeText(params.linkURL); return; }
   if (azione === 'immagine-copia') { wc.copyImageAt(params.x, params.y); return; }
@@ -65,7 +87,7 @@ function esegui(azione, params, wc, schede, tab) {
   else wc.navigationHistory[metodo]();
 }
 
-function mostra(wc, params) {
+async function mostra(wc, params, frame) {
   if (wc.isDestroyed()) return;
   let win = null; let schede = null; let tab = null;
   for (const w of BrowserWindow.getAllWindows()) {
@@ -74,23 +96,31 @@ function mostra(wc, params) {
   }
   if (!win) win = BrowserWindow.fromWebContents(wc);
   if (!win || win.isDestroyed()) return;
+  // In incognito l'elenco dei siti è quello della sessione, come per le sue pagine.
+  const incognito = !!win._filoIncognito;
+  const spento = incognito
+    ? await require('./shim/storage').runIncognito(() => spentoQui(wc, frame))
+    : await spentoQui(wc, frame);
+  if (wc.isDestroyed() || win.isDestroyed()) return;
   const b = tab ? tab.view.getBounds() : { x: 0, y: 0 };
-  showPopupMenu(win, voci(params, wc, !!schede), b.x + (params.x || 0), b.y + (params.y || 0), (scelta) => {
+  showPopupMenu(win, voci(params, wc, !!schede, spento), b.x + (params.x || 0), b.y + (params.y || 0), (scelta) => {
     const m = /^@action:([a-zA-Z-]{1,20})$/.exec(String(scelta || ''));
-    if (m) { try { esegui(m[1], params, wc, schede, tab); } catch (_) {} }
+    if (m) { try { esegui(m[1], params, wc, schede, tab, { win, frame, incognito }); } catch (_) {} }
   });
 }
 
 function chiesto(event, richiesta) {
   const wc = event.sender;
+  let frame = '';
+  try { frame = String((event.senderFrame && event.senderFrame.url) || ''); } catch (_) { frame = ''; }
   const r = richiesta && typeof richiesta === 'object' ? richiesta : {};
   const ora = Date.now();
   const clic = Number.isFinite(r.clic) && r.clic <= ora ? r.clic : ora;
   if (r.motivo) console.error('[menu di riserva] il menu di Filo non si è aperto:', String(r.motivo).slice(0, 2000));
   const ultimo = ULTIMI.get(wc);
-  if (ultimo && ultimo.alle >= clic - MARGINE_MS) { mostra(wc, ultimo.params); return; }
+  if (ultimo && ultimo.alle >= clic - MARGINE_MS) { mostra(wc, ultimo.params, frame).catch(() => {}); return; }
   const scade = setTimeout(() => IN_ATTESA.delete(wc), ATTESA_MS);
-  IN_ATTESA.set(wc, (params) => { clearTimeout(scade); mostra(wc, params); });
+  IN_ATTESA.set(wc, (params) => { clearTimeout(scade); mostra(wc, params, frame).catch(() => {}); });
 }
 
 module.exports = { segui, chiesto, voci };
