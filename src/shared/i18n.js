@@ -764,6 +764,8 @@
       '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
       'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
       'su un altro computer.',
+    security_export_keys_label: 'Includi le chiavi',
+    security_export_keys_desc: 'Chi ha il file può usare le tue chiavi API. Trattalo come una password.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
