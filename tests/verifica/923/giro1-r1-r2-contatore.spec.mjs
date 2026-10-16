@@ -98,8 +98,6 @@ async function apriGestione(f) {
   await aspettaChe(() => f.giro.finito, { cosa: 'il giro di Gestione non è arrivato al contatore', oltreMs: 30000 });
 }
 
-test.describe.configure({ mode: 'serial' });
-
 for (const [come, contatore] of [
   ['spinto di uno in uno fino al tetto', 1000000],
   ['già spinto oltre il tetto dalla sincronizzazione di prima', 1000010],
