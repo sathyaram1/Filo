@@ -1157,12 +1157,7 @@
     btn.addEventListener('mousedown', (e) => e.preventDefault());
     btn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
-      let ok = false;
-      try { await navigator.clipboard.writeText(testo); ok = true; } catch (_) {}
-      // Come il «Copia» del tasto destro: quello che Filo mette negli appunti lo ritrova Incolla.
-      if (ok) {
-        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry: { type: 'text', text: testo } })).catch(() => {}); } catch (_) {}
-      }
+      const ok = await copiaTesto(testo);
       clearTimeout(timer);
       mostra(ok ? 'ok' : 'no');
       timer = setTimeout(() => mostra(null), COPIATO_MS);
