@@ -130,6 +130,8 @@ try {
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
     const clic = Date.now();
+    // Filo spento sul sito (#843): il clic è della pagina, e se lei tace il menu di riserva offre di riaccenderlo.
+    if (globalThis.__snFiloSpento === true) { riservaSeLaPaginaTace(e, clic); return; }
     const prima = typeof contextMenuHandler === 'function' && sitoPrima();
     // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sui siti dove il tasto
     // destro apre il loro menu, Shift è la strada per quello di Filo.
@@ -172,8 +174,9 @@ function replayContextMenu(e, clic) {
   const copy = require('./menu-del-sito.js').copiaDelClic(e);
   const deadline = Date.now() + 3000;
   const tick = () => {
+    if (globalThis.__snFiloSpento === true) { menuDiRiserva(clic); return; }
     if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
-    if (globalThis.__snFiloSpento === true || Date.now() > deadline) { menuDiRiserva(clic); return; }
+    if (Date.now() > deadline) { menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);
@@ -799,6 +802,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
