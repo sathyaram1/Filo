@@ -4630,7 +4630,7 @@ function fileNominatiDallaRisposta(textReply, azioni) {
 function nomiDellaSalvata(p, piano) {
   const titolo = piano(p.title);
   const nomi = titolo.length >= 4 ? [titolo] : [];
-  for (const pezzo of titolo.split(/\s[-–—|·:]\s/)) {
+  for (const pezzo of titolo.split(/\s[-–—|·:]\s|:\s/)) {
     const t = pezzo.trim();
     if (t !== titolo && t.length >= 8 && t.includes(' ')) nomi.push(t);
   }
