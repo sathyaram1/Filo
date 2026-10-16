@@ -847,6 +847,14 @@ test('lo schermo intero ha il tasto di ogni sistema, e chi sceglie una scorciato
   assert.equal(voce('darwin').accelerator, 'Ctrl+Cmd+F');
   assert.equal(voce('win32').accelerator, 'F11');
   assert.equal(voce('win32').registerAccelerator, false, 'su Windows il tasto lo ascolta Filo, non la barra invisibile');
+
+  // E lo dicono, con il tasto di ogni sistema, il manifesto e l'elenco delle scorciatoie di Opzioni → Altro.
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const fs = (globalThis.SN_CAPABILITIES.list || globalThis.SN_CAPABILITIES.CAPABILITIES || []).find?.((c) => c.id === 'fullscreen')
+    || JSON.stringify(globalThis.SN_CAPABILITIES);
+  const testo = typeof fs === 'string' ? fs : fs.invoke;
+  for (const forma of ['F11', 'Ctrl+Cmd+F']) assert.ok(testo.includes(forma), `il manifesto non dice ${forma}`);
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'options', 'altro.js'), 'utf8'), /etichettaSchermoIntero\(\)/);
 });
 
 test('quello che si legge sul salto di scheda è quello che succede', () => {
