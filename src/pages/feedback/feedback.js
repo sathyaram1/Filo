@@ -1561,7 +1561,11 @@
         if (!item) return;
         const v = input.value.slice(0, 500);
         if (String(item.userNote || '') === v) return;
-        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true }).then((ok) => { if (ok) riflettiFrase(id); });
+        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true }).then((ok) => {
+          if (ok) { riflettiFrase(id); return; }
+          // Come in Gestione: se il salvataggio fallisce a casella chiusa, si riapre su quello che c'è davvero.
+          mostraFrase(listEl.querySelector(`.fb-card[data-id="${cssEsc(id)}"]`), id, true);
+        });
       };
       input.addEventListener('blur', flush);
       input.addEventListener('input', () => {
