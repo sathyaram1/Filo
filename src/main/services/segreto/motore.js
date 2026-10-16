@@ -1172,6 +1172,7 @@ async function apriOCrea(opzioni, crea) {
     .map((x) => (typeof x === 'string' ? x.normalize('NFC').trim() : ''))
     .filter((x) => x && x !== proprio))];
   if (altri.length > ETICHETTE_MAX - 2) throw errore('DICHIARATI', `Si possono dichiarare fino a ${ETICHETTE_MAX - 2} altri segreti.`);
+  if (!(sale instanceof Uint8Array) || sale.length < SALE_MIN) throw errore('SALE', `Il sale del dispositivo è di almeno ${SALE_MIN} byte.`);
   controllaDimensione(dimensione);
   const chiave = await chiaveContenitore(contenitore);
   const [chiavi, ...chiaviAltri] = await Promise.all([proprio, ...altri].map((x) => derivaChiavi(x, sale, parametriChiave)));
