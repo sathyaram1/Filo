@@ -41,6 +41,8 @@
   const S3 = /^s3(?:[.-][a-z0-9-]+){0,3}\.amazonaws\.com$/;
   // Così le pagine d'accesso di Cognito, <prefisso>.auth.<regione>.amazoncognito.com: il prefisso lo sceglie l'utente.
   const COGNITO = /^auth(?:-fips)?\.[a-z0-9-]+\.amazoncognito\.com$/;
+  // Così i secchi di Google Cloud Storage, <secchio>.storage.googleapis.com: per la PSL sarebbero tutti storage.googleapis.com.
+  const GCS = /^(?:storage|commondatastorage)\.googleapis\.com$/;
   // Queste il web NON le separa (un login su wordpress.com vale sui blog): solo per il giudizio, mai per i cookie.
   // Ci sta solo ciò che la PSL non ha (tests/unit/safebrowsePiattaforme.test.mjs).
   const PRIVATE_AVVISO = new Set([
