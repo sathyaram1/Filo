@@ -4,6 +4,10 @@
 
 const { pageHints } = require('../../content/safebrowseHints.js');
 
+// #965 — lotti di link in attesa per scheda (la pagina ne manda uno alla volta), e link da avviso tenuti pronti.
+const LINK_IN_CODA = 4;
+const LINK_SEGNALATI_MAX = 10000;
+
 // In un riquadro di un altro sito la pagina sopra non si legge: se è lei a nasconderlo (trasparente, ritagliato,
 // coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.
 const CODICE_RIQUADRO = `(async () => {
