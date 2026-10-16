@@ -358,10 +358,23 @@ module.exports = function register(on, ctx) {
 
   on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, msg.entry)) return vietato;
-    const e = msg.entry;
+    return inCronologia(msg.entry, msg.via);
+  });
+
+  on(MSG.COPY_TEXT_TO_CLIPBOARD, async (msg, sender, origin) => {
+    const text = typeof msg.text === 'string' ? msg.text : '';
+    if (!text) return { ok: false, error: 'empty' };
+    const entry = { type: 'text', text };
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, entry)) return vietato;
+    try { require('electron').clipboard.writeText(text); } catch (_) { return { ok: false, error: 'clipboard' }; }
+    await inCronologia(entry);
+    return { ok: true };
+  });
+
+  async function inCronologia(e, via) {
     if (!e) return { ok: true };
     // `tenuta: false` dice alla pagina di non far descrivere a un modello un'immagine che la cronologia non tiene.
-    if (!(await Tolti().daTenere(e, msg.via))) return { ok: true, tenuta: false };
+    if (!(await Tolti().daTenere(e, via))) return { ok: true, tenuta: false };
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
