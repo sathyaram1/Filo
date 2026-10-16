@@ -60,8 +60,9 @@ const safebrowseMethods = {
     return tab;
   },
 
-  // Abbassa il verdetto a "safe" se l'utente ha già confermato/chiuso l'avviso
-  // per questo dominio in questo tab.
+  // Abbassa il verdetto a "safe" se l'utente ha già confermato l'avviso per questo dominio in questa scheda, o se si
+  // fida del sito (#967): la fiducia tace solo il «sospetto». Il sospetto taciuto resta da parte, per ridarlo se la
+  // fiducia viene tolta mentre la pagina è aperta.
   _sbApplyState(tab, verdict) {
     if (!verdict || verdict.level === 'safe') return verdict;
     const reg = verdict.scope || (verdict.norm && verdict.norm.registrable);
@@ -70,10 +71,39 @@ const safebrowseMethods = {
     if (verdict.level === 'pericoloso' && tab.sbBypass.has(reg)) {
       return { ...verdict, level: 'safe', message: null };
     }
-    if (verdict.level === 'sospetto' && tab.sbDismissed.has(reg)) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    if (verdict.level === 'sospetto' && (tab.sbDismissed.has(reg) || (SB && SB.fidato(reg)))) {
+      tab._sbTaciuto = { scope: reg, verdict: { level: 'sospetto', message: verdict.message || null } };
       return { ...verdict, level: 'safe', message: null };
     }
     return verdict;
+  },
+
+  // L'elenco dei siti fidati è cambiato (#967): un sito appena aggiunto perde l'avviso «sospetto» in ogni scheda, uno
+  // tolto lo riprende nelle schede che lo avevano taciuto. Il «pericoloso» non dipende dall'elenco.
+  _sbFidatiCambiati({ aggiunti = [], tolti = [] } = {}) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    if (!SB || (!aggiunti.length && !tolti.length)) return;
+    for (const tab of this.tabs) {
+      const wc = tab.view && tab.view.webContents;
+      if (!wc || wc.isDestroyed()) continue;
+      this._sbState(tab);
+      for (const s of tolti) tab.sbDismissed.delete(s);
+      const a = tab.sbAvviso;
+      let scopeAvviso = null;
+      try { scopeAvviso = a ? SB.scopeOf(a.url) : null; } catch (_) {}
+      if (a && a.level === 'sospetto' && scopeAvviso && aggiunti.includes(scopeAvviso)) {
+        tab._sbTaciuto = { scope: scopeAvviso, verdict: { level: 'sospetto', message: a.message || null } };
+        this._sbMostra(tab, a.url, { level: 'safe', message: null });
+        continue;
+      }
+      const t = tab._sbTaciuto;
+      if (a || !t || !tolti.includes(t.scope) || SB.fidato(t.scope)) continue;
+      const url = sitoDellaPagina(wc.getURL(), [tab._urlNavigato, tab._sbApertaDa]);
+      let scopeOra = null;
+      try { scopeOra = url ? SB.scopeOf(url) : null; } catch (_) {}
+      if (scopeOra === t.scope) this._sbMostra(tab, url, t.verdict);
+    }
   },
 
   // Un verdetto arrivato in ritardo per un sito da cui la scheda è già andata via non vale più. Quello della pagina che
