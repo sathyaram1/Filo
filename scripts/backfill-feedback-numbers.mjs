@@ -203,11 +203,11 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
   // deve essere quello vero, non quello che fa apparire il fix più bello.
   if (contati) letture.aggiungi(2, 'conteggi');
   if (contati && conto.totale === conto.numerati) {
-    const max = await FB.maxSeq({ idToken: bearer || '' });
-    letture.aggiungi(1, 'numero più alto');
-    const maxSeq = Number.isInteger(max) ? max : 0;
-    console.log(`${conto.totale} feedback totali: ${conto.numerati} già numerati, 0 da numerare (si parte da #${maxSeq + 1}).`);
-    await allineaContatore(maxSeq, bearer, dry, letture);
+    // Niente da numerare, quindi niente da allineare: il prossimo numero è
+    // quello del contatore, non il massimo dei documenti (#923).
+    const contatore = await FB.submissionCount({ idToken: bearer || '' });
+    letture.aggiungi(1, 'contatore');
+    console.log(`${conto.totale} feedback totali: ${conto.numerati} già numerati, 0 da numerare (si parte da #${ultimoNumeroBuono(contatore, []) + 1}).`);
     console.log(letture.riga());
     return { total: conto.totale, numbered: 0, failures: 0, dry, letture: letture.totale };
   }
