@@ -158,7 +158,7 @@ function daEstensioni(est) {
 }
 
 // La testa (blocco logico 0): numero di blocchi, date, contatore delle versioni e la tabella dei file, dentro se ci
-// sta, altrimenti le estensioni dei blocchi che la contengono.
+// sta, altrimenti le estensioni dei blocchi che ne tengono le copie, una dopo l'altra (b[1] = quante copie).
 function scriviTesta({ L, creato, aperto, contatore, bytes, blocchiTabella }) {
   const b = Buffer.alloc(CARICO);
   b[0] = 1;
@@ -173,7 +173,7 @@ function scriviTesta({ L, creato, aperto, contatore, bytes, blocchiTabella }) {
     return b;
   }
   const est = estensioni(blocchiTabella);
-  b[1] = 1;
+  b[1] = blocchiTabella.length / Math.ceil(bytes.length / CARICO);
   b.writeUInt16BE(est.length, 2);
   est.forEach(([s, n], x) => {
     b.writeUInt32BE(s, TESTA_FISSA + 8 * x);
