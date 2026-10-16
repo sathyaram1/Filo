@@ -146,7 +146,7 @@ export function esitoProveTolte({
     accorciate.map(riga).join('\n'),
     'Correggi finché è verde, e consegna di nuovo.',
   ] : [];
-  if (!proprie.length) return { ferma: true, testo: [...casiRestati, ...lasciate].join('\n') };
+  if (!proprie.length) return { ferma: true, testo: [...casiRestati, ...lasciate, ...segno].join('\n') };
   const supporto = proprie.some((f) => usa(f));
   // Senza pulizia registrata, e senza i numeri, una rossa può essere di un rilievo messo da parte: quello aspetta l'owner.
   const perche = conPulizia ? [
