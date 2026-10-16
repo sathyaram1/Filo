@@ -266,6 +266,9 @@ async function creaContenitore(percorso, dimensione) {
   try {
     for (let s = 0; s < dimensione; s += 4 << 20) await scriviTutto(fh, crypto.randomBytes(Math.min(4 << 20, dimensione - s)), s);
     await fh.datasync();
+    // Già alla grana con cui le operazioni le rimettono: le cifre sotto il microsecondo non dicono se è stato usato.
+    const ora = secondiDa(BigInt(Date.now()) * 1_000_000n);
+    await fh.utimes(ora, ora);
     await fh.close();
     if (await fsp.stat(percorso).then(() => true, () => false)) throw errore('CONTENITORE', 'Il contenitore esiste già.');
     await fsp.rename(provvisorio, percorso);
