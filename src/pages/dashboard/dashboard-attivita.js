@@ -1493,8 +1493,17 @@
   async function apriSalvataDaChat(btn, p, { tieni = false } = {}) {
     if (btn.dataset.inCorso) return;
     btn.dataset.inCorso = '1';
+    const msg = { type: MSG.APRI_PAGINA_SALVATA, id: p.id, tieni };
     let r = null;
-    try { r = await send({ type: MSG.APRI_PAGINA_SALVATA, id: p.id, tieni }); } catch (_) { r = null; }
+    try { r = await send(msg); } catch (_) { r = null; }
+    // Un indirizzo che la porta delle uscite vuole confermato si conferma qui, come i collegamenti della chat.
+    if (r && r.conferma) {
+      const Ui = window.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      r = null;
+      if (ok) { try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; } }
+      if (!ok) { delete btn.dataset.inCorso; return; }
+    }
     delete btn.dataset.inCorso;
     // Già aperta da un'altra strada, o tolta dalla lista: resta un link, e si apre come gli altri della chat.
     if (!r || !r.ok) { apriProposta(p.url, btn); return; }
