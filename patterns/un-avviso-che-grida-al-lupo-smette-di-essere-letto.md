@@ -48,6 +48,14 @@ confondibili ricondotte alle latine), e la frase dice dove il link porta
 davvero. Un nome corto o di tutti i giorni (`x`, `apple`) da solo, come
 sottodominio o accanto a un trattino, non prova niente (`apple.stackexchange.com`).
 
+**Un falso allarme già respinto non si ripete.** Chi ha detto «è il sito che
+volevo» una volta non deve ridirlo a ogni scheda: un sì ripetuto all'infinito
+insegna a confermare senza leggere (#967, team.com scambiato per Steam). Il
+«Continua» del sospetto mette il sito fra quelli di cui l'utente si fida, per
+sempre e in un elenco che vede e svuota (Sicurezza); il «confermo» del
+pericoloso resta della scheda, e la fiducia non tace mai il pericoloso. Regole
+in `src/main/tabs/tabSafebrowse.js`, prove in `tests/unit/sitiFidati.test.mjs`.
+
 **Ogni frase ipotizza, nessuna afferma.** Il controllo guarda l'indirizzo, non
 il sito: «potrebbe essere un'imitazione» si può dire, «chi lo riceve entra al
 posto tuo» no.
