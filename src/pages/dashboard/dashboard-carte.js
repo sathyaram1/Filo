@@ -234,7 +234,9 @@
     const scarica = AVVISI_AGGIORNAMENTO.includes(tipo);
     // Una versione pronta (#1039): il fallimento lo dice la barra, la carta resta per riprovare.
     const pronto = tipo === 'aggiornamento-pronto';
+    const pagina = C.paginaDiAvviso(n);
     let principale = { etichetta: 'Chiudi', fai: chiudi };
+    if (pagina) principale = { etichetta: pagina.etichetta, forte: true, fai: () => apri(pagina.url) };
     if (scarica) principale = { etichetta: 'Scarica Filo', forte: true, fai: () => apri(URL_SCARICA_FILO) };
     if (pronto) principale = { etichetta: 'Riavvia e aggiorna', forte: true, fai: () => d.send({ type: MSG.AGGIORNAMENTO_INSTALLA, avvisa: true }) };
     const carta = {
