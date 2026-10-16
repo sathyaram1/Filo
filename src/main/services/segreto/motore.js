@@ -987,11 +987,10 @@ async function riparaProprio(ctx, S) {
   await distruggiSpazzatura(ctx, S);
   await ctx.fh.datasync();
   if (persi.length && marcaDanneggiati(tabella, persi)) {
-    const piano = pianifica(S, libere(ctx), (t) => { for (const [n, f] of tabella) t.set(n, f); });
-    if (piano) {
-      await transazione(ctx, S, piano, new Map());
-      return;
-    }
+    // Stessa lunghezza, stessi blocchi: la tabella segnata si scrive dove sta, anche a contenitore pieno.
+    const piano = { tabella, bytes: serializzaTabella(tabella), blocchiTabella: S.blocchiTabella, L2: S.L };
+    await transazione(ctx, S, piano, new Map());
+    return;
   }
   await scriviTestaGruppo(ctx, S);
 }
