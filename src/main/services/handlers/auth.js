@@ -1368,11 +1368,8 @@ module.exports = function register(on, ctx) {
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
 
-      // Il contatore dei numeri: lo rimette in pari l'app dell'owner, l'unica
-      // a poterlo scrivere a piacere. Si alza solo fino a un numero con la
-      // prova del mittente (#923); il massimo di tutti, chiesto al server
-      // perché i caricati sono solo i più recenti, serve da pavimento per
-      // riportarlo giù quando qualcuno l'ha gonfiato di uno in uno.
+      // Il contatore dei numeri si alza solo fino a un numero provato (#923); il massimo di tutti si
+      // chiede al server (i caricati sono solo i più recenti) e fa da pavimento per riportarlo giù.
       const provato = FB.maxSeqProvato(raw);
       let piuAlto = null;
       try { piuAlto = await FB.maxSeq({ idToken, timeoutMs: 15000 }); }
