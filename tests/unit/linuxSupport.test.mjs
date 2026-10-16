@@ -561,6 +561,15 @@ test('su Linux le scorciatoie si chiamano e funzionano come su Windows', () => {
   assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'linux'), null);
   assert.equal(T.riservato('Ctrl+0', 'linux'), false,
     'su Linux lo zoom arriva alla pagina: quel tasto non è riservato');
+  // Lo schermo intero è F11 come su Windows (#858), e Filo se lo prende prima della pagina.
+  assert.equal(T.etichettaSchermoIntero('linux'), 'F11');
+  assert.equal(T.riservato('F11', 'linux'), true);
+  assert.equal(T.riservato('Ctrl+Cmd+F', 'linux'), false);
+  assert.equal(T.comandoSchermoIntero({ type: 'keyDown', key: 'F11', code: 'F11' }, 'linux'), true);
+  assert.equal(T.comandoSchermoIntero({ type: 'keyDown', key: 'F11', code: 'F11', shift: true }, 'linux'), false);
+  const { template } = require(join(ROOT, 'src', 'main', 'menu.js'));
+  const voce = template('linux').flatMap((m) => m.submenu || []).find((v) => v.label === 'Schermo intero');
+  assert.equal(voce.accelerator, 'F11');
 });
 
 test('su Linux il clic centrale in un campo resta all\'incolla del sistema, non apre lo zoom', () => {
