@@ -685,28 +685,9 @@ module.exports = function register(on, ctx) {
     if (!FiloMem?.addNotification) return;
     let detti = [];
     try { detti = await globalThis.SN_STORAGE.getRaw(AVVISI_DETTI_KEY, []); } catch (_) {}
-    const piano = W.avvisiOwnerPiano(detti, W.avvisiOwner(overview));
-    const vive = (await FiloMem.listNotifications()).filter((n) => n.action && n.action.tipo === W.AVVISO_OWNER);
-    let cambiato = false;
-    const togli = async (caso) => {
-      for (const n of vive.filter((x) => x.action.caso === caso)) { await FiloMem.dismissNotification(n.id); cambiato = true; }
-    };
-    for (const caso of piano.togli) await togli(caso);
-    for (const c of piano.scrivi) {
-      await togli(c.caso);
-      await FiloMem.addNotification({
-        kind: 'alert', text: c.testo,
-        action: { tipo: W.AVVISO_OWNER, caso: c.caso, marcatori: c.marcatori, apri: W.PAGINA_OWNER, etichetta: 'Apri Inviti e utenti' },
-      });
-      cambiato = true;
-    }
-    for (const c of piano.riscrivi) {
-      for (const n of vive.filter((x) => x.action.caso === c.caso)) {
-        if (await FiloMem.setNotificationText(n.id, c.testo)) cambiato = true;
-      }
-    }
-    await globalThis.SN_STORAGE.setRaw(AVVISI_DETTI_KEY, piano.detti);
-    if (cambiato) ctx.broadcastLiveUpdate();
+    const esito = await W.applicaAvvisiOwner(FiloMem, detti, overview);
+    await globalThis.SN_STORAGE.setRaw(AVVISI_DETTI_KEY, esito.detti);
+    if (esito.cambiato) ctx.broadcastLiveUpdate();
   }
   // Il controllo da solo: all'avvio e ogni sei ore, solo sulla copia dell'owner. Un server muto non scrive niente.
   async function controllaAvvisiOwner() {
