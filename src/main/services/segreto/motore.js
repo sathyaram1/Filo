@@ -1049,6 +1049,8 @@ async function riparaProprio(ctx, S) {
   }
   await distruggiSpazzatura(ctx, S);
   await ctx.fh.datasync();
+  // Una crescita interrotta lascia blocchi vuoti in coda: tornano al contenitore.
+  await liberaEStringi(ctx, S, usati);
   await scriviTestaGruppo(ctx, S);
 }
 
