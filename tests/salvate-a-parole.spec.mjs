@@ -6,14 +6,20 @@
 import { test, expect } from './helpers/reteFinta.mjs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
 
-const RICETTA = 'https://www.cucina.example/ricette/pasta-alla-carbonara-classica-romana';
-const SAPONE = 'https://www.casa.example/fai-da-te/ricetta-sapone-di-marsiglia';
-const LAGO = 'https://campeggi.example/lazio/bolsena-piazzole-sul-lago';
-const SALVATE = [
-  { id: 'p1', url: RICETTA, title: 'Pasta alla carbonara classica romana - Cucina', favicon: '', thumbnail: '', savedAt: '2026-10-03T10:00:00.000Z', category: 'Cucina', categoryConfidence: null },
-  { id: 'p2', url: LAGO, title: 'Campeggio sul lago di Bolsena: le piazzole', favicon: '', thumbnail: '', savedAt: '2026-10-02T10:00:00.000Z', category: null, categoryConfidence: null },
-  { id: 'p3', url: SAPONE, title: 'Ricetta del sapone di Marsiglia fatto in casa', favicon: '', thumbnail: '', savedAt: '2026-10-01T10:00:00.000Z', category: null, categoryConfidence: null },
-];
+// Le tre pagine salvate stanno sulla rete finta: aprirle carica una pagina vera, non una d'errore.
+function pagineDi(rete) {
+  const RICETTA = rete.pagina('articolo.test', '/ricette/pasta-alla-carbonara-classica-romana', '<title>Carbonara</title><p>ok</p>');
+  const LAGO = rete.pagina('sito.test', '/lazio/bolsena-piazzole-sul-lago', '<title>Bolsena</title><p>ok</p>');
+  const SAPONE = rete.pagina('example.org', '/fai-da-te/ricetta-sapone-di-marsiglia', '<title>Sapone</title><p>ok</p>');
+  return {
+    RICETTA, LAGO, SAPONE,
+    SALVATE: [
+      { id: 'p1', url: RICETTA, title: 'Pasta alla carbonara classica romana - Cucina', favicon: '', thumbnail: '', savedAt: '2026-10-03T10:00:00.000Z', category: 'Cucina', categoryConfidence: null },
+      { id: 'p2', url: LAGO, title: 'Campeggio sul lago di Bolsena: le piazzole', favicon: '', thumbnail: '', savedAt: '2026-10-02T10:00:00.000Z', category: null, categoryConfidence: null },
+      { id: 'p3', url: SAPONE, title: 'Ricetta del sapone di Marsiglia fatto in casa', favicon: '', thumbnail: '', savedAt: '2026-10-01T10:00:00.000Z', category: null, categoryConfidence: null },
+    ],
+  };
+}
 
 const semina = (app, pagine) => app.evaluate(async (_e, p) => {
   await globalThis.chrome.storage.local.set({ [globalThis.SN_CONST.STORAGE_KEYS.SAVED_PAGES]: p });
@@ -22,8 +28,9 @@ const salvate = (app) => app.evaluate(async () => (await globalThis.SN_SAVED_PAG
 const schedaAperta = (shell, url) => shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.some((t) => t.url === u), url);
 const esitoDelloStrumento = (messaggi) => (messaggi || []).filter((m) => m.role === 'tool').map((m) => String(m.content || '')).join('\n');
 
-test('dalla chat: la ricetta salvata torna col suo bottone, che la apre e la toglie dalla lista', async ({ app, shell }) => {
+test('dalla chat: la ricetta salvata torna col suo bottone, che la apre e la toglie dalla lista', async ({ app, shell, rete }) => {
   test.setTimeout(90_000);
+  const { RICETTA, SAPONE, SALVATE } = pagineDi(rete);
   await semina(app, SALVATE);
   try {
     await modelloFinto(app, [
@@ -35,6 +42,9 @@ test('dalla chat: la ricetta salvata torna col suo bottone, che la apre e la tog
 
     // Un bottone solo: la pagina che la risposta nomina, non l'altra «ricetta» trovata (il sapone).
     const bottone = page.locator('.dash-bubble-actions .dash-salvata-btn');
+    await page.waitForTimeout(6000);
+    console.log('DEBUG', JSON.stringify(await page.locator('#bubbles, .dash-bubble').allTextContents()).slice(0, 3000));
+    console.log('DEBUG2', JSON.stringify(await chiamateAlModello(app)).slice(-3000));
     await expect(bottone).toHaveCount(1, { timeout: 20_000 });
     await expect(bottone).toContainText('Pasta alla carbonara classica romana');
     await expect(bottone).toHaveAttribute('data-url', RICETTA);
@@ -65,15 +75,16 @@ test('dalla chat: la ricetta salvata torna col suo bottone, che la apre e la tog
   }
 });
 
-test('«aprila» al turno dopo: la pagina trovata si apre e lascia la lista; con «tienila» resta', async ({ app, shell }) => {
+test('«aprila» al turno dopo: la pagina trovata si apre e lascia la lista; con «tienila» resta', async ({ app, shell, rete }) => {
   test.setTimeout(90_000);
+  const { RICETTA, LAGO, SALVATE } = pagineDi(rete);
   await semina(app, SALVATE);
   try {
     await modelloFinto(app, [
       { toolCalls: [{ id: 's1', name: 'CERCA_SALVATE', arguments: JSON.stringify({ cerca: 'campeggio' }) }] },
       { text: 'Hai salvato «Campeggio sul lago di Bolsena: le piazzole».' },
       { toolCalls: [{ id: 'a1', name: 'APRI_SALVATA', arguments: JSON.stringify({ id: 'p2' }) }] },
-      { text: 'Aperta, e tolta da «Aperti per dopo».' },
+      { text: 'Fatto.' },
       { toolCalls: [{ id: 'a2', name: 'APRI_SALVATA', arguments: JSON.stringify({ id: 'p1', tieni: 'true' }) }] },
       { text: 'Aperta, ed è rimasta in lista.' },
     ]);
@@ -88,7 +99,7 @@ test('«aprila» al turno dopo: la pagina trovata si apre e lascia la lista; con
     const chiamate = await chiamateAlModello(app);
     expect(JSON.stringify(chiamate[2])).toContain('[p2] Campeggio sul lago di Bolsena');
     expect(esitoDelloStrumento(chiamate[3])).toContain('tolta da «Aperti per dopo»');
-    await expect(page.locator('.dash-activity, .dash-bubble').filter({ hasText: 'tolta da «Aperti per dopo»' }).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.dash-activity-row', { hasText: 'Aperta «Campeggio sul lago di Bolsena: le piazzole» · tolta da «Aperti per dopo»' })).toHaveCount(1, { timeout: 10_000 });
 
     await page.bringToFront();
     await chiedi(page, 'apri anche la carbonara, ma tienila');
@@ -100,8 +111,9 @@ test('«aprila» al turno dopo: la pagina trovata si apre e lascia la lista; con
   }
 });
 
-test('se la pagina salvata non c\'è, il modello lo sa e la chat non mostra bottoni', async ({ app }) => {
+test('se la pagina salvata non c\'è, il modello lo sa e la chat non mostra bottoni', async ({ app, rete }) => {
   test.setTimeout(60_000);
+  const { SALVATE } = pagineDi(rete);
   await semina(app, SALVATE);
   try {
     await modelloFinto(app, [
