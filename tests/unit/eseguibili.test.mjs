@@ -163,6 +163,32 @@ test('#876 giro 2 — i secchi di Google Cloud: l\'host di tutti non entra, il s
   assert.equal(E.fidato('https://altro.storage.googleapis.com/setup.exe', ['mio.storage.googleapis.com']), false);
 });
 
+// Una regola sola per la famiglia: un indirizzo che consegna i file di chiunque non lo copre nessuna voce, nemmeno il
+// sito che lo contiene, e non diventa il «sito preciso» da proporre (s3.<regione>.amazonaws.com darebbe la regione).
+test('#876 giro 3 — S3 per regione, Google Drive, Discord: né coperti dal sito né proposti', () => {
+  const frase = E.testoPiattaforma('amazonaws.com', ['s3.eu-west-1.amazonaws.com', 's3.dualstack.us-west-2.amazonaws.com']);
+  assert.match(frase, /«amazonaws\.com» raccoglie i siti di chiunque.*fidarsi di tutti\.$/);
+  assert.doesNotMatch(frase, /eu-west-1|us-west-2|nome\.amazonaws/);
+  assert.match(E.testoPiattaforma('amazonaws.com', ['s3.eu-west-1.amazonaws.com', 'mio.s3.eu-west-1.amazonaws.com']),
+    /come mio\.s3\.eu-west-1\.amazonaws\.com\.$/);
+  for (const [url, voce] of [
+    ['https://s3.eu-west-1.amazonaws.com/secchio-di-un-altro/setup.exe', 'eu-west-1.amazonaws.com'],
+    ['https://s3.dualstack.eu-west-1.amazonaws.com/altro/setup.exe', 'eu-west-1.amazonaws.com'],
+    ['https://drive.usercontent.google.com/download?id=1abc&export=download', 'dl.google.com'],
+    ['https://drive.google.com/uc?export=download&id=1abc', 'google.com'],
+    ['https://sites.google.com/view/chiunque/setup.exe', 'google.com'],
+    ['https://cdn.discordapp.com/attachments/1/2/setup.exe', 'discordapp.com'],
+    ['https://media.discordapp.net/attachments/1/2/setup.exe', 'dl.discordapp.net'],
+    ['https://f000.backblazeb2.com/file/altro/setup.exe', 'backblazeb2.com'],
+    ['https://s3.us-west-004.backblazeb2.com/altro/setup.exe', 'backblazeb2.com'],
+  ]) assert.equal(E.fidato(url, [voce]), false, url);
+  for (const h of ['drive.google.com', 'cdn.discordapp.com', 'f000.backblazeb2.com']) assert.ok(E.sitoFidabile(h).piattaforma, h);
+  // Il resto del sito resta fidato, e il secchio con nome resta di uno.
+  assert.equal(E.fidato('https://dl.google.com/chrome/install/ChromeSetup.exe', ['google.com']), true);
+  assert.equal(E.fidato('https://dl.discordapp.net/distro/DiscordSetup.exe', ['discordapp.net']), true);
+  assert.equal(E.fidato('https://mio.s3.eu-west-1.amazonaws.com/setup.exe', ['mio.s3.eu-west-1.amazonaws.com']), true);
+});
+
 test('un riquadro dello stesso sito non rende incerta la pagina; uno di un altro ospite della piattaforma sì', () => {
   assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://shop.esempio.it', 'https://cdn.esempio.it']), false);
   assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://esempio.it:8443']), false);
