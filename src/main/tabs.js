@@ -2478,6 +2478,7 @@ class TabManager {
     });
     collegaScorciatoie(wc, () => this.win);
     this._sbGuardiaTastiera(tab, wc);
+    this._sbSeguiPuntatore(tab, wc);
     wc.on('before-input-event', (event, input) => {
       // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
       // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,

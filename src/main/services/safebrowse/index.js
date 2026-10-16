@@ -407,7 +407,8 @@ function preverifica(url, ctx = {}) {
   const voce = { link, passi: [link], destinazione: null, verdetto: null, finito: false };
   voce.pronto = track(preEsegui(voce, ctx).catch(() => {}).then(() => {
     voce.finito = true;
-    if (voce.annullato) preCache.delete(link);
+    // Lasciato a un link più recente: ripassandoci sopra si ricomincia, a meno che la lista nera abbia già parlato.
+    if (voce.annullato && !(voce.verdetto && voce.verdetto.level !== 'safe')) preCache.delete(link);
     else preCache.set(link, voce, voce.destinazione ? PRE_TTL : FAILED_RETRY_MS);
     return voce;
   }));
