@@ -183,9 +183,11 @@
     let soloCondivisi = false;
     for (const e of Array.isArray(esempi) ? esempi : []) {
       const h = comeSito(e);
-      const s = h && h.endsWith(`.${p}`) ? S.sitoDi(h, OSPITI) : '';
-      if (s && S.condiviso(s)) soloCondivisi = true;
-      else if (s && !S.piattaforma(s, OSPITI) && !sotto.includes(s)) sotto.push(s);
+      if (!h || !h.endsWith(`.${p}`)) continue;
+      // Da un indirizzo che consegna i file di chiunque non si ricava un sito: s3.eu-west-1.amazonaws.com darebbe la regione.
+      if (S.piattaforma(h, OSPITI)) { soloCondivisi = true; continue; }
+      const s = S.sitoDi(h, OSPITI);
+      if (s && !S.piattaforma(s, OSPITI) && !sotto.includes(s)) sotto.push(s);
     }
     // Un programma arrivato da storage.googleapis.com/<secchio>/… non ha un sito preciso: «nome.googleapis.com» porterebbe lì.
     if (!sotto.length && soloCondivisi) return perche;
