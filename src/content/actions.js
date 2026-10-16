@@ -987,18 +987,16 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        salvataggioInCorso = false;
         Popup.showToast(I18n.t('toast_save_failed'));
-        return;
+        return null;
       }
       entry = res.entry;
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
-      salvataggioInCorso = false;
       console.error('[SN] savePage', e);
       Popup.showToast(I18n.t('toast_save_failed'));
-      return;
+      return null;
     }
 
     // Miniatura best-effort: la scatta il main (piccola, #839) dopo che il menu
@@ -1006,14 +1004,17 @@
     // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
     // risposta. Se la pagina è già cambiata la cattura può fallire: il
     // salvataggio resta comunque valido, solo senza anteprima.
+    const rimetti = nascondiPannelli();
     try {
       await attendiCompositor();
       if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
     } catch (_) { /* miniatura opzionale */ }
+    rimetti();
 
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
     showSaveConfirm(entry);
+    return entry || { id: null };
   }
 
   // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
