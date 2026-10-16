@@ -54,6 +54,13 @@ function crea(dip = {}) {
   const casuale = dip.casuale || (() => crypto.randomBytes(10).toString('hex'));
   const rest = dip.rest || (() => (globalThis.SN_FEEDBACK && globalThis.SN_FEEDBACK.rest) || {});
   const log = dip.log || ((...a) => console.warn('[contatori]', ...a));
+  // Il giorno conta come «Filo aperto» solo con una finestra normale: chi usa solo l'incognito non lascia traccia.
+  const finestraNormale = dip.finestraNormale || (() => {
+    try {
+      const { BrowserWindow } = require('electron');
+      return BrowserWindow.getAllWindows().some((w) => w && !w.isDestroyed() && w._filoTabs && !w._filoIncognito);
+    } catch (_) { return false; }
+  });
 
   const usoCorrente = new AsyncLocalStorage();
   let stato = null;
@@ -105,6 +112,12 @@ function crea(dip = {}) {
     const oggi = C.giornoDi(adesso());
     if (!stato.giorni[oggi]) stato.giorni[oggi] = { ...C.giornoVuoto(), app: C.versioneApp(versione()) };
     return stato.giorni[oggi];
+  }
+
+  function segnaPresenza() {
+    let aperta = false;
+    try { aperta = Boolean(finestraNormale()); } catch (_) { aperta = false; }
+    if (aperta) giornoDiOggi();
   }
 
   async function registra(funzione, attesaMs, errori) {
@@ -193,7 +206,7 @@ function crea(dip = {}) {
     if (!(await accesi())) { await azzera(); return 'spenti'; }
     await carica();
     const oggi = C.giornoDi(adesso());
-    giornoDiOggi();
+    segnaPresenza();
     const persi = C.potaGiorni(stato.giorni);
     if (persi.length) log(`${persi.length} giorni mai partiti lasciati andare (dal ${persi[0]} al ${persi[persi.length - 1]})`);
     if (stato.fallitoIl === oggi) { await salva(); return 'rimandato'; }

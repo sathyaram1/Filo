@@ -1,0 +1,251 @@
+// I contatori giornalieri (#969), la spedizione: con un fetch finto, un documento al giorno con la forma giusta; in
+// incognito e a contatori spenti nessuno. Il servizio vero (src/main/services/contatori.js) con disco e orologio finti.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+require(join(ROOT, 'src', 'shared', 'constants.js'));
+require(join(ROOT, 'src', 'shared', 'modelUsage.js'));
+require(join(ROOT, 'src', 'shared', 'wallet.js'));
+require(join(ROOT, 'src', 'shared', 'contatoriGiornalieri.js'));
+require(join(ROOT, 'src', 'main', 'services', 'modelGate.js'));
+const Servizio = require(join(ROOT, 'src', 'main', 'services', 'contatori.js'));
+const C = globalThis.SN_CONTATORI;
+const A = globalThis.SN_CONST.ACTIONS;
+
+const BASE = 'https://firestore.test/v1/projects/p/databases/(default)/documents';
+const GIORNO = 24 * 60 * 60 * 1000;
+const T0 = new Date(2026, 9, 15, 9, 0, 0).getTime();
+const attendi = () => new Promise((r) => setImmediate(r));
+
+function daFs(v) {
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(daFs);
+  if ('mapValue' in v) return Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, daFs(x)]));
+  throw new Error(`tipo inatteso ${JSON.stringify(v)}`);
+}
+
+function banco({ accesi = true, incognito = false, finestra = true, risposta = 200 } = {}) {
+  const disco = new Map();
+  const inviati = [];
+  const b = {
+    t: T0, accesi, incognito, finestra, risposta, disco, inviati, n: 0,
+  };
+  b.s = Servizio.crea({
+    contatori: C,
+    storage: {
+      getRaw: async (k, d) => (disco.has(k) ? JSON.parse(JSON.stringify(disco.get(k))) : d),
+      setRaw: async (k, v) => { disco.set(k, JSON.parse(JSON.stringify(v))); },
+    },
+    impostazioni: async () => ({ contatori: { attivi: b.accesi } }),
+    inIncognito: () => b.incognito,
+    runNormale: (fn) => fn(),
+    finestraNormale: () => b.finestra,
+    adesso: () => b.t,
+    versione: () => '0.2.243',
+    piattaforma: 'darwin',
+    esclusi: async () => ['abcdef0123456789'],
+    casuale: () => `${'9'.repeat(18)}${String(++b.n).padStart(2, '0')}`,
+    rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }),
+    fetch: async (url, opt) => {
+      if (b.risposta === 'rete') throw new TypeError('fetch failed');
+      inviati.push({ url, opt, doc: Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)])) });
+      return { ok: b.risposta >= 200 && b.risposta < 300, status: b.risposta, json: async () => ({}) };
+    },
+    log: () => {},
+  });
+  return b;
+}
+
+async function usa(b, action, { attesa = 0, errore = null, ok = true } = {}) {
+  const h = b.s.apri(action);
+  b.t += attesa;
+  h.visto();
+  if (errore) h.errore(errore, { modello: 'deepseek/deepseek-v4-pro', host: 'DeepInfra' });
+  h.fine(ok);
+  await attendi(); await attendi();
+}
+
+test('un documento al giorno, con la forma giusta e niente altro', async () => {
+  const b = banco();
+  await usa(b, A.FILO_CHAT, { attesa: 1500 });
+  await usa(b, A.FILO_CHAT, { attesa: 400 });
+  await usa(b, A.EXPLAIN, { errore: Object.assign(new Error('OpenRouter 402'), { status: 402 }), ok: false });
+  assert.equal(await b.s.controlla(), 'niente', 'il giorno in corso non parte');
+  assert.equal(b.inviati.length, 0);
+
+  b.t += GIORNO;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.inviati.length, 1);
+  const [{ url, opt, doc }] = b.inviati;
+  assert.equal(opt.method, 'POST');
+  assert.ok(!opt.headers.Authorization, 'si spedisce senza login, come i feedback');
+  const id = `99999999999999999901_2026-10-15`;
+  assert.equal(url, `${BASE}/${C.COLLEZIONE}?documentId=${id}&key=K`);
+  assert.deepEqual(doc, {
+    v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', app: '0.2.243', os: 'mac',
+    uso: { 'filo-chat': { n: 2, fasce: { ms500: 1, s2: 1 } }, explain: { n: 1, fasce: {} } },
+    errori: { explain: [{ modello: 'deepseek/deepseek-v4-pro', host: 'DeepInfra', tipo: 'crediti', n: 1 }] },
+  });
+  assert.equal(C.valida(doc).ok, true);
+
+  // Lo stesso giorno non riparte, e il giorno dopo parte il giorno di Filo aperto, con lo stesso pseudonimo del mese.
+  assert.equal(await b.s.controlla(), 'niente');
+  b.t += GIORNO;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.equal(b.inviati.length, 2);
+  assert.equal(b.inviati[1].doc.giorno, '2026-10-16');
+  assert.equal(b.inviati[1].doc.pseudonimo, '99999999999999999901');
+  assert.deepEqual(b.inviati[1].doc.uso, {});
+});
+
+test('un messaggio di chat coi suoi giri di strumenti è un uso, con l’attesa da quando è partito', async () => {
+  const b = banco();
+  await b.s.unUso(A.FILO_CHAT, async () => {
+    b.t += 700; // la preparazione del contesto: anche questa è attesa
+    const primo = b.s.apri(A.FILO_CHAT);
+    b.t += 1000; primo.errore(Object.assign(new Error('x'), { status: 500 }), { modello: 'a/b', host: 'H' });
+    b.t += 300; primo.visto(); primo.fine(true);
+    const secondo = b.s.apri(A.FILO_CHAT);
+    b.t += 5000; secondo.visto(); secondo.fine(true);
+    const altra = b.s.apri(A.DESCRIBE_IMAGE); // un'altra funzione dentro la chat conta da sé
+    b.t += 100; altra.fine(true);
+  });
+  await attendi(); await attendi();
+  b.t += GIORNO;
+  await b.s.controlla();
+  const { doc } = b.inviati[0];
+  assert.deepEqual(doc.uso['filo-chat'], { n: 1, fasce: { s2: 1 } });
+  assert.deepEqual(doc.uso['describe-image'], { n: 1, fasce: { ms500: 1 } });
+  assert.deepEqual(doc.errori['filo-chat'], [{ modello: 'a/b', host: 'H', tipo: 'fornitore', n: 1 }]);
+});
+
+test('in incognito non si conta niente e non parte nessun documento', async () => {
+  const b = banco({ incognito: true, finestra: false });
+  await usa(b, A.FILO_CHAT, { attesa: 900 });
+  await b.s.unUso(A.FILO_CHAT, async () => { b.s.apri(A.FILO_CHAT).fine(true); });
+  await b.s.controlla();
+  b.t += GIORNO;
+  await b.s.controlla();
+  b.incognito = false;
+  b.t += GIORNO;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, 0, JSON.stringify(b.inviati.map((x) => x.doc)));
+});
+
+test('a contatori spenti non si conta niente e non parte niente, e quello che c’era si butta', async () => {
+  const b = banco();
+  await usa(b, A.FILO_CHAT, { attesa: 900 });
+  b.accesi = false;
+  b.s.seguiImpostazioni({ contatori: { attivi: false } });
+  await attendi(); await attendi();
+  await usa(b, A.EXPLAIN, { attesa: 300 });
+  b.t += GIORNO;
+  assert.equal(await b.s.controlla(), 'spenti');
+  b.t += GIORNO;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, 0);
+  const salvato = b.disco.get(Servizio.CHIAVE);
+  assert.deepEqual(salvato.giorni, {}, 'spenti, i giorni raccolti prima non restano ad aspettare');
+  assert.deepEqual(salvato.pseudonimi, {});
+
+  // Riaccesi, si riparte da zero: il giorno di prima non torna.
+  b.accesi = true;
+  await usa(b, A.HELP, { attesa: 100 });
+  b.t += GIORNO;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, 1);
+  assert.deepEqual(Object.keys(b.inviati[0].doc.uso), ['help']);
+});
+
+test('un invio fallito riprova il giorno dopo, e al ritorno partono tutti i giorni rimasti, dal più vecchio', async () => {
+  const b = banco({ risposta: 403 });
+  for (let d = 0; d < 3; d++) {
+    await usa(b, A.TRANSLATE_PAGE, { attesa: 2500 });
+    b.t += GIORNO;
+    assert.equal(await b.s.controlla(), 'fallito');
+    assert.equal(await b.s.controlla(), 'rimandato', 'dopo un rifiuto, nello stesso giorno non si bussa di nuovo');
+  }
+  assert.equal(b.inviati.length, 3, 'un tentativo al giorno');
+  b.risposta = 'rete';
+  b.t += GIORNO;
+  assert.equal(await b.s.controlla(), 'fallito');
+  b.risposta = 200;
+  b.inviati.length = 0;
+  b.t += GIORNO;
+  assert.equal(await b.s.controlla(), 'inviati');
+  assert.deepEqual(b.inviati.map((x) => x.doc.giorno), ['2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18', '2026-10-19']);
+  assert.equal(b.inviati[0].doc.uso['translate-page'].n, 1);
+});
+
+test('i giorni rimasti partono con un tetto, e il resto il giro dopo', async () => {
+  const b = banco({ risposta: 403 });
+  const giorni = C.TETTO_INVII_PER_GIRO + 4;
+  for (let d = 0; d < giorni; d++) { await usa(b, A.HELP); b.t += GIORNO; }
+  b.risposta = 200;
+  b.inviati.length = 0;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, C.TETTO_INVII_PER_GIRO);
+  b.t += 60 * 60 * 1000;
+  await b.s.controlla();
+  assert.equal(b.inviati.length, giorni);
+});
+
+test('l’ultimo giorno del mese, spedito il mese dopo, porta lo pseudonimo del suo mese', async () => {
+  const b = banco();
+  b.t = new Date(2026, 9, 31, 22, 0, 0).getTime();
+  await usa(b, A.HELP);
+  b.t = new Date(2026, 10, 2, 9, 0, 0).getTime();
+  await b.s.controlla();
+  b.t += GIORNO;
+  await b.s.controlla();
+  const [ott, nov] = b.inviati.map((x) => x.doc);
+  assert.equal(ott.giorno, '2026-10-31');
+  assert.equal(nov.giorno, '2026-11-02');
+  assert.notEqual(ott.pseudonimo, nov.pseudonimo, 'al mese nuovo uno pseudonimo nuovo');
+  assert.notEqual(nov.pseudonimo, 'abcdef0123456789');
+});
+
+test('il cancello conta ogni chiamata e non si ferma se il contatore si rompe', async () => {
+  const G = globalThis.SN_MODEL_GATE;
+  const visti = [];
+  const contatore = {
+    apri: (action) => {
+      const voce = { action, visti: 0, errori: [], fine: null };
+      visti.push(voce);
+      return { visto: () => { voce.visti += 1; }, errore: (e, x) => voce.errori.push({ e, x }), fine: (ok) => { voce.fine = ok; } };
+    },
+  };
+  const gate = (c) => G.create({
+    getSettings: async () => ({}), buildChain: () => [{ provider: 'p', model: 'm/a' }, { provider: 'p', model: 'm/b' }],
+    modelFor: () => 'x', costs: { isOverLimit: async () => false, record: async () => 0 }, contatore: () => c,
+  });
+  globalThis.SN_PROVIDERS = {
+    getProvider: () => ({}),
+    streamCompleteWithFallback: async ({ onDelta, onTentativoFallito }) => {
+      onTentativoFallito(Object.assign(new Error('giù'), { status: 503 }), { modello: 'm/a', host: 'H' });
+      onDelta('ciao'); onDelta(' mondo');
+      return { text: 'ciao mondo' };
+    },
+    completeWithFallback: async () => { throw Object.assign(new Error('OpenRouter 402'), { status: 402 }); },
+  };
+  await gate(contatore).stream({ action: A.FILO_CHAT, messages: [], onDelta: () => {} });
+  await assert.rejects(gate(contatore).complete({ action: A.EXPLAIN, messages: [] }));
+  assert.equal(visti[0].action, A.FILO_CHAT);
+  assert.equal(visti[0].visti, 2);
+  assert.equal(visti[0].errori[0].x.modello, 'm/a');
+  assert.equal(visti[0].fine, true);
+  assert.equal(visti[1].fine, false);
+  const rotto = { apri: () => { throw new Error('rotto'); } };
+  const r = await gate(rotto).stream({ action: A.FILO_CHAT, messages: [], onDelta: () => {} });
+  assert.equal(r.text, 'ciao mondo');
+  const metaRotto = { apri: () => ({ visto() { throw new Error('x'); }, errore() { throw new Error('x'); }, fine() { throw new Error('x'); } }) };
+  assert.equal((await gate(metaRotto).stream({ action: A.FILO_CHAT, messages: [], onDelta: () => {} })).text, 'ciao mondo');
+  delete globalThis.SN_PROVIDERS;
+});
