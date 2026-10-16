@@ -151,7 +151,9 @@
     const g = normaleGiorno(giorno);
     const per = has(g.errori, funzione) && g.errori[funzione] && typeof g.errori[funzione] === 'object' ? g.errori[funzione] : {};
     let chiave = `${modelloPulito(modello)}|${hostPulito(host)}|${tipo}`;
-    if (!has(per, chiave) && Object.keys(per).length >= TETTO_COMBINAZIONI) chiave = `${ALTRO}||${tipo}`;
+    // Il posto per le sei righe «altro» (una per tipo) resta sempre libero: oltre il tetto non si perde niente.
+    const specifiche = Object.keys(per).filter((k) => !k.startsWith(`${ALTRO}||`)).length;
+    if (!has(per, chiave) && specifiche >= TETTO_COMBINAZIONI - ERRORI.length) chiave = `${ALTRO}||${tipo}`;
     per[chiave] = (intero(per[chiave]) ? per[chiave] : 0) + 1;
     g.errori[funzione] = per;
     giorno.uso = g.uso;
