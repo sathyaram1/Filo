@@ -778,6 +778,36 @@ test('orchestratore su Haiku 5.5: prezzato col suo listino, e le sue richieste o
   } finally { togliCartella(base); }
 });
 
+test('orchestratore in modalità veloce: costa la sua tariffa, e la nota di una tariffa di ripiego arriva nel rapporto del worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-veloce-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const riga = (id, model, ts, tool = null) => JSON.stringify({
+      type: 'assistant', timestamp: ts, sessionId: id.startsWith('o') ? 'orch' : 'w5',
+      message: { id, model, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1000000, speed: 'fast' }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+    });
+    writeFileSync(join(dir, 'orch.jsonl'), [
+      riga('o1', 'claude-sonnet-5-5', H('09:00:00')),
+      riga('o2', 'claude-opus-5-5', H('09:01:00'), { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} }),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w5.jsonl'), riga('w1', 'claude-opus-5-5', H('09:02:00')) + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'resolver', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w5');
+    assert.equal(rep.costUsd, 40, 'un milione in uscita su Opus 5.5 veloce: 40 $');
+    assert.equal(rep.orchestrator.costUsd, 60, 'Sonnet 5.5 veloce, non a listino, al doppio (20 $) più Opus 5.5 veloce (40 $)');
+    assert.deepEqual(rep.notes.filter((n) => /velocità/.test(n)),
+      ['orchestratore: velocità «fast» non a listino per «claude-sonnet-5-5»: 1 turno calcolato a 2× la tariffa Sonnet 5']);
+    assert.match(riassunto(rep)[4], /note: .*orchestratore: velocità «fast»/);
+  } finally { togliCartella(base); }
+});
+
 // Worker in sottofondo (il default di Claude Code): la chiamata riceve subito
 // «Async agent launched», la fine arriva come notifica in più forme.
 const lanciato = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Async agent launched successfully.\nagentId: x' }] }] } });
