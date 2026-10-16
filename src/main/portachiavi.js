@@ -19,7 +19,6 @@ function portachiaviDaChiedere({ platform, env = {}, haSwitch = false } = {}) {
 
 // Si consiglia solo il portachiavi che Filo userebbe davvero su quel desktop (#708.1):
 // su KDE solo KWallet; con la cifratura di ripiego imposta da chi lancia, nessuno.
-// `perChe`: a cosa serve, detto all'inizio della frase (l'accesso da ricordare, le chiavi API da cifrare).
 function consiglioPortachiavi({ platform, backend, perChe = 'Per farlo ricordare' } = {}) {
   if (platform !== 'linux') return '';
   const b = String(backend || '');
