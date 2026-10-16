@@ -983,6 +983,8 @@ module.exports = function register(on, ctx) {
     // L'invito che arriva da fuori (#651): main.js porta dentro il
     // collegamento filo://invito/<codice>, l'avvio l'invito in attesa.
     redeemFromInvite, tryPendingInvite, portaDentroInvito,
+    // Il controllo che all'avvio e ogni sei ore scrive gli avvisi all'owner (#855): lo chiamano anche gli spec.
+    controllaAvvisiOwner,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // La prova di una chiave dalle Impostazioni (handlers/ai.js): niente riserva.
