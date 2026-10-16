@@ -30,13 +30,16 @@ REGISTRATO con gli script, mentre lavori:
   release <biglietto> --role <il tuo ruolo>`: il rilascio allega da solo il
   rapporto di fine sessione, e il ruolo è la firma di quel rapporto. Senza,
   il rapporto esce anonimo);
-- un guasto che ti impedisce di lavorare → dichiaralo AL CANALE nel rilascio,
-  col motivo (`node scripts/routine-channel.mjs release <biglietto>
-  --role <il tuo ruolo> --guasto "<motivo>"`): è così che il server smette di dare lavoro per
-  questo giro. Non "riportarlo" a parole: registralo.
+- un guasto che ti impedisce di lavorare → una domanda all'owner, il feedback
+  in attesa e il rilascio col guasto (`node scripts/routine-channel.mjs release <biglietto>
+  --role <il tuo ruolo> --guasto "<motivo>"`), come dice la sezione qui sotto: è
+  così che il server smette di dare lavoro per questo giro e l'owner legge il
+  guasto come guasto. Non "riportarlo" a parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
 conta niente. Se non l'hai registrato, non esiste.
+
+<!-- includi: _guasto-con-domanda.md -->
 
 ## I pezzi lunghi del payload stanno in un file
 
