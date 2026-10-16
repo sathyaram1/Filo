@@ -518,9 +518,6 @@
   }
 
   // ===== Suggerimenti =====
-  // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
-  // gratis, niente API key, regge i casi mancanti restituendo un'icona
-  // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
   // Quello che l'utente ha scritto in questa chat: un codice scritto da lui può uscire (#810). Il testo di un
   // suggerimento della home no, l'ha scritto un modello.
   function paroleUtente() {
