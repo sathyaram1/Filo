@@ -352,6 +352,40 @@
       },
     };
   }
+  // #843 — spegnere Filo su un sito si disfa con una parola e non spegne protezioni (lì tacciono menu, correttore e
+  // azioni sulla pagina): costo 1 nei due versi. Un sito alla volta: a costo 1 l'elenco intero non si riscrive.
+  function sitiFiloSpento() {
+    const base = elenco({
+      keys: ['siti_filo_spento', 'domini_esclusi', 'siti dove filo è spento', 'spegni filo sul sito', 'riaccendi filo sul sito',
+        'filo spento sul sito', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
+      percorso: 'blocklist',
+      nome: 'Siti dove Filo è spento',
+      aiuto: 'siti dove Filo non mette il suo menu del tasto destro, il correttore e le sue azioni sulla pagina; «aggiungi» spegne '
+        + 'Filo su quel sito e sui suoi sottodomini, «togli» lo riaccende. Per il sito aperto: «questo sito» (la scheda web davanti)',
+      risk: 'Cambia i siti dove Filo si spegne: lì il tasto destro apre il menu del sito, e non ci sono il correttore né le '
+        + 'azioni di Filo sulla pagina.',
+    });
+    return {
+      ...base,
+      aiuto: base.aiuto.replace(' | "solo <siti>" | "svuota"', ''),
+      costo: 1,
+      build(v) {
+        const o = opElenco(v);
+        if (!o || o.rifiuto) return o;
+        if (o.op === 'sostituisci') {
+          return {
+            rifiuto: 'l\'elenco dei siti dove Filo è spento si cambia un sito alla volta',
+            perModello: 'Usa «aggiungi <sito>» per spegnere Filo su un sito e «togli <sito>» per riaccenderlo (più siti separati da '
+              + 'virgole): l\'elenco intero non si riscrive. Per svuotarlo togli i siti che contiene.',
+          };
+        }
+        const lista = o.voci.map(sitoLeggibile).join(', ');
+        const label = o.op === 'aggiungi' ? `Filo spento su ${lista}` : `Filo riacceso su ${lista}`;
+        return { partial: nidifica('blocklist', o.voci), label, elenco: { percorso: 'blocklist', op: o.op, voci: o.voci, nome: 'Siti dove Filo è spento' } };
+      },
+    };
+  }
+
   // Si salva la forma «xn--» con cui il sito si confronta; a una persona si mostra münchen.de, come fa la pagina.
   function sitoLeggibile(x) {
     const N = nomiSito();
