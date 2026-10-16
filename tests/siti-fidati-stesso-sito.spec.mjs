@@ -15,7 +15,7 @@ import { primaFinestra } from './helpers/primaFinestra.mjs';
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
 
-// Ogni host risponde con la stessa pagina: `?metti=<valore>` scrive un cookie che dura un giorno, poi lo si rilegge.
+// Ogni host risponde con la stessa pagina, che mostra i cookie che ha.
 async function serverSiti(pagine = {}) {
   const srv = createServer((req, res) => {
     const percorso = String(req.url || '').split('?')[0];
@@ -25,11 +25,7 @@ async function serverSiti(pagine = {}) {
       return;
     }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(`<!doctype html><html><body><p id="c"></p><script>
-      const v = new URLSearchParams(location.search).get('metti');
-      if (v) document.cookie = 'sessione=' + v + '; max-age=86400; path=/';
-      document.getElementById('c').textContent = document.cookie;
-    </script></body></html>`);
+    res.end('<!doctype html><html><body><p id="c"></p><script>document.getElementById("c").textContent = document.cookie;</script></body></html>');
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   return {
@@ -93,10 +89,12 @@ test('in Privacy massima un fidato scritto come sottodominio o come indirizzo ti
       await sec.reload();
       await expect(sec.locator('#cookie-wl-list li span')).toHaveText(['due.test', 'uno.test', 'tre.test'], { timeout: 10_000 });
 
-      for (const [url, v] of [[sito('posta.uno.test', '?metti=uno'), 'uno'], [`${posta}?metti=due`, 'due'],
-        [sito('posta.tre.test', '?metti=tre'), 'tre'], [sito('posta.quattro.test', '?metti=quattro'), 'quattro']]) {
+      // Il cookie lo scrive la pagina già aperta: una scheda riaperta dopo il riavvio lo rilegge, non lo riscrive.
+      for (const [url, v] of [[sito('posta.uno.test'), 'uno'], [posta, 'due'], [sito('posta.tre.test'), 'tre'],
+        [sito('posta.quattro.test'), 'quattro']]) {
         const p = await run.apri(url);
-        await expect(p.locator('#c')).toHaveText(`sessione=${v}`, { timeout: 10_000 });
+        await p.evaluate((x) => { document.cookie = `sessione=${x}; max-age=86400; path=/`; }, v);
+        await expect.poll(() => p.evaluate(() => document.cookie)).toBe(`sessione=${v}`);
       }
       await run.app.evaluate(async ({ session }) => {
         for (const s of ['uno', 'due', 'tre']) await session.fromPartition(`persist:filo-priv-${s}.test`).cookies.flushStore();
@@ -130,30 +128,25 @@ test.describe('programmi scaricati', () => {
 
   test('un riquadro di un sottodominio è lo stesso sito; quello di un altro utente della piattaforma no', async ({ shell, openTab }) => {
     test.setTimeout(120_000);
-    const pagine = {
-      '/riquadro.html': `<!doctype html><html><body>
-        <a id="data" download="dalriquadro.exe" href="data:application/octet-stream;base64,TVoBAgME">scarica</a></body></html>`,
-    };
+    const pagine = {};
     const srv = await serverSiti(pagine);
     try {
-      for (const [pagina, riquadro, nome, atteso] of [
-        ['shop.esempio.test', 'cdn.esempio.test', 'dalriquadro.exe', 'programma da shop.esempio.test.'],
-        ['alice.github.io', 'bob.github.io', 'dalriquadro.exe', 'altri siti'],
+      for (const [pagina, riquadro, nome, incerto] of [
+        ['shop.esempio.test', 'cdn.esempio.test', 'dalcdn.exe', false],
+        ['alice.github.io', 'bob.github.io', 'dabob.exe', true],
       ]) {
+        pagine[`/${nome}.html`] = `<!doctype html><html><body>
+          <a id="data" download="${nome}" href="data:application/octet-stream;base64,TVoBAgME">scarica</a></body></html>`;
         pagine[`/${pagina}.html`] = `<!doctype html><html><body><h1>Negozio</h1>
-          <iframe id="r" src="http://${riquadro}:${srv.porta}/riquadro.html" width="400" height="120"></iframe></body></html>`;
+          <iframe id="r" src="http://${riquadro}:${srv.porta}/${nome}.html" width="400" height="120"></iframe></body></html>`;
         const page = await openTab(`http://${pagina}:${srv.porta}/${pagina}.html`);
         await page.frameLocator('#r').locator('#data').click();
         await expect.poll(async () => (await voce(shell, nome))?.state ?? null, { timeout: 20_000 }).toBe('pending');
         const v = await voce(shell, nome);
         expect(v.site).toBe(pagina);
-        expect(v.siteUncertain).toBe(atteso === 'altri siti');
-        await expect(domanda(shell, nome)).toContainText(atteso, { timeout: 10_000 });
-        await shell.evaluate((id) => window.filoShell.downloads.confirm?.(id, false), v.id).catch(() => {});
-        await shell.evaluate(() => window.filoShell.downloads.list()).then(async (r) => {
-          for (const it of (r && r.items) || []) await shell.evaluate((id) => window.filoShell.downloads.remove?.(id), it.id).catch(() => {});
-        });
-        await page.close().catch(() => {});
+        expect(v.siteUncertain).toBe(incerto);
+        await expect(domanda(shell, nome)).toContainText(incerto ? `da una pagina di ${pagina} con parti di altri siti`
+          : `è un programma da ${pagina}.`, { timeout: 10_000 });
       }
     } finally { await srv.close(); }
   });
