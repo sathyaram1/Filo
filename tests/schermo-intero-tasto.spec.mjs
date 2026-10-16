@@ -22,6 +22,18 @@ function stato(app) {
   });
 }
 
+// Il suggerimento della barra laterale è una finestra a sé, sopra la scheda (come in barra-laterale-suggerimento).
+const suggerimentoVisibile = (app) => app.evaluate(async ({ BrowserWindow }) => {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w._filoTabs || w.isDestroyed() || !w.isVisible()) continue;
+    try {
+      const t = await w.webContents.executeJavaScript("(document.getElementById('tip') || {}).textContent || ''");
+      if (t) return t;
+    } catch (_) {}
+  }
+  return '';
+});
+
 async function entraEdEsciConF11(app, dove) {
   await premi(app, dove, 'F11');
   await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 5000 }).toBe(true);
