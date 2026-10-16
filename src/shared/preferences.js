@@ -1452,13 +1452,15 @@
         + 'un sito sospetto può aprirsi senza avviso.',
     }),
     interruttore({
-      keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata'],
+      keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata',
+        'link accorciati', 'destinazione dei link accorciati'],
       percorso: 'security.safeBrowse.sandbox',
-      nome: 'Link sospetti in una finestra isolata',
+      nome: 'Link accorciati in una finestra isolata',
       stati: ['sì', 'no'],
-      aiuto: 'true | false (finestra nascosta per provare un link sospetto prima che si apra; oggi nessuna funzione la usa)',
-      risk: 'Controlla la finestra nascosta e isolata in cui Filo proverebbe un link sospetto prima che tu lo apra. '
-        + 'Oggi nessuna funzione prova i link così: accesa o spenta, non cambia niente.',
+      aiuto: 'true | false (puntatore fermo su un link accorciato: Filo lo apre in una finestra nascosta per scoprire la destinazione prima del clic)',
+      risk: 'Controlla la finestra nascosta e isolata in cui Filo apre un link accorciato su cui tieni fermo il puntatore, '
+        + 'per scoprire la destinazione prima del clic. Spenta, Filo cerca ancora il link nella lista nera, ma dove porta '
+        + 'lo scopre solo quando lo apri.',
     }),
     interruttore({
       keys: ['segnalazione_automatica', 'segnalazione automatica', 'segnalazione automatica dei problemi', 'segnalazioni automatiche', 'feedback automatico'],

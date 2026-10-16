@@ -56,7 +56,7 @@ test('le parole e i pulsanti promessi sono quelli dell\'avviso e della pagina Si
   assert.ok(testo.includes(`«${avanti}»`) && testo.includes(`«${continua}»`), `i pulsanti sono «${avanti}» e «${continua}»`);
   assert.match(leggi('src/renderer/avviso-sito.html'), /Torna indietro/);
   for (const k of ['options_security_safebrowse', 'options_security_safebrowse_network', 'options_security_safebrowse_llm',
-    'options_action_safebrowse_judge']) {
+    'options_security_safebrowse_sandbox', 'options_action_safebrowse_judge']) {
     assert.ok(testo.includes(`«${T(k)}»`), `la voce nomina l'interruttore com'è scritto: «${T(k)}»`);
   }
   const eta = globalThis.SN_SERVIZI_ESTERNI.SERVIZI.find((s) => s.id === 'eta-dominio');
@@ -87,11 +87,23 @@ test('le descrizioni della pagina Sicurezza non promettono quello che il codice 
   assert.doesNotMatch(chiave, /amministratore|account/);
   assert.match(leggi('src/main/config/default-keys.js'), /SAFEBROWSING/i, 'la chiave arriva davvero col programma');
 
+  // #966 — la frase dei link accorciati racconta quello che fanno il puntatore e la finestra nascosta.
   const prova = T('options_security_safebrowse_sandbox_desc');
-  assert.doesNotMatch(prova, /li apre prima|segue prima|segue dove portano/);
-  assert.match(prova, /Oggi nessuna funzione la usa/);
-  assert.match(leggi('src/main/services/safebrowse/index.js'), /ctx\.daAprire === true/,
-    'la finestra nascosta parte solo per un link da aprire: se cambia, cambia anche la frase');
+  assert.doesNotMatch(prova, /nessuna funzione|li apre prima/);
+  const scheda = leggi('src/main/tabs/tabSafebrowse.js');
+  assert.match(prova, /mezzo secondo/);
+  assert.match(scheda, /const SOSTA_MS = 500;/, 'mezzo secondo fermo sul link');
+  assert.match(prova, /tasto Tab/);
+  assert.match(scheda, /input\.key === 'Tab'/);
+  assert.match(prova, /lista nera di Google/);
+  assert.match(prova, /mai in incognito/);
+  const index = leggi('src/main/services/safebrowse/index.js');
+  assert.match(index, /if \(ctx\.incognito \|\| !providers\.destinazione\) return null;/, 'in incognito la finestra non parte');
+  assert.match(prova, /Una finestra alla volta/);
+  assert.equal(require(join(ROOT, 'src/main/services/safebrowse/sandbox.js')).MAX_CONCURRENT, 1);
+  assert.match(prova, /Spento, resta solo la lista nera/);
+  assert.match(index, /destinazione: enableSandbox \?/, 'l\'interruttore spegne solo la finestra');
+  assert.match(prova, /col dito su uno schermo touch, prima del clic non parte niente/);
 
   const giudizio = T('options_security_safebrowse_llm_desc');
   assert.doesNotMatch(giudizio, /chiavi che hai già configurato/);

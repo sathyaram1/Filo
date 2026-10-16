@@ -11,6 +11,7 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Tieni fermo il puntatore mezzo secondo su un link accorciato, come bit.ly o t.co, e Filo scopre dove porta e lo controlla prima che tu clicchi. Se la destinazione è una truffa, l\'avviso è già pronto quando la apri. Gli altri link restano come sono.',
         'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
       ],
       fixes: [

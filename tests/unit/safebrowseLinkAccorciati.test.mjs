@@ -64,7 +64,7 @@ test('accorciato: lista nera sul link, finestra nascosta per la destinazione, li
   assert.deepEqual(chiesto.finestra, [link]);
   assert.deepEqual(chiesto.gsb.sort(), [DEST, link].sort());
   assert.equal(voce.verdetto.level, 'pericoloso');
-  assert.match(voce.verdetto.message.body, /conto-truffa/);
+  assert.match(voce.verdetto.message.body, /example-qualunque\.com/);
   assert.equal(SB.preverdetto(link), voce);
   await SB.preverifica(link, { pagina: 'https://sito.com/' });
   assert.equal(chiesto.finestra.length, 1, 'ripassandoci sopra non si riapre niente');
@@ -98,6 +98,10 @@ test('in incognito la lista nera sì, la finestra nascosta no', async () => {
   assert.deepEqual(chiesto.finestra, []);
   assert.deepEqual(chiesto.gsb, ['https://bit.ly/3xYz']);
   assert.equal(voce.destinazione, null);
+  // Lo stesso link poi in una finestra normale: la destinazione si cerca adesso.
+  const dopo = await SB.preverifica('https://bit.ly/3xYz', {});
+  assert.deepEqual(chiesto.finestra, ['https://bit.ly/3xYz']);
+  assert.equal(dopo.destinazione, DEST);
 });
 
 test('rilevatore spento: niente parte; finestra spenta: solo la lista nera', async () => {
@@ -114,7 +118,7 @@ test('una pagina che cambia i link sotto il puntatore arriva al tetto per ora de
     for (let i = 0; i < SB.PRE_PER_ORA; i++) assert.ok(SB.preverifica(`https://bit.ly/x${i}`, { pagina: 'https://ostile.example.com/' }));
     assert.equal(SB.preverifica('https://bit.ly/oltre', { pagina: 'https://ostile.example.com/' }), null);
     assert.ok(avvisi.mock.calls.some((c) => /si controlla all'apertura/.test(String(c.arguments[0]))));
-    assert.ok(SB.preverifica('https://bit.ly/oltre', { pagina: 'https://altro.example.com/' }), 'un altro sito ha il suo conto');
+    assert.ok(SB.preverifica('https://bit.ly/oltre', { pagina: 'https://altro.example-diverso.org/' }), 'un altro sito ha il suo conto');
     await SB._settled();
   } finally {
     avvisi.mock.restore();
@@ -147,7 +151,7 @@ function electronFinto(pagina) {
   const session = { fromPartition: () => ({ on() {}, clearStorageData: async () => {} }) };
   return { electron: { BrowserWindow, session }, conta: () => ({ vive: vive.size, picco }), fermati };
 }
-const prosegue = (u) => !!SB.tipoLink(u);
+const prosegue = SB.rimandi.siApre;
 
 test('di fabbrica una sola finestra nascosta alla volta, che vive pochi secondi', () => {
   assert.equal(MAX_CONCURRENT, 1);
@@ -166,6 +170,17 @@ test('la finestra segue i rimandi e si ferma PRIMA della destinazione, che non r
   assert.deepEqual(r.passi, ['http://bit.ly/3xYz', 'https://bit.ly/3xYz', 'https://tinyurl.com/ab', DEST]);
   assert.deepEqual(f.fermati, [DEST], 'la navigazione verso la destinazione è annullata');
   assert.equal(f.conta().vive, 0);
+});
+
+test('un rimando che scrive la destinazione ferma la finestra: lo si legge, non lo si visita', async () => {
+  const google = 'https://www.google.com/url?q=' + encodeURIComponent(DEST);
+  const f = electronFinto((emetti) => emetti('will-redirect', google));
+  const r = await createDetonator({ electron: f.electron }).destinazione('https://bit.ly/3xYz', prosegue);
+  assert.equal(r.destinazione, google);
+  assert.deepEqual(f.fermati, [google]);
+  fornitori({ destinazione: google });
+  const voce = await SB.preverifica('https://bit.ly/3xYz', {});
+  assert.equal(voce.destinazione, DEST, 'la destinazione scritta nel rimando');
 });
 
 test('un accorciato che rimanda da script si ferma uguale; uno che non rimanda chiude la finestra senza destinazione', async () => {
@@ -316,9 +331,9 @@ test('al clic sul link controllato la pagina d\'arrivo ha subito il suo avviso; 
 });
 
 test('cliccato mentre il controllo è ancora in corso: l\'avviso arriva appena il controllo finisce', async () => {
-  let rispondi;
+  const attese = new Map();
   fornitori({ destinazione: null });
-  SB.setProviders({ gsb: (u) => new Promise((ok) => { rispondi = () => ok({ listed: u.includes('bit.ly'), category: 'malware' }); }) });
+  SB.setProviders({ gsb: (u) => new Promise((ok) => { attese.set(u, () => ok({ listed: u.includes('bit.ly'), category: 'malware' })); }) });
   const inCorso = SB.preverifica('https://bit.ly/lento', {});
   const f = finestra();
   const arrivo = 'https://pulito.example-qualunque.com/';
@@ -327,7 +342,7 @@ test('cliccato mentre il controllo è ancora in corso: l\'avviso arriva appena i
   f.schede._sbOnNavigate(f.tab, arrivo);
   assert.equal(f.tab.sbAvviso, null);
   await svuota();
-  rispondi();
+  for (const rispondi of attese.values()) rispondi();
   await inCorso;
   await svuota();
   assert.equal(f.tab.sbAvviso && f.tab.sbAvviso.level, 'pericoloso');

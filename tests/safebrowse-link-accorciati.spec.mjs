@@ -71,20 +71,20 @@ const chiesteAllaLista = (app) => app.evaluate(() => globalThis.__gsb966.slice()
 const finito = (app) => app.evaluate(() => globalThis.SN_SAFEBROWSE._settled());
 
 // Quanto dopo il clic la scheda ha l'avviso «pericoloso», misurato nel main.
-async function cliccaEMisura(app, page, sel) {
+async function cliccaEMisura(app, page, sel, opzioni = {}) {
   await app.evaluate(({ BrowserWindow }) => {
     globalThis.__clic966 = Date.now();
     globalThis.__avviso966 = null;
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     clearInterval(globalThis.__guarda966);
     globalThis.__guarda966 = setInterval(() => {
-      const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
-      if (tab && tab.sbAvviso && tab.sbAvviso.level === 'pericoloso' && globalThis.__avviso966 === null) {
+      const tab = win._filoTabs.tabs.find((t) => t.sbAvviso && t.sbAvviso.level === 'pericoloso');
+      if (tab && globalThis.__avviso966 === null) {
         globalThis.__avviso966 = Date.now() - globalThis.__clic966;
       }
     }, 10);
   });
-  await page.click(sel);
+  await page.click(sel, opzioni);
   await expect.poll(() => app.evaluate(() => globalThis.__avviso966), { timeout: 10_000 }).not.toBeNull();
   return app.evaluate(() => { clearInterval(globalThis.__guarda966); return globalThis.__avviso966; });
 }
@@ -124,6 +124,25 @@ test('puntatore fermo su un link accorciato verso una pagina in lista nera: al c
   }
 });
 
+test('lo stesso link aperto in una scheda nuova col clic centrale: anche lì l\'avviso è già pronto', async ({ app, openTab }) => {
+  const t = {};
+  const s = await siti(t);
+  try {
+    await listaNeraLenta(app);
+    const page = await openTab(s.pagina);
+    await page.hover('#corto');
+    await expect.poll(() => s.quante(`${CORTO}/x7k`), { timeout: 5_000 }).toBe(1);
+    await finito(app);
+    const ms = await cliccaEMisura(app, page, '#corto', { button: 'middle' });
+    expect(ms).toBeLessThan(2000);
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs
+      .filter((x) => x.sbAvviso).map((x) => x.sbAvviso.url))).toEqual([expect.stringContaining(TRUFFA)]);
+  } finally {
+    await app.evaluate(() => clearInterval(globalThis.__campiona966)).catch(() => {});
+    await t.after();
+  }
+});
+
 test('puntatore che passa veloce su un link accorciato, o fermo su un link normale: nessuna richiesta di rete', async ({ app, openTab }) => {
   const t = {};
   const s = await siti(t);
@@ -148,6 +167,24 @@ test('puntatore che passa veloce su un link accorciato, o fermo su un link norma
   }
 });
 
+test('raggiunto col tasto Tab il link accorciato si controlla come sotto il puntatore', async ({ app, openTab }) => {
+  const t = {};
+  const s = await siti(t);
+  try {
+    await listaNeraLenta(app);
+    const page = await openTab(s.pagina);
+    await finito(app);
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('corto');
+    await expect.poll(() => s.quante(`${CORTO}/x7k`), { timeout: 5_000 }).toBe(1);
+    await finito(app);
+    expect(s.quante(`${TRUFFA}/`)).toBe(0);
+  } finally {
+    await app.evaluate(() => clearInterval(globalThis.__campiona966)).catch(() => {});
+    await t.after();
+  }
+});
+
 test('fermo su tre link accorciati lenti uno dopo l\'altro: mai più di una finestra nascosta, e vince l\'ultimo', async ({ app, openTab }) => {
   const t = {};
   const s = await siti(t);
@@ -166,6 +203,36 @@ test('fermo su tre link accorciati lenti uno dopo l\'altro: mai più di una fine
       return v && { destinazione: v.destinazione, level: v.verdetto && v.verdetto.level };
     }, `http://${CORTO}:${s.porta}/lento3`);
     expect(ultimo).toEqual({ destinazione: `http://${TRUFFA}:${s.porta}/accesso?da=lento3`, level: 'pericoloso' });
+  } finally {
+    await app.evaluate(() => clearInterval(globalThis.__campiona966)).catch(() => {});
+    await t.after();
+  }
+});
+
+test('l\'interruttore in Sicurezza si vede, e spento la finestra nascosta non parte: resta la lista nera', async ({ app, openTab }) => {
+  const t = {};
+  const s = await siti(t);
+  try {
+    const sicurezza = await openTab('filo://security/');
+    const casella = sicurezza.locator('#sec-safebrowse-sandbox');
+    await expect(casella).toBeVisible({ timeout: 8_000 });
+    await expect(sicurezza.locator('#sec-safebrowse-sandbox-label')).toHaveText(/link accorciati/);
+    await expect(sicurezza.locator('#sec-safebrowse-sandbox-desc')).toContainText('mezzo secondo');
+    await sicurezza.locator('#sec-safebrowse-sandbox-row').screenshot({ path: 'tests/.shots/966-interruttore.png' });
+    await casella.uncheck();
+    await expect.poll(() => app.evaluate(() => globalThis.SN_SAFEBROWSE.activeProviders().destinazione)).toBe(false);
+    await listaNeraLenta(app);
+    const page = await openTab(s.pagina);
+    await finito(app);
+    await app.evaluate(() => { globalThis.__gsb966.length = 0; });
+    await page.hover('#corto');
+    await page.waitForTimeout(700);
+    await finito(app);
+    expect(s.quante(`${CORTO}/`)).toBe(0);
+    expect(await chiesteAllaLista(app)).toEqual([`http://${CORTO}:${s.porta}/x7k`]);
+    await sicurezza.bringToFront();
+    await casella.check();
+    await expect.poll(() => app.evaluate(() => globalThis.SN_SAFEBROWSE.activeProviders().destinazione)).toBe(true);
   } finally {
     await app.evaluate(() => clearInterval(globalThis.__campiona966)).catch(() => {});
     await t.after();

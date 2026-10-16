@@ -157,6 +157,7 @@ const safebrowseMethods = {
     return this._sbApplyState(tab, this._sbConLink(tab, url, verdict));
   },
 
+  // Arriva solo ad alzare l'avviso: quello a schermo può venire da indizi della pagina che qui non si rivedono.
   _sbLinkPronto(tab, link) {
     const wc = tab.view && tab.view.webContents;
     if (tab._sbLink !== link || !wc || wc.isDestroyed()) return;

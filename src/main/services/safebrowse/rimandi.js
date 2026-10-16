@@ -79,4 +79,10 @@ function tipo(url) {
   return null;
 }
 
-module.exports = { tipo, ACCORCIATORI };
+// La finestra nascosta prosegue solo attraverso gli accorciati: un rimando che scrive la destinazione si legge, non si visita.
+function siApre(url) {
+  const t = tipo(url);
+  return !!t && t.tipo === 'accorciato';
+}
+
+module.exports = { tipo, siApre, ACCORCIATORI };

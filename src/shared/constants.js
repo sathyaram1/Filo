@@ -2685,7 +2685,7 @@
       // - networkSignals: età dominio (RDAP) + età primo certificato (CT).
       //   Keyless. Disattivabile da chi non vuole alcuna chiamata esterna.
       // - llmJudge: giudizio LLM solo-metadati sui casi sospetti non conclusivi.
-      // - sandbox: detonation dei link sospetti in finestra isolata.
+      // - sandbox: finestra isolata che scopre la destinazione di un link accorciato prima del clic (#966).
       safeBrowse: {
         enabled: true,
         safeBrowsingKey: '',

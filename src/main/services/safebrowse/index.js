@@ -90,7 +90,7 @@ function configure(opts = {}) {
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
     sandbox: enableSandbox ? ((url) => sandbox.detonate(url, (finalUrl) => checkSync(finalUrl))) : null,
-    destinazione: enableSandbox ? ((url) => sandbox.destinazione(url, (passo) => !!rimandi.tipo(passo))) : null,
+    destinazione: enableSandbox ? ((url) => sandbox.destinazione(url, rimandi.siApre)) : null,
   });
   gsbKeyOf = keyOf;
 }
@@ -398,7 +398,8 @@ function preverifica(url, ctx = {}) {
   const link = String(url || '');
   if (!rimandi.tipo(link) || (!providers.gsb && !providers.destinazione)) return null;
   const gia = preCache.get(link);
-  if (gia) return gia.pronto;
+  // Senza finestra (in incognito, o a interruttore spento) la destinazione non si è cercata: dove si può, si cerca.
+  if (gia && !(gia.finito && gia.senzaFinestra && !ctx.incognito && providers.destinazione)) return gia.pronto;
   const chi = (ctx.pagina && ownerOf(ctx.pagina)) || 'filo';
   if (!preBudget.spend(chi)) {
     console.warn(`[safebrowse] ${PRE_PER_ORA} link accorciati controllati in un'ora su ${chi}: ${link} si controlla all'apertura`);
@@ -439,7 +440,7 @@ async function preDestinazione(voce, ctx) {
     const t = rimandi.tipo(cur);
     if (!t) return cur;
     if (t.destinazione) { cur = t.destinazione; voce.passi.push(cur); continue; }
-    if (ctx.incognito || !providers.destinazione) return null;
+    if (ctx.incognito || !providers.destinazione) { voce.senzaFinestra = true; return null; }
     const r = await providers.destinazione(cur);
     if (!r || r.annullato) { voce.annullato = true; return null; }
     voce.passi.push(...(r.passi || []).slice(1));
