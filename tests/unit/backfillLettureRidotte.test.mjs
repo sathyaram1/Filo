@@ -6,8 +6,9 @@
 // che ha fatto il 40% del conto mensile di Firestore (#680).
 //
 // Qui si guarda la RICHIESTA che parte, non solo il risultato: due conteggi
-// prima della scansione, e la scansione — quando serve — che chiede i quattro
-// campi che usa. Senza il fix questo file è rosso.
+// prima della scansione, e la scansione — quando serve — che chiede i soli
+// campi che usa. Senza il fix questo file è rosso. In fondo, il contatore che
+// un numero anonimo non deve spostare (#923).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
