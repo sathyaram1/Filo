@@ -112,10 +112,14 @@ function allAvvio(app) {
 
 function fraseEsito(e) {
   if (!e) return '';
-  if (!e.rimasti.length) return 'Ho cancellato tutti i dati di Filo da questo computer: si riparte da zero.';
+  if (!e.rimasti.length) return 'Ho cancellato tutti i dati di Filo da questo computer. Si riparte da zero.';
+  const uno = e.rimasti.length === 1;
   const quali = e.rimasti.map((n) => `«${n}»`).join(', ');
-  return `Ho cancellato i dati di Filo, ma non ${e.rimasti.length === 1 ? 'il file' : 'questi file'} della cartella dei dati: ${quali}. `
-    + (e.riprova ? 'Li tiene aperti un altro programma: riprovo al prossimo avvio.' : 'Li tiene aperti un altro programma: cancellali a mano dalla cartella dei dati di Filo.');
+  const inizio = uno
+    ? `Ho cancellato i dati di Filo, tranne ${quali} nella cartella dei dati, che non si è lasciato cancellare.`
+    : `Ho cancellato i dati di Filo, tranne questi file nella cartella dei dati, che non si sono lasciati cancellare: ${quali}.`;
+  if (e.riprova) return `${inizio} Riprovo al prossimo avvio.`;
+  return `${inizio} ${uno ? 'Cancellalo' : 'Cancellali'} a mano${e.cartella ? ` da ${e.cartella}` : ''}.`;
 }
 
 function annuncia() {
