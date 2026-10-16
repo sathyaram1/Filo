@@ -113,6 +113,83 @@ const safebrowseMethods = {
     };
   },
 
+  // #965 — I link che la pagina mostra, ai soli controlli locali appena arrivano: un lotto alla volta per scheda, a
+  // fette, così migliaia di link non fermano Filo. Restano quelli da avviso, pronti per il clic, del documento che li ha
+  // mandati. Una pagina che riempisse la coda o la memoria non toglie niente: al clic il link si giudica comunque.
+  safebrowseLinks(tabId, urls) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const tab = this.tabs.find((t) => t.id === tabId);
+    if (!SB || !tab || !Array.isArray(urls)) return Promise.resolve({ ok: false });
+    if ((tab._sbLinkInCoda || 0) >= LINK_IN_CODA) return Promise.resolve({ ok: false, error: 'occupato' });
+    tab._sbLinkInCoda = (tab._sbLinkInCoda || 0) + 1;
+    const giro = tab._sbLinkGiro || 0;
+    const wc = tab.view && tab.view.webContents;
+    const vivo = () => giro === (tab._sbLinkGiro || 0) && this.tabs.includes(tab) && !!wc && !wc.isDestroyed()
+      && tab.view.webContents === wc;
+    const esame = (tab._sbLinkCoda || Promise.resolve()).then(async () => {
+      const r = await SB.checkLinks(urls, { vivo });
+      if (!vivo()) return { ok: true, esaminati: 0 };
+      if (!tab._sbLink) tab._sbLink = new Map();
+      for (const s of r.segnalati) {
+        tab._sbLink.delete(s.url);
+        tab._sbLink.set(s.url, s);
+        if (tab._sbLink.size > LINK_SEGNALATI_MAX) tab._sbLink.delete(tab._sbLink.keys().next().value);
+      }
+      return { ok: true, esaminati: r.esaminati };
+    }).catch(() => ({ ok: false })).finally(() => { tab._sbLinkInCoda -= 1; });
+    tab._sbLinkCoda = esame;
+    return esame;
+  },
+
+  // Il verdetto di un link al clic: quello pronto dall'esame, o lo stesso esame adesso per un link nato dopo (o un
+  // indirizzo scritto da uno script). Vale quello che l'utente ha già confermato o chiuso in questa scheda.
+  _sbVerdettoLink(tab, url) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    if (!SB || typeof SB.checkLink !== 'function') return null;
+    let v = (tab._sbLink && tab._sbLink.get(url)) || null;
+    if (!v) { try { v = SB.checkLink(url); } catch (_) { v = null; } }
+    if (!v) return null;
+    const a = this._sbApplyState(tab, v);
+    return a && (a.level === 'pericoloso' || a.level === 'sospetto') ? a : null;
+  },
+
+  // #965 — Un link da avviso non si apre prima dell'avviso: compare sulla pagina da cui parte, e «Procedi» o «Continua»
+  // fanno l'apertura che era stata chiesta (`apri(segna)`, che segna la conferma sulla scheda dove il sito si apre).
+  // Solo dalle pagine web; l'avviso della pagina stessa, se c'è, resta il suo.
+  _sbPrimaDelClic(tab, url, apri) {
+    if (!tab || tab.isInternal !== false || !/^https?:\/\//i.test(String(url || ''))) return false;
+    if (tab.sbAvviso && !tab.sbAvviso.prima) return false;
+    const v = this._sbVerdettoLink(tab, url);
+    if (!v) return false;
+    tab.sbAvviso = { level: v.level, message: v.message || null, url: String(url), prima: { apri } };
+    if (tab.id === this.activeId) this.layout();
+    return true;
+  },
+
+  // Le scelte sull'avviso di un link non ancora aperto: «Non aprire» lo toglie e basta, la conferma apre.
+  _sbSceltaPrima(tab, a, scelta, dati) {
+    const via = () => {
+      if (tab.sbAvviso !== a) return;
+      tab.sbAvviso = null;
+      if (tab.id === this.activeId) this.layout();
+    };
+    const procedi = scelta === 'procedi' && a.level === 'pericoloso' && String(dati.testo || '').trim().toLowerCase() === 'confermo';
+    const continua = scelta === 'continua' && a.level === 'sospetto';
+    if (procedi || continua) {
+      via();
+      let chiave = null;
+      try { chiave = globalThis.SN_SAFEBROWSE.scopeOf(a.url); } catch (_) {}
+      const segna = (t) => {
+        if (!t || !chiave) return;
+        this._sbState(t);
+        (procedi ? t.sbBypass : t.sbDismissed).add(chiave);
+      };
+      try { a.prima.apri(segna); } catch (_) {}
+    } else if (scelta === 'indietro') {
+      via();
+    }
+  },
+
   // did-navigate: ricontrolla l'URL FINALE (dopo i redirect). Una pagina che non è un sito (filo://, about:blank)
   // toglie l'avviso del documento di prima.
   _sbOnNavigate(tab, url) {
