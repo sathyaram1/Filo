@@ -11,6 +11,7 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Se paghi con una tua chiave OpenRouter, nelle Opzioni trovi «Con la mia chiave, usa anche i fornitori esclusi». Acceso, le richieste pagate con la tua chiave possono andare anche ai fornitori che Filo esclude, e così funzionano modelli come Gemini o Grok. È spento di serie e lo accendi anche chiedendolo a Filo. Coi crediti di Filo l\'esclusione resta.',
         'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
       ],
       fixes: [

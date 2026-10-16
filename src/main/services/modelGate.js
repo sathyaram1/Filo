@@ -82,9 +82,8 @@
   function plainNoteServed(settings, action, result) {
     const servedBy = (result && result.servedBy) || null;
     const C = global.SN_CONST;
-    const keySource = (result && (result.keySource || (result.usage && result.usage.keySource))) || '';
-    const violation = Boolean(servedBy && C && typeof C.servedPolicyViolation === 'function'
-      && C.servedPolicyViolation(servedBy, result.model, C.excludedProvidersForKey(settings, keySource)));
+    const violation = Boolean(servedBy && C && typeof C.servedViolationOf === 'function'
+      && C.servedViolationOf(settings, result));
     return { servedBy, violation };
   }
 

@@ -587,10 +587,8 @@ function openWeightsBlockReason(settings, entry) {
 function noteServedProvider(settings, action, result) {
   const servedBy = (result && result.servedBy) || null;
   const model = (result && result.model) || '';
-  // Si giudica con la lista con cui la richiesta è partita: con la chiave propria e il suo interruttore (#962) chi
-  // serve si registra e basta; coi crediti, anche dopo un ripiego, vale l'intera.
-  const keySource = (result && (result.keySource || (result.usage && result.usage.keySource))) || '';
-  const why = SN_CONST.servedPolicyViolation(servedBy, model, SN_CONST.excludedProvidersForKey(settings, keySource));
+  // Con la lista della chiave che ha pagato (#962): coi crediti, anche dopo un ripiego, vale l'intera.
+  const why = SN_CONST.servedViolationOf(settings, { ...result, servedBy, model });
   const violation = Boolean(why);
   if (why === 'not-producer') {
     console.error(
@@ -2072,6 +2070,11 @@ async function eseguiAzioneFilo(action, {
         action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
         action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
       );
+      // Senza una chiave propria l'interruttore dei fornitori esclusi non ha effetto (#962): si dice, senza chiedere un OK.
+      if (built && built.partial && built.partial.ownKeyAllProviders === true
+        && !SN_CONST.hasOwnOpenrouterKey(await Storage.getSettings())) {
+        return { executed: false, kept: false, output: { error: global.SN_PREF.SENZA_CHIAVE_PROPRIA, rifiuto: true } };
+      }
       // Il modello di una funzione: si controlla prima della conferma, che non chieda un OK a un cambio che non parte.
       if (built && built.modelloFunzione) {
         const v = await require('./costoModelli').verificaCambio(built.modelloFunzione, { Defaults });

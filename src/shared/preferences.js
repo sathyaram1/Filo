@@ -1169,6 +1169,25 @@
       },
     },
     {
+      // Vale solo con una chiave OpenRouter propria: senza, il main lo rifiuta prima della conferma (SENZA_CHIAVE_PROPRIA).
+      scrive: ['ownKeyAllProviders'],
+      aiuto: 'true | false (con una chiave OpenRouter propria, le richieste pagate con lei possono andare anche ai fornitori che Filo esclude; coi crediti di Filo l\'esclusione vale sempre)',
+      keys: ['fornitori_esclusi', 'fornitori esclusi', 'usa anche i fornitori esclusi', 'con la mia chiave usa anche i fornitori esclusi',
+        'fornitori esclusi con la mia chiave', 'lista di esclusione', 'lista dei fornitori esclusi', 'esclusione dei fornitori'],
+      costo: 2,
+      allenta: (r) => r.partial.ownKeyAllProviders === true,
+      risk: 'Le richieste pagate con la tua chiave OpenRouter potranno andare anche ai fornitori che Filo esclude '
+        + '(come Google, OpenAI o xAI), che riceveranno i testi che mandi. Coi crediti di Filo restano esclusi.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { ownKeyAllProviders: b },
+          label: `Fornitori esclusi con la tua chiave → ${b ? 'usati' : 'esclusi'}`,
+        };
+      },
+    },
+    {
       scrive: ['provider'],
       aiuto: '"openrouter"',
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
@@ -1894,8 +1913,13 @@
     return (r && r.setter) || null;
   }
 
+  // Il rifiuto dell'interruttore dei fornitori esclusi chiesto senza una chiave propria (#962): lo legge l'utente.
+  const SENZA_CHIAVE_PROPRIA = 'serve una tua chiave OpenRouter, da mettere nella pagina Crediti: senza, le richieste '
+    + 'le pagano i crediti di Filo, e lì i fornitori esclusi restano esclusi';
+
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
     applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
+    SENZA_CHIAVE_PROPRIA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

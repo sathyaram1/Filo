@@ -149,6 +149,7 @@
       campi: {
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
+        ownKeyAllProviders: 'ownKeyAllProviders',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',

@@ -563,6 +563,12 @@
       doesNot: 'Una funzione senza equivalente aperto si ferma e lo dice: non torna di nascosto su un modello proprietario, nemmeno se il sostituto non risponde (lettura ad alta voce, dettatura e indicizzazione partono già da modelli a pesi aperti). Non governa i modelli che girano sui server di Filo, come i giudici dei feedback.',
     },
     {
+      id: 'own-key-all-providers', title: 'Fornitori esclusi con la tua chiave', category: 'settings',
+      desc: 'Con una tua chiave OpenRouter, messa nella pagina Crediti, nelle Opzioni compare l’interruttore «Con la mia chiave, usa anche i fornitori esclusi», spento di serie. Acceso, le richieste pagate con la tua chiave partono senza la lista dei fornitori che Filo esclude coi suoi crediti: così funzionano anche modelli come Gemini o Grok, che servono solo i loro produttori. Filo continua a registrare chi ha servito ogni risposta, senza segnalarlo come errore.',
+      invoke: 'Opzioni → «Con la mia chiave, usa anche i fornitori esclusi», oppure chiedendolo a Filo ("con la mia chiave usa anche i fornitori esclusi").',
+      doesNot: 'Senza una tua chiave non compare e non ha effetto, e Filo dalla chat non lo accende. Se OpenRouter rifiuta la tua chiave e Filo passa ai suoi crediti, l’esclusione torna a valere per intero. Non tocca «Solo modelli a pesi aperti», che vale comunque.',
+    },
+    {
       id: 'model-usage-census', title: 'Dove Filo usa un modello', category: 'settings',
       desc: 'L’elenco completo dei punti in cui Filo usa un modello, anche quelli che non si vedono: riordino delle schede, riassunti, memoria, etichette dei mazzi, giudizi sui feedback, indicizzazione dell’archivio. Per ognuno c’è scritto se il modello lo scegli tu, se lo sceglie chi gestisce Filo, o se quel punto un modello non lo usa affatto.',
       invoke: 'Opzioni → sezione dei modelli (l’elenco sta sotto le funzioni impostabili).',
