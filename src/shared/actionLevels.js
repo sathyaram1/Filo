@@ -440,7 +440,7 @@
       },
       describeDone: (a) => {
         const o = (a && a._output) || {};
-        const titolo = String(o.titolo || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        const titolo = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         if (!o.aperta) return 'Pagina salvata non aperta';
         return `Aperta «${titolo || 'la pagina salvata'}»${o.tolta ? ' e tolta da «Aperti per dopo»' : ', ancora in «Aperti per dopo»'}`;
       },
