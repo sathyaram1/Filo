@@ -2243,28 +2243,18 @@ if (isMainModule) {
       console.log(verifierReplyText(s.reply, id));
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const seg = stripFileArg(conBiglietto(argv), 'segnala');
-      if (seg.error) { console.error(seg.error); process.exit(1); }
-      const ferma = seg.args.includes('--ferma');
-      const [, id, ...rest] = seg.args.filter((a) => a !== '--ferma');
+      const ferma = opz['--ferma'] === true;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
-      const senza = fermaSenzaSegnalazione(ferma, seg.file);
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
+      const senza = fermaSenzaSegnalazione(ferma, opz['--segnala']);
       if (senza) { console.error(senza); process.exit(1); }
-      // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
-      // resto è il report per l'owner, che il server cifra.
-      const fi = rest.indexOf('--frase');
-      const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
-      const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
-      // Qui l'unica opzione è `--frase`: qualunque altra cosa coi trattini
-      // davanti finirebbe sepolta dentro al report cifrato, e la frase per chi
-      // ha segnalato partirebbe vuota (#565).
-      // `--frase` in fondo alla riga, senza niente dopo: spariva, e la frase
-      // per chi ha segnalato partiva vuota (feedback #565).
-      if (fi !== -1 && rest[fi + 1] === undefined) {
-        console.error('--frase vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.');
-        process.exit(1);
-      }
-      const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => sembraOpzioneNelReport(a));
+      // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
+      // che il server cifra.
+      const frase = typeof opz['--frase'] === 'string' ? opz['--frase'] : '';
+      const report = rest.join(' ');
+      // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
+      const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
         console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
