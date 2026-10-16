@@ -51,7 +51,8 @@ test('l\'uscita 1 di Playwright che spiegano solo rossi attesi col corpo verde n
 const NPX_FINTO = [
   "import { readFileSync, writeFileSync } from 'node:fs';",
   "const f = process.argv.find((a) => /\\.spec\\.mjs$/.test(a));",
-  "const blocchi = readFileSync(f, 'utf8').split(/(?=test\\(')/);",
+  // L'a capo davanti: split non taglia mai a zero, e il primo caso finirebbe fra le righe prima dei casi.
+  "const blocchi = `\\n${readFileSync(f, 'utf8')}`.split(/(?=test\\(')/);",
   "const tutto = blocchi[0].includes('test.fail(');",
   "const rotto = (b) => [...b.matchAll(/stato-([a-z])\\.txt/g)].some((m) => readFileSync(`stato-${m[1]}.txt`, 'utf8').includes('rotto'));",
   'const specs = blocchi.slice(1).map((b) => {',
