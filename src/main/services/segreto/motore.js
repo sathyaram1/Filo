@@ -726,7 +726,7 @@ function colloca(ctx, S, i) {
   for (let r = 0; r < CATENA_MAX; r++) {
     const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
     if (occ[p] || (vecchie && vecchie[p])) continue;
-    if (!saltato && S.letti[p]) {
+    if (vecchie && !saltato && S.letti[p]) {
       saltato = true;
       continue;
     }
