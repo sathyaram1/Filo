@@ -579,6 +579,9 @@ const TASTI_DI_FILO = {
   'CommandOrControl+-': 'rimpicciolisci la PAGINA',
   'CommandOrControl+0': 'riporta la PAGINA al 100%',
   'CommandOrControl+Shift+B': 'apre e chiude la barra laterale',
+  // Lo schermo intero ha il tasto abituale di ogni sistema (src/shared/tasti.js), e Filo lo ascolta ovunque.
+  F11: 'mette e toglie lo schermo intero',
+  'Ctrl+Cmd+F': 'mette e toglie lo schermo intero (la forma del Mac: F11 lì è del sistema)',
 };
 
 // I `role` che, su Mac, farebbero la cosa sbagliata al posto di Filo.
