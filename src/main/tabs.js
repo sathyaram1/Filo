@@ -3009,12 +3009,6 @@ class TabManager {
         this._notifyPopupBlocked(tab.id, url, wc);
         return { action: 'deny' };
       }
-      if (accesso && gesto) {
-        if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
-        // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
-        // finestrella diventa una scheda, dove l'avviso c'è.
-        if (!tab.sbAvviso) return this._allowAuthPopup(url, details.features);
-      }
       // #170.3 — la lista dei siti bloccati la applica openTab; un «Apri comunque»
       // dato qui vale anche per le schede che apre sullo stesso sito.
       // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
@@ -3035,6 +3029,18 @@ class TabManager {
         const nuova = this.tabs.find((t) => t.id === aperta);
         if (nuova) nuova._sbApertaDa = tab._urlNavigato;
       };
+      // #965 — un link da avviso non si apre prima dell'avviso, sulla pagina da cui parte; confermato, in una scheda.
+      if (this._sbPrimaDelClic(tab, url, (segna) => {
+        const id = this.openTab(url, opzioni);
+        daLei(id);
+        segna(this.tabs.find((t) => t.id === id));
+      })) return { action: 'deny' };
+      if (accesso && gesto) {
+        if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
+        // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
+        // finestrella diventa una scheda, dove l'avviso c'è.
+        if (!tab.sbAvviso) return this._allowAuthPopup(url, details.features);
+      }
       // La finestra resta in mano alla pagina che l'ha chiesta (la riempie, la porta altrove, la chiude), come in un
       // browser; si può solo se la scheda nuova starebbe nella sua stessa partizione, altrove nasce staccata.
       if (this._finestraDellaPagina(tab, url, opzioni.apriComunque)) {
@@ -3390,10 +3396,16 @@ class TabManager {
 
   // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
   // siti in blacklist fermati come un clic, il resto in una scheda nuova.
-  apriDaCollegamento(url, { sfondo = false } = {}) {
+  // `daScheda`: la pagina dove l'utente ha scelto il link (il menu di riserva), dove compare l'avviso che lo precede (#965).
+  apriDaCollegamento(url, { sfondo = false, daScheda = null } = {}) {
     if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
-    this.openTab(url, { activate: !sfondo, openedByLink: true });
+    const apri = (segna) => {
+      const id = this.openTab(url, { activate: !sfondo, openedByLink: true });
+      if (segna) segna(this.tabs.find((t) => t.id === id));
+    };
+    if (daScheda && this._sbPrimaDelClic(daScheda, url, apri)) return true;
+    apri();
     return true;
   }
 

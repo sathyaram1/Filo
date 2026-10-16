@@ -121,7 +121,8 @@ class AvvisoSito {
     try { host = new URL(a.url).hostname; } catch (_) {}
     let vars = {};
     try { vars = require('./movimento').variabili(); } catch (_) {}
-    return { scheda: testo(tab.id), level: a.level, title: testo(m.title), body: testo(m.body), host, vars };
+    // `prima`: l'avviso di un link non ancora aperto (#965), dove «indietro» vuol dire non aprirlo.
+    return { scheda: testo(tab.id), level: a.level, title: testo(m.title), body: testo(m.body), host, vars, prima: !!a.prima };
   }
 
   _invia() {
