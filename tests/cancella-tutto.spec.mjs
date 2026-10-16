@@ -166,8 +166,9 @@ test('con «conferma» Filo si riapre come appena installato: niente memoria, ch
       expect(existsSync(join(userData, 'cancella-tutto.json'))).toBe(false);
       expect(readdirSync(userData).some((n) => n.startsWith('identity.bin'))).toBe(true);
       await nienteInVista(app, shell);
-      // E lo dice, una volta, nella finestra.
-      await expect.poll(() => shell.evaluate(() => document.body.innerText)).toContain('Ho cancellato tutti i dati di Filo');
+      // E lo dice nella finestra: l'avviso vive nella vista sopra la pagina, col modello nella shell.
+      const avvisi = async () => (await Promise.all(app.windows().map((w) => w.evaluate(() => document.body?.textContent || '').catch(() => '')))).join('\n');
+      await expect.poll(avvisi, { timeout: 15_000 }).toContain('Ho cancellato tutti i dati di Filo');
     } finally {
       await chiudiApp(app);
     }
