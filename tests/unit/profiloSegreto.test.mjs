@@ -584,4 +584,87 @@ describe('danni', () => {
     assert.ok(integra(await impronta(base, 'Rotto')));
     rmSync(base.contenitore, { force: true });
   });
+
+  test('sovrascritto da fuori mentre è aperto: la scrittura si ferma prima di toccare niente e la riapertura ripara', async () => {
+    const base = await contenitore(4 * MB);
+    const s = await crea(base, 'Aperto');
+    await s.scriviFile('a', randomBytes(5 * F.CARICO));
+    const b = randomBytes(20 * F.CARICO);
+    await s.scriviFile('b', b);
+    const prima = await impronta(base, 'Aperto');
+    // Il gruppo 2 (blocchi 20-29) tiene la coda di «b» e i blocchi dove andrà «c»: 11 copie su 20 sparite.
+    sporca(base, Array.from({ length: 11 }, (_, x) => prima.copie.get(2 * F.GRUPPO * 2 + x).p));
+    await assert.rejects(s.scriviFile('c', randomBytes(2 * F.CARICO)), (e) => e.codice === 'RIAPRI');
+    assert.throws(() => s.elencaFile(), (e) => e.codice === 'CHIUSO');
+    const r = await apri(base, 'Aperto');
+    assert.deepEqual(r.segreto.elencaFile().map((f) => [f.nome, f.danneggiato]), [['a', false], ['b', true]]);
+    await r.segreto.chiudi();
+    assert.ok(integra(await impronta(base, 'Aperto')));
+    rmSync(base.contenitore, { force: true });
+  });
+});
+
+describe('interruzioni', () => {
+  // Una scrittura che si ferma a metà (Filo chiuso, corrente via) si simula facendo fallire la n-esima scrittura su disco.
+  async function conTaglio(n, fn) {
+    const { open } = await import('node:fs/promises');
+    const fh = await open(join(dir, 'sonda'), 'w');
+    const proto = Object.getPrototypeOf(fh);
+    await fh.close();
+    const write = proto.write;
+    let fatte = 0;
+    proto.write = function (...a) {
+      if (++fatte > n) return Promise.reject(Object.assign(new Error('interrotto'), { code: 'EIO' }));
+      return write.apply(this, a);
+    };
+    try {
+      await fn();
+    } catch (e) {
+      if (e.message !== 'interrotto') throw e;
+    } finally {
+      proto.write = write;
+    }
+    return fatte > n;
+  }
+
+  test('a ogni punto di taglio, sostituendo un file che fa crescere il segreto: si riapre col vecchio o col nuovo, mai un misto', async () => {
+    const a = randomBytes(3 * F.CARICO);
+    const vecchio = randomBytes(25 * F.CARICO);
+    const nuovo = randomBytes(40 * F.CARICO + 17);
+    let tagliate = 0;
+    for (const n of [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]) {
+      const base = await contenitore(4 * MB);
+      const s = await crea(base, 'T');
+      await s.scriviFile('a', a);
+      await s.scriviFile('b', vecchio);
+      if (await conTaglio(n, () => s.scriviFile('b', nuovo))) tagliate++;
+      const r = await apri(base, 'T');
+      const b = await r.segreto.leggiFile('b');
+      assert.ok(b.equals(vecchio) || b.equals(nuovo), `taglio dopo ${n} scritture: «b» non è né il vecchio né il nuovo`);
+      assert.ok((await r.segreto.leggiFile('a')).equals(a), `taglio dopo ${n}: «a» cambiato`);
+      await r.segreto.chiudi();
+      assert.ok(integra(await impronta(base, 'T')), `taglio dopo ${n}: ridondanza non tornata`);
+      rmSync(base.contenitore, { force: true });
+    }
+    assert.ok(tagliate >= 10, 'quasi nessun taglio è caduto dentro la scrittura: la prova non prova niente');
+  });
+
+  test('a ogni punto di taglio, cancellando il file in coda (il segreto si accorcia): c’è ancora o non c’è, e il resto è intatto', async () => {
+    const a = randomBytes(3 * F.CARICO);
+    const coda = randomBytes(30 * F.CARICO);
+    for (const n of [0, 1, 2, 4, 8, 16, 32, 64, 128]) {
+      const base = await contenitore(4 * MB);
+      const s = await crea(base, 'T');
+      await s.scriviFile('a', a);
+      await s.scriviFile('coda', coda);
+      await conTaglio(n, () => s.cancellaFile('coda'));
+      const r = await apri(base, 'T');
+      const nomi = r.segreto.elencaFile().map((f) => f.nome);
+      if (nomi.includes('coda')) assert.ok((await r.segreto.leggiFile('coda')).equals(coda), `taglio dopo ${n}: «coda» rovinata`);
+      assert.ok((await r.segreto.leggiFile('a')).equals(a), `taglio dopo ${n}: «a» cambiato`);
+      await r.segreto.chiudi();
+      assert.ok(integra(await impronta(base, 'T')), `taglio dopo ${n}: ridondanza non tornata`);
+      rmSync(base.contenitore, { force: true });
+    }
+  });
 });
