@@ -163,7 +163,17 @@ test('eseguiGitServer: token negato, guasto, git che fallisce, origin estraneo',
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(URL_SERVER), scrivi, token: async () => ({ outcome: 'fault', reason: 'http_503' }) }), 3);
     righe = [];
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(URL_SERVER, 128), scrivi, token: async () => ({ outcome: 'ok', token: TOKEN }) }), 1);
-    assert.match(righe.join('\n'), /git è uscito con 128[^]*GitHub l'ha respinto/);
+    assert.match(righe.join('\n'), /git è uscito con 128[^]*il motivo è nel testo di git/);
+    for (const [stderr, atteso] of [
+      ['remote: Repository not found.\nfatal: repository \'https://github.com/sathyaram1/filo-security.git/\' not found\n', /GitHub l'ha respinto/],
+      ['remote: Rejected by the session proxy: credentials not allowed\nfatal: Authentication failed for \'x\'\n', /il proxy della sessione, non GitHub/],
+      ['fatal: Authentication failed for \'https://github.com/sathyaram1/filo-security.git/\'\n', /non dice chi lo manda/],
+    ]) {
+      righe = [];
+      const respinto = (argv) => (argv.includes('get-url') ? { status: 0, stdout: URL_SERVER } : { status: 128, stderr });
+      assert.equal(await eseguiGitServer({ ...base, lancia: respinto, scrivi, token: async () => ({ outcome: 'ok', token: TOKEN }) }), 1);
+      assert.match(righe.join('\n'), atteso, stderr);
+    }
     righe = [];
     const estraneo = 'https://x-access-token:SEGRETO@example.com/filo-security.git';
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(estraneo), scrivi, token: async () => { chiamato = true; return { outcome: 'ok', token: TOKEN }; } }), 1);
