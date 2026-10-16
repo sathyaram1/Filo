@@ -44,8 +44,7 @@ Se è l'ultimo caso, dillo nella critica.
    prove dei rilievi che sta correggendo, e la chiusura non la rilancia. Quindi
    qui, adesso, in partenza. Una porta di un giro passato che si riapre è un
    rilievo di livello 2, interno; le porte già chiuse si ri-provano, non si
-   riscoprono come nuove. Come si legge una prova segnata come rosso atteso lo
-   dice «Le prove restano nel ramo», più sotto.
+   riscoprono come nuove.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
    rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
    sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li
