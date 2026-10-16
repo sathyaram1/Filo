@@ -2235,7 +2235,7 @@ if (isMainModule) {
       }
       // Il file della segnalazione si legge qui, a critica già buona: un file
       // assente ferma con la frase giusta, e niente parte a metà.
-      const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
+      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
