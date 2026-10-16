@@ -55,9 +55,9 @@ indistinguibili, e niente registra quanti segreti ci sono né dove stanno.
   non zeri. I blocchi non usati che non sono vuoti si azzerano.
 - **Dichiarati.** Le loro chiavi vivono per la durata della chiamata; le
   posizioni dei loro blocchi (non i nomi) restano nella sessione aperta, così le
-  evitano anche le scritture successive. Un dichiarato si ripara copiando le
-  copie mancanti, ma un suo gruppo perso resta com'è: il proprietario se ne
-  accorge aprendolo, invece di trovarci zeri.
+  evitano anche le scritture successive. Di un dichiarato si rifanno le copie
+  mancanti, ma un suo gruppo perso resta com'è: il proprietario se ne accorge
+  aprendolo, invece di trovarci zeri.
 - **Spazio.** Libero vuol dire il contenitore meno il segreto stesso e quelli
   dichiarati. Una scrittura che non ci sta si rifiuta con `servono` e
   `disponibili` in byte; sostituire un file conta lo spazio che lascia il vecchio,
