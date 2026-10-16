@@ -120,6 +120,7 @@ test.beforeAll(async () => {
 
       if (url === '/walletState') return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
       if (url === '/walletOverview') {
+        overviewChiesti += 1;
         const cfg = { ...configDoc, eurUsdAt: '2026-09-18', maxGrantUsd: 57.33, migrateLocalMax: 10000 };
         return json(res, 200, {
           result: {
