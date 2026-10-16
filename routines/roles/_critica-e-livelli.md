@@ -143,8 +143,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   rossa a verde. Una prova segnata conta per quello che fa il corpo, anche per
   la pulizia e la consegna: se fallisce ancora la porta è aperta come prima, e
   non è un rilievo nuovo; se passa («Expected to fail, but passed») la porta è
-  chiusa, e le togli il segno nel commit delle tue prove. Una prova che era solo esplorazione (dipende dall'ambiente, non
-  asserisce niente) si cancella. Si cancella anche quella di un rilievo
+  chiusa, e le togli il segno nel commit delle tue prove. Una prova che era
+  solo esplorazione (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche quella di un rilievo
   **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
   suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
   rispiegare per sempre.
