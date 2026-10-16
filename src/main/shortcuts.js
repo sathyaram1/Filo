@@ -1,4 +1,4 @@
-// Le quattro scorciatoie di Filo (Spiega, Traduci, Salva per dopo, Aiuto), sui tasti scelti dall'utente (#842):
+// Le quattro scorciatoie di Filo (Spiega, Traduci, Salva per dopo, Aiuto), sui tasti scelti dall'utente (#842), e lo schermo intero:
 // valgono solo con Filo in primo piano, mai come scorciatoie di sistema (#838). Tasti e nomi: src/shared/tasti.js.
 // Sentinelle: tests/unit/scorciatoieSoloInFilo.test.mjs, tests/unit/scorciatoieFilo.test.mjs.
 
@@ -54,6 +54,7 @@ function collegaScorciatoie(wc, finestra) {
   if (!wc || typeof wc.on !== 'function') return;
   wc.on('before-input-event', (event, input) => {
     if (staRegistrandoTasti(wc)) return;
+    if (tastoSchermoIntero(wc, event, input, finestra)) return;
     const command = comandoDaTasto(input);
     if (!command) return;
     event.preventDefault();
@@ -61,6 +62,18 @@ function collegaScorciatoie(wc, finestra) {
     if (input.isAutoRepeat) return;
     dispatch(command, typeof finestra === 'function' ? finestra() : finestra);
   });
+}
+
+// Lo schermo intero da tastiera, la stessa commutazione della voce di menu, da qualunque vista abbia il fuoco
+// (tranne la pagina che s'è presa lo schermo pieno col suo pulsante: `schermoPienoDi`).
+function tastoSchermoIntero(wc, event, input, finestra) {
+  if (!input || input.type !== 'keyDown' || !globalThis.SN_TASTI.comandoSchermoIntero(input)) return false;
+  const tabs = finestraDiFilo(typeof finestra === 'function' ? finestra() : finestra)?._filoTabs;
+  if (!tabs || tabs.schermoPienoDi(wc)) return false;
+  event.preventDefault();
+  // Tenuto premuto non lampeggia: entra una volta sola.
+  if (!input.isAutoRepeat) tabs.toggleContentFullscreen();
+  return true;
 }
 
 // Una tab è "interna" (pagina filo://) se il flag isInternal è settato oppure

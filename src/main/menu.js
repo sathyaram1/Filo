@@ -170,8 +170,10 @@ function zoom(verso) {
   try { c.tab.view.webContents.send('filo:zoom-key', verso); } catch (_) {}
 }
 
-function schermoIntero() {
+// Dal tasto, lo schermo pieno chiesto dalla pagina a fuoco (un video) resta suo, come in src/main/shortcuts.js.
+function schermoIntero(_voce, _finestra, evento) {
   const win = finestra();
+  if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.schermoPienoDi(contenutoAFuoco())) return;
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
 }
 
@@ -293,10 +295,8 @@ function template(piattaforma) {
       { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: () => zoom('out'), ...SOLO_SCRITTA },
       { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: () => zoom('reset'), ...SOLO_SCRITTA },
       { type: 'separator' },
-      // Senza acceleratore, e non è una dimenticanza: in questa barra ci vanno
-      // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
-      // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
-      { label: 'Schermo intero', click: schermoIntero },
+      // Il tasto abituale di ogni sistema (F11, su Mac Control+Cmd+F): lo ascolta src/main/shortcuts.js ovunque.
+      { label: 'Schermo intero', accelerator: globalThis.SN_TASTI.etichettaSchermoIntero(MAC ? 'darwin' : 'win32'), click: schermoIntero, ...SOLO_SCRITTA },
       { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
     ],
   };

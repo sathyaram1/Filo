@@ -39,6 +39,7 @@
       [T.etichettaIndietro(), 'Torna alla pagina precedente'],
       [T.etichettaAvanti(), 'Vai alla pagina successiva'],
       [T.etichettaBarra(), 'Apri e chiudi la barra laterale'],
+      [T.etichettaSchermoIntero(), 'Metti e togli lo schermo intero'],
     ];
     for (const [k, v] of righe) {
       const li = document.createElement('li');

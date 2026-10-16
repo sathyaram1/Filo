@@ -94,6 +94,13 @@
   // Anche i nomi italiani e i simboli del Mac: un modificatore che non si
   // riconosce sparirebbe dalla forma e la scorciatoia scatterebbe senza (#545.1).
   const CTRL = /^(ctrl|control|controllo|cmd|command|comando|meta|\u2318|\u2303)$/;
+  // Scritti INSIEME sono due tasti, Control e Cmd del Mac: Ctrl+Cmd+F non è Cmd+F.
+  const CONTROL = /^(ctrl|control|controllo|\u2303)$/;
+  const COMANDO = /^(cmd|command|comando|meta|\u2318)$/;
+  function conControlECmd(modificatori) {
+    const m = modificatori.map((x) => String(x).toLowerCase());
+    return m.some((x) => CONTROL.test(x)) && m.some((x) => COMANDO.test(x));
+  }
   const ALT = /^(alt|option|opt|opzione|\u2325)$/;
   const SHIFT = /^(shift|maiusc|maiuscolo|maiuscole|\u21e7)$/;
 
@@ -141,7 +148,8 @@
 
     // Tutto il resto passa da Ctrl, e su Mac Ctrl si preme Cmd.
     const out = [];
-    if (haCtrl) out.push('Cmd');
+    if (conControlECmd(modificatori)) out.push('Ctrl', 'Cmd');
+    else if (haCtrl) out.push('Cmd');
     if (haAlt) out.push('Alt');
     out.push(...altri, tastoFinale);
     return out.join('+');
@@ -296,6 +304,19 @@
   }
   function etichettaBarra(esplicita) { return etichetta(ACCEL_BARRA, esplicita); }
 
+  // ── Lo schermo intero ─────────────────────────────────────────────────────
+  // Il tasto abituale di ogni sistema, quindi un tasto DIVERSO e non una riscrittura: F11 su Windows e
+  // Linux, Control+Cmd+F su Mac (lì F11 è del sistema e Cmd+F è la ricerca). Valido anche come acceleratore.
+  function etichettaSchermoIntero(esplicita) { return suMac(esplicita) ? 'Ctrl+Cmd+F' : 'F11'; }
+  function comandoSchermoIntero(ev, esplicita) {
+    if (!ev || modificatore(ev, 'alt') || modificatore(ev, 'shift')) return false;
+    const [ctrl, meta] = [modificatore(ev, 'ctrl'), modificatore(ev, 'meta')];
+    const code = String(ev.code || '');
+    const key = String(ev.key || '');
+    if (suMac(esplicita)) return ctrl && meta && (code ? code === 'KeyF' : key.toLowerCase() === 'f');
+    return !ctrl && !meta && (code === 'F11' || key === 'F11');
+  }
+
   function etichettaIndietro(esplicita) { return etichetta('Alt+\u2190', esplicita); }
   function etichettaAvanti(esplicita) { return etichetta('Alt+\u2192', esplicita); }
 
@@ -348,6 +369,7 @@
     'space', 'enter', 'escape', 'tab', 'backspace', 'delete', 'insert',
     'home', 'end', 'pageup', 'pagedown', 'contextmenu', 'pause', 'printscreen',
   ]);
+  const TASTO_FUNZIONE = /^f([1-9]|1[0-9]|2[0-4])$/;
   function tastoCanonico(nome) {
     const n = String(nome || '').toLowerCase().replace(/\s+/g, ' ');
     return SINONIMI_TASTO[n] || n;
@@ -357,13 +379,16 @@
     // si spezzerebbe in ["Ctrl"] e sparirebbe dalla lista.
     const testo = String(accel || '').trim().replace(/\+\s*\+$/, '+Plus');
     const parti = pezzi(testo);
+    // Un tasto funzione da solo è una combinazione intera: F11 è lo schermo intero.
+    if (parti.length === 1 && TASTO_FUNZIONE.test(parti[0].toLowerCase())) return `|${parti[0].toLowerCase()}`;
     if (parti.length < 2) return '';
     const finale = parti[parti.length - 1].toLowerCase();
     const mods = parti.slice(0, -1).map((m) => m.toLowerCase());
     const c = mods.some((m) => CTRL.test(m)) ? 'c' : '';
-    const a = mods.some((m) => ALT.test(m)) ? 'a' : '';
-    const s = mods.some((m) => SHIFT.test(m)) ? 's' : '';
-    return `${c}${a}${s}|${tastoCanonico(finale)}`;
+    const m = conControlECmd(mods) ? 'm' : '';
+    const a = mods.some((x) => ALT.test(x)) ? 'a' : '';
+    const s = mods.some((x) => SHIFT.test(x)) ? 's' : '';
+    return `${c}${m}${a}${s}|${tastoCanonico(finale)}`;
   }
 
   // Scritti in forma canonica (Windows): `riservato` confronta per forma, e
@@ -406,6 +431,7 @@
       // Il salto di scheda: Alt+cifra qui, Cmd+cifra su Mac.
       ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
     ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
+    lista.push([etichettaSchermoIntero(esplicita), 'mette e toglie lo schermo intero']);
     if (!senzaFilo) {
       for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
     }
@@ -439,7 +465,7 @@
     const f = forma(accel);
     if (!f) return false;
     const t = f.slice(f.indexOf('|') + 1);
-    return [...t].length === 1 || TASTI_CON_NOME.has(t) || /^f([1-9]|1[0-9]|2[0-4])$/.test(t);
+    return [...t].length === 1 || TASTI_CON_NOME.has(t) || TASTO_FUNZIONE.test(t);
   }
 
   // Il modificatore scritto, o '' se non è un modificatore che si sa premere.
@@ -488,11 +514,13 @@
   function combacia(ev, accel) {
     const f = forma(accel);
     if (!ev || !f) return false;
-    const c = modificatore(ev, 'ctrl') || modificatore(ev, 'meta') ? 'c' : '';
+    const [ctrl, meta] = [modificatore(ev, 'ctrl'), modificatore(ev, 'meta')];
+    const c = ctrl || meta ? 'c' : '';
+    const m = ctrl && meta ? 'm' : '';
     const a = modificatore(ev, 'alt') ? 'a' : '';
     const s = modificatore(ev, 'shift') ? 's' : '';
     const [mods, tasto] = [f.slice(0, f.indexOf('|')), f.slice(f.indexOf('|') + 1)];
-    const premuti = simbolo(tasto) ? `${c}${a}${mods.includes('s') ? 's' : ''}` : `${c}${a}${s}`;
+    const premuti = simbolo(tasto) ? `${c}${m}${a}${mods.includes('s') ? 's' : ''}` : `${c}${m}${a}${s}`;
     return mods === premuti && tastiDaEvento(ev).has(tasto);
   }
 
@@ -517,7 +545,7 @@
     if (!f) return null;
     const mods = f.slice(0, f.indexOf('|'));
     return {
-      ctrlKey: mods.includes('c'), metaKey: false,
+      ctrlKey: mods.includes('c'), metaKey: mods.includes('m'),
       altKey: mods.includes('a'), shiftKey: mods.includes('s'),
       key: f.slice(f.indexOf('|') + 1), code: '',
     };
@@ -682,7 +710,7 @@
     if (code === 'Space' || key === ' ') return 'space';
     if ([...key].length === 1 && key > '\u00a0') return key.toLowerCase();
     const t = tastoCanonico(key);
-    return TASTI_CON_NOME.has(t) || /^f([1-9]|1[0-9]|2[0-4])$/.test(t) || /^[\u2190-\u2193]$/.test(t) ? t : '';
+    return TASTI_CON_NOME.has(t) || TASTO_FUNZIONE.test(t) || /^[\u2190-\u2193]$/.test(t) ? t : '';
   }
 
   const SOLO_MODIFICATORI = new Set(['Control', 'Alt', 'AltGraph', 'Shift', 'Meta', 'OS', 'Super', 'Hyper', 'Fn', 'CapsLock']);
@@ -722,8 +750,8 @@
     if (r) return { rifiuto: r };
     const f = forma(testo);
     const mods = pezzi(testo).slice(0, -1).map((m) => m.toLowerCase());
-    const cmd = mods.some((m) => /^(cmd|command|comando|meta|\u2318)$/.test(m));
-    const control = mods.some((m) => /^(ctrl|control|controllo|\u2303)$/.test(m));
+    const cmd = mods.some((m) => COMANDO.test(m));
+    const control = mods.some((m) => CONTROL.test(m));
     if (suMac(esplicita) && control && !cmd && f.slice(0, f.indexOf('|')).includes('a')) return { accel: daForma(f.replace(/^c/, '')) };
     return { accel: daForma(f) };
   }
@@ -813,7 +841,7 @@
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
-    comandoBarra, etichettaBarra, ACCEL_BARRA,
+    comandoBarra, etichettaBarra, ACCEL_BARRA, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,

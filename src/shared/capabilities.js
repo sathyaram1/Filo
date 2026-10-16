@@ -92,7 +92,7 @@
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
       desc: 'Nasconde la barra delle schede così la pagina occupa tutta la finestra.',
-      invoke: 'Barra laterale → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc; a schermo intero la barra laterale si apre come sempre dal bordo sinistro.',
+      invoke: 'F11 (su Mac Ctrl+Cmd+F), che premuto di nuovo lo toglie, da qualunque pagina e anche mentre scrivi; barra laterale → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc; a schermo intero la barra laterale si apre come sempre dal bordo sinistro.',
       doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina.',
     },
     {
@@ -678,7 +678,7 @@
       id: 'filo-shortcuts', title: 'Scorciatoie da tastiera di Filo', category: 'settings',
       desc: 'I tasti di Spiega, Traduci, Salva per dopo e Aiuto si cambiano. Una combinazione che Filo usa già (le schede, lo zoom, copia e incolla, il microfono delle chat, le altre tre azioni, un modulo dell\'Editor in qualunque documento) o che si prende il sistema viene rifiutata col motivo, senza salvarla. Il tasto vecchio torna alla pagina, e quelli nuovi valgono subito, su ogni pagina, anche dopo aver chiuso e riaperto Filo. Il menu del tasto destro e l\'elenco di Opzioni → Altro mostrano i tasti scelti; su Mac, coi tasti del Mac.',
       invoke: 'Preferenze → Impostazioni avanzate → «Scorciatoie da tastiera»: clicca la combinazione e premi i tasti nuovi (Esc lascia quella di prima); ↺ su una riga o «Ripristina i tasti di serie» le rimettono com\'erano. Oppure chiedilo a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl), «rimetti le scorciatoie di serie».',
-      doesNot: 'Le scorciatoie delle schede e della finestra (nuova scheda, chiudi, ricarica, indirizzo, salto di scheda, indietro e avanti) restano quelle fisse.',
+      doesNot: 'Le scorciatoie delle schede e della finestra (nuova scheda, chiudi, ricarica, indirizzo, salto di scheda, indietro e avanti, schermo intero) restano quelle fisse.',
     },
     {
       id: 'theme', title: 'Tema chiaro / scuro', category: 'settings',

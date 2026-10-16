@@ -1163,6 +1163,9 @@
   // fabbricato da codice non passerebbe da `soloGestiVeri`.
   const apritori = new WeakMap();
 
+  // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
+  function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
+
   function makeRowButton(sub, opts = {}) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1176,7 +1179,7 @@
     if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
     // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
-    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, sub.label);
+    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
     setIconContent(b, sub.icon || sub.label);
     // Il bottone contiene solo un disegno: senza nome accessibile è un bottone
     // muto per chi legge lo schermo (e invisibile a chi lo cerca per etichetta).
@@ -1248,7 +1251,7 @@
     setIconContent(b, it.icon || it.label || '');
     if (it.id) b.dataset.snIconId = it.id;
     // Vedi makeRowButton: nome accessibile su un bottone di sola icona.
-    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, it.label); }
+    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (it.disabled) return;
