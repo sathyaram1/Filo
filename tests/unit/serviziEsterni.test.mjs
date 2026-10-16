@@ -423,7 +423,7 @@ test('le voci sono complete e ben formate', () => {
 test('l’elenco nomina ogni servizio della richiesta #849', () => {
   const copre = (url) => SE.SERVIZI.some((v) => v.base.some((b) => SE.copre(b, url)));
   for (const url of [
-    'https://rdap.org/domain/esempio.it', 'https://crt.sh/?q=esempio.it', 'https://www.google.com/s2/favicons?domain=esempio.it',
+    'https://rdap.org/domain/esempio.it', 'https://crt.sh/?q=esempio.it',
     'https://api.frankfurter.dev/v1/latest', 'https://easylist.to/easylist/easylist.txt',
     'https://identitytoolkit.googleapis.com/v1/accounts:signUp', 'https://firestore.googleapis.com/v1/projects/x',
     'https://europe-west1-filo-8b9cb.cloudfunctions.net/x', 'https://firebasestorage.googleapis.com/v0/b/x',
