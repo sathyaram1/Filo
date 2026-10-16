@@ -760,7 +760,7 @@ test('--solo fa girare solo i file dati, con la guardia della corsa intera: un f
     assert.match(fermo.stdout, /ROSSO: .*fermo\.test\.mjs non è andato avanti/);
     assert.equal(fermo.status, 1);
 
-    const vuoto = lancia();
+    const vuoto = lancia([]);
     assert.equal(vuoto.status, 1, 'zero file non è un verde');
     assert.match(vuoto.stderr, /--solo senza file/);
   } finally {
