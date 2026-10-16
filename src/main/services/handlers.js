@@ -5892,6 +5892,7 @@ const handlerCtx = {
   executeFiloAction,
   controllaUscita,
   apriDaFilo,
+  sitoDaConfermare,
   SCHEMI_USCITA,
   ricordaLettoDallAiuto,
   ricordaLettoInChat,
