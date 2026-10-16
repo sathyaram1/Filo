@@ -1000,7 +1000,8 @@ function daRiaprire() {
 
 async function transazione(ctx, S, piano, dati) {
   const { tabella, bytes, blocchiTabella, L2 } = piano;
-  for (let x = 0; x < blocchiTabella.length; x++) dati.set(blocchiTabella[x], bytes.subarray(x * CARICO, (x + 1) * CARICO));
+  const t = Math.ceil(bytes.length / CARICO);
+  for (let x = 0; x < blocchiTabella.length; x++) dati.set(blocchiTabella[x], bytes.subarray((x % t) * CARICO, (x % t + 1) * CARICO));
   const prima = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const Lprima = S.L;
   const gruppi = [...new Set([...dati.keys()].filter((j) => j >= GRUPPO).map((j) => Math.floor(j / GRUPPO)))].sort((a, b) => a - b);
