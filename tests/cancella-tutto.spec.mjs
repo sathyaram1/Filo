@@ -232,6 +232,11 @@ test('Annulla ed Esc non cambiano niente, e senza identità la scelta non compar
   await page.locator('#sec-wipe-word').fill('conferma');
   await page.keyboard.press('Escape');
   await expect(page.locator('#sec-wipe-box')).toBeHidden();
+  // Un doppio clic sul tasto la apre e la lascia aperta, invece di richiuderla al secondo clic.
+  await page.locator('#sec-wipe-btn').dblclick();
+  await expect(page.locator('#sec-wipe-box')).toBeVisible();
+  await expect(page.locator('#sec-wipe-word')).toHaveValue('');
+  await page.locator('#sec-wipe-cancel').click();
   await new Promise((r) => setTimeout(r, 800));
   expect(app.process().exitCode).toBe(null);
   expect(existsSync(join(userData, 'cancella-tutto.json'))).toBe(false);
