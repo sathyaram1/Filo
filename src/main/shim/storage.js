@@ -231,7 +231,8 @@ function testoChiaviInChiaro() {
 }
 
 function chiaviInChiaro() {
-  if (inChiaroInCorso || STATE.data[CHIAVE_IN_CHIARO] || !app.isReady()) return;
+  // Prima di `ready` il portachiavi risulta assente anche dove c'è.
+  if (inChiaroInCorso || STATE.data[CHIAVE_IN_CHIARO] || (typeof app.isReady === 'function' && !app.isReady())) return;
   inChiaroInCorso = true;
   // Fuori dal giro di serializzazione in corso, e sul disco anche se la scrittura era partita da un incognito.
   setImmediate(() => avvisa(testoChiaviInChiaro(), 'chiavi-in-chiaro', 0, () => {
