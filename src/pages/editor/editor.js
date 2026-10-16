@@ -4616,11 +4616,12 @@
     }
     // scorciatoie personalizzate dei moduli
     for (const m of doc.modules) {
-      if (AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut && matchShortcut(e, m.data.shortcut)) {
+      const c = AZIONE_SCORCIATOIA[m.type] && candidatoDi(m.data);
+      if (c && colpisce(c, e)) {
         // Difesa per le scorciatoie senza modificatore già salvate (prima della
         // validazione): mentre si scrive nel documento o in un campo di testo NON
         // devono rubare il tasto — lascia digitare normalmente la lettera.
-        if (!shortcutHasRealModifier(m.data.shortcut) && isEditableTarget(e.target)) continue;
+        if (!c.tasto && !shortcutHasRealModifier(c.nome) && isEditableTarget(e.target)) continue;
         e.preventDefault(); triggerModuleShortcut(m); return;
       }
     }
