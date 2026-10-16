@@ -523,8 +523,8 @@ export function fermoDopoLaProva(prova) {
 }
 
 /**
- * La parte dell'app che arriva a pratica chiusa dalla parte del server, mentre del server c'è ancora un ramo fuori da
- * main: lasciata chiusa, la pratica rifiuterebbe quel ramo. Si riapre prima di chiedere la fusione, che così la lascia
+ * La parte dell'app (o un suo seguito) che arriva a pratica chiusa, mentre del server c'è ancora un ramo fuori da
+ * main: lasciata chiusa, la pratica rifiuterebbe l'una o l'altro (regola: riaperturaConAltraInArrivo). Si riapre prima di chiedere la fusione, che così la lascia
  * aperta per lui (#938). `of`: owner-feedback.mjs. → la riga da stampare, '' se non c'era niente da fare.
  */
 export async function riapriPerIlServer({ id, ramo, pendingParts = [] }, { of, ora = Date.now() } = {}) {
