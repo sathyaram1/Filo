@@ -2093,6 +2093,8 @@ async function eseguiAzioneFilo(action, {
     if (!voce) return { executed: false, kept: true, output: { aperta: false, trovata: false } };
     action.url = voce.url;
     action._titolo = voce.title || '';
+    // I modelli piccoli a volte mandano "true" come stringa.
+    action.tieni = action.tieni === true || /^(true|1|si|sì|yes)$/i.test(String(action.tieni ?? ''));
   }
 
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
@@ -2826,7 +2828,7 @@ async function eseguiAzioneFilo(action, {
       }
       case 'APRI_SALVATA': {
         // La porta delle uscite l'ha già guardata prima del gate, con l'indirizzo dell'elenco.
-        const r = await apriPaginaSalvata(action.id, { win: winOf(sender), tieni: action.tieni === true, porta: false });
+        const r = await apriPaginaSalvata(action.id, { sender, tieni: action.tieni === true, porta: false });
         if (!r.ok) {
           return { executed: false, kept: true, output: { aperta: false, trovata: r.trovata !== false, ...(r.blocked ? { blocked: r.blocked, host: r.host, reason: r.reason, url: r.url } : {}) } };
         }
@@ -3661,14 +3663,15 @@ async function salvatePerChat(query) {
 // La pagina salvata che la chat apre (lo strumento o il bottone sotto la risposta) fa quello del clic sulla lista:
 // si apre davanti con l'indirizzo che ha in elenco e, salvo `tieni`, esce dalla lista. `porta`: il bottone passa
 // dalla porta delle uscite come i collegamenti delle pagine di Filo; lo strumento ci è già passato prima del gate.
-async function apriPaginaSalvata(id, { win = null, wc = null, tieni = false, porta = true, confermato = false } = {}) {
+async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = true, confermato = false } = {}) {
   const voce = (await SavedPages.list()).find((p) => p && p.id === String(id || '').trim());
   if (!voce || !/^https?:\/\//i.test(String(voce.url || ''))) return { ok: false, trovata: false };
+  const win = winOf(sender);
   const tm = win && win._filoTabs;
   if (!tm || typeof tm.openTab !== 'function') return { ok: false, trovata: true, error: 'no_window' };
   let tabId = null;
   if (porta) {
-    const r = await apriDaFilo(voce.url, { wc, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
+    const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
     if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
   } else {
     tabId = tm.openTab(voce.url, { activate: true });

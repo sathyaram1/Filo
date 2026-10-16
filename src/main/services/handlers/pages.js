@@ -78,9 +78,7 @@ module.exports = function register(on, ctx) {
 
   // Il bottone di una pagina salvata in chat (#845): l'indirizzo è quello in elenco, non uno che manda la pagina.
   soloFilo(MSG.APRI_PAGINA_SALVATA, async (msg, sender) => {
-    const r = await ctx.apriPaginaSalvata(msg.id, {
-      win: sender?.win, wc: sender?.wc, tieni: msg.tieni === true, confermato: msg.confermato === true,
-    });
+    const r = await ctx.apriPaginaSalvata(msg.id, { sender, tieni: msg.tieni === true, confermato: msg.confermato === true });
     return r.ok ? { ok: true, tolta: r.tolta } : { ok: false, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
   });
 
