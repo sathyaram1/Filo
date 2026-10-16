@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.243', date: '2026-10-16',
+      features: [],
+      fixes: [
+        'L\'archivio che esporti da Sicurezza non porta più le tue chiavi API, nemmeno quelle copiate o scritte in chat, a meno che tu non spunti «Includi le chiavi». Importarlo non tocca le chiavi che hai già. Gli archivi fatti prima le contengono, quindi trattali come una password. Su un computer senza portachiavi di sistema, Filo ti dice una volta che salva le chiavi in chiaro.',
+      ],
+    },
+    {
       version: '0.2.242', date: '2026-10-16',
       features: [
         'Puoi togliere dal computer, in un colpo, tutto quello che Filo sa di te. In Sicurezza, sotto Esporta e Importa, c\'è «Cancella tutti i dati di Filo». Ti propone di esportare prima, ti dice cosa sparisce e parte solo quando scrivi «conferma». Poi Filo si riapre come appena installato. I tuoi crediti restano, a meno che tu non scelga di cancellare anche la loro identità. Se lo chiedi in chat, Filo ti porta a quel tasto.',
@@ -20,7 +27,6 @@
         'Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto adesso le scegli tu. In Preferenze, nelle impostazioni avanzate, clicchi la combinazione e premi i tasti nuovi, oppure lo chiedi a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl). Se quei tasti li usa già Filo o il sistema, Filo te lo dice e tiene quelli di prima. Il menu del tasto destro e l\'elenco in Opzioni → Altro mostrano i tasti che hai scelto.',
       ],
       fixes: [
-        'L\'archivio che esporti da Sicurezza non porta più le tue chiavi API, nemmeno quelle copiate o scritte in chat, a meno che tu non spunti «Includi le chiavi». Importarlo non tocca le chiavi che hai già. Gli archivi fatti prima le contengono, quindi trattali come una password. Su un computer senza portachiavi di sistema, Filo ti dice una volta che salva le chiavi in chiaro.',
         'Su alcuni siti Esc non chiudeva il menu del tasto destro né gli altri riquadri di Filo, e a schermo intero ti faceva uscire lasciandoli aperti sopra la pagina. Adesso il primo Esc chiude il riquadro e lo schermo intero resta. Con l\'Esc dopo esci.',
         'Nell\'Editor Ctrl+Shift+T, W, L e R non si possono più dare a un modulo: Filo ti dice che aprono una scheda, la chiudono, portano alla home o ricaricano la pagina. Prima si salvavano senza avvisi e alla pressione facevano quello invece del modulo.',
       ],
