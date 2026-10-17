@@ -634,9 +634,11 @@ scrive: con i compiti quella lettura si toglie.
     diff dal server senza clonare;
   - il pacemaker la accende con una voce sua (`routineIdServer` in config,
     segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
-    se c'è un lavoro server che nascerebbe pulito. Conta nel tetto
-    dell'account `accountServer` (assente = B), si ferma con `accountServerOff`
-    o con l'account escluso; il tetto delle sessioni è comune.
+    se c'è un lavoro server che nascerebbe pulito. Decide prima di A/B, che
+    altrimenti riempirebbero ogni posto anche con l'esplorazione. Conta nel
+    tetto dell'account della sua parola d'ordine (senza, `accountServer`;
+    assente = B), si ferma con `accountServerOff`, con l'account escluso o in
+    riserva dei crediti; il tetto delle sessioni è comune.
 - **Su `main` di filo-security** scrive solo il cancello di fusione (regola come
   per Filo):
   - una suite su GitHub Actions prova i rami;
