@@ -302,6 +302,8 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
 4. **Discuterne.** Il pulsante copia una riga sola («Discutiamo la domanda
    D-123») da incollare in una sessione locale. La sessione legge la domanda con
    `domanda.mjs mostra` e risponde con `domanda.mjs rispondi`.
+5. **Letto**, su un resoconto senza opzioni (§ 3.1): la domanda si chiude,
+   senza agenti.
 
 ### 3.5 Il compito «Gestisci la risposta»
 
