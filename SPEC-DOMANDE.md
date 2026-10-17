@@ -647,8 +647,9 @@ Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
 Invariante, con sentinella: al massimo un compito aperto per feedback.
 
 **Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
-(§ 3.5), l'unione (§ 1.3), l'esplorazione a coda vuota, e i compiti creati a
-mano dall'owner o da una sessione locale.
+(§ 3.5), l'unione (§ 1.3), l'esplorazione a coda vuota, gli esperimenti del
+monitoraggio (§ 4.6), che rifanno un lavoro già fatto ma non sono una fase del
+suo feedback, e i compiti creati a mano dall'owner o da una sessione locale.
 
 **Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
 server), l'invio di una mail approvata (lo fa il server, § 5.1), il blocco di
