@@ -43,7 +43,6 @@ function senzaFeedback() {
   };
   return {
     risposta: n('Gestisci la risposta'),
-    invio: n('Invio'),
     monitoraggio: n('Monitoraggio'),
     domande: n('Revisione delle domande'),
     unione: n('Unione'),
