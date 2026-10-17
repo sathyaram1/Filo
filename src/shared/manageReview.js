@@ -621,6 +621,7 @@
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
+    attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',
     guasto: 'fermo per un guasto',
     judges: 'verdetto dei giudici',
@@ -664,7 +665,17 @@
     // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
     // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
     if (tab === 'queue' && isLocalOnly(fb)) return 'local';
+    // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
+    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
+  }
+
+  // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
+  const STATI_CHE_ASPETTANO = ['todo', 'revision_capability', 'revision_security'];
+  // `opts.trovaAtteso(id)` → il documento dell'aspettato, se la pagina lo conosce. Senza il modulo nessuna attesa.
+  function aspettaAncora(fb, opts) {
+    const A = global.SN_FB_ATTESE;
+    return !!A && A.aspettaAncora(fb, opts && opts.trovaAtteso);
   }
 
   // Gli stati in cui una pratica aspetta l'owner: le sessioni locali non la spostano da lì (#908).
@@ -889,7 +900,7 @@
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
       return acts;
     }
-    if (tab === 'queue' || tab === 'local') {
+    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
@@ -1036,8 +1047,8 @@
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
     // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
-    // stessa coda, lavorata da un'altra parte.
-    if (tab === 'queue' || tab === 'local') {
+    // stessa coda, lavorata da un'altra parte; chi aspetta (#903) la stessa coda, più tardi.
+    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in
       // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
@@ -1098,12 +1109,12 @@
   // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 };
     const inbox = [];
     for (const f of list) {
       const tab = manageTabFor(f, opts);
       if (tab === 'inbox') inbox.push(f);
-      else if (tab === 'queue' || tab === 'local' || tab === 'resolved') counts[tab]++;
+      else if (tab === 'queue' || tab === 'local' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
     counts.inbox = filtraLivelli(inbox, opts && opts.livelli, opts).length;
     counts.archived = listArchiveTab(list, opts).length;
@@ -1855,7 +1866,7 @@
   // cosa che mostra: un pulsante che non apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110).
   const SEZIONI = Object.freeze([
     { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
-    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'resolved', 'archived', 'fbstats', 'stats'] },
+    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
     { id: 'routine', nome: 'Routine', schede: ['automation', 'log'] },
   ]);
 

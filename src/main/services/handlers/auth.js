@@ -366,6 +366,35 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // «Aspetta #N» (#903): la pagina manda i numeri come li ha scritti l'owner; li risolve e li controlla il main, che
+  // legge i documenti col token (la pagina ne vede una finestra). Vuoto = togliere. Regole: SN_FB_ATTESE.valida.
+  // `tieni`: id delle attese già scritte che la pagina non sa rinumerare (aspettato cancellato o non letto): restano come sono.
+  async function prepareAttese(id, valore, idToken, tieni) {
+    const A = globalThis.SN_FB_ATTESE;
+    const FB = globalThis.SN_FEEDBACK;
+    const letti = A.leggiNumeri(valore === null || valore === false ? '' : valore);
+    if (!letti.ok) return letti;
+    if (tieni !== undefined && (!Array.isArray(tieni) || tieni.length > A.MAX || tieni.some((x) => typeof x !== 'string'))) {
+      return { ok: false, motivo: 'elenco delle attese da tenere non valido' };
+    }
+    if (!letti.numeri.length && !(tieni || []).length) return { ok: true, attese: [] };
+    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
+    if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
+    return A.valida({
+      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri, gia: A.atteseDi(proprio), tieni: tieni || [],
+      risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
+      leggiAttese: async (ids) => {
+        const out = new Map();
+        for (let i = 0; i < ids.length; i += 100) {
+          // eslint-disable-next-line no-await-in-loop
+          const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
+          for (const r of righe) out.set(r._id, A.atteseDi(r));
+        }
+        return out;
+      },
+    });
+  }
+
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
   // Firestore rules; questo è il gate applicativo + il trasporto autenticato.
@@ -402,6 +431,12 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
+      let waitsFor;
+      if (msg.waitsFor !== undefined) {
+        const r = await prepareAttese(id, msg.waitsFor, idToken, msg.waitsTieni);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      }
       // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
       // partenza si chiede al documento, non alla copia della pagina.
       const FB = globalThis.SN_FEEDBACK;
@@ -412,7 +447,7 @@ module.exports = function register(on, ctx) {
       }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -429,6 +464,7 @@ module.exports = function register(on, ctx) {
       // dritti su quello, e l'età non conta più.
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
+      if (waitsFor) return { ok: true, waitsFor };
       // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
       return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
     } catch (e) {

@@ -169,6 +169,13 @@
   const mgManage     = document.getElementById('mgManage');
   const mgFiduciaBtn = document.getElementById('mgFiduciaBtn');
   const mgLocalBtn   = document.getElementById('mgLocalBtn');
+  const mgAtteseToggle = document.getElementById('mgAtteseToggle');
+  const mgAttese       = document.getElementById('mgAttese');
+  const mgAtteseLista  = document.getElementById('mgAtteseLista');
+  const mgAtteseScrivi = document.getElementById('mgAtteseScrivi');
+  const mgAtteseInput  = document.getElementById('mgAtteseInput');
+  const mgAtteseAggiungi = document.getElementById('mgAtteseAggiungi');
+  const mgAtteseTogliTutte = document.getElementById('mgAtteseTogliTutte');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
@@ -205,19 +212,24 @@
   let testDataInjected = false; // uno spec ha iniettato la lista: il caricamento vero non la tocca più
   let searchMode    = false;      // true = la lista mostra i risultati di ricerca
   let searchSeq     = 0;          // guardia anti-race tra ricerche concorrenti
+  // #903: gli aspettati che l'elenco non ha caricato, letti a parte una volta (id → riga, o { missing: true }).
+  const attesiFuori = new Map();
+  const attesiChiesti = new Set();
+  let atteseApertePer = '';     // la pratica su cui l'owner ha aperto la casella delle attese
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox:    'Nessun feedback ricevuto.',
     queue:    'Nessun feedback in coda.',
     local:    'Nessun lavoro server.',
+    waiting:  'Nessun feedback aspetta un altro.',
     resolved: 'Nessun feedback risolto.',
     archived: 'Nessun feedback archiviato.',
   };
-  const LIST_TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
+  const LIST_TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
   // Come si chiama la lista quando le sezioni non ci sono: nessun nome di
   // sezione, perché nessuna sezione è stata scelta.
   const SENZA_SEZIONI_LABEL = 'Segnalazioni';
@@ -226,6 +238,7 @@
 
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
+  const ATT = window.SN_FB_ATTESE;
   const TH  = window.SN_FEEDBACK_THREAD;
   const SRCH = window.SN_MANAGE_SEARCH;
   const DOMANDE = window.SN_MG_DOMANDE;
@@ -1611,7 +1624,7 @@
     mostraNelFiltro(fb);
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
-    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
+    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, opzSezioni()));
     // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
     else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
@@ -2149,7 +2162,7 @@
   // dall'owner. Più pallini pieni = priorità più alta → le routine di Claude la
   // affrontano prima. Non mostrata su Risolti/Archiviati (lì non serve agire).
   function priorityHasDots() {
-    return currentTab === 'queue' || currentTab === 'local' || currentTab === 'inbox';
+    return currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting' || currentTab === 'inbox';
   }
   function priorityDotsHtml(fb) {
     if (!priorityHasDots()) return '';
@@ -2316,6 +2329,17 @@
         azione: () => segnoDalMenu(fb, true),
       });
     }
+    if (isAdmin && ATT) {
+      if (!MR.praticaChiusa(fb, opzSezioni())) {
+        voci.push({ testo: '⏳ Aspetta un altro feedback…', titolo: 'Nessuna routine lo prende finché quello non è fuso.', azione: () => apriCasellaAttese(fb._id) });
+      }
+      if (ATT.atteseDi(fb).length) {
+        voci.push({
+          testo: '⏳ Non aspettare più', titolo: testoStatiAttese(ATT.statiDelleAttese(fb, trovaAtteso)),
+          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, () => []); },
+        });
+      }
+    }
     const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
     if (lavoroLocale) {
       voci.push({ testo: '💻 Approva come lavoro server', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
@@ -2460,7 +2484,7 @@
     updateLivelliFiltro();
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni, livelli: livelliScelti })
+      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly, livelli: livelliScelti }))
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
@@ -2568,7 +2592,7 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni, livelli: livelliScelti });
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni({ livelli: livelliScelti }));
       if (currentTab === 'inbox' && livelliScelti.length) {
         mgListEmpty.textContent = `Nessun feedback fermo a ${livelliScelti.slice().sort().map((l) => l.toUpperCase()).join(' o ')}.`;
       }
@@ -2593,6 +2617,7 @@
     // resterebbe lì anche dopo che la sua scheda è arrivata, e si leggerebbe
     // due volte.
     renderFusioniOrfane();
+    caricaAttesiFuori();
   }
 
   // Questa segnalazione ha una fusione ferma che aspetta l'owner?
@@ -2674,7 +2699,7 @@
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local')) ? MR.workProgress(fb) : null;
+      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
@@ -2717,6 +2742,7 @@
         ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${localBadgeHtml(fb)}
+        ${attesaBadgeHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
@@ -2818,10 +2844,14 @@
     // Nessun tempo promesso: il momento del rientro dipende da quando il ramo si
     // è fermato, e una riga che dice "fra un'ora" sarebbe di nuovo una cosa non
     // vera.
+    // Chi aspetta altri feedback non lo prende nessuno finché non sono fusi: né un verificatore né il rientro in coda.
+    const aspetta = !!(ATT && fb && ATT.aspettaAncora(fb, trovaAtteso));
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
       : `<span class="mg-work-idle">${
-          progress.current.key === 'impl'
+          aspetta
+            ? 'Nessuna istanza al lavoro: riparte quando quelli che aspetta sono fusi'
+            : progress.current.key === 'impl'
             ? 'Nessuna istanza al lavoro: rientra in coda da solo'
             : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;
@@ -3594,6 +3624,7 @@
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
     reflectLocal(fb);
+    reflectAttese(fb);
     reflectFiducia(fb);
   }
 
@@ -3703,7 +3734,7 @@
       fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
       if (selectedId === id) reflectLocal(fb);
       renderList();
-      const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
+      const dove = MR.manageTabFor(fb, opzSezioni());
       const fatto = !valore
         ? (check.chiusa ? `Da ora${chi} non è più un lavoro server${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} è un lavoro come gli altri.`)
         : check.chiusa ? `Segnata${chi} come lavoro server${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
@@ -3722,6 +3753,207 @@
     });
   }
 
+  // ── «Aspetta #N» (#903) ───────────────────────────────────────────────────
+  // I feedback da fondere prima: finché uno non lo è nessuna routine lo prende, e qui sta fra quelli che aspettano.
+  // Numeri, esistenza e giri li controlla il main (MSG.FEEDBACK_UPDATE); la regola sta in SN_FB_ATTESE.
+  function trovaAtteso(id) {
+    return allFeedbacks.find((f) => f._id === id) || attesiFuori.get(id);
+  }
+  function opzSezioni(extra) {
+    return Object.assign({ releasedVersion, fusioni, trovaAtteso }, extra);
+  }
+  // Gli aspettati più vecchi della finestra caricata: una lettura, poi la lista si ridisegna con il loro stato.
+  function caricaAttesiFuori() {
+    if (!ATT || !isAdmin || !dataLoaded) return;
+    const mancano = [];
+    for (const fb of allFeedbacks) {
+      for (const w of ATT.atteseDi(fb)) {
+        if (attesiChiesti.has(w.id) || allFeedbacks.some((f) => f._id === w.id)) continue;
+        attesiChiesti.add(w.id);
+        mancano.push(w.id);
+      }
+    }
+    if (!mancano.length) return;
+    (async () => {
+      let righe = await FB.getMany(mancano, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 });
+      if (righe.length) {
+        const r = await sendToMain({ type: 'feedback_decrypt_fields', list: righe });
+        if (r && r.ok && Array.isArray(r.list)) righe = r.list;
+      }
+      for (const r of righe) attesiFuori.set(r._id, r);
+      for (const id of mancano) if (!attesiFuori.has(id)) attesiFuori.set(id, { _id: id, missing: true });
+      renderList();
+      const aperto = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (aperto) reflectAttese(aperto);
+    })().catch(() => { /* restano «stato non letto»: chi li aspetta resta fra quelli che aspettano, come per la coda */ });
+  }
+
+  function numeroDi(doc) {
+    return doc ? FB.formatNum(doc.seq, doc.subSeq) : '';
+  }
+  function statoAttesaTesto(w) {
+    if (w.stato !== ATT.STATO.APERTO) return ATT.ETICHETTA[w.stato] || w.stato;
+    const doc = trovaAtteso(w.id);
+    const info = doc && window.SN_FB_STATUS && window.SN_FB_STATUS.STATUSES[MR.normalizeStatus(doc).status];
+    if (!info) return ATT.ETICHETTA.aperto;
+    return info.tab === 'inbox' ? 'nei Ricevuti' : info.label.toLowerCase();
+  }
+  function testoStatiAttese(stati) {
+    return `Aspetta ${stati.map((w) => `${ATT.etichetta(w)} (${statoAttesaTesto(w)})`).join(', ')}. `
+      + 'Finché non sono tutti fusi nessuna routine lo prende.';
+  }
+  function attesaBadgeHtml(fb) {
+    if (!ATT) return '';
+    const stati = ATT.statiDelleAttese(fb, trovaAtteso);
+    const aperte = stati.filter((w) => w.stato !== ATT.STATO.FUSO);
+    if (!aperte.length) return '';
+    return `<span class="mg-attesa-badge" title="${esc(testoStatiAttese(stati))}">⏳ ${esc(aperte.map(ATT.etichetta).join(' '))}</span>`;
+  }
+
+  function reflectAttese(fb) {
+    if (!mgAtteseToggle || !mgAttese || !ATT) return;
+    const stati = ATT.statiDelleAttese(fb, trovaAtteso);
+    const chiusa = MR.praticaChiusa(fb, opzSezioni());
+    mgAtteseToggle.hidden = !isAdmin || (chiusa && !stati.length);
+    mgAtteseToggle.disabled = false;
+    mgAtteseToggle.textContent = !stati.length ? '⏳ Aspetta'
+      : stati.length <= 3 ? `⏳ Aspetta ${ATT.testoAttese(stati)}` : `⏳ Aspetta ${stati.length} feedback`;
+    mgAtteseToggle.classList.toggle('mg-attese-piena', stati.some((w) => w.stato !== ATT.STATO.FUSO));
+    mgAtteseToggle.title = stati.length ? testoStatiAttese(stati)
+      : 'Fallo aspettare un altro feedback: nessuna routine lo prende finché quello non è fuso.';
+    const mostra = isAdmin && (stati.length > 0 || atteseApertePer === fb._id);
+    mgAttese.hidden = !mostra;
+    mgAtteseToggle.setAttribute('aria-expanded', mostra ? 'true' : 'false');
+    if (mgAtteseScrivi) mgAtteseScrivi.hidden = chiusa;
+    if (mgAtteseTogliTutte) mgAtteseTogliTutte.hidden = stati.length < 2;
+    mgAtteseLista.innerHTML = stati.map((w) => {
+      const nota = statoAttesaTesto(w);
+      const apribile = allFeedbacks.some((f) => f._id === w.id);
+      return `<li class="mg-attesa mg-attesa--${esc(w.stato)}" data-id="${esc(w.id)}">`
+        + `<button type="button" class="mg-attesa-num" data-azione="apri" ${apribile ? `title="Apri ${esc(ATT.etichetta(w))}"` : 'disabled'}>${esc(ATT.etichetta(w))}</button>`
+        + `<span class="mg-attesa-stato">${esc(nota)}</span>`
+        + (chiusa ? '' : `<button type="button" class="mg-attesa-togli" data-azione="togli" title="Non aspettare più ${esc(ATT.etichetta(w))}" aria-label="Non aspettare più ${esc(ATT.etichetta(w))}">×</button>`)
+        + '</li>';
+    }).join('');
+  }
+
+  // Le attese da riscrivere, tranne `salvo`: per numero quelle di un aspettato che la pagina vede, per id le altre
+  // (cancellato, non letto, senza numero), che il main tiene come sono invece di rifiutarle cercandone il numero.
+  function atteseDaTenere(fb, salvo = '') {
+    return ATT.atteseDi(fb).filter((w) => w.id !== salvo).map((w) => {
+      const doc = trovaAtteso(w.id);
+      const n = doc && !doc.missing ? (w.num || numeroDi(doc)) : '';
+      return n || { id: w.id };
+    });
+  }
+
+  async function scriviAttese(id, voci) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb || !ATT) return false;
+    const num = numeroDi(fb);
+    const chi = num ? `#${num}` : 'Il feedback';
+    const tieni = voci.filter((v) => v && typeof v === 'object').map((v) => v.id);
+    const lette = ATT.leggiNumeri(voci.filter((v) => typeof v === 'string'));
+    if (!lette.ok) { setManageMsg(`Attese non scritte: ${lette.motivo}.`, 'err'); return false; }
+    const vuoto = !lette.numeri.length && !tieni.length;
+    for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = true;
+    setManageMsg(vuoto ? 'Tolgo le attese…' : 'Scrivo le attese…', '');
+    try {
+      const r = await sendToMain(Object.assign({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') }, tieni.length ? { waitsTieni: tieni } : {}));
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
+      // Si chiude col gesto che toglie l'ultima, non con la risposta: un'attesa tenuta per id resta da guardare.
+      if (vuoto && atteseApertePer === id) atteseApertePer = '';
+      else if (!vuoto) atteseApertePer = id;
+      renderList();
+      if (selectedId === id) reflectAttese(fb);
+      const dove = MR.manageTabFor(fb, opzSezioni());
+      setManageMsg(fb.waitsFor
+        ? `Da ora ${chi} aspetta ${ATT.testoAttese(fb.waitsFor)}${dove === 'waiting' ? ': nessuna routine lo prende finché non sono tutti fusi.' : '.'}`
+        : `${chi} non aspetta più niente.`, 'ok');
+      return true;
+    } catch (e) {
+      setManageMsg(`Attese non scritte: ${e.message || 'Errore'}`, 'err');
+      return false;
+    } finally {
+      for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = false;
+    }
+  }
+
+  // Una scrittura alla volta, e ciascuna calcola l'elenco solo quando tocca a lei: calcolato prima, un gesto fatto
+  // mentre la precedente è in volo riscriverebbe l'elenco vecchio e la cancellerebbe.
+  let codaAttese = Promise.resolve();
+  function accodaAttese(id, calcola) {
+    const giro = codaAttese.then(() => {
+      const fb = allFeedbacks.find((f) => f._id === id);
+      return fb ? scriviAttese(id, calcola(fb)) : false;
+    });
+    codaAttese = giro.catch(() => false);
+    return giro;
+  }
+
+  function apriCasellaAttese(id) {
+    if (selectedId !== id) openDetail(id);
+    atteseApertePer = id;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (fb) reflectAttese(fb);
+    if (mgAtteseInput && mgAttese && !mgAttese.hidden) mgAtteseInput.focus();
+  }
+  async function aggiungiAttese() {
+    const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+    if (!fb || !mgAtteseInput) return;
+    const nuovi = ATT.leggiNumeri(mgAtteseInput.value);
+    if (!nuovi.ok) { setManageMsg(`Attese non scritte: ${nuovi.motivo}.`, 'err'); return; }
+    if (!nuovi.numeri.length) { mgAtteseInput.focus(); return; }
+    // Il campo si libera subito per il numero dopo; a un rifiuto torna il testo, se nel frattempo non se n'è scritto altro.
+    const testo = mgAtteseInput.value;
+    mgAtteseInput.value = '';
+    const ok = await accodaAttese(fb._id, (f) => [...atteseDaTenere(f), ...nuovi.numeri]);
+    if (!ok && !mgAtteseInput.value) mgAtteseInput.value = testo;
+  }
+  if (mgAtteseToggle) {
+    mgAtteseToggle.addEventListener('click', () => {
+      const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (!fb) return;
+      // Con le attese la casella resta aperta (lo stato di ciascuna è quello che si viene a guardare): il tasto porta lì.
+      if (mgAttese.hidden || ATT.atteseDi(fb).length) { apriCasellaAttese(fb._id); return; }
+      atteseApertePer = '';
+      reflectAttese(fb);
+    });
+  }
+  if (mgAtteseAggiungi) mgAtteseAggiungi.addEventListener('click', () => { aggiungiAttese(); });
+  if (mgAtteseInput) {
+    mgAtteseInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); aggiungiAttese(); }
+      if (e.key === 'Escape' && !mgAtteseInput.value) {
+        const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+        atteseApertePer = '';
+        if (fb) reflectAttese(fb);
+      }
+    });
+  }
+  if (mgAtteseTogliTutte) {
+    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, () => []); });
+  }
+  if (mgAtteseLista) {
+    mgAtteseLista.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-azione]');
+      const li = btn && btn.closest('.mg-attesa[data-id]');
+      const fb = li && selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (!fb) return;
+      if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
+      const via = li.dataset.id;
+      accodaAttese(fb._id, (f) => atteseDaTenere(f, via));
+    });
+  }
+  // Dall'attesa alla pratica aspettata, nella sua sezione.
+  function openFromAttesa(id) {
+    const altro = allFeedbacks.find((f) => f._id === id);
+    if (!altro) return;
+    const tab = sezioneDi(altro);
+    if (tab && tab !== currentTab) selectTab(tab);
+    openDetail(id);
+  }
 
   // La riga dei tasti, quando non entra, scorre di lato (#1034): la rotella normale deve bastare a raggiungerli.
   const mgOwnerTasti = mgOwnerBar && mgOwnerBar.querySelector('.mg-owner-tasti');
@@ -5536,7 +5768,7 @@
 
   function sezioneDi(fb) {
     if (!sezioniAttendibili() || !statoLeggibile(fb)) return null;
-    return MR.manageTabFor(fb, { releasedVersion, fusioni });
+    return MR.manageTabFor(fb, opzSezioni());
   }
 
   function segnaArrivi(prima, fresh) {
@@ -7595,7 +7827,7 @@
     if (!fb) { toast('Questa segnalazione non è fra quelle caricate nella lista'); return; }
     // La stessa scheda della lista (manageTabFor): con tabFor un lavoro locale si apriva «In coda», dove non c'è.
     let tab = 'inbox';
-    try { tab = MR.manageTabFor(fb, { releasedVersion, fusioni }) || 'inbox'; } catch (_) { /* senza stato leggibile si apre dai Ricevuti */ }
+    try { tab = MR.manageTabFor(fb, opzSezioni()) || 'inbox'; } catch (_) { /* senza stato leggibile si apre dai Ricevuti */ }
     mostraNelFiltro(fb);
     selectTab(tab);
     openDetail(id);

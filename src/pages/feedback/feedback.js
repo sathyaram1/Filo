@@ -83,16 +83,17 @@
   // Le sezioni della macchina a stati, le stesse della dashboard di
   // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
   // In coda (l'iter di lavorazione), 'local' Lavori locali (la stessa coda, che
-  // le routine non prendono: #908), 'resolved' Risolti (fix usciti davvero in
+  // le routine non prendono: #908), 'waiting' Aspettano (in coda dopo altri feedback: #903), 'resolved' Risolti (fix usciti davvero in
   // una versione rilasciata), 'archived' Archiviati.
-  const TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
+  const TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
     local: 'Nessun lavoro server.',
+    waiting: 'Nessun feedback aspetta un altro.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
   };
@@ -125,7 +126,7 @@
   // Il più vecchio caricato, quando il caricamento si è fermato al tetto: il giro non porta dentro i più vecchi.
   let sogliaFinestra = null;
   function opzSezioni() {
-    return { releasedVersion, fusioni };
+    return { releasedVersion, fusioni, trovaAtteso: (id) => all.find((f) => f._id === id) };
   }
 
   // Stato CANONICO di un feedback (spec FEEDBACK-STATES.md §2). Unica porta
@@ -270,6 +271,15 @@
     const testo = l5.esito === 'conflitto' ? 'fusione non avvenuta' : 'fusione ferma';
     const titolo = `${(l5.pannello && l5.pannello.testo) || ''} Si decide in Gestione.`.trim();
     return `<span class="fb-fusione" title="${escapeHtml(titolo)}">${escapeHtml(testo)}</span>`;
+  }
+
+  // «Aspetta #N» (#903): cosa aspetta e lo stato di ciascuno, come in Gestione (dove si mette e si toglie).
+  function attesaChipHtml(f) {
+    const ATT = window.SN_FB_ATTESE;
+    const stati = ATT ? ATT.statiDelleAttese(f, opzSezioni().trovaAtteso) : [];
+    if (!stati.length) return '';
+    const testo = stati.map((w) => `${ATT.etichetta(w)} ${ATT.ETICHETTA[w.stato] || w.stato}`).join(', ');
+    return `<span class="fb-attesa" title="Nessuna routine lo prende finché non sono tutti fusi. Si cambia in Gestione.">⏳ aspetta ${escapeHtml(testo)}</span>`;
   }
 
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
@@ -1147,7 +1157,7 @@
       // ci si scrive dentro non si può salvare (sostituirebbe il report), e
       // offrirla vorrebbe dire far scrivere l'owner per niente.
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
-        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local');
+        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
@@ -1261,6 +1271,7 @@
             <span>${escapeHtml(when)}</span>
             ${stateBadgeHtml(f)}
             ${fusioneChipHtml(f)}
+            ${attesaChipHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}

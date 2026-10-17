@@ -41,7 +41,7 @@ test('la barra mostra le sezioni e ogni scheda si apre dalla sua', async ({ open
     .toEqual(['Domande', 'Feedback', 'Routine']);
   // Si parte da Feedback: le sue schede si vedono, quelle delle altre sezioni no.
   await expect(page.locator('.mg-sezione[data-sezione="feedback"]')).toHaveClass(/mg-sezione--active/);
-  for (const t of ['inbox', 'queue', 'local', 'resolved', 'archived', 'fbstats', 'stats']) {
+  for (const t of ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeVisible();
   }
   for (const t of ['automation', 'log', 'domande', 'domande-lavoro', 'domande-archivio']) {
