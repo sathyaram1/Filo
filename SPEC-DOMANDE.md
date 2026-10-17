@@ -590,7 +590,7 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | Ambito | Può | Non può |
 |---|---|---|
 | `lavoro` | lavorare il suo feedback, spingere il suo ramo, chiedere la fusione, aprire feedback e domande | tutto il resto |
-| `coda` | leggere i feedback **in coda** (non quelli in Ricevuti né quelli fermi per attacco), cambiare priorità, chiedere un biglietto di unione (§ 1.3), archiviare | scrivere testi di feedback, cancellare, toccare Ricevuti |
+| `coda` | leggere i feedback **in coda** (non quelli in Ricevuti né quelli fermi per attacco), cambiare priorità, chiedere un biglietto di unione (§ 1.3), archiviare, scrivere nel taccuino del monitoraggio | scrivere testi di feedback, cancellare, toccare Ricevuti |
 | `unisci` | leggere i genitori indicati, scrivere il figlio, chiudere i genitori col rimando | leggere altro |
 | `domande` | leggere le domande e il registro, raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
 | `posta` | ricevere dal server i messaggi della casella di Filo, cercare sul web, tenere il suo taccuino, aprire domande con bozze di mail, aprire feedback dalle mail degli utenti | mandare mail, vedere le credenziali della casella |
