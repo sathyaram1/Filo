@@ -691,7 +691,7 @@ fidato e figlio. I nipoti contano come figli.
 |---|---|
 | Gestisci la risposta | 47 |
 | Monitoraggio, audit di sicurezza, riordino della coda | 45 |
-| Revisione delle domande, posta | 30 |
+| Revisione delle domande, opportunità e posta | 30 |
 | Unione di feedback | 20 |
 | Potatura dei rami | 5 |
 | Esplorazione | sotto tutto, solo a coda vuota |
