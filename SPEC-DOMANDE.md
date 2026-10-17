@@ -1,6 +1,7 @@
 # Domande all'owner, fiducia e lavoro che si organizza da solo
 
-Specifica decisa con l'owner l'08–09/10/2026; compiti e urgenze (§ 6) il 12/10.
+Specifica decisa con l'owner l'08–09/10/2026; compiti e urgenze (§ 6) il 12/10;
+gestione del lavoro (§ 4.3–4.8) il 13/10.
 È il riferimento per i feedback che la realizzano: chi ne lavora uno legge la
 sezione che gli tocca, non tutto il file.
 
