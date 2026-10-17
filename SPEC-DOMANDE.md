@@ -635,7 +635,10 @@ scrive: con i compiti quella lettura si toglie.
   - il pacemaker la accende con una voce sua (`routineIdServer` in config,
     segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
     se c'è un lavoro server che nascerebbe pulito. Decide prima di A/B, che
-    altrimenti riempirebbero ogni posto anche con l'esplorazione. Conta nel
+    altrimenti riempirebbero ogni posto anche con l'esplorazione, e prende i
+    posti che le spettano nell'ordine di priorità della coda: a pari priorità
+    il server, e un lavoro normale più urgente non lo ferma se A/B non
+    possono accendere. Conta nel
     tetto dell'account della sua parola d'ordine (senza, `accountServer`;
     assente = B), si ferma con `accountServerOff`, con l'account escluso o in
     riserva dei crediti; il tetto delle sessioni è comune.
