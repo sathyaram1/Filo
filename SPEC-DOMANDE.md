@@ -991,7 +991,7 @@ lavorano in locale.
 9. Gestione del lavoro (§ 4.3–4.8): taccuino, sveglie, controllo del
    monitoraggio, lanci per numeri, curva del parallelismo applicata dal
    server, indicatori, ambito `esperimento`, budget, rapporto settimanale,
-   potatura per regola sul server.
+   potatura per regola sul server, azioni `esperimento` e `cancella_rami`.
 10. Crediti (§ 8), dopo la conferma dei numeri.
 11. Lavori server dalla cloud (§ 7).
 12. Istruzioni dei ruoli sul server (§ 9).
