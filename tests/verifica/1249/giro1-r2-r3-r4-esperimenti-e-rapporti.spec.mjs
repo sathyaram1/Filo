@@ -32,5 +32,5 @@ test('r4 il rapporto con cui chiude ogni istanza rimanda a una sezione che lo de
   const ricorrenti = sezione('### 4.1');
   const m = ricorrenti.match(/chiude con un rapporto \(§ (\d+\.\d+)\)/);
   if (!m) return;
-  expect(sezione(`### ${m[1]}`)).toMatch(/istanz[ae] (successiv|dopo)|ogni istanza|ricorrent/i);
+  expect(sezione(`### ${m[1]}`)).toMatch(/istanz[ae] successiv|alla successiva|prossima istanza|ogni istanza/i);
 });
