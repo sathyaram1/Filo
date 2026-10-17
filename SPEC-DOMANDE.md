@@ -228,6 +228,8 @@ dall'owner e dal server. Campi:
 - `problema`: cosa succede in pratica. Per un buco, cosa fa un attaccante; per
   una funzione, cosa vede l'utente.
 - `opzioni`: per ciascuna testo, pro, contro e `azione` strutturata (§ 3.3).
+  Vuote in un resoconto senza niente da decidere (§ 4.8): l'owner lo chiude
+  con «letto».
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
@@ -278,7 +280,13 @@ Tipi ammessi:
 - `approva_locale`;
 - `automazione` (accendi o spegni una voce);
 - `ambito` (approva un ambito nuovo, § 5.3);
-- `esperimento` (approva un esperimento del monitor, § 4.3);
+- `esperimento` (approva un esperimento del monitoraggio oltre il suo budget,
+  § 4.8);
+- `cancella_rami` (cancella i rami elencati nell'azione, § 4.7);
+- `invia_mail` (il server manda la mail: destinatario, oggetto, testo, e i
+  solleciti con il loro testo e dopo quanti giorni lavorativi. Un sollecito
+  parte solo se nella stessa conversazione non è arrivata risposta. L'owner
+  può correggere il testo prima di approvare, e il testo corretto è suo);
 - `compito` (l'opzione richiede lavoro: nasce il compito della § 3.5).
 
 Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
@@ -348,7 +356,7 @@ macchina a stati non cambia. Per l'owner, però, un `design` con una domanda
 aperta si vede nella scheda **In coda**, col segno «aspetta una domanda» che
 porta alla domanda, e non in Ricevuti.
 
-## 4. Compiti ricorrenti, pubblicazione, monitoraggio
+## 4. Compiti ricorrenti, pubblicazione, gestione del lavoro
 
 ### 4.1 Compiti ricorrenti
 
@@ -360,18 +368,28 @@ ancora iniziata quando nasce la successiva si chiude come «superata»: le
 istanze non si accumulano.
 
 Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
-l'ambito, non il ruolo.
+l'ambito, non il ruolo. I testi dei ricorrenti stanno nel repo privato del
+server (§ 9), non in questa spec.
+
+Ogni istanza chiude con un rapporto (§ 4.3), che resta legato al ricorrente:
+l'istanza successiva lo riceve col biglietto, con la fiducia che aveva. È così
+che l'audit sa da quale commit ripartire e la potatura quanti rami sono nuovi.
+Un ricorrente che segue cose lunghe settimane ha anche un **taccuino** suo sul
+server, come il monitoraggio (§ 4.3): oggi le opportunità, con le loro
+pratiche.
 
 | Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
 |---|---|---|---|---|
 | ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus |
-| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus |
+| ogni giorno | opportunità e posta: incentivi, crediti, programmi; la casella di Filo | `posta` | 30 | Opus |
 | ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
 | lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
-| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare |
-| domenica | audit di sicurezza | `lavoro` | 45 | Opus |
+| lunedì | potatura dei rami (§ 4.7) | `rami` | 5 | Opus; Haiku da provare |
+| domenica | audit di sicurezza | `audit` | 45 | Opus |
 
-Si vedono e si cambiano in Routine → Compiti ricorrenti.
+Si vedono e si cambiano in Routine → Compiti ricorrenti. Monitoraggio, riordino
+e potatura sono la **gestione del lavoro** (§ 4.3): il monitoraggio può
+lanciare gli altri due anche fuori cadenza.
 
 ### 4.2 Due canali di aggiornamento
 
@@ -385,31 +403,162 @@ Si vedono e si cambiano in Routine → Compiti ricorrenti.
 L'utente sceglie il canale nelle impostazioni. Il canale stabile è per chi
 preferisce un'esperienza più ferma, con le verifiche fatte poco prima.
 
-### 4.3 Monitoraggio
+### 4.3 Gestione del lavoro
 
-Legge i registri:
+Tre compiti gestiscono il lavoro delle routine: il **monitoraggio**, che
+decide, e il **riordino della coda** (§ 6.6) e la **potatura dei rami**
+(§ 4.7), che lavorano per lui. Lo scopo è uno: fondere più lavoro utile
+possibile per ogni credito speso, a cominciare dal più urgente. Decisioni
+dell'owner del 13/10.
 
-- costi e giri delle routine;
-- fusioni e tempi;
-- accensioni a vuoto;
-- suite, rilasci, esecuzioni in cloud;
-- **tutte le domande passate** con le risposte.
+Il monitoraggio legge i registri: costi e giri delle routine, fusioni e tempi,
+accensioni a vuoto, sessioni, suite, rilasci, esecuzioni in cloud, e **tutte le
+domande passate** con le risposte.
 
-Quando qualcosa non va, apre una domanda o un feedback.
-
-- **Ha un taccuino suo,** persistente sul server: appunti da ricontrollare il
-  giorno dopo, modifiche che sta studiando, ipotesi. Lo legge a ogni
+- **Il suo contesto è sempre non fidato:** legge testo scritto da chiunque.
+  Quindi non scrive codice e non cambia feedback. Apre feedback e domande, e i
+  suoi feedback che toccano L5 li approva l'owner (§ 1.5).
+- **Lancia riordino e potatura per numeri.** Chiede al server di anticipare
+  l'istanza di un ricorrente, al massimo con dei numeri di feedback, mai testo.
+  Come per l'unione (§ 1.3), l'istanza nasce fidata e lavora col suo ambito.
+- **Riordino e potatura gli fanno rapporto:** a fine istanza scrivono nel suo
+  taccuino cosa hanno fatto e cosa hanno trovato.
+- **Le sue leve:** ritmo e parallelismo (§ 4.5), quando lanciare riordino e
+  potatura, indagini ed esperimenti (§ 4.6), la domanda di fine turno dei ruoli
+  (§ 5.4), lo spegnimento in emergenza.
+- **Non sono sue leve:** la priorità dei feedback, i criteri di verifica, i
+  prompt dei ruoli, i blocchi di sicurezza. Può proporre di cambiarli con una
+  domanda. Così non può migliorare i suoi indicatori verificando di meno o
+  gonfiando le priorità.
+- **Spegne in emergenza** routine o account, e riaccende solo quello che ha
+  spento lui, mai quello che ha spento l'owner.
+- **Taccuino**, persistente sul server: appunti da ricontrollare, ipotesi,
+  modifiche in studio, i rapporti di riordino e potatura. Lo legge a ogni
   accensione.
-- **Propone esperimenti** (per esempio rifare un feedback con altri prompt o
-  modelli): diventano domande con azione `esperimento`.
-- **Cambia la domanda di fine turno** dei ruoli (§ 5.4).
-- **Può spegnere** routine o account in emergenza, non riaccenderli. Riaccendere
-  spende, e lo decide l'owner.
+- **Una sessione al giorno**, che riparte dal taccuino, non un contesto che vive
+  per sempre. Le indagini lunghe le fanno sotto-agenti, e il suo contesto resta
+  piccolo.
 - **Segue un problema da vicino:**
   - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
     massimo, così la cache (60 minuti) resta calda;
   - per attese più lunghe chiede al server una **sveglia**, che il pacemaker
     rispetta con un tetto suo, separato da quello del lavoro.
+- **Chi controlla lui:** se il server non lo vede scrivere nel taccuino da 26
+  ore, apre una domanda.
+
+### 4.4 Cosa minimizzare
+
+Il monitoraggio non ha un numero da massimizzare: qualunque conteggio si
+gonfia, spezzando un lavoro in tre, aprendo ogni ritrovamento a parte o alzando
+le priorità. Ha indicatori da tenere bassi, e li usa come indizi, non come
+regole.
+
+- **Lavoro a vuoto:** spesa che non finisce in una fusione al primo colpo.
+  - accensioni a vuoto e compiti morti;
+  - giri di verifica oltre il primo;
+  - riallineamenti con main;
+  - lavori archiviati dopo averci speso.
+- **Contesto inutile:** token letti che al compito non servivano. File interi
+  al posto di un pezzo, uscite non filtrate, istruzioni che il ruolo non usa,
+  rapporti di sotto-agenti incollati interi. Si giudica caso per caso, leggendo
+  le sessioni.
+- **Cache freddata:** contesto scritto in cache e non riletto prima che scada.
+  Pause più lunghe della durata della cache dentro una sessione, sessioni che
+  muoiono subito dopo una scrittura grossa, cambi di modello a metà sessione.
+
+**Vincoli**, che non devono peggiorare: regressioni dopo una fusione, suite
+rossa nuova, feedback riaperti.
+
+**Andamento**, da leggere e non da inseguire: le **radici chiuse**. Una radice
+è una segnalazione nata fuori dalle routine: dell'owner, di un utente, di una
+sessione locale. Figli e derivati non contano come risultato, e il loro costo
+si somma a quello della radice da cui vengono. Un'unione di tre radici ne
+chiude tre. I feedback che le routine aprono da sole (audit, esplorazione,
+monitoraggio) contano solo come spesa. Il costo per radice dipende anche da
+cosa c'è in coda, quindi da solo non dice se il processo è migliorato: lo
+dicono gli esperimenti (§ 4.6).
+
+### 4.5 Ritmo e parallelismo
+
+- Il monitoraggio scrive una **curva**: quanti lavori insieme (N, § 12.2) in
+  base alla quota usata e alle ore che mancano al rinnovo di ciascun account.
+  Il server la applica a ogni battito del pacemaker (10 minuti). Il
+  monitoraggio non è sempre acceso, e a pieno ritmo la quota sale di circa
+  1,4% l'ora (26/09: 662 $ in 21,5 ore).
+- **Niente tetto.** Bruciare una settimana costa solo un po' di efficienza, in
+  riallineamenti: il lavoro resta fatto. Il parallelismo giusto è quello che
+  fonde di più, non quello che spende di più. Oltre un certo N i conflitti con
+  main crescono, e il monitoraggio lo misura.
+- **Inizio settimana più pieno:** spendere presto sfrutta un rinnovo
+  anticipato, se arriva.
+- **Fine quota senza compiti morti.** Vicino al limite la curva scende, per
+  esempio 4 lavori fino al 95% e poi 1. Il server dà biglietti solo ai compiti
+  il cui costo tipico, per fase e ruolo, sta nella quota rimasta. Abbassare N
+  non ferma i lavori in corso (§ 12.2).
+- Resta la **riserva dell'owner** su A (§ 8.2). Non è un tetto al
+  parallelismo: è la quota per le sessioni locali.
+- **Senza curva**, perché il monitoraggio non è mai partito o la curva è
+  scaduta, vale il passo del § 8.2.
+
+### 4.6 Indagini ed esperimenti
+
+- **Indagini.** Quando un indicatore va male, il monitoraggio scende nel caso:
+  un feedback con molti giri di verifica (per esempio 4 o più), una sessione
+  con molto contesto inutile, una fila di compiti morti. Un sotto-agente legge
+  i motivi (rilievi dei giri, registro della sessione), e l'ipotesi va nel
+  taccuino.
+- **Esperimenti.** Un'ipotesi si prova rifacendo un lavoro già fatto con una
+  cosa cambiata: prompt del ruolo, modello, sforzo, contesto. Un esperimento è
+  un compito con ambito `esperimento`:
+  - parte da un commit fissato, lo stato di allora, col numero del feedback;
+  - porta il testo alternativo scritto dal monitoraggio, quindi non fidato;
+  - non fonde, non apre feedback né domande, spinge solo su rami
+    `esperimento/*`;
+  - non vede il `main` di oggi: in una copia del repo il ref `main` è quello
+    attuale, e un esperimento che lo legge falsa il confronto (lab di Haiku,
+    12/10);
+  - l'esito lo confronta con l'originale un giudice cieco.
+
+  Ha meno permessi di un primo lavoro, per questo lo decide il monitoraggio da
+  solo, dentro il budget (§ 4.8).
+- **Proposte.** Se un esperimento conferma l'ipotesi, il monitoraggio apre una
+  domanda con la modifica (a un prompt, ai criteri, a una regola) e le prove.
+  La approva l'owner, perché tocca tutti i lavori futuri. Gli sprechi che si
+  correggono nel codice diventano feedback.
+
+### 4.7 Potatura dei rami
+
+- **La cancellazione è meccanica.** La fa il server il lunedì, per regola: un
+  ramo fuso in `main` che nessun feedback aperto nomina. L'agente non allunga
+  l'elenco.
+- **L'agente capisce perché i rami sono lì.** Prima della cancellazione legge
+  i candidati e gli altri rami fermi (non fusi, o di feedback chiusi senza
+  fusione) e li raggruppa per causa, non uno per uno: il 07/10 erano 617. Per
+  ogni causa:
+  - un problema del processo (per esempio nessuno cancella il ramo dopo la
+    fusione) → un feedback;
+  - lavoro non fuso che forse serve → una domanda, con azioni `riprendi` o
+    `cancella_rami`.
+- Il rapporto va al monitoraggio (§ 4.3).
+
+### 4.8 Budget e rapporto settimanale
+
+- **Budget:** 200 € a settimana per tutta la manutenzione del processo:
+  sessioni del monitoraggio, indagini, esperimenti, e le pulizie della coda e
+  dei rami (riordino e potatura, anche quelle del lunedì). È circa
+  il 10% della settimana di un account (§ 8.1). Il monitoraggio lo divide come
+  crede; sforare di poco va bene. Si conta come nei rapporti delle routine.
+- **Oltre il budget** chiede con una domanda, azione `esperimento`.
+- **Rapporto settimanale:** una domanda, anche senza opzioni se non c'è niente
+  da decidere. Contiene:
+  - cosa ha fatto: curve, indagini, esperimenti, feedback e domande aperti;
+  - l'andamento degli indicatori (§ 4.4) rispetto alle settimane prima;
+  - una **stima del risparmio** e quanto è costato lui, per decidere se il
+    ruolo serve ancora e con che budget. È una stima con l'incertezza
+    dichiarata: dagli esperimenti quando ci sono, altrimenti dal prima e dopo
+    di ogni modifica.
+- **In mezzo alla settimana** le domande arrivano quando servono, come tutte le
+  altre.
 
 ## 5. Ambiti: i permessi stanno sul server
 
@@ -425,8 +574,13 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
   - agire verso l'esterno.
 - **Nessun ambito** può approvare blocchi di sicurezza, cambiare la fiducia,
   creare ambiti o toccare le chiavi.
-- **I segreti** (casella di posta) stanno solo nell'ambiente cloud del compito
-  che li usa. Gli ambienti li crea l'owner.
+- **I segreti** stanno solo nell'ambiente cloud del compito che li usa. Gli
+  ambienti li crea l'owner.
+- **La casella di posta** la legge e la scrive solo il server: le credenziali
+  non arrivano mai a un agente. Chi legge la posta legge testo non fidato, e
+  con la password potrebbe anche spedire. L'agente riceve i messaggi come dati
+  e propone bozze; il server manda quelle approvate (azione `invia_mail`,
+  § 3.3).
 
 ### 5.2 Gli ambiti iniziali
 
@@ -436,10 +590,11 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `coda` | leggere i feedback **in coda** (non quelli in Ricevuti né quelli fermi per attacco), cambiare priorità, chiedere un biglietto di unione (§ 1.3), archiviare | scrivere testi di feedback, cancellare, toccare Ricevuti |
 | `unisci` | leggere i genitori indicati, scrivere il figlio, chiudere i genitori col rimando | leggere altro |
 | `domande` | leggere le domande e il registro, raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
-| `posta` | leggere la casella di Filo, aprire domande con bozze | mandare mail |
-| `invio` | mandare una bozza approvata dall'owner | scrivere testi |
-| `monitor` | leggere registri e domande passate, il suo taccuino, cambiare la domanda di fine turno, spegnere, chiedere una sveglia, aprire domande e feedback | accendere, cambiare feedback |
-| `rami` | cancellare rami fusi che nessun feedback aperto nomina | tutto il resto |
+| `posta` | ricevere dal server i messaggi della casella di Filo, cercare sul web, tenere il suo taccuino, aprire domande con bozze di mail, aprire feedback dalle mail degli utenti | mandare mail, vedere le credenziali della casella |
+| `monitor` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lui; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; riaccendere quello che ha spento l'owner |
+| `rami` | leggere rami, storia di git e feedback; aprire feedback e domande; scrivere nel taccuino del monitoraggio | cancellare rami: lo fa la regola del server (§ 4.7) |
+| `audit` | leggere il codice di Filo e del server, i metadati dei feedback aperti e i testi che servono; provare il codice nel contenitore; aprire feedback e domande | spingere rami, chiedere fusioni, cambiare feedback |
+| `esperimento` | lavorare dal commit indicato, spingere su `esperimento/*`, consegnare l'esito | fondere, aprire feedback o domande, spingere altrove, leggere il `main` di oggi |
 | `server` | come `lavoro`, più spingere un ramo su filo-security (§ 7) | — solo per biglietti puliti |
 
 ### 5.3 Ambiti nuovi
@@ -489,12 +644,12 @@ Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
 Invariante, con sentinella: al massimo un compito aperto per feedback.
 
 **Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
-(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), l'esplorazione a coda
-vuota, e i compiti creati a mano dall'owner o da una sessione locale.
+(§ 3.5), l'unione (§ 1.3), l'esplorazione a coda vuota, e i compiti creati a
+mano dall'owner o da una sessione locale.
 
 **Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
-server), il blocco di sicurezza (diventa una domanda), la segnalazione (diventa
-un feedback, § 5.4).
+server), l'invio di una mail approvata (lo fa il server, § 5.1), il blocco di
+sicurezza (diventa una domanda), la segnalazione (diventa un feedback, § 5.4).
 
 ### 6.2 Le fasi di un cambio di codice
 
@@ -531,7 +686,6 @@ fidato e figlio. I nipoti contano come figli.
 | Compito | Urgenza |
 |---|---|
 | Gestisci la risposta | 47 |
-| Invio di una mail approvata | 46 |
 | Monitoraggio, audit di sicurezza, riordino della coda | 45 |
 | Revisione delle domande, posta | 30 |
 | Unione di feedback | 20 |
@@ -589,7 +743,9 @@ scrive: con i compiti quella lettura si toglie.
   - archivia gli stantii e i già fatti;
   - rivede le priorità con la scala 3/2/1/0.
 
-  Quelli che aspettano una scelta li segnala alla revisione delle domande.
+  Quelli che aspettano una scelta li segnala alla revisione delle domande. Il
+  rapporto va al monitoraggio, che può anche lanciare il riordino fuori
+  cadenza (§ 4.3).
 - I feedback a bassa priorità che si accumulano sono normali: aspettano i
   crediti (§ 8).
 - I lavori `localOnly` di oggi diventano **lavori server**: lavori che hanno
@@ -676,8 +832,9 @@ I numeri restano dell'owner, in Routine → Crediti.
   10% resta sempre libero: il pacemaker non ci accende più niente oltre il 90%
   della settimana. Le sessioni locali dell'owner consumano da A: col dato della
   barra di stato entrano nel conto da sole. L'account B può arrivare al 100%.
-- **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
-  mancano al rinnovo, così la settimana non finisce il martedì.
+- **Passo:** lo decide la curva del monitoraggio (§ 4.5). Senza curva, ogni
+  giorno si spende al massimo il rimasto diviso i giorni che mancano al
+  rinnovo.
 - **Ordine:** quello della coda, cioè l'urgenza dei compiti (§ 6.3). Il passo
   e la riserva dicono quanto si spende, non cosa viene prima: la priorità 3
   resta sopra le risposte e i ricorrenti.
@@ -767,6 +924,7 @@ migrazione le mappa. Il codice che decide in base al prefisso
   vivi, di tutti gli orchestratori insieme, sono meno di N. L'orchestratore non
   fa conti: chiede, e il server risponde sì o no. Così più orchestratori
   possono convivere e i lavori non superano mai N.
+- **N lo decide la curva del monitoraggio** (§ 4.5), applicata dal server.
 - **Abbassare N** non chiude niente: il server smette di dare biglietti, e i
   lavori in corso finiscono.
 - **Vita di 4 ore.** Dopo 4 ore, o col contesto oltre il 70%, l'orchestratore
@@ -824,13 +982,18 @@ lavorano in locale.
    agenti.
 7. Registro, revisione quotidiana, risposte automatiche.
 8. Compiti ricorrenti, ruolo `compito`, ambiti `coda`/`unisci`/`domande`/
-   `monitor`/`rami`, segnalazioni, domanda di fine turno per tutti i ruoli.
-9. Monitoraggio: taccuino, sveglie, esperimenti.
+   `monitor`/`rami`/`audit`, rapporto che passa all'istanza successiva,
+   segnalazioni, domanda di fine turno per tutti i ruoli.
+9. Gestione del lavoro (§ 4.3–4.8): taccuino, sveglie, controllo del
+   monitoraggio, lanci per numeri, curva del parallelismo applicata dal
+   server, indicatori, ambito `esperimento`, budget, rapporto settimanale,
+   potatura per regola sul server.
 10. Crediti (§ 8), dopo la conferma dei numeri.
 11. Lavori server dalla cloud (§ 7).
 12. Istruzioni dei ruoli sul server (§ 9).
 13. Canale stabile (§ 4.2).
-14. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
+14. Opportunità e posta: il server legge e scrive la casella con le sue
+    credenziali, ambito `posta`, azione `invia_mail` coi solleciti, taccuino.
 15. Mittenti normalizzati (§ 10).
 16. Cartella padre per le sessioni cloud (§ 11).
 17. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
