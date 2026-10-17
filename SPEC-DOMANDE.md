@@ -624,6 +624,19 @@ scrive: con i compiti quella lettura si toglie.
   Il server lo dà solo a un biglietto pulito su un feedback fidato, e non lo
   rinnova a un biglietto che si è sporcato. Il worker clona filo-security con
   quel token e spinge il suo ramo.
+- **Una routine a parte (#1253).** Dalla cloud il clone passa solo se la routine
+  ha filo-security fra i suoi repo: il proxy della sessione vede solo quelli.
+  Quindi i lavori server li fa una routine dedicata, con Filo e filo-security
+  collegati e la rete limitata:
+  - la sua parola d'ordine ha `lavori: server` (`routine-keys.mjs lavori`) e
+    riceve solo lavori server fidati, mai l'esplorazione; le altre chiavi non
+    ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
+    diff dal server senza clonare;
+  - il pacemaker la accende con una voce sua (`routineIdServer` in config,
+    segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
+    se c'è un lavoro server che nascerebbe pulito. Conta nel tetto
+    dell'account `accountServer` (assente = B), si ferma con `accountServerOff`
+    o con l'account escluso; il tetto delle sessioni è comune.
 - **Su `main` di filo-security** scrive solo il cancello di fusione (regola come
   per Filo):
   - una suite su GitHub Actions prova i rami;
