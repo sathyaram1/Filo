@@ -176,7 +176,16 @@
         break;
       case TIPI.MESSAGGIO: {
         if (!c) { c = chatNuova(ev.chat, ev.ts); stato.chat.set(ev.chat, c); }
-        c.messages.push({ ...ev.msg, ts: ev.ts });
+        // Due messaggi di Filo scritti di sua iniziativa, uno dietro l'altro, sono un messaggio solo (#869): il secondo
+        // riscrive il primo con tutto quello che è successo, e su disco restano tutti e due.
+        const ultimo = c.messages[c.messages.length - 1];
+        if (ev.msg.spontaneo && ultimo && ultimo.spontaneo && ultimo.role === 'filo' && ev.msg.role === 'filo') {
+          c.messages[c.messages.length - 1] = { ...ev.msg, ts: ultimo.ts };
+          c._disp[c.messages.length - 1] = ev.dispositivo;
+        } else {
+          c.messages.push({ ...ev.msg, ts: ev.ts });
+          c._disp.push(ev.dispositivo);
+        }
         c.updatedAt = ev.ts;
         c._pos = stato.pos;
         // Riapre solo l'utente: una risposta arrivata a chat chiusa è la coda di quella di prima.
