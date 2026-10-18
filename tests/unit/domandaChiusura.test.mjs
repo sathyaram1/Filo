@@ -7,8 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const QUI = dirname(fileURLToPath(import.meta.url));
@@ -22,6 +22,7 @@ const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
 
 const { senzaSessione } = await import('../helpers/sessione.mjs');
+const { cartellaTemporanea, togliCartella } = await import('../helpers/percorsi.mjs');
 
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 const piano = { sleep: async () => {} };
@@ -118,6 +119,43 @@ test('risposta: il testo parte intero, anche lungo (il tetto lo tiene il server,
   assert.equal(corpo.answer, lungo);
 });
 
+test('risposta dell\'orchestratore: il rapporto della chiusura viaggia con lei; quella del worker non lo porta mai', async () => {
+  const rap = { v: 3, role: 'orchestrator', closing: true, turns: 3 };
+  assert.deepEqual(canale.corpoChiusura('answer', { passphrase: 'p', id: 'c1', answer: 'niente', report: rap }),
+    { passphrase: 'p', op: 'answer', id: 'c1', answer: 'niente', report: rap });
+  assert.deepEqual(canale.corpoChiusura('answer', { ticket: 't', answer: 'x', report: rap }), { ticket: 't', op: 'answer', answer: 'x' });
+  assert.equal('report' in canale.corpoChiusura('question', { passphrase: 'p', report: rap }), false);
+  const corpi = [];
+  const ok = async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); };
+  const r = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'niente', { fetchImpl: ok, ...piano }, rap);
+  assert.equal(r.esito, 'ok');
+  assert.equal(r.avviso, undefined);
+  assert.deepEqual(corpi.map((c) => c.report), [rap]);
+});
+
+test('risposta dell\'orchestratore: un rapporto che il server non prende si toglie, la risposta riparte e lo si dice', async () => {
+  const rap = { v: 3, role: 'orchestrator', closing: true, turns: 3 };
+  for (const [status, rifiuto, dice] of [
+    [413, { ok: false, reason: 'report_too_big', bytes: 70000, max: 65536 }, /report_too_big \(70000 byte, massimo 65536\)/],
+    [400, { ok: false, reason: 'report_malformed', detail: 'il rapporto deve essere un oggetto JSON' }, /report_malformed: il rapporto deve essere/],
+  ]) {
+    const corpi = [];
+    const fetchImpl = async (u, init) => { const c = JSON.parse(init.body); corpi.push(c); return c.report ? reply(status, rifiuto) : reply(200, { ok: true }); };
+    const r = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'niente', { fetchImpl, ...piano }, rap);
+    assert.equal(r.esito, 'ok', rifiuto.reason);
+    assert.match(r.avviso, dice);
+    assert.match(r.avviso, /SENZA rapporto/);
+    assert.deepEqual(corpi.map((c) => 'report' in c), [true, false]);
+    assert.ok(corpi.every((c) => c.answer === 'niente'));
+  }
+  // Un rifiuto della risposta stessa resta quello: niente ritentata.
+  const corpi = [];
+  const troppo = async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(413, { ok: false, reason: 'answer_too_big', bytes: 40000, max: 32768 }); };
+  const r = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'x', { fetchImpl: troppo, ...piano }, rap);
+  assert.equal(r.esito, 'rifiutato');
+  assert.equal(corpi.length, 1);
+});
+
 // ─── parsing dei sottocomandi ───────────────────────────────────────────────
 
 test('argomenti: parola d\'ordine per l\'orchestratore, --biglietto per il worker, mai tutti e due', () => {
@@ -158,8 +196,8 @@ function fintoServer(status, risposta) {
 }
 
 // spawn ASINCRONO: il server finto vive in questo processo.
-function cli(port, args, stdin = '') {
-  const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+function cli(port, args, stdin = '', extra = {}) {
+  const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}`, ...extra };
   return new Promise((risolvi) => {
     const p = spawn(process.execPath, [CANALE, ...args], { env });
     let stdout = ''; let stderr = '';
@@ -201,6 +239,32 @@ test('CLI: risposta da stdin col biglietto → arriva intera, apostrofi compresi
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(richieste[0].body, { ticket: TK, op: 'answer', answer: "L'ultimo passo m'ha confuso." });
   } finally { srv.close(); }
+});
+
+test('CLI: la risposta dell\'orchestratore allega da sola i suoi turni dopo l\'ultimo rapporto, e lo stampa', async () => {
+  const { srv, richieste, port } = await fintoServer(200, { ok: true });
+  const dir = cartellaTemporanea('filo-chiusura-cli-');
+  try {
+    const turno = (id, ts, cw, cr, tool) => JSON.stringify({ type: 'assistant', timestamp: ts, sessionId: 'orch', message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: 10 }, content: tool ? [tool] : [{ type: 'text', text: id }] } });
+    const principale = join(dir, 'orch.jsonl');
+    writeFileSync(principale, [
+      turno('p1', '2026-10-07T09:00:00.000Z', 30000, 0),
+      turno('p2', '2026-10-07T09:00:20.000Z', 0, 30000),
+      turno('p3', '2026-10-07T09:00:40.000Z', 0, 30200, { type: 'tool_use', id: 'rs', name: 'Bash', input: { command: 'node "/t/scripts/routine-channel.mjs" risposta "<parola-d-ordine>" c1 <<\'FINE\'\nniente\nFINE' } }),
+    ].join('\n') + '\n');
+    const r = await cli(port, ['risposta', 'parola', 'c1'], 'niente\n', { FILO_TRANSCRIPT: principale });
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /OK: risposta registrata\./);
+    const rap = richieste[0].body.report;
+    assert.equal(rap.closing, true);
+    assert.equal(rap.role, 'orchestrator');
+    assert.equal(rap.turns, 3);
+    assert.match(r.stderr, /chiusura dell'orchestratore: \$\d+\.\d{4} \(3 turni/);
+    // Col biglietto (il worker) il corpo resta quello di sempre: il suo rapporto è nel rilascio.
+    const w = await cli(port, ['risposta', '--biglietto', TK], 'niente\n', { FILO_TRANSCRIPT: principale });
+    assert.equal(w.status, 0, w.stderr);
+    assert.equal('report' in richieste[1].body, false);
+  } finally { srv.close(); togliCartella(dir); }
 });
 
 test('CLI: answer_too_big → exit 4 coi numeri stampati', async () => {

@@ -27,7 +27,8 @@
 //   fra la sua chiamata Agent e il risultato) e si sommano nel suo rapporto,
 //   come quelli di una sessione (figliDelSottoAgente). Da una cartella di lavoro separata (git
 //   worktree) si guarda anche la cartella del checkout principale, dove Claude
-//   Code li scrive davvero.
+//   Code li scrive davvero; e quella della sessione che Claude Code nomina in
+//   CLAUDE_CODE_SESSION_ID (in cloud la sessione nasce nella cartella sopra il repo).
 //   `since` (il rilascio lo prende dal marcatore del biglietto) limita il conto
 //   a quello che è successo da quel momento.
 //
@@ -221,8 +222,8 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     // Richieste pagate al listino alto perché il prompt passava la soglia, per
     // modello ({ 'claude-haiku-5-5': 3 }): un costo che si evita col contesto stretto.
     oltreSoglia: {},
-    // I turni dell'orchestratore fra il biglietto prima e questo (FUORI da
-    // costUsd): senza, un terzo del consumo vero non stava in nessun rapporto.
+    // I turni dell'orchestratore dall'ultimo rapporto consegnato a questo
+    // (FUORI da costUsd): senza, un terzo del consumo vero non stava in nessun rapporto.
     orchestrator: null,
     tools: { total: 0, byName: {}, timeouts: 0, errors: 0 },
     // Turni per sforzo dichiarato ({ xhigh: 40 }): dice se le definizioni degli
@@ -374,7 +375,21 @@ export function ultimoAssistantMs(file) {
  * Torna { file, note } — `file` vuoto se non c'è niente, con la nota che
  * spiega dove si è guardato.
  */
-/** Le cartelle dei transcript di questa cartella di lavoro (e del checkout principale, da un worktree). */
+/** La cartella dei transcript che contiene la sessione `id`, o ''. L'id diventa un nome di file: niente barre. */
+function cartellaDellaSessione(base, id) {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) return '';
+  const radice = join(base, 'projects');
+  let nomi = [];
+  try { nomi = readdirSync(radice); } catch (_) { return ''; }
+  for (const n of nomi.sort()) if (existsSync(join(radice, n, `${id}.jsonl`))) return join(radice, n);
+  return '';
+}
+
+/**
+ * Le cartelle dei transcript di questa cartella di lavoro (e del checkout principale, da un worktree), più quella
+ * della sessione in CLAUDE_CODE_SESSION_ID: in cloud la sessione nasce in /home/user col repo sotto, e il rapporto
+ * cercato dallo slug del repo non trovava niente.
+ */
 export function cartelleTranscript({ env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
   const base = configDir || env.CLAUDE_CONFIG_DIR || join(os.homedir(), '.claude');
   const cartelle = [];
@@ -383,6 +398,8 @@ export function cartelleTranscript({ env = process.env, cwd = process.cwd(), con
     const c = join(base, 'projects', slugProgetto(dir));
     if (!cartelle.includes(c)) cartelle.push(c);
   }
+  const sessione = cartellaDellaSessione(base, String(env.CLAUDE_CODE_SESSION_ID || '').trim());
+  if (sessione && !cartelle.includes(sessione)) cartelle.push(sessione);
   return cartelle;
 }
 
@@ -425,7 +442,7 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
  * tool_use di nome Agent o Task; `longestToolS` = distanza massima fra un
  * tool_use e il suo tool_result.
  */
-export async function analizzaRighe(righe, { role = '', ticket = '', since = '', finestreAgent = null, continua = false } = {}) {
+export async function analizzaRighe(righe, { role = '', ticket = '', since = '', until = '', finestreAgent = null, continua = false } = {}) {
   const rep = rapportoVuoto({ role, ticket });
   // L'usage di ogni messaggio, per id: un messaggio su più righe (pensa, poi
   // chiama uno strumento) porta sulla PRIMA riga un output parziale (2, 5, 7
@@ -443,6 +460,8 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
   // tutti i worker del giro.
   const sinceMs = since ? Date.parse(String(since)) : NaN;
+  // `until`: fin dove arriva la finestra dell'orchestratore (la consegna di questo rapporto); il resto è del prossimo.
+  const untilMs = until ? Date.parse(String(until)) : NaN;
   let primoMs = Infinity;
   let ultimoMs = -Infinity;
   let illeggibili = 0;
@@ -458,6 +477,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     if (!rep.sessionId && typeof e.sessionId === 'string') rep.sessionId = e.sessionId;
     const ms = e.timestamp ? Date.parse(e.timestamp) : NaN;
     if (Number.isFinite(sinceMs) && Number.isFinite(ms) && ms < sinceMs) continue;
+    if (Number.isFinite(untilMs) && Number.isFinite(ms) && ms > untilMs) continue;
     if (Number.isFinite(ms)) { if (ms < primoMs) primoMs = ms; if (ms > ultimoMs) ultimoMs = ms; }
     const msg = e.message && typeof e.message === 'object' ? e.message : null;
     if (!msg) continue;
@@ -711,109 +731,150 @@ export function sommaSottoAgente(rep, sub) {
 }
 
 /**
+ * Le parole di un comando di shell, virgolette tolte: si leggono le parole, non la grafia. Il testo di un heredoc
+ * non è del comando: una risposta che scrive «--biglietto» non diventa quella di un worker. PURA.
+ */
+function paroleDi(comando) {
+  const trovate = [...String(comando || '').matchAll(/"([^"]*)"|'([^']*)'|([^\s"']+)/g)];
+  const heredoc = trovate.findIndex((m) => m[3] !== undefined && m[3].startsWith('<<'));
+  return (heredoc >= 0 ? trovate.slice(0, heredoc) : trovate).map((m) => m[1] ?? m[2] ?? m[3]);
+}
+
+/** Il sottocomando del canale chiamato da `parole`, o ''. */
+function sottocomandoCanale(parole) {
+  const i = parole.findIndex((p) => /(^|[\\/])routine-channel\.mjs$/.test(p));
+  return i >= 0 ? String(parole[i + 1] || '') : '';
+}
+
+/**
  * Il comando chiama il rilascio del canale, comunque sia scritto: in cloud il preflight lo consegna col percorso
- * intero fra virgolette, e c'è chi mette davanti una variabile o un `cd`. Si leggono le parole, non la grafia. PURA.
+ * intero fra virgolette, e c'è chi mette davanti una variabile o un `cd`. PURA.
  */
 export function eRilascio(comando) {
-  const parole = [...String(comando || '').matchAll(/"([^"]*)"|'([^']*)'|([^\s"']+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
-  return parole.some((p, i) => /(^|[\\/])routine-channel\.mjs$/.test(p) && parole[i + 1] === 'release');
+  return sottocomandoCanale(paroleDi(comando)) === 'release';
 }
 
 /**
- * L'intestazione di una notifica di Claude Code, solo dove la mette lui (coda, allegato, messaggio di testo):
- * un turno o il risultato di uno strumento che la cita non è una notifica. Fino al riassunto, perché il
- * rapporto di un worker riportato dentro può citare altri id. '' se la riga non è una notifica. PURA.
+ * Che rapporto consegna un comando: 'rilascio' (il rilascio di un biglietto), 'chiusura' (la risposta
+ * dell'orchestratore alla domanda di fine sessione, con la parola d'ordine: quella col biglietto è di un worker e
+ * non ne porta), o ''. Un rilascio con `--senza-rapporto` non ne porta. PURA.
  */
-export function testaNotifica(e) {
-  if (!e || typeof e !== 'object') return '';
-  const msg = e.message && typeof e.message === 'object' ? e.message : null;
-  let s = '';
-  if (e.type === 'queue-operation' && typeof e.content === 'string') s = e.content;
-  else if (e.type === 'attachment' && e.attachment && typeof e.attachment.prompt === 'string') s = e.attachment.prompt;
-  else if (e.type === 'user' && msg) {
-    s = typeof msg.content === 'string' ? msg.content
-      : Array.isArray(msg.content) ? msg.content.filter((b) => b && b.type === 'text').map((b) => String(b.text || '')).join('\n') : '';
-  }
-  s = s.trimStart();
-  if (!s.startsWith('<task-notification>')) return '';
-  return s.split(/<summary>|<result>/)[0];
+export function consegnaRapporto(comando) {
+  const parole = paroleDi(comando);
+  const sotto = sottocomandoCanale(parole);
+  if (sotto === 'release') return parole.includes('--senza-rapporto') ? '' : 'rilascio';
+  if (sotto === 'risposta') return parole.some((p) => p === '--biglietto' || p.startsWith('--biglietto=')) ? '' : 'chiusura';
+  return '';
 }
 
 /**
- * Le righe del thread principale che toccano al biglietto in corso: i turni
- * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
- * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
- * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
- * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
- * col suo tool-use-id, non quel risultato. PURA.
+ * L'uscita di una consegna dice che il rapporto è arrivato al server: la riga d'esito del canale, e nessuna
+ * ritentata partita senza rapporto. Un rilascio rifiutato, o fermo prima del server, non ha portato niente. PURA.
  */
-export function finestraOrchestratore(linee) {
+export function rapportoArrivato(tipo, testo) {
+  const t = String(testo || '');
+  if (/SENZA rapporto/.test(t)) return false;
+  if (tipo === 'rilascio') return /OK: biglietto rilasciato/.test(t);
+  if (tipo === 'chiusura') return /OK: risposta registrata/.test(t);
+  return false;
+}
+
+/**
+ * Le consegne di un rapporto in un transcript, riga per riga: `arrivate` sono i momenti (ms della riga che le
+ * chiama) di quelle che il server ha preso; `ultima[tipo]` è l'ultima chiamata di quel tipo, arrivata o in corso.
+ * Il JSON si apre solo per le righe che possono contare: i transcript dei worker pesano decine di MB.
+ */
+function raccoltaConsegne() {
+  const attese = new Map();
+  const arrivate = [];
+  const ultima = { rilascio: NaN, chiusura: NaN };
+  return {
+    arrivate,
+    ultima,
+    leggi(linea) {
+      const l = String(linea || '');
+      if (!l.includes('routine-channel') && !(attese.size && [...attese.keys()].some((id) => l.includes(id)))) return;
+      let e;
+      try { e = JSON.parse(l); } catch (_) { return; }
+      const msg = e && e.message && typeof e.message === 'object' ? e.message : null;
+      const blocchi = msg && Array.isArray(msg.content) ? msg.content : [];
+      const ms = Date.parse(e && e.timestamp);
+      if (e.type === 'assistant' && Number.isFinite(ms)) {
+        for (const b of blocchi) {
+          if (!b || b.type !== 'tool_use' || !b.input) continue;
+          const tipo = consegnaRapporto(b.input.command);
+          if (!tipo) continue;
+          if (b.id) attese.set(String(b.id), { tipo, ms });
+          if (!(ultima[tipo] >= ms)) ultima[tipo] = ms;
+        }
+      } else if (e.type === 'user') {
+        for (const b of blocchi) {
+          const a = b && b.type === 'tool_result' ? attese.get(String(b.tool_use_id || '')) : null;
+          if (!a) continue;
+          attese.delete(String(b.tool_use_id));
+          if (rapportoArrivato(a.tipo, testoDi(b.content))) arrivate.push(a.ms);
+        }
+      }
+    },
+  };
+}
+
+async function consegneDelFile(file) {
+  const r = raccoltaConsegne();
+  for await (const l of righeDelFile(file)) r.leggi(l);
+  return r;
+}
+
+/**
+ * La finestra dell'orchestratore per il rapporto che si sta consegnando: le righe del thread principale dopo
+ * l'ultimo rapporto ARRIVATO al server (rilascio di un worker o dell'orchestratore, risposta di chiusura) e fino
+ * a `fine`, il momento di questa consegna. Il confine è dove il rapporto di prima ha smesso di contare, non la
+ * fine del worker: una notifica provvisoria, una consegna arrivata prima della notifica o un lancio fallito e
+ * riprovato spostavano la fine e lasciavano fuori da ogni rapporto i turni lì in mezzo (#1170).
+ * `confini`: i momenti delle consegne arrivate negli ALTRI transcript della sessione (i worker); quelle del thread
+ * principale si leggono qui. PURA.
+ */
+export function finestraOrchestratore(linee, { confini = [], fine = Infinity } = {}) {
   const voci = [];
+  const consegne = raccoltaConsegne();
   for (const l of linee) {
     let e;
     try { e = JSON.parse(l); } catch (_) { continue; }
+    consegne.leggi(l);
     const ms = e && e.timestamp ? Date.parse(e.timestamp) : NaN;
     voci.push({ l, e: e || {}, ms });
   }
-  const chiamate = new Map();
-  const rilasci = [];
+  let limite = Number.isFinite(fine) ? fine : Infinity;
+  const passati = [...(Array.isArray(confini) ? confini : []), ...consegne.arrivate].filter((t) => Number.isFinite(t) && t < limite);
+  let inizio = passati.length ? Math.max(...passati) : -Infinity;
+  // Un turno sta su più righe con la stessa usage: un confine che ne taglia uno va dopo la sua ultima riga (il
+  // turno resta tutto nella finestra di prima), o le righe scritte dopo lo farebbero contare due volte.
+  const messaggi = new Map();
   const turni = [];
   for (const { e, ms } of voci) {
-    const msg = e.message && typeof e.message === 'object' ? e.message : null;
+    const msg = e.type === 'assistant' && e.message && typeof e.message === 'object' ? e.message : null;
     if (!msg || !Number.isFinite(ms)) continue;
-    const blocchi = Array.isArray(msg.content) ? msg.content : [];
-    if (e.type === 'assistant') {
-      // Una richiesta fallita («<synthetic>», usage a zero) non ha toccato la cache: non accorcia l'attesa.
-      if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
-      for (const b of blocchi) {
-        if (!b || b.type !== 'tool_use') continue;
-        if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
-        if (b.input && eRilascio(b.input.command)) rilasci.push(ms);
-      }
-    } else if (e.type === 'user') {
-      for (const b of blocchi) {
-        if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
-        const testo = testoDi(b.content);
-        const c = chiamate.get(b.tool_use_id);
-        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
-        c.fine = ms;
-      }
-    }
-  }
-  // Un worker in sottofondo finisce solo con la prima notifica dopo il lancio che lo NOMINA (tool-use-id della
-  // chiamata o task-id = agentId del lancio): un Monitor, un comando, un artefatto o un testo che ne parla non lo chiudono.
-  const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
-  for (const { e, ms } of voci) {
-    const testa = Number.isFinite(ms) ? testaNotifica(e) : '';
-    if (!testa) continue;
-    const ids = [...testa.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1].trim());
-    const task = [...testa.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1].trim());
-    for (const [id, c] of chiamate) {
-      if (aperta(c, ms) && (ids.includes(id) || (c.agentId && task.includes(c.agentId)))) c.fine = ms;
-    }
-  }
-  // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
-  // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
-  const confini = [...[...chiamate.values()].map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t));
-  let inizio = confini.length ? Math.max(...confini) : -Infinity;
-  // Un turno sta su più righe con la stessa usage: il confine che ne taglia uno va dopo la sua ultima riga,
-  // o le righe scritte dopo (un'altra chiamata nello stesso turno del rilascio) lo farebbero contare due volte.
-  const messaggi = new Map();
-  for (const { e, ms } of voci) {
-    const id = e.type === 'assistant' && e.message && typeof e.message.id === 'string' ? e.message.id : '';
-    if (!id || !Number.isFinite(ms)) continue;
+    // Una richiesta fallita («<synthetic>», usage a zero) non ha toccato la cache: non accorcia l'attesa.
+    if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
+    const id = typeof msg.id === 'string' ? msg.id : '';
+    if (!id) continue;
     const m = messaggi.get(id) || { primo: ms, ultimo: ms };
     messaggi.set(id, { primo: Math.min(m.primo, ms), ultimo: Math.max(m.ultimo, ms) });
   }
-  for (const { primo, ultimo } of messaggi.values()) if (primo <= inizio && ultimo > inizio) inizio = ultimo;
+  for (const { primo, ultimo } of messaggi.values()) {
+    if (primo <= inizio && ultimo > inizio) inizio = ultimo;
+    if (primo <= limite && ultimo > limite) limite = ultimo;
+  }
+  const dentro = (t) => t > inizio && t <= limite;
   const prima = turni.filter((t) => t <= inizio);
-  const dentro = turni.filter((t) => t > inizio);
+  const suoi = turni.filter(dentro);
   return {
     inizioMs: inizio,
-    righe: voci.filter((v) => Number.isFinite(v.ms) && v.ms > inizio).map((v) => v.l),
+    fineMs: limite,
+    righe: voci.filter((v) => Number.isFinite(v.ms) && dentro(v.ms)).map((v) => v.l),
     // Quanto è rimasto fermo il thread principale prima del primo turno: oltre
     // un'ora la sua cache (a un'ora) è scaduta e il turno riscrive tutto.
-    attesaPrimaS: prima.length && dentro.length ? Math.round((Math.min(...dentro) - Math.max(...prima)) / 1000) : 0,
+    attesaPrimaS: prima.length && suoi.length ? Math.round((Math.min(...suoi) - Math.max(...prima)) / 1000) : 0,
     // Il primo turno della finestra non è il primo della sessione: se riscrive
     // la cache dopo l'attesa, conta come riscaldata.
     continua: prima.length > 0,
@@ -826,15 +887,44 @@ async function lineeDi(file) {
   return linee;
 }
 
-async function rapportoOrchestratore(principale, note = []) {
+/** Il transcript principale di una sessione, anche partendo da quello di un suo sotto-agente. PURA. */
+function principaleDi(file) {
+  return eSottoAgente(file) ? `${dirname(dirname(file))}.jsonl` : file;
+}
+
+/**
+ * La finestra dell'orchestratore per la consegna in corso: `corrente` è il transcript che la sta facendo (il
+ * worker, o il thread principale stesso) e `tipo` la consegna ('rilascio' | 'chiusura'). I confini arrivano da
+ * tutti i transcript della sessione. → { linee, finestra } o null senza thread principale.
+ */
+async function finestraPerConsegna(principale, { corrente = '', tipo = 'rilascio' } = {}) {
   if (!existsSync(principale)) return null;
-  const { righe, attesaPrimaS, continua } = finestraOrchestratore(await lineeDi(principale));
+  const linee = await lineeDi(principale);
+  const confini = [];
+  let fine = NaN;
+  for (const f of transcriptSottoAgenti(principale)) {
+    const c = await consegneDelFile(f);
+    confini.push(...c.arrivate);
+    if (corrente && resolve(f) === resolve(corrente)) fine = c.ultima[tipo];
+  }
+  if (corrente && resolve(corrente) === resolve(principale)) {
+    const c = raccoltaConsegne();
+    for (const l of linee) c.leggi(l);
+    fine = c.ultima[tipo];
+  }
+  return { linee, finestra: finestraOrchestratore(linee, { confini, fine: Number.isFinite(fine) ? fine : Infinity }) };
+}
+
+/** I numeri dei turni dell'orchestratore nella finestra, con le note della sua lettura (una tariffa di ripiego). */
+async function rapportoOrchestratore(principale, opzioni) {
+  const f = await finestraPerConsegna(principale, opzioni);
+  if (!f) return null;
+  const { righe, attesaPrimaS, continua } = f.finestra;
   const r = await analizzaRighe(righe, { role: 'orchestrator', continua });
-  // Le sue note (una tariffa di ripiego) vanno nel rapporto: il suo costo è stimato quanto quello del worker.
-  for (const n of r.notes) if (!note.includes(`orchestratore: ${n}`)) note.push(`orchestratore: ${n}`);
   return {
     costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
     maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, oltreSoglia: r.oltreSoglia, startedAt: r.startedAt, endedAt: r.endedAt,
+    notes: r.notes,
   };
 }
 
@@ -856,31 +946,8 @@ export async function nascitaBiglietto(principale, ticket) {
   return '';
 }
 
-/** Il confine della finestra dell'orchestratore prima di `since`: { since: ISO, o '' = dall'inizio; continua }. */
-async function inizioFinestraPrima(principale, since) {
-  const sinceMs = Date.parse(String(since));
-  if (!Number.isFinite(sinceMs)) {
-    // Senza un momento del biglietto: dall'ultimo confine prima di questo rilascio, mai dall'inizio, che è già
-    // nei rapporti di prima. Il rilascio in corso è anche lui nel transcript, ed è un confine: si guarda prima.
-    const linee = await lineeDi(principale);
-    let ultimo = linee.length;
-    for (let i = linee.length - 1; i >= 0; i -= 1) {
-      let e;
-      try { e = JSON.parse(linee[i]); } catch (_) { continue; }
-      const blocchi = e && e.type === 'assistant' && e.message && Array.isArray(e.message.content) ? e.message.content : [];
-      if (blocchi.some((b) => b && b.type === 'tool_use' && b.input && eRilascio(b.input.command))) { ultimo = i; break; }
-    }
-    const { inizioMs, continua } = finestraOrchestratore(linee.slice(0, ultimo));
-    return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua, senzaBiglietto: true };
-  }
-  const prima = (await lineeDi(principale)).filter((l) => {
-    let ms = NaN;
-    try { ms = Date.parse(JSON.parse(l).timestamp); } catch (_) { /* riga illeggibile: la scarta finestraOrchestratore */ }
-    return !Number.isFinite(ms) || ms < sinceMs;
-  });
-  const { inizioMs, continua } = finestraOrchestratore(prima);
-  return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua };
-}
+const isoDopo = (ms) => (Number.isFinite(ms) ? new Date(ms + 1).toISOString() : '');
+const isoA = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : '');
 
 /**
  * Il rapporto di questa sessione, sotto-agenti compresi. Non lancia mai per
@@ -897,17 +964,19 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
   try {
     const finestre = [];
     const sottoAgente = eSottoAgente(trovato.file);
-    // L'orchestratore che rilascia per un worker morto: i suoi turni fra la fine del worker di prima e il
-    // biglietto (il primo riscrive la cache) non li porta nessun altro rapporto.
-    // I sotto-agenti restano dal biglietto: quelli di prima sono di altri biglietti. Il biglietto è quello
-    // rilasciato, nato nel transcript: il marcatore può essere del worker di prima, già contato (giro 5).
+    // L'orchestratore che rilascia per un worker morto: il rapporto è suo, coi turni dall'ultimo rapporto
+    // arrivato (il primo riscrive la cache), che nessun altro porta. I sotto-agenti restano dal biglietto:
+    // quelli di prima sono di altri biglietti. Il biglietto è quello rilasciato, nato nel transcript: il
+    // marcatore può essere del worker di prima, già contato (giro 5).
     const perMorto = !sottoAgente && role === 'orchestrator';
     const sinceBiglietto = perMorto ? ((await nascitaBiglietto(trovato.file, ticket)) || since) : since;
-    const finestra = perMorto ? await inizioFinestraPrima(trovato.file, sinceBiglietto) : { since, continua: false };
-    const sinceFigli = perMorto ? (sinceBiglietto || finestra.since) : since;
-    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since: finestra.since, continua: finestra.continua, finestreAgent: finestre });
+    const finestra = perMorto ? (await finestraPerConsegna(trovato.file, { corrente: trovato.file, tipo: 'rilascio' })).finestra : null;
+    const rep = await analizzaRighe(righeDelFile(trovato.file), finestra
+      ? { role, ticket, since: isoDopo(finestra.inizioMs), until: isoA(finestra.fineMs), continua: finestra.continua }
+      : { role, ticket, since, finestreAgent: finestre });
+    const sinceFigli = perMorto ? (sinceBiglietto || isoDopo(finestra.inizioMs)) : since;
     if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
-    if (finestra.senzaBiglietto) rep.notes.push('momento del biglietto non trovato: contato dalla fine dell\'ultimo worker');
+    if (perMorto && !sinceBiglietto) rep.notes.push('momento del biglietto non trovato: sotto-agenti contati dall\'ultimo rapporto arrivato');
     if (sottoAgente) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
     // Una sessione ha i suoi sotto-agenti in <sessione>/subagents/; un
     // sotto-agente li ha ACCANTO a se', e li si riconosce dal meta (o, in
@@ -922,7 +991,13 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     }
     if (sottoAgente) {
       try {
-        rep.orchestrator = await rapportoOrchestratore(`${dirname(dirname(trovato.file))}.jsonl`, rep.notes);
+        const o = await rapportoOrchestratore(principaleDi(trovato.file), { corrente: trovato.file, tipo: 'rilascio' });
+        if (o) {
+          const { notes: noteOrch, ...numeri } = o;
+          rep.orchestrator = numeri;
+          // Il suo costo è stimato quanto quello del worker: una tariffa di ripiego va detta.
+          for (const n of noteOrch) if (!rep.notes.includes(`orchestratore: ${n}`)) rep.notes.push(`orchestratore: ${n}`);
+        }
       } catch (e) {
         rep.notes.push(`thread principale illeggibile: ${String((e && e.message) || e)}`);
       }
@@ -933,6 +1008,32 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     rep.notes.push(`transcript illeggibile (${trovato.file}): ${String((e && e.message) || e)}`);
     return rep;
   }
+}
+
+/**
+ * Il rapporto della chiusura dell'orchestratore: i suoi turni dopo l'ultimo rapporto arrivato (la cache
+ * riscritta dopo l'ultimo worker, il biglietto che risponde «niente da fare», la domanda e la risposta di fine
+ * sessione) o, in un'accensione senza worker, tutta la sessione. Nessun rilascio li porta: viaggia con la sua
+ * risposta alla domanda di fine sessione. Non lancia mai.
+ */
+export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
+  const base = { v: 3, role: 'orchestrator', closing: true, sessionId: '', notes: [] };
+  const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
+  if (!trovato.file) return { ...base, notes: [trovato.note || 'transcript non trovato'] };
+  const principale = principaleDi(trovato.file);
+  try {
+    const o = await rapportoOrchestratore(principale, { corrente: principale, tipo: 'chiusura' });
+    if (!o) return { ...base, notes: [`thread principale assente: ${principale}`] };
+    return { ...base, sessionId: basename(principale, '.jsonl'), ...o };
+  } catch (e) {
+    return { ...base, notes: [`thread principale illeggibile: ${String((e && e.message) || e)}`] };
+  }
+}
+
+/** La riga per chi guarda lo schermo, alla risposta di chiusura. PURA. */
+export function riassuntoChiusura(rep) {
+  if (!rep || rep.turns === undefined) return `chiusura dell'orchestratore: nessun rapporto${rep && rep.notes && rep.notes.length ? ` (${rep.notes.join(' | ')})` : ''}`;
+  return `chiusura dell'orchestratore: $${Number(rep.costUsd || 0).toFixed(4)} (${rep.turns} turni, contesto ${rep.maxContextTokens}, ${rep.rewarmTurns} da riscaldare, fermo ${rep.attesaPrimaS}s)${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`;
 }
 
 /** «claude-haiku-5-5 3, …», o '' se nessuna richiesta ha passato la soglia. PURA. */
