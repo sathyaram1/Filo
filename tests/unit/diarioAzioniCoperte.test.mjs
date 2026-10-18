@@ -59,8 +59,10 @@ test('ogni riga del diario si conta nel riassunto e sa dire che non è riuscita'
 });
 
 test('le tabelle del diario non nominano azioni che non esistono più', () => {
-  // FERMATA non è un'azione: è la riga di un'azione fermata perché avrebbe portato fuori un segreto (#810).
-  const noti = new Set([...registro(), 'FERMATA']);
+  // Una riga può dichiararsi con un tipo suo (`tipo: 'FERMATA'` per un segreto fermato, #810; il ricordo ripescato
+  // da solo, #868): quei nomi non sono azioni del registro, ma esistono.
+  const dichiarati = [...ATTIVITA.matchAll(/\btipo:\s*'([A-Z_]+)'/g)].map((m) => m[1]);
+  const noti = new Set([...registro(), ...dichiarati]);
   const tutte = [
     ...chiavi('ACTIVITY_ROWS'), ...chiavi('ACTIVITY_VERBS'),
     ...chiavi('ACTIVITY_VERBS_PROPOSTI'), ...chiavi('FAILED_LABELS'), ...soloBottone(),
