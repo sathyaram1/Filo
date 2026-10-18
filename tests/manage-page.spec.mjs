@@ -240,7 +240,7 @@ async function stubAutomation(page, initial = {}) {
   await page.evaluate((init) => {
     window.__automation = Object.assign({
       enabled: false,
-      autoApprove: { owner: true, filo: true, claude: true, user: true },
+      autoApprove: { fidato: true, non_fidato: true },
       routinesEnabled: true,
       lavoriServer: false,
     }, init);
@@ -276,108 +276,70 @@ async function stubAutomation(page, initial = {}) {
   }, initial);
 }
 
-test('#446 — gli interruttori per mittente scrivono nella config, uno alla volta', async ({ openTab }) => {
+test('§10 — gli interruttori per fiducia scrivono nella config, uno alla volta', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
 
-  await stubAutomation(page, { enabled: true });
+  await stubAutomation(page, { enabled: true, autoApprove: { fidato: true, non_fidato: true } });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
 
-  // Con l'automatica accesa gli interruttori sono azionabili e partono da "tutti".
-  const user = page.locator('#mgAutoApproveUser');
-  await expect(user).toBeEnabled();
-  await expect(user).toBeChecked();
-  await expect(page.locator('#mgAutoApproveClaude')).toBeChecked();
+  // Due interruttori, uno per fiducia: nessuno per mittente.
+  await expect(page.locator('#mgAutoApproveBlock input[type=checkbox]')).toHaveCount(2);
+  const nonFidati = page.locator('#mgAutoApproveNonFidato');
+  await expect(nonFidati).toBeEnabled();
+  await expect(nonFidati).toBeChecked();
+  await expect(page.locator('#mgAutoApproveFidato')).toBeChecked();
 
-  // L'esempio dell'owner: gli utenti NON entrano più in coda da soli.
-  await page.evaluate(() => {
-    const el = document.getElementById('mgAutoApproveUser');
-    el.checked = false;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await expect.poll(() => page.evaluate(() => window.__automation.autoApprove)).toEqual({
-    owner: true, filo: true, claude: true, user: false,
-  });
-  // Gli altri interruttori non sono stati toccati.
-  await expect(page.locator('#mgAutoApproveClaude')).toBeChecked();
-  await expect(page.locator('#mgAutoApproveOwner')).toBeChecked();
+  // I non fidati NON entrano più in coda da soli.
+  await page.locator('#mgAutoApproveNonFidato + .mg-switch-track').click();
+  await expect.poll(() => page.evaluate(() => window.__automation.autoApprove)).toEqual({ fidato: true, non_fidato: false });
+  expect(await page.evaluate(() => window.__automationSets.at(-1))).toEqual({ autoApprove: { non_fidato: false } });
+  await expect(nonFidati).not.toBeChecked();
+  await expect(page.locator('#mgAutoApproveFidato')).toBeChecked();
 });
 
-test('ogni istanza di Claude si spegne da sola, senza trascinare le altre', async ({ openTab }) => {
+test('una config per mittente salvata prima non riaccende ciò che l\'owner aveva spento', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
 
-  await stubAutomation(page, { enabled: true });
+  // Gli utenti spenti, le routine accese: i non fidati restano fuori, i fidati entrano.
+  await stubAutomation(page, { enabled: true, autoApprove: { owner: true, user: false, worker: true, prober: true } });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
+  await expect(page.locator('#mgAutoApproveNonFidato')).not.toBeChecked();
+  await expect(page.locator('#mgAutoApproveFidato')).toBeChecked();
 
-  // Lo sviluppo non entra più in coda da solo…
-  await page.evaluate(() => {
-    const el = document.getElementById('mgAutoApproveWorker');
-    el.checked = false;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await expect
-    .poll(() => page.evaluate(() => window.__automation.autoApprove.worker))
-    .toBe(false);
-
-  // …e la sessione locale, che è l'istanza che lavora insieme all'owner, resta
-  // ammessa: è il motivo per cui gli interruttori si sono sdoppiati.
-  expect(await page.evaluate(() => window.__automation.autoApprove.local)).not.toBe(false);
-  await expect(page.locator('#mgAutoApproveLocal')).toBeChecked();
-  await expect(page.locator('#mgAutoApproveVerifier')).toBeChecked();
-  await expect(page.locator('#mgAutoApproveResiduo')).toBeChecked();
-  await expect(page.locator('#mgAutoApproveClaude')).toBeChecked();
-});
-
-test('una config salvata prima dello sdoppiamento non riaccende le istanze spente', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await apriScheda(page, 'automation');
-
-  // La mappa vecchia: un solo interruttore per tutte le istanze di Claude, spento.
-  await stubAutomation(page, {
-    enabled: true,
-    autoApprove: { owner: true, filo: true, claude: false, user: true },
-  });
-  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  // Il vecchio interruttore unico di Claude spento chiude anche i fidati.
+  await stubAutomation(page, { enabled: true, autoApprove: { owner: true, filo: true, claude: false, user: true } });
   await page.evaluate(() => window.__mgTest.loadAutoMode());
-
-  for (const id of ['mgAutoApproveLocal', 'mgAutoApproveWorker', 'mgAutoApproveVerifier',
-    'mgAutoApproveResiduo', 'mgAutoApproveClaude']) {
-    await expect(page.locator('#' + id)).not.toBeChecked();
-  }
-  await expect(page.locator('#mgAutoApproveOwner')).toBeChecked();
-  await expect(page.locator('#mgAutoApproveUser')).toBeChecked();
+  await expect(page.locator('#mgAutoApproveFidato')).not.toBeChecked();
+  await expect(page.locator('#mgAutoApproveNonFidato')).not.toBeChecked();
 });
 
-test('#446 — con l\'automatica spenta gli interruttori per mittente restano modificabili e salvano', async ({ openTab }) => {
+test('#446 — con l\'automatica spenta gli interruttori per fiducia restano modificabili e salvano', async ({ openTab }) => {
   // L'owner prepara chi entra in coda da solo PRIMA di accendere l'automatica.
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
 
-  await stubAutomation(page, { enabled: false });
+  await stubAutomation(page, { enabled: false, autoApprove: { fidato: true, non_fidato: true } });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
   await expect(page.locator('#mgAutoState')).toHaveText('Off');
 
-  for (const id of ['mgAutoApproveOwner', 'mgAutoApproveUser', 'mgAutoApproveLocal',
-    'mgAutoApproveWorker', 'mgAutoApproveVerifier', 'mgAutoApproveResiduo',
-    'mgAutoApproveClaude', 'mgAutoApproveFilo']) {
+  for (const id of ['mgAutoApproveFidato', 'mgAutoApproveNonFidato']) {
     await expect(page.locator('#' + id)).toBeEnabled();
   }
 
-  await page.locator('#mgAutoApproveUser + .mg-switch-track').click();
-  await expect.poll(() => page.evaluate(() => window.__automation.autoApprove.user)).toBe(false);
-  await expect(page.locator('#mgAutoApproveUser')).not.toBeChecked();
+  await page.locator('#mgAutoApproveFidato + .mg-switch-track').click();
+  await expect.poll(() => page.evaluate(() => window.__automation.autoApprove.fidato)).toBe(false);
+  await expect(page.locator('#mgAutoApproveFidato')).not.toBeChecked();
   expect(await page.evaluate(() => window.__automation.enabled)).toBe(false);
 });
 

@@ -718,8 +718,8 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa dei mittenti
-  // ammessi all'auto-approvazione, #446), e tocca SOLO ciò che riceve: la vecchia
+  // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa per fiducia
+  // dell'auto-approvazione, #446 e §10), e tocca SOLO ciò che riceve: la vecchia
   // pagina feedback manda ancora il solo `enabled` e non deve azzerare la mappa.
   on(MSG.AUTOMATION_SET, ownerOnly(async (msg) => {
     try {

@@ -62,15 +62,16 @@
     return !!fb && fb.fiducia === 'fidato';
   }
 
-  // Mittente provato = prefisso riservato E prova (#595): resta per le statistiche e le icone, non dà permessi.
-  // Speculare a isTrustedIdentity nel backend (filo-security).
-  const SENDER_PROOFS = ['admin', 'server'];
-  const RESERVED_CLIENT_RE = /^(owner|routine|agent|local):/i;
-  function isTrustedClient(clientId, senderProof) {
-    return RESERVED_CLIENT_RE.test(String(clientId || '')) && SENDER_PROOFS.includes(senderProof);
+  // La classe del mittente (SPEC-DOMANDE.md §10): solo per leggere e contare, i permessi seguono `fiducia`. Nelle
+  // pagine filo:// shared/mittenti.js va incluso prima di questo file; in Node si carica da sé.
+  function MT() {
+    if (!global.SN_MITTENTI && typeof require === 'function') require('./mittenti.js');
+    const m = global.SN_MITTENTI;
+    if (!m) throw new Error('SN_MITTENTI mancante: carica shared/mittenti.js prima di manageReview.js');
+    return m;
   }
   function isUnprovenSender(fb) {
-    return !!fb && RESERVED_CLIENT_RE.test(String(fb.clientId || '')) && !SENDER_PROOFS.includes(fb.senderProof);
+    return !!fb && MT().nomeRiservato(fb.clientId) && !MT().PROVE.includes(fb.senderProof);
   }
   // Il mittente con cui decidere autore e gruppo: senza prova il prefisso riservato non lo riconosce nessuno,
   // cioè vale come un utente. Stessa chiave di effectiveClientId sul server.
@@ -83,7 +84,6 @@
   // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno da solo la toglie alle routine;
   // si mette su un feedback fidato (#1148) o approvato dall'owner come lavoro locale (`localApproval { by, at }`,
   // #913: lo scrive solo l'admin). Saltare L5 lo decide il server con la fiducia del ramo (fiduciaRamo.js).
-  const LOCAL_SENDER_RE = /^(owner|local):/i;
   function isLocalOnly(fb) {
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
@@ -98,8 +98,10 @@
   function inAttesaFusioneServer(fb) {
     return attesaServer(fb) === 'pc';
   }
+  // Owner o sessione locale con la prova dell'admin: conta solo per le pratiche nate prima della migrazione (§1.7).
   function isProvenLocalSender(fb) {
-    return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
+    const m = fb && fb.senderProof === 'admin' ? MT().classifica(fb) : null;
+    return !!m && (m.classe === 'owner' || m.classe === 'sessione_locale');
   }
   function isLocalApproved(fb) {
     const m = fb && fb.localApproval;
@@ -112,7 +114,7 @@
   }
   // Un utente approvato (#913) vede la risoluzione con la sola frase per lui: la chiusura locale non la porta, la scrive la sessione.
   function fraseAttesa(fb) {
-    return isLocalApproved(fb) && !isTrustedClient(fb.clientId, fb.senderProof) && !String(fb.userNote || '').trim();
+    return isLocalApproved(fb) && !MT().diProcesso(fb) && !String(fb.userNote || '').trim();
   }
   // Giudici saltati alla nascita: `pipeline.skipped` lo scrive solo il server, e solo per un feedback fidato
   // (functions/src/nascita.js). Senza fiducia non vale, e la pratica resta da giudicare.
@@ -180,15 +182,15 @@
 
     const p = fb && fb.pipeline;
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
-    // Lo stato lo decide statusForDecision sul server, che fino al §10 esenta da attacco/spam il mittente provato.
-    const trusted = isTrustedClient(fb && fb.clientId, fb && fb.senderProof);
+    // Lo stato lo decide statusForDecision sul server, che esenta da attacco/spam il feedback fidato (mai il mittente, §10).
+    const trusted = isFidato(fb);
     const status = (fb && fb.status) || 'new';
     // "Da giudicare": feedback aperto e in attesa di giudizio. Esclude i chiusi
     // (done/verified/archived/ignored) e i `clarify` (sono un dialogo con l'owner,
     // non in attesa dei giudici).
     const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
-    // SENZA verdetti: fidato coi giudici saltati alla nascita → nessun colore; mittente provato flaggato per errore
+    // SENZA verdetti: fidato coi giudici saltati alla nascita → nessun colore; fidato flaggato per errore
     // → "da ri-giudicare" (bianco), non un blocco. Va prima dei controlli di blocco identità.
     if (p && verdicts.length === 0 && judgeable) {
       if (judgesSkippedText(fb)) return null;
@@ -210,6 +212,10 @@
     }
     if (p.action === 'block_spam' || p.l1Category === 'spam') {
       return { reason: 'spam', ...REASONS.spam };
+    }
+    // Un segno di giudici saltati che non vale (senza fiducia): i giudici non hanno mai girato, si ri-giudica.
+    if (verdicts.length === 0 && judgeable && p.skipped) {
+      return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
     // Panel parziale ("non filtrato"): vince su attacco/spam/design perché
@@ -599,7 +605,7 @@
         const worst = worstVerdictBlock(fb);
         if (worst) {
           const chi = isFidato(fb) ? 'Fidato, ma segnalato'
-            : isTrustedClient(fb.clientId, fb.senderProof) ? 'Mittente provato, segnalato' : 'Segnalato';
+            : MT().diProcesso(fb) ? 'Mittente provato, segnalato' : 'Segnalato';
           return { text: `${chi} come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
         }
         return null;
@@ -770,11 +776,10 @@
       if (fb.fiducia === undefined || fb.fiducia === null) return { ok: true, primaDellaMigrazione: true };
       return { ok: false, nonFidato: true, motivo: 'è tuo o di una tua sessione, ma non è fidato: segnalo fidato, o approvalo come lavoro server' };
     }
-    const cid = String(fb.clientId || '');
-    if (LOCAL_SENDER_RE.test(cid)) {
+    if (isUnprovenSender(fb)) {
       return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale si lavora solo se l’owner lo approva come lavoro server' };
     }
-    if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
+    if (MT().diProcesso(fb)) {
       return { ok: false, routine: true, motivo: 'l’ha aperto una routine: in locale si lavora solo se l’owner lo approva come lavoro server' };
     }
     return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro server' };
@@ -1990,7 +1995,7 @@
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
-    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
+    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
     isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
