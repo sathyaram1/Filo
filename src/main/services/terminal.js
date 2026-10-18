@@ -234,19 +234,32 @@ function testoPowerShell(testo) {
   return `(-join @(${pezzi.join(',')}))`;
 }
 
-// Dopo ogni istruzione di primo livello, su una riga sua perché un errore mostri la riga del comando e non questa:
-// il primo codice d'errore di un programma resta in $__filo_x, perché quello riuscito dopo lo azzera. Poi $? torna
-// com'era (Write-Error ignorato lo spegne senza lasciare traccia): `x; if ($?) {...}` regge.
+// Dopo ogni istruzione di primo livello: il primo codice d'errore di un programma resta in $__filo_x, perché quello
+// riuscito dopo lo azzera. Poi $? torna com'era (Write-Error ignorato lo spegne senza lasciare traccia).
 const SONDA_ISTRUZIONE_POWERSHELL = '$__filo_p=$?;if($global:LASTEXITCODE -and -not $__filo_x)'
   + '{$__filo_x=$global:LASTEXITCODE};if(-not $__filo_p){Write-Error -Message x -ErrorAction Ignore}';
 
-// Con blocchi param/begin/process le istruzioni non sono tutte di primo livello: la sonda va in fondo e basta.
-const SONDE_POWERSHELL = '$__filo_s=if ($__filo_a -and $__filo_a.EndBlock -and -not ($__filo_a.ParamBlock -or '
-  + '$__filo_a.BeginBlock -or $__filo_a.ProcessBlock -or $__filo_a.DynamicParamBlock)) '
-  + '{ @($__filo_a.EndBlock.Statements) } else { @() }; '
-  + 'if ($__filo_s.Count) { for ($__filo_i=$__filo_s.Count-1; $__filo_i -ge 0; $__filo_i--) '
-  + `{ $__filo_t=$__filo_t.Insert($__filo_s[$__filo_i].Extent.EndOffset, "\`n" + '${SONDA_ISTRUZIONE_POWERSHELL}' + "\`n") } } `
-  + `else { $__filo_t+="\`n" + '${SONDA_ISTRUZIONE_POWERSHELL}' }; `;
+// Le sonde entrano nell'albero del comando, non nel testo: così un errore mostra la riga e il testo che l'utente ha
+// scritto. Il costruttore a quattro argomenti è l'unico senza ambiguità con $null, anche nella 5.1. Con param, begin,
+// process o using la sonda va in fondo al testo e basta.
+const AST_POWERSHELL = 'Management.Automation.Language';
+function bloccoConSonde(conCoda, coda) {
+  const istruzioni = (testo) => `[${AST_POWERSHELL}.Parser]::ParseInput('${testo}', [ref]$null, [ref]$null).EndBlock.Statements`;
+  const copia = (da, verso) => `foreach ($__filo_z in @(${da})) { if ($__filo_z) { ${verso}.Add($__filo_z.Copy()) } }; `;
+  return '$__filo_b=$null; if ($__filo_a -and $__filo_a.EndBlock -and -not ($__filo_a.ParamBlock -or $__filo_a.BeginBlock '
+    + '-or $__filo_a.ProcessBlock -or $__filo_a.DynamicParamBlock -or @($__filo_a.UsingStatements).Count)) { try { '
+    + `$__filo_q=@(${istruzioni(SONDA_ISTRUZIONE_POWERSHELL)}); `
+    + `$__filo_l=[Collections.Generic.List[${AST_POWERSHELL}.StatementAst]]::new(); `
+    + 'foreach ($__filo_s in $__filo_a.EndBlock.Statements) { $__filo_l.Add($__filo_s.Copy()); '
+    + 'foreach ($__filo_z in $__filo_q) { $__filo_l.Add($__filo_z.Copy()) } }; '
+    + (coda ? copia(istruzioni(coda), '$__filo_l') : '')
+    + `$__filo_r=[Collections.Generic.List[${AST_POWERSHELL}.TrapStatementAst]]::new(); `
+    + copia('$__filo_a.EndBlock.Traps', '$__filo_r')
+    + `$__filo_b=[${AST_POWERSHELL}.ScriptBlockAst]::new($__filo_a.Extent, $null, `
+    + `[${AST_POWERSHELL}.StatementBlockAst]::new($__filo_a.EndBlock.Extent, $__filo_l, $__filo_r), $false).GetScriptBlock() `
+    + '} catch { $__filo_b=$null } }; '
+    + `if (-not $__filo_b) { $__filo_b=[ScriptBlock]::Create($__filo_t + [char]10 + '${SONDA_ISTRUZIONE_POWERSHELL}'${conCoda}) }; `;
+}
 
 // Si esegue con `. scriptblock`, nello scope di chi chiama: con Invoke-Expression gli errori che fermano (e quelli
 // di sintassi) mostravano questa riga invece del comando. La sintassi si controlla prima, sul solo testo; `coda`
