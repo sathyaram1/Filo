@@ -96,7 +96,8 @@ import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
-import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
+import { MAX_LIVELLO_BYTES, leggiTestoLivello } from './lib/livelli.mjs';
+import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
@@ -287,9 +288,7 @@ export function defaultState(id, branch) {
 // in silenzio faceva registrare una promozione a chi credeva di bocciare
 // (feedback #565), e una ricetta non aggiornata è meglio che si fermi.
 export const VERIFIER_OUTCOMES = ['pass', 'fix', 'stop'];
-// Tetto di una critica, lo stesso del server. Oltre: rifiuto con la
-// spiegazione, non un taglio.
-export const MAX_CRITIQUE_CHARS = 12000;
+export { MAX_CRITIQUE_BYTES };
 // E un pavimento, lo stesso dello strumento locale: una verifica di due parole
 // non è una verifica, e vale in tutti e due i sensi. Senza rilievi l'esito
 // calcolato è «superata», quindi una critica vuota è una PROMOZIONE, non una
@@ -320,7 +319,7 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'stop';
   else s.verifierVerdict = String(outcome || '') || null;
-  if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim().slice(0, MAX_CRITIQUE_CHARS);
+  if (typeof critique === 'string' && critique.trim()) s.verifierCritique = critique.trim();
   else if (outcome === 'pass') s.verifierCritique = '';
   return s;
 }
@@ -405,7 +404,7 @@ export function secauditPassato(verdict) {
 // La lettura del file (intera, mai tosata, col tetto del server) sta in
 // lib/livelli.mjs, perché la usa anche il canale (`deliver status --segnala`).
 // Ri-esportata da qui per chi la importava da dispatch.
-export { MAX_LIVELLO_CHARS, leggiTestoLivello };
+export { MAX_LIVELLO_BYTES, leggiTestoLivello };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
 // Si tolgono tutte PRIMA di leggere comando, identificativo e testo, come il biglietto: rimasta fra i
@@ -1102,11 +1101,10 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
     // controllare ramo e cartella invece della riga (verifica del giro 4).
     return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]». Il livello, fra 0 e 3, va a inizio riga seguito dalla sede — «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro — e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
   }
-  // Stesso tetto del server (12000 caratteri), detto QUI prima del viaggio e
-  // col numero: mai un taglio silenzioso (CLAUDE.md § Limiti).
-  if (String(critiqueText || '').length > MAX_CRITIQUE_CHARS) {
-    return { rejected: true, formatRejected: true, message: `critica non registrata: troppo lunga (${String(critiqueText).length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}). Accorcia il riassunto, non i rilievi.` };
-  }
+  // Stesso tetto del server, detto QUI prima del viaggio e col numero: mai un
+  // taglio silenzioso (CLAUDE.md § Limiti).
+  const troppo = criticaTroppoLunga(critiqueText);
+  if (troppo) return { rejected: true, formatRejected: true, message: `critica non registrata: ${troppo}` };
   // Il pass vale per il commit dichiarato qui sotto. Se nella directory ci sono
   // file non registrati (di solito le spec temporanee della verifica), il
   // salvataggio automatico li committerà DOPO la registrazione, la punta si

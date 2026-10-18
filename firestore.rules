@@ -62,8 +62,8 @@ service cloud.firestore {
     // sicurezza, anche quando passa, e il salto dell'owner). Li scrive SOLO il
     // server con la sua identità; qui la forma, così una voce storpiata non
     // passa da nessuno dei due rami di triage. `testo` è cifrato come `notes`,
-    // e il tetto è abbondante (CLAUDE.md § Limiti): 12.000 caratteri in
-    // chiaro, cifrati, stanno in 20.000.
+    // e il tetto è abbondante (CLAUDE.md § Limiti): 12.000 byte in chiaro
+    // (non caratteri: in cirillico sarebbero il doppio), cifrati, stanno in 20.000.
     function livelloValido(l) {
       return l is map
         && l.keys().hasOnly(['esito', 'at', 'ruolo', 'by', 'testo'])
@@ -466,9 +466,10 @@ service cloud.firestore {
         // QUALUNQUE scrittura sul feedback (anche il solo cambio di stato) —
         // il feedback diventerebbe immobile. Tenere allineato a
         // SN_FEEDBACK_THREAD.NOTES_MAX (src/shared/feedbackThread.js), che
-        // taglia i turni più vecchi lato scrittura.
+        // taglia i turni più vecchi lato scrittura: 400.000 byte in chiaro,
+        // cifrati, stanno in 540.000.
         && request.resource.data.get('notes', '') is string
-        && request.resource.data.get('notes', '').size() <= 60000
+        && request.resource.data.get('notes', '').size() <= 540000
         // La frase per l'utente e' corta per costruzione: e' l'unico dei due
         // testi che resta leggibile da tutti, e un tetto stretto la tiene tale.
         && request.resource.data.get('userNote', '') is string
@@ -633,7 +634,7 @@ service cloud.firestore {
         // rami devono restare allineati, o una routine potrebbe scrivere note
         // che poi bloccano l'owner.
         && request.resource.data.get('notes', '') is string
-        && request.resource.data.get('notes', '').size() <= 60000
+        && request.resource.data.get('notes', '').size() <= 540000
         && (!('updatedAt' in request.resource.data)
             || request.resource.data.updatedAt is timestamp)
         && livelliValidi(request.resource.data);

@@ -10,8 +10,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // Tetto sul testo di un livello, lo stesso del server. Oltre: rifiuto con il
-// numero, qui, prima di chiamare il server.
-export const MAX_LIVELLO_CHARS = 12000;
+// numero, qui, prima di chiamare il server. In BYTE: il testo finisce cifrato in
+// un campo che le regole misurano (20.000), e in cirillico 12.000 caratteri non ci stavano.
+export const MAX_LIVELLO_BYTES = 12000;
 
 /**
  * Legge il testo di un livello da file. Un file assente o vuoto è un errore
@@ -33,8 +34,9 @@ export function leggiTestoLivello(file, nome) {
   }
   testo = testo.replace(/\r\n/g, '\n').trim();
   if (!testo) return { ok: false, message: `--${nome}: il file ${file} è vuoto. Ci va il testo per l'owner: non ho consegnato niente.` };
-  if (testo.length > MAX_LIVELLO_CHARS) {
-    return { ok: false, message: `--${nome}: ${testo.length} caratteri, il massimo è ${MAX_LIVELLO_CHARS} (lo stesso del server, che lo respingerebbe). Accorcia il testo, non i fatti: non ho consegnato niente.` };
+  const byte = Buffer.byteLength(testo, 'utf8');
+  if (byte > MAX_LIVELLO_BYTES) {
+    return { ok: false, message: `--${nome}: ${byte} byte, il massimo è ${MAX_LIVELLO_BYTES} (byte UTF-8, lo stesso tetto del server, che lo respingerebbe: una lettera accentata o cirillica ne vale 2). Accorcia il testo, non i fatti: non ho consegnato niente.` };
   }
   return { ok: true, testo };
 }

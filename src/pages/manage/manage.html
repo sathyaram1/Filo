@@ -1077,6 +1077,28 @@
       font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
     }
     .mg-bubble-body > em { color: var(--sn-muted); font-style: italic; }
+    /* Nota lunga ripiegata (#559): otto righe e una sfumatura che dice «continua»; un tocco la apre. */
+    .mg-bubble--ripiegata .mg-bubble-body {
+      max-height: calc(8 * 1.55em); overflow: hidden; cursor: pointer;
+      -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+      mask-image: linear-gradient(to bottom, #000 55%, transparent);
+    }
+    .mg-bubble--ripiegata .mg-bubble-body:hover {
+      -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent);
+      mask-image: linear-gradient(to bottom, #000 75%, transparent);
+    }
+    .mg-bubble-apri {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin: 6px 0 0 -8px; padding: 2px 8px; border: 0; border-radius: 6px;
+      background: transparent; color: var(--sn-muted); font: inherit; font-size: 12px; cursor: pointer;
+      transition: background calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-bubble-apri:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-bubble-apri::after {
+      content: '▾'; font-size: 11px;
+      transition: transform calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-bubble-apri[aria-expanded="true"]::after { transform: rotate(180deg); }
     .mg-bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .mg-bubble-imgs img {
       max-width: 200px; max-height: 200px; border-radius: 6px;
