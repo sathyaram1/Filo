@@ -117,21 +117,10 @@
     }
   }
 
-  function nomeGruppo(g) {
-    const pagine = g.pagine || [];
-    for (let i = pagine.length - 1; i >= 0; i--) {
-      const t = String(pagine[i].titolo || '').trim();
-      if (t && t !== pagine[i].url) return t;
-    }
-    const u = pagine[pagine.length - 1];
-    return u ? sito(u.url) : '';
-  }
-  function sito(url) {
-    try { return new URL(String(url)).hostname.replace(/^www\./, ''); } catch (_) { return String(url || ''); }
-  }
+  const sito = (url) => global.SN_FILO_CODA.sito(url);
   function testoGruppo(g) {
     const n = g.pagine.length;
-    const nome = nomeGruppo(g);
+    const nome = global.SN_FILO_CODA.nomeDelGruppo(g);
     if (n === 1) return `1 pagina: ${nome}`;
     return `${n} pagine, fra cui ${nome}`;
   }
@@ -345,7 +334,7 @@
     for (const v of res.elementi || []) {
       const c = conChiave(v.key);
       if (c) { aggiorna(c, v); continue; }
-      if (v.k === 'msg' && v.chat === qui && !(daAltrove && !d.occupata())) continue;
+      if (v.k === 'msg' && v.chat === qui && !daAltrove) continue;
       metti(v, { scorri: false });
       messi++;
     }
