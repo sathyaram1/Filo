@@ -1,6 +1,6 @@
 // Un lavoro locale con app e server (#915): la pratica si chiude quando tutte le parti sono su main. Qui le regole
-// lato sessione: parte tardiva, parte del server che manca, cosa legge chi lancia finish, forma nelle regole Firestore.
-// La metà del server (ownerMerge, localWork) ha la sua prova in filo-security, test/lavori-locali-parti-915.test.js.
+// lato sessione: parte tardiva, parte del server che manca, cosa legge chi lancia finish, forma nelle regole Firestore
+// (col motore vero: partiLavoro.motore-vero.mjs). La metà del server ha la sua prova in filo-security, test/lavori-locali-*.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  PARTI, FINESTRA_PARTE_TARDIVA_MS, partiDaCampi, parteTardiva, partiServerInSospeso,
+  PARTI, FINESTRA_PARTE_TARDIVA_MS, dopoLaFusione, partiDaCampi, parteTardiva, partiServerInSospeso, serverUltimaParte,
 } from '../../scripts/lib/parti-lavoro.mjs';
 import { classifyOwnerMerge, messageForOwnerMerge, askServerMerge } from '../../scripts/lib/owner-merge.mjs';
 
@@ -27,6 +27,19 @@ test('le parti fuse dai campi REST: solo app e server, solo numeri positivi', ()
   assert.deepEqual(partiDaCampi(undefined), {});
   assert.deepEqual([...PARTI], ['app', 'server']);
   assert.equal(FINESTRA_PARTE_TARDIVA_MS, 48 * ORE);
+});
+
+test('la parte del server è l’ultima solo con l’app registrata e nessun suo ramo fuori; dopo la fusione si rifà il conto', () => {
+  assert.equal(serverUltimaParte({ parti: { app: ORA }, ramiApp: [] }), true);
+  assert.equal(serverUltimaParte({ parti: { app: ORA }, ramiApp: ['claude/x'] }), false, 'un seguito dell’app è ancora fuori');
+  assert.equal(serverUltimaParte({ parti: { server: ORA }, ramiApp: [] }), false, 'l’app può ancora arrivare');
+  assert.equal(serverUltimaParte(), false);
+  // #939: chi fonde per secondo rilegge; chi la trova già chiusa non la richiude.
+  assert.equal(dopoLaFusione({ status: 'working', ultima: true }), 'chiudi');
+  assert.equal(dopoLaFusione({ status: 'todo', ultima: false }), 'aperta');
+  assert.equal(dopoLaFusione({ status: 'done', ultima: true }), 'chiusa');
+  assert.equal(dopoLaFusione({ status: 'done', ultima: false }), 'chiusa');
+  assert.equal(dopoLaFusione(), 'aperta');
 });
 
 test('parte tardiva: solo a pratica chiusa dall’altra parte da meno di 48 ore, locale, una volta per parte, dallo stesso ramo', () => {
