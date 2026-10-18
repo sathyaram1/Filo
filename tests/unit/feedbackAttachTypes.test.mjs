@@ -81,6 +81,29 @@ test('con MIME vuoto/generico un\'estensione non in allowlist è rifiutata', () 
   assert.equal(f('senza-estensione', ''), null);
 });
 
+test('#1337: il nome che il sistema dà a un documento ammesso vale con l\'estensione della sua voce, e si dichiara col tipo della lista', () => {
+  const casi = [
+    ['diario.log', 'text/x-log', 'file', 'text/plain'],
+    ['config.yaml', 'application/yaml', 'file', 'application/x-yaml'],
+    ['config.yml', 'text/yaml', 'file', 'application/x-yaml'],
+    ['misure.csv', 'application/vnd.ms-excel', 'file', 'text/csv'],
+    ['note.md', 'text/x-markdown', 'file', 'text/markdown'],
+    ['schema.json', 'application/schema+json', 'file', 'application/json'],
+    ['vecchia.bmp', 'image/x-ms-bmp', 'image', 'image/bmp'],
+    ['note.md', '', 'file', 'text/markdown'],
+    ['shot.png', 'application/octet-stream', 'image', 'image/png'],
+    ['n.txt', 'text/plain', 'file', 'text/plain'],
+  ];
+  for (const [name, type, kind, dichiarato] of casi) {
+    assert.equal(f(name, type), kind, `${name} ${type}`);
+    assert.equal(A.tipoDichiarato({ name, type }), dichiarato, `${name} ${type}`);
+  }
+  for (const [name, type] of [['conti.xls', 'application/vnd.ms-excel'], ['a.txt', 'application/yaml'], ['a.csv', 'text/x-log'], ['x.html', 'text/x-log'], ['travestito.txt', 'text/html']]) {
+    assert.equal(f(name, type), null, `${name} ${type}`);
+    assert.equal(A.tipoDichiarato({ name, type }), '', `${name} ${type}`);
+  }
+});
+
 test('input mancanti/degeneri non esplodono e sono rifiutati', () => {
   assert.equal(A.classify(null), null);
   assert.equal(A.classify(undefined), null);
@@ -118,6 +141,48 @@ test('il tipo di un allegato è sempre una stringa, anche coi nomi di serie', ()
   assert.equal(mimeDiAllegato('a.yaml'), 'application/x-yaml');
 });
 
+// ── Una lista sola: selettori, controllo, manifesto e `feedback:apri` leggono la stessa (#582.2) ──
+
+test('il selettore offre esattamente i tipi che il controllo accetta, senza famiglie con l\'asterisco', () => {
+  const voci = A.ACCEPT.split(',');
+  assert.ok(!voci.some((v) => v.includes('*')), `famiglia con asterisco nel selettore: ${A.ACCEPT}`);
+  for (const v of voci) {
+    const prova = v.startsWith('.') ? f(`x${v}`, '') : f('x', v);
+    assert.ok(prova, `il selettore offre ${v}, che il controllo rifiuta`);
+  }
+  for (const t of A.TIPI) {
+    for (const m of t.mime) assert.ok(voci.includes(m), `${m} accettato ma non offerto`);
+    for (const e of t.ext) assert.ok(voci.includes(`.${e}`), `.${e} accettato ma non offerto`);
+  }
+  assert.ok(voci.includes('.tsv') && voci.includes('text/tab-separated-values'), 'la tabella .tsv è offerta');
+  for (const attivo of ['image/svg+xml', '.svg', 'text/html', '.html', 'text/*', 'image/*']) {
+    assert.ok(!voci.includes(attivo), `${attivo} offerto`);
+  }
+});
+
+test('i nomi dei documenti per le frasi vengono dalla stessa lista', () => {
+  for (const t of A.TIPI.filter((x) => x.kind === 'file')) assert.ok(A.NOMI_DOCUMENTI.includes(t.nome), t.nome);
+  assert.match(A.NOMI_DOCUMENTI, /TSV/);
+  assert.match(A.NOMI_DOCUMENTI, / e YAML$/);
+});
+
+test('il tipo dichiarato da un\'estensione è sempre una stringa, e vuota fuori lista', () => {
+  assert.equal(A.mimeDaEstensione('TSV'), 'text/tab-separated-values');
+  assert.equal(A.mimeDaEstensione('yml'), 'application/x-yaml');
+  assert.equal(A.mimeDaEstensione('jpg'), 'image/jpeg');
+  for (const e of ['__proto__', 'constructor', 'svg', 'html', '', undefined]) assert.equal(A.mimeDaEstensione(e), '', String(e));
+});
+
+test('il manifesto dice che a una segnalazione si allegano anche documenti, coi nomi della lista', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'capabilities.js'));
+  const CAP = globalThis.SN_CAPABILITIES;
+  const desc = CAP.get('feedback').desc;
+  assert.ok(desc.includes(A.NOMI_DOCUMENTI), desc.slice(0, 200));
+  for (const c of CAP.all({ redteam: true })) {
+    for (const k of ['desc', 'invoke', 'doesNot']) assert.ok(!String(c[k] || '').includes('{tipiAllegato}'), `${c.id}.${k}`);
+  }
+});
+
 // #1337.5: una lista sola dei tipi, per il selettore e per il messaggio, in ogni casella che allega.
 test('ACCEPT propone solo i tipi che classify accetta, e ogni casella che allega lo usa', () => {
   const A = globalThis.SN_FEEDBACK_ATTACH;
@@ -135,4 +200,42 @@ test('ACCEPT propone solo i tipi che classify accetta, e ogni casella che allega
     assert.match(testo, /\.ACCEPT\b/, `${f} non prende la lista dei tipi da SN_FEEDBACK_ATTACH`);
     assert.doesNotMatch(testo, /['"]image\/\*,/, `${f} ha ancora un elenco dei tipi scritto a mano`);
   }
+});
+
+// #1337 giro 7: il tipo dichiarato lo decide l'invio, in un posto solo, per ogni casella che allega.
+test('l\'invio dichiara ogni allegato col tipo della lista, qualunque casella lo mandi', async () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedback.js'));
+  const F = globalThis.SN_FEEDBACK;
+  for (const [name, type, atteso] of [
+    ['server.log', 'text/x-log', 'text/plain'], ['tabella.csv', 'application/vnd.ms-excel', 'text/csv'],
+    ['conf.yml', 'application/yaml', 'application/x-yaml'], ['note.md', '', 'text/markdown'],
+    ['schermata.png', 'image/png', 'image/png'], ['disegno.svg', 'image/svg+xml', 'image/svg+xml'],
+  ]) assert.equal(F.tipoAllegato(name, type), atteso, `${name} ${type}`);
+
+  const prima = { crypto: globalThis.SN_FEEDBACK_CRYPTO, fetch: globalThis.fetch };
+  globalThis.SN_FEEDBACK_CRYPTO = {
+    isEnabled: () => true, hasPublicKey: () => true,
+    encryptBytesForOwner: async () => new Uint8Array(100).fill(1), isEncryptedBytes: () => true,
+  };
+  globalThis.fetch = async () => new Response(JSON.stringify({ downloadTokens: 't' }), { status: 200 });
+  try {
+    const att = await F.uploadAttachment(new Blob(['riga'], { type: 'text/x-log' }), 'server.log');
+    assert.equal(att.type, 'text/plain');
+    assert.equal(att.kind, 'file');
+  } finally {
+    globalThis.SN_FEEDBACK_CRYPTO = prima.crypto;
+    globalThis.fetch = prima.fetch;
+  }
+  const radice = join(__dirname, '..', '..');
+  // L'invio di una segnalazione dichiara i documenti con la stessa regola.
+  assert.match(readFileSync(join(radice, 'src/shared/feedback.js'), 'utf8'), /voceDocumento\(u\.url, fname, tipoAllegato\(/);
+  for (const f of ['src/pages/feedback/feedback.js', 'src/content/feedback.js', 'src/pages/manage/manageAllegati.js']) {
+    assert.doesNotMatch(readFileSync(join(radice, f), 'utf8'), /\.tipoDichiarato\b/, `${f} dichiara il tipo per conto suo`);
+  }
+});
+
+test('il messaggio di rifiuto nomina ogni voce della lista', () => {
+  const A = globalThis.SN_FEEDBACK_ATTACH;
+  for (const t of A.TIPI) assert.ok(A.MESSAGGIO_TIPO.includes(t.nome), t.nome);
+  for (const e of A.TIPI.flatMap((t) => t.anche)) assert.ok(A.MESSAGGIO_TIPO.includes(e), e);
 });

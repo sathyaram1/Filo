@@ -1,69 +1,108 @@
-// Allowlist degli allegati ammessi: `accept` su un <input type=file> è un suggerimento
-// e non vincola né «Tutti i file» né il drop, quindi serve un gate deterministico.
-// Rifiuta i tipi ATTIVI (text/html, svg…). Elenco unico di riquadro, pagina dei feedback, caselle di Gestione e
-// riga di comando; il gate L0 del server gli resta allineato. Il deposito vede solo blob cifrati (#1518).
+// Tipi di allegato dei feedback: la lista UNICA di controllo (classify), selettori (ACCEPT), messaggi e tetti di riquadro,
+// pagina dei feedback e caselle di Gestione, manifesto (NOMI_DOCUMENTI) e riga di comando (mimeDaEstensione).
+// Mai tipi attivi (text/html, image/svg+xml); il gate L0 del server gli resta allineato. Il deposito vede solo blob cifrati (#1518).
 
 (function (global) {
   'use strict';
 
-  // NIENTE image/svg+xml: un SVG è un documento attivo, può contenere <script>.
-  const RASTER_IMAGE_MIME = new Set([
-    'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp',
-  ]);
+  // `mime[0]` è il tipo con cui si dichiara un file riconosciuto solo dall'estensione. `alias`: come lo chiamano i
+  // sistemi (Linux per .log e .yaml, Windows con Excel per .csv); vale solo con un'estensione della stessa voce.
+  const TIPI = Object.freeze([
+    { nome: 'PNG', kind: 'image', mime: ['image/png'], ext: ['png'] },
+    { nome: 'JPEG', kind: 'image', mime: ['image/jpeg', 'image/jpg'], ext: ['jpg', 'jpeg'] },
+    { nome: 'GIF', kind: 'image', mime: ['image/gif'], ext: ['gif'] },
+    { nome: 'WebP', kind: 'image', mime: ['image/webp'], ext: ['webp'] },
+    { nome: 'BMP', kind: 'image', mime: ['image/bmp'], ext: ['bmp'], alias: ['image/x-bmp', 'image/x-ms-bmp'] },
+    { nome: 'PDF', kind: 'file', mime: ['application/pdf'], ext: ['pdf'] },
+    { nome: 'testo', kind: 'file', mime: ['text/plain'], ext: ['txt', 'log'], alias: ['text/x-log'], anche: ['log'] },
+    { nome: 'Markdown', kind: 'file', mime: ['text/markdown'], ext: ['md', 'markdown'], alias: ['text/x-markdown'] },
+    { nome: 'CSV', kind: 'file', mime: ['text/csv'], ext: ['csv'],
+      alias: ['application/vnd.ms-excel', 'application/csv', 'text/x-csv', 'application/x-csv', 'text/comma-separated-values'] },
+    { nome: 'TSV', kind: 'file', mime: ['text/tab-separated-values'], ext: ['tsv'], alias: ['text/tsv'] },
+    { nome: 'JSON', kind: 'file', mime: ['application/json'], ext: ['json'], alias: ['application/schema+json', 'text/json'] },
+    { nome: 'YAML', kind: 'file', mime: ['application/x-yaml'], ext: ['yaml', 'yml'], alias: ['application/yaml', 'text/yaml', 'text/x-yaml'] },
+  ].map((t) => Object.freeze({
+    ...t, mime: Object.freeze(t.mime.slice()), ext: Object.freeze(t.ext.slice()), alias: Object.freeze((t.alias || []).slice()),
+    anche: Object.freeze((t.anche || []).slice()),
+  })));
 
-  // Documenti passivi per MIME esplicito. NIENTE text/html, application/xhtml+xml, text/xml.
-  const DOC_MIME = new Set([
-    'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
-    // Col tipo esplicito perché la riga di comando li dichiara così: senza, mandava quello
-    // che una persona non poteva allegare (#582).
-    'text/tab-separated-values', 'application/x-yaml',
-  ]);
+  const di = (kind, campo) => new Set(TIPI.filter((t) => t.kind === kind).flatMap((t) => t[campo]));
+  const RASTER_IMAGE_MIME = di('image', 'mime');
+  const DOC_MIME = di('file', 'mime');
+  const IMAGE_EXT = di('image', 'ext');
+  const DOC_EXT = di('file', 'ext');
 
-  // Ammesse SOLO con MIME vuoto o generico: il sistema non sempre mappa .md/.yml/.log.
-  // Mai per «salvare» un MIME pericoloso: un .txt tipizzato text/html resta rifiutato.
-  const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
-  const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'yml', 'yaml', 'pdf']);
+  // Map e non oggetto: la chiave è l'estensione di un nome di file, e `note.__proto__` non deve trovare niente.
+  const MIME_PER_EXT = new Map(TIPI.flatMap((t) => t.ext.map((e) => [e, t.mime[0]])));
+
+  // Tipi esatti ed estensioni, mai famiglie con l'asterisco: `image/*` e `text/*` offrono SVG e HTML, che classify rifiuta.
+  const ACCEPT = [
+    ...TIPI.flatMap((t) => t.mime),
+    ...TIPI.flatMap((t) => t.ext.map((e) => `.${e}`)),
+  ].join(',');
+
+  const elenco = (nomi) => (nomi.length > 1 ? `${nomi.slice(0, -1).join(', ')} e ${nomi[nomi.length - 1]}` : nomi.join(''));
+  const nomiDoc = TIPI.filter((t) => t.kind === 'file').map((t) => t.nome);
+  const NOMI_DOCUMENTI = elenco(nomiDoc);
+
+  // Il messaggio di rifiuto nomina anche le estensioni che il nome della voce non fa pensare (il .log è testo).
+  const AMMESSI = elenco([
+    `immagini (${TIPI.filter((t) => t.kind === 'image').map((t) => t.nome).join(', ')})`,
+    ...nomiDoc,
+    ...TIPI.flatMap((t) => t.anche || []),
+  ]);
+  const MESSAGGIO_TIPO = `Tipo di file non supportato. Ammessi: ${AMMESSI}.`;
+  // Gli stessi tetti per ogni casella che allega: il deposito e il server li controllano di nuovo.
+  const LIMITI = Object.freeze({ immagini: 5, file: 5, byte: 4 * 1024 * 1024 });
 
   function extOf(name) {
     const m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
     return m ? m[1].toLowerCase() : '';
   }
 
-  // Un MIME generico non dice nulla sul contenuto: solo lì ci fidiamo dell'estensione.
-  function isGenericMime(t) {
-    return !t || t === 'application/octet-stream';
+  function mimeDaEstensione(ext) {
+    return MIME_PER_EXT.get(String(ext || '').toLowerCase()) || '';
   }
 
-  function classify(file) {
+  const VOCE_PER_EXT = new Map(TIPI.flatMap((t) => t.ext.map((e) => [e, t])));
+
+  // Un MIME vuoto o generico non dice niente sul contenuto: solo allora decide l'estensione (il SO non sempre
+  // tipizza .md/.yml/.log). Un MIME esplicito fuori lista resta rifiutato anche con un'estensione benigna, salvo
+  // l'alias della voce di quell'estensione.
+  function voceDi(file) {
     if (!file) return null;
     const type = String(file.type || '').toLowerCase().trim();
-    const ext = extOf(file.name);
-
-    if (RASTER_IMAGE_MIME.has(type)) return 'image';
-    if (DOC_MIME.has(type)) return 'file';
-
-    // MIME esplicito fuori allowlist → rifiuto a prescindere dall'estensione (.html trascinato).
-    if (!isGenericMime(type)) return null;
-
-    if (IMAGE_EXT.has(ext)) return 'image';
-    if (DOC_EXT.has(ext)) return 'file';
+    const perExt = VOCE_PER_EXT.get(extOf(file.name)) || null;
+    const perMime = TIPI.find((t) => t.mime.includes(type));
+    if (perMime) return { voce: perMime, type };
+    if (!type || type === 'application/octet-stream') return perExt ? { voce: perExt, type: perExt.mime[0] } : null;
+    if (perExt && perExt.alias.includes(type)) return { voce: perExt, type: perExt.mime[0] };
     return null;
   }
 
-  // Il selettore propone solo quello che `classify` accetta: con image/* e text/* offriva SVG e HTML, poi rifiutati.
-  const ACCEPT = [...RASTER_IMAGE_MIME, ...DOC_MIME, ...[...IMAGE_EXT, ...DOC_EXT].map((e) => `.${e}`)].join(',');
-  const AMMESSI = 'immagini (PNG, JPEG, GIF, WebP, BMP), PDF, testo, Markdown, CSV, TSV, JSON, YAML e log';
-  const MESSAGGIO_TIPO = `Tipo di file non supportato. Ammessi: ${AMMESSI}.`;
-  // Gli stessi tetti per ogni casella che allega: il deposito e il server li controllano di nuovo.
-  const LIMITI = Object.freeze({ immagini: 5, file: 5, byte: 4 * 1024 * 1024 });
+  function classify(file) {
+    const v = voceDi(file);
+    return v ? v.voce.kind : null;
+  }
+
+  // Il tipo con cui il file va dichiarato nel feedback: sempre uno della lista, mai l'alias del sistema, che il gate
+  // del server non conosce. '' se il file non è ammesso.
+  function tipoDichiarato(file) {
+    const v = voceDi(file);
+    return v ? v.type : '';
+  }
 
   global.SN_FEEDBACK_ATTACH = {
     classify,
+    tipoDichiarato,
+    mimeDaEstensione,
+    TIPI,
+    ACCEPT,
+    NOMI_DOCUMENTI,
     RASTER_IMAGE_MIME,
     DOC_MIME,
     IMAGE_EXT,
     DOC_EXT,
-    ACCEPT,
     AMMESSI,
     MESSAGGIO_TIPO,
     LIMITI,

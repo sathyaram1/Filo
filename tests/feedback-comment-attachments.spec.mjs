@@ -467,3 +467,52 @@ test("#602 — un allegato già salvato in una nota si rivede in anteprima", asy
     .poll(() => miniatura.evaluate((el) => el.naturalWidth), { timeout: 10_000 })
     .toBeGreaterThan(0);
 });
+
+// #1337 (#582.2, #602.1) — nel compositore il selettore offre solo quello che Filo accetta, e tre file scelti insieme
+// con la cifratura che si rompe dopo il primo: la frase dice quale è allegato e quali mancano, non «niente».
+test('compositore: il selettore offre solo i tipi accettati; con la cifratura rotta a metà la frase nomina i file', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  await setupAdmin(app, page, {
+    _id: 'mock-att-cifratura-meta',
+    status: 'clarify',
+    text: 'il pulsante non risponde',
+    url: 'https://example.com',
+    clientId: 'tester-123',
+    notes: 'Puoi mandarmi uno screenshot del problema?',
+    createdAt: new Date().toISOString(),
+  });
+
+  await page.locator('[data-tab="inbox"]').click();
+  const card = page.locator('.fb-card');
+  const mount = card.locator('.fb-attach-mount[data-kind="reply"]');
+  const input = mount.locator('input[type="file"]');
+  await expect(input).toHaveCount(1, { timeout: 10_000 });
+
+  const accept = String(await input.getAttribute('accept')).split(',');
+  for (const via of ['image/*', 'text/*', 'image/svg+xml', '.svg', 'text/html', '.html']) expect(accept, via).not.toContain(via);
+  for (const si of ['.tsv', '.yaml', '.pdf', 'image/png']) expect(accept, si).toContain(si);
+
+  await page.evaluate(() => {
+    const finto = window.SN_FEEDBACK.uploadAttachment;
+    let n = 0;
+    window.SN_FEEDBACK.uploadAttachment = async (blob, name) => {
+      n += 1;
+      if (n === 1) return finto(blob, name);
+      window.SN_FEEDBACK_CRYPTO.hasPublicKey = () => false;
+      return window.__caricamentoVero(blob, name);
+    };
+  });
+
+  await input.setInputFiles([
+    { name: 'primo.png', mimeType: 'image/png', buffer: PNG_1x1 },
+    { name: 'secondo.png', mimeType: 'image/png', buffer: PNG_1x1 },
+    { name: 'log.txt', mimeType: 'text/plain', buffer: Buffer.from('errore 42') },
+  ]);
+
+  const stato = mount.locator('.fb-attach-status');
+  await expect(stato).toContainText('Non ho allegato «secondo.png» e «log.txt»: manca la chiave con cui si cifra.');
+  await expect(stato).toContainText('«primo.png» invece è allegato.');
+  await expect(stato).not.toContainText('Non ho mandato niente');
+  await expect(mount.locator('.fb-attach-thumb img')).toHaveCount(1);
+  await expect(mount.locator('.fb-attach-chip')).toHaveCount(0);
+});

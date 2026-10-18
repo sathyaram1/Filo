@@ -252,6 +252,21 @@
       + 'Senza cifratura quel contenuto lo può leggere chiunque.';
   }
 
+  // Per chi allega più file di fila: quelli già saliti restano attaccati, quindi la frase nomina i file che mancano e
+  // quelli allegati invece di dire che non è partito niente (#602.1).
+  function encryptionBlockedForFiles(motivo, mancati, allegati) {
+    const elenco = (nomi) => {
+      const q = (Array.isArray(nomi) ? nomi : []).filter(Boolean).map((n) => `«${n}»`);
+      return q.length > 1 ? `${q.slice(0, -1).join(', ')} e ${q[q.length - 1]}` : (q[0] || '');
+    };
+    const quali = elenco(mancati);
+    let frase = `Non ho allegato ${quali || 'il file'}: ${motivo || 'non riesco a cifrare'}. `
+      + 'Senza cifratura quel contenuto lo può leggere chiunque.';
+    const fatti = (Array.isArray(allegati) ? allegati : []).filter(Boolean);
+    if (fatti.length) frase += ` ${elenco(fatti)} invece ${fatti.length > 1 ? 'sono allegati' : 'è allegato'}.`;
+    return frase;
+  }
+
   // Cifra un campo testo. Se non si può cifrare, LANCIA: il chiamante decide se
   // fermarsi (l'invio) o lasciare il campo com'era (le scritture della
   // dashboard), ma nessuno scrive il valore in chiaro al posto del cifrato.
@@ -262,18 +277,18 @@
     // «non si è potuto cifrare» da «la rete non c'era», perché il primo non si
     // risolve riprovando (scripts/claude-feedback.mjs lo usa per il codice
     // d'uscita, la pagina per decidere che frase mostrare).
-    if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
+    if (motivo) throw new ErroreCifratura(motivo);
     const C = global.SN_FEEDBACK_CRYPTO;
     let out;
     try { out = await C.encryptForOwner(String(value)); }
     catch (e) {
-      throw new ErroreCifratura(encryptionBlockedMessage(
-        `la cifratura non è riuscita (${e?.message || e})`));
+      throw new ErroreCifratura(
+        `la cifratura non è riuscita (${e?.message || e})`);
     }
     // Cintura: se quello che torna non è un ciphertext, qualcuno ha sostituito
     // il modulo di cifratura con qualcosa che restituisce l'originale.
     if (!C.isEncrypted(out)) {
-      throw new ErroreCifratura(encryptionBlockedMessage('il testo non risulta cifrato'));
+      throw new ErroreCifratura('il testo non risulta cifrato');
     }
     return out;
   }
@@ -293,8 +308,14 @@
   // perché chi invia lo tratta diversamente da un caricamento andato storto:
   // un caricamento fallito lascia partire il resto della segnalazione, una
   // cifratura mancata ferma tutto.
+  // `motivo` resta da solo per chi deve dire anche COSA non è partito (più allegati di fila, #602.1).
   class ErroreCifratura extends Error {
-    constructor(message) { super(message); this.name = 'ErroreCifratura'; this.cifratura = true; }
+    constructor(motivo) {
+      super(encryptionBlockedMessage(motivo));
+      this.name = 'ErroreCifratura';
+      this.cifratura = true;
+      this.motivo = String(motivo || 'non riesco a cifrare');
+    }
   }
   function isEncryptionError(e) { return !!(e && e.cifratura === true); }
 
@@ -374,18 +395,18 @@
   // originale da qui non esce (#602).
   async function sealForUpload(blob) {
     const motivo = encryptionUnavailable();
-    if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
+    if (motivo) throw new ErroreCifratura(motivo);
     const C = global.SN_FEEDBACK_CRYPTO;
     let sealed;
     try {
       const ab = await blob.arrayBuffer();
       sealed = await C.encryptBytesForOwner(new Uint8Array(ab));
     } catch (e) {
-      throw new ErroreCifratura(encryptionBlockedMessage(
-        `la cifratura dell'allegato non è riuscita (${e?.message || e})`));
+      throw new ErroreCifratura(
+        `la cifratura dell'allegato non è riuscita (${e?.message || e})`);
     }
     if (!C.isEncryptedBytes(sealed)) {
-      throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
+      throw new ErroreCifratura("l'allegato non risulta cifrato");
     }
     return new Blob([sealed], { type: ATTACHMENT_CONTENT_TYPE });
   }
@@ -396,8 +417,8 @@
   async function assertSealed(blob) {
     const C = global.SN_FEEDBACK_CRYPTO;
     if (!C || !C.isEncryptedBytes) {
-      throw new ErroreCifratura(encryptionBlockedMessage(encryptionUnavailable()
-        || 'la parte di Filo che cifra non è stata caricata'));
+      throw new ErroreCifratura(encryptionUnavailable()
+        || 'la parte di Filo che cifra non è stata caricata');
     }
     const HEAD = 1 + 65 + 12; // versione + chiave effimera + nonce
     let testa;
@@ -405,12 +426,32 @@
       const pezzo = (blob && typeof blob.slice === 'function') ? blob.slice(0, HEAD) : blob;
       testa = new Uint8Array(await pezzo.arrayBuffer());
     } catch (e) {
-      throw new ErroreCifratura(encryptionBlockedMessage(
-        `non ho potuto controllare che l'allegato fosse cifrato (${e?.message || e})`));
+      throw new ErroreCifratura(
+        `non ho potuto controllare che l'allegato fosse cifrato (${e?.message || e})`);
     }
     if (!C.isEncryptedBytes(testa)) {
-      throw new ErroreCifratura(encryptionBlockedMessage("l'allegato non risulta cifrato"));
+      throw new ErroreCifratura("l'allegato non risulta cifrato");
     }
+  }
+
+  /** `testo` in fondo a `prima` dopo una riga vuota, una volta sola: chi salva il testo rimesso e il riquadro che lo
+   * rimette nel campo usano questa (#602.1). PURA. */
+  function accodaTesto(prima, testo) {
+    const p = typeof prima === 'string' ? prima : '';
+    const t = String(testo || '');
+    if (!t.trim() || p.includes(t)) return p;
+    return p.trim() ? `${p}\n\n${t}` : t;
+  }
+
+  // Il tipo con cui ogni allegato si dichiara, in un posto solo: quello della lista, mai l'alias del sistema (.log su
+  // Linux, .csv con Excel), che il gate del server non conosce. Fuori lista resta quello del file, e il gate lo rifiuta.
+  function tipoAllegato(name, type) {
+    if (!global.SN_FEEDBACK_ATTACH && typeof require === 'function') {
+      try { require('./feedbackAttachTypes.js'); } catch (_) {}
+    }
+    const A = global.SN_FEEDBACK_ATTACH;
+    const dichiarato = A && typeof A.tipoDichiarato === 'function' ? A.tipoDichiarato({ name, type }) : '';
+    return dichiarato || String(type || '');
   }
 
   // Carica un allegato (immagine O file) su Storage e lo classifica per la UI.
@@ -426,7 +467,7 @@
   // mostrare un'immagine o un collegamento, e con che tipo riaprire il file
   // dopo averlo decifrato.
   async function uploadAttachment(blob, name) {
-    const type = (blob && blob.type) || '';
+    const type = tipoAllegato(name || (blob && blob.name), blob && blob.type);
     const kind = type.startsWith('image/') ? 'img' : 'file';
     const sealed = await sealForUpload(blob);
     const u = await uploadImage(sealed);
@@ -680,7 +721,7 @@
     // Chi chiama trasforma questo errore in una frase per l'utente.
     {
       const motivo = encryptionUnavailable();
-      if (motivo) throw new ErroreCifratura(encryptionBlockedMessage(motivo));
+      if (motivo) throw new ErroreCifratura(motivo);
     }
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
@@ -715,7 +756,7 @@
         const rawBlob = dataUrlToBlob(f.dataUrl);
         const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
-        uploadedFiles.push(voceDocumento(u.url, fname, f.type || rawBlob.type || ''));
+        uploadedFiles.push(voceDocumento(u.url, fname, tipoAllegato(fname, f.type || rawBlob.type || '')));
       } catch (e) {
         if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
@@ -2261,7 +2302,10 @@
     // un «grazie» e vedere la segnalazione riprovare in eterno nella coda.
     encryptionUnavailable,
     encryptionBlockedMessage,
+    encryptionBlockedForFiles,
     isEncryptionError,
+    tipoAllegato,
+    accodaTesto,
     sealForUpload,
     // #582 — il confine degli allegati: la forma del nome e il tipo (che storage.rules
     // pretende), il riconoscimento di un URL del bucket e le intestazioni con

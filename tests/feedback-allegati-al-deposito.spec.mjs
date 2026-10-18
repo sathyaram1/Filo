@@ -3,8 +3,10 @@
 // pubblicate (storage.rules): un'immagine e un .txt arrivano e la dashboard li riapre; un .zip no.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { webcrypto } from 'node:crypto';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const REGOLE = readFileSync(new URL('../storage.rules', import.meta.url), 'utf8').replace(/\/\/[^\n]*/g, ' ');
 const NOME_AMMESSO = /file\.matches\('([^']+)'\)/.exec(REGOLE)[1].replace(/\\\\/g, '\\');
@@ -197,4 +199,39 @@ test('un’immagine e un .txt arrivano nel deposito come blob cifrati e la dashb
   const doc = await dash.evaluate(() => window.__decifrati.find((x) => x.mime === 'text/plain'));
   expect(doc.r.ok, JSON.stringify(doc.r)).toBe(true);
   expect(Buffer.from(doc.r.dataUrl.split(',')[1], 'base64').toString('utf8')).toBe(TESTO);
+});
+
+// #1337: il sistema chiama certi documenti ammessi con un altro nome (Linux: .log `text/x-log`, .yaml `application/yaml`;
+// Windows con Excel: .csv `application/vnd.ms-excel`). Si allegano lo stesso, e il documento che arriva li dichiara
+// col tipo della lista, l'unico che il cancello del server conosce.
+test('un .log, un .yaml e un .csv col tipo dato dal sistema arrivano dichiarati col tipo della lista', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await depositoConLeRegole(app, await coppiaDiProva());
+  const page = await newtabPage(app);
+  await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(page.locator('.sn-fb-modal')).toBeVisible();
+
+  const dir = cartellaTemporanea('filo-tipi-');
+  const log = join(dir, 'diario.log');
+  const yaml = join(dir, 'config.yaml');
+  writeFileSync(log, 'errore 42\n');
+  writeFileSync(yaml, 'a: 1\n');
+  const input = page.locator('.sn-fb-file');
+  // Dal disco il tipo lo decide Chromium col sistema, come per chi sceglie il file nel selettore.
+  await input.setInputFiles([log, yaml]);
+  await input.setInputFiles({ name: 'misure.csv', mimeType: 'application/vnd.ms-excel', buffer: Buffer.from('a,b\n1,2\n') });
+  await trascina(page, { name: 'note.md', type: 'text/x-markdown', base64: Buffer.from('# ciao').toString('base64') });
+  await expect(page.locator('.sn-fb-file-chip .sn-fb-file-name')).toHaveText(['diario.log', 'config.yaml', 'misure.csv', 'note.md']);
+  await expect(page.locator('.sn-fb-status')).not.toContainText('non supportato');
+
+  await page.locator('.sn-fb-text').fill('allego i file');
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 8_000 });
+
+  await expect.poll(async () => (await deposito(app)).documenti.length, { timeout: 30_000 }).toBe(1);
+  const d = await deposito(app);
+  expect(d.rifiutati).toEqual([]);
+  expect(allegatiDelDocumento(d.documenti[0]).files.map((f) => [f.name, f.type])).toEqual([
+    ['diario.log', 'text/plain'], ['config.yaml', 'application/x-yaml'], ['misure.csv', 'text/csv'], ['note.md', 'text/markdown'],
+  ]);
 });
