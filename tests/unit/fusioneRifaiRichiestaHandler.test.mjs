@@ -124,6 +124,13 @@ test('blocco senza richiesta, conflitto, fusione, guasto: ognuno col suo esito',
   assert.match((await rifai()).error, /«stale»/);
 });
 
+// Verifica #1040 giro 1, rilievo 1: commit arrivati dopo i controlli non li ha letti nessuno, e il server non li fonde
+// né li chiede. Per la pagina è un esito suo, che propone di rimettere in coda: non un errore da riprovare.
+test('ramo mosso dopo i controlli della pratica: esito «cambiato», non un errore', async () => {
+  fusione = { ok: true, result: 'stale', headSha: 'b'.repeat(40), pratica: true };
+  assert.deepEqual(await rifai(), { ok: true, esito: 'cambiato' });
+});
+
 test('senza pratica o senza un ramo fondibile non chiede niente al server', async () => {
   for (const msg of [{ feedbackId: '' }, { branch: '' }, { branch: 'main' }, { branch: 'a..b' }, { branch: '--force' }, { branch: 'x'.repeat(201) }]) {
     const r = await rifai(msg);

@@ -78,7 +78,7 @@ test('ferma al cancello senza richiesta: il quadrato lo dice, e «Rifai la richi
 
   const btn = page.locator('#mgRifaiRichiestaBtn');
   await expect(btn).toBeVisible();
-  await expect(btn).toHaveAttribute('title', /ricontrolla il ramo/);
+  await expect(btn).toHaveAttribute('title', /ricontrolla la versione del ramo/);
   await btn.click();
   await expect(pannello.locator('.mg-liv-esito')).toContainText('Chiedo al server');
 
@@ -115,6 +115,20 @@ test('il ramo non si fonde più con main: lo dice, resta detto alle riletture, e
   await page.screenshot({ path: 'tests/.shots/manage-l5-senza-richiesta-conflitto.png' });
 
   await coda.click();
+  await expect.poll(() => page.evaluate(() => window.__chiamate.filter((c) => c.type === 'feedback_update').map((c) => c.status))).toEqual(['todo']);
+});
+
+// Verifica #1040 giro 1, rilievo 1: dopo i controlli il ramo ha preso commit nuovi. Il server non li fonde né li chiede:
+// la scheda lo dice e propone di rimettere in coda, come per il ramo che non si fonde più.
+test('ramo cambiato dopo i controlli: lo dice e propone «Rimetti in coda», non un errore da riprovare', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, { rifai: { ok: true, esito: 'cambiato' } });
+  await page.locator('#mgRifaiRichiestaBtn').click();
+  const pannello = page.locator('#mgSideBody');
+  await expect(pannello.locator('.mg-liv-testo')).toContainText('commit che nessuno ha letto', { timeout: 8_000 });
+  await expect(page.locator('#mgRimettiInCodaBtn')).toBeVisible();
+  await expect(page.locator('#mgRifaiRichiestaBtn')).toHaveCount(0);
+  await page.locator('#mgRimettiInCodaBtn').click();
   await expect.poll(() => page.evaluate(() => window.__chiamate.filter((c) => c.type === 'feedback_update').map((c) => c.status))).toEqual(['todo']);
 });
 

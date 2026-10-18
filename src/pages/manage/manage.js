@@ -5505,6 +5505,7 @@
     gia_decisa: { kind: 'err', text: 'Su questa versione del ramo avevi già deciso: la richiesta resta com’era. Rimettila in coda o archiviala.', coda: true },
     non_legata: { kind: 'err', text: 'Il server ha aperto la richiesta ma non l’ha legata a questa pratica: la trovi in Automazioni.' },
     conflitto: { kind: 'err', text: 'Il ramo non si fonde più con main: va rifatto. Rimettila in coda.', coda: true },
+    cambiato: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto: non lo fondo e non lo chiedo. Rimettila in coda.', coda: true },
     fuso: { kind: 'ok', text: 'I controlli adesso passano: il ramo è entrato in main e la pratica è chiusa.' },
     fusoAperta: { kind: 'err', text: 'Il ramo è entrato in main, ma la pratica non si è chiusa da sola: archiviala.' },
   };
@@ -5561,7 +5562,7 @@
     } else {
       btn.id = 'mgRifaiRichiestaBtn';
       btn.textContent = 'Rifai la richiesta';
-      btn.title = 'Il server ricontrolla il ramo e apre qui la richiesta per il tuo via libera. Se i controlli adesso passano, lo fonde.';
+      btn.title = 'Il server ricontrolla la versione del ramo già controllata e apre qui la richiesta per il tuo via libera. Se adesso passa, la fonde.';
       btn.disabled = rifaiInVolo.has(fb._id);
       btn.addEventListener('click', () => { rifaiRichiesta(fb); });
     }

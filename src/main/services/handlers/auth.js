@@ -1563,6 +1563,8 @@ module.exports = function register(on, ctx) {
     }
     const result = String(r.result || '');
     if (result === 'conflict') return { ok: true, esito: 'conflitto' };
+    // Il ramo non è più la versione letta dai controlli: il server non fonde né chiede commit che nessuno ha letto.
+    if (result === 'stale' && r.pratica === true) return { ok: true, esito: 'cambiato' };
     if (result === 'merged') return { ok: true, esito: 'fuso', sha: String(r.sha || ''), chiusa: r.chiusa === true };
     if (result !== 'blocked') return { ok: false, error: `Il server ha risposto «${result || 'niente'}»: riprova.` };
     const requestId = String(r.requestId || '');
