@@ -515,7 +515,12 @@ module.exports = function register(on, ctx) {
       // Riga di un modello che non è di testo (voce, dettatura, indicizzazione):
       // si prova nel suo mestiere.
       const rowEntry = (s.modelRegistry || {})[msg.nickname] || null;
-      const routing = providerRouting(s, rowEntry && rowEntry.sort);
+      // La riga delle Opzioni manda ordinamento e ragionamento già risolti al clic: la misura le verrà attribuita.
+      const sortRiga = typeof msg.sort === 'string' ? msg.sort : null;
+      const routing = sortRiga != null
+        ? providerRouting({ ...s, providerSort: '' }, sortRiga)
+        : providerRouting(s, rowEntry && rowEntry.sort);
+      const reasoningRiga = typeof msg.reasoning === 'string' ? msg.reasoning : (rowEntry && rowEntry.reasoning);
       const kind = modelKind(provider, model, rowEntry);
       if (kind !== 'text') {
         return await probeNonText({ settings: s, kind, provider, apiKey, model, routing, nickname: msg.nickname || '' });
@@ -528,7 +533,7 @@ module.exports = function register(on, ctx) {
       // ragionamento che la voce userebbe davvero: senza, la velocità letta parlerebbe di un'altra chiamata.
       const result = await probe({
         settings: s, provider, apiKey, model, routing, method: 'streamComplete',
-        reasoning: SN_CONST.normalizeReasoning(rowEntry && rowEntry.reasoning) || undefined,
+        reasoning: SN_CONST.normalizeReasoning(reasoningRiga) || undefined,
         args: {
           messages,
           onDelta: (delta) => {
@@ -737,11 +742,11 @@ module.exports = function register(on, ctx) {
       // dell'uso reale.
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
-      // Riga dell'editor: l'ordinamento lo ha già risolto la pagina su ciò che
-      // si vede lì, quindi qui non si torna alla scelta generale salvata.
-      // Una voce predefinita si prova come la chiamerebbe questo utente: con la sua scelta personale, se ne ha una.
-      const routing = explicitModel
-        ? providerRouting({ ...eff, providerSort: '' }, tuning.sort)
+      // L'editor e le Opzioni mandano l'ordinamento già risolto dalla pagina (al clic: la misura va a quello, anche se
+      // la tendina cambia intanto). Senza, una voce predefinita si prova con la scelta personale di questo utente.
+      const sortDelClic = !explicitModel && typeof msg.sort === 'string' ? msg.sort : null;
+      const routing = explicitModel || sortDelClic != null
+        ? providerRouting({ ...eff, providerSort: '' }, explicitModel ? tuning.sort : sortDelClic)
         : providerRouting(eff, SN_CONST.ordinamentoPerUtente(eff.ordineHost, tuning.sort, ''));
       if (kind !== 'text') {
         return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing, nickname });

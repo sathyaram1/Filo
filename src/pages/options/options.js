@@ -386,10 +386,13 @@
     const statusEl = row.querySelector('.sn-model-row-status');
     statusEl.textContent = I18n.t('options_test_running');
     btn.disabled = true;
+    // Fissata al clic e mandata con la richiesta: la tendina cambiata mentre la prova gira non si prende i suoi numeri.
+    const conf = configurazioneRiga(row);
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
+        sort: conf.sort || '',
       });
       if (!res?.ok) {
         statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
@@ -398,7 +401,7 @@
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
-          ...configurazioneRiga(row),
+          ...conf,
         };
         renderRowTest(row);
         saveDefaultModelTest(nickname, row._test);
@@ -759,6 +762,8 @@
     if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
+    // Come per le righe predefinite: la prova chiama, e la misura si attribuisce, con la configurazione del clic.
+    const conf = configurazioneRiga(row);
     try {
       // L'id del registry va passato così com'è: stesso percorso dell'uso reale.
       const res = await chrome.runtime.sendMessage({
@@ -766,6 +771,8 @@
         provider: providerId,
         apiKey,
         model: modelId,
+        sort: conf.sort || '',
+        reasoning: conf.reasoning || '',
       });
       if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
@@ -778,7 +785,7 @@
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
-          ...configurazioneRiga(row),
+          ...conf,
         };
         renderRowTest(row);
         save();
