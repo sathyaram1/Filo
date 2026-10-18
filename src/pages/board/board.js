@@ -283,9 +283,12 @@
 
   // Quali testi non ci stanno lo dice solo la lista posata, e cambia con la larghezza della finestra.
   function segnaTestiLunghi() {
-    for (const box of bdList.querySelectorAll('.bd-card-testo')) {
+    // Prima tutte le misure, poi tutte le classi: alternarle rifarebbe l'impaginazione a ogni scheda.
+    const misure = [...bdList.querySelectorAll('.bd-card-testo')].map((box) => {
       const corto = box.firstElementChild;
-      const lungo = !!corto && corto.scrollHeight > corto.clientHeight + 1;
+      return [box, !!corto && corto.scrollHeight > corto.clientHeight + 1];
+    });
+    for (const [box, lungo] of misure) {
       box.classList.toggle('lungo', lungo);
       if (lungo) box.tabIndex = 0; else box.removeAttribute('tabindex');
     }
