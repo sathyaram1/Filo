@@ -129,7 +129,7 @@ import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
 import { URL_SERVER, ambienteGitServer, cartellaCloneServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
-import { accoda, commitPropri, inviaSpinte, rigaSpinte } from './lib/spinte.mjs';
+import { accoda, inviaSpinte, rigaSpinte, spintaDi } from './lib/spinte.mjs';
 import { commitDelRamo } from './lib/biglietto-locale.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
@@ -929,8 +929,7 @@ export const dichiaraSpintaServer = {
   prima(dir, ramo) {
     try {
       const locale = execFileSync('git', ['-C', dir, 'rev-parse', `refs/heads/${ramo}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-      const p = commitPropri(dir, { locale, ramo });
-      return p && (p.commits.length || p.oltre) ? Object.assign({ ramo, punta: locale, commits: p.commits }, p.oltre ? { oltre: true } : {}) : null;
+      return spintaDi(dir, { locale, ramo });
     } catch (_) {
       return null;
     }
