@@ -7,7 +7,10 @@ const Servizio = require('../contatori');
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
+  const A = globalThis.SN_CONST.ACTIONS;
   const contatori = Servizio.crea({
+    // Le funzioni che preparano una risposta prima che la persona la chieda: l'uso lo conta la pagina che la mostra.
+    dallaPagina: [A.EXPLAIN, A.SPELLCHECK_WORD],
     esclusi: async () => {
       const out = [];
       try { out.push(await globalThis.SN_STORAGE.getRaw('sn_feedback_client_id', null)); } catch (_) {}
@@ -17,6 +20,8 @@ module.exports = function register(on, ctx) {
   });
   globalThis.SN_CONTATORI_MAIN = contatori;
   contatori.avvia();
+
+  on(MSG.CONTATORI_USO, async (msg) => ({ ok: contatori.usoDallaPagina(msg && msg.action, msg && msg.attesaMs) }));
 
   on(MSG.CONTATORI_INSTALLAZIONI, soloFilo(async () => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };

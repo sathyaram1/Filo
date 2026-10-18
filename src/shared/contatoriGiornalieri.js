@@ -23,6 +23,7 @@
   const TETTO_GIORNI_IN_ATTESA = 62;
   const TETTO_INVII_PER_GIRO = 31;
 
+  const MAX_CONTO = 999999999;
   const PSEUDONIMO_RE = /^[0-9a-f]{20}$/;
   const GIORNO_RE = /^20\d{2}-[01]\d-[0-3]\d$/;
   const APP_RE = /^\d{1,4}\.\d{1,4}\.\d{1,6}$/;
@@ -32,6 +33,15 @@
   // Chi ha servito, come lo dichiara il router («DeepInfra», «Google Vertex»): mai scritto da chi usa Filo.
   const HOST_RE = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,47}$/;
   const ALTRO = 'altro';
+  // Le forme dei valori annidati del documento: le regole ne tengono la copia (la sentinella le confronta).
+  const USO_FORMA = '^[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6}$';
+  const VOCE_ERRORE = `[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](${ERRORI.join('|')})[|][0-9]{1,9}`;
+  const ERRORI_FORMA = `^${VOCE_ERRORE}(;${VOCE_ERRORE})*$`;
+  const USO_RE = new RegExp(USO_FORMA);
+  const ERRORI_RE = new RegExp(ERRORI_FORMA);
+  const TETTO_CARATTERI_USO = 80;
+  // Una voce è al più 120 + 48 + 11 + 9 caratteri più i separatori: 190 per voce, con margine.
+  const TETTO_CARATTERI_ERRORI = 190 * TETTO_COMBINAZIONI;
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const intero = (n) => Number.isInteger(n) && n >= 0;
@@ -164,23 +174,29 @@
   // ── Il documento che esce ─────────────────────────────────────────────────
   // Si ricostruisce dagli elenchi chiusi, non si copia: un disco manomesso o un campo nuovo non arrivano al server.
 
+  // Ogni valore annidato esce come UNA stringa di forma fissa: le regole Firestore non sanno passare in rassegna una
+  // mappa o una lista, una stringa sì (tipo, lunghezza, espressione regolare). Così il server tiene fuori il testo libero.
+  // Uso: «n;f1,…,f7», gli usi e le attese nelle fasce di NOMI_FASCE, in quell'ordine.
   function usoPulito(uso) {
     const out = {};
     const ammesse = funzioni();
     for (const f of ammesse) {
       const u = uso && has(uso, f) ? uso[f] : null;
       if (!u || !intero(u.n) || u.n === 0) continue;
-      const fasce = {};
+      const n = Math.min(u.n, MAX_CONTO);
       let somma = 0;
-      for (const k of NOMI_FASCE) {
-        const n = u.fasce && has(u.fasce, k) ? u.fasce[k] : 0;
-        if (intero(n) && n > 0 && somma + n <= u.n) { fasce[k] = n; somma += n; }
-      }
-      out[f] = { n: u.n, fasce };
+      const fasce = NOMI_FASCE.map((k) => {
+        const v = u.fasce && has(u.fasce, k) ? u.fasce[k] : 0;
+        if (!intero(v) || v === 0 || somma + v > n) return 0;
+        somma += v;
+        return v;
+      });
+      out[f] = `${n};${fasce.join(',')}`;
     }
     return out;
   }
 
+  // Errori: «modello|host|tipo|n» separati da «;», al più TETTO_COMBINAZIONI per funzione.
   function erroriPuliti(errori) {
     const out = {};
     for (const f of funzioni()) {
@@ -191,12 +207,29 @@
         if (!intero(n) || n === 0) continue;
         const [m, h, t] = String(chiave).split('|');
         if (!ERRORI.includes(t)) continue;
-        lista.push({ modello: modelloPulito(m), host: hostPulito(h), tipo: t, n });
+        lista.push(`${modelloPulito(m)}|${hostPulito(h)}|${t}|${Math.min(n, MAX_CONTO)}`);
         if (lista.length >= TETTO_COMBINAZIONI) break;
       }
-      if (lista.length) out[f] = lista;
+      if (lista.length) out[f] = lista.join(';');
     }
     return out;
+  }
+
+  // Il contrario, per chi legge i documenti: { n, fasce: { fascia: n } } e [{ modello, host, tipo, n }].
+  function leggiUso(s) {
+    if (!USO_RE.test(String(s))) return null;
+    const [n, resto] = String(s).split(';');
+    const fasce = {};
+    resto.split(',').forEach((v, i) => { if (Number(v) > 0) fasce[NOMI_FASCE[i]] = Number(v); });
+    return { n: Number(n), fasce };
+  }
+
+  function leggiErrori(s) {
+    if (!ERRORI_RE.test(String(s))) return null;
+    return String(s).split(';').map((v) => {
+      const [modello, host, tipo, n] = v.split('|');
+      return { modello, host, tipo, n: Number(n) };
+    });
   }
 
   function meseDi(giorno) { return String(giorno || '').slice(0, 7); }
@@ -217,7 +250,7 @@
 
   function idDocumento(doc) { return `${doc.pseudonimo}_${doc.giorno}`; }
 
-  // La stessa forma che chiedono le regole, più quello che le regole non sanno controllare (i valori annidati).
+  // La stessa forma che chiedono le regole, e in più che le fasce non superino gli usi.
   function valida(doc) {
     const no = (motivo) => ({ ok: false, motivo });
     if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return no('non è un documento');
@@ -229,28 +262,20 @@
     if (!APP_RE.test(String(doc.app))) return no('versione dell\'app');
     if (!OS.includes(doc.os)) return no('sistema');
     const ammesse = funzioni();
-    if (!doc.uso || typeof doc.uso !== 'object') return no('uso');
+    if (!doc.uso || typeof doc.uso !== 'object' || Array.isArray(doc.uso)) return no('uso');
     for (const [f, u] of Object.entries(doc.uso)) {
       if (!ammesse.includes(f)) return no(`funzione ${f}`);
-      if (!u || Object.keys(u).some((k) => k !== 'n' && k !== 'fasce') || !intero(u.n)) return no(`uso di ${f}`);
-      if (!u.fasce || typeof u.fasce !== 'object') return no(`fasce di ${f}`);
-      let somma = 0;
-      for (const [k, n] of Object.entries(u.fasce)) {
-        if (!NOMI_FASCE.includes(k) || !intero(n)) return no(`fascia ${k}`);
-        somma += n;
-      }
-      if (somma > u.n) return no(`fasce di ${f} oltre gli usi`);
+      if (typeof u !== 'string' || u.length > TETTO_CARATTERI_USO) return no(`uso di ${f}`);
+      const letto = leggiUso(u);
+      if (!letto) return no(`uso di ${f}`);
+      if (Object.values(letto.fasce).reduce((a, n) => a + n, 0) > letto.n) return no(`fasce di ${f} oltre gli usi`);
     }
-    if (!doc.errori || typeof doc.errori !== 'object') return no('errori');
-    for (const [f, lista] of Object.entries(doc.errori)) {
+    if (!doc.errori || typeof doc.errori !== 'object' || Array.isArray(doc.errori)) return no('errori');
+    for (const [f, e] of Object.entries(doc.errori)) {
       if (!ammesse.includes(f)) return no(`funzione ${f}`);
-      if (!Array.isArray(lista) || lista.length > TETTO_COMBINAZIONI) return no(`errori di ${f}`);
-      for (const e of lista) {
-        if (!e || Object.keys(e).sort().join(',') !== 'host,modello,n,tipo') return no(`errore di ${f}`);
-        if (e.modello !== ALTRO && !MODELLO_RE.test(String(e.modello))) return no('modello');
-        if (e.host !== '' && !HOST_RE.test(String(e.host))) return no('host');
-        if (!ERRORI.includes(e.tipo) || !intero(e.n) || e.n === 0) return no('tipo di errore');
-      }
+      if (typeof e !== 'string' || e.length > TETTO_CARATTERI_ERRORI) return no(`errori di ${f}`);
+      const lista = leggiErrori(e);
+      if (!lista || lista.length > TETTO_COMBINAZIONI || lista.some((x) => x.n === 0)) return no(`errori di ${f}`);
     }
     return { ok: true, motivo: '' };
   }
@@ -304,9 +329,9 @@
   global.SN_CONTATORI = {
     VERSIONE, COLLEZIONE, ERRORI, OS, FASCE, NOMI_FASCE, CAMPI,
     TETTO_COMBINAZIONI, TETTO_GIORNI_IN_ATTESA, TETTO_INVII_PER_GIRO,
-    PSEUDONIMO_RE, GIORNO_RE, APP_RE, MODELLO_RE, HOST_RE,
+    PSEUDONIMO_RE, GIORNO_RE, APP_RE, MODELLO_RE, HOST_RE, USO_RE, ERRORI_RE, USO_FORMA, ERRORI_FORMA, TETTO_CARATTERI_USO, TETTO_CARATTERI_ERRORI,
     funzioni, funzioneDi, fasciaDi, famigliaOs, versioneApp, modelloPulito, hostPulito, tipoErrore,
-    giornoVuoto, registraUso, registraErrore, documento, idDocumento, valida,
+    giornoVuoto, registraUso, registraErrore, documento, idDocumento, valida, leggiUso, leggiErrori,
     giornoDi, giornoPrima, meseDi, daInviare, potaGiorni, pseudonimoDelMese,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

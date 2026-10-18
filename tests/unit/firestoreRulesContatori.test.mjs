@@ -63,14 +63,50 @@ test('i campi ammessi sono quelli che l’app costruisce, tutti obbligatori', ()
   assert.deepEqual(Object.keys(doc), [...C.CAMPI]);
 });
 
-test('le chiavi di uso ed errori vengono dall’elenco chiuso delle funzioni, lo stesso dell’app', () => {
+test('le chiavi di uso ed errori vengono dall’elenco chiuso delle funzioni, che contiene quello dell’app', () => {
   const nelleRegole = elencoDopo('function funzioniContate\\(\\)');
-  assert.deepEqual(nelleRegole, C.funzioni(),
-    'le funzioni delle regole devono essere quelle di SN_CONTATORI.funzioni(), nello stesso ordine. Una funzione nuova va '
-    + 'aggiunta qui e le regole ripubblicate (npm run regole:pubblica): finché non lo sono, i giorni che la portano vengono '
-    + 'rifiutati e restano in attesa.');
+  const mancano = C.funzioni().filter((f) => !nelleRegole.includes(f));
+  assert.deepEqual(mancano, [],
+    'ogni funzione di SN_CONTATORI.funzioni() deve stare nelle regole. Una funzione nuova va aggiunta qui '
+    + 'e le regole ripubblicate (npm run regole:pubblica): finché non lo sono, i giorni che la portano '
+    + 'vengono rifiutati e restano in attesa. Una funzione tolta dall’app resta: le copie vecchie la mandano ancora.');
+  assert.equal(new Set(nelleRegole).size, nelleRegole.length, 'una funzione scritta due volte nelle regole');
   assert.match(B, /d\.uso is map && d\.uso\.keys\(\)\.hasOnly\(funzioniContate\(\)\)/);
   assert.match(B, /d\.errori is map && d\.errori\.keys\(\)\.hasOnly\(funzioniContate\(\)\)/);
+});
+
+// Le regole non sanno passare in rassegna una mappa: ne uniscono i valori in una stringa sola, e una stringa si misura e
+// si confronta. Un valore che non è una stringa fa fallire l'unione, e il giorno viene rifiutato.
+test('i valori annidati hanno la forma dell’app e un tetto di lunghezza che regge l’elenco intero', () => {
+  const nelleRegole = elencoDopo('function funzioniContate\\(\\)');
+  const forma = (campo) => {
+    const tetto = new RegExp(`d\\.${campo}\\.values\\(\\)\\.join\\('#'\\)\\.size\\(\\) <= (\\d+)`).exec(B);
+    const re = new RegExp(`d\\.${campo}\\.values\\(\\)\\.join\\('#'\\)\\.matches\\('([^']+)'\\)`).exec(B);
+    assert.ok(tetto && re, `manca il controllo dei valori di ${campo}`);
+    return { tetto: Number(tetto[1]), re: re[1] };
+  };
+  const uso = forma('uso');
+  const err = forma('errori');
+  const unite = (voce) => `^(${voce}(#${voce})*)?$`;
+  assert.equal(uso.re, unite(C.USO_FORMA.slice(1, -1)));
+  assert.equal(err.re, unite(C.ERRORI_FORMA.slice(1, -1)));
+  assert.ok(uso.tetto >= (C.TETTO_CARATTERI_USO + 1) * nelleRegole.length, 'il tetto delle regole sugli usi non regge un giorno con ogni funzione');
+  assert.ok(err.tetto >= (C.TETTO_CARATTERI_ERRORI + 1) * nelleRegole.length, 'il tetto delle regole sugli errori non regge un giorno con ogni funzione');
+  assert.ok(err.tetto <= 900000, 'oltre, il documento passa il limite di Firestore (1 MiB)');
+  // Il documento più carico che l'app può costruire passa le forme delle regole.
+  const giorno = C.giornoVuoto();
+  for (const f of C.funzioni()) {
+    for (let i = 0; i < 80; i++) C.registraErrore(giorno, f, { modello: `${'m'.repeat(60)}/${'x'.repeat(50)}${i}`, host: 'H'.repeat(48), tipo: 'fornitore' });
+    for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraUso(giorno, f, ms);
+  }
+  const doc = C.documento({ pseudonimo: 'a'.repeat(20), giorno: '2026-10-15', app: '0.2.243', os: 'win', dati: giorno });
+  const usi = Object.values(doc.uso).join('#');
+  const errori = Object.values(doc.errori).join('#');
+  assert.ok(usi.length <= uso.tetto && new RegExp(uso.re).test(usi));
+  assert.ok(errori.length <= err.tetto && new RegExp(err.re).test(errori));
+  assert.ok(new RegExp(err.re).test('') && new RegExp(uso.re).test(''), 'un giorno senza usi né errori passa');
+  assert.ok(!new RegExp(err.re).test('modello|host|fornitore|1;<script>alert(1)</script>'));
+  assert.ok(!new RegExp(uso.re).test('1;0,0,0,0,0,0,0 ciao'));
 });
 
 test('pseudonimo, giorno, versione e sistema hanno la forma dell’app, e l’id è pseudonimo più giorno', () => {

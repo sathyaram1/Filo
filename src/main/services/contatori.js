@@ -25,7 +25,7 @@ function valoreFs(v) {
   return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, valoreFs(x)])) } };
 }
 
-function statoVuoto() { return { giorni: {}, pseudonimi: {}, fallitoIl: '', ultimo: null, errore: '' }; }
+function statoVuoto() { return { giorni: {}, pseudonimi: {}, fallitoIl: '', rifiutati: {}, ultimo: null, errore: '' }; }
 
 function normale(s) {
   const o = s && typeof s === 'object' ? s : {};
@@ -33,6 +33,7 @@ function normale(s) {
     giorni: o.giorni && typeof o.giorni === 'object' ? o.giorni : {},
     pseudonimi: o.pseudonimi && typeof o.pseudonimi === 'object' ? o.pseudonimi : {},
     fallitoIl: typeof o.fallitoIl === 'string' ? o.fallitoIl : '',
+    rifiutati: o.rifiutati && typeof o.rifiutati === 'object' ? o.rifiutati : {},
     ultimo: o.ultimo && typeof o.ultimo === 'object' ? o.ultimo : null,
     errore: typeof o.errore === 'string' ? o.errore : '',
   };
@@ -120,11 +121,12 @@ function crea(dip = {}) {
     if (aperta) giornoDiOggi();
   }
 
-  async function registra(funzione, attesaMs, errori) {
+  async function registra(funzione, attesaMs, errori, { uso = true } = {}) {
+    if (!uso && !errori.length) return;
     if (!(await accesi())) { await azzera(); return; }
     await carica();
     const g = giornoDiOggi();
-    C.registraUso(g, funzione, attesaMs);
+    if (uso) C.registraUso(g, funzione, attesaMs);
     for (const e of errori) C.registraErrore(g, funzione, e);
     salvaPresto();
   }
@@ -138,17 +140,50 @@ function crea(dip = {}) {
 
   // Un uso che raccoglie più chiamate della stessa funzione: un messaggio di chat con i suoi giri di strumenti, una
   // dettatura coi suoi ripieghi. L'attesa parte da quando è partito l'uso, non dall'ultima chiamata.
-  async function unUso(action, fn) {
+  async function unUso(action, fn, { soloGuasti = false } = {}) {
     const funzione = C.funzioneDi(action);
     const fuori = usoCorrente.getStore();
     if (!funzione || inIncognito() || (fuori && !fuori.chiuso && fuori.funzione === funzione)) return fn();
-    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0, chiuso: false };
+    const uso = { funzione, t0: adesso(), visto: null, errori: [], chiamate: 0, chiuso: false, soloGuasti };
     try {
       return await usoCorrente.run(uso, fn);
     } finally {
       uso.chiuso = true;
-      if (uso.chiamate > 0) registra(funzione, uso.visto, uso.errori).catch(() => {});
+      if (uso.chiamate > 0) registra(funzione, uso.visto, uso.errori, { uso: !soloGuasti }).catch(() => {});
     }
+  }
+
+  // Una chiamata che non è la richiesta di chi usa Filo: un anticipo (la spiegazione preparata alla selezione) o un
+  // pezzo di un uso già contato (un blocco della traduzione, un passo dell'Aiuto). Conta i guasti, non un uso: l'uso
+  // lo conta chi vede la risposta (`usoDallaPagina`) o la prima chiamata della richiesta.
+  function parteDiUnUso(action, fn) { return unUso(action, fn, { soloGuasti: true }); }
+
+  // Una risposta data dalla cache è un uso come un altro, senza attesa: il cancello delle chiamate non la vede.
+  function servitaDaCache(action) {
+    try {
+      const funzione = C.funzioneDi(action);
+      if (!funzione || inIncognito()) return;
+      const uso = usoCorrente.getStore();
+      if (uso && !uso.chiuso && uso.funzione === funzione) {
+        uso.chiamate += 1;
+        if (uso.visto == null) uso.visto = adesso() - uso.t0;
+        return;
+      }
+      registra(funzione, 0, []).catch(() => {});
+    } catch (_) {}
+  }
+
+  // L'uso che conta la superficie dove la persona chiede e vede: una spiegazione preparata e poi aperta, la correzione
+  // di una parola già pronta. `attesaMs` va dal gesto alla risposta a schermo; null se non ne è arrivata una.
+  const DALLA_PAGINA = new Set(dip.dallaPagina || []);
+  const ATTESA_MAX_MS = 60 * 60 * 1000;
+  function usoDallaPagina(action, attesaMs) {
+    const funzione = C.funzioneDi(action);
+    if (!funzione || (DALLA_PAGINA.size && !DALLA_PAGINA.has(action)) || inIncognito()) return false;
+    const n = Number(attesaMs);
+    const attesa = attesaMs == null || !Number.isFinite(n) || n < 0 ? null : Math.min(n, ATTESA_MAX_MS);
+    registra(funzione, attesa, []).catch(() => {});
+    return true;
   }
 
   // Il cancello chiama `apri` a ogni chiamata; `visto` alla prima cosa che arriva a schermo, `errore` a ogni tentativo
@@ -200,11 +235,14 @@ function crea(dip = {}) {
     }
     // 409: il giorno è già sul server (la risposta di un invio riuscito si era persa).
     if (res.ok || res.status === 409) return { ok: true };
-    return { ok: false, motivo: `il server ha risposto ${res.status}` };
+    // 400 e 403: è QUESTO giorno che il server non accetta (una funzione che le regole pubblicate non conoscono
+    // ancora), non il server che è giù.
+    return { ok: false, motivo: `il server ha risposto ${res.status}`, soloQuesto: res.status === 400 || res.status === 403 };
   }
 
-  // Il giro: segna che oggi Filo è stato aperto, poi spedisce i giorni chiusi dal più vecchio. Un rifiuto ferma il
-  // giro fino a domani; i giorni restano in attesa, al più TETTO_GIORNI_IN_ATTESA.
+  // Il giro: segna che oggi Filo è stato aperto, poi spedisce i giorni chiusi dal più vecchio. Un server che non
+  // risponde ferma il giro fino a domani; un giorno rifiutato si riprova domani e non ferma quelli dopo. I giorni
+  // restano in attesa, al più TETTO_GIORNI_IN_ATTESA.
   async function giro() {
     if (!(await accesi())) { await azzera(); return 'spenti'; }
     await carica();
@@ -213,8 +251,10 @@ function crea(dip = {}) {
     const persi = C.potaGiorni(stato.giorni);
     if (persi.length) log(`${persi.length} giorni mai partiti lasciati andare (dal ${persi[0]} al ${persi[persi.length - 1]})`);
     if (stato.fallitoIl === oggi) { await salva(); return 'rimandato'; }
+    for (const g of Object.keys(stato.rifiutati)) if (!stato.giorni[g]) delete stato.rifiutati[g];
+    const candidati = Object.fromEntries(Object.keys(stato.giorni).filter((g) => stato.rifiutati[g] !== oggi).map((g) => [g, true]));
     let esito = 'niente';
-    for (const g of C.daInviare(stato.giorni, oggi)) {
+    for (const g of C.daInviare(candidati, oggi)) {
       if (!(await accesi())) { await azzera(); return 'spenti'; }
       let id;
       try {
@@ -231,6 +271,13 @@ function crea(dip = {}) {
         continue;
       }
       const r = await spedisci(doc);
+      if (!r.ok && r.soloQuesto) {
+        stato.rifiutati[g] = oggi;
+        stato.errore = r.motivo;
+        log(`il ${g} è stato rifiutato (${r.motivo}): si riprova domani, gli altri giorni partono`);
+        esito = 'fallito';
+        continue;
+      }
       if (!r.ok) {
         stato.fallitoIl = oggi;
         stato.errore = r.motivo;
@@ -239,9 +286,10 @@ function crea(dip = {}) {
         break;
       }
       delete stato.giorni[g];
+      delete stato.rifiutati[g];
       stato.ultimo = { giorno: g, at: adesso() };
       stato.errore = '';
-      esito = 'inviati';
+      if (esito !== 'fallito') esito = 'inviati';
     }
     await salva();
     return esito;
@@ -321,7 +369,10 @@ function crea(dip = {}) {
 
   async function letto() { await carica(); return JSON.parse(JSON.stringify(stato)); }
 
-  return { apri, unUso, controlla, avvia, seguiImpostazioni, installazioni, accesi, letto, salva };
+  return {
+    apri, unUso, parteDiUnUso, servitaDaCache, usoDallaPagina, controlla, avvia, seguiImpostazioni, installazioni, accesi,
+    letto, salva,
+  };
 }
 
 module.exports = { crea, CHIAVE, MUTO };

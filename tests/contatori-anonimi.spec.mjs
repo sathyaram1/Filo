@@ -258,3 +258,94 @@ test('la pagina dell’owner mostra le installazioni attive di ieri e del mese, 
     });
   }
 });
+
+// Un uso è quello che la persona chiede, non ogni chiamata: l'anticipo alla selezione e i blocchi di una traduzione
+// non sono usi a sé (#969 giro 1).
+const PAGINA_PAROLE = `<!doctype html><meta charset="utf-8">
+<body style="font:20px sans-serif;padding:30px;margin:0">
+<p id="p1">Il teorema di Pitagora vale per tutti i triangoli rettangoli del piano.</p>
+<p id="p2">La fotosintesi clorofilliana trasforma la luce in energia chimica dentro le foglie.</p>
+</body>`;
+
+async function fornitoreCheConta(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash', [C.ACTIONS.TRANSLATE_PAGE]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__chiamate = { spiega: 0, traduci: 0 };
+    const finto = async ({ messages }) => {
+      const t = JSON.stringify(messages);
+      if (t.includes('ha selezionato un testo')) { globalThis.__chiamate.spiega += 1; return { text: 'Spiegazione di prova', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} }; }
+      globalThis.__chiamate.traduci += 1;
+      await new Promise((r) => setTimeout(r, 50));
+      // Come il modello: rimanda i blocchi tradotti, coi separatori al loro posto.
+      const prompt = [...messages].reverse().find((m) => typeof m.content === 'string')?.content || '';
+      const APRE = '<<<TESTO_IN_PAGINA>>>\n';
+      const i = prompt.indexOf(APRE);
+      const fine = prompt.lastIndexOf('\n<<<FINE_TESTO_IN_PAGINA>>>');
+      const blocco = i >= 0 && fine > i ? prompt.slice(i + APRE.length, fine) : '';
+      const text = blocco.split(/\n?@@@SN_SEP@@@\n?/).map((x) => `IT ${x}`).join('\n@@@SN_SEP@@@\n');
+      return { text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+  });
+}
+
+function puntoDellaParola(page, id, parola) {
+  return page.evaluate(([i, w]) => {
+    const nodo = document.getElementById(i).firstChild;
+    const da = nodo.textContent.indexOf(w);
+    const r = document.createRange();
+    r.setStart(nodo, da);
+    r.setEnd(nodo, da + w.length);
+    const b = r.getBoundingClientRect();
+    return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+  }, [id, parola]);
+}
+
+const usiOggi = async (app, funzione) => ((await oggi(app))?.uso?.[funzione]?.n) || 0;
+
+test('selezionare senza aprire Spiega non conta usi; aprirla sulla risposta già pronta ne conta uno', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await fornitoreCheConta(app);
+  const page = await testServer.openReady(openTab, PAGINA_PAROLE, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+
+  for (const [id, parola] of [['p1', 'Pitagora'], ['p2', 'fotosintesi']]) {
+    const p = await puntoDellaParola(page, id, parola);
+    await page.mouse.dblclick(p.x, p.y);
+    await page.waitForTimeout(900);
+  }
+  await expect.poll(() => app.evaluate(() => globalThis.__chiamate.spiega), { timeout: 5000 }).toBe(2);
+  await page.waitForTimeout(3500);
+  expect(await usiOggi(app, 'explain'), 'le spiegazioni preparate e mai aperte non sono usi').toBe(0);
+
+  // Aperta col tasto destro: la risposta era già pronta, nessuna chiamata nuova, un uso con un'attesa da nulla.
+  const p = await puntoDellaParola(page, 'p2', 'fotosintesi');
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  await expect(page.locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
+  expect(await app.evaluate(() => globalThis.__chiamate.spiega)).toBe(2);
+  await expect.poll(() => usiOggi(app, 'explain'), { timeout: 5000 }).toBe(1);
+  expect((await oggi(app)).uso.explain.fasce).toEqual({ ms500: 1 });
+});
+
+test('tradurre una pagina lunga è un uso, non uno per blocco', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await fornitoreCheConta(app);
+  const paragrafi = Array.from({ length: 12 }, (_, i) => `<p>Paragraph ${i} ${'the quick brown fox jumps over the lazy dog '.repeat(25)}</p>`).join('');
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><meta charset="utf-8"><body>${paragrafi}</body></html>`, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await page.locator('body').click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.locator('[data-sn-icon-id="translate"]').click();
+  await expect(page.locator('p').last()).toHaveText(/^IT /, { timeout: 20_000 });
+  const chiamate = await app.evaluate(() => globalThis.__chiamate.traduci);
+  expect(chiamate, 'la pagina è abbastanza lunga da partire a più blocchi').toBeGreaterThan(2);
+  await expect.poll(() => usiOggi(app, 'translate-page'), { timeout: 5000 }).toBe(1);
+  await page.waitForTimeout(1000);
+  expect(await usiOggi(app, 'translate-page')).toBe(1);
+});

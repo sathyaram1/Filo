@@ -90,8 +90,8 @@ test('un documento al giorno, con la forma giusta e niente altro', async () => {
   assert.equal(url, `${BASE}/${C.COLLEZIONE}?documentId=${id}&key=K`);
   assert.deepEqual(doc, {
     v: 1, pseudonimo: '99999999999999999901', giorno: '2026-10-15', mese: '2026-10', app: '0.2.243', os: 'mac',
-    uso: { 'filo-chat': { n: 2, fasce: { ms500: 1, s2: 1 } }, explain: { n: 1, fasce: {} } },
-    errori: { explain: [{ modello: 'deepseek/deepseek-v4-pro', host: 'DeepInfra', tipo: 'crediti', n: 1 }] },
+    uso: { 'filo-chat': '2;1,0,1,0,0,0,0', explain: '1;0,0,0,0,0,0,0' },
+    errori: { explain: 'deepseek/deepseek-v4-pro|DeepInfra|crediti|1' },
   });
   assert.equal(C.valida(doc).ok, true);
 
@@ -121,9 +121,9 @@ test('un messaggio di chat coi suoi giri di strumenti è un uso, con l’attesa 
   b.t += GIORNO;
   await b.s.controlla();
   const { doc } = b.inviati[0];
-  assert.deepEqual(doc.uso['filo-chat'], { n: 1, fasce: { s2: 1 } });
-  assert.deepEqual(doc.uso['describe-image'], { n: 1, fasce: { ms500: 1 } });
-  assert.deepEqual(doc.errori['filo-chat'], [{ modello: 'a/b', host: 'H', tipo: 'fornitore', n: 1 }]);
+  assert.deepEqual(C.leggiUso(doc.uso['filo-chat']), { n: 1, fasce: { s2: 1 } });
+  assert.deepEqual(C.leggiUso(doc.uso['describe-image']), { n: 1, fasce: { ms500: 1 } });
+  assert.deepEqual(C.leggiErrori(doc.errori['filo-chat']), [{ modello: 'a/b', host: 'H', tipo: 'fornitore', n: 1 }]);
 });
 
 test('in incognito non si conta niente e non parte nessun documento', async () => {
@@ -175,12 +175,12 @@ test('a contatori spenti non si conta niente e non parte niente, e quello che c�
 });
 
 test('un invio fallito riprova il giorno dopo, e al ritorno partono tutti i giorni rimasti, dal più vecchio', async () => {
-  const b = banco({ risposta: 403 });
+  const b = banco({ risposta: 503 });
   for (let d = 0; d < 3; d++) {
     await usa(b, A.TRANSLATE_PAGE, { attesa: 2500 });
     b.t += GIORNO;
     assert.equal(await b.s.controlla(), 'fallito');
-    assert.equal(await b.s.controlla(), 'rimandato', 'dopo un rifiuto, nello stesso giorno non si bussa di nuovo');
+    assert.equal(await b.s.controlla(), 'rimandato', 'col server giù, nello stesso giorno non si bussa di nuovo');
   }
   assert.equal(b.inviati.length, 3, 'un tentativo al giorno');
   b.risposta = 'rete';
@@ -191,11 +191,71 @@ test('un invio fallito riprova il giorno dopo, e al ritorno partono tutti i gior
   b.t += GIORNO;
   assert.equal(await b.s.controlla(), 'inviati');
   assert.deepEqual(b.inviati.map((x) => x.doc.giorno), ['2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18', '2026-10-19']);
-  assert.equal(b.inviati[0].doc.uso['translate-page'].n, 1);
+  assert.equal(C.leggiUso(b.inviati[0].doc.uso['translate-page']).n, 1);
+});
+
+test('un giorno che il server rifiuta non ferma quelli dopo: si riprova domani, e parte quando le regole lo accettano', async () => {
+  const b = banco();
+  const rifiuta = new Set(['explain-deep']);
+  // Il server finto rifiuta, come le regole non ancora ripubblicate, il giorno che porta una funzione che non conosce.
+  const inviati = b.inviati;
+  b.s = Servizio.crea({
+    contatori: C,
+    storage: { getRaw: async (k, d) => (b.disco.has(k) ? JSON.parse(JSON.stringify(b.disco.get(k))) : d), setRaw: async (k, v) => { b.disco.set(k, JSON.parse(JSON.stringify(v))); } },
+    impostazioni: async () => ({ contatori: { attivi: true } }), inIncognito: () => false, runNormale: (fn) => fn(),
+    finestraNormale: () => true, adesso: () => b.t, versione: () => '0.2.243', piattaforma: 'win32',
+    casuale: () => 'a'.repeat(20), rest: () => ({ FIRESTORE_BASE: BASE, API_KEY: 'K' }), log: () => {},
+    fetch: async (url, opt) => {
+      const doc = Object.fromEntries(Object.entries(JSON.parse(opt.body).fields).map(([k, v]) => [k, daFs(v)]));
+      const no = Object.keys(doc.uso).some((f) => rifiuta.has(f));
+      inviati.push({ doc, rifiutato: no });
+      return { ok: !no, status: no ? 403 : 200, json: async () => ({}) };
+    },
+  });
+  await usa(b, A.EXPLAIN_DEEP); b.t += GIORNO;
+  await usa(b, A.EXPLAIN); b.t += GIORNO;
+  await b.s.controlla();
+  assert.deepEqual(inviati.map((x) => [x.doc.giorno, x.rifiutato]), [['2026-10-15', true], ['2026-10-16', false]]);
+  inviati.length = 0;
+  await b.s.controlla();
+  assert.deepEqual(inviati, [], 'il giorno rifiutato non si ripropone nello stesso giorno');
+  rifiuta.clear(); // le regole ripubblicate
+  b.t += GIORNO;
+  await b.s.controlla();
+  assert.deepEqual(inviati.map((x) => x.doc.giorno), ['2026-10-15', '2026-10-17']);
+  assert.deepEqual(b.disco.get(Servizio.CHIAVE).rifiutati, {});
+});
+
+test('un anticipo o un pezzo di un uso conta i guasti ma non un uso; la cache e la pagina contano l’uso', async () => {
+  const b = banco();
+  // La spiegazione preparata alla selezione e mai aperta: un guasto sì, un uso no.
+  await b.s.parteDiUnUso(A.EXPLAIN, async () => {
+    const h = b.s.apri(A.EXPLAIN);
+    h.errore(Object.assign(new Error('giù'), { status: 503 }), { modello: 'a/b', host: 'H' });
+    h.fine(false);
+  });
+  await b.s.parteDiUnUso(A.EXPLAIN, async () => { const h = b.s.apri(A.EXPLAIN); b.t += 900; h.visto(); h.fine(true); });
+  // Aperta poi dalla persona: l'uso lo conta la pagina, con l'attesa che ha visto lei.
+  assert.equal(b.s.usoDallaPagina(A.EXPLAIN, 1500), true);
+  assert.equal(b.s.usoDallaPagina('una funzione inventata', 10), false);
+  // Una risposta dalla cache è un uso senza attesa; dentro un uso aperto non ne conta un secondo.
+  b.s.servitaDaCache(A.EXPLAIN);
+  await b.s.unUso(A.FILO_CHAT, async () => { b.s.servitaDaCache(A.FILO_CHAT); });
+  b.incognito = true;
+  assert.equal(b.s.usoDallaPagina(A.EXPLAIN, 10), false, 'in incognito la pagina non conta');
+  b.s.servitaDaCache(A.EXPLAIN);
+  b.incognito = false;
+  await attendi(); await attendi();
+  b.t += GIORNO;
+  await b.s.controlla();
+  const { doc } = b.inviati[0];
+  assert.deepEqual(C.leggiUso(doc.uso.explain), { n: 2, fasce: { ms500: 1, s2: 1 } });
+  assert.deepEqual(C.leggiUso(doc.uso['filo-chat']), { n: 1, fasce: { ms500: 1 } });
+  assert.deepEqual(C.leggiErrori(doc.errori.explain), [{ modello: 'a/b', host: 'H', tipo: 'fornitore', n: 1 }]);
 });
 
 test('i giorni rimasti partono con un tetto, e il resto il giro dopo', async () => {
-  const b = banco({ risposta: 403 });
+  const b = banco({ risposta: 503 });
   const giorni = C.TETTO_INVII_PER_GIRO + 4;
   for (let d = 0; d < giorni; d++) { await usa(b, A.HELP); b.t += GIORNO; }
   b.risposta = 200;

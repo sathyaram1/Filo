@@ -43,8 +43,10 @@ test('un campo di testo libero non passa: funzione, modello, host e tipo vengono
   g.errori['explain'] = { 'deepseek/deepseek-v4-pro|DeepInfra|inventato': 2 };
   g.titolo = 'la pagina di prima';
   const doc = docDi(g);
-  assert.deepEqual(doc.uso, { 'filo-chat': { n: 1, fasce: { s2: 1 } } });
-  assert.deepEqual(doc.errori, { 'filo-chat': [{ modello: 'altro', host: '', tipo: 'rete', n: 1 }] });
+  assert.deepEqual(doc.uso, { 'filo-chat': '1;0,0,1,0,0,0,0' });
+  assert.deepEqual(C.leggiUso(doc.uso['filo-chat']), { n: 1, fasce: { s2: 1 } });
+  assert.deepEqual(doc.errori, { 'filo-chat': 'altro||rete|1' });
+  assert.deepEqual(C.leggiErrori(doc.errori['filo-chat']), [{ modello: 'altro', host: '', tipo: 'rete', n: 1 }]);
   assert.deepEqual(Object.keys(doc), [...C.CAMPI]);
   const tutto = JSON.stringify(doc);
   for (const parola of ['Mario', 'mario', 'Roma', 'segreto', 'ciao', 'pagina', 'inventato', 'preferito']) {
@@ -62,12 +64,15 @@ test('il validatore respinge quello che le regole non vedono: valori annidati fu
     { ...buono, app: 'ciao' },
     { ...buono, pseudonimo: 'mario' },
     { ...buono, mese: '2026-09' },
-    { ...buono, uso: { help: { n: 1, fasce: { s1: 2 } } } },
-    { ...buono, uso: { help: { n: 1, fasce: {}, testo: 'x' } } },
-    { ...buono, uso: { 'non esiste': { n: 1, fasce: {} } } },
-    { ...buono, errori: { help: [{ modello: 'Scrivi qui il tuo nome', host: '', tipo: 'rete', n: 1 }] } },
-    { ...buono, errori: { help: [{ modello: 'altro', host: 'a<b>', tipo: 'rete', n: 1 }] } },
-    { ...buono, errori: { help: [{ modello: 'altro', host: '', tipo: 'rete', n: 1, testo: 'x' }] } },
+    { ...buono, uso: { help: '1;0,2,0,0,0,0,0' } },
+    { ...buono, uso: { help: { n: 1, fasce: {} } } },
+    { ...buono, uso: { help: '1;0,0,0,0,0,0,0;testo' } },
+    { ...buono, uso: { 'non esiste': '1;0,0,0,0,0,0,0' } },
+    { ...buono, errori: { help: 'Scrivi qui il tuo nome||rete|1' } },
+    { ...buono, errori: { help: 'altro|a<b>|rete|1' } },
+    { ...buono, errori: { help: [{ modello: 'altro', host: '', tipo: 'rete', n: 1 }] } },
+    { ...buono, errori: { help: 'altro||rete|0' } },
+    { ...buono, errori: { help: `altro||rete|1${';altro||rete|1'.repeat(C.TETTO_COMBINAZIONI)}` } },
   ];
   for (const r of rotti) assert.equal(C.valida(r).ok, false, `doveva essere respinto: ${JSON.stringify(r)}`);
 });
@@ -77,13 +82,14 @@ test('le attese finiscono in fasce, e l’uso senza risposta conta senza fascia'
   for (const ms of [120, 900, 1500, 4000, 9000, 29000, 61000]) C.registraUso(g, 'explain', ms);
   C.registraUso(g, 'explain', null);
   const d = docDi(g);
-  assert.deepEqual(d.uso.explain, { n: 8, fasce: { ms500: 1, s1: 1, s2: 1, s5: 1, s10: 1, s30: 1, oltre: 1 } });
+  assert.equal(d.uso.explain, '8;1,1,1,1,1,1,1');
+  assert.deepEqual(C.leggiUso(d.uso.explain), { n: 8, fasce: { ms500: 1, s1: 1, s2: 1, s5: 1, s10: 1, s30: 1, oltre: 1 } });
 });
 
 test('le combinazioni di errore hanno un tetto, oltre si sommano in «altro» e non si perdono', () => {
   const g = C.giornoVuoto();
   for (let i = 0; i < C.TETTO_COMBINAZIONI + 5; i++) C.registraErrore(g, 'help', { modello: `x/modello-${i}`, host: 'Host', tipo: 'fornitore' });
-  const lista = docDi(g).errori.help;
+  const lista = C.leggiErrori(docDi(g).errori.help);
   assert.ok(lista.length <= C.TETTO_COMBINAZIONI);
   assert.equal(lista.reduce((a, e) => a + e.n, 0), C.TETTO_COMBINAZIONI + 5);
 });

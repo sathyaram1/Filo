@@ -122,7 +122,14 @@ const idBuono = C.idDocumento(BUONO);
 console.log('\n— quello che NON si deve poter fare —');
 const conCampo = (patch) => ({ ...BUONO, ...patch });
 await prova('un campo in più (testo libero)', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ nota: 'ciao' }))));
-await prova('una funzione fuori elenco', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { 'mario rossi': { n: 1, fasce: {} } } }))));
+await prova('una funzione fuori elenco', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { 'mario rossi': '1;0,0,0,0,0,0,0' } }))));
+await prova('un uso che è una mappa con testo dentro', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: { n: 1, fasce: {}, nota: 'testo libero' } } }))));
+await prova('un uso che è una lista con dentro la stringa giusta', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: ['1;0,0,0,0,0,0,0'] } }))));
+await prova('un uso che è un numero', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: 1 } }))));
+await prova('un uso con testo in coda', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ uso: { help: '1;0,0,0,0,0,0,0 testo libero' } }))));
+await prova('un errore col testo libero al posto del modello', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { help: 'Scrivi a mario.rossi@gmail.com|H|rete|1' } }))));
+await prova('un errore che è una lista di mappe', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { help: [{ modello: 'a', host: 'b', tipo: 'rete', n: 1, nota: 'x'.repeat(5000) }] } }))));
+await prova('errori oltre il tetto di lunghezza', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { help: Array.from({ length: 3500 }, (_, i) => `${'m'.repeat(120)}|${'H'.repeat(48)}|fornitore|${i + 1}`).join(';') } }))));
 await prova('un errore sotto una funzione fuori elenco', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), conCampo({ errori: { 'via roma 1': [] } }))));
 await prova('uno pseudonimo che non è uno pseudonimo', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/mario_2026-10-14`), conCampo({ pseudonimo: 'mario' }))));
 await prova('un id che non è pseudonimo più giorno', () => assertFails(setDoc(doc(anon, 'contatori-giornalieri/qualsiasi'), BUONO)));
@@ -135,6 +142,16 @@ await prova('un anonimo elenca la collezione', () => assertFails(getDocs(collect
 
 console.log('\n— quello che si deve poter fare, e poi più —');
 await prova('un anonimo crea il suo giorno', () => assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
+await prova('il giorno più carico che l’app costruisce (ogni funzione, ogni fascia, cinquanta errori lunghi) passa', () => {
+  const dati = C.giornoVuoto();
+  for (const f of C.funzioni()) {
+    for (const ms of [100, 900, 1500, 4000, 9000, 20000, 99999]) C.registraUso(dati, f, ms);
+    for (let i = 0; i < 60; i++) C.registraErrore(dati, f, { modello: `${'m'.repeat(60)}/${'x'.repeat(50)}${i}`, host: 'H'.repeat(48), tipo: C.ERRORI[i % 6] });
+  }
+  const pieno = C.documento({ pseudonimo: 'd'.repeat(20), giorno: '2026-10-14', app: '0.2.243', os: 'linux', dati });
+  vero(C.valida(pieno).ok, C.valida(pieno).motivo);
+  return assertSucceeds(setDoc(doc(anon, `contatori-giornalieri/${C.idDocumento(pieno)}`), pieno));
+});
 await prova('ma non lo riscrive', () => assertFails(setDoc(doc(anon, `contatori-giornalieri/${idBuono}`), BUONO)));
 await prova('né lo aggiorna', () => assertFails(updateDoc(doc(anon, `contatori-giornalieri/${idBuono}`), { os: 'linux' })));
 await prova('né lo cancella', () => assertFails(deleteDoc(doc(anon, `contatori-giornalieri/${idBuono}`))));

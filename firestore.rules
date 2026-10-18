@@ -875,10 +875,10 @@ service cloud.firestore {
     //
     // SOLA CREAZIONE E SENZA LOGIN, come i feedback: chi ha la chiave web può scrivere numeri falsi, e i contatori
     // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, le chiavi delle
-    // mappe dall'elenco chiuso delle funzioni (che ne fa anche il tetto). I valori annidati (fasce, errori) le regole
-    // non li sanno passare in rassegna: li ricostruisce dagli elenchi chiusi l'app (src/shared/contatoriGiornalieri.js).
-    // L'elenco qui sotto è la copia di quello dell'app: tests/unit/firestoreRulesContatori.test.mjs li confronta, e una
-    // funzione nuova va aggiunta qui e ripubblicata, o i giorni che la portano vengono rifiutati e restano in attesa.
+    // mappe dall'elenco chiuso delle funzioni, e i valori annidati: ognuno è una stringa di forma fissa (le regole non
+    // passano in rassegna una mappa, ma ne uniscono i valori in una stringa sola, che si misura e si confronta).
+    // L'elenco contiene quello dell'app (tests/unit/firestoreRulesContatori.test.mjs): una funzione nuova va aggiunta
+    // e ripubblicata, o i giorni che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
     // Legge solo l'admin.
     match /contatori-giornalieri/{docId} {
       function funzioniContate() {
@@ -904,7 +904,11 @@ service cloud.firestore {
           && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
           && d.os in ['win', 'mac', 'linux', 'altro']
           && d.uso is map && d.uso.keys().hasOnly(funzioniContate())
-          && d.errori is map && d.errori.keys().hasOnly(funzioniContate());
+          && d.uso.values().join('#').size() <= 8000
+          && d.uso.values().join('#').matches('^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && d.errori is map && d.errori.keys().hasOnly(funzioniContate())
+          && d.errori.values().join('#').size() <= 600000
+          && d.errori.values().join('#').matches('^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$');
       }
       allow get, list: if isAdmin();
       allow create: if contatoriValidi(request.resource.data);

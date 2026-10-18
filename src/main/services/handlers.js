@@ -790,6 +790,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
   const skipCache = hasTools || AICache.esclusa(action);
   const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
+    try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(action); } catch (_) {}
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
@@ -904,6 +905,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
 
   const cached = await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
+    try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(action); } catch (_) {}
     if (onDelta) onDelta(cached.text);
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
