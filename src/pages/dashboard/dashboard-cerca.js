@@ -45,7 +45,7 @@
     b.type = 'button';
     b.setAttribute('role', 'option');
     const ic = el('span', 'dash-cerca-ico');
-    ic.innerHTML = icona(r.k === 'pagina' ? 'globe' : (r.role === 'user' ? 'user' : 'chat'), 13);
+    ic.innerHTML = icona(r.k === 'pagina' ? 'globe' : (r.role === 'user' ? 'user' : 'filoLogo'), 13);
     const corpo = el('span', 'dash-cerca-corpo');
     if (r.k === 'pagina') {
       corpo.append(el('span', 'dash-cerca-titolo', r.titolo || global.SN_FILO_CODA.sito(r.url)));
@@ -120,7 +120,7 @@
       ];
     }
     return [
-      { type: 'item', icon: icona('chat', 16), label: 'Vai a questo punto del filo', onClick: () => { apri(r).catch(() => {}); } },
+      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', onClick: () => { apri(r).catch(() => {}); } },
       { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
     ];
   }
