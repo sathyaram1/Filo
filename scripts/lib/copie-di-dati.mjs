@@ -331,6 +331,18 @@ ${SCELTA_SPINTE}[ -f "$principale/.claude/routine-ticket.json" ] && exit 0
 exit 0
 `;
 
+// La copia di un rebase o di un amend porta anche gli autori dell'originale, chiunque riscriva: se no la riscrittura la
+// darebbe alla sessione che riscrive (#1362 giro 3 r1).
+const POST_REWRITE = `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: la copia di un rebase o di un amend porta la sessione che aveva fatto l'originale (#1362).
+# Lo scrive scripts/lib/copie-di-dati.mjs.
+radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+command -v node >/dev/null 2>&1 || exit 0
+${SCELTA_SPINTE}[ -f "$principale/.claude/routine-ticket.json" ] && exit 0
+[ -f "$spinte" ] && node "$spinte" --post-rewrite "$radice" >/dev/null 2>&1
+exit 0
+`;
+
 function installa(root, contenuto, gancio = 'pre-push') {
   try { if (gitTesto(root, ['config', '--get', 'core.hooksPath']).trim()) return 'altrove'; } catch (_) { /* non impostato */ }
   const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', `hooks/${gancio}`]).trim());
@@ -352,6 +364,7 @@ function installa(root, contenuto, gancio = 'pre-push') {
 export function installaControlloSpedizione(root) {
   const esito = installa(root, PRE_PUSH);
   try { installa(root, POST_COMMIT, 'post-commit'); } catch (_) { /* senza, i commit valgono di chi li spinge */ }
+  try { installa(root, POST_REWRITE, 'post-rewrite'); } catch (_) { /* senza, una copia riscritta vale di chi la spinge */ }
   return esito;
 }
 
