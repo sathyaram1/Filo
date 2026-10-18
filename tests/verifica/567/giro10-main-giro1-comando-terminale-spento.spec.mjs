@@ -1,4 +1,4 @@
-// Copia di giro1-comando-terminale-spento.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
+// Copia di giro1-comando-terminale-spento.spec.mjs adattata a main (la finestra con le schede #530, terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // #567.2 — con la modalità terminale spenta l'utente deve leggere PERCHÉ il
 // comando non è partito, e trovare da lì l'interruttore. Chi non sa che quel
 // interruttore esiste, con una riga «Azione non riuscita» non ha modo di capire.
@@ -41,7 +41,7 @@ test('il comando che non parte spiega che il terminale è spento e porta all\'in
   await apri.click();
   await expect.poll(
     () => app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows()[0];
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
       const t = w && w._filoTabs;
       return (t ? t.tabs : []).map((x) => String(x.url || '')).join(' ');
     }),

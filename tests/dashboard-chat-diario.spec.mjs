@@ -529,42 +529,33 @@ test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ri
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
-  await app.evaluate(async () => {
-    await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Ada.', PREFERENZE: 'Risposte brevi.' });
-  });
+  // Da Conservativo una lezione chiede l'OK: è l'azione confermata nel popup che non è un'impostazione.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'h1', name: 'CANCELLA_MEMORIA', arguments: '{}' }] },
-    { text: 'Dimmi di sì e dimentico tutto.' },
+    { toolCalls: [{ id: 'h1', name: 'SALVA_LEZIONE', arguments: JSON.stringify({ testo: 'L\'utente non beve caffè' }) }] },
+    { text: 'Me lo ricordo, se mi dici di sì.' },
   ], '__fakeH');
 
-  await page.locator('#input').fill('dimentica tutto quello che sai di me');
+  await page.locator('#input').fill('ricordati che non bevo caffè');
   await page.locator('#sendBtn').click();
-  const btn = page.locator('.dash-action-btn').first();
-  await expect(btn).toBeVisible({ timeout: 10_000 });
-  await btn.click();
-  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'danger');
-
-  // È successo davvero: il profilo è vuoto.
-  await expect.poll(
-    () => app.evaluate(async () => String(((await globalThis.SN_FILO_MEMORY.getMemory()) || {}).PROFILO || '')),
-    { timeout: 10_000 },
-  ).toBe('');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Me lo ricordo' })).toBeVisible({ timeout: 10_000 });
+  const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
+  await expect(btn).toBeVisible();
+  // Il popup si apre da solo: l'utente legge e conferma.
+  await clickConfirm(page, 'ok', { timeout: 10_000 });
 
   // Il diario lo dice in cima e nella riga: prima restava «Conferma chiesta»
-  // sotto un titolo «Come ha lavorato», e della cancellazione nessuna traccia.
+  // sotto un titolo «Come ha lavorato».
   const activity = page.locator('.dash-activity');
-  await expect(activity.locator('.dash-activity-label')).toContainText('cancellato la memoria');
+  await expect(activity.locator('.dash-activity-label')).toContainText('memorizzato una cosa', { timeout: 10_000 });
   await activity.locator('.dash-activity-head').click();
-  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Memoria cancellata' })).toHaveCount(1);
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Memorizzato' })).toHaveCount(1);
 
   // Il bottone è la ricevuta di cosa è successo, non la frase al futuro.
+  await expect(btn).toContainText('✓');
   const testoBtn = await btn.textContent();
-  expect(testoBtn).toContain('✓');
   expect(testoBtn).not.toContain('vuole');
-  expect(testoBtn).not.toContain('Eliminare DEFINITIVAMENTE');
 
   await restore(app, '__fakeH');
 });
@@ -579,6 +570,8 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     win._filoTabs.runAutoTriage = async () => ({ archived: 3 });
   });
+  // Da Conservativo il riordino aspetta il sì dell'utente: a Normale parte da solo (#530).
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'i1', name: 'PULISCI_TAB', arguments: '{}' }] },
@@ -660,21 +653,22 @@ test('L — la conversazione riaperta racconta com’è andata, non solo cosa Fi
   await configureModel(app);
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
 
-  // Una conferma che l'utente legge e non dà: la memoria è intatta.
+  // Un riordino che l'utente legge e non avvia: le schede sono com'erano.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
   await fakeProvider(app, [
-    { toolCalls: [{ id: 'l1', name: 'CANCELLA_MEMORIA', arguments: '{}' }] },
-    { text: 'Posso cancellare tutto quello che so di te.' },
+    { toolCalls: [{ id: 'l1', name: 'PULISCI_TAB', arguments: '{}' }] },
+    { text: 'Posso riordinare le schede.' },
   ], '__fakeL1');
-  await page.locator('#input').fill('dimentica tutto quello che sai di me');
+  await page.locator('#input').fill('riordina le schede e archivia quelle che non servono');
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Posso cancellare' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('.dash-action-btn').first()).toBeVisible();
-  const chatMem = await chatConAzione(app, 'CANCELLA_MEMORIA');
-  expect(chatMem, 'la chat non è arrivata nell’archivio').toBeTruthy();
-  // L'archivio tiene solo ciò che è successo (#825.3): la conferma mai data non c'è.
-  const raccontoMem = await raccontoRiaperto(openTab, chatMem.id);
-  expect(raccontoMem, `la memoria non è stata cancellata, e la chat riaperta racconta: ${raccontoMem}`)
-    .not.toContain('cancellato la memoria');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Posso riordinare' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-action-btn', { hasText: 'Riordina e archivia' })).toBeVisible();
+  const chatTab = await chatConAzione(app, 'PULISCI_TAB');
+  expect(chatTab, 'la chat non è arrivata nell’archivio').toBeTruthy();
+  // L'archivio tiene solo ciò che è successo (#825.3): il riordino mai avviato non c'è.
+  const raccontoTab = await raccontoRiaperto(openTab, chatTab.id);
+  expect(raccontoTab, `il riordino non è partito, e la chat riaperta racconta: ${raccontoTab}`)
+    .not.toContain('riordinato le schede');
   await restore(app, '__fakeL1');
 
   // Un comando che non è mai partito: la modalità terminale è spenta.
@@ -779,6 +773,8 @@ test('N — il riordino delle schede che non è potuto partire non si legge come
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
+  // Da Conservativo il riordino passa dal bottone; a Normale parte da solo, ed è la seconda metà.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'n1', name: 'PULISCI_TAB', arguments: '{}' }] },
@@ -805,7 +801,28 @@ test('N — il riordino delle schede che non è potuto partire non si legge come
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
   await expect(activity.locator('.dash-activity-label')).not.toContainText('riordinato le schede');
+  await restore(app, '__fakeN');
+
+  // A Normale il riordino parte dalla chat senza bottone: il diario dice che non è riuscito, e perché.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' } }); });
+  const page2 = await newtabPage(app);
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'n2', name: 'PULISCI_TAB', arguments: '{}' }] },
+    { text: 'Ho provato a riordinare.' },
+  ], '__fakeN2');
+  await page2.locator('#input').fill('riordina le schede e archivia quelle che non servono');
+  await page2.locator('#sendBtn').click();
+  await expect(page2.locator('.dash-bubble-filo', { hasText: 'Ho provato a riordinare.' })).toBeVisible({ timeout: 15_000 });
+  const diario = page2.locator('.dash-activity').last();
+  await diario.locator('.dash-activity-head').click();
+  await expect(diario.locator('.dash-activity-body .dash-activity-row', { hasText: 'Riordino non riuscito' }))
+    .toContainText('non è riuscito a valutare le schede');
+  await expect(diario.locator('.dash-activity-label')).not.toContainText('riordinato le schede');
+  // E il modello lo sa: non risponde «nessuna scheda da archiviare».
+  const detto = await app.evaluate(() => JSON.stringify(globalThis.__fakeN2_calls.at(-1)));
+  expect(detto).not.toContain('nessuna da archiviare');
+  expect(detto).toContain('non è riuscito a valutare le schede');
 
   await app.evaluate(() => { globalThis.SN_TAB_TRIAGE_DECIDE = globalThis.__nOrig; });
-  await restore(app, '__fakeN');
+  await restore(app, '__fakeN2');
 });

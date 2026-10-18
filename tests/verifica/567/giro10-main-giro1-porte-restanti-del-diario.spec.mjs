@@ -1,4 +1,4 @@
-// Copia di giro1-porte-restanti-del-diario.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
+// Copia di giro1-porte-restanti-del-diario.spec.mjs adattata a main (la memoria non si cancella da chat #530, terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // Le porte restanti della stessa causa di #567.1 e #567.4.
 //
 // Il titolo del blocco e le righe del diario nascono da due tabelle: un verbo
@@ -13,7 +13,6 @@
 // In coda, il controllo del tema scuro sulle superfici toccate.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { clickConfirm, fillConfirmInput, CONFIRM_HOST } from '../../helpers/confirm.mjs';
 import { newtabPage, configureModel, fakeProvider, restore, chiedi } from './aiuto.mjs';
 
 test('la memoria cancellata dalla chat: cosa ne resta nel diario', async ({ app, shell }) => {
@@ -32,21 +31,12 @@ test('la memoria cancellata dalla chat: cosa ne resta nel diario', async ({ app,
   ], '__v567q');
 
   await chiedi(page, 'dimentica tutto quello che sai di me');
-  const btn = page.locator('.dash-action-btn').first();
-  await expect(btn).toBeVisible({ timeout: 10_000 });
-  await btn.click();
-  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'danger');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Dimmi di sì' })).toBeVisible({ timeout: 10_000 });
 
-  // È successo davvero.
-  await expect.poll(
-    () => app.evaluate(async () => {
-      const m = await globalThis.SN_FILO_MEMORY.getMemory();
-      return String((m && m.PROFILO) || '');
-    }),
-    { timeout: 10_000 },
-  ).toBe('');
+  // Su main cancellare la memoria da chat è nell'elenco fisso (#530): non succede a nessun livello. Il diario
+  // deve dirlo, col perché, invece di vantarsene o di tacere.
+  const intatta = await app.evaluate(async () => String(((await globalThis.SN_FILO_MEMORY.getMemory()) || {}).PROFILO || ''));
+  expect(intatta).toBe('Si chiama Ada.');
 
   const activity = page.locator('.dash-activity');
   const label = activity.locator('.dash-activity-label');
@@ -56,17 +46,11 @@ test('la memoria cancellata dalla chat: cosa ne resta nel diario', async ({ app,
 
   // Il diario non nomina l'azione col suo nome interno…
   expect(testi, `righe del diario: ${testi}`).not.toContain('cancella memoria');
-  // …dice che la memoria è stata cancellata…
-  expect(testi).toContain('Memoria cancellata');
-  // …e il titolo del blocco lo conta, invece di restare su «Come ha lavorato».
-  const titolo = await label.textContent();
-  expect(titolo).not.toContain('Come ha lavorato');
-  expect(titolo).toContain('cancellato la memoria');
-
-  // Il bottone è una ricevuta, non più «Filo vuole…» con la spunta davanti.
-  const testoBtn = await btn.textContent();
-  expect(testoBtn).toContain('✓');
-  expect(testoBtn).not.toContain('Eliminare DEFINITIVAMENTE');
+  // …dice che la memoria NON è stata cancellata, e perché…
+  expect(testi).toContain('Memoria non cancellata');
+  expect(testi).toContain('cancellare dati in modo definitivo');
+  // …e il titolo del blocco non se ne vanta.
+  expect(await label.textContent()).not.toContain('cancellato la memoria');
 
   await restore(app, '__v567q');
 });

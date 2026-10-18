@@ -1402,7 +1402,7 @@
       apri.className = 'dash-action-btn dash-cmd-blocked-btn';
       apri.textContent = 'Apri Preferenze';
       apri.title = 'Preferenze → Modalità terminale';
-      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#terminalEnabled' }));
+      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: PREF_TERMINALE }));
       wrap.append(testo, apri);
       return wrap;
     }

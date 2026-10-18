@@ -1,4 +1,4 @@
-// Copia di giro3-quel-che-il-click-fa.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
+// Copia di giro3-quel-che-il-click-fa.spec.mjs adattata a main (autonomia #530, terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // #567.1/2, terzo giro — due famiglie sulla stessa chat della home.
 //
 // A) Un'azione che Filo NON esegue perché tocca all'utente finirla (riordina le
@@ -30,6 +30,8 @@ test('chiesto il riordino delle schede, l\'utente deve trovare il bottone per fa
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Su main (#530) a Normale il riordino e i comandi che scrivono partono da soli: il bottone e il popup sono di Conservativo.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'g3a', name: 'PULISCI_TAB', arguments: '{}' }] },
@@ -78,6 +80,8 @@ test('eseguito il comando confermato nel popup, il diario deve contarlo', async 
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } });
   });
+  // Su main (#530) a Normale il riordino e i comandi che scrivono partono da soli: il bottone e il popup sono di Conservativo.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   const cartella = `/tmp/filo-v567-g3-${Date.now()}`;
   await fakeProvider(app, [
@@ -106,6 +110,8 @@ test('il riordino chiesto da un suggerimento della home deve dire com\'è andato
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
+  // Su main (#530) a Normale il riordino e i comandi che scrivono partono da soli: il bottone e il popup sono di Conservativo.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   // Il riordino vero dipende da quante schede sono aperte: qui conta solo che
   // Filo ne abbia archiviate alcune, non come le ha scelte.

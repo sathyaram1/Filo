@@ -1,4 +1,4 @@
-// Copia di giro1-riassunto-e-nomi.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
+// Copia di giro1-riassunto-e-nomi.spec.mjs adattata a main (accendere il terminale chiede la parola #530, terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // #567.1 e #567.4 — quello che l'utente legge del diario del lavoro.
 //
 // 1: un'impostazione confermata nel popup arriva DOPO che il riassunto è già
@@ -13,7 +13,7 @@
 // forma e la stessa frase pronta altrove.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { clickConfirm } from '../../helpers/confirm.mjs';
+import { clickConfirm, confirmState, fillConfirmInput } from '../../helpers/confirm.mjs';
 import { newtabPage, configureModel, fakeProvider, restore, chiedi } from './aiuto.mjs';
 
 test('l\'impostazione applicata subito si legge in italiano e il riassunto la conta', async ({ app, shell }) => {
@@ -68,7 +68,14 @@ test('l\'impostazione confermata nel popup rifà il riassunto, che non resta «C
 
   // Il popup si apre da solo: prima della conferma il titolo non può dire che
   // un'impostazione è cambiata.
-  await clickConfirm(page, 'ok', { timeout: 15_000 });
+  // Su main accendere il terminale abbassa una difesa (#530): il popup vuole la parola scritta.
+  await expect.poll(async () => !!(await confirmState(page)), { timeout: 15_000 }).toBe(true);
+  if ((await confirmState(page)).hasInput) {
+    await fillConfirmInput(page, 'conferma');
+    await clickConfirm(page, 'danger', { timeout: 15_000 });
+  } else {
+    await clickConfirm(page, 'ok', { timeout: 15_000 });
+  }
 
   await expect(label).toContainText('cambiato un\'impostazione', { timeout: 10_000 });
   expect(await label.textContent()).not.toContain('Come ha lavorato');
