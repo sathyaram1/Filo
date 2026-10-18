@@ -22,7 +22,8 @@
   // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
   // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
   // Un interruttore per ogni categoria d'autore che la lista mostra come icona
-  // (AUTHOR_META più sotto): chi si vede separato si regola separato.
+  // (AUTHOR_META più sotto): chi si vede separato si regola separato. Esplorazione
+  // e allarmi della pubblicazione no: entrano in coda comunque (#1035).
   const mgAutoApprove = {
     owner:    document.getElementById('mgAutoApproveOwner'),
     user:     document.getElementById('mgAutoApproveUser'),
@@ -30,7 +31,6 @@
     worker:   document.getElementById('mgAutoApproveWorker'),
     verifier: document.getElementById('mgAutoApproveVerifier'),
     residuo:  document.getElementById('mgAutoApproveResiduo'),
-    prober:   document.getElementById('mgAutoApproveProber'),
     claude:   document.getElementById('mgAutoApproveClaude'),
     filo:     document.getElementById('mgAutoApproveFilo'),
   };
@@ -288,6 +288,8 @@
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
+    // Lo apre il server quando una versione non si costruisce (#1002): non è Claude, ed è lavoro che ferma le uscite.
+    costruzione: { icon: '🏗️', label: 'Allarme della pubblicazione' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
   };
   // Dal feedback, non dal clientId: un nome riservato senza prova è un utente come gli altri (#912).
@@ -340,7 +342,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
+  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, costruzione: 7, claude: 8, filo: 9 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.

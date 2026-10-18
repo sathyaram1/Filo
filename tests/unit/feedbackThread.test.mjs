@@ -135,6 +135,18 @@ test('authorKind: routine:residuo è una categoria propria, non prober né verif
 // compresi. Prima le istanze di Claude ne avevano uno solo per tutte, e per
 // fermarne una bisognava fermarle tutte. Gemello del test in filo-security
 // (functions/test/autoApprove.test.js), che è la copia che decide davvero.
+// #1002: l'allarme della pubblicazione ha il suo autore, non «Claude (ruolo non indicato)». Interruttore no (#1035):
+// nasce senza origine e il server lo mette in coda comunque; per la mappa resta nel gruppo del gemello del server.
+test('authorKind: agent:costruzione provato è l’allarme della pubblicazione, senza un interruttore suo', () => {
+  assert.equal(TH.authorKind({ clientId: 'agent:costruzione', senderProof: 'server' }), 'costruzione');
+  assert.equal(TH.authorKind('agent:costruzione'), 'costruzione', 'una firma già efficace');
+  assert.equal(TH.authorKind({ clientId: 'agent:costruzione' }), 'user', 'il solo nome è un utente');
+  assert.equal(TH.authorKind({ clientId: 'agent:costruzione', senderProof: 'owner' }), 'user');
+  assert.equal(TH.AUTO_APPROVE_GROUPS.includes('costruzione'), false);
+  assert.equal(TH.autoApproveGroup('agent:costruzione'), 'claude');
+  assert.equal(TH.autoApproveGroup({ clientId: 'agent:costruzione' }), 'user');
+});
+
 test('autoApproveGroup: il gruppo è la categoria d’autore, una per una', () => {
   assert.equal(TH.autoApproveGroup('routine:residuo'), 'residuo');
   assert.equal(TH.autoApproveGroup('routine:prober'), 'prober');

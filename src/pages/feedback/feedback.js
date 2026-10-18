@@ -189,6 +189,10 @@
   // (il titolo breve sta in `name`), quindi lo trattiamo a parte.
   function agentMeta(f) {
     const c = String(f.clientId || '');
+    // L'allarme della pubblicazione (#1002) non è un modello: il suo titolo sta in `name`.
+    if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.authorKind(f) === 'costruzione') {
+      return { source: 'costruzione', model: '', severity: '', area: '', title: String(f.name || '').trim() };
+    }
     if (c.startsWith('routine:')) {
       const slug = c.slice('routine:'.length) || 'routine';
       return { source: 'routine', model: slug, severity: '', area: '', title: String(f.name || '').trim() };
@@ -1122,9 +1126,11 @@
       const agent = isAgent(f);
       const am = agent ? agentMeta(f) : null;
       const isRoutineFind = am && am.source === 'routine';
-      const agentIcon = isRoutineFind ? '🔧' : '🤖';
-      const agentLabel = am ? (isRoutineFind ? `audit · ${am.model}` : am.model) : '';
-      const agentBadgeTitle = isRoutineFind ? 'Audit automatico di una routine cloud' : "Modello che ha trovato l'errore";
+      const isAllarme = am && am.source === 'costruzione';
+      const agentIcon = isAllarme ? '🏗️' : isRoutineFind ? '🔧' : '🤖';
+      const agentLabel = !am ? '' : isAllarme ? 'Allarme della pubblicazione' : isRoutineFind ? `audit · ${am.model}` : am.model;
+      const agentBadgeTitle = isAllarme ? 'Aperto dal server quando una versione non si costruisce'
+        : isRoutineFind ? 'Audit automatico di una routine cloud' : "Modello che ha trovato l'errore";
       const agentTitleHtml = am && (am.title || num)
         ? `<div class="fb-title">${numHtml}${numHtml ? ' ' : ''}${segnoFermataHtml(f)}${escapeHtml(am.title)}</div>` : '';
       const agentHtml = agent ? `
