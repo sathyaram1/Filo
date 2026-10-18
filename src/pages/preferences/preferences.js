@@ -877,6 +877,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'contatori.attivi': return $('contatoriAttivi').checked;
       case 'featureFlags.help': return $('aiutoAcceso').checked;
       case 'featureFlags.spellcheck': return $('correttoreAcceso').checked;
       case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
@@ -945,6 +946,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
       case 'featureFlags.help':
       case 'featureFlags.spellcheck':
       case 'featureFlags.categorize': {
@@ -1136,6 +1138,7 @@
       if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
     }
     if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    if (vuole('contatori.attivi')) $('contatoriAttivi').checked = !(settings.contatori && settings.contatori.attivi === false);
     for (const [nome, id, diSerie] of INTERRUTTORI) {
       if (vuole(`featureFlags.${nome}`)) $(id).checked = interruttore(settings, nome, diSerie);
     }
@@ -1877,6 +1880,7 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
+    $('contatoriAttivi').addEventListener('change', persist);
     for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
     for (const [, id] of CAMPI_CREDITI) {
       $(id).addEventListener('change', persist);

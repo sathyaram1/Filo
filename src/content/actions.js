@@ -630,7 +630,8 @@
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
-      ...(suRichiesta ? { suRichiesta: true } : {}),
+      // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
+      ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
     }).then(
       (res) => {
         if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
@@ -641,6 +642,10 @@
       (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
     );
     return entry;
+  }
+
+  function contaUso(action, attesaMs) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs })).catch(() => {}); } catch (_) {}
   }
 
   // Restituisce la Promise per la spiegazione di questa selezione.
@@ -660,7 +665,7 @@
         pre.usata = true;
         Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
       }
-      return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
+      return pre.promise.then((res) => (pre.fermata ? chiedi() : { ...res, giaChiesta: true }));
     }
     return chiedi();
   }
@@ -694,7 +699,11 @@
         }
 
         let cancelled = false;
+        const apertaIl = Date.now();
         getExplainPromise(selInfo).then((res) => {
+          // Una risposta già chiesta prima (l'anticipo alla selezione) non passa dal conto delle chiamate: l'uso lo
+          // conta chi la mostra, con l'attesa da quando la persona ha aperto Spiega (#969).
+          if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
           if (!res || res.error || !res.text) {
