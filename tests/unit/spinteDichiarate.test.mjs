@@ -117,6 +117,55 @@ test('#1194: il commit che un altro spinge sul ramo e la pulita incorpora non en
   assert.ok(!coda(d.pulita).flatMap((x) => x.commits).includes(z2), 'Z2 visto su origin resta di chi l’ha spinto');
 });
 
+test('#1362 r1: alla spinta gira lo script di chi ha installato il pre-push, mai quello del ramo, che un commit spinto da altri può aver riscritto', () => {
+  const d = deposito();
+  const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  commit(d.pulita, 'a.txt');
+  spingi(d.pulita, env);
+  // L'altra copia spinge Z, con dentro uno script delle spinte che dichiara tutto col biglietto di chi spinge.
+  g(d.altra, ['fetch', '-q', 'origin']);
+  g(d.altra, ['reset', '-q', '--hard', 'origin/claude/x']);
+  mkdirSync(join(d.altra, 'scripts'), { recursive: true });
+  writeFileSync(join(d.altra, 'scripts', 'dichiara-spinte.mjs'), `import { writeFileSync } from 'node:fs';
+writeFileSync(${JSON.stringify(join(d.base, 'girato.txt'))}, String(process.env.FILO_ROUTINE_TICKET));
+`);
+  const z = commit(d.altra, 'z.txt');
+  assert.equal(spingi(d.altra, ambiente(d.origin), '--no-verify').status, 0);
+  g(d.pulita, ['fetch', '-q', 'origin']);
+  g(d.pulita, ['merge', '-q', '--no-edit', 'origin/claude/x']);
+  const b = commit(d.pulita, 'b.txt');
+  assert.equal(spingi(d.pulita, env).status, 0);
+  assert.equal(existsSync(join(d.base, 'girato.txt')), false, 'lo script del ramo non deve girare col biglietto di chi spinge');
+  const tutte = coda(d.pulita).flatMap((x) => x.commits);
+  assert.ok(tutte.includes(b), 'le spinte le accoda lo script di chi ha installato');
+  assert.ok(!tutte.includes(z));
+});
+
+test('#1362 r3: due sessioni nella stessa cartella, ogni commit si dichiara col biglietto della sessione che l’ha fatto', () => {
+  const d = deposito();
+  const biglietto = (nome, lettera) => {
+    const file = join(d.base, `${nome}.json`);
+    writeFileSync(file, JSON.stringify({ ticket: `${nome}-${lettera.repeat(40)}`, fp: lettera.repeat(64), natoIl: 1 }));
+    return { file, ticket: `${nome}-${lettera.repeat(40)}`, fp: lettera.repeat(64) };
+  };
+  const pulito = biglietto('pulito', 'a');
+  const sporco = biglietto('sporco', 'b');
+  const envPulita = ambiente(d.origin, { FILO_BIGLIETTO_FILE: pulito.file });
+  // La sporca committa dalla shell e non spinge; la pulita committa e spinge tutto.
+  const s = commit(d.pulita, 's.txt', ambiente(d.origin, { FILO_BIGLIETTO_FILE: sporco.file }));
+  const p = commit(d.pulita, 'p.txt', envPulita);
+  assert.equal(spingi(d.pulita, envPulita).status, 0);
+  const di = (t) => coda(d.pulita).filter((v) => v.ticket === t).flatMap((v) => v.commits);
+  assert.deepEqual(di(pulito.ticket), [p]);
+  assert.deepEqual(di(sporco.ticket), [s], 'il commit della sporca parte col suo biglietto');
+  const [v] = coda(d.pulita).filter((x) => x.ticket === sporco.ticket);
+  assert.deepEqual([v.tipo, v.fp, v.file, v.ramo], ['locale', sporco.fp, sporco.file, 'claude/x']);
+  // Un commit fatto senza sessione (l'owner dal terminale) resta di chi lo spinge, come prima.
+  const o = commit(d.pulita, 'o.txt', ambiente(d.origin));
+  spingi(d.pulita, envPulita);
+  assert.deepEqual(di(pulito.ticket), [p, o]);
+});
+
 test('il salvataggio automatico dichiara col biglietto della sessione che ha modificato (session_id dallo stdin)', () => {
   const s = scene();
   const sessione = 'sess-dello-stdin';

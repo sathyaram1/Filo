@@ -1,6 +1,6 @@
-// dichiara-spinte.mjs — le spinte col biglietto di chi spinge (#1362). `--pre-push <app|server> <radice> [<url>]`: il
-// pre-push di git (scripts/lib/copie-di-dati.mjs) accoda i commit che la sessione ha creato e lancia l'invio in
-// sottofondo; non ferma mai un push. `--invia <radice>`: dichiara la coda al server. Regole: scripts/lib/spinte.mjs.
+// dichiara-spinte.mjs — le spinte col biglietto di chi spinge (#1362). `--pre-push <app|server> <radice> [<url>]` accoda i
+// commit creati qui, ognuno col biglietto di chi l'ha fatto (`--post-commit <radice>` lo annota), e lancia l'invio; non
+// ferma mai git. `--invia <radice>`: dichiara la coda al server. Regole: scripts/lib/spinte.mjs.
 
 import { execFileSync, spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -37,9 +37,21 @@ export async function prePush({ repo, radice, url = '', righe, env = process.env
   const chi = S.chiSpinge({ root: repo === 'server' ? FILO : radice, env });
   if (!chi) return 0;
   const spinte = S.spinteDelPrePush(radice, righe);
-  const n = S.accoda(radice, chi, repo, spinte);
+  let n = 0;
+  for (const g of S.perAutore(radice, chi, spinte)) n += S.accoda(radice, g.chi, repo, g.spinte);
   if (n && !env.FILO_SPINTE_SENZA_INVIO) lanciaInvio(radice, env);
   return n;
+}
+
+/** Il post-commit: annota la sessione locale che ha fatto HEAD. Mai un'eccezione verso git. */
+export function postCommit({ radice, env = process.env } = {}) {
+  try {
+    const chi = S.chiSpinge({ root: radice, env });
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: radice, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return S.annotaAutore(radice, chi, sha);
+  } catch (_) {
+    return false;
+  }
 }
 
 function lancia(radice, env) {
@@ -55,6 +67,10 @@ async function main(argv) {
     await prePush({ repo: a, radice: resolve(b || process.cwd()), url: resto[0] || '', righe: await leggiStdin() });
     return 0;
   }
+  if (modo === '--post-commit') {
+    postCommit({ radice: resolve(a || process.cwd()) });
+    return 0;
+  }
   if (modo === '--invia') {
     const i = resto.indexOf('--attendi');
     const attendiMs = b === '--attendi' ? Number(resto[0]) || 0 : i >= 0 ? Number(resto[i + 1]) || 0 : 0;
@@ -63,7 +79,7 @@ async function main(argv) {
     if (riga) console.error(riga);
     return 0;
   }
-  console.error('Uso: node scripts/dichiara-spinte.mjs --pre-push <app|server> <radice> [<url>] | --invia <radice>');
+  console.error('Uso: node scripts/dichiara-spinte.mjs --pre-push <app|server> <radice> [<url>] | --post-commit <radice> | --invia <radice>');
   return 2;
 }
 
