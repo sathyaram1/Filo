@@ -6,6 +6,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 import '../../src/shared/contenutoEsterno.js';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
@@ -181,6 +182,8 @@ test('il prompt del messaggio dice perché Filo scrive, e quando sostituisce il 
   assert.match(P.filoDashboard({}), /message resta vuoto/);
 });
 
+// Misurato a meno di un'unità (2.000 chat e 20.000 pagine); il tetto lascia largo margine.
+const TETTO = 4;
 test('con migliaia di eventi le righe e il pezzo da mostrare si fanno senza attesa', () => {
   const chats = [];
   for (let i = 0; i < 2000; i++) {
@@ -188,10 +191,8 @@ test('con migliaia di eventi le righe e il pezzo da mostrare si fanno senza atte
     chats.push(chat(`c${i}`, [m('user', `domanda ${i}`, new Date(t0).toISOString()), m('filo', `risposta ${i}`, new Date(t0 + 1000).toISOString())]));
   }
   const pagine = Array.from({ length: 20000 }, (_, i) => ({ id: `p${i}`, ts: new Date(ORA - (20000 - i) * 360000).toISOString(), url: `https://s${i % 50}.it/${i}`, titolo: `Pagina ${i}` }));
-  const t = Date.now();
-  const el = C.elementi({ chats, pagine, cambi: [], qui: 'qui' });
-  const r = C.pezzo(el);
-  const dt = Date.now() - t;
+  let r = null;
+  const c = costoInUnita(() => { r = C.pezzo(C.elementi({ chats, pagine, cambi: [], qui: 'qui' })); }, { tetto: TETTO });
   assert.ok(r.elementi.length > 0 && r.elementi.length <= C.PEZZO + 2);
-  assert.ok(dt < 1500, `righe e pezzo in ${dt} ms`);
+  assert.ok(c.entro, c.come);
 });

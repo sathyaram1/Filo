@@ -149,7 +149,8 @@
     chatId: () => chatId,
     occupata: () => sending || Accoglienza.isActive(),
   });
-  self.SN_DASH_CERCA.init({ send, coda: Coda, input: $('cercaFilo') });
+  const Cerca = self.SN_DASH_CERCA;
+  Cerca.init({ send, coda: Coda, input: $('cercaFilo') });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {

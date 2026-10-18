@@ -614,13 +614,13 @@
     },
     {
       scrive: ['showHomeMessage'],
-      aiuto: 'true | false (commento di Filo al centro della home)',
+      aiuto: 'true | false (Filo scrive per primo nella home quando succede qualcosa)',
       costo: 1,
-      keys: ['commento_home', 'commento nella home', 'commento home', 'messaggio home', 'messaggio nella home', 'showhomemessage', 'commento'],
+      keys: ['scrive_per_primo', 'filo scrive per primo', 'scrive per primo', 'commento_home', 'commento nella home', 'commento home', 'messaggio home', 'messaggio nella home', 'showhomemessage', 'commento'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { showHomeMessage: b }, label: `Commento nella home → ${b ? 'mostrato' : 'nascosto'}` };
+        return { partial: { showHomeMessage: b }, label: `Filo scrive per primo → ${b ? 'sì' : 'no'}` };
       },
     },
     // Ora, batteria, rete, Bluetooth e volume nella home (#873, #874): una voce per chiave, le altre restano come sono.
