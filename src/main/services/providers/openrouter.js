@@ -517,6 +517,7 @@
       err.status = 502;
       err.provider = 'openrouter';
       if (servedBy) err.hostFallito = servedBy;
+      produttoreNonRisponde(err, model);
       throw err;
     }
     return {
@@ -630,7 +631,31 @@
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
+    produttoreNonRisponde(err, model, errText);
     return err;
+  }
+
+  // Un modello da comprare solo dal produttore (#904) non ripiega su altri host: se il produttore non risponde, a catena
+  // finita la richiesta fallisce con la frase del #828 e questo motivo (#829). Il 500 è del router, non dell'host.
+  const PRODUTTORE_GIU = new Set([408, 502, 503, 504, 529]);
+  const NESSUN_AMMESSO = /no allowed providers|provider restrictions/i;
+  function produttoreNonRisponde(err, model, errText = '') {
+    const C = global.SN_CONST;
+    const rule = model && C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
+    if (!rule || (err.code && err.code !== 'NO_PROVIDER_ALLOWED' && err.code !== 'DATA_POLICY')) return false;
+    const filtrati = err.status === 404 && NESSUN_AMMESSO.test(errText) && !/settings\/privacy/i.test(errText);
+    if (!PRODUTTORE_GIU.has(err.status) && !filtrati) return false;
+    const CE = global.SN_CHAT_ERRORS;
+    const motivo = CE && typeof CE.motivoProduttoreGiu === 'function' ? CE.motivoProduttoreGiu(rule.nome) : '';
+    console.warn(`[Filo policy] "${model}" lo serve solo ${rule.nome || rule.only.join(', ')}, che non risponde: ${err.message}`);
+    err.dettaglio = err.message;
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo }) : `NO_ALLOWED_HOST ${model}`;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'produttore';
+    err.motivo = motivo;
+    err.model = model;
+    err.hosts = [];
+    return true;
   }
 
   // Un 404 del router su un modello che servono solo host esclusi (#828). Lo dicono gli host dichiarati, non il testo
