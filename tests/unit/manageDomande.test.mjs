@@ -20,6 +20,7 @@ const ESEMPI = {
   valorePriorita: 3,
   chiave: Object.keys(D.CHIAVI_AUTOMAZIONE)[0],
   valoreBooleano: true,
+  nomeRiserva: 'reserve_1',
 };
 const RIFERIMENTI = { fb902: { num: '#902', priorita: 1, stato: 'todo', motivo: '' } };
 

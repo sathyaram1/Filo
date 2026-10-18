@@ -6049,7 +6049,7 @@
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
   // Slot → editor a segmenti (buildChain del modelChainEditor).
   // Caricato pigro: viene inizializzato la prima volta che l'utente clicca la tab.
-  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch', 'manageSearchClassifier'];
+  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeReserve', 'judgeRedTeam', 'judgePriority', 'manageSearch', 'manageSearchClassifier'];
   // Etichette amichevoli per slot (i giudici del panel L2 sono "Giudice 1/2/3"
   // + "Giudice dinamico"; l'id grezzo non va mai mostrato all'utente). L'HTML
   // ha già le <label> statiche; questa mappa è la sorgente di verità se in
@@ -6060,6 +6060,7 @@
     judge2:        'Giudice 2',
     judge3:        'Giudice 3',
     judgeDynamic:  'Giudice dinamico',
+    judgeReserve:  'Giudici di riserva',
     judgeRedTeam:  'Giudice red-team',
     judgePriority: 'Giudice priorità',
     manageSearch:  'Ricerca fra i feedback',

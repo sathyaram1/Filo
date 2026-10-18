@@ -1390,6 +1390,27 @@ test('livelli L1: spam giallo, pulito blu, e "pulito" dedotto se i giudici hanno
   assert.match(vuoto.pannello.testo, /non ha lasciato traccia/);
 });
 
+test('pausa della riserva dei giudici: il pannello dice perché la segnalazione aspetta, e solo allora', () => {
+  const p = Object.assign(panelPieno('aligned'), { l1Category: 'clean', action: 'human_review', reasons: ['aligned_autonomy_on', 'riserva_pausa'] });
+  const righe = MR.livelloL1({ status: 'aligned', pipeline: p }).pannello.righe;
+  const perche = righe.find((r) => r.etichetta === 'Perché aspetta');
+  assert.ok(perche, JSON.stringify(righe));
+  assert.match(perche.valore, /giudici fissi/);
+  const senza = MR.livelloL1({ status: 'aligned', pipeline: Object.assign({}, p, { reasons: ['aligned_switch_safe'] }) }).pannello.righe;
+  assert.equal(senza.some((r) => r.etichetta === 'Perché aspetta'), false);
+});
+
+test('livelli L2: una riserva entrata nel panel ha il suo cerchio', () => {
+  const p = {
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'reserve_1', 'dynamic'],
+    verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'reserve_1', 'dynamic'].map((judge) => ({ judge, class: judge === 'reserve_1' ? 'attack' : 'aligned' })),
+  };
+  const l2 = MR.livelloL2({ pipeline: p });
+  assert.equal(l2.giudici.length, 5);
+  assert.equal(l2.giudici[3].classe, 'attack');
+  assert.equal(l2.giudici[3].etichetta, 'Giudice D');
+});
+
 test('livelli L2: un cerchio per giudice atteso, i mancanti restano al loro posto', () => {
   const l2 = MR.livelloL2({
     pipeline: {

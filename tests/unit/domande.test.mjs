@@ -24,9 +24,17 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.accountBOff', valore: true }, {}), 'Routine dell’account B: spegni');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.accountAOff', valore: false }, {}), 'Routine dell’account A: accendi');
   assert.equal(D.etichettaAzione({ tipo: 'compito' }, {}), 'Affida a un agente');
+  assert.equal(D.etichettaAzione({ tipo: 'riserva_riprendi' }, {}), 'Togli la pausa dei giudici');
+  assert.equal(D.etichettaAzione({ tipo: 'riserva_attendi' }, {}), 'Lascia la pausa dei giudici');
+  assert.equal(D.etichettaAzione({ tipo: 'riserva_togli', nome: 'reserve_2' }, {}), 'Togli dal panel reserve_2');
+  assert.equal(D.etichettaAzione({ tipo: 'riserva_tieni', nome: 'reserve_2' }, {}), 'Tieni nel panel reserve_2');
   for (const [nome, spec] of Object.entries(D.TIPI)) {
     if (!spec.attivo) continue;
-    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' }, automazione: { chiave: 'routine.proberWhenIdle', valore: true }, compito: {} }[nome];
+    const esempio = {
+      riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' },
+      automazione: { chiave: 'routine.proberWhenIdle', valore: true }, compito: {},
+      riserva_riprendi: {}, riserva_attendi: {}, riserva_togli: { nome: 'reserve_1' }, riserva_tieni: { nome: 'reserve_1' },
+    }[nome];
     assert.ok(esempio, `il tipo attivo «${nome}» non ha un esempio in questo test`);
     assert.equal(typeof D.etichettaAzione({ tipo: nome, ...esempio }, RIF), 'string', nome);
   }
@@ -56,6 +64,19 @@ test('validaAzione: tipo e soli parametri; i non attivi rifiutati col loro codic
 function base(extra) {
   return { titolo: 'Che fare?', priorita: 'importante', opzioni: [{ testo: 'Archivia', azione: { tipo: 'archivia', feedbackId: 'f1' } }], consiglio: { opzione: 0, perche: 'doppione' }, ...extra };
 }
+
+test('i pulsanti della riserva dei giudici li propone solo il server: da un agente la domanda si rifiuta', () => {
+  const pausa = base({ opzioni: [{ testo: 'Togli la pausa', azione: { tipo: 'riserva_riprendi' } }] });
+  const daAgente = D.validaDomanda(pausa);
+  assert.equal(daAgente.ok, false);
+  assert.equal(daAgente.errore, 'tipo_solo_server');
+  assert.equal(D.validaDomanda(pausa, { daServer: true }).ok, true);
+  const togli = base({ opzioni: [{ testo: 'Toglilo', azione: { tipo: 'riserva_togli', nome: 'reserve_1' } }] });
+  assert.equal(D.validaDomanda(togli).errore, 'tipo_solo_server');
+  assert.equal(D.validaAzione({ tipo: 'riserva_togli', nome: 'fixed_1' }).errore, 'parametri_non_validi', 'solo una riserva si toglie, mai un fisso');
+  assert.equal(D.TIPI.riserva_riprendi.consenso, true, 'togliere la pausa vuole il gesto dell’owner');
+  assert.equal(D.TIPI.riserva_togli.consenso, true);
+});
 
 test('validaDomanda: tetti superati rifiutati col numero, mai tagliati', () => {
   const r = D.validaDomanda(base({ contesto: 'x'.repeat(D.TETTI.contesto + 1) }));

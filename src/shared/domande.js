@@ -45,9 +45,11 @@
     valorePriorita: (v) => Number.isInteger(v) && v >= 0 && v <= 3,
     chiave: (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHIAVI_AUTOMAZIONE, v),
     valoreBooleano: (v) => typeof v === 'boolean',
+    nomeRiserva: (v) => typeof v === 'string' && /^reserve_[1-9][0-9]{0,3}$/.test(v),
   });
 
   // `bulk`: ammessa in «applica il consiglio» su più domande. `consenso`: vale solo da un gesto dell'owner nella finestra.
+  // `soloServer`: la propone solo il server (la riserva dei giudici): una domanda di un agente che la porta si rifiuta.
   function tipo(parametri, flag) {
     return Object.freeze(Object.assign({ parametri: Object.freeze(parametri) }, flag));
   }
@@ -60,6 +62,10 @@
     ambito: tipo({}, { bulk: false, consenso: true, attivo: false }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
     compito: tipo({}, { bulk: true, consenso: false, attivo: true }),
+    riserva_riprendi: tipo({}, { bulk: false, consenso: true, attivo: true, soloServer: true }),
+    riserva_attendi: tipo({}, { bulk: true, consenso: false, attivo: true, soloServer: true }),
+    riserva_togli: tipo({ nome: 'nomeRiserva' }, { bulk: false, consenso: true, attivo: true, soloServer: true }),
+    riserva_tieni: tipo({ nome: 'nomeRiserva' }, { bulk: true, consenso: false, attivo: true, soloServer: true }),
   });
 
   const ha = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -102,7 +108,7 @@
   const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
-  function validaOpzione(o, i) {
+  function validaOpzione(o, i, daServer) {
     const n = i + 1;
     if (!isOggetto(o)) return no('opzione_non_valida', `l'opzione ${n} non è un oggetto con testo, pro, contro e azione`);
     const ignoti = Object.keys(o).filter((k) => !CAMPI_OPZIONE.includes(k));
@@ -117,6 +123,7 @@
     if (!ha(o, 'azione')) return no('parametri_non_validi', `l'opzione ${n} non ha l'azione: ogni opzione dice cosa fa il suo pulsante`);
     const a = validaAzione(o.azione);
     if (!a.ok) return Object.assign(a, { dettaglio: `opzione ${n}: ${a.dettaglio}` });
+    if (TIPI[a.azione.tipo].soloServer && daServer !== true) return no('tipo_solo_server', `opzione ${n}: «${a.azione.tipo}» lo propone solo il server`);
     return { ok: true, opzione: { testo: o.testo.trim(), pro: pro.valore, contro: contro.valore, azione: a.azione } };
   }
 
@@ -133,9 +140,10 @@
 
   /**
    * Una domanda in ingresso, controllata e normalizzata. `conOrigine` false: l'origine la mette il server (biglietto).
+   * `daServer`: la scrive il server stesso, e solo lui può proporre i tipi `soloServer`.
    * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string }}
    */
-  function validaDomanda(input, { conOrigine = true } = {}) {
+  function validaDomanda(input, { conOrigine = true, daServer = false } = {}) {
     if (!isOggetto(input)) return no('domanda_non_valida', 'la domanda deve essere un oggetto JSON');
     const ignoti = Object.keys(input).filter((k) => !CAMPI_DOMANDA.includes(k) && !CAMPI_DEL_SERVER.includes(k));
     if (ignoti.length) {
@@ -159,7 +167,7 @@
     }
     const opzioni = [];
     for (let i = 0; i < grezze.length; i++) {
-      const r = validaOpzione(grezze[i], i);
+      const r = validaOpzione(grezze[i], i, daServer);
       if (!r.ok) return r;
       opzioni.push(r.opzione);
     }
@@ -212,6 +220,10 @@
     if (!v.ok) return null;
     const a = v.azione;
     if (a.tipo === 'compito') return 'Affida a un agente';
+    if (a.tipo === 'riserva_riprendi') return 'Togli la pausa dei giudici';
+    if (a.tipo === 'riserva_attendi') return 'Lascia la pausa dei giudici';
+    if (a.tipo === 'riserva_togli') return `Togli dal panel ${a.nome}`;
+    if (a.tipo === 'riserva_tieni') return `Tieni nel panel ${a.nome}`;
     if (a.tipo === 'automazione') {
       const k = CHIAVI_AUTOMAZIONE[a.chiave];
       return `${k.nome}: ${a.valore !== k.spegne ? 'accendi' : 'spegni'}`;

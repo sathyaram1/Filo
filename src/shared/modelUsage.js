@@ -135,6 +135,7 @@
     owner('judge2', 'Giudice 2 dei feedback', 'Feedback (server)', 'judge2'),
     owner('judge3', 'Giudice 3 dei feedback', 'Feedback (server)', 'judge3'),
     owner('judge-dynamic', 'Giudice dinamico dei feedback', 'Feedback (server)', 'judgeDynamic'),
+    owner('judge-reserve', 'Giudici di riserva dei feedback', 'Feedback (server)', 'judgeReserve'),
     owner('judge-redteam', 'Giudice degli attacchi (red-team)', 'Feedback (server)', 'judgeRedTeam'),
     owner('judge-priority', 'Giudice della priorità dei feedback', 'Feedback (server)', 'judgePriority'),
 

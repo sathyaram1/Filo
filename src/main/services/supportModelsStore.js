@@ -49,8 +49,9 @@ const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 // Slot validi. Stabile: i backend filo-security li leggono per nome.
 // I 3 giudici fissi del panel L2 + il giudice dinamico hanno ciascuno il proprio
 // slot (judge1/judge2/judge3/judgeDynamic). Il vecchio slot unico `judgeL2`,
-// non letto da nessuno, è stato rimosso.
-const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch', 'manageSearchClassifier'];
+// non letto da nessuno, è stato rimosso. `judgeReserve` è una lista, non una catena: il server prova tutti i
+// modelli in ordine quando un attacco passa i giudici fissi (riserva dei giudici, #1384).
+const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeReserve', 'judgeRedTeam', 'judgePriority', 'manageSearch', 'manageSearchClassifier'];
 
 // Slot spostati qui dalle Opzioni (#465): campo assente nel doc = null, e vale ancora la scelta di
 // prima; una stringa vuota invece è una scelta (nessun modello).

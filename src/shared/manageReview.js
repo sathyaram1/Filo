@@ -1346,6 +1346,14 @@
     return { etichetta: String(etichetta || ''), valore: String(valore == null ? '' : valore) };
   }
 
+  // La pausa della riserva dei giudici (#1384) sta solo nel pipeline cifrato: in chiaro direbbe a tutti che i giudici
+  // fissi sono stati bucati.
+  const FRASE_PAUSA_RISERVA = 'un attacco ha passato tutti i giudici fissi: finché non entra un giudice di riserva, ogni segnalazione che andrebbe in coda da sola aspetta te';
+  function inPausaRiserva(fb) {
+    const p = fb && fb.pipeline;
+    return !!(p && typeof p === 'object' && Array.isArray(p.reasons) && p.reasons.includes('riserva_pausa'));
+  }
+
   /**
    * Dove è arrivata la pratica e perché, in righe. PURA.
    *
@@ -1361,6 +1369,7 @@
     if (b) righe.push(riga('Stato', b.label + (b.showReason ? ` — ${b.reasonText}` : '')));
     const nota = judgesNote(fb);
     if (nota && nota.text) righe.push(riga('In breve', nota.text));
+    if (inPausaRiserva(fb)) righe.push(riga('Perché aspetta', FRASE_PAUSA_RISERVA));
     return righe;
   }
 

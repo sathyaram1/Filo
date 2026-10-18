@@ -59,9 +59,29 @@ test('editor giudici: chiave, registro e datalist nickname si popolano dai dati'
   });
   expect(hasNick).toBe(true);
 
-  // I 7 slot per-giudice sono renderizzati (catena per ciascuno).
+  // Gli 8 slot per-giudice sono renderizzati (catena per ciascuno), riserva compresa.
   const slotCount = await page.evaluate(() => document.querySelectorAll('#mgSmSlots .mg-sm-chain-host .sn-chain').length);
-  expect(slotCount).toBe(7);
+  expect(slotCount).toBe(8);
+});
+
+// #1384: la lista dei giudici di riserva si vede e si cambia come gli altri slot, tutta e nell'ordine scelto.
+test('giudici di riserva: la lista salvata si vede intera, in ordine, sotto il giudice dinamico', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderSupportModelsEditor);
+  await page.evaluate(() => window.__mgTest.setTab('automation'));
+  await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m),
+    Object.assign({}, FAKE_MODELS, { judgeReserve: 'giudice-veloce, minimax/minimax-m3, deepseek/deepseek-v4-flash' }));
+  const slot = page.locator('.mg-sm-slot[data-slot="judgeReserve"]');
+  await expect(slot.locator('label')).toHaveText('Giudici di riserva');
+  const valori = await slot.locator('.sn-chain-input').evaluateAll((els) => els.map((e) => e.value).filter(Boolean));
+  expect(valori).toEqual(['giudice-veloce', 'minimax/minimax-m3', 'deepseek/deepseek-v4-flash']);
+  const ordine = await page.evaluate(() => Array.from(document.querySelectorAll('#mgSmSlots .mg-sm-slot')).map((s) => s.dataset.slot));
+  expect(ordine.indexOf('judgeReserve')).toBe(ordine.indexOf('judgeDynamic') + 1);
+  await slot.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/1384-riserva-giudici.png' });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: 'tests/.shots/1384-riserva-giudici-scuro.png' });
 });
 
 test('il registro raccoglie le righe (anche quelle aggiunte) come voci OpenRouter', async ({ openTab }) => {
