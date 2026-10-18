@@ -41,6 +41,12 @@ const SLOT_DEFAULTS = {
   judgePriority: 'flash',
 };
 
+// La scelta iniziale delle funzioni dell'owner nate dopo lo spostamento (#465): non hanno una scelta di prima da
+// ereditare, e senza questa partirebbero spente finché l'owner non le imposta (#1118). Una stringa vuota le spegne.
+const OWNER_SLOT_DEFAULTS = Object.freeze({
+  manageSearchClassifier: 'typesafe/jev-1.13',
+});
+
 /**
  * Risolve il modello per uno slot di supporto.
  *
@@ -74,4 +80,52 @@ async function resolveSupportModel(slot, hardcoded, getConfig) {
   return fallback;
 }
 
-module.exports = { resolveSupportModel, SLOT_DEFAULTS };
+function ownerSlotFor(action) {
+  const Usage = globalThis.SN_MODEL_USAGE;
+  return Usage && typeof Usage.ownerSlotForAction === 'function' ? Usage.ownerSlotForAction(action) : '';
+}
+
+// Funzioni che usa solo l'owner (#465): catena dal loro slot, registro dei giudici sopra a quello
+// effettivo come sul server; slot null = mai impostato, resta la scelta di prima dello spostamento o, se non
+// c'è, la scelta iniziale dello slot.
+function initialChain(slot, settings, action) {
+  const prima = settings && settings.models ? settings.models[action] : null;
+  if (typeof prima === 'string' && prima.trim()) return null;
+  return OWNER_SLOT_DEFAULTS[slot] || null;
+}
+
+async function settingsForOwnerAction(settings, action, getConfig) {
+  const slot = ownerSlotFor(action);
+  if (!slot) return settings;
+  const getter = typeof getConfig === 'function' ? getConfig : SupportModels.get;
+  let config = null;
+  try { config = await getter(); } catch (_) { config = null; }
+  let chain = config ? config[slot] : null;
+  if (typeof chain !== 'string') chain = initialChain(slot, settings, action);
+  if (typeof chain !== 'string') return settings;
+  const judgeRegistry = (config && config.judgeRegistry && typeof config.judgeRegistry === 'object') ? config.judgeRegistry : {};
+  return {
+    ...settings,
+    models: { ...(settings.models || {}), [action]: chain.trim() },
+    modelRegistry: { ...(settings.modelRegistry || {}), ...judgeRegistry },
+  };
+}
+
+// Per l'editor di Gestione: uno slot spostato e mai impostato mostra la catena che la funzione usa
+// adesso, e `movedUnset` lo dice all'editor: quel valore è una lettura, non una scelta, e un
+// salvataggio che non l'ha cambiato non lo scrive (senza predefiniti arrivati sarebbe vuoto).
+function fillMovedSlots(models, settings) {
+  const Usage = globalThis.SN_MODEL_USAGE;
+  const pairs = Usage && typeof Usage.ownerActions === 'function' ? Usage.ownerActions() : [];
+  const inUse = (settings && settings.models) || {};
+  const unset = [];
+  for (const { action, slot } of pairs) {
+    if (models[slot] != null) continue;
+    models[slot] = initialChain(slot, settings, action) || (typeof inUse[action] === 'string' ? inUse[action] : '');
+    unset.push(slot);
+  }
+  models.movedUnset = unset;
+  return models;
+}
+
+module.exports = { resolveSupportModel, SLOT_DEFAULTS, OWNER_SLOT_DEFAULTS, ownerSlotFor, settingsForOwnerAction, fillMovedSlots };

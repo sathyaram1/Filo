@@ -192,6 +192,8 @@
    */
   function cardFor(fb) {
     if (isFlagged(fb)) return null;
+    // #908: il lavoro locale dell'owner è una pratica interna, non un fix da mostrare (decisione owner); un utente approvato no (#913).
+    if (MR().isPrivateLocalWork(fb)) return null;
     const { status } = MR().normalizeStatus(fb);
     if (!PUBLISHABLE_STATUSES.includes(status)) return null;
 

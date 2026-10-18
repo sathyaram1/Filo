@@ -249,3 +249,14 @@ test('una priorità assente o illeggibile vale la fascia di base', () => {
   // il portafoglio quando accredita: una cifra fuori tabella non deve esistere.
   assert.equal(V.cardFor({ ...PULITO, priority: 99 }).reward, table[3]);
 });
+
+test('un lavoro solo locale (#908) non ha scheda, e quella che aveva si toglie', () => {
+  const locale = { ...PULITO, _id: 'fb-loc', clientId: 'local:claude', senderProof: 'admin', localOnly: { by: 'local:claude', at: 1 } };
+  assert.equal(V.cardFor(locale), null, 'una pratica interna dell’owner non va in bacheca');
+  assert.ok(V.cardFor({ ...locale, localOnly: null }), 'senza il segno lo stesso fix chiuso la scheda la ha');
+  const giaPubblicata = { _id: 'fb-loc', ...V.cardFor({ ...locale, localOnly: null }) };
+  assert.deepEqual(V.planSync([giaPubblicata], [locale]).remove, ['fb-loc']);
+  const MR = globalThis.SN_MANAGE_REVIEW;
+  assert.equal(MR.listBoardTab([locale], { releasedVersion: '9.9.9' }).length, 0, 'seconda rete: nemmeno dai documenti veri');
+  assert.equal(MR.listBoardTab([{ ...locale, localOnly: null }], { releasedVersion: '9.9.9' }).length, 1);
+});

@@ -37,6 +37,7 @@
 //   gate proprietario si verificano invece SENZA stub, sul main vero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const NEWTAB = 'filo://newtab/';
 const MANAGE = 'filo://manage/manage.html';
@@ -127,13 +128,13 @@ async function apriGestione(page, opts) {
   await page.evaluate((admin) => window.__mgTest.setAdmin(admin), opts?.admin !== false);
   await page.evaluate(() => window.__mgTest.setData([]));
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 }
 
-/** Gestione → Automazioni: dove vive la traccia delle decisioni passate. */
-async function apriAutomazioni(page, opts) {
+/** Gestione → Log: dove vive la traccia delle decisioni passate (#1110). */
+async function apriLog(page, opts) {
   await apriGestione(page, opts);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'log');
 }
 
 // ── 1. Una fusione senza segnalazione l'owner la trova in Automazioni ───────
@@ -158,6 +159,28 @@ test('Automazioni: una fusione ferma senza segnalazione c’è, e dice ramo, com
   // Nei Ricevuti non c'è più niente del genere: le tre aree non hanno più
   // niente sopra che le schiacci.
   await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);
+});
+
+// ── 1ter. Su quale main sono girati gli unit della fusione (#929) ───────────
+//
+// Al clic, anche giorni dopo, nessuno rifà gli unit sul risultato della fusione: la scheda dice quando sono girati.
+
+test('la scheda dice su quale main sono girati gli unit della fusione, e che approvando non si rifanno', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const prova = { esito: 'verde', mainSha: 'c0ffee00'.repeat(5), atMs: Date.now() - 3 * 60 * 60 * 1000 };
+  await apriGestione(page, { pending: [richiesta({ provaUnit: prova })] });
+
+  const riga = page.locator('#mgMergeApprovalsOrphans .sn-mac .sn-mac-prova');
+  await expect(riga).toHaveText('Unit verdi sulla fusione con main di 3 ore fa', { timeout: 8_000 });
+  await expect(riga).toHaveAttribute('title', /c0ffee00.*non si rifanno/);
+  await page.locator('#mgMergeApprovalsOrphans .sn-mac').first().screenshot({ path: 'tests/.shots/merge-approvals-prova-unit.png' }).catch(() => {});
+});
+
+test('una richiesta di prima, senza la prova, non dice niente degli unit', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, { pending: [richiesta()] });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-prova')).toHaveCount(0);
 });
 
 // ── 1bis. Un sì già dato che non ha prodotto niente resta in vista ──────────
@@ -269,14 +292,14 @@ test('l’elenco vive in Automazioni: sulle schede-lista non c’è', async ({ o
   await apriGestione(page, { pending: [richiesta()] });
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
 
-  for (const scheda of ['inbox', 'queue', 'resolved', 'archived']) {
-    await page.locator(`.mg-tab[data-tab="${scheda}"]`).click();
+  for (const scheda of ['inbox', 'queue', 'local', 'resolved', 'archived']) {
+    await apriScheda(page, scheda);
     await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).not.toBeVisible();
     await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);
   }
 
   // Tornando in Automazioni è ancora lì, senza ricaricare niente.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible();
 });
 
@@ -448,11 +471,90 @@ test('un guasto del server non diventa un “fatto”: si dice, e la richiesta r
   await expect(btn).toBeEnabled();
 });
 
-// ── La traccia delle decisioni passate (Automazioni) ────────────────────────
-
-test('Automazioni elenca le decisioni già prese: un’eccezione deve lasciare traccia', async ({ openTab }) => {
+test('dopo un guasto i tasti sono dove erano: ripremere nello stesso punto riarma Approva, non scarta', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apriAutomazioni(page, {
+  await apriGestione(page, {
+    pending: [richiesta()],
+    approveReply: { ok: false, error: 'callable ownerMergeApprovals 500: github_unreachable' },
+  });
+  const btn = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
+  await expect(btn).toBeVisible({ timeout: 8_000 });
+  const prima = await btn.boundingBox();
+  const punto = { x: prima.x + 3, y: prima.y + prima.height / 2 };
+  await page.mouse.click(punto.x, punto.y);
+  await page.mouse.click(punto.x, punto.y);
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-status')).toContainText(/non raggiungibile/i, { timeout: 8_000 });
+  await expect(btn).toBeEnabled();
+  const dopo = await btn.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(dopo[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect(btn).toHaveText('Confermi?');
+  expect(await page.evaluate(() => window.__macCalls)).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
+});
+
+// Una rilettura che arriva mentre «Confermi?» è armato aspetta: rifatta sotto il
+// cursore, la card perdeva la conferma e un elenco cambiato spostava i tasti (#550).
+test('una rilettura mentre «Confermi?» è armato aspetta che la conferma finisca, poi arriva', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, { pending: [richiesta()] });
+  const host = page.locator('#mgMergeApprovalsOrphans');
+  const go = host.locator('.sn-mac-btn-go');
+  await expect(go).toBeVisible({ timeout: 8_000 });
+  await go.click();
+  await expect(go).toHaveText('Confermi?');
+
+  const altra = richiesta({ id: 'ff12cd34ef56ab12cd34ef99', branch: 'claude/altro-ramo' });
+  await page.evaluate((lista) => window.__mgTest.loadMergeApprovals({ ok: true, pending: lista, failed: [], recent: [] }),
+    [altra, richiesta()]);
+  await page.waitForTimeout(300);
+  await expect(host.locator('.sn-mac-card')).toHaveCount(1);
+  await expect(go).toHaveText('Confermi?');
+
+  // Disarmata da sola, la card lascia passare l'elenco nuovo.
+  await expect(host.locator('.sn-mac-card')).toHaveCount(2, { timeout: 8_000 });
+  await expect(host).toContainText('claude/altro-ramo');
+});
+
+test('un guasto alla conferma resta scritto anche quando la rilettura rimandata ridisegna la card', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, {
+    pending: [richiesta()],
+    approveReply: { ok: false, error: 'callable ownerMergeApprovals 500: github_unreachable' },
+  });
+  const host = page.locator('#mgMergeApprovalsOrphans');
+  const go = host.locator('.sn-mac-btn-go');
+  await expect(go).toBeVisible({ timeout: 8_000 });
+  await go.click();
+  await expect(go).toHaveText('Confermi?');
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await go.click();
+  await expect(host.locator('.sn-mac-status')).toContainText(/non raggiungibile/i, { timeout: 8_000 });
+  await page.waitForTimeout(500);
+  await expect(host.locator('.sn-mac-status')).toContainText(/non raggiungibile/i);
+  await expect(go).toBeEnabled();
+});
+
+// La coda di un doppio clic non è una conferma: «Approva e fondi» è irreversibile
+// (stessa guardia del cestino dell'editor, #415).
+test('un doppio clic su «Approva e fondi» arma soltanto; il clic voluto dopo fonde', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, { pending: [richiesta()] });
+  const go = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
+  await expect(go).toBeVisible({ timeout: 8_000 });
+  await go.dblclick();
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => window.__macCalls)).toEqual([]);
+  await expect(go).toHaveText('Confermi?');
+  await go.click();
+  await expect.poll(() => page.evaluate(() => window.__macCalls)).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
+});
+
+// ── La traccia delle decisioni passate (Log) ────────────────────────
+
+test('il Log elenca le decisioni già prese: un’eccezione deve lasciare traccia', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriLog(page, {
     pending: [],
     recent: [
       richiesta({ id: '11'.repeat(12), used: true, outcome: 'merged', decidedAtMs: Date.now() - 3 * 60 * 1000 }),
@@ -541,7 +643,7 @@ test('se la segnalazione c’è, la richiesta NON sta in Automazioni: sta sulla 
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(0);
 
   // …e riconoscibile nella lista, dove aspetta una decisione.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   const card = page.locator('.mg-item', { hasText: 'Menu copertina' });
   await expect(card).toBeVisible({ timeout: 8_000 });
   await expect(card.locator('.mg-fusione-badge')).toBeVisible();
@@ -582,9 +684,9 @@ test('una richiesta di un’automazione non manda l’owner a lanciare la pubbli
 
 const RIA = { from: SHA, to: 'e'.repeat(40), mainSha: 'd'.repeat(40) };
 
-test('Automazioni: una richiesta riallineata dal server NON compare come «approvata»', async ({ openTab }) => {
+test('Log: una richiesta riallineata dal server NON compare come «approvata»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apriAutomazioni(page, {
+  await apriLog(page, {
     pending: [],
     recent: [
       richiesta({ id: '33'.repeat(12), branch: 'worker/riallineata', used: true, outcome: 'stale', realigned: RIA, newRequestId: '44'.repeat(12), decidedAtMs: Date.now() - 3 * 60 * 1000 }),

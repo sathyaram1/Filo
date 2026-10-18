@@ -8,6 +8,7 @@
 // quando l'utente fa Ctrl+V su un'immagine.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriCronologia } from './helpers/cronologiaAppunti.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -48,16 +49,9 @@ test('Incolla → cronologia → immagine allega l\'immagine nella barra home (p
 
   // Tasto destro sulla barra home, naviga il sotto-menu cronologia.
   await page.locator('#input').focus();
-  await page.locator('#input').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
-
-  const arrow = page.locator('.sn-menu .sn-menu-paste-arrow').first();
-  await expect(arrow).toBeVisible();
-  await arrow.click();
-
-  const histItem = page.locator('.sn-menu-sub .sn-menu-history-item').first();
-  await expect(histItem).toBeVisible({ timeout: 2000 });
-  await histItem.click();
+  const stato = await apriCronologia(app, page, '#input');
+  expect(stato.voci[0]?.testo).toBe('png 1x1 di test');
+  await page.mouse.click(stato.voci[0].incolla.x, stato.voci[0].incolla.y);
 
   // Successo: la dashboard deve mostrare l'anteprima dell'immagine allegata,
   // identica al risultato di un Ctrl+V su immagine.

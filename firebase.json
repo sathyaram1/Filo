@@ -1,9 +1,28 @@
 {
   "firestore": {
     "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "indexes": "firestore.indexes.json",
+    "predeploy": ["node scripts/regole-pubblica.mjs --controlla"]
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "storage.rules",
+    "predeploy": ["node scripts/regole-pubblica.mjs --controlla"]
+  },
+  "hosting": {
+    "public": "site/approvazioni",
+    "ignore": ["**/.*"],
+    "predeploy": ["node scripts/regole-pubblica.mjs --controlla", "node scripts/build-approvazioni.mjs --controlla"],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://apis.google.com; connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://europe-west1-filo-8b9cb.cloudfunctions.net; frame-src https://filo-8b9cb.firebaseapp.com https://accounts.google.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "Referrer-Policy", "value": "no-referrer" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      }
+    ]
   }
 }

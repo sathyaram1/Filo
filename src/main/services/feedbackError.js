@@ -48,7 +48,7 @@ function permissionDeniedHelp(rawError, claims, opts) {
     'filo-8b9cb) → Firestore → collezione "admins" crea un documento con ID',
     email ? `esattamente uguale alla tua email: ${email}` : 'uguale alla tua email',
     '(i campi possono restare vuoti). Verifica anche che le regole Firestore',
-    'siano deployate (firebase deploy --only firestore:rules).',
+    'siano pubblicate (npm run regole:pubblica, da main).',
   ];
   if (claims && claims.email_verified === false) {
     lines.push('');

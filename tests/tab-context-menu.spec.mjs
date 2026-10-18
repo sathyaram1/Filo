@@ -182,12 +182,13 @@ async function apriMenuLinguetta(app, shell) {
   return popup;
 }
 
+// Il menu è una finestra riusata (#1090): aperto vuol dire in vista, non soltanto esistente.
 const menuAperto = (app) => app.evaluate(({ BrowserWindow }) =>
-  BrowserWindow.getAllWindows().some((w) => !w.isDestroyed() && w.webContents.getURL().startsWith('data:text/html')));
+  BrowserWindow.getAllWindows().some((w) => !w.isDestroyed() && w.isVisible() && w.webContents.getURL().startsWith('data:text/html')));
 
 function tastoAlMenu(app, keyCode) {
   return app.evaluate(({ BrowserWindow }, k) => {
-    const m = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.webContents.getURL().startsWith('data:text/html'));
+    const m = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isVisible() && w.webContents.getURL().startsWith('data:text/html'));
     m.webContents.sendInputEvent({ type: 'keyDown', keyCode: k });
     if (k === 'Enter') m.webContents.sendInputEvent({ type: 'char', keyCode: '\r' });
     m.webContents.sendInputEvent({ type: 'keyUp', keyCode: k });

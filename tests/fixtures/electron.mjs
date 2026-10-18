@@ -3,7 +3,7 @@
 // Lancia l'app via _electron.launch e fornisce ai test:
 //   - app:        l'istanza ElectronApplication
 //   - shell:      Page object della shell (BrowserWindow primary)
-//   - openTab:    apre una URL come nuovo tab e ritorna la Page del WebContentsView
+//   - openTab:    apre una URL come nuovo tab e ritorna la Page della sua vista
 //   - testServer: mini HTTP server locale per pagine di test (i content
 //                 script Filo si caricano via preload anche su http://127.0.0.1)
 //
@@ -15,12 +15,14 @@
 //     vogliono il pixel-perfect.
 
 import { test as base, _electron as electron, expect } from '@playwright/test';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
+import { primaFinestra } from '../helpers/primaFinestra.mjs';
+import { paginaDellaScheda } from '../helpers/schede.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
@@ -46,15 +48,72 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   const scaduto = new Promise((r) => { timer = setTimeout(r, tetto); timer.unref?.(); });
   await Promise.race([app.close(), scaduto]).catch(() => {});
   clearTimeout(timer);
-  if (pid) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
+  if (!pid) return;
+  // Fuori da Windows Playwright fa di Electron il capo di un gruppo di processi: si ammazza il gruppo,
+  // perché un figlio rimasto (un renderer) tiene aperte le pipe e Playwright aspetta che si chiudano.
+  if (process.platform === 'win32') { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
+  else { try { process.kill(-pid, 'SIGKILL'); } catch (_) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} } }
 }
 
+// Una finestra arriva quando arriva: con la macchina carica ci mette più di dieci secondi (#1212). L'attesa la
+// ferma il tetto del test, non un tempo suo, e il rosso dice quale finestra mancava.
+export async function aspettaFinestra(app, trova, perche) {
+  let win = null;
+  const cerca = () => {
+    win = app.windows().find((w) => { try { return trova(w); } catch (_) { return false; } }) || null;
+    return Boolean(win);
+  };
+  await expect.poll(cerca, { message: perche, timeout: 0, intervals: [100] }).toBe(true);
+  return win;
+}
+
+// Quello che l'app scrive su stdout/stderr (in test le righe render-process-gone e did-fail-load)
+// Playwright non lo mostra: senza, un rosso che c'è solo in GitHub non si spiega (#639).
+const TETTO_RIGHE_APP = 20_000;
+function registraUsciteApp(app) {
+  const righe = [];
+  let perse = 0;
+  const t0 = Date.now();
+  const resti = { out: '', err: '' };
+  const prendi = (canale) => (pezzo) => {
+    const parti = (resti[canale] + pezzo.toString('utf8')).split('\n');
+    resti[canale] = parti.pop();
+    for (const r of parti) {
+      righe.push(`+${Date.now() - t0}ms [${canale}] ${r}`);
+      if (righe.length > TETTO_RIGHE_APP) { righe.shift(); perse++; }
+    }
+  };
+  try {
+    const proc = app.process();
+    proc.stdout?.on('data', prendi('out'));
+    proc.stderr?.on('data', prendi('err'));
+  } catch (_) {}
+  return () => [
+    'Uscita dell\'app (stdout e stderr dal momento in cui Playwright l\'ha agganciata):',
+    ...(perse ? [`… ${perse} righe più vecchie non tenute: il tetto è ${TETTO_RIGHE_APP}`] : []),
+    ...righe,
+    ...Object.entries(resti).filter(([, r]) => r).map(([c, r]) => `[${c}, senza a capo] ${r}`),
+  ].join('\n');
+}
+
+// Chi apre Filo in una prova è già stato accolto (FILO_TEST_ACCOLTO, da playwright.config.js). Una prova
+// dell'accoglienza parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
+// `argomentiInPiu` vanno dopo la manopola della scala: una prova che fissa il suo fattore lo tiene anche con FILO_TEST_SCALE.
 export const test = base.extend({
-  app: async ({}, use) => {
+  accoglienzaFatta: [true, { option: true }],
+  // La home nascosta pronta per la scheda nuova (#1128) nelle prove è spenta (playwright.config.js): chi la prova la
+  // riaccende con `test.use({ riservaNuovaScheda: true })`.
+  riservaNuovaScheda: [false, { option: true }],
+  argomentiInPiu: [[], { option: true }],
+  // Nomi in più portati al loopback, per le prove che vogliono un sito col suo nome (example.org, #823).
+  hostInPiu: [[], { option: true }],
+
+  app: async ({ accoglienzaFatta, riservaNuovaScheda, argomentiInPiu, hostInPiu }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
     const userData = cartellaTemporanea('filo-test-');
+    if (typeof accoglienzaFatta !== 'boolean') throw new Error(`accoglienzaFatta vuole true o false, non ${JSON.stringify(accoglienzaFatta)}`);
     const app = await electron.launch({
       // host-resolver-rules:
       //  • "blocked.test" al loopback, così l'e2e del blocco siti
@@ -73,13 +132,16 @@ export const test = base.extend({
       //    la pagina con un nome da internet (testServer.html(…, { pubblico: true })).
       args: [
         ...argomentiScala,
-        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1',
+        ...argomentiInPiu,
+        `--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1${hostInPiu.map((h) => `, MAP ${h} 127.0.0.1`).join('')}`,
         '.',
       ],
       cwd: APP_ROOT,
       env: {
         ...process.env,
         FILO_USER_DATA: userData,
+        FILO_TEST_ACCOLTO: accoglienzaFatta ? '1' : '0',
+        ...(riservaNuovaScheda ? { FILO_RISERVA_NUOVA_SCHEDA: '1' } : {}),
         // I download ("Salva immagine come…") finiscono qui SENZA dialogo
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.
@@ -91,15 +153,24 @@ export const test = base.extend({
         NODE_ENV: 'test',
       },
     });
+    const usciteApp = registraUsciteApp(app);
     await use(app);
     await chiudiApp(app);
+    // Dopo la chiusura, così ci sono anche le righe di un'app che muore male uscendo.
+    if (testInfo.status !== testInfo.expectedStatus) {
+      try {
+        const file = testInfo.outputPath('uscita-app.txt');
+        writeFileSync(file, usciteApp());
+        await testInfo.attach('uscita-app', { path: file, contentType: 'text/plain' });
+      } catch (_) {}
+    }
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   },
 
   // Pagina della shell del browser (tab bar + barra indirizzi). È la prima
   // window che Filo apre.
   shell: async ({ app }, use) => {
-    const win = await app.firstWindow();
+    const win = await primaFinestra(app);
     await win.waitForLoadState('domcontentloaded');
     await use(win);
   },
@@ -107,36 +178,23 @@ export const test = base.extend({
   // La vista che disegna sopra la pagina gli avvisi della barra (#588.5); nasce al primo avviso.
   // La pila nella shell è solo il modello, nascosto: quello che l'utente vede e clicca sta qui.
   avvisi: async ({ app }, use) => {
-    await use(async () => {
-      const scadenza = Date.now() + 10_000;
-      while (Date.now() < scadenza) {
-        const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
-        if (p) return p;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      throw new Error('avvisi: la vista degli avvisi non è nata');
-    });
+    await use(() => aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'avvisi: la vista degli avvisi non è nata'));
   },
 
-  // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
-  // Polling sull'URL: app.waitForEvent('window') può risolvere con la
-  // newtab (già pendente al boot), non con il tab appena aperto. Per evitare
-  // race usiamo app.windows() filtrato per hostname della URL richiesta.
+  // Apre un URL come scheda e torna la Page della scheda che Filo dice di aver aperto, arrivata sull'host chiesto: per
+  // indirizzo si prendeva una scheda vecchia o una finestra nascosta sullo stesso host (#877, tests/helpers/schede.mjs).
   openTab: async ({ app, shell }, use) => {
     const fn = async (url) => {
       const target = new URL(url).hostname;
-      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      const deadline = Date.now() + 10_000;
+      const sulPosto = (w) => new URL(w.url()).hostname === target;
+      const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
       let page = null;
-      while (Date.now() < deadline) {
-        page = app.windows().find((w) => {
-          try { return new URL(w.url()).hostname === target; }
-          catch (_) { return false; }
-        });
-        if (page) break;
-        await new Promise((r) => setTimeout(r, 100));
+      // Nessuna scheda (indirizzo fermato, sito bloccato): resta la ricerca per host, e il rosso dice perché.
+      if (!aperta?.id) page = await aspettaFinestra(app, sulPosto, `openTab: Filo non ha aperto una scheda per ${url} (${JSON.stringify(aperta)}) e nessuna finestra è su ${target}`);
+      else {
+        await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, aperta.id, sulPosto)),
+          { message: `openTab: la scheda aperta per ${url} non è arrivata su ${target}`, timeout: 0, intervals: [100] }).toBe(true);
       }
-      if (!page) throw new Error(`openTab: nessuna window per ${url}`);
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       return page;
     };
@@ -148,21 +206,37 @@ export const test = base.extend({
   // serviamo HTML su 127.0.0.1.
   testServer: async ({}, use) => {
     const pages = new Map();
+    // File binari serviti come li servirebbe un sito: un'immagine di prova deve
+    // arrivare coi suoi byte veri, non riscritta da un data: URL.
+    const assets = new Map();
     let nextId = 0;
     const server = createServer((req, res) => {
       const id = req.url.replace(/^\//, '').split('?')[0];
-      const html = pages.get(id);
-      if (!html) { res.writeHead(404); res.end('not found'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      const asset = assets.get(id);
+      if (asset) {
+        res.writeHead(200, { 'Content-Type': asset.type, 'Content-Length': asset.body.length });
+        res.end(asset.body);
+        return;
+      }
+      const page = pages.get(id);
+      if (!page) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, { ...page.headers, 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(page.body);
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;
     const api = {
-      html(body, { pubblico = false } = {}) {
+      // `headers`: intestazioni della risposta, per i siti che le usano per stringere la pagina (CSP).
+      html(body, { pubblico = false, headers = {} } = {}) {
         const id = String(++nextId);
-        pages.set(id, body);
+        pages.set(id, { body, headers });
         return `${pubblico ? this.originPubblico : this.origin}/${id}`;
+      },
+      /** Serve dei byte a un indirizzo di questo server e torna la URL. */
+      asset(body, type = 'application/octet-stream') {
+        const id = `a${++nextId}`;
+        assets.set(id, { body: Buffer.from(body), type });
+        return `http://127.0.0.1:${port}/${id}`;
       },
       origin: `http://127.0.0.1:${port}`,
       originPubblico: `http://sito-pubblico.test:${port}`,

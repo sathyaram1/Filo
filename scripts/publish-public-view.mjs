@@ -10,8 +10,8 @@
 //   numero ora che la collezione non si può più interrogare senza credenziali.
 //
 // QUANDO SERVE
-//   Subito dopo aver pubblicato le regole (`firebase deploy --only
-//   firestore:rules`): da quel momento la bacheca legge la vista, che va
+//   Subito dopo aver pubblicato le regole (`npm run
+//   regole:pubblica`): da quel momento la bacheca legge la vista, che va
 //   riempita una prima volta. Dopo, lo fa da sé l'app dell'owner (il main
 //   sincronizza a ogni triage e a ogni caricamento della dashboard), ma questo
 //   comando resta la strada per rifarlo a mano senza aprire Filo.

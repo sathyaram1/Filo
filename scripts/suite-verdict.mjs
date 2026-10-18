@@ -3,9 +3,9 @@
 // un rosso NUOVO, cioè fuori dai rossi noti del contenitore senza schermo.
 //
 // PERCHÉ ESISTE
-//   Dal 2026-09-15 la suite completa gira SOLO in GitHub Actions, nel lavoro
-//   di release, prima di pubblicare (.github/workflows/release.yml, job
-//   `suite`). Lì un rosso non vale per forza «non pubblicare»: nel contenitore
+//   La suite completa gira SOLO in GitHub Actions, a ogni fusione su main
+//   (.github/workflows/suite.yml), e si pubblica solo un commit con la suite
+//   verde. Lì un rosso non vale per forza «non pubblicare»: nel contenitore
 //   senza schermo ci sono casi che sono rossi da sempre e per motivi
 //   d'ambiente (una cattura dello schermo, un sito esterno), scritti in
 //   tests/rossi-noti.json → contenitore.specs. Senza questo confronto la
@@ -37,7 +37,10 @@
 //
 // USO
 //   node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>]
-//                                  [--rossi <rossi-noti.json>]
+//                                  [--rossi <rossi-noti.json>] [--chiavi <file>]
+//
+//   --chiavi scrive le chiavi dell'allarme (scripts/build-alarm.mjs), una per
+//   riga: cosa è rotto, perché il server non apra un doppione per lo stesso guasto.
 //
 //   Come si produce il JSON (Playwright ≥ 1.49):
 //   PLAYWRIGHT_JSON_OUTPUT_NAME=suite.json npx playwright test --reporter=list,json
@@ -104,6 +107,7 @@ export function raccogliCasi(json) {
       for (const t of Array.isArray(spec?.tests) ? spec.tests : []) {
         out.push({
           spec: normalizzaSpec(specFile),
+          riga: Number(spec?.line) || 0,
           titolo,
           titoloCompleto: [...corniceQui, titolo].join(' › '),
           stato: statoFinale(t),
@@ -159,6 +163,69 @@ export function primaRiga(e) {
     .trim();
 }
 
+const COLORI = /\u001b\[[0-9;]*m/g;
+// L'elenco che Playwright appende all'errore fatale di un worker: una riga per test, «[progetto] › file:riga:col › …».
+const ELENCO_DEL_WORKER = /Failed worker ran [^\n]*:((?:\n(?:\[[^\]\n]*\] › )?[^\n]+?:\d+:\d+ › [^\n]*)*)/;
+
+/**
+ * L'ultimo test eseguito dal worker di un errore fatale, { spec, riga }, o null. L'elenco dice cosa il worker ha
+ * eseguito, non cosa è rotto: dei dieci può c'entrare solo l'ultimo, dopo il quale il worker si è fermato. PURA.
+ */
+export function ultimoTestDelWorker(e) {
+  const m = `${e?.message || ''}\n${e?.stack || ''}`.replace(COLORI, '').match(ELENCO_DEL_WORKER);
+  const righe = m ? m[1].split('\n').filter(Boolean) : [];
+  const ultima = righe.length ? righe[righe.length - 1].match(/^(?:\[[^\]]*\] › )?(.+?):(\d+):\d+ › /) : null;
+  return ultima ? { spec: normalizzaSpec(ultima[1]), riga: Number(ultima[2]) } : null;
+}
+
+/**
+ * Il file che il testo di un errore nomina, relativo alla radice, o '', senza l'elenco dei test del worker. Prima la
+ * posizione di Playwright, poi chi importava il modulo che manca, poi il primo percorso sotto tests/. PURA.
+ */
+function fileNelTesto(e, radice) {
+  const base = String(radice || '').replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  const testo = `${e?.message || ''}\n${e?.stack || ''}`.replace(COLORI, '').replace(new RegExp(ELENCO_DEL_WORKER, 'g'), '');
+  // Un percorso può avere spazi (una cartella utente): «imported from» si prende fino a fine riga.
+  const percorsi = [...testo.matchAll(/[^\s'"`()]+\.m?[jt]s\b/g)].map((m) => m[0]);
+  const candidati = [e?.location?.file, testo.match(/imported from\s+(.+?)['"]?\s*$/m)?.[1],
+    ...percorsi.filter((p) => /\.spec\.m?js$/.test(p)), ...percorsi];
+  for (const c of candidati) {
+    let f = String(c || '').replace(/^file:\/+/, '/').replace(/\\/g, '/').replace(/^\/([a-z]:)/i, '$1')
+      .replace(/(:\d+){1,2}$/, '');
+    if (!f || f.includes('/node_modules/')) continue;
+    if (base && f.toLowerCase().startsWith(`${base}/`)) f = f.slice(base.length + 1);
+    else if (f.includes('/tests/')) f = f.slice(f.lastIndexOf('/tests/') + 1);
+    if (f.startsWith('tests/')) return f;
+  }
+  return '';
+}
+
+/**
+ * Il file di tests/ di un errore fuori dai casi, relativo alla radice, o ''. Quello che il testo nomina (per un file
+ * che non si carica è lo spec, anche se l'errore sta in un aiuto); se non ne nomina, lo spec dell'ultimo test del
+ * worker. PURA.
+ */
+export function fileDellErrore(e, radice = ROOT) {
+  const ultimo = ultimoTestDelWorker(e);
+  return fileNelTesto(e, radice) || (ultimo ? `tests/${ultimo.spec}.spec.mjs` : '');
+}
+
+/**
+ * Il caso dopo il quale si è fermato il worker di un errore che il testo non lega a nessun file, se quel caso è
+ * rosso o ripassato solo ai tentativi: l'errore è il suo strascico, non un guasto a sé. null altrimenti. PURA.
+ */
+export function casoDelloStrascico(e, casi, radice = ROOT) {
+  const ultimo = ultimoTestDelWorker(e);
+  if (!ultimo || fileNelTesto(e, radice)) return null;
+  return (Array.isArray(casi) ? casi : []).find((c) => normalizzaSpec(c.spec) === ultimo.spec && c.riga === ultimo.riga
+    && (c.stato === 'unexpected' || c.stato === 'flaky')) || null;
+}
+
+/** La chiave dell'allarme di un file di tests/: quella dei suoi casi se è uno spec. PURA. */
+export function chiaveDelFile(file) {
+  return /\.spec\.m?js$/.test(file) ? `suite:tests/${normalizzaSpec(file)}.spec.mjs` : `suite:${file}`;
+}
+
 /**
  * Gli errori fuori dai casi (un file che non si carica, un fixture rotto, un
  * worker che non chiude) divisi in ROSSI e AVVISI. Playwright li mette in
@@ -204,8 +271,20 @@ export function verdetto(json, noti) {
       else v.nuovi.push(c);
     }
   }
-  const globali = classificaErroriGlobali(json?.errors, v.nuovi.length > 0);
-  for (const riga of globali.rossi) v.nuovi.push({ spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga });
+  const errori = Array.isArray(json?.errors) ? json.errors : [];
+  const globali = classificaErroriGlobali(errori, v.nuovi.length > 0);
+  // Stesso ordine e stessa scelta di classificaErroriGlobali, ma errore per errore: tre teardown con la stessa prima
+  // riga possono venire da tre worker diversi.
+  const eTeardown = (e) => /^Worker teardown timeout/i.test(primaRiga(e));
+  const rossi = [...errori.filter((e) => !eTeardown(e)), ...(globali.avvisi.length ? [] : errori.filter(eTeardown))];
+  for (const e of rossi) {
+    const riga = primaRiga(e);
+    const strascico = casoDelloStrascico(e, casi);
+    v.nuovi.push({
+      spec: FUORI_DAI_CASI, titolo: riga, titoloCompleto: riga, file: strascico ? '' : fileDellErrore(e),
+      ...(strascico ? { strascicoDi: `tests/${strascico.spec}.spec.mjs:${strascico.riga}` } : {}),
+    });
+  }
   v.avvisi = globali.avvisi;
   return v;
 }
@@ -215,8 +294,47 @@ export function verdetto(json, noti) {
  * «errore fuori dai casi: <testo>» per un rosso senza caso. PURA.
  */
 export function rigaRosso(c) {
-  if (c.spec === FUORI_DAI_CASI) return `errore fuori dai casi: ${c.titolo}`;
+  if (c.spec === FUORI_DAI_CASI) {
+    return `errore fuori dai casi: ${c.titolo}${c.strascicoDi ? ` (strascico di ${c.strascicoDi}, non un guasto a sé)` : ''}`;
+  }
   return `tests/${c.spec}.spec.mjs › ${c.titoloCompleto || c.titolo}`;
+}
+
+/** La chiave dell'allarme quando la suite non è partita o non ha lasciato un esito. */
+export const CHIAVE_NON_PARTITA = 'suite:non-partita';
+
+/**
+ * Le chiavi dell'allarme per i rossi nuovi: `suite:tests/<spec>.spec.mjs` per
+ * ogni spec, e per un errore senza caso quella del file che nomina, o
+ * `suite:fuori-dai-casi` se non ne nomina nessuno. Una per spec e non per
+ * caso: dieci casi rotti dalla stessa modifica sono un guasto. Lo strascico
+ * di un caso rosso non ha chiave sua: il guasto è quel caso. PURA.
+ */
+export function chiaviDelVerdetto(v) {
+  const nuovi = Array.isArray(v?.nuovi) ? v.nuovi : [];
+  const chiavi = [];
+  for (const c of nuovi) {
+    if (c.strascicoDi) continue;
+    const k = c.spec !== FUORI_DAI_CASI ? `suite:tests/${normalizzaSpec(c.spec)}.spec.mjs`
+      : c.file ? chiaveDelFile(c.file) : 'suite:fuori-dai-casi';
+    if (!chiavi.includes(k)) chiavi.push(k);
+  }
+  // Un rosso nuovo c'è: l'allarme vuole una chiave, e «non partita» direbbe il falso.
+  if (!chiavi.length && nuovi.length) chiavi.push('suite:fuori-dai-casi');
+  return chiavi;
+}
+
+/**
+ * Le chiavi di una suite che non ha eseguito nessun caso: un file che non si carica ferma tutta la suite, ed è un
+ * guasto suo, non quello di un'installazione fallita. Nessun file riconoscibile: la suite non partita. PURA.
+ */
+export function chiaviSenzaCasi(errori, radice = ROOT) {
+  const chiavi = [];
+  for (const e of Array.isArray(errori) ? errori : []) {
+    const f = fileDellErrore(e, radice);
+    if (f && !chiavi.includes(chiaveDelFile(f))) chiavi.push(chiaveDelFile(f));
+  }
+  return chiavi.length ? chiavi : [CHIAVE_NON_PARTITA];
 }
 
 /** Il riassunto a schermo. Non taglia niente: l'elenco è quello intero. PURA. */
@@ -236,17 +354,17 @@ export function testoRiassunto(v) {
 
 /** Le opzioni della riga di comando. PURA. */
 export function leggiArgomenti(argv) {
-  const out = { file: '', out: '', rossi: '' };
+  const out = { file: '', out: '', rossi: '', chiavi: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--out' || a === '--rossi') {
+    if (a === '--out' || a === '--rossi' || a === '--chiavi') {
       const k = a.slice(2);
       const val = argv[i + 1];
       if (!val || val.startsWith('--')) throw new Error(`${a} vuole un percorso`);
       out[k] = val;
       i += 1;
     } else if (a.startsWith('--')) {
-      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file>`);
+      throw new Error(`Opzione non capita: ${a}. Opzioni: --out <file> --rossi <file> --chiavi <file>`);
     } else if (!out.file) {
       out.file = a;
     } else {
@@ -262,22 +380,27 @@ function leggiNoti(percorso) {
   return Array.isArray(specs) ? specs : [];
 }
 
+function scriviChiavi(opt, chiavi) {
+  if (opt.chiavi) writeFileSync(resolve(opt.chiavi), chiavi.length ? `${chiavi.join('\n')}\n` : '', 'utf8');
+}
+
 async function main() {
   let opt;
   try {
     opt = leggiArgomenti(process.argv.slice(2));
   } catch (e) {
     console.error(String(e.message || e));
-    console.error('Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>] [--rossi <rossi-noti.json>]');
+    console.error('Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <rossi-nuovi.txt>] [--rossi <rossi-noti.json>] [--chiavi <file>]');
     process.exit(2);
   }
   if (!opt.file) {
-    console.error('Manca il JSON dei risultati. Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>]');
+    console.error('Manca il JSON dei risultati. Uso: node scripts/suite-verdict.mjs <risultato.json> [--out <file>] [--rossi <file>] [--chiavi <file>]');
     process.exit(2);
   }
   const fileJson = resolve(opt.file);
   if (!existsSync(fileJson)) {
     console.error(`La suite NON è partita: il JSON dei risultati non c'è (${fileJson}). Non è un verde.`);
+    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
     process.exit(2);
   }
   let json;
@@ -285,6 +408,7 @@ async function main() {
     json = JSON.parse(readFileSync(fileJson, 'utf8'));
   } catch (e) {
     console.error(`La suite NON ha lasciato un esito leggibile (${fileJson}): ${String(e.message || e)}. Non è un verde.`);
+    scriviChiavi(opt, [CHIAVE_NON_PARTITA]);
     process.exit(2);
   }
   let noti;
@@ -293,6 +417,7 @@ async function main() {
     noti = leggiNoti(fileNoti);
   } catch (e) {
     console.error(`L'elenco dei rossi noti non si legge (${fileNoti}): ${String(e.message || e)}.`);
+    scriviChiavi(opt, ['suite:rossi-noti']);
     process.exit(2);
   }
 
@@ -300,6 +425,7 @@ async function main() {
   if (v.totale === 0) {
     console.error('La suite NON ha eseguito nessun caso: non è un verde.');
     for (const e of Array.isArray(json.errors) ? json.errors : []) console.error(`  errore: ${primaRiga(e)}`);
+    scriviChiavi(opt, chiaviSenzaCasi(json.errors));
     process.exit(2);
   }
   // Gli errori fuori dai casi stanno già dentro `v`: fra i nuovi (rossi) o fra
@@ -309,6 +435,7 @@ async function main() {
     const righe = v.nuovi.map(rigaRosso);
     writeFileSync(resolve(opt.out), righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
   }
+  scriviChiavi(opt, chiaviDelVerdetto(v));
   process.exit(v.nuovi.length ? 1 : 0);
 }
 

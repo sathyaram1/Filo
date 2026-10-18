@@ -85,7 +85,9 @@ test('getMany: una sola richiesta batchGet, torna solo i trovati', async () => {
     const out = await FB.getMany(['a', 'zz']);
     assert.equal(calls.length, 1);
     assert.ok(calls[0].url.includes(':batchGet'));
-    assert.deepEqual(calls[0].body.documents, [DOC_PREFIX + 'a', DOC_PREFIX + 'zz']);
+    // Il NOME della risorsa, non l'indirizzo: con l'indirizzo intero Firestore risponde 400 a ogni batchGet.
+    const nome = 'projects/filo-8b9cb/databases/(default)/documents/feedback/';
+    assert.deepEqual(calls[0].body.documents, [nome + 'a', nome + 'zz']);
     assert.equal(out.length, 1);
     assert.equal(out[0]._id, 'a');
     assert.equal(out[0].name, 'A');

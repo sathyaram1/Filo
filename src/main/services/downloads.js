@@ -35,6 +35,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { spingiAllaScheda } = require('./impostazioniPerOrigine');
+const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 
 // Tetto della cronologia persistita: teniamo le voci più recenti. 200 è ampio
 // per l'uso reale e non gonfia storage.json (poche centinaia di byte a voce).
@@ -55,18 +56,29 @@ function ESE() { return globalThis.SN_ESEGUIBILI; }
 // finché le impostazioni non sono arrivate, un programma si ferma comunque.
 let chiediEseguibili = true;
 let sitiFidati = [];
+// #950 — un nome sensato da solo agli scaricamenti che arrivano con un nome che non dice niente. Spento di
+// serie: il contenuto del file va a un modello senza che l'utente l'abbia chiesto per quel file.
+let nomeDaSolo = false;
+// Senza modello l'avviso arriva una volta, non a ogni scaricamento; riacceso l'interruttore, di nuovo.
+let avvisatoSenzaNome = false;
 
 function configureFromSettings(settings) {
   const d = (settings && settings.security && settings.security.downloads) || {};
   chiediEseguibili = d.confirmExecutables !== false;
   sitiFidati = Array.isArray(d.trustedSites) ? d.trustedSites.slice() : [];
+  const prima = nomeDaSolo;
+  nomeDaSolo = !!(settings && settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+  if (nomeDaSolo && !prima) avvisatoSenzaNome = false;
 }
 
 // Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
 // La fiducia vale solo per un sito CERTO: un file che può venire da un
 // riquadro di altri non prende quella della pagina che lo ospita (#588).
-function chiedeConferma(sito, incerto) {
+// Dopo un rimando valgono il sito cliccato E quello che ha servito i byte,
+// che il browser garantisce: fidarsi di chi serve il file non presta fiducia a nessuno (#588.3).
+function chiedeConferma(sito, incerto, servito) {
   if (!chiediEseguibili) return false;
+  try { if (servito && ESE().fidato(servito, sitiFidati)) return false; } catch (_) {}
   if (incerto) return true;
   try { return !ESE().fidato(sito, sitiFidati); } catch (_) { return true; }
 }
@@ -296,6 +308,9 @@ function publicRecord(r) {
     exe: !!r.exe,
     site: r.site || '',
     siteUncertain: !!r.siteUncertain,
+    servedBy: r.servedBy || '',
+    // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
+    nomeOriginale: r.nomeOriginale || '',
   };
 }
 
@@ -377,10 +392,7 @@ function notifyTabs(scope = '') {
     const type = (globalThis.SN_MSG && globalThis.SN_MSG.MSG.DOWNLOADS_UPDATED) || 'downloads_updated';
     const msg = { type };
     for (const win of windowsOf(scope)) {
-      const tm = win._filoTabs;
-      if (tm && Array.isArray(tm.tabs)) {
-        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg, { inVista: t.id === tm.activeId });
-      }
+      for (const { wc, inVista } of vistePerAnnunci(win._filoTabs)) spingiAllaScheda(wc, msg, { inVista });
     }
   } catch (_) {}
 }
@@ -464,6 +476,75 @@ function completa(rec) {
       { label: 'Apri cartella', revealDownloadId: rec.id },
     ],
   }, scopeOf(rec));
+  if (nomeDaSolo) nominaDaSolo(rec);
+}
+
+// #950 — solo i nomi che non dicono niente («scan_00231.pdf»): un nome scelto da qualcuno resta. L'incognito
+// no: lì il contenuto di un file non parte verso un modello senza che l'utente lo chieda.
+async function nominaDaSolo(rec) {
+  const NF = globalThis.SN_NOMI_FILE;
+  if (!NF || scopeOf(rec) || rec.exe || !rec.savePath) return;
+  if (!NF.tipoDi(rec.filename) || !NF.nomeSenzaSenso(rec.filename)) return;
+  const Nomi = require('./nomiFile');
+  const letto = rec.savePath;
+  const p = await Nomi.proponi(letto);
+  if (!records.has(rec.id) || rec.state !== 'completed') return;
+  // Un nome dato dall'utente mentre il modello leggeva vince sempre su quello automatico.
+  if (rec.savePath !== letto) return;
+  if (!p.ok) {
+    // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
+    if (p.errore === 'modello' && !avvisatoSenzaNome) {
+      avvisatoSenzaNome = true;
+      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10 }, '');
+    }
+    return;
+  }
+  const r = await Nomi.rinomina(letto, p.proposta);
+  if (!r.ok || r.invariato) return;
+  shellToast(`Nome dato: ${shortName(r.nome)}`, {
+    durationSec: 10,
+    actions: [
+      { label: 'Annulla', rimettiNomeDownloadId: rec.id },
+      { label: 'Apri file', openDownloadId: rec.id },
+    ],
+  }, '');
+}
+
+const stessoPercorso = (a, b) => (process.platform === 'win32' || process.platform === 'darwin'
+  ? String(a).toLowerCase() === String(b).toLowerCase()
+  : String(a) === String(b));
+
+// #950 — un file dell'elenco cambiato di nome da Filo (da qualunque strada): la voce lo segue, invece di
+// dichiararlo sparito, e ricorda il nome di arrivo per poterlo rimettere.
+function rinominato(da, a) {
+  let toccati = 0;
+  for (const rec of records.values()) {
+    if (!rec.savePath || !stessoPercorso(rec.savePath, da)) continue;
+    if (!rec.nomeOriginale) rec.nomeOriginale = rec.filename;
+    forgetExists(rec.savePath);
+    rec.savePath = a;
+    rec.filename = path.basename(a);
+    if (rec.filename === rec.nomeOriginale) rec.nomeOriginale = '';
+    forgetExists(a);
+    toccati += 1;
+    broadcast('renamed', rec);
+  }
+  if (toccati) persist();
+  return toccati;
+}
+
+function percorsoDi(id, scope = '') {
+  const rec = recordIn(id, scope);
+  return rec && rec.state === 'completed' ? (rec.savePath || '') : '';
+}
+
+async function rimettiNome(id, scope = '') {
+  const rec = recordIn(id, scope);
+  if (!rec) return { ok: false, frase: 'Questo scaricamento non è più nell’elenco' };
+  if (!rec.nomeOriginale) return { ok: false, frase: 'Ha già il nome con cui era arrivato' };
+  const r = await require('./nomiFile').rinomina(rec.savePath, rec.nomeOriginale, { esatto: true });
+  if (!r.ok) return { ok: false, frase: r.frase };
+  return { ok: true, nome: r.nome, cambiato: !!r.cambiato };
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
@@ -475,13 +556,21 @@ function onWillDownload(item, webContents, scope = '') {
   })() || 'download');
 
   const url = item.getURL();
-  const { sito, incerto } = sitoDi(url, webContents);
+  // La fiducia si lega al PRIMO indirizzo della catena di rimandi, quello
+  // cliccato; chi ha servito il file davvero va comunque nominato (#588.3).
+  let primo = url;
+  try { const c = item.getURLChain(); if (Array.isArray(c) && c[0]) primo = c[0]; } catch (_) {}
+  const { sito, incerto } = sitoDi(primo, webContents);
+  let servito = '';
+  try { servito = ESE().servitoDa(sito, url); } catch (_) {}
   let exe = false;
   try { exe = ESE().eEseguibile(filename); } catch (_) {}
   // Un programma si ferma PRIMA della cartella Download: i byte scendono in
   // quarantena e ci restano finché l'utente non risponde (#588). Il resto dei
   // file non cambia di una virgola: l'attrito va solo dove serve.
-  const attesa = exe && chiedeConferma(sito, incerto);
+  let finale = '';
+  try { finale = ESE().sito(url); } catch (_) {}
+  const attesa = exe && chiedeConferma(sito, incerto, finale);
 
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
@@ -508,6 +597,7 @@ function onWillDownload(item, webContents, scope = '') {
     exe,
     site: sito,
     siteUncertain: incerto,
+    servedBy: servito,
     _quarantena: attesa,
     _scope: scope || '',
   };
@@ -706,7 +796,7 @@ function finalizeManual(rec, state, savePath) {
   // già la sua conferma nella pagina (un secondo avviso sarebbe un doppione).
 }
 
-function beginManual({ url, filename, totalBytes, scope } = {}) {
+function beginManual({ url, filename, totalBytes, scope, servedFrom } = {}) {
   const id = uuid();
   const nome = safeName(filename || 'download');
   const indirizzo = String(url || '');
@@ -719,6 +809,7 @@ function beginManual({ url, filename, totalBytes, scope } = {}) {
     // lo dichiara e "Apri file" chiede conferma come per ogni altro (#588).
     exe: marca(() => ESE().eEseguibile(nome), false),
     site: marca(() => ESE().sito(indirizzo), ''),
+    servedBy: marca(() => ESE().servitoDa(indirizzo, servedFrom), ''),
     mime: '',
     totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
     receivedBytes: 0,
@@ -875,6 +966,13 @@ function confirmDownload(id, allow, scope = '') {
   return { ok: true, items: listRecords(scope) };
 }
 
+// Chi ha servito i byte: in un record nativo `url` è già l'ultimo indirizzo,
+// in uno «a mano» è il primo e l'ultimo sta in `servedBy`.
+function servitoDi(rec) {
+  if (rec.servedBy) return rec.servedBy;
+  try { return ESE().sito(rec.url); } catch (_) { return ''; }
+}
+
 function openFile(id, opts, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
@@ -894,10 +992,10 @@ function openFile(id, opts, scope = '') {
   // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
   // le superfici che offrono "Apri file" sono tre (avviso, barra, pagina) e una
   // regola per porta sarebbe una porta dimenticata.
-  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain)) {
+  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain, servitoDi(rec))) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain); title = ESE().titoloApri(rec.filename); } catch (_) {}
+    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy); title = ESE().titoloApri(rec.filename); } catch (_) {}
     return { ok: false, needsConfirm: true, exe: true, title, text };
   }
   try {
@@ -962,6 +1060,9 @@ function resume(id, scope = '') {
 
 module.exports = {
   init,
+  rinominato,
+  percorsoDi,
+  rimettiNome,
   attachSession,
   forgetScope,
   scopeOfWindow,

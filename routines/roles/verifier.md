@@ -22,27 +22,28 @@ un **livello**.
   o se quel file è fra quelli che il ramo modifica già
   (`git diff --name-only origin/main...HEAD`).
 
+<!-- includi: _immagini.md -->
+
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, dillo nella critica.
 
 ## Passi
 
-1. **Capisci il sintomo** (`feedback.text`, `feedback.images`,
-   `feedback.documents`): cosa voleva fare l'utente, cosa lamentava.
+1. **Capisci il sintomo** (`feedback.text`, `feedback.documents`, le immagini
+   di `payload.immagini` aperte con Read): cosa voleva fare l'utente, cosa
+   lamentava.
 2. **Sei già sul ramo del lavoro: non cambiarlo.** Una critica emessa da
    un'altra versione del codice viene rifiutata.
 3. **Rilancia le prove dei giri passati**, se `payload.history` non è vuoto:
    `npx playwright test tests/verifica/<numero>` (numero del feedback senza
-   cancelletto). Il percorso va scritto relativo alla radice del repo e con le
-   barre normali: in ogni altra forma la risposta è «No tests found» anche a
-   cartella piena. Al primo giro la cartella non c'è: controlla con
-   `ls tests/verifica`, non dal messaggio. **È l'unica corsa di quella cartella
-   in tutto il giro, e tocca a te**: dopo di te chi corregge lancia solo le
-   prove dei rilievi che sta correggendo, e la chiusura non la rilancia. Quindi
-   qui, adesso, in partenza. Una porta di un giro passato che si riapre è un
-   rilievo di livello 2, interno; le porte già chiuse si ri-provano, non si
-   riscoprono come nuove. Una prova già segnata come rosso atteso resta rossa:
-   non è un rilievo.
+   cancelletto, percorso relativo alla radice del repo, barre normali: in altre
+   forme risponde «No tests found» anche a cartella piena). Al primo giro la
+   cartella non c'è: controlla con `ls tests/verifica`. **È l'unica corsa di
+   quella cartella in tutto il giro, e tocca a te**: dopo di te chi corregge
+   lancia solo le prove dei rilievi che sta correggendo, e la chiusura non la
+   rilancia. Quindi qui, adesso, in partenza. Una porta di un giro passato che
+   si riapre è un rilievo di livello 2, interno; le porte già chiuse si
+   ri-provano, non si riscoprono come nuove.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
    rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
    sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li

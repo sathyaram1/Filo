@@ -40,13 +40,24 @@
       const w = Math.max(1, window.innerWidth);
       const xs = [w * 0.2, w * 0.5, w * 0.8];
       const ys = [6, 16, 28];
-      const acc = [0, 0, 0]; let n = 0;
+      const campioni = [];
       for (const y of ys) for (const x of xs) {
         let el = null;
         try { el = document.elementFromPoint(x, y); } catch (_) {}
         const c = el ? bgOf(el) : null;
-        if (c) { acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]; n++; }
+        if (c) campioni.push(c);
       }
+      // Il colore che prevale, non la media: una cima in due colori darebbe un grigio che sulla pagina non c'è (#429).
+      // Senza un gruppo che faccia maggioranza (sfumature, foto) la media resta la stima migliore.
+      const vicini = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2])) <= 24;
+      let meglio = [];
+      for (const c of campioni) {
+        const gruppo = campioni.filter((d) => vicini(c, d));
+        if (gruppo.length > meglio.length) meglio = gruppo;
+      }
+      const scelti = meglio.length * 2 > campioni.length ? meglio : campioni;
+      const acc = [0, 0, 0]; let n = 0;
+      for (const c of scelti) { acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]; n++; }
       if (!n) {
         const c = parseRGB(getComputedStyle(document.body || document.documentElement).backgroundColor)
           || parseRGB(getComputedStyle(document.documentElement).backgroundColor);
@@ -75,6 +86,23 @@
 
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule, { passive: true });
+    // La cima cambia colore anche senza scorrere: il tema del sito acceso dal suo interruttore, un'intestazione
+    // che arriva tardi, il tema di sistema. Senza, la scheda restava del colore vecchio fino alla rotella (#429).
+    // Una pagina che muta di continuo non deve costare più di quattro campioni al secondo.
+    let quieto = null;
+    const dopoUnCambio = () => { if (!quieto) quieto = setTimeout(() => { quieto = null; schedule(); }, 250); };
+    try {
+      new MutationObserver(dopoUnCambio).observe(document.documentElement, {
+        attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-scheme', 'theme', 'dark'],
+        childList: true, subtree: true,
+      });
+    } catch (_) {}
+    document.addEventListener('transitionend', dopoUnCambio, { capture: true, passive: true });
+    document.addEventListener('animationend', dopoUnCambio, { capture: true, passive: true });
+    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', dopoUnCambio); } catch (_) {}
+    // Lo stile può cambiare senza nessun evento (una regola aggiunta al foglio, un foglio sostituito): un campione
+    // al secondo a pagina visibile chiude tutte quelle porte insieme; senza cambio di colore non parte niente.
+    setInterval(() => { if (document.visibilityState === 'visible') schedule(); }, 1000);
     // Primo campione subito + ritardati per le pagine che colorano dopo il paint.
     schedule();
     setTimeout(schedule, 400);
@@ -86,7 +114,7 @@
   // ------------------------------------------------------------
   // Si calcola UNA VOLTA per pagina (con qualche retry per i siti che settano
   // theme-color/favicon dopo il paint) e si manda al main, che lo cacha per
-  // dominio. La shell lo applica attenuato alle tab inattive.
+  // dominio. La shell lo mescola col fondo della barra nelle tab inattive.
   // getParams (opzionale): funzione che ritorna i parametri di estrazione
   // correnti (settings.tabColor). Vengono passati a extractIdentityFromPixels,
   // così cambiarli (a voce o nelle Preferenze) cambia il colore estratto. Se

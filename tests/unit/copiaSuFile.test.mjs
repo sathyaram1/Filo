@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, statSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, collegaCartella, collegaFile } from '../helpers/percorsi.mjs';
 
 const { leggiCopia, scriviCopia, scordaCopia, percorsoCopia, rigaCopiaRiusata, cartellaCopie } =
   await import('../../scripts/lib/copia-su-file.mjs');
@@ -219,7 +219,7 @@ test('la cartella delle copie nasce chiusa agli altri utenti della macchina', { 
 });
 
 test('una cartella preparata da qualcun altro non si usa', { skip: !CONDIVISA }, async () => {
-  const { symlinkSync, mkdirSync: crea } = await import('node:fs');
+  const { mkdirSync: crea } = await import('node:fs');
   const { join: unisci } = await import('node:path');
   // Un rimando al posto della cartella: chi lo lascia lì deciderebbe dove
   // finisce quello che abbiamo letto. Meglio ripagare la lettura.
@@ -227,22 +227,23 @@ test('una cartella preparata da qualcun altro non si usa', { skip: !CONDIVISA },
   const altrove = unisci(base, 'roba-sua');
   crea(altrove, { recursive: true, mode: 0o700 });
   const finta = unisci(base, 'copie');
-  symlinkSync(altrove, finta);
+  collegaCartella(altrove, finta);
   assert.equal(cartellaCopie(finta), '');
   assert.equal(percorsoCopia('x', finta), '');
   assert.equal(scriviCopia('x', { a: 1 }, { dir: finta }), '');
   assert.equal(leggiCopia('x', { dir: finta }), null);
 });
 
-test('un rimando lasciato lì da qualcun altro non fa scrivere lo strumento dove dice lui', { skip: !CONDIVISA }, async () => {
-  const { symlinkSync, mkdirSync: crea } = await import('node:fs');
+test('un rimando lasciato lì da qualcun altro non fa scrivere lo strumento dove dice lui', { skip: !CONDIVISA }, async (t) => {
+  const { mkdirSync: crea } = await import('node:fs');
   const { join: unisci } = await import('node:path');
   const base = cartellaTemporanea('copia-rimando-');
   const dir = unisci(base, 'copie');
   crea(dir, { recursive: true, mode: 0o700 });
   const altrui = unisci(base, 'file-di-un-altro.txt');
   writeFileSync(altrui, 'originale', 'utf8');
-  symlinkSync(altrui, percorsoCopia('prova/rimando', dir));
+  const negato = collegaFile(altrui, percorsoCopia('prova/rimando', dir));
+  if (negato) return t.skip(negato);
 
   assert.equal(scriviCopia('prova/rimando', [{ _id: 'x' }], { dir }), '');
   assert.equal(readFileSync(altrui, 'utf8'), 'originale');

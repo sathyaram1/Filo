@@ -12,10 +12,12 @@
 // page.evaluate, così il test non dipende dal backend (non ancora deployato).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriRedteamATutti } from './helpers/redteam.mjs';
 
 const URL = 'filo://redteam/redteam.html';
 
-test('le tab esistono e cambiano il contenuto visibile (Codici nascosta ai non-owner)', async ({ openTab }) => {
+test('le tab esistono e cambiano il contenuto visibile (Codici nascosta ai non-owner)', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -43,7 +45,8 @@ test('le tab esistono e cambiano il contenuto visibile (Codici nascosta ai non-o
   await expect(page.locator('#panel-rules')).toBeHidden();
 });
 
-test('stato verificato: griglia rende celle sbloccate/bloccate e riepilogo', async ({ openTab }) => {
+test('stato verificato: griglia rende celle sbloccate/bloccate e riepilogo', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -94,7 +97,8 @@ test('stato verificato: griglia rende celle sbloccate/bloccate e riepilogo', asy
   await expect(page.locator('#summaryHandle')).toHaveText('tester1');
 });
 
-test('leaderboard rende le righe ed ESCAPE un handle con <script> (anti-XSS)', async ({ openTab }) => {
+test('leaderboard rende le righe ed ESCAPE un handle con <script> (anti-XSS)', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -121,7 +125,8 @@ test('leaderboard rende le righe ed ESCAPE un handle con <script> (anti-XSS)', a
   expect(xssFired).toBe(false);
 });
 
-test('non verificato: la card mostra il form di riscatto codice (anche da sloggato)', async ({ openTab }) => {
+test('non verificato: la card mostra il form di riscatto codice (anche da sloggato)', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -150,7 +155,8 @@ test('non verificato: la card mostra il form di riscatto codice (anche da slogga
   await expect(page.locator('#signinHint')).toBeVisible();
 });
 
-test('owner: la tab Codici è visibile e renderCodesTable elenca i codici con revoca solo sui liberi', async ({ openTab }) => {
+test('owner: la tab Codici è visibile e renderCodesTable elenca i codici con revoca solo sui liberi', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -194,7 +200,8 @@ test('owner: la tab Codici è visibile e renderCodesTable elenca i codici con re
   await expect(page.locator('#codesTab')).toBeHidden();
 });
 
-test('owner: renderCodesTable con XSS nell\'handle lo mostra letterale (anti-XSS)', async ({ openTab }) => {
+test('owner: renderCodesTable con XSS nell\'handle lo mostra letterale (anti-XSS)', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -211,7 +218,8 @@ test('owner: renderCodesTable con XSS nell\'handle lo mostra letterale (anti-XSS
   expect(xssFired).toBe(false);
 });
 
-test('storico tentativi: righe con colonne/stati corretti ed ESCAPE del titolo (anti-XSS)', async ({ openTab }) => {
+test('storico tentativi: righe con colonne/stati corretti ed ESCAPE del titolo (anti-XSS)', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -306,7 +314,8 @@ test('storico tentativi: righe con colonne/stati corretti ed ESCAPE del titolo (
   await expect(r3.locator('.rt-hist-valid')).toHaveText('—');
 });
 
-test('storico tentativi: lista vuota mostra lo stato "nessun tentativo"', async ({ openTab }) => {
+test('storico tentativi: lista vuota mostra lo stato "nessun tentativo"', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -321,7 +330,8 @@ test('storico tentativi: lista vuota mostra lo stato "nessun tentativo"', async 
   await expect(page.locator('#historyEmpty')).toBeVisible();
 });
 
-test('formatRelativeTime: scala da "ora" a data assoluta', async ({ openTab }) => {
+test('formatRelativeTime: scala da "ora" a data assoluta', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -352,7 +362,8 @@ test('formatRelativeTime: scala da "ora" a data assoluta', async ({ openTab }) =
   expect(out.future).toBe('ora');
 });
 
-test('live reveal: slot in attesa diventano rivelati e mostra esito validità', async ({ openTab }) => {
+test('live reveal: slot in attesa diventano rivelati e mostra esito validità', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -402,7 +413,8 @@ test('live reveal: slot in attesa diventano rivelati e mostra esito validità', 
 // dell'attacco, spiegazione, giudizio di validità (con motivazione) e cosa ha
 // detto ogni giudice. Il test ASSERISCE che quei contenuti compaiano al click
 // (senza fix la riga non è nemmeno espandibile → gli assert diventano rossi).
-test('storico: cliccando un tentativo si vedono attacco, spiegazione e motivazioni dei giudici', async ({ openTab }) => {
+test('storico: cliccando un tentativo si vedono attacco, spiegazione e motivazioni dei giudici', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -483,7 +495,8 @@ test('storico: cliccando un tentativo si vedono attacco, spiegazione e motivazio
 // Feedback #295 (rivelazione live): quando dal backend arrivano attacco e
 // motivazioni, la sezione dettaglio le mostra; quando NON arrivano (forma
 // attuale, backend non deployato) resta nascosta e non fa rumore.
-test('rivelazione live: mostra i dettagli quando ci sono, resta nascosta quando mancano', async ({ openTab }) => {
+test('rivelazione live: mostra i dettagli quando ci sono, resta nascosta quando mancano', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.evaluate(() => {

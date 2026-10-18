@@ -136,8 +136,8 @@ test('§5 — cancellazione multipla dall’archivio (DELETE_ARCHIVED_TABS)', as
 test('cambiando modello di indicizzazione, i vettori vecchi si rifanno da soli e la ricerca riparte', async ({ app, openTab }) => {
   // Le schede archiviate prima del cambio (o con l'API di Google, che non c'è
   // più) hanno vettori di un'altra "lingua": non si confrontano con quelli
-  // nuovi. La ricerca deve ignorarli — e reindicizzarli in background, così
-  // dalla ricerca dopo ci sono anche loro. Senza il fix: o si confrontano
+  // nuovi. La ricerca deve ignorarli e reindicizzarli col modello in uso, così
+  // la scheda conta già in quella ricerca. Senza il fix: o si confrontano
   // vettori incompatibili (risultati a caso) o le schede vecchie spariscono
   // dalla ricerca per sempre.
   await app.evaluate(async () => {
@@ -163,11 +163,10 @@ test('cambiando modello di indicizzazione, i vettori vecchi si rifanno da soli e
   const page = await openTab('filo://newtab/');
   const prima = await page.evaluate(async () =>
     await chrome.runtime.sendMessage({ type: 'search_archived_tabs', query: 'vecchia' }));
-  // Al primo giro il vettore incompatibile non conta: la scheda non è fra i risultati.
+  // Il vettore incompatibile non si confronta: la ricerca lo rifà col modello in uso e la scheda c'è già al primo giro (#825).
   expect(prima.ok).toBe(true);
-  expect((prima.results || []).some((x) => x.title === 'Vecchia')).toBe(false);
+  expect((prima.results || []).some((x) => x.title === 'Vecchia' && typeof x.score === 'number')).toBe(true);
 
-  // …ma viene reindicizzata in background col modello in uso.
   const EM = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['qwen-embed'].model);
   await expect.poll(async () => app.evaluate(async () => {
     const l = await globalThis.SN_ARCHIVED_TABS.list();

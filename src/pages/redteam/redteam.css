@@ -103,7 +103,7 @@
   border-radius: var(--sn-radius);
   border: 1px solid var(--sn-border);
   font-variant-numeric: tabular-nums;
-  transition: transform 120ms ease;
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .rt-cell--off {
   background: var(--sn-hover);
@@ -127,7 +127,7 @@
 }
 /* Sblocco appena rivelato: un tocco celebrativo. */
 .rt-cell--justunlocked {
-  animation: rt-pop 600ms ease;
+  animation: rt-pop calc(600ms * var(--sn-motion, 1)) ease;
 }
 @keyframes rt-pop {
   0% { transform: scale(0.9); }
@@ -272,7 +272,7 @@
   left: 8px;
   color: var(--sn-muted);
   display: inline-block;
-  transition: transform 120ms ease;
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .rt-hist-row--open .rt-hist-when::before { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) {
@@ -428,7 +428,7 @@
 .rt-slot-label { font-weight: 700; font-size: 15px; }
 .rt-slot-icon { font-size: 26px; line-height: 1; }
 .rt-slot-pts { font-size: 12px; color: var(--sn-muted); }
-.rt-slot--revealed { animation: rt-pop 400ms ease; border-color: var(--rt-judge-color, var(--sn-accent)); }
+.rt-slot--revealed { animation: rt-pop calc(400ms * var(--sn-motion, 1)) ease; border-color: var(--rt-judge-color, var(--sn-accent)); }
 .rt-slot--waiting .rt-slot-pts { font-style: italic; }
 .rt-slot-spinner {
   width: 18px;
@@ -436,7 +436,7 @@
   border-radius: 50%;
   border: 2px solid var(--sn-border);
   border-top-color: var(--sn-accent);
-  animation: rt-spin 800ms linear infinite;
+  animation: rt-spin calc(800ms * var(--sn-motion, 1)) linear infinite;
 }
 @keyframes rt-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
@@ -517,3 +517,14 @@
 .rt-ms-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
 .rt-empty, .rt-error { margin-top: 16px; }
+
+/* In pausa (#896): la stessa frase e la stessa forma di pausa.html. */
+.rt-pausa {
+  min-height: calc(100vh / var(--sn-zoom, 1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.rt-pausa p { margin: 0; font-size: 18px; line-height: 1.5; color: var(--sn-muted); text-align: center; }

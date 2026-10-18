@@ -5,6 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback #422: le istruzioni fisse dei prompt lunghi ora stanno in testa,
 // così i fornitori riusano quella parte invece di rielaborarla a ogni messaggio.
@@ -55,7 +56,7 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
     const page = await findTabPage(app, 'history');

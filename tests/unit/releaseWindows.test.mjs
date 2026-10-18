@@ -4,11 +4,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const YML = readFileSync(join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8');
@@ -67,7 +67,7 @@ function eseguiControllo(allegati, { crlf = false, ghFallisce = false } = {}) {
     try { argomenti = readFileSync(join(dir, 'argomenti.txt'), 'utf8'); } catch {}
     return { status: r.status, out: r.stdout + r.stderr, riepilogo: readFileSync(riepilogo, 'utf8'), argomenti };
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 }
 

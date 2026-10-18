@@ -11,6 +11,12 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+
+// La cache delle liste va in una cartella di prova, e niente rete: i giri si fanno con testi scritti qui.
+process.env.NODE_ENV = 'test';
+process.env.FILO_USER_DATA = cartellaTemporanea('filo-adblock-');
 const A = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'adblock.js'));
 
 test('parseList: formato hosts (0.0.0.0 / 127.0.0.1) → estrae i domini', () => {
@@ -79,4 +85,239 @@ test('isEnabled: default-on, disattivabile col toggle', () => {
   assert.equal(A.isEnabled({ security: { adblock: {} } }), true);
   assert.equal(A.isEnabled({ security: { adblock: { enabled: true } } }), true);
   assert.equal(A.isEnabled({ security: { adblock: { enabled: false } } }), false);
+});
+
+test('parseList: una regola con un percorso dopo ^ non blocca il sito intero (#576)', () => {
+  const set = A.parseList([
+    '||dev.to^*/bb/post_body_bottom^',
+    '||alicdn.com^*-300x250.$domain=~alibaba.com',
+    '||ads.vere.test^',
+    '||popup.vere.test^$popup,third-party',
+  ].join('\n'));
+  assert.ok(!set.has('dev.to'), 'dev.to si aprirebbe solo come pagina d\'errore');
+  assert.ok(!set.has('alicdn.com'));
+  assert.ok(set.has('ads.vere.test'));
+  assert.ok(set.has('popup.vere.test'));
+});
+
+test('parseList: una regola solo di terzi o solo per certi tipi non ferma la pagina aperta dall\'utente (#576)', () => {
+  const pagine = new Set();
+  const set = A.parseList([
+    '0.0.0.0 hosts.test',
+    '||nuda.test^',
+    '||terzi.test^$third-party',
+    '||script.test^$script,subdocument,third-party',
+    '||immagine.test^$image',
+    '||documento.test^$document',
+    '||popup.test^$popup,third-party',
+    '||nonterzi.test^$~third-party',
+    '||importante.test^$important',
+  ].join('\n'), pagine);
+  for (const d of ['hosts.test', 'nuda.test', 'terzi.test', 'script.test', 'immagine.test', 'documento.test', 'popup.test', 'nonterzi.test', 'importante.test']) {
+    assert.ok(set.has(d), d + ' resta fermato dentro le pagine');
+  }
+  assert.deepEqual([...pagine].sort(), ['documento.test', 'hosts.test', 'importante.test', 'nonterzi.test', 'nuda.test', 'popup.test']);
+});
+
+test('isBlockedSite: il blocco dei siti vede solo i domini che valgono per la pagina', async () => {
+  await A.refresh({ force: true, sources: ['l'], fetchImpl: async () => '||terzi.test^$third-party\n||nuda.test^' });
+  assert.equal(A.isBlockedHost('terzi.test'), true);
+  assert.equal(A.isBlockedSite('terzi.test'), false);
+  assert.equal(A.isBlockedSite('www.nuda.test'), true);
+  A.setDomainsForTest(['a.test']);
+  assert.equal(A.isBlockedSite('a.test'), true);
+});
+
+test('parseList: le regole che cambiano la richiesta o valgono su certi siti non bloccano il dominio', () => {
+  const set = A.parseList([
+    '||sito-con-csp.test^$csp=script-src \'self\'',
+    '||tf1.test^$media,rewrite=abp-resource:blank-mp3,domain=tf1.fr',
+    '||imgur.test^$domain=ghostbin.me',
+    '||cdn.test^$third-party,domain=~casa.test',
+    '||tracker.test^$removeparam=utm_source',
+  ].join('\n'));
+  assert.ok(!set.has('sito-con-csp.test'), 'una csp= spegnerebbe il sito');
+  assert.ok(!set.has('tf1.test'));
+  assert.ok(!set.has('imgur.test'), 'domain= positivo: vale solo su quei siti');
+  assert.ok(set.has('cdn.test'), 'un domain= solo negativo blocca ancora');
+  assert.ok(!set.has('tracker.test'));
+});
+
+const LISTA = [
+  '[Adblock Plus 2.0]',
+  '##.ad-slot',
+  '###ad_top',
+  '##div[id^="div-gpt-ad"]',
+  'betaseries.com###banner_top',
+  'betaseries.com##a[href^="/partner/"]',
+  'betaseries.com#?#.blockSearch:has(.adsbygoogle)',
+  'esempio.test#?#.box:has-text(Sponsor)',
+  'sito-buono.test#@#.ad-slot',
+  'rotto.test##.x}body{display:none',
+  'rotto.test##@import url(https://altrove.test/x.css);.y',
+  '@@||accounts.google.com^$generichide',
+  '@@||negozio.test^$elemhide',
+  '@@$generichide,domain=altro.test|~niente.test',
+].join('\n');
+
+test('occultamento: la pagina riceve le regole generiche e quelle del suo sito (#576)', () => {
+  A.setCosmeticForTest(LISTA);
+  A.configureFromSettings({});
+  const p = A.cosmeticForPage('https://www.betaseries.com/it/episode/pantheon/s01e02');
+  assert.equal(p.tokens, true);
+  assert.match(p.css, /^#banner_top\{display:none!important\}$/m);
+  assert.match(p.css, /^a\[href\^="\/partner\/"\]\{display:none!important\}$/m);
+  assert.match(p.css, /^\.blockSearch:has\(\.adsbygoogle\)\{display:none!important\}$/m, 'un #?# in CSS vero vale');
+  assert.match(p.css, /^div\[id\^="div-gpt-ad"\]\{display:none!important\}$/m);
+  assert.doesNotMatch(p.css, /ad-slot|ad_top/, 'id e classi semplici arrivano dopo, se la pagina li ha');
+  assert.doesNotMatch(A.cosmeticForPage('https://altrove.test/').css, /banner_top/, 'le regole di un sito restano sue');
+  assert.doesNotMatch(A.cosmeticForPage('https://esempio.test/').css, /has-text/, 'le regole procedurali non sono CSS');
+});
+
+test('occultamento: id e classi della pagina tornano come CSS solo se la lista li nasconde', () => {
+  A.setCosmeticForTest(LISTA);
+  A.configureFromSettings({});
+  const css = A.cosmeticForTokens('https://www.example.org/', ['ad_top', 'main'], ['ad-slot', 'container']);
+  assert.equal(css, '#ad_top{display:none!important}\n.ad-slot{display:none!important}');
+  assert.equal(A.cosmeticForTokens('https://sito-buono.test/', [], ['ad-slot']), '', 'eccezione #@# del sito');
+  assert.equal(A.cosmeticForTokens('https://x.test/', [{}, 'a'.repeat(121)], 'non-un-array'), '');
+});
+
+test('occultamento: $generichide e $elemhide spengono le regole dove la lista lo dice', () => {
+  A.setCosmeticForTest(LISTA);
+  A.configureFromSettings({});
+  const acc = A.cosmeticForPage('https://accounts.google.com/signin');
+  assert.equal(acc.tokens, false);
+  assert.doesNotMatch(acc.css, /div-gpt-ad/);
+  assert.equal(A.cosmeticForTokens('https://accounts.google.com/', ['ad_top'], []), '');
+  assert.deepEqual(A.cosmeticForPage('https://www.negozio.test/'), { on: true, css: '', tokens: false });
+  assert.equal(A.cosmeticForPage('https://altro.test/').tokens, false);
+  assert.equal(A.cosmeticForPage('https://niente.test/').tokens, true);
+});
+
+test('occultamento: un selettore con graffe non scrive CSS nella pagina', () => {
+  A.setCosmeticForTest(LISTA);
+  A.configureFromSettings({});
+  const css = A.cosmeticForPage('https://rotto.test/').css;
+  assert.doesNotMatch(css, /body\{display:none/);
+  assert.doesNotMatch(css, /@import/);
+});
+
+test('occultamento: spento col toggle, e fuori dalle pagine web', () => {
+  A.setCosmeticForTest(LISTA);
+  A.configureFromSettings({ security: { adblock: { enabled: false } } });
+  assert.deepEqual(A.cosmeticForPage('https://www.betaseries.com/'), { on: false, css: '', tokens: false });
+  assert.equal(A.cosmeticForTokens('https://www.example.org/', ['ad_top'], []), '');
+  A.configureFromSettings({});
+  assert.deepEqual(A.cosmeticForPage('filo://home/'), { on: false, css: '', tokens: false });
+  assert.deepEqual(A.cosmeticForPage('file:///C:/x.html'), { on: false, css: '', tokens: false });
+});
+
+test('aggiornamento: le regole di occultamento vengono dalle liste EasyList, non dai commenti di un file hosts', async () => {
+  const HOSTS = '# Title: hosts\n#### sezione ####\n0.0.0.0 ads.hosts.test\n';
+  const r = await A.refresh({
+    force: true,
+    sources: ['hosts', 'easylist'],
+    fetchImpl: async (u) => (u === 'hosts' ? HOSTS : LISTA + '\n||rete.test^'),
+  });
+  assert.equal(r.ok, true);
+  assert.equal(A.isBlockedHost('ads.hosts.test'), true);
+  assert.equal(A.isBlockedHost('rete.test'), true);
+  A.configureFromSettings({});
+  const css = A.cosmeticForPage('https://www.betaseries.com/').css;
+  assert.match(css, /#banner_top/);
+  assert.doesNotMatch(css, /sezione/);
+});
+
+test('aggiornamento: se arriva solo il file hosts si tengono le regole di occultamento che c\'erano', async () => {
+  A.setCosmeticForTest(LISTA);
+  A.configureFromSettings({});
+  await A.refresh({ force: true, sources: ['hosts', 'easylist'], fetchImpl: async (u) => (u === 'hosts' ? '0.0.0.0 a.test\n' : null) });
+  assert.match(A.cosmeticForPage('https://www.betaseries.com/').css, /#banner_top/);
+});
+
+test('cache: le regole sopravvivono al riavvio, e una cache di prima delle regole si riscarica subito', async () => {
+  await A.refresh({ force: true, sources: ['easylist'], fetchImpl: async () => LISTA + '\n||rete.test^' });
+  A.setCosmeticForTest('');
+  await A.init({});
+  assert.match(A.cosmeticForPage('https://www.betaseries.com/').css, /#banner_top/);
+  assert.ok(A.status().updatedAt > 0);
+
+  const file = join(process.env.FILO_USER_DATA, 'adblock', 'lists.json');
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify({ updatedAt: Date.now(), count: 1, domains: ['vecchio.test'] }));
+  await A.init({});
+  assert.equal(A.isBlockedHost('vecchio.test'), true, 'i domini della cache vecchia valgono finché non arriva la nuova');
+  assert.equal(A.status().updatedAt, 0, 'cache senza regole di occultamento: da riscaricare');
+  assert.ok(JSON.parse(readFileSync(file, 'utf8')).domains.length);
+});
+
+test('un elemento fermato dal blocco si chiude nella pagina: immagini, riquadri e oggetti, non video né script', () => {
+  const inviati = [];
+  const wc = { isDestroyed: () => false, send: (canale, url) => inviati.push([canale, url]) };
+  for (const resourceType of ['image', 'subFrame', 'object', 'media', 'script', 'xhr', 'mainFrame']) {
+    A.chiudiInPagina({ resourceType, url: `https://ads.test/${resourceType}`, webContents: wc });
+  }
+  A.chiudiInPagina({ resourceType: 'image', url: 'https://ads.test/senza-pagina' });
+  A.chiudiInPagina({ resourceType: 'image', url: 'https://ads.test/chiusa', webContents: { isDestroyed: () => true, send: () => { throw new Error('chiusa'); } } });
+  assert.deepEqual(inviati.map(([, u]) => u), [['https://ads.test/image'], ['https://ads.test/subFrame'], ['https://ads.test/object']]);
+  assert.ok(inviati.every(([c]) => c === 'filo:adblock-chiudi'));
+});
+
+test('un annuncio arrivato con un rinvio porta anche l\'indirizzo di partenza, che è quello scritto nella pagina', () => {
+  const inviati = [];
+  const wc = { isDestroyed: () => false, send: (_c, urls) => inviati.push(urls) };
+  A.ricordaRichiesta({ id: 901, resourceType: 'image', url: 'https://partner.test/click' });
+  A.ricordaRichiesta({ id: 901, resourceType: 'image', url: 'https://ads.test/creativo.gif' });
+  A.chiudiInPagina({ id: 901, resourceType: 'image', url: 'https://ads.test/creativo.gif', webContents: wc });
+  A.chiudiInPagina({ id: 901, resourceType: 'image', url: 'https://ads.test/creativo.gif', webContents: wc });
+  assert.deepEqual(inviati, [['https://ads.test/creativo.gif', 'https://partner.test/click'], ['https://ads.test/creativo.gif']]);
+});
+
+test('un annuncio dentro un riquadro: l\'avviso va al riquadro e al suo padre; un riquadro fermato si fa riconoscere dal padre', () => {
+  const inviati = [];
+  const eseguiti = [];
+  const padre = { send: (_c, urls) => inviati.push(['padre', urls]), frames: [] };
+  const riquadro = { parent: padre, frameTreeNodeId: 7, send: (_c, urls) => inviati.push(['riquadro', urls]), executeJavaScript: (js) => { eseguiti.push(js); return Promise.resolve(); } };
+  A.chiudiInPagina({ id: 902, resourceType: 'image', url: 'https://ads.test/dentro.gif', frame: riquadro });
+  assert.deepEqual(inviati, [['padre', ['https://ads.test/dentro.gif']], ['riquadro', ['https://ads.test/dentro.gif']]]);
+  inviati.length = 0;
+  A.chiudiInPagina({ id: 903, resourceType: 'subFrame', url: 'https://ads.test/nav.html', frame: riquadro });
+  assert.deepEqual(inviati, [['padre', ['https://ads.test/nav.html']]]);
+  assert.equal(eseguiti.length, 1);
+  assert.ok(eseguiti[0].includes(A.RIQUADRO_FERMATO) && eseguiti[0].includes('parent.postMessage'));
+  const preload = readFileSync(join(__dirname, '..', '..', 'src', 'preload', 'nascondi-pubblicita.js'), 'utf8');
+  assert.ok(preload.includes(`'${A.RIQUADRO_FERMATO}'`), 'il preload ascolta lo stesso segnale che il main fa mandare');
+});
+
+test('regole sotto cancello: ogni selettore dell\'elenco prende la radice aperta, uno malformato si scarta', () => {
+  const g = 'data-filo-abc123';
+  assert.equal(A.sottoCancello('.ad', g), ':root:not([data-filo-abc123]) .ad');
+  assert.equal(A.sottoCancello('div[title="a,b"], .x > a', g), ':root:not([data-filo-abc123]) div[title="a,b"],:root:not([data-filo-abc123]) .x > a');
+  assert.equal(A.sottoCancello('html.mobile .ad', g), 'html:not([data-filo-abc123]).mobile .ad');
+  assert.equal(A.sottoCancello(':root .ad', g), ':root:not([data-filo-abc123]) .ad');
+  assert.equal(A.sottoCancello('.blockSearch:has(.adsbygoogle, .x)', g), ':root:not([data-filo-abc123]) .blockSearch:has(.adsbygoogle, .x)');
+  assert.equal(A.sottoCancello('div:has(.ad', g), '');
+  assert.equal(A.sottoCancello('a[href="x', g), '');
+  A.setCosmeticForTest('##.ad-slot\n##div:has(.rotto\n##div[id^="gpt"]');
+  A.configureFromSettings({});
+  assert.equal(A.cosmeticForPage('https://pagina.test/', g).css, ':root:not([data-filo-abc123]) div[id^="gpt"]{display:none!important}');
+  assert.equal(A.cosmeticForTokens('https://pagina.test/', [], ['ad-slot'], g), ':root:not([data-filo-abc123]) .ad-slot{display:none!important}');
+  assert.equal(A.cosmeticForTokens('https://pagina.test/', [], ['ad-slot'], 'x]{} body'), '.ad-slot{display:none!important}');
+});
+
+// #576 giro 5: chat e novità raccontano il blocco com'è. Una voce sola nel manifesto, e nessuna promessa di aprire
+// i link delle reti di affiliazione che il file hosts ferma come siti.
+test('il manifesto ha una voce sola per il blocco della pubblicità, e le novità non promettono i link di affiliazione', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'capabilities.js'));
+  const voci = globalThis.SN_CAPABILITIES.all().filter((v) => /EasyList/.test(`${v.desc} ${v.doesNot}`));
+  assert.deepEqual(voci.map((v) => v.id), ['ad-block']);
+  assert.doesNotMatch(voci[0].doesNot, /spazio vuoto/);
+
+  const pagine = new Set();
+  const domini = A.parseList('0.0.0.0 go.skimresources.com\n0.0.0.0 www.awin1.com', pagine);
+  A.setDomainsForTest([...domini], [...pagine]);
+  assert.equal(A.isBlockedSite('go.skimresources.com'), true);
+  require(join(__dirname, '..', '..', 'src', 'shared', 'patchNotes.js'));
+  assert.doesNotMatch(JSON.stringify(globalThis.SN_PATCH_NOTES.NOTES), /link di affiliazione[^"]*?si aprono/i);
 });

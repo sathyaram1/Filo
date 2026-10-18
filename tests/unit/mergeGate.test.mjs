@@ -14,14 +14,15 @@
 //        0 fuso · 10 bloccato (L5) · 20 conflitto · 1 errore/rifiuto.
 //      Server finto via FILO_ROUTINE_API, come in routineChain.test.mjs.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(__dirname, '..', '..', '.claude', 'hooks', 'auto-commit-merge.sh');
@@ -29,7 +30,7 @@ const MERGE_GATE = resolve(__dirname, '..', '..', 'scripts', 'merge-gate.mjs');
 
 // ─── logica pura del CLI (niente git, niente rete) ───────────────────────────
 
-const { parseArgs, isValidBranch, exitCodeFor } = await import('../../scripts/merge-gate.mjs');
+const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer, testoEsitoServer } = await import('../../scripts/merge-gate.mjs');
 
 test('parseArgs: solo il source; qualunque flag è sconosciuto', () => {
   assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', unknown: [] });
@@ -52,6 +53,11 @@ test('exitCodeFor: il contratto CLI su cui il ruolo secaudit decide le chiusure'
   assert.equal(exitCodeFor({ ok: true, result: 'merged', sha: 'abc' }), 0);
   assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }), 10);
   assert.equal(exitCodeFor({ ok: true, result: 'conflict' }), 20);
+  // Lavoro server (#1159 fase 2): la parte del server la segue il server, e chi chiede non fa niente.
+  assert.equal(exitCodeFor({ ok: true, result: 'server', esito: 'attesa_suite' }), 30);
+  assert.equal(exitCodeFor({ ok: true, result: 'merged', sha: 'abc', server: true }), 0, 'lavoro misto: app e server su main');
+  assert.match(testoEsitoServer('attesa_suite'), /aspetta la suite di filo-security.*rilascia il biglietto/);
+  assert.match(testoEsitoServer('boh'), /esito «boh»/);
   // Un RIFIUTO del server (verdetti non registrati, ramo che non combacia,
   // biglietto morto) è 1, non 10: non è un blocco di sicurezza da spiegare
   // all'owner, è una richiesta fuori perimetro già registrata dal server.
@@ -118,7 +124,7 @@ function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
     p.stdout.on('data', (c) => { stdout += c; });
     p.stderr.on('data', (c) => { stderr += c; });
     p.on('close', (status) => {
-      rmSync(casa, { recursive: true, force: true });
+      togliCartella(casa);
       risolvi({ status, stdout, stderr });
     });
   });
@@ -130,17 +136,129 @@ test('merged → exit 0, e al server arrivano biglietto, branch e il COMMIT da f
     const r = await gate(port, ['worker/7']);
     assert.equal(r.status, 0, `exit 0 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stdout, /fuso su main dal server/);
-    assert.equal(richieste.length, 1);
-    assert.ok(richieste[0].url.endsWith('/routineMerge'));
+    // Prima della richiesta un battito: la prova degli unit che la precede dura minuti (#929).
+    assert.ok(richieste[0].url.endsWith('/routineHeartbeat'), richieste.map((x) => x.url).join(' '));
+    const fusioni = richieste.filter((x) => x.url.endsWith('/routineMerge'));
+    assert.equal(fusioni.length, 1);
     // Il contratto che chiude il buco: nessun verdetto viaggia nel corpo. Se
     // un giorno qualcuno reinfilasse un FILO_L4_VERDICT, questo diventa rosso.
     // Lo `sha` invece c'è, e non è un verdetto: dice su quale contenuto
     // giravano i controlli, come fa il cammino locale (#485).
-    assert.deepEqual(Object.keys(richieste[0].body).sort(), ['branch', 'sha', 'ticket']);
-    assert.equal(richieste[0].body.ticket, 'biglietto-di-prova');
-    assert.equal(richieste[0].body.branch, 'worker/7');
-    assert.match(String(richieste[0].body.sha), /^[0-9a-f]{40}$/);
+    assert.deepEqual(Object.keys(fusioni[0].body).sort(), ['branch', 'sha', 'ticket']);
+    assert.equal(fusioni[0].body.ticket, 'biglietto-di-prova');
+    assert.equal(fusioni[0].body.branch, 'worker/7');
+    assert.match(String(fusioni[0].body.sha), /^[0-9a-f]{40}$/);
   } finally { srv.close(); }
+});
+
+// ─── il lavoro resta vivo mentre girano gli unit sulla fusione (#929, verifica giro 3) ───
+
+const { attesaBattito } = await import('../../scripts/routine-channel.mjs');
+const { tieniVivo } = await import('../../scripts/merge-gate.mjs');
+
+test('il battito si fa dentro la scadenza detta dal server: dieci minuti con un\'ora, più fitto con meno', () => {
+  const ora = Date.parse('2026-10-03T10:00:00Z');
+  const fra = (ms) => new Date(ora + ms).toISOString();
+  assert.equal(attesaBattito(fra(60 * 60 * 1000), ora), 10 * 60 * 1000);
+  assert.equal(attesaBattito(fra(6000), ora), 2000);
+  assert.equal(attesaBattito(fra(1500), ora), 1000);
+  assert.equal(attesaBattito('', ora), 10 * 60 * 1000);
+  assert.equal(attesaBattito('non una data', ora), 10 * 60 * 1000);
+});
+
+test('tieniVivo: un battito subito, poi un figlio che batte col biglietto nell\'ambiente, fermato alla fine', async () => {
+  const battuti = [];
+  let avviato = null;
+  let ucciso = false;
+  const v = await tieniVivo('biglietto-x', {
+    batti: async (t) => { battuti.push(t); return { ok: true }; },
+    avvia: (cmd, args, opz) => { avviato = { cmd, args, opz }; return { on() {}, kill() { ucciso = true; } }; },
+    script: 'canale.mjs',
+  });
+  assert.deepEqual(battuti, ['biglietto-x']);
+  assert.deepEqual(avviato.args, ['canale.mjs', 'heartbeat', '--loop']);
+  assert.equal(avviato.opz.env.FILO_ROUTINE_TICKET, 'biglietto-x');
+  assert.ok(!avviato.args.includes('biglietto-x'), 'il biglietto non sta nella riga di comando');
+  assert.equal(ucciso, false);
+  v.ferma();
+  assert.equal(ucciso, true);
+});
+
+// Il silenzio si conta in battiti, non in secondi (#1063): la prova lunga dura finché il server non ha visto due battiti
+// arrivati mentre lei girava, e il server dà il biglietto per morto se in quella prova non è arrivato nessun battito.
+// Senza chi batte durante gli unit la prova lunga arriva al suo tetto e la fusione trova il biglietto morto.
+test('una prova degli unit più lunga della finestra di silenzio non fa arrivare la fusione a biglietto morto', async () => {
+  const TETTO_PROVA_LUNGA_MS = 5 * 60 * 1000;
+  const casa = cartellaTemporanea('filo-mg-battito-');
+  const g = (cwd, ...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  let provaLunga = false;
+  let battitiNellaProva = 0;
+  const vie = [];
+  const srv = createServer((req, res) => {
+    req.on('data', () => {});
+    req.on('end', () => {
+      if (req.url === '/prova-lunga') { provaLunga = true; res.end('ok'); return; }
+      if (req.url === '/battiti-nella-prova') { res.end(String(battitiNellaProva)); return; }
+      const battito = req.url.endsWith('/routineHeartbeat');
+      if (battito && provaLunga) battitiNellaProva += 1;
+      const vivo = battito || !provaLunga || battitiNellaProva > 0;
+      vie.push(`${req.url}${vivo ? '' : ' (morto)'}`);
+      res.setHeader('Content-Type', 'application/json');
+      if (!vivo) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'dead_ticket' })); return; }
+      // Una scadenza vicina fa battere il figlio ogni secondo: la prova lunga finisce presto se il battito c'è.
+      if (battito) res.end(JSON.stringify({ ok: true, expiresAt: new Date(Date.now() + 3000).toISOString() }));
+      else res.end(JSON.stringify({ ok: true, result: 'merged', sha: 'f'.repeat(40) }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const server = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const origin = join(casa, 'origin.git');
+    const lavoro = join(casa, 'lavoro');
+    const altro = join(casa, 'altro');
+    g(casa, 'init', '-q', '--bare', '--initial-branch=main', origin);
+    g(casa, 'clone', '-q', origin, lavoro);
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
+      mkdirSync(dirname(join(lavoro, f)), { recursive: true });
+      copyFileSync(resolve(__dirname, '..', '..', f), join(lavoro, f));
+    }
+    mkdirSync(join(lavoro, 'tests', 'unit'), { recursive: true });
+    writeFileSync(join(lavoro, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(lavoro, 'tests', 'unit', 'base.test.mjs'), "import test from 'node:test'; test('base', () => {});\n");
+    g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'base'); g(lavoro, 'push', '-q', 'origin', 'main');
+    g(casa, 'clone', '-q', origin, altro);
+    writeFileSync(join(altro, 'nuovo.txt'), 'main va avanti\n');
+    g(altro, 'add', '-A'); g(altro, 'commit', '-qm', 'main avanti'); g(altro, 'push', '-q', 'origin', 'main');
+    g(lavoro, 'checkout', '-q', '-b', 'claude/lungo');
+    writeFileSync(join(lavoro, 'tests', 'unit', 'lungo.test.mjs'), `import test from 'node:test';
+test('lungo', async () => {
+  const server = ${JSON.stringify(server)};
+  await fetch(server + '/prova-lunga');
+  const fine = Date.now() + ${TETTO_PROVA_LUNGA_MS};
+  while (Date.now() < fine && Number(await (await fetch(server + '/battiti-nella-prova')).text()) < 2) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+});
+`);
+    g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'ramo'); g(lavoro, 'push', '-q', 'origin', 'claude/lungo');
+    const tmp = join(casa, 'tmp');
+    mkdirSync(tmp);
+    const esito = await new Promise((ok) => {
+      const env = { ...process.env, FILO_REPO_ROOT: lavoro, FILO_ROUTINE_TICKET: 'biglietto-lungo', FILO_ROUTINE_API: server, TEMP: tmp, TMP: tmp, TMPDIR: tmp };
+      const p = spawn(process.execPath, [MERGE_GATE, 'claude/lungo'], { cwd: lavoro, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      p.stdout.on('data', (c) => { out += c; });
+      p.stderr.on('data', (c) => { out += c; });
+      p.on('close', (code) => ok({ code, out }));
+    });
+    assert.equal(provaLunga, true, `la prova lunga non è partita:\n${esito.out}`);
+    assert.ok(battitiNellaProva >= 2, `mentre giravano gli unit il lavoro non ha battuto:\n${vie.join('\n')}`);
+    assert.equal(esito.code, 0, `${esito.out}\n${vie.join('\n')}`);
+    assert.ok(vie.some((v) => v === '/routineMerge'), vie.join('\n'));
+  } finally {
+    srv.close();
+    togliCartella(casa);
+  }
 });
 
 test('blocked (L5 sul server) → exit 10, col motivo del blocco', async () => {
@@ -169,6 +287,30 @@ test('rifiuto del server (verdetti non registrati) → exit 1, col motivo', asyn
     assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /not_approved/);
   } finally { srv.close(); }
+});
+
+// #773: il server lega anche il via libera di sicurezza al commit. Quando non
+// copre la punta lo azzera e rimanda da sé un nuovo controllo: chi ha chiesto
+// la fusione deve leggerlo, non un «ERROR» che sembra un guasto.
+test('via libera di sicurezza decaduto sul server → exit 1, e la frase dice che non c’è altro da fare', async () => {
+  for (const reason of ['secaudit_stale', 'stale']) {
+    const { srv, port } = await fintoServer({ ok: false, reason }, 401);
+    try {
+      const r = await gate(port, ['worker/12']);
+      assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
+      assert.match(r.stderr, new RegExp(`RIFIUTATO \\(${reason}\\)`));
+      assert.match(r.stderr, /nuovo controllo sulla punta/);
+      assert.match(r.stderr, /rilascia il biglietto/);
+      assert.doesNotMatch(r.stderr, /ERROR/);
+    } finally { srv.close(); }
+  }
+});
+
+test('testoRifiutoServer: una frase per i due motivi del #773, niente per gli altri', () => {
+  assert.notEqual(testoRifiutoServer('secaudit_stale'), testoRifiutoServer('stale'));
+  for (const reason of ['not_approved', 'branch_mismatch', 'malformed', '', undefined]) {
+    assert.equal(testoRifiutoServer(reason), '', String(reason));
+  }
 });
 
 test('senza biglietto → exit 1 SENZA nemmeno chiamare il server', async () => {
@@ -270,7 +412,7 @@ test('nessun branch di lavoro arriva su main da solo, nemmeno con un nome qualsi
       'una modifica in corso non deve raggiungere main: da lì viene distribuita agli utenti ogni 6 ore');
     assert.ok(originHasFile(origin, 'claude/foo', 'normal.txt'),
       'ma deve essere al sicuro sul suo branch: è ciò che salva il lavoro se la sessione si interrompe');
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
 
 test('un branch worker/* NON arriva su main, ma resta sul suo branch', { skip }, () => {
@@ -289,5 +431,5 @@ test('un branch worker/* NON arriva su main, ma resta sul suo branch', { skip },
     assert.ok(originHasBranch(origin, 'worker/42'), 'il branch worker/42 deve esistere su origin');
     assert.ok(originHasFile(origin, 'worker/42', 'worker.txt'),
       'la edit deve essere committata e pushata sul branch worker/42');
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });

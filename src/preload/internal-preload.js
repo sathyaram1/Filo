@@ -5,7 +5,7 @@
 // quanto portato dall'estensione. Possiamo assegnare direttamente window.*
 // e l'assegnazione è visibile alla pagina.
 
-const { ipcRenderer, webFrame } = require('electron');
+const { ipcRenderer, webFrame, webUtils } = require('electron');
 
 // ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
 // Questo preload è PRIVILEGIATO: espone window.filo (IPC, shell, AI stream) e
@@ -30,6 +30,7 @@ const IS_FILO_ORIGIN = (() => {
 // non nostro finisse a girare qui (il caso che teme il gate qui sopra) se lo
 // scriverebbe da sé per rendersi impossibile da ingrandire (#686).
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
+try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
 
 let streamCounter = 0;
 
@@ -42,6 +43,10 @@ const filoApi = {
   // nella modalità terminale non sono le stesse. È un dato pubblico del
   // sistema, non un'informazione dell'utente: nessuna superficie in più.
   sistema: process.platform,
+  // Il percorso su disco di un file trascinato in una pagina di Filo (#950): '' se non viene dal disco.
+  percorsoDelFile: (file) => {
+    try { return (webUtils && webUtils.getPathForFile(file)) || ''; } catch (_) { return ''; }
+  },
   onBroadcast: (fn) => {
     const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
     ipcRenderer.on('filo:broadcast', wrapped);
@@ -69,11 +74,19 @@ const filoApi = {
   // modello ha appena nominato un'azione: { type }), 'done' (eseguita, con
   // l'azione completa di esito: { action }) e 'round' (un giro con azioni si è
   // chiuso: il testo scritto in quel giro è una nota di lavoro, non la
-  // risposta: { text }). Il chiamante filtra per reqId. Ritorna un unsubscribe.
+  // risposta: { text }; con `risposta: true` è un giro di soli bottoni e il
+  // testo apre la risposta). Il chiamante filtra per reqId. Ritorna un unsubscribe.
   onAction: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:action', wrapped);
     return () => ipcRenderer.removeListener('filo:action', wrapped);
+  },
+  // #590 — una pagina aperta da NAVIGA che, a turno finito, si è spostata da sé su un sito
+  // della lista: { callId, host, reason, url }. Ritorna un unsubscribe.
+  onAperturaFermata: (fn) => {
+    const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
+    ipcRenderer.on('filo:apertura-fermata', wrapped);
+    return () => ipcRenderer.removeListener('filo:apertura-fermata', wrapped);
   },
   aiStream: ({ action, payload, onMeta, onDelta, onReset, onDone, onError }) => {
     const requestId = `s${Date.now()}_${++streamCounter}`;
@@ -104,7 +117,7 @@ const filoApi = {
   // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
   // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
   // Ritorna { sendInput(text), abort() }.
-  shellExec: ({ command, cwd, shell, onData, onExit, onError }) => {
+  shellExec: ({ command, cwd, shell, chat, onData, onExit, onError }) => {
     const execId = `sh${Date.now()}_${++streamCounter}`;
     const offData = (_e, data) => onData && onData(data);
     const offExit = (_e, data) => { cleanup(); onExit && onExit(data); };
@@ -117,7 +130,7 @@ const filoApi = {
     ipcRenderer.on(`shell:${execId}:data`, offData);
     ipcRenderer.on(`shell:${execId}:exit`, offExit);
     ipcRenderer.on(`shell:${execId}:error`, offError);
-    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell });
+    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat });
     return {
       sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
       abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },
@@ -127,6 +140,9 @@ const filoApi = {
   // Esiste questo comando nella shell? Per l'evidenziazione live (rosso = non
   // riconosciuto) della dashboard in modalità terminale.
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
+  // #968 — le virgolette a un percorso con spazi: appena incollato nel comando, e proposte dopo un errore.
+  shellVirgoletteIncolla: (opts) => ipcRenderer.invoke('shell:virgolette-incolla', opts),
+  shellPropostaVirgolette: (opts) => ipcRenderer.invoke('shell:proposta-virgolette', opts),
   // Questo "/dominio.tld" risolve davvero? Per colorare di rosso (e non
   // navigare verso) un sito inesistente dalla barra comando della dashboard.
   siteResolves: (opts) => ipcRenderer.invoke('net:resolves', opts),
@@ -184,7 +200,10 @@ const chromeShim = {
               if (onDisconnect) onDisconnect();
             },
             onError: (e) => {
-              if (onMessage) onMessage({ type: 'error', message: e.message, code: e.code });
+              // Tutto quello che il main ha detto sull'errore: con i soli
+              // message e code la frase già scritta per l'utente non si
+              // ricompone e arriva la riga grezza del servizio (#663).
+              if (onMessage) onMessage({ type: 'error', ...e });
               if (onDisconnect) onDisconnect();
             },
           });
@@ -265,7 +284,7 @@ if (IS_FILO_ORIGIN) {
 const path = require('node:path');
 const shouldInjectContentScripts = () => true;
 function injectContentScriptStyles() {
-  const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css',
+  const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
     'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css'];
   for (const f of STYLES) {
     if (document.querySelector(`link[href="filo://style/${f}"]`)) continue;
@@ -290,10 +309,14 @@ function loadContentScripts() {
   // la disegnano, lo legge chi cammina sulla pagina.
   safe(path.join(SHARED, 'filoUi.js'));
   safe(path.join(SHARED, 'i18n.js'));
+  safe(path.join(SHARED, 'clipboardHistory.js')); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
+  safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»
+  safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro
   safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
   safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'themeTokens.js'));
@@ -304,6 +327,8 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   safe(path.join(CONTENT, 'extractContext.js'));
+  safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
+  safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
@@ -321,6 +346,8 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'modelCaps.js'));
   safe(path.join(SHARED, 'ttsVoices.js'));
   safe(path.join(SHARED, 'dictationSegmenter.js'));
+  safe(path.join(SHARED, 'ascolto.js')); // microfono e trascrizione: Detta e le chat
+  safe(path.join(SHARED, 'voceChat.js')); // tasto microfono delle chat, a cui «Detta» passa la mano
   // Solo nei test: modelli di prova (vedi loader.js).
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));

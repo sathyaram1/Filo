@@ -112,6 +112,8 @@
     switch (action) {
       case A.DESCRIBE_IMAGE:
       case A.TRANSCRIBE_IMAGE:
+      case A.FILE_NAME:
+      case A.EMBED_COOKIE_CHECK:
         return { output: M.TEXT, inputs: [M.IMAGE] };
       case A.TRANSCRIBE_AUDIO:
         return { output: M.TEXT, inputs: [M.AUDIO] };
@@ -123,6 +125,9 @@
       // validazione impedisce entrambi gli scambi.
       case A.ARCHIVE_EMBED:
         return { output: M.EMBED, inputs: [] };
+      // La chat chiama le azioni come strumenti: un modello che non li regge risponde senza fare niente.
+      case A.FILO_CHAT:
+        return { output: M.TEXT, inputs: [], tools: true };
       default:
         return { output: M.TEXT, inputs: [] };
     }

@@ -4,6 +4,10 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi } from './helpers/riquadri.mjs';
+
+// Sui siti la spiegazione sta in uno shadow root chiuso (#1071): il titolo si legge dal mondo dei content script.
+const titolo = async (app, page, frame = null) => (await statoDi(app, page, '.sn-popup .sn-popup-title', frame))?.testo || '';
 
 const TESTO = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
   <p id="testo">Una frase abbastanza lunga da poterla selezionare, spiegare e tradurre.</p>
@@ -60,7 +64,7 @@ test('Alt+E sul testo selezionato apre la spiegazione, e la pagina non vede il t
   await page.locator('#testo').click();
   await seleziona(page, '#testo');
   await premi(app, 'E');
-  await expect(page.locator('.sn-popup .sn-popup-title')).toHaveText('Approfondimento', { timeout: 8000 });
+  await expect.poll(() => titolo(app, page), { timeout: 8000 }).toBe('Approfondimento');
   expect(await page.evaluate(() => window.__visti)).toEqual([]);
 });
 
@@ -69,7 +73,7 @@ test('Alt+T sul testo selezionato apre la traduzione', async ({ app, openTab, te
   await page.locator('#testo').click();
   await seleziona(page, '#testo');
   await premi(app, 'T');
-  await expect(page.locator('.sn-popup .sn-popup-title')).toHaveText('Traduzione', { timeout: 8000 });
+  await expect.poll(() => titolo(app, page), { timeout: 8000 }).toBe('Traduzione');
 });
 
 test('Alt+H apre l\'Aiuto sulla pagina, anche col fuoco sulla barra di Filo', async ({ app, openTab, testServer }) => {
@@ -98,7 +102,7 @@ test('Alt+E sul testo selezionato dentro un riquadro di un altro sito apre la sp
   const frame = page.frames().find((f) => f !== page.mainFrame());
   await seleziona(frame, '#inner-text');
   await premi(app, 'E');
-  await expect(frameLoc.locator('.sn-popup')).toBeVisible({ timeout: 8000 });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup', frame))?.visibile, { timeout: 8000 }).toBe(true);
 });
 
 test('Alt+S salva la pagina e chiude la scheda una volta sola, anche tenendolo premuto', async ({ app, openTab, testServer }) => {
@@ -244,8 +248,8 @@ test('col fuoco sulla barra, cambiare scheda non le toglie la tastiera', async (
   })).toBe(true);
 });
 
-// Un PDF si apre nel visore, che è un webContents a sé e prende la tastiera
-// appena il documento compare: da lì i tasti di Filo devono valere come dalla pagina.
+// Un PDF si apre nel visore, un riquadro della scheda (da Electron 41) che prende la tastiera
+// dopo un clic sul documento: da lì i tasti di Filo devono valere come dalla pagina.
 function pdfMinimo(testo) {
   const ogg = [
     '<< /Type /Catalog /Pages 2 0 R >>',
@@ -284,11 +288,28 @@ async function pdfColTastieraNelVisore(app, shell, openTab, testServer, pdfUrl) 
     w.show(); w.focus();
   });
   await shell.evaluate((u) => window.filoShell.tabs.open(u), pdfUrl);
-  await expect.poll(() => app.evaluate(({ webContents }) => {
-    const f = webContents.getFocusedWebContents();
-    return !!f && f.getType() === 'remote' && !f.isLoading();
-  }), { timeout: 15_000 }).toBe(true);
+  let pdf = null;
+  await expect.poll(() => { pdf = app.windows().find((w) => w.url() === pdfUrl); return !!pdf; }, { timeout: 15_000 }).toBe(true);
+  const visore = () => pdf.frames().find((f) => f.url().startsWith('chrome-extension://'));
+  await expect.poll(() => Boolean(visore()), { timeout: 15_000 }).toBe(true);
+  // Il clic sul documento gli dà la tastiera; partito mentre il visore si monta va a vuoto, e si ripete.
+  await expect.poll(async () => {
+    if (await tastieraNelVisore(app, pdf, pdfUrl)) return true;
+    const [larga, alta] = await pdf.evaluate(() => [innerWidth, innerHeight]);
+    await pdf.mouse.click(larga / 2, alta / 2);
+    return tastieraNelVisore(app, pdf, pdfUrl);
+  }, { timeout: 15_000 }).toBe(true);
   return (await schede(app)).activeId;
+}
+
+// La tastiera sta nel visore: la scheda del PDF è quella a fuoco e, dentro, il fuoco è nel riquadro del visore.
+async function tastieraNelVisore(app, pdf, pdfUrl) {
+  const scheda = await app.evaluate(({ webContents }, u) => {
+    const f = webContents.getFocusedWebContents();
+    return !!f && f.getURL() === u && !f.isLoading();
+  }, pdfUrl);
+  const visore = pdf.frames().find((f) => f.url().startsWith('chrome-extension://'));
+  return scheda && !!visore && await visore.evaluate(() => document.hasFocus() && document.activeElement?.tagName === 'PDF-VIEWER');
 }
 
 function premiNelVisore(app, keyCode, modifiers) {
@@ -333,20 +354,20 @@ testPdf('dal visore di un PDF valgono anche Ctrl+T, Alt+cifra e Ctrl+W, ciascuno
     t.closeTab(t.activeId);
     t.activate(tid);
   }, id);
-  await expect.poll(() => app.evaluate(({ webContents }) => {
+  await expect.poll(() => app.evaluate(({ webContents }, u) => {
     const f = webContents.getFocusedWebContents();
-    return !!f && f.getType() === 'remote';
-  }), { timeout: 10_000 }).toBe(true);
+    return !!f && f.getURL() === u;
+  }, pdfUrl), { timeout: 10_000 }).toBe(true);
 
   await premiNelVisore(app, '1', ['alt']);
   await expect.poll(async () => (await schede(app)).activeId).not.toBe(id);
   await app.evaluate(({ BrowserWindow }, tid) => {
     BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.activate(tid);
   }, id);
-  await expect.poll(() => app.evaluate(({ webContents }) => {
+  await expect.poll(() => app.evaluate(({ webContents }, u) => {
     const f = webContents.getFocusedWebContents();
-    return !!f && f.getType() === 'remote';
-  }), { timeout: 10_000 }).toBe(true);
+    return !!f && f.getURL() === u;
+  }, pdfUrl), { timeout: 10_000 }).toBe(true);
 
   await premiNelVisore(app, 'W', ['control']);
   await expect.poll(async () => (await schede(app)).ids.includes(id)).toBe(false);

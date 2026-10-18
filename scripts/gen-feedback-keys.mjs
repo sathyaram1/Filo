@@ -1,17 +1,6 @@
-// Genera la coppia di chiavi per la cifratura dei feedback (S1.1).
-//
-// Schema: ECDH P-256 (sealed box, vedi src/shared/feedbackCrypto.js).
-//   - PUBBLICA  -> scritta in src/shared/feedbackPublicKey.js (committabile).
-//   - PRIVATA   -> stampata a video, da salvare FUORI dal repo (owner/backend/
-//                  routine). Non viene mai scritta su disco da questo script.
-//
-// USO:
-//   node scripts/gen-feedback-keys.mjs            # genera e aggiorna il file pubblico
-//   node scripts/gen-feedback-keys.mjs --print    # stampa soltanto, NON tocca il file
-//
-// ⚠️ Rigenerare la coppia rende ILLEGGIBILI i feedback cifrati con la vecchia
-//    chiave. Fallo solo a freddo (nessun feedback cifrato in giro) o gestisci
-//    la rotazione conservando la vecchia privata per decifrare lo storico.
+// Genera la coppia di chiavi dei feedback: la pubblica la scrive in src/shared/feedbackPublicKey.js, la privata
+// la stampa soltanto. Rigenerare rende illeggibili i feedback cifrati con la vecchia; dove va la privata lo dice
+// il messaggio finale, sorvegliato da tests/unit/routineSenzaChiave.test.mjs.
 
 import { webcrypto as crypto } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -28,7 +17,8 @@ if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) {
   console.log([
     'Uso: node scripts/gen-feedback-keys.mjs [--print]',
     '  ATTENZIONE: senza --print RIGENERA la chiave, e i feedback cifrati con la',
-    '  vecchia non si leggono più. --print stampa soltanto la chiave attuale.',
+    '  vecchia non si leggono più. --print ne genera una nuova e la stampa soltanto,',
+    '  senza toccare il file: la coppia in uso non si può ristampare.',
   ].join('\n'));
   process.exit(0);
 }
@@ -84,7 +74,7 @@ async function main() {
     '\nDove va la privata (S1.5):\n' +
     '  • owner:    impostazione/env locale sulla macchina dell\'owner;\n' +
     '  • backend:  secret delle Cloud Functions (filo-security);\n' +
-    '  • routine:  variabile d\'ambiente FILO_FEEDBACK_PRIVKEY (mai in chiaro nel repo).\n' +
+    '  • routine:  nessuna copia, la legge solo il server.\n' +
     '⚠️ NON committarla, NON incollarla in chat/prompt non fidati.\n'
   );
 }

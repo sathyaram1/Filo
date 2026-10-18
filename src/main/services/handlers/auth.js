@@ -3,6 +3,7 @@
 
 const path = require('node:path');
 const auth = require('../../auth/google-auth');
+const ProdottiGoogle = require('../../auth/prodottiGoogle');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
@@ -40,35 +41,75 @@ async function callSecurityFunction(name, data = {}) {
   });
   if (!res.ok) {
     let detail = '';
-    try { detail = (await res.json())?.error?.message || ''; } catch (_) {}
-    throw new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`);
+    let code = '';
+    try {
+      const err = (await res.json())?.error || {};
+      detail = err.message || '';
+      code = err.status || '';
+    } catch (_) {}
+    // Codice e spiegazione del server restano attaccati all'errore: chi chiama sceglie la frase per l'owner.
+    throw Object.assign(new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`),
+      { httpStatus: res.status, code: String(code), detail: String(detail) });
   }
   const body = await res.json();
   return body && body.result;
 }
 
+// Un errore di ownerSenderFlag detto all'owner. Su frase o stato sbagliati la spiegazione è del server.
+const ERRORI_SEGNO = {
+  PERMISSION_DENIED: 'Il server dice che questo account non può toccare il segno: serve quello del proprietario.',
+  NOT_FOUND: 'Il server non trova questo feedback o il suo mittente.',
+  UNAUTHENTICATED: 'Sessione scaduta: rifai l\'accesso.',
+};
+function erroreSegno(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (code === 'INVALID_ARGUMENT' || code === 'FAILED_PRECONDITION') return detail || 'Il server ha rifiutato la richiesta.';
+  if (ERRORI_SEGNO[code]) return detail ? `${ERRORI_SEGNO[code]} (${detail})` : ERRORI_SEGNO[code];
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}${detail ? `: ${detail}` : ''}.`;
+  // `fetch` fallisce con un TypeError quando il server non si raggiunge; il resto ha già la sua frase.
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Un errore di ownerDomande detto all'owner. Prima del deploy la callable non esiste (404 senza codice del
+// protocollo): lo si dice, non «riprova». Un 404 col codice è una domanda che non c'è, e la frase è del server.
+function erroreDomande(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.';
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Un istante del server (ISO, millisecondi, secondi o Timestamp serializzato) come ISO; '' se non c'è.
+function aIso(v) {
+  if (v == null || v === '') return '';
+  let ms = NaN;
+  if (typeof v === 'object') {
+    const s = v._seconds ?? v.seconds;
+    if (typeof s === 'number') ms = s * 1000;
+  } else if (typeof v === 'number' || /^\d+$/.test(String(v).trim())) {
+    const n = Number(v);
+    ms = n < 1e11 ? n * 1000 : n;
+  } else {
+    ms = Date.parse(String(v));
+  }
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : '';
+}
+
 // ---- Slot chiave privata feedback (S1.3) ----------------------------------------
-// La chiave privata non deve MAI uscire dal main process né essere passata al
-// renderer. Il main la legge da env FILO_FEEDBACK_PRIVKEY oppure da
-// storage.json (campo `feedbackPrivateKey`), in quest'ordine.
-//
-// DOVE L'OWNER LA METTE
-//   - Locale: `FILO_FEEDBACK_PRIVKEY=<base64>` nel file `tests/agent/.env`
-//     (gitignorato) oppure come variabile d'ambiente prima di lanciare Filo.
-//   - Cloud/routine: passata come env `FILO_FEEDBACK_PRIVKEY` nella config
-//     del runner (secrets della routine — NON in chiaro nel prompt).
-//   - Alternativa: impostare il campo `feedbackPrivateKey` in storage.json
-//     (il file di storage locale, mai nel repo) con il valore base64 della chiave.
-//     Lo storage si trova in %APPDATA%/Filo/storage.json (produzione) o nel
-//     percorso in $FILO_USER_DATA/storage.json (test).
-//
-// La chiave viene letta a ogni chiamata (non cachata) per restare aggiornata
-// se l'utente la cambia a runtime.
+// La privata non esce mai dal main process: il renderer non la vede. Si rilegge a ogni chiamata, così
+// un cambio a runtime vale subito.
 async function getPrivateKey() {
-  // 1. Variabile d'ambiente (priorità massima: setting esplicito del runner).
+  // Prima l'ambiente: è la scelta esplicita di chi lancia Filo.
   if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
 
-  // 2. File .env locale (per comodità in sviluppo; gitignorato).
+  // Poi tests/agent/.env (gitignorato) e infine il campo `feedbackPrivateKey` di storage.json.
   try {
     const fs = require('node:fs');
     // __dirname = src/main/services/handlers → root = ../../../../
@@ -82,7 +123,6 @@ async function getPrivateKey() {
     }
   } catch (_) {}
 
-  // 3. Storage.json locale (campo feedbackPrivateKey).
   try {
     if (globalThis.SN_STORAGE) {
       const v = await globalThis.SN_STORAGE.getRaw('feedbackPrivateKey', null);
@@ -249,6 +289,7 @@ module.exports = function register(on, ctx) {
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
+  // `remembered` serve solo alla finestra (avviso «accesso non ricordato»): ai siti non va.
   // Da un sito visitato questa porta risponde, ma senza IDENTITÀ: niente
   // indirizzo email, niente nome, niente identificativo dell'account. Un
   // content script gira anche dentro le pagine dei siti, e di sé deve sapere
@@ -260,11 +301,32 @@ module.exports = function register(on, ctx) {
     const signedIn = auth.isSignedIn();
     const isAdmin = auth.isAdmin();
     if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
-    const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
+    // `senzaRete`: chi apre un menu non aspetta il rinnovo del token che serve all'uid.
+    const conUid = !(msg && msg.senzaRete);
+    const uid = signedIn && conUid ? await auth.getUid() : null;
+    // Se una scheda nuova su Google troverebbe un account: il menu dell'account ne fa le sue voci (#1123).
+    let googleNelleSchede = false;
+    try { googleNelleSchede = await require('../accessoGoogle').collegatoNelleSchede(); } catch (_) {}
+    const out = { ok: true, signedIn, isAdmin, profile: auth.getProfile(), remembered: auth.isRemembered(), googleNelleSchede };
+    return conUid ? { ...out, uid } : out;
   });
 
-  on(MSG.AUTH_SIGNIN, async () => {
+  // YouTube, Gmail e Drive nelle schede per chi è dentro Filo (#1123). Solo da Filo: un sito non apre pagine d'accesso.
+  on(MSG.AUTH_COLLEGA_GOOGLE, soloFilo(async (msg, sender) => {
+    const win = sender && sender.win;
+    let daUrl = '';
+    try {
+      const tabs = win && win._filoTabs;
+      const attiva = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
+      daUrl = (attiva && attiva.url) || '';
+    } catch (_) {}
+    try { return ProdottiGoogle.collega({ daUrl, finestra: win }); }
+    catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  }));
+
+  // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
+  // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
+  on(MSG.AUTH_SIGNIN, async (msg, sender, origin) => {
     try {
       const profile = await auth.signIn();
       const remembered = auth.isRemembered();
@@ -281,6 +343,9 @@ module.exports = function register(on, ctx) {
       // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
       // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
+      // I feedback dell'owner fermi ad aspettare la sua firma (#912) partono adesso, non al prossimo giro della coda.
+      if (auth.isAdmin()) { try { globalThis.SN_FEEDBACK_OUTBOX?.accessoCambiato?.(); } catch (_) {} }
+      if (!daFilo(origin, sender)) return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin() };
       return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
@@ -300,6 +365,35 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.message || String(e) };
     }
   }));
+
+  // «Aspetta #N» (#903): la pagina manda i numeri come li ha scritti l'owner; li risolve e li controlla il main, che
+  // legge i documenti col token (la pagina ne vede una finestra). Vuoto = togliere. Regole: SN_FB_ATTESE.valida.
+  // `tieni`: id delle attese già scritte che la pagina non sa rinumerare (aspettato cancellato o non letto): restano come sono.
+  async function prepareAttese(id, valore, idToken, tieni) {
+    const A = globalThis.SN_FB_ATTESE;
+    const FB = globalThis.SN_FEEDBACK;
+    const letti = A.leggiNumeri(valore === null || valore === false ? '' : valore);
+    if (!letti.ok) return letti;
+    if (tieni !== undefined && (!Array.isArray(tieni) || tieni.length > A.MAX || tieni.some((x) => typeof x !== 'string'))) {
+      return { ok: false, motivo: 'elenco delle attese da tenere non valido' };
+    }
+    if (!letti.numeri.length && !(tieni || []).length) return { ok: true, attese: [] };
+    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
+    if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
+    return A.valida({
+      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri, gia: A.atteseDi(proprio), tieni: tieni || [],
+      risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
+      leggiAttese: async (ids) => {
+        const out = new Map();
+        for (let i = 0; i < ids.length; i += 100) {
+          // eslint-disable-next-line no-await-in-loop
+          const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
+          for (const r of righe) out.set(r._id, A.atteseDi(r));
+        }
+        return out;
+      },
+    });
+  }
 
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
@@ -321,23 +415,39 @@ module.exports = function register(on, ctx) {
       // metà dei due testi (il report, cifrato, è `notes`). Va inoltrata, o la
       // dashboard resta l'unica strada da cui quella metà si perde.
       const { id, status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
-      // «Fondi senza chiedermelo» su questa pratica: la pagina manda solo
-      // sì/no, il CHI lo mette il main dalla sessione (l'email del token, la
-      // stessa che le regole vedono) — non è un dato che la pagina possa
-      // raccontare. `true` → { by, at }; `false` → il campo si toglie.
-      let mergePreapproved;
-      if (typeof msg.mergePreapproved === 'boolean') {
-        if (msg.mergePreapproved) {
-          let email = '';
-          try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
-          mergePreapproved = { by: email || 'owner', at: new Date().toISOString() };
-        } else {
-          mergePreapproved = null;
-        }
+      // «Solo in locale» (#908): la pagina manda solo sì/no, il CHI lo mette il main dalla sessione (l'email del
+      // token, la stessa che le regole vedono). La fiducia non passa di qui: la scrive il server (FIDUCIA_SEGNA).
+      let localOnly;
+      if (typeof msg.localOnly === 'boolean') {
+        let email = '';
+        if (msg.localOnly) { try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {} }
+        localOnly = msg.localOnly ? { by: email || 'owner', at: Date.now() } : null;
+      }
+      // #913: «approvalo come lavoro locale» su un feedback non tuo. Resta anche se il segno si toglie: senza, il
+      // segno non si rimetterebbe più, perché il sì si dà solo dai Ricevuti.
+      let localApproval;
+      if (msg.localApproval === true) {
+        let email = '';
+        try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
+        localApproval = { by: email || 'owner', at: Date.now() };
+      }
+      let waitsFor;
+      if (msg.waitsFor !== undefined) {
+        const r = await prepareAttese(id, msg.waitsFor, idToken, msg.waitsTieni);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      }
+      // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
+      // partenza si chiede al documento, non alla copia della pagina.
+      const FB = globalThis.SN_FEEDBACK;
+      let localMerges;
+      if (status !== undefined && FB.statusToPublic(status) === 'open') {
+        const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
+        if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
       }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -354,9 +464,9 @@ module.exports = function register(on, ctx) {
       // dritti su quello, e l'età non conta più.
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
-      // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
-      // glielo dice il main, che è l'unico a saperlo.
-      return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
+      if (waitsFor) return { ok: true, waitsFor };
+      // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
+      return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
       // Nel registro, non solo nella risposta: la pagina può aver cambiato
@@ -537,7 +647,13 @@ module.exports = function register(on, ctx) {
     try {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
-      return { ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {} };
+      const FC = globalThis.SN_FILO_CONTESTO;
+      return {
+        ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
+        contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
+        lunghezzaRisposte: d.lunghezzaRisposte || {},
+        lunghezzaRisposteDiSerie: globalThis.SN_LUNGHEZZA_RISPOSTE ? { ...globalThis.SN_LUNGHEZZA_RISPOSTE.DI_SERIE } : {},
+      };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -566,7 +682,8 @@ module.exports = function register(on, ctx) {
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
       const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
       const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled };
+      const lavoriServer = await Defaults.getLavoriServer(idToken);
+      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -597,7 +714,11 @@ module.exports = function register(on, ctx) {
       const routinesEnabled = (typeof msg.routinesEnabled === 'boolean')
         ? await Defaults.setRoutinesEnabled(msg.routinesEnabled, idToken)
         : await Defaults.getRoutinesEnabled(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled };
+      // I lavori server alle routine (#1159): spento, restano alle sessioni locali.
+      const lavoriServer = (typeof msg.lavoriServer === 'boolean')
+        ? await Defaults.setLavoriServer(msg.lavoriServer, idToken)
+        : await Defaults.getLavoriServer(idToken);
+      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -675,6 +796,29 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Modello e sforzo del worker per fase (config/routines.roleModels). Owner-only. Le legge il server
+  // quando consegna un biglietto: cambiarle qui vale dal prossimo.
+  on(MSG.AUTOMATION_ROLE_MODELS_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return { ok: true, roleModels: await Defaults.getRoutineRoleModels(idToken) };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  on(MSG.AUTOMATION_ROLE_MODELS_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const r = await Defaults.setRoutineRoleModel({ ruolo: msg.ruolo, campo: msg.campo, valore: msg.valore }, idToken);
+      return Object.assign({ ok: true }, r);
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
@@ -700,7 +844,7 @@ module.exports = function register(on, ctx) {
     try {
       const limit = Number(msg && msg.limit);
       const r = await callSecurityFunction('routineLog', Number.isFinite(limit) ? { limit } : {});
-      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [] };
+      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [], proveFusione: (r && r.proveFusione) || null };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -750,7 +894,7 @@ module.exports = function register(on, ctx) {
         };
       }
       try {
-        return await handler(msg);
+        return await handler(msg, sender, origin);
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
       }
@@ -860,8 +1004,16 @@ module.exports = function register(on, ctx) {
     // caricamento della dashboard. `complete` viaggia con le righe: se il
     // freno sulle pagine è scattato, chi guarda deve poterlo dire.
     if (op === 'listAll') {
-      const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken });
-      return { ok: true, rows, complete };
+      const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+      const startedAt = Date.now();
+      const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs, idToken, fields });
+      // `lista`: è il caricamento della Gestione (#676), che ora legge tutto: le
+      // schede si riuniscono, la vista si rimette in pari e il giro riparte da qui.
+      if (msg.lista !== true) return { ok: true, rows, complete, readTime };
+      scheduleViewSync({ rows });
+      const w = liveWatcherDi();
+      if (w && complete) w.allineato(startedAt, rows, readTime);
+      return { ok: true, rows: await mergeCardFields(rows), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
@@ -880,6 +1032,123 @@ module.exports = function register(on, ctx) {
     // un attimo dopo.
     scheduleViewSync({ rows });
     return { ok: true, rows: await mergeCardFields(rows) };
+  }));
+
+  // ── #676: il giro dei cambiati della Gestione, uno solo, qui nel main ────
+  // Non ha un orologio suo: gira quando una Gestione IN VISTA lo chiede, e
+  // l'esito arriva a chi l'ha chiesto e alle altre iscritte. La logica sta in
+  // SN_FEEDBACK_LIVE.makeWatcher; la regola in
+  // patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
+  const liveSubs = new Map();   // wc → Set degli id che quella pagina segue da vicino
+  let liveWatcher = null;
+
+  function liveToken() {
+    return auth.getIdToken().then((t) => {
+      if (!t) throw new Error('sessione scaduta');
+      return t;
+    });
+  }
+
+  function liveWatcherDi() {
+    if (liveWatcher) return liveWatcher;
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    const FB = FEEDBACK();
+    if (!LIVE || !LIVE.makeWatcher || !FB) return null;
+    const campi = Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null;
+    liveWatcher = LIVE.makeWatcher({
+      // Letti dal modulo, non dalle sue costanti: gli spec accorciano i tempi.
+      pollMs: LIVE.POLL_MS,
+      reconcileMs: LIVE.RECONCILE_MS,
+      onWarn: (m) => console.warn('[feedback] giro:', m),
+      seguiti: () => {
+        const out = new Set();
+        for (const ids of liveSubs.values()) for (const id of ids) out.add(id);
+        return Array.from(out);
+      },
+      versionsOf: async (ids) => FB.versionsOf(ids, { timeoutMs: 20000, idToken: await liveToken() }),
+      readRows: async (ids) => {
+        const rows = await FB.getMany(ids, { timeoutMs: 20000, idToken: await liveToken(), fields: campi });
+        return mergeCardFields(rows, { mirate: true });
+      },
+      submissionCount: async () => FB.submissionCount({ timeoutMs: 20000, idToken: await liveToken() }),
+      avviiRoutine: async () => Defaults.getWorkerLog(await liveToken(), { severo: true }),
+      idDelNumero: async (num) => FB.idDelNumero(num, { timeoutMs: 20000, idToken: await liveToken() }),
+      listVersions: async () => {
+        // La data d'invio costa pochi byte e serve a chi tiene solo i più recenti (nellaFinestra).
+        const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs: 20000, idToken: await liveToken(), fields: ['createdAt'] });
+        return { versions: rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime, createdAt: r.createdAt })), complete, readTime };
+      },
+      listChangedSince: async ({ since }) => {
+        const out = await FB.listChangedSince({ since, timeoutMs: 20000, idToken: await liveToken(), fields: campi });
+        const rows = await mergeCardFields(out.rows, { mirate: true });
+        return { rows, complete: out.complete, readTime: out.readTime };
+      },
+    });
+    return liveWatcher;
+  }
+
+  // La posta dell'owner non esce da filo://: una scheda andata su un sito si toglie.
+  function liveIscritteValide() {
+    for (const wc of Array.from(liveSubs.keys())) {
+      try {
+        if (!wc || (wc.isDestroyed && wc.isDestroyed()) || !String(wc.getURL() || '').startsWith('filo://')) liveSubs.delete(wc);
+      } catch (_) { liveSubs.delete(wc); }
+    }
+  }
+
+  function liveAvvisaAltre(payload, mittente) {
+    liveIscritteValide();
+    const msg = { type: MSG.FEEDBACK_LIVE_CHANGED, ...payload };
+    for (const wc of liveSubs.keys()) {
+      if (wc === mittente) continue;
+      try { wc.send('filo:broadcast', msg); } catch (_) { liveSubs.delete(wc); }
+    }
+  }
+
+  // Una pagina che non è in vista non tiene vivo il giro (#676, punto 6): la
+  // pagina lo sa già, ma la porta lo ricontrolla.
+  function inVistaDi(sender) {
+    try {
+      const win = typeof ctx.winOf === 'function' ? ctx.winOf(sender) : null;
+      const tabs = win && win._filoTabs;
+      if (!tabs || !sender || !sender.tab || !sender.tab.id || typeof tabs.inVista !== 'function') return true;
+      return tabs.inVista(sender.tab.id);
+    } catch (_) { return true; }
+  }
+
+  //   { off:true }                  → smette di ricevere
+  //   { watch:[id…] }               → gli id da seguire da vicino
+  //   { giro:true, force? }         → un giro adesso; torna il suo esito
+  on(MSG.FEEDBACK_LIVE_SUBSCRIBE, ownerOnly(async (msg, sender) => {
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    const wc = sender && sender.wc;
+    if (!wc) return { ok: false, error: 'mittente sconosciuto' };
+    if (msg && msg.off === true) {
+      liveSubs.delete(wc);
+      return { ok: true, subscribed: false };
+    }
+    let scartati = 0;
+    if (Array.isArray(msg && msg.watch)) {
+      // Solo nomi di documento: un id con una barra uscirebbe dalla collezione.
+      const puliti = Array.from(new Set(msg.watch.map((s) => String(s || '')).filter((s) => /^[A-Za-z0-9_-]{1,120}$/.test(s))));
+      const tetto = (LIVE && LIVE.SEGUITI_TETTO) || 500;
+      scartati = Math.max(0, puliti.length - tetto);
+      liveSubs.set(wc, new Set(puliti.slice(0, tetto)));
+    } else if (!liveSubs.has(wc)) {
+      liveSubs.set(wc, new Set());
+    }
+    if (!wc.__filoLiveBound) {
+      wc.__filoLiveBound = true;
+      try { wc.once('destroyed', () => liveSubs.delete(wc)); } catch (_) {}
+    }
+    const base = { ok: true, subscribed: true, ...(scartati ? { scartati } : {}) };
+    if (!(msg && msg.giro === true)) return base;
+    if (!inVistaDi(sender)) return { ...base, giro: { kind: 'fuori-vista' } };
+    const w = liveWatcherDi();
+    if (!w) return { ok: false, error: 'giro non disponibile' };
+    const esito = await w.tick({ force: msg.force === true });
+    if (esito && esito.kind !== 'skipped') liveAvvisaAltre(esito, wc);
+    return { ...base, giro: esito };
   }));
 
   // ── Chi pubblica la vista, e quando ──────────────────────────────────────
@@ -1260,17 +1529,145 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
+  // Il segno di mittente pericoloso (#922). La frase di `clear` arriva dalla pagina, che la manda solo dopo
+  // il sì dell'owner: qui non si inventa, e il server rifiuta qualunque altra.
+  on(MSG.FEEDBACK_SENDER_FLAG, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const action = String(msg?.action || '');
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback di cui leggere il mittente.' };
+    if (action !== 'read' && action !== 'clear') return { ok: false, error: 'Sul segno si può solo leggere o togliere.' };
+    const data = { feedbackId, action };
+    if (action === 'clear') data.conferma = String(msg?.conferma ?? '');
+    let r;
+    try {
+      r = await callSecurityFunction('ownerSenderFlag', data);
+    } catch (e) {
+      return { ok: false, error: erroreSegno(e) };
+    }
+    if (!r || r.ok === false) {
+      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sul segno.' };
+    }
+    const out = {
+      ok: true,
+      flagged: r.flagged === true,
+      reason: typeof r.reason === 'string' ? r.reason : '',
+      flaggedAt: aIso(r.flaggedAt),
+      clearedAt: aIso(r.clearedAt),
+    };
+    // Una risposta di `clear` che non riporta l'ora la conosce comunque chi l'ha chiesta.
+    if (action === 'clear' && !out.flagged && !out.clearedAt) out.clearedAt = new Date().toISOString();
+    return out;
+  }));
+
+  // Le domande all'owner (#1149): il main fa solo da tramite verso ownerDomande. Le azioni le applica il server,
+  // che decide anche chi ha scritto ogni turno: la pagina non può dichiararlo.
+  async function chiamaDomande(data) {
+    let r;
+    try {
+      r = await callSecurityFunction('ownerDomande', data);
+    } catch (e) {
+      return { ok: false, error: erroreDomande(e) };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sulle domande.' };
+    return r;
+  }
+
+  on(MSG.DOMANDE_ELENCO, ownerOnly(async (msg) => {
+    const data = { op: 'elenco' };
+    if (Number.isFinite(msg?.dopo) && msg.dopo > 0) data.dopo = msg.dopo;
+    if (msg?.tutte === true) data.tutte = true;
+    const r = await chiamaDomande(data);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      domande: Array.isArray(r.domande) ? r.domande : [],
+      riferimenti: r.riferimenti && typeof r.riferimenti === 'object' ? r.riferimenti : {},
+      adesso: Number(r.adesso) || 0,
+      // Oltre il tetto dell'elenco il server lo dice: la pagina non deve credere di vederle tutte.
+      altre: r.altre === true,
+    };
+  }));
+
+  on(MSG.DOMANDA_MOSTRA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda da mostrare.' };
+    const r = await chiamaDomande({ op: 'mostra', id });
+    if (!r.ok) return r;
+    return { ok: true, domanda: r.domanda || null, riferimenti: r.riferimenti || {} };
+  }));
+
+  on(MSG.DOMANDA_RISPONDI, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda a cui rispondere.' };
+    const data = { op: 'rispondi', id };
+    if (Number.isInteger(msg?.scelta)) data.scelta = msg.scelta;
+    if (typeof msg?.testo === 'string' && msg.testo.trim()) data.testo = msg.testo;
+    if (data.scelta === undefined && data.testo === undefined) return { ok: false, error: 'Scegli un’opzione o scrivi una risposta.' };
+    const r = await chiamaDomande(data);
+    if (!r.ok) return r;
+    return { ok: true, domanda: r.domanda || null, esito: r.esito || null };
+  }));
+
+  on(MSG.DOMANDE_CONSIGLIO, ownerOnly(async (msg) => {
+    const ids = Array.isArray(msg?.ids) ? msg.ids.map((x) => String(x || '').trim()).filter(Boolean) : [];
+    if (!ids.length) return { ok: false, error: 'Nessuna domanda selezionata.' };
+    const r = await chiamaDomande({ op: 'consiglio', ids });
+    if (!r.ok) return r;
+    return { ok: true, esiti: Array.isArray(r.esiti) ? r.esiti : [] };
+  }));
+
+  for (const [tipo, op] of [[MSG.DOMANDA_ARCHIVIA, 'archivia'], [MSG.DOMANDA_RIAPRI, 'riapri']]) {
+    on(tipo, ownerOnly(async (msg) => {
+      const id = String(msg?.id || '').trim();
+      if (!id) return { ok: false, error: 'Manca la domanda.' };
+      const r = await chiamaDomande({ op, id });
+      if (!r.ok) return r;
+      return { ok: true, domanda: r.domanda || null };
+    }));
+  }
+
+  // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
+  on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const togli = msg?.fidato === false;
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback da segnare fidato.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerFiducia', { op: togli ? 'togli' : 'segna', feedbackId });
+    } catch (e) {
+      if (e?.httpStatus === 404) return { ok: false, error: 'La funzione «segna fidato» non è ancora pubblicata sul server.' };
+      if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { ok: false, error: 'Il server dice che questo account non può segnare fidato: serve quello del proprietario.' };
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
+    return { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
+  }));
+
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
     return { ok: true, result: 'discarded' };
   }));
 
+  // All'editor servono anche la catena in uso negli slot spostati mai salvati e
+  // i nickname del registro condiviso, che il server dei giudici unisce al loro.
+  async function perEditor(models) {
+    let settings = null;
+    try { settings = await ctx.getEffectiveSettings(); } catch (_) {}
+    if (typeof ctx.fillMovedSlots === 'function') ctx.fillMovedSlots(models, settings);
+    const shared = (Defaults.get() || {}).modelRegistry || {};
+    models.sharedNicknames = Object.keys(shared).map((nick) => ({ nick, label: String((shared[nick] || {}).label || '') }));
+    // Gli slot spostati girano nell'app: i loro nickname si risolvono sul registro in uso qui (#465).
+    models.appRegistry = (settings && settings.modelRegistry && typeof settings.modelRegistry === 'object') ? settings.modelRegistry : {};
+    return models;
+  }
+
   // Config "modelli di supporto" (doc config/supportModels). Owner-only.
-  // GET legge i 4 slot; UPDATE scrive solo i campi passati (per-campo PATCH).
+  // GET legge gli slot; UPDATE scrive solo i campi passati (per-campo PATCH).
   on(MSG.SUPPORT_MODELS_GET, ownerOnly(async () => {
     try {
-      const models = await SupportModels.get();
+      const models = await perEditor(await SupportModels.get());
       return { ok: true, models };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
@@ -1303,7 +1700,7 @@ module.exports = function register(on, ctx) {
       if (typeof msg.openrouterKey === 'string') partial.openrouterKey = msg.openrouterKey;
       // Timeout per giudice (ms): solo se passato (PATCH per-campo, non tocca il resto).
       if (msg.judgeTimeoutMs != null) partial.judgeTimeoutMs = msg.judgeTimeoutMs;
-      const models = await SupportModels.update(partial, idToken);
+      const models = await perEditor(await SupportModels.update(partial, idToken));
       return { ok: true, models };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };

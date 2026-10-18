@@ -11,13 +11,14 @@
 // (SPEC-RIDISEGNO-MAX.md §1; la copia viva delle regole è
 // filo-security/functions/src/routine/select.js, coi suoi test).
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
-import { resolve, dirname, isAbsolute, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { resolve, dirname, isAbsolute } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { cartellaTemporanea, fuoriDa, togliCartella } from '../helpers/percorsi.mjs';
 
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
 const TMP = cartellaTemporanea('filo-dispatch-');
@@ -25,11 +26,17 @@ process.env.FILO_DISPATCH_STATE_DIR = TMP;
 // Anche la ROOT: emit() ci scrive il marcatore di ruolo (#443) e non deve
 // sporcare il checkout vero durante i test.
 process.env.FILO_REPO_ROOT = TMP;
+// Il preflight riuscito installa il gancio dell'orchestratore cieco nelle impostazioni utente: mai in quelle vere.
+process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 // E la radice degli STRUMENTI, che dal 2026-08-24 è una cosa diversa dalla
 // radice del progetto: le ricette dei ruoli seguono gli strumenti, perché
 // quelle del progetto sono quelle del ramo su cui si sta lavorando
 // (scripts/lib/tools-pin.mjs). Qui le due coincidono, come in locale.
 process.env.FILO_TOOLS_ROOT = TMP;
+// Anche la temporanea, fuori dalla ROOT: dispatch ci scarica i pezzi grossi del payload, e una cartella nuova a
+// ogni corsa restava lì per sempre (#717).
+const TEMP = cartellaTemporanea('filo-dispatch-tmp-');
+Object.assign(process.env, { TMPDIR: TEMP, TEMP, TMP: TEMP });
 
 const {
   applyVerifierVerdict,
@@ -100,7 +107,9 @@ test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da part
   assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 0 } }, buona).message, /nessun rilievo/);
   assert.equal(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'c'.repeat(40), n: 2 } }, buona).ok, false,
     'il conto di una critica vecchia non vale per questa');
-  assert.equal(applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona).ok, false);
+  const dopoPass = applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona);
+  assert.equal(dopoPass.ok, false);
+  assert.match(dopoPass.message, /verifica superata la pulizia non si registra[^]*rilascio del biglietto la sigilla/, 'dopo un pass basta il commit (#880)');
   assert.match(applyPulizia(aperta, { ok: false, motivo: 'qui c\'è codice' }).message, /qui c'è codice/);
   const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/9/giro1-r2-c.spec.mjs'] };
   assert.match(applyPulizia(aperta, larga).message, /giro1-r2-c\.spec\.mjs: r2 non è fra i rilievi messi da parte/,
@@ -566,6 +575,18 @@ test('serverCtx: la ripresa passa dalla busta del server a chi riprende, e un va
   assert.equal(serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }).ripresa, null);
 });
 
+test('riallineamento per unit rossi sulla fusione (#929): l\'elenco dei test rotti scritto dal server arriva a chi riallinea', () => {
+  const critica = 'FAIL tecnico: unit ROSSI sul risultato della fusione.\n  - tests/unit/x.test.mjs › rotto sulla fusione';
+  const fx = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' }, critique: critica } }));
+  assert.equal(fx.case, 'riallineamento');
+  assert.equal(fx.critique, critica);
+  const senza = buildPayload({ role: 'fixer', id: 'A', branch: 'worker/A' }, serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }));
+  assert.ok(!('critique' in senza), 'un server vecchio non la manda: nessun campo vuoto');
+  assert.equal(serverCtx({ role: 'new-work' }, { payload: { critique: critica } }).critique, undefined, 'solo chi riallinea');
+  const testo = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routines', 'roles', 'resolver-rebase.md'), 'utf8');
+  assert.match(testo, /Unit rossi sulla fusione/, 'il testo di ruolo dice cosa fare dei test elencati');
+});
+
 test('readRoleInstructions: il caso del correttore sceglie il testo (ripresa ≠ rebase), e un caso ignoto vale il rebase', () => {
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
@@ -675,7 +696,7 @@ test('emit secaudit: un diff grosso va intero in un file fuori dal repo, e il te
   assert.equal(j.payload.diff, undefined);
   assert.ok(isAbsolute(j.payload.diffFile));
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  assert.ok(relative(repo, j.payload.diffFile).startsWith('..'), 'il file sta fuori dal repo');
+  assert.ok(fuoriDa(repo, j.payload.diffFile), 'il file sta fuori dal repo');
   assert.equal(readFileSync(j.payload.diffFile, 'utf8'), diff, 'il file contiene tutto il diff');
   assert.deepEqual(j.payload.diffBase, base);
   assert.equal(j.payload.diffComando, `git diff ${'a'.repeat(40)}...${'b'.repeat(40)}`);
@@ -703,11 +724,59 @@ test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni
     assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
     const j = JSON.parse(out);
     assert.match(j.instructions, /Ruolo: verifier/);
+    // Con i percorsi lunghi di Windows il ruolo può uscire nel suo file: in stampa o lì, arriva intero.
+    const ruolo = j.istruzioniFile ? readFileSync(j.istruzioniFile, 'utf8') : j.instructions;
+    if (j.istruzioniFile) assert.ok(j.instructions.includes(j.istruzioniFile), 'la stampa dice dove sta il ruolo');
+    assert.match(ruolo, /Ruolo: verifier[\s\S]*Contratto comune dei worker[\s\S]*NON RISPONDE \(exit 3\)/);
+    if (payload.history) assert.match(ruolo, /Avvertenza di serie/);
     // Quello che è uscito dalla stampa sta tutto nei file citati.
     const nei = Object.values(j.payload.fileEsterni || {}).map((f) => readFileSync(f, 'utf8')).join('\n');
-    if (payload.history) assert.ok(nei.includes(critica) || JSON.stringify(j.payload).includes(critica.slice(0, 200)));
+    if (payload.history) assert.ok(nei.includes(critica) || j.payload.history.some((h) => h.critique === critica));
     if (payload.decisioni) assert.ok(nei.includes('domanda 29') || JSON.stringify(j.payload).includes('domanda 29'));
   }
+});
+
+test('emit: un ruolo che col payload già fuori passa ancora la soglia esce intero nel suo file, e la consegna dopo lo cancella', () => {
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'verifier.md' || f === 'prober.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const stampa = (bucket, ctx) => {
+    let out = '';
+    const real = process.stdout.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    try { emit(bucket, ctx); } finally { process.stdout.write = real; }
+    return out;
+  };
+  // Il verificatore di un lavoro server: ruolo, istruzioni del clone e avvertenza di serie superano da soli la soglia.
+  const critica = ('Provato il pulsante e la scorciatoia.\n[2i] un rilievo coi suoi passi\n').repeat(40).slice(0, 2500);
+  const bucket = { role: 'verifier', id: 'v', num: '#4', branch: 'worker/v' };
+  const payload = { feedback: { text: 'Premo salva e non succede niente.' }, history: [1, 2, 3].map((i) => ({ critique: critica, sha: `c${i}` })), lavoroServer: { repo: 'filo-security' } };
+  const out = stampa(bucket, serverCtx(bucket, { payload }));
+  assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
+  const j = JSON.parse(out);
+  assert.ok(isAbsolute(j.istruzioniFile), 'il ruolo esce in un file');
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  assert.ok(fuoriDa(repo, j.istruzioniFile), 'il file sta fuori dal repo');
+  assert.match(j.instructions, /^# Ruolo: verifier/, 'in stampa resta il titolo del ruolo');
+  assert.ok(j.instructions.includes(j.istruzioniFile), 'e dove sta il resto');
+  const ruolo = readFileSync(j.istruzioniFile, 'utf8');
+  assert.ok(ruolo.length > 30000 - 2000, `il ruolo è intero (${ruolo.length} caratteri)`);
+  assert.match(ruolo, /^# Ruolo: verifier[\s\S]*Contratto comune dei worker[\s\S]*Lavoro server: anche filo-security[\s\S]*Avvertenza di serie/);
+  assert.ok(!/<!--\s*includi:/.test(ruolo));
+  const esterni = j.payload.fileEsterni || {};
+  j.payload.history.forEach((h, i) => {
+    const letta = h.critique === critica ? h.critique : readFileSync(esterni[`history.${i}.critique`], 'utf8');
+    assert.equal(letta, critica, 'col ruolo fuori, il payload resta tutto da leggere');
+  });
+
+  // Il ruolo dopo non eredita il file di quello prima, e un ruolo che sta in stampa non porta il rimando.
+  const dopo = JSON.parse(stampa({ role: 'prober' }, {}));
+  assert.ok(!existsSync(j.istruzioniFile), 'il file del ruolo di prima è sparito');
+  assert.equal(dopo.istruzioniFile, undefined);
+  assert.match(dopo.instructions, /Contratto comune dei worker/);
 });
 
 test('diffForBranch: dichiara la base remota su cui è calcolato, anche col main locale indietro', () => {
@@ -734,6 +803,121 @@ test('diffForBranch: dichiara la base remota su cui è calcolato, anche col main
   const grezzo = execFileSync('git', ['diff', `${r.base.sha}...${r.head}`], { cwd: repo, encoding: 'utf8' });
   assert.equal(r.diff, grezzo, 'il comando dichiarato riproduce il diff, fino all\'ultimo carattere');
   assert.match(g('diff', 'main...worker/x'), /gia-fuso\.txt/, 'premessa: col main locale il diff si gonfia');
+});
+
+// I cloni delle routine sono poco profondi, a volte del solo ramo: lì il diff usciva vuoto senza avviso, e il
+// controllo di sicurezza dava il via libera su niente (#740).
+function origineConRamo(nome) {
+  const dir = resolve(TMP, nome);
+  const lavoro = resolve(dir, 'lavoro');
+  const nudo = resolve(dir, 'origine.git');
+  mkdirSync(lavoro, { recursive: true });
+  const g = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const scrivi = (f, t) => { writeFileSync(resolve(lavoro, f), t); g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-q', '-m', f); };
+  g(lavoro, 'init', '-q', '--initial-branch=main');
+  scrivi('base.txt', 'base\n');
+  g(lavoro, 'checkout', '-q', '-b', 'worker/x');
+  scrivi('del-ramo.txt', 'lavoro\n');
+  scrivi('del-ramo-2.txt', 'ancora\n');
+  g(lavoro, 'checkout', '-q', 'main');
+  for (const i of [1, 2, 3]) scrivi(`gia-fuso-${i}.txt`, `già su main ${i}\n`);
+  g(dir, 'clone', '-q', '--bare', lavoro, nudo);
+  const clona = (dove, ...opz) => {
+    g(dir, 'clone', '-q', ...opz, pathToFileURL(nudo).href, dove);
+    return resolve(dir, dove);
+  };
+  return { g, clona, mainSha: g(lavoro, 'rev-parse', 'main'), puntaSha: g(lavoro, 'rev-parse', 'worker/x') };
+}
+
+function diffGiusto(r, o, clone) {
+  assert.equal(r.ok, true, `diff calcolato (${r.motivo || ''})`);
+  assert.deepEqual(r.base, { ref: 'origin/main', sha: o.mainSha });
+  assert.equal(r.head, o.puntaSha);
+  assert.match(r.diff, /del-ramo\.txt/);
+  assert.match(r.diff, /del-ramo-2\.txt/);
+  assert.doesNotMatch(r.diff, /gia-fuso/, 'le modifiche già su main non entrano nel diff');
+  assert.equal(r.diff, execFileSync('git', ['diff', `${r.base.sha}...${r.head}`], { cwd: clone, encoding: 'utf8' }));
+}
+
+test('diffForBranch: in un clone del solo ramo scarica main, invece di consegnare un diff vuoto (#740)', () => {
+  const o = origineConRamo('diff-ramo-singolo');
+  const clone = o.clona('clone', '--depth', '1', '--single-branch', '--branch', 'worker/x');
+  assert.throws(() => o.g(clone, 'rev-parse', '--verify', 'refs/remotes/origin/main'), 'premessa: origin/main non c\'è');
+  diffGiusto(diffForBranch('worker/x', clone), o, clone);
+});
+
+test('diffForBranch: in un clone poco profondo scarica la storia fino alla base comune (#740)', () => {
+  const o = origineConRamo('diff-poco-profondo');
+  const clone = o.clona('clone', '--depth', '1', '--no-single-branch');
+  o.g(clone, 'checkout', '-q', 'worker/x');
+  assert.throws(() => o.g(clone, 'merge-base', 'origin/main', 'worker/x'), 'premessa: la base comune non è nel clone');
+  diffGiusto(diffForBranch('worker/x', clone, { passi: [1] }), o, clone);
+});
+
+test('diffForBranch: se la base non si scarica si ferma col motivo, mai con un diff vuoto (#740)', () => {
+  const o = origineConRamo('diff-senza-base');
+  const clone = o.clona('clone', '--depth', '1', '--single-branch', '--branch', 'worker/x');
+  o.g(clone, 'remote', 'set-url', 'origin', pathToFileURL(resolve(TMP, 'diff-senza-base', 'non-esiste.git')).href);
+  const r = diffForBranch('worker/x', clone);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /origin\/main/);
+  assert.equal(r.diff, '');
+  // Con main scaricato ma la storia irraggiungibile: la base comune manca, e lo dice.
+  const o2 = origineConRamo('diff-senza-storia');
+  const c2 = o2.clona('clone', '--depth', '1', '--no-single-branch');
+  o2.g(c2, 'checkout', '-q', 'worker/x');
+  o2.g(c2, 'remote', 'set-url', 'origin', pathToFileURL(resolve(TMP, 'diff-senza-storia', 'non-esiste.git')).href);
+  const r2 = diffForBranch('worker/x', c2);
+  assert.equal(r2.ok, false);
+  assert.match(r2.motivo, /storia/);
+  assert.equal(r2.head, o2.puntaSha, 'dice su quale punta si è fermato');
+  assert.equal(diffForBranch('worker/non-esiste', c2).ok, false, 'un ramo che non c\'è non è un diff vuoto');
+});
+
+test('diffForBranch: un diff vuoto passa solo se il contenuto del ramo è davvero quello della base, e lo dichiara', () => {
+  const repo = resolve(TMP, 'repo-diff-vuoto');
+  mkdirSync(repo, { recursive: true });
+  const g = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const scrivi = (f, t) => { writeFileSync(resolve(repo, f), t); g('add', '-A'); g('commit', '-q', '-m', f); };
+  g('init', '-q', '--initial-branch=main');
+  scrivi('base.txt', 'base\n');
+  g('update-ref', 'refs/remotes/origin/main', g('rev-parse', 'HEAD'));
+  g('branch', 'worker/fermo');
+  g('checkout', '-q', '-b', 'worker/annullato');
+  scrivi('base.txt', 'cambiato\n');
+  scrivi('base.txt', 'base\n');
+  g('checkout', '-q', '-b', 'worker/vero');
+  scrivi('nuovo.txt', 'x\n');
+
+  const fermo = diffForBranch('worker/fermo', repo);
+  assert.deepEqual([fermo.ok, fermo.diff, fermo.vuoto], [true, '', { commitPropri: 0 }]);
+  const annullato = diffForBranch('worker/annullato', repo);
+  assert.deepEqual([annullato.ok, annullato.diff, annullato.vuoto], [true, '', { commitPropri: 2 }]);
+  // Un git che stampa niente (qui un diff esterno muto) su un ramo che cambia dei file: guasto, non via libera.
+  g('config', 'diff.external', 'true');
+  const muto = diffForBranch('worker/vero', repo);
+  assert.equal(muto.ok, false);
+  assert.match(muto.motivo, /vuoto ma il ramo cambia/);
+  g('config', '--unset', 'diff.external');
+  assert.equal(diffForBranch('worker/vero', repo).vuoto, undefined);
+
+  // Al controllo il vuoto arriva col suo perché, mai muto.
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const bucket = { role: 'secaudit', id: 's', num: '#740', branch: 'worker/annullato' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit(bucket, serverCtx(bucket, null, annullato)); } finally { process.stdout.write = real; }
+  const j = JSON.parse(out);
+  assert.match(j.payload.diffVuoto, /vuoto davvero[^]*2 commit propri/);
+  assert.equal(j.payload.diffCaratteri, 0);
+  assert.match(j.instructions, /diffVuoto/, 'il testo del ruolo dice cosa farne');
+  assert.equal(buildPayload(bucket, serverCtx(bucket, null, diffForBranch('worker/vero', repo))).diffVuoto, undefined);
 });
 
 // ─── teardown ─────────────────────────────────────────────────────────────────
@@ -778,6 +962,35 @@ test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comun
   assert.equal(readRoleInstructions('off'), '');
 });
 
+test('emit halt: il testo consegnato chiede la domanda di fine sessione PRIMA del rilascio col guasto (#1205)', () => {
+  // Le sessioni andate storte sono quelle che all'owner interessano di più: halt
+  // non riceve il contratto (non lavora), ma la sua parte sulla domanda sì.
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'halt.md' || f === 'resolver.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit({ role: 'halt', kind: 'transient', message: 'canale giù' }, {}); } finally { process.stdout.write = real; }
+  const t = JSON.parse(out).instructions;
+  const domanda = t.indexOf('routine-channel.mjs domanda --biglietto <biglietto>');
+  const rilascio = t.indexOf('routine-channel.mjs release <biglietto> --role halt --guasto');
+  assert.ok(domanda > -1, 'halt riceve la domanda di fine sessione');
+  assert.ok(rilascio > -1, 'e il rilascio col guasto');
+  assert.ok(domanda < rilascio, 'la domanda viene prima: a biglietto rilasciato non si può più chiedere');
+  assert.match(t.replace(/\s+/g, ' '), /Se la domanda non arriva \(exit diverso da 0\), rilascia e basta/);
+  assert.ok(!t.includes('Contratto comune dei worker') && !/<!--\s*includi:/.test(t), 'del contratto solo la domanda, e niente richiami rimasti');
+  // Un testo solo per due destinatari: i ruoli lavoranti la ricevono dal contratto, uguale.
+  const nw = readRoleInstructions('new-work');
+  assert.ok(nw.includes('Contratto comune dei worker') && !/<!--\s*includi:/.test(nw));
+  const pezzo = (s) => s.slice(s.indexOf('- la domanda di fine sessione'), s.indexOf('rilascia e basta;'));
+  assert.ok(pezzo(t).length > 100);
+  assert.equal(pezzo(nw), pezzo(t));
+});
+
 test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', () => {
   // Il preflight consegna orchestrator.md, dispatch consegna gli altri: un file
   // spostato o svuotato è un ruolo che parte senza istruzioni.
@@ -799,6 +1012,15 @@ test('secaudit: sul fail la ricetta non chiede una consegna di design, che il se
   const fail = t.match(/Su \*\*fail\*\*[^]*?rilascio del biglietto/);
   assert.ok(fail, 'la ricetta deve dire cosa fare sul fail, fino al rilascio');
   assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
+});
+
+test('secaudit: la richiesta di fusione fa girare gli unit sulla fusione per minuti, e la ricetta la manda in sottofondo (#929)', () => {
+  // Una chiamata da due minuti la taglia a metà: nessuna richiesta parte e resta la cartella di prova.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const i = t.indexOf('merge-gate.mjs');
+  assert.ok(i > -1);
+  assert.match(t.slice(i, i + 1200), /sottofondo/);
+  assert.ok(!/Qui non gira nessun git/.test(t), 'qui adesso girano git e gli unit');
 });
 
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
@@ -958,7 +1180,7 @@ test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il 
         `un flag (${finto}) scambiato per biglietto non deve sovrascrivere il promemoria`);
     }
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
+    togliCartella(sandbox);
   }
 });
 
@@ -1027,7 +1249,7 @@ test('CLI #565: un esito senza motivo non si registra (e «fail» da sola non pr
       'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.']);
     assert.notEqual(vera.status, 1, `una critica vera non è un errore d'uso: ${vera.stderr}`);
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
+    togliCartella(sandbox);
   }
 });
 
@@ -1051,7 +1273,39 @@ test('#507: il ramo lo dice il biglietto, e le fini di giro sigillano', () => {
     'consegna e rilascio devono sigillare il punto fermo');
 });
 
+test('emit secaudit di un lavoro server: anche il diff del server, intero in un file fuori dal repo, e niente del feedback (#1222)', () => {
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const diffServer = `diff --git a/functions/index.js b/functions/index.js\n${'+una riga del server\n'.repeat(3000)}`;
+  const busta = { payload: { role: 'secaudit', branch: 'worker/s', diffServer: { diff: diffServer, base: { ref: 'main di filo-security', sha: '1'.repeat(40) }, head: 'a'.repeat(40) }, feedback: { text: 'SEGRETO' } } };
+  const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
+  const j = JSON.parse(out);
+  assert.match(j.instructions, /diffServerFile/, 'il testo del ruolo dice del diff del server');
+  assert.match(j.instructions.replace(/\s+/g, ' '), /`30` → lavoro server: la parte del server la segue il server[^`]*Non fare niente/, 'e cosa fare con l’uscita 30 del gate');
+  assert.equal(j.payload.diffServer, undefined);
+  assert.ok(isAbsolute(j.payload.diffServerFile));
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  assert.ok(fuoriDa(repo, j.payload.diffServerFile), 'il file sta fuori dal repo');
+  assert.equal(readFileSync(j.payload.diffServerFile, 'utf8'), diffServer, 'il file contiene tutto il diff del server');
+  assert.equal(j.payload.diffServerHead, 'a'.repeat(40));
+  assert.deepEqual(j.payload.diffServerBase, { ref: 'main di filo-security', sha: '1'.repeat(40) });
+  assert.ok(j.payload.diffFile, 'il diff dell’app resta');
+  assert.ok(!out.includes('SEGRETO'), 'del feedback niente');
+  // Un lavoro dell'app non porta niente del server.
+  const app = buildPayload(bucket, serverCtx(bucket, { payload: {} }, 'DIFF'));
+  assert.equal(app.diffServer, undefined);
+  assert.equal(app.diffServerHead, undefined);
+});
+
 test('cleanup STATE_DIR temporanea', () => {
-  rmSync(TMP, { recursive: true, force: true });
+  togliCartella(TMP);
   assert.ok(!existsSync(TMP));
 });

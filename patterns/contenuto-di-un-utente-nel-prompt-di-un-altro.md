@@ -76,5 +76,5 @@ anonima o è dichiarata col suo perché o non passa, e
 promemoria e il contenuto che non riesce a forgiare la recinzione.
 
 Una cosa che questo pattern non fa da solo: le regole le pubblica una mano.
-Finché non gira `firebase deploy --only firestore:rules`, in produzione la porta
+Finché non gira `npm run regole:pubblica`, in produzione la porta
 è ancora quella di prima.

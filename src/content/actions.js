@@ -20,6 +20,9 @@
   // a mano è il modo con cui il menu del tasto destro è tornato a mentire.
   const Tasti = global.SN_TASTI;
   const LinkSospetto = global.SN_LINK_SOSPETTO;
+  // I pezzi che questo file mette nel documento del sito vanno avanti solo per un tasto o un clic dell'utente: lo script
+  // della pagina li raggiunge e ci fabbrica sopra eventi (#592.16). Chiudere resta aperto a tutti.
+  const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
@@ -85,7 +88,7 @@
         const end = activeEl.selectionEnd ?? 0;
         activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
         activeEl.setSelectionRange(start, start);
-        activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        activeEl.dispatchEvent(nostro(new Event('input', { bubbles: true })));
       } else {
         document.execCommand('delete');
       }
@@ -110,6 +113,9 @@
   // ------------------------------------------------------------
   // Incolla (da clipboard e da cronologia)
   // ------------------------------------------------------------
+  // Ciò che scriviamo noi in un campo di un riquadro di Filo lo deve sentire anche il riquadro, che ai finti è chiuso.
+  const nostro = (ev) => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
@@ -131,9 +137,9 @@
             if (targetKind === 'input') {
               // input/textarea non supportano immagini: prova a delegare ad
               // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = new CustomEvent('filo:paste-image', {
+              const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
                 bubbles: true, cancelable: true, detail: { blob },
-              });
+              }));
               if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
                 return;
               }
@@ -142,7 +148,7 @@
               if (textType) {
                 const text = await (await it.getType(textType)).text();
                 insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text });
+                pushClipboardEntry({ type: 'text', text }, 'paste');
               } else {
                 Popup.showToast(I18n.t('toast_cannot_paste_image'));
               }
@@ -159,7 +165,7 @@
               return;
             }
             const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description });
+            pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
             Popup.showToast(I18n.t('toast_pasted_image'));
             return;
           }
@@ -174,7 +180,7 @@
       if (!text) return;
       deps.restorePasteContext();
       insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text });
+      pushClipboardEntry({ type: 'text', text }, 'paste');
     } catch (_) {}
   }
 
@@ -197,9 +203,9 @@
       // feedback, barra input dashboard, ecc.) possono allegarla. Senza questa
       // delega l'Incolla→cronologia falliva ovunque Ctrl+V su immagine funziona.
       if (ctx?.kind === 'input' && blob) {
-        const pasteEvt = new CustomEvent('filo:paste-image', {
+        const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
           bubbles: true, cancelable: true, detail: { blob },
-        });
+        }));
         if (ctx.el.dispatchEvent(pasteEvt) === false) {
           Popup.showToast(I18n.t('toast_pasted_image'));
           return;
@@ -290,6 +296,8 @@
     if (!ctx) return;
     const { kind, el } = ctx;
     if (!el || !el.isConnected) return;
+    // Incolla e dettatura li ha chiesti l'utente a Filo, fuori dalla pagina: il correttore li tratta come scritti a mano.
+    try { global.SN_GESTO?.segna([global.SN_GESTO.CHIUDE], { el, x: null, y: null, tasto: '' }); } catch (_) {}
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
@@ -298,7 +306,8 @@
       el.setSelectionRange(caret, caret);
       ctx.start = caret;
       ctx.end = caret;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
+      el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
       // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
@@ -413,11 +422,13 @@
     } catch (_) { return { canBack: true, canFwd: true }; }
   }
 
-  function pushClipboardEntry(entry) {
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
-    // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
+  // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
+  // incolla, non da una copia scelta: una voce appena tolta non rientra così.
+  function pushClipboardEntry(entry, via) {
+    const spinta = chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => null);
+    // Un'immagine che l'utente ha tolto dalla cronologia non torna a un modello per farsi descrivere.
     if (entry?.type === 'image' && entry.dataUrl) {
-      requestImageDescription(entry.dataUrl).catch(() => {});
+      spinta.then((r) => { if (r?.tenuta !== false) requestImageDescription(entry.dataUrl).catch(() => {}); });
     }
   }
 
@@ -436,7 +447,9 @@
   // finché una descrizione può davvero arrivare, altrimenti dice che manca il
   // modello (un'attesa che non finirà mai è una bugia).
   let imageDescNoModel = false;
-  function imagePlaceholderLabel() {
+  let ultimaDaDelicata = null;
+  function imagePlaceholderLabel(dataUrl) {
+    if (dataUrl && dataUrl === ultimaDaDelicata) return I18n.t('clipboard_image_delicata');
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
@@ -452,13 +465,24 @@
       res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
-        payload: { dataUrl },
+        payload: { dataUrl, automatica: true },
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
     }
+    // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
+    if (res?.code === 'PAGINA_DELICATA') {
+      ultimaDaDelicata = dataUrl;
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t('clipboard_image_delicata'),
+      }).catch(() => {});
+      return null;
+    }
     if (!res?.ok) {
-      if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
+      // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
+      if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
         warnModelConfigOnce(res.error);
         // La voce in cronologia incolla resterebbe su «Descrizione…» per
@@ -559,10 +583,13 @@
   // il box inline lo mostra istantaneamente invece di aspettare il provider.
   // - Debounce 400ms (selectionchange spara molto durante il drag).
   // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
-  // - No prefetch se tab nascosto, dominio bloccato, selezione troppo corta.
+  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
+  // - Parte solo dietro un gesto vero che seleziona (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
+  // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
+  const PREFETCH_MAX_CHARS = 2000;
 
   function explainKey(text) { return (text || '').trim().slice(0, 2000); }
 
@@ -573,42 +600,69 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // Spenta dalle Preferenze, o per far durare i crediti (#818): la spiegazione parte al tasto destro.
+    if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) return;
+    // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
+    if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
+    const Gesto = global.SN_GESTO;
+    if (!Gesto || !Gesto.recente(Gesto.SELEZIONA)) return;
     const sel = Extract.getSelectionWithSentence();
     if (!sel) return;
+    if (sel.selection.length > PREFETCH_MAX_CHARS) return;
     const key = explainKey(sel.selection);
     if (key.length < 3) return;
     // Stessa selezione di prima: l'entry esistente sta già lavorando (o ha il risultato).
     if (prefetchedExplain && prefetchedExplain.key === key) return;
+    // Solo il gesto che ha fatto o toccato questa selezione: un clic su un pulsante non paga il testo che la pagina
+    // seleziona altrove (#1070).
+    if (!Gesto.prendi('spiega', Gesto.SELEZIONA, Gesto.sullaSelezione)) return;
     prefetchedExplain = startExplainRequest(sel);
+    prefetchedExplain.anticipata = true;
   }
 
-  function startExplainRequest(selInfo) {
+  // `suRichiesta`: l'ha chiesta l'utente col tasto destro, e il tetto del main sulle automatiche non la ferma.
+  function startExplainRequest(selInfo, { suRichiesta = false } = {}) {
     const key = explainKey(selInfo.selection);
-    const entry = { key, sentence: selInfo.sentence };
+    const entry = { key, sentence: selInfo.sentence, fermata: false };
     entry.promise = chrome.runtime.sendMessage({
       type: MSG.AI_REQUEST,
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+      diceRipiego: true,
+      ...(suRichiesta ? { suRichiesta: true } : {}),
     }).then(
-      (res) => (res?.ok && typeof res.text === 'string')
-        ? { text: res.text }
-        : { error: res?.error || I18n.t('err_provider_failed') },
-      (e) => ({ error: e?.message || I18n.t('err_provider_failed') }),
+      (res) => {
+        if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        return (res?.ok && typeof res.text === 'string')
+          ? { text: res.text, keyFallback: res.keyFallback || null }
+          : { error: Popup.frasePerLUtente(res) };
+      },
+      (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
     );
     return entry;
   }
 
   // Restituisce la Promise per la spiegazione di questa selezione.
   // Riusa il prefetch se è dello stesso testo; altrimenti parte ora.
+  // Un anticipo fermato dal tetto delle automatiche non è la risposta: al tasto destro si chiede davvero.
   function getExplainPromise(selInfo) {
     const key = explainKey(selInfo.selection);
-    if (prefetchedExplain && prefetchedExplain.key === key) {
-      return prefetchedExplain.promise;
+    const chiedi = () => {
+      const entry = startExplainRequest(selInfo, { suRichiesta: true });
+      prefetchedExplain = entry;
+      return entry.promise;
+    };
+    const pre = prefetchedExplain;
+    if (pre && pre.key === key && !pre.fermata) {
+      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
+      if (pre.anticipata && !pre.usata) {
+        pre.usata = true;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+      }
+      return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
     }
-    const entry = startExplainRequest(selInfo);
-    prefetchedExplain = entry;
-    return entry.promise;
+    return chiedi();
   }
 
   function buildInlineExplain(selInfo, opts = {}) {
@@ -629,7 +683,7 @@
           const arrow = document.createElement('button');
           arrow.type = 'button';
           arrow.className = 'sn-menu-inline-arrow';
-          arrow.title = Tasti.frase(I18n.t('menu_explain_deep'), 'Alt+E');
+          arrow.title = `${I18n.t('menu_explain_deep')} (${Tasti.etichettaFilo(Tasti.scorciatoiaFilo('explain-selection'))})`;
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -645,6 +699,7 @@
           el.classList.remove('sn-menu-inline-loading');
           if (!res || res.error || !res.text) {
             el.classList.add('sn-menu-inline-error');
+            // Già tradotto da startExplainRequest: qui si mostra, non si ritraduce.
             body.textContent = (res && res.error) || I18n.t('err_provider_failed');
             return;
           }
@@ -656,6 +711,8 @@
             return;
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
+          Popup.notaRipiego(body, res.keyFallback);
+          Popup.notaInterrotta(body, res.finishReason);
         });
         return () => { cancelled = true; };
       },
@@ -673,9 +730,37 @@
     el.appendChild(w);
   }
 
+  // Quello che Filo dice di un'immagine viene da byte che il sito non può leggere (altro dominio,
+  // cookie dell'utente): la ricerca nel testo del sito attraversa lo shadow chiuso, quindi glifi, non testo (#946).
+  function testoChiuso(el, s) {
+    el.textContent = '';
+    global.SN_MENU.testoNascosto(el, el, s);
+  }
+
+  // Le etichette di origine di un'immagine già scaricata (#711): le legge il main
+  // dai byte, sul computer e senza crediti. Il menu e l'Aiuto passano entrambi da qui.
+  function leggiOrigine(dataUrl) {
+    return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
+  }
+
+  // I byte originali di un'immagine della pagina, come data URL. Quella di un'altra
+  // origine (quasi sempre: le foto stanno su un CDN) lo script non la può leggere,
+  // e la scarica il main (#946): senza, descrizione e origine tacevano sulla maggior parte dei siti.
+  async function scaricaImmagine(src) {
+    try {
+      const r = await fetch(src);
+      if (r.ok) return await blobToDataUrl(await r.blob());
+    } catch (_) {}
+    if (!/^https?:/i.test(String(src || ''))) throw new Error('immagine non leggibile');
+    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src });
+    if (!res || !res.ok || !res.dataUrl) throw new Error((res && res.error) || 'immagine non leggibile');
+    return res.dataUrl;
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
   // `linkEl` è il collegamento che l'immagine apre: l'unica sezione del menu parla
   // dell'immagine, ma l'avviso sull'indirizzo non si perde (#725.1).
+  // I byte si scaricano UNA volta: descrizione e controllo dell'origine partono da quelli.
   function buildInlineExplainImage(imgEl, linkEl) {
     return {
       type: 'inline',
@@ -684,6 +769,10 @@
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
         el.textContent = '';
+        const origine = document.createElement('div');
+        origine.className = 'sn-menu-origine';
+        origine.hidden = true;
+        el.appendChild(origine);
         if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
@@ -698,24 +787,45 @@
         }
         let cancelled = false;
         (async () => {
+          let dataUrl;
           try {
-            const r = await fetch(src);
-            const blob = await r.blob();
-            const dataUrl = await blobToDataUrl(blob);
+            dataUrl = await scaricaImmagine(src);
+          } catch (_) {
             if (cancelled) return;
+            el.classList.remove('sn-menu-inline-loading');
+            el.classList.add('sn-menu-inline-error');
+            body.textContent = I18n.t('menu_image_unreadable');
+            return;
+          }
+          if (cancelled) return;
+
+          // Locale: arriva molto prima della descrizione, e si mostra appena c'è.
+          leggiOrigine(dataUrl).then((p) => {
+            if (cancelled || !p || !p.ok || !p.frase) return;
+            testoChiuso(origine, p.frase);
+            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified'
+              : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
+            origine.classList.toggle('sn-menu-origine-debole', !p.forte);
+            origine.hidden = false;
+          }).catch(() => {});
+
+          try {
             const res = await chrome.runtime.sendMessage({
               type: MSG.AI_REQUEST,
               action: ACTIONS.DESCRIBE_IMAGE,
               payload: { dataUrl },
+              diceRipiego: true,
             });
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              body.textContent = res?.error || I18n.t('err_provider_failed');
+              body.textContent = Popup.frasePerLUtente(res);
               return;
             }
-            body.textContent = res.text;
+            testoChiuso(body, res.text);
+            Popup.notaRipiego(el, res.keyFallback);
+            Popup.notaInterrotta(el, res.finishReason);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -784,10 +894,13 @@
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
               body.textContent = '';
+            } else if (m.type === 'done') {
+              Popup.notaRipiego(el, m.keyFallback);
+              Popup.notaInterrotta(el, m.finishReason);
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              body.textContent = m.message || I18n.t('err_provider_failed');
+              body.textContent = Popup.frasePerLUtente(m);
             }
           });
           port.postMessage({
@@ -838,13 +951,32 @@
     };
   }
 
-  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
-  let salvataggioInCorso = false;
+  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per
+  // chiudersi, e chi chiede riceve lo stesso esito (la voce salvata, o null).
+  let salvataggioInCorso = null;
   const confermeMostrate = new Set();
 
-  async function savePage() {
-    if (salvataggioInCorso) return;
-    salvataggioInCorso = true;
+  function savePage() {
+    if (!salvataggioInCorso) {
+      salvataggioInCorso = salva().then((entry) => {
+        if (!entry) salvataggioInCorso = null;
+        return entry;
+      }, () => {
+        salvataggioInCorso = null;
+        return null;
+      });
+    }
+    return salvataggioInCorso;
+  }
+
+  // La miniatura è della pagina: l'Aiuto aperto sopra non ci finisce dentro.
+  function nascondiPannelli() {
+    const aperti = [...document.querySelectorAll('.sn-sidebar')].filter((el) => el.style.visibility !== 'hidden');
+    for (const el of aperti) el.style.visibility = 'hidden';
+    return () => { for (const el of aperti) el.style.visibility = ''; };
+  }
+
+  async function salva() {
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
     // della miniatura attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
@@ -858,18 +990,16 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        salvataggioInCorso = false;
         Popup.showToast(I18n.t('toast_save_failed'));
-        return;
+        return null;
       }
       entry = res.entry;
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
-      salvataggioInCorso = false;
       console.error('[SN] savePage', e);
       Popup.showToast(I18n.t('toast_save_failed'));
-      return;
+      return null;
     }
 
     // Miniatura best-effort: la scatta il main (piccola, #839) dopo che il menu
@@ -877,14 +1007,17 @@
     // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
     // risposta. Se la pagina è già cambiata la cattura può fallire: il
     // salvataggio resta comunque valido, solo senza anteprima.
+    const rimetti = nascondiPannelli();
     try {
       await attendiCompositor();
       if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
     } catch (_) { /* miniatura opzionale */ }
+    rimetti();
 
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
     showSaveConfirm(entry);
+    return entry;
   }
 
   // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
@@ -918,28 +1051,33 @@
     pill.appendChild(cta);
     // Nello stack degli avvisi in pagina (#409). `sticky`: porta l'unica strada
     // verso la lista "Aperti per dopo", un toast in arrivo non deve sfrattarla.
-    Popup.mountToast(pill, { sticky: true });
+    Popup.mountToast(pill, {
+      sticky: true,
+      chiudi: () => finish(false),
+      azioni: [{ label: I18n.t('toast_saved_open'), fn: () => finish(true) }],
+    });
     requestAnimationFrame(() => pill.classList.add('sn-save-confirm-visible'));
 
     const finish = (openList) => {
       if (done) return;
       done = true;
-      if (chiudiScheda) salvataggioInCorso = false;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (chiudiScheda) salvataggioInCorso = null;
+      if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
-      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
+      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, self.SN_THEME_TOKENS?.motionMs(220) ?? 220);
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
       if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
     };
 
-    pill.addEventListener('click', () => finish(true));
+    pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });
     pill.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
+      if ((e.key === 'Enter' || e.key === ' ') && gestoVero(e)) { e.preventDefault(); finish(true); }
     });
-    timer = setTimeout(() => finish(false), AUTO_CLOSE_MS);
+    // Nella pila: col puntatore sopra aspetta, come gli altri avvisi (la scheda si chiude dopo).
+    timer = Popup.tempoAvviso(AUTO_CLOSE_MS, () => finish(false), { deveScadere: true });
   }
 
   async function saveLink(linkEl) {
@@ -951,10 +1089,19 @@
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
 
+  function dataUrlToBlob(dataUrl) {
+    const m = /^data:([^;,]*)[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+    if (!m) throw new Error('immagine non leggibile');
+    const bin = atob(m[2]);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: m[1] || 'application/octet-stream' });
+  }
+
   async function copyImage(imgEl) {
     try {
-      const r = await fetch(imgEl.currentSrc || imgEl.src);
-      const blob = await r.blob();
+      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src);
+      const blob = dataUrlToBlob(originale);
       let pngBlob = blob;
       // Clipboard API supporta image/png; converte se serve
       if (blob.type !== 'image/png') {
@@ -970,6 +1117,8 @@
       }
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
       const dataUrl = await blobToDataUrl(pngBlob);
+      // Dopo la scrittura: il main legge gli appunti per riconoscere la copia quando torna incollata.
+      chrome.runtime.sendMessage({ type: MSG.IMAGE_COPIED, originale, copia: dataUrl }).catch(() => {});
       const description = await describeImage(pngBlob);
       pushClipboardEntry({ type: 'image', dataUrl, description });
       Popup.showToast(I18n.t('toast_copied'));
@@ -1093,9 +1242,24 @@
     copyToClipboard(href);
   }
 
+  function searchUrlFor(text) {
+    return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
+  }
+
+  // Una voce del menu di Filo non usa il gesto della pagina (è di Filo): l'indirizzo scelto lo dichiara prima (#737.1).
+  function apriInSchedaNuova(url) {
+    if (!url) return;
+    // Questi Chromium li rifiuta a una pagina senza dire niente: li ferma il main, che lo dice (#482).
+    if (/^(?:file|data|javascript|vbscript):/i.test(String(url).trim())) {
+      chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB, url: String(url) }).catch(() => {});
+      return;
+    }
+    try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
+    window.open(url, '_blank', 'noopener');
+  }
+
   function searchTextOnWeb(text) {
-    const q = encodeURIComponent((text || '').slice(0, 500));
-    window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
+    apriInSchedaNuova(searchUrlFor(text));
   }
 
   // ------------------------------------------------------------
@@ -1320,12 +1484,15 @@
     return items;
   }
 
+  // Lens-style reverse search (più affidabile di searchbyimage)
+  function imageSearchUrlFor(imgEl) {
+    const src = imgEl && (imgEl.currentSrc || imgEl.src);
+    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+  }
+
   function searchImageOnWeb(imgEl) {
-    const src = imgEl.currentSrc || imgEl.src;
-    if (!src) return;
-    const q = encodeURIComponent(src);
-    // Lens-style reverse search (più affidabile di searchbyimage)
-    window.open(`https://lens.google.com/uploadbyurl?url=${q}`, '_blank', 'noopener');
+    const url = imageSearchUrlFor(imgEl);
+    apriInSchedaNuova(url);
   }
 
   // ------------------------------------------------------------
@@ -1352,7 +1519,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel(cap.dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
@@ -1499,20 +1666,21 @@
         }
       }
 
+      // Il riquadro scelto diventa una chiamata al modello, un file e gli appunti: lo disegna solo il mouse dell'utente.
       overlay.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || !gestoVero(e)) return;
         dragging = true;
         startX = curX = e.clientX;
         startY = curY = e.clientY;
         updateMask(startX, startY, startX, startY);
       });
       overlay.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         curX = e.clientX; curY = e.clientY;
         updateMask(startX, startY, curX, curY);
       });
       overlay.addEventListener('mouseup', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         dragging = false;
         curX = e.clientX; curY = e.clientY;
         finish();
@@ -1543,7 +1711,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel(dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
@@ -1568,7 +1736,7 @@
         action: ACTIONS.TRANSCRIBE_IMAGE,
         payload: { dataUrl: region.dataUrl },
       });
-      if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+      if (!res?.ok) { Popup.showToast(Popup.frasePerLUtente(res), { duration: 9000 }); return; }
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
@@ -1581,7 +1749,9 @@
         ta.remove();
       }
       try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
-      Popup.showToast(I18n.t('toast_transcribed'));
+      // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
       Popup.showToast(I18n.t('err_provider_failed'));
     }
@@ -1745,7 +1915,7 @@
       b.textContent = label;
       const base = [
         'flex:1', 'padding:9px 12px', 'border-radius:8px', 'font-size:13px',
-        'font-family:inherit', 'cursor:pointer', 'transition:background .12s,border-color .12s',
+        'font-family:inherit', 'cursor:pointer', 'transition:background calc(.12s * var(--sn-motion, 1)),border-color calc(.12s * var(--sn-motion, 1))',
       ];
       if (primary) {
         base.push('border:1px solid var(--sn-accent,#c45a3b)', 'background:var(--sn-accent,#c45a3b)', 'color:#fff');
@@ -1767,10 +1937,11 @@
     };
 
     const downloadBtn = mkBtn(I18n.t('qr_download'), true);
-    downloadBtn.addEventListener('click', () => downloadQrPng(matrix, quiet, url));
+    downloadBtn.addEventListener('click', (e) => { if (gestoVero(e)) downloadQrPng(matrix, quiet, url); });
 
     const copyBtn = mkBtn(I18n.t('qr_copy_link'), false);
-    copyBtn.addEventListener('click', async () => {
+    copyBtn.addEventListener('click', async (e) => {
+      if (!gestoVero(e)) return;
       try {
         await navigator.clipboard.writeText(url);
       } catch (_) {
@@ -1873,6 +2044,8 @@
     schedulePrefetchExplain,
     buildInlineExplain,
     buildInlineExplainImage,
+    leggiOrigine,
+    scaricaImmagine,
     buildInlineExplainLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,
@@ -1887,7 +2060,10 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    apriInSchedaNuova,
+    searchUrlFor,
     searchImageOnWeb,
+    imageSearchUrlFor,
     // video / audio
     buildMediaItems,
     buildMediaSpeedItem,

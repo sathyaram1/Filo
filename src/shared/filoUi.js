@@ -23,6 +23,9 @@
 //   SN_FILO_UI.is(el)       → è la radice di un pezzo di UI di Filo?
 //   SN_FILO_UI.inside(el)   → sta dentro (o è) un pezzo di UI di Filo?
 //   SN_FILO_UI.aperti()     → le radici NOSTRE attaccate al documento adesso
+//   SN_FILO_UI.gestoVero(e) → l'evento viene dall'utente, non dal codice del sito?
+//   SN_FILO_UI.soloGestiVeri(el) → i gesti fabbricati dallo script del sito non lo toccano
+//   SN_FILO_UI.ombra(host)  → shadow root chiuso di un riquadro; bersaglio(e) ci scende dentro
 //
 // L'attributo e l'elenco rispondono a due domande diverse, e la differenza è
 // tutta nel mittente. Chi cammina sulla pagina chiede «questo pezzo lo salto?»:
@@ -104,5 +107,147 @@
     } catch (_) { return false; }
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark };
+  // Un clic o un tasto dell'utente, non del codice del sito: i nostri pezzi nel suo documento li preme
+  // anche lui. Chi fa avanzare qualcosa di Filo da lì passa di qui (#592.6).
+  function gestoVero(e) {
+    return !!(e && e.isTrusted === true);
+  }
+
+  // Lo script del sito raggiunge ogni nodo del suo documento e sa fabbricarci sopra clic, passaggi e tasti:
+  // a un pezzo di Filo arrivano solo quelli dell'utente (#589.8). Il cancello sta su OGNI nodo, non sulla radice:
+  // un pulsante che il sito sposta fuori dal pezzo se lo porta dietro. Si chiama prima di attaccare al documento.
+  const GESTI = ['click', 'dblclick', 'auxclick', 'contextmenu', 'mousedown', 'mouseup', 'mousemove',
+    'mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'pointerdown', 'pointerup', 'pointermove',
+    'pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'keydown', 'keyup', 'keypress',
+    'beforeinput', 'input', 'change', 'wheel', 'dragstart', 'dragenter', 'dragover', 'drop',
+    'touchstart', 'touchmove', 'touchend'];
+  // Un evento fabbricato da codice nostro (l'Incolla del menu che scrive in un campo, la correzione) passa: lo
+  // segniamo nel mondo isolato, dove l'oggetto che vede il sito è un altro e la sua copia non entra nell'elenco.
+  const nostri = new WeakSet();
+  function nostro(ev) { try { nostri.add(ev); } catch (_) {} return ev; }
+  function veroONostro(e) { return !!(e && (e.isTrusted || nostri.has(e))); }
+  function fermaIFinti(e) { if (!veroONostro(e)) e.stopImmediatePropagation(); }
+  const chiusi = new WeakSet();
+  function chiudi(n) {
+    if (!n || n.nodeType !== 1 || chiusi.has(n)) return;
+    chiusi.add(n);
+    for (const t of GESTI) n.addEventListener(t, fermaIFinti, true);
+  }
+  function chiudiAlbero(n) {
+    chiudi(n);
+    if (n && n.querySelectorAll) for (const d of n.querySelectorAll('*')) chiudi(d);
+  }
+  // Ciò che entra dopo nel pezzo (contenuti che arrivano in ritardo) lo chiude l'osservatore: è la rete, non la
+  // strada principale, perché un osservatore del sito creato prima del nostro viene avvisato per primo.
+  const osservati = new WeakSet();
+  function soloGestiVeri(el) {
+    try {
+      chiudiAlbero(el);
+      if (!osservati.has(el) && typeof MutationObserver === 'function') {
+        osservati.add(el);
+        new MutationObserver((ms) => {
+          for (const m of ms) for (const n of m.addedNodes) chiudiAlbero(n);
+        }).observe(el, { childList: true, subtree: true });
+      }
+    } catch (_) {}
+    return el;
+  }
+
+  // Un riquadro che porta parole dell'utente o di un modello sta in uno shadow root chiuso (#1071): l'host è l'unico
+  // nodo che il documento vede. L'attributo dice a chi chiede «si sta scrivendo?» da fuori (anche dal main, che
+  // non vede dentro) che il fuoco lì dentro è in un campo nostro; la radice resta raggiungibile solo da qui.
+  const RIQUADRO = 'data-sn-riquadro';
+  const ombre = new WeakMap();
+  function ombra(host) {
+    const radice = host.attachShadow({ mode: 'closed' });
+    ombre.set(host, radice);
+    try { host.setAttribute(RIQUADRO, ''); } catch (_) {}
+    return radice;
+  }
+  function ombraDi(el) {
+    try { return (el && (el.shadowRoot || ombre.get(el))) || null; } catch (_) { return null; }
+  }
+
+  // Il nodo vero sotto un evento. Chi ascolta su window o sul documento vede l'host di un riquadro chiuso, non il
+  // campo o il collegamento toccati: si scende col punto del puntatore, o col fuoco quando il gesto è da tastiera.
+  function bersaglio(e) {
+    let t = null;
+    try { t = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target || null; } catch (_) { t = null; }
+    for (let giri = 0; t && giri < 8; giri++) {
+      const r = ombre.get(t);
+      if (!r) break;
+      let giu = null;
+      const x = Number(e.clientX);
+      const y = Number(e.clientY);
+      const colPuntatore = Number.isFinite(x) && Number.isFinite(y) && (x !== 0 || y !== 0) && e.detail !== 0;
+      try { if (colPuntatore || e.type === 'contextmenu') giu = r.elementFromPoint(x, y); } catch (_) { giu = null; }
+      if (!giu || giu === t) giu = r.activeElement;
+      if (!giu || giu === t) break;
+      t = giu;
+    }
+    return t;
+  }
+
+  // Da fuori un tasto scritto in un riquadro chiuso parte dall'host, che per il sito non è una casella: le sue scorciatoie,
+  // anche in cattura, si prenderebbero quello che l'utente scrive (#1071). Lo ferma il primo ascolto della pagina (il ponte
+  // in page-preload, a document_start) e al campo arriva una copia nostra che non esce dallo shadow; l'Esc resta di tutti (#514).
+  function tastoNelRiquadro(e) {
+    try {
+      if (!e || !e.isTrusted || e.key === 'Escape') return;
+      const host = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+      if (!host || !ombre.has(host)) return;
+      const campo = bersaglio(e);
+      if (!campo || campo === host) return;
+      e.stopImmediatePropagation();
+      const copia = nostro(new KeyboardEvent(e.type, {
+        key: e.key, code: e.code, location: e.location, repeat: e.repeat, isComposing: e.isComposing,
+        ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey,
+        keyCode: e.keyCode, charCode: e.charCode, which: e.which,
+        bubbles: true, cancelable: true, composed: false, view: e.view,
+      }));
+      campo.dispatchEvent(copia);
+      if (copia.defaultPrevented) e.preventDefault();
+    } catch (_) {}
+  }
+
+  // La chiave di una bozza scritta in un riquadro: resta al sito dove è nata, e il main concede a ogni riquadro solo
+  // quella con la sua origine (BOZZE_PER_SITO in impostazioniPerOrigine.js). Senza origine non c'è bozza (null).
+  function chiaveDiBozza(nome) {
+    try {
+      if (location.protocol === 'filo:') return nome;
+      return location.origin && location.origin !== 'null' ? `${nome}@${location.origin}` : null;
+    } catch (_) { return null; }
+  }
+
+  const _test = {
+    // Il primo nodo che risponde al selettore, nel documento o dentro un riquadro nostro (anche chiuso).
+    trova(sel) { return trovaTutti(sel)[0] || null; },
+    trovaTutti,
+    // Il nodo più profondo sotto un punto, scendendo nei riquadri nostri.
+    daPunto(x, y) {
+      let el = document.elementFromPoint(x, y);
+      for (let giri = 0; el && ombre.has(el) && giri < 8; giri++) {
+        const giu = ombre.get(el).elementFromPoint(x, y);
+        if (!giu || giu === el) break;
+        el = giu;
+      }
+      return el;
+    },
+  };
+  function trovaTutti(sel) {
+    const out = [];
+    try {
+      out.push(...document.querySelectorAll(sel));
+      for (const host of document.querySelectorAll('[' + RIQUADRO + ']')) {
+        const r = ombre.get(host);
+        if (r) out.push(...r.querySelectorAll(sel));
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  global.SN_FILO_UI = {
+    ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
+    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -100,13 +100,14 @@ test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', 
   // servizi di Filo aprono lo stesso URL in finestre nascoste — la scheda è
   // il webContents che appartiene alla finestra principale (quella visibile,
   // che ospita anche la shell).
+  // SIGKILL al processo e non forcefullyCrashRenderer: il perché sta in tests/unit/chiusuraApp.test.mjs (#639).
   await app.evaluate(({ webContents, BrowserWindow }, target) => {
     const shellWc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://shell/'));
     const mainWin = BrowserWindow.fromWebContents(shellWc);
     const wc = webContents.getAllWebContents().find((w) =>
       w.getURL() === target && BrowserWindow.fromWebContents(w) === mainWin);
     if (!wc) throw new Error('webContents della scheda non trovato');
-    wc.forcefullyCrashRenderer();
+    process.kill(wc.getOSProcessId(), 'SIGKILL');
   }, url);
 
   const errPage = await waitErrorPage(app);

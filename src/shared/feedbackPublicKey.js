@@ -1,15 +1,6 @@
-// Chiave PUBBLICA di Filo per cifrare i feedback (sealed box, vedi
-// feedbackCrypto.js e CLAUDE.md → S1). È sicuro committarla: serve solo a
-// CIFRARE. La chiave PRIVATA corrispondente NON sta nel repo — la tiene
-// l'owner (dashboard), il backend di sicurezza (Functions secrets) e le
-// routine (passata via env). Vedi S1.5.
-//
-// Per (ri)generare la coppia:  node scripts/gen-feedback-keys.mjs
-// Lo script sovrascrive la riga `SN_FEEDBACK_PUBKEY` qui sotto con la nuova
-// chiave pubblica e stampa la privata (da salvare fuori dal repo).
-//
-// Finché è `null`, encryptForOwner() lancia un errore esplicito: la cifratura
-// dei feedback è inattiva finché l'owner non genera la coppia.
+// Chiave PUBBLICA dei feedback (sealed box di feedbackCrypto.js): serve solo a cifrare, quindi sta nel repo.
+// La privata non sta nel repo: la tengono solo l'owner e il server. La riga fra i marcatori la riscrive
+// scripts/gen-feedback-keys.mjs; finché è null, encryptForOwner() lancia un errore esplicito.
 
 (function (global) {
   'use strict';
@@ -17,16 +8,9 @@
   global.SN_FEEDBACK_PUBKEY = "BM44td2o-xZx_7Wvnx9LMeJLvdpgQU_DwidPKFFkIrHJ2abUMtBKVonlXdTRt3G3wWmtbZago2UCJfB9vnrqso8";
   // === /FILO_FEEDBACK_PUBKEY ===
 
-  // INTERRUTTORE DI ATTIVAZIONE (S1, cutover). La presenza della chiave pubblica
-  // NON basta ad accendere la cifratura: serve anche questo flag = true. Così il
-  // codice di cifratura vive su main in modo DORMIENTE senza rompere i lettori
-  // che non hanno ancora la chiave privata (dashboard owner, routine cloud,
-  // backend filo-security) né le feature utente che leggono i campi (ricompense
-  // C5). L'owner lo mette a `true` SOLO al cutover, dopo aver: (1) distribuito la
-  // privata a dashboard/routine/backend, (2) verificato che dashboard e routine
-  // decifrano, (3) confermato che nessun campo cifrato è mostrato a un utente
-  // senza chiave. (Cutover S1 fatto 2026-06-25; storia in git.)
+  // Interruttore separato dalla chiave: a false la cifratura resta dormiente anche con la chiave presente,
+  // per chi deve leggere i campi senza avere la privata. Chi lo imposta prima del caricamento vince.
   if (global.SN_FEEDBACK_ENC_ENABLED === undefined) {
-    global.SN_FEEDBACK_ENC_ENABLED = true; // CUTOVER 2026-06-25: cifratura S1 ATTIVA.
+    global.SN_FEEDBACK_ENC_ENABLED = true;
   }
 })(typeof globalThis !== 'undefined' ? globalThis : self);

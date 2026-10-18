@@ -225,7 +225,7 @@
     var d = deps();
     var id = fb && fb.clientId;
     if (d.MR.valueUnreadable && d.MR.valueUnreadable(id)) return CREATORE_ILLEGGIBILE;
-    return d.TH.authorKind(id);
+    return d.TH.authorKind(fb);
   }
 
   // I creatori, nell'ordine della coda (prima le persone, poi le istanze di

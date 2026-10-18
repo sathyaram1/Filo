@@ -59,7 +59,7 @@ module.exports = function register(on, ctx) {
     const deckId = String(msg?.deckId || '');
     const change = {
       op: String(msg?.op || ''), messages: msg?.messages, turn: msg?.turn, message: msg?.message,
-      userText: msg?.userText, nameIds: msg?.nameIds,
+      userText: msg?.userText, nameIds: msg?.nameIds, sort: msg?.sort,
     };
     // Pagina ricaricata o chiusa col turno ancora atteso: le altre schede rileggono e lo trovano interrotto.
     const r = await Chats.edit(deckId, change, { wc: sender && sender.wc, onAbandon: () => changed(deckId, '') });

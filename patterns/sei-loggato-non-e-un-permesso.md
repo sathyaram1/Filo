@@ -35,8 +35,8 @@ altrimenti la funzione si spegne in silenzio, e un rilevamento che non trova
 niente somiglia molto a uno che funziona.
 
 **Una regola stretta nel repo non è una porta chiusa.** Le regole le pubblica
-una mano, non un automatismo: finché non gira `firebase deploy --only
-firestore:rules` il confine in produzione è ancora quello di prima, e il lavoro
+una mano, non un automatismo: finché non gira `npm run
+regole:pubblica` il confine in produzione è ancora quello di prima, e il lavoro
 sembra finito mentre non lo è. E l'ordine conta: **prima si pubblicano le
 regole, poi si ruotano le chiavi**. Al contrario le chiavi nuove nascono dentro
 un documento che chiunque legge ancora, e la rotazione è da rifare. Chi chiude

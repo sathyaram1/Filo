@@ -43,16 +43,14 @@ legge smette di credere a tutti e due.
 **Un elenco solo vale quanto quello che sa.** Dare al menu il giudizio
 dell'apertura gli ha passato anche i suoi falsi allarmi (#725.8, giro 1):
 `revolut.me` e `apple.co` sono indirizzi ufficiali che l'elenco non conosceva,
-`mail.com`, `post.ch`, `cloud.it` e `imposte.it` sono parole vere a una lettera
-da un marchio o con un marchio dentro, e all'apertura venivano bloccati come
-pericolosi. Ogni marchio porta tutti i suoi indirizzi ufficiali; le parole vere
-vicine ai marchi stanno in un elenco, ricavato dalle parole più usate in italiano
-e in inglese, e una parola vale solo dove sta: non scavalca un trattino e non
-copre il nome attaccato accanto (`risposte-poste`). Una sigla di tre lettere non
-basta da sola a nominare un marchio (`bnl.gov`). Il nome di un sistema pubblico
-lo usano per mestiere anche altri: le pagine d'accesso SPID stanno sui domini
-dei gestori accreditati (`spid.register.it`), che il marchio elenca a parte,
-senza farli entrare nella whitelist (#725.8, giro 2).
+`imposte.it` è una parola vera con un marchio dentro. Ogni marchio porta tutti i
+suoi indirizzi ufficiali; un marchio che è anche una parola, o ci sta dentro,
+conta solo da solo fra punti e trattini o accanto a parole da truffa (#732, la
+regola è in `brands.js`). Una sigla di tre lettere non basta da sola a nominare
+un marchio (`bnl.gov`). Il nome di un sistema pubblico lo usano per mestiere
+anche altri: le pagine d'accesso SPID stanno sui domini dei gestori accreditati
+(`spid.register.it`), che il marchio elenca a parte, senza farli entrare nella
+whitelist (#725.8, giro 2).
 
 **Stringere la soglia non deve spegnere il controllo.** Quello che la soglia
 più stretta perde si recupera con un segnale più preciso, non allargandola di
@@ -60,12 +58,22 @@ nuovo: le lettere che a occhio ne valgono un'altra (`paypa1`, `micros0ft`,
 `arnazon`) si riconoscono normalizzandole, e lì la prova è l'uguaglianza, non
 una distanza.
 
-**Un nome a una lettera avvisa, il blocco vuole un secondo segnale** (decisione
-dell'owner, #725.8). Vale per i marchi segnati `unaLetteraAvvisa`, quelli con
-vicini veri (`ariba.com`, `isbank.com.tr`, `bancobpi.pt`): avviso che si chiude,
+**Un nome a una lettera avvisa, il blocco vuole un secondo segnale** (#728, e
+decisione dell'owner su #725.8). Sui marchi corti vale per tutti (`pcloud.com`,
+`posteo.de`, `posten.no`, `mail.com`), sui lunghi per quelli segnati
+`unaLetteraAvvisa`, che hanno vicini veri (`bancobpi.pt`): avviso che si chiude,
 e pagina piena solo con dominio giovane, certificato non valido o password
 chiesta. Queste regole sono il ripiego: le eccezioni a mano per i siti vicini a
 un marchio non si aggiungono, la classificazione principale passa a Jev (#890).
+
+**Il nome c'è, ma chi comanda è un altro.** Le imitazioni più comuni non
+sbagliano una lettera: portano il nome vero intero davanti a un altro dominio
+(`paypal.com.accesso-sicuro.net`, `paypal.com@altro.net`), lo legano col
+trattino a un'altra parola (`secure-paypal.com`), o lo scrivono con lettere di
+un altro alfabeto (`раураl`, che nel link viaggia come `xn--…`). Il confronto
+va fatto sul nome come lo legge chi guarda (punycode decodificato, lettere
+confondibili ricondotte alle latine), e la frase dice dove il link porta
+davvero.
 
 **Ogni frase ipotizza, nessuna afferma.** Il controllo guarda l'indirizzo, non
 il sito: «potrebbe essere un'imitazione» si può dire, «chi lo riceve entra al
@@ -75,8 +83,8 @@ posto tuo» no.
 
 `src/shared/linkSospetto.js` (euristica e frasi), mostrato da
 `src/content/actions.js` nella sezione inline del link. Il giudizio sul marchio
-lo dà `imitazione()` in `src/main/services/safebrowse/engine.js`, coi marchi e
-le parole vere di `brands.js`; un link che passa da un rinvio si giudica anche per
+lo dà `imitazione()` in `src/main/services/safebrowse/engine.js`, coi marchi di
+`brands.js`; un link che passa da un rinvio si giudica anche per
 l'indirizzo che si porta dentro (nei parametri, nel percorso, codificato alla
 Proofpoint), e il nome scritto prima della chiocciola conta come quello del link. Le soglie e i casi
 — quelli che devono scattare e quelli che non devono — stanno in

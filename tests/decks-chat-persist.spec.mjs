@@ -9,6 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -50,6 +51,14 @@ async function mockProvider(app) {
     globalThis.__chatCalls = [];
     globalThis.__trattieni = null;
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La home aperta scrive il suo saluto col modello: non è una chiamata della chat dei mazzi.
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      // Il giudice dei risultati (#382) le tiene tutte: qui si prova la chat, non il filtro.
+      const prompt = String(messages[messages.length - 1].content || '');
+      if (/CARTE CANDIDATE/.test(prompt)) {
+        const keep = (prompt.match(/^\d+(?=\. )/gm) || []).map(Number);
+        return { text: JSON.stringify({ keep }), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      }
       globalThis.__chatCalls.push(messages);
       if (globalThis.__trattieni) await globalThis.__trattieni;
       const last = String(messages[messages.length - 1].content || '');
@@ -394,7 +403,7 @@ test('chi supera il tetto di messaggi lo vede scritto', async ({ app, openTab })
   await expect(page.locator('.dk-chat-cap')).toHaveCount(0);
   await ask(page, 'una di troppo');
   await expect(page.locator('.dk-chat-cap')).toBeVisible();
-  const scritto = await page.evaluate((n) => n.toLocaleString('it-IT'), max);
+  const scritto = await page.evaluate((n) => n.toLocaleString('it-IT', { useGrouping: true }), max);
   await expect(page.locator('.dk-chat-cap')).toContainText(scritto);
 });
 
@@ -407,7 +416,7 @@ test('riavviato Filo, la chat del mazzo è ancora lì e il + funziona', async ()
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
   const openDecks = async (app, hash = '') => {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     const before = new Set(app.windows());
     await shell.evaluate((u) => window.filoShell.tabs.open(u), `filo://decks/decks.html${hash}`);

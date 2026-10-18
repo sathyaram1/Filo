@@ -16,15 +16,27 @@
 //     2) che il lanciatore trovi davvero tutti i file, anche in sottocartelle,
 //        e funzioni lanciato da una cartella qualsiasi.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
-import { join, dirname, resolve, isAbsolute } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { join, dirname, resolve, isAbsolute, relative, posix, win32 } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-import { collectTestFiles, isTestFile, UNIT_DIR, REPO_ROOT } from '../../scripts/run-unit-tests.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import {
+  collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
+  gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
+  allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
+  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento, guardiaFermo, orologioMacchina, conConcorrenza,
+  IDENTITA_SESSIONE, guardiaPerFile, testoFileChiusi, leggiProcessi, processiDelFile,
+} from '../../scripts/run-unit-tests.mjs';
+import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
+import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { concorrenzaUnit } from '../../scripts/lib/dati-worker.mjs';
+import { slugProgetto } from '../../scripts/session-report.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
@@ -69,6 +81,19 @@ describe('raccolta dei file di test', () => {
     for (const f of collectTestFiles()) assert.ok(isAbsolute(f), `percorso relativo: ${f}`);
   });
 
+  test('a node --test arrivano relativi alla root: la riga di comando non cresce con la cartella del repo', () => {
+    const files = collectTestFiles();
+    const args = fileArgs(files);
+    assert.equal(args.length, files.length);
+    for (const a of args) {
+      assert.ok(!isAbsolute(a) && a.startsWith('tests/unit/'), `argomento inatteso: ${a}`);
+      assert.ok(existsSync(resolve(REPO_ROOT, a)), `non esiste dalla root: ${a}`);
+    }
+    // Il tetto di Windows è 32767 caratteri per tutta la riga: che il repo stia in una cartella lunga non deve contare.
+    const profonda = resolve(REPO_ROOT, 'x'.repeat(200));
+    assert.deepEqual(fileArgs(files.map((f) => resolve(profonda, f.slice(REPO_ROOT.length + 1))), profonda), args);
+  });
+
   test('scende nelle sottocartelle, e ignora quello che non è un test', () => {
     const casa = cartellaTemporanea('filo-runner-');
     try {
@@ -83,7 +108,7 @@ describe('raccolta dei file di test', () => {
       writeFileSync(join(casa, '.cache', 'y.test.mjs'), '');
       const trovati = collectTestFiles(casa).map((f) => f.slice(casa.length + 1));
       assert.deepEqual(trovati.sort(), [join('dentro', 'due.test.mjs'), 'uno.test.mjs'].sort());
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('cartella assente o vuota: nessun file, e nessuna eccezione', () => {
@@ -91,7 +116,7 @@ describe('raccolta dei file di test', () => {
     try {
       assert.deepEqual(collectTestFiles(vuota), []);
       assert.deepEqual(collectTestFiles(join(vuota, 'non-esiste')), []);
-    } finally { rmSync(vuota, { recursive: true, force: true }); }
+    } finally { togliCartella(vuota); }
   });
 
   test('isTestFile riconosce solo i *.test.mjs', () => {
@@ -116,7 +141,7 @@ describe('il lanciatore lanciato da fuori', () => {
       // sta guardando la cartella sbagliata.
       assert.ok(righe.some((f) => f.endsWith('unitRunner.test.mjs')), 'manca il file della sentinella');
       assert.equal(REPO_ROOT, ROOT);
-    } finally { rmSync(altrove, { recursive: true, force: true }); }
+    } finally { togliCartella(altrove); }
   });
 
   test('zero test trovati = uscita ROSSA, mai un verde silenzioso', () => {
@@ -127,6 +152,665 @@ describe('il lanciatore lanciato da fuori', () => {
       });
       assert.equal(r.status, 1, 'una suite vuota deve fallire');
       assert.match(r.stderr, /nessun file/);
-    } finally { rmSync(vuota, { recursive: true, force: true }); }
+    } finally { togliCartella(vuota); }
   });
+});
+
+// #765: Windows rifiuta una riga oltre 32.767 caratteri (CreateProcess) e `npm run test:unit` usciva con ENAMETOOLONG
+// senza eseguire niente. La riga si misura intera, eseguibile e flag compresi, mai a numero di file.
+const lunghezzaRiga = (execPath, flags, gruppo) =>
+  [execPath, '--test', ...flags, ...gruppo].reduce((n, a) => n + costoArgomentoWindows(a), 0);
+const LUNGO = 'C:\\Users\\agenti AI\\Desktop\\Filo\\Filo\\.claude\\worktrees\\' + 'nome-lunghissimo-'.repeat(12);
+
+describe('la riga di comando sta nel tetto di Windows', () => {
+  test('il tetto è sotto il limite vero, con margine', () => {
+    assert.equal(TETTO_WINDOWS, 32767);
+    assert.ok(TETTO_RIGA < TETTO_WINDOWS && TETTO_RIGA >= 28000, `tetto ${TETTO_RIGA}`);
+  });
+
+  test('una riga oltre il tetto si spezza: ogni gruppo ci sta, e insieme sono tutti i file nell’ordine', () => {
+    const tanti = Array.from({ length: 4000 }, (_, i) => join(UNIT_DIR, `prova-${String(i).padStart(4, '0')}-${'x'.repeat(30)}.test.mjs`));
+    const flags = flagsConRiepilogo(['--test-name-pattern=una "frase" con spazi'], join(LUNGO, 'gruppo-0001.jsonl'));
+    const gruppi = gruppiDiLancio(tanti, { flags });
+    assert.ok(gruppi.length > 1, '4.000 file non stanno in una riga sola');
+    assert.deepEqual(gruppi.flat(), tanti.map((f) => perLaRiga(f)), 'nessun file perso, duplicato o spostato');
+    for (const g of gruppi) {
+      const n = lunghezzaRiga(process.execPath, flags, g);
+      assert.ok(n <= TETTO_RIGA, `riga di ${n} caratteri`);
+    }
+  });
+
+  test('un percorso di cartella di lavoro lungo non porta mai la riga oltre il tetto', () => {
+    const veri = collectTestFiles();
+    const nodeLungo = join(LUNGO, 'node', 'node.exe');
+    const flags = flagsConRiepilogo([], join(LUNGO, 'tmp', 'gruppo-0001.jsonl'), { tty: true });
+    const spostati = veri.map((f) => join(LUNGO, relative(REPO_ROOT, f)));
+    const gruppi = gruppiDiLancio(spostati, { root: LUNGO, flags, execPath: nodeLungo });
+    assert.deepEqual(gruppi, gruppiDiLancio(veri, { flags, execPath: nodeLungo }), 'stessi gruppi qualunque sia la root');
+    for (const g of gruppi) {
+      for (const f of g) assert.ok(!isAbsolute(f) && f.startsWith('tests/unit/'), `argomento non relativo: ${f}`);
+      assert.ok(lunghezzaRiga(nodeLungo, flags, g) <= TETTO_RIGA);
+    }
+    // Anche con una root lunghissima: la cartella non entra nella riga.
+    const enorme = 'D:\\' + 'x'.repeat(100_000);
+    assert.deepEqual(gruppiDiLancio(veri.map((f) => join(enorme, relative(REPO_ROOT, f))), { root: enorme }), gruppiDiLancio(veri));
+  });
+
+  test('con la suite di oggi un gruppo solo: l’uscita resta quella di un `node --test` qualunque', () => {
+    assert.equal(gruppiDiLancio(collectTestFiles(), { flags: flagsConRiepilogo([], join(LUNGO, 'g.jsonl')) }).length, 1);
+  });
+
+  test('un file fuori dalla root resta assoluto, e le barre sono quelle normali', () => {
+    const fuori = resolve(REPO_ROOT, '..', 'altrove', 'a.test.mjs');
+    assert.equal(perLaRiga(fuori), fuori);
+    assert.equal(perLaRiga(join(REPO_ROOT, 'tests', 'unit', 'sotto', 'b.test.mjs')), 'tests/unit/sotto/b.test.mjs');
+  });
+
+  test('i lotti degli spec della chiusura sono la stessa funzione, col tetto di cmd.exe', () => {
+    assert.equal(lottiDiFinish, lottiPerRigaDiComando);
+    assert.deepEqual(lottiPerRigaDiComando(['a', 'b', 'c'], 4), [['a', 'b'], ['c']]);
+    assert.deepEqual(lottiPerRigaDiComando(['abcdef'], 4), [['abcdef']], 'una voce più lunga del tetto va da sola, non sparisce');
+  });
+});
+
+describe('il riepilogo di una suite a gruppi', () => {
+  test('il reporter del riepilogo si aggiunge senza spegnere quello che si vede', () => {
+    assert.deepEqual(flagsConRiepilogo([], 'R', { tty: true }),
+      ['--test-reporter=spec', '--test-reporter-destination=stdout', '--test-reporter=./scripts/lib/riepilogo-unit.mjs', '--test-reporter-destination=R']);
+    assert.equal(flagsConRiepilogo([], 'R', { tty: false })[0], '--test-reporter=tap', 'fuori dal terminale node usa tap, e tap si legge nei log del cancello');
+    assert.deepEqual(flagsConRiepilogo(['--test-reporter=dot'], 'R').slice(0, 2), ['--test-reporter=dot', '--test-reporter-destination=stdout']);
+    assert.equal(flagsConRiepilogo(['--test-reporter=dot', '--test-reporter=tap', '--test-reporter-destination=x'], 'R'), null);
+  });
+
+  test('somma i gruppi contando come node, e i rossi sono le cause, non i genitori', () => {
+    const t = (esito, nome, extra = {}) => ({ esito, nome, file: join(REPO_ROOT, 'tests', 'unit', 'a.test.mjs'), riga: 3, suite: false, causa: null, skip: false, todo: false, ...extra });
+    const somma = sommaRiepiloghi([
+      [t('pass', 'uno'), t('fail', 'due', { causa: 'testCodeFailure' }), t('fail', 'S', { suite: true, causa: 'subtestsFailed' })],
+      [t('pass', 'tre', { skip: true }), t('fail', 'quattro', { todo: true }), t('fail', 'figlio', { causa: 'cancelledByParent' }),
+        t('fail', 'H', { suite: true, causa: 'hookFailed' })],
+    ]);
+    assert.deepEqual({ ...somma, rossi: somma.rossi.map((r) => `${r.gruppo}:${r.nome}`) },
+      { test: 5, pass: 1, fail: 1, annullati: 1, saltati: 1, todo: 1, rossi: ['1:due', '2:H'] });
+    const testo = testoRiepilogo({ somma, gruppi: 2, file: 2, esiti: [1, 1] });
+    assert.match(testo, /riepilogo di 2 gruppi, 2 file: 5 test, 1 passato, 1 fallito, 1 annullato, 1 saltato, 1 da fare\./);
+    assert.match(testo, /✖ tests\/unit\/a\.test\.mjs:3 {2}due {2}\(gruppo 1\)/);
+    assert.match(testo, /ROSSO: gruppi 1, 2 di 2\.$/);
+  });
+
+  test('un gruppo rosso senza un test rosso registrato non sparisce dal riepilogo', () => {
+    const testo = testoRiepilogo({ somma: sommaRiepiloghi([[], []]), gruppi: 2, file: 9, esiti: [0, 1] });
+    assert.match(testo, /il gruppo 2 è uscito rosso senza un test rosso registrato/);
+    assert.match(testo, /ROSSO: gruppo 2 di 2\.$/);
+  });
+
+  test('a gruppi: girano tutti, un gruppo rosso fa rossa l’uscita, e alla fine c’è il conto di tutti', () => {
+    const casa = cartellaTemporanea('filo-runner-gruppi-');
+    const marche = join(casa, 'marche');
+    const prove = join(casa, 'prove');
+    try {
+      mkdirSync(marche, { recursive: true });
+      mkdirSync(prove, { recursive: true });
+      const scrivi = (nome, rosso) => writeFileSync(join(prove, nome), [
+        "import { test } from 'node:test';",
+        "import { writeFileSync } from 'node:fs';",
+        "import { join } from 'node:path';",
+        `test('prova ${nome}', () => { writeFileSync(join(process.env.FILO_MARCHE, '${nome}'), ''); ${rosso ? "throw new Error('rosso voluto');" : ''} });`,
+      ].join('\n'));
+      scrivi('a.test.mjs', false);
+      scrivi('b.test.mjs', true);
+      scrivi('c.test.mjs', false);
+      // Tetto minimo: ogni file nel suo gruppo, come su Windows con una suite enorme. Senza NODE_TEST_CONTEXT,
+      // o il `node --test` annidato riferirebbe al processo di questa prova invece che al lanciatore.
+      const { NODE_TEST_CONTEXT: _, ...ambiente } = process.env;
+      const lancia = () => spawnSync(process.execPath, [LANCIATORE], {
+        cwd: ROOT, encoding: 'utf8',
+        env: { ...ambiente, FILO_UNIT_DIR: prove, FILO_UNIT_TETTO_RIGA: '1', FILO_MARCHE: marche },
+      });
+      const r = lancia();
+      assert.notEqual(r.status, 0, 'un gruppo rosso deve fare rossa l’uscita');
+      assert.deepEqual(readdirSync(marche).sort(), ['a.test.mjs', 'b.test.mjs', 'c.test.mjs'], 'il gruppo dopo il rosso deve girare lo stesso');
+      assert.equal((r.stdout.match(/^TAP version/gm) || []).length, 3, 'ogni gruppo stampa la sua uscita');
+      assert.match(r.stdout, /^not ok 1 - prova b\.test\.mjs/m, 'il registro del cancello cerca le righe «not ok»');
+      const coda = r.stdout.slice(r.stdout.lastIndexOf('[test:unit] riepilogo'));
+      assert.match(coda, /riepilogo di 3 gruppi, 3 file: 3 test, 2 passati, 1 fallito\./);
+      assert.match(coda, /✖ .*b\.test\.mjs:4 {2}prova b\.test\.mjs {2}\(gruppo 2\)/);
+      assert.match(coda, /ROSSO: gruppo 2 di 3\.\s*$/);
+
+      scrivi('b.test.mjs', false);
+      assert.ok(togliCartella(marche), `${marche} è ancora tenuta da qualcuno`); mkdirSync(marche);
+      const verde = lancia();
+      assert.equal(verde.status, 0, verde.stdout + verde.stderr);
+      assert.equal(readdirSync(marche).length, 3);
+      assert.match(verde.stdout, /3 test, 3 passati, 0 falliti\.\s+\[test:unit\] verde: 3 gruppi, 3 file\.\s*$/);
+    } finally { togliCartella(casa); }
+  });
+});
+
+const { NODE_TEST_CONTEXT: _contesto, ...AMBIENTE } = process.env;
+const lanciaSu = (dir, args = [], extra = {}) => spawnSync(process.execPath, [LANCIATORE, ...args], {
+  cwd: ROOT, encoding: 'utf8', env: { ...AMBIENTE, FILO_UNIT_DIR: dir, ...extra },
+});
+
+describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
+  test('una destinazione su file passa per una copia di gruppo; stdout e stderr restano', () => {
+    const r = rapportiDaRiunire(
+      ['--test-reporter=junit', '--test-reporter-destination=out.xml', '--test-reporter=spec', '--test-reporter-destination', 'stdout',
+        '--test-reporter=tap', '--test-reporter-destination', 'b.tap'],
+      (k) => `COPIA${k}`,
+    );
+    assert.deepEqual(r.rapporti, ['out.xml', 'b.tap']);
+    assert.deepEqual(r.accodati, ['stdout', 'b.tap'], 'spec e tap restano uno per gruppo, file o stdout che sia');
+    assert.deepEqual(r.flags, ['--test-reporter=junit', '--test-reporter-destination=COPIA0', '--test-reporter=spec',
+      '--test-reporter-destination=stdout', '--test-reporter=tap', '--test-reporter-destination=COPIA1']);
+  });
+
+  test('un documento su stdout, junit o lcov, passa anch’esso per una copia; i formati che scorrono restano su stdout', () => {
+    const c = (k) => `COPIA${k}`;
+    assert.deepEqual(rapportiDaRiunire(['--test-reporter=junit'], c),
+      { flags: ['--test-reporter=junit', '--test-reporter-destination=COPIA0'], rapporti: ['stdout'], accodati: [] });
+    assert.deepEqual(rapportiDaRiunire(['--test-reporter', 'lcov', '--test-reporter-destination', 'stdout'], c).rapporti, ['stdout']);
+    assert.deepEqual(rapportiDaRiunire(['--test-reporter=spec'], c).rapporti, []);
+    const misti = ['--test-reporter=dot', '--test-reporter=junit', '--test-reporter-destination=x'];
+    assert.deepEqual(rapportiDaRiunire(misti, c), { flags: misti, rapporti: [], accodati: [] }, 'numeri diversi: decide node, che rifiuta');
+  });
+
+  test('i file dati a mano si separano dalle opzioni, anche dai valori scritti dopo l’opzione', () => {
+    assert.deepEqual(
+      separaArgomenti(['--test-reporter', 'spec', 'a.test.mjs', '--test-name-pattern', 'b.test.mjs', '--experimental-test-coverage', 'c.mjs']),
+      { opzioni: ['--test-reporter', 'spec', '--test-name-pattern', 'b.test.mjs', '--experimental-test-coverage'], posizionali: ['a.test.mjs', 'c.mjs'] },
+    );
+  });
+
+  test('a gruppi un junit su stdout è un documento solo, e stdout non porta altro', () => {
+    const casa = cartellaTemporanea('filo-runner-junit-stdout-');
+    try {
+      for (const n of ['uno', 'due', 'tre']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('caso-${n}', () => {});\n`);
+      const r = lanciaSu(casa, ['--test-reporter=junit'], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stderr, /3 file in 3 gruppi/);
+      assert.match(r.stderr, /riuniti sull'uscita standard/);
+      assert.match(r.stdout.trim(), /^<\?xml[^>]*\?>\s*<testsuites>[\s\S]*<\/testsuites>$/);
+      assert.equal((r.stdout.match(/<\?xml/g) || []).length, 1);
+      for (const n of ['uno', 'due', 'tre']) assert.match(r.stdout, new RegExp(`name="caso-${n}"`));
+    } finally { togliCartella(casa); }
+  });
+
+  test('un rapporto che non si può scrivere fa rosso l’esito, e il riepilogo non lo dà per riunito', () => {
+    const casa = cartellaTemporanea('filo-runner-rapporto-perso-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const dest = join(casa, 'manca', 'r.xml');
+      const r = lanciaSu(casa, ['--test-reporter=junit', `--test-reporter-destination=${dest}`], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.doesNotMatch(r.stdout, /riuniti/);
+      assert.match(r.stdout, /non è stato scritto/);
+      assert.match(r.stdout.trim().split('\n').pop(), /^\[test:unit\] ROSSO: rapporto non scritto\.$/);
+    } finally { togliCartella(casa); }
+  });
+
+  test('a gruppi un tap su file non si dice riunito: il riepilogo dice che ha un rapporto per gruppo', () => {
+    const casa = cartellaTemporanea('filo-runner-tap-file-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const dest = join(casa, 'r.tap');
+      const r = lanciaSu(casa, ['--test-reporter=tap', `--test-reporter-destination=${dest}`], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.doesNotMatch(r.stdout, /riuniti/);
+      assert.ok(r.stdout.includes(`in ${dest} c'è un rapporto per gruppo, uno dopo l'altro`), r.stdout);
+      assert.match(r.stdout, /i conti di tutta la suite sono in questo riepilogo/);
+      assert.equal((readFileSync(dest, 'utf8').match(/^TAP version/gm) || []).length, 2);
+    } finally { togliCartella(casa); }
+  });
+
+  test('a gruppi un file dato a mano gira una volta, e i conti tornano', () => {
+    const casa = cartellaTemporanea('filo-runner-argomento-');
+    const fuori = cartellaTemporanea('filo-runner-argomento-extra-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const extra = join(fuori, 'extra.test.mjs');
+      writeFileSync(extra, "import { test } from 'node:test';\ntest('extra', () => {});\n");
+      const r = lanciaSu(casa, [extra, join(casa, 'a.test.mjs')], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.equal((r.stdout.match(/ok \d+ - extra/g) || []).length, 1);
+      assert.equal((r.stdout.match(/ok \d+ - a\b/g) || []).length, 1, 'un file già trovato non gira due volte');
+      assert.match(r.stdout, /2 file: 3 test, 3 passati, 0 falliti/);
+    } finally {
+      togliCartella(casa);
+      togliCartella(fuori);
+    }
+  });
+
+  test('dei junit dei gruppi resta un documento solo con tutti i casi; gli altri formati si accodano', () => {
+    const j = (c) => `<?xml version="1.0" encoding="utf-8"?>\n<testsuites>\n\t<testcase name="${c}"/>\n</testsuites>\n`;
+    const uno = unisciRapporti([j('a'), j('b')]);
+    assert.equal((uno.match(/<testsuites>/g) || []).length, 1);
+    assert.equal((uno.match(/<\?xml/g) || []).length, 1);
+    assert.match(uno, /name="a"[\s\S]*name="b"/);
+    assert.equal(unisciRapporti(['uno\n', 'due\n']), 'uno\ndue\n');
+  });
+
+  test('il rapporto chiesto su file, a gruppi, contiene i test di ogni gruppo', () => {
+    const casa = cartellaTemporanea('filo-runner-rapporto-');
+    try {
+      for (const n of ['uno', 'due', 'tre']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('caso-${n}', () => {});\n`);
+      const xml = join(casa, 'rapporto.xml');
+      const testo = join(casa, 'rapporto.txt');
+      const r = lanciaSu(casa, ['--test-reporter=junit', `--test-reporter-destination=${xml}`, '--test-reporter=spec', '--test-reporter-destination', testo],
+        { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /3 file in 3 gruppi/);
+      const junit = readFileSync(xml, 'utf8');
+      assert.equal((junit.match(/<testsuites>/g) || []).length, 1, 'un documento junit solo');
+      for (const n of ['uno', 'due', 'tre']) {
+        assert.match(junit, new RegExp(`name="caso-${n}"`));
+        assert.match(readFileSync(testo, 'utf8'), new RegExp(`caso-${n}`));
+      }
+    } finally { togliCartella(casa); }
+  });
+
+  test('--watch a gruppi si rifiuta con la ragione, invece di fermarsi al primo gruppo per sempre', () => {
+    assert.ok(chiedeWatch(['--watch']) && chiedeWatch(['--watch-path=src']) && !chiedeWatch(['--test-only']));
+    const casa = cartellaTemporanea('filo-runner-watch-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const r = lanciaSu(casa, ['--watch'], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, /--watch/);
+    } finally { togliCartella(casa); }
+  });
+
+  test('copertura e rapporti su file a gruppi si dichiarano nel riepilogo; il rosso senza test rimanda anche al file', () => {
+    assert.ok(chiedeCopertura(['--experimental-test-coverage']) && !chiedeCopertura(['--test-only']));
+    const testo = testoRiepilogo({ somma: sommaRiepiloghi([[], []]), gruppi: 2, file: 4, esiti: [0, 1], rapporti: ['r.xml'], copertura: true });
+    assert.match(testo, /nella sua uscita, sopra o nel rapporto in r\.xml/);
+    assert.match(testo, /rapporti di tutti i gruppi sono riuniti in r\.xml/);
+    assert.match(testo, /copertura è per gruppo/);
+    // «dei 8», «dei 11»: l'articolo davanti a un numero cambia con la sua lettura.
+    const otto = testoRiepilogo({ somma: sommaRiepiloghi(Array(8).fill([])), gruppi: 8, file: 8, esiti: Array(8).fill(0), rapporti: ['r.xml'] });
+    assert.doesNotMatch(otto, /\bdei (8|11)\b/);
+    const misti = testoRiepilogo({ somma: sommaRiepiloghi([[], []]), gruppi: 2, file: 2, esiti: [0, 0], rapporti: ['r.xml', 'b.tap'], accodati: ['stdout', 'b.tap'] });
+    assert.match(misti, /rapporti di tutti i gruppi sono riuniti in r\.xml\./);
+    assert.match(misti, /sull'uscita standard c'è un rapporto per gruppo, uno dopo l'altro/);
+    assert.match(misti, /in b\.tap c'è un rapporto per gruppo, uno dopo l'altro/);
+    assert.doesNotMatch(misti, /riuniti[^\n]*b\.tap/);
+  });
+});
+
+describe('un file trovato è un file che gira', () => {
+  test('per un node che legge modelli, i caratteri speciali del nome si prendono alla lettera', () => {
+    assert.equal(allaLettera('tests/unit/caso [1] (b).test.mjs'), 'tests/unit/caso [[]1[]] [(]b[)].test.mjs');
+    assert.deepEqual(fileArgs([join(REPO_ROOT, 'tests', 'unit', 'a [1].test.mjs')], REPO_ROOT, { modelli: true }), ['tests/unit/a [[]1[]].test.mjs']);
+    assert.deepEqual(fileArgs([join(REPO_ROOT, 'tests', 'unit', 'a [1].test.mjs')], REPO_ROOT, { modelli: false }), ['tests/unit/a [1].test.mjs']);
+    assert.equal(NODE_LEGGE_MODELLI, Number(process.versions.node.split('.')[0]) >= 21);
+  });
+
+  test('un test rosso in un file con quadre o tonde nel nome rende rosso l’esito, da solo e a gruppi', () => {
+    const casa = cartellaTemporanea('filo-runner-nomi-');
+    try {
+      writeFileSync(join(casa, 'verde.test.mjs'), "import { test } from 'node:test';\ntest('verde', () => {});\n");
+      writeFileSync(join(casa, 'caso [1] (b).test.mjs'), "import { test } from 'node:test';\ntest('rosso-nel-nome-strano', () => { throw new Error('x'); });\n");
+      for (const extra of [{}, { FILO_UNIT_TETTO_RIGA: '1' }]) {
+        const r = lanciaSu(casa, [], extra);
+        assert.notEqual(r.status, 0, `il file con le quadre non è girato: ${JSON.stringify(extra)}`);
+        assert.match(r.stdout, /rosso-nel-nome-strano/);
+      }
+    } finally { togliCartella(casa); }
+  });
+
+  test('un nome con graffe che node espanderebbe ferma la corsa e lo nomina, mai un verde senza quel file', () => {
+    assert.ok(nomeNonLanciabile('a{b,c}.test.mjs') && nomeNonLanciabile('a{1..2}.test.mjs') && !nomeNonLanciabile('a{b}.test.mjs'));
+    if (!NODE_LEGGE_MODELLI) return;
+    const casa = cartellaTemporanea('filo-runner-graffe-');
+    try {
+      writeFileSync(join(casa, 'a{b,c}.test.mjs'), "import { test } from 'node:test';\ntest('g', () => {});\n");
+      const r = lanciaSu(casa);
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, /a\{b,c\}\.test\.mjs/);
+    } finally { togliCartella(casa); }
+  });
+});
+
+// Un file appeso (col disco pieno, #717) teneva ferma la corsa per sempre, senza dire quale fosse. Il tetto conta il tempo
+// senza avanzamenti: uno sulla durata del file tagliava i file sani della macchina carica (#1063).
+test('il tetto conta il tempo fermo, è largo, e quello di node resta solo dove l\'avanzamento non si vede', () => {
+  assert.ok(TETTO_FERMO_MS >= 10 * 60 * 1000, 'un tetto stretto fa rossi sui Windows lenti');
+  const conGuardia = flagsConAvanzamento([], 'A');
+  assert.ok(!conGuardia.some((a) => a.startsWith('--test-timeout')), 'con la guardia node non deve contare la durata del file');
+  assert.deepEqual(conGuardia.slice(-2), ['--test-reporter=./scripts/lib/avanzamento-unit.mjs', '--test-reporter-destination=A']);
+  assert.equal(flagsConAvanzamento(['--test-reporter=dot', '--test-reporter=tap', '--test-reporter-destination=x'], 'A'), null);
+  assert.deepEqual(conTettoDiTempo(['--test-only']), [`--test-timeout=${TETTO_FERMO_MS}`, '--test-only']);
+  assert.deepEqual(conTettoDiTempo(['--test-timeout', '5000']), ['--test-timeout', '5000']);
+  assert.deepEqual(conTettoDiTempo(['--test-timeout=5000']), ['--test-timeout=5000']);
+});
+
+test('worker in parallelo (#1157): ognuno prende la sua parte di CPU, a meno che chi lancia non dica la sua', () => {
+  assert.deepEqual(conConcorrenza(['--x'], concorrenzaUnit(3, 16)), ['--test-concurrency=5', '--x']);
+  assert.deepEqual(conConcorrenza([], concorrenzaUnit(4, 2)), ['--test-concurrency=1'], 'almeno uno');
+  assert.deepEqual(conConcorrenza(['--x'], 0), ['--x'], 'fuori da un worker decide node, come prima');
+  assert.deepEqual(conConcorrenza([], concorrenzaUnit(1, 16)), [], 'un worker solo: tutte le CPU');
+  assert.deepEqual(conConcorrenza(['--test-concurrency', '2'], 4), ['--test-concurrency', '2']);
+  assert.deepEqual(conConcorrenza(['--test-concurrency=2'], 4), ['--test-concurrency=2']);
+});
+
+test('fermo è il primo file partito e non finito: gli altri aspettano lui', () => {
+  const r = [{ via: 'a' }, {}, { via: 'b' }, { via: 'c' }, { fine: 'a' }, {}, { via: 'd' }, { fine: 'c' }];
+  assert.deepEqual(fileInCorso(r), ['b', 'd']);
+  assert.deepEqual(fileInCorso([{}, {}]), []);
+  const t = testoFermo([join(ROOT, 'tests', 'unit', 'b.test.mjs'), join(ROOT, 'tests', 'unit', 'd.test.mjs')], 20 * 60 * 1000, ROOT);
+  assert.match(t, /ROSSO: tests\/unit\/b\.test\.mjs non è andato avanti per 20 minuti/);
+  assert.match(t, /senza esito: tests\/unit\/d\.test\.mjs/);
+  assert.match(testoFermo([], 3000, ROOT), /ROSSO: per 3 secondi non è andato avanti niente/);
+});
+
+test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto di node', () => {
+  const casa = cartellaTemporanea('filo-copia-lanciatore-');
+  try {
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
+      mkdirSync(dirname(join(casa, f)), { recursive: true });
+      writeFileSync(join(casa, f), readFileSync(join(ROOT, f)));
+    }
+    mkdirSync(join(casa, 'tests', 'unit'), { recursive: true });
+    writeFileSync(join(casa, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(casa, 'tests', 'unit', 'base.test.mjs'), "import { test } from 'node:test';\ntest('base', () => {});\n");
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.FILO_UNIT_DIR;
+    const r = spawnSync(process.execPath, [join(casa, 'scripts', 'run-unit-tests.mjs')], { env, cwd: casa, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - base$/m);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza non arriva mai al tetto', () => {
+  const lento = guardiaFermo(1000);
+  assert.equal(lento(0, 0), false);
+  assert.equal(lento(0, 50_000), false, 'prima del primo evento node sta ancora partendo');
+  for (let t = 1; t <= 30; t++) assert.equal(lento(t * 10, 50_000 + t * 900), false, 'un evento ogni 900 ms su un tetto di 1000');
+  const appeso = guardiaFermo(1000);
+  assert.equal(appeso(10, 0), false);
+  assert.equal(appeso(10, 999), false);
+  assert.equal(appeso(10, 1000), true);
+});
+
+// #1231: chiusa la corsa intera, i file dopo quello appeso non giravano e una chiusura restava ferma più di un'ora.
+test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli altri file girano e dicono il loro esito', () => {
+  const dir = cartellaTemporanea('filo-fermo-');
+  try {
+    // I sani non hanno un tempo da rispettare (#1235): partono con gli appesi, e il primo appeso va avanti finché non
+    // sono usciti. Il tetto conta solo per gli appesi.
+    const usciti = ['b', 'd'].map((n) => join(dir, `${n}.uscito`));
+    const esceSegnando = (f) => `import { writeFileSync } from 'node:fs';\nprocess.on('exit', () => writeFileSync(${JSON.stringify(f)}, ''));\n`;
+    writeFileSync(join(dir, 'a-appeso-dopo.test.mjs'), "import { test } from 'node:test';\nimport { existsSync } from 'node:fs';\n"
+      + `const usciti = ${JSON.stringify(usciti)};\nconst oltre = Date.now() + 120_000;\n`
+      + "test('prima di appendersi', async (t) => {\n"
+      + "  while (!usciti.every((f) => existsSync(f))) {\n"
+      + "    if (Date.now() > oltre) throw new Error('i file sani non sono usciti in due minuti');\n"
+      + "    await t.test('aspetta i sani', () => new Promise((ok) => setTimeout(ok, 100)));\n"
+      + '  }\n});\nsetInterval(() => {}, 1000);\n');
+    writeFileSync(join(dir, 'b-sano.test.mjs'), `import { test } from 'node:test';\n${esceSegnando(usciti[0])}test('sano dopo il primo appeso', () => {});\n`);
+    writeFileSync(join(dir, 'c-appeso-subito.test.mjs'), "setInterval(() => {}, 1000);\nawait new Promise(() => {});\n");
+    writeFileSync(join(dir, 'd-sano.test.mjs'), `import { test } from 'node:test';\n${esceSegnando(usciti[1])}test('sano in fondo', () => {});\n`);
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '6000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE, '--test-concurrency=4'], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    const uscita = `${r.stdout}\n${r.stderr}`;
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.match(r.stdout, /^ok \d+ - prima di appendersi$/m, uscita);
+    assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m, uscita);
+    assert.match(r.stdout, /^ok \d+ - sano in fondo$/m, uscita);
+    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso; gli altri file sono andati avanti/, uscita);
+    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso/, uscita);
+    assert.match(r.stdout, /^not ok \d+ - .*c-appeso-subito\.test\.mjs$/m, 'node lo dà rosso');
+    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/, uscita);
+    assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/, uscita);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('quattro file appesi insieme si chiudono tutti, ciascuno col suo nome, e la corsa finisce', () => {
+  const dir = cartellaTemporanea('filo-appesi-insieme-');
+  try {
+    const nomi = ['a', 'b', 'c', 'd'].map((n) => `${n}-appeso.test.mjs`);
+    for (const n of nomi) writeFileSync(join(dir, n), "import { test } from 'node:test';\ntest('appeso', async () => { setInterval(() => {}, 1000); await new Promise(() => {}); });\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '6000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE, '--test-concurrency=4'], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    for (const n of nomi) assert.match(r.stdout, new RegExp(`ROSSO: .*${n.replace('.', '\\.')} non è andato avanti per 6 secondi ed è stato chiuso`));
+    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('il tetto per file conta solo l\'avanzamento del primo file in corso: gli altri che partono e finiscono non lo fanno ripartire', () => {
+  const g = guardiaPerFile(1000);
+  assert.equal(g([{ via: 'a' }, {}], 0), null);
+  assert.equal(g([{}], 900), null);
+  assert.equal(g([], 1800), null, 'l\'ultimo passo di a è a 900');
+  assert.equal(g([{ via: 'b' }, { fine: 'b' }, { via: 'c' }], 1899), null);
+  assert.deepEqual(g([], 1900), { file: ['a'] }, 'b e c partiti o finiti non sono avanzamento di a; c è partito da poco');
+  assert.equal(g([], 2500), null, 'detto una volta, il suo tempo riparte');
+  assert.deepEqual(g([], 2900), { tutto: true }, 'ridetto senza che sia finito niente: chiuderlo non è servito');
+
+  const h = guardiaPerFile(1000);
+  assert.equal(h([{ via: 'a' }, {}, { via: 'b' }, { via: 'z' }], 0), null);
+  assert.equal(h([{ fine: 'z' }], 500), null);
+  assert.deepEqual(h([], 1000), { file: ['a'] }, 'z è finito da poco: la corsa va avanti, si chiude solo il primo');
+  assert.equal(h([{ fine: 'a' }, { via: 'c' }, { fine: 'c' }], 1100), null, 'chiuso a, il primo diventa b e il suo tempo parte adesso');
+  assert.equal(h([], 2099), null);
+  assert.deepEqual(h([], 2100), { file: ['b'] });
+  assert.equal(h([{ fine: 'b' }], 2200), null);
+  assert.equal(h([], 99_999), null, 'nessun file in corso: niente da chiudere');
+});
+
+// #1231: in fila dietro il primo, quattro file appesi insieme costavano quattro tetti; col disco pieno (#717), centinaia.
+test('più file appesi insieme si chiudono insieme, e se dopo non finisce più niente si chiude la corsa', () => {
+  const g = guardiaPerFile(1000);
+  assert.equal(g([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}, {}], 0), null);
+  assert.equal(g([{ via: 'd' }], 400), null);
+  assert.deepEqual(g([], 1000), { file: ['a', 'b', 'c'] }, 'nessun file finito in un tetto: con a i partiti da un tetto; d è appena partito');
+  assert.equal(g([{ fine: 'a' }, { fine: 'b' }, { fine: 'c' }, { via: 'e' }], 1100), null, 'le fini dei chiusi non sono avanzamento');
+  assert.equal(g([], 2099), null);
+  assert.deepEqual(g([], 2100), { tutto: true }, 'dopo una chiusura non è finito niente per un tetto: la corsa è ferma');
+
+  const sani = guardiaPerFile(1000);
+  sani([{ via: 'a' }, { via: 'b' }, {}], 0);
+  assert.deepEqual(sani([], 1000), { file: ['a', 'b'] });
+  assert.equal(sani([{ fine: 'a' }, { fine: 'b' }, { via: 'c' }, { via: 'd' }, { fine: 'd' }], 1500), null);
+  assert.deepEqual(sani([], 2500), { file: ['c'] }, 'd è finito da sé: la corsa va avanti, e si continua a chiudere file');
+  assert.match(testoFileChiusi([join(ROOT, 'tests', 'unit', 'x.test.mjs')], 20 * 60 * 1000, ROOT),
+    /^\[test:unit\] ROSSO: tests\/unit\/x\.test\.mjs non è andato avanti per 20 minuti ed è stato chiuso; gli altri file sono andati avanti\.$/);
+});
+
+// #1235: chiusa la corsa, gli esiti dei file finiti dietro all'ultimo appeso sparivano.
+test('in fondo alla corsa l\'appeso che resta dopo una chiusura si chiude da solo; se dopo è partito qualcosa che non finisce, è ferma la corsa', () => {
+  const coda = guardiaPerFile(1000);
+  assert.equal(coda([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}], 0), null);
+  assert.equal(coda([{ fine: 'b' }], 300), null);
+  assert.deepEqual(coda([], 1000), { file: ['a'] }, 'b è finito da poco: la corsa è viva, si chiude solo il primo');
+  assert.equal(coda([{ fine: 'a' }], 1100), null);
+  assert.equal(coda([], 2099), null);
+  assert.deepEqual(coda([], 2100), { file: ['c'] }, 'dopo la chiusura non è partito niente: c è un appeso di prima, come a');
+  assert.equal(coda([{ fine: 'c' }], 2200), null);
+  assert.equal(coda([], 99_999), null);
+
+  const ferma = guardiaPerFile(1000);
+  ferma([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}], 0);
+  ferma([{ fine: 'b' }], 300);
+  assert.deepEqual(ferma([], 1000), { file: ['a'] });
+  assert.equal(ferma([{ fine: 'a' }, { via: 'd' }], 1100), null);
+  assert.deepEqual(ferma([], 2100), { tutto: true }, 'd è partito dopo la chiusura e non finisce nemmeno lui');
+});
+
+test('il processo del file da chiudere si trova dalla riga di comando, coi suoi figli, e solo sotto il node --test', () => {
+  const lista = leggiProcessi([
+    '  100     1 /usr/bin/node /home/u/Filo/scripts/run-unit-tests.mjs',
+    '  200   100 /usr/bin/node --test --test-reporter=tap tests/unit/a.test.mjs tests/unit/xa.test.mjs',
+    '  201   200 /usr/bin/node tests/unit/xa.test.mjs',
+    '  202   200 /usr/bin/node /home/u/Filo/tests/unit/a.test.mjs',
+    '  203   202 /usr/bin/node figlio.mjs',
+    '  204   203 sleep 100',
+    '  300     1 /usr/bin/node tests/unit/a.test.mjs',
+    'riga che non è un processo',
+  ].join('\n'));
+  assert.equal(lista.length, 7);
+  assert.deepEqual(processiDelFile(lista, 200, '/home/u/Filo/tests/unit/a.test.mjs', { root: '/home/u/Filo', p: posix }), [202, 203, 204]);
+  assert.deepEqual(processiDelFile(lista, 200, '/home/u/Filo/tests/unit/xa.test.mjs', { root: '/home/u/Filo', p: posix }), [201]);
+  assert.deepEqual(processiDelFile(lista, 200, '/home/u/Filo/tests/unit/b.test.mjs', { root: '/home/u/Filo', p: posix }), []);
+
+  const win = leggiProcessi('512 64 "C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\agenti AI\\Filo\\Tests\\unit\\a.test.mjs"\r\n'
+    + '513 64 "C:\\Program Files\\nodejs\\node.exe" tests\\unit\\b.test.mjs\r\n514 64 \r\n');
+  const comeWin = { root: 'C:\\Users\\agenti AI\\Filo', p: win32 };
+  assert.deepEqual(processiDelFile(win, 64, 'C:\\Users\\agenti AI\\Filo\\tests\\unit\\a.test.mjs', comeWin), [512]);
+  assert.deepEqual(processiDelFile(win, 64, 'C:\\Users\\agenti AI\\Filo\\tests\\unit\\b.test.mjs', comeWin), [513]);
+});
+
+test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
+  const dir = cartellaTemporanea('filo-appeso-');
+  try {
+    writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';\ntest('appeso', async () => { setInterval(() => {}, 1000); await new Promise(() => {}); });\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts', 'run-unit-tests.mjs'), '--test-timeout=1500'],
+      { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /appeso\.test\.mjs/);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('l\'orologio della guardia va alla velocità della macchina: carica quattro volte, un minuto conta un quarto', () => {
+  let lavoro = 10;
+  let ora = 0;
+  const tempo = orologioMacchina({ misura: () => lavoro, ora: () => ora });
+  assert.equal(tempo(), 0);
+  ora = 60_000;
+  assert.equal(tempo(), 60_000, 'a macchina libera conta come l\'orologio');
+  lavoro = 40;
+  ora = 120_000;
+  assert.equal(tempo(), 75_000);
+  lavoro = 10;
+  ora = 180_000;
+  assert.equal(tempo(), 135_000, 'tornata libera, torna a contare per intero');
+});
+
+test('le righe che un test stampa non sono avanzamento: un file appeso che scrive diventa un rosso col suo nome', async () => {
+  const { default: avanzamento } = await import('../../scripts/lib/avanzamento-unit.mjs');
+  async function* eventi() {
+    yield { type: 'test:stdout', data: { message: 'aspetto' } };
+    yield { type: 'test:stderr', data: { message: 'aspetto' } };
+    yield { type: 'test:diagnostic', data: { message: 'aspetto' } };
+    yield { type: 'test:pass', data: { nesting: 1, name: 'x' } };
+  }
+  const righe = [];
+  for await (const r of avanzamento(eventi())) righe.push(r);
+  assert.deepEqual(righe, ['{}\n']);
+
+  // Del test che node crea per ogni file valgono solo partenza e fine: il resto arriva anche mentre il primo è fermo.
+  const f = join(ROOT, 'tests', 'unit', 'z.test.mjs');
+  async function* delFile() {
+    for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:pass', 'test:complete']) yield { type, data: { nesting: 0, name: f, file: f } };
+    yield { type: 'test:pass', data: { nesting: 0, name: 'dentro', file: f } };
+  }
+  const delle = [];
+  for await (const r of avanzamento(delFile())) delle.push(r);
+  assert.deepEqual(delle, [`${JSON.stringify({ via: f })}\n`, `${JSON.stringify({ fine: f })}\n`, '{}\n']);
+
+  const dir = cartellaTemporanea('filo-appeso-che-stampa-');
+  try {
+    writeFileSync(join(dir, 'chiacchiera.test.mjs'), "import { test } from 'node:test';\n"
+      + "test('appeso che stampa', async () => { setInterval(() => console.log('aspetto ancora'), 100); await new Promise(() => {}); });\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.match(r.stdout, /ROSSO: .*chiacchiera\.test\.mjs non è andato avanti/);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('--solo fa girare solo i file dati, con la guardia della corsa intera: un file fermo diventa un rosso col suo nome', () => {
+  const dir = cartellaTemporanea('filo-solo-');
+  try {
+    writeFileSync(join(dir, 'scelto.test.mjs'), "import { test } from 'node:test';\ntest('scelto', () => {});\n");
+    writeFileSync(join(dir, 'altro.test.mjs'), "import { test } from 'node:test';\ntest('altro', () => { throw new Error('non doveva girare'); });\n");
+    writeFileSync(join(dir, 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir };
+    delete env.NODE_TEST_CONTEXT;
+    // Il tetto piccolo solo dove c'è un fermo da chiudere: sotto carico un file sano può metterci di più a partire (#1235).
+    const lancia = (file, tetto = {}) => spawnSync(process.execPath, [LANCIATORE, '--solo', ...file], { env: { ...env, ...tetto }, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+
+    const scelto = lancia([join(dir, 'scelto.test.mjs')]);
+    assert.equal(scelto.status, 0, scelto.stdout + scelto.stderr);
+    assert.match(scelto.stdout, /^ok 1 - scelto$/m);
+    assert.doesNotMatch(scelto.stdout, /altro|fermo/);
+
+    const fermo = lancia([join(dir, 'fermo.test.mjs')], { FILO_UNIT_TETTO_FERMO_MS: '3000' });
+    assert.notEqual(fermo.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
+    assert.match(fermo.stdout, /ROSSO: .*fermo\.test\.mjs non è andato avanti/);
+    assert.equal(fermo.status, 1);
+
+    const vuoto = lancia([]);
+    assert.equal(vuoto.status, 1, 'zero file non è un verde');
+    assert.match(vuoto.stderr, /--solo senza file/);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('i test non vedono chi è la sessione che li lancia: una routine e una sessione locale corrono gli stessi test (#949.1)', () => {
+  const casa = cartellaTemporanea('filo-runner-identita-');
+  try {
+    writeFileSync(join(casa, 'identita.test.mjs'), [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      `const chiavi = ${JSON.stringify(IDENTITA_SESSIONE)};`,
+      "test('identita', () => { assert.deepEqual(chiavi.filter((k) => k in process.env), []); assert.equal(process.env.FILO_ALTRO, 'resta'); });",
+    ].join('\n'));
+    const sessione = Object.fromEntries(IDENTITA_SESSIONE.map((k) => [k, k === 'FILO_ROUTINE' ? '1' : `valore-${k}`]));
+    const r = lanciaSu(casa, [], { ...sessione, FILO_ALTRO: 'resta' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - identita$/m);
+    assert.ok(['FILO_ROUTINE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID'].every((k) => IDENTITA_SESSIONE.includes(k)), 'un elenco svuotato farebbe passare la prova senza togliere niente');
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('nemmeno dalla cartella di Claude: col biglietto in cartella un test non misura la sessione che lo lancia (#730.6)', () => {
+  const casa = cartellaTemporanea('filo-runner-claude-');
+  try {
+    // La sessione che lancia: il suo transcript sta dove il ripiego lo cerca, per la cartella da cui partono i test.
+    const claude = join(casa, 'claude-della-sessione');
+    const progetto = join(claude, 'projects', slugProgetto(ROOT));
+    mkdirSync(progetto, { recursive: true });
+    const turno = { type: 'assistant', message: { id: 'm1', model: 'claude-opus-5-5', usage: { input_tokens: 10, output_tokens: 5 } } };
+    writeFileSync(join(progetto, 'sessione-vera.jsonl'), `${JSON.stringify(turno)}\n`);
+    const lavoro = join(casa, 'lavoro');
+    mkdirSync(join(lavoro, '.claude'), { recursive: true });
+    writeFileSync(join(lavoro, '.claude', 'routine-ticket.json'), '{}');
+    const prove = join(casa, 'prove');
+    mkdirSync(prove);
+    writeFileSync(join(prove, 'crediti.test.mjs'), [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      `import { misureCrediti } from ${JSON.stringify(pathToFileURL(join(ROOT, 'scripts', 'routine-channel.mjs')).href)};`,
+      `test('crediti', () => { assert.deepEqual(misureCrediti({ root: ${JSON.stringify(lavoro)} }), {}); });`,
+    ].join('\n'));
+    const r = lanciaSu(prove, [], { CLAUDE_CONFIG_DIR: claude, FILO_ROUTINE: '1' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - crediti$/m);
+  } finally {
+    togliCartella(casa);
+  }
 });

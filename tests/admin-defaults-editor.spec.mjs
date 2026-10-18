@@ -29,9 +29,13 @@ async function openStubbedEditor(openTab, overrides = {}) {
       excludedProviders: null,
       ...over,
     };
+    // `__defaultsMinus`: la lista del codice tranne quelle voci, letta dal codice e
+    // non ricopiata, così una voce di serie nuova non sposta l'avviso del test.
     if (fakeConfig.excludedProviders == null) {
+      const minus = new Set(fakeConfig.__defaultsMinus || []);
       Object.defineProperty(fakeConfig, 'excludedProviders', {
-        get: () => (window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [],
+        get: () => ((window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [])
+          .filter((n) => !minus.has(n)),
       });
     }
     window.__sent = [];
@@ -62,6 +66,11 @@ async function openStubbedEditor(openTab, overrides = {}) {
               { name: 'Together', slug: 'together' },
             ],
           };
+        case 'audio_host_check': {
+          // Come il main: il verdetto dipende dalla lista di esclusione che la pagina manda (#1141).
+          const misto = msg.model === 'acme/misto' && Array.isArray(msg.excluded) && msg.excluded.includes('OpenAI');
+          return misto ? { ok: true, verdict: 'mixed', warning: `Con «${msg.label}» la lettura non parte.` } : { ok: true, verdict: 'ok' };
+        }
         case 'test_default_model':
           // Il main risponderebbe ok solo se riceve la stringa modello.
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
@@ -205,6 +214,25 @@ test('la lista dei fornitori esclusi si modifica e si salva nella config condivi
   await page.screenshot({ path: 'tests/.shots/admin-defaults-excluded.png', fullPage: true }).catch(() => {});
 });
 
+test('voce e dettatura: l\'avviso del modello segue la lista dei fornitori esclusi che si sta modificando (#1141)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google', 'OpenAI'],
+    modelRegistry: { 'voce-mista': { provider: 'openrouter', model: 'acme/misto', label: 'Voce mista', inputs: ['text'], outputs: ['audio'] } },
+    models: { tts: 'voce-mista' },
+  });
+  const idx = await page.evaluate(() => window.SN_MODEL_CHAIN.actionLabels().findIndex(([a]) => a === 'tts'));
+  const avviso = page.locator('#modelsGrid > div').nth(idx).locator('.sn-chain-warn');
+  await expect(avviso).toHaveText('Con «Voce mista» la lettura non parte.');
+  const chiesto = await page.evaluate(() => window.__sent.filter((m) => m.type === 'audio_host_check').pop());
+  expect(chiesto).toMatchObject({ action: 'tts', provider: 'openrouter', model: 'acme/misto', excluded: ['Google', 'OpenAI'] });
+
+  // Tolto OpenAI dalla lista (non ancora salvata), l'avviso se ne va.
+  await page.locator('#excludedList .sn-excluded-row').nth(1).getByRole('button', { name: 'Rimuovi' }).click();
+  await expect(avviso).toBeHidden();
+  const dopo = await page.evaluate(() => window.__sent.filter((m) => m.type === 'audio_host_check').pop());
+  expect(dopo.excluded).toEqual(['Google']);
+});
+
 test('esclusioni del codice che la lista condivisa non copre: la pagina le nomina e le rimette', async ({ openTab }) => {
   // Lista remota vecchia: non contiene Novita (né gli altri aggiunti dopo).
   const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'OpenAI'] });
@@ -313,9 +341,7 @@ test('ogni fornitore escluso dice perché, e il perché si salva', async ({ open
 // #541 giro 1: il nome che il menu scrive per Novita è quello del catalogo; la
 // pagina deve riconoscerlo come la voce del codice, e dargli il suo motivo.
 test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e il motivo segue', async ({ openTab }) => {
-  const page = await openStubbedEditor(openTab, {
-    excludedProviders: ['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI'],
-  });
+  const page = await openStubbedEditor(openTab, { __defaultsMinus: ['Novita'] });
   await expect(page.locator('#excludedDriftText')).toContainText('Novita');
   await page.click('#addExcludedRow');
   const row = page.locator('#excludedList .sn-excluded-row').last();
@@ -331,6 +357,33 @@ test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e i
   await expect(page.locator('#excludedDrift')).toBeVisible();
   await row.locator('.sn-model-id-wrap .sn-select-option', { hasText: 'NovitaAI' }).click();
   await expect(page.locator('#excludedDrift')).toBeHidden();
+});
+
+// #1004.2: il blur chiude il menu in ritardo; un campo tornato a fuoco nel frattempo
+// deve tenerlo aperto, e un campo già a fuoco lo riapre al clic.
+test('il menu del catalogo resta sceglibile se il campo torna a fuoco subito, e si riapre al clic', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  await page.click('#addExcludedRow');
+  const row = page.locator('#excludedList .sn-excluded-row').last();
+  const name = row.locator('.sn-excluded-name');
+  const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
+  await name.click();
+  await expect(pop).toBeVisible();
+
+  await name.evaluate((el) => { el.blur(); el.focus(); });
+  await page.waitForTimeout(300);
+  await expect(pop).toBeVisible();
+  await pop.locator('.sn-select-option', { hasText: 'NovitaAI' }).click();
+  await expect(name).toHaveValue('NovitaAI');
+  await expect(row.locator('.sn-excluded-kind')).toHaveValue('unreliable');
+  await expect(pop).toBeHidden();
+
+  // Dopo la scelta il campo resta a fuoco: cambiarla passa di nuovo dal menu.
+  await expect(name).toBeFocused();
+  await name.click();
+  await expect(pop).toBeVisible();
+  await pop.locator('.sn-select-option', { hasText: 'Google Vertex' }).click();
+  await expect(name).toHaveValue('Google Vertex');
 });
 
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
@@ -350,4 +403,116 @@ test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza 
   const provRes = await page.evaluate(() => window.filo.message({ type: 'default_providers_list' }));
   expect(provRes.ok).toBe(false);
   expect(String(provRes.error || '')).toMatch(/amministrator/i);
+});
+
+// #465: la ricerca fra i feedback si imposta in Gestione, ma finché lì non la si salva la
+// sua catena vive qui. Salvare la griglia non deve cancellare le funzioni che non mostra.
+test('salvare i modelli predefiniti tiene la catena delle funzioni spostate in Gestione', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    models: { manage_search: 'esistente', explain: 'esistente' },
+  });
+  await expect(page.locator('#modelsGrid label', { hasText: /ricerca fra i feedback/i })).toHaveCount(0);
+
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(true);
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd.config.models.manage_search).toBe('esistente');
+  expect(upd.config.models.explain).toBe('esistente');
+
+  // Anche al secondo salvataggio, dopo che la pagina ha riletto la risposta.
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').length)).toBe(2);
+  const upd2 = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd2.config.models.manage_search).toBe('esistente');
+});
+
+// #833 — I modelli predefiniti veri stanno nella config condivisa: una scelta dell'owner può fermare una funzione a
+// chi ha acceso «Solo modelli a pesi aperti». La pagina lo dice prima del salvataggio, senza impedirlo, e chiama le
+// funzioni coi nomi della griglia, che sono quelli delle Opzioni.
+const PESI_APERTI = {
+  modelRegistry: {
+    chiuso: { provider: 'openrouter', model: 'openai/gpt-5.2' },
+    aperto: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
+    claude: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.5' },
+    deepseek: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
+  },
+  models: { explain: 'chiuso', filo_chat: 'claude', translate_selection: 'aperto' },
+};
+
+function cellaDi(page, action) {
+  return page.evaluate((a) => window.SN_MODEL_CHAIN.actionLabels().findIndex(([x]) => x === a), action)
+    .then((idx) => page.locator('#modelsGrid > div').nth(idx));
+}
+
+test('pesi aperti: una funzione col solo modello chiuso senza sostituto è fra quelle che si fermano, e ne esce con un modello aperto in coda (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, PESI_APERTI);
+  const [spiega, chat] = await page.evaluate(() => [window.SN_I18N.t('options_action_explain'), window.SN_I18N.t('options_action_filo_chat')]);
+
+  const box = page.locator('#openWeightsImpact');
+  const ferme = box.locator('.sn-ow-stop');
+  await expect(box).toBeVisible();
+  await expect(box.locator('.sn-info-box-title')).toHaveText('Per chi accende «Solo modelli a pesi aperti»');
+  // Lo stesso nome della griglia, che è quello delle Opzioni; la chat ha un sostituto e non si ferma.
+  const cella = await cellaDi(page, 'explain');
+  await expect(cella.locator('label')).toHaveText(spiega);
+  await expect(ferme).toHaveText(`Si fermano (nessun equivalente a pesi aperti): ${spiega}`);
+  await expect(box).toContainText(`Passano a deepseek: ${chat}`);
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-open-weights-ferme.png', fullPage: true }).catch(() => {});
+
+  // In coda alla catena un modello a pesi aperti: con l'interruttore acceso la funzione gira su quello.
+  await cella.locator('.sn-chain-add').click();
+  await expect(cella.locator('.sn-chain-input')).toHaveCount(2);
+  await cella.locator('.sn-chain-input').nth(1).click();
+  await cella.locator('.sn-chain-pop .sn-select-option', { hasText: 'aperto' }).click();
+  await expect(cella.locator('.sn-chain-input').nth(1)).toHaveValue('aperto');
+  await expect(ferme).toHaveCount(0);
+  await expect(box).toContainText(`Passano a aperto: ${spiega}`);
+  await expect(box).toContainText('Nessuna funzione si ferma.');
+
+  // È un avviso: niente è partito prima del clic, e il salvataggio resta libero.
+  expect(await page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(false);
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(true);
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd.config.models.explain).toBe('chiuso, aperto');
+});
+
+test('pesi aperti: tolto dal registro il sostituto aperto, la funzione che contava su di lui passa fra le ferme (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, PESI_APERTI);
+  const chat = await page.evaluate(() => window.SN_I18N.t('options_action_filo_chat'));
+  const ferme = page.locator('#openWeightsImpact .sn-ow-stop');
+  await expect(ferme).not.toContainText(chat);
+
+  const righe = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+  const idx = await righe.evaluateAll((els) => els.findIndex((r) => r.querySelector('.sn-model-nick').value === 'deepseek'));
+  expect(idx).toBeGreaterThanOrEqual(0);
+  await righe.nth(idx).getByRole('button', { name: 'Rimuovi', exact: true }).click();
+  await expect(ferme).toContainText(chat);
+  await expect(page.locator('#openWeightsImpact')).not.toContainText('Passano a deepseek');
+});
+
+test('pesi aperti: con tutte le funzioni già su modelli aperti la pagina lo dice in una riga, e cambiando un modello torna l\'elenco (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { ...PESI_APERTI, models: { explain: 'aperto', translate_selection: 'aperto, deepseek' } });
+  const box = page.locator('#openWeightsImpact');
+  await expect(box).toHaveText('Con «Solo modelli a pesi aperti» acceso non cambia niente. Tutte le funzioni partono già da modelli a pesi aperti.');
+  await expect(box).not.toHaveClass(/sn-info-box/);
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-open-weights-tutte.png', fullPage: true }).catch(() => {});
+
+  // Sostituito il modello aperto con uno chiuso (scelto dal menu, come farebbe l'owner), l'avviso si accende.
+  const cella = await cellaDi(page, 'explain');
+  const campo = cella.locator('.sn-chain-input').first();
+  await campo.click();
+  await campo.fill('');
+  await cella.locator('.sn-chain-pop .sn-select-option', { hasText: 'chiuso' }).click();
+  await expect(campo).toHaveValue('chiuso');
+  const spiega = await page.evaluate(() => window.SN_I18N.t('options_action_explain'));
+  await expect(box.locator('.sn-ow-stop')).toHaveText(`Si fermano (nessun equivalente a pesi aperti): ${spiega}`);
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('dark'));
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-open-weights-scuro.png', fullPage: true }).catch(() => {});
+});
+
+test('pesi aperti: senza nessun modello scelto la riga non compare (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  await expect(page.locator('#modelsGrid .sn-chain').first()).toBeVisible();
+  await expect(page.locator('#openWeightsImpact')).toBeHidden();
 });

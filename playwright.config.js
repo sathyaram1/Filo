@@ -26,6 +26,11 @@ if (process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug'
   process.env.FILO_TEST_VISIBLE = '1';
 }
 if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
+// Ogni Filo aperto da una prova parte già accolto (src/main/shim/storage.js); chi prova l'accoglienza passa '0'.
+process.env.FILO_TEST_ACCOLTO = '1';
+// La home nascosta pronta per la scheda nuova (#1128) è una pagina in più che conta come home: le prove che contano o
+// cercano le viste partono senza; tests/riserva-nuova-scheda.spec.mjs la riaccende. `=1` la tiene accesa ovunque.
+if (process.env.FILO_RISERVA_NUOVA_SCHEDA !== '1') process.env.FILO_RISERVA_NUOVA_SCHEDA = '0';
 
 export default defineConfig({
   testDir: './tests',
@@ -33,14 +38,18 @@ export default defineConfig({
   // Le prove dei giri di verifica (tests/verifica/<numero>/) restano nel ramo
   // ma NON entrano nella suite completa: quelle di un solo feedback costano
   // otto minuti e mezzo (misurato il 9/09/2026 su #495), e la suite completa
-  // dal 2026-09-15 gira SOLO in GitHub Actions, nel lavoro di release, ogni
-  // sei ore prima di pubblicare: nessun ruolo e nessuna sessione la lancia.
+  // dal 2026-09-15 gira SOLO in GitHub Actions, a ogni fusione su main
+  // (suite.yml): nessun ruolo e nessuna sessione la lancia.
   // Si lanciano per numero (`npx playwright test tests/verifica/<numero>`:
   // il filtro si spegne da solo quando la cartella è nominata sulla riga di
   // comando), oppure tutte con FILO_TEST_VERIFICA=1.
   testIgnore: (process.env.FILO_TEST_VERIFICA === '1' || process.argv.some((a) => /tests[\\/]verifica/.test(a)))
     ? []
     : [/[\\/]tests[\\/]verifica[\\/]/],
+  // In GitHub (CI=true) una prova lasciata «a fuoco» fa girare solo sé stessa: la suite risulterebbe verde e il
+  // commit si pubblicherebbe senza essere provato. Lì si rifiuta; in locale resta lo strumento di chi prova.
+  forbidOnly: !!process.env.CI,
+  globalSetup: './tests/fixtures/prima-della-corsa.mjs',
   timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza

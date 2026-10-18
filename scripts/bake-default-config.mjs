@@ -44,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync } from 'node:fs';
 // Il tetto del testo che il server accetta vive in un posto solo: là sta anche
 // la regola che un taglio si dichiara invece di mangiare la parte che contava.
-import { testoEntroIlTetto } from './build-alarm.mjs';
+import { testoEntroIlTetto, normalizzaChiavi, parolaDellaCostruzione, DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -178,7 +178,7 @@ export function descriviEsitoServer(esito) {
     case 'passphrase-assente':
       return 'La costruzione non ha nemmeno interrogato il server: FILO_BUILD_PASSPHRASE è assente dal job.';
     case 'rifiutato':
-      return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata.`;
+      return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata. Va ricopiata ${DOVE_VA_LA_PAROLA}.`;
     case 'http':
       return `Il server ha risposto HTTP ${e.status}.`;
     case 'rete':
@@ -209,7 +209,7 @@ export function spiegaChiaviMancanti(mancanti, esitoServer) {
 }
 
 async function main() {
-  const passphrase = process.env.FILO_BUILD_PASSPHRASE;
+  const passphrase = parolaDellaCostruzione();
   if (!passphrase) {
     console.warn('[bake] FILO_BUILD_PASSPHRASE assente: uso solo i secret d\'ambiente FILO_DEFAULT_*.');
   }
@@ -295,10 +295,16 @@ async function main() {
   }
 }
 
+/** Le chiavi dell'allarme: `bake:<nome>` per ogni chiave che manca, `bake` se l'elenco è vuoto. PURA. */
+export function chiaviAllarmeBake(mancanti) {
+  const chiavi = normalizzaChiavi((mancanti || []).map((c) => `bake:${c?.nome || ''}`).filter((k) => k !== 'bake:'));
+  return chiavi.length ? chiavi : ['bake'];
+}
+
 // Apre un feedback quando la costruzione sta per produrre una versione monca,
 // con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
 async function avvisa(mancanti, righe) {
-  const passphrase = process.env.FILO_BUILD_PASSPHRASE;
+  const passphrase = parolaDellaCostruzione();
   if (!passphrase) {
     console.warn('::warning::Nessun feedback aperto per questa pubblicazione ferma: l\'allarme si apre con FILO_BUILD_PASSPHRASE, che qui manca. Resta solo il guasto qui sopra.');
     return;
@@ -319,6 +325,7 @@ async function avvisa(mancanti, righe) {
           ? `Pubblicazione ferma: manca la chiave di default ${nomi}`
           : 'Pubblicazione ferma: nessuna chiave di default',
         text: testo,
+        keys: chiaviAllarmeBake(mancanti),
       }),
     });
     const body = await res.json().catch(() => ({}));

@@ -60,5 +60,5 @@ prima pubblicazione a mano, dopo il deploy delle regole). Sentinelle:
 pubbliche e la vista non ammette campi sensibili) e
 `tests/unit/feedbackPublicView.test.mjs` (cosa finisce in una scheda).
 
-E come per ogni regola: **finché non gira `firebase deploy --only
-firestore:rules`, la porta in produzione è ancora quella di prima.**
+E come per ogni regola: **finché non gira `npm run
+regole:pubblica`, la porta in produzione è ancora quella di prima.**

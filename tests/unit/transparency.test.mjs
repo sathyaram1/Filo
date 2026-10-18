@@ -10,10 +10,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -163,9 +163,44 @@ test('nessuna voce della barra è un vicolo cieco: anche le aree non scritte han
     const pagina = join(ROOT, 'site', 'transparency', `${n.id}.html`);
     assert.ok(existsSync(pagina), `"${n.label}" è nella barra ma sul sito non ha nessuna pagina: 404`);
   }
-  const vuota = readFileSync(join(ROOT, 'site', 'transparency', 'privacy.html'), 'utf8');
-  assert.match(vuota, /non è ancora scritta/, 'la pagina di un\'area non scritta non lo dice');
+  const mancante = T.NAV.find((n) => !T.ids().includes(n.id));
+  if (!mancante) return;
+  const vuota = readFileSync(join(ROOT, 'site', 'transparency', `${mancante.id}.html`), 'utf8');
+  if (mancante.nota) assert.ok(vuota.includes(mancante.nota), 'la pagina di un\'area non scritta non porta la sua nota');
+  else assert.match(vuota, /non è ancora scritta/, 'la pagina di un\'area non scritta non lo dice');
   assert.match(vuota, /models\.html/, 'la pagina di un\'area non scritta non porta a quello che c\'è');
+});
+
+// #951 — Privacy e Sicurezza sono scritte: la loro pagina pubblica ha il documento, non il segnaposto.
+test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente', () => {
+  const { T } = loadModules();
+  for (const [id, titolo] of [['privacy', 'Privacy'], ['security', 'Sicurezza']]) {
+    const doc = T.get(id);
+    assert.ok(doc, `il documento "${id}" non esiste`);
+    assert.equal(doc.title, titolo);
+    assert.ok(doc.sections.some((s) => s.title === 'I punti deboli'), `"${id}": manca la sezione dei punti deboli`);
+    const pagina = readFileSync(join(ROOT, 'site', 'transparency', `${id}.html`), 'utf8');
+    assert.doesNotMatch(pagina, /non è ancora scritta/, `"${id}": la pagina pubblica è ancora il segnaposto`);
+    assert.match(pagina, /id="i-punti-deboli"/, `"${id}": la pagina pubblica non ha il documento`);
+    assert.doesNotMatch(T.asText(id), /NON esiste/, `"${id}": l'agente riceve un no`);
+    assert.doesNotMatch(doc.text, /NOTE DI LAVORO|BOZZA|\[NOTA/, `"${id}": è rimasto un pezzo della bozza`);
+  }
+  assert.match(T.asText('security'), /SHA-256/, 'il documento sulla sicurezza non dice come controllare il file scaricato');
+});
+
+test('un comando fra apici inversi si legge come codice sulla pagina e senza segni per l\'agente', () => {
+  const { tmp, leggi } = generaCopia({
+    'zz-codice.md': [
+      '---', 'id: zz-codice', 'title: Codice', 'order: 50', '---',
+      '', 'Scrivi `certutil -hashfile <file> SHA256` e poi **guarda** [qui](https://example.com/x).', '',
+    ],
+  });
+  const html = leggi('site', 'transparency', 'zz-codice.html');
+  assert.ok(html.includes('<code>certutil -hashfile &lt;file&gt; SHA256</code>'), 'il comando non è reso come codice');
+  assert.ok(!html.includes('`'), 'sulla pagina sono rimasti gli apici inversi');
+  const testo = leggi('src', 'shared', 'transparency.js');
+  assert.ok(testo.includes('Scrivi certutil -hashfile <file> SHA256 e poi guarda qui [1]'), 'il testo per il modello non è pulito');
+  togliCartella(tmp);
 });
 
 test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da sé', () => {
@@ -191,7 +226,7 @@ test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da s
   const barra = readFileSync(join(tmp, 'site', 'transparency', 'models.html'), 'utf8')
     .split('<nav class="sn-nav">')[1].split('</nav>')[0];
   assert.ok(barra.includes('dati.html'), 'sul sito la barra non porta al documento nuovo');
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 // #515 — Terza copia dello stesso elenco: il manifesto che l'assistente
@@ -253,14 +288,16 @@ test('lo strumento della chat promette esattamente i documenti che esistono', ()
   const fn = toolTrasparenza();
   const ids = T.ids();
   assert.ok(ids.length, 'nessun documento di trasparenza: il test non prova niente');
-  assert.deepEqual(fn.parameters.properties.doc.enum, ids,
-    'i valori ammessi dello strumento non sono i documenti che esistono');
+  // Una sezione non scritta con la sua nota si legge come un documento (#888).
+  const leggibili = ids.concat(T.conNota().map((n) => n.id));
+  assert.deepEqual(fn.parameters.properties.doc.enum, leggibili,
+    'i valori ammessi dello strumento non sono i documenti che esistono più le sezioni con una nota');
 
   const promesso = `${fn.description} ${fn.parameters.properties.doc.description}`;
   for (const n of T.NAV) {
     const re = new RegExp(`(^|[^a-z0-9_-])${n.id}([^a-z0-9_-]|$)`, 'i');
-    if (ids.includes(n.id)) {
-      assert.match(promesso, re, `il documento "${n.id}" esiste ma il prompt non lo nomina`);
+    if (leggibili.includes(n.id)) {
+      assert.match(promesso, re, `il documento "${n.id}" si può leggere ma il prompt non lo nomina`);
     } else {
       assert.doesNotMatch(promesso, re,
         `il prompt promette il documento "${n.id}", che nessuno ha scritto: l'agente lo chiederà e tornerà a mani vuote`);
@@ -270,8 +307,9 @@ test('lo strumento della chat promette esattamente i documenti che esistono', ()
 
 test('un documento previsto ma non scritto: asText lo dice, e lo dice col suo nome', () => {
   const { T } = loadModules();
-  const mancanti = T.NAV.map((n) => n.id).filter((id) => !T.ids().includes(id));
-  for (const id of mancanti) {
+  const mancanti = T.NAV.filter((n) => !n.nota).map((n) => n.id).filter((id) => !T.ids().includes(id));
+  // Senza sezioni mute resta da provare il nome che nessuno ha previsto: anche lì un no esplicito.
+  for (const id of mancanti.length ? mancanti : ['bilancio']) {
     const risposta = T.asText(id);
     assert.match(risposta, new RegExp(id), `la risposta non nomina "${id}": l'agente non sa cosa è mancato`);
     assert.match(risposta, /NON esiste/, `"${id}": la risposta non dice che il documento non c'è`);
@@ -279,6 +317,94 @@ test('un documento previsto ma non scritto: asText lo dice, e lo dice col suo no
   }
   // L'indice (nessun id chiesto) resta un esito legittimo, non un errore.
   assert.doesNotMatch(T.asText(''), /NON esiste/);
+});
+
+// #888 — A «quanto costa Filo?» la chat rispondeva «non esiste ancora», mentre
+// l'owner ha una risposta: arriverà coi pagamenti, intanto è tutto offerto.
+// La nota sta in un posto solo e arriva identica a pagina, sito, chat e manifesto.
+test('una sezione non scritta con la sua nota: la chat riceve la nota, non un «non esiste»', () => {
+  const { T } = loadModules();
+  const conNota = T.conNota();
+  assert.deepEqual(conNota.map((n) => n.id), ['business'], 'la nota su come si sostiene non c\'è più: aggiorna questo test');
+  for (const n of conNota) {
+    assert.ok(!T.ids().includes(n.id), `"${n.id}" ha un documento scritto e porta ancora la nota`);
+    assert.equal(T.nota(n.id), n.nota);
+    assert.equal(T.nota(` ${n.id.toUpperCase()} `), n.nota, 'la nota non si trova col nome scritto come lo scrive il modello');
+    const risposta = T.asText(n.id);
+    assert.ok(risposta.includes(n.nota), `"${n.id}": la chat non riceve la nota intera`);
+    assert.doesNotMatch(risposta, /NON esiste/, `"${n.id}": la chat riceve ancora «non esiste»`);
+    assert.match(risposta, /così com'è/, `"${n.id}": manca l'istruzione a riferirla senza aggiungere`);
+  }
+  for (const n of T.NAV.filter((v) => !v.nota)) assert.equal(T.nota(n.id), '', `"${n.id}" ha una nota che nessuno ha scritto`);
+  assert.equal(T.nota('inesistente'), '');
+  // L'indice dice che la sezione con la nota si può leggere.
+  assert.match(T.asText(''), /business \(Come si sostiene\)/);
+});
+
+// Il modello ripete il nome che legge nella barra: chiesto così, non è un documento che «non esiste».
+test('una sezione chiesta col nome della barra o col titolo è la stessa sezione', () => {
+  const { T } = loadModules();
+  for (const v of T.NAV) {
+    for (const nome of [v.label, ` ${v.label.toUpperCase()} `, `«${v.label}»`]) {
+      assert.equal(T.idDi(nome), v.id, `«${nome}» non porta a "${v.id}"`);
+      assert.doesNotMatch(T.asText(nome), /NON esiste/, `chiesto «${nome}», la chat riceve «non esiste»`);
+      if (v.nota) assert.ok(T.asText(nome).includes(v.nota), `chiesto «${nome}», la chat non riceve la nota`);
+      else if (T.get(v.id)) assert.equal(T.get(nome), T.get(v.id));
+    }
+  }
+  for (const d of T.all()) assert.equal(T.get(d.title), d, `il titolo «${d.title}» non porta al suo documento`);
+  assert.equal(T.idDi('costi'), '');
+  assert.match(T.asText('costi'), /NON esiste/);
+});
+
+test('la nota sul sito: al posto di «non ancora scritta», escapata, e privacy e sicurezza restano com\'erano', () => {
+  const { T } = loadModules();
+  for (const n of T.NAV.filter((v) => !T.ids().includes(v.id))) {
+    const html = readFileSync(join(ROOT, 'site', 'transparency', `${n.id}.html`), 'utf8');
+    const corpo = html.split('<h1>')[1];
+    if (n.nota) {
+      const resa = n.nota.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      assert.ok(corpo.includes(`<p>${resa}</p>`), `"${n.id}": sul sito la nota non c'è`);
+      assert.ok(html.includes(`<meta name="description" content="${resa}" />`), `"${n.id}": l'anteprima del link non porta la nota`);
+      assert.doesNotMatch(corpo, /non è ancora scritta/, `"${n.id}": la pagina dice ancora solo «non ancora scritta»`);
+    } else {
+      assert.match(corpo, /<p class="sn-doc-sub">Questa sezione non è ancora scritta\.<\/p>/, `"${n.id}": la pagina è cambiata`);
+      assert.match(corpo, /Quello che c’è scritto: /);
+    }
+    assert.match(corpo, /models\.html/, `"${n.id}": la pagina non porta più a quello che c'è scritto`);
+  }
+});
+
+// Il manifesto riporta la nota parola per parola: la frase che l'assistente
+// legge su cosa sa fare Filo non può dire una cosa diversa dalla pagina. E nei
+// due versi: una citazione che non è più una nota (il documento è arrivato, o
+// l'owner l'ha riscritta) è una promessa vecchia.
+test('il manifesto e la nota dicono la stessa cosa', () => {
+  const { T } = loadModules();
+  delete globalThis.SN_CAPABILITIES;
+  // eslint-disable-next-line no-new-func
+  new Function(readFileSync(join(ROOT, 'src', 'shared', 'capabilities.js'), 'utf8')).call(globalThis);
+  const voce = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'transparency-docs');
+  const note = T.conNota().map((n) => n.nota);
+  for (const nota of note) assert.ok(voce.desc.includes(`«${nota}»`), `il manifesto non riporta la nota com'è: «${nota}»`);
+  const citate = [...voce.desc.matchAll(/«([^»]+)»/g)].map((m) => m[1]);
+  for (const c of citate) assert.ok(note.includes(c), `il manifesto cita «${c}», che non è più la nota di nessuna sezione`);
+});
+
+test('quando il documento arriva, la nota sparisce da sola', () => {
+  const { tmp, leggi } = generaCopia({
+    'business.md': [
+      '---', 'id: business', 'title: Come si sostiene Filo', 'updated: 2026-12-01', '---',
+      '', 'Filo costa tanto così.', '', '## Dove vanno i soldi', '', 'Qui.', '',
+    ],
+  });
+  const modulo = leggi('src', 'shared', 'transparency.js');
+  const nav = JSON.parse(/const NAV = (\[[\s\S]*?\]);/.exec(modulo)[1]);
+  assert.ok(nav.every((n) => !n.nota), 'il documento è scritto ma la barra si porta dietro la nota');
+  const pagina = leggi('site', 'transparency', 'business.html');
+  assert.match(pagina, /Filo costa tanto così/);
+  assert.doesNotMatch(pagina, /Fino ad allora è tutto offerto/);
+  togliCartella(tmp);
 });
 
 test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
@@ -326,7 +452,7 @@ test('un documento scritto in un\'area annunciata porta nella barra il suo nome 
     'la barra non usa il nome corto e l\'ordine che il documento si dà');
   const barra = leggi('site', 'transparency', 'models.html').split('<nav class="sn-nav">')[1].split('</nav>')[0];
   assert.ok(barra.includes('>I tuoi dati<'), 'sul sito la barra tiene il nome dell\'area invece di quello del documento');
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 // #515 — L'etichetta di una fonte veniva presa dal testo già escapato: sulla
@@ -352,7 +478,7 @@ test('le fonti si leggono come testo, sulla pagina e per il modello', () => {
   const testo = leggi('src', 'shared', 'transparency.js');
   assert.ok(testo.includes('[1] titolo \\"tra virgolette\\" con <b>markup</b> e l\'apostrofo — https://example.com/a?x=1&y=2'),
     'il testo per il modello non riporta la fonte com\'è scritta');
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 // #515 — Presentato col sottotitolo («le motivazioni etiche…»), il documento

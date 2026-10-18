@@ -1,4 +1,4 @@
-# In chat: il blocco di attività della domanda (chiuso di default, uno per messaggio)
+# In chat: il blocco di attività della domanda (uno per messaggio, avvolto a lavoro finito)
 
 [← Tutti i pattern](../PATTERNS.md)
 
@@ -24,26 +24,25 @@ riparte). Non esistono più messaggi di spinta mandati dalla scheda come turni
 «utente» interni. Il modello che ignora gli strumenti e scrive il vecchio JSON
 nel testo viene ancora letto (`legacyEnvelope`), senza ritentativi.
 
-- **Chiuso di default, sempre.** Il 90 % delle volte l'utente vuole che il
-  lavoro sia invisibile. La riga in testa dice cosa succede ADESSO: rotella e
-  «Aspetto la risposta…», poi «Sta ragionando · …ultima frase del
-  ragionamento», poi l'azione in corso («Cerco sul web: …», «Eseguito · …»).
-  A lavoro finito diventa il riassunto: «Ha cercato sul web, impostato una
-  sveglia e letto un documento · 1 min 20 s» (`summarizeActivity`, verbi per
-  tipo con i doppioni contati) oppure «Ragionamento · 24 s».
+- **Cosa si vede mentre lavora, e dopo**: il filo, i nodi e il gomitolo,
+  in [Il filo dell'attesa](il-filo-dell-attesa.md). A lavoro finito il blocco
+  è una riga sola (il gomitolo) col riassunto: «Ha cercato sul web, impostato
+  una sveglia e letto un documento · 1 min 20 s» (`summarizeActivity`, verbi
+  per tipo con i doppioni contati) oppure «Ragionamento · 24 s».
 - **Niente frasi inventate.** Le vecchie righe «Consulto la memoria…» erano
   teatro, non stato: l'utente le leggeva come ragionamento del modello.
-- **Un click apre la cronologia completa**, nell'ordine in cui è avvenuta:
-  ragionamento di ogni turno (tutto, non le ultime tre righe), righe delle
-  azioni «icona + due parole» (`ACTIVITY_ROWS` dà il testo; l'icona la dà
-  `src/shared/actionIcons.js`, `SN_ACTION_ICONS.svg(type, size)`: SVG della
-  famiglia di Filo, mai emoji — l'icona di un'azione sta in un posto solo, e
-  la sentinella `tests/unit/actionIcons.test.mjs` pretende che ogni azione
-  registrata in `actionLevels.js` ne abbia una), esiti dei comandi eseguiti subito, e le
-  **note**: il testo di un turno che non era l'ultimo («Provo subito tutti e
-  tre…») era una bolla e diventa una nota dentro il blocco. Per l'utente conta
-  la risposta, non il commento a metà lavoro. Il prompt chiede al modello di
-  lasciare vuoto quel testo salvo lavori lunghi.
+- **Un clic srotola la cronologia completa**, nell'ordine in cui è avvenuta, un
+  nodo per pensiero: dentro ogni nodo il ragionamento (tutto, non le ultime tre
+  righe), le **note** e le righe delle azioni «icona + due parole»
+  (`ACTIVITY_ROWS` dà il testo; l'icona la dà `src/shared/actionIcons.js`,
+  `SN_ACTION_ICONS.svg(type, size)`: SVG della famiglia di Filo, mai emoji —
+  l'icona di un'azione sta in un posto solo, e la sentinella
+  `tests/unit/actionIcons.test.mjs` pretende che ogni azione registrata in
+  `actionLevels.js` ne abbia una), con gli esiti dei comandi eseguiti subito.
+  Una nota è il testo di un giro che non era l'ultimo («Provo subito tutti e
+  tre…»): era una bolla e diventa una nota dentro il suo nodo. Per l'utente
+  conta la risposta, non il commento a metà lavoro. Il prompt chiede al modello
+  di lasciare vuoto quel testo salvo lavori lunghi.
 - **Ciò che si clicca resta fuori.** Un link da aprire, una conferma da dare,
   l'esito di un comando bloccato: bottoni sotto la risposta, come da regola
   «i passi intermedi sono tracce, i risultati sono bottoni». Una bolla
@@ -61,7 +60,7 @@ nel testo viene ancora letto (`legacyEnvelope`), senza ritentativi.
 - Test: `tests/dashboard-chat-attivita.spec.mjs` (con screenshot in
   `tests/agent/.out/attivita-*.png`). Gli spec che asseriscono una traccia
   («Cerco sul web», «Verifico cosa so fare») contano l'elemento, non la
-  visibilità: vive nella cronologia chiusa.
+  visibilità: vive dentro un nodo chiuso del gomitolo.
 
 Le altre chat (Mazzi, barra laterale) hanno ancora le loro versioni: da
 unificare su questa.
