@@ -157,9 +157,19 @@ test('l\'inizio scritto dall\'utente la tiene, un altro testo o un valore messo 
   await tasto(app, 'Escape');
   await expect.poll(() => mostrata(app)).toBe(false);
   expect(await page.evaluate(() => window.tasti)).not.toContain('Escape');
-  await page.keyboard.type('c');
+  await page.keyboard.type('x');
   await page.waitForTimeout(400);
-  expect(await mostrata(app), 'chiusa con Esc resta chiusa finché non si rientra nel campo').toBe(false);
+  expect(await mostrata(app), 'dopo Esc un testo che non è l\'inizio dell\'email non la riapre').toBe(false);
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type('chi');
+  await expect.poll(() => mostrata(app), { message: 'dopo Esc scrivere l\'inizio dell\'email la ripropone' }).toBe(true);
+
+  // Dopo Esc un clic nel campo, che ha ancora il fuoco, la ripropone.
+  await tasto(app, 'Escape');
+  await expect.poll(() => mostrata(app)).toBe(false);
+  await page.click('#e');
+  await expect.poll(() => mostrata(app), { message: 'dopo Esc un clic nel campo la ripropone' }).toBe(true);
+  await page.evaluate(() => { document.getElementById('e').value = ''; });
 
   await page.click('#altro');
   await page.click('#e');
@@ -170,6 +180,45 @@ test('l\'inizio scritto dall\'utente la tiene, un altro testo o un valore messo 
   await page.waitForTimeout(500);
   expect(await mostrata(app), 'una casella di ricerca non chiede l\'email').toBe(false);
   expect(await nonLaTrova(page)).toMatchObject({ html: false, find: false, osservata: false });
+});
+
+// La pagina che dà il fuoco a un campo che l'utente non vede farebbe comparire la proposta dove lui sta per cliccare.
+const INVISIBILI = `<!doctype html><body style="margin:0;padding:40px;height:2000px">
+  <button id="ok" style="position:absolute;left:300px;top:340px;width:200px;height:40px">Accetta</button>
+  <input type="email" id="trasparente" style="opacity:0.05;position:absolute;left:300px;top:300px;width:200px;height:30px">
+  <div style="opacity:0.1"><input type="email" id="velato" style="position:absolute;left:300px;top:420px;width:200px;height:30px"></div>
+  <input type="email" id="pixel" style="position:absolute;left:300px;top:300px;width:1px;height:1px;border:0;padding:0">
+  <input type="email" id="coperto" style="position:absolute;left:40px;top:500px;width:200px;height:30px">
+  <div style="position:absolute;left:30px;top:490px;width:240px;height:60px;background:#fff"></div>
+  <input type="email" id="fuori" style="position:fixed;left:-400px;top:100px;width:200px;height:30px">
+  <input type="email" id="vero" style="width:260px">
+  <span id="lb">Email address</span><input type="text" id="aria" aria-labelledby="lb" style="width:260px;margin-left:20px">
+</body>`;
+
+test('un campo che l\'utente non vede, a fuoco per mano della pagina, non riceve la proposta; uno visibile sì', async ({ app, openTab, testServer }) => {
+  await accountFinto(app);
+  const page = await testServer.openReady(openTab, INVISIBILI);
+  for (const id of ['trasparente', 'velato', 'pixel', 'coperto', 'fuori']) {
+    await page.evaluate((x) => document.getElementById(x).focus({ preventScroll: true }), id);
+    await page.waitForTimeout(900);
+    expect(await mostrata(app), `campo ${id}`).toBe(false);
+    await page.evaluate(() => document.activeElement.blur());
+  }
+  // Come l'autofocus di Google: la pagina dà il fuoco a un campo che si vede, e la proposta c'è.
+  await page.evaluate(() => document.getElementById('vero').focus());
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  await page.evaluate(() => document.activeElement.blur());
+  await expect.poll(() => mostrata(app)).toBe(false);
+  // Il campo che diventa invisibile mentre ha la proposta la perde.
+  await page.evaluate(() => document.getElementById('vero').focus());
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  await page.evaluate(() => { document.getElementById('vero').style.opacity = '0'; });
+  await expect.poll(() => mostrata(app)).toBe(false);
+  await page.evaluate(() => document.activeElement.blur());
+
+  // Il nome «Email address» collegato come etichetta accessibile basta.
+  await page.click('#aria');
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
 });
 
 test('con l\'interruttore spento, o senza account, non compare niente; spegnerlo toglie quella a schermo', async ({ app, openTab, testServer }) => {
@@ -268,6 +317,19 @@ test('in un riquadro di un\'altra origine la proposta sta sotto il campo, segue 
   await vista.click('#voce');
   await expect.poll(() => riquadro.locator('#u').inputValue()).toBe(EMAIL);
   await expect.poll(() => mostrata(app)).toBe(false);
+});
+
+test('un riquadro di un\'altra origine che l\'utente non vede non fa comparire la proposta, nemmeno cliccandoci', async ({ app, openTab, testServer }) => {
+  await accountFinto(app);
+  const dentro = altraOrigine(testServer.html(RIQUADRO));
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="margin:0;padding:30px">
+    <button style="position:absolute;left:40px;top:40px;width:300px;height:60px">Accetta</button>
+    <iframe id="r" src="${dentro}" style="opacity:0.05;position:absolute;left:20px;top:20px;width:400px;height:100px;border:0"></iframe></body>`);
+  await page.frameLocator('#r').locator('#u').click();
+  await page.waitForTimeout(1200);
+  expect(await mostrata(app)).toBe(false);
+  await page.evaluate(() => { document.getElementById('r').style.opacity = '1'; });
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
 });
 
 test('in un riquadro di un\'altra origine dentro un altro riquadro di un\'altra origine la proposta sta sotto il campo', async ({ app, openTab, testServer }) => {

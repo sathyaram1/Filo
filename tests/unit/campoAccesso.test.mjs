@@ -25,6 +25,8 @@ test('i campi di accesso si riconoscono da tipo, autocomplete, nome ed etichetta
     { placeholder: 'Nome utente o email' },
     { ariaLabel: 'Email or phone' },
     { label: 'E-mail' },
+    { labelledBy: 'Email address' },
+    { title: 'Il tuo indirizzo e-mail' },
   ];
   for (const c of si) assert.equal(A.chiedeAccesso(campo(c), 'esempio.it'), true, JSON.stringify(c));
 });
@@ -47,6 +49,7 @@ test('password, codici, ricerche, nomi di battesimo e campi spenti non sono camp
     { name: 'user_phone' },
     { name: 'search' },
     { placeholder: 'Cerca nel sito' },
+    { labelledBy: 'Cerca un utente' },
     { placeholder: 'Codice di accesso' },
     { name: 'account' },
     { name: 'nome' },

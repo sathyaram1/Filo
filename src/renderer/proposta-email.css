@@ -14,7 +14,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; }
   border-radius: var(--sn-radius);
   padding: 4px 0;
   user-select: none;
-  animation: sn-entra 100ms ease-out;
+  animation: sn-entra calc(100ms * var(--sn-motion, 1)) ease-out;
 }
 
 @keyframes sn-entra {
@@ -33,7 +33,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; }
   cursor: pointer;
   line-height: 1.35;
   color: var(--sn-fg);
-  transition: background-color 80ms ease-out;
+  transition: background-color calc(80ms * var(--sn-motion, 1)) ease-out;
 }
 
 .voce:hover, .voce.attiva { background: rgba(var(--sn-accent-rgb), 0.35); }

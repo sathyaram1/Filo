@@ -141,6 +141,11 @@ selezione).
 - **Un clic vale dopo mezzo secondo di proposta ferma sotto il campo**: la pagina può farla comparire sotto il
   cursore, come la conferma.
 - **Sotto l'avviso del sito sospetto non compare**: la scheda coperta non è quella che l'utente vede.
+- **Né sotto un campo che l'utente non vede**: quasi trasparente (anche per un antenato o un riquadro), più piccolo
+  di 20×10, fuori schermo; coperto da altro conta quando il fuoco l'ha dato la pagina, non un clic vero sul campo
+  o sulla sua etichetta. Il controllo si ripete mentre è a schermo. Se no la pagina mette a fuoco un campo invisibile
+  sopra il suo «Accetta» e il clic dell'utente sceglie l'email (#1124 giro 2).
+- **Dopo Esc torna come in Chrome**: rientrando nel campo, cliccandoci (ha ancora il fuoco) o scrivendo l'utente.
 
 Dove vive: `src/main/propostaEmail.js` (vista, tasti, scelta), `src/content/propostaEmail.js` (il campo),
 `src/shared/campoAccesso.js` (quali campi, quando proporre), `src/renderer/proposta-email.*`. Prove:

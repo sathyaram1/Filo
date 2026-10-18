@@ -16,6 +16,12 @@
   // Il campo che si sposta da solo (un'animazione della pagina, un riquadro che si apre sopra) si rimisura a questo passo.
   const PASSO_MS = 300;
   const ANELLI_MAX = 8;
+  // Un campo che l'utente non vede non riceve la proposta: la pagina la farebbe comparire dove lui sta per cliccare.
+  const OPACITA_MIN = 0.25;
+  const LARGO_MIN = 20;
+  const ALTO_MIN = 10;
+  // Un fuoco nato da un clic dell'utente sul campo (o sulla sua etichetta) poco prima non l'ha deciso la pagina.
+  const GESTO_MS = 1500;
 
   // Per campo: la sua chiave (stabile finché il nodo vive) e l'ultimo valore scritto dall'utente stesso.
   const perCampo = new WeakMap();
@@ -56,10 +62,97 @@
     let label = '';
     try { const l = el.labels && el.labels[0]; if (l) label = l.textContent || ''; } catch (_) {}
     const attr = (n) => el.getAttribute(n) || '';
+    let labelledBy = '';
+    try {
+      const radice = el.getRootNode();
+      const cerca = radice && typeof radice.getElementById === 'function' ? radice : document;
+      labelledBy = attr('aria-labelledby').split(/\s+/).filter(Boolean).slice(0, 8)
+        .map((id) => { const n = cerca.getElementById(id); return n ? n.textContent || '' : ''; }).join(' ');
+    } catch (_) {}
     return C.chiedeAccesso({
       tag: 'input', type: el.type, autocomplete: attr('autocomplete'), name: attr('name'), id: el.id || '',
-      placeholder: attr('placeholder'), ariaLabel: attr('aria-label'), label, disabled: el.disabled, readOnly: el.readOnly,
+      placeholder: attr('placeholder'), ariaLabel: attr('aria-label'), labelledBy, title: attr('title'), label,
+      disabled: el.disabled, readOnly: el.readOnly,
     }, location.hostname);
+  }
+
+  // L'ultimo clic vero in questo documento, col percorso: dice se il fuoco a un campo l'ha dato l'utente.
+  let gesto = null;
+  function premuto(e) {
+    if (!e.isTrusted) return;
+    let p = [];
+    try { p = e.composedPath(); } catch (_) { p = []; }
+    gesto = { t: performance.now(), p };
+    const c = corrente;
+    if (c && attivo() === c.el && suCampo(p, c.el)) { c.dalUtente = true; c.muto = false; invia('clic'); }
+  }
+
+  function suCampo(percorso, el) {
+    let labels = [];
+    try { labels = Array.from(el.labels || []); } catch (_) { labels = []; }
+    return percorso.some((n) => n === el || labels.includes(n));
+  }
+
+  function dalUtente(el) {
+    return !!gesto && performance.now() - gesto.t < GESTO_MS && suCampo(gesto.p, el);
+  }
+
+  // Opacità vista dall'utente: quella di tutti gli antenati, anche attraverso gli shadow root, filtri compresi.
+  function opacita(el) {
+    let o = 1;
+    for (let n = el, i = 0; n && i < 256; i++) {
+      if (n.nodeType === 1) {
+        let cs = null;
+        try { cs = n.ownerDocument.defaultView.getComputedStyle(n); } catch (_) { cs = null; }
+        if (cs) {
+          if (n === el && (cs.visibility === 'hidden' || cs.visibility === 'collapse')) return 0;
+          const v = parseFloat(cs.opacity);
+          if (Number.isFinite(v)) o *= v;
+          for (const m of String(cs.filter || '').matchAll(/opacity\(\s*([\d.]+)\s*(%?)\s*\)/g)) {
+            const f = parseFloat(m[1]);
+            if (Number.isFinite(f)) o *= m[2] ? f / 100 : f;
+          }
+        }
+      }
+      n = n.assignedSlot || n.parentElement || (n.parentNode && n.parentNode.host) || null;
+    }
+    return o;
+  }
+
+  function tenue(el, r) {
+    return r.width < LARGO_MIN || r.height < ALTO_MIN || opacita(el) < OPACITA_MIN;
+  }
+
+  // Un nodo coperto da un altro (o tagliato via) non risponde ai punti dove sta: basta un punto che risponda.
+  function scoperto(el, r, win, xs, ys) {
+    const radice = el.getRootNode();
+    const q = radice && typeof radice.elementFromPoint === 'function' ? radice : el.ownerDocument;
+    for (const fy of ys) {
+      const y = r.top + r.height * fy;
+      if (y < 0 || y >= win.innerHeight) continue;
+      for (const fx of xs) {
+        const x = r.left + r.width * fx;
+        if (x < 0 || x >= win.innerWidth) continue;
+        let h = null;
+        try { h = q.elementFromPoint(x, y); } catch (_) { h = null; }
+        if (h && (h === el || suCampo([h, ...antenatiDi(h)], el))) return true;
+      }
+    }
+    return false;
+  }
+
+  function antenatiDi(n) {
+    const out = [];
+    for (let p = n.parentElement, i = 0; p && i < 8; p = p.parentElement, i++) out.push(p);
+    return out;
+  }
+
+  const PUNTI_CAMPO = [[0.5, 0.25, 0.75, 0.1, 0.9], [0.5]];
+  const PUNTI_RIQUADRO = [[0.5, 0.2, 0.8], [0.5, 0.2, 0.8]];
+
+  // Un riquadro (iframe) che l'utente non vede, o che la pagina copre per intero, nasconde il campo che contiene.
+  function riquadroVisto(fe, fr, win) {
+    return !tenue(fe, fr) && scoperto(fe, fr, win, ...PUNTI_RIQUADRO);
   }
 
   function fuoriVista(r, win) {
@@ -78,7 +171,7 @@
       if (!fe) return { x, y, s: 1, ancora: win };
       const sopra = fe.ownerDocument.defaultView;
       const fr = fe.getBoundingClientRect();
-      if (fuoriVista(fr, sopra)) return { fuori: true };
+      if (fuoriVista(fr, sopra) || !riquadroVisto(fe, fr, sopra)) return { fuori: true };
       const cs = sopra.getComputedStyle(fe);
       x += fr.left + fe.clientLeft + (parseFloat(cs.paddingLeft) || 0);
       y += fr.top + fe.clientTop + (parseFloat(cs.paddingTop) || 0);
@@ -91,9 +184,11 @@
   }
 
   // Il campo in px CSS della scheda (o del suo riquadro di un'altra origine, `ancora`); { w: 0 } se non si vede.
-  function rettangolo(el) {
+  // Coperto conta solo se il fuoco l'ha dato la pagina: un clic vero sul campo dice che l'utente lo vede.
+  function rettangolo(el, { utente = false } = {}) {
     let r;
     try { r = el.getBoundingClientRect(); } catch (_) { return null; }
+    if (tenue(el, r) || (!utente && !scoperto(el, r, window, ...PUNTI_CAMPO))) return { x: 0, y: 0, w: 0, h: 0, ancora: null };
     const p = risali(r, window);
     if (!p) return null;
     if (p.fuori) return { x: 0, y: 0, w: 0, h: 0, ancora: null };
@@ -109,7 +204,7 @@
   function invia(motivo) {
     const c = corrente;
     if (!c || c.muto) return;
-    const r = rettangolo(c.el);
+    const r = rettangolo(c.el, { utente: c.dalUtente });
     if (!r) { c.muto = true; return; }
     const valore = String(c.el.value || '');
     const digitato = valore === c.dati.digitato;
@@ -129,7 +224,7 @@
     const c = corrente;
     if (!c || bersaglio(e) !== c.el) return;
     if (e.isTrusted) c.dati.digitato = String(c.el.value || '');
-    invia('input');
+    invia(e.isTrusted ? 'scrive' : 'input');
   }
 
   function passo() {
@@ -142,7 +237,7 @@
   function inizia(el) {
     let dati = perCampo.get(el);
     if (!dati) { dati = { campo: chiave(), digitato: '' }; perCampo.set(el, dati); }
-    corrente = { el, dati, firma: '', muto: false, ancora: chiave(), timer: setInterval(passo, PASSO_MS) };
+    corrente = { el, dati, firma: '', muto: false, dalUtente: dalUtente(el), ancora: chiave(), timer: setInterval(passo, PASSO_MS) };
     el.addEventListener('input', suInput, true);
   }
 
@@ -181,6 +276,7 @@
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  window.addEventListener('pointerdown', premuto, true);
   document.addEventListener('focusin', (e) => entra(bersaglio(e), 'focus'), true);
   document.addEventListener('focusout', (e) => {
     if (corrente && bersaglio(e) === corrente.el) chiudi();
@@ -200,7 +296,7 @@
     const top = fr.top + q.ifr.clientTop + (parseFloat(cs.paddingTop) || 0);
     const p = risali({ left, top, right: fr.right, bottom: fr.bottom, width: fr.width, height: fr.height }, window);
     if (!p) return;
-    const dati = p.fuori ? { x: 0, y: 0, s: 0 } : { x: p.x, y: p.y, s: p.s };
+    const dati = p.fuori || !riquadroVisto(q.ifr, fr, window) ? { x: 0, y: 0, s: 0 } : { x: p.x, y: p.y, s: p.s };
     if (p.ancora) segnaAncora(p.ancora, q.su);
     const firma = `${Math.round(dati.x)},${Math.round(dati.y)},${dati.s}|${!!p.ancora}`;
     if (firma === q.firma) return;

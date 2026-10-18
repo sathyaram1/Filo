@@ -19,7 +19,8 @@ const STACCO = 2;
 const CAMPO = /^[0-9a-f]{32}$/;
 // Riquadri di un'altra origine uno dentro l'altro: oltre questo non si risale.
 const ANELLI_MAX = 8;
-const MOTIVI = new Set(['focus', 'input', 'posto']);
+// `clic` e `scrive` arrivano solo da un gesto vero dell'utente sul campo; `input` può averlo mosso la pagina.
+const MOTIVI = new Set(['focus', 'clic', 'scrive', 'input', 'posto']);
 const RIEMPI = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG.PROPOSTA_EMAIL_RIEMPI) || 'proposta_email_riempi';
 
 const testo = (v) => (typeof v === 'string' ? v : '');
@@ -117,10 +118,10 @@ class PropostaEmail {
       this._segui(wc);
     }
     const c = this.c;
-    // Rientrare nel campo dopo Esc la ripropone, come rientrarci da un'altra parte.
-    if (d.motivo === 'focus' && !this._toccata()) c.chiusa = false;
+    // Dopo Esc la ripropongono il rientro nel campo, un clic sul campo e lo scrivere dell'utente, come in Chrome.
+    if ((d.motivo === 'focus' && !this._toccata()) || d.motivo === 'clic' || d.motivo === 'scrive') c.chiusa = false;
     // Chi scrive dopo aver evidenziato con la freccia vuole il suo testo: il prossimo Invio è della pagina.
-    if (d.motivo === 'input') c.evidenziata = false;
+    if (d.motivo === 'input' || d.motivo === 'scrive') c.evidenziata = false;
     Object.assign(c, { x: d.x, y: d.y, w: d.w, h: d.h, ancora: d.ancora, valore: d.valore, digitato: d.digitato, email, lasciato: false });
     this.tema = tema;
     this.posa();

@@ -33,7 +33,8 @@
   }
 
   /**
-   * c: { tag, type, autocomplete, name, id, placeholder, ariaLabel, label, disabled, readOnly }; host del frame.
+   * c: { tag, type, autocomplete, name, id, placeholder, ariaLabel, labelledBy, title, label, disabled, readOnly };
+   * host del frame. `labelledBy` è il testo dei nodi di aria-labelledby: il nome che l'utente legge sopra il campo.
    * True se il campo chiede un'email o un nome utente.
    */
   function chiedeAccesso(c, host) {
@@ -49,7 +50,7 @@
     if (nomi.some((p) => PAROLE_NO.has(p))) return false;
     if (nomi.some((p) => PAROLE_NOME.has(p))) return true;
     if (nomi.includes('user') && !nomi.some((p) => USER_NO.has(p))) return true;
-    const leggibile = [testo(c.placeholder), testo(c.ariaLabel), testo(c.label)].join(' · ');
+    const leggibile = [c.placeholder, c.ariaLabel, c.labelledBy, c.label, c.title].map(testo).join(' · ');
     return TESTO_SI.test(leggibile) && !TESTO_NO.test(leggibile);
   }
 
