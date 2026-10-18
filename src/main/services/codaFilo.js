@@ -11,7 +11,9 @@ async function tutte(opts) {
   const dati = await F().perLaCoda(opts);
   let cambi = [];
   try { cambi = await globalThis.SN_REGISTRO_CAMBI.tutti(); } catch (_) { cambi = []; }
-  const firma = `${opts && opts.incognito ? 'i' : 'n'}|${dati.pos}|${cambi.length}|${cambi.map((c) => `${c.id}${c.annullatoDa ? '~' : ''}`).join(',').slice(-4000)}`;
+  let incog = !!(opts && opts.incognito);
+  try { if (!opts || opts.incognito == null) incog = require('../shim/storage').inIncognito(); } catch (_) {}
+  const firma = `${incog ? 'i' : 'n'}|${dati.pos}|${cambi.length}|${cambi.map((c) => `${c.id}${c.annullatoDa ? '~' : ''}`).join(',').slice(-4000)}`;
   if (memo && memo.firma === firma) return memo;
   memo = { firma, dati, elementi: C().elementi({ chats: dati.chats, pagine: dati.pagine, cambi, qui: dati.qui }) };
   return memo;
