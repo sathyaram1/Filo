@@ -155,7 +155,9 @@
     const piuGiorni = isoGiorno(ultimoGiorno) !== isoGiorno(inizio);
     let quando = `${leggibile(inizio)} alle ${orario(inizio)}`;
     if (ultimo || !vuoto(oraFine)) {
-      if (piuGiorni) quando = `dal ${quando} al ${leggibile(vuoto(oraFine) ? ultimoGiorno : fine)}${vuoto(oraFine) ? '' : ` alle ${orario(fine)}`}`;
+      // A mezzanotte finisce la giornata intera: si nomina il giorno, non «alle 00:00» del giorno dopo.
+      const giornataIntera = orario(fine) === '00:00';
+      if (piuGiorni) quando = `dal ${quando} al ${leggibile(giornataIntera ? ultimoGiorno : fine)}${giornataIntera ? '' : ` alle ${orario(fine)}`}`;
       else quando = `${quando}, fino alle ${orario(fine)}`;
     }
     return {
