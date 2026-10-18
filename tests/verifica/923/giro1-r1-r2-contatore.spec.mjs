@@ -1,5 +1,5 @@
 // Verifica #923 giro 1: il giro di Gestione vero contro un Firestore in memoria con le regole del contatore.
-// r1: un numero anonimo enorme blocca ancora la discesa del contatore; r2: un contatore mancante rinasce sotto i numeri dati.
+// r2: un contatore mancante rinasce sotto i numeri dati. La prova di r1 è tolta per decisione dell'owner: la cura sta in un feedback a parte.
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
