@@ -634,6 +634,8 @@ test('#592.7 — in chat lo stile che chiude da sé le virgolette resta nel suo 
 
 test('#592.7 — nell’Aiuto lo stile che chiude da sé le virgolette resta nel suo riquadro', async ({ app, openTab }) => {
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ agentStyle: '' }));
+  // A Conservativo uno stile chiede sempre l'OK (#530): è il popup che si guarda qui.
+  await livelloAutonomia(app, 'conservativo');
   const page = await openTab('filo://newtab/');
   await page.evaluate(() => window.SN_SIDEBAR.open());
   await page.evaluate((v) => { window.__filoSidebarTest.runFiloAction({ type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: v }); }, TRAVESTITO);
