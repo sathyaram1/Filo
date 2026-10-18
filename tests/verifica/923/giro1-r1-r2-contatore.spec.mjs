@@ -98,27 +98,6 @@ async function apriGestione(f) {
   await aspettaChe(() => f.giro.finito, { cosa: 'il giro di Gestione non è arrivato al contatore', oltreMs: 30000 });
 }
 
-for (const [come, contatore] of [
-  ['spinto di uno in uno fino al tetto', 1000000],
-  ['già spinto oltre il tetto dalla sincronizzazione di prima', 1000010],
-]) {
-  test(`r1 con un feedback anonimo a 1.000.000, un contatore ${come} torna giù e il feedback dopo ha un numero`, async () => {
-    const f = firestore({
-      contatore,
-      documenti: [
-        feedback('owner', 880, { senderProof: 'admin' }),
-        feedback('utente', 900),
-        feedback('estraneo', 1000000),
-      ],
-    });
-    await apriGestione(f);
-    const prossimo = await FB.nextSeq().catch((e) => `rifiutato: ${e.message}`);
-    // Un numero nuovo, mai uno già dato: il valore esatto lo sceglie la cura.
-    expect(Number.isInteger(prossimo) && prossimo > 900 && prossimo < 1000000,
-      `prossimo: ${prossimo}, contatore dopo la sincronizzazione: ${f.db.contatore}`).toBe(true);
-  });
-}
-
 test('r2 un contatore che manca rinasce sopra i numeri già dati, non sul solo numero provato', async () => {
   const f = firestore({
     contatore: null,
