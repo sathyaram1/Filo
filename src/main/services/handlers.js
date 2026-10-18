@@ -1983,7 +1983,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   if (d.risposta !== 'si' && d.risposta !== 'no') {
     const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
     if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
-    else if (d.regola === 'difesa') perche = 'Te lo chiedo perché abbassa una difesa di Filo.';
+    // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
     else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
   return { ...d, livello, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
