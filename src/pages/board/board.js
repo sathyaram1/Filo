@@ -299,6 +299,42 @@
     rimisura = setTimeout(segnaTestiLunghi, 120);
   });
 
+  // Il testo intero sta tutto nella finestra: su una scheda in basso sale quanto serve, e se non basta scorre al suo
+  // interno. Sotto il bordo la fine non si leggerebbe, perché la rotella sopra il riquadro non muove la pagina.
+  const MARGINE_INTERO = 8;
+  function posaIntero(box) {
+    const intero = box && box.querySelector('.bd-card-intero');
+    if (!intero) return;
+    intero.style.top = '';
+    intero.style.maxHeight = '';
+    const vh = window.innerHeight;
+    const cs = getComputedStyle(intero);
+    const px = (v) => parseFloat(v) || 0;
+    const bordi = px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+    // Le misure sono dell'ingombro vero; max-height, in content-box, non conta cornice e imbottitura.
+    const fuori = cs.boxSizing === 'border-box' ? 0 : bordi + px(cs.paddingTop) + px(cs.paddingBottom);
+    const tetto = (parseFloat(cs.maxHeight) || vh) + fuori;
+    const alto = Math.min(intero.scrollHeight + bordi, tetto);
+    const base = px(cs.top);
+    const cima = box.getBoundingClientRect().top + base;
+    const sotto = vh - MARGINE_INTERO - cima;
+    const sale = Math.max(0, Math.min(alto - sotto, cima - MARGINE_INTERO));
+    if (sale > 0) intero.style.top = `${base - sale}px`;
+    if (alto > sotto + sale) intero.style.maxHeight = `${Math.max(0, sotto + sale - fuori)}px`;
+  }
+  const testoLungoDa = (el) => (el && el.closest ? el.closest('.bd-card-testo.lungo') : null);
+  bdList.addEventListener('mouseover', (e) => {
+    const box = testoLungoDa(e.target);
+    if (box && !box.contains(e.relatedTarget)) posaIntero(box);
+  });
+  bdList.addEventListener('focusin', (e) => {
+    const box = testoLungoDa(e.target);
+    if (!box) return;
+    // Il fuoco da tastiera fa prima scorrere la pagina fino alla scheda: si misura dopo.
+    posaIntero(box);
+    requestAnimationFrame(() => posaIntero(box));
+  });
+
   // ── Render ──────────────────────────────────────────────────────────────
   function renderList() {
     // Caricamento fallito e mai riuscito: la lista è vuota perché non l'abbiamo,

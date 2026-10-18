@@ -80,16 +80,16 @@ async function pronta(page) {
   await page.locator('#bdLoading').waitFor({ state: 'hidden', timeout: 20_000 });
 }
 
-async function apri(openTab, { primaDelRicarico } = {}) {
+async function apri(openTab, { primaDelRicarico, schede = SCHEDE } = {}) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await pronta(page);
-  await reteFinta(page, SCHEDE);
+  await reteFinta(page, schede);
   if (primaDelRicarico) await primaDelRicarico(page);
   await page.reload();
   await pronta(page);
   await page.evaluate(() => window.__boardTest.setReleasedVersion('0.2.71'));
-  await expect(page.locator('.bd-card')).toHaveCount(SCHEDE.length);
+  await expect(page.locator('.bd-card')).toHaveCount(schede.length);
   return page;
 }
 
@@ -188,4 +188,44 @@ test('una copia su disco di prima del testo non lo nasconde', async ({ openTab }
     }),
   });
   await expect(carta(page, 'Timer muto').locator('.bd-card-text')).toHaveText(CORTO);
+});
+
+test('il testo intero di una scheda in fondo alla finestra si legge tutto, fino all’ultima riga', async ({ openTab }) => {
+  // Aperto verso il basso finiva sotto il bordo, e la rotella sopra il riquadro non muove la pagina.
+  const riga = (i) => `Riga ${i + 1}: il timer non suona e il volume resta muto anche dopo il riavvio.`;
+  const MEDIO = Array.from({ length: 12 }, (_, i) => riga(i)).join('\n') + '\nFINE-MEDIO';
+  const ENORME = Array.from({ length: 60 }, (_, i) => riga(i)).join('\n') + '\nFINE-ENORME';
+  const schede = [
+    scheda('t-enorme', 1, { name: 'Enorme in fondo', publicText: ENORME }),
+    scheda('t-medio', 2, { name: 'Medio in fondo', publicText: MEDIO }),
+    ...Array.from({ length: 10 }, (_, i) => scheda(`t-n${i}`, 3 + i, { name: `Riempitivo ${i}`, publicText: 'Breve.' })),
+  ];
+  const page = await apri(openTab, { schede });
+
+  for (const [titolo, fine] of [['Medio in fondo', 'FINE-MEDIO'], ['Enorme in fondo', 'FINE-ENORME']]) {
+    const c = carta(page, titolo);
+    const corto = c.locator('.bd-card-text');
+    await page.mouse.move(2, 2);
+    await corto.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().bottom - window.innerHeight + 20));
+    const b = await corto.boundingBox();
+    await page.mouse.move(b.x + 40, b.y + b.height / 2);
+    const intero = c.locator('.bd-card-intero');
+    await expect(intero).toBeVisible();
+    await expect.poll(() => intero.evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
+    for (let i = 0; i < 40; i++) await page.mouse.wheel(0, 300);
+    await page.waitForTimeout(300);
+    await expect(intero).toBeVisible();
+    const m = await intero.evaluate((el) => {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const rs = r.getClientRects();
+      const box = el.getBoundingClientRect();
+      return { ultima: rs[rs.length - 1].bottom, fondo: box.bottom, cima: box.top, finestra: window.innerHeight, testo: el.textContent };
+    });
+    expect(m.testo.endsWith(fine)).toBe(true);
+    expect(m.ultima, JSON.stringify(m)).toBeLessThanOrEqual(m.finestra);
+    expect(m.fondo, JSON.stringify(m)).toBeLessThanOrEqual(m.finestra);
+    expect(m.cima, JSON.stringify(m)).toBeGreaterThanOrEqual(0);
+    await page.screenshot({ path: `tests/.shots/board-testo-in-fondo-${fine.toLowerCase()}.png` });
+  }
 });
