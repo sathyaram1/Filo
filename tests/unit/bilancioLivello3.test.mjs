@@ -73,11 +73,17 @@ test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da pa
   assert.match(uno, /Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità 2: \[2i\] non salva/);
 });
 
-test('un 2 interno col segno ? ferma ancora: la decisione dell\'owner non dipende dal bilancio', () => {
-  const d = decide([f(2, 'i', 'A o B?', true)], { count2: 4 });
+test('un 2 interno col ? difficile da disfare ferma: la decisione dell\'owner non dipende dal bilancio (#1202)', () => {
+  const irr = { ...f(2, 'i', 'A o B, sui dati salvati?', true), irreversibile: true };
+  const d = decide([irr], { count2: 4 });
   assert.equal(d.stop, true);
   assert.deepEqual(livelli(d.blocking), ['2i']);
-  assert.match(R.roundNote({ summary: '', findings: [f(2, 'i', 'A o B?', true)], decision: d }), /livello 3 o 2 che chiede una tua decisione/);
+  assert.match(R.roundNote({ summary: '', findings: [irr], decision: d }), /di livello 3 o su una scelta difficile da disfare/);
+  // Senza il segno, a bilancio dei 2 finito il 2 col ? va da parte con la domanda, senza fermare.
+  const q = decide([f(2, 'i', 'A o B?', true)], { count2: 4 });
+  assert.equal(q.stop, false);
+  assert.deepEqual(q.fix, []);
+  assert.deepEqual(q.derived.map((x) => [x.priority, x.decision, x.inCorrezione === true]), [[2, true, false]]);
 });
 
 test('3 e 2 insieme: il giro si paga dal 3, e il 2 entra anche a bilancio dei 2 finito; a cap3 finito il 3 ferma e il 2 resta sospeso', () => {
@@ -181,7 +187,7 @@ test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 m
   assert.match(pass, /Bilancio delle correzioni di livello 2 finito: il rilievo interno di livello 2 rimasto è entrato nel feedback dei rimasti/);
   assert.match(pass, /Bilanci: cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1 · cap0: 0 giri residui su 0/);
   const stop = verifierReplyText({ outcome: 'stop', motivo: 'loop', blocking: [f(3, 'i', 'perde i dati')], sospesi: [], derived: [], budgets: decide([f(3, 'i', 'x')], { count3: 5 }).budgets });
-  assert.match(stop, /un 3 a bilancio esaurito, o un 3\/2 che chiede una decisione/);
+  assert.match(stop, /un 3 a bilancio esaurito, o una decisione su un 3 o su una scelta difficile da disfare/);
   assert.match(stop, /Bilanci: cap3: 0 giri residui su 5/);
   const fase2 = verifierReplyText({ outcome: 'fix', phase2: { findings: [f(1, 'i', 'bordo')], derived: [{ level: 2, sede: 'i', text: 'a', priority: 2, num: '#7.2' }], budgets: finito.budgets, instructions: 'FASE 2' } });
   assert.match(fase2, /Bilancio delle correzioni di livello 2 finito/);

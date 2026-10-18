@@ -132,15 +132,18 @@ test('withFixed senza un giro aperto: rifiutata', () => {
   assert.equal(withFixed(s, 'r', { report: 'x', sha: SHA }).ok, false);
 });
 
-test('un 3 a bilancio esaurito, o un 2 col segno ?: esito stop; un 2 a bilancio esaurito passa e mette da parte', () => {
+test('un 3 a bilancio esaurito, o un 2 col segno ?!: esito stop; un 2 a bilancio esaurito passa e mette da parte', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   s.r.counts = { count3: 5 };
   const r = withCritique(s, 'r', { critique: '[3i] ancora rotto', sha: SHA });
   assert.equal(r.outcome, 'stop');
   assert.equal(r.state.r.verdict, 'fail');
   assert.match(checkVerdict(r.state.r, SHA).reason, /bocciato/);
-  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada?', sha: SHA });
+  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?!] quale formato su disco?', sha: SHA });
   assert.equal(d.outcome, 'stop');
+  // Senza il segno «!» un 2 col ? non ferma più (#1202): si corregge con l'opzione consigliata.
+  const q = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada? Consiglio A.', sha: SHA });
+  assert.equal(q.outcome, 'fix');
   // Il 2 a bilancio dei 2 finito non ferma (2026-09-23): esce a parte, a priorità 2.
   let due = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   due.r.counts = { count2: 5 };
@@ -470,7 +473,7 @@ test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo 
   assert.match(ripensa.reason, /start/);
   assert.equal(ripensa.state.r.verdict, 'pass', 'il pass registrato resta quello');
   assert.equal(ripensa.state.r.counts.count2 || 0, 0, 'nessun giro pagato');
-  const fermo = withCritique(s, 'r', { critique: 'P.\n[2i?] scelta', sha: SHA });
+  const fermo = withCritique(s, 'r', { critique: 'P.\n[3i?] scelta', sha: SHA });
   assert.equal(fermo.outcome, 'stop');
   assert.equal(withCritique(fermo.state, 'r', { critique: 'Regge.', sha: SHA }).ok, false);
   // Dopo start la critica di un'altra istanza passa.

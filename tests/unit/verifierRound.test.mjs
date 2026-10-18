@@ -166,9 +166,13 @@ test('livello 3 con cap3 esaurito → stop, decide l\'owner; un 2 a cap2 esaurit
   assert.deepEqual(due.derived.map((x) => x.priority), [2]);
 });
 
-test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
+test('il segno ? → stop al livello 3 e su un 2 difficile da disfare, il 2 va avanti, derivato ai livelli 1 e 0 (#1202)', () => {
   assert.equal(decide([f(3, 'chiavi SSH?', true)]).stop, true);
-  assert.equal(decide([f(2, 'quale strada?', true)]).stop, true, 'anche a bilancio pieno');
+  assert.equal(decide([{ ...f(2, 'formato su disco?', true), irreversibile: true }]).stop, true, 'anche a bilancio pieno');
+  const dueQ = decide([f(2, 'quale strada?', true)]);
+  assert.equal(dueQ.stop, false, 'un 2 col ? non ferma più');
+  assert.equal(dueQ.fix.length, 1, 'chi corregge applica l\'opzione consigliata');
+  assert.deepEqual(dueQ.derived.map((x) => [x.priority, x.inCorrezione]), [[2, true]], 'e la domanda esce in un derivato');
   const uno = decide([f(1, 'gusto?', true)]);
   assert.equal(uno.stop, false);
   assert.deepEqual(uno.fix, []);

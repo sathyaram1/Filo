@@ -699,18 +699,20 @@ Tre consegne portano un testo in più, che il server cifra come le `notes` e
 scrive in `livelli` sul documento del feedback (lo legge la dashboard, nella
 fila delle forme della scheda):
 
-- `fixed` e `verdict` accettano `segnalazione` (markdown, al più 12.000
-  caratteri: oltre, `malformed` col numero) → `livelli.l3 = { esito: segnalato,
-  ruolo, at, testo }`. Il ruolo lo dice il biglietto, mai il messaggio. È un
-  trade-off vero che decide l'owner; il server la appende anche alle note,
-  per la storia della chat. Sulla riga di comando: `--segnala <file.md>`.
-- `fixed` accetta `stop: true`, solo insieme a `segnalazione`: chi corregge
-  dichiara che non può andare avanti senza una decisione. Il server risponde
-  `{ outcome: 'stop' }` e porta il feedback in attesa dell'owner invece che a
-  un'altra verifica. Sulla riga di comando: `--record-fixed … --segnala
-  <file.md> --ferma`; senza `--segnala` dispatch si ferma prima di consegnare.
-  Se la risposta non porta `stop` (server non aggiornato) dispatch lo dice:
-  il lavoro è tornato in coda.
+- `status`, `fixed` e `verdict` accettano `segnalazione` (markdown, al più
+  12.000 caratteri: oltre, `malformed` col numero) → `livelli.l3 = { esito:
+  segnalato, ruolo, at, testo }`. Il ruolo lo dice il biglietto, mai il
+  messaggio. È un trade-off vero che decide l'owner; il server la appende anche
+  alle note, per la storia della chat. Con lei viaggiano `segnalazioneLivello`
+  (0-3) e `segnalazioneIrreversibile` (dal 2026-10-12, #1202): la consegna si
+  ferma (`{ outcome: 'stop' }`, attesa dell'owner) solo per un 3 o una scelta
+  difficile da disfare; con le altre il server apre un feedback derivato con la
+  domanda, scrive il suo numero in `livelli.l3.derivato`, risponde
+  `{ segnalazione: { num, id, priority } }` e la consegna va dove era chiesta.
+  Senza livello (uno strumento vecchio) ferma come prima. Sulla riga di
+  comando: `--segnala <file.md> --livello <0-3> [--irreversibile]`.
+- `fixed` accetta ancora `stop: true` (`--ferma`), solo insieme a
+  `segnalazione`, ma non ferma niente da sé: decidono livello e segno.
 - `secaudit` accetta `testo` (accettato anche il nome storico `notes`) →
   `livelli.l4 = { esito: pass|fail, at, testo }`, **sempre**, anche su pass. Un
   `pass` senza testo è respinto (`malformed`): un controllo passato senza dire

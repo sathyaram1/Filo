@@ -512,7 +512,7 @@ test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () =
 });
 
 test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senza chi decide non saprebbe cosa decidere', () => {
-  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala <file\.md> che ferma il lavoro/);
+  assert.match(fermaSenzaSegnalazione(true, ''), /--segnala <file\.md> con --livello 3 o --irreversibile/);
   assert.match(fermaSenzaSegnalazione(true, '   '), /non ho consegnato niente/);
   assert.equal(fermaSenzaSegnalazione(true, 'file.md'), '');
   assert.equal(fermaSenzaSegnalazione(false, ''), '');
@@ -524,6 +524,11 @@ test('fixedReplyText: il fermo lo conferma il server; una segnalazione non ferma
   assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
   assert.match(fixedReplyText('A', {}, true), /segnalazione/);
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
+  // Una segnalazione che non ferma (livello 0-2, non difficile da disfare) esce in un derivato: lo si dice col numero (#1202).
+  const derivata = fixedReplyText('A', { segnalazione: { num: '#7.3' } }, true);
+  assert.match(derivata, /torna in coda per la verifica/);
+  assert.match(derivata, /feedback derivato #7\.3/);
+  assert.doesNotMatch(derivata, /ATTENZIONE|FERMATO/);
 });
 
 test('la nota che lo strumento stampa dopo la critica dice che la segnalazione ferma, senza --ferma', () => {
@@ -541,7 +546,7 @@ test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server, e d
     execFileSync(process.execPath, [script, '--record-fixed', 'fid-x', report, '--ferma'], { encoding: 'utf8', stdio: 'pipe', env: { ...process.env, FILO_ROUTINE_TICKET: '' } });
   } catch (e) { uscita = e.status; testo = `${e.stdout || ''}${e.stderr || ''}`; }
   assert.equal(uscita, 1);
-  assert.match(testo, /--segnala <file\.md> che ferma il lavoro/);
+  assert.match(testo, /--segnala <file\.md> con --livello 3 o --irreversibile/);
 });
 
 // ─── La ripresa dopo la risposta dell'owner ──────────────────────────────────
@@ -605,7 +610,8 @@ test('il testo di ruolo della ripresa esiste nel repo e dice da dove si riparte'
   assert.match(testo, /--record-fixed/);
   assert.match(testo, /includi: _segnala\.md/);
   const segnala = readFileSync(fileURLToPath(new URL('../../routines/roles/_segnala.md', import.meta.url)), 'utf8');
-  assert.match(segnala, /FERMA il lavoro/);
+  assert.match(segnala, /Ferma il lavoro solo un 3 o una scelta difficile da disfare/);
+  assert.match(segnala, /--livello <0-3>/);
 });
 
 // ─── L'ambito della verifica (pieno / riallineamento / chiusura) ─────────────

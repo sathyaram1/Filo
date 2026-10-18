@@ -61,15 +61,21 @@ aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
 suo: non si disfa il lavoro fatto).
 
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
-resta un 3. Il giro continua per i rilievi interni; un vicino può essere
-corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
-lavoro; ogni esterno esce subito in un feedback suo, con la priorità uguale al
-livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
-suo feedback.
+resta un 3. Il giro lo decidono i rilievi interni: un vicino entra nella
+correzione solo se il giro parte comunque per loro, perché il suo file è già
+aperto; altrimenti esce in un feedback derivato col livello che hai scritto.
+Non fa partire un giro, non lo paga e non ferma questo lavoro. Ogni esterno
+esce subito in un feedback suo, con la priorità uguale al livello, e non ferma
+questo lavoro — nemmeno col `?`: la domanda viaggia nel suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
 rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
-prodotto o di gusto. Un difetto non chiede decisioni.
+prodotto o di gusto. Un difetto non chiede decisioni. Nel testo del rilievo
+scrivi **l'opzione che consigli**: un `[2i?]` non ferma il lavoro, chi corregge
+applica quella e la domanda esce in un feedback a parte. Ferma il lavoro un
+`[3i?]`, e una scelta **difficile da disfare** (dati degli utenti, sicurezza,
+formati salvati su disco), che marchi col `!` dopo il `?`: `[2i?!]`. Un 1 o uno
+0 col `?` esce in un feedback derivato senza fermare niente.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|
@@ -118,7 +124,7 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
     Con la scorciatoia di salvataggio, uguale.
 [2e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
 [1v] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
-[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto.
+[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto; consiglio caldo.
 [0i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
 ```
 
@@ -179,20 +185,23 @@ Registra col testo intero, **in un pezzo solo** dentro le stesse virgolette:
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [2i] …
-[0e] …" [--segnala <file.md>]
+[0e] …" [--segnala <file.md> --livello <0-3> [--irreversibile]]
 ```
 
 <!-- includi: _segnala.md -->
 
-Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
-rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
-di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
-`--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
-restano davanti a chi riprende dopo la sua risposta. Un 1 col `?`, o un
-esterno di qualunque livello, va avanti in un feedback derivato che l'owner
-decide a parte. Se poi il server ti manda a correggere, una segnalazione a
-QUELLA consegna ferma il lavoro come per chi risolve.
+Qui il file accompagna un rilievo col `?` che ferma il lavoro, con lo stesso
+livello e lo stesso segno: la riga nella critica resta una riga, le scelte e i
+loro costi stanno nel file. Per un rilievo col `?` che non ferma il file non
+serve: scelte, costi e consiglio stanno nel rilievo, che esce col suo feedback.
+Un difetto non va lì: è un rilievo col suo livello. Sulla critica fermano il
+lavoro un rilievo interno col `?` di livello 3 o col `!`, e una segnalazione di
+livello 3 o `--irreversibile`, anche senza rilievi: i rilievi da correggere
+restano davanti a chi riprende dopo la risposta dell'owner. Un `[2i?]` va
+avanti con l'opzione che consigli; un 1 col `?`, un esterno di qualunque
+livello e una segnalazione che non ferma escono in un feedback derivato che
+l'owner decide a parte. Se poi il server ti manda a correggere, una
+segnalazione a QUELLA consegna segue la stessa regola che per chi risolve.
 
 La critica registrata non si modifica più.
 

@@ -105,7 +105,7 @@ test('gli esterni tornano a parte, ciascuno con la priorità uguale al livello, 
   assert.deepEqual(r.external.map((x) => [x.level, x.priority, x.decision]), [[3, 3, false], [0, 0, false], [1, 1, true]]);
   assert.deepEqual(livelli(r.fix), ['2i']);
   // Anche a lavoro fermo: sono di un altro lavoro, e ne escono.
-  const fermo = decide([f(2, 'i', 'qui', true), f(2, 'e', 'altrove')]);
+  const fermo = decide([f(3, 'i', 'qui', true), f(2, 'e', 'altrove')]);
   assert.equal(fermo.stop, true);
   assert.deepEqual(livelli(fermo.external), ['2e']);
   assert.equal(fermo.external[0].priority, 2);
@@ -122,15 +122,15 @@ test('pass con soli esterni: nessun interno da correggere, il lavoro passa', () 
   assert.match(R.roundNote({ summary: 'ok', findings: list, decision: r }), /3 rilievi sono esterni[\s\S]*Nessun rilievo interno: il lavoro prosegue/);
 });
 
-test('un esterno col ? non ferma: diventa un derivato con la domanda dentro; un interno col ? di livello 2 ferma', () => {
+test('un esterno col ? non ferma: diventa un derivato con la domanda dentro; un interno col ? di livello 3 ferma', () => {
   const esterno = decide([f(3, 'e', 'scelta su un altro lavoro', true)]);
   assert.equal(esterno.stop, false);
   assert.deepEqual(esterno.blocking, []);
   assert.equal(esterno.external[0].decision, true);
   assert.equal(esterno.external[0].priority, 3);
-  const interno = decide([f(2, 'i', 'scelta su questo lavoro', true)]);
+  const interno = decide([f(3, 'i', 'scelta su questo lavoro', true)]);
   assert.equal(interno.stop, true);
-  assert.deepEqual(livelli(interno.blocking), ['2i']);
+  assert.deepEqual(livelli(interno.blocking), ['3i']);
 });
 
 test('i bilanci li consumano solo gli interni: un 2e non paga cap2, un 1e non paga cap1', () => {
@@ -154,9 +154,9 @@ test('gli interni messi da parte dal bilancio portano anche loro la priorità ug
 });
 
 test('roundNote dice quanti esterni escono, e che il lavoro si ferma solo per un interno', () => {
-  const fermo = decide([f(2, 'i', 'qui', true), f(2, 'e', 'altrove')]);
-  const nota = R.roundNote({ summary: 's', findings: [f(2, 'i', 'qui', true), f(2, 'e', 'altrove')], decision: fermo });
+  const lista = [{ ...f(2, 'i', 'qui', true), irreversibile: true }, f(2, 'e', 'altrove')];
+  const nota = R.roundNote({ summary: 's', findings: lista, decision: decide(lista) });
   assert.match(nota, /Un rilievo è esterno/);
-  assert.match(nota, /rilievo interno di livello 3 o 2 che chiede una tua decisione/);
-  assert.match(nota, /- \[2i\?\] qui\n- \[2e\] altrove/);
+  assert.match(nota, /rilievo interno che chiede una tua decisione di livello 3 o su una scelta difficile da disfare/);
+  assert.match(nota, /- \[2i\?!\] qui\n- \[2e\] altrove/);
 });

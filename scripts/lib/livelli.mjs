@@ -40,3 +40,39 @@ export function leggiTestoLivello(file, nome) {
   }
   return { ok: true, testo };
 }
+
+export const SPIEGAZIONE_LIVELLO_SEGNALAZIONE = '--segnala vuole anche --livello <0-3>, il livello del problema, e --irreversibile se la scelta è difficile da disfare (dati degli utenti, sicurezza, formati salvati su disco). Fermano il lavoro solo un 3 o una scelta difficile da disfare; con le altre il lavoro va avanti con la scelta che consigli, e la segnalazione esce in un feedback derivato con la domanda per l\'owner';
+
+/**
+ * La segnalazione di una consegna dalle opzioni (`--segnala <file.md> --livello <0-3> [--irreversibile]`): il
+ * livello è obbligatorio, perché è lui (col segno) a decidere se il lavoro si ferma (#1202). Niente file = niente
+ * segnalazione, e allora livello e segno non hanno a cosa attaccarsi: errore, non un'opzione ignorata.
+ * @returns {{ ok:true, testo:string, livello?:number, irreversibile?:boolean }|{ ok:false, message:string }}
+ */
+export function leggiSegnalazione({ file, livello, irreversibile } = {}) {
+  const conLivello = livello !== undefined && livello !== null && livello !== false;
+  if (!file) {
+    if (conLivello || irreversibile === true) {
+      return { ok: false, message: '--livello e --irreversibile valgono solo insieme a --segnala <file.md>: non ho consegnato niente.' };
+    }
+    return { ok: true, testo: '' };
+  }
+  const raw = String(conLivello && livello !== true ? livello : '').trim();
+  if (!raw) return { ok: false, message: `${SPIEGAZIONE_LIVELLO_SEGNALAZIONE}. Non ho consegnato niente.` };
+  if (!/^[0-3]$/.test(raw)) {
+    return { ok: false, message: `--livello vuole un numero fra 0 e 3 (il metro dei rilievi), non «${raw.slice(0, 20)}»: non ho consegnato niente.` };
+  }
+  const letto = leggiTestoLivello(file, 'segnala');
+  if (!letto.ok) return letto;
+  return { ok: true, testo: letto.testo, livello: Number(raw), irreversibile: irreversibile === true };
+}
+
+/** I campi della segnalazione nel payload di una consegna (vuoto senza segnalazione). PURA. */
+export function campiSegnalazione(seg) {
+  const testo = String((seg && seg.testo) || '').trim();
+  if (!testo) return {};
+  const out = { segnalazione: testo };
+  if (Number.isInteger(seg.livello)) out.segnalazioneLivello = seg.livello;
+  if (seg.irreversibile === true) out.segnalazioneIrreversibile = true;
+  return out;
+}

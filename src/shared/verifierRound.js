@@ -6,8 +6,9 @@
 //   quali si correggono subito (e da quale bilancio si paga il giro), quali
 //   finiscono nel feedback derivato, e quando il lavoro si ferma e passa
 //   all'owner. Più il formato con cui il verificatore scrive la critica
-//   (`[livello+sede] testo`: `[2i]`, `[1v]`, `[1e?]`, una riga per rilievo) e il
-//   suo parser. Contano gli interni, i vicini valgono 0, gli esterni escono a parte.
+//   (`[livello+sede] testo`: `[2i]`, `[1v]`, `[1e?]`, `[2i?!]`, una riga per
+//   rilievo) e il suo parser. Decidono gli interni; i vicini seguono un giro che
+//   parte comunque, gli esterni escono a parte.
 //
 // PERCHÉ È CONDIVISO
 //   Le stesse regole girano in TRE posti: sul server (filo-security, che le
@@ -32,8 +33,9 @@
   // 2026-09-22): `i` interno (tocca a questo lavoro: lo scenario della
   // segnalazione, o l'ha creato il ramo), `e` esterno (un altro lavoro), `v`
   // vicino (un altro lavoro, ma in un file che il ramo modifica già: decisione
-  // del 2026-09-27). Il giro conta gli interni, e i vicini come livello 0; ogni
-  // esterno esce subito in un feedback suo con priorità uguale al livello.
+  // del 2026-09-27). Il giro lo decidono solo gli interni: un vicino entra in una
+  // correzione che parte comunque, e non paga nessun bilancio (2026-10-12, #1202);
+  // ogni esterno esce subito in un feedback suo con priorità uguale al livello.
   const SEDI = ['i', 'e', 'v'];
   const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro (per esempio [2i], [1v], [1e?])';
 
@@ -72,7 +74,11 @@
   //   [2e] Preferenze aperta in due schede cancella le modifiche (c'era già su main)
   //
   // Il `?` dopo la sede segna «chiede una decisione dell'owner» (un
-  // trade-off vero, una scelta di prodotto). La sede è OBBLIGATORIA: un
+  // trade-off vero, una scelta di prodotto); il `!` dopo il `?` (`[2i?!]`) dice
+  // che quella scelta è difficile da disfare (dati degli utenti, sicurezza,
+  // formati salvati su disco): è il segno da cui il server decide se fermare,
+  // mai dal testo (#1202). Un `!` senza `?` non è una scelta, e si respinge.
+  // La sede è OBBLIGATORIA: un
   // «[2]» senza lettera non prende un default in silenzio, viene respinto con
   // la spiegazione (unparsedLevelLines, e `rifiutati` di parseFindings). Le
   // righe che seguono un rilievo senza un livello davanti sono la sua
@@ -94,16 +100,27 @@
   // underscore: guardando solo gli asterischi, «__tre] …» passava muta e la
   // bocciatura finiva nel riassunto (feedback #565).
   const GRASSETTO = '(?:\\*{1,3}|_{1,3})?';
-  // Il segno «?» si accetta anche PRIMA della lettera («[1?i]»): il significato
-  // è lo stesso e respingerlo costerebbe un giro per un ordine di due caratteri.
-  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(?:(\\?)\\s*)?([ievIEV])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  // Il segno «?» si accetta anche PRIMA della lettera («[1?i]»), e il «!» prima
+  // del «?» («[2i!?]»): il significato è lo stesso e respingerlo costerebbe un
+  // giro per un ordine di due caratteri.
+  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(?:(\\?)\\s*)?([ievIEV])\\s*(\\?\\s*!|!\\s*\\?|\\?|!)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
   // La forma VECCHIA, col solo livello: si riconosce per respingerla con la
   // spiegazione giusta, non per leggerla.
   const FINDING_LINE_SENZA_SEDE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  const SPIEGAZIONE_SEGNO = 'il segno «!» (scelta difficile da disfare) va con il «?» della decisione: [2i?!]';
 
-  /** I gruppi di FINDING_LINE come rilievo: livello, sede minuscola, segno «?», testo. PURA. */
+  /** I gruppi di FINDING_LINE come rilievo: livello, sede minuscola, segni «?» e «!», testo. PURA. */
   function rilievoDa(m) {
-    return { level: Number(m[1]), sede: String(m[3]).toLowerCase(), text: m[5].trim(), decision: m[2] === '?' || m[4] === '?' };
+    const dopo = String(m[4] || '');
+    const f = { level: Number(m[1]), sede: String(m[3]).toLowerCase(), text: m[5].trim(), decision: m[2] === '?' || dopo.includes('?') };
+    if (dopo.includes('!')) f.irreversibile = true;
+    return f;
+  }
+
+  /** Una riga di FINDING_LINE col «!» ma senza «?»: si respinge invece di leggerla. PURA. */
+  function segnoSenzaDecisione(m) {
+    const f = rilievoDa(m);
+    return f.irreversibile === true && !f.decision;
   }
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
@@ -296,6 +313,11 @@
           out.push(raw.trim());
           continue;
         }
+        if (segnoSenzaDecisione(m)) {
+          flush();
+          out.push(`${raw.trim()} (${SPIEGAZIONE_SEGNO})`);
+          continue;
+        }
         flush();
         count += 1;
         current = { line: raw.trim(), text: m[5].trim() };
@@ -337,11 +359,11 @@
   /**
    * Legge la critica scritta dal verificatore. PURA.
    *
-   * `rifiutati` sono le righe con un livello ma SENZA la sede («[2] …»), con
-   * la spiegazione: non diventano rilievi né riassunto, e chi registra deve
-   * respingere la critica finché ce ne sono (le altre forme storte le elenca
-   * unparsedLevelLines).
-   * @returns {{ summary: string, findings: Array<{level:number, sede:'i'|'e', text:string, decision:boolean}>, rifiutati: string[] }}
+   * `rifiutati` sono le righe con un livello ma SENZA la sede («[2] …») o col
+   * «!» senza il «?», con la spiegazione: non diventano rilievi né riassunto, e
+   * chi registra deve respingere la critica finché ce ne sono (le altre forme
+   * storte le elenca unparsedLevelLines).
+   * @returns {{ summary: string, findings: Array<{level:number, sede:'i'|'e'|'v', text:string, decision:boolean, irreversibile?:true}>, rifiutati: string[] }}
    */
   function parseFindings(text) {
     const lines = normalizeCritique(text).split('\n');
@@ -351,6 +373,11 @@
     let current = null;
     for (const raw of lines) {
       const m = FINDING_LINE.exec(raw);
+      if (m && segnoSenzaDecisione(m)) {
+        rifiutati.push(`${raw.trim()} (${SPIEGAZIONE_SEGNO})`);
+        current = null;
+        continue;
+      }
       if (m) {
         current = rilievoDa(m);
         findings.push(current);
@@ -381,9 +408,35 @@
     return s === 'e' || s === 'v' ? s : 'i';
   }
 
-  /** Il livello con cui un rilievo conta nel giro: un vicino vale 0, qualunque livello porti scritto. PURA. */
-  function effectiveLevel(f) {
-    return f && sedeDi(f.sede) === 'v' ? 0 : Number(f && f.level);
+  /** Il livello più alto fra gli INTERNI di un elenco (null se non ce ne sono): è quello che paga il giro. PURA. */
+  function livelloDegliInterni(list) {
+    return maxLevel((Array.isArray(list) ? list : []).filter((f) => f && sedeDi(f.sede) === 'i'));
+  }
+
+  /**
+   * Un rilievo interno col «?» ferma il lavoro? Solo un 3, o un 2 su una scelta
+   * difficile da disfare (`!`): gli altri 2 vanno avanti con l'opzione
+   * consigliata, gli 1 e gli 0 vanno da parte (decisione dell'owner del
+   * 2026-10-12, #1202). PURA.
+   */
+  function decisioneFerma(f) {
+    if (!f || f.decision !== true) return false;
+    const n = Number(f.level);
+    return n >= 3 || (n === 2 && f.irreversibile === true);
+  }
+
+  /**
+   * Una segnalazione per l'owner ferma il lavoro? Solo per un problema di
+   * livello 3 o una scelta difficile da disfare; le altre escono in un feedback
+   * derivato e il lavoro va avanti con la scelta consigliata (#1202). Senza un
+   * livello valido vale la regola di prima, che ferma sempre: è la consegna di
+   * uno strumento che il livello non lo manda ancora. PURA.
+   */
+  function segnalazioneFerma(s) {
+    const raw = s && s.livello;
+    const n = raw == null || raw === '' || typeof raw === 'boolean' ? NaN : Number(raw);
+    if (!LEVELS.includes(n)) return true;
+    return n >= 3 || (s && s.irreversibile === true);
   }
 
   /**
@@ -402,7 +455,10 @@
       if (!LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
-      out.push({ level, sede: sedeDi(f.sede), text, decision: f.decision === true });
+      const item = { level, sede: sedeDi(f.sede), text, decision: f.decision === true };
+      // Il «!» vale solo su una scelta: senza «?» non c'è niente da disfare.
+      if (item.decision && f.irreversibile === true) item.irreversibile = true;
+      out.push(item);
       if (out.length >= MAX_FINDINGS) break;
     }
     return out;
@@ -475,13 +531,18 @@
    * L'esito di un giro, calcolato dai livelli e dai bilanci (spec §4). PURA.
    *
    * Regole:
-   *   - un rilievo di livello 3 o 2 che chiede una decisione ferma il lavoro;
+   *   - ferma il lavoro un rilievo che chiede una decisione se è un 3, o un 2
+   *     su una scelta difficile da disfare (`[2i?!]`: decisioneFerma);
    *   - un 3 si corregge se il bilancio dei 3 ha ancora giri; a bilancio
    *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
    *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
    *     lo paga il 3) oppure se il bilancio dei 2 ha ancora giri; a bilancio
    *     finito NON ferma: va nel feedback derivato, a priorità 2, e il giro
    *     passa se non c'è altro (decisione dell'owner del 2026-09-23);
+   *   - un 2 col `?` segue le stesse regole del 2: chi corregge applica
+   *     l'opzione consigliata, e il rilievo esce ANCHE fra i `derived` (con
+   *     `inCorrezione: true`), in un feedback suo con la domanda: se l'owner
+   *     sceglie diversamente, quel feedback cambia il codice già fuso (#1202);
    *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
    *     giro lo paga già il livello più alto, e un altro verificatore arriva
    *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
@@ -496,11 +557,11 @@
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
    *     peggio di un errore (decisione del 2026-09-16).
    *
-   * Contano i rilievi interni (sede `i`) e i vicini (sede `v`), questi ultimi
-   * come livello 0 qualunque sia il livello scritto: entrano in una correzione
-   * che parte comunque, da soli la fanno partire solo col bilancio `cap0`, e
-   * un `v?` va da parte come uno 0 col `?`. Gli esterni non entrano in
-   * nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
+   * Il giro lo decidono i rilievi interni (sede `i`). Un vicino (sede `v`)
+   * entra nella correzione solo se parte comunque per gli interni; altrimenti
+   * va da parte col livello scritto. Non paga e non ferma niente, e un `v?` va
+   * sempre da parte (decisione dell'owner del 2026-10-12, #1202). Gli esterni
+   * non entrano in nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
    * `priority` uguale al livello, in ogni esito (anche a lavoro fermo: sono
    * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
@@ -535,14 +596,21 @@
     const twos = [];
     const ones = [];
     const zeros = [];
+    const vicini = [];
     for (const f of findings) {
-      const level = effectiveLevel(f);
-      if (level >= 3) {
-        if (f.decision || left('cap3') <= 0) blocking.push(f);
+      if (f.sede === 'v') {
+        if (f.decision) derived.push(f);
+        else vicini.push(f);
+        continue;
+      }
+      const level = Number(f.level);
+      if (decisioneFerma(f)) {
+        blocking.push(f);
+      } else if (level >= 3) {
+        if (left('cap3') <= 0) blocking.push(f);
         else fixable.push(f);
       } else if (level === 2) {
-        if (f.decision) blocking.push(f);
-        else twos.push(f);
+        twos.push(f);
       } else if (level === 1) {
         ones.push(f);
       } else {
@@ -572,6 +640,12 @@
       else if (fixable.length || left('cap0') > 0) fixable.push(f);
       else derived.push(f);
     }
+    // I vicini per ultimi: seguono il giro degli interni, non lo fanno partire.
+    const parteComunque = fixable.length > 0;
+    for (const f of vicini) {
+      if (parteComunque) fixable.push(f);
+      else derived.push(f);
+    }
 
     const budgets = {};
     for (const k of CAP_KEYS) budgets[k] = { cap: caps[k], used: counts[k.replace('cap', 'count')], left: Math.max(0, left(k)) };
@@ -584,12 +658,15 @@
     }
 
     // Ordine stabile: come nella critica. Il bilancio si paga dal livello più
-    // alto corretto.
+    // alto fra gli interni corretti. Un 2 col `?` corretto esce anche da parte:
+    // la domanda all'owner viaggia nel suo feedback mentre il lavoro va avanti.
     const fix = findings.filter((f) => fixable.includes(f));
-    const rest = findings.filter((f) => derived.includes(f)).map(conPriorita);
+    const rest = findings
+      .filter((f) => derived.includes(f) || (fixable.includes(f) && f.decision))
+      .map((f) => (fixable.includes(f) ? Object.assign(conPriorita(f), { inCorrezione: true }) : conPriorita(f)));
     let consume = null;
     if (fix.length) {
-      consume = capKeyOf(maxLevel(fix.map((f) => ({ level: effectiveLevel(f) }))));
+      consume = capKeyOf(livelloDegliInterni(fix));
       counts[consume.replace('cap', 'count')] += 1;
       budgets[consume].used += 1;
       budgets[consume].left = Math.max(0, budgets[consume].left - 1);
@@ -604,7 +681,8 @@
    * (decisione dell'owner del 2026-09-27). PURA. Tre tipi di gruppo:
    *   - `esterno`: un rilievo con sede `e`, da solo (anche col `?`: la domanda
    *     viaggia nel suo feedback), così un esterno di livello 3 nasce subito;
-   *   - `decisione`: un interno o vicino col `?`, da solo;
+   *   - `decisione`: un interno o vicino col `?`, da solo (anche un 2 col `?`
+   *     che intanto si corregge: porta `inCorrezione`);
    *   - `rimasti`: TUTTI gli altri (interni messi da parte dal bilancio, vicini
    *     non corretti) in un feedback solo, a priorità = il livello scritto più alto.
    * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
@@ -641,9 +719,10 @@
     return groups;
   }
 
-  /** «[2i]», «[1v?]»: livello e sede di un rilievo, senza testo. PURA. */
+  /** «[2i]», «[1v?]», «[2i?!]»: livello e sede di un rilievo, senza testo. PURA. */
   function findingTag(f) {
-    return `[${Number(f && f.level) || 0}${sedeDi(f && f.sede)}${f && f.decision ? '?' : ''}]`;
+    const segni = f && f.decision ? `?${f.irreversibile === true ? '!' : ''}` : '';
+    return `[${Number(f && f.level) || 0}${sedeDi(f && f.sede)}${segni}]`;
   }
 
   /**
@@ -653,7 +732,10 @@
   function groupLabel(g) {
     const findings = g && Array.isArray(g.findings) ? g.findings : [];
     if (g && g.tipo === 'esterno') return g.decision ? 'esterno, da decidere' : 'esterno';
-    if (g && g.tipo === 'decisione') return `${findings[0] && sedeDi(findings[0].sede) === 'v' ? 'vicino' : 'interno'}, da decidere`;
+    if (g && g.tipo === 'decisione') {
+      const chi = findings[0] && sedeDi(findings[0].sede) === 'v' ? 'vicino' : 'interno';
+      return findings[0] && findings[0].inCorrezione === true ? `${chi}, da decidere: intanto si applica l'opzione consigliata` : `${chi}, da decidere`;
+    }
     const n = findings.length;
     return `rimasti del giro: ${n} ${n === 1 ? 'rilievo' : 'rilievi'} (${findings.map(findingTag).join(', ')})`;
   }
@@ -693,9 +775,9 @@
     }
     // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza
     // dei 3 non fermano il lavoro. Un vicino di livello scritto 2 non è il caso.
-    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i').length : 0;
+    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i' && f.decision !== true).length : 0;
     if (d.stop) {
-      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito), o un rilievo interno di livello 3 o 2 che chiede una tua decisione.');
+      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito), o un rilievo interno che chiede una tua decisione di livello 3 o su una scelta difficile da disfare.');
       const sospesi = Array.isArray(d.sospesi) ? d.sospesi.length : 0;
       if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la tua risposta.`);
     } else if (Array.isArray(d.fix) && d.fix.length) {
@@ -708,9 +790,13 @@
         : 'Nessun rilievo interno da correggere adesso: il lavoro prosegue e i rilievi messi da parte vanno in feedback derivati.');
     }
     const gruppi = derivedGroups({ derived: d.stop ? [] : d.derived });
-    const domande = gruppi.filter((g) => g.tipo === 'decisione').length;
+    const applicate = gruppi.filter((g) => g.tipo === 'decisione' && g.findings[0].inCorrezione === true).length;
+    const domande = gruppi.filter((g) => g.tipo === 'decisione').length - applicate;
     if (domande) {
       parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, con priorità uguale al livello.`);
+    }
+    if (applicate) {
+      parts.push(`${applicate === 1 ? 'Un rilievo di livello 2 chiede una tua decisione' : `${applicate} rilievi di livello 2 chiedono una tua decisione`} senza fermare il lavoro: chi corregge applica intanto l'opzione consigliata dal verificatore, e la domanda esce in un feedback a parte. Se scegli diversamente, quel feedback cambia il codice già fuso.`);
     }
     const rimasti = gruppi.find((g) => g.tipo === 'rimasti');
     if (rimasti) {
@@ -728,9 +814,10 @@
   }
 
   global.SN_VERIFIER_ROUND = {
-    LEVELS, SEDI, SPIEGAZIONE_SEDE, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
+    LEVELS, SEDI, SPIEGAZIONE_SEDE, SPIEGAZIONE_SEGNO, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel, primaFrase,
-    sedeDi, effectiveLevel, missingCaps, normalizeCaps, normalizeCounts, decideRound, derivedGroups, groupLabel,
+    sedeDi, livelloDegliInterni, decisioneFerma, segnalazioneFerma, missingCaps, normalizeCaps, normalizeCounts,
+    decideRound, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote,
   };
 

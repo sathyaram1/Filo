@@ -34,10 +34,11 @@ credenziali. La parte del server da qui non si fa, e la strada dipende dal perch
 - **un no per regola** (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro):
   - se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella
     sezione «Se il lavoro si fa solo in locale», e scrivi nelle note il motivo;
-  - se verifichi, non passare il lavoro guardando solo l'app. Registra la critica con un rilievo `[2i?]` che dice che
-    la parte del server non si è potuta verificare, col motivo, e allega con `--segnala` un file per l'owner con le due
-    strade: lavorarlo in locale, o ridarlo alle routine quando il motivo è sparito. Il lavoro si ferma finché non
-    risponde.
+  - se verifichi, non passare il lavoro guardando solo l'app. Registra la critica con un rilievo `[2i?!]` (codice del
+    server non verificato: una scelta di sicurezza, difficile da disfare) che dice che la parte del server non si è
+    potuta verificare, col motivo, e allega con `--segnala <file.md> --livello 2 --irreversibile` un file per l'owner
+    con le due strade: lavorarlo in locale, o ridarlo alle routine quando il motivo è sparito. Il lavoro si ferma
+    finché non risponde.
 
 ### Il ramo
 

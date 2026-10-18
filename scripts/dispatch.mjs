@@ -96,7 +96,7 @@ import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
-import { MAX_LIVELLO_BYTES, leggiTestoLivello } from './lib/livelli.mjs';
+import { MAX_LIVELLO_BYTES, leggiTestoLivello, leggiSegnalazione, campiSegnalazione } from './lib/livelli.mjs';
 import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
@@ -411,11 +411,13 @@ export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 // posizionali, la frase finiva nel report e il suo nome faceva da identificativo (#879).
 export const OPZIONI_REGISTRAZIONE = {
   '--segnala': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
+  '--livello': { tipo: 'livello', comandi: ['--record-verifier', '--record-fixed'] },
+  '--irreversibile': { tipo: 'bandiera', comandi: ['--record-verifier', '--record-fixed'] },
   '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
   '--frase': { tipo: 'testo', comandi: ['--record-fixed'] },
   '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
 };
-const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
+const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', livello: ' <0-3>', bandiera: '' };
 
 /**
  * Anche come `--opzione=valore`, la forma del canale. PURA. `error`: valore mancante o storto, opzione
@@ -443,6 +445,10 @@ export function leggiOpzioniRegistrazione(list) {
       const file = String(v ?? '').trim();
       if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`);
       valori[nome] = file;
+    } else if (tipo === 'livello') {
+      const livello = String(v ?? '').trim();
+      if (!livello || SEMBRA_OPZIONE(livello)) return no(`${nome} vuole un numero fra 0 e 3 subito dopo di sé: non ho consegnato niente.`);
+      valori[nome] = livello;
     } else {
       // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
       // l'identificativo sparivano dalla riga.
@@ -469,7 +475,7 @@ export function leggiOpzioniRegistrazione(list) {
  */
 export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
-  if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
+  Object.assign(p, campiSegnalazione(typeof segnalazione === 'object' && segnalazione ? segnalazione : { testo: segnalazione }));
   if (ferma === true) p.stop = true;
   if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
   return p;
@@ -491,8 +497,8 @@ function puntaDellaCartella() {
 export function fermaSenzaSegnalazione(ferma, segnalazione) {
   if (!ferma || String(segnalazione || '').trim()) return '';
   return [
-    '--ferma da solo non ferma niente: è --segnala <file.md> che ferma il lavoro, e non ho consegnato niente.',
-    'Fermarsi chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con --segnala (--ferma puoi toglierlo).',
+    '--ferma da solo non ferma niente: a fermare il lavoro è --segnala <file.md> con --livello 3 o --irreversibile, e non ho consegnato niente.',
+    'Fermarsi chiama l\'owner, e senza la segnalazione non saprebbe cosa decidere: scrivi nel file il problema, le scelte e cosa hai fatto nel frattempo, poi rilancia con --segnala e --livello (--ferma puoi toglierlo).',
   ].join('\n');
 }
 
@@ -1151,7 +1157,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
     sha: shaProvato,
     // L3: la segnalazione per l'owner, se c'è (un trade-off vero trovato
     // verificando). Il server la cifra in `livelli.l3`.
-    ...(String(segnalazione || '').trim() ? { segnalazione: String(segnalazione).trim() } : {}),
+    ...campiSegnalazione(typeof segnalazione === 'object' && segnalazione ? segnalazione : { testo: segnalazione }),
   });
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `critica non accettata (${motivoRifiuto(sent)})` };
@@ -1177,7 +1183,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
   // I rilievi messi da parte su QUESTO commit, col loro posto nella critica: la pulizia toglie solo le loro prove.
-  const daParte = derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived);
+  const daParte = messiDaParte(reply.phase2 ? reply.phase2.derived : reply.derived, reply.phase2 && reply.phase2.findings);
   next.messiDaParteGiro = outcome === 'fix'
     ? { sha: shaProvato, n: daParte.reduce((k, d) => k + d.rilievi.length, 0), numeri: daParte.flatMap((d) => d.rilievi.map((f) => f.n)).filter(Number.isInteger), avvio: avvio || '' }
     : null;
@@ -1201,10 +1207,19 @@ export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 // ferma la dice lo strumento, o chi corregge non la scopre mai.
 export const FERMA_NOTE = [
   'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
-  'prodotto), scrivi la segnalazione e consegna quello che hai fatto:',
-  '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --segnala <file.md>',
-  'Una segnalazione FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
-  'risposto. Senza segnalazione torna in coda per un\'altra verifica. Un difetto non è una segnalazione.',
+  'prodotto), scrivi la segnalazione e consegna quello che hai fatto, col livello del problema:',
+  '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --segnala <file.md> --livello <0-3> [--irreversibile]',
+  'La segnalazione FERMA il lavoro solo per un 3 o per una scelta difficile da disfare (--irreversibile: dati',
+  'degli utenti, sicurezza, formati salvati su disco): aspetta l\'owner, e riprende da lì quando ha risposto.',
+  'Con le altre applichi la scelta che consigli, il lavoro torna in verifica e la segnalazione esce in un',
+  'feedback derivato con la domanda per l\'owner. Un difetto non è una segnalazione.',
+].join('\n');
+
+// Un 2 col «?» da correggere: la regola la dice lo strumento, perché il testo della fase 2 può essere dell'owner.
+export const DECISIONE_IN_CORREZIONE_NOTE = [
+  'I rilievi col «?» nell\'elenco da correggere chiedono una decisione dell\'owner che non ferma il lavoro:',
+  'applica l\'opzione che il verificatore consiglia nel testo del rilievo. La domanda è già nel suo feedback',
+  'derivato, qui sotto: se l\'owner sceglie diversamente, sarà quel feedback a cambiare il codice già fuso.',
 ].join('\n');
 
 /**
@@ -1238,6 +1253,20 @@ export function derivatiAperti(derived) {
     if (num) perNumero.set(num, voce);
   }
   return voci;
+}
+
+/**
+ * I derivati del giro senza i rilievi che chi corregge sta anche correggendo (un 2 col «?»: la domanda esce in un
+ * feedback, il codice lo cambia questo giro). La loro prova resta e si toglie verde con quella durevole: la pulizia
+ * toglie solo quelle dei rilievi davvero messi da parte (#1202). Se il server non manda il segno, li riconosce il
+ * numero, che è lo stesso nei due elenchi. PURA.
+ */
+export function messiDaParte(derived, fix) {
+  const daCorreggere = new Set((Array.isArray(fix) ? fix : []).map((f) => f && f.n).filter(Number.isInteger));
+  const fuori = (f) => f.inCorrezione === true || (Number.isInteger(f.n) && daCorreggere.has(f.n));
+  return derivatiAperti(derived)
+    .map((d) => ({ ...d, rilievi: d.rilievi.filter((f) => !fuori(f)) }))
+    .filter((d) => d.rilievi.length);
 }
 
 function frase(f) {
@@ -1287,17 +1316,24 @@ export function verifierReplyText(reply, id = '<id>') {
   // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
   // il testo vive nel feedback, e la cartella del giro si svuota invece di
   // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
-  const daTogliere = derivati.flatMap((d) => d.rilievi.map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
+  const daParte = messiDaParte(r.phase2 ? r.phase2.derived : r.derived, r.phase2 && r.phase2.findings);
+  const daTogliere = daParte.flatMap((d) => d.rilievi.map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
+  const segDerivata = r.segnalazione && String(r.segnalazione.num || '').trim()
+    ? `La segnalazione allegata non ferma il lavoro: è uscita nel feedback derivato ${String(r.segnalazione.num).trim()}, con la domanda per l'owner.`
+    : null;
   if (r.outcome === 'fix' && r.phase2) {
+    const conDomanda = Array.isArray(r.phase2.findings) && r.phase2.findings.some((f) => f && f.decision === true);
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
       'Rilievi interni da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
       fmt(r.phase2.findings),
-      'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
+      conDomanda ? DECISIONE_IN_CORREZIONE_NOTE : null,
+      'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu; una domanda su un rilievo che correggi ha qui il suo feedback):',
       derivatiRighe(derivati),
-      derivati.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi, e il suo caso resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).' : null,
-      derivati.length ? daTogliere : null,
-      derivati.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
+      segDerivata,
+      daParte.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi, e il suo caso resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).' : null,
+      daParte.length ? daTogliere : null,
+      daParte.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
       'Una prova del giro ancora rossa non si toglie e non si cambia mai: la consegna la rilancia com\'era e si ferma. Si toglie solo verde, insieme alla prova durevole che la sostituisce.',
       ROSSO_ATTESO_CHIUSO,
       dueRiga,
@@ -1319,7 +1355,7 @@ export function verifierReplyText(reply, id = '<id>') {
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
       perSegnalazione
         ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
-        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
+        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o una decisione su un 3 o su una scelta difficile da disfare): decide l\'owner.',
       perSegnalazione ? null : fmt(r.blocking),
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
@@ -1331,6 +1367,7 @@ export function verifierReplyText(reply, id = '<id>') {
     return [
       '══ RISPOSTA DEL SERVER: verifica superata ══',
       derivati.length ? `Rilievi non corretti, diventati feedback derivati (esterni e domande uno per rilievo, gli altri insieme nel feedback dei rimasti):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
+      segDerivata,
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       derivati.length ? 'Prove del giro da TOGLIERE adesso, prima di rilasciare il biglietto:' : null,
@@ -1354,14 +1391,17 @@ export function verifierReplyText(reply, id = '<id>') {
 }
 /**
  * Cosa si stampa a consegna accettata: il lavoro si è fermato, o torna in
- * verifica. `conSegnalazione` = la consegna portava una segnalazione (o il
- * vecchio --ferma), quindi DOVEVA fermarsi. PURA.
+ * verifica. `conSegnalazione` = la consegna portava una segnalazione: ferma solo
+ * se il server l'ha detto, altrimenti la risposta porta il feedback derivato in
+ * cui è uscita (#1202). PURA.
  */
 export function fixedReplyText(id, reply, conSegnalazione = false) {
   const fermato = reply && reply.outcome === 'stop';
   if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
-  // Un server vecchio, che non ferma su una segnalazione, rimette in coda: dirlo, o chi ha segnalato crede di essersi fermato.
-  if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  const derivato = reply && reply.segnalazione && String(reply.segnalazione.num || '').trim();
+  if (derivato) return `stato ${id}: consegnato, torna in coda per la verifica. La segnalazione non ferma il lavoro: è uscita nel feedback derivato ${derivato}, con la domanda per l'owner, e resta applicata la scelta che consigli.`;
+  // Né fermo né un derivato: chi ha segnalato deve saperlo, o crede che la domanda sia arrivata da qualche parte.
+  if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non dice né di aver fermato il lavoro né in quale feedback è uscita (server vecchio?): è tornato in coda per la verifica, e la segnalazione è nelle note del lavoro.`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
 async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
@@ -1695,8 +1735,9 @@ export function usageText() {
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
     '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
     '                         torna su main, perché il prossimo worker parta con i suoi agenti',
-    '  --record-verifier <id> "<critica>" [--segnala <file.md>] [--ticket <b>]   una riga per rilievo,',
-    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione);',
+    '  --record-verifier <id> "<critica>" [--segnala <file.md> --livello <0-3>] [--ticket <b>]   una riga per rilievo,',
+    '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione,',
+    '                         [2i?!] = una scelta difficile da disfare);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
@@ -1704,7 +1745,7 @@ export function usageText() {
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
     '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
     '                         più tardi, per una prova dimenticata, il commit è l\'ultimo e da solo',
-    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
+    '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md> --livello <0-3>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
     '                         la nota dice cosa hai controllato e cosa hai trovato;',
@@ -1713,15 +1754,21 @@ export function usageText() {
     '  --segnala <file.md>    un trade-off vero o una domanda di design trovati',
     '                         lavorando: NON deciderlo, segnalalo (Problema / Scelte',
     '                         col loro trade-off / Cosa ho fatto nel frattempo); è quello',
-    '                         che l\'owner legge cliccando il rombo in dashboard. Una',
-    '                         segnalazione FERMA il lavoro: aspetta l’owner, e riprende',
-    '                         da lì quando ha risposto. Un difetto non è una segnalazione',
-    '  --ferma                accettato per chi lo scrive ancora: non serve, è --segnala',
-    '                         che ferma il lavoro; da solo non consegna niente',
+    '                         che l\'owner legge cliccando il rombo in dashboard. Un',
+    '                         difetto non è una segnalazione',
+    '  --livello <0-3>        obbligatorio con --segnala: il livello del problema. Un 3',
+    '                         FERMA il lavoro (aspetta l’owner, e riprende da lì quando',
+    '                         ha risposto); con 2, 1 e 0 il lavoro va avanti con la',
+    '                         scelta che consigli, e la segnalazione esce in un feedback',
+    '                         derivato con la domanda',
+    '  --irreversibile        con --segnala: la scelta è difficile da disfare (dati degli',
+    '                         utenti, sicurezza, formati salvati su disco); ferma sempre',
+    '  --ferma                accettato per chi lo scrive ancora: non serve e non ferma',
+    '                         niente; da solo non consegna niente',
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
-    'Nei --record-* le opzioni (--frase, --segnala, --nota, --ferma, --ticket) valgono in ogni',
+    'Nei --record-* le opzioni (--frase, --segnala, --livello, --irreversibile, --nota, --ferma, --ticket) valgono in ogni',
     'posizione, anche come `--opzione=valore`, come nel canale; quello che resta, in ordine, è',
     'comando, identificativo e testo.',
     'Il biglietto si rilegge da solo dal promemoria (.claude/routine-ticket.json): `--ticket`',
@@ -2212,7 +2259,7 @@ if (isMainModule) {
     if (flag === '--record-verifier') {
       const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, con livello e sede davanti: [2i] …>"'); process.exit(1); }
-      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--segnala <file.md>')); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--segnala <file.md> --livello <0-3>')); process.exit(1); }
       // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
       // più: veniva buttata via in silenzio, e senza rilievi la verifica
       // risulta superata — chi scriveva `fail` per bocciare registrava una
@@ -2251,9 +2298,9 @@ if (isMainModule) {
       }
       // Il file della segnalazione si legge qui, a critica già buona: un file
       // assente ferma con la frase giusta, e niente parte a metà.
-      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
+      const segnalazione = leggiSegnalazione({ file: opz['--segnala'], livello: opz['--livello'], irreversibile: opz['--irreversibile'] });
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const s = await recordVerifier(id, critica, segnalazione.testo);
+      const s = await recordVerifier(id, critica, segnalazione);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply, id));
@@ -2261,8 +2308,8 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
       const [, id, ...rest] = conBiglietto(argv);
-      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
-      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md> --livello <0-3> [--irreversibile]]'); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--frase "…", --segnala <file.md> --livello <0-3>, --irreversibile e --ferma')); process.exit(1); }
       const senza = fermaSenzaSegnalazione(ferma, opz['--segnala']);
       if (senza) { console.error(senza); process.exit(1); }
       // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
@@ -2272,7 +2319,7 @@ if (isMainModule) {
       // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
       const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
-        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
+        console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> con --livello <0-3> e --irreversibile, e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
       }
       // Anche di qui esce un esito — il lavoro torna in coda a un'altra
@@ -2283,11 +2330,11 @@ if (isMainModule) {
         console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: è quello che l\'owner legge, e non si riscrive più.');
         process.exit(1);
       }
-      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
+      const segnalazione = leggiSegnalazione({ file: opz['--segnala'], livello: opz['--livello'], irreversibile: opz['--irreversibile'] });
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
+      const s = await recordFixed(id, report, frase, segnalazione, ferma);
       if (s.rejected) esciRespinto(s);
-      console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim()));
+      console.log(fixedReplyText(id, s.reply, !!segnalazione.testo.trim()));
       process.exit(0);
     } else if (flag === '--record-pulizia') {
       const [, id, ...avanzo] = conBiglietto(argv);

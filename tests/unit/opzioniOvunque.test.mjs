@@ -88,11 +88,11 @@ async function lancia(costruisci) {
 
 test('--record-fixed: frase e segnalazione arrivano uguali in ogni posizione, col ramo e l\'identificativo giusti', async () => {
   const righe = {
-    'in fondo': ({ seg }) => ['--record-fixed', ID, REPORT, '--frase', FRASE, '--segnala', seg],
-    'davanti al comando': ({ seg }) => ['--frase', FRASE, '--segnala', seg, '--record-fixed', ID, REPORT],
-    'fra comando e identificativo': ({ seg }) => ['--record-fixed', '--frase', FRASE, '--segnala', seg, ID, REPORT],
-    'fra identificativo e report': ({ seg }) => ['--record-fixed', ID, '--frase', FRASE, REPORT, '--segnala', seg],
-    'con l\'uguale': ({ seg }) => ['--record-fixed', `--frase=${FRASE}`, `--segnala=${seg}`, ID, REPORT],
+    'in fondo': ({ seg }) => ['--record-fixed', ID, REPORT, '--frase', FRASE, '--segnala', seg, '--livello', '2'],
+    'davanti al comando': ({ seg }) => ['--frase', FRASE, '--segnala', seg, '--livello', '2', '--record-fixed', ID, REPORT],
+    'fra comando e identificativo': ({ seg }) => ['--record-fixed', '--frase', FRASE, '--segnala', seg, '--livello', '2', ID, REPORT],
+    'fra identificativo e report': ({ seg }) => ['--record-fixed', ID, '--frase', FRASE, '--livello', '2', REPORT, '--segnala', seg],
+    'con l\'uguale': ({ seg }) => ['--record-fixed', `--frase=${FRASE}`, `--segnala=${seg}`, '--livello=2', ID, REPORT],
   };
   for (const [dove, riga] of Object.entries(righe)) {
     const r = await lancia(riga);
@@ -102,12 +102,13 @@ test('--record-fixed: frase e segnalazione arrivano uguali in ogni posizione, co
     assert.equal(r.dati.userNote, FRASE, `${dove}: a chi ha segnalato arriva la frase`);
     assert.equal(r.dati.branch, 'worker/900', `${dove}: la consegna porta il ramo del lavoro`);
     assert.equal(r.dati.segnalazione, SEGNALAZIONE, `${dove}: la segnalazione arriva intera`);
+    assert.equal(r.dati.segnalazioneLivello, 2, `${dove}: col livello del problema (#1202)`);
     assert.deepEqual(r.stati, [`${ID}.json`], `${dove}: lo stato locale resta sotto l'identificativo vero`);
   }
 });
 
 test('--record-fixed: --ferma davanti al comando vale come in fondo', async () => {
-  const r = await lancia(({ seg }) => ['--ferma', '--record-fixed', ID, REPORT, '--segnala', seg]);
+  const r = await lancia(({ seg }) => ['--ferma', '--record-fixed', ID, REPORT, '--segnala', seg, '--livello', '3']);
   assert.equal(r.code, 0, `stderr: ${r.se}`);
   assert.equal(r.dati?.stop, true, 'la consegna porta la richiesta di fermarsi');
   assert.equal(r.dati?.report, REPORT);
@@ -129,10 +130,12 @@ test('--record-secaudit: la nota davanti al comando o all\'identificativo arriva
 });
 
 test('--record-verifier: la segnalazione davanti al comando arriva con la critica', async () => {
-  const r = await lancia(({ seg }) => ['--segnala', seg, '--record-verifier', ID, CRITICA]);
+  const r = await lancia(({ seg }) => ['--segnala', seg, '--irreversibile', '--livello', '1', '--record-verifier', ID, CRITICA]);
   assert.equal(r.code, 0, `stderr: ${r.se}`);
   assert.equal(r.dati?.critique, CRITICA);
   assert.equal(r.dati?.segnalazione, SEGNALAZIONE);
+  assert.equal(r.dati?.segnalazioneLivello, 1);
+  assert.equal(r.dati?.segnalazioneIrreversibile, true, 'il segno «difficile da disfare» viaggia col suo nome');
   assert.equal(r.dati?.branch, 'worker/900');
 });
 

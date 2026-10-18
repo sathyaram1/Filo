@@ -188,7 +188,8 @@
   //         bilancio finito un 1 va nel feedback derivato.
   //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
   //         soli non si correggono mai: solo insieme ad altro.
-  // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
+  // Ogni giro consuma UN giro dal bilancio del livello più alto fra gli interni
+  // corretti: i vicini non pagano niente e da soli non fanno partire un giro (#1202).
   const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {

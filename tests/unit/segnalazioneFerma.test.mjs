@@ -27,7 +27,7 @@ const F = (s) => V.parseFindings(s).findings;
 const decide = (s, counts = {}) => V.decideRound({ findings: F(s), caps: CAPS, counts });
 
 test('allo stop gli altri interni della critica sono «sospesi»: restano con quello che ha fermato, senza pagare niente', () => {
-  const d = decide('[2i?] a\n[1i] b\n[0i] c\n[1e] d');
+  const d = decide('[2i?!] a\n[1i] b\n[0i] c\n[1e] d');
   assert.equal(d.stop, true);
   assert.deepEqual(d.blocking.map((f) => f.text), ['a']);
   assert.deepEqual(d.sospesi.map((f) => f.text), ['b', 'c']);
@@ -42,8 +42,8 @@ test('allo stop gli altri interni della critica sono «sospesi»: restano con qu
 });
 
 test('la nota per la chat e la risposta stampata dicono che i sospesi restano davanti a chi riprende', () => {
-  const findings = F('[2i?] a\n[1i] b');
-  const decision = decide('[2i?] a\n[1i] b');
+  const findings = F('[3i?] a\n[1i] b');
+  const decision = decide('[3i?] a\n[1i] b');
   assert.match(V.roundNote({ summary: '', findings, decision }), /Un altro rilievo interno resta davanti a chi riprende/);
   const stampa = verifierReplyText({ outcome: 'stop', blocking: decision.blocking, sospesi: decision.sospesi, derived: [] });
   assert.match(stampa, /restano davanti a chi riprende/);

@@ -573,8 +573,8 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   const serverFermo = partenzaServer === String((server && server.sha) || '');
   if (sha && partenza && sha === partenza && serverFermo) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
-    // Un vicino conta 0 qualunque livello porti scritto: non corretto non ferma, esce coi rimasti.
-    const gravi = pending.filter((f) => ROUND.effectiveLevel(f) >= 2);
+    // Fermano solo gli interni: un vicino non corretto esce coi rimasti, qualunque livello porti scritto.
+    const gravi = pending.filter((f) => ROUND.sedeDi(f.sede) === 'i' && Number(f.level) >= 2);
     const lievi = pending.filter((f) => !gravi.includes(f));
     if (gravi.length) {
       // Anche qui il lavoro si ferma e decide l'owner: bilanci azzerati.
@@ -603,7 +603,7 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
     return { ok: false, reason: 'nessun giro di correzione aperto su questo ramo: la pulizia si fa subito dopo una critica che manda a correggere, prima della correzione.' };
   }
-  const parte = [prev.pending.derived, prev.pending.external].flatMap((l) => (Array.isArray(l) ? l : []));
+  const parte = [prev.pending.derived, prev.pending.external].flatMap((l) => (Array.isArray(l) ? l : [])).filter(messoDaParte);
   if (!parte.length) {
     return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
@@ -620,10 +620,18 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   return { ok: true, state: s, files: controllo.files, numeri };
 }
 
+/**
+ * Un rilievo uscito in un feedback suo che questo giro NON corregge. Un 2 col «?» sta in tutti e due gli elenchi:
+ * la domanda esce, ma il codice lo cambia questo giro, e la sua prova si toglie verde con quella durevole (#1202). PURA.
+ */
+function messoDaParte(f) {
+  return !!f && f.inCorrezione !== true;
+}
+
 /** I posti nella critica dei rilievi che il giro ha messo da parte: le loro prove escono con la pulizia. PURA. */
 export function numeriMessiDaParte(prev) {
   const p = (prev && prev.pending) || {};
-  const parte = [p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : []));
+  const parte = [p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : [])).filter(messoDaParte);
   return numeraRilievi(ROUND.parseFindings((prev && prev.critique) || '').findings, parte).map((f) => f.n);
 }
 
@@ -664,7 +672,7 @@ export function cartellaProveGiro(branch) {
  */
 export function testoProveDaCancellare(branch, derived) {
   const cartella = cartellaProveGiro(branch);
-  const elenco = (Array.isArray(derived) ? derived : []).filter((f) => f && f.text);
+  const elenco = (Array.isArray(derived) ? derived : []).filter((f) => messoDaParte(f) && f.text);
   return [
     `Adesso togli da ${cartella} le prove che riproducono questi rilievi: il rilievo vive nel feedback`,
     'che ne nasce, e la cartella del giro non deve crescere di giro in giro. Una per rilievo:',
@@ -691,8 +699,9 @@ export function codaDalServer(testoServer) {
     '- qui i rilievi lasciati fuori non prendono un numero di feedback: le prove da togliere sono quelle dei rilievi',
     '  elencati più su, riconosciute dal numero r<n> che le precede e che la prova porta nel nome;',
     '- non c\'è `--segnala`, quindi qui una segnalazione non ferma niente da sola: un trade-off vero si scrive',
-    '  PER PRIMO nel report, con le strade e i loro costi, e lo porta all\'owner chi guida il giro, che è lui a',
-    '  fermare il lavoro. Un rilievo che chiede una sua decisione non si corregge a metà: consegna il resto;',
+    '  PER PRIMO nel report, col suo livello, le strade e i loro costi, e lo porta all\'owner chi guida il giro,',
+    '  che è lui a fermare il lavoro (per un 3 o una scelta difficile da disfare; con le altre applichi la scelta',
+    '  che consigli). Un rilievo col «?» dell\'elenco si corregge con l\'opzione consigliata nel suo testo;',
     '- la consegna è `node scripts/verify-local.mjs corretto "<report della correzione>"`, e non c\'è un biglietto',
     '  da rilasciare. Dopo serve un\'altra verifica, di un\'altra istanza: la lancia chi guida.',
   ].join('\n');
@@ -722,7 +731,7 @@ export function bilanciResiduiText(budgets) {
 
 /** La riga che dice dei 2 interni messi da parte (bilancio dei 2 finito), o vuota. PURA. */
 export function dueDaParteText(list) {
-  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && ROUND.sedeDi(f.sede) === 'i').length;
+  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && ROUND.sedeDi(f.sede) === 'i' && f.decision !== true).length;
   if (!n) return '';
   return `Bilancio delle correzioni di livello 2 finito: ${n === 1 ? 'il rilievo interno di livello 2 rimasto entra' : `i ${n} rilievi interni di livello 2 rimasti entrano`} nel feedback dei rimasti. Il lavoro non si ferma.`;
 }
@@ -742,14 +751,21 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
   // in cloud sta nelle istruzioni del ruolo, ma qui la coda arriva da un file
   // fuori dal repo, che non le nomina — e la parte che vive nel repo è questa.
   const cartella = cartellaProveGiro(branch);
-  const messi = [derived, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+  const daParte = (Array.isArray(derived) ? derived : []).filter(messoDaParte);
+  const messi = [daParte, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+  const conDomanda = Array.isArray(findings) && findings.some((f) => f && f.decision === true);
   const righe = [
     '══ ESITO: c\'è da correggere ══',
     `Ramo: ${branch}.`,
     'Rilievi da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
     fmt(findings),
+    ...(conDomanda ? [
+      'I rilievi col «?» qui sopra chiedono una decisione dell\'owner che non ferma il lavoro: applica l\'opzione che il',
+      'verificatore consiglia nel testo del rilievo. La domanda finisce nel report per l\'owner, come feedback a parte:',
+      'se sceglie diversamente, sarà quel feedback a cambiare il codice già fuso.',
+    ] : []),
     'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
-    derivatiText(derived),
+    derivatiText(daParte),
     'Rilievi esterni (non toccano a questo lavoro: ciascuno diventa un feedback suo, lo apre chi guida dal report):',
     derivatiText(external),
   ];
@@ -1146,7 +1162,8 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'cosa chiesta non si ottiene o cammino principale · 1 cosmetica/attrito fuori cammino ·',
     '0 situazione rara; `i` tocca a questo lavoro, `e` è un altro lavoro, `v` è un altro lavoro',
     'ma sta in un file che questo ramo modifica già; `[1i?]` = chiede una decisione',
-    'dell’owner). Una riga col solo livello viene respinta. Le righe prima del',
+    'dell’owner, e nel testo scrivi l’opzione che consigli; `[2i?!]` = una scelta difficile da',
+    'disfare: dati degli utenti, sicurezza, formati salvati su disco). Una riga col solo livello viene respinta. Le righe prima del',
     'primo rilievo sono il riassunto di cosa funziona. Nessun rilievo = verifica superata.',
     'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
     'nel riassunto E NEI PASSI un livello si cita a parole («il livello 2»), mai',
@@ -1428,7 +1445,7 @@ if (isMain) {
       const sospesi = Array.isArray(r.decision.sospesi) && r.decision.sospesi.length
         ? `\nAltri rilievi interni della stessa critica, che restano davanti a chi riprende dopo la risposta dell'owner:\n${ROUND.formatFindings(r.decision.sospesi)}`
         : '';
-      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
+      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o una decisione su un 3 o su una scelta difficile da disfare): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
       if (r.decision.external && r.decision.external.length) {
         console.log(`Rilievi esterni (non toccano a questo lavoro): ciascuno diventa un feedback suo, lo apre chi guida dal report.\n${derivatiText(r.decision.external)}`);
       }

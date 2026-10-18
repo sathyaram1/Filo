@@ -221,8 +221,10 @@ export function derivatiDaAprire(p, derived) {
     const titolo = g.tipo === 'rimasti' && g.findings.length > 1
       ? `Rilievi rimasti del lavoro locale #${p.num}`
       : (prima.length > 90 ? `${prima.slice(0, 89)}…` : prima);
+    // Un 2 col «?» si corregge con l'opzione consigliata: il feedback porta la domanda, non un rilievo lasciato lì (#1202).
+    const applicata = g.tipo === 'decisione' && g.findings[0].inCorrezione === true;
     const testo = [
-      `Rilievo messo da parte nella verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): ${ROUND.groupLabel(g)}.`,
+      `${applicata ? 'Domanda su un rilievo corretto con l’opzione consigliata' : 'Rilievo messo da parte'} nella verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): ${ROUND.groupLabel(g)}.${applicata ? ' Se scegli diversamente, questo feedback cambia il codice già fuso.' : ''}`,
       '',
       ROUND.formatFindings(g.findings),
     ].join('\n');

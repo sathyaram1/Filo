@@ -81,9 +81,11 @@
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
 //         mandato il feedback, che la vede nella sua bacheca. `--segnala
-//         <file.md>` (su status, fixed e verdict) è la segnalazione per
-//         l'owner — un trade-off vero, che decide lui — letta intera dal file
-//         e scritta dal server nel livello L3 del feedback.
+//         <file.md> --livello <0-3> [--irreversibile]` (su status, fixed e
+//         verdict) è la segnalazione per l'owner — un trade-off vero, che
+//         decide lui — letta intera dal file e scritta dal server nel livello
+//         L3 del feedback; ferma il lavoro solo un 3 o una scelta difficile da
+//         disfare, le altre escono in un feedback derivato.
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
 //
@@ -123,7 +125,7 @@ import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
-import { leggiTestoLivello } from './lib/livelli.mjs';
+import { leggiSegnalazione, campiSegnalazione } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
@@ -1108,7 +1110,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
+    'segnala', 'livello', 'irreversibile', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1133,14 +1135,14 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'livello', 'role', 'domanda',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
   // posizionali, e chi lo cercava lì non lo trovava: il ruolo usciva vuoto,
   // chi guida leggeva «server vecchio» e lanciava sempre il worker generico —
   // col biglietto ormai ritirato, che è la cosa che non si annulla (#565).
-  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop']);
+  const CAMPI_BANDIERA = new Set(['json', 'senza-push', 'senza-rapporto', 'stop', 'irreversibile']);
   const args = [];
   const flags = [];
   const data = {};
@@ -1192,7 +1194,8 @@ if (isMain) {
         // volte. Stessa frase di dispatch --record-*.
         console.error(key === 'segnala'
           ? '--segnala vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.'
-          : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
+          : key === 'livello' ? '--livello vuole un numero fra 0 e 3 subito dopo di sé: non ho consegnato niente.'
+            : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
       }
       data[key] = true;
@@ -1228,25 +1231,28 @@ if (isMain) {
   // oltre il tetto = errore chiaro, prima del server). Il server la legge col
   // nome `segnalazione` su status, fixed e verdict; su un altro intento non
   // avrebbe dove andare, e sparirebbe in silenzio.
-  if (typeof data.segnala === 'string') {
+  // Con lei il livello del problema e il segno «difficile da disfare»: sono loro a dire al server se fermare (#1202).
+  if (typeof data.segnala === 'string' || data.livello !== undefined || data.irreversibile !== undefined) {
     const intentoSeg = [args[0], args[1]].find((a) => ['status', 'fixed', 'verdict'].includes(a));
     if (cmd !== 'deliver' || !intentoSeg) {
-      console.error('--segnala vale solo su deliver status, fixed e verdict: non ho consegnato niente.');
+      console.error('--segnala, --livello e --irreversibile valgono solo su deliver status, fixed e verdict: non ho consegnato niente.');
       process.exit(1);
     }
-    const seg = leggiTestoLivello(data.segnala, 'segnala');
+    const seg = leggiSegnalazione({ file: typeof data.segnala === 'string' ? data.segnala : '', livello: data.livello, irreversibile: data.irreversibile });
     if (!seg.ok) { console.error(seg.message); process.exit(1); }
-    data.segnalazione = seg.testo;
+    Object.assign(data, campiSegnalazione(seg));
   }
   delete data.segnala;
+  delete data.livello;
+  delete data.irreversibile;
 
-  // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
-  // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
-  // decidere. Stessa regola di dispatch --record-fixed --ferma.
+  // `--stop` resta accettato per chi lo scrive ancora, ma non ferma niente da
+  // sé: decidono il livello e il segno della segnalazione, e senza segnalazione
+  // l'owner non saprebbe cosa decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
     if (data.stop !== true || !suFixed || !data.segnalazione) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (che da sola ferma già il lavoro): non ho consegnato niente.');
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (non ferma niente da sé: fermano --livello 3 o --irreversibile): non ho consegnato niente.');
       process.exit(1);
     }
   }
@@ -1660,12 +1666,14 @@ if (isMain) {
     }
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
-      // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
-      // adesso, o crede di averlo mandato in verifica.
+      // Una segnalazione ferma il lavoro o esce in un feedback derivato: chi consegna deve sapere quale delle due,
+      // o crede di averlo mandato in verifica, o che la domanda sia rimasta ferma ad aspettare.
       const fermo = r.reply && r.reply.outcome === 'stop';
       const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
+      const derivato = r.reply && r.reply.segnalazione && String(r.reply.segnalazione.num || '').trim();
       if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
-      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
+      else if (derivato) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. La segnalazione non ferma il lavoro: è uscita nel feedback derivato ${derivato}, con la domanda per l'owner, e resta applicata la scelta che consigli.`);
+      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non dice né di aver fermato il lavoro né in quale feedback è uscita (server vecchio?).`);
       else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
       process.exit(0);
     }
