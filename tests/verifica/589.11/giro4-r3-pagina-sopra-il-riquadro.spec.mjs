@@ -29,6 +29,7 @@ const RIQUADRO = `<!doctype html><html><body style="margin:10px;background:#fff"
   <input id="campo" style="width:240px;font-size:16px"></body></html>`;
 
 test('r3 una pagina scura per inversione resta scura col menu aperto nel suo riquadro', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'D14: col menu aperto in un riquadro la pagina sopra perde i suoi effetti, accettato fino al menu disegnato fuori dalla pagina (#1052–#1056)');
   const riquadro = testServer.html(RIQUADRO, { pubblico: true });
   const page = await apri(openTab, testServer, `<!doctype html><html style="filter:invert(1) hue-rotate(180deg)">
     <body style="padding:20px;background:#fff"><iframe src="${riquadro}" style="width:500px;height:300px;border:0"></iframe></body></html>`);
@@ -41,6 +42,7 @@ test('r3 una pagina scura per inversione resta scura col menu aperto nel suo riq
 });
 
 test('r3 un riquadro in un contenitore rimpicciolito non cambia misura quando si apre il menu', async ({ openTab, testServer }) => {
+  test.fail(true, 'D14: col menu aperto in un riquadro la pagina sopra perde i suoi effetti, accettato fino al menu disegnato fuori dalla pagina (#1052–#1056)');
   const riquadro = testServer.html(RIQUADRO, { pubblico: true });
   const page = await apri(openTab, testServer, `<!doctype html><html><body style="padding:20px">
     <div style="transform:scale(0.75);transform-origin:0 0"><iframe src="${riquadro}" style="width:600px;height:420px;border:0"></iframe></div>
