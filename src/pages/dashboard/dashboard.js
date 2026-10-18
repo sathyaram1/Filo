@@ -1,8 +1,6 @@
-// Dashboard Filo (new tab). Controller UI.
-//
-// Il centro è la coda del filo (#869): gli ultimi scambi di tutte le schede, le azioni fatte dall'interfaccia, le pagine
-// visitate ripiegate; sotto, il campo. Aprire una scheda o tornare alla home non apre né chiude una chat: la coda la
-// disegna dashboard-coda.js, la ricerca dashboard-cerca.js, qui restano chat e turni. Ai lati le carte (#870).
+// Dashboard Filo (new tab): chat e turni. Il centro è la coda del filo (#869, dashboard-coda.js e dashboard-cerca.js):
+// aprire una scheda o tornare alla home non apre né chiude una chat. Ai lati le carte (#870, dashboard-carte.js).
+// Regole: patterns/la-home-e-la-coda-del-filo.md.
 
 (function () {
   'use strict';
@@ -136,7 +134,8 @@
   // Le conversazioni delle altre app, righe ripiegate del filo a schermo (#974).
   const Righe = self.SN_DASH_RIGHE;
   Righe.init({
-    send, bubblesEl, homeEl: $('righeApp'), inThread: () => body.dataset.state === 'thread', chatId: () => chatId,
+    // Le righe stanno sempre nel filo al centro (#869).
+    send, bubblesEl, homeEl: $('righeApp'), inThread: () => true, chatId: () => chatId,
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
@@ -256,8 +255,12 @@
     runTurnAndContinue: (args) => runTurnAndContinue(args),
     // Niente da interrompere: in questa scheda l'utente non ha ancora scritto.
     nienteInCorso: () => !scrittoQui && !sending,
+    // Filo può rispondere: la frase su perché non poteva se ne va, e coi suggerimenti la carta dei Crediti (#869: senza
+    // modello chiamato, la home li rilegge e basta).
+    allApertura: () => { mostraSenzaModello(''); loadDashboard().catch(() => {}); },
+    // Solo le bolle: nel filo ci sono anche i segni dei giorni e le righe delle azioni (#869).
     soloRisposteSenzaCrediti: () => {
-      const bolle = [...bubblesEl.children];
+      const bolle = [...bubblesEl.querySelectorAll('.dash-bubble')];
       return bolle.some((b) => b.dataset.senzaCrediti === '1')
         && bolle.every((b) => b.dataset.senzaCrediti === '1' || b.classList.contains('dash-bubble-user'));
     },
@@ -281,7 +284,9 @@
     iconaDelSito: (url, opz) => iconaDelSito(url, opz),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
-    chatCorrente: () => chatId,
+    // Il lavoro che si vede già al centro è quello che gira in questa scheda: la stessa conversazione, continuata in una
+    // scheda nuova (#869), lì non lo mostra.
+    chatCorrente: () => (sending ? chatId : null),
   });
   // ===== Helpers messaggi =====
   function send(msg) {
@@ -364,15 +369,16 @@
     } else {
       bubblesEl.scrollTop = bubblesEl.scrollHeight;
     }
-    goThread();
+    body.dataset.state = 'home';
     inputEl.value = '';
     autoGrowInput();
     inputEl.focus();
   }
 
+  // `thread`: in questa scheda c'è una conversazione in corso (un messaggio, l'accoglienza, una chat riaperta); `home`:
+  // c'è solo il filo. Il centro è lo stesso.
   function goThread() {
     body.dataset.state = 'thread';
-    threadView.hidden = false;
   }
 
   // La coda del filo all'apertura: la conversazione che una scheda nuova continua la riprende anche lo storico, così il
@@ -380,7 +386,6 @@
   async function caricaFilo() {
     const corrente = await Coda.carica();
     if (corrente && !chatId && !Accoglienza.isActive()) await adotta(corrente).catch(() => false);
-    Righe.aggiorna().catch(() => {});
     return corrente;
   }
 
@@ -418,7 +423,12 @@
         if (isUser) bollaUtente = b;
       }
       // I cambi chiesti con quel messaggio ritrovano il loro segno, col loro stato di adesso.
-      if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) Cambi.segna(bollaUtente, m.cambi);
+      // In un frammento non ancora a schermo il segno aspetta: il suo stato lo legge solo da una bolla nella pagina.
+      if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) {
+        const b = bollaUtente;
+        const ids = m.cambi;
+        if (dove.isConnected) Cambi.segna(b, ids); else queueMicrotask(() => Cambi.segna(b, ids));
+      }
       // Le immagini incollate non stanno nell'archivio (sono data URL da centinaia di KB l'una), ma il loro NUMERO sì:
       // senza, chi rilegge trova «cosa vedi in questo grafico?» riferito al nulla.
       const quante = Number(m.images) || 0;
@@ -508,6 +518,7 @@
     const chat = r && r.ok && r.chat;
     if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
     const trovata = await Coda.vaiA({ chat: chat.id, app: !!chat.app, ts: chat.messages[0].ts, i: 0 });
+    if (trovata || riprendi) goThread();
     if (chat.app) {
       if (!trovata) await Righe.mostraSola(chat);
       inputEl.focus();
@@ -528,9 +539,13 @@
   async function apriNelFilo({ chat = null, testo = '', esterno = '' } = {}) {
     if (Accoglienza.isActive()) return 'accoglienza';
     if (sending) return 'risponde';
-    if (chat && chat === chatId) { goHome(); return true; }
-    // La conversazione che l'ha fatta nascere è nel filo: ci si va, senza chiudere quella in corso (#869).
-    if (chat && await reopenChat(chat, { riprendi: false }).catch(() => false)) return true;
+    if (chat) {
+      // Se un'altra scheda la sta vivendo (un turno che lavora lì), si va là; se no il filo va al suo punto, qui (#869).
+      const r = await send({ type: MSG.FILO_CHAT_FOCUS, id: chat });
+      if (r && r.portato) return true;
+      if (chat === chatId) { goHome(); return true; }
+      if (await reopenChat(chat, { riprendi: false }).catch(() => false)) return true;
+    }
     if (!testo) return false;
     // La stessa carta aperta due volte non ripete la frase: è già l'ultima cosa che Filo ha detto qui.
     const ultimo = threadHistory[threadHistory.length - 1];

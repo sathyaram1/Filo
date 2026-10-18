@@ -30,8 +30,16 @@ function segnala({ tipo, testo = '' } = {}) {
 }
 
 // Un giro alla volta: il secondo evento arrivato mentre il primo si scriveva trova già il messaggio da fondere.
+// Sempre sul filo di disco: un evento nato mentre girava una richiesta dell'incognito non finisce nel suo filo in memoria.
+function normale(fn) {
+  let D = null;
+  try { D = require('../shim/storage'); } catch (_) { D = null; }
+  return D && typeof D.runNormale === 'function' ? D.runNormale(fn) : fn();
+}
+
 function giro({ subito = [] } = {}) {
-  const p = corsa.then(() => giroOra(subito), () => giroOra(subito));
+  const fai = () => normale(() => giroOra(subito));
+  const p = corsa.then(fai, fai);
   corsa = p.then(() => {}, () => {});
   return p;
 }

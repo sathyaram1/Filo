@@ -6783,12 +6783,14 @@ ConversazioniApp.collega({
 FiloParla.collega({
   genera: (o) => generaPerFiloParla(o),
   puoParlare: () => filoPuoParlare(),
-  annuncia: (m) => broadcastToTabs({ type: MSG.FILO_PARLA, ...m }),
+  // Il messaggio sta nel filo di disco: una finestra incognito ha il suo, e non lo vede.
+  annuncia: (m) => broadcastToTabs({ type: MSG.FILO_PARLA, ...m }, { soloNormali: true }),
 });
 
-function broadcastToTabs(message) {
+function broadcastToTabs(message, { soloNormali = false } = {}) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
+      if (soloNormali && win._filoIncognito) continue;
       for (const { wc, inVista } of vistePerAnnunci(win._filoTabs)) {
         try { spingiAllaScheda(wc, message, { inVista }); } catch (_) {}
       }

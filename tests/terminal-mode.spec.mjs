@@ -83,9 +83,9 @@ test('#892: di serie il terminale è acceso, e la home resta senza gergo finché
   await expect(page.locator('#dashDir')).not.toHaveText('');
   await expect(input).toHaveAttribute('placeholder', /comando per la shell/);
 
-  // Tornati alla home la chat è nuova: niente gergo finché non gira un altro comando.
-  await submitInput(page, '/home');
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'home');
+  // Chiusa la conversazione (#869: tornare alla home non la chiude più) la chat è nuova: niente gergo finché non gira un
+  // altro comando.
+  await submitInput(page, '/clear');
   await expect(input).toHaveAttribute('placeholder', 'Chiedi qualsiasi cosa…');
   await expect(page.locator('#dashDir')).toBeHidden();
 });
@@ -178,10 +178,10 @@ test('la cartella del terminale sopravvive alla riapertura (#259): riaprendo si 
   // "Esci e rientra": ricarica la dashboard (rilancia l'init, la stessa via che
   // prima resettava la cartella alla home). Ora la cartella salvata va
   // ripristinata: la riga grigia deve mostrare ANCORA la temp dir, non la home.
-  // La riga resta nascosta nella chat nuova (#892), ma il primo comando gira lì.
+  // Riaperta, la scheda continua la stessa conversazione (#869), che i comandi li aveva già: la riga c'è subito.
   await page.reload();
   await terminaleAcceso(page);
-  await expect(page.locator('#dashDir')).toBeHidden();
+  await expect(page.locator('#dashDir')).toHaveText(dir, { timeout: 8_000 });
   await submitInput(page, '/pwd');
   await expect(page.locator('.dash-term-out').last()).toContainText(dir, { timeout: 12_000 });
   await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });

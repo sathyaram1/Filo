@@ -316,8 +316,8 @@
     return caricando;
   }
 
-  // Quello che è arrivato dopo l'ultima lettura. I messaggi della conversazione di questa scheda li ha già disegnati il
-  // turno: tornano solo se la scheda era nascosta e a scriverli è stata un'altra (`daAltrove`).
+  // Quello che è arrivato dopo l'ultima lettura, al suo posto. I messaggi della conversazione di questa scheda li ha già
+  // disegnati il turno: tornano solo se la scheda era nascosta e a scriverli è stata un'altra (`daAltrove`).
   function allinea({ daAltrove = false } = {}) {
     if (!d || ultimo == null) return Promise.resolve();
     const p = coda.then(() => allineaOra(daAltrove), () => allineaOra(daAltrove));
@@ -335,12 +335,24 @@
     for (const v of res.elementi || []) {
       const c = conChiave(v.key);
       if (c) { aggiorna(c, v); continue; }
-      if (v.k === 'msg' && v.chat === qui && !daAltrove) continue;
+      if (v.k === 'msg' && v.chat === qui && !daAltrove) { riconosci(v); continue; }
       metti(v, { scorri: false });
       messi++;
     }
     if (messi) segnaGiorni();
     if (messi && giu) d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+  }
+
+  // Una bolla disegnata dal turno prende il nome che ha nel filo, così una ricerca la ritrova.
+  function riconosci(v) {
+    const testo = String(v.text || '').trim();
+    if (!testo) return;
+    for (const b of d.bubblesEl.querySelectorAll(`.dash-bubble-${v.role === 'user' ? 'user' : 'filo'}:not([data-key])`)) {
+      if (String((b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent) || '').trim() !== testo) continue;
+      b.dataset.key = v.key;
+      b.dataset.chat = v.chat;
+      return;
+    }
   }
 
   function aggiorna(n, v) {

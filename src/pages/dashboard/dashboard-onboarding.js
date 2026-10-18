@@ -33,6 +33,7 @@
   let beginSending = null;
   let runTurnAndContinue = null;
   let nienteInCorso = null;
+  let allApertura = null;
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
@@ -96,6 +97,7 @@
   async function openOnboarding(state) {
     onboardingActive = true;
     hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
+    if (allApertura) allApertura();
     goThread();
     renderOnboardingThread(state);
     showSkipOnboarding();
@@ -464,6 +466,7 @@
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
     nienteInCorso = deps.nienteInCorso;
+    allApertura = deps.allApertura;
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
