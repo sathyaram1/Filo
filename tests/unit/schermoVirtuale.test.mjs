@@ -69,7 +69,7 @@ test('riallineamento: il commit verificato arriva dal marcatore di chi verifica,
   const sha = 'abcdef1234567890abcdef1234567890abcdef12';
   assert.equal(shaDelRiallineamento({ role: 'verifier', dal: sha }), sha);
   assert.equal(shaDelRiallineamento({ role: 'verifier' }), '');
-  assert.equal(shaDelRiallineamento({ role: 'prober', dal: sha }), '', 'solo un verificatore è in un giro di riallineamento');
+  assert.equal(shaDelRiallineamento({ role: 'new-work', dal: sha }), '', 'solo un verificatore è in un giro di riallineamento');
   assert.equal(shaDelRiallineamento({ role: 'verifier', dal: 'HEAD; rm -rf /' }), '', 'solo esadecimale');
   assert.equal(shaDelRiallineamento(null), '');
 });

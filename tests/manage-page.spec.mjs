@@ -232,8 +232,8 @@ test("se il salvataggio fallisce lo switch NON resta acceso a vuoto", async ({ o
   await expect(page.locator('#mgAutoMsg')).toContainText('NON è cambiata');
 });
 
-// Stub dell'IPC dell'automatica: simula il doc Firestore config/automation
-// (campi `enabled`, `autoApprove`, `proberWhenIdle`) senza rete né main.
+// Stub dell'IPC dell'automatica: simula i doc Firestore config/automation e
+// config/routines (`enabled`, `autoApprove`, `routinesEnabled`, `lavoriServer`) senza rete né main.
 // `__automationSets` raccoglie ciò che il client MANDA: è la prova che
 // l'impostazione lascia la pagina e arriva dove il backend la legge.
 async function stubAutomation(page, initial = {}) {
@@ -241,8 +241,8 @@ async function stubAutomation(page, initial = {}) {
     window.__automation = Object.assign({
       enabled: false,
       autoApprove: { owner: true, filo: true, claude: true, user: true },
-      proberWhenIdle: true,
       routinesEnabled: true,
+      lavoriServer: false,
     }, init);
     window.__automationSets = [];
     const orig = window.filo.message.bind(window.filo);
@@ -260,9 +260,9 @@ async function stubAutomation(page, initial = {}) {
           Object.assign(window.__automation.autoApprove, msg.autoApprove);
           sent.autoApprove = { ...msg.autoApprove };
         }
-        if (typeof msg.proberWhenIdle === 'boolean') {
-          window.__automation.proberWhenIdle = msg.proberWhenIdle;
-          sent.proberWhenIdle = msg.proberWhenIdle;
+        if (typeof msg.lavoriServer === 'boolean') {
+          window.__automation.lavoriServer = msg.lavoriServer;
+          sent.lavoriServer = msg.lavoriServer;
         }
         if (typeof msg.routinesEnabled === 'boolean') {
           window.__automation.routinesEnabled = msg.routinesEnabled;
@@ -381,37 +381,6 @@ test('#446 — con l\'automatica spenta gli interruttori per mittente restano mo
   expect(await page.evaluate(() => window.__automation.enabled)).toBe(false);
 });
 
-test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle routine', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await apriScheda(page, 'automation');
-
-  // Il checkbox è visivamente nascosto (switch custom: la levetta è il fratello
-  // .mg-switch-track), quindi si asserisce sul controllo reale, non sulla resa.
-  const sw = page.locator('#mgProberIdle');
-  await expect(page.locator('#mgProberIdle + .mg-switch-track')).toBeVisible();
-  // Non-admin: sola lettura, come il resto della tab.
-  await expect(sw).toBeDisabled();
-
-  await stubAutomation(page);
-  await page.evaluate(() => window.__mgTest.setAdmin(true));
-  await page.evaluate(() => window.__mgTest.loadAutoMode());
-  await expect(sw).toBeEnabled();
-  // Acceso di default: è il comportamento che le routine hanno sempre avuto.
-  await expect(sw).toBeChecked();
-
-  await page.evaluate(() => {
-    const el = document.getElementById('mgProberIdle');
-    el.checked = false;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await expect.poll(() => page.evaluate(() => window.__automation.proberWhenIdle)).toBe(false);
-  await expect.poll(() => page.evaluate(() => window.__automationSets)).toContainEqual({
-    proberWhenIdle: false,
-  });
-});
-
 test('l\'interruttore master spegne le routine e le impostazioni che valgono per loro restano modificabili', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
@@ -442,8 +411,8 @@ test('l\'interruttore master spegne le routine e le impostazioni che valgono per
   await expect.poll(() => page.evaluate(() => window.__automation.routinesEnabled)).toBe(false);
   await expect(page.locator('#mgRoutinesState')).toHaveText('Off');
 
-  // Spente le routine, bilanci, istruzioni ed esplorazione si preparano per la riaccensione.
-  await expect(page.locator('#mgProberIdle')).toBeEnabled();
+  // Spente le routine, bilanci, istruzioni e lavori server si preparano per la riaccensione.
+  await expect(page.locator('#mgLavoriServer')).toBeEnabled();
   for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions',
     '#mgCap3Save', '#mgCap2Save', '#mgCap1Save', '#mgCap0Save', '#mgFixInstructionsSave']) {
     await expect(page.locator(id)).toBeEnabled();
@@ -467,11 +436,12 @@ test('a routine spente un bilancio e le istruzioni si modificano e restano salva
   await page.locator('#mgFixInstructions').fill('Correggi prima i livelli 3.');
   await page.locator('#mgFixInstructionsSave').click();
   await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato.');
-  await page.locator('#mgProberIdle + .mg-switch-track').click();
+  await page.locator('#mgLavoriServer + .mg-switch-track').click();
 
   await expect.poll(() => page.evaluate(() => window.__capsSets))
     .toEqual([{ cap3: 6 }, { fixInstructions: 'Correggi prima i livelli 3.' }]);
-  await expect.poll(() => page.evaluate(() => window.__automation.proberWhenIdle)).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.__automation.lavoriServer)).toBe(true);
+  await expect(page.locator('#mgLavoriServer')).toBeChecked();
 
   // Riletti dalla config, i valori nuovi sono quelli che la pagina mostra.
   await page.evaluate(() => {

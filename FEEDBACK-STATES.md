@@ -280,9 +280,9 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     `onFeedbackOrigineCambiata` (functions/src/origine.js), e alla nascita si rilegge l'origine
     dopo la scrittura perché un passo appena avvenuto non vada perso;
   - origine sparita → `aligned` (`statusReason: origine_mancante`);
-  - senza origine (allarmi della costruzione, esplorazioni) → `todo`, a interruttori spenti o accesi
+  - senza origine (gli allarmi della costruzione) → `todo`, a interruttori spenti o accesi
     (decisione dell'owner del 05/10, #1035): le routine lo prendono quando l'automatica è accesa,
-    come ogni altro lavoro in coda. Vale anche per il NON fidato (l'esploratore lo è sempre): passa
+    come ogni altro lavoro in coda. Vale anche per il NON fidato: passa
     dai giudici, e se lo dicono allineato entra in coda senza guardare gli interruttori; se lo
     fermano resta nei Ricevuti. La prova è `senderProof: 'server'` col prefisso, mai il solo nome:
     un anonimo che si firma `agent:costruzione` è un utente. L'allarme porta la sua priorità
@@ -342,7 +342,8 @@ La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackT
 (dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
 
 C'È UN GRUPPO PER OGNI CATEGORIA D'AUTORE, quelle che la coda mostra con un'icona:
-`owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`,
+`owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`
+(l'esplorazione a coda vuota, tolta col #1206: resta per i feedback che ha aperto),
 `claude` (automazioni che non dichiarano il ruolo) e `filo`. Fino al 2026-08-22 le cinque
 istanze di Claude stavano dietro un interruttore solo: la coda le distingueva ma la
 fiducia era una sola, quindi per fermare l'esploratore si fermava anche la sessione

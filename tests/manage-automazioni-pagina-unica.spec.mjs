@@ -39,7 +39,7 @@ async function apri(app, openTab, { admin = true, recent = STORIA.slice(0, 6), p
       if (!cfg.admin && /^(support_models_get|merge_approvals_get|automation_)/.test(t || '')) return { ok: false, error: 'riservato' };
       if (t === 'support_models_get') return { ok: true, models: cfg.modelli };
       if (t === 'merge_approvals_get') return { ok: true, pending: [], failed: [], recent: cfg.recent, preapproved: cfg.preapproved, ttlMs: 7 * 864e5 };
-      if (t === 'automation_get') return { ok: true, enabled: true, routinesEnabled: true, autoApprove: {}, proberWhenIdle: true };
+      if (t === 'automation_get') return { ok: true, enabled: true, routinesEnabled: true, autoApprove: {} };
       if (t === 'automation_caps_get') return { ok: true, cap3: 3, cap2: 2, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true };
       if (t === 'automation_sessions_get') return { ok: true, letto: true, maxSessions: 4, priorityAccount: '', accountAOff: false, accountBOff: false };
       return orig(msg);

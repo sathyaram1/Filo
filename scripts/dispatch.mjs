@@ -122,7 +122,7 @@ const ROLES_DIR = resolve(TOOLS_ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 // Il documento che dice alle routine come devono comportarsi: acceso/spento,
-// esplorazione a coda vuota, tentativi del loop. Leggibile SENZA credenziali
+// tentativi del loop. Leggibile SENZA credenziali
 // (le regole lo aprono in lettura, la scrittura resta all'owner) — vedi
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
@@ -169,9 +169,8 @@ export const VERIFIER_ROUND = (() => {
  *   Stavano in `config/automation`, leggibile solo con un bearer admin, e la
  *   lettura era best-effort: senza credenziale si ricadeva sui default **senza
  *   dirlo**. Ma nelle macchine delle routine quella credenziale non c'è mai
- *   (è la causa del registro worker sempre vuoto, feedback #451): quindi né
- *   l'esplorazione a coda vuota né i tentativi del loop hanno MAI raggiunto una
- *   routine cloud. In dashboard sembravano attivi, nei fatti non lo erano.
+ *   (è la causa del registro worker sempre vuoto, feedback #451): quindi
+ *   nessuna di quelle impostazioni ha MAI raggiunto una routine cloud. In dashboard sembravano attivi, nei fatti non lo erano.
  *
  *   Ora vivono in `config/routines`, che le regole rendono leggibile da chiunque
  *   e scrivibile solo dall'owner (dentro c'è solo come devono comportarsi le
@@ -186,7 +185,7 @@ export const VERIFIER_ROUND = (() => {
  *   Documento mai scritto (404) NON è un dubbio: è "l'owner non ha mai toccato
  *   niente" ⇒ comportamento storico (routine accese, coi default).
  *
- * @returns {Promise<{enabled?:boolean, proberWhenIdle?:boolean}>}
+ * @returns {Promise<{enabled?:boolean}>}
  * @throws {Error} con `faultKind` se il documento non è leggibile.
  */
 async function fetchRoutineConfig() {
@@ -231,7 +230,6 @@ export function parseRoutineConfig(fields) {
   const f = fields && typeof fields === 'object' ? fields : {};
   const out = {};
   if (f.enabled && typeof f.enabled.booleanValue === 'boolean') out.enabled = f.enabled.booleanValue;
-  if (f.proberWhenIdle && f.proberWhenIdle.booleanValue === false) out.proberWhenIdle = false;
   return out;
 }
 
@@ -566,7 +564,6 @@ const ROLE_FILE = {
   fixer: 'resolver-rebase.md',
   'new-work': 'resolver.md',
   resolver: 'resolver.md',
-  prober: 'prober.md',
   halt: 'halt.md',
 };
 // Il correttore ha due casi (payload.case), e la ripresa dopo la risposta
@@ -779,7 +776,6 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
  *              in conflitto, e il perché scritto dal server (`critique`): un
  *              conflitto, o gli unit rossi sulla fusione con il loro elenco (#929).
  *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
- *   - prober:   niente.
  *
  * @param {object} bucket  bucket costruito dalla busta del server
  * @param {object} ctx     { diff?, feedback? } dati già raccolti dal chiamante
@@ -869,7 +865,6 @@ export function buildPayload(bucket, ctx = {}) {
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
       return { kind: bucket.kind || 'transient', message: bucket.message || '' };
-    case 'prober':
     default:
       return {};
   }
@@ -953,8 +948,8 @@ export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi }
  *                  da scrivere = nessuna logica di retry da sbagliare);
  *   - 'permanent'  il branch nello stato non esiste più → riprovare ogni 6h è
  *                  inutile: il feedback esce dal giro automatico (`design`).
- * Prima esisteva solo il fallback su prober, che traveste un guasto da
- * "giornata tranquilla" — ed è già costato un'ondata di lavoro fantasma.
+ * Un guasto non si traveste da "giornata tranquilla": è già costato
+ * un'ondata di lavoro fantasma.
  */
 export function routineFault(kind, message) {
   const e = new Error(message);
@@ -1763,7 +1758,7 @@ export async function run() {
   // leggere la coda, e leggere la coda vuole la chiave che apre TUTTI i
   // feedback — chiave che non vive più su queste macchine
   // (ROUTINE-AUTH-SPEC.md). Ci si ferma con un guasto DICHIARATO, non si
-  // ripiega sull'esplorazione: travestire un giro cieco da audit è già
+  // ripiega su un altro lavoro: travestire un giro cieco da lavoro è già
   // costato un'ondata di lavoro fantasma.
   const ticket = readRoutineTicket(ROOT);
   if (!ticket) {
@@ -1810,24 +1805,6 @@ export async function run() {
   // arrivare al lavoratore un pacchetto vuoto, con il giro che usciva
   // dicendo che era tutto a posto.
   return finalizeBucket(bucket, w);
-}
-
-// Raccoglie il payload (diff/feedback) della busta del server e stampa il JSON.
-// Ritorna { exit }.
-// Il prober non lavora su un branch: la directory torna alla LINEA PRINCIPALE
-// e l'identità attesa viene rilasciata. Senza, resteremmo sul branch del
-// compito precedente e le modifiche del prober finirebbero là dentro, dove
-// diventerebbero modifiche di QUEL lavoro nel diff che va al gate.
-function prepareForProber() {
-  clearExpectation(ROOT);
-  const g = (args) => tryGit(args);
-  g(['fetch', 'origin', MAIN_BRANCH]);
-  if (currentBranch(ROOT) === MAIN_BRANCH) return;
-  if (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok) {
-    g(['checkout', '-B', MAIN_BRANCH, `origin/${MAIN_BRANCH}`]);
-  } else {
-    g(['checkout', MAIN_BRANCH]);
-  }
 }
 
 // Fra un worker e l'altro la cartella torna sulla linea principale: la sessione legge gli agenti (e il loro
@@ -1916,7 +1893,7 @@ function positionOnBranch(bucket) {
  */
 // I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
 // lavoro: è una busta che non sappiamo aprire.
-const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'prober'];
+const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work'];
 // Chi lavora su un ramo esistente: senza, non c'è niente su cui posizionarsi.
 const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
 
@@ -1949,7 +1926,7 @@ export function checkEnvelope(w) {
   if (RUOLI_CON_RAMO.includes(role) && !String((w && w.branch) || '')) {
     return `lavoro "${role}" senza il ramo su cui lavorare`;
   }
-  if (role !== 'prober' && !String((w && w.id) || '')) {
+  if (!String((w && w.id) || '')) {
     return `lavoro "${role}" senza il feedback a cui si riferisce`;
   }
   // La busta può essere formalmente perfetta e VUOTA dentro: succede se il
@@ -2010,11 +1987,6 @@ async function finalizeBucket(bucket, fromServer) {
   // Il ruolo `idle` non esiste più (SPEC-RIDISEGNO-MAX.md §12): coda vuota o
   // interruttore spento sono un exit 2 alla richiesta di biglietto, PRIMA che
   // un worker venga spawnato. Qui arrivano solo buste con un lavoro dentro.
-  if (bucket.role === 'prober') {
-    prepareForProber();
-    emit(bucket, {});
-    return { exit: 0 };
-  }
 
   // Un lavoro server clona filo-security: dentro il checkout di Filo l'hook di salvataggio lo pubblicherebbe (#1159).
   if (fromServer && fromServer.payload && fromServer.payload.lavoroServer && cloneDentroIlRepo(cartellaCloneServer(), ROOT)) {
@@ -2040,7 +2012,7 @@ async function finalizeBucket(bucket, fromServer) {
   // Rovesciando l'ordine si guadagna anche un'altra cosa: se il posizionamento
   // fallisce, il feedback resta in coda invece di restare marchiato "in
   // lavorazione" da nessuno.
-  if (bucket.id && bucket.role !== 'prober') {
+  if (bucket.id) {
     const pos = positionOnBranch(bucket);
     if (!pos.ok) {
       if (pos.kind === 'permanent') {
@@ -2053,7 +2025,7 @@ async function finalizeBucket(bucket, fromServer) {
         clearState(bucket.id);
         process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
         // Non si ripiega su un altro lavoro: il biglietto vale per QUESTO
-        // feedback e per nessun altro, e mettersi a esplorare tenendoselo in
+        // feedback e per nessun altro, e mettersi a fare altro tenendoselo in
         // mano lascerebbe il semaforo preso su un lavoro che nessuno sta
         // facendo — con il giro che esce dicendo che è andato tutto bene.
         return emitHalt('permanent', pos.message);
