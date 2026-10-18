@@ -529,11 +529,12 @@ for (const [w, h, intera] of [[1024, 640, true], [960, 600, false], [900, 520, f
       };
     });
     const tutti = { casella: true, invio: true, microfono: true, rispostaInVista: true };
+    // Il registro torna in fondo al frame dopo che la casella è cresciuta: si legge quello che vede l'utente.
     await casella.fill('riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera');
-    expect(await dentro()).toEqual(tutti);
+    await expect.poll(dentro, { timeout: 3_000 }).toEqual(tutti);
     if (intera) expect(await casella.evaluate((t) => t.scrollHeight <= t.clientHeight)).toBe(true);
     await casella.fill('una richiesta lunga '.repeat(30));
-    expect(await dentro()).toEqual(tutti);
+    await expect.poll(dentro, { timeout: 3_000 }).toEqual(tutti);
     await chat.locator('[data-chat="send"]').click({ trial: true });
     mkdirSync(SHOTS, { recursive: true });
     await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-bassa-${w}.png` });
