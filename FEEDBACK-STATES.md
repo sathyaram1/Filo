@@ -129,8 +129,10 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
 - `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
   correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
   `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 anche `[1v]`, il vicino, un
-  difetto di un altro lavoro in un file che il ramo modifica già, che conta come
-  livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
+  difetto di un altro lavoro in un file che il ramo modifica già: dal 2026-10-12
+  (#1202) entra nella correzione solo se il giro parte comunque per gli interni,
+  altrimenti va da parte col livello scritto, e non paga nessun bilancio. Ciò che
+  il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
   server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
   priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore (quello col `?` aspetta la risposta alla sua domanda: sopra,
@@ -143,10 +145,13 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (feedback #561, dal 2026-09-05); —rilievo di livello 3 non correggibile (bilancio
   dei 3 esaurito)→ `design` (`statusReason: loop`); un 2 a bilancio dei 2 esaurito NON
   ferma: entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
-  (dal 2026-09-23, bilanci separati per livello); —rilievo di livello 3/2 che chiede una
-  decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
+  (dal 2026-09-23, bilanci separati per livello); —rilievo interno che chiede una
+  decisione, di livello 3 o su una scelta difficile da disfare (`[2i?!]`: dati degli
+  utenti, sicurezza, formati su disco)→ `design` (`statusReason: decisione`); un `[2i?]`
+  NON ferma: si corregge con l'opzione consigliata dal verificatore ed esce anche in un
+  feedback derivato con la domanda (dal 2026-10-12, #1202); —QUALUNQUE consegna con una
   domanda che blocca (`--domanda`: di chi risolve, di chi corregge, e la domanda di un
-  rilievo interno di livello 3 o 2 col `?` di chi verifica, in ogni esito)→ `design`
+  rilievo interno di livello 3 o col `!` di chi verifica, in ogni esito)→ `design`
   (`statusReason: decisione`), senza bisogno di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
   consegne che non possono fermare (nota, controllo di sicurezza, apertura di un
   feedback) la RESPINGONO, mai ignorata in silenzio. Il segnalibro di ripresa porta,
@@ -654,9 +659,10 @@ alla chat + `statusReason: clarify`); (2b) un derivato nato da un rilievo col `?
 (`statusReason: decisione`, domanda in chat dalla nascita, #775): alla risposta torna
 `todo` e lo prende un risolutore da capo, con domanda e risposta nelle `decisioni`; (3) la verifica ha trovato un difetto di livello
 3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
-(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3/2 che chiede una
-decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
-consegnato con una segnalazione per l'owner (stesso `statusReason: decisione`); in
+(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3, o un 2 su una
+scelta difficile da disfare, che chiede una decisione dell'owner (`statusReason:
+decisione`), oppure chi risolve o chi corregge ha consegnato con una segnalazione per
+l'owner (stesso `statusReason: decisione`); in
 tutti questi casi bilanci e verdetti del giro si azzerano — la storia delle critiche
 resta — e il server lascia un **segnalibro di ripresa** nello stato del giro (chi si
 è fermato, perché, i rilievi rimasti aperti). Nei casi `clarify` e `decisione` la

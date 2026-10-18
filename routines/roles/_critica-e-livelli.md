@@ -36,7 +36,7 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
     Con la scorciatoia di salvataggio, uguale.
 [2e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
 [1v] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
-[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto.
+[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto; consiglio caldo.
 [0i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
 ```
 
@@ -121,12 +121,14 @@ parte. Le opzioni agiscono su `payload.id`; per un rilievo che esce in un
 feedback derivato il server le sposta sul derivato, che nasce col titolo della
 domanda. Un difetto non va lì: è un rilievo col suo livello.
 
-Sulla critica fermano il lavoro i rilievi interni di livello 2 o 3 col `?`:
-con la loro domanda che blocca il lavoro aspetta l'owner in ogni esito, e i
-rilievi da correggere restano davanti a chi riprende dopo la sua risposta; con
-`"blocca": false` la critica va avanti col suo esito e la domanda resta aperta.
-Un 1 col `?`, o un esterno di qualunque livello, va avanti in un feedback
-derivato con la sua domanda, che l'owner decide a parte.
+Sulla critica fermano il lavoro i rilievi interni col `?` di livello 3 o col
+`!` (`[2i?!]`): con la loro domanda che blocca il lavoro aspetta l'owner in
+ogni esito, e i rilievi da correggere restano davanti a chi riprende dopo la
+sua risposta; con `"blocca": false` la critica va avanti col suo esito e la
+domanda resta aperta. Un `[2i?]` va avanti: chi corregge applica l'opzione che
+consigli, e la sua domanda esce in un feedback derivato. Un 1 col `?`, o un
+esterno di qualunque livello, va avanti in un feedback derivato con la sua
+domanda, che l'owner decide a parte.
 
 La critica registrata non si modifica più.
 
