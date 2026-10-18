@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback #392: nella Cronologia AI il pulsante "Cancella tutto" svuotava la
 // lista ma NON aggiornava il menu "filtra per tipo", che continuava a elencare i
@@ -56,7 +57,7 @@ test('Cronologia AI: dopo "Cancella tutto" il menu filtro torna alla sola "Tutte
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
     const page = await findTabPage(app, 'history');

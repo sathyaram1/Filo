@@ -35,10 +35,13 @@
     // #525 — rileggere le conversazioni di prima: l'icona è quella della
     // cronologia, che è esattamente quello che sta facendo.
     CERCA_CHAT: 'history',
+    CERCA_SALVATE: 'saveForLater',
+    APRI_SALVATA: 'openTab',
     ONBOARDING: 'checklist',
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
+    CERCA_DOCUMENTI: 'search',
     LEGGI_TRASPARENZA: 'transparency',
     LEGGI_IMPOSTAZIONI: 'options',
     TOGLI_PERMESSO_SITO: 'eraser',
@@ -56,8 +59,12 @@
     RIMUOVI_PROXY_TUTTE: 'globeOff',
     REGOLA_PROXY_DOMINIO: 'globePinned',
     RIMUOVI_REGOLA_PROXY: 'globeOff',
+    TIENI_APERTA: 'pin',
+    NON_TENERE_APERTA: 'eraser',
     COMANDO_FINESTRA: 'windowFrame',
+    SPOSTA_ICONA: 'pin',
     INSTALLA_AGGIORNAMENTO: 'download',
+    RIMEDIO_CREDITI: 'credits',
     CARTA_HOME: 'home',
     ZOOM_PAGINA: 'zoomPagina',
     VOLUME: 'volume',
@@ -66,6 +73,7 @@
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
     ANNULLA_CAMBIO: 'undo',
+    VEDI_SCHERMO: 'screenshot',
   };
 
   const PREVISTE = {

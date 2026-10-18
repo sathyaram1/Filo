@@ -8,6 +8,7 @@
 //     bug, non un dettaglio di stile.
 //   - call: ritenta i guasti che possono passare da soli, NON i rifiuti.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -180,4 +181,16 @@ test('biglietto con ruolo → il ruolo passa; senza ruolo → nessuna chiave in 
     { outcome: 'work', ticket: 'abc', role: 'secaudit' });
   assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', role: '' }),
     { outcome: 'work', ticket: 'abc' });
+});
+
+// #1189: modello e sforzo decisi dal server viaggiano col biglietto; assenti, vuoti o non stringhe non ci sono.
+test('biglietto con model ed effort → passano; vuoti o non stringhe → nessuna chiave in più', () => {
+  assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', role: 'new-work', model: 'haiku', effort: 'low' }),
+    { outcome: 'work', ticket: 'abc', role: 'new-work', model: 'haiku', effort: 'low' });
+  assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', model: ' fable ', effort: 'max' }),
+    { outcome: 'work', ticket: 'abc', model: 'fable', effort: 'max' });
+  for (const [model, effort] of [['', '   '], [null, undefined], [5, { x: 1 }]]) {
+    assert.deepEqual(readTicketReply(200, { ok: true, work: true, ticket: 'abc', model, effort }), { outcome: 'work', ticket: 'abc' });
+  }
+  assert.equal(readTicketReply(200, { ok: true, work: false, model: 'opus' }).model, undefined, 'niente lavoro, niente decisione');
 });

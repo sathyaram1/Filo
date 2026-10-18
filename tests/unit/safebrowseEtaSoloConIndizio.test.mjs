@@ -28,17 +28,19 @@ beforeEach(() => {
 });
 afterEach(() => { Date.now = realNow; });
 
-const analizza = (url, ctx = {}) => new Promise((ok) => {
-  SB.analyze(url, ctx, ok);
-  setTimeout(ok, 30);
-});
+const analizza = async (url, ctx = {}) => {
+  let primo;
+  SB.analyze(url, ctx, (v) => { if (primo === undefined) primo = v; });
+  await SB._settled();
+  return primo;
+};
 
 test('una pagina pulita non manda il nome del sito ai registri; con una password sì, una volta', async () => {
   await analizza('https://forno-di-marco.com/', {});
   await analizza('https://forno-di-marco.com/chi-siamo', {});
   assert.deepEqual(conta.rdap, []);
   assert.deepEqual(conta.ct, []);
-  assert.equal(conta.gsb.length, 1, 'la lista nera resta consultata (e ricordata per il sito)');
+  assert.equal(conta.gsb.length, 2, 'la lista nera resta consultata, una volta per pagina: una pagina pulita non copre le altre del sito (#813)');
 
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });
@@ -117,9 +119,10 @@ test('giudizio AI e finestra isolata: una sola chiamata in volo per pagina, anch
     sandbox: async (u) => { conta.sandbox.push(u); await attesa; return { verdict: 'clean', finalUrl: u, redirects: [] }; },
   });
   const url = 'http://accesso-esempio.com/login';
-  SB.analyze(url, {}, () => {});
-  SB.analyze(url, { hasPassword: true }, () => {});
-  SB.analyze(url, { hasPassword: true, linkOrigin: 'email' }, () => {});
+  const link = { daAprire: true };
+  SB.analyze(url, link, () => {});
+  SB.analyze(url, { ...link, hasPassword: true }, () => {});
+  SB.analyze(url, { ...link, hasPassword: true, linkOrigin: 'email' }, () => {});
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(conta.llm.length, 1);
   assert.equal(conta.sandbox.length, 1);
@@ -191,7 +194,7 @@ test('un sito in whitelist col certificato rotto ha l\'avviso, ma niente giudizi
     sandbox: async (u) => { conta.sandbox.push(u); return { verdict: 'clean', finalUrl: u, redirects: [] }; },
   });
   SB.recordCert('www.google.com', 'mismatch');
-  const v = SB.analyze('https://www.google.com/', {}, () => {});
+  const v = SB.analyze('https://www.google.com/', { daAprire: true }, () => {});
   await new Promise((ok) => setTimeout(ok, 20));
   assert.equal(v.level, 'sospetto');
   assert.deepEqual([conta.llm.length, conta.sandbox.length, conta.rdap.length], [0, 0, 0]);

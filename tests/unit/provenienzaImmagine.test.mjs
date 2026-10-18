@@ -277,7 +277,7 @@ test('la nota per il modello dice sempre che l’assenza di etichette non prova 
   assert.equal(muta.etichetta, '', 'senza etichette non c’è niente da imbustare');
   const firmata = P.notaPerModello(conElenco(pngFirmato(firmatario())));
   assert.match(firmata.etichetta, /Generata con l’AI/);
-  assert.match(firmata.sistema, /non giudica mai i pixel/);
+  assert.match(firmata.sistema, /non stima mai l’origine dall’aspetto/);
   assert.doesNotMatch(firmata.sistema, /OpenAI/, 'il nome scritto dal file non entra nella voce di Filo');
 });
 

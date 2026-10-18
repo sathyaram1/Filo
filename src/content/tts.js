@@ -530,10 +530,21 @@
         type: MSG.UPDATE_SETTINGS,
         settings: { models: { [ACTIONS.TRANSCRIBE_AUDIO]: nickname } },
       });
-      Popup.showToast(I18n.t('menu_dictate_model_set'));
     } catch (_) {
       Popup.showToast(I18n.t('err_provider_failed'));
+      return;
     }
+    // Lo stesso avviso delle Opzioni (#1141): il modello resta scelto, ma si sa subito che con lui non parte.
+    let avviso = '';
+    try {
+      const entry = ((deps.getSettings() || {}).modelRegistry || {})[nickname] || {};
+      const r = await chrome.runtime.sendMessage({
+        type: MSG.AUDIO_HOST_CHECK, action: ACTIONS.TRANSCRIBE_AUDIO, nickname, label: entry.label || nickname,
+      });
+      avviso = (r && typeof r.warning === 'string' && r.warning) || '';
+    } catch (_) {}
+    if (avviso) Popup.showToast(`${I18n.t('menu_dictate_model_set')}. ${avviso}`, { duration: 8000 });
+    else Popup.showToast(I18n.t('menu_dictate_model_set'));
   }
 
   // La dettatura in corso col suo riquadro (al più una alla volta): l'ascolto vero è di SN_ASCOLTO.

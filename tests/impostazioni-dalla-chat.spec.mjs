@@ -4,7 +4,8 @@
 // fix la chiave non esiste e l'interruttore resta acceso.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
@@ -20,7 +21,6 @@ const homeDi = (app) => trovaPagina(app, (u) => u.startsWith('filo://newtab') &&
 async function configura(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -87,7 +87,11 @@ test('A — «spegni il blocco della pubblicità»: conferma, interruttore spent
   expect((await confirmState(chat)).text).toMatch(/tracker/);
   expect((await impostazioni(app)).security.adblock.enabled).toBe(true);
   await chat.screenshot({ path: 'tests/.shots/impostazioni-chat-conferma-adblock.png' });
-  await clickConfirm(chat, 'ok');
+  // Abbassa una difesa (#530): vuole la parola «conferma» a ogni livello.
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await fillConfirmInput(chat, 'conferma');
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'danger');
   await expect.poll(async () => (await impostazioni(app)).security.adblock.enabled, { timeout: 5_000 }).toBe(false);
   // Dopo l'OK il pulsante dice la cosa fatta, non «Filo vuole impostare».
   const pulsante = chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' }).locator('.dash-action-btn');
@@ -134,6 +138,7 @@ test('A — «spegni il blocco della pubblicità»: conferma, interruttore spent
 });
 
 test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la pagina Sicurezza aperta li mostra, una pagina aperta dopo anche', async ({ app, shell, openTab }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
@@ -182,7 +187,11 @@ test('C — il limite di spesa cambiato in chat compare nella pagina Modelli ape
 
   await modelloFinto(app, [imposta('limite_spesa', '12 euro'), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'metti il limite di spesa a 12 euro');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  // Abbassa una difesa (#530): vuole la parola «conferma» a ogni livello.
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await fillConfirmInput(chat, 'conferma');
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'danger');
   await expect.poll(async () => (await impostazioni(app)).monthlyLimitEur, { timeout: 5_000 }).toBe(12);
   await opt.bringToFront();
   await expect(opt.locator('#monthlyLimit')).toHaveValue('12', { timeout: 3_000 });
@@ -244,6 +253,7 @@ test('E — chi scrive nella lista dei siti bloccati non perde l\'a capo quando 
 });
 
 // La pagina Altro rimanda tutta la casella a ogni salvataggio: senza riallinearsi toglieva il dominio della chat.
+// Spegnere Filo su un sito è un costo 1 (#843): parte senza popup.
 test('F — un dominio escluso aggiunto dalla chat compare nella pagina Altro aperta, e scriverci dopo non lo toglie', async ({ app, shell, openTab }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -254,9 +264,8 @@ test('F — un dominio escluso aggiunto dalla chat compare nella pagina Altro ap
   const casella = altro.locator('#blocklist');
   await expect(casella).toHaveValue('banca.it', { timeout: 8_000 });
 
-  await modelloFinto(app, [imposta('domini_esclusi', 'aggiungi esempio.org'), { text: 'Ti chiedo conferma.' }]);
+  await modelloFinto(app, [imposta('domini_esclusi', 'aggiungi esempio.org'), { text: 'Fatto.' }]);
   await scrivi(chat, 'non intervenire su esempio.org');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(async () => (await impostazioni(app)).blocklist, { timeout: 5_000 }).toEqual(['banca.it', 'esempio.org']);
   await altro.bringToFront();
   await expect(casella).toHaveValue('banca.it\nesempio.org', { timeout: 3_000 });
@@ -269,6 +278,7 @@ test('F — un dominio escluso aggiunto dalla chat compare nella pagina Altro ap
 
 // Annullare un cambio a un elenco toglie solo i siti di quel cambio: rimettere l'elenco intero perdeva b.it.
 test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto dopo', async ({ app, shell }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);

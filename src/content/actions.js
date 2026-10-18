@@ -20,6 +20,9 @@
   // a mano è il modo con cui il menu del tasto destro è tornato a mentire.
   const Tasti = global.SN_TASTI;
   const LinkSospetto = global.SN_LINK_SOSPETTO;
+  // I pezzi che questo file mette nel documento del sito vanno avanti solo per un tasto o un clic dell'utente: lo script
+  // della pagina li raggiunge e ci fabbrica sopra eventi (#592.16). Chiudere resta aperto a tutti.
+  const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
@@ -85,7 +88,7 @@
         const end = activeEl.selectionEnd ?? 0;
         activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
         activeEl.setSelectionRange(start, start);
-        activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        activeEl.dispatchEvent(nostro(new Event('input', { bubbles: true })));
       } else {
         document.execCommand('delete');
       }
@@ -110,6 +113,9 @@
   // ------------------------------------------------------------
   // Incolla (da clipboard e da cronologia)
   // ------------------------------------------------------------
+  // Ciò che scriviamo noi in un campo di un riquadro di Filo lo deve sentire anche il riquadro, che ai finti è chiuso.
+  const nostro = (ev) => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
@@ -131,9 +137,9 @@
             if (targetKind === 'input') {
               // input/textarea non supportano immagini: prova a delegare ad
               // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = new CustomEvent('filo:paste-image', {
+              const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
                 bubbles: true, cancelable: true, detail: { blob },
-              });
+              }));
               if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
                 return;
               }
@@ -142,7 +148,7 @@
               if (textType) {
                 const text = await (await it.getType(textType)).text();
                 insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text });
+                pushClipboardEntry({ type: 'text', text }, 'paste');
               } else {
                 Popup.showToast(I18n.t('toast_cannot_paste_image'));
               }
@@ -159,7 +165,7 @@
               return;
             }
             const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description });
+            pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
             Popup.showToast(I18n.t('toast_pasted_image'));
             return;
           }
@@ -174,7 +180,7 @@
       if (!text) return;
       deps.restorePasteContext();
       insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text });
+      pushClipboardEntry({ type: 'text', text }, 'paste');
     } catch (_) {}
   }
 
@@ -197,9 +203,9 @@
       // feedback, barra input dashboard, ecc.) possono allegarla. Senza questa
       // delega l'Incolla→cronologia falliva ovunque Ctrl+V su immagine funziona.
       if (ctx?.kind === 'input' && blob) {
-        const pasteEvt = new CustomEvent('filo:paste-image', {
+        const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
           bubbles: true, cancelable: true, detail: { blob },
-        });
+        }));
         if (ctx.el.dispatchEvent(pasteEvt) === false) {
           Popup.showToast(I18n.t('toast_pasted_image'));
           return;
@@ -290,6 +296,8 @@
     if (!ctx) return;
     const { kind, el } = ctx;
     if (!el || !el.isConnected) return;
+    // Incolla e dettatura li ha chiesti l'utente a Filo, fuori dalla pagina: il correttore li tratta come scritti a mano.
+    try { global.SN_GESTO?.segna([global.SN_GESTO.CHIUDE], { el, x: null, y: null, tasto: '' }); } catch (_) {}
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
@@ -298,7 +306,8 @@
       el.setSelectionRange(caret, caret);
       ctx.start = caret;
       ctx.end = caret;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
+      el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
       // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
@@ -413,11 +422,13 @@
     } catch (_) { return { canBack: true, canFwd: true }; }
   }
 
-  function pushClipboardEntry(entry) {
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
-    // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
+  // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
+  // incolla, non da una copia scelta: una voce appena tolta non rientra così.
+  function pushClipboardEntry(entry, via) {
+    const spinta = chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => null);
+    // Un'immagine che l'utente ha tolto dalla cronologia non torna a un modello per farsi descrivere.
     if (entry?.type === 'image' && entry.dataUrl) {
-      requestImageDescription(entry.dataUrl).catch(() => {});
+      spinta.then((r) => { if (r?.tenuta !== false) requestImageDescription(entry.dataUrl).catch(() => {}); });
     }
   }
 
@@ -470,7 +481,8 @@
       return null;
     }
     if (!res?.ok) {
-      if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
+      // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
+      if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
         warnModelConfigOnce(res.error);
         // La voce in cronologia incolla resterebbe su «Descrizione…» per
@@ -571,10 +583,13 @@
   // il box inline lo mostra istantaneamente invece di aspettare il provider.
   // - Debounce 400ms (selectionchange spara molto durante il drag).
   // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
-  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta.
+  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
+  // - Parte solo dietro un gesto vero che seleziona (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
+  // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
+  const PREFETCH_MAX_CHARS = 2000;
 
   function explainKey(text) { return (text || '').trim().slice(0, 2000); }
 
@@ -585,45 +600,69 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // Spenta dalle Preferenze, o per far durare i crediti (#818): la spiegazione parte al tasto destro.
+    if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) return;
     // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
     if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
+    const Gesto = global.SN_GESTO;
+    if (!Gesto || !Gesto.recente(Gesto.SELEZIONA)) return;
     const sel = Extract.getSelectionWithSentence();
     if (!sel) return;
+    if (sel.selection.length > PREFETCH_MAX_CHARS) return;
     const key = explainKey(sel.selection);
     if (key.length < 3) return;
     // Stessa selezione di prima: l'entry esistente sta già lavorando (o ha il risultato).
     if (prefetchedExplain && prefetchedExplain.key === key) return;
+    // Solo il gesto che ha fatto o toccato questa selezione: un clic su un pulsante non paga il testo che la pagina
+    // seleziona altrove (#1070).
+    if (!Gesto.prendi('spiega', Gesto.SELEZIONA, Gesto.sullaSelezione)) return;
     prefetchedExplain = startExplainRequest(sel);
+    prefetchedExplain.anticipata = true;
   }
 
-  function startExplainRequest(selInfo) {
+  // `suRichiesta`: l'ha chiesta l'utente col tasto destro, e il tetto del main sulle automatiche non la ferma.
+  function startExplainRequest(selInfo, { suRichiesta = false } = {}) {
     const key = explainKey(selInfo.selection);
-    const entry = { key, sentence: selInfo.sentence };
+    const entry = { key, sentence: selInfo.sentence, fermata: false };
     entry.promise = chrome.runtime.sendMessage({
       type: MSG.AI_REQUEST,
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
+      ...(suRichiesta ? { suRichiesta: true } : {}),
     }).then(
-      (res) => (res?.ok && typeof res.text === 'string')
-        ? { text: res.text, keyFallback: res.keyFallback || null }
-        : { error: res?.error || I18n.t('err_provider_failed') },
-      (e) => ({ error: e?.message || I18n.t('err_provider_failed') }),
+      (res) => {
+        if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        return (res?.ok && typeof res.text === 'string')
+          ? { text: res.text, keyFallback: res.keyFallback || null }
+          : { error: Popup.frasePerLUtente(res) };
+      },
+      (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
     );
     return entry;
   }
 
   // Restituisce la Promise per la spiegazione di questa selezione.
   // Riusa il prefetch se è dello stesso testo; altrimenti parte ora.
+  // Un anticipo fermato dal tetto delle automatiche non è la risposta: al tasto destro si chiede davvero.
   function getExplainPromise(selInfo) {
     const key = explainKey(selInfo.selection);
-    if (prefetchedExplain && prefetchedExplain.key === key) {
-      return prefetchedExplain.promise;
+    const chiedi = () => {
+      const entry = startExplainRequest(selInfo, { suRichiesta: true });
+      prefetchedExplain = entry;
+      return entry.promise;
+    };
+    const pre = prefetchedExplain;
+    if (pre && pre.key === key && !pre.fermata) {
+      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
+      if (pre.anticipata && !pre.usata) {
+        pre.usata = true;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+      }
+      return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
     }
-    const entry = startExplainRequest(selInfo);
-    prefetchedExplain = entry;
-    return entry.promise;
+    return chiedi();
   }
 
   function buildInlineExplain(selInfo, opts = {}) {
@@ -644,7 +683,7 @@
           const arrow = document.createElement('button');
           arrow.type = 'button';
           arrow.className = 'sn-menu-inline-arrow';
-          arrow.title = Tasti.frase(I18n.t('menu_explain_deep'), 'Alt+E');
+          arrow.title = `${I18n.t('menu_explain_deep')} (${Tasti.etichettaFilo(Tasti.scorciatoiaFilo('explain-selection'))})`;
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -660,6 +699,7 @@
           el.classList.remove('sn-menu-inline-loading');
           if (!res || res.error || !res.text) {
             el.classList.add('sn-menu-inline-error');
+            // Già tradotto da startExplainRequest: qui si mostra, non si ritraduce.
             body.textContent = (res && res.error) || I18n.t('err_provider_failed');
             return;
           }
@@ -672,6 +712,7 @@
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
           Popup.notaRipiego(body, res.keyFallback);
+          Popup.notaInterrotta(body, res.finishReason);
         });
         return () => { cancelled = true; };
       },
@@ -762,7 +803,8 @@
           leggiOrigine(dataUrl).then((p) => {
             if (cancelled || !p || !p.ok || !p.frase) return;
             testoChiuso(origine, p.frase);
-            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
+            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified'
+              : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
             origine.classList.toggle('sn-menu-origine-debole', !p.forte);
             origine.hidden = false;
           }).catch(() => {});
@@ -778,11 +820,12 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              body.textContent = res?.error || I18n.t('err_provider_failed');
+              body.textContent = Popup.frasePerLUtente(res);
               return;
             }
             testoChiuso(body, res.text);
             Popup.notaRipiego(el, res.keyFallback);
+            Popup.notaInterrotta(el, res.finishReason);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -853,10 +896,11 @@
               body.textContent = '';
             } else if (m.type === 'done') {
               Popup.notaRipiego(el, m.keyFallback);
+              Popup.notaInterrotta(el, m.finishReason);
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              body.textContent = m.message || I18n.t('err_provider_failed');
+              body.textContent = Popup.frasePerLUtente(m);
             }
           });
           port.postMessage({
@@ -907,13 +951,32 @@
     };
   }
 
-  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
-  let salvataggioInCorso = false;
+  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per
+  // chiudersi, e chi chiede riceve lo stesso esito (la voce salvata, o null).
+  let salvataggioInCorso = null;
   const confermeMostrate = new Set();
 
-  async function savePage() {
-    if (salvataggioInCorso) return;
-    salvataggioInCorso = true;
+  function savePage() {
+    if (!salvataggioInCorso) {
+      salvataggioInCorso = salva().then((entry) => {
+        if (!entry) salvataggioInCorso = null;
+        return entry;
+      }, () => {
+        salvataggioInCorso = null;
+        return null;
+      });
+    }
+    return salvataggioInCorso;
+  }
+
+  // La miniatura è della pagina: l'Aiuto aperto sopra non ci finisce dentro.
+  function nascondiPannelli() {
+    const aperti = [...document.querySelectorAll('.sn-sidebar')].filter((el) => el.style.visibility !== 'hidden');
+    for (const el of aperti) el.style.visibility = 'hidden';
+    return () => { for (const el of aperti) el.style.visibility = ''; };
+  }
+
+  async function salva() {
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
     // della miniatura attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
@@ -927,18 +990,16 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        salvataggioInCorso = false;
         Popup.showToast(I18n.t('toast_save_failed'));
-        return;
+        return null;
       }
       entry = res.entry;
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
-      salvataggioInCorso = false;
       console.error('[SN] savePage', e);
       Popup.showToast(I18n.t('toast_save_failed'));
-      return;
+      return null;
     }
 
     // Miniatura best-effort: la scatta il main (piccola, #839) dopo che il menu
@@ -946,14 +1007,17 @@
     // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
     // risposta. Se la pagina è già cambiata la cattura può fallire: il
     // salvataggio resta comunque valido, solo senza anteprima.
+    const rimetti = nascondiPannelli();
     try {
       await attendiCompositor();
       if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
     } catch (_) { /* miniatura opzionale */ }
+    rimetti();
 
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
     showSaveConfirm(entry);
+    return entry;
   }
 
   // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
@@ -997,20 +1061,20 @@
     const finish = (openList) => {
       if (done) return;
       done = true;
-      if (chiudiScheda) salvataggioInCorso = false;
+      if (chiudiScheda) salvataggioInCorso = null;
       if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
-      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
+      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, self.SN_THEME_TOKENS?.motionMs(220) ?? 220);
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
       if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
     };
 
-    pill.addEventListener('click', () => finish(true));
+    pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });
     pill.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
+      if ((e.key === 'Enter' || e.key === ' ') && gestoVero(e)) { e.preventDefault(); finish(true); }
     });
     // Nella pila: col puntatore sopra aspetta, come gli altri avvisi (la scheda si chiude dopo).
     timer = Popup.tempoAvviso(AUTO_CLOSE_MS, () => finish(false), { deveScadere: true });
@@ -1182,8 +1246,20 @@
     return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
   }
 
+  // Una voce del menu di Filo non usa il gesto della pagina (è di Filo): l'indirizzo scelto lo dichiara prima (#737.1).
+  function apriInSchedaNuova(url) {
+    if (!url) return;
+    // Questi Chromium li rifiuta a una pagina senza dire niente: li ferma il main, che lo dice (#482).
+    if (/^(?:file|data|javascript|vbscript):/i.test(String(url).trim())) {
+      chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB, url: String(url) }).catch(() => {});
+      return;
+    }
+    try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
+    window.open(url, '_blank', 'noopener');
+  }
+
   function searchTextOnWeb(text) {
-    window.open(searchUrlFor(text), '_blank', 'noopener');
+    apriInSchedaNuova(searchUrlFor(text));
   }
 
   // ------------------------------------------------------------
@@ -1416,7 +1492,7 @@
 
   function searchImageOnWeb(imgEl) {
     const url = imageSearchUrlFor(imgEl);
-    if (url) window.open(url, '_blank', 'noopener');
+    apriInSchedaNuova(url);
   }
 
   // ------------------------------------------------------------
@@ -1590,20 +1666,21 @@
         }
       }
 
+      // Il riquadro scelto diventa una chiamata al modello, un file e gli appunti: lo disegna solo il mouse dell'utente.
       overlay.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || !gestoVero(e)) return;
         dragging = true;
         startX = curX = e.clientX;
         startY = curY = e.clientY;
         updateMask(startX, startY, startX, startY);
       });
       overlay.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         curX = e.clientX; curY = e.clientY;
         updateMask(startX, startY, curX, curY);
       });
       overlay.addEventListener('mouseup', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         dragging = false;
         curX = e.clientX; curY = e.clientY;
         finish();
@@ -1659,7 +1736,7 @@
         action: ACTIONS.TRANSCRIBE_IMAGE,
         payload: { dataUrl: region.dataUrl },
       });
-      if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+      if (!res?.ok) { Popup.showToast(Popup.frasePerLUtente(res), { duration: 9000 }); return; }
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
@@ -1672,7 +1749,9 @@
         ta.remove();
       }
       try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
-      Popup.showToast(I18n.t('toast_transcribed'));
+      // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
       Popup.showToast(I18n.t('err_provider_failed'));
     }
@@ -1836,7 +1915,7 @@
       b.textContent = label;
       const base = [
         'flex:1', 'padding:9px 12px', 'border-radius:8px', 'font-size:13px',
-        'font-family:inherit', 'cursor:pointer', 'transition:background .12s,border-color .12s',
+        'font-family:inherit', 'cursor:pointer', 'transition:background calc(.12s * var(--sn-motion, 1)),border-color calc(.12s * var(--sn-motion, 1))',
       ];
       if (primary) {
         base.push('border:1px solid var(--sn-accent,#c45a3b)', 'background:var(--sn-accent,#c45a3b)', 'color:#fff');
@@ -1858,10 +1937,11 @@
     };
 
     const downloadBtn = mkBtn(I18n.t('qr_download'), true);
-    downloadBtn.addEventListener('click', () => downloadQrPng(matrix, quiet, url));
+    downloadBtn.addEventListener('click', (e) => { if (gestoVero(e)) downloadQrPng(matrix, quiet, url); });
 
     const copyBtn = mkBtn(I18n.t('qr_copy_link'), false);
-    copyBtn.addEventListener('click', async () => {
+    copyBtn.addEventListener('click', async (e) => {
+      if (!gestoVero(e)) return;
       try {
         await navigator.clipboard.writeText(url);
       } catch (_) {
@@ -1980,6 +2060,7 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    apriInSchedaNuova,
     searchUrlFor,
     searchImageOnWeb,
     imageSearchUrlFor,

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let app;
@@ -30,7 +31,7 @@ test.beforeEach(async () => {
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  shell = await app.firstWindow();
+  shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
 });
 test.afterEach(async () => {

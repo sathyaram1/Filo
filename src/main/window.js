@@ -32,6 +32,29 @@ function revealWindow(win) {
   } catch (_) {}
 }
 
+// Chi deve sapere che è nata una finestra normale fuori dall'avvio (il main ci
+// tiene il suo riferimento): senza, resterebbe puntato a una finestra chiusa.
+const osservatoriFinestraNormale = [];
+function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinestraNormale.push(cb); }
+
+// Durante la chiusura di Filo una finestra nuova annullerebbe l'uscita: chi ha
+// chiesto di uscire se lo vedrebbe riaprire da solo.
+let inChiusura = false;
+try { require('electron').app.on('before-quit', () => { inChiusura = true; }); } catch (_) {}
+
+// Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
+// non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
+function assicuraFinestraNormale() {
+  const esistente = BrowserWindow.getAllWindows().find((w) => {
+    try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
+  });
+  if (esistente) return esistente;
+  if (inChiusura) return null;
+  const win = createMainWindow();
+  for (const cb of osservatoriFinestraNormale) { try { cb(win); } catch (_) {} }
+  return win;
+}
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
@@ -48,6 +71,11 @@ function wireWindowCommon(win, tabs) {
   } catch (_) {}
 
   win.on('resize', () => tabs.layout());
+  // Se si chiude la finestra che stava suonando, il turno passa a un'altra:
+  // senza questo avviso il rumore morirebbe con la finestra, scadenza viva.
+  win.on('closed', () => {
+    try { require('./services/handlers').broadcastLiveUpdate(); } catch (_) {}
+  });
   // Se la finestra va a tutto schermo per una strada che non è quella di Filo
   // (gesto o scorciatoia del sistema, gestore finestre), adottiamo la modalità
   // invece di limitarci al layout: altrimenti resterebbe uno schermo intero che
@@ -73,11 +101,18 @@ function wireWindowCommon(win, tabs) {
   // handleFullscreenEscape risponde false e l'Esc resta a chi lo usa nella barra
   // (il pannello degli scaricamenti si chiude ancora con Esc).
   win.webContents.on('before-input-event', (event, input) => {
+    // La barra laterale prima: il suo tasto, e l'Esc che la chiude prima di uscire dalla modalità.
+    if (tabs.barra && tabs.barra.tasto(input)) { event.preventDefault(); return; }
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
   });
   // Spiega, Traduci, Salva per dopo e Aiuto anche col fuoco sulla barra.
   collegaScorciatoie(win.webContents, win);
+
+  // Il menu a comparsa nasce con la barra pronta: il primo clic lo trova carico (#1090). Il setTimeout fa partire prima il ripristino delle schede.
+  win.webContents.once('did-finish-load', () => {
+    setTimeout(() => { try { require('./popup-menu').preparaMenu(win); } catch (_) {} }, 0);
+  });
 
   // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
   // mai — Electron manda gli app-command su Windows e Linux, lo swipe su Mac —
@@ -120,7 +155,8 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,
@@ -161,6 +197,7 @@ function createIncognitoWindow() {
   // filo:// è registrato globalmente solo sulla sessione di default: i tab di
   // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);
+  try { require('./services/cookies').coverAdblock(ses); } catch (_) {}
 
   const win = new BrowserWindow({
     width: 1180,
@@ -176,7 +213,8 @@ function createIncognitoWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,
@@ -206,6 +244,8 @@ function createIncognitoWindow() {
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}
       try { require('./services/ilFilo').resetIncognito(); } catch (_) {}
+      try { require('./services/contestoFilo').dimenticaIncognito(); } catch (_) {}
+      try { globalThis.SN_HISTORY.resetIncognito(); } catch (_) {}
       try { require('./services/cookies').resetIncognito(); } catch (_) {}
       try { require('./services/fingerprint').resetIncognito(); } catch (_) {}
     }
@@ -214,4 +254,7 @@ function createIncognitoWindow() {
   return win;
 }
 
-module.exports = { createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT };
+module.exports = {
+  createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
+  assicuraFinestraNormale, onFinestraNormale,
+};

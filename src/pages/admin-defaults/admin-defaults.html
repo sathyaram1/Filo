@@ -17,6 +17,7 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/comboBox.js"></script>
   <script src="filo://shared/modelChainEditor.js"></script>
+  <script src="filo://shared/stimaCosto.js"></script>
 </head>
 <body>
   <main class="sn-page" id="page">
@@ -62,6 +63,8 @@
         <h2 id="h-models"></h2>
         <p class="sn-muted" id="models-desc"></p>
         <div class="sn-grid-2" id="modelsGrid"></div>
+        <!-- Sotto la griglia e non sopra: cresce e cala mentre si cambiano le catene, e sopra sposterebbe i campi sotto il cursore. -->
+        <div id="openWeightsImpact" role="status" hidden></div>
         <datalist id="nicknames-list"></datalist>
       </section>
 
@@ -85,6 +88,30 @@
         <h2 id="h-delicate"></h2>
         <p class="sn-muted" id="delicate-desc"></p>
         <div id="delicateLists"></div>
+      </section>
+
+      <section id="sec-contesto">
+        <h2 id="h-contesto"></h2>
+        <p class="sn-muted" id="contesto-desc"></p>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;">
+          <label for="contestoGiorni" id="l-contesto-giorni"></label>
+          <input type="number" id="contestoGiorni" min="0.5" max="365" step="0.5" style="width:120px;" />
+          <label for="contestoToken" id="l-contesto-token"></label>
+          <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+        </div>
+      </section>
+
+      <section id="sec-lunghezza">
+        <h2 id="h-lunghezza"></h2>
+        <p class="sn-muted" id="lunghezza-desc"></p>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;">
+          <label for="lunghezzaConversazioni" id="l-lunghezza-conversazioni"></label>
+          <input type="number" id="lunghezzaConversazioni" min="1024" max="262144" step="1024" style="width:140px;" />
+          <label for="lunghezzaTesti" id="l-lunghezza-testi"></label>
+          <input type="number" id="lunghezzaTesti" min="1024" max="262144" step="1024" style="width:140px;" />
+          <label for="lunghezzaBrevi" id="l-lunghezza-brevi"></label>
+          <input type="number" id="lunghezzaBrevi" min="1024" max="262144" step="1024" style="width:140px;" />
+        </div>
       </section>
 
       <div class="sn-toolbar" style="margin-top: 24px;">

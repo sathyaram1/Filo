@@ -64,6 +64,18 @@ aspettava 600 ms da `toBeVisible()` prima di premere Invio era rossa tre volte s
 quattro. Prima di un gesto che deve valere si chiede al dialogo se è pronto
 (`aspettaConfermaPronta`, `tests/helpers/confirm.mjs`), non si aspetta un tempo fisso.
 
+## La sessione che li lancia (#949.1, #1144.1)
+
+Nel contenitore delle routine la shell porta l'identità della sessione (`FILO_ROUTINE`, e
+a volte il suo transcript), e uno script del canale lanciato da un test la crede sua:
+misura il consumo vero, lo mette nel corpo che la prova confronta e scrive il suo stato
+nella cartella di prova. Il lanciatore toglie quell'identità a tutti i test
+(`ambientePerITest`, `scripts/run-unit-tests.mjs`); un file lanciato da solo con
+`node --test` non passa da lui, quindi una prova che confronta il corpo spedito da uno
+di quegli script, o lo stato della sua cartella, passa al figlio
+`ambientePerITest(process.env)` e non `process.env`. Sentinelle:
+`tests/unit/unitRunner.test.mjs` e `tests/unit/routineChannelRilascio.test.mjs`.
+
 ## La macchina dell'owner (#563)
 
 Due proprietà che le altre macchine non hanno, e ogni test che le dava per scontate
@@ -122,6 +134,29 @@ il rosso ferma le versioni per tutti:
 
 Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
 
+**Il codice che fa una cosa diversa per sistema** (#1135). Su Windows la versione
+nuova si installa all'apertura dopo, altrove alla chiusura (#1039): la prova scritta
+su Linux asseriva «alla chiusura», passava ovunque tranne al cancello, e otto rossi
+hanno fermato la pubblicazione. Quando l'esito dipende dalla piattaforma, la prova la
+sceglie lei e gira per ognuna (`perOgniSistema` in
+`tests/unit/aggiornamentiAutomatici.test.mjs`), così Linux corre anche il caso
+Windows: `conPiattaforma` cambia `process.platform` per la durata del caso e lo
+rimette com'era. Regge solo perché il codice la chiede al momento, da un punto solo
+(`dip.piattaforma()`), mai fissata in una costante al caricamento del modulo: lì la
+prova non arriverebbe più, e il caso Windows girerebbe da Linux. Uno spec in Electron
+fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per ognuna
+(`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
+dà un ramo che la suite in GitHub non corre mai (#1171).
+
+**Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
+la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
+su main da un giorno, hanno riaperto il loro feedback appena il primo si era chiuso.
+Prima di aprirlo il cancello rifà ogni file rosso sulla punta di main
+(`scripts/rossi-sulla-punta.mjs`): verdi tutti, nessun feedback e la corsa resta rossa;
+altrimenti il feedback dice il commit provato e quali file sono già verdi. Nel dubbio
+(main irraggiungibile, rosso senza file, controllo rotto) si apre come prima.
+Sentinella: `tests/unit/rossiSullaPunta.test.mjs`.
+
 ## Il collegamento simbolico (#742)
 
 Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
@@ -154,6 +189,58 @@ torna indietro, costa centinaia di unità.
 Un timer atteso (`await` di qualcosa che scade da sé) misura il timer e non il lavoro, e
 resta in millisecondi. Sentinella: `tests/unit/tempiSottoCarico.test.mjs`.
 
+### Nessun unit dipende dalla velocità della macchina (#1063)
+
+Dieci chiusure locali di fila rosse, ogni volta per un unit diverso, tutti verdi da soli.
+Le forme che cadevano, e cosa le ha sostituite:
+
+- **Un tempo atteso dal codice provato** (tempo limite, rate limit, attesa del menu, vita
+  massima di una finestra): orologio finto (`mock.timers` con `setTimeout` e `Date`), e il
+  tempo passa a tick con `scorri`/`finoA` (`tests/helpers/orologio.mjs`). Così la prova dice
+  anche il quando esatto: «non prima di 199 ms, sì a 200».
+- **Un processo o un file vero che deve arrivare** (un battito, la porta di un server finto,
+  un segno scritto da un figlio): si aspetta il fatto con `aspettaChe`
+  (`tests/helpers/attese.mjs`), mai «entro N secondi». Il tempo massimo di un processo vero
+  è una guardia contro l'appeso, `TETTO_ATTESA_MS`: un numero scritto a mano lo ferma una
+  sentinella, nelle opzioni di `spawnSync` ed esecuzioni simili, in un `setTimeout` da un
+  secondo in su, in un `timeoutMs`/`attesaMs` dato al codice provato. Il server finto di
+  `config/routines` si lancia da `tests/helpers/server-finto.mjs`, mai da una copia. Vale anche per il tempo
+  massimo che sta nel codice provato: la funzione che chiede qualcosa a un programma di
+  sistema prende l'attesa da chi la chiama, e la prova le passa `TETTO_ATTESA_MS` (il
+  controllo del comando che esiste: dieci secondi bastano all'uso, non a una macchina carica).
+- **«Non cresce con i dati»** (un messaggio con 50.000 eventi nel filo, una scheda chiusa con
+  6.000 in archivio): prima si contano le operazioni sul disco (nessuna rilettura, nessuna
+  riscrittura, una riga in coda; `tests/helpers/spiaDisco.mjs`), poi il lavoro in memoria si
+  misura a turno contro lo stesso lavoro su dati quasi vuoti, campione per campione, col
+  minimo di ciascuno (`rapportoFraCosti`). Quando i dati quasi vuoti non sono il paragone giusto
+  (un flush di 4 MB copia comunque 4 MB), si paragona lo stesso lavoro fatto per intero; e se il
+  campione ha un pezzo da non contare (la scrittura su disco), `ora` è un orologio che corre solo
+  nella finestra misurata (#1228, `tests/unit/storageScritturePerChiave.test.mjs`). Un `await` fra
+  partenza e arrivo nasconde la soglia fissa alla sentinella: lì la regola la tiene chi scrive.
+  Una finestra di tempo fra due figli che devono sovrapporsi si toglie facendoli girare in fila.
+- **La pulizia**: una cartella si toglie con `togliCartella`, che ritenta e non fa rosso il
+  test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
+  sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
+  ritentano anche loro (`maxRetries`).
+- **Il tetto del lanciatore** (20 minuti in cui un file non va avanti, non la sua durata: un
+  file sano sotto carico è lento ma avanza): il file fermo si chiude da solo, rosso col suo
+  nome, e gli altri girano (#1231). Node mostra in diretta solo i passi del primo file in
+  corso: se in un tetto non finisce nessun file, con lui si chiudono i file partiti da più
+  di un tetto (in fila costerebbero un tetto ciascuno), e se dopo non finisce più niente si
+  chiude la corsa (il disco pieno). Una prova sola che ci si avvicina si divide, e una
+  scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
+  (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
+  risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
+  lanciatore, e la riprova dei rossi pure (`--solo`). Una prova che fa girare altri file di
+  prova con un ambiente suo (le prove da sole in sessione, #1214) usa la stessa guardia,
+  `lanciaSorvegliato`, col tetto delle attese: cinque minuti sulla durata della corsa
+  cadevano con due corse insieme su un portatile lento.
+- **Un file non si appende sul primo errore.** Un intervallo vero che tiene vivo il processo
+  per tutto il file tiene vivo anche una promessa rimasta a metà: si accende solo finché
+  l'attesa vera è in viaggio (`tests/helpers/letturaIsolata.mjs`). Un pacchetto che il
+  codice provato usa si cerca al caricamento del modulo, così se manca il file cade subito
+  col nome del pacchetto.
+
 ## Il verso opposto (#937)
 
 Una prova nata su Windows che asserisce un percorso `C:\…` cade su Linux se la
@@ -163,3 +250,14 @@ rosso confrontata fra due cartelle), si riconoscono entrambe le forme:
 `isAbsolute(p) || win32.isAbsolute(p)`. Un rosso solo su Linux non ferma né le fusioni
 né le versioni, quindi nessun allarme lo segnala: resta finché una routine non lo trova.
 Riferimento: `chiaveTest` in `scripts/lib/unit-sulla-fusione.mjs`.
+
+## La sessione che lancia le prove (#949.1, #1110.1)
+
+Gli strumenti delle routine misurano la sessione in cui girano: il suo nome
+(`FILO_ROUTINE`, `FILO_TRANSCRIPT`…), o, con un biglietto nella radice del repo, il
+transcript più recente della cartella. Una prova che li esegue misurava così la
+sessione che la lanciava: consumo vero nei corpi confrontati, il suo conto nella copia di
+prova, rossi solo in una routine. Il lanciatore toglie ai test nome e cartella dei
+transcript (`ambientePerITest`, sentinella in `tests/unit/unitRunner.test.mjs`); un
+figlio che una prova lancia da sé prende l'ambiente da lì, così un `node --test` a mano
+dà lo stesso esito del lanciatore.

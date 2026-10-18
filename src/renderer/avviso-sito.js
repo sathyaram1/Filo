@@ -27,6 +27,10 @@
 
   function disegna(s) {
     stato = s;
+    // Durata delle animazioni e intensità delle ombre scelte dall'utente: solo numeri, solo variabili --sn-*.
+    for (const [k, v] of Object.entries((s && s.vars) || {})) {
+      if (/^--sn-[a-z-]+$/.test(k) && /^[0-9.]+$/.test(String(v))) root.style.setProperty(k, String(v));
+    }
     const pericoloso = s.level === 'pericoloso';
     root.dataset.livello = pericoloso ? 'pericoloso' : 'sospetto';
     titolo.textContent = s.title || (pericoloso ? 'Sito pericoloso' : 'Sito potenzialmente sospetto');
@@ -43,8 +47,13 @@
     try { (pericoloso ? parola : carta).focus(); } catch (_) {}
   }
 
+  // Due verdetti a pochi millisecondi (sospetto, poi Google) possono arrivare invertiti: vale l'ultimo mandato.
+  let giro = 0;
   api.onStato((s) => {
     if (!s || typeof s !== 'object') return;
+    const n = Number(s.giro) || 0;
+    if (n && n <= giro) return;
+    giro = n || giro;
     disegna({
       scheda: String(s.scheda || ''),
       level: s.level === 'pericoloso' ? 'pericoloso' : 'sospetto',

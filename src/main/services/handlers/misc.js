@@ -41,7 +41,9 @@ async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, 
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     // eslint-disable-next-line no-await-in-loop
-    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders, onProgress, shouldStop });
+    const servito = target;
+    const conIndirizzo = onHeaders && ((h) => onHeaders({ ...h, servito }));
+    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders: conIndirizzo, onProgress, shouldStop });
     if (res.redirect) {
       try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
       if (!/^https?:/i.test(target)) throw new Error('redirect non http');
@@ -275,6 +277,20 @@ function bytesDaDataUrl(dataUrl) {
   } catch (_) { return null; }
 }
 
+// I byte dell'immagine che il sistema tiene negli appunti, PNG prima di tutto; null se non ce n'è.
+async function immagineNegliAppunti() {
+  const voci = await require('electron').clipboard.read();
+  for (const tipo of ['image/png', /^image\//]) {
+    for (const v of voci) {
+      const t = v.types.find((x) => (typeof tipo === 'string' ? x === tipo : tipo.test(x)));
+      if (!t) continue;
+      const b = Buffer.from(await (await v.getType(t)).arrayBuffer());
+      if (b.length && b.length <= MAX_BYTE_PROVENIENZA) return b;
+    }
+  }
+  return null;
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
@@ -311,7 +327,9 @@ module.exports = function register(on, ctx) {
     const wc = Foto.paginaDaFotografare(sender);
     if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     const img = await wc.capturePage();
-    return { ok: true, dataUrl: img.toDataURL() };
+    if (!msg || msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL() };
+    const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
+    return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
   });
 
   // "Salva immagine come…" (#274). Il vecchio cammino era un <a download>
@@ -407,13 +425,13 @@ module.exports = function register(on, ctx) {
         kind,
         // Arrivati gli header sappiamo nome e peso: da qui in poi il
         // salvataggio non è più cieco.
-        onHeaders: ({ filename, totalBytes }) => {
+        onHeaders: ({ filename, totalBytes, servito }) => {
           // Nome file sicuro: preferisci il Content-Disposition del server, poi
           // il path dell'URL; neutralizza separatori e tentativi di traversal.
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win) });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito });
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
           askDest = () => pickDestination(name).then((d) => {
@@ -494,7 +512,7 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
     }
     let negliAppunti = null;
-    try { negliAppunti = require('electron').clipboard.readImage(); } catch (_) {}
+    try { negliAppunti = await immagineNegliAppunti(); } catch (_) {}
     try {
       const ricordata = await require('../firmatariC2pa').ricordaCopia(originale, [copia, negliAppunti]);
       return { ok: true, ricordata };

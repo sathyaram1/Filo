@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
+import { conta } from './helpers/riquadri.mjs';
 
 const SEGRETO = 'pw-Segreta-589-otto';
 
@@ -193,6 +194,91 @@ test('un riquadro di un altro sito dentro la pagina non apre il menu con un tast
   await frame.waitForFunction(() => window.__fatto === true, null, { timeout: 10_000 });
   expect(await frame.evaluate(() => window.__menuMai)).toBe(false);
   expect(await frame.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
+});
+
+const IBAN = 'IT60X0542811101000000123456';
+
+// #592.13: la pagina fa tutto da sola appena si apre, senza nessun gesto dell'utente.
+const PAGINA_DA_SOLA = `<!doctype html><html><body style="padding:40px">
+  <input id="campo" style="width:320px;font-size:16px">
+  <script>${ATTACCO}
+  window.__menuMai = false;
+  window.premi = (testo) => {
+    const b = [...document.querySelectorAll('.sn-menu button')].find((x) => (x.textContent || '').trim().startsWith(testo));
+    if (b) b.click();
+    return !!b;
+  };
+  // Insiste dall'apertura fino a tre secondi dopo che Filo è pronto nella pagina.
+  let pronto = 0;
+  const giro = setInterval(async () => {
+    if (!pronto && document.documentElement.dataset.filoContentReady === '1') pronto = Date.now();
+    window.tasto();
+    await new Promise((ok) => setTimeout(ok, 150));
+    if (document.querySelector('.sn-menu')) window.__menuMai = true;
+    window.freccia();
+    window.incolla();
+    for (const v of ['Detta', 'Invia feedback', 'Aiuto']) window.premi(v);
+    if (pronto && Date.now() - pronto > 3000) { clearInterval(giro); window.__fatto = true; }
+  }, 300);</script>
+</body></html>`;
+
+test('una pagina appena aperta non apre da sola il menu e non legge appunti né cronologia', async ({ app, shell, openTab, testServer }) => {
+  for (const text of [SEGRETO, IBAN]) {
+    await shell.evaluate((t) => window.filoShell.message({ type: 'push_clipboard_entry', entry: { type: 'text', text: t } }), text);
+  }
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await testServer.openReady(openTab, PAGINA_DA_SOLA);
+  await page.waitForFunction(() => window.__fatto === true, null, { timeout: 15_000 });
+
+  expect(await page.evaluate(() => window.__menuMai), 'il tasto destro fabbricato non apre il menu').toBe(false);
+  const visto = await page.evaluate(() => window.cosaVede());
+  expect(visto).not.toContain(SEGRETO);
+  expect(visto).not.toContain(IBAN);
+  expect(await page.locator('#campo').inputValue()).toBe('');
+  expect(await statoCronologia(app, page)).toBeNull();
+  await expect(page.locator('.sn-sidebar')).toHaveCount(0);
+  expect(await conta(app, page, '.sn-fb-modal')).toBe(0);
+
+  // Il tasto destro dell'utente apre il menu, e la cronologia mostra a lui le due voci.
+  await page.locator('#campo').click({ button: 'right' });
+  await page.locator('.sn-menu-paste-arrow').hover();
+  await expect.poll(() => testiCronologia(app, page)).toEqual(expect.arrayContaining([SEGRETO, IBAN]));
+});
+
+test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'utente sì', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+  const voce = (testo) => page.locator('.sn-menu button').filter({ hasText: testo }).first();
+  const preme = (testo, fuori) => page.evaluate(({ t, f }) => {
+    const b = [...document.querySelectorAll('.sn-menu button')].find((x) => (x.textContent || '').trim().startsWith(t));
+    if (!b) return false;
+    if (f) document.body.appendChild(b);
+    b.click();
+    return true;
+  }, { t: testo, f: fuori });
+
+  for (const fuori of [false, true]) {
+    for (const testo of ['Invia feedback', 'Aiuto']) {
+      await page.locator('#campo').click({ button: 'right' });
+      await expect(voce(testo)).toBeVisible();
+      expect(await preme(testo, fuori)).toBe(true);
+      await page.waitForTimeout(600);
+      await expect(page.locator('.sn-sidebar'), `il sito non apre l'Aiuto premendo «${testo}»`).toHaveCount(0);
+      expect(await conta(app, page, '.sn-fb-modal'), `il sito non apre il feedback premendo «${testo}»`).toBe(0);
+      await page.keyboard.press('Escape');
+      await page.evaluate(() => { for (const b of document.body.querySelectorAll(':scope > button[class^="sn-"]')) b.remove(); });
+    }
+  }
+
+  await page.locator('#campo').click({ button: 'right' });
+  await voce('Invia feedback').click();
+  await expect.poll(() => conta(app, page, '.sn-fb-modal')).toBe(1);
+
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+  await page.locator('#campo').click({ button: 'right' });
+  await voce('Aiuto').click();
+  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
 });
 
 test('la cronologia aperta dall\'utente non si fa leggere dal sito con la ricerca testuale del browser', async ({ app, shell, openTab, testServer }) => {

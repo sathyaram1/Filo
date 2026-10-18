@@ -64,6 +64,22 @@
     });
   }
 
+  // Ciò che la chat ha letto, come classi di fonte (#530): una chat ripresa dall'archivio non riparte pulita,
+  // perché l'archivio dei messaggi tiene solo il nome delle azioni.
+  function segnaFonti(id, fonti) {
+    if (!id) return Promise.resolve(null);
+    id = String(id);
+    return F().transazione(async (t) => {
+      const c = t.chat(id);
+      if (!c) return null;
+      const prima = Array.isArray(c.fonti) ? c.fonti : [];
+      const nuove = (Array.isArray(fonti) ? fonti : []).filter((f) => f && Number.isInteger(f.classe)
+        && !prima.some((p) => p && p.chiave === f.chiave && p.classe === f.classe));
+      if (nuove.length) await t.scrivi([t.evento(T().CHAT_FONTI, { chat: id, fonti: nuove }, { autore: 'filo' })]);
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
+    });
+  }
+
   // Ritorna la chat chiusa, o null se non c'è niente da chiudere: una home aperta e mai usata non è una conversazione.
   function close(id) {
     if (!id) return Promise.resolve(null);
@@ -144,14 +160,15 @@
     return Number(chat.triagedCount) !== n;
   }
 
-  // Il testo di una chat cancellata se ne va anche dalle sue copie: registro grezzo, cache e richieste ai modelli.
+  // Il testo di una chat cancellata se ne va anche dalle sue copie: cache, richieste ai modelli, vettori ed esiti
+  // tenuti per il contesto della chat (#868).
   async function dimenticaCopie(chat) {
+    try { global.SN_CONTESTO_FILO?.dimentica(chat.id); } catch (_) {}
+    await global.SN_RICORDI_FILO?.dimentica(chat.id);
     const forme = CA().formeDaDimenticare((chat.messages || []).map((m) => m && m.text));
     if (!forme.length) return;
-    const M = global.SN_FILO_MEMORY;
     const C = global.SN_AI_CACHE;
     const H = global.SN_HISTORY;
-    if (M && M.togliRaw) await M.togliRaw((e) => !!e && /^chat_/.test(String(e.type)) && CA().riguardaChat(e.summary, forme));
     if (C && C.togli) await C.togli((e) => CA().riguardaChat(e, forme));
     if (H && H.redigi) {
       await H.redigi((it) => (CA().riguardaChat([it.input, it.output], forme)
@@ -176,13 +193,14 @@
   }
 
   // Le chat rimaste aperte perché l'app è stata chiusa di colpo: alla partenza dopo si chiudono e si classificano.
+  // Quelle delle altre app (#974) no: nome e tipo li hanno dalla nascita, e restano aperte finché l'app le continua.
   async function listDangling() {
-    return (await list()).filter((c) => !c.closedAt && c.messages.length);
+    return (await list()).filter((c) => !c.app && !c.closedAt && c.messages.length);
   }
 
   // Le chat chiuse ancora senza titolo e tipo (classificazione non riuscita, o conversazione andata avanti).
   async function listUntriaged() {
-    return (await list()).filter((c) => c.closedAt && needsTriage(c));
+    return (await list()).filter((c) => !c.app && c.closedAt && needsTriage(c));
   }
 
   async function clear() {
@@ -190,11 +208,13 @@
     if (ids.length) {
       await F().transazione((t) => t.scrivi(ids.map((id) => t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' }))));
     }
+    try { global.SN_CONTESTO_FILO?.dimentica(null); } catch (_) {}
+    await global.SN_RICORDI_FILO?.dimentica(null).catch(() => {});
     return [];
   }
 
   global.SN_FILO_CHATS = {
     list, listIndex, get, needsTriage, listDangling, listUntriaged, uuid, open, append, close, setTriage, setUserTriage,
-    remove, clear,
+    remove, clear, segnaFonti,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

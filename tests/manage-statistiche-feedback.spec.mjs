@@ -24,6 +24,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { oggiFa } from './helpers/istanti.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 const GIORNO = 24 * 60 * 60 * 1000;
@@ -56,7 +57,7 @@ async function apri(page, dati) {
   // La lista a sinistra resta vuota: questa scheda legge l'INSIEME per conto
   // suo, e mescolarle nasconderebbe proprio l'errore che si vuole escludere.
   await page.evaluate(() => window.__mgTest.setData([]));
-  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await apriScheda(page, 'fbstats');
   await page.evaluate((d) => window.__mgTest.setFsData(d), dati);
   await expect(page.locator('#mgFsBody')).toBeVisible();
 }
@@ -107,7 +108,7 @@ test('#496 — chi non gestisce i feedback non vede i numeri, e la pagina lo dic
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setAdmin(false));
-  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await apriScheda(page, 'fbstats');
   await page.evaluate(() => window.__mgTest.loadFsData());
   await expect(page.locator('#mgFsDenied')).toBeVisible();
   await expect(page.locator('#mgFsBody')).toBeHidden();
@@ -599,7 +600,7 @@ test('#496 — dall\'elenco si arriva alla segnalazione vera', async ({ openTab 
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate((f) => window.__mgTest.setData([f]), uno);
-  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await apriScheda(page, 'fbstats');
   await page.evaluate((f) => window.__mgTest.setFsData({ feedbacks: [f], workerLog: [] }), uno);
   await page.locator('[data-fs-range="30g"]').click();
   await page.locator('[data-fs-id="ricevuti"]').click({ button: 'right' });
@@ -623,7 +624,7 @@ test('#496 — la scheda aperta si rimette in pari da sola, come il resto della 
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate((a) => window.__mgTest.setData([a]), A);
-  await page.locator('.mg-tab[data-tab="fbstats"]').click();
+  await apriScheda(page, 'fbstats');
   await page.evaluate((a) => window.__mgTest.setFsData({ feedbacks: [a], workerLog: [] }), A);
   await page.locator('[data-fs-range="30g"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('1');

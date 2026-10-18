@@ -332,17 +332,19 @@ test('un comando confermato scrive nella cartella che Filo aveva mostrato', asyn
     const page = await openTab('filo://dashboard/dashboard.html');
     await setTerminal(page, true);
 
-    // Un turno dell'assistente: entra nella cartella e poi propone un comando
-    // che modifica — livello 2, quindi si ferma e chiede.
+    // Un turno dell'assistente che ha già letto una ricerca sul web: entra nella
+    // cartella e poi propone un comando che modifica — costo 2, quindi a Normale
+    // si ferma e chiede (#530).
     const [vai, proposta] = await app.evaluate(async (electron, dove) => {
       const wc = electron.webContents.getAllWebContents()
         .find((w) => String(w.getURL() || '').includes('dashboard.html'));
       const mittente = { url: wc ? wc.getURL() : '', tab: null, wc: wc || null };
+      const contesto = [{ type: 'CERCA_WEB', query: 'x', _output: { results: [{ url: 'https://esempio.test/' }] } }];
       const esiti = [];
       for (const comando of [`cd '${dove}'`, 'mkdir prova-di-filo']) {
         esiti.push(await globalThis.SN_EXECUTE_FILO_ACTION(
           { type: 'ESEGUI_COMANDO', comando },
-          { sender: mittente },
+          { sender: mittente, contesto },
         ));
       }
       return esiti;

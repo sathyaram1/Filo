@@ -9,8 +9,9 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const SB = require('../../src/main/services/safebrowse/index.js');
 
-const LOGIN = { linkOrigin: 'email', hasPassword: true };
-const ACCESSO = { hasPassword: true };
+// I conti valgono anche per la finestra nascosta, che prova solo un link non ancora aperto (#1081).
+const LOGIN = { linkOrigin: 'email', hasPassword: true, daAprire: true };
+const ACCESSO = { hasPassword: true, daAprire: true };
 // Piattaforme che l'elenco interno non separa: il dominio è di migliaia di proprietari.
 const PIATTAFORME = ['weebly.com', '000webhostapp.com', 'r2.dev', 'webflow.io', 'trycloudflare.com', 'wixsite.com', 'square.site', 'godaddysites.com'];
 
@@ -19,10 +20,12 @@ beforeEach(() => {
   SB.setProviders({ gsb: null, rdap: null, ct: null, llm: null, sandbox: null });
 });
 
-const analizza = (url, ctx) => new Promise((ok) => {
-  SB.analyze(url, ctx, ok);
-  setTimeout(ok, 30);
-});
+const analizza = async (url, ctx = {}) => {
+  let primo;
+  SB.analyze(url, ctx, (v) => { if (primo === undefined) primo = v; });
+  await SB._settled();
+  return primo;
+};
 
 const finestraCheTrova = (aperte) => async (u) => {
   aperte.push(u);
@@ -84,11 +87,8 @@ test('il secondo sito dello stesso dominio ha il suo controllo e il suo verdetto
   });
   const aggiornati = [];
   const primo = analizza('https://accesso.dominio-gemello.com/login', LOGIN);
-  const inVolo = new Promise((ok) => {
-    SB.analyze('https://verifica.dominio-gemello.com/login', LOGIN, (v) => { aggiornati.push(v.level); ok(); });
-    setTimeout(ok, 200);
-  });
-  await Promise.all([primo, inVolo]);
+  SB.analyze('https://verifica.dominio-gemello.com/login', LOGIN, (v) => { aggiornati.push(v.level); });
+  await Promise.all([primo, SB._settled()]);
   assert.deepEqual(aggiornati, ['pericoloso'], 'la pagina dove l\'utente arriva riceve il suo avviso');
   for (const s of ['accesso', 'verifica']) {
     assert.equal(SB.checkSync(`https://${s}.dominio-gemello.com/login`, LOGIN).level, 'pericoloso', s);
@@ -103,10 +103,8 @@ test('due analisi dello stesso sito con gli stessi indizi in volo insieme fanno 
   let giudizi = 0;
   SB.setProviders({ llm: async () => { giudizi++; await new Promise((r) => setTimeout(r, 10)); return { suspicious: true, reason: 'x' }; } });
   const aggiornati = [];
-  await Promise.all([1, 2].map(() => new Promise((ok) => {
-    SB.analyze('https://accesso.dominio-doppio.com/login', LOGIN, (v) => { aggiornati.push(v.level); ok(); });
-    setTimeout(ok, 200);
-  })));
+  for (let i = 0; i < 2; i++) SB.analyze('https://accesso.dominio-doppio.com/login', LOGIN, (v) => { aggiornati.push(v.level); });
+  await SB._settled();
   assert.equal(giudizi, 1);
   assert.deepEqual(aggiornati, ['sospetto', 'sospetto'], 'tutte e due le analisi ricevono la risposta');
 });
@@ -218,7 +216,7 @@ test('nella scheda: una pagina ospitata che cambia indirizzo da sola, anche vers
   installSafebrowse(Schede);
   const schede = new Schede();
   let adesso = '';
-  const campo = { executeJavaScript: async () => ({ hasPassword: true, hasPayment: false }) };
+  const campo = { executeJavaScript: async () => ({ hasPassword: true, hasPayment: false, shownPassword: true, shownPayment: false }) };
   const wc = { getURL: () => adesso, isDestroyed: () => false, send() {}, mainFrame: { framesInSubtree: [campo] } };
   const tab = { id: 1, view: { webContents: wc } };
   schede.tabs = [tab];

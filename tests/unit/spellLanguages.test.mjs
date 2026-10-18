@@ -40,3 +40,14 @@ test('nessun dizionario disponibile → lista vuota (no-op)', () => {
   assert.deepEqual(select([], 'it-IT'), []);
   assert.deepEqual(select(null, 'it-IT'), []);
 });
+
+// #1084: su Linux si caricano solo i dizionari inclusi in Filo; una variante della stessa lingua vale più di nessuna.
+test('con i dizionari inclusi: la variante inclusa vince, le altre lingue restano quelle di sempre', () => {
+  const LINUX = ['de-DE', 'en-AU', 'en-CA', 'en-GB', 'en-US', 'fr-FR', 'it-IT'];
+  const INCLUSI = ['en-GB', 'en-US', 'it-IT'];
+  assert.deepEqual(select(LINUX, 'en-AU', INCLUSI), ['it-IT', 'en-GB']);
+  assert.deepEqual(select(LINUX, 'en-US', INCLUSI), ['it-IT', 'en-US']);
+  assert.deepEqual(select(LINUX, 'it-IT', INCLUSI), ['it-IT']);
+  assert.deepEqual(select(LINUX, 'de-DE', INCLUSI), ['it-IT', 'de-DE'], 'un dizionario messo a mano nella cartella si carica ancora');
+  assert.deepEqual(select(LINUX, 'en-AU', []), ['it-IT', 'en-AU'], 'senza inclusi resta la scelta di prima');
+});

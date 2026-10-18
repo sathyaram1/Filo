@@ -717,7 +717,7 @@
     const host = document.createElement('div');
     global.SN_FILO_UI?.mark(host);
     host.style.cssText = HOST_CHIUSO;
-    const ombra = host.attachShadow({ mode: 'closed' });
+    const ombra = global.SN_FILO_UI?.ombra ? global.SN_FILO_UI.ombra(host) : host.attachShadow({ mode: 'closed' });
     try { ombra.adoptedStyleSheets = fogliDelMenu(); } catch (_) {}
     ombra.appendChild(contenuto);
     return host;
@@ -770,9 +770,10 @@
       const list = document.createElement('div');
       list.className = 'sn-menu-history-list';
 
-      const searchTextOf = (entry) =>
-        (entry.type === 'image' ? (entry.description || 'Immagine') : (entry.text || ''))
-          .replace(/\s+/g, ' ').trim();
+      // Come si legge una voce: la decide il modulo condiviso della cronologia
+      // appunti, così menu e pagina della Sicurezza non divergono.
+      const Clip = global.SN_CLIPBOARD;
+      const searchTextOf = (entry) => Clip.etichetta(entry).replace(/\s+/g, ' ').trim();
 
       // Messaggi di stato (creati prima così i gestori possono riferirli):
       // - noResults: nessuna corrispondenza nella ricerca;
@@ -798,9 +799,10 @@
       let clearWrap = null;
 
       // Quando l'utente rimuove l'ultima voce: mostra lo stato vuoto e nascondi
-      // ricerca/svuota (non c'è più nulla da cercare o svuotare).
+      // ricerca/svuota (non c'è più nulla da cercare o svuotare). Le righe già
+      // tolte restano a schermo barrate, quindi non contano.
       const refreshEmptyState = () => {
-        if (list.querySelector('.sn-menu-history-item')) return;
+        if (list.querySelector('.sn-menu-history-item:not(.sn-menu-history-gone)')) return;
         noResults.style.display = 'none';
         emptyMsg.style.display = '';
         searchWrap.style.display = 'none';
@@ -816,10 +818,34 @@
       // rimozione è avvenuta davvero sul disco, ma la UI dice il contrario, e su
       // una password copiata è la bugia peggiore possibile. Quindi la togliamo
       // anche di lì, così le due viste restano d'accordo.
+      // Si dimenticano tutte le voci con la stessa chiave: chi tiene la
+      // cronologia su disco le toglie tutte insieme (le gemelle che lascia
+      // «Importa dati»), e il menu deve dire lo stesso.
       const forgetEntry = (entry) => {
         if (!Array.isArray(entries)) return;
-        const i = entries.indexOf(entry);
-        if (i >= 0) entries.splice(i, 1);
+        const k = Clip.chiave(entry);
+        for (let i = entries.length - 1; i >= 0; i--) {
+          if (Clip.chiave(entries[i]) === k) entries.splice(i, 1);
+        }
+      };
+
+      // Quante voci VIVE la ricerca sta mostrando IN QUESTO MOMENTO: le righe
+      // già tolte restano a schermo barrate ma non contano più. Si conta
+      // guardando la lista invece di tenere un numero a parte che qualcuno deve
+      // ricordarsi di aggiornare: quel numero partiva da zero e nessuno lo
+      // toccava finché non scrivevi nel campo di ricerca, così la conferma
+      // dello svuotamento parlava di una ricerca mai scritta (#256).
+      // Ritorna null quando NON c'è nessuna ricerca in corso: è il modo di dire
+      // "della ricerca non parlarne".
+      const visibiliVive = () => {
+        if (!input.value.trim()) return null;
+        let n = 0;
+        for (const b of list.querySelectorAll('.sn-menu-history-item')) {
+          if (b.style.display === 'none') continue;
+          if (b.classList.contains('sn-menu-history-gone')) continue;
+          n++;
+        }
+        return n;
       };
 
       // Applica il filtro di ricerca corrente. Serve anche DOPO una rimozione:
@@ -831,9 +857,29 @@
         for (const b of list.querySelectorAll('.sn-menu-history-item')) {
           const match = !q || (b.dataset.snSearch || '').includes(q);
           b.style.display = match ? '' : 'none';
-          if (match) visible++;
+          if (match && !b.classList.contains('sn-menu-history-gone')) visible++;
         }
         noResults.style.display = visible === 0 ? '' : 'none';
+      };
+
+      // Dove va il fuoco dopo aver tolto una voce col tasto Invio: sulla "×"
+      // della prima voce ancora viva DOPO quella tolta (a scorrere in giù, poi
+      // in su), e se non ne resta nessuna sul campo di ricerca. Le righe tolte
+      // e quelle nascoste dal filtro si saltano: non sono cose che si possono
+      // premere.
+      const fuocoDopoRimozione = (rowTolta) => {
+        const righe = [...list.querySelectorAll('.sn-menu-history-item')];
+        const i = righe.indexOf(rowTolta);
+        const utile = (r) => r
+          && r.style.display !== 'none'
+          && !r.classList.contains('sn-menu-history-gone')
+          && r.querySelector('.sn-menu-history-remove');
+        const candidate = [...righe.slice(i + 1), ...righe.slice(0, Math.max(i, 0)).reverse()];
+        const prossima = candidate.find(utile);
+        const target = prossima
+          ? prossima.querySelector('.sn-menu-history-remove')
+          : input;
+        try { target.focus({ preventScroll: true }); } catch (_) { try { target.focus(); } catch (__) {} }
       };
 
       entries.forEach((entry) => {
@@ -842,6 +888,7 @@
         const row = document.createElement('div');
         row.className = 'sn-menu-history-item';
         row.dataset.snSearch = searchTextOf(entry).toLowerCase();
+        row.dataset.snKey = Clip.chiave(entry);
 
         const b = document.createElement('button');
         b.type = 'button';
@@ -849,19 +896,37 @@
         if (entry.type === 'image') {
           const icon = document.createElement('span');
           icon.className = 'sn-menu-history-icon';
-          const img = global.SN_ICONS?.image;
-          if (img) icon.innerHTML = img(16);
-          else icon.textContent = '🖼';
+          const iconaGenerica = () => {
+            const img = global.SN_ICONS?.image;
+            if (img) icon.innerHTML = img(16);
+            else icon.textContent = '🖼';
+          };
+          // Due immagini copiate diverse con la stessa iconcina e la stessa
+          // parola "Immagine" si leggono uguali: con la "×" accanto, che
+          // cancella per sempre, non si sa quale delle due si sta buttando. La
+          // miniatura c'è già nella pagina della Sicurezza ed è quella che
+          // toglie il dubbio. Se la pagina ospite vieta le immagini `data:`
+          // (CSP), l'`onerror` rimette l'iconcina di prima.
+          if (entry.dataUrl) {
+            const thumb = document.createElement('img');
+            thumb.className = 'sn-menu-history-thumb';
+            thumb.alt = '';
+            thumb.addEventListener('error', () => { thumb.remove(); iconaGenerica(); });
+            thumb.src = entry.dataUrl;
+            icon.appendChild(thumb);
+          } else {
+            iconaGenerica();
+          }
           const desc = document.createElement('span');
           desc.className = 'sn-menu-label';
-          testoNascosto(desc, b, entry.description || 'Immagine');
+          testoNascosto(desc, b, Clip.etichetta(entry));
           b.appendChild(icon);
           b.appendChild(desc);
         } else {
           const lbl = document.createElement('span');
           lbl.className = 'sn-menu-label';
-          const text = (entry.text || '').replace(/\s+/g, ' ').trim();
-          testoNascosto(lbl, b, text.length > 40 ? text.slice(0, 40) + '…' : text);
+          const mostrato = Clip.etichetta(entry);
+          testoNascosto(lbl, b, mostrato.length > 40 ? mostrato.slice(0, 40) + '…' : mostrato);
           b.appendChild(lbl);
         }
         b.addEventListener('click', () => {
@@ -879,11 +944,38 @@
           rm.setAttribute('aria-label', I18n.t('menu_paste_remove'));
           rm.addEventListener('click', (ev) => {
             ev.stopPropagation();
+            if (row.classList.contains('sn-menu-history-gone')) return;
             try { onRemove(entry); } catch (e) { console.error(e); }
             forgetEntry(entry);
-            row.remove();
+            // La riga NON sparisce: resta al suo posto barrata finché il
+            // sotto-menu è aperto. Toglierla ricompattava la lista e faceva
+            // salire di una posizione tutte quelle sotto, così il secondo clic
+            // di un doppio clic colpiva la voce vicina e la cancellava anche
+            // lei, per sempre e senza dirlo.
+            // Chi ha premuto col TASTO INVIO non deve restare senza niente
+            // sotto le dita: disabilitare il bottone che ha il fuoco lo
+            // rimanda al corpo della pagina, e per togliere la voce dopo
+            // toccherebbe ricominciare il giro col tabulatore. Il fuoco passa
+            // alla "×" della prima voce ancora viva dopo questa, o al campo di
+            // ricerca se non ne resta nessuna.
+            // `detail === 0` distingue Invio/Barra dal clic del mouse: col
+            // mouse il fuoco non si sposta, o comparirebbe un anello di fuoco
+            // sulla riga vicina a ogni clic.
+            // Nello shadow chiuso (#589.8) il documento vede solo l'ospite: il fuoco si chiede alla radice del bottone.
+            const avevaFuoco = ev.detail === 0 && rm.getRootNode().activeElement === rm;
+            for (const gemella of list.querySelectorAll('.sn-menu-history-item')) {
+              if (gemella.dataset.snKey !== row.dataset.snKey) continue;
+              gemella.classList.add('sn-menu-history-gone');
+              gemella.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+              const x = gemella.querySelector('.sn-menu-history-remove');
+              if (x) {
+                x.title = I18n.t('menu_paste_removed');
+                x.setAttribute('aria-label', I18n.t('menu_paste_removed'));
+              }
+            }
             applyFilter();
             refreshEmptyState();
+            if (avevaFuoco) fuocoDopoRimozione(row);
           });
           row.appendChild(rm);
         }
@@ -923,8 +1015,15 @@
           const Ui = global.SN_CONFIRM_UI;
           let ok = true;
           try {
+            // La conferma dice QUANTE voci spariscono, e se la ricerca ne sta
+            // nascondendo una parte lo dichiara: con un filtro attivo la lista
+            // ne mostrava una e lo svuotamento le portava via tutte.
+            const testo = Clip.testoConferma(
+              Array.isArray(entries) ? entries.length : 0,
+              visibiliVive(),
+            );
             ok = Ui
-              ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: I18n.t('menu_paste_clear_confirm') })
+              ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: testo })
               : true;
           } catch (_) { ok = false; }
           if (activeMenu) activeMenu.subLocked = false;
@@ -1064,6 +1163,9 @@
   // fabbricato da codice non passerebbe da `soloGestiVeri`.
   const apritori = new WeakMap();
 
+  // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
+  function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
+
   function makeRowButton(sub, opts = {}) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1077,7 +1179,7 @@
     if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
     // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
-    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, sub.label);
+    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
     setIconContent(b, sub.icon || sub.label);
     // Il bottone contiene solo un disegno: senza nome accessibile è un bottone
     // muto per chi legge lo schermo (e invisibile a chi lo cerca per etichetta).
@@ -1149,7 +1251,7 @@
     setIconContent(b, it.icon || it.label || '');
     if (it.id) b.dataset.snIconId = it.id;
     // Vedi makeRowButton: nome accessibile su un bottone di sola icona.
-    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, it.label); }
+    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (it.disabled) return;
@@ -1202,10 +1304,21 @@
   // ============================================================================
   const dropZones = [];
 
+  // La barra laterale come zona in più (#871): la installa menuIcons.js. Il puntatore resta della
+  // pagina per tutto il gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
+  let ponteBarra = null;
+  function setPonteBarra(p) { ponteBarra = p || null; }
+  // Dove comincia il menu aperto: se sta dove si apre la barra, lei aspetta che il puntatore vada al bordo.
+  function sinistraDelMenu() {
+    const els = [activeMenu?.root, activeMenu?.subRoot].filter((e) => e && e.isConnected);
+    return els.length ? Math.min(...els.map((e) => e.getBoundingClientRect().left)) : null;
+  }
+
   function attachDrag(el, { id, source }) {
     el.dataset.snDraggable = '1';
     el.addEventListener('pointerdown', (ev) => {
-      if (ev.button !== 0) return;
+      // Solo gesti veri: un trascinamento finto aprirebbe la barra a comando di un sito.
+      if (!ev.isTrusted || ev.button !== 0) return;
       if (el.disabled) return;
       const startX = ev.clientX, startY = ev.clientY;
       let dragging = false;
@@ -1242,6 +1355,7 @@
         preview.style.height = r.height + 'px';
         monta(preview);
         updatePreview(x, y);
+        try { ponteBarra?.inizio(id, sinistraDelMenu()); } catch (_) {}
       };
 
       const checkHoverOpen = (x, y) => {
@@ -1271,7 +1385,9 @@
         }
         e.preventDefault();
         updatePreview(e.clientX, e.clientY);
-        setHover(findZoneAt(e.clientX, e.clientY));
+        let sopraBarra = false;
+        try { sopraBarra = !!ponteBarra?.sopra(e.clientX, e.clientY); } catch (_) {}
+        setHover(sopraBarra ? null : findZoneAt(e.clientX, e.clientY));
         checkHoverOpen(e.clientX, e.clientY);
       };
 
@@ -1283,12 +1399,15 @@
         el.classList.remove('sn-dragging');
         setHover(null);
         if (preview) { try { preview.remove(); } catch (_) {} preview = null; }
+        if (dragging) { try { ponteBarra?.fine(); } catch (_) {} }
       };
 
       const onUp = (e) => {
         if (!e.isTrusted) return;
         if (!dragging) { cleanup(); return; }
-        const zone = findZoneAt(e.clientX, e.clientY);
+        let inBarra = false;
+        try { inBarra = !!ponteBarra?.posa(id, e.clientX, e.clientY); } catch (_) {}
+        const zone = inBarra ? null : findZoneAt(e.clientX, e.clientY);
         cleanup();
         if (zone) {
           const beforeBtn = findInsertBefore(zone.zoneEl, e.clientX, e.clientY, el);
@@ -1307,6 +1426,49 @@
       window.addEventListener('pointerup', onUp, true);
       window.addEventListener('pointercancel', onCancel, true);
     });
+  }
+
+  // Un'icona trascinata fuori dalla barra laterale, sopra questa pagina: il gesto è della barra,
+  // qui arrivano solo le coordinate. Se il menu è aperto, cade nelle sue zone.
+  let esterno = null;
+  function trascinaDaFuori({ fase, id, x, y, icon }) {
+    const via = () => {
+      if (!esterno) return;
+      if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
+      try { esterno.preview.remove(); } catch (_) {}
+      esterno = null;
+    };
+    if (fase === 'muovi') {
+      if (!esterno || esterno.id !== id) {
+        via();
+        const preview = document.createElement('div');
+        preview.className = 'sn-drag-preview';
+        preview.style.width = '36px';
+        preview.style.height = '36px';
+        preview.innerHTML = icon || '';
+        menuHost().appendChild(preview);
+        esterno = { id, preview, zona: null };
+      }
+      esterno.preview.style.left = (x - 18) + 'px';
+      esterno.preview.style.top = (y - 18) + 'px';
+      const zona = findZoneAt(x, y);
+      if (zona !== esterno.zona) {
+        if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
+        if (zona) zona.zoneEl.classList.add('sn-drop-hover');
+        esterno.zona = zona;
+      }
+      return true;
+    }
+    if (fase === 'rilascia') {
+      const zona = findZoneAt(x, y);
+      via();
+      if (!zona) return false;
+      const prima = findInsertBefore(zona.zoneEl, x, y, null);
+      try { zona.onDrop && zona.onDrop({ id, source: 'bar', target: zona.target, beforeId: prima?.dataset?.snIconId || null }); } catch (er) { console.error(er); }
+      return true;
+    }
+    via();
+    return false;
   }
 
   function attachDropZone(zoneEl, { target, onDrop }) {
@@ -1358,6 +1520,9 @@
         testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
+        tolta: riga.classList.contains('sn-menu-history-gone'),
+        miniatura: riga.querySelector('.sn-menu-history-thumb')?.getAttribute('src') || null,
+        fuocoRimuovi: sub.getRootNode().activeElement === riga.querySelector('.sn-menu-history-remove'),
       })),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
       cerca: cerca ? {
@@ -1384,6 +1549,8 @@
     refreshIconRow,
     refreshIconGrid,
     isSubMenuOpen,
+    setPonteBarra,
+    trascinaDaFuori,
     testoNascosto,
     // C'è un menu aperto adesso? Lo chiede content.js per decidere di chi è
     // l'Esc quando si è a tutto schermo (#514).

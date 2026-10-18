@@ -43,6 +43,8 @@ function registerProtocolSchemes() {
         supportFetchAPI: true,
         corsEnabled: true,
         stream: true,
+        // Senza, Electron tiene la cache del codice V8 solo per http(s) e ogni pagina interna ricompila i suoi script a ogni apertura (#1091).
+        codeCache: true,
       },
     },
   ]);

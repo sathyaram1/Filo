@@ -10,6 +10,9 @@
 //   • una concatenazione di soli comandi sicuri (es. `cd x && ls`, #201) NON
 //     chiede conferma: il livello è il massimo dei pezzi, non 3 d'ufficio;
 //   • il livello è deciso dal main sul comando effettivo, mai dall'LLM.
+// Se un costo parte, chiede o vuole «conferma» lo decide SN_AUTONOMIA (#530): qui
+// i comandi arrivano in un compito che ha letto una ricerca sul web, dove a
+// Normale ogni costo ha la sua risposta (1 subito, 2 un OK, 3 «conferma»).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
@@ -20,7 +23,8 @@ import fs from 'node:fs';
 const NEWTAB = 'filo://newtab/';
 
 // Esegue un'azione Filo nel main, come farebbe la chat (handleFiloChat).
-const execAction = (app, action, opts) =>
+const DOPO_UNA_RICERCA = { contesto: [{ type: 'CERCA_WEB', query: 'x', _output: { results: [{ url: 'https://esempio.test/' }] } }] };
+const execAction = (app, action, opts = DOPO_UNA_RICERCA) =>
   app.evaluate((_electron, { action, opts }) =>
     globalThis.SN_EXECUTE_FILO_ACTION(action, opts), { action, opts });
 

@@ -77,6 +77,39 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   "Interrompi lettura", che appare solo mentre la sintesi è in corso).
 - **Avanzamento reale mentre lavora**: il totale dei pezzi è noto, quindi
   l'avviso "in corso" mostra `fatti/totale` invece di una frase fissa.
+- **"È rimasto fuori un pezzo" non conta ciò che l'utente non può raggiungere**
+  (#503). Mandare a cercare nella pagina qualcosa che nella pagina non c'è è la
+  bugia opposta e costa uguale. Prima della prova del punto (la regola "dove la
+  prova non si può fare, si tace" sta in
+  `riscrivere-il-testo-di-una-pagina-esterna-niente-whitelist.md`) restano fuori:
+  nascosto dal CSS (`display:none`, `visibility:hidden`, opacità zero, anche
+  ereditate: l'opacità la prova del punto non la vede, un componente trasparente
+  si lascia colpire come uno visibile); portato oltre i bordi dell'area
+  scorribile (`left:-9999px`, `transform`), o fuori dalla finestra se è
+  agganciato a lei (`position:fixed`); **ritagliato** da un antenato che non
+  scorre — la fisarmonica ripiegata e il banner dei cookie chiuso sono un
+  contenitore schiacciato a zero con `overflow:hidden`.
+- **Il ritaglio si calcola risalendo, non guardando il singolo elemento.** Un
+  antenato con `overflow` diverso da `visible` limita ciò che si raggiunge: se
+  scorre, il limite è la sua estensione scorribile e il rettangolo che prosegue
+  verso l'alto diventa quello della finestrella (una volta scorso, il contenuto
+  sta lì dentro); se ritaglia e basta, il limite è la finestrella e quel che
+  sborda è perduto. Due trappole: un elemento in posizione assoluta NON è
+  ritagliato dagli antenati che non lo contengono (saltarli evita di dichiarare
+  irraggiungibile un riquadro visibilissimo), e l'`overflow` di `<body>`/`<html>`
+  "sale" al viewport — il `body { overflow-x: hidden }` che sta ovunque non
+  ritaglia niente, e va giudicato con l'area scorribile del documento.
+  Implementazione: `isReachableByUser` in `src/content/extractContext.js`.
+- **I riquadri incorporati si giudicano col metro delle sezioni ripiegate**
+  (#503), sul riquadro e su ogni antenato: fuori schermo, trasparente, in una
+  fisarmonica chiusa non si conta e non si traduce; più in basso della prima
+  schermata sì. Chi non si conta **non deve rispondere**: un "ci sono" in più
+  copre nel conto il silenzio di un riquadro chiuso a chiave. Il riquadro non
+  sa se chi lo ospita lo mostra, quindi il giudizio glielo manda la finestra
+  madre per lettera (`postMessage`, accettata solo da `window.parent`) prima
+  della parola di tradurre, e il suo preload senza un sì non lo sveglia. Un
+  riquadro nascosto passa il no ai suoi; aperto, il menu lo offre come testo
+  scoperto.
 - **Dove:** `src/content/translatePage.js` (stato + ripresa),
   `src/content/extractContext.js` (`extractTranslatableBlocks`),
   `src/content/menuIcons.js` + `src/content/content.js` (menu). Test:

@@ -203,7 +203,7 @@ test('la richiesta in corso non è una carta fra cui scegliere: «il backup» tr
 
 test('l’azione è di livello 1 e la descrizione usa il nome che l’utente vede', () => {
   const L = globalThis.SN_ACTION_LEVELS;
-  assert.equal(L.levelFor({ type: 'CARTA_HOME', operazione: 'togli', carta: 'mazzi' }), 1);
+  assert.equal(L.costoFor({ type: 'CARTA_HOME', operazione: 'togli', carta: 'mazzi' }), 1);
   assert.equal(L.describe({ type: 'CARTA_HOME', operazione: 'togli', carta: 'mazzi' }), 'Togliere la carta «Mazzi» dalla home');
   assert.match(L.describeDone({ type: 'CARTA_HOME', operazione: 'togli', carta: 'mazzi' }), /«Mazzi» tolta.*«altro»/);
   assert.match(L.describeDone({ type: 'CARTA_HOME', operazione: 'rimetti', carta: 'suggerimenti' }), /«Filo ti suggerisce» rimessa/);

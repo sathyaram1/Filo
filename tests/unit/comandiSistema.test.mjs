@@ -485,7 +485,7 @@ test('il livello lo decide la stessa lettura che poi esegue: spegnere e staccare
   const L = globalThis.SN_ACTION_LEVELS;
   const livello = (type, args) => {
     const cosa = type === 'VOLUME' ? 'volume' : type.toLowerCase();
-    return L.levelFor({ type, ...args, _richiestaSistema: C.normalizzaRichiesta({ ...args, cosa }) });
+    return L.costoFor({ type, ...args, _richiestaSistema: C.normalizzaRichiesta({ ...args, cosa }) });
   };
   assert.equal(livello('VOLUME', { livello: 100 }), 1);
   assert.equal(livello('VOLUME', { muto: true }), 1);
@@ -501,11 +501,11 @@ test('il livello lo decide la stessa lettura che poi esegue: spegnere e staccare
   assert.equal(livello('WIFI', { rete: 'casa' }), 2);
   assert.equal(livello('WIFI', { elenca: true }), 1);
   // Senza la lettura del main (o con una richiesta che non si capisce) non si abbassa niente.
-  assert.equal(L.levelFor({ type: 'BLUETOOTH', acceso: true }), 2);
+  assert.equal(L.costoFor({ type: 'BLUETOOTH', acceso: true }), 2);
   assert.equal(livello('WIFI', { acceso: 'boh' }), 2);
   assert.match(L.describe({ type: 'WIFI', _richiestaSistema: C.normalizzaRichiesta({ cosa: 'wifi', acceso: false }) }), /a parole non potrai riaccenderlo/);
   // Già com'è chiesto: niente cade, niente da confermare.
-  const gia = (type, args) => L.levelFor({ type, ...args, _richiestaSistema: { ...C.normalizzaRichiesta({ ...args, cosa: type.toLowerCase() }), gia: true } });
+  const gia = (type, args) => L.costoFor({ type, ...args, _richiestaSistema: { ...C.normalizzaRichiesta({ ...args, cosa: type.toLowerCase() }), gia: true } });
   assert.equal(gia('WIFI', { rete: 'casa' }), 1);
   assert.equal(gia('WIFI', { acceso: false }), 1);
   assert.equal(gia('BLUETOOTH', { acceso: false }), 1);

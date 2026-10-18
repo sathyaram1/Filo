@@ -3,6 +3,7 @@
 // handlers.js e riceve (msg, sender, origin), ritornando l'oggetto risposta.
 
 const { app } = require('electron');
+const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf, apriDaFilo, SCHEMI_USCITA } = ctx;
@@ -109,6 +110,11 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  on(MSG.AGGIORNAMENTO_INSTALLA, soloFilo(async (msg) => {
+    const U = require('../../updater');
+    return msg && msg.avvisa === true ? U.riavviaDallaHome() : U.riavviaEAggiorna();
+  }));
+
   on(MSG.NAV_BACK, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
@@ -137,11 +143,9 @@ module.exports = function register(on, ctx) {
     if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
     const win = winOf(sender);
     const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
-    const wc = tab?.view?.webContents;
-    if (!wc) return { ok: false, canBack: false, canFwd: false };
-    const canBack = wc.navigationHistory?.canGoBack?.() ?? wc.canGoBack?.() ?? false;
-    const canFwd = wc.navigationHistory?.canGoForward?.() ?? wc.canGoForward?.() ?? false;
-    return { ok: true, canBack: !!canBack, canFwd: !!canFwd };
+    if (!tab?.view?.webContents) return { ok: false, canBack: false, canFwd: false };
+    const tabs = win._filoTabs;
+    return { ok: true, canBack: tabs.puoTornare(tab, 'indietro'), canFwd: tabs.puoTornare(tab, 'avanti') };
   });
 
   on(MSG.TOGGLE_FULLSCREEN, async (msg, sender) => {

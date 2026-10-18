@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -33,6 +34,8 @@ test('motore: impersonazioni → pericoloso, domini legittimi → safe', async (
       gusercontent: v('https://googleusercontent.com/'),
       cyrillicApple: v('https://xn--80ak6aa92e.com/', { hasPassword: true }),
       paypalTypo: v('https://paypa1.com/', { hasPassword: true }),
+      parolaComune: v('https://team.com/'),
+      parolaComuneConPassword: v('https://team.com/', { hasPassword: true }),
     };
   });
 
@@ -47,6 +50,11 @@ test('motore: impersonazioni → pericoloso, domini legittimi → safe', async (
   expect(verdicts.cyrillicApple.hasMsg).toBe(true);
   expect(verdicts.paypalTypo.level).toBe('pericoloso');
   expect(verdicts.paypalTypo.hasMsg).toBe(true);
+
+  // #728 — una parola comune a una lettera da un marchio corto avvisa e basta;
+  // il blocco torna appena un secondo segnale lo conferma.
+  expect(verdicts.parolaComune.level).toBe('sospetto');
+  expect(verdicts.parolaComuneConPassword.level).toBe('pericoloso');
 });
 
 test('pagina Sicurezza: controlli personali default ON e persistenti; nessun campo chiave (è condivisa)', async ({ openTab }) => {
@@ -59,12 +67,14 @@ test('pagina Sicurezza: controlli personali default ON e persistenti; nessun cam
   await expect(page.locator('#sec-safebrowse-llm')).toBeChecked();
   await expect(page.locator('#sec-safebrowse-sandbox')).toBeChecked();
 
-  // La chiave NON è più un campo per-utente: il vecchio input è sparito e al suo
-  // posto c'è la nota che dice che è gestita centralmente in "Modelli predefiniti".
+  // La chiave NON è un campo per-utente: arriva col programma e vale anche senza accesso (#815).
   await expect(page.locator('#sec-safebrowse-key')).toHaveCount(0);
   const note = page.locator('#sec-safebrowse-key-managed');
   await expect(note).toBeVisible();
-  await expect(note).toContainText('Modelli predefiniti');
+  await expect(note).toContainText('anche senza aver fatto l\'accesso');
+  await expect(note).not.toContainText('amministratore');
+  await expect(page.locator('#sec-safebrowse-desc')).toContainText('«confermo»');
+  await expect(page.locator('#sec-safebrowse-desc')).not.toContainText('ignorare');
 
   // I toggle personali restano e si persistono: spegni il giudizio AI, ricarica.
   await page.locator('#sec-safebrowse-llm').uncheck();
@@ -205,6 +215,26 @@ test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo"
   await expect(page.locator('#campo')).toHaveValue('ok');
 });
 
+// #871 — la barra laterale resta raggiungibile sopra l'avviso: Indietro serve proprio lì.
+test('interstitial "pericoloso": la barra laterale sta sopra l\'avviso e si apre', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-paypa1.com/login': MODULO }, { gsbListed: true });
+  await apriSenzaAspettare(app, shell, 'https://conto-paypa1.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  const ordine = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const figli = w.contentView.children;
+    return figli.indexOf(w._filoTabs.barra.vista) > figli.indexOf(w._filoTabs.avvisoSito.vista);
+  });
+  await expect.poll(ordine).toBe(true);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  expect(await ordine()).toBe(true);
+  await expect(barra.locator('#nav .ico[data-id="back"]')).toBeVisible();
+});
+
 test('interstitial "pericoloso": "Torna indietro" su scheda NUOVA esce SENZA confermare il sito (#288)', async ({ app, shell }) => {
   await serviInCaricamento(app, { 'conto-indietro.com/login': MODULO }, { gsbListed: true });
   const page = await apriSenzaAspettare(app, shell, 'https://conto-indietro.com/login');
@@ -324,6 +354,21 @@ test('Google Sites: un modulo d\'accesso nel riquadro incorporato fa comparire l
   expect(await livelloScheda(app, 'sites.google.com')).toBe('sospetto');
 });
 
+// #730 — nessuna password: decide il nome del sito, che sta nel sottodominio di una piattaforma mai elencata a mano.
+test('un sosia sul sottodominio di una piattaforma di hosting qualunque fa comparire l\'avviso col marchio', async ({ app, openTab }) => {
+  const SOSIA = '<h1>PayPal</h1><p>Il tuo conto è sospeso: accedi per riattivarlo.</p>';
+  const host = ['paypal-login.weebly.com', 'paypal-login.us-east-1.elasticbeanstalk.com', 'paypal-com.translate.goog'];
+  await servi(app, Object.fromEntries(host.map((h) => [h, SOSIA])));
+  for (const h of host) {
+    await openTab('https://' + h + '/');
+    expect(await livelloScheda(app, h), h).toBe('sospetto');
+  }
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByRole('heading', { name: 'PayPal? Controlla l\'indirizzo' })).toBeVisible({ timeout: 8_000 });
+  await expect(avviso.getByText('paypal-com.translate.goog usa il nome "PayPal"')).toBeVisible();
+  await expect(avviso.getByRole('button', { name: 'Continua' })).toBeVisible();
+});
+
 test('Apps Script: la pagina dell\'utente in un riquadro dentro un riquadro fa comparire l\'avviso', async ({ app, openTab }) => {
   await servi(app, {
     'script.google.com/macros/s/AKfy123/exec': '<iframe src="https://n-abc-0lu-script.googleusercontent.com/panel" width="600" height="400"></iframe>',
@@ -400,6 +445,70 @@ test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro f
   });
   await openTab('https://sites.google.com/view/posta-lenta');
   expect(await livelloScheda(app, 'sites.google.com', 12000)).toBe('sospetto');
+});
+
+// Safe Browsing a prefissi (#813): la chiamata a Google è intercettata nel main. Una pagina del mini server in lista
+// mostra l'avviso di oggi anche dopo una pagina pulita dello stesso sito, e verso Google escono solo prefissi di 4 byte.
+// Il nome è da internet: la rete di casa non chiede niente fuori (#591).
+test('Safe Browsing: una pagina in lista mostra l\'avviso, e a Google arrivano solo prefissi dell\'impronta', async ({ app, openTab, testServer }) => {
+  const pulita = testServer.html('<title>SB813_PULITA</title><p>pagina pulita</p>', { pubblico: true });
+  const trappola = testServer.html('<title>SB813_TRAPPOLA</title><p>pagina in lista</p>', { pubblico: true });
+  const { hostname, port, pathname } = new URL(trappola);
+  await app.evaluate(async (_e, listata) => {
+    const crypto = process.getBuiltinModule('crypto');
+    const full = crypto.createHash('sha256').update(listata).digest();
+    const prima = globalThis.fetch;
+    const Defaults = globalThis.__filoDefaults;
+    globalThis.__sb813 = { richieste: [], prima, get: Defaults.get };
+    const risposta = (ok, corpo) => ({ ok, status: ok ? 200 : 404, async json() { return corpo; }, async text() { return ''; } });
+    globalThis.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.startsWith('https://safebrowsing.googleapis.com/')) {
+        globalThis.__sb813.richieste.push(u + ' ' + JSON.stringify(opts || {}));
+        const chiesti = new URL(u).searchParams.getAll('hashPrefixes');
+        const fullHashes = chiesti.includes(full.subarray(0, 4).toString('base64'))
+          ? [{ fullHash: full.toString('base64'), fullHashDetails: [{ threatType: 'SOCIAL_ENGINEERING' }] }] : [];
+        return risposta(true, { fullHashes, cacheDuration: '300s' });
+      }
+      if (/rdap\.org|crt\.sh/.test(u)) return risposta(false, {});
+      return prima(url, opts);
+    };
+    Defaults.get = () => ({ ...globalThis.__sb813.get(), safeBrowsingKey: 'chiave-finta-813' });
+    await globalThis.__filoHandlers.wireSafebrowse();
+  }, hostname + pathname);
+
+  try {
+    const richieste = () => app.evaluate(() => globalThis.__sb813.richieste.slice());
+
+    const page = await openTab(pulita);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+    await expect.poll(async () => (await richieste()).length, { timeout: 6_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+    expect(await livelloScheda(app, hostname, 500)).toBe('safe');
+
+    // Stessa scheda, stesso sito: la pagina pulita appena vista non deve coprire quella in lista.
+    await page.goto(trappola);
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+    await expect(avviso.getByText(/phishing/)).toBeVisible();
+    await expect.poll(() => copertura(app)).toMatchObject({ coperta: true, sopra: true, stessiBordi: true });
+
+    const uscite = await richieste();
+    expect(uscite.length).toBeGreaterThan(1);
+    for (const r of uscite) {
+      expect(r).not.toContain(hostname);
+      expect(r).not.toContain(`:${port}`);
+      const u = new URL(r.split(' ')[0]);
+      expect([...new Set(u.searchParams.keys())].sort()).toEqual(['alt', 'hashPrefixes', 'key']);
+      for (const p of u.searchParams.getAll('hashPrefixes')) expect(Buffer.from(p, 'base64').length).toBe(4);
+    }
+  } finally {
+    await app.evaluate(async () => {
+      globalThis.fetch = globalThis.__sb813.prima;
+      globalThis.__filoDefaults.get = globalThis.__sb813.get;
+      await globalThis.__filoHandlers.wireSafebrowse();
+    });
+  }
 });
 
 // Una pagina che non finisce di caricarsi (#813.1): il modulo è già a schermo, lo script dopo non arriva mai. Il server
@@ -807,6 +916,13 @@ const urlAttiva = (app) => app.evaluate(({ BrowserWindow }) => {
 for (const [dove, js] of [['nella stessa scheda', 'location.href=u'], ['in una scheda nuova', 'window.open(u)']]) {
   test(`la pagina in lista si riscrive in una sua copia blob (${dove}): l'avviso resta e i tasti non le arrivano`, async ({ app, shell }) => {
     const h = `conto-blob-${js.length}.com`;
+    // Senza un clic la scheda nuova la ferma il blocco dei popup (#737.1): qui conta chi l'ha spento.
+    if (js.startsWith('window.open')) {
+      await app.evaluate(({ BrowserWindow }) => {
+        const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+        tm.security.blockPopups = false;
+      });
+    }
     await serviInCaricamento(app, { [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F='
       + JSON.stringify(BLOB_MODULO).replace(/<\//g, '<\\/')
       + ';setTimeout(function(){var u=URL.createObjectURL(new Blob([F],{type:"text/html"}));' + js + '},2500)</script>' }, { gsbListed: true });
@@ -822,10 +938,16 @@ for (const [dove, js] of [['nella stessa scheda', 'location.href=u'], ['in una s
   });
 }
 
+// Senza un clic anche la finestrella di accesso la ferma il blocco dei popup (#737.1): qui conta chi l'ha spento.
+const senzaBloccoPopup = (app) => app.evaluate(({ BrowserWindow }) => {
+  BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.security.blockPopups = false;
+});
+
 const finestreFuoriDaFilo = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
   .filter((w) => !w._filoTabs && !w.isDestroyed() && w.isVisible() && /^https?:/.test(w.webContents.getURL())).map((w) => w.webContents.getURL()));
 
 test('la pagina in lista apre da sola una finestrella di accesso del suo sito: diventa una scheda sotto l\'avviso', async ({ app, shell }) => {
+  await senzaBloccoPopup(app);
   const h = 'conto-finestrella.com';
   await serviInCaricamento(app, {
     [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>setTimeout(function(){'
@@ -844,11 +966,14 @@ test('la pagina in lista apre da sola una finestrella di accesso del suo sito: d
   expect(await accesso.evaluate(() => ({ k: window.__k, pw: document.getElementById('pw').value }))).toEqual({ k: '', pw: '' });
 });
 
+// La finestrella di accesso la apre solo il clic dell'utente (#1066), anche col blocco dei popup spento.
+const BOTTONE_ACCESSO = (js) => `<button id="accedi" style="width:200px;height:60px" onclick='${js}'>Accedi con…</button>`;
+
 test('una finestrella di accesso che apre un sito in lista torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
   const h = 'conto-in-finestrella.com';
   await serviInCaricamento(app, {
-    'pagina-con-accesso.it/': '<title>Negozio</title><script>setTimeout(function(){'
-      + `window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")},1000)</script>`,
+    'pagina-con-accesso.it/': '<title>Negozio</title>'
+      + BOTTONE_ACCESSO(`window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")`),
     [h + '/oauth/authorize']: BLOB_MODULO,
   });
   await app.evaluate((_e, host) => {
@@ -857,7 +982,7 @@ test('una finestrella di accesso che apre un sito in lista torna in una scheda, 
       rdap: null, ct: null, sandbox: null, llm: async () => ({ suspicious: false, reason: null }),
     });
   }, h);
-  await apriSenzaAspettare(app, shell, 'https://pagina-con-accesso.it/');
+  await (await apriSenzaAspettare(app, shell, 'https://pagina-con-accesso.it/')).click('#accedi');
   const avviso = await vistaAvviso(app, 12_000);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => urlAttiva(app)).toContain(`${h}/oauth/authorize`);
@@ -880,12 +1005,13 @@ test('finestrella aperta prima del verdetto e poi riscritta dal sito in lista in
   const idp = 'accesso-esempio.org';
   await serviInCaricamento(app, {
     [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F=' + JSON.stringify(BLOB_MODULO).replace(/<\//g, '<\\/')
-      + `;if(!localStorage.aperta){localStorage.aperta=1;var p=window.open("https://${idp}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600");`
-      + 'setTimeout(function(){p.location="about:blank";setTimeout(function(){p.document.open();p.document.write(F);p.document.close()},700)},3000)}</script>',
+      + ';function accedi(){var p=window.open("https://' + idp + '/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600");'
+      + 'setTimeout(function(){p.location="about:blank";setTimeout(function(){p.document.open();p.document.write(F);p.document.close()},700)},3000)}</script>'
+      + BOTTONE_ACCESSO('accedi()'),
     [idp + '/oauth/authorize']: '<title>Accedi con</title><p>Accesso</p>',
   });
-  await gsbInRitardo(app, h, 800);
-  await apriSenzaAspettare(app, shell, `https://${h}/login`);
+  await gsbInRitardo(app, h, 2500);
+  await (await apriSenzaAspettare(app, shell, `https://${h}/login`)).click('#accedi');
   await expect.poll(() => finestreFuoriDaFilo(app), { timeout: 8_000 }).toEqual([expect.stringContaining(idp)]);
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
@@ -900,12 +1026,13 @@ test('finestrella aperta prima del verdetto e poi riscritta dal sito in lista in
 test('finestrella del sito in lista che cambia indirizzo sul posto prima del verdetto: torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
   const h = 'conto-sposta.com';
   await serviInCaricamento(app, {
-    [h + '/login']: `<title>Attendere</title><p>Caricamento…</p><script>if(!localStorage.aperta){localStorage.aperta=1;window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")}</script>`,
+    [h + '/login']: '<title>Attendere</title><p>Caricamento…</p>'
+      + BOTTONE_ACCESSO(`window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")`),
     [h + '/oauth/authorize']: BLOB_MODULO + '<script>var i=0;setInterval(function(){history.replaceState(null,"",'
       + 'location.pathname+"?client_id=1&redirect_uri=x&t="+(++i))},150)</script>',
   });
-  await gsbInRitardo(app, h, 1500);
-  await apriSenzaAspettare(app, shell, `https://${h}/login`);
+  await gsbInRitardo(app, h, 2500);
+  await (await apriSenzaAspettare(app, shell, `https://${h}/login`)).click('#accedi');
   const avviso = await vistaAvviso(app, 12_000);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => finestreFuoriDaFilo(app), { timeout: 8_000 }).toEqual([]);
@@ -915,4 +1042,236 @@ test('finestrella del sito in lista che cambia indirizzo sul posto prima del ver
   await expect(avviso.getByPlaceholder('confermo')).toHaveValue('segreto');
   const accesso = app.windows().find((w) => { try { return w.url().includes('/oauth/authorize'); } catch (_) { return false; } });
   expect(await accesso.evaluate(() => ({ k: window.__k, pw: document.getElementById('pw').value }))).toEqual({ k: '', pw: '' });
+});
+
+test('parola comune vicina a un marchio: avviso richiudibile, non il blocco a pagina piena (#728)', async ({ app, openTab }) => {
+  // team.com dista una lettera da "steam": prima l'utente trovava il blocco che si toglie solo scrivendo "confermo".
+  await servi(app, { 'team.com': '<title>SB_PAROLA_COMUNE</title><h1>Team</h1><p>contenuto della pagina</p>' });
+  const page = await openTab('https://team.com/');
+  const avviso = await vistaAvviso(app, 12_000);
+  const continua = avviso.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeVisible({ timeout: 12_000 });
+  await expect(avviso.getByRole('button', { name: 'Procedi comunque' })).toHaveCount(0);
+  await expect(avviso.getByText(/assomiglia all'indirizzo di Steam/)).toBeVisible();
+
+  // Un clic e l'utente è sulla pagina che voleva.
+  await continua.click();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
+});
+
+// #728 — un sosia di un marchio corto blocca solo se chiede la password: il campo va visto anche quando arriva dopo
+// il caricamento o sta in un riquadro. Niente rete: conta solo il nome, come con un dominio vecchio.
+async function serviSenzaRete(app, pagine) {
+  await servi(app, pagine);
+  await app.evaluate(() => globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null }));
+}
+
+async function bloccoMostrato(app) {
+  const avviso = await vistaAvviso(app, 12_000);
+  await expect(avviso.getByPlaceholder('confermo')).toBeVisible({ timeout: 10_000 });
+  // La tastiera non si guarda: openTab non porta la finestra in primo piano.
+  await expect.poll(async () => { const c = await copertura(app); return c.coperta && c.sopra; }).toBe(true);
+  return avviso;
+}
+
+test('sosia di un marchio corto: il modulo d\'accesso montato dopo l\'apertura porta al blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><div id="app">Caricamento…</div><script>'
+      + `setTimeout(() => { document.getElementById('app').innerHTML = ${JSON.stringify(ACCESSO)}; }, 2500);</script>`,
+  });
+  await openTab('https://paypak.com/');
+  const avviso = await vistaAvviso(app, 12_000);
+  await expect(avviso.getByRole('button', { name: 'Continua' })).toBeVisible({ timeout: 12_000 });
+  await bloccoMostrato(app);
+  await expect(avviso.getByText(/ti sta chiedendo la password/)).toBeVisible();
+});
+
+test('sosia di un marchio corto: la password chiesta dopo l\'email, senza ricaricare, porta al blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><div id="f"><input name="email" placeholder="Email">'
+      + '<button id="avanti" onclick="document.getElementById(\'f\').innerHTML = '
+      + '\'<input type=password placeholder=Password><button>Accedi</button>\'">Avanti</button></div>',
+  });
+  const page = await openTab('https://paypak.com/');
+  const avviso = await vistaAvviso(app, 12_000);
+  const continua = avviso.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeVisible({ timeout: 12_000 });
+  await continua.click();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  await page.getByPlaceholder('Email').fill('mario@example.com');
+  await page.waitForTimeout(3000);
+  await page.click('#avanti');
+  await bloccoMostrato(app);
+});
+
+test('sosia di un marchio corto col modulo d\'accesso in un riquadro della pagina: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com/accesso': `<!doctype html><body>${ACCESSO}</body>`,
+    'paypak.com': '<h1>PayPal</h1><iframe src="/accesso" width="400" height="200"></iframe>',
+  });
+  const page = await openTab('https://paypak.com/');
+  await expect(page.frameLocator('iframe').getByPlaceholder('Email')).toBeVisible({ timeout: 12_000 });
+  await bloccoMostrato(app);
+});
+
+test('il blocco già a schermo non si ridisegna quando un\'altra analisi lo rimanda: il «confermo» a metà resta (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, { 'paypak.com': `<h1>PayPal</h1>${ACCESSO}` });
+  await openTab('https://paypak.com/');
+  const avviso = await bloccoMostrato(app);
+  const campo = avviso.getByPlaceholder('confermo');
+  await campo.fill('conf');
+  // Il giro sui campi della pagina parte dopo il caricamento e rimanda lo stesso verdetto.
+  await new Promise((r) => setTimeout(r, 3000));
+  await expect(campo).toHaveValue('conf');
+});
+
+// #728 — conta il campo a schermo: un modulo d'accesso tenuto nascosto dietro «Accedi» non fa del sito vero un sosia.
+test('parola comune vicina a un marchio col modulo d\'accesso nascosto: popup, non il blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'email.com': '<h1>Posta gratuita</h1><button onclick="document.getElementById(\'m\').hidden=false">Accedi</button>'
+      + `<div id="m" hidden>${ACCESSO}</div>`,
+  });
+  await openTab('https://email.com/');
+  const avviso = await vistaAvviso(app, 12_000);
+  await expect(avviso.getByRole('button', { name: 'Continua' })).toBeVisible({ timeout: 12_000 });
+  // Più di un giro sui campi della pagina.
+  await new Promise((r) => setTimeout(r, 4000));
+  await expect(avviso.getByPlaceholder('confermo')).toBeHidden();
+});
+
+test('sosia di un marchio corto: il modulo nascosto che si apre dopo «Continua» porta al blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><button id="apri" onclick="document.getElementById(\'m\').hidden=false">Accedi</button>'
+      + `<div id="m" hidden>${ACCESSO}</div>`,
+  });
+  const page = await openTab('https://paypak.com/');
+  const avviso = await vistaAvviso(app, 12_000);
+  const continua = avviso.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeVisible({ timeout: 12_000 });
+  await continua.click();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  await page.click('#apri');
+  await bloccoMostrato(app);
+});
+
+test('sosia di un marchio corto col modulo d\'accesso in un componente incapsulato (shadow DOM): blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><login-box></login-box><script>customElements.define("login-box", class extends HTMLElement {'
+      + `constructor(){super(); this.attachShadow({mode:"open"}).innerHTML = ${JSON.stringify(ACCESSO)};}});</script>`,
+  });
+  await openTab('https://paypak.com/');
+  await bloccoMostrato(app);
+});
+
+// #728 — a schermo è ciò che l'utente vede: un modulo nascosto dal riquadro che lo contiene (trasparente, chiuso,
+// fuori dal bordo) non conta; lo stesso modulo, aperto, sì.
+const NASCOSTI_728 = {
+  'menu a tendina trasparente': ['<style>.m{opacity:0;pointer-events:none;position:absolute;top:40px;right:0}.m.su{opacity:1}</style>', 'm'],
+  'pannello chiuso': ['<style>.m{max-height:0;overflow:hidden}.m.su{max-height:none}</style>', 'm'],
+  'cassetto laterale fuori schermo': ['<style>body{overflow-x:hidden}.m{position:fixed;top:0;right:0;width:300px;height:100%;'
+    + 'transform:translateX(100%)}.m.su{transform:none}</style>', 'm'],
+};
+const conModulo = (stile, titolo) => `${stile}<h1>${titolo}</h1><button id="apri" onclick="document.querySelector('.m').classList.add('su')">Accedi</button>`
+  + `<div class="m">${ACCESSO}</div>`;
+
+for (const [modo, [stile]] of Object.entries(NASCOSTI_728)) {
+  test(`parola comune vicina a un marchio, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, { 'email.com': conModulo(stile, 'Posta gratuita') });
+    await openTab('https://email.com/');
+    expect(await livelloScheda(app, 'email.com', 12_000)).toBe('sospetto');
+    await new Promise((r) => setTimeout(r, 4500));
+    expect(await livelloScheda(app, 'email.com', 1000)).toBe('sospetto');
+  });
+
+  test(`sosia di un marchio corto, modulo d'accesso nascosto (${modo}) che si apre: blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, { 'paypak.com': conModulo(stile, 'PayPal') });
+    const page = await openTab('https://paypak.com/');
+    expect(await livelloScheda(app, 'paypak.com', 12_000)).toBe('sospetto');
+    await page.evaluate(() => document.querySelector('.m').classList.add('su'));
+    await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 10_000 }).toBe('pericoloso');
+  });
+}
+
+test('sosia di un marchio corto, modulo in una tendina che esce da una testata che ritaglia: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<style>header{height:40px;overflow:hidden}.m{position:absolute;top:40px;left:0}</style>'
+      + `<header><h1>PayPal</h1><div class="m">${ACCESSO}</div></header>`,
+  });
+  await openTab('https://paypak.com/');
+  await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+});
+
+test('sosia di un marchio corto col modulo d\'accesso in un componente incapsulato chiuso: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><login-box></login-box><script>customElements.define("login-box", class extends HTMLElement {'
+      + `constructor(){super(); this.attachShadow({mode:"closed"}).innerHTML = ${JSON.stringify(ACCESSO)};}});</script>`,
+  });
+  await openTab('https://paypak.com/');
+  await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+});
+
+// #728 — a schermo lo dice il motore, non un elenco di trucchi: un ritaglio di qualunque forma, o la pagina che nasconde
+// il riquadro col modulo (dello stesso sito o di un altro), lasciano il sito vero al popup.
+const NASCOSTI_DAL_MOTORE_728 = {
+  'tendina ritagliata (clip-path)': `<div style="clip-path:inset(0 0 100% 0);position:absolute;top:60px;right:0">${ACCESSO}</div>`,
+  'riquadro dello stesso sito in una tendina trasparente':
+    '<div style="opacity:0;position:absolute;top:60px;right:0"><iframe src="/login" width="400" height="200"></iframe></div>',
+  'riquadro di un altro sito in una tendina trasparente':
+    '<div style="opacity:0;position:absolute;top:60px;right:0"><iframe src="https://accesso-posta.net/login" width="400" height="200"></iframe></div>',
+};
+for (const [modo, corpo] of Object.entries(NASCOSTI_DAL_MOTORE_728)) {
+  test(`parola comune vicina a un marchio, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, {
+      'email.com/login': `<!doctype html><body>${ACCESSO}</body>`,
+      'accesso-posta.net/login': `<!doctype html><body>${ACCESSO}</body>`,
+      'email.com': `<h1>Posta gratuita</h1><button>Accedi</button>${corpo}`,
+    });
+    await openTab('https://email.com/');
+    expect(await livelloScheda(app, 'email.com', 12_000)).toBe('sospetto');
+    await new Promise((r) => setTimeout(r, 5000));
+    expect(await livelloScheda(app, 'email.com', 1000)).toBe('sospetto');
+  });
+}
+
+test('sosia di un marchio corto col modulo d\'accesso nel riquadro di un altro sito, a schermo: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'accesso-posta.net/login': `<!doctype html><body>${ACCESSO}</body>`,
+    'paypak.com': '<h1>PayPal</h1><iframe src="https://accesso-posta.net/login" width="400" height="200"></iframe>',
+  });
+  await openTab('https://paypak.com/');
+  await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+});
+
+const CHIUSI_728 = {
+  'scritto nell\'HTML': `<div><template shadowrootmode="closed">${ACCESSO}</template></div>`,
+  'dentro un riquadro della pagina': '<iframe src="/inner" width="400" height="200"></iframe>',
+};
+for (const [modo, corpo] of Object.entries(CHIUSI_728)) {
+  test(`sosia di un marchio corto col modulo in un componente chiuso ${modo}: blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, {
+      'paypak.com/inner': '<!doctype html><body><div id="h"></div><script>document.getElementById("h")'
+        + `.attachShadow({mode:"closed"}).innerHTML = ${JSON.stringify(ACCESSO)};</script></body>`,
+      'paypak.com': `<h1>PayPal</h1>${corpo}`,
+    });
+    await openTab('https://paypak.com/');
+    await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+  });
+}
+
+test('i componenti chiusi di una pagina restano chiusi ai suoi script: Filo non li espone (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'esempio-negozio.com': '<div id="h"></div><script>document.getElementById("h").attachShadow({mode:"closed"})'
+      + '.innerHTML = "<input id=segreto value=123>";</script>',
+  });
+  const page = await openTab('https://esempio-negozio.com/');
+  await page.waitForLoadState('load');
+  const letto = await page.evaluate(() => {
+    const cerca = (lista) => { for (const r of lista || []) { try { const el = r.querySelector('#segreto'); if (el) return el.value; } catch (_) {} } return null; };
+    for (const k of [...Object.getOwnPropertySymbols(window), ...Object.getOwnPropertyNames(window)]) {
+      try { const v = window[k]; if (Array.isArray(v) || (v && typeof v[Symbol.iterator] === 'function' && typeof v !== 'string')) { const x = cerca(v); if (x) return x; } } catch (_) {}
+    }
+    return null;
+  });
+  expect(letto).toBeNull();
 });

@@ -10,28 +10,25 @@ test('preferences: select option:checked usa l\'accent arancione Filo, non il bl
   const page = await openTab('filo://preferences/preferences.html');
   await page.waitForSelector('#theme', { timeout: 8_000 });
 
-  // Ispeziona le regole CSS globali (theme.css) caricate sulla pagina.
-  // Cerchiamo la regola `option:checked` (qualificata da [data-sn-theme] o no).
-  const rule = await page.evaluate(() => {
-    for (const sheet of document.styleSheets) {
-      let rules;
-      try { rules = sheet.cssRules; } catch (_) { continue; }
-      for (const r of rules) {
-        if (!r.selectorText) continue;
-        if (/option:checked|option:hover/.test(r.selectorText)) {
-          return {
-            selector: r.selectorText,
-            bg: r.style.backgroundColor || r.style.background || '',
-            color: r.style.color || '',
-          };
-        }
-      }
-    }
-    return null;
+  // Si guarda il colore che l'opzione scelta prende davvero: da Electron 44 le regole di theme.css (filo://style)
+  // non si leggono più da un'altra pagina di Filo, che per il motore è un'altra origine.
+  const colori = await page.evaluate(() => {
+    const sonda = document.createElement('div');
+    sonda.style.backgroundColor = 'var(--sn-accent)';
+    const lista = document.createElement('select');
+    lista.size = 3;
+    for (const t of ['Chiaro', 'Scuro', 'Sistema']) lista.add(new Option(t, t));
+    lista.value = 'Scuro';
+    document.body.append(sonda, lista);
+    const esito = {
+      accent: getComputedStyle(sonda).backgroundColor,
+      scelta: getComputedStyle(lista.options[1]).backgroundColor,
+      altra: getComputedStyle(lista.options[0]).backgroundColor,
+    };
+    sonda.remove(); lista.remove();
+    return esito;
   });
-
-  expect(rule, 'mancano regole per option:checked/option:hover').toBeTruthy();
-  // L'accent Filo è --sn-accent: #c45a3b (rgb 196,90,59). La regola può usare
-  // direttamente la variabile, quindi nei computed values cercheremo "var(--sn-accent)".
-  expect(rule.bg).toMatch(/var\(--sn-accent\)|#c45a3b|196,?\s*90,?\s*59/i);
+  expect(colori.accent).not.toBe('rgba(0, 0, 0, 0)');
+  expect(colori.scelta, 'l\'opzione scelta non prende l\'arancione di Filo').toBe(colori.accent);
+  expect(colori.altra).not.toBe(colori.accent);
 });

@@ -3,11 +3,13 @@
 // La regola sta in src/shared/pagineDelicate.js; dall'incognito non si scrive niente su disco.
 
 const { getDomainInfo } = require('./safebrowse/psl');
+const { ElencoSiti } = require('./stessoSito');
 
 const PD = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
 
 // Per dominio registrabile: chi entra da accesso.banca.it e poi legge i movimenti su online.banca.it resta sullo stesso sito.
-const conCampi = new Set();
+// Un ricordo salvato su gov.it quando contava come un sito solo copre ancora i siti sotto di lui (stessoSito.js).
+const conCampi = new ElencoSiti();
 // Quelli da tenere anche dopo un riavvio: la scheda riaperta è già dentro l'area riservata, dove il campo non c'è.
 const salvati = new Set();
 let caricati = null;

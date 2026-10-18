@@ -23,6 +23,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -199,6 +200,18 @@ test('il lanciatore spegne la gabbia solo dove questo sistema la nega', { skip: 
     negata
       ? 'aperto dal menu delle applicazioni Filo non parte: la gabbia va spenta anche di lì'
       : 'aperto dal menu delle applicazioni Filo naviga senza gabbia su una macchina che la concede');
+
+  // Da Electron 38 una sessione Wayland fa partire Chromium su Wayland, dove i menu di Filo (finestre a sé) non
+  // stanno più accanto al puntatore: con un X a disposizione si resta su X, e chi sceglie da sé viene ascoltato.
+  const lancia = (args, env) => String(execFileSync(join(dove, 'filo'), args, { encoding: 'utf8', env })).trim();
+  const conX = { PATH: process.env.PATH, DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0', XDG_SESSION_TYPE: 'wayland' };
+  assert.ok(lancia(['ciao'], conX).includes('--ozone-platform=x11'), 'in una sessione Wayland con X Filo parte su Wayland');
+  const scelta = lancia(['--ozone-platform=wayland', 'ciao'], conX);
+  assert.ok(scelta.includes('--ozone-platform=wayland') && !scelta.includes('--ozone-platform=x11'),
+    'chi chiede Wayland da sé si ritrova anche X');
+  const senzaX = lancia(['ciao'], { PATH: process.env.PATH, WAYLAND_DISPLAY: 'wayland-0', XDG_SESSION_TYPE: 'wayland' });
+  assert.ok(senzaX.includes('ciao') && !senzaX.includes('--ozone-platform'),
+    'senza un X a disposizione il lanciatore chiede X lo stesso, e Filo non si apre');
 });
 
 test('il pacchetto costruito, se c\'è, ha il lanciatore al posto giusto', () => {
@@ -497,7 +510,7 @@ test('chi sceglie Bash ottiene davvero Bash, e chi non sceglie niente la shell d
   const chiedi = (shell) => new Promise((risolvi, rifiuta) => {
     const sessione = createSession({ shell });
     let uscita = '';
-    const stop = setTimeout(() => { try { sessione.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, 15000);
+    const stop = setTimeout(() => { try { sessione.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, TETTO_ATTESA_MS);
     // `$BASH_VERSION` è vuota in sh e piena in bash: è la shell stessa a dire
     // chi è, invece di fidarsi di quello che abbiamo chiesto noi.
     sessione.exec('echo "sono:${BASH_VERSION:-non-bash}"', {
@@ -548,6 +561,26 @@ test('su Linux le scorciatoie si chiamano e funzionano come su Windows', () => {
   assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'linux'), null);
   assert.equal(T.riservato('Ctrl+0', 'linux'), false,
     'su Linux lo zoom arriva alla pagina: quel tasto non è riservato');
+  // Lo schermo intero è F11 come su Windows (#858), e Filo se lo prende prima della pagina.
+  assert.equal(T.etichettaSchermoIntero('linux'), 'F11');
+  assert.equal(T.riservato('F11', 'linux'), true);
+  assert.equal(T.riservato('Ctrl+Cmd+F', 'linux'), false);
+  assert.equal(T.comandoSchermoIntero({ type: 'keyDown', key: 'F11', code: 'F11' }, 'linux'), true);
+  assert.equal(T.comandoSchermoIntero({ type: 'keyDown', key: 'F11', code: 'F11', shift: true }, 'linux'), false);
+  const { template } = require(join(ROOT, 'src', 'main', 'menu.js'));
+  const voce = template('linux').flatMap((m) => m.submenu || []).find((v) => v.label === 'Schermo intero');
+  assert.equal(voce.accelerator, 'F11');
+});
+
+test('su Linux il clic centrale in un campo resta all\'incolla del sistema, non apre lo zoom', () => {
+  require('../../src/shared/zoomPagina.js');
+  const Z = globalThis.SN_ZOOM;
+  assert.equal(Z.centraleIncolla('linux'), true, 'su Linux il clic centrale incolla la selezione: lo zoom non deve prenderselo nei campi');
+  assert.equal(Z.centraleIncolla('freebsd'), true);
+  assert.equal(Z.centraleIncolla('win32'), false);
+  assert.equal(Z.centraleIncolla('darwin'), false);
+  const preload = readFileSync(join(ROOT, 'src', 'preload', 'wheel-zoom.js'), 'utf8');
+  assert.equal((preload.match(/\|\| incollaQui\(e, Z\)/g) || []).length, 2, 'la pagina e i riquadri incorporati lasciano tutti e due il clic centrale ai campi');
 });
 
 // ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────
@@ -574,4 +607,23 @@ test('su Linux volume, Bluetooth e Wi-Fi si comandano con la shell di sistema e 
   assert.match(C.SCRIPT.linux['wifi-collega'], /nmcli --wait \d+ connection up uuid "\$U"/, 'la rete si sceglie col suo identificativo, non col nome');
   // La shell vera la decide resolveShell: su Linux «sh» resta la shell di sistema anche se l'utente preferisce PowerShell.
   if (process.platform === 'linux') assert.equal(resolveShell('sh'), 'sh');
+});
+
+// #778 — su una sessione Wayland Chromium cattura dal selettore del sistema anche con Filo su X: lì le finestre non si
+// elencano, la scelta la fa l'utente nel selettore, e ogni sessione X normale resta col suo elenco.
+test('su Linux con Wayland guardare lo schermo passa dal selettore del sistema', async () => {
+  const Schermo = require(join(ROOT, 'src', 'main', 'services', 'schermo.js'));
+  assert.equal(Schermo.sessioneWayland({ XDG_SESSION_TYPE: 'wayland', WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' }, 'linux'), true);
+  assert.equal(Schermo.sessioneWayland({ XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' }, 'linux'), false);
+  let fonti = 0;
+  const S = Schermo.crea({
+    sistema: {
+      piattaforma: () => 'linux', wayland: () => true, permessoMac: () => 'granted',
+      fonti: async () => { fonti += 1; return []; },
+      finestreFilo: () => [], maniglieFilo: () => [], schermi: () => ({}), delicata: async () => '',
+    },
+  });
+  const r = await S.prepara({ type: 'VEDI_SCHERMO' }, { settings: { schermo: { guarda: true } }, chiave: 't' });
+  assert.deepEqual(r.esito.output.elenco.map((v) => v.tipo), ['selettore']);
+  assert.equal(fonti, 0, 'elencare non apre il selettore');
 });

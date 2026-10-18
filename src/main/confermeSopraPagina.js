@@ -1,0 +1,362 @@
+// Vista che mostra sopra un sito le conferme di Filo (#592.6): nel documento del sito il suo codice poteva
+// nasconderle e disegnarne una finta al loro posto. Una per finestra, nata alla prima domanda; non decide niente.
+// Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
+
+const path = require('node:path');
+const { BrowserWindow, webContents: WebContents } = require('electron');
+const { collegaScorciatoie } = require('./shortcuts');
+
+const TIPI = new Set(['confirm', 'typed', 'notify']);
+const CAMPI = ['title', 'text', 'okLabel', 'cancelLabel', 'word', 'avviso'];
+const BANDIERE = ['coprePagina', 'reversibile'];
+
+// Dalla pagina arrivano solo le forme attese, e i testi interi: si conferma quello che si legge.
+function pulisci(r) {
+  const out = {
+    tipo: TIPI.has(r && r.tipo) ? r.tipo : 'confirm',
+    scriveva: !!(r && r.scriveva === true),
+    campo: !!(r && r.campo === true),
+  };
+  for (const k of CAMPI) if (r && typeof r[k] === 'string') out[k] = r[k];
+  for (const k of BANDIERE) if (r && r[k] === true) out[k] = true;
+  const parti = partiPulite(r && r.parti);
+  if (parti) out.parti = parti;
+  // Un avviso sulla pagina non rimanda tasti alla pagina, qualunque cosa dica chi chiede.
+  if (out.coprePagina) { out.scriveva = false; out.campo = false; }
+  return out;
+}
+
+// Le parole di Filo (stringhe) e i riquadri col testo che non è suo (#592.7): la vista li disegna in un elemento
+// che nessun carattere del testo può chiudere. Altre forme si scartano, i testi restano interi.
+function partiPulite(parti) {
+  if (!Array.isArray(parti)) return null;
+  const out = [];
+  for (const x of parti) {
+    if (typeof x === 'string') out.push(x);
+    else if (x && typeof x === 'object' && Array.isArray(x.elenco)) out.push({ elenco: x.elenco.map((v) => (typeof v === 'string' ? v : String(v ?? ''))) });
+    else if (x && typeof x === 'object' && typeof x.citazione === 'string') out.push(x.nuda === true ? { citazione: x.citazione, nuda: true } : { citazione: x.citazione });
+  }
+  return out.some((x) => typeof x !== 'string') ? out : null;
+}
+
+// Le finestre che apre un sito (i popup di accesso) stanno sopra quella di Filo: con una domanda a schermo il sito ci
+// posava sopra il testo finto, lasciando scoperto l'OK vero (#592.6, giro 7). Finché una domanda si vede, si nascondono
+// quelle nate dalla stessa finestra di Filo: una domanda lasciata in un'altra finestra non spegne gli accessi qui (giro 8).
+const finestreDelSito = new Map();
+const nascoste = new Set();
+const aSchermo = new Set();
+
+function allineaFinestre() {
+  const esenti = new Set([...aSchermo].map((c) => c.win));
+  const conDomanda = new Set([...aSchermo].map((c) => finestreDelSito.get(c.win) || c.win));
+  for (const [w, padre] of [...finestreDelSito]) {
+    if (!w || w.isDestroyed()) { finestreDelSito.delete(w); nascoste.delete(w); continue; }
+    if (conDomanda.has(padre) && !esenti.has(w)) {
+      if (w.isVisible()) { nascoste.add(w); try { w.hide(); } catch (_) {} }
+    } else if (nascoste.has(w)) {
+      nascoste.delete(w);
+      try { w.showInactive(); } catch (_) {}
+    }
+  }
+}
+
+// Ogni finestra nata da una pagina web passa di qui, con la finestra di Filo da cui viene (`padre`); se il sito la
+// rimostra mentre c'è una domanda, torna nascosta.
+function registraFinestraDelSito(win, padre) {
+  if (!win || finestreDelSito.has(win) || win.isDestroyed()) return;
+  finestreDelSito.set(win, padre || null);
+  win.once('closed', () => { finestreDelSito.delete(win); nascoste.delete(win); });
+  win.on('show', () => { if (aSchermo.size) setImmediate(allineaFinestre); });
+  allineaFinestre();
+}
+
+function stessoFrame(frame, pid, rid) {
+  try { return frame.processId === pid && frame.routingId === rid; } catch (_) { return true; }
+}
+
+class ConfermeSopraPagina {
+  // sotto(): il webContents che si vede adesso nell'area da coprire; area(): quell'area, nella finestra.
+  // dopoInCima: la barra laterale le torna sopra, se no la domanda ne coprirebbe la striscia.
+  constructor(win, { sotto = () => null, area = () => null, dopoInCima = () => {} } = {}) {
+    this.win = win;
+    this.sotto = sotto;
+    this.area = area;
+    this.dopoInCima = dopoInCima;
+    this.vista = null;
+    this.pronta = false;
+    this.coda = [];
+    this.mostrata = null;
+    this.seq = 0;
+    this.seguite = new WeakSet();
+    if (win && typeof win.once === 'function') win.once('closed', () => { this._togli(() => true); this._butta(); });
+  }
+
+  chiedi(wc, frame, richiesta) {
+    if (!wc || wc.isDestroyed() || !this.win || this.win.isDestroyed()) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const idPagina = richiesta && Number.isSafeInteger(richiesta.id) ? richiesta.id : 0;
+      this.coda.push({ id: ++this.seq, wc, frame, idPagina, richiesta: pulisci(richiesta), resolve });
+      this._segui(wc);
+      this.posa();
+    });
+  }
+
+  // Chi ha chiesto non la vuole più (il verdetto sul sito è cambiato): vale un Annulla, anche se è a schermo.
+  ritira(wc, frame, idPagina) {
+    if (!Number.isSafeInteger(idPagina) || idPagina <= 0) return;
+    this._togli((v) => v.wc === wc && v.idPagina === idPagina
+      && (!frame || !v.frame || stessoFrame(v.frame, frame.processId, frame.routingId)));
+  }
+
+  // Chiamata dal layout delle schede: cambio di scheda, ridimensionamenti, schermo intero.
+  // Una domanda si vede solo sopra la sua scheda, quando è davanti; le altre aspettano il loro turno.
+  posa() {
+    if (!this.win || this.win.isDestroyed()) return;
+    const voce = this._daMostrare();
+    const b = voce ? this.area() : null;
+    if (!voce || !b || !(b.width > 0) || !(b.height > 0)) { this._nascondi(); return; }
+    const vista = this._vista();
+    if (!vista || !this.pronta) return;
+    vista.setBounds(b);
+    this._inCima();
+    vista.setVisible(true);
+    if (!aSchermo.has(this)) { aSchermo.add(this); allineaFinestre(); }
+    if (this.mostrata === voce.id) return;
+    this.mostrata = voce.id;
+    this._invia(voce);
+    this._tastiera(voce);
+  }
+
+  // Gli avvisi della barra tornano in cima a ogni loro cambio: la domanda aperta resta sopra di loro.
+  inCima() {
+    if (this.mostrata && this.vista && !this.vista.webContents.isDestroyed()) this._inCima();
+  }
+
+  _inCima() {
+    const cv = this.win.contentView;
+    const figli = cv.children || [];
+    if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    try { this.dopoInCima(); } catch (_) {}
+  }
+
+  _daMostrare() {
+    let wc = null;
+    try { wc = this.sotto(); } catch (_) { wc = null; }
+    return (wc && this.coda.find((v) => v.wc === wc)) || null;
+  }
+
+  _nascondi() {
+    if (aSchermo.delete(this)) allineaFinestre();
+    const vista = this.vista;
+    if (!vista || vista.webContents.isDestroyed()) return;
+    const aveva = this._haTastiera();
+    vista.setVisible(false);
+    vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    // Tornando davanti la domanda si ridisegna da capo, e col popup riparte il mezzo secondo prima del sì.
+    if (this.mostrata) {
+      this.mostrata = null;
+      try { vista.webContents.send('conferma:via'); } catch (_) {}
+    }
+    if (aveva) this._restituisci();
+  }
+
+  _haTastiera() {
+    try { return WebContents.getFocusedWebContents() === this.vista.webContents; } catch (_) { return false; }
+  }
+
+  // La domanda si prende la tastiera se ce l'aveva la pagina che la fa (o nessuno): chi scriveva nella
+  // barra la tiene. Quello che batte chi scriveva nella pagina torna nel suo campo (conferma:tasto).
+  _tastiera(voce) {
+    if (!this.win.isFocused() || !this.vista) return;
+    let col = null;
+    try { col = WebContents.getFocusedWebContents(); } catch (_) { col = null; }
+    if (col && col !== voce.wc && col !== this.vista.webContents) return;
+    try { this.vista.webContents.focus(); } catch (_) {}
+  }
+
+  _restituisci() {
+    if (!this.win || this.win.isDestroyed() || !this.win.isFocused()) return;
+    let wc = null;
+    try { wc = this.sotto(); } catch (_) { wc = null; }
+    if (wc && !wc.isDestroyed()) { try { wc.focus(); } catch (_) {} }
+  }
+
+  _segui(wc) {
+    if (this.seguite.has(wc)) return;
+    this.seguite.add(wc);
+    const via = (filtro) => this._togli((v) => v.wc === wc && filtro(v));
+    wc.once('destroyed', () => via(() => true));
+    wc.on('render-process-gone', () => via(() => true));
+    // Un documento nuovo non aspetta la risposta del vecchio: la sua domanda se ne va con lui.
+    wc.on('did-frame-navigate', (_e, _url, _codice, _stato, principale, pid, rid) => {
+      via((v) => principale || !v.frame || stessoFrame(v.frame, pid, rid));
+    });
+    // Finché la domanda è a schermo la pagina sotto non si riprende la tastiera (tornando alla finestra,
+    // o con la scheda riattivata): al giro dopo, perché durante l'evento il fuoco risulta ancora suo.
+    wc.on('focus', () => {
+      const v = this.coda.find((x) => x.id === this.mostrata);
+      if (!v || v.wc !== wc) return;
+      setTimeout(() => {
+        if (this.mostrata !== v.id || !this.vista || this.vista.webContents.isDestroyed()) return;
+        try { this.vista.webContents.focus(); } catch (_) {}
+      }, 0);
+    });
+  }
+
+  _togli(filtro) {
+    const via = this.coda.filter(filtro);
+    if (!via.length) return;
+    this.coda = this.coda.filter((v) => !via.includes(v));
+    for (const v of via) v.resolve(false);
+    this.posa();
+  }
+
+  _esito(d) {
+    const id = Number(d && d.id);
+    const voce = id && id === this.mostrata ? this.coda.find((v) => v.id === id) : null;
+    if (!voce) return;
+    this.coda = this.coda.filter((v) => v !== voce);
+    // La vista ha già tolto il suo popup: niente «via» da mandarle.
+    this.mostrata = null;
+    voce.resolve(d.ok === true);
+    this.posa();
+  }
+
+  _tasto(d) {
+    const id = Number(d && d.id);
+    const voce = id && id === this.mostrata ? this.coda.find((v) => v.id === id) : null;
+    const tasto = d && d.tasto;
+    if (!voce || !voce.richiesta.campo || !voce.frame || typeof tasto !== 'string') return;
+    if (tasto.length !== 1 && tasto !== 'Backspace') return;
+    try { voce.frame.send('filo:conferma-tasto', { id: voce.idPagina, tasto }); } catch (_) {}
+  }
+
+  async _invia(voce) {
+    let s = {};
+    try { s = (await globalThis.SN_STORAGE?.getSettings?.()) || {}; } catch (_) { s = {}; }
+    if (this.mostrata !== voce.id || !this.vista || this.vista.webContents.isDestroyed()) return;
+    const tema = {
+      theme: typeof s.theme === 'string' ? s.theme : 'system',
+      tokens: s.themeTokens && typeof s.themeTokens === 'object' ? s.themeTokens : {},
+    };
+    try { this.vista.webContents.send('conferma:mostra', { ...voce.richiesta, id: voce.id, tema }); } catch (_) {}
+  }
+
+  _vista() {
+    if (this.vista && !this.vista.webContents.isDestroyed()) return this.vista;
+    if (!this.win || this.win.isDestroyed()) return null;
+    const { WebContentsView } = require('electron');
+    const vista = new WebContentsView({
+      webPreferences: {
+        preload: path.join(__dirname, '..', 'preload', 'conferma-preload.js'),
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+        spellcheck: false,
+        backgroundThrottling: false,
+      },
+    });
+    vista.setBackgroundColor('#00000000');
+    vista.setVisible(false);
+    vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    this.vista = vista;
+    this.pronta = false;
+    this.mostrata = null;
+    const wc = vista.webContents;
+    wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+    wc.on('will-navigate', (e) => e.preventDefault());
+    collegaScorciatoie(wc, this.win);
+    wc.on('ipc-message', (_e, canale, dati) => {
+      if (canale === 'conferma:esito') this._esito(dati);
+      else if (canale === 'conferma:tasto') this._tasto(dati);
+    });
+    wc.once('did-finish-load', () => { this.pronta = true; this.posa(); });
+    // Una vista morta non risponde più: le domande aperte valgono un Annulla, la prossima ne fa nascere un'altra.
+    wc.on('render-process-gone', () => { this._butta(); this._togli(() => true); });
+    // Carica FUORI dalla finestra (ci entra alla prima posa): dentro si prenderebbe la tastiera di chi scrive.
+    wc.loadURL('filo://shell/conferma.html');
+    return vista;
+  }
+
+  _butta() {
+    if (aSchermo.delete(this)) allineaFinestre();
+    const vista = this.vista;
+    this.vista = null;
+    this.pronta = false;
+    this.mostrata = null;
+    if (!vista) return;
+    try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(vista); } catch (_) {}
+    try { if (!vista.webContents.isDestroyed()) vista.webContents.close(); } catch (_) {}
+  }
+}
+
+const perPopup = new WeakMap();
+
+// Una regola sola per la finestrella che porta la domanda: grande abbastanza per il testo (il riquadro è largo
+// 440 più i margini, il testo alto quanto la finestra meno 160) e tutta dentro il suo schermo. Il sito la
+// rimpiccioliva (giro 10) o la apriva oltre il bordo (giro 11): restava in vista OK e non il testo.
+const MINIMO_DOMANDA = { width: 488, height: 360 };
+function mettiInVistaPerLaDomanda(win) {
+  if (!win || win.isDestroyed()) return;
+  const [w, h] = win.getContentSize();
+  if (w < MINIMO_DOMANDA.width || h < MINIMO_DOMANDA.height) {
+    try { win.setContentSize(Math.max(w, MINIMO_DOMANDA.width), Math.max(h, MINIMO_DOMANDA.height)); } catch (_) {}
+  }
+  let b; let a;
+  try { b = win.getBounds(); a = require('electron').screen.getDisplayMatching(b).workArea; } catch (_) { return; }
+  const width = Math.min(b.width, a.width);
+  const height = Math.min(b.height, a.height);
+  const x = Math.min(Math.max(b.x, a.x), a.x + a.width - width);
+  const y = Math.min(Math.max(b.y, a.y), a.y + a.height - height);
+  if (x === b.x && y === b.y && width === b.width && height === b.height) return;
+  try { win.setBounds({ x, y, width, height }); } catch (_) {}
+}
+
+// La domanda di una pagina web va sopra la sua scheda; da un popup di accesso, che è una finestra vera
+// con dentro un sito (#589.3), sopra la finestra. Da chiunque altro non si apre niente.
+function confermeDi(wc, { crea = false } = {}) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    const tm = w._filoTabs;
+    if (tm && tm.conferme && tm.tabs.some((t) => t.view && t.view.webContents === wc)) return tm.conferme;
+  }
+  const win = BrowserWindow.fromWebContents(wc);
+  if (!win || win.isDestroyed() || win._filoTabs || win.webContents !== wc) return null;
+  let c = perPopup.get(win);
+  if (!c && crea) {
+    c = new ConfermeSopraPagina(win, {
+      sotto: () => (win.isDestroyed() ? null : win.webContents),
+      area: () => {
+        mettiInVistaPerLaDomanda(win);
+        const [width, height] = win.getContentSize();
+        return { x: 0, y: 0, width, height };
+      },
+    });
+    perPopup.set(win, c);
+    win.on('resize', () => c.posa());
+    // Il sito rimpiccioliva la sua finestrella appena compariva la domanda: il testo spariva e OK restava pronto
+    // (#592.6, giro 10). Finché una domanda aspetta, resizeTo/moveTo della pagina non valgono.
+    win.webContents.on('content-bounds-updated', (e) => { if (c.coda.length) e.preventDefault(); });
+  }
+  return c || null;
+}
+
+function chiediConferma(event, richiesta) {
+  const wc = event && event.sender;
+  const c = wc ? confermeDi(wc, { crea: true }) : null;
+  return c ? c.chiedi(wc, event.senderFrame || null, richiesta) : Promise.resolve(false);
+}
+
+function ritiraConferma(event, d) {
+  const wc = event && event.sender;
+  const c = wc ? confermeDi(wc) : null;
+  if (c) c.ritira(wc, event.senderFrame || null, Number(d && d.id));
+}
+
+// Una domanda che fa il main per una scheda: il sì vale solo se dato qui, perché lo chiede per conto di qualcosa
+// che sta nella pagina (l'Aiuto) e la pagina premerebbe un bottone suo.
+function chiediDalMain(wc, richiesta) {
+  const c = wc && !wc.isDestroyed() ? confermeDi(wc, { crea: true }) : null;
+  return c ? c.chiedi(wc, null, { ...richiesta, scriveva: false, campo: false }) : Promise.resolve(false);
+}
+
+module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci };

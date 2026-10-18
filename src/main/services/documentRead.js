@@ -64,10 +64,10 @@ const KNOWN_BINARY = {
   '.tar': 'è un archivio compresso',
   '.exe': 'è un programma eseguibile', '.dll': 'è una libreria di programma',
   '.msi': 'è un installatore', '.bin': 'è un file binario', '.iso': 'è un\'immagine disco',
-  '.doc': 'è un documento Word', '.docx': 'è un documento Word',
+  '.doc': 'è un documento Word nel formato vecchio (.doc), che Filo non sa ancora leggere: aperto in Word e salvato come .docx si legge',
   '.xls': 'è un foglio di calcolo Excel', '.xlsx': 'è un foglio di calcolo Excel',
   '.ppt': 'è una presentazione PowerPoint', '.pptx': 'è una presentazione PowerPoint',
-  '.odt': 'è un documento OpenDocument', '.ods': 'è un foglio OpenDocument',
+  '.ods': 'è un foglio OpenDocument', '.odp': 'è una presentazione OpenDocument',
   '.epub': 'è un ebook', '.mobi': 'è un ebook',
   '.db': 'è un database', '.sqlite': 'è un database',
 };
@@ -335,13 +335,19 @@ function dettaglioNonTrovato(ambigui, tipo) {
     + `con un nome quasi uguale (${mostrati}${resto}): serve sapere quale`;
 }
 
+// I documenti di testo di Word e LibreOffice (#947): la ricerca nei documenti li trova, e chi li trova deve poterli
+// leggere. Fogli e presentazioni no: dei fogli si leggerebbero le scritte senza i numeri, delle presentazioni le prime
+// diapositive, e un testo a metà che sembra intero è peggio di un rifiuto spiegato.
+const OFFICE_EXT = new Set(['.docx', '.odt']);
+
 /**
  * Che tipo di file è, dalla sola estensione. PURA.
- * → 'pdf' | 'text' | { binary: 'spiegazione' } | 'unknown'
+ * → 'pdf' | 'office' | 'text' | { binary: 'spiegazione' } | 'unknown'
  */
 function kindFromExtension(filePath) {
   const ext = path.extname(String(filePath || '')).toLowerCase();
   if (ext === '.pdf') return 'pdf';
+  if (OFFICE_EXT.has(ext)) return 'office';
   if (TEXT_EXT.has(ext)) return 'text';
   if (KNOWN_BINARY[ext]) return { binary: KNOWN_BINARY[ext] };
   return 'unknown';
@@ -756,6 +762,30 @@ async function readDocument(input, { cwd } = {}) {
   const kind = kindFromExtension(full);
   if (kind && typeof kind === 'object' && kind.binary) {
     return { ...base, error: 'unsupported', detail: kind.binary };
+  }
+
+  if (kind === 'office') {
+    base.kind = 'office';
+    let t = '';
+    try {
+      t = String(await require('./nomiFile').testoDocumento(full) || '').trim();
+    } catch (e) {
+      const permesso = e && (e.code === 'EACCES' || e.code === 'EPERM' || e.code === 'EBUSY');
+      return {
+        ...base,
+        error: permesso ? 'unreadable' : 'office_failed',
+        detail: permesso ? 'il file non si riesce ad aprire (permessi o file in uso)' : 'il documento è danneggiato o protetto da password',
+      };
+    }
+    if (!t) {
+      // Un archivio vero e vuoto è un documento senza testo; un file che non è nemmeno un archivio è rotto.
+      let firma = '';
+      try { const fh = await fsp.open(full, 'r'); try { const b = Buffer.alloc(2); await fh.read(b, 0, 2, 0); firma = b.toString('latin1'); } finally { await fh.close(); } } catch (_) {}
+      if (firma !== 'PK') return { ...base, error: 'office_failed', detail: 'il documento è danneggiato o protetto da password' };
+      return { ...base, ok: true, empty: true, text: '' };
+    }
+    const capped = capText(t);
+    return { ...base, ok: true, text: capped.text, truncated: capped.truncated };
   }
 
   let buf;

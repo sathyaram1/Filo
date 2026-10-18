@@ -300,7 +300,7 @@
     `<path d="M19.5 10l-4 4"/>`;
 
   // --- Cronologia: orologio con freccia antioraria (il classico "indietro nel
-  //     tempo") + lancette. Usata dall'icona Cronologia in alto a destra nella home.
+  //     tempo") + lancette. Usata dall'icona Cronologia della barra laterale.
   const history =
     `<path d="M3.5 12a8.5 8.5 0 1 1 2.6 6.1"/>` +
     `<path d="M3.5 18v-4h4"/>` +
@@ -316,8 +316,8 @@
     `<path d="M12 5.5a2 2 0 1 0 0.01 0"/>`;
 
   // --- Red-team: scudo (sicurezza) con un mirino/bersaglio al centro (l'attacco
-  //     che prova a forare le difese). Usata dall'icona Red-team in alto a destra
-  //     nella home e dalla voce "Invia attacco" del menu tasto destro.
+  //     che prova a forare le difese). Usata dall'icona Red-team della barra
+  //     laterale e dalla voce "Invia attacco" del menu tasto destro.
   const redteam =
     `<path d="M12 3.5l6.5 2.5v5c0 4.2-2.8 7.2-6.5 8.5-3.7-1.3-6.5-4.3-6.5-8.5v-5z"/>` +
     `<circle cx="12" cy="11" r="2.4"/>` +

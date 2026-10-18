@@ -156,6 +156,10 @@
 
   async function route() {
     const r = parseRoute();
+    // Una rinomina dalla libreria si salva prima che il banco di lavoro rilegga il mazzo, o lo riscriverebbe col nome vecchio.
+    if (libRename) libRename.finish(true);
+    await libSaving;
+    if (r.screen !== 'library') libPriceToken++;
     if (r.screen === 'builder') {
       const [res] = await Promise.all([send({ type: MSG.DECKS_GET, id: r.id }), ensureChatLoaded(r.id)]);
       if (!res || !res.ok) { location.hash = '#/'; return; }
@@ -185,6 +189,73 @@
     const res = await send({ type: MSG.DECKS_LIST });
     decks = Decks.sortForLibrary((res && res.decks) || []);
     renderLibrary();
+    loadLibraryPrices();
+  }
+
+  // Prezzo totale sulla scheda (§10): stesso conto e formato del pannello statistiche (budgetInfo, fmtEur).
+  // Prima la cache, poi i prezzi freschi dietro, senza far aspettare la griglia (#380).
+  const PRICE_CHUNK = 25;
+  let libPricesRead = false; // prima della cache la scheda tace: «n.d.» direbbe che il prezzo manca, non che arriva
+  let libPriceToken = 0;
+
+  function deckCardIds(deck) {
+    const ids = deck.carte.map((c) => c.scryfall_id);
+    if (deck.commander) ids.push(deck.commander);
+    return ids;
+  }
+
+  function paintPrice(slot, deck) {
+    if (!libPricesRead) return;
+    const b = Stats.budgetInfo(deck, cardsById);
+    const carte = (n) => `${n} cart${n === 1 ? 'a' : 'e'}`;
+    if (b.missing && !b.total) {
+      slot.textContent = 'prezzo n.d.';
+      slot.title = `Prezzo non noto per ${carte(b.missing)}`;
+    } else if (b.missing) {
+      slot.textContent = `≥ ${fmtEur(b.total)}`;
+      slot.title = `Totale parziale: ${carte(b.missing)} senza prezzo noto`;
+    } else {
+      slot.textContent = fmtEur(b.total);
+      slot.title = 'Prezzo totale del mazzo';
+    }
+    slot.dataset.missing = String(b.missing);
+  }
+
+  function paintLibraryPrices() {
+    for (const el of $('deckGrid').querySelectorAll('[data-deck-id]')) {
+      const deck = decks.find((d) => d.id === el.dataset.deckId);
+      const slot = el.querySelector('.dk-price');
+      if (deck && slot) paintPrice(slot, deck);
+    }
+  }
+
+  // I freschi vanno mazzo per mazzo nell'ordine della griglia e a pezzi: lasciata la libreria il giro si ferma al
+  // pezzo dopo, invece di occupare Scryfall con mazzi che nessuno sta guardando.
+  async function loadLibraryPrices() {
+    const token = ++libPriceToken;
+    const live = () => token === libPriceToken;
+    const all = [...new Set(decks.flatMap(deckCardIds))];
+    if (all.length) {
+      const r = await send({ type: MSG.SCRYFALL_CARDS, ids: all, cacheOnly: true }).catch(() => null);
+      if (!live()) return;
+      Object.assign(cardsById, (r && r.ok && r.cards) || {});
+    }
+    libPricesRead = true;
+    paintLibraryPrices();
+    const seen = new Set();
+    for (const deck of decks) {
+      const ids = deckCardIds(deck).filter((id) => !seen.has(id));
+      ids.forEach((id) => seen.add(id));
+      for (let i = 0; i < ids.length; i += PRICE_CHUNK) {
+        if (!live()) return;
+        const r = await send({ type: MSG.SCRYFALL_CARDS, ids: ids.slice(i, i + PRICE_CHUNK), freshPrices: true }).catch(() => null);
+        if (!live()) return;
+        if (r && r.ok && r.cards) {
+          Object.assign(cardsById, r.cards);
+          paintLibraryPrices();
+        }
+      }
+    }
   }
 
   function pipsHtml(deck) {
@@ -213,6 +284,7 @@
           <div class="dk-meta">
             ${pipsHtml(deck)}
             <span>${Decks.deckCount(deck)}/100</span>
+            <span class="dk-price"></span>
             <span style="margin-left:auto">${esc(dateStr)}</span>
           </div>
         </div>
@@ -223,9 +295,73 @@
     const grid = $('deckGrid');
     grid.innerHTML = decks.map(deckCardHtml).join('');
     $('deckEmpty').hidden = decks.length > 0;
+    paintLibraryPrices();
   }
 
-  // ── Menu contestuale sulla card (duplica / elimina) ────────────────────────
+  function libraryCardEl(id) {
+    return [...$('deckGrid').querySelectorAll('[data-deck-id]')].find((el) => el.dataset.deckId === id) || null;
+  }
+
+  // Rinomina dalla libreria: un campo al posto del titolo, come nel banco di lavoro (Invio o uscita salvano, Esc
+  // annulla). La scheda resta al suo posto: il riordino per data aspetta il prossimo giro della libreria (#509).
+  let libRename = null;
+  let libSaving = Promise.resolve();
+
+  function renameFromLibrary(id) {
+    if (libRename) libRename.finish(true);
+    const cardEl = libraryCardEl(id);
+    const deck = decks.find((d) => d.id === id);
+    if (!cardEl || !deck) return;
+    const title = cardEl.querySelector('.sn-card-title');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'dk-card-rename';
+    input.setAttribute('aria-label', 'Rinomina il mazzo');
+    input.value = deck.nome;
+    title.hidden = true;
+    title.after(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      libRename = null;
+      const refocus = document.activeElement === input;
+      const nome = input.value;
+      input.remove();
+      title.hidden = false;
+      if (commit) libSaving = libSaving.then(() => saveLibraryName(id, nome, refocus)).catch(() => {});
+      else if (refocus) cardEl.focus();
+    };
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    libRename = { finish };
+  }
+
+  // Si rinomina il mazzo salvato, non la riga della griglia: quella può essere più vecchia di una modifica fatta altrove.
+  async function saveLibraryName(id, nome, refocus) {
+    const r = await send({ type: MSG.DECKS_GET, id });
+    if (!r || !r.ok) return;
+    const next = Decks.renameDeck(r.deck, nome);
+    if (next === r.deck) return;
+    const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
+    if (!res || !res.ok) { showToast('Rinomina non riuscita.'); return; }
+    const i = decks.findIndex((d) => d.id === id);
+    if (i >= 0) decks[i] = res.deck;
+    const old = libraryCardEl(id);
+    if (!old) return;
+    old.insertAdjacentHTML('afterend', deckCardHtml(res.deck));
+    const fresh = old.nextElementSibling;
+    old.remove();
+    paintPrice(fresh.querySelector('.dk-price'), res.deck);
+    if (refocus) fresh.focus();
+  }
+
+  // ── Menu contestuale sulla card (duplica / esporta / rinomina / elimina) ───
   // Stesso pattern dell'archivio: popup .sn-select-pop posizionato fixed alle
   // coordinate del click, chiuso al primo click fuori / Escape.
 
@@ -261,9 +397,10 @@
     pop.style.left = `${Math.min(x, window.innerWidth - r.width - 8)}px`;
     pop.style.top = `${Math.min(y, window.innerHeight - r.height - 8)}px`;
     ctxEl = pop;
+    document.addEventListener('keydown', ctxKey, true);
     setTimeout(() => {
+      if (ctxEl !== pop) return;
       document.addEventListener('click', closeCtx, true);
-      document.addEventListener('keydown', ctxKey, true);
     }, 0);
   }
 
@@ -565,37 +702,82 @@
   }
 
   // Sotto-pannello probabilità (§9.3): una riga-input per categoria (tag del
-  // mazzo + "terre"). I valori già digitati sopravvivono al rerender.
+  // mazzo + "terre"), con accanto quante ne servono nella mano per tenerla
+  // (visibile solo con almeno un mulligan). I valori digitati sopravvivono al rerender.
   function renderProbForm() {
     const cats = Stats.categoriesOf(current, cardsById);
     const host = $('probNeeds');
     const prev = {};
-    for (const inp of host.querySelectorAll('input[data-tag]')) {
-      prev[inp.dataset.tag] = inp.value;
-    }
+    const prevKeep = {};
+    for (const inp of host.querySelectorAll('input[data-tag]')) prev[inp.dataset.tag] = inp.value;
+    for (const inp of host.querySelectorAll('input[data-keep]')) prevKeep[inp.dataset.keep] = inp.value;
     host.innerHTML = cats.map((tag, i) => `
       <div class="dk-prob-row">
         <label for="probTag${i}">${esc(tag)}</label>
         <input id="probTag${i}" data-tag="${esc(tag)}" type="number"
                min="0" max="99" step="1" value="${esc(prev[tag] || '0')}" />
+        <input class="dk-prob-keep" data-keep="${esc(tag)}" type="number" min="0" max="7" step="1"
+               value="${esc(prevKeep[tag] || '0')}" aria-label="${esc(tag)} nella mano da tenere"
+               title="Quante ne vuoi nella mano iniziale per tenerla" />
       </div>`).join('');
     $('probHint').hidden = cats.length > 1;
     $('probCard').hidden = !cats.length;
   }
 
+  // Partita (#791): Commander si gioca in più persone, quindi il default pesca al primo turno.
+  const PROB_GAMES = [
+    { id: 'multi', label: 'a più giocatori' },
+    { id: 'play', label: 'a due, inizio io' },
+    { id: 'draw', label: 'a due, inizia l\'altro' },
+  ];
+  function setProbGame(id) {
+    const g = PROB_GAMES.find((x) => x.id === id) || PROB_GAMES[0];
+    $('probGame').dataset.game = g.id;
+    $('probGame').textContent = `${g.label} ▾`;
+  }
+
+  const probCount = (id, max) => Math.min(max, Math.max(0, Math.floor(Number($(id).value) || 0)));
+
+  function probConditions() {
+    const mulligans = probCount('probMull', 7);
+    const keep = mulligans > 0
+      ? [...$('probNeeds').querySelectorAll('input[data-keep]')]
+        .map((inp) => ({ tag: inp.dataset.keep, n: Number(inp.value) || 0 }))
+        .filter((w) => w.n > 0)
+      : [];
+    return { game: $('probGame').dataset.game, mulligans, keep, extraDraws: probCount('probExtra', 99) };
+  }
+
+  // Con il primo mulligan compare la colonna «per tenere»: se è vuota parte da
+  // 2 terre, la mano più comune da tenere, perché un mulligan senza mano da
+  // tenere non cambierebbe niente.
+  let probMullBefore = 0;
+  function onProbMull() {
+    const m = probCount('probMull', 7);
+    $('probCard').dataset.mull = m > 0 ? '1' : '0';
+    const keeps = [...$('probNeeds').querySelectorAll('input[data-keep]')];
+    if (m > 0 && probMullBefore === 0 && keeps.every((inp) => !(Number(inp.value) > 0))) {
+      for (const w of Stats.DEFAULT_KEEP) {
+        const inp = keeps.find((x) => x.dataset.keep === w.tag);
+        if (inp) inp.value = String(w.n);
+      }
+    }
+    probMullBefore = m;
+  }
+
   // Calcolatore di probabilità (§9.3): la stima si raffina DA SOLA (feedback
-  // #354). Appena cambiano le condizioni (turno, categorie richieste, o il mazzo
-  // stesso) riparte una simulazione progressiva: un primo batch dà subito una
+  // #354). Appena cambiano le condizioni (turno, categorie, partita, mulligan,
+  // pescate extra o il mazzo) riparte una simulazione progressiva: un primo batch dà subito una
   // stima, i batch successivi si accumulano e la fanno convergere verso il vero
   // valore, poi si ferma. Niente più bottone "Calcola" né oscillazione del
   // risultato tra un ricalcolo e l'altro.
   //
-  //   PROB_BATCH  simulazioni per giro (~15k = pochi ms, non blocca la UI)
+  //   PROB_BATCH  simulazioni per giro (SN_DECK_STATS, condiviso con la chat)
   //   PROB_CAP    tetto totale = 100× le 10.000 di prima. A 1.000.000 di mani
   //               l'errore statistico è ~0,05 punti percentuali (ben sotto
   //               l'oscillazione di ~1 punto segnalata): salire oltre non
   //               cambierebbe la cifra mostrata, costerebbe solo CPU.
-  const PROB_BATCH = 15000;
+  const PROB_BATCH = Stats.PROB_BATCH;
   const PROB_CAP = 1000000;
   let probRunId = 0;         // invalida i batch di run precedenti
   let probDebounce = null;
@@ -617,17 +799,19 @@
       return;
     }
     const turn = Math.max(1, Number($('probTurn').value) || 1);
+    const cond = probConditions();
     const library = Stats.buildLibrary(current, cardsById);
     let hits = 0; let iters = 0; let batchSeed = 1; let seen = 0;
     out.classList.add('dk-prob-refining');
 
     const step = () => {
       if (runId !== probRunId) return; // le condizioni sono cambiate: molla
-      const r = Stats.simulate({ library, want, turn, iterations: PROB_BATCH, seed: batchSeed++ });
+      const r = Stats.simulate({ library, want, turn, ...cond, iterations: PROB_BATCH, seed: batchSeed++ });
       hits += r.hits; iters += r.iterations; seen = r.seen;
       const p = hits / iters;
       out.textContent = `≈ ${(p * 100).toFixed(1).replace('.', ',')}%`;
-      out.title = `${iters.toLocaleString('it-IT')} mani simulate, ${seen} carte viste`;
+      out.title = `${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate, ${seen} carte viste`
+        + (cond.keep.length ? ' tenendo la prima mano' : '');
       // Converge finché non tocca il tetto; un risultato esattamente 0 o 100%
       // è deterministico (caso certo/impossibile) → inutile insistere.
       if (iters < PROB_CAP && hits > 0 && hits < iters) {
@@ -643,6 +827,8 @@
   // digitare più cifre o una raffica di rerender del mazzo non lancia mille run.
   function scheduleProb() {
     clearTimeout(probDebounce);
+    // Il numero di prima non vale più: il puntino lo dice già durante l'attesa.
+    $('probResult').classList.add('dk-prob-refining');
     probDebounce = setTimeout(runProb, 120);
   }
 
@@ -1031,7 +1217,7 @@
   // Bolla in attesa: la frase del modello appena c'è, e la fase della ricerca con quante carte su quante (#382).
   function progressHtml(p) {
     if (!p || !(p.total > 0)) return '<div class="dk-msg-pending">Filo sta pensando…</div>';
-    const n = (x) => Number(x).toLocaleString('it-IT');
+    const n = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
     const done = Math.min(Number(p.done) || 0, p.total);
     const label = p.fase === 'controllo'
       ? `Controllo una per una le ${n(p.total)} carte trovate…`
@@ -1053,7 +1239,16 @@
     if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
     const parts = [cotHtml(m)];
-    if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
+    // Risposta fermata a metà: la riga lo dice da nota, non da risposta, e l'ultima bolla offre «Continua».
+    const CE = window.SN_CHAT_ERRORS;
+    const righe = String(m.reply || '').split('\n');
+    const interrotta = righe.length > 1 && !!CE?.eFraseInterrotta?.(righe[righe.length - 1]);
+    const testo = interrotta ? righe.slice(0, -1).join('\n') : m.reply;
+    if (testo) parts.push(`<p class="dk-msg-text">${proseHtml(testo)}</p>`);
+    if (interrotta) {
+      parts.push(`<div class="dk-msg-pending">${esc(righe[righe.length - 1])}</div>`);
+      if (isLast) parts.push('<button class="dk-retry" data-continua="1" title="Continua la risposta da dove si è interrotta">Continua</button>');
+    }
     // Sopra la lista: con decine di righe, sotto non lo vedrebbe nessuno.
     if (m.retryable) parts.push(retry);
     if (m.clearChat) {
@@ -1135,7 +1330,7 @@
     chatDom = next;
     const capEl = log.querySelector(':scope > .dk-chat-cap');
     if (Chat.fits(msgs)) { if (capEl) capEl.remove(); } else if (!capEl) {
-      log.insertAdjacentHTML('beforeend', `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT')} messaggi e da qui in poi Filo non salva i nuovi. Svuotala per ripartire da zero.</p>`);
+      log.insertAdjacentHTML('beforeend', `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT', { useGrouping: true })} messaggi e da qui in poi Filo non salva i nuovi. Svuotala per ripartire da zero.</p>`);
     }
     log.scrollTop = follow ? log.scrollHeight : prevTop;
     syncCarouselHighlight();
@@ -1201,7 +1396,7 @@
     void btn.offsetWidth;
     btn.classList.add('dk-nudge');
     clearTimeout(nudgeTimer);
-    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), 900);
+    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionMs(900) : 900);
   }
 
   async function sendChat(text) {
@@ -1512,7 +1707,7 @@
     return box.querySelector('.dk-io-body');
   }
 
-  function openExportDialog() {
+  function openExportDialog(deckId) {
     const body = buildIoOverlay('Esporta mazzo');
     body.innerHTML = `
       <textarea class="dk-io-textarea" readonly rows="14">(generazione…)</textarea>
@@ -1521,7 +1716,7 @@
         <button class="dk-io-btn dk-io-btn-ok" data-io="copy">Copia</button>
       </div>`;
     const ta = body.querySelector('textarea');
-    send({ type: MSG.DECKS_EXPORT, id: current.id }).then((r) => {
+    send({ type: MSG.DECKS_EXPORT, id: deckId }).then((r) => {
       ta.value = (r && r.ok) ? r.text : 'Non riuscito a generare la lista.';
       ta.focus();
       ta.select();
@@ -2096,7 +2291,17 @@
     // condizione (feedback #354). Delego l'ascolto a #stateStats perché le righe
     // categoria (#probNeeds) sono ricostruite a ogni rerender delle statistiche.
     $('stateStats').addEventListener('input', (e) => {
-      if (e.target && e.target.matches('#probTurn, #probNeeds input')) scheduleProb();
+      if (!e.target || !e.target.matches('#probTurn, #probNeeds input, #probMull, #probExtra')) return;
+      if (e.target.id === 'probMull') onProbMull();
+      scheduleProb();
+    });
+    $('probGame').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = $('probGame').getBoundingClientRect();
+      openCtx(r.left, r.bottom + 2, PROB_GAMES.map((g) => ({
+        label: `Partita ${g.label}`,
+        run: () => { setProbGame(g.id); scheduleProb(); },
+      })));
     });
 
     $('carouselPrev').addEventListener('click', () => carouselNav(-1));
@@ -2191,7 +2396,7 @@
       if (r && r.ok) location.hash = `#/deck/${encodeURIComponent(r.deck.id)}`;
     });
     add('Importa…', () => openImportDialog(), 'dk-sw-sep');
-    add('Esporta…', () => openExportDialog());
+    add('Esporta…', () => openExportDialog(current.id));
     add('Rinomina…', () => startEdit('deckNameEdit', current.nome, async (v) => {
       await saveDeck(Decks.renameDeck(current, v));
     }));
@@ -2223,9 +2428,10 @@
 
     $('deckHead').appendChild(pop);
     switcherEl = pop;
+    document.addEventListener('keydown', switcherKey, true);
     setTimeout(() => {
+      if (switcherEl !== pop) return;
       document.addEventListener('click', closeSwitcher, true);
-      document.addEventListener('keydown', switcherKey, true);
     }, 0);
   }
 
@@ -2268,22 +2474,30 @@
     $('gameBack').addEventListener('click', () => { location.hash = '#/'; });
 
     const grid = $('deckGrid');
+    // Dentro il campo della rinomina clic, Invio e spazio sono del campo, non della scheda che apre il mazzo.
+    const inRename = (e) => !!e.target.closest('.dk-card-rename');
     grid.addEventListener('click', (e) => {
+      if (inRename(e)) return;
       const card = e.target.closest('[data-deck-id]');
       if (card) location.hash = `#/deck/${encodeURIComponent(card.dataset.deckId)}`;
     });
     grid.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (inRename(e)) return;
       const card = e.target.closest('[data-deck-id]');
       if (card) { e.preventDefault(); location.hash = `#/deck/${encodeURIComponent(card.dataset.deckId)}`; }
     });
+    // Le stesse azioni del menu del mazzo nel banco di lavoro, con lo stesso dialogo d'esportazione.
     grid.addEventListener('contextmenu', (e) => {
+      if (inRename(e)) return;
       const card = e.target.closest('[data-deck-id]');
       if (!card) return;
       e.preventDefault();
       const id = card.dataset.deckId;
       openCtx(e.clientX, e.clientY, [
         { label: 'Duplica', run: () => duplicateDeck(id) },
+        { label: 'Esporta…', run: () => openExportDialog(id) },
+        { label: 'Rinomina…', run: () => renameFromLibrary(id) },
         { label: 'Elimina…', run: () => deleteDeck(id) },
       ]);
     });
@@ -2350,6 +2564,7 @@
     log.addEventListener('click', (e) => {
       if (toggleCot(e.target)) return;
       if (e.target.closest('[data-retry]')) { retryLastTurn(); return; }
+      if (e.target.closest('[data-continua]')) { sendChat(window.SN_CHAT_ERRORS.CHIEDI_SEGUITO); return; }
       if (e.target.closest('[data-clear-chat]')) { clearChat(); return; }
       const impAll = e.target.closest('[data-import-all]');
       if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }

@@ -89,3 +89,53 @@ test('keywordSearch: nessuna parola utile o nessun match → []', () => {
   assert.deepEqual(S.keywordSearch(FBS, 'a'), []); // token < 2 char scartati
   assert.deepEqual(S.keywordSearch([], 'sezioni'), []);
 });
+
+// ── Classificatore (#1118) ───────────────────────────────────────────────────
+
+test('classificatore: prima i feedback con parole in comune, poi gli altri nell\'ordine della lista', () => {
+  const cands = S.buildCandidates(FBS);
+  const ordine = S.classifierOrder(cands, 'tasto chiusura').map((c) => c.id);
+  assert.equal(ordine[0], 'b');
+  assert.deepEqual(ordine.slice(1), ['a', 'c']);
+  assert.deepEqual(S.classifierOrder(cands, '').map((c) => c.id), ['a', 'b', 'c']);
+});
+
+test('classificatore: una domanda chiusa per feedback, col SUO feedback dentro, a gruppi; la ricerca nello stato', () => {
+  const cands = Array.from({ length: 35 }, (_, i) => ({ id: `id-${i}`, title: `Titolo ${i}`, text: `testo ${i} ${'x'.repeat(3000)}` }));
+  const reqs = S.buildDecisionRequests('  il tasto che non chiude  ', cands, 16);
+  assert.deepEqual(reqs.map((r) => r.ids.length), [16, 16, 3]);
+  const r0 = reqs[0];
+  assert.equal(r0.state.ricerca, 'il tasto che non chiude');
+  assert.deepEqual(Object.keys(r0.questions), Array.from({ length: 16 }, (_, k) => `f${k + 1}`));
+  const q = r0.questions.f3;
+  assert.equal(q.type, 'noul');
+  assert.ok(q.instructions.includes('Titolo 2') && q.instructions.includes('testo 2'), 'la domanda porta il suo feedback');
+  assert.ok(!q.instructions.includes('Titolo 3'));
+  assert.ok(q.instructions.length < S.CLASSIFIER.MAX_TEXT + 300, 'il testo del feedback ha un tetto');
+  assert.ok(q.criteria && q.criteria.true && q.criteria.false);
+  assert.equal(reqs[2].ids[2], 'id-34');
+});
+
+test('classificatore: il nome di una domanda non è mai l\'id del feedback', () => {
+  const reqs = S.buildDecisionRequests('x', [{ id: '__proto__', title: 't', text: '' }, { id: 'constructor', title: 'u', text: '' }]);
+  assert.deepEqual(Object.keys(reqs[0].questions), ['f1', 'f2']);
+  assert.deepEqual(reqs[0].ids, ['__proto__', 'constructor']);
+});
+
+test('classificatore: probabilità dalla risposta, sopra soglia diventa risultato, ordinati dal più probabile', () => {
+  assert.equal(S.probabilityOf({ type: 'noul', noul: 0.96 }), 0.96);
+  assert.equal(S.probabilityOf({ type: 'noul', noul: 1.7 }), 1);
+  assert.equal(S.probabilityOf(true), 1);
+  assert.equal(S.probabilityOf({ type: 'noul' }), null);
+  assert.equal(S.probabilityOf('sì'), null);
+
+  const req = { ids: ['a', 'b', 'c', 'd'] };
+  const out = S.hitsFromAnswers(req, { f1: { noul: 0.2 }, f2: { noul: 0.81 }, f4: { noul: 0.5 } }, 0.5);
+  assert.deepEqual(out.hits, [{ id: 'b', p: 0.81 }, { id: 'd', p: 0.5 }]);
+  assert.equal(out.senza, 1, 'una domanda senza risposta non è un «no»: si conta a parte');
+  assert.equal(out.letti, 3);
+  // Una risposta che non è sua (nome ereditato) non conta.
+  assert.equal(S.hitsFromAnswers({ ids: ['x'] }, Object.create({ f1: { noul: 1 } })).hits.length, 0);
+
+  assert.deepEqual(S.rankHits([{ id: 'd', p: 0.5 }, { id: 'b', p: 0.81 }, { id: 'e', p: 0.5 }]).map((h) => h.id), ['b', 'd', 'e']);
+});

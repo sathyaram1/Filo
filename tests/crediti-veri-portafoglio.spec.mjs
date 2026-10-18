@@ -178,9 +178,7 @@ test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale 
 async function semina(app, schede) {
   await app.evaluate(async (_electron, { schede }) => {
     const clientId = 'client-816';
-    // Col portafoglio Filo risponde, e una home nuova aprirebbe l'intervista di
-    // benvenuto, sotto la quale i riquadri non partono: qui è già fatta.
-    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId, filo_onboarding: { done: true } });
+    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
     const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
     const mioHash = await H.hashClientId(clientId);
     const cards = [];

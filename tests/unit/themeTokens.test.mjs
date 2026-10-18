@@ -243,3 +243,89 @@ test('illegibleAfter NON segnala i cambi estetici sensati', () => {
   // Cambiare il raggio degli angoli non c'entra con la leggibilità.
   assert.equal(TT.illegibleAfter('radius', '12px', {}, 'light'), false);
 });
+
+// ── #837: font dei link, durata delle animazioni, intensità delle ombre ─────
+
+test('link.font eredita dal font della UI finché non lo si tocca', () => {
+  const ui = TT.defaultValue('font', 'light');
+  assert.equal(TT.effectiveValue('link.font', {}, 'light'), ui);
+  assert.equal(TT.effectiveValue('link.font', { font: 'Georgia, serif' }, 'dark'), 'Georgia, serif');
+  assert.equal(TT.effectiveValue('link.font', { font: 'Georgia, serif', 'link.font': 'Verdana, sans-serif' }, 'light'), 'Verdana, sans-serif');
+  assert.equal(TT.effectiveValue('font', { 'link.font': 'Verdana, sans-serif' }, 'light'), ui);
+  const css = TT.pageCss({ 'link.font': 'Georgia, serif' });
+  assert.match(css, /--sn-link-font: Georgia, serif;/);
+  // La regola esce solo con l'override, e solo per le pagine di Filo: sui siti l'<html> non ha data-sn-pagina.
+  assert.match(css, /html\[data-sn-pagina\] a \{ font-family: var\(--sn-link-font\); \}/);
+  assert.ok(!TT.pageCss({ font: 'Georgia, serif' }).includes('data-sn-pagina'));
+  assert.ok(!TT.shellCss({ 'link.font': 'Georgia, serif' }).includes('data-sn-pagina'));
+  assert.ok(!TT.validate('link.font', 'Georgia; color: red'));
+});
+
+test('motion: un moltiplicatore da 0 a 3, validato come gli altri tipi', () => {
+  assert.equal(TT.get('motion').type, 'factor');
+  assert.equal(TT.defaultValue('motion', 'light'), '1');
+  for (const ok of ['0', '1', '2', '3', '0.5', '1.25', '.5', '2.125', ' 2 ']) assert.ok(TT.validate('motion', ok), ok);
+  for (const no of ['4', '3.5', '-1', '1,,5', '1,5,0', '2x', '×2', '1e1', '0.12345', 'calc(2)', '1;}', '', ' ', 'NaN', 'Infinity', NaN, Infinity, -1, 4, null, true]) {
+    assert.ok(!TT.validate('motion', no), String(no));
+  }
+});
+
+test('#837 r1 — i numeri scritti con la virgola o passati come numero dalla chat si accettano, e nel CSS esce il punto', () => {
+  assert.ok(TT.validate('motion', '1,5'));
+  assert.ok(TT.validate('motion', 0));
+  assert.ok(TT.validate('motion', 1.5));
+  assert.ok(TT.validate('shadow', '0,1'));
+  assert.ok(TT.validate('shadow', 0.3));
+  assert.ok(TT.validate('selection.opacity', ',4'));
+  assert.equal(TT.normalize('motion', ' 1,5 '), '1.5');
+  assert.equal(TT.normalize('motion', 0), '0');
+  assert.equal(TT.normalize('shadow', 0.3), '0.3');
+  assert.deepEqual(TT.sanitize({ motion: '1,5', shadow: 0.1 }).clean, { motion: '1.5', shadow: '0.1' });
+  assert.equal(TT.effectiveValue('motion', { motion: '2,5' }, 'light'), '2.5');
+  assert.match(TT.pageCss({ motion: '1,5' }), /--sn-motion: 1.5;/);
+  assert.match(TT.shellCss({ shadow: '0,05' }), /--sn-shadow-opacity: 0.05;/);
+  // La virgola resta un separatore dove lo è: i font non si toccano, e un colore non diventa un numero.
+  assert.equal(TT.normalize('link.font', 'Georgia,serif'), 'Georgia,serif');
+  assert.ok(!TT.validate('accent', 1));
+  assert.ok(!TT.validate('radius', 6));
+});
+
+test('motion arriva a pagine e shell con la stessa variabile', () => {
+  assert.match(TT.pageCss({ motion: '0' }), /--sn-motion: 0;/);
+  assert.match(TT.shellCss({ motion: '2' }), /--sn-motion: 2;/);
+  assert.equal(TT.pageCss({ motion: '9' }), '');
+});
+
+test('shadow: intensità di tipo opacità, sulle pagine e nella shell', () => {
+  assert.equal(TT.get('shadow').type, 'opacity');
+  assert.equal(TT.effectiveValue('shadow', {}, 'dark'), '0.18');
+  assert.match(TT.pageCss({ shadow: '0.05' }), /--sn-shadow-opacity: 0.05;/);
+  assert.match(TT.shellCss({ shadow: '0' }), /--sn-shadow-opacity: 0;/);
+  assert.ok(!TT.validate('shadow', '0 4px 16px black'), 'niente testo CSS libero');
+});
+
+test('errorMessage dice il formato giusto per ogni tipo', () => {
+  assert.match(TT.errorMessage('motion'), /fra 0 e 3/);
+  assert.match(TT.errorMessage('shadow'), /fra 0 e 1/);
+  assert.match(TT.errorMessage('link.font'), /famiglie/);
+  assert.match(TT.errorMessage('accent'), /#rrggbb/);
+  for (const n of TT.names()) assert.notEqual(TT.errorMessage(n), 'Valore non valido.', `${n} senza messaggio per il suo tipo`);
+});
+
+test('motionFactor legge --sn-motion dal documento, con 1 se manca e un tetto', () => {
+  const doc = (v) => ({ documentElement: { v } });
+  const prima = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = (el) => ({ getPropertyValue: () => el.v });
+  try {
+    assert.equal(TT.motionFactor(doc('')), 1);
+    assert.equal(TT.motionFactor(doc(' 0')), 0);
+    assert.equal(TT.motionFactor(doc('2')), 2);
+    assert.equal(TT.motionFactor(doc('7')), 3);
+    assert.equal(TT.motionFactor(doc('boh')), 1);
+    assert.equal(TT.motionMs(200, doc('1.5')), 300);
+    assert.equal(TT.motionMs(200, doc('0')), 0);
+  } finally {
+    globalThis.getComputedStyle = prima;
+  }
+  assert.equal(TT.motionFactor(null), 1);
+});

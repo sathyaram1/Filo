@@ -297,6 +297,51 @@ test('il rifiuto si annota col suo esito: la personale ha risposto, oppure il ri
   assert.equal(refusals[0].served, false);
 });
 
+// #1071.4: chi ha chiesto la risposta la ferma (il riquadro chiuso) mentre il ripiego è in volo. Con la risposta
+// già aperta da OpenRouter la richiesta coi crediti di Filo è partita e si può pagare: conta come servita, e
+// l'avviso parte. Ferma prima che OpenRouter risponda non ha prodotto niente: come un ripiego caduto.
+test('ripiego fermato da chi l’ha chiesto: a risposta aperta conta come servito, prima come caduto', async () => {
+  const finche = async (cond) => { for (let i = 0; i < 400 && !cond(); i++) await new Promise((r) => setTimeout(r, 5)); };
+  const fermato = () => new DOMException('This operation was aborted', 'AbortError');
+  statusFor = { [OWN]: 402 };
+
+  globalThis.fetch = async (url, init) => {
+    const key = String(init.headers.Authorization || '').replace('Bearer ', '');
+    calls.push({ url, key });
+    if (key === OWN) return new Response('{"error":{}}', { status: 402 });
+    const corpo = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode(': OPENROUTER PROCESSING\n\n'));
+        init.signal.addEventListener('abort', () => c.error(fermato()));
+      },
+    });
+    return new Response(corpo, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  };
+  const ac = new AbortController();
+  const aperta = P.streamComplete({ apiKey: OWN, model: 'm', messages: [], onDelta: () => {}, signal: ac.signal });
+  await finche(() => refusals.length > 0);
+  ac.abort();
+  await assert.rejects(aperta, (e) => e.name === 'AbortError');
+  assert.deepEqual(calls.map((c) => c.key), [OWN, PERSONAL]);
+  assert.equal(refusals.length, 1);
+  assert.equal(refusals[0].served, true, 'la risposta coi crediti di Filo era già aperta');
+
+  refusals = []; calls = [];
+  globalThis.fetch = async (url, init) => {
+    const key = String(init.headers.Authorization || '').replace('Bearer ', '');
+    calls.push({ url, key });
+    if (key === OWN) return new Response('{"error":{}}', { status: 402 });
+    return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(fermato())));
+  };
+  const ac2 = new AbortController();
+  const chiusa = P.streamComplete({ apiKey: OWN, model: 'm', messages: [], onDelta: () => {}, signal: ac2.signal });
+  await finche(() => calls.length === 2);
+  ac2.abort();
+  await assert.rejects(chiusa, (e) => e.name === 'AbortError');
+  assert.equal(refusals.length, 1, 'il rifiuto della chiave resta un fatto');
+  assert.equal(refusals[0].served, false, 'OpenRouter non aveva ancora risposto: niente speso');
+});
+
 test('la nota di Crediti dice che Filo ha usato i crediti solo se è successo', () => {
   const usati = W.ownKeyRefusalNote({ at: '2026-09-18T07:41:00.000Z', status: 402, usedCredits: true });
   assert.match(usati, /ha usato i tuoi crediti/);

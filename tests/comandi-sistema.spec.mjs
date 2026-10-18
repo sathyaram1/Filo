@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const PARTENZA = {
   batteria: { livello: 70, inCarica: false, collegata: false },
@@ -15,15 +16,17 @@ const PARTENZA = {
 };
 
 // L'esecutore finto cambia la stessa lettura che il lettore finto restituisce: come un computer vero.
-async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [], negato = null, letturaMs = 0 } = {}) {
+// `lettureFerme`: gli elenchi restano in volo finché la prova non chiama liberaLetture, a qualunque velocità della macchina.
+async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [], negato = null, lettureFerme = false } = {}) {
   await app.evaluate(async (_, a) => {
     globalThis.__pc = JSON.parse(JSON.stringify(a.stato));
     globalThis.__pcChiamate = [];
+    globalThis.__pcLetture = [];
     const pc = globalThis.__pc;
     const disp = a.dispositivi;
     const reti = a.reti;
     const traccia = (nome, p) => globalThis.__pcChiamate.push([nome, p || {}]);
-    const lettura = () => new Promise((r) => setTimeout(r, a.letturaMs));
+    const lettura = () => (a.lettureFerme ? new Promise((r) => globalThis.__pcLetture.push(r)) : Promise.resolve());
     globalThis.SN_COMANDI_SISTEMA._perProve.usaComputer({
       async volume(p) {
         traccia('volume', p);
@@ -59,8 +62,10 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
       },
     });
     await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => globalThis.__pc);
-  }, { stato, dispositivi, reti, negato, letturaMs });
+  }, { stato, dispositivi, reti, negato, lettureFerme });
 }
+
+const liberaLetture = (app) => app.evaluate(() => { for (const libera of globalThis.__pcLetture.splice(0)) libera(); });
 
 const computer = (app) => app.evaluate(() => JSON.parse(JSON.stringify(globalThis.__pc)));
 const chiamate = (app) => app.evaluate(() => globalThis.__pcChiamate);
@@ -92,6 +97,7 @@ test('«alza il volume al 40%» in chat: il volume del computer è al 40% e la v
 });
 
 test('«spegni il Bluetooth» in chat e il tasto nel riquadro della home fanno la stessa cosa allo stesso computer', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app);
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
@@ -209,6 +215,7 @@ test('le cuffie abbinate si collegano dal riquadro del Bluetooth, e una rete con
 });
 
 test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma col nome vero prima di partire', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app, { reti: ['Casa', 'Ufficio 5G'] });
   const page = await home(app);
   await modelloFinto(app, [
@@ -224,6 +231,7 @@ test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma 
 });
 
 test('in chat: la conferma nomina la rete che partirà anche trovata per somiglianza; un nome che non ne trova una sola non chiede conferma', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app, { reti: ['Cava', 'Ufficio 5G', 'Ufficio Ospiti'] });
   const page = await home(app);
   await modelloFinto(app, [
@@ -249,6 +257,7 @@ test('in chat: la conferma nomina la rete che partirà anche trovata per somigli
 });
 
 test('in chat, le parole dell\'utente bastano: «le cuffie Sony» collega le Cuffie Sony e «la rete di casa» chiede conferma per Casa', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app, {
     dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: false }, { indirizzo: '00:11:22:33:44:66', nome: 'Casse JBL', collegato: false }],
     reti: ['Casa', 'Ufficio 5G'],
@@ -357,7 +366,9 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
 });
 
 test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'elenco dei dispositivi, e le letture non si accodano', async ({ app }) => {
-  await computerFinto(app, { letturaMs: 4000, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  // Letture ferme, non a tempo: «in volo» non deve dipendere dalla velocità della macchina della suite (#1223).
+  await computerFinto(app, { lettureFerme: true, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  const letture = async () => (await chiamate(app)).filter((c) => c[0] === 'btElenco').length;
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
   // Aperto e richiuso due volte cercando la voce giusta, poi il gesto.
@@ -366,17 +377,42 @@ test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'e
     await page.keyboard.press('Escape');
   }
   await voce(page, 'bluetooth').click();
-  // Tre aperture con la lettura ancora in volo sono una lettura sola.
-  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(1);
+  await expect.poll(letture).toBe(1);
+  // La lettura non finisce mai da sola: se il tasto la aspettasse, il Bluetooth resterebbe acceso.
   await opzione(page, 'Spegni il Bluetooth').click();
-  await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 2_000 }).toBe(false);
-  await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 2_000 });
-  // Spento il Bluetooth l'elenco si rilegge una volta, e arriva nel riquadro aperto.
+  await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 10_000 }).toBe(false);
+  await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 10_000 });
+  await expect(riquadro(page).locator('.dash-sis-attesa')).toBeVisible();
+  // Spento il Bluetooth l'elenco si rilegge una volta, e arriva nel riquadro aperto. Le tre aperture di prima, arrivate
+  // al main prima del comando, sono una lettura sola: con letture accodate qui sarebbero quattro.
+  await expect.poll(letture).toBe(2);
+  await liberaLetture(app);
   await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 10_000 });
-  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(2);
+  expect(await letture()).toBe(2);
+});
+
+test('il riquadro di Bluetooth e rete: Esc appena aperto lo chiude, e mentre legge l\'elenco non copre la sua voce', async ({ app }) => {
+  await computerFinto(app, { lettureFerme: true, reti: ['Casa'], dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
+  for (const v of ['bluetooth', 'rete']) {
+    // L'Esc più svelto possibile: nello stesso giro del clic che apre.
+    await voce(page, v).evaluate((el) => { el.click(); el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    await expect(riquadro(page)).toHaveCount(0);
+    await voce(page, v).click();
+    await expect(riquadro(page).locator('.dash-sis-attesa')).toBeVisible();
+    // Un clic sulla voce mentre l'elenco si legge arriva alla voce, non a «Nascondi» in fondo al riquadro.
+    const b = await voce(page, v).boundingBox();
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    await expect(voce(page, v)).toBeVisible();
+    await expect(riquadro(page)).toHaveAttribute('data-voce', v);
+    await page.keyboard.press('Escape');
+    await expect(riquadro(page)).toHaveCount(0);
+  }
 });
 
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   void shell;
   await computerFinto(app);
   const out = await app.evaluate(async ({ BrowserWindow }) => {
