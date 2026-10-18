@@ -106,8 +106,8 @@ const VELOCE_RIPIEGO = 2;
 
 /**
  * La versione del listino (PREZZI e VERSIONI), scritta in ogni rapporto: chi confronta costi di prima e di dopo
- * un cambio di prezzi vede dove sta il salto (#882). Un rapporto senza il campo è di prima del 18/10/2026, e fino
- * al 02/10/2026 contava Opus 5.5 al listino di Opus 5. Si cambia insieme ai prezzi: sentinella in sessionReport.test.
+ * un cambio di prezzi vede dove sta il salto (#882). I rapporti senza il campo non si ricalcolano: fino al 02/10/2026
+ * contavano Opus 5.5 al listino di Opus 5. Si cambia insieme ai prezzi: sentinella in sessionReport.test.
  */
 export const LISTINO = '2026-10-06';
 
