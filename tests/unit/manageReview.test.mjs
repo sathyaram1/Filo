@@ -1815,6 +1815,9 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
   const rev = (attesa) => ({ status: 'revision_security', attesa });
   assert.equal(MR.attesaServer(rev('fusione_server')), 'pc');
   assert.equal(MR.attesaServer(rev('suite_server')), 'suite');
+  // Gli unit sulla fusione lanciati da GitHub (#1207): un'attesa che segue il server anche fuori dai lavori server.
+  assert.equal(MR.attesaServer(rev('unit_fusione')), 'unit');
+  assert.equal(MR.attesaServer({ status: 'revision_capability', attesa: 'unit_fusione' }), '');
   // L'app si fonde prima del server: nessuno aspetta più la pubblicazione.
   assert.equal(MR.attesaServer(rev('deploy_server')), '');
   assert.equal(MR.attesaServer(rev('')), '');

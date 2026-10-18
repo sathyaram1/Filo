@@ -338,10 +338,17 @@ tutti. "Difficile" non è una difesa: **l'ultimo livello deve essere non
 convincibile**, cioè un posto dove non c'è nessun LLM da persuadere e nessun
 ambiente da avvelenare.
 
-Da oggi la fusione è una consegna del canale come le altre:
+Da oggi la fusione è una consegna del canale come le altre. **Dal #1207
+(decisione dell'owner del 12/10/2026) non la chiede più nessuno**: col pass
+della verifica e del controllo di sicurezza registrati il server accende da sé
+l'azione degli unit sulla fusione e, con l'esito letto da GitHub, fa i passi qui
+sotto (sezione «Gli unit sulla fusione li lancia GitHub»). `routineMerge` resta
+per gli strumenti di prima: controlla biglietto, ruolo, ramo e verdetti come
+sempre, non fonde e passa la pratica all'azione (`result: 'server'`,
+`esito: 'attesa_unit'`).
 
-- **`routineMerge` `{ ticket, branch }`** — la chiede solo il controllo di
-  sicurezza, a verdetto registrato. Il server, in ordine e fail-closed:
+- **La fusione** (fino al #1207 `routineMerge` `{ ticket, branch }`, chiesta
+  dal controllo di sicurezza a verdetto registrato). Il server, in ordine e fail-closed:
   1. biglietto vivo, ruolo `secaudit`, ramo = quello **del biglietto** (un
      messaggio che ne nomina un altro è respinto e registrato, non corretto);
   2. **stato vero**: PASS della verifica e PASS del controllo di sicurezza
@@ -380,10 +387,10 @@ Da oggi la fusione è una consegna del canale come le altre:
   fidato → richiesta all'owner come prima. `mergePreapproved` non si scrive
   più: lo legge solo la decisione dei rami nati prima del registro
   (`fiduciaRamo.decisioneL5Legacy`), finché l'ultimo non si chiude.
-- **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
-  e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
-  1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
-  sono spariti da questa macchina: qui non c'è più niente da convincere.
+- **Il citofono `scripts/merge-gate.mjs`** presentava il biglietto e riferiva
+  l'esito; dal #1207 non c'è più: il git locale, l'L5 locale, il verdetto
+  passato via ambiente e infine la prova degli unit sono spariti dalla macchina
+  che lavora, e lì non c'è più niente da convincere.
 - **Cosa copre un'approvazione** (dal 2026-09-13). Un'approvazione copre il
   contenuto approvato più uno spostamento su main senza conflitti,
   ricontrollato. Vale per il click dell'owner in Gestione come per il segno di
@@ -580,13 +587,14 @@ La regola, uguale per tutti e due:
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
   NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
-  su questa macchina parla di un altro commit. Dal #929 `routineMerge` e
-  `ownerMerge` portano anche `provaUnit`: gli unit girati da chi chiede sul
-  risultato della fusione con origin/main (`scripts/lib/unit-sulla-fusione.mjs`).
-  Il server fonde solo se main è ancora lo sha provato (`main_moved`
-  altrimenti, e chi chiede rifà la prova, al massimo tre volte); rossi solo
-  sulla fusione → riallineamento con l'elenco dei test (`unit_rossi`); senza il
-  campo fonde come prima e lo scrive nel log (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
+  su questa macchina parla di un altro commit. Dal #929 `ownerMerge` porta anche
+  `provaUnit`: gli unit girati da chi chiede sul risultato della fusione con
+  origin/main (`scripts/lib/unit-sulla-fusione.mjs`); per le routine, dal #1207,
+  la prova la legge il server da GitHub. Il server fonde solo se main è ancora lo
+  sha provato (`main_moved` altrimenti, e la prova si rifà, al massimo tre
+  volte); rossi solo sulla fusione → riallineamento con l'elenco dei test
+  (`unit_rossi`); senza prova fonde come prima e lo scrive nel log
+  (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
   un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
   giudica il server (punto sopra). Se su questa macchina non risulta su quale
   commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in
@@ -647,14 +655,55 @@ La regola, uguale per tutti e due:
   richiesta partiva lo stesso. Adesso il nome e la directory devono combaciare,
   ed è il primo controllo di tutti.
 
-Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
-`scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
-timbra da solo invece di chiederlo a chi lavora — e questa regola. **Il
+Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs` e
+`scripts/routine-channel.mjs`, dove lo sha si timbra da solo invece di
+chiederlo a chi lavora — e questa regola. (Fino al #1207 anche il citofono,
+`scripts/merge-gate.mjs`, coi controlli descritti qui sopra.) **Il
 confronto al passo 2 del cancello vive nel server** (`filo-security`), che è
 il posto giusto: è l'ultimo livello, quello che non si può convincere. Il
 repo pubblico chiude il cammino onesto; il muro è il server, che dal #773
 respinge un verdetto L4 senza sha e al cancello lo confronta con la punta
 come quello della verifica.
+
+### Gli unit sulla fusione li lancia GitHub (#1207, 12/10/2026)
+
+Fino al #1207 gli unit sul risultato della fusione del ramo con main li faceva
+girare l'agente del controllo di sicurezza (5–20 minuti, `scripts/merge-gate.mjs`)
+e la prova la dichiarava lui al server. Adesso:
+
+- **chi lavora registra il verdetto e rilascia.** Col pass il server mette la
+  pratica in attesa (`feedback.attesa = 'unit_fusione'`, `routine-state.provaFusione`):
+  `select` non le dà ruoli e il recupero delle fusioni non la tocca;
+- **l'azione** è `.github/workflows/unit-fusione.yml` del repo pubblico, accesa
+  dal server con `repository_dispatch` (basta il permesso sui contenuti che il
+  cancello ha già). GitHub accende sempre la versione del workflow che sta su
+  main: un ramo non la cambia per la propria corsa. Gira il codice di un ramo
+  che può venire da un feedback non fidato, quindi: nessun segreto, token in
+  sola lettura (`contents: read`), credenziali mai lasciate nei checkout, la
+  coppia di sha solo come variabili d'ambiente validate, e nessun workflow del
+  repo usa le cache di Actions (sentinella: `tests/unit/unitFusioneAzione.test.mjs`).
+  Gli strumenti della prova vengono da main (`scripts/unit-fusione-azione.mjs`),
+  le dipendenze dal ramo, come sulla macchina che provava prima;
+- **il server si fida solo di quello che legge da GitHub per quella coppia**
+  (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
+  `repository_dispatch` su main col titolo della coppia, conclusa, e nel suo
+  registro la riga `FILO-UNIT-FUSIONE` con i due sha interi e un esito che dice
+  la stessa cosa della conclusione. Una corsa accesa da una spinta, o con
+  un'altra coppia, non decide niente;
+- **gli esiti**: verde (o rosso anche su main da solo, o main già dentro il
+  ramo, che non costa una corsa) → cancello e fusione sul main provato, come
+  sempre; rossi solo sulla fusione o conflitto → riallineamento; main o punta
+  mossi prima della fusione → la prova si rifà, al più tre volte, poi la
+  riprende il recupero fra un'ora. Un blocco L5 va all'owner con la spiegazione
+  composta dal server dai blocchi. Un'azione che non parte, non finisce o non
+  scrive la riga si riaccende; alla terza di fila si fonde senza prova, come
+  quando la prova non si poteva fare, e la riga del registro in Gestione lo conta;
+- **il recupero delle fusioni mai chieste (#715)** si riduce al rilancio
+  dell'azione: un'ora senza fusione, o un'attesa che nessuno muove da tre ore,
+  e la prova riparte; al terzo rilancio sullo stesso verdetto la pratica va
+  all'owner;
+- **`npm run finish` non cambia**: la prova la fa il PC dell'owner, che la
+  dichiara con le sue credenziali (`ownerMerge`).
 
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
