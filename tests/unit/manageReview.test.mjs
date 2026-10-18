@@ -1553,6 +1553,35 @@ test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenc
   assert.equal(l5.colore, MR.REASONS.attack.color);
 });
 
+// #1040 (caso #952.1): ferma al cancello, ma sul server nessuna richiesta per lei. Con gli elenchi letti non è più
+// «non ancora arrivata»: è un vicolo cieco, e il quadrato offre di rifarla.
+test('livelli L5: design/l5 con gli elenchi letti e nessuna richiesta → «Rifai la richiesta», non l’attesa', () => {
+  const ferma = { _id: 'p1', seq: 952, subSeq: 1, status: 'design', statusReason: 'l5', branch: 'worker/p1' };
+  const vuoti = { pending: [], failed: [], recent: [], preapproved: [] };
+  const letto = MR.livelloL5(ferma, { fusioni: vuoti, fusioniLette: true });
+  assert.equal(letto.esito, 'bloccato');
+  assert.equal(letto.colore, MR.REASONS.attack.color);
+  assert.deepEqual(letto.pannello.azioni, ['rifai_richiesta']);
+  assert.match(letto.pannello.testo, /non c’è: non hai niente da approvare/);
+  assert.doesNotMatch(letto.pannello.testo, /non è \(ancora\) arrivata/);
+  // Elenchi non ancora letti (o non la macchina dell'owner): non si sa, e non si offre niente.
+  const nonLetto = MR.livelloL5(ferma, { fusioni: vuoti });
+  assert.deepEqual(nonLetto.pannello.azioni, []);
+  assert.match(nonLetto.pannello.testo, /non è \(ancora\) arrivata/);
+  // Una richiesta di un'altra pratica non conta come sua.
+  assert.deepEqual(MR.livelloL5(ferma, { fusioni: { ...vuoti, pending: [{ id: 'z', num: '#999' }] }, fusioniLette: true }).pannello.azioni, ['rifai_richiesta']);
+  // La sua richiesta c'è: niente tasto, c'è la card.
+  const conRichiesta = MR.livelloL5(ferma, { fusioni: { ...vuoti, pending: [{ id: 'r', feedbackId: 'p1' }] }, fusioniLette: true });
+  assert.deepEqual(conRichiesta.pannello.azioni, []);
+  assert.equal(conRichiesta.richieste.length, 1);
+  // Senza ramo, o lavoro server (fermo al cancello del server, che richieste non ne ha): niente da rifare da qui.
+  for (const fb of [{ ...ferma, branch: '' }, { ...ferma, localOnly: { by: 'owner', at: 1 } }]) {
+    const l = MR.livelloL5(fb, { fusioni: vuoti, fusioniLette: true });
+    assert.deepEqual(l.pannello.azioni, []);
+    assert.match(l.pannello.testo, /Rimettila in coda o archiviala/);
+  }
+});
+
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
   const fb = { status: 'design', statusReason: 'l5' };
   assert.equal(MR.classifyBlock(fb).reason, 'l5');

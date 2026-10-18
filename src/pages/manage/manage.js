@@ -1407,6 +1407,7 @@
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
+  const FUSIONE_RICHIESTA_RIFAI = (window.SN_MSG?.MSG?.FUSIONE_RICHIESTA_RIFAI) || 'fusione_richiesta_rifai';
   const FEEDBACK_SENDER_FLAG = (window.SN_MSG?.MSG?.FEEDBACK_SENDER_FLAG) || 'feedback_sender_flag';
 
   // Perché una richiesta è stata respinta, detto all'owner e non al codice.
@@ -1571,7 +1572,7 @@
     return esito && (esito.kind === 'ok' || esito.reload) ? 'decisa' : null;
   }
   function opzioniLivelli(fb) {
-    return { fusioni, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
+    return { fusioni, fusioniLette: fusioniOk, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
   }
   // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
   function statoFusioniCambiato() {
@@ -5333,7 +5334,9 @@
       body.appendChild(righe);
     }
 
-    if (p.testo) {
+    // «Rifalla» non vale più quando il server ha già detto che non si può rifare: lì parla il suo esito.
+    const rifaiSuperato = liv.key === 'l5' && p.azioni.includes('rifai_richiesta') && !!(esitiRifai.get(fb._id) || {}).coda;
+    if (p.testo && !rifaiSuperato) {
       const t = document.createElement('div');
       t.className = 'mg-liv-testo';
       riempiTestoLivello(t, p);
@@ -5341,6 +5344,7 @@
     }
 
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
+    if (isAdmin && liv.key === 'l5' && liv.pannello.azioni.includes('rifai_richiesta')) body.appendChild(pannelloRifaiRichiesta(fb));
     if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
@@ -5400,10 +5404,11 @@
   // pratiche vecchie, ferme prima che l'audit lasciasse traccia: lì il segno è
   // lo stato (`design` con motivo `secaudit`). Senza questo secondo caso quelle
   // pratiche non avrebbero nessuna via d'uscita.
+  // Ferma per l'audit vale anche con l'audit già saltato: se il cancello dopo non ha registrato la richiesta (#1040)
+  // la pratica resta lì, e il salto si ripreme.
   function mostraSaltaAudit(fb, liv) {
     if (!isAdmin || !liv || liv.key !== 'l4') return false;
     if (liv.pannello.azioni.includes('salta_l4')) return true;
-    if (liv.esito !== 'nonfatto') return false;
     const n = MR.normalizeStatus(fb);
     return n.status === 'design' && n.statusReason === 'secaudit';
   }
@@ -5489,6 +5494,95 @@
     box.appendChild(btn);
     box.appendChild(esito);
     return box;
+  }
+
+  // #1040: ferma al cancello senza niente da approvare. Gli esiti che chiedono un altro passo restano per pratica:
+  // il pannello si ridisegna a ogni rilettura delle fusioni, e «non si fonde più con main» non deve sparire con lui.
+  const esitiRifai = new Map();
+  const rifaiInVolo = new Set();
+  const RIFAI_ESITI = {
+    richiesta: { kind: 'ok', text: 'Richiesta rifatta: la trovi qui, sul quadrato.' },
+    gia_decisa: { kind: 'err', text: 'Su questa versione del ramo avevi già deciso: la richiesta resta com’era. Rimettila in coda o archiviala.', coda: true },
+    non_legata: { kind: 'err', text: 'Il server ha aperto la richiesta ma non l’ha legata a questa pratica: la trovi in Automazioni.' },
+    conflitto: { kind: 'err', text: 'Il ramo non si fonde più con main: va rifatto. Rimettila in coda.', coda: true },
+    fuso: { kind: 'ok', text: 'I controlli adesso passano: il ramo è entrato in main e la pratica è chiusa.' },
+    fusoAperta: { kind: 'err', text: 'Il ramo è entrato in main, ma la pratica non si è chiusa da sola: archiviala.' },
+  };
+
+  async function rifaiRichiesta(fb) {
+    const id = fb._id;
+    if (rifaiInVolo.has(id)) return;
+    rifaiInVolo.add(id);
+    esitiRifai.delete(id);
+    ridisegnaPannelloAperto();
+    let m;
+    try {
+      const r = await sendToMain({ type: FUSIONE_RICHIESTA_RIFAI, feedbackId: id, branch: String(fb.branch || '') });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
+      m = (r.esito === 'fuso' && r.chiusa === false ? RIFAI_ESITI.fusoAperta : RIFAI_ESITI[r.esito])
+        || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+    } catch (e) {
+      m = { kind: 'err', text: e.message || 'Non riuscito.' };
+    } finally {
+      rifaiInVolo.delete(id);
+    }
+    // Un esito riuscito lo racconta il quadrato stesso alla rilettura: tenerlo lo ripeterebbe a una richiesta sparita.
+    if (m.kind !== 'ok') esitiRifai.set(id, m);
+    toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+    ridisegnaPannelloAperto();
+    loadMergeApprovals();
+    refreshFromRemote({ force: true }).catch(() => {});
+  }
+
+  function pannelloRifaiRichiesta(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+    const stato = esitiRifai.get(fb._id);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary';
+    if (stato && stato.coda) {
+      btn.id = 'mgRimettiInCodaBtn';
+      btn.textContent = 'Rimetti in coda';
+      btn.title = 'Torna alle automazioni, che rifanno il lavoro da main.';
+      btn.addEventListener('click', () => {
+        const azione = MR.ownerActionFor(fb, 'accept', { releasedVersion });
+        if (!azione) {
+          esito.dataset.kind = 'err';
+          esito.textContent = 'Da qui non si rimette in coda: lo stato è cambiato.';
+          return;
+        }
+        esitiRifai.delete(fb._id);
+        applyAction(azione);
+      });
+    } else {
+      btn.id = 'mgRifaiRichiestaBtn';
+      btn.textContent = 'Rifai la richiesta';
+      btn.title = 'Il server ricontrolla il ramo e apre qui la richiesta per il tuo via libera. Se i controlli adesso passano, lo fonde.';
+      btn.disabled = rifaiInVolo.has(fb._id);
+      btn.addEventListener('click', () => { rifaiRichiesta(fb); });
+    }
+    if (rifaiInVolo.has(fb._id)) {
+      esito.dataset.kind = 'wait';
+      esito.textContent = 'Chiedo al server…';
+    } else if (stato && !stato.coda) {
+      esito.dataset.kind = stato.kind;
+      esito.textContent = stato.text;
+    }
+    box.appendChild(btn);
+    box.appendChild(esito);
+    if (!stato || !stato.coda) return box;
+    // Al posto della frase del quadrato, che proponeva di rifarla: prima cosa è successo, poi il tasto.
+    const insieme = document.createElement('div');
+    const testo = document.createElement('div');
+    testo.className = 'mg-liv-testo';
+    testo.textContent = stato.text;
+    insieme.appendChild(testo);
+    insieme.appendChild(box);
+    return insieme;
   }
 
   mgSideClose.addEventListener('click', closeSidebar);

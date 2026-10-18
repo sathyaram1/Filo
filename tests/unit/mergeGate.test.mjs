@@ -30,7 +30,7 @@ const MERGE_GATE = resolve(__dirname, '..', '..', 'scripts', 'merge-gate.mjs');
 
 // ─── logica pura del CLI (niente git, niente rete) ───────────────────────────
 
-const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer, testoEsitoServer } = await import('../../scripts/merge-gate.mjs');
+const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer, testoEsitoServer, testoBloccoSenzaRichiesta } = await import('../../scripts/merge-gate.mjs');
 
 test('parseArgs: solo il source; qualunque flag è sconosciuto', () => {
   assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', unknown: [] });
@@ -51,7 +51,7 @@ test('isValidBranch: accetta nomi tipici, rifiuta injection', () => {
 
 test('exitCodeFor: il contratto CLI su cui il ruolo secaudit decide le chiusure', () => {
   assert.equal(exitCodeFor({ ok: true, result: 'merged', sha: 'abc' }), 0);
-  assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }), 10);
+  assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules', approval: 'req-7' }), 10);
   assert.equal(exitCodeFor({ ok: true, result: 'conflict' }), 20);
   // Lavoro server (#1159 fase 2): la parte del server la segue il server, e chi chiede non fa niente.
   assert.equal(exitCodeFor({ ok: true, result: 'server', esito: 'attesa_suite' }), 30);
@@ -68,6 +68,19 @@ test('exitCodeFor: il contratto CLI su cui il ruolo secaudit decide le chiusure'
   assert.equal(exitCodeFor({}), 1);
   assert.equal(exitCodeFor(null), 1);
   assert.equal(exitCodeFor({ ok: true }), 1);
+});
+
+// #1040 (caso #952.1): con exit 10 il ruolo secaudit consegna design/l5, che vuol dire «c'è una richiesta da
+// approvare». Un blocco senza richiesta è un guasto: exit 1, e la pratica non si ferma in un punto senza uscita.
+test('exitCodeFor: blocked senza la richiesta per l’owner → 1, mai 10', () => {
+  for (const approval of [undefined, '', '   ', null]) {
+    assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: hooks', approval }), 1, JSON.stringify(approval));
+  }
+  assert.match(testoBloccoSenzaRichiesta('guard_the_guards: hooks'), /GUASTO: il cancello ha fermato la fusione \(guard_the_guards: hooks\) ma la richiesta per l’owner non si è registrata/);
+  assert.match(testoBloccoSenzaRichiesta(''), /NON consegnare design\/l5.*Rilascia il biglietto/);
+  // Il server, quando la richiesta non si registra nemmeno riprovando, risponde col guasto: stesso testo.
+  assert.equal(exitCodeFor({ ok: false, reason: 'approval_not_recorded' }), 1);
+  assert.equal(testoRifiutoServer('approval_not_recorded'), testoBloccoSenzaRichiesta(''));
 });
 
 // ─── il client contro un server finto ─────────────────────────────────────────
@@ -262,12 +275,24 @@ test('lungo', async () => {
 });
 
 test('blocked (L5 sul server) → exit 10, col motivo del blocco', async () => {
-  const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' });
+  const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules', approval: 'req-13' });
   try {
     const r = await gate(port, ['worker/13']);
     assert.equal(r.status, 10, `exit 10 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /BLOCKED/);
     assert.match(r.stderr, /firestore\.rules/);
+    assert.match(r.stderr, /aspetta il via libera dell’owner.*req-13/);
+  } finally { srv.close(); }
+});
+
+test('blocked senza richiesta per l’owner → exit 1 col guasto detto, non BLOCKED (#1040)', async () => {
+  const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: .claude/hooks', approval: '' });
+  try {
+    const r = await gate(port, ['worker/14']);
+    assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
+    assert.match(r.stderr, /la richiesta per l’owner non si è registrata/);
+    assert.match(r.stderr, /NON consegnare design\/l5/);
+    assert.doesNotMatch(r.stderr, /BLOCKED/);
   } finally { srv.close(); }
 });
 

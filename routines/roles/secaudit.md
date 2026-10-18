@@ -131,14 +131,17 @@ server un verdetto raccontato non lo legge).
 3. Chiudi in base all'exit del gate:
    - `0` → fuso → `node scripts/routine-channel.mjs deliver status --status done --notes "<riga>"` +
      `node scripts/dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 sul diff) → `node scripts/routine-channel.mjs deliver status --status design
+   - `10` → BLOCCATO (L5 sul diff), con la richiesta per l'owner registrata (il gate la stampa) →
+     `node scripts/routine-channel.mjs deliver status --status design
      --notes "<spiegazione>" --branch <branch> --reason l5`.
      Il motivo è `l5`, non `secaudit`: il tuo controllo è passato, a fermare è
      stato il cancello del server, e in dashboard sono due forme diverse (il
-     pentagono verde, il quadrato rosso). Il ramo NON è perduto: il server apre una richiesta in attesa che l'owner
-     trova nel quadrato rosso della pratica, in cima ai Ricevuti di Gestione, e da lì può dare il via libera
+     pentagono verde, il quadrato rosso). Il ramo NON è perduto: l'owner trova la richiesta nel quadrato rosso della
+     pratica, in cima ai Ricevuti di Gestione, e da lì può dare il via libera
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
+     `design`/`l5` vale «c'è una richiesta da approvare»: se per la pratica non ce n'è una, il server respinge
+     la consegna (`l5_senza_richiesta`), e anche lì rilasci il biglietto e basta.
    - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
      solo; oppure gli unit, che il gate fa girare sul risultato della fusione
      con main prima di chiederla, lì sono rossi e su main da solo no.
@@ -156,6 +159,9 @@ server un verdetto raccontato non lo legge).
      `stale` il server ha trovato il tuo verdetto su un commit diverso dalla
      punta che fonderebbe: l'ha azzerato e rimanda da sé un nuovo controllo di
      sicurezza sulla punta. Rilascia il biglietto e basta.
+     Con «il cancello ha fermato la fusione ma la richiesta per l'owner non si è registrata» (anche
+     `approval_not_recorded`) è un guasto, non un blocco: niente `design`/`l5`, che lascerebbe la pratica senza
+     niente da approvare. Rilascia il biglietto e basta: la fusione la rifà chi la riprende al giro dopo.
 
 **Quanto scrivere — dipende dall'esito:**
 

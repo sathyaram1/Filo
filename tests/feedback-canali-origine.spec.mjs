@@ -160,6 +160,8 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       fusioniElenco: { type: MSG.MERGE_APPROVALS_GET },
       fusioniApprova: { type: MSG.MERGE_APPROVAL_APPROVE, id: 'ab12cd34ef56ab12cd34ef56' },
       fusioniScarta: { type: MSG.MERGE_APPROVAL_DISCARD, id: 'ab12cd34ef56ab12cd34ef56' },
+      // #1040: rifà la richiesta di una pratica ferma al cancello, chiedendo al server la fusione del suo ramo.
+      fusioneRifaiRichiesta: { type: MSG.FUSIONE_RICHIESTA_RIFAI, feedbackId: 'f1', branch: 'worker/f1' },
       domandeElenco: { type: MSG.DOMANDE_ELENCO },
       domandaMostra: { type: MSG.DOMANDA_MOSTRA, id: 'D-1' },
       domandaRispondi: { type: MSG.DOMANDA_RISPONDI, id: 'D-1', scelta: 0 },

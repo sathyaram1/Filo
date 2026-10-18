@@ -158,7 +158,19 @@ export function testoRifiutoServer(reason) {
     return '[merge-gate] RIFIUTATO (stale): sul server la punta del ramo non è il commit per cui hai chiesto la fusione, quindi il ramo '
       + `si è mosso nel frattempo. ${coda}`;
   }
+  if (reason === 'approval_not_recorded') return testoBloccoSenzaRichiesta('');
   return '';
+}
+
+/**
+ * Il cancello ha fermato la fusione ma la richiesta per l'owner non c'è (#1040). PURA.
+ * È un guasto, non un blocco: con design/l5 la pratica resterebbe ferma senza niente da approvare.
+ */
+export function testoBloccoSenzaRichiesta(motivo) {
+  const m = String(motivo || '').trim();
+  return `[merge-gate] GUASTO: il cancello ha fermato la fusione${m ? ` (${m.slice(0, 300)})` : ''} ma la richiesta per l’owner non si è registrata. `
+    + 'Niente fusione, e NON consegnare design/l5: la pratica resterebbe ferma senza niente da approvare. '
+    + 'Rilascia il biglietto: la fusione la rifà chi la riprende al giro dopo.';
 }
 
 /**
@@ -338,7 +350,8 @@ export async function tieniVivo(ticket, { batti = heartbeat, avvia = spawn, scri
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
-  if (r.ok === true && r.result === 'blocked') return 10;
+  // Un blocco senza la richiesta per l'owner è un guasto: in design/l5 la pratica resterebbe senza niente da approvare (#1040).
+  if (r.ok === true && r.result === 'blocked') return String(r.approval || '').trim() ? 10 : 1;
   // Unit rossi sul risultato della fusione (#929): come un conflitto, il server ha già instradato il riallineamento.
   if (r.ok === true && (r.result === 'conflict' || r.result === 'unit_rossi')) return 20;
   // Lavoro server (#1159 fase 2): la parte del server la segue il server, chi chiede non fa niente.
@@ -375,11 +388,11 @@ const USO = [
   '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo il controllo di sicurezza,',
   '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
   '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
-  '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
+  '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza, con la richiesta per l’owner registrata (decide lui)',
   '  Prima di chiedere fa girare gli unit sul risultato della fusione con origin/main.',
   '        20 conflitto o unit rossi sulla fusione · 1 uso sbagliato, ramo diverso da quello della directory,',
   '           ramo mosso dopo il controllo di sicurezza, contenuto che non è quello in cima',
-  '           su origin, main mosso a ogni prova, o rifiuto del server',
+  '           su origin, main mosso a ogni prova, rifiuto del server, o blocco senza la richiesta per l’owner',
 ].join('\n');
 
 async function main() {
@@ -505,11 +518,10 @@ async function main() {
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
   else if (code === 10) {
     console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
-    // Il blocco non è più un vicolo cieco: il server apre una richiesta che
-    // l'owner trova sulla scheda della pratica in Gestione. Dirlo qui evita che
-    // chi legge il registro creda che il ramo sia perduto.
-    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
+    // Dirlo qui evita che chi legge il registro creda che il ramo sia perduto.
+    console.error(`[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica (richiesta ${String(reply.approval).slice(0, 40)})`);
   }
+  else if (reply && reply.ok === true && reply.result === 'blocked') console.error(testoBloccoSenzaRichiesta(reply.reason));
   else if (code === 20 && reply.result === 'unit_rossi') console.error(testoUnitRossi());
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
   else if (code === 30) console.error(`[merge-gate] SERVER: ${testoEsitoServer(reply.esito)}`);

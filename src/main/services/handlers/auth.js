@@ -1548,6 +1548,33 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
+  // #1040: pratica in design/l5 senza nessuna richiesta da approvare. Il server rifà L5 sul ramo (la punta la legge
+  // lui da GitHub) e apre la richiesta legata alla pratica, o fonde se ora passa: qui si traduce solo l'esito.
+  const RAMO_FONDIBILE = /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/;
+  on(MSG.FUSIONE_RICHIESTA_RIFAI, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const branch = String(msg?.branch || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca la segnalazione.' };
+    if (!RAMO_FONDIBILE.test(branch) || branch === 'main') return { ok: false, error: 'Questa pratica non ha un ramo da fondere.' };
+    const r = await callSecurityFunction('ownerMerge', { branch, feedbackId });
+    if (!r || r.ok === false) {
+      const motivo = String((r && r.reason) || '');
+      return { ok: false, error: (r && r.detail) || (/^github_/.test(motivo) ? 'GitHub non risponde: riprova fra poco.' : '') || motivo || 'Il server non ha rifatto la richiesta.' };
+    }
+    const result = String(r.result || '');
+    if (result === 'conflict') return { ok: true, esito: 'conflitto' };
+    if (result === 'merged') return { ok: true, esito: 'fuso', sha: String(r.sha || ''), chiusa: r.chiusa === true };
+    if (result !== 'blocked') return { ok: false, error: `Il server ha risposto «${result || 'niente'}»: riprova.` };
+    const requestId = String(r.requestId || '');
+    if (!requestId) return { ok: false, error: 'I controlli hanno fermato di nuovo il ramo, ma la richiesta non si è registrata: riprova.' };
+    if (r.pratica !== true) return { ok: true, esito: 'non_legata', requestId };
+    // Stesso ramo e stessa punta danno la stessa richiesta: se l'owner l'aveva già scartata o decisa resta così.
+    let elenco = null;
+    try { elenco = await listMergeApprovals(); } catch (_) { elenco = null; }
+    const ferma = !elenco || [...elenco.pending, ...elenco.failed].some((x) => x && x.id === requestId);
+    return { ok: true, esito: ferma ? 'richiesta' : 'gia_decisa', requestId };
+  }));
+
   // «Salta il controllo»: l'owner ha letto la bocciatura dell'audit di
   // sicurezza e decide di andare avanti. Stesso cancello delle approvazioni di
   // fusione — solo pagine filo://, solo il proprietario — perché è lo stesso

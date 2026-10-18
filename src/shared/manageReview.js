@@ -1697,11 +1697,21 @@
     // richiesta ferma: è un sì già dato che non ha prodotto niente.
     const ferme = failed.concat(pending);
     if (!ferme.length && fermaDaStato) {
+      // Elenchi letti e nessuna richiesta: la pratica è ferma senza niente da approvare (#1040). Rifarla tocca al
+      // server; un lavoro server fermo al cancello del server non ha richieste per sua natura e non si rifà da qui.
+      const letti = !!(opts && opts.fusioniLette === true);
+      const locale = isLocalOnly(fb);
+      const ramo = String((fb && fb.branch) || '').trim();
+      const rifacibile = letti && !locale && !!ramo;
       return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
         titolo,
         righe: [],
-        testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
-        azioni: [],
+        testo: !letti
+          ? 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.'
+          : rifacibile
+            ? 'I controlli del server l’hanno fermata, ma la richiesta per il tuo via libera non c’è: non hai niente da approvare. Rifalla: il server ricontrolla il ramo e la apre qui.'
+            : 'Il cancello non ha portato il lavoro su main e non c’è una richiesta da approvare: il perché è nella conversazione. Rimettila in coda o archiviala.',
+        azioni: rifacibile ? ['rifai_richiesta'] : [],
       }, { richiesta: null, richieste: [], conflitto: false });
     }
     if (ferme.length) {
