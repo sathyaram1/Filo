@@ -28,9 +28,6 @@ async function configureModel(app) {
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
-    // Fuori dall'intervista di benvenuto: lì a fine turno la conversazione si
-    // ridisegna dal salvato e il diario del turno sparisce.
-    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
   });
   // Il popup di un costo 2 a compito pulito si vede a Conservativo: a Normale partirebbe da solo (#530).
   await livelloAutonomia(app, 'conservativo');
@@ -148,7 +145,7 @@ test('in chat la memoria arriva recintata, lezioni comprese', async ({ app, shel
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ciao!' })).toBeVisible({ timeout: 10_000 });
   const sys = await app.evaluate(() => {
     const c = globalThis.__mem_calls;
-    return (c[c.length - 1].find((m) => m.role === 'system') || {}).content || '';
+    return c[c.length - 1].filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => m.content).join('\n');
   });
   const a = sys.indexOf('<<<MEMORIA_FILO>>>');
   const b = sys.indexOf('<<<FINE_MEMORIA_FILO>>>');

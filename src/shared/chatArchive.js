@@ -119,6 +119,28 @@
     return `${head}\n…(parte centrale della conversazione omessa)…\n${tail}`;
   }
 
+  // La trascrizione per CERCA_CHAT con l'id: intera fino a `cap`, oltre testa e coda, e la parte omessa si legge
+  // davvero, a pezzi, richiamando con `da` (#868: il contesto della chat promette di rileggere intero un messaggio tagliato).
+  const PEZZO_RILETTURA = 30000;
+  function transcriptForReading(messages, { da = null, cap = 8000, pezzo = PEZZO_RILETTURA } = {}) {
+    const full = (Array.isArray(messages) ? messages : [])
+      .filter((m) => m && String(m.text || '').trim())
+      .map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${String(m.text).replace(/\s+/g, ' ').trim()}`)
+      .join('\n');
+    const n = full.length;
+    const inizio = Number(da);
+    if (da == null || da === '' || !Number.isFinite(inizio)) {
+      if (n <= cap) return full;
+      const a = Math.floor(cap * 0.6);
+      const b = n - Math.floor(cap * 0.4);
+      return `${full.slice(0, a)}\n…(parte centrale omessa: caratteri ${a}-${b} di ${n}; si legge richiamando CERCA_CHAT con questo id e da = ${a})…\n${full.slice(b)}`;
+    }
+    const a = Math.min(n, Math.max(0, Math.floor(inizio)));
+    const b = Math.min(n, a + pezzo);
+    const dopo = b < n ? `; il seguito con da = ${b}` : '; qui finisce la conversazione';
+    return `…(caratteri ${a}-${b} di ${n}${dopo})…\n${full.slice(a, b)}`;
+  }
+
   // ── Voce d'elenco ────────────────────────────────────────────────────────
   // Quello che la pagina Cronologia deve mostrare senza scaricarsi addosso
   // tutte le conversazioni: titolo, date, tipo, quanti messaggi, e un estratto
@@ -136,6 +158,8 @@
       closedAt: chat.closedAt || null,
       messageCount: messages.length,
       excerpt: excerptOf(messages, chat.title || fallbackTitle(messages)),
+      // Una conversazione di un'altra app (#974): si riapre nel filo o nella sua app, non si continua dalla home.
+      ...(chat.app ? { app: chat.app, dove: typeof chat.dove === 'string' ? chat.dove : '' } : {}),
     };
   }
 
@@ -279,7 +303,9 @@
     const tutte = normalizeForSearch(query).split(/\s+/).filter(Boolean);
     if (!tutte.length) return { results: taglia(candidate), termini: [], allargata: false };
 
-    const hays = new Map(candidate.map((c) => [c.id, haystackOf(c)]));
+    // `o.testo(c)`: dove cercare quando i candidati non sono chat (le pagine del filo), con gli stessi tre passi.
+    const pagliaio = typeof o.testo === 'function' ? (c) => normalizeForSearch(o.testo(c)) : haystackOf;
+    const hays = new Map(candidate.map((c) => [c.id, pagliaio(c)]));
     const conTutte = candidate.filter((c) => tutte.every((t) => hays.get(c.id).includes(t)));
     if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
 
@@ -363,9 +389,23 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
+      const guardate = [
+        ...(Array.isArray(turn.guardate) ? turn.guardate : []),
+        ...(Array.isArray(turn.actions) ? turn.actions : [])
+          .filter((a) => a && String(a.type || '').toUpperCase() === 'VEDI_SCHERMO' && a._executed !== false && a._output && a._output.testo)
+          .map((a) => a._output.finestra),
+      ].filter((n) => typeof n === 'string' && n.trim()).map((n) => n.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120));
+      if (guardate.length) out.guardate = [...new Set(guardate)].slice(0, 20);
       // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
       const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
       if (cambi.length) out.cambi = cambi;
+      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora.
+      const linkDaConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
+        .filter((x) => x && typeof x.url === 'string' && x.url)
+        .slice(0, 200)
+        .map((x) => ({ url: x.url, motivo: String(x.motivo || '').slice(0, 200) }));
+      if (linkDaConfermare.length) out.linkDaConfermare = linkDaConfermare;
     }
     return out;
   }
@@ -512,6 +552,7 @@
     normalizeKindOrNull,
     parseTriage,
     transcriptForTriage,
+    transcriptForReading,
     toIndexEntry,
     excerptOf,
     isVisibleByDefault,

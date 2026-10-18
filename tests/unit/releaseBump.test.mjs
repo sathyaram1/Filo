@@ -205,6 +205,18 @@ describe('il CLI', () => {
     assert.equal(r.stdout.trim(), '');
   });
 
+  // #1210: il segreto incollato con la riga rientrata in cui routine-keys la stampava.
+  test('una parola d’ordine con spazi e a capo ai bordi arriva pulita, e su stdout resta SOLO il numero', async () => {
+    const { srv, richieste, port } = await fintoServer({ ok: true, version: '0.2.197', previous: '0.2.196' });
+    try {
+      const r = await cli(port, { passphrase: '    segreto-di-prova\n' });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(richieste[0].body.passphrase, 'segreto-di-prova');
+      assert.equal(r.stdout, '0.2.197\n', 'l’avviso dei bordi sta su stderr: lo stdout lo cattura il lavoro di pubblicazione');
+      assert.match(r.stderr, /::warning::FILO_BUILD_PASSPHRASE ha spazi/);
+    } finally { srv.close(); }
+  });
+
   test('senza la credenziale non si chiede niente → uscita 2', async () => {
     const { srv, richieste, port } = await fintoServer({ ok: true, version: '0.2.197' });
     try {

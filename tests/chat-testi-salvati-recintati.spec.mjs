@@ -99,7 +99,8 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
 
   const calls = await app.evaluate(() => globalThis.__calls);
   expect(calls).toHaveLength(3);
-  const sistema = calls[2][0].content;
+  // Istruzioni e contesto di adesso (#868: il contesto sta subito prima della domanda, non nel messaggio di sistema).
+  const sistema = calls[2].filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => m.content).join('\n');
   // Il modello li vede (sa quali sveglie e quali appunti ci sono)…
   const { volte, fuori } = await conta(app, sistema, AGO);
   expect(volte).toBeGreaterThanOrEqual(2);
@@ -194,7 +195,9 @@ test('il testo di un file dell\'editor letto per intero torna recintato', async 
   expect(fuori).toBe(0);
   // La chiusura scritta nel file non ha chiuso niente: ne resta una sola, la vera.
   const m = await app.evaluate(() => globalThis.SN_ESTERNO.marcature('TESTO_SALVATO'));
-  const dopoIlFile = prompt.slice(prompt.indexOf('[Contenuto completo del file'));
+  const inizioFile = prompt.indexOf('[Contenuto completo del file');
+  const fineFile = prompt.indexOf('═══ CONTESTO DI ADESSO', inizioFile);
+  const dopoIlFile = prompt.slice(inizioFile, fineFile < 0 ? undefined : fineFile);
   expect(dopoIlFile.split(m.fine).length - 1).toBe(1);
 });
 

@@ -11,6 +11,7 @@
 // + funzione pura iniettata via page.evaluate).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi } from './helpers/riquadri.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
 
@@ -90,11 +91,12 @@ test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due cam
   const item = menu.locator('.sn-menu-item', { hasText: 'Invia attacco' });
   await expect(item).toBeVisible();
 
-  // Click → apre il pannello con i due campi separati.
+  // Click → apre il pannello con i due campi separati (su un sito, in uno shadow root chiuso: #1071).
   await item.click();
-  await expect(page.locator('.sn-rt-overlay .sn-rt-attack')).toBeVisible({ timeout: 4000 });
-  await expect(page.locator('.sn-rt-overlay .sn-rt-desc')).toBeVisible();
-  await expect(page.locator('.sn-rt-overlay .sn-rt-send')).toBeVisible();
+  const visibile = async (sel) => !!(await statoDi(app, page, sel))?.visibile;
+  await expect.poll(() => visibile('.sn-rt-overlay .sn-rt-attack'), { timeout: 4000 }).toBe(true);
+  expect(await visibile('.sn-rt-overlay .sn-rt-desc')).toBe(true);
+  expect(await visibile('.sn-rt-overlay .sn-rt-send')).toBe(true);
 });
 
 test('mappa pura status→messaggio (spec §8.1)', async ({ app, openTab }) => {

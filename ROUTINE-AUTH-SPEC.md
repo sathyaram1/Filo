@@ -361,25 +361,24 @@ Da oggi la fusione è una consegna del canale come le altre:
      non una richiesta che verrebbe approvata e fallirebbe;
   5. fusione di **quello sha**, via API GitHub con l'identità del server.
      Conflitto → `conflict`, niente fusione.
-- **La pre-approvazione per singola pratica** (dal 2026-09-13). L'owner può
-  mettere sulla pratica un segno — «Fondi senza chiedermelo», dal dettaglio in
-  Gestione o con `scripts/owner-feedback.mjs <id> --preapprova`; si toglie con
-  «Chiedimi prima di fondere» / `--chiedi-prima`. È il campo
-  `mergePreapproved { by, at }` sul documento del feedback, scrivibile solo
-  dall'owner (regole Firestore) e valido finché la pratica è aperta. Al passo
-  4, se L5 blocca **e** la pratica porta il segno, il server **non apre la
-  richiesta**: fa gli stessi passi di una fusione approvata (la prova di
-  fusione è già passata; un conflitto esce come `conflict` prima), fonde lo
-  sha esaminato con la sua identità e registra la fusione nella collezione
-  delle approvazioni con `preapproved: true`, chi aveva messo il segno e
-  **l'elenco intero** di ciò che L5 aveva segnalato (gate, file, righe: senza
-  tetto). Il blocco resta comunque nel registro dei rifiuti. Il lavoratore
-  riceve `merged` e chiude la pratica come dopo ogni fusione. L'owner rilegge
-  a posteriori in Gestione → Automazioni, «Fuse senza chiedere»
-  (`ownerMergeApprovals {op:'list'}` → `preapproved`, stessa finestra di
-  `recent`). Vale **solo** per il lavoro delle routine: `npm run finish`
-  locale non guarda il segno e apre la richiesta come sempre. Non esiste una
-  pre-approvazione globale o per mittente.
+- **La fiducia decide L5** (dal #1148, SPEC-DOMANDE.md §1.5; al posto della
+  pre-approvazione per pratica del 2026-09-13). Ogni biglietto nasce pulito o
+  sporco e si sporca quando il server gli consegna qualcosa di non fidato
+  (`channel.fetchWork`, prima della consegna); ogni biglietto che può spingere
+  sul ramo entra nel registro `routine-branches` con la sua fiducia e lo sha
+  (emissione, consegne `fixed`/`status`, riallineamenti del server). Al passo
+  4, se L5 blocca **e** il lavoro è fidato (feedback fidato, registro tutto
+  fidato, nessun buco, la punta è l'ultimo sha registrato), il server **non
+  apre la richiesta**: fonde lo sha esaminato con la sua identità e registra
+  la fusione nella collezione delle approvazioni con `preapproved: true`,
+  `skippedL5: true`, `motivo: 'fiducia'` e **l'elenco intero** di ciò che L5
+  aveva segnalato. Il blocco resta nel registro dei rifiuti. L'owner rilegge a
+  posteriori in Gestione → Log, «Fuse senza chiedere». Lo stesso vale
+  per «Salta il controllo» e per il finish locale (registro scritto da
+  `verify-local start` e `finish` col biglietto della sessione). Lavoro non
+  fidato → richiesta all'owner come prima. `mergePreapproved` non si scrive
+  più: lo legge solo la decisione dei rami nati prima del registro
+  (`fiduciaRamo.decisioneL5Legacy`), finché l'ultimo non si chiude.
 - **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
   e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
   1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
@@ -404,15 +403,10 @@ Da oggi la fusione è una consegna del canale come le altre:
   riallinea: il suo ramo vive anche nella cartella dell'owner, e un commit
   messo sul remoto dal server farebbe respingere in silenzio il salvataggio
   automatico di quella cartella.
-- **Il segno di pre-approvazione**, in breve: l'owner può marcare una pratica
-  con «Fondi senza chiedermelo» (dal dettaglio in Gestione, o dallo script
-  locale dei feedback; si toglie con «Chiedimi prima di fondere»). Con il
-  segno, un blocco L5 sul lavoro di quella pratica non apre la richiesta: il
-  server fonde come dopo un'approvazione e registra la fusione fra le
-  approvazioni con `preapproved: true`, chi aveva messo il segno e l'elenco
-  intero dei blocchi (`ownerMergeApprovals {op:'list'}` → `preapproved`).
-  Vale solo per il lavoro delle routine, mai per il finish locale; non esiste
-  una pre-approvazione globale o per mittente.
+- **Il segno del clic** (#515): un'approvazione col clic vale anche per i
+  riallineamenti dello stesso ciclo, limitata ai blocchi già approvati. Dal
+  #1148 il segno vive nello stato del giro (`routine-state/{id}.approvatoIl`,
+  solo server) e si toglie quando la pratica entra o esce dalla chiusura.
 
 ### L'identità del server: una GitHub App (2026-08-20)
 
@@ -606,9 +600,10 @@ La regola, uguale per tutti e due:
   tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
   `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
   detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
-  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
-  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
-  copia che il ramo si porta dietro;
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto, come quelli di ogni testo che
+  uno strumento del giro stampa (suo o del server), portano agli **attrezzi del
+  giro** (`absolutizeOutput`), non a `scripts/…`, che riporterebbe alla copia
+  che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
   Il rifiuto e le note del citofono si reggono sullo specchio locale («la
   verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo

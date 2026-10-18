@@ -78,11 +78,59 @@
     return dup;
   }
 
+  // «Tieni sempre aperto X» (#823): la voce è un host, e copre anche i suoi sottodomini. Il sito registrabile
+  // sarebbe troppo largo: «tieni aperto Google Docs» non deve tenere aperte anche le ricerche su google.com.
+  // Un nome senza punto è una macchina (localhost, il NAS dell'ufficio) solo detto come indirizzo, con schema o
+  // porta: «whatsapp» da solo è un nome di servizio, e salvarlo non terrebbe aperto niente.
+  function hostTenuto(v) {
+    let s = String(v == null ? '' : v).trim().toLowerCase();
+    if (!s) return '';
+    const conSchema = /^[a-z][a-z0-9+.-]*:\/\//.test(s);
+    if (!conSchema) s = `https://${s}`;
+    let host;
+    let porta;
+    try {
+      const u = new URL(s);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+      host = u.hostname;
+      porta = u.port;
+    } catch (_) { return ''; }
+    host = host.replace(/\.$/, '').replace(/^www\./, '');
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) || /^\[[0-9a-f:.]+\]$/.test(host)) return host;
+    return /^[a-z0-9-]+$/.test(host) && (host === 'localhost' || conSchema || porta) ? host : '';
+  }
+
+  function copreHost(voce, host) {
+    return !!voce && !!host && (host === voce || host.endsWith(`.${voce}`));
+  }
+
+  // La voce salvata che tiene aperta `url`, o null.
+  function voceTenuta(url, voci) {
+    if (!/^https?:\/\//i.test(String(url || ''))) return null;
+    const host = hostTenuto(url);
+    let presa = null;
+    for (const v of (Array.isArray(voci) ? voci : [])) {
+      if (copreHost(v, host) && (!presa || v.length > presa.length)) presa = v;
+    }
+    return presa;
+  }
+
+  // Le voci che «non tenere più aperto X» toglie: quelle che coprono X e quelle che X copre
+  // (salvato web.whatsapp.com, l'utente dice whatsapp.com).
+  function vociDaTogliere(input, voci) {
+    const host = hostTenuto(input);
+    if (!host) return [];
+    return (Array.isArray(voci) ? voci : []).filter((v) => copreHost(v, host) || copreHost(host, v));
+  }
+
   global.SN_TAB_TRIAGE = {
     isEphemeralInternalUrl,
     isTriageableUrl,
     normalizeForDedup,
     findDuplicateIndices,
     EPHEMERAL_INTERNAL_HOSTS,
+    hostTenuto,
+    voceTenuta,
+    vociDaTogliere,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

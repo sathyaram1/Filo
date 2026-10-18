@@ -3,6 +3,8 @@
 // fabbricherebbe un pulsante per avere gesti veri. Regole: tests/unit/adSkip.test.mjs; il lato pagina è src/content/adSkip.js.
 'use strict';
 
+const Permessi = require('./permessiPagine');
+
 // Fra due clic veri sulla stessa scheda: più fitto di così non serve nemmeno a una serie di pubblicità.
 const INTERVALLO_MS = 800;
 const ultimoClic = new WeakMap();
@@ -160,6 +162,7 @@ function clicVero(wc, msg, { win, view, ora = Date.now() } = {}) {
   const p = b && puntoNellaVista(msg, zoom, b.width, b.height);
   if (!p) return { ok: false, code: 'punto' };
   ultimoClic.set(wc, ora);
+  Permessi.clicDiFilo(wc);
   try {
     wc.sendInputEvent({ type: 'mouseMove', x: p.x, y: p.y });
     wc.sendInputEvent({ type: 'mouseDown', x: p.x, y: p.y, button: 'left', clickCount: 1 });
@@ -179,6 +182,7 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now() } = {}) {
   try { zoom = wc.getZoomFactor(); } catch (_) { zoom = 1; }
   if (!b || !puntoNellaVista(msg, zoom, b.width, b.height)) return { ok: false, code: 'punto' };
   ultimoClic.set(wc, ora);
+  Permessi.clicDiFilo(wc);
   const dbg = wc.debugger;
   let mio = false;
   try {

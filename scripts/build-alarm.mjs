@@ -164,9 +164,29 @@ export async function inviaAllarme(name, text, chiavi = []) {
   if (!(await spedisciAllarme(name, text, chiavi))) process.exit(1);
 }
 
+/** Dove va la parola della costruzione: i lavori la leggono dall'ambiente, che fa ombra al segreto omonimo del repo. */
+export const DOVE_VA_LA_PAROLA = 'nell\'ambiente «rilascio» del repo (Settings → Environments → rilascio): quella col nome uguale fra i segreti del repo non la legge nessuno';
+
+let bordiDetti = false;
+
+/**
+ * FILO_BUILD_PASSPHRASE senza spazi né a capo ai bordi, che il server non perdona: copiata con la riga rientrata di
+ * routine-keys finiva nel segreto con quattro spazi davanti, e allarmi, chiavi e numero di versione tacevano (#1210).
+ */
+export function parolaDellaCostruzione(env = process.env) {
+  const grezza = typeof env?.FILO_BUILD_PASSPHRASE === 'string' ? env.FILO_BUILD_PASSPHRASE : '';
+  const parola = grezza.trim();
+  if (parola && parola !== grezza && !bordiDetti) {
+    bordiDetti = true;
+    // Su stderr: lo stdout di release-bump è il numero di versione, e lo cattura il lavoro di pubblicazione.
+    console.warn(`::warning::FILO_BUILD_PASSPHRASE ha spazi o a capo ai bordi: tolti prima di spedirla. Il segreto va ricopiato senza, ${DOVE_VA_LA_PAROLA}.`);
+  }
+  return parola;
+}
+
 /** Come inviaAllarme, ma dice se è arrivato invece di fermare il processo: per chi deve proseguire comunque. */
 export async function spedisciAllarme(name, text, chiavi = []) {
-  const passphrase = process.env.FILO_BUILD_PASSPHRASE;
+  const passphrase = parolaDellaCostruzione();
 
   if (!passphrase) {
     console.error('[allarme] FILO_BUILD_PASSPHRASE assente: non posso avvisare nessuno.');
@@ -204,6 +224,10 @@ export async function spedisciAllarme(name, text, chiavi = []) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok || !body.ok) {
       console.error(`[allarme] non consegnato (${res.status}${body.reason ? ' ' + body.reason : ''}).`);
+      // In evidenza nella corsa: in coda al registro nessuno lo legge, e la pubblicazione si ferma in silenzio (#1210).
+      if (res.status === 401 || body.reason === 'bad_passphrase') {
+        console.error(`::error::Allarme non consegnato: il server non riconosce FILO_BUILD_PASSPHRASE di questo lavoro. Va ricopiata, quella in uso, ${DOVE_VA_LA_PAROLA}. Senza, nessun guasto della costruzione diventa un feedback e la pubblicazione non parte.`);
+      }
       return false;
     }
     if (body.duplicate) {

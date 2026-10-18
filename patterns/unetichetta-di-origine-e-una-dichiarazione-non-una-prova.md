@@ -56,10 +56,28 @@ La regola, in tre pezzi:
   dopo e se la sua firma regge, e a dichiarare è chi ha firmato quel manifesto.
 - **Dai pixel non si stima niente.** Niente classificatori a percentuale, e il
   modello che descrive l'immagine non parla della sua origine. Un marchio
-  invisibile (TrustMark, quello di Stable Diffusion) è un messaggio noto, non una
-  stima, e se arriverà (#889) si leggerà dove l'immagine è già decodificata per
-  mostrarla, mai nel processo principale: un decoder d'immagini lì è una porta
-  aperta a chiunque mandi un file.
+  invisibile aperto invece è un messaggio fisso che il generatore scrive nei
+  pixel, e si legge come un'etichetta senza firma: «porta il marchio che
+  Stable Diffusion XL mette nelle sue immagini» (#889). Si cerca solo se il file
+  non dichiara niente, e solo coi marchi che si decodificano sul computer senza
+  servizi (dwtDct di invisible-watermark: SD 1, SDXL, FLUX.1). TrustMark resta
+  fuori perché da solo non dice «AI», SynthID perché lo legge solo Google.
+- **Un marchio entra con una soglia scelta prima di guardare le foto vere.** La
+  lettura del decodificatore di riferimento (bit a maggioranza) sbaglia anche sui
+  file che il suo stesso codificatore ha appena marcato: Filo confronta invece le
+  medie per posizione con un test esatto (Mann-Whitney, 1e-9 per messaggio e per
+  lettura), valido perché senza marchio le posizioni sono scambiabili. Il centro
+  di U conta: chi marca l'uscita del modello (diffusers, FLUX) lavora in virgola
+  mobile, chi marca un file salvato (SD 1) sugli 8 bit, e letto nell'altro modo
+  un marchio di SDXL sembra rumore. Le prove usano file marcati dalla libreria di
+  riferimento lungo il cammino vero di ogni generatore
+  (`tests/fixtures/marchi/genera.py`) e foto vere che non devono accendere niente.
+- **I pixel si decodificano nel recinto, in JS puro.** PNG con lo zlib di Node,
+  JPEG con jpeg-js, nel thread a tempo e memoria limitati dove già si leggono le
+  etichette: un decoder nativo nel processo principale sarebbe una porta aperta a
+  chiunque mandi un file, e un modulo nativo per architettura romperebbe il
+  pacchetto universale per Mac. L'esito si ricorda per l'impronta dei byte, così
+  menu, Aiuto e chat non decodificano tre volte la stessa immagine.
 
 **I nomi dentro l'etichetta li scrive chi ha fatto il file.** Il soggetto di un
 certificato e il generatore dichiarato sono contenuto esterno a tutti gli
@@ -102,6 +120,7 @@ un'immagine.
 
 Il codice: `src/shared/provenienzaImmagine.js` (lettura dei contenitori, JUMBF,
 COSE, catena fino all'elenco, ingredienti, verdetto e frase),
+`src/shared/marchiInvisibili.js` (i marchi aperti nei pixel e la loro soglia),
 `src/main/services/firmatariC2pa.js`
 (l'elenco: scaricarlo, tenerlo, e l'unica lettura che usano menu, chat e Aiuto),
 `tests/helpers/immagineFirmata.mjs` (immagini di prova firmate davvero: autorità,

@@ -174,7 +174,7 @@
       chiave: `download:${r.id}`, tipo: 'download', icona: 'download', titolo: nome,
       togli: () => muovi({ tipo: 'nascondi', chiave: `download:${r.id}` }), etichettaTogli: 'Togli dalla home',
       esterno: 'download',
-      altreVoci: [{ etichetta: 'Mostra negli Scaricamenti', fai: () => apri(URL_SCARICAMENTI) }],
+      altreVoci: [{ etichetta: 'Mostra nei Download', fai: () => apri(URL_SCARICAMENTI) }],
     };
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
@@ -197,7 +197,7 @@
         ...base,
         stato: 'è un programma: aspetta il tuo sì',
         principale: { etichetta: 'Decidi', fai: () => apri(URL_SCARICAMENTI) },
-        filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dagli Scaricamenti.`,
+        filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dai Download.`,
       };
     }
     const cartella = {
@@ -234,14 +234,17 @@
     const scarica = AVVISI_AGGIORNAMENTO.includes(tipo);
     // Una versione pronta (#1039): il fallimento lo dice la barra, la carta resta per riprovare.
     const pronto = tipo === 'aggiornamento-pronto';
+    const pagina = C.paginaDiAvviso(n);
     let principale = { etichetta: 'Chiudi', fai: chiudi };
+    if (pagina) principale = { etichetta: pagina.etichetta, forte: true, fai: () => apri(pagina.url) };
     if (scarica) principale = { etichetta: 'Scarica Filo', forte: true, fai: () => apri(URL_SCARICA_FILO) };
     if (pronto) principale = { etichetta: 'Riavvia e aggiorna', forte: true, fai: () => d.send({ type: MSG.AGGIORNAMENTO_INSTALLA, avvisa: true }) };
+    const titolo = n.action && typeof n.action.titolo === 'string' && n.action.titolo.trim();
     const carta = {
       chiave: `avviso:${n.id}`, tipo: 'avviso', icona: pronto ? 'download' : allarme ? 'warning' : 'bell',
-      titolo: allarme ? 'Avviso' : 'Filo', stato: n.text, lungo: true,
+      titolo: titolo || (allarme ? 'Avviso' : 'Filo'), stato: n.text, lungo: true,
       principale,
-      secondaria: scarica || pronto ? { etichetta: 'Chiudi', fai: chiudi } : null,
+      secondaria: scarica || pronto || pagina ? { etichetta: 'Chiudi', fai: chiudi } : null,
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: n.text,
     };
@@ -432,22 +435,21 @@
   const ICONA_SUGGERIMENTO = { gmail: 'mailOpen', calendar: 'calendar', editor: 'editor', file: 'folder', note: 'note', link: 'globe', web: 'globe' };
   function faviconDi(s) {
     const tipo = String((s.action && s.action.type) || '').toUpperCase();
-    const url = tipo === 'NAVIGA' ? d.faviconUrl(s.action.url) : '';
     const ico = el('span', 'dash-carta-voce-ico');
     ico.setAttribute('aria-hidden', 'true');
     const generica = () => {
       const ICONS = global.SN_ICONS || {};
-      const nome = ICONA_SUGGERIMENTO[s.icon] || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
+      // Un nome che l'insieme delle icone conosce vale com'è: col solo elenco, «Apri Opzioni» prendeva il globo dei siti.
+      const propria = typeof ICONS[s.icon] === 'function' ? s.icon : '';
+      const nome = ICONA_SUGGERIMENTO[s.icon] || propria || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
       ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
     };
-    if (url) {
-      const img = el('img');
-      img.src = url;
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      img.onerror = () => { img.remove(); generica(); };
-      ico.appendChild(img);
-    } else generica();
+    if (tipo !== 'NAVIGA') { generica(); return ico; }
+    const img = el('img');
+    img.alt = '';
+    img.onerror = () => { img.remove(); generica(); };
+    ico.appendChild(img);
+    d.iconaDelSito(s.action.url, { soloCopie: !!s.chiedeOk }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 
@@ -788,10 +790,11 @@
     menuAperto = { nodo, primaDelMenu: document.activeElement };
     const prima = nodo.querySelector('.dash-menu-voce');
     if (prima) prima.focus({ preventScroll: true });
+    // I tasti subito: nessun tasto ha aperto il menu, e in una scheda non in vista il timer può tardare un secondo.
+    document.addEventListener('keydown', tastiMenu, true);
     setTimeout(() => {
       if (!menuAperto || menuAperto.nodo !== nodo) return;
       document.addEventListener('mousedown', fuoriDalMenu, true);
-      document.addEventListener('keydown', tastiMenu, true);
       global.addEventListener('blur', chiudiMenu);
       global.addEventListener('resize', chiudiMenu);
     }, 0);

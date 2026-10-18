@@ -16,6 +16,7 @@
   <script src="filo://shared/timeFormat.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/chatErrors.js"></script>
   <script src="filo://shared/paneLayout.js"></script>
   <script src="filo://shared/decks.js"></script>
   <script src="filo://shared/deckStats.js"></script>
@@ -36,8 +37,19 @@
       color: var(--sn-muted); font-size: 26px;
     }
     .dk-meta {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px;
       font-size: 12px; color: var(--sn-muted);
+    }
+    /* Il prezzo è il dato su cui i mazzi si confrontano (§10): colore del testo, cifre allineate, mai spezzato. */
+    .dk-price { color: var(--sn-fg); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .dk-price:empty { display: none; }
+    .sn-card-title[hidden] { display: none; }
+    /* L'id batte lo stile generico dei campi di .sn-page: il campo prende il posto del titolo senza spostarne il testo. */
+    #deckGrid .dk-card-rename {
+      font: inherit; font-size: 13px; font-weight: 600;
+      color: var(--sn-fg); background: transparent;
+      border: 1px solid var(--sn-accent); border-radius: 6px;
+      padding: 1px 5px; margin: -2px -6px; width: calc(100% + 12px); box-sizing: border-box; outline: none;
     }
     /* Palette WUBRG fissa: come per i grafici, i token di tema non bastano, servono cinque colori
        distinguibili su tema chiaro E scuro. */
@@ -56,7 +68,7 @@
       position: fixed; right: auto; top: auto; min-width: 140px;
       max-width: min(420px, calc(100vw - 16px)); max-height: min(480px, calc(100vh - 16px));
     }
-    .dk-ctxmenu .sn-select-option { transition: background-color 120ms ease; }
+    .dk-ctxmenu .sn-select-option { transition: background-color calc(120ms * var(--sn-motion, 1)) ease; }
     .dk-ctxmenu .sn-select-option:hover,
     .dk-ctxmenu .sn-select-option:focus-visible {
       background-color: rgba(var(--sn-accent-rgb), 0.18);
@@ -206,7 +218,7 @@
     }
     .dk-progress-bar > span {
       display: block; height: 100%; background: var(--sn-accent);
-      transition: width .18s ease;
+      transition: width calc(.18s * var(--sn-motion, 1)) ease;
     }
     /* Carta che il giudice non ha potuto guardare: nome attenuato e un ? col suo perché al passaggio. */
     .dk-row-unchecked .dk-row-name { color: var(--sn-muted); font-style: italic; }
@@ -302,12 +314,12 @@
       padding: 2px 9px; font: inherit; font-size: 12px; line-height: 1.4; color: var(--sn-fg);
       border: 1px solid var(--sn-border); border-radius: 6px;
       background: var(--sn-bg); cursor: pointer;
-      transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+      transition: border-color calc(.15s * var(--sn-motion, 1)) ease, background-color calc(.15s * var(--sn-motion, 1)) ease, color calc(.15s * var(--sn-motion, 1)) ease;
     }
     .dk-stop:hover, .dk-stop:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
     .dk-stop:active { color: var(--sn-accent); }
     /* Invio a chat occupata: il tasto che la tiene si accende un attimo. */
-    .dk-stop.dk-nudge { animation: dk-stop-nudge .9s ease; }
+    .dk-stop.dk-nudge { animation: dk-stop-nudge calc(.9s * var(--sn-motion, 1)) ease; }
     @keyframes dk-stop-nudge {
       0%, 100% { border-color: var(--sn-border); }
       20%, 60% { border-color: var(--sn-accent); color: var(--sn-accent); background: var(--sn-hover); }
@@ -331,7 +343,7 @@
       background: color-mix(in srgb, var(--sn-bg) 82%, transparent);
       color: var(--sn-text); font-size: 15px; line-height: 1;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: transform .18s ease, border-color .18s ease, color .18s ease;
+      transition: transform calc(.18s * var(--sn-motion, 1)) ease, border-color calc(.18s * var(--sn-motion, 1)) ease, color calc(.18s * var(--sn-motion, 1)) ease;
       backdrop-filter: blur(2px);
     }
     .dk-flip[hidden] { display: none; }
@@ -454,6 +466,21 @@
       padding: 3px 6px; outline: none;
     }
     .dk-prob-row input[type="number"]:focus { border-color: var(--sn-accent); }
+    .dk-prob-choice {
+      flex: 0 0 auto; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font: inherit; font-size: 12px; color: var(--sn-text); background: transparent;
+      border: 1px solid var(--sn-border); border-radius: 6px; padding: 3px 6px; cursor: pointer;
+      transition: border-color calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
+    }
+    .dk-prob-choice:hover, .dk-prob-choice:focus-visible { border-color: var(--sn-accent); color: var(--sn-accent); outline: none; }
+    /* La colonna «per tenere» e la sua intestazione esistono solo con almeno un mulligan: senza, il riquadro
+       resta alto come prima. */
+    .dk-prob-head { display: none; padding: 0; color: var(--sn-muted); font-size: 10px; }
+    .dk-prob-head-gap { flex: 1 1 auto; }
+    .dk-prob-col { flex: 0 0 auto; width: 56px; text-align: right; white-space: nowrap; }
+    .dk-prob-row .dk-prob-keep { display: none; }
+    #probCard[data-mull="1"] .dk-prob-head { display: flex; }
+    #probCard[data-mull="1"] .dk-prob-row .dk-prob-keep { display: inline-block; }
     .dk-prob-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .dk-prob-result { font-weight: 600; }
     /* Finché la stima si raffina un puntino pulsa piano accanto al risultato, e sparisce quando ha finito. */
@@ -461,7 +488,7 @@
       content: ''; display: inline-block; margin-left: 6px;
       width: 6px; height: 6px; border-radius: 50%;
       background: var(--sn-accent); vertical-align: middle;
-      animation: dk-prob-pulse 0.9s ease-in-out infinite;
+      animation: dk-prob-pulse calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes dk-prob-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
     @media (prefers-reduced-motion: reduce) {
@@ -523,7 +550,7 @@
       border-left: 3px solid var(--sn-accent); border-radius: 10px;
       box-shadow: var(--sn-shadow); padding: 12px 14px; font-size: 13px;
       line-height: 1.4; color: var(--sn-fg); opacity: 0; transform: translateY(8px);
-      transition: opacity 0.18s ease, transform 0.18s ease;
+      transition: opacity calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.18s * var(--sn-motion, 1)) ease;
       pointer-events: none; z-index: 2147483001;
     }
     /* Visibile prende il puntatore (sopra, il tempo aspetta; un clic lo chiude); nascosto torna trasparente. */
@@ -646,7 +673,26 @@
                     <label for="probTurn">Turno</label>
                     <input id="probTurn" type="number" min="1" max="30" step="1" value="4" />
                   </div>
+                  <div class="dk-prob-row dk-prob-head" aria-hidden="true">
+                    <span class="dk-prob-head-gap"></span>
+                    <span class="dk-prob-col">al turno</span>
+                    <span class="dk-prob-col dk-prob-keep">per tenere</span>
+                  </div>
                   <div id="probNeeds"></div>
+                  <div class="dk-prob-row">
+                    <label for="probGame" id="probGameLabel">Partita</label>
+                    <button id="probGame" class="dk-prob-choice" type="button" data-game="multi"
+                            aria-haspopup="menu" aria-labelledby="probGameLabel probGame"
+                            title="Chi pesca al primo turno, e se il primo mulligan è gratis">a più giocatori ▾</button>
+                  </div>
+                  <div class="dk-prob-row">
+                    <label for="probMull" title="Quante volte al massimo rifai la mano iniziale">Mulligan</label>
+                    <input id="probMull" type="number" min="0" max="7" step="1" value="0" />
+                  </div>
+                  <div class="dk-prob-row">
+                    <label for="probExtra" title="Carte pescate in più entro il turno, oltre a quella di ogni turno">Pescate extra</label>
+                    <input id="probExtra" type="number" min="0" max="99" step="1" value="0" />
+                  </div>
                   <div class="dk-prob-actions">
                     <span class="dk-prob-result" id="probResult" aria-live="polite"></span>
                   </div>

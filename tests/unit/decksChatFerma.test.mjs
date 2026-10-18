@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { EventEmitter } from 'node:events';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -86,7 +87,7 @@ const FILO = 'filo://decks/decks.html';
 const scheda = (id) => Object.assign(new EventEmitter(), { id, send() {}, isDestroyed: () => false });
 const chat = (msg, wc) => handlers.get(MSG.DECKS_CHAT)(msg, { wc }, FILO);
 const ferma = (reqId, wc, origin = FILO) => handlers.get(MSG.DECKS_CHAT_STOP)({ reqId }, { wc }, origin);
-const finché = async (cond) => { for (let i = 0; i < 200 && !cond(); i += 1) await new Promise((r) => setTimeout(r, 5)); };
+const finché = (cond) => aspettaChe(cond, { ogniMs: 5 });
 
 function seedDeck() {
   const d = Decks.newDeck({ nome: 'Prova' });

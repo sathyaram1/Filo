@@ -110,8 +110,8 @@ test('le combinazioni che il sistema operativo si prende sono riconosciute', () 
 test("l'Editor non ha un suo parser dei tasti: chiede a SN_TASTI", () => {
   const src = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
   assert.match(src, /TASTI\.combacia\(/, 'la pressione va confrontata con SN_TASTI.combacia');
-  assert.match(src, /TASTI\.pezzoSconosciuto\(/, 'il salvataggio deve rifiutare un nome sconosciuto');
+  // I controlli comuni (nomi sconosciuti, tasti del sistema e di Filo) sono la regola di SN_TASTI, la stessa delle azioni di Filo (#842).
+  assert.match(src, /TASTI\.rifiutoScritta\(/, 'il salvataggio deve chiedere a SN_TASTI se la scorciatoia partirebbe');
   assert.doesNotMatch(src, /SHORTCUT_MODIFIERS\s*=/, 'secondo elenco dei modificatori tornato nell\'Editor');
-  assert.match(src, /TASTI\.delSistema\(/, 'il salvataggio deve rifiutare un tasto del sistema');
   assert.doesNotMatch(src, /function eventKeyCandidates/, 'secondo parser dei tasti tornato nell\'Editor');
 });

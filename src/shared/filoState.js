@@ -6,7 +6,6 @@
 //   - TAB APERTE (URL/titolo/focus, ultima attività via chrome.tabs)
 //   - PROCESSI ATTIVI (timer, notifiche pending)
 //   - NOTIFICHE NON GESTITE
-//   - AZIONI RECENTI (ultime 24h dal raw log)
 //   - DASHBOARD ATTUALE (cache dell'ultimo output del Generatore Dashboard)
 //
 // Esposto come funzione che ritorna sia l'oggetto strutturato sia un testo
@@ -110,6 +109,15 @@
     } catch (_) { return null; }
   }
 
+  // «Tieni sempre aperto X» (#823): a «quali siti tieni aperti?» il modello risponde col dato. Solo host: una voce
+  // arrivata da un backup con altro dentro non entra nel prompt.
+  async function readSempreAperte(Mem) {
+    try {
+      const voci = Mem && typeof Mem.listKeepOpen === 'function' ? Object.keys(await Mem.listKeepOpen()) : [];
+      return voci.filter((h) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h)).sort();
+    } catch (_) { return []; }
+  }
+
   // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
   // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
   // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
@@ -122,21 +130,47 @@
     }
   }
 
+  // Gli ultimi messaggi del filo per chi non ha il filo davanti (la home, il creatore di lezioni): la chat ha il tratto
+  // intero (#868) e non li riceve. Un taglio si dichiara: «…» sul testo, e quanti messaggi restano fuori.
+  const ORE_CONVERSAZIONI = 24;
+  const MAX_CONVERSAZIONI = 40;
+  const CARATTERI_CONVERSAZIONE = 300;
+  function conversazioniRecenti(messaggi, ora = Date.now()) {
+    const da = Number(ora) - ORE_CONVERSAZIONI * 3600 * 1000;
+    const recenti = (Array.isArray(messaggi) ? messaggi : [])
+      .filter((m) => m && String(m.text || '').trim() && Date.parse(m.ts) >= da);
+    const presi = recenti.slice(-MAX_CONVERSAZIONI);
+    return {
+      righe: presi.map((m) => {
+        const t = String(m.text).replace(/\s+/g, ' ').trim();
+        const testo = t.length > CARATTERI_CONVERSAZIONE ? `${t.slice(0, CARATTERI_CONVERSAZIONE)}…` : t;
+        // La riga di una conversazione di un'altra app (#974) non l'ha detta nessuno dei due: è un fatto.
+        if (m.riga) return `- [${formatRelativeTime(m.ts)}] ${testo}`;
+        return `- [${formatRelativeTime(m.ts)}] ${m.role === 'user' ? 'utente' : 'Filo'}: ${testo}`;
+      }),
+      tolti: recenti.length - presi.length,
+    };
+  }
+
   // `sistema: false`: il messaggio della home resta in cache per ore, e una batteria citata lì invecchierebbe.
-  async function assemble({ creditiFreschi = false, sistema: conSistema = true } = {}) {
+  // `conversazioni`: i messaggi del filo, per chi non li ha già davanti (vedi conversazioniRecenti).
+  async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, cambi, sistema, autonomia] = await Promise.all([
+    // Le due letture che possono far aspettare un turno (computer e saldo): i loro tempi vanno nella cronologia (#1097.1).
+    const attese = {};
+    const cronometra = (nome, p) => { const t = Date.now(); return p.finally(() => { attese[nome] = Date.now() - t; }); };
+    const [tabs, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia, sempreAperte] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
       Mem.listNotifications(),
       Mem.getDashboardCache(),
-      Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
-      readCredits({ fresco: creditiFreschi }),
+      cronometra('saldoMs', readCredits({ fresco: creditiFreschi })),
       readCambi(),
-      conSistema ? readSistema() : Promise.resolve(undefined),
+      conSistema ? cronometra('sistemaMs', readSistema()) : Promise.resolve(undefined),
       readAutonomia(),
+      readSempreAperte(Mem),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -158,6 +192,7 @@
         session: sessionInfo,
       },
       tabs,
+      sempreAperte,
       // Filtra i timer scaduti (non in pausa): se Filo era chiuso alla scadenza
       // non c'è stata notifica, quindi mostrarli come "processi attivi" al boot
       // confonde l'LLM ("Il timer sta per suonare" in modo permanente).
@@ -184,8 +219,8 @@
         text: n.text,
         ageRel: formatRelativeTime(n.ts),
       })),
-      recentActions: rawLog,
       cambi: cambi ? { righe: cambi.righe || [], tolti: cambi.tolti || 0 } : null,
+      conversazioni: Array.isArray(conversazioni) ? conversazioniRecenti(conversazioni, now.getTime()) : null,
       dashboard: dashboardCache,
       credits,
       sistema,
@@ -193,7 +228,7 @@
     };
 
     const stateText = renderForPrompt(state);
-    return { state, stateText };
+    return { state, stateText, attese };
   }
 
   // #593 (terzo giro di verifica) — la busta del contenuto esterno, e la
@@ -318,6 +353,11 @@
       lines.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n') }));
     }
     lines.push('');
+    if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
+      lines.push('SITI SEMPRE APERTI (la pulizia delle schede non li archivia; si tolgono con NON_TENERE_APERTA)');
+      lines.push(state.sempreAperte.join(', '));
+      lines.push('');
+    }
     // ZOOM — #686: il livello della scheda davanti, come Filo vede il titolo.
     // Sempre, anche al 100%: senza la riga, a «a quanto è lo zoom?» il modello
     // rispondeva a naso. È un dato di Filo, non del sito: fuori dalla busta.
@@ -364,13 +404,6 @@
     if (!state.notifications.length) lines.push('(nessuna)');
     else lines.push(salvati(state.notifications.map((n) => `- [${n.ageRel}] ${n.kind}: ${n.text}`)));
     lines.push('');
-    lines.push('AZIONI RECENTI (ultime 24h)');
-    if (!state.recentActions.length) lines.push('(nessuna)');
-    else {
-      lines.push(salvati(state.recentActions.slice(0, 30)
-        .map((a) => `- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`)));
-    }
-    lines.push('');
     // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
     if (state.cambi) {
       lines.push('CAMBI RECENTI (impostazioni, aspetto, sveglie e timer, regole del proxy, zoom; dal più vecchio al più nuovo)');
@@ -380,6 +413,7 @@
       if (state.cambi.tolti > 0) lines.push(`(più ${state.cambi.tolti} cambi più vecchi, non elencati qui)`);
       lines.push('');
     }
+    if (state.conversazioni) lines.push(testoConversazioni(state.conversazioni, salvati), '');
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
       const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
@@ -396,5 +430,18 @@
     return lines.join('\n');
   }
 
-  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate };
+  // Le frasi le hanno scritte l'utente e un modello che può aver letto una pagina: recinto come gli altri testi salvati.
+  function testoConversazioni(c, salvati) {
+    const E = esterno();
+    const recinto = salvati || ((righe) => E.imbusta({
+      tipo: 'TESTO_SALVATO', conIntestazione: true, testo: righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n'),
+    }));
+    const out = [`CONVERSAZIONI RECENTI (ultime ${ORE_CONVERSAZIONI} ore, tutte le schede; dal più vecchio al più nuovo)`];
+    if (!c || !c.righe.length) out.push('(nessuna)');
+    else out.push(recinto(c.righe));
+    if (c && c.tolti > 0) out.push(`(più ${c.tolti} messaggi più vecchi, non elencati qui)`);
+    return out.join('\n');
+  }
+
+  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate, conversazioniRecenti, testoConversazioni };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

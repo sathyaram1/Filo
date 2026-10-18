@@ -1,5 +1,6 @@
 // Chiamate di rete della pipeline (stage 1 + parte di stage 3): best-effort, non lanciano mai e non bloccano la
-// navigazione. Timeout corti; RDAP e CT distinguono «non si sa» (null) da «non ha risposto» (TRANSIENT).
+// navigazione. Timeout corti; RDAP e CT distinguono «non si sa» (null) da «non ha risposto» (TRANSIENT); Safe Browsing
+// dice l'errore, che non vale «pulito».
 
 'use strict';
 
@@ -19,9 +20,10 @@ async function fetchJson(url, opts = {}, timeoutMs = TIMEOUT_MS) {
   }
 }
 
-// ── Google Safe Browsing v4 (stage 1: blacklist) ──────────────────────────
-// Richiede una API key (Google Cloud, API "Safe Browsing"). Senza chiave →
-// null (lo stage 1 viene semplicemente saltato; gli altri stage reggono).
+// ── Google Safe Browsing v5, hashes.search (stage 1: blacklist) ─────────
+// L'unico punto che conosce indirizzo e formato del servizio: passare a Web Risk vuol dire riscrivere solo questo.
+// Escono soltanto prefissi di 4 byte (gsb.js). Senza chiave → null, e non parte nessuna richiesta.
+const GSB_SEARCH = 'https://safebrowsing.googleapis.com/v5/hashes:search';
 const GSB_THREATS = {
   SOCIAL_ENGINEERING: 'phishing',
   MALWARE: 'malware',
@@ -29,28 +31,39 @@ const GSB_THREATS = {
   POTENTIALLY_HARMFUL_APPLICATION: 'malware',
 };
 
-async function safeBrowsingLookup(rawUrl, apiKey) {
-  if (!apiKey || !rawUrl) return null;
-  const endpoint = `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${encodeURIComponent(apiKey)}`;
-  const body = {
-    client: { clientId: 'filo-browser', clientVersion: '0.1' },
-    threatInfo: {
-      threatTypes: ['MALWARE', 'SOCIAL_ENGINEERING', 'UNWANTED_SOFTWARE', 'POTENTIALLY_HARMFUL_APPLICATION'],
-      platformTypes: ['ANY_PLATFORM'],
-      threatEntryTypes: ['URL'],
-      threatEntries: [{ url: rawUrl }],
-    },
-  };
-  const data = await fetchJson(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!data || !Array.isArray(data.matches) || data.matches.length === 0) {
-    return { listed: false };
+function durationMs(d) {
+  const m = /^(\d+(?:\.\d+)?)s$/.exec(String(d || ''));
+  return m ? Math.round(Number(m[1]) * 1000) : 0;
+}
+
+// → { ok:true, matches:[{ hash, threatType, category }], cacheMs } | { ok:false, status } | null.
+async function hashesSearch(prefixes, apiKey) {
+  if (!apiKey || !Array.isArray(prefixes) || !prefixes.length) return null;
+  const q = new URLSearchParams({ key: apiKey, alt: 'json' });
+  for (const p of prefixes) q.append('hashPrefixes', p);
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
+  let data;
+  try {
+    const r = await fetch(`${GSB_SEARCH}?${q}`, { signal: ac.signal });
+    if (!r.ok) return { ok: false, status: r.status || 0 };
+    data = await r.json();
+  } catch (_) {
+    return { ok: false, status: 0 };
+  } finally {
+    clearTimeout(t);
   }
-  const m = data.matches[0];
-  return { listed: true, category: GSB_THREATS[m.threatType] || 'phishing', threatType: m.threatType };
+  const matches = [];
+  for (const fh of (data && Array.isArray(data.fullHashes)) ? data.fullHashes : []) {
+    if (!fh || typeof fh.fullHash !== 'string' || Buffer.from(fh.fullHash, 'base64').length !== 32) continue;
+    const hash = Buffer.from(fh.fullHash, 'base64').toString('base64');
+    for (const d of Array.isArray(fh.fullHashDetails) ? fh.fullHashDetails : []) {
+      // Un attributo (CANARY, FRAME_ONLY o sconosciuto) toglie valore al dettaglio per una pagina intera: lo dice il protocollo.
+      if (!d || !GSB_THREATS[d.threatType] || (Array.isArray(d.attributes) && d.attributes.length)) continue;
+      matches.push({ hash, threatType: d.threatType, category: GSB_THREATS[d.threatType] });
+    }
+  }
+  return { ok: true, matches, cacheMs: durationMs(data && data.cacheDuration) };
 }
 
 // Una risposta che non è arrivata (rete, tempo scaduto, servizio sovraccarico): si richiede presto, non fra un giorno.
@@ -134,4 +147,4 @@ async function ctFirstSeenDays(registrable) {
   return { firstSeenDays: days >= 0 ? days : 0 };
 }
 
-module.exports = { safeBrowsingLookup, rdapAgeDays, ctFirstSeenDays, fetchJson, fetchOutcome, TRANSIENT, CT_MAX_BYTES };
+module.exports = { hashesSearch, rdapAgeDays, ctFirstSeenDays, fetchJson, fetchOutcome, TRANSIENT, CT_MAX_BYTES };

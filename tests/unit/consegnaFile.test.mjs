@@ -3,14 +3,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { scaricaPayload, cartellaConsegna, PAYLOAD_IN_STAMPA_MAX } from '../../scripts/lib/consegna-file.mjs';
 
 const BASE = cartellaTemporanea('filo-consegna-test-');
 const ROOT = resolve(BASE, 'progetto');
-test.after(() => rmSync(BASE, { recursive: true, force: true }));
+test.after(() => togliCartella(BASE));
 
 test('il diff esce sempre dalla stampa e il file lo contiene tutto', () => {
   const diff = `diff --git a/x b/x\n${'+riga àèì\n'.repeat(9000)}`;

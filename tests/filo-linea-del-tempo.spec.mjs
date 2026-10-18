@@ -6,11 +6,12 @@ import { test, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs
 import { _electron as electron } from '@playwright/test';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
@@ -24,7 +25,7 @@ async function avvia(userData) {
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   return { app, shell };
 }
@@ -507,7 +508,7 @@ test('una pagina che si dà il titolo dopo il caricamento, o lo cambia dopo un c
   expect(eventi(userData).filter((e) => e.tipo === 'navigazione.titolo').map((e) => e.titolo)).toContain('Orche al tramonto - Video');
 });
 
-test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle richieste ai modelli, dalla cache e dal registro grezzo', async ({ app }) => {
+test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle richieste ai modelli e dalla cache', async ({ app }) => {
   test.setTimeout(90_000);
   await configura(app);
   await turno(app, 'chat-privata', 'La mia diagnosi è arrivata oggi.\nIl medico dice PRIVATO-77, cosa ne pensi?');
@@ -518,15 +519,27 @@ test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle ri
   await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_CHAT_DELETE, id: 'chat-privata' }, { url: 'filo://archive/archive.html' }));
   const dove = await app.evaluate(async () => {
     const tutto = await globalThis.chrome.storage.local.get(null);
+    const cronologia = await globalThis.SN_HISTORY.list();
+    const con = (ago) => cronologia.filter((it) => JSON.stringify(it).includes(ago)).length;
     return {
       privato: Object.keys(tutto).filter((k) => JSON.stringify(tutto[k]).includes('PRIVATO-77')),
       tenuto: Object.keys(tutto).filter((k) => JSON.stringify(tutto[k]).includes('TIENIMI-55')).sort(),
-      segnate: (tutto.aiHistory || []).filter((it) => JSON.stringify(it).includes('[chat cancellata]')).length,
+      privatoInCronologia: con('PRIVATO-77'),
+      tenutoInCronologia: con('TIENIMI-55'),
+      segnate: con('[chat cancellata]'),
+      cartella: globalThis.SN_HISTORY.cartella(),
     };
   });
   expect(dove.privato).toEqual([]);
+  expect(dove.privatoInCronologia).toBe(0);
+  // La cronologia AI ha file suoi (#1065): il testo tolto non resta nemmeno in una riga di prima.
+  const suDisco = readdirSync(dove.cartella).map((n) => readFileSync(join(dove.cartella, n), 'utf8')).join('\n');
+  expect(suDisco).not.toContain('PRIVATO-77');
   // L'altra chat resta dov'era, e le richieste della chat cancellata restano coi loro costi, senza il testo.
-  expect(dove.tenuto).toEqual(expect.arrayContaining(['aiHistory', 'filo_raw_log']));
+  expect(dove.tenutoInCronologia).toBeGreaterThan(0);
+  expect(suDisco).toContain('TIENIMI-55');
+  // Il registro grezzo non c'è più (#868): il contesto della chat è il filo.
+  expect(dove.tenuto).not.toContain('filo_raw_log');
   expect(dove.segnate).toBeGreaterThan(0);
   expect(await voci()).toBe(prima);
 });

@@ -220,7 +220,7 @@ test('«aggiornati» a Filo: con una versione pronta riavvia; senza, controlla e
   assert.match(r.frase, /0\.2\.233/);
   assert.equal(prova.registro.controlli, 1, '«aggiornati» non ha nemmeno controllato');
 
-  prova.registro.risposta = { evento: 'update-available', dati: { version: '0.2.240' } };
+  prova.registro.risposta = { evento: 'update-available', dati: { version: '0.2.240', tag: 'v0.2.240' } };
   r = await U.aggiornaDaChat();
   assert.match(r.frase, /0\.2\.240/);
   assert.match(r.frase, /scaricando/);
@@ -306,7 +306,7 @@ test('la carta dell\'apertura prima funziona anche prima che electron-updater ri
 test('dopo un riavvio «aggiornati» installa la versione pronta come la carta: senza rete, e mentre il controllo gira', async () => {
   for (const risposta of [
     { evento: 'error', dati: new Error('net::ERR_INTERNET_DISCONNECTED') },
-    { evento: 'update-available', dati: { version: '0.2.234' } },
+    { evento: 'update-available', dati: { version: '0.2.234', tag: 'v0.2.234' } },
   ]) {
     preparaCache();
     const prima = U.perProva({ piattaforma: 'win32', versione: '0.2.233', cartella: dati, avvisoVero: false });
@@ -328,7 +328,7 @@ test('mentre si scarica, «aggiornati» promette «Riavvia e aggiorna» solo dov
   for (const [piattaforma, attesa] of [['darwin', false], ['linux', false], ['win32', true]]) {
     const dati2 = cartellaTemporanea('filo-agg-scarica-');
     const prova = U.perProva({ piattaforma, versione: '0.2.233', cartella: dati2, avvisoVero: false });
-    prova.finto.emit('update-available', { version: '0.2.234' });
+    prova.finto.emit('update-available', { version: '0.2.234', tag: 'v0.2.234' });
     const r = await U.aggiornaDaChat({ riavvio: true });
     assert.equal(/Riavvia e aggiorna/.test(r.frase), attesa, `${piattaforma}: ${r.frase}`);
     assert.match(r.frase, /0\.2\.234/);
@@ -381,7 +381,7 @@ test('con «Installa gli aggiornamenti da solo» spento (#786) la versione scari
   const spento = { aggiornamenti: { automatici: false } };
   U.seguiImpostazioni(spento);
   assert.equal(prova.finto.autoDownload, false);
-  prova.finto.emit('update-available', { version: '0.2.234' });
+  prova.finto.emit('update-available', { version: '0.2.234', tag: 'v0.2.234' });
   await aspettaCarte();
   assert.equal(carteAttive('aggiornamento-disponibile').length, 1, 'nessuna carta «Installa»');
   // Spenta a metà scaricamento: la versione arriva lo stesso.

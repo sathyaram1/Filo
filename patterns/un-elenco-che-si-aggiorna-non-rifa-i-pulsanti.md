@@ -43,6 +43,10 @@ Tre dettagli fanno la differenza:
 
 - `src/shared/righeVive.js` — `SN_RIGHE_VIVE.riconcilia(lista, righeNuove, selettoreAzioni)`.
 - Lo usano il pannello scaricamenti della barra (`src/renderer/shell.js`) e la pagina Scaricamenti.
+- La barra delle schede (`render` in `src/renderer/shell.js`) tiene un nodo per scheda, gli eventi sulla striscia e
+  una firma per scheda: un titolo che cambia non tocca le altre (#1089, `tests/tab-barra-riconciliata.spec.mjs`).
 - `tests/downloads-eseguibili.spec.mjs` — «Scarica» premuto col tasto giù più a lungo di un avanzamento, su tutte e due le superfici.
+- I rimedi dell'avviso dei crediti (`src/shared/creditiAvvisoUi.js`, `aggiorna`): la pagina Crediti e la bolla in chat si
+  riallineano sul posto, una riga per rimedio, e il pulsante resta finché fa la stessa cosa (#818, `tests/avviso-crediti.spec.mjs`).
 
 Vicini: [Una conferma non è un avviso sopra un fatto già compiuto](una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md).

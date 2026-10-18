@@ -231,11 +231,19 @@
   }
 
   // null = la scheda resta sul neutro della barra (nessuna identità o colore spento).
+  // Un acromatico non si stacca dalla barra più di una tinta: dal lato opposto alla barra si ferma a
+  // luminosita_tab, sennò il marchio bianco al buio (o nero in chiaro) fa la scheda più accesa di tutte (#429).
   function inactiveTabBackground(identity, bar, params) {
-    const adapted = adaptIdentity(identity, params);
+    let adapted = adaptIdentity(identity, params);
     const b = toRgb(bar);
     if (!adapted || !b) return null;
-    return blendRgb(adapted, b, clampParams(params).opacita_tab);
+    const p = clampParams(params);
+    if (Math.max(...adapted) - Math.min(...adapted) < IDENTITY_CHROMA_MIN) {
+      const tetto = 255 * p.luminosita_tab;
+      const barraScura = (b[0] + b[1] + b[2]) / 3 < 128;
+      adapted = adapted.map((v) => Math.round(barraScura ? Math.min(v, tetto) : Math.max(v, tetto)));
+    }
+    return blendRgb(adapted, b, p.opacita_tab);
   }
 
   function relativeLuminance(color) {
@@ -280,6 +288,26 @@
     return { ink, hover: blendRgb(bg, far, 0.85) };
   }
 
+  // ------------------------------------------------------------
+  // Ordine arcobaleno della barra e della Cronologia (§1.3)
+  // ------------------------------------------------------------
+  // La chiave è il colore salvato, cioè quello estratto: l'adattamento a schermo non sposta nessuno.
+  // Grigi chiari in testa e scuri in coda, dal più chiaro al più scuro; i senza colore dopo, com'erano.
+  function rainbowKey(color) {
+    const c = toRgb(color);
+    if (!c || !c.every(Number.isFinite)) return [3, 0];
+    const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]);
+    if (mx - mn >= IDENTITY_CHROMA_MIN) return [1, rgbToHsl(c[0], c[1], c[2])[0]];
+    const l = (mx + mn) / 510;
+    return [l >= 0.5 ? 0 : 2, -l];
+  }
+
+  // 0 a parità: l'ordine di prima lo tiene il sort, che è stabile.
+  function compareRainbow(a, b) {
+    const ka = rainbowKey(a), kb = rainbowKey(b);
+    return (ka[0] - kb[0]) || (ka[1] - kb[1]);
+  }
+
   function rgbCss(c) {
     return `rgb(${Math.round(c[0])}, ${Math.round(c[1])}, ${Math.round(c[2])})`;
   }
@@ -314,6 +342,7 @@
     IDENTITY_PARAMS, IDENTITY_PARAM_META, defaultParams, clampParams,
     rgbToHsl, hslToRgb, extractIdentityFromPixels,
     adaptIdentity, blendRgb, inactiveTabBackground,
-    relativeLuminance, contrastRatio, readableInk, inkAndHover, rgbCss, resolveCssColor,
+    relativeLuminance, contrastRatio, readableInk, inkAndHover, rainbowKey, compareRainbow,
+    rgbCss, resolveCssColor,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

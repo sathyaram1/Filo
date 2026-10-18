@@ -30,6 +30,7 @@ const IS_FILO_ORIGIN = (() => {
 // non nostro finisse a girare qui (il caso che teme il gate qui sopra) se lo
 // scriverebbe da sé per rendersi impossibile da ingrandire (#686).
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
+try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
 
 let streamCounter = 0;
 
@@ -73,7 +74,8 @@ const filoApi = {
   // modello ha appena nominato un'azione: { type }), 'done' (eseguita, con
   // l'azione completa di esito: { action }) e 'round' (un giro con azioni si è
   // chiuso: il testo scritto in quel giro è una nota di lavoro, non la
-  // risposta: { text }). Il chiamante filtra per reqId. Ritorna un unsubscribe.
+  // risposta: { text }; con `risposta: true` è un giro di soli bottoni e il
+  // testo apre la risposta). Il chiamante filtra per reqId. Ritorna un unsubscribe.
   onAction: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:action', wrapped);
@@ -138,6 +140,9 @@ const filoApi = {
   // Esiste questo comando nella shell? Per l'evidenziazione live (rosso = non
   // riconosciuto) della dashboard in modalità terminale.
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
+  // #968 — le virgolette a un percorso con spazi: appena incollato nel comando, e proposte dopo un errore.
+  shellVirgoletteIncolla: (opts) => ipcRenderer.invoke('shell:virgolette-incolla', opts),
+  shellPropostaVirgolette: (opts) => ipcRenderer.invoke('shell:proposta-virgolette', opts),
   // Questo "/dominio.tld" risolve davvero? Per colorare di rosso (e non
   // navigare verso) un sito inesistente dalla barra comando della dashboard.
   siteResolves: (opts) => ipcRenderer.invoke('net:resolves', opts),
@@ -195,7 +200,10 @@ const chromeShim = {
               if (onDisconnect) onDisconnect();
             },
             onError: (e) => {
-              if (onMessage) onMessage({ type: 'error', message: e.message, code: e.code });
+              // Tutto quello che il main ha detto sull'errore: con i soli
+              // message e code la frase già scritta per l'utente non si
+              // ricompone e arriva la riga grezza del servizio (#663).
+              if (onMessage) onMessage({ type: 'error', ...e });
               if (onDisconnect) onDisconnect();
             },
           });
@@ -301,11 +309,13 @@ function loadContentScripts() {
   // la disegnano, lo legge chi cammina sulla pagina.
   safe(path.join(SHARED, 'filoUi.js'));
   safe(path.join(SHARED, 'i18n.js'));
+  safe(path.join(SHARED, 'clipboardHistory.js')); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»
   safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro
   safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
   safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
@@ -317,6 +327,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   safe(path.join(CONTENT, 'extractContext.js'));
+  safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu

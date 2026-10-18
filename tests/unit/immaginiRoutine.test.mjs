@@ -2,6 +2,7 @@
 // consegna le scrive su file e mette il percorso al posto dei byte; le fallite e le rinviate restano col motivo.
 // Rosso se un'immagine resta in base64 nella stampa, se il file perde un byte, o se sopravvive al ruolo dopo.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';

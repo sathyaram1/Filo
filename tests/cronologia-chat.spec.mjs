@@ -16,14 +16,10 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const ARCHIVE = 'filo://archive/archive.html';
 
-// Modelli di prova + chiave finta: senza, la chat non parte nemmeno. E
-// l'intervista di benvenuto chiusa: su un profilo appena nato è APERTA, e
-// finché lo è ogni chat è l'intervista — cioè sempre una conversazione (#524,
-// ed è il comportamento giusto). Qui vogliamo provare le chat normali.
+// Modelli di prova + chiave finta: senza, la chat non parte nemmeno.
 async function configura(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -375,15 +371,19 @@ test('Filo ritrova una conversazione di prima e la rilegge', async ({ app }) => 
   expect(vuota.output.found).toBe(false);
 });
 
-test('la chat in corso non torna fra i risultati: non è un ricordo, è adesso', async ({ app }) => {
+test('la chat in corso non torna fra i risultati: non è un ricordo, è adesso; quella aperta in un\'altra scheda sì (#868)', async ({ app }) => {
   await configura(app);
   await stubProvider(app, {});
   await turno(app, 'c-aperta', 'Parliamo di vulcani');
 
   const r = await app.evaluate(
-    () => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'vulcani' }, { confirmed: false }),
+    () => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'vulcani' }, { confirmed: false, chatId: 'c-aperta' }),
   );
   expect(r.output.results.length).toBe(0);
+  const daAltrove = await app.evaluate(
+    () => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'vulcani' }, { confirmed: false, chatId: 'c-altra' }),
+  );
+  expect(daAltrove.output.results.map((x) => x.id)).toEqual(['c-aperta']);
 });
 
 test('una chat vuota non lascia un guscio senza titolo in Cronologia', async ({ app, openTab }) => {
@@ -426,58 +426,62 @@ test('l’intervista di benvenuto resta una conversazione anche se il modello di
   await expect(page.locator('.arc-chat')).toHaveCount(1);
 });
 
-test('l’intervista spezzata su più aperture resta UNA chat, non cinque', async ({ app, shell }) => {
-  test.setTimeout(90_000);
-  // L'intervista di benvenuto si svolge nella home vera, e chi la lascia a
-  // metà la riprende riaprendo Filo. Se ogni caricamento della scheda aprisse
-  // una chat nuova, in Cronologia se ne troverebbe una manciata di monconi.
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await pagineNuovaScheda(app);
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: {
-        [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
-        [C.ACTIONS.FILO_LESSON]: 'deepseek-flash',
-        [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
-        [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
-        [C.ACTIONS.FILO_CHAT_TRIAGE]: 'deepseek-flash',
-      },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+test.describe(() => {
+  test.use({ accoglienzaFatta: false });
+
+  test('l’intervista spezzata su più aperture resta UNA chat, non cinque', async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    // L'intervista di benvenuto si svolge nella home vera, e chi la lascia a
+    // metà la riprende riaprendo Filo. Se ogni caricamento della scheda aprisse
+    // una chat nuova, in Cronologia se ne troverebbe una manciata di monconi.
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await pagineNuovaScheda(app);
+    await app.evaluate(async () => {
+      const C = globalThis.SN_CONST;
+      await globalThis.SN_STORAGE.updateSettings({
+        useDefaultModels: false,
+        apiKeys: { openrouter: 'k-test' },
+        models: {
+          [C.ACTIONS.FILO_CHAT]: 'deepseek-flash',
+          [C.ACTIONS.FILO_LESSON]: 'deepseek-flash',
+          [C.ACTIONS.FILO_COMPACT]: 'deepseek-flash',
+          [C.ACTIONS.FILO_DASHBOARD]: 'deepseek-flash',
+          [C.ACTIONS.FILO_CHAT_TRIAGE]: 'deepseek-flash',
+        },
+        modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      });
+      const P = globalThis.SN_PROVIDERS;
+      const reply = () => JSON.stringify({ text: 'Piacere!', actions: [] });
+      P.streamCompleteWithFallback = async ({ attempts }) => ({ text: reply(), model: attempts[0].model, provider: attempts[0].provider, usage: {} });
+      P.completeWithFallback = async ({ attempts }) => ({ text: reply(), model: attempts[0].model, provider: attempts[0].provider, usage: {} });
     });
-    const P = globalThis.SN_PROVIDERS;
-    const reply = () => JSON.stringify({ text: 'Piacere!', actions: [] });
-    P.streamCompleteWithFallback = async ({ attempts }) => ({ text: reply(), model: attempts[0].model, provider: attempts[0].provider, usage: {} });
-    P.completeWithFallback = async ({ attempts }) => ({ text: reply(), model: attempts[0].model, provider: attempts[0].provider, usage: {} });
-  });
-  await page.reload();
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
 
-  await page.locator('#input').fill('Mi chiamo Ada');
-  await page.locator('#input').press('Enter');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Piacere!' }).first()).toBeVisible({ timeout: 20_000 });
+    await page.locator('#input').fill('Mi chiamo Ada');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Piacere!' }).first()).toBeVisible({ timeout: 20_000 });
 
-  // Si chiude Filo a metà intervista e si riapre: la conversazione riprende.
-  await page.reload();
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
-  await page.locator('#input').fill('Lavoro sui compilatori');
-  await page.locator('#input').press('Enter');
-  // Cinque messaggi: la domanda con cui Filo apre l'intervista più due
-  // scambi. L'apertura è un testo fisso che non passa da nessun turno, ma
-  // l'utente l'ha letta sullo schermo e la deve ritrovare (verifica #525,
-  // giro 1): senza, l'intervista in archivio cominciava dalla risposta.
-  await expect.poll(async () => {
+    // Si chiude Filo a metà intervista e si riapre: la conversazione riprende.
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await page.locator('#input').fill('Lavoro sui compilatori');
+    await page.locator('#input').press('Enter');
+    // Cinque messaggi: la domanda con cui Filo apre l'intervista più due
+    // scambi. L'apertura è un testo fisso che non passa da nessun turno, ma
+    // l'utente l'ha letta sullo schermo e la deve ritrovare (verifica #525,
+    // giro 1): senza, l'intervista in archivio cominciava dalla risposta.
+    await expect.poll(async () => {
+      const chats = await leggiArchivio(app);
+      return chats.length === 1 ? chats[0].messages.length : `${chats.length} chat`;
+    }, { timeout: 20_000 }).toBe(5);
+
     const chats = await leggiArchivio(app);
-    return chats.length === 1 ? chats[0].messages.length : `${chats.length} chat`;
-  }, { timeout: 20_000 }).toBe(5);
-
-  const chats = await leggiArchivio(app);
-  expect(chats[0].onboarding).toBe(true);
-  const benvenuto = await app.evaluate(() => globalThis.SN_ONBOARDING.WELCOME_MESSAGE);
-  expect(chats[0].messages[0].role).toBe('filo');
-  expect(chats[0].messages[0].text).toBe(benvenuto);
+    expect(chats[0].onboarding).toBe(true);
+    const benvenuto = await app.evaluate(() => globalThis.SN_ONBOARDING.WELCOME_MESSAGE);
+    expect(chats[0].messages[0].role).toBe('filo');
+    expect(chats[0].messages[0].text).toBe(benvenuto);
+  });
 });
 
 test('la trascrizione arriva al classificatore imbustata, e non può chiudersi la recinzione da sola', async ({ app }) => {
@@ -583,7 +587,8 @@ test('un’accoglienza aperta e mai risposta non lascia una chat con dentro la s
   await expect(page.locator('#chatsSection')).toBeHidden();
 });
 
-test('un’immagine incollata: la chat riaperta dice quante ce n’erano', async ({ app, openTab }) => {
+// A Filo ancora aperto l'immagine è in memoria (#1166) e torna nella bolla; il conto «non conservata» vale dopo un riavvio.
+test('un’immagine incollata: la chat riaperta a Filo ancora aperto la rimostra', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await configura(app);
   await stubProvider(app, { grafico: { tipo: 'conversazione', titolo: 'Il grafico' } });
@@ -594,8 +599,10 @@ test('un’immagine incollata: la chat riaperta dice quante ce n’erano', async
   await chiudi(app, 'c-img');
 
   const dash = await openTab('filo://dashboard/dashboard.html?chat=c-img');
-  await expect(dash.locator('.dash-bubble').first()).toContainText('Cosa vedi in questo grafico?');
-  await expect(dash.locator('.dash-thread')).toContainText('1 immagine');
+  const bolla = dash.locator('.dash-bubble').first();
+  await expect(bolla).toContainText('Cosa vedi in questo grafico?');
+  await expect(bolla.locator('img.dash-bubble-img')).toHaveAttribute('src', png);
+  await expect(dash.locator('.dash-thread')).not.toContainText('non conservata');
 });
 
 test('la Cronologia aperta si accorge di una chat finita in un’altra scheda', async ({ app, openTab }) => {

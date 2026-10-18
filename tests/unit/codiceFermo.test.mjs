@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { fuoriDalleProve, codiceCambiatoDallAvvio, testoCodiceCambiato } from '../../scripts/lib/codice-fermo.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -43,7 +43,7 @@ test('il codice rimesso com\'era prima della correzione e committato si vede; le
     assert.deepEqual(codiceCambiatoDallAvvio(avvio, dir).cambiati, ['src/x.js']);
     assert.equal(codiceCambiatoDallAvvio('', dir).cambiati.length, 0, 'senza avvio registrato non si ferma niente');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -71,7 +71,7 @@ test('in locale la critica su un codice cambiato dall\'avvio non si registra', (
     const dopo = JSON.parse(readFileSync(resolve(dir, '.claude', 'verify-local.json'), 'utf8'))[RAMO];
     assert.equal(dopo.verdict, undefined, 'nessun esito scritto');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 

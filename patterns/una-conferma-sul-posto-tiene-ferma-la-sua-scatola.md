@@ -9,9 +9,15 @@ fila allineata a destra il vicino scivola nel posto liberato, e il secondo clic
 lo preme. Sulla card delle fusioni ferme il vicino era «Scarta», che non chiede
 conferma: una fusione voluta è finita scartata (#550).
 
-- **Il tasto armato tiene la sua larghezza.** Prima di cambiare l'etichetta si
-  fissa la larghezza che aveva (`min-width` dalla misura vera, così vale con
-  qualunque font scelto dall'utente) e la si toglie al disarmo.
+- **Il tasto armato tiene la sua scatola, larghezza e altezza.** Prima di
+  cambiare l'etichetta si fissano le misure che aveva (`min-width` e
+  `min-height` dalla misura vera, così vale con qualunque font scelto
+  dall'utente) e le si toglie al disarmo. L'altezza conta quando l'etichetta
+  di riposo va su due righe e quella armata ne occupa una (#256.3).
+- **Fra due tasti va a capo la fila, non la scritta.** La fila dei tasti ha
+  `flex-wrap: wrap`: con un font più largo di Segoe UI o un pannello stretto i
+  tasti si mettono uno sotto l'altro invece di spezzare l'etichetta. La
+  scritta va a capo solo se il tasto non ci sta nemmeno da solo.
 - **Un esito che compare non spinge i tasti.** La riga di stato («Chiedo al
   server…», un errore) sta sotto la fila dei tasti, non sopra: dopo un guasto il
   clic per riprovare cade di nuovo sul tasto giusto.
@@ -28,5 +34,6 @@ conferma: una fusione voluta è finita scartata (#550).
 - Vicino: [Un clic, una scheda: nessuna azione ricompone la lista sotto il cursore](un-clic-una-scheda-nessuna-azione-ricompone-la-lista.md),
   la stessa trappola quando a muoversi è la lista intera.
 - **Dove:** `buildCard` in `src/shared/mergeApprovals.js` (copiato nella pagina
-  delle approvazioni da browser). Prove: `tests/livelli-forme.spec.mjs`,
+  delle approvazioni da browser) e «Salta il controllo» del pentagono in
+  `src/pages/manage/manage.js`. Prove: `tests/livelli-forme.spec.mjs`,
   `tests/merge-approvals.spec.mjs`.

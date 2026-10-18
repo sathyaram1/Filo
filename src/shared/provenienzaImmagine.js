@@ -1267,9 +1267,22 @@
       if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;
       return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.`;
     }
+    if (res.prova === 'marchio') return chi ? `${cosa}: porta il marchio invisibile che ${chi} mette nelle sue immagini.` : '';
     return chi
       ? `${cosa} secondo il file stesso (${chi}), senza firma che lo confermi.`
       : `${cosa} secondo il file stesso, senza firma che lo confermi.`;
+  }
+
+  // Un marchio letto nei pixel (src/shared/marchiInvisibili.js) lo dichiara chi ha generato l'immagine, e non è firmato.
+  function esitoDaMarchio(m) {
+    if (!m || !m.marchio || !m.chi) return null;
+    return { trovato: true, origine: 'ai', prova: 'marchio', dichiarante: m.chi, firmatario: '', avvisi: [], fonte: 'marchio', marchio: m.marchio };
+  }
+
+  function marchiLeggibili() {
+    const M = global.SN_MARCHI_INVISIBILI;
+    const nomi = M && Array.isArray(M.MARCHI) ? M.MARCHI.map((m) => m.chi) : [];
+    return nomi.length ? ` (${nomi.join(', ')})` : '';
   }
 
   // Quello che l'agente deve sapere quando gli si chiede «è fatta con l'AI?»:
@@ -1284,21 +1297,28 @@
         : 'dell’immagine';
       return {
         sistema: `ho letto in locale le etichette di origine ${dove} e l’esito è nel blocco qui sotto; `
-          + 'Filo legge solo ciò che il file dichiara e non giudica mai i pixel, quindi riporta quell’esito senza aggiungerci un verdetto tuo',
+          + 'Filo legge solo ciò che l’immagine dichiara (un’etichetta nel file, o un marchio che il generatore scrive nei pixel) '
+          + 'e non stima mai l’origine dall’aspetto, quindi riporta quell’esito senza aggiungerci un verdetto tuo',
         etichetta,
       };
     }
+    // Dei marchi si dice solo quello che è successo: cercati e assenti, oppure non cercabili (formato o misure).
+    const cercati = res ? res.marchiCercati : undefined;
+    const marchi = cercati === true ? `, né uno dei marchi invisibili aperti che Filo sa leggere nei pixel${marchiLeggibili()}`
+      : cercati === false ? `; i marchi invisibili aperti che Filo sa leggere nei pixel${marchiLeggibili()} in questo file non si possono cercare`
+        : '';
     return {
       sistema: 'ho letto in locale le etichette di origine dell’immagine: il file non ne porta nessuna — '
-        + 'né credenziali firmate, né etichetta IPTC/XMP, né parametri di generazione. Questo NON prova che l’immagine sia '
-        + 'autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, e molti generatori non '
-        + 'le scrivono affatto. Dillo così, senza sbilanciarti sull’origine',
+        + `né credenziali firmate, né etichetta IPTC/XMP, né parametri di generazione${marchi}. Questo NON prova che l’immagine sia `
+        + 'autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, molti generatori non '
+        + 'le scrivono affatto, e il marchio SynthID di Google, che portano anche le immagini di ChatGPT, sul computer non si '
+        + 'legge. Dillo così, senza sbilanciarti sull’origine',
       etichetta: '',
     };
   }
 
   global.SN_PROVENIENZA = {
-    analizza, frase, notaPerModello, ancoreDaPem,
+    analizza, frase, notaPerModello, ancoreDaPem, esitoDaMarchio,
     _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

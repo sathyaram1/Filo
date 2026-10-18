@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ESTENSIONI = new Set(['.js', '.mjs', '.cjs', '.ts', '.html', '.json', '.md', '.sh', '.ps1', '.yml', '.yaml', '.txt']);
@@ -61,7 +62,7 @@ test('il messaggio di gen-feedback-keys.mjs dice che alle routine non va nessuna
   const pubblica = readFileSync(join(ROOT, 'src', 'shared', 'feedbackPublicKey.js'), 'utf8');
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^npm_/i.test(k)));
   const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'gen-feedback-keys.mjs'), '--print'],
-    { cwd: ROOT, env, encoding: 'utf8', timeout: 60_000 });
+    { cwd: ROOT, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   assert.equal(r.status, 0, r.stderr);
   // --print non deve toccare la chiave pubblica nel repo: qui lo si lancia davvero.
   assert.equal(readFileSync(join(ROOT, 'src', 'shared', 'feedbackPublicKey.js'), 'utf8'), pubblica);

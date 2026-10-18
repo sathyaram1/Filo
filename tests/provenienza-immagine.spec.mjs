@@ -1,6 +1,7 @@
-// Feedback #711 e #946: il tasto destro su un'immagine descriveva e basta. Adesso,
+// Feedback #711, #946 e #889: il tasto destro su un'immagine descriveva e basta. Adesso,
 // in cima al riquadro «Spiega immagine», dice anche cosa il file dichiara sulla
-// propria origine — e TACE quando il file non dichiara niente.
+// propria origine, o il marchio aperto che il generatore ha scritto nei pixel — e
+// TACE quando non c'è né l'uno né l'altro.
 //
 // Le immagini di prova sono firmate davvero (tests/helpers/immagineFirmata.mjs):
 // autorità, certificato, COSE e legame duro sui byte. Se il lettore smettesse di
@@ -435,7 +436,7 @@ test('credenziali valide nel formato del 2023: il menu non dice che la firma non
   expect((await riga.isVisible()) ? await riga.getAttribute('aria-label') : '').not.toMatch(/non è valida/);
 });
 
-// Le immagini non tornano nei turni dopo: la domanda fatta al messaggio seguente deve trovare l'esito (#946).
+// La domanda fatta al messaggio seguente trova l'esito (#946), insieme all'immagine che torna col suo messaggio (#1166).
 test('nella chat della Home, «è fatta con l’AI?» al messaggio dopo l’immagine trova lo stesso esito', async ({ app, openTab }) => {
   await modelloFinto(app);
   const home = await openTab('filo://newtab/');
@@ -459,7 +460,7 @@ test('nella chat della Home, «è fatta con l’AI?» al messaggio dopo l’imma
   await home.locator('#sendBtn').click();
   await expect.poll(() => app.evaluate(turno, 'ed è fatta con'), { timeout: 20000 }).not.toBe('');
   const secondo = await app.evaluate(turno, 'ed è fatta con');
-  expect(secondo).not.toContain('data:image');
+  expect(secondo).toContain('data:image');
   expect(secondo).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
   expect(secondo).toContain('messaggi precedenti di questa chat');
 });
@@ -475,7 +476,7 @@ async function copiaEIncollaInChat(app, openTab, testServer, src, domanda) {
   await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
   await app.evaluate(({ clipboard }) => clipboard.clear());
   await menu.getByText('Copia immagine', { exact: true }).click();
-  await expect.poll(() => app.evaluate(({ clipboard }) => !clipboard.readImage().isEmpty()), { timeout: 8000 }).toBe(true);
+  await expect.poll(() => app.evaluate(async ({ clipboard }) => (await clipboard.read()).some((v) => v.types.some((t) => t.startsWith('image/')))), { timeout: 8000 }).toBe(true);
 
   const home = await openTab('filo://newtab/');
   await expect(home.locator('#input')).toBeVisible({ timeout: 10000 });
@@ -606,4 +607,82 @@ test('un’immagine finta che punta a un documento di un altro sito non viene sc
   const descritte = await app.evaluate(() => globalThis.__descritte);
   expect(descritte).toHaveLength(1);
   expect(descritte.join('')).not.toContain('saldo');
+});
+
+// ── #889: i marchi invisibili aperti nei pixel ───────────────────────────────
+// Marcate dalla libreria di riferimento lungo il cammino vero del loro generatore (tests/fixtures/marchi/genera.py):
+// nessuna porta etichette, quindi la riga può venire solo dai pixel.
+
+const marchio = (nome) => readFileSync(join(process.cwd(), 'tests', 'fixtures', 'marchi', nome));
+const FRASE_SDXL = 'Generata con l’AI: porta il marchio invisibile che Stable Diffusion XL mette nelle sue immagini.';
+
+test('un’immagine senza etichette ma col marchio di SDXL nei pixel fa comparire la riga, come dichiarazione', async ({ openTab, testServer }) => {
+  const { page, riga } = await rigaSu(testServer, openTab, marchio('marchio-sdxl.png'), 'image/png');
+  await expect(riga).toHaveAttribute('aria-label', FRASE_SDXL, { timeout: 10000 });
+  await expect(riga).toHaveClass(/sn-menu-origine-debole/);
+  await expect(riga).toHaveAttribute('title', /ha scritto questo marchio nei pixel/);
+  await page.screenshot({ path: 'tests/.shots/provenienza-marchio-sdxl.png' }).catch(() => {});
+});
+
+test('il marchio di FLUX regge nel JPEG che FLUX salva, e la riga lo dice', async ({ openTab, testServer }) => {
+  const { riga } = await rigaSu(testServer, openTab, marchio('marchio-flux.jpg'), 'image/jpeg');
+  await expect(riga).toHaveAttribute('aria-label', 'Generata con l’AI: porta il marchio invisibile che FLUX.1 mette nelle sue immagini.', { timeout: 10000 });
+});
+
+test('la stessa immagine senza marchio non fa comparire nessuna frase sull’origine', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
+    <img id="marcata" src="${testServer.asset(marchio('marchio-sdxl.png'), 'image/png')}" width="160" height="128">
+    <img id="spoglia" src="${testServer.asset(marchio('senza-marchio.png'), 'image/png')}" width="160" height="128">
+  </body></html>`);
+  const menu = page.locator('.sn-menu');
+  // Prima quella marcata: quando la sua riga c'è, il lettore dei pixel è già partito e risponde in fretta.
+  await page.locator('#marcata').click({ button: 'right', position: { x: 20, y: 20 } });
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', FRASE_SDXL, { timeout: 10000 });
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+
+  await page.locator('#spoglia').click({ button: 'right', position: { x: 20, y: 20 } });
+  await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  await expect(menu.locator(RIGA)).toBeHidden();
+  expect(await menu.innerText()).not.toMatch(/generata con|marchio|autentic|immagine reale|nessun segno/i);
+});
+
+test('il menu non aspetta la lettura dei pixel: si apre subito e la riga arriva dopo', async ({ app, openTab, testServer }) => {
+  await app.evaluate(() => globalThis.__filoFirmatariC2pa._rallentaMarchi(2500));
+  try {
+    const { menu, riga } = await rigaSu(testServer, openTab, marchio('marchio-sdxl.png'), 'image/png');
+    await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 2000 });
+    await expect(riga).toBeHidden();
+    await expect(riga).toHaveAttribute('aria-label', FRASE_SDXL, { timeout: 10000 });
+  } finally {
+    await app.evaluate(() => globalThis.__filoFirmatariC2pa._rallentaMarchi(0));
+  }
+});
+
+test('in chat, l’immagine col marchio porta al modello la stessa frase del menu', async ({ app }) => {
+  await configuraModello(app);
+  const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(marchio('marchio-sdxl.png')));
+  const dentro = (prompt.split('<<<ETICHETTA_FILE>>>')[1] || '').split('<<<FINE_ETICHETTA_FILE>>>')[0];
+  expect(dentro).toContain(FRASE_SDXL);
+  expect(prompt).toContain('un marchio che il generatore scrive nei pixel');
+});
+
+test('in chat, la stessa immagine senza marchio dice che Filo l’ha cercato e che questo non prova niente', async ({ app }) => {
+  await configuraModello(app);
+  const prompt = await promptConImmagine(app, 'questa foto è fatta con l’AI?', dataUrl(marchio('senza-marchio.png')));
+  expect(prompt).toContain('né uno dei marchi invisibili aperti che Filo sa leggere nei pixel');
+  expect(prompt).toMatch(/NON prova che l’immagine sia autentica/);
+  expect(prompt).not.toContain('<<<ETICHETTA_FILE>>>');
+});
+
+test('all’Aiuto della pagina il modello riceve la stessa frase del marchio', async ({ app, openTab, testServer }) => {
+  await modelloFinto(app);
+  const page = await testServer.openReady(openTab, pagina(testServer.asset(marchio('marchio-sdxl.png'), 'image/png')));
+  const menu = await apriMenuSullaFoto(page);
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', FRASE_SDXL, { timeout: 10000 });
+
+  const prompt = await chiediAllAiuto(app, page, 'questa foto è fatta con l’AI?');
+  const dentro = (prompt.split('<<<ETICHETTA_FILE>>>')[1] || '').split('<<<FINE_ETICHETTA_FILE>>>')[0];
+  expect(dentro).toContain(FRASE_SDXL);
 });

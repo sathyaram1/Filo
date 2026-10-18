@@ -37,6 +37,7 @@
 //   gate proprietario si verificano invece SENZA stub, sul main vero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const NEWTAB = 'filo://newtab/';
 const MANAGE = 'filo://manage/manage.html';
@@ -127,13 +128,13 @@ async function apriGestione(page, opts) {
   await page.evaluate((admin) => window.__mgTest.setAdmin(admin), opts?.admin !== false);
   await page.evaluate(() => window.__mgTest.setData([]));
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 }
 
-/** Gestione → Automazioni: dove vive la traccia delle decisioni passate. */
-async function apriAutomazioni(page, opts) {
+/** Gestione → Log: dove vive la traccia delle decisioni passate (#1110). */
+async function apriLog(page, opts) {
   await apriGestione(page, opts);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'log');
 }
 
 // ── 1. Una fusione senza segnalazione l'owner la trova in Automazioni ───────
@@ -292,13 +293,13 @@ test('l’elenco vive in Automazioni: sulle schede-lista non c’è', async ({ o
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
 
   for (const scheda of ['inbox', 'queue', 'local', 'resolved', 'archived']) {
-    await page.locator(`.mg-tab[data-tab="${scheda}"]`).click();
+    await apriScheda(page, scheda);
     await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).not.toBeVisible();
     await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);
   }
 
   // Tornando in Automazioni è ancora lì, senza ricaricare niente.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible();
 });
 
@@ -549,11 +550,11 @@ test('un doppio clic su «Approva e fondi» arma soltanto; il clic voluto dopo f
   await expect.poll(() => page.evaluate(() => window.__macCalls)).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
 });
 
-// ── La traccia delle decisioni passate (Automazioni) ────────────────────────
+// ── La traccia delle decisioni passate (Log) ────────────────────────
 
-test('Automazioni elenca le decisioni già prese: un’eccezione deve lasciare traccia', async ({ openTab }) => {
+test('il Log elenca le decisioni già prese: un’eccezione deve lasciare traccia', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apriAutomazioni(page, {
+  await apriLog(page, {
     pending: [],
     recent: [
       richiesta({ id: '11'.repeat(12), used: true, outcome: 'merged', decidedAtMs: Date.now() - 3 * 60 * 1000 }),
@@ -642,7 +643,7 @@ test('se la segnalazione c’è, la richiesta NON sta in Automazioni: sta sulla 
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(0);
 
   // …e riconoscibile nella lista, dove aspetta una decisione.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   const card = page.locator('.mg-item', { hasText: 'Menu copertina' });
   await expect(card).toBeVisible({ timeout: 8_000 });
   await expect(card.locator('.mg-fusione-badge')).toBeVisible();
@@ -683,9 +684,9 @@ test('una richiesta di un’automazione non manda l’owner a lanciare la pubbli
 
 const RIA = { from: SHA, to: 'e'.repeat(40), mainSha: 'd'.repeat(40) };
 
-test('Automazioni: una richiesta riallineata dal server NON compare come «approvata»', async ({ openTab }) => {
+test('Log: una richiesta riallineata dal server NON compare come «approvata»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apriAutomazioni(page, {
+  await apriLog(page, {
     pending: [],
     recent: [
       richiesta({ id: '33'.repeat(12), branch: 'worker/riallineata', used: true, outcome: 'stale', realigned: RIA, newRequestId: '44'.repeat(12), decidedAtMs: Date.now() - 3 * 60 * 1000 }),

@@ -72,7 +72,10 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
           expect(f.left, dove).toBeGreaterThanOrEqual(s.left - 0.5);
           expect(f.right, dove).toBeLessThanOrEqual(s.right + 0.5);
         }
-        const piene = s.figli.filter((f) => f.width > 0);
+        // Sulle inattive la X non è in fila: sta sopra la fine del nome, contro il bordo destro (#429).
+        const xSopra = !s.active && s.figli.find((f) => f.cls === 'close');
+        if (xSopra) expect(Math.round(s.right - xSopra.right), dove).toBe(8);
+        const piene = s.figli.filter((f) => f.width > 0 && f !== xSopra);
         for (let i = 1; i < piene.length; i++) expect(piene[i].left, dove).toBeGreaterThanOrEqual(piene[i - 1].right - 0.5);
 
         const ha = (c) => s.figli.some((f) => f.cls === c);
@@ -85,7 +88,8 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
           expect(icona, dove).toBe(true);
           expect(ha('close'), dove).toBe(s.width >= 58);
         }
-        expect(ha('title'), dove).toBe(s.width >= 64);
+        // Il titolo vive da 6px di gap più 12 di testo dopo l'icona; sull'attiva anche la X in fila.
+        expect(ha('title'), dove).toBe(s.width >= (s.active ? 64 : 52));
         if (s.id === ids[2] || s.id === ids[3]) expect(ha('proxy-ind'), dove).toBe(s.width >= 96);
         // La spinner non si schiaccia: resta un cerchio.
         const spin = s.figli.find((f) => f.cls === 'spinner');

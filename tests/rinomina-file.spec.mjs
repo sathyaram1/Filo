@@ -121,8 +121,8 @@ test('tasto destro su un file trovato in chat → «Dai un nome sensato»: nome 
     await modelloDeiNomi(app);
     const page = await home(app);
     await chiedi(page, 'trova la scansione della bolletta');
-    const chip = page.locator('a.dash-action-btn');
-    await expect(chip).toHaveText('scan_00231.pdf', { timeout: 15000 });
+    const chip = page.locator('.dash-file-btn');
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf', { timeout: 15000 });
 
     await chip.click({ button: 'right' });
     const voce = page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' });
@@ -143,15 +143,15 @@ test('tasto destro su un file trovato in chat → «Dai un nome sensato»: nome 
     expect(existsSync(join(dir, NOME_NUOVO))).toBe(true);
     expect(existsSync(vecchio)).toBe(false);
     // Il riferimento in chat segue il file: un clic dopo apre quello vero.
-    await expect(chip).toHaveText(NOME_NUOVO);
-    await expect(chip).toHaveAttribute('href', join(dir, NOME_NUOVO));
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText(NOME_NUOVO);
+    await expect(chip).toHaveAttribute('data-percorso', join(dir, NOME_NUOVO));
     await page.screenshot({ path: join(SHOTS, 'rinomina-fatto.png') });
 
     await riquadro.locator('.sn-rinomina-annulla').click();
     await expect(riquadro.locator('.sn-rinomina-esito-testo')).toHaveText('Nome di prima rimesso: scan_00231.pdf');
     expect(existsSync(vecchio)).toBe(true);
     expect(existsSync(join(dir, NOME_NUOVO))).toBe(false);
-    await expect(chip).toHaveText('scan_00231.pdf');
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf');
   } finally {
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
@@ -172,7 +172,7 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     await modelloDeiNomi(app);
     const page = await home(app);
     await chiedi(page, 'trova la scansione');
-    const chip = page.locator('a.dash-action-btn', { hasText: 'La scansione' });
+    const chip = page.locator('.dash-file-btn', { hasText: 'La scansione' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
@@ -186,8 +186,8 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     await expect(page.locator('.sn-rinomina-stato')).toContainText('già preso');
     expect(readdirSync(dir).sort()).toEqual(['Bolletta marzo (2).pdf', 'Bolletta marzo.pdf']);
     // Un'etichetta scelta dal modello resta, ma il riferimento punta al file nuovo.
-    await expect(chip).toHaveText('La scansione');
-    await expect(chip).toHaveAttribute('href', join(dir, 'Bolletta marzo (2).pdf'));
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('La scansione');
+    await expect(chip).toHaveAttribute('data-percorso', join(dir, 'Bolletta marzo (2).pdf'));
 
     // Esc chiude senza fare niente; vuoto e soli spazi non partono.
     await page.keyboard.press('Escape');
@@ -327,6 +327,34 @@ test('in chat, una cartella dove ogni file ha già un nome: niente da confermare
   }
 });
 
+// #1072 — prima dell'OK il main legge la cartella per preparare l'elenco: fuori perimetro, o su un altro
+// computer della rete, non la apre nemmeno, e dice perché.
+test('in chat, una cartella fuori dalla cartella personale o in rete: non si apre, e il perché arriva', async ({ app }) => {
+  test.setTimeout(90_000);
+  const fuori = cartellaTemporanea('filo-nomi-fuori-');
+  writeFileSync(join(fuori, 'scan_00999.pdf'), BOLLETTA);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: fuori }) }] },
+      { toolCalls: [{ id: 'r2', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: '\\\\host\\condivisa' }) }] },
+      { text: 'Non posso rinominarli da qui.' },
+    ]);
+    await modelloDeiNomi(app);
+    const page = await home(app);
+    await chiedi(page, 'rinomina i file di quelle cartelle');
+    await expect(page.locator('.dash-bubble', { hasText: 'Non posso rinominarli da qui.' })).toBeVisible({ timeout: 15000 });
+    expect(await confirmText(page)).toBe('');
+    const consegnato = (await app.evaluate(() => globalThis.__chatFinta_calls)).map((m) => JSON.stringify(m)).join('\n');
+    expect(consegnato).toContain('sta fuori dalla tua cartella personale');
+    expect(consegnato).toContain('sta su un altro computer della rete');
+    expect(consegnato, 'la cartella fuori perimetro non è stata letta').not.toContain('scan_00999');
+    expect(readdirSync(fuori)).toEqual(['scan_00999.pdf']);
+  } finally {
+    await ripristina(app);
+    rmSync(fuori, { recursive: true, force: true });
+  }
+});
+
 test('un file trascinato dove si scrive: entra col percorso, e dal tasto destro gli si dà un nome prima di mandarlo', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = cartellaTemporanea('filo-nomi-drop-');
@@ -411,15 +439,15 @@ test('in chat, chiuso il riquadro, «Rimetti il nome di prima» dal tasto destro
     await modelloDeiNomi(app);
     const page = await home(app);
     await chiedi(page, 'trova la bolletta');
-    const chip = page.locator('a.dash-action-btn').first();
-    await expect(chip).toHaveText('scan_00231.pdf', { timeout: 15000 });
+    const chip = page.locator('.dash-file-btn').first();
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf', { timeout: 15000 });
     await chip.click({ button: 'right' });
     await rinominaEChiudi(page);
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti il nome di prima' }).click();
     await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText('Nome di prima rimesso: scan_00231.pdf');
     expect(readdirSync(dir)).toEqual(['scan_00231.pdf']);
-    await expect(chip).toHaveAttribute('href', trovato);
+    await expect(chip).toHaveAttribute('data-percorso', trovato);
     // Rimesso, la voce non c'è più: non c'è un nome di prima da rimettere.
     await page.keyboard.press('Escape');
     await chip.click({ button: 'right' });
@@ -460,7 +488,7 @@ test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non 
     await modelloDeiNomi(app, { ritardoMs: 2500 });
     const page = await home(app);
     await chiedi(page, 'trova la bolletta');
-    const chip = page.locator('a.dash-action-btn', { hasText: 'scan_00231.pdf' });
+    const chip = page.locator('.dash-file-btn', { hasText: 'scan_00231.pdf' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
@@ -593,7 +621,7 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
     });
     const page = await home(app);
     await chiedi(page, 'trova la scansione');
-    const chip = page.locator('a.dash-action-btn', { hasText: 'scan_00901.pdf' });
+    const chip = page.locator('.dash-file-btn', { hasText: 'scan_00901.pdf' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();

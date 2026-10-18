@@ -1,9 +1,9 @@
 // Spec Playwright per la pagina di gestione (filo://manage/).
 //
 // Assert di COMPORTAMENTO:
-//   - dashboard unificata (DB1): 9 tab, "Ricevuti" attiva di default; le tab
+//   - dashboard unificata (DB1): "Ricevuti" attiva di default; le tab
 //     lista (Ricevuti/In coda/Risolti/Archiviati) condividono panel-list;
-//     stats/models sono segnaposto; "Automazioni" raccoglie le impostazioni;
+//     "Automazioni" raccoglie le impostazioni, Modelli di supporto compresi (#1110);
 //   - lo switch "Modalità automatica" vive nella tab "Automazioni",
 //     si attiva/disattiva e lo stato sopravvive al ricaricamento;
 //   - il numero di tentativi del loop di correzione è editabile e persiste;
@@ -12,6 +12,7 @@
 //   - un feedback in `clarify` mostra il box risposta dell'owner sotto Ricevuti.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -39,25 +40,28 @@ const FAKE_FB = {
   },
 };
 
-test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1)', async ({ openTab }) => {
+test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 10 tab della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908).
-  await expect(page.locator('.mg-tab')).toHaveCount(10);
-  // Con i feedback caricati (qui: nessuno) le cinque schede-lista dicono
+  // 9 schede: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni
+  // (#1110); più le tre della sezione Domande (#1150) e «Aspettano» (#903).
+  await expect(page.locator('.mg-tab')).toHaveCount(13);
+  // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setData([]));
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
-  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori locali (0)');
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori server (0)');
+  await expect(page.locator('.mg-tab[data-tab="waiting"]')).toHaveText('Aspettano (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Red Team');
-  await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
+  // I Modelli di supporto stanno dentro Automazioni (#1110).
+  await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveCount(0);
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
 
@@ -70,7 +74,7 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (0)');
 });
 
-test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arrivo" (DB1)', async ({ openTab }) => {
+test('le tab-lista condividono panel-list; le altre hanno il loro pannello (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -81,20 +85,21 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
   // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo
   // l'intestazione — che dice anche quanti feedback sta mostrando (#495).
   for (const [tab, head] of [['queue', 'In coda'], ['resolved', 'Risolti'], ['archived', 'Archiviati'], ['inbox', 'Ricevuti']]) {
-    await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
+    await apriScheda(page, tab);
     await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
     await expect(page.locator('#mgListHead')).toHaveText(`${head} (0)`);
   }
 
   // Red Team → l'interruttore «aperto a tutti» (#896).
-  await page.locator('.mg-tab[data-tab="stats"]').click();
+  await apriScheda(page, 'stats');
   await expect(page.locator('#panel-stats')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#panel-stats #mgRtOpenSwitch')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 
-  // Modelli di supporto → pannello dedicato (DD1: non più un segnaposto).
-  await page.locator('.mg-tab[data-tab="models"]').click();
-  await expect(page.locator('#panel-models')).toHaveClass(/mg-panel--active/);
+  // Modelli di supporto → dentro Automazioni (#1110).
+  await apriScheda(page, 'automation');
+  await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#panel-automation #mgSmSection')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 });
 
@@ -107,17 +112,17 @@ test('lo switch "Modalità automatica" vive nella tab Automazioni ed è read-onl
 
   // Lo switch non è più nella barra in alto: è dentro la tab "Automazioni".
   await expect(sw).toBeHidden();
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
   await expect(sw).toBeVisible();
 
   // Cambiando tab lo switch non è più visibile (è una sezione, non globale).
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(sw).toBeHidden();
 
   // Da non-admin (userData pulito → nessuna sessione) lo switch è disabilitato:
   // stesso contratto di sola lettura del banner.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(input).toBeDisabled();
   await expect(sw).toHaveClass(/mg-switch--disabled/);
 });
@@ -127,7 +132,7 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   await page.waitForLoadState('domcontentloaded');
 
   // Lo switch vive nella tab Automazioni.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const input = page.locator('#mgAutoToggle');
   const state = page.locator('#mgAutoState');
 
@@ -203,7 +208,7 @@ test("se il salvataggio fallisce lo switch NON resta acceso a vuoto", async ({ o
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await page.evaluate(() => {
     const orig = window.filo.message.bind(window.filo);
@@ -274,7 +279,7 @@ test('#446 — gli interruttori per mittente scrivono nella config, uno alla vol
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await stubAutomation(page, { enabled: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
@@ -304,7 +309,7 @@ test('ogni istanza di Claude si spegne da sola, senza trascinare le altre', asyn
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await stubAutomation(page, { enabled: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
@@ -333,7 +338,7 @@ test('una config salvata prima dello sdoppiamento non riaccende le istanze spent
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   // La mappa vecchia: un solo interruttore per tutte le istanze di Claude, spento.
   await stubAutomation(page, {
@@ -356,7 +361,7 @@ test('#446 — con l\'automatica spenta gli interruttori per mittente restano mo
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await stubAutomation(page, { enabled: false });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
@@ -379,7 +384,7 @@ test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle ro
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   // Il checkbox è visivamente nascosto (switch custom: la levetta è il fratello
   // .mg-switch-track), quindi si asserisce sul controllo reale, non sulla resa.
@@ -410,7 +415,7 @@ test('l\'interruttore master spegne le routine e le impostazioni che valgono per
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   const sw = page.locator('#mgRoutinesToggle');
   // La levetta si vede davvero (il checkbox è nascosto per costruzione: se si
@@ -485,7 +490,7 @@ test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano sp
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubAutomation(page);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
@@ -539,7 +544,7 @@ async function apriAutomazioni(openTab) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   return page;
 }
 
@@ -767,7 +772,7 @@ test('il timeout dei giudici è editabile (in secondi) e il salvataggio lo scriv
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const input = page.locator('#mgJudgeTimeout');
   await expect(input).toBeVisible();
 
@@ -795,7 +800,7 @@ test('il timeout dei giudici viene clampato nel range consentito', async ({ open
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubJudgeTimeout(page, 60000);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   const input = page.locator('#mgJudgeTimeout');
@@ -820,7 +825,7 @@ test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabi
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const cap3 = page.locator('#mgCap3');
   const cap2 = page.locator('#mgCap2');
   const cap1 = page.locator('#mgCap1');
@@ -884,7 +889,7 @@ test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const giro = page.locator('#mgGiroStretto');
   const etichetta = page.locator('#mgGiroStrettoSwitch');
   await expect(etichetta).toBeVisible();
@@ -941,7 +946,7 @@ test('i bilanci dei giri di correzione vengono clampati nel range [0, 10] al sal
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
 
@@ -1708,26 +1713,26 @@ test('la modalità automatica NON sposta gli allineati: restano nei Ricevuti fin
   // Owner + dati: l'allineato (in attesa di approvazione) è nei Ricevuti.
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_ALIGNED);
   await expect(page.locator('.mg-item')).toHaveCount(1);
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item')).toHaveCount(0);
 
   // Accendi l'automatica: NON deve cambiare nulla nelle liste.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await page.evaluate(() => {
     const el = document.getElementById('mgAutoToggle');
     el.disabled = false; el.checked = true;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item')).toHaveCount(0);
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
   // È l'APPROVAZIONE (che scrive lo status todo) a spostarlo in coda.
   const approved = { ...FAKE_FB_ALIGNED, status: 'todo' };
   await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('queue'); }, approved);
   await expect(page.locator('.mg-item')).toHaveCount(1);
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
@@ -1768,11 +1773,11 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
-  // Apri il dettaglio: il box risposta chiarimenti è visibile. Con la macchina
-  // a stati `clarify` normalizza a `design` (bloccato, decide l'owner), quindi
-  // ANCHE le azioni dei Ricevuti sono legittimamente visibili accanto al box.
+  // Apri il dettaglio: il pannello del rombo si apre da sé con la casella della
+  // risposta. Con la macchina a stati `clarify` normalizza a `design` (bloccato,
+  // decide l'owner), quindi ANCHE le azioni dei Ricevuti sono visibili.
   await page.evaluate((id) => window.__mgTest.openDetail(id), CLARIFY_FB._id);
-  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   await expect(page.locator('#mgActions')).toBeVisible();
   await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
   // La fila dei livelli c'e' comunque, e dice la verita': un feedback mai
@@ -1784,8 +1789,8 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(4);
 
   // Rispondi: il patch rimette in coda (todo) e appende la risposta alle note.
-  await page.locator('#mgClarifyText').fill('Intendo il pulsante in alto a destra.');
-  await page.locator('#mgClarifyBtn').click();
+  await page.locator('#mgSideRispostaText').fill('Intendo il pulsante in alto a destra.');
+  await page.locator('#mgSideRispostaBtn').click();
 
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
   const patch = await page.evaluate(() => window.__updates[0]);
@@ -1796,7 +1801,7 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   // e ricompare sotto "In coda".
   await expect(page.locator('#mgDetail')).toBeHidden();
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(0);
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 
@@ -1854,7 +1859,7 @@ test('tab Archiviati: OFF mostra i soli archiviati, il filtro ⭐ mostra tutti i
   await expect(page.locator('.mg-item-title')).toHaveText('Preferito in coda');
 
   // Il filtro sparisce sulle altre tab.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('#mgArchiveFilter')).toBeHidden();
 });
 
@@ -1983,11 +1988,10 @@ test('#497 — azioni di stato, ⭐ e frase: tutti i tasti sulla stessa riga', a
   expect(Math.abs(centri.frase - centri.azione)).toBeLessThan(6);
 });
 
-// ── #1034: anche «fondi senza chiedermelo» sta sulla riga dei tasti ────────
+// ── #1034: anche l'ultimo tasto dell'owner sta sulla riga dei tasti ────────
 // Aveva una riga sua sotto gli altri tasti, su ogni pratica aperta. Si guarda
 // alla misura della finestra di serie: i Ricevuti (il caso con più tasti fra
-// quelli di ogni giorno) e una pratica in coda col segno, dove accanto ai tasti
-// c'è anche chi l'ha messo.
+// quelli di ogni giorno) e una pratica in coda che si segna fidata (#1148).
 async function tastiDellOwner(page) {
   return page.evaluate(() => {
     const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
@@ -1995,12 +1999,11 @@ async function tastiDellOwner(page) {
       const r = b.getBoundingClientRect();
       return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, basso: r.bottom };
     });
-    const info = document.getElementById('mgPreapprovedInfo');
-    return { tasti, infoTop: vis(info) ? info.getBoundingClientRect().top : null };
+    return { tasti };
   });
 }
 
-test('#1034 — Ricevuti: anche «Senza chiedere» sta sulla riga degli altri tasti', async ({ openTab }) => {
+test('#1034 — Ricevuti: anche «Segna fidato» sta sulla riga degli altri tasti', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
@@ -2013,24 +2016,27 @@ test('#1034 — Ricevuti: anche «Senza chiedere» sta sulla riga degli altri ta
     window.__mgTest.openDetail(f._id);
   }, fb);
 
-  await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
-  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Senza chiedere');
+  await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
+  await expect(page.locator('#mgFiduciaBtn')).toHaveText('🤝 Segna fidato');
   await expect(page.locator('#mgAcceptLocalBtn')).toBeVisible();
   const { tasti } = await tastiDellOwner(page);
-  expect(tasti.map((t) => t.id)).toEqual(expect.arrayContaining(['mgAcceptBtn', 'mgArchiveBtn', 'mgStarBtn', 'mgUserNoteToggle', 'mgPreapproveBtn']));
+  expect(tasti.map((t) => t.id)).toEqual(expect.arrayContaining(['mgAcceptBtn', 'mgArchiveBtn', 'mgStarBtn', 'mgUserNoteToggle', 'mgFiduciaBtn']));
   for (const t of tasti) expect(Math.abs(t.centro - tasti[0].centro), t.id).toBeLessThan(6);
 });
 
-test('#1034 — In coda col segno: tasto acceso e chi l’ha messo, sulla stessa riga; il clic non sposta i vicini', async ({ openTab }) => {
+test('#1034 — In coda: «Segna fidato» al clic resta premuto sulla stessa riga, e i vicini non si spostano', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
   await page.evaluate(() => {
+    window.__fiducia = [];
     const orig = window.filo.message.bind(window.filo);
-    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update')
-      ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'fiducia_segna') { window.__fiducia.push(msg); return { ok: true, fiducia: 'fidato' }; }
+      return (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    };
   });
-  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-coda', mergePreapproved: { by: 'owner@esempio', at: '2026-09-13T07:30:00.000Z' } };
+  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-coda' };
   await page.evaluate((f) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([f]);
@@ -2038,41 +2044,43 @@ test('#1034 — In coda col segno: tasto acceso e chi l’ha messo, sulla stessa
     window.__mgTest.openDetail(f._id);
   }, fb);
 
-  const tasto = page.locator('#mgPreapproveBtn');
-  await expect(tasto).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#mgPreapprovedInfo')).toContainText('owner@esempio');
+  const tasto = page.locator('#mgFiduciaBtn');
+  await expect(tasto).toBeVisible();
   const prima = await tastiDellOwner(page);
   for (const t of prima.tasti) expect(Math.abs(t.centro - prima.tasti[0].centro), t.id).toBeLessThan(6);
-  // Chi l'ha messo sta accanto ai tasti, non sotto.
-  expect(prima.infoTop).toBeLessThan(prima.tasti[0].basso);
+  const stella = await page.locator('#mgStarBtn').boundingBox();
 
-  const box = await tasto.boundingBox();
   await tasto.click();
-  await expect(tasto).toHaveAttribute('aria-pressed', 'false');
-  await expect(tasto).toHaveText('Senza chiedere');
-  const dopo = await tasto.boundingBox();
-  expect(Math.round(dopo.x)).toBe(Math.round(box.x));
-  expect(Math.round(dopo.width)).toBe(Math.round(box.width));
+  await expect(tasto).toHaveAttribute('aria-pressed', 'true');
+  await expect(tasto).toHaveText('🤝 Fidato');
+  expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'fb-una-riga-coda' }]);
+  const dopo = await tastiDellOwner(page);
+  for (const t of dopo.tasti) expect(Math.abs(t.centro - dopo.tasti[0].centro), t.id).toBeLessThan(6);
+  // L'esito sotto la riga la può alzare, non spostare di lato.
+  const stellaDopo = await page.locator('#mgStarBtn').boundingBox();
+  expect(Math.round(stellaDopo.x)).toBe(Math.round(stella.x));
 });
 
-// La riga non va mai a capo: con tanti tasti (spam, file sospetto, «È mio») o con la colonna stretta i tasti
-// si stringono e restano dentro la riga; chi ha messo il segno va sotto, leggibile.
+// La riga non va mai a capo: con tanti tasti (spam, file sospetto, «Segna fidato») o con la colonna stretta i tasti
+// si stringono e restano dentro la riga.
 const RIGA_BASE = { text: 'Testo.', name: 'Prova', seq: 12, subSeq: 0, createdAt: '2026-06-22T10:00:00Z', images: [] };
+// [nome, sezione, feedback, tasti visibili almeno].
 const RIGA_CASI = [
-  ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }],
-  ['mittente da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-mio', status: 'new', clientId: 'owner:abc' }],
-  ['file sospetto da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-file', status: 'suspicious_file', clientId: 'owner:abc' }],
-  ['in coda col segno da approvazione', 'queue', { ...RIGA_BASE, _id: 'riga-coda', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com',
-    mergePreapproved: { by: 'owner@esempio.it · approvazione 0123456789abcdef01234567', at: '2026-09-13T07:30:00.000Z' } }],
+  ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }, 5],
+  ['proprio non fidato', 'inbox', { ...RIGA_BASE, _id: 'riga-mio', status: 'new', clientId: 'owner:abc' }, 5],
+  ['file sospetto, non fidato', 'inbox', { ...RIGA_BASE, _id: 'riga-file', status: 'suspicious_file', clientId: 'owner:abc' }, 5],
+  ['in coda, da segnare fidato', 'queue', { ...RIGA_BASE, _id: 'riga-coda', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com' }, 4],
+  ['in coda, segnato fidato da te', 'queue', { ...RIGA_BASE, _id: 'riga-fidato', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com',
+    fiducia: 'fidato', fiduciaDa: { by: 'owner', at: Date.parse('2026-09-13T07:30:00.000Z') } }, 4],
 ];
 for (const larghezza of [1280, 960]) {
-  for (const [nome, tab, fb] of RIGA_CASI) {
+  for (const [nome, tab, fb, minimo] of RIGA_CASI) {
     test(`#1034 — finestra ${larghezza}, ${nome}: i tasti restano su una riga e dentro la colonna`, async ({ openTab, app }) => {
       const page = await openTab(URL);
       await page.waitForLoadState('domcontentloaded');
       await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
       await app.evaluate(({ BrowserWindow }, w) => {
-        const win = BrowserWindow.getAllWindows()[0];
+        const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
         win.setSize(w, win.getSize()[1]);
       }, larghezza);
       await page.waitForFunction((w) => Math.abs(window.outerWidth - w) < 40, larghezza);
@@ -2082,7 +2090,7 @@ for (const larghezza of [1280, 960]) {
         window.__mgTest.setTab(t);
         window.__mgTest.openDetail(f._id);
       }, [fb, tab]);
-      await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+      await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
       const m = await page.evaluate(() => {
         const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
         const riga = document.querySelector('#mgOwnerBar .mg-owner-row').getBoundingClientRect();
@@ -2094,10 +2102,9 @@ for (const larghezza of [1280, 960]) {
           const v = b.getBoundingClientRect();
           return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, destra: v.right, sinistra: v.left, largo: r.width };
         });
-        const info = document.getElementById('mgPreapprovedInfo');
-        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti, infoLarga: vis(info) ? info.getBoundingClientRect().width : null };
+        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti };
       });
-      expect(m.tasti.length).toBeGreaterThanOrEqual(5);
+      expect(m.tasti.length).toBeGreaterThanOrEqual(minimo);
       expect(m.destraScatola).toBeLessThanOrEqual(m.destraRiga + 1);
       for (const t of m.tasti) {
         expect(Math.abs(t.centro - m.tasti[0].centro), t.id).toBeLessThan(6);
@@ -2105,7 +2112,6 @@ for (const larghezza of [1280, 960]) {
         expect(t.sinistra, t.id).toBeGreaterThanOrEqual(m.sinistraRiga - 2);
         expect(t.largo, t.id).toBeGreaterThan(24);
       }
-      if (m.infoLarga !== null) expect(m.infoLarga).toBeGreaterThan(150);
     });
   }
 }
@@ -2114,11 +2120,14 @@ test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto'
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
-  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setSize(960, win.getSize()[1]); });
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs); win.setSize(960, win.getSize()[1]); });
   await page.waitForFunction(() => Math.abs(window.outerWidth - 960) < 40);
   await page.evaluate(() => {
     const orig = window.filo.message.bind(window.filo);
-    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'fiducia_segna') return { ok: true, fiducia: 'fidato' };
+      return (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    };
   });
   const fb = RIGA_CASI[2][2];
   await page.evaluate((f) => {
@@ -2127,11 +2136,11 @@ test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto'
     window.__mgTest.setTab('inbox');
     window.__mgTest.openDetail(f._id);
   }, fb);
-  const ultimo = page.locator('#mgPreapproveBtn');
+  const ultimo = page.locator('#mgFiduciaBtn');
   await expect(ultimo).toBeVisible();
   const dentro = () => page.evaluate(() => {
     const s = document.querySelector('#mgOwnerBar .mg-owner-tasti').getBoundingClientRect();
-    const b = document.getElementById('mgPreapproveBtn').getBoundingClientRect();
+    const b = document.getElementById('mgFiduciaBtn').getBoundingClientRect();
     return b.right <= s.right + 2;
   });
   expect(await dentro()).toBe(false);
@@ -2327,7 +2336,7 @@ async function stubSupportModels(page, initialModels, isAdmin = true) {
   }, { models: initialModels, admin: isAdmin });
 }
 
-test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEditor', async ({ openTab }) => {
+test('DD1: i Modelli di supporto (in Automazioni) renderizzano tutti gli slot col modelChainEditor', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
@@ -2335,15 +2344,16 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
 
   // Clicca la tab: innesca il caricamento lazy.
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await apriScheda(page, 'automation');
 
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
-  // 8 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
-  // priorità, e la ricerca fra i feedback spostata qui dalle Opzioni, #465).
-  await expect(page.locator('.mg-sm-slot')).toHaveCount(8);
+  // 9 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
+  // priorità, la ricerca fra i feedback spostata qui dalle Opzioni, #465, e il suo classificatore, #1118).
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(9);
   await expect(page.locator('[data-slot="manageSearch"] label')).toHaveText('Ricerca fra i feedback');
+  await expect(page.locator('[data-slot="manageSearchClassifier"] label')).toHaveText('Classificatore della ricerca');
   await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge1"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge2"]')).toBeVisible();
@@ -2375,7 +2385,7 @@ test('DD1: i valori caricati popolano i campi (slot con catena ha più segmenti)
   await page.waitForFunction(() => window.__mgTest && window.filo);
 
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
   // Lo slot "sanitizer" ha valore "flash" → un solo input con "flash".
@@ -2401,7 +2411,7 @@ test('DD1: il bottone Salva invia support_models_update con i valori corretti', 
   await page.waitForFunction(() => window.__mgTest && window.filo);
 
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
   // Salva senza modifiche.
@@ -2441,7 +2451,7 @@ test('DD1: per i non-admin la sezione mostra il messaggio di accesso negato', as
 
   // Stub con admin=false.
   await stubSupportModels(page, {}, false);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await apriScheda(page, 'automation');
 
   // Aspetta che il caricamento finisca (il denied appare subito dopo la risposta).
   await expect(page.locator('#mgSmDenied')).toBeVisible({ timeout: 5000 });
@@ -2608,16 +2618,17 @@ test('il testo delle istruzioni di correzione oltre il tetto non viene salvato m
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: 'PRIMA' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   const fix = page.locator('#mgFixInstructions');
   await expect(fix).toHaveValue('PRIMA');
   const max = await page.evaluate(() => window.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX);
+  const it = (n) => n.toLocaleString('it-IT', { useGrouping: true }).replace('.', '\\.');
   await fix.fill('x'.repeat(max + 1));
   await page.locator('#mgFixInstructionsSave').click();
-  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText(new RegExp(`Troppo lungo: ${max + 1} caratteri, il massimo è ${max}`));
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText(new RegExp(`Troppo lungo: ${it(max + 1)} caratteri, il massimo è ${it(max)}`));
   expect(await page.evaluate(() => window.__capsSets)).toEqual([]);
   expect(await page.evaluate(() => window.__capsValue.fixInstructions)).toBe('PRIMA');
   // Al tetto esatto si salva.
@@ -2630,7 +2641,7 @@ test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e 
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page, { cap2: 3, cap1: 2, cap0: 0, fixInstructions: '' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
@@ -2662,7 +2673,7 @@ test('giro stretto: se la config non si legge l’interruttore resta com’era e
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page, { cap2: 5, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());

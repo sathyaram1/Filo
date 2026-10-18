@@ -51,6 +51,19 @@ test('dalla pagina d\'errore Alt+freccia sinistra torna al sito di prima', async
   await expect.poll(async () => (await scheda(app)).vera, { timeout: 10_000 }).toBe(a);
 });
 
+// #685.1: su Mac Cmd+← passa dalla pagina d'errore (non si scrive lì) e deve arrivare alla stessa cronologia.
+test('su Mac dalla pagina d\'errore Cmd+freccia sinistra torna al sito di prima', async ({ app, openTab, testServer }) => {
+  const a = await sitoPoiErrore(app, openTab, testServer);
+  await app.evaluate(() => { Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true }); });
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    return t.view.webContents.executeJavaScript('document.readyState');
+  }), { timeout: 8_000 }).toBe('complete');
+  await premi(app, 'tab', 'Left', ['meta']);
+  await expect.poll(async () => (await scheda(app)).vera, { timeout: 10_000 }).toBe(a);
+});
+
 test('Ricarica sulla pagina d\'errore, il sito fallisce ancora: Indietro torna comunque al sito di prima', async ({ app, openTab, testServer }) => {
   const a = await sitoPoiErrore(app, openTab, testServer);
   const barra = await barraPage(app);

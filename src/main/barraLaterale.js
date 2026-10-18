@@ -7,6 +7,7 @@ const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
 const RedteamGate = require('./services/redteamGate');
+const { tastoPremuto } = require('./tastoDelMouse');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -147,7 +148,7 @@ class BarraLaterale {
     this._nascondiSuggerimento();
     this._invia();
     this._ferma('stringi');
-    this.timer.stringi = setTimeout(() => { this.timer.stringi = null; if (!this.aperta) this.posa(); }, CHIUSURA_MS);
+    this.timer.stringi = setTimeout(() => { this.timer.stringi = null; if (!this.aperta) this.posa(); }, require('./movimento').ms(CHIUSURA_MS));
     if (avevaFuoco) this._restituisciTastiera();
     // Chiusa col puntatore fermo sul bordo (scorciatoia, Esc): si riapre solo se il puntatore si muove.
     this.puntoFermo = this._punto();
@@ -290,7 +291,7 @@ class BarraLaterale {
       this.puntoFermo = this._punto();
       this._guarda();
     } else if (t === 'mouseMove') {
-      this.tasti[chi] = (input.modifiers || []).some((m) => /buttondown$/i.test(String(m)));
+      this.tasti[chi] = Boolean(tastoPremuto(input));
     }
   }
 
@@ -374,8 +375,8 @@ class BarraLaterale {
   }
 
   // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra, e sopra
-  // l'avviso del sito pericoloso che copre la scheda (Indietro serve proprio lì), ma sotto gli avvisi,
-  // che restano l'ultima vista (tests/avvisi-sopra-pagina.spec.mjs).
+  // l'avviso del sito pericoloso che copre la scheda (Indietro serve proprio lì) e la conferma a schermo sopra
+  // la scheda (#592.6), che sta sopra gli avvisi; senza conferma gli avvisi restano l'ultima vista.
   _inCima() {
     if (!this.vista || !this.win || this.win.isDestroyed()) return;
     const cv = this.win.contentView;
@@ -383,6 +384,8 @@ class BarraLaterale {
     const daCoprire = new Set(this.tabs.tabs.map((t) => t.view));
     const sito = this.tabs.avvisoSito && this.tabs.avvisoSito.vista;
     if (sito) daCoprire.add(sito);
+    const conferme = this.tabs.conferme;
+    try { if (conferme && conferme.vista && conferme.vista.getBounds().width > 0) daCoprire.add(conferme.vista); } catch (_) {}
     const mia = figli().indexOf(this.vista);
     if (mia >= 0 && !figli().slice(mia + 1).some((v) => daCoprire.has(v))) return;
     if (mia >= 0) cv.removeChildView(this.vista);
@@ -468,7 +471,8 @@ class BarraLaterale {
       if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
       const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
         || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && !nav.pagina);
-      out.push({ id, icona, etichetta, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
+      const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
+      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
     }
     return out;
   }
@@ -681,7 +685,9 @@ class BarraLaterale {
       { label: 'Copia data e ora', action: 'barra:copia-ora' },
     ];
     const scegli = (a) => {
-      if (a === 'barra:copia-ora') { try { require('electron').clipboard.writeText(`${data} ${orario}`); } catch (_) {} }
+      if (a === 'barra:copia-ora') {
+        try { Promise.resolve(require('electron').clipboard.writeText(`${data} ${orario}`)).catch(() => {}); } catch (_) {}
+      }
     };
     return { voci, scegli };
   }
@@ -725,7 +731,9 @@ class BarraLaterale {
 
   _mostraSuggerimento(dati) {
     const t = testo(dati && dati.testo).slice(0, 300);
-    if (!t || !this.vista || !this.win || this.win.isDestroyed()) { this._nascondiSuggerimento(); return; }
+    // L'etichetta è della barra aperta: chiusa, la vista si stringe sotto il puntatore senza dirgli che è uscito,
+    // e un'etichetta arrivata in ritardo resterebbe sopra la pagina (#1201).
+    if (!t || !this.aperta || !this.vista || !this.win || this.win.isDestroyed()) { this._nascondiSuggerimento(); return; }
     const b = this.vista.getBounds();
     this.suggerimento = true;
     try { require('./popup-tooltip').showTooltip(this.win, t, b.x + numero(dati.x, 0, 10000), b.y + numero(dati.y, 0, 10000)); } catch (_) {}
@@ -907,6 +915,12 @@ class BarraLaterale {
       if (attiva && typeof this.tabs.tastoDelBrowser === 'function' && this.tabs.tastoDelBrowser(input, attiva)) {
         event.preventDefault();
         this.chiudi();
+        return;
+      }
+      // Cmd+freccia su Mac vale qui come Cmd+[ (#685.1): naviga se nella barra non si scrive.
+      const verso = input.type === 'keyDown' && globalThis.SN_TASTI?.comandoNavigazioneFuoriDalCampo?.(input);
+      if (attiva && verso && typeof this.tabs._navigaSeNonScrive === 'function') {
+        this.tabs._navigaSeNonScrive(wc, verso, attiva.id).then((fatto) => { if (fatto) this.chiudi(); }, () => {});
       }
     });
     collegaScorciatoie(wc, this.win);

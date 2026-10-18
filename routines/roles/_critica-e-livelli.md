@@ -100,10 +100,10 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
   spec da solo prima di farne un rilievo; in dubbio confronta con `main`.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
-- Nel contenitore delle routine gli spec che aprono Electron vogliono davanti
-  `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`: `finish:check` ce li mette da
-  sé, un `npx playwright test` lanciato a mano no. Un rosso all'avvio senza
-  quei due non è un rosso.
+- Nel contenitore delle routine `npx playwright test` si accende da solo lo
+  schermo virtuale con la sandbox spenta, come `finish:check`; senza xvfb si
+  ferma prima di aprire Electron e lo dice. Quello stop non è un rosso del
+  codice.
 
 ## La critica
 
@@ -134,13 +134,15 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   titolo preso dalla prima frase.
 - **Le prove restano nel ramo**, in
   `tests/verifica/<numero>/giro<k>-r<n>-<cosa>.spec.mjs` (con `FILO_TEST_SCALE` e le
-  fixture del repo, come ogni spec). In un giro locale la cartella te la dice
-  il compito ricevuto. Sono la memoria del giro, e a rilanciarle sei solo tu,
-  in partenza. Una prova che era solo esplorazione (dipende dall'ambiente, non
-  asserisce niente) si cancella. Si cancella anche quella di un rilievo
-  **esterno**, nello stesso commit: quel rilievo esce di qui dentro un feedback
-  suo, col suo testo, e la prova lasciata indietro sarebbe solo un rosso da
-  rispiegare per sempre.
+  fixture del repo, come ogni spec), e si committano rosse: il segno di rosso
+  atteso (`test.fail`) va solo su quella di un rilievo messo da parte che resta
+  nel ramo, mai su una di un rilievo che registri. Segnata, conta il corpo: se
+  fallisce non è un rilievo nuovo, se passa («Expected to fail, but passed») la
+  porta è chiusa e le togli il segno. Una prova che era solo esplorazione
+  (dipende dall'ambiente, non asserisce niente) si cancella. Si cancella anche
+  quella di un rilievo **esterno**, nello stesso commit: quel rilievo esce di
+  qui dentro un feedback suo, col suo testo, e la prova lasciata indietro
+  sarebbe solo un rosso da rispiegare per sempre.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
@@ -163,6 +165,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   una prova senza più un rosso, la respinge (può durare qualche minuto: lanciala
   in sottofondo). Da quel commit una prova rossa tolta ferma la consegna, e una
   a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
+  Una che la pulizia ha dimenticato esce con un'altra, anche dopo le correzioni:
+  un commit a parte che toglie solo lei, registrato finché è l'ultimo.
   Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il

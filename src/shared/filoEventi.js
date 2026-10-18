@@ -166,6 +166,13 @@
       case TIPI.CHAT_APERTA:
         if (!c) { c = chatNuova(ev.chat, ev.ts); c._pos = stato.pos; stato.chat.set(ev.chat, c); }
         if (ev.onboarding) c.onboarding = true;
+        // Una conversazione di un'altra app (Editor, Mazzi, Aiuto): nel filo è una riga ripiegata (src/shared/filoApp.js).
+        if (stringa(ev.app)) {
+          c.app = ev.app;
+          c.rif = typeof ev.rif === 'string' ? ev.rif : '';
+          if (typeof ev.soggetto === 'string') c.soggetto = ev.soggetto;
+          if (typeof ev.dove === 'string') c.dove = ev.dove;
+        }
         break;
       case TIPI.MESSAGGIO: {
         if (!c) { c = chatNuova(ev.chat, ev.ts); stato.chat.set(ev.chat, c); }
@@ -187,6 +194,7 @@
         if (ev.titleByUser) c.titleByUser = true;
         if (ev.kindByUser) c.kindByUser = true;
         if (Number.isFinite(ev.triagedCount)) c.triagedCount = ev.triagedCount;
+        if (typeof ev.soggetto === 'string') c.soggetto = ev.soggetto;
         break;
       case TIPI.CHAT_FONTI: {
         if (!c) break;

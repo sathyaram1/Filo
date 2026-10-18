@@ -79,6 +79,12 @@ const safebrowseMethods = {
     }, 0));
   },
 
+  // Ogni verifica di una pagina di questa finestra passa di qui: l'incognito spegne giudizio del modello e finestra
+  // nascosta (#1081). Le pagine qui sono già aperte: niente `daAprire`.
+  _sbAnalizza(url, ctx, onUpdate) {
+    return globalThis.SN_SAFEBROWSE.analyze(url, { ...ctx, incognito: !!this.incognito }, onUpdate);
+  },
+
   // Chiesto dal content script (SAFEBROWSE_GET) all'apertura del documento e quando compaiono campi sensibili: il
   // verdetto sincrono si mostra subito, quello dei segnali di rete quando arriva.
   safebrowseGet(tabId, url, ctx = {}) {
@@ -89,7 +95,7 @@ const safebrowseMethods = {
     if (!url) return { ok: true, level: 'safe', message: null };
     let verdict;
     try {
-      verdict = SB.analyze(url, { ...ctx, budgetUrl: tab._urlNavigato }, (next) => {
+      verdict = this._sbAnalizza(url, { ...ctx, budgetUrl: tab._urlNavigato }, (next) => {
         this._sbMostra(tab, url, this._sbApplyState(tab, next));
       });
     } catch (_) {
@@ -117,7 +123,7 @@ const safebrowseMethods = {
     // blocco geografico.
     tab._urlNavigato = sito;
     try {
-      const verdict = SB.analyze(sito, {}, (next) => {
+      const verdict = this._sbAnalizza(sito, {}, (next) => {
         this._sbMostra(tab, sito, this._sbApplyState(tab, next));
       });
       this._sbMostra(tab, sito, this._sbApplyState(tab, verdict));
@@ -173,7 +179,7 @@ const safebrowseMethods = {
         const ora = sitoOra();
         if (a && (a.level === 'pericoloso' || a.level === 'sospetto') && ora && stessoSito(sito, ora)) sposta();
       };
-      try { decidi(SB.analyze(sito, hints, decidi)); } catch (_) {}
+      try { decidi(this._sbAnalizza(sito, hints, decidi)); } catch (_) {}
     };
     pwc.on('did-navigate', () => giudica({}));
     // Il sospetto che nasce dal campo password lo vede solo la pagina caricata.
@@ -230,7 +236,7 @@ const safebrowseMethods = {
     if ((hints.hasPassword || hints.hasPayment) && wc.getURL() === url) {
       tab._sbCampiUrl = url;
       try {
-        const v = SB.analyze(url, hints, (next) => this._sbMostra(tab, url, this._sbApplyState(tab, next)));
+        const v = this._sbAnalizza(url, hints, (next) => this._sbMostra(tab, url, this._sbApplyState(tab, next)));
         if (v && v.level !== 'safe') this._sbMostra(tab, url, this._sbApplyState(tab, v));
       } catch (_) {}
       return;
@@ -333,7 +339,7 @@ const safebrowseMethods = {
     } else if (scelta === 'indietro') {
       this.safebrowseIndietro(tab.id);
     } else if (scelta === 'copia') {
-      try { require('electron').clipboard.writeText(a.url); } catch (_) {}
+      try { Promise.resolve(require('electron').clipboard.writeText(a.url)).catch(() => {}); } catch (_) {}
     } else if (scelta === 'chiedi' || scelta === 'segnala') {
       this._sbApriCasa(tab, scelta);
     }

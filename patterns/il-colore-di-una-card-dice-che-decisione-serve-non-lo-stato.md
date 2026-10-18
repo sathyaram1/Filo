@@ -25,7 +25,9 @@ poi bocciato). Due regole (#462, #238):
   attacchi. Ogni scheda dei Ricevuti porta accanto al titolo la FORMA del
   livello che l'ha fermata, la stessa della fila nel dettaglio (triangolo
   filtro, cerchio giudici, rombo Claude che chiede, pentagono audit, quadrato
-  fusione), con il motivo in parole sotto il puntatore. Il bordo resta la
+  fusione), con il motivo in parole sotto il puntatore. Un rimando che chiede
+  lavoro locale è un'altra decisione, quindi un altro colore: rombo azzurro come
+  lo schermo di 💻 (#1060), in lista e nella fila, dove si colora dallo stato. Il bordo resta la
   famiglia del motivo. Il segno sparisce quando la pratica esce dai Ricevuti
   (una risposta partita la rimette in coda). Stessa regola nella pagina dei
   feedback. Fonte unica: `segnoFermata` in `manageReview.js`.

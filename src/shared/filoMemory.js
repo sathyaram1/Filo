@@ -1,8 +1,6 @@
 // Persistenza del sistema di memoria di Filo.
 //
-// Tre livelli (vedi filo-architettura.md sezione 4):
-//   - raw_log: storico completo di interazioni utente/Filo. Volume previsto
-//     ~1MB/anno → niente retention policy stringente, basta un cap difensivo.
+// Due livelli (vedi filo-architettura.md sezione 4; lo storico delle interazioni è il filo, #866):
 //   - lessons buffer: lezioni estratte dall'agente Creatore Lezioni, in attesa
 //     di compattazione (svuotato dal Compattatore quando supera 3000 char).
 //   - moduli: PROFILO, PREFERENZE, e N espansioni dinamiche. Sempre persistenti.
@@ -23,9 +21,6 @@
 
   const KEYS = global.SN_CONST.STORAGE_KEYS;
 
-  // Limite difensivo sul raw log per non saturare chrome.storage (~10MB totali).
-  // 5000 entry ≈ pochi MB con messaggi corti.
-  const RAW_LOG_CAP = 5000;
   // Quando il buffer di lezioni supera questa soglia in caratteri, il
   // Compattatore va eseguito (vedi spec sezione 4.2).
   const LESSONS_BUFFER_TRIGGER_CHARS = 3000;
@@ -69,7 +64,7 @@
   }
   async function setRaw(key, value) {
     await chrome.storage.local.set({ [key]: value });
-    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER) && onMemoriaCambiata) {
+    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER || key === KEYS.FILO_KEEP_OPEN) && onMemoriaCambiata) {
       try { onMemoriaCambiata(); } catch (_) {}
     }
   }
@@ -77,39 +72,6 @@
   // Il main avvisa da qui le pagine che mostrano la memoria (Preferenze, #592).
   let onMemoriaCambiata = null;
   function setOnMemoryChange(fn) { onMemoriaCambiata = typeof fn === 'function' ? fn : null; }
-
-  // ===== Raw log =====
-
-  async function appendRaw(entry) {
-    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
-    list.unshift({
-      ts: entry.ts || new Date().toISOString(),
-      type: entry.type || 'unknown', // 'chat_user', 'chat_filo', 'dismiss', 'click', ...
-      summary: entry.summary || '',
-      extra: entry.extra || null,
-    });
-    if (list.length > RAW_LOG_CAP) list.length = RAW_LOG_CAP;
-    await setRaw(KEYS.FILO_RAW_LOG, list);
-    return list[0];
-  }
-
-  async function listRaw({ since, limit = 100 } = {}) {
-    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
-    let out = list;
-    if (since) {
-      const cutoff = new Date(since).getTime();
-      out = out.filter((e) => new Date(e.ts).getTime() >= cutoff);
-    }
-    return out.slice(0, limit);
-  }
-
-  // Toglie le voci che `pred` riconosce (i messaggi di una chat cancellata, #866).
-  async function togliRaw(pred) {
-    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
-    const next = list.filter((e) => !pred(e));
-    if (next.length !== list.length) await setRaw(KEYS.FILO_RAW_LOG, next);
-    return list.length - next.length;
-  }
 
   // ===== Lessons buffer =====
 
@@ -172,7 +134,7 @@
   }
 
   // La memoria come la rilegge l'utente nelle Preferenze (#592): i moduli in
-  // righe, e le lezioni ancora da riordinare.
+  // righe, le lezioni ancora da riordinare e i siti da tenere aperti (#823).
   async function viewForUser() {
     const mem = await getMemory();
     const moduli = Object.entries(mem || {})
@@ -181,17 +143,21 @@
     const lezioni = (await getLessonsBuffer())
       .filter((l) => l && typeof l.text === 'string' && l.text.trim())
       .map((l) => ({ ts: l.ts, text: l.text }));
-    return { moduli, lezioni };
+    const sempreAperte = Object.keys(await listKeepOpen()).sort();
+    return { moduli, lezioni, sempreAperte };
   }
+
+  const fraseSempreAperta = (host) => `Tieni sempre aperto ${host}`;
 
   // Le righe che una frase detta a voce indica (#592): quelle uguali, se ce ne
   // sono, altrimenti quelle che la contengono. Ognuna porta il `via` di
   // FILO_MEMORY_FORGET, così la voce toglie esattamente quello che toglie la ×.
   async function tutteLeRighe() {
-    const { moduli, lezioni } = await viewForUser();
+    const { moduli, lezioni, sempreAperte } = await viewForUser();
     return [
       ...moduli.flatMap((m) => m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } }))),
       ...lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })),
+      ...sempreAperte.map((host) => ({ testo: fraseSempreAperta(host), via: { sempreAperta: host } })),
     ];
   }
 
@@ -213,6 +179,7 @@
 
   async function forgetLine(via) {
     if (via && via.lezione && typeof via.lezione === 'object') return forgetLesson(via.lezione);
+    if (via && typeof via.sempreAperta === 'string') return (await removeKeepOpen(via.sempreAperta)).length > 0;
     if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') return forgetModuleLine(via.modulo, via.riga);
     return false;
   }
@@ -888,6 +855,46 @@
     return rules[normProxyDomain(domain)] || null;
   }
 
+  // ===== Siti sempre aperti (#823) =====
+  // La pulizia delle schede li legge senza passare dal modello. La voce (host) la calcola il main.
+
+  async function listKeepOpen() {
+    const r = await getRaw(KEYS.FILO_KEEP_OPEN, {});
+    return r && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  }
+
+  // Rilegge e riscrive la chiave intera: le scritture in fila, o due insieme si mangiano a vicenda
+  // (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+  let codaKeepOpen = Promise.resolve();
+  function inCodaKeepOpen(fn) {
+    const r = codaKeepOpen.then(fn, fn);
+    codaKeepOpen = r.then(() => {}, () => {});
+    return r;
+  }
+
+  function addKeepOpen(host) {
+    const h = normProxyDomain(host);
+    if (!h) return Promise.resolve(null);
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      voci[h] = { ts: (voci[h] && voci[h].ts) || new Date().toISOString() };
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return h;
+    });
+  }
+
+  // Torna le voci tolte davvero.
+  function removeKeepOpen(hosts) {
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      const tolte = (Array.isArray(hosts) ? hosts : [hosts]).map(normProxyDomain).filter((h) => h && h in voci);
+      if (!tolte.length) return [];
+      for (const h of tolte) delete voci[h];
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return tolte;
+    });
+  }
+
   // ===== Session =====
 
   async function getSession() {
@@ -919,7 +926,6 @@
 
   global.SN_FILO_MEMORY = {
     // raw log
-    appendRaw, listRaw, togliRaw,
     // lessons
     getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,
@@ -939,6 +945,8 @@
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)
     listProxyRules, setProxyRule, removeProxyRule, getProxyRule,
+    // siti sempre aperti (#823)
+    listKeepOpen, addKeepOpen, removeKeepOpen, fraseSempreAperta,
     // session
     getSession, setSession, touchSession,
   };

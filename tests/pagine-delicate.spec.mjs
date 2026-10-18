@@ -22,7 +22,9 @@ async function modelliFinti(app) {
     };
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ messages }) => {
       const testo = JSON.stringify(messages);
-      globalThis.__mandato.push({ tipo: /Riassumi in italiano/.test(testo) ? 'riassunto' : 'altro', testo });
+      // La home si prepara da sola quando un modello c'è, e vede i titoli delle schede aperte: non è un lavoro di queste prove.
+      const tipo = /Riassumi in italiano/.test(testo) ? 'riassunto' : /preparare la dashboard/.test(testo) ? 'home' : 'altro';
+      globalThis.__mandato.push({ tipo, testo });
       return { text: 'Riassunto finto della pagina.', provider: 'openrouter', model: 'stub', usage: {} };
     };
   });
@@ -59,7 +61,8 @@ test('chiusa una pagina con un campo password, al modello del riassunto e all\'i
 
   const partito = await mandato(app);
   expect(partito.filter((m) => m.tipo === 'riassunto')).toEqual([]);
-  expect(partito.some((m) => m.testo.includes('Saldo') || m.testo.includes('Il mio conto'))).toBe(false);
+  // «Saldo» da solo c'è anche nei crediti che il saluto della home manda al modello: si cerca il testo della pagina.
+  expect(partito.some((m) => m.testo.includes('Saldo disponibile') || m.testo.includes('Il mio conto'))).toBe(false);
 });
 
 test('con l\'interruttore delle pagine delicate spento, il testo della stessa pagina arriva al riassunto', async ({ app, shell, openTab, testServer }) => {
@@ -95,7 +98,7 @@ test('con il riassunto delle schede chiuse spento non parte niente, e la scheda 
 
   const partito = await mandato(app);
   expect(partito.filter((m) => m.tipo === 'riassunto')).toEqual([]);
-  expect(partito.some((m) => /lievito|Ricetta del pane/.test(m.testo))).toBe(false);
+  expect(partito.some((m) => m.tipo !== 'home' && /lievito|Ricetta del pane/.test(m.testo))).toBe(false);
 });
 
 test('la pulizia automatica delle schede: di una pagina delicata al modello va solo il tipo, mai titolo, indirizzo o testo', async ({ app }) => {
@@ -149,7 +152,7 @@ test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interrutt
   await t.chiudi();
   await expect.poll(() => voceDi(app, 'Area clienti dello studio'), { timeout: 8_000 })
     .toEqual({ delicata: 'utente', summary: '', snippet: '', embedding: false });
-  expect((await mandato(app)).some((m) => m.testo.includes('Saldo'))).toBe(false);
+  expect((await mandato(app)).some((m) => m.testo.includes('Saldo disponibile'))).toBe(false);
 
   await sicurezza.bringToFront();
   await sicurezza.locator('#sec-delicate').uncheck();
@@ -352,7 +355,8 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
     !!BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
   const IBAN = 'IT60X0542811101000000123456';
   const url = testServer.html(`<!doctype html><title>Bonifico</title><body><p id="p">Il mio IBAN è ${IBAN} per il bonifico.</p></body>`, { pubblico: true });
-  const seleziona = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito }) => {
+  // Un doppio clic vero sull'IBAN: una selezione fatta da script non prepara niente in nessuna finestra (#1070).
+  const seleziona = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito, IBAN }) => {
     const win = BrowserWindow.getAllWindows().find((w) => !!w._filoIncognito === incognito && w._filoTabs);
     const tm = win._filoTabs;
     const id = tm.openTab(url);
@@ -361,21 +365,35 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
     while (Date.now() - t0 < 10_000) {
       tab = tm.tabs.find((t) => t.id === id);
       const pronta = tab && tab.view && await tab.view.webContents.executeJavaScript(
-        'document.documentElement.dataset.filoReady === "1"').catch(() => false);
+        'document.documentElement.dataset.filoContentReady === "1"').catch(() => false);
       if (pronta) break;
       await new Promise((r) => setTimeout(r, 100));
     }
-    await tab.view.webContents.executeJavaScript(`(function(){const t=document.getElementById('p').firstChild;
-      const r=document.createRange();r.setStart(t,13);r.setEnd(t,40);const s=getSelection();s.removeAllRanges();s.addRange(r);})()`);
-  }, { url, incognito });
+    const wc = tab.view.webContents;
+    const q = await wc.executeJavaScript(`(function(){const t=document.getElementById('p').firstChild;
+      const da=t.textContent.indexOf(${JSON.stringify(IBAN)});const r=document.createRange();r.setStart(t,da);r.setEnd(t,da+${IBAN.length});
+      const b=r.getBoundingClientRect();return {x:Math.round(b.left+b.width/2),y:Math.round(b.top+b.height/2)};})()`);
+    for (const clickCount of [1, 2]) {
+      wc.sendInputEvent({ type: 'mouseDown', x: q.x, y: q.y, button: 'left', clickCount });
+      wc.sendInputEvent({ type: 'mouseUp', x: q.x, y: q.y, button: 'left', clickCount });
+    }
+    const t1 = Date.now();
+    let scelta = '';
+    while (Date.now() - t1 < 3000 && scelta !== IBAN) {
+      scelta = await wc.executeJavaScript('getSelection().toString()');
+      if (scelta !== IBAN) await new Promise((r) => setTimeout(r, 50));
+    }
+    return scelta;
+  }, { url, incognito, IBAN });
   const spiegazioni = async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN));
 
-  await seleziona(true);
+  // Lo stesso gesto nelle due finestre: in incognito a fermarlo è solo l'incognito.
+  expect(await seleziona(true)).toBe(IBAN);
   // La preparazione parte dopo 400 ms dalla selezione: oltre il secondo e mezzo non è partita.
   await new Promise((r) => setTimeout(r, 1500));
   expect(await spiegazioni()).toEqual([]);
 
-  await seleziona(false);
+  expect(await seleziona(false)).toBe(IBAN);
   await expect.poll(async () => (await spiegazioni()).length, { timeout: 8_000 }).toBe(1);
 });
 

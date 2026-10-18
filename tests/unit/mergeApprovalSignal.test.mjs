@@ -21,11 +21,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { rmSync, existsSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -98,7 +99,7 @@ describe('il percorso: chi suona e chi ascolta devono guardare lo stesso punto',
       assert.ok(existsSync(S.signalFile(base)));
       assert.equal(S.readNote(base).id, 'ab12cd34ef56ab12cd34ef56');
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      togliCartella(base);
     }
   });
 
@@ -112,7 +113,7 @@ describe('il percorso: chi suona e chi ascolta devono guardare lo stesso punto',
       writeFileSync(finto, 'x');
       assert.equal(S.note('ab12cd34ef56ab12cd34ef56', finto), false);
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      togliCartella(base);
     }
   });
 });
@@ -212,12 +213,14 @@ test('chi ascolta sente chi suona (file veri, processi diversi)', async () => {
   let colpi = 0;
   const stop = S.watchSignal(() => { colpi++; }, { base, debounceMs: 30 });
   try {
-    await attendi(80);
-    S.note('ab12cd34ef56ab12cd34ef56', base);
-    for (let i = 0; i < 60 && colpi === 0; i++) await attendi(50);
-    assert.ok(colpi >= 1, 'il campanello non è stato sentito');
+    // Si suona finché qualcuno sente: un ascolto che sotto carico si arma tardi sente il colpo dopo, uno rotto mai (#1063).
+    await aspettaChe(async () => {
+      if (!colpi) S.note('ab12cd34ef56ab12cd34ef56', base);
+      await attendi(100);
+      return colpi >= 1;
+    }, { cosa: 'il campanello non è stato sentito' });
   } finally {
     stop();
-    rmSync(base, { recursive: true, force: true });
+    togliCartella(base);
   }
 });

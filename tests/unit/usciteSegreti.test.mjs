@@ -812,7 +812,8 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     prima(finestre, 'SN_USCITA_DA_FILO(', 'openExternalScheme(', 'una pagina di Filo passa la posta al sistema prima della porta');
     assert.match(finestre.slice(0, finestre.indexOf('return { action: \'deny\' }')), /SN_USCITA_DA_FILO\(url, wc, \(\) => \{\s*this\.apriDaCollegamento\(/);
     const apre = corpo(tabs, '  apriDaCollegamento(url');
-    for (const passo of ['openExternalScheme(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
+    for (const passo of ['fermaNavigazione(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
+    assert.ok(corpo(tabs, 'function fermaNavigazione(').includes('openExternalScheme('), 'fermaNavigazione non passa la posta al sistema');
     prima(corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'"), 'controllaUscita(', 'safeFetch(', 'leggere un collegamento lo chiede al sito prima della porta');
     const dash = src('pages', 'dashboard', 'dashboard.js');
     assert.ok(/document\.addEventListener\('click', apriDaCollegamento, true\)/.test(dash), 'i collegamenti della pagina non passano da apriProposta');
@@ -862,7 +863,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.equal((clic.match(/submitMessage\(.*\{ daModello: true \}\)/g) || []).length, 2);
     assert.match(corpo(dash, 'function paroleUtente('), /!m\.daModello/);
     const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
-    assert.match(handlers, /const paroleUtente = cleanHistory\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
+    assert.match(handlers, /const paroleUtente = \[\.\.\.vistiDalFilo, \.\.\.codaScheda\]\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
     assert.match(handlers, /concat\(internal \|\| daModello \? \[\] :/);
   });
 

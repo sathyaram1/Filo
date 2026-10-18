@@ -1,8 +1,9 @@
 // Unit test — i flush dello storage devono essere serializzati.
 //
-// Regressione reale: due flush concorrenti condividono lo stesso file .tmp
-// (write-then-rename): il primo rinomina il tmp, la rename del secondo trova
-// ENOENT e la scrittura va persa con "[Filo storage] flush failed" nel log.
+// Regressione reale: quando i due flush condividevano lo stesso file .tmp, il
+// primo lo rinominava e la rename del secondo trovava ENOENT. Oggi ogni
+// scrittura ha il suo temporaneo (#1087), ma due in volo possono ancora
+// arrivare alla rename in ordine inverso e lasciare sul disco la più vecchia.
 // Succedeva a ogni avvio con storage grande (~5MB): la scrittura async dura
 // più del debounce (100ms) e il flush successivo partiva mentre il precedente
 // era ancora in volo.

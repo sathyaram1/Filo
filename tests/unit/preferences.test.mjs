@@ -159,7 +159,8 @@ test('#592: uno stile oltre il tetto è rifiutato col perché, non tagliato', ()
   const r = build('stile_agente', lungo);
   assert.ok(r && r.rifiuto, 'oltre il tetto torna un rifiuto, non null e non un partial');
   assert.equal(r.partial, undefined, 'niente da scrivere: né intero né accorciato');
-  assert.ok(r.rifiuto.includes(String(C.agentStyleLength(lungo))), `il rifiuto dice quanto è lungo: ${r.rifiuto}`);
+  assert.equal(C.agentStyleLength(lungo), 1199);
+  assert.ok(r.rifiuto.includes('1.199'), `il rifiuto dice quanto è lungo, col punto delle migliaia: ${r.rifiuto}`);
   assert.ok(r.rifiuto.includes(String(C.AGENT_STYLE_MAX)), `il rifiuto dice il tetto: ${r.rifiuto}`);
   // Nessun popup per un rifiuto: il dispatch lo respinge spiegando perché.
   assert.equal(Levels.costoFor(stileDalModello(lungo)), 1);
@@ -435,4 +436,34 @@ test('#530: spegnere una protezione o allargare un\'eccezione della pagina Sicur
   }
   assert.equal(allenta('siti_delicati', 'togli x.com'), true);
   assert.equal(allenta('domini_esclusi', 'aggiungi x.com'), false, 'non è una difesa');
+});
+
+test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è un rifiuto col numero, e si spegne', () => {
+  assert.deepEqual(build('avvisa quando i crediti durano', '3,5').partial, { avvisoCrediti: { giorni: 3.5 } });
+  assert.deepEqual(build('soglia_percento_crediti', '20%').partial, { avvisoCrediti: { percento: 20 } });
+  assert.deepEqual(build('soglia_giorni_crediti', 'predefinito').partial, { avvisoCrediti: { giorni: 2 } });
+  assert.match(build('soglia_percento_crediti', '250').rifiuto, /250 è fuori dai limiti: da 0 a 100/);
+  assert.deepEqual(build('avviso_crediti', 'spento').partial, { avvisoCrediti: { attivo: false } });
+  assert.deepEqual(build('spiegazione_anticipata', 'no').partial, { spiegaAnticipata: { enabled: false } });
+});
+
+test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla volta, la risposta nomina il sito', () => {
+  const spegni = build('siti_filo_spento', 'aggiungi https://www.Docs.Google.com/document/d/x');
+  assert.equal(spegni.costo, 1);
+  assert.equal(spegni.allenta, false);
+  assert.deepEqual(spegni.elenco, { percorso: 'blocklist', op: 'aggiungi', voci: ['docs.google.com'], nome: 'Siti dove Filo è spento' });
+  assert.match(spegni.label, /docs\.google\.com/);
+  const riaccendi = build('domini_esclusi', 'togli docs.google.com');
+  assert.equal(riaccendi.costo, 1);
+  assert.equal(riaccendi.elenco.op, 'togli');
+  assert.match(riaccendi.label, /riacceso su docs\.google\.com/);
+  for (const intero of ['solo esempio.it', 'svuota']) {
+    const no = build('siti_filo_spento', intero);
+    assert.ok(no.rifiuto, `«${intero}» riscriverebbe l'elenco intero a costo 1`);
+    assert.match(no.perModello, /aggiungi|togli/);
+  }
+  const giro = P.applicaElenco(spegni.elenco, { blocklist: ['banca.it'] });
+  assert.deepEqual(giro.partial, { blocklist: ['banca.it', 'docs.google.com'] }, 'si aggiunge senza togliere gli altri');
+  assert.deepEqual(P.applicaElenco(riaccendi.elenco, { blocklist: ['banca.it', 'docs.google.com'] }).partial, { blocklist: ['banca.it'] });
+  assert.match(build('siti_filo_spento', 'aggiungi localhost').rifiuto, /localhost/);
 });

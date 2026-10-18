@@ -52,7 +52,7 @@
   const FRAME_MIN_W = 120;
   const FRAME_MIN_H = 40;
   // Tempo dato a un riquadro per farsi vivo. Chi non risponde entro questo
-  // momento non ha script (sandbox chiuso): è esattamente il caso in cui
+  // momento non ha un Filo che lavori lì dentro: è esattamente il caso in cui
   // l'avviso deve dire che una parte è rimasta fuori.
   const FRAME_ACK_GRACE = 2500;
   // Tetto all'attesa di chi si è fatto vivo e sta lavorando. Non è un timer da
@@ -438,9 +438,8 @@
   // — quasi sempre è di un'altra origine — ma il content script di Filo gira
   // anche lì dentro, e la traduzione gli passa parola: ogni riquadro traduce se
   // stesso e riferisce com'è andata. Dove nemmeno questo si può (un riquadro
-  // senza script, chiuso a chiave dal `sandbox`), l'avviso finale lo dice,
-  // invece di dichiarare tradotta una pagina con dentro un rettangolo in
-  // inglese (#407).
+  // in cui il nostro script non risponde), l'avviso finale lo dice, invece di
+  // dichiarare tradotta una pagina con dentro un rettangolo in inglese (#407).
 
   // I riquadri di questo documento, divisi da chi li guarda come guarda il resto della pagina (#503): quelli da
   // contare e quelli che non si contano. Fra questi ultimi, a parte, quelli nascosti adesso che l'utente può aprire.
@@ -845,15 +844,12 @@
     return { ok: false, error: errFrom(null) };
   }
 
-  // La risposta d'errore che arriva dal main è un oggetto piatto
-  // ({ error, code }): lo ricompone nella forma che SN_CHAT_ERRORS sa leggere
-  // (message/code/status), così "chiave rifiutata", "servizio sovraccarico" e
-  // "rete caduta" diventano frasi diverse invece di un unico messaggio generico.
+  // La regola sta in SN_CHAT_ERRORS, una volta sola: ricomporre a mano la
+  // risposta d'errore dell'IPC faceva perdere il codice a chi se lo scordava.
   function errFrom(res) {
-    const e = new Error(String((res && res.error) || 'translate_failed'));
-    if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
-    if (res && Number(res.status) > 0) e.status = Number(res.status);
-    return e;
+    const CE = global.SN_CHAT_ERRORS;
+    return CE ? CE.fromResponse(res, 'translate_failed')
+      : new Error(String((res && res.error) || 'translate_failed'));
   }
 
   // Sostituisce il contenuto dell'unità con la traduzione, rimettendo i figli

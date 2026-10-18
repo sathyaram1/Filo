@@ -461,6 +461,8 @@ async function rimetti(coppie) {
 
 module.exports = {
   collega, proponi, rinomina, rimetti, contenuto, messaggi,
+  // il testo dei documenti di Office e LibreOffice lo legge anche l'indice dei documenti
+  testoDocumento,
   // per gli unit test
   vociZip, testoDaXml, TESTO_MAX, immagineDellaPagina, apriPdf, LETTURA_MAX,
 };

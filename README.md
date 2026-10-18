@@ -6,68 +6,33 @@
 > L'eseguibile è scaricabile perché lo sviluppo è pubblico, ma per ora provalo
 > solo per curiosità.
 
-Browser AI-native cross-device. Layer di interazione sopra il linguaggio
-naturale: la UI è un'accelerazione della conversazione, non l'opposto.
+Filo è un modo nuovo di usare il computer, costruito sull'intelligenza
+artificiale, soprattutto sui modelli linguistici. L'interazione è pensata da
+zero, senza le convenzioni nate da vecchi limiti tecnici e rimaste per
+abitudine. Non è chi lo usa a dover imparare Filo. È Filo che impara a
+conoscere chi lo usa, e prova a capire cosa vuole prima che lo dica.
 
-Filo è l'evoluzione dell'estensione Chrome `filo-extension` (archiviata in
-`../ROBA VECCHIA/extension-mv3/` quando il refactor è completo). Il modello
-extension era zoppo: niente vera new tab nativa, niente hotkey globali, niente
-intercettazione pre-navigazione, quote `chrome.storage` strette. Filo desktop
-risolve tutto questo costruendo sopra Electron.
+- Tutto si ottiene scrivendo cosa si vuole. I pulsanti sono scorciatoie: lo
+  zoom della pagina si può chiedere a Filo o dare con un clic, che fa prima.
+- Il tasto destro vuol dire «voglio fare qualcosa qui». Cambia secondo
+  l'elemento e porta quello che ci si può fare.
+- Quasi tutto è un modulo che si sposta o si sostituisce. Le scelte estetiche,
+  come colori e font, si cambiano nelle impostazioni o chiedendolo a Filo.
+- Deve reggere l'uso sbagliato, come un telefono regge una caduta. Chi non
+  salva mai, non dà un nome ai file o sbaglia una parola su tre non deve
+  trovarsi nei guai.
 
-## Architettura
+Oggi Filo gira sul computer, su Windows, Mac e Linux: è un browser con l'AI
+dentro. Più avanti sarà un sistema solo, condiviso fra computer, telefono e TV.
 
-```
-src/
-├── main/                       Processo main Electron (Node.js)
-│   ├── main.js                 Entry point, app lifecycle
-│   ├── window.js               BrowserWindow + shell
-│   ├── tabs.js                 TabManager (multi-WebContentsView)
-│   ├── protocol.js             Custom protocol filo://
-│   ├── ipc.js                  Routing IPC main↔renderer
-│   ├── shortcuts.js            Hotkey globali Alt+E/T/S/H
-│   ├── updater.js              Auto-update (electron-builder: NSIS su Windows, zip su Mac)
-│   ├── popup-menu.js, popup-tooltip.js   Popup nativi della shell
-│   ├── auth/                   Login Google (PKCE, token store)
-│   ├── config/                 Chiavi default incastonate dal build
-│   ├── shim/
-│   │   ├── storage.js          chrome.storage.local → file JSON
-│   │   └── chrome-api.js       Namespace chrome.* per servizi portati
-│   └── services/
-│       ├── loader.js           Carica i moduli SN_* su globalThis
-│       ├── handlers.js         Registro messaggi + helper condivisi (ex background.js)
-│       ├── handlers/           Handler per dominio (nav, tabs, storage, pages,
-│       │                       ai, filo, auth, safebrowse, misc)
-│       ├── providers/          OpenRouter (chat, voce, dettatura, embedding), fallback chain
-│       ├── safebrowse/         Protezione phishing/typosquatting (12 moduli)
-│       ├── categorizer.js, savedPages.js, historyStore.js,
-│       │   archivedTabs.js, cookies.js, costTracker.js, exportData.js,
-│       │   fxRates.js, llmsTxt.js, webSearch.js, shell.js, ...
-│       └── (porting 1:1 dei file background dell'estensione + servizi nuovi)
-├── preload/
-│   ├── shell-preload.js        Espone window.filoShell alla shell renderer
-│   ├── internal-preload.js     Espone window.filo + shim chrome alle pagine filo://
-│   ├── page-preload.js         Shim chrome + content script su pagine web esterne
-│   ├── popup-preload.js        Preload dei popup nativi
-│   └── wheel-zoom.js, fingerprint-guard.js
-├── renderer/                   Shell del browser (tab bar + address bar)
-│   ├── shell.html / shell.css / shell.js
-├── pages/                      Pagine interne servite via filo://
-│   ├── dashboard/   → filo://newtab/
-│   ├── home/, editor/, options/, history/, feedback/,
-│   ├── spellcheck/, security/, admin-defaults/
-├── content/                    Content script (menu, popup, sidebar, highlight,
-│                               spellcheck, feedback, extractContext, ...)
-├── shared/                     Moduli condivisi main+renderer (IIFE → globalThis)
-└── styles/                     CSS condivisi (theme, menu, popup, sidebar, ...)
-assets/icons/                   Icone applicazione
-```
-
-Le istruzioni operative per Claude vivono in `CLAUDE.md` (con lo "switch di
-ruolo": `LOCAL.md` per le sessioni locali; le routine cloud ricevono il proprio
-ruolo da `scripts/dispatch.mjs`, file in `routines/roles/`); le convenzioni UI
-in `PATTERNS.md` — l'indice delle regole, con il racconto di ognuna in
-`patterns/<slug>.md`.
+Le scelte sono spiegate per esteso. I documenti in
+[`transparency/`](transparency/) dicono quali modelli usa Filo e perché, cosa
+resta sul computer e cosa esce, verso chi, e come si cercano i problemi di
+sicurezza. [`SECURITY.md`](SECURITY.md) spiega come protegge dati e account,
+misura per misura, e quali misure sono già attive e quali in arrivo. Cosa sa
+fare oggi lo elenca voce per voce
+[`src/shared/capabilities.js`](src/shared/capabilities.js): è la stessa lista
+che Filo legge per rispondere a «puoi farlo?».
 
 ## Quick start
 
@@ -77,16 +42,81 @@ npm start                       # avvia Filo (apre la finestra)
 npm run test:smoke              # smoke headless (verifica che la newtab carichi)
 ```
 
-Il primo `npm install` scarica Electron (~150MB). Se non lo fa in automatico
-(succede su alcune configurazioni di npm), esegui manualmente:
+Prima di aprire la finestra, `npm start` prova ad allineare il ramo in cui sei
+a `origin/main` (`git pull --rebase --autostash`). Se non ci riesce, per
+esempio offline o con un conflitto, annulla e apre Filo comunque.
+
+Il binario di Electron non lo scarica `npm install`: lo scarica il primo
+`npm start`, o il primo lancio dei test. Per scaricarlo subito:
 
 ```bash
 node node_modules/electron/install.js
 ```
 
-## Filosofia di porting
+## Sistemi e aggiornamenti
 
-Il codice dell'estensione era scritto in stile "no-build, IIFE su globalThis":
+Filo si scarica da [filo.red](https://filo.red). I pacchetti li costruisce
+electron-builder (`npm run build` per Windows, `npm run build:mac`,
+`npm run build:linux`) e li pubblica `.github/workflows/release.yml` nelle
+release di GitHub.
+
+- **Windows.** Un installatore. Filo scarica la versione nuova e la installa da
+  solo: la prossima volta che lo apri, oppure in silenzio quando lo chiudi, a
+  scelta nelle Preferenze. «Riavvia e aggiorna» la installa subito.
+- **Mac.** Un'immagine disco universale, per Intel e Apple Silicon. Filo non ha
+  una firma di Apple, e il Mac non lo lascia aggiornare da solo. Quando c'è una
+  versione nuova Filo avvisa, e la si scarica da filo.red per sostituire l'app.
+  Dentro l'immagine c'è «Se Filo non si apre», che spiega il primo avvio.
+- **Linux.** Un AppImage. Se Filo può riscrivere il proprio file, la versione
+  nuova si installa quando lo chiudi, o subito con «Riavvia e aggiorna». Se non
+  può, per esempio perché la cartella del file non si può scrivere, Filo lo
+  segnala e la versione nuova si scarica a mano da filo.red: prende il posto
+  del file vecchio, e al file va ridato il permesso di esecuzione.
+
+Su Windows e Linux, con «Installa gli aggiornamenti da solo» spento nelle
+Preferenze, la versione nuova arriva solo quando premi «Installa».
+
+## Architettura
+
+```
+src/
+├── main/         processo main di Electron: finestra, schede, filo://, IPC, scorciatoie, aggiornamenti
+│   ├── services/ servizi, handler dei messaggi per dominio, provider dei modelli
+│   └── shim/     le API chrome.* ricreate per il codice nato nell'estensione
+├── preload/      i preload della shell, delle pagine filo://, delle pagine web e delle finestrelle native
+├── renderer/     la shell della finestra (schede, barra degli indirizzi) e le finestrelle native
+├── pages/        le pagine interne, servite da filo://
+├── content/      gli script nelle pagine web (tasto destro, popup, barra laterale, evidenziatore…)
+├── shared/       i moduli condivisi fra main e pagine, registrati su globalThis
+├── styles/       i CSS condivisi
+└── vendor/       codice e dati di terzi
+tests/            unit test in tests/unit/, spec Playwright in tests/*.spec.mjs
+scripts/          strumenti di sviluppo, rilascio e routine
+transparency/     i documenti di trasparenza, sorgente unica
+site/             pagine web: la trasparenza generata da transparency/, le approvazioni
+patterns/         il racconto delle convenzioni indicizzate in PATTERNS.md
+routines/         i ruoli degli agenti che lavorano su Filo in cloud
+assets/           le icone dell'app
+build/            i file che accompagnano i pacchetti
+```
+
+Il dettaglio di `src/` sta in `CLAUDE.md`, sezione Architettura.
+`node scripts/mappa-moduli.mjs <cartella>` elenca i file di una cartella con la
+prima frase della loro intestazione.
+
+Le istruzioni per gli agenti che lavorano su Filo stanno in `CLAUDE.md`. Le
+routine in cloud ricevono il loro ruolo da `scripts/dispatch.mjs`, che lo
+prende da `routines/roles/`. Le convenzioni della UI stanno in `PATTERNS.md`,
+una riga per regola, col racconto di ognuna in `patterns/<slug>.md`.
+
+## Com'è fatto il codice
+
+Filo è nato come estensione di Chrome. L'estensione non poteva avere una vera
+pagina nuova nativa, intercettare la navigazione prima che parta, o tenere dati
+oltre le quote strette di `chrome.storage`. Su Electron Filo ha tutto questo.
+Il porting è finito, e gran parte del codice di oggi è nata dopo.
+
+Dall'estensione resta lo stile senza build, a moduli IIFE su `globalThis`:
 
 ```js
 (function (global) {
@@ -94,46 +124,39 @@ Il codice dell'estensione era scritto in stile "no-build, IIFE su globalThis":
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 ```
 
-Questo si è rivelato un dono: caricando ogni file con `require()` nel main
-process Electron, i moduli si auto-registrano su `globalThis` e gli altri li
-trovano lì — esattamente come succedeva nel service worker via `importScripts`.
+Nel processo main ogni file si carica con `require()`, si registra su
+`globalThis`, e gli altri lo trovano lì, come succedeva nel service worker con
+`importScripts`. L'ordine di caricamento sta in `src/main/services/loader.js`,
+e un modulo nuovo va aggiunto lì.
 
-Le API `chrome.*` (storage, runtime, tabs, action, commands) sono shimmate
-in `src/main/shim/chrome-api.js`. Lo storage punta a un file JSON in
-`%APPDATA%/Filo/storage.json` invece che a `chrome.storage.local`.
+Le API `chrome.*` usate dal codice nato nell'estensione sono ricreate in tre
+posti, uno per contesto: `src/main/shim/chrome-api.js` nel main,
+`src/preload/internal-preload.js` nelle pagine `filo://` (passa ogni chiamata
+al main via IPC), `src/preload/page-preload.js` nelle pagine web. Lo storage è
+un file JSON, `storage.json`, nella cartella dati dell'app
+(`app.getPath('userData')`), che cambia da un sistema all'altro.
 
-Le pagine interne (dashboard, options, ecc.) hanno il loro shim `chrome.*`
-nel preload `internal-preload.js`, che ridiriziona ogni chiamata via IPC al
-main. Così le pagine girano quasi invariate.
-
-## Stato del porting
-
-- [x] Browser shell (tab bar, address bar, nav buttons, hotkey browser-style)
-- [x] Multi-tab tramite `WebContentsView`
-- [x] Protocollo `filo://` per pagine interne e asset
-- [x] Storage su disco
-- [x] Servizi background (providers, savedPages, categorizer, costTracker, history, llmsTxt, paths, fxRates, aiCache, webSearch)
-- [x] IPC + streaming AI
-- [x] Hotkey globali (Alt+E/T/S/H; su Mac Ctrl+Alt, perché Alt da solo è il tasto degli accenti)
-- [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
-- [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
-- [x] Test Playwright adattati a `_electron.launch` (~450 spec, ~1.450 casi)
-- [x] Auto-update (electron-builder/NSIS, vedi `src/main/updater.js`)
-- [x] Packaging Windows (NSIS) e Mac (dmg universale, Intel + Apple Silicon); Linux non previsto per ora
+Un messaggio IPC nuovo:
+1. si definisce in `src/shared/messages.js` (costante `MSG.*`);
+2. si gestisce nel modulo di dominio giusto sotto `src/main/services/handlers/`,
+   registrandolo con `on(MSG.X, fn)` (il registro sta in `handlers.js`);
+3. se va dal main a tutte le pagine, parte con `broadcastToTabs` o
+   `broadcastLiveUpdate` (in `handlers.js`).
 
 ## Test
 
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~450 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
+npm test               # suite Playwright completa (~530 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 
 La suite completa non la lancia più nessuno a mano (decisione owner
 2026-09-15): gira in GitHub a ogni fusione su main, in
 `.github/workflows/suite.yml` (Linux senza schermo; `scripts/suite-verdict.mjs`
-toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`), e un
+toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`), insieme
+agli unit test su Windows che rifà anche il cancello di pubblicazione, e un
 rosso nuovo diventa un feedback. Ogni sei ore `release.yml` pubblica il commit
 più nuovo di main con la suite verde. Per provare la suite su un ramo:
 `gh workflow run suite.yml --ref <ramo>`.
@@ -141,19 +164,6 @@ Sulla macchina di chi sviluppa Filo
 durerebbe quasi sette ore con un solo worker. Si lancia `npm run finish:check`,
 più lo spec mirato della feature toccata (`npx playwright test
 tests/<feature>.spec.mjs`). Vedi CLAUDE.md § Verifica.
-
-## Sviluppo
-
-I file `src/shared/*` e `src/main/services/*` sono **porting 1:1** dai
-corrispondenti dell'estensione. Le modifiche dovrebbero restare allineate
-finché l'estensione legacy esiste (ma vedi nota sopra: per ora è congelata).
-
-Quando aggiungi un nuovo messaggio IPC, ricordati di:
-1. Definirlo in `src/shared/messages.js` (costante `MSG.*`).
-2. Gestirlo nel modulo di dominio giusto sotto `src/main/services/handlers/`
-   registrandolo con `on(MSG.X, fn)` (il registro vive in `handlers.js`).
-3. Se è broadcast main→renderer, usa `broadcastToTabs` o
-   `broadcastLiveUpdate` (vedi handlers.js).
 
 ## Licenza
 

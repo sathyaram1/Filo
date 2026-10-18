@@ -12,6 +12,10 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   classifyOwnerMerge,
@@ -20,7 +24,13 @@ import {
   askServerMerge,
   statoDellaRichiesta,
   richiestaForseInAttesa,
+  DOVE_SI_APPROVA,
 } from '../../scripts/lib/owner-merge.mjs';
+
+const RADICE = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+createRequire(import.meta.url)(join(RADICE, 'src', 'shared', 'feedbackStatus.js'));
+createRequire(import.meta.url)(join(RADICE, 'src', 'shared', 'manageReview.js'));
+const MR = globalThis.SN_MANAGE_REVIEW;
 
 const risposta = (result) => ({ result });
 
@@ -128,13 +138,11 @@ describe('cosa legge l’owner', () => {
       'claude/x'
     );
     assert.match(msg, /in attesa/i);
-    // Il posto è UNO (scelta owner 2026-08-26): la dashboard di gestione, in
-    // cima ai Ricevuti. Il vecchio messaggio mandava sulla prima schermata,
-    // che l'avviso non lo mostra più: un'indicazione sbagliata è peggio di
-    // nessuna indicazione.
-    assert.match(msg, /dashboard di gestione/i);
-    assert.match(msg, /Ricevuti/);
-    assert.doesNotMatch(msg, /prima schermata|in cima alla home/i);
+    // Un'indicazione sbagliata è peggio di nessuna: l'avviso in cima ai Ricevuti
+    // non c'è più dal 2026-09-13, e l'owner lo ha cercato lì per niente (#761).
+    // Che la richiesta stia davvero in Automazioni lo prova il test qui sotto.
+    assert.match(msg, /in Gestione → Automazioni/);
+    assert.doesNotMatch(msg, /Ricevuti|avviso|prima schermata|in cima alla home/i);
     // Quanto dura si dice QUI: è l'unico posto dove l'owner sta guardando nel
     // momento in cui la richiesta nasce, e sapere se deve correre o no cambia
     // cosa fa dopo. Una settimana (decisione owner 2026-08-28): l'approvazione
@@ -146,6 +154,23 @@ describe('cosa legge l’owner', () => {
     assert.match(msg, /già apert/i);
     // Il giorno che Filo non si apre, la strada che resta si legge qui (#489).
     assert.ok(msg.includes('https://filo-8b9cb.web.app'), msg);
+  });
+
+  test('il posto che il messaggio nomina è quello dove Gestione disegna la richiesta del lavoro locale (#761)', () => {
+    // La richiesta come la apre il server per `npm run finish`: senza numero né id della pratica, anche con --feedback.
+    const req = { id: 'ab12cd34ef56ab12cd34ef56', branch: 'claude/x', sha: 'f'.repeat(40), who: 'owner', trips: [], origin: 'locale' };
+    const pratica = { _id: 'pratica908', seq: 908, subSeq: 0, status: 'working', localOnly: true };
+    assert.deepEqual(MR.fusioniSenzaFeedback([req], [pratica]), [req], 'senza pratica non ha una scheda nei Ricevuti');
+    const html = readFileSync(join(RADICE, 'src', 'pages', 'manage', 'manage.html'), 'utf8');
+    const inizio = html.indexOf('data-panel="automation"');
+    assert.ok(inizio > 0, 'la scheda Automazioni non c’è più');
+    const fine = html.indexOf('data-panel=', inizio + 1);
+    const pannello = html.slice(inizio, fine > 0 ? fine : undefined);
+    const orfane = pannello.indexOf('id="mgMergeApprovalsOrphans"');
+    assert.ok(orfane > 0, 'le richieste senza pratica non stanno più in Automazioni: va cambiato DOVE_SI_APPROVA');
+    assert.ok(orfane < pannello.indexOf('mg-auto-main'), 'non sono più in cima alla scheda');
+    assert.match(html, /data-tab="automation"[^>]*>Automazioni</);
+    assert.equal(DOVE_SI_APPROVA, 'Gestione → Automazioni');
   });
 
   test('bloccato SENZA richiesta: non promette un avviso che non comparirà mai', () => {
@@ -341,7 +366,7 @@ describe('una richiesta già decisa non si annuncia in attesa (#486)', () => {
       assert.match(msg, /In Filo non c'è niente da approvare/);
       assert.match(msg, /git commit --allow-empty -m "riproposta"/);
       assert.match(msg, /npm run finish/);
-      assert.doesNotMatch(msg, /approvala da Filo|IN ATTESA|aspetta il tuo sì|compare da solo/, `"${requestState}" promette un avviso che non arriverà`);
+      assert.doesNotMatch(msg, /approvala da Filo|IN ATTESA|aspetta il tuo sì|compare da sol/, `"${requestState}" promette un avviso che non arriverà`);
       assert.equal(richiestaForseInAttesa(reply), false, `"${requestState}" non deve suonare il campanello`);
       assert.equal(exitCodeForOwnerMerge(reply), 10);
     }
@@ -351,7 +376,8 @@ describe('una richiesta già decisa non si annuncia in attesa (#486)', () => {
     const reply = { outcome: 'blocked', reason: 'x', requestId: ID, requestState: '', requestCheck: 'elenco delle richieste: http_500' };
     const msg = messageForOwnerMerge(reply, 'claude/x');
     assert.match(msg, /non sono riuscito a\s+controllarlo \(elenco delle richieste: http_500\)/);
-    assert.match(msg, /Se in cima ai Ricevuti della dashboard di gestione non c'è l'avviso/);
+    assert.match(msg, /Se in Gestione → Automazioni la richiesta non c'è/);
+    assert.doesNotMatch(msg, /Ricevuti/);
     assert.match(msg, /git commit --allow-empty/);
     assert.doesNotMatch(msg, /L'ho messa IN ATTESA/);
     assert.equal(richiestaForseInAttesa(reply), true);

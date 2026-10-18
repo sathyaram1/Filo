@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { createRequire } from 'node:module';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
@@ -386,7 +387,7 @@ testSenzaFixture('dopo la migrazione le schede senza vettore si indicizzano da s
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     // Chiave e modelli arrivano ad app aperta, perché il fornitore finto si installa solo da qui.
     await preparaModelli(app);

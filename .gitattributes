@@ -51,3 +51,6 @@
 *.pdf binary
 *.avif binary
 *.heic binary
+
+# I dizionari del correttore e le loro sorgenti (GPL: vanno distribuite com'erano, CRLF e Latin-1 compresi).
+assets/dizionari/** binary
