@@ -271,7 +271,7 @@ function invocaCodificato(testo, coda = '') {
     + `if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Invoke-Expression ($__filo_t${conCoda}) } else { `
     + 'try { $__filo_a=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch { $__filo_a=$null }; '
     + 'if ($__filo_pe) { [Console]::Error.WriteLine((New-Object Management.Automation.ParseException (,$__filo_pe)).Message); $__filo_ok=$false } '
-    + `else { ${SONDE_POWERSHELL}. ([ScriptBlock]::Create($__filo_t${conCoda})) } }`;
+    + `else { ${bloccoConSonde(conCoda, coda)}. $__filo_b } }`;
 }
 
 const SEGNA_ESITO = '$__filo_ok=$?';
