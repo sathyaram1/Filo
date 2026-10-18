@@ -151,7 +151,7 @@
 
   function chatNuova(id, ts) {
     return {
-      id, startedAt: ts, updatedAt: ts, closedAt: null, title: '', kind: null, onboarding: false, messages: [], _pos: 0,
+      id, startedAt: ts, updatedAt: ts, closedAt: null, title: '', kind: null, onboarding: false, messages: [], _pos: 0, _disp: [],
     };
   }
 
