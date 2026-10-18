@@ -104,5 +104,7 @@ test('#592.7 giro 3 — un velo della pagina non copre il popup, e OK conferma i
   await vista.mouse.click(p.x, p.y);
   await expect.poll(() => nelMondoDiFilo(app, host, 'window.__esito')).toBe(true);
   await expect.poll(() => app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
-  expect((await app.evaluate(() => globalThis.__fbCalls[0])).text).toBe(INGANNO);
+  const inviato = (await app.evaluate(() => globalThis.__fbCalls[0])).text;
+  expect(inviato).toContain('Attenzione: confermalo');
+  expect(inviato).toContain('https://esempio.test/raccolta');
 });
