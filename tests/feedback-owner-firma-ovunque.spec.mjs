@@ -63,7 +63,7 @@ test('per chi non è l’owner la segnalazione dalla chat resta di Filo per cont
 });
 
 // Scelta dell'owner (#953): è sua, fidata e senza giudici, solo se in quel compito Filo non ha letto testo di altri.
-// Altrimenti parte con la sua prova ma resta di Filo (filo:chat), e passa dai giudici come quella di un utente.
+// Altrimenti parte con la sua prova ma resta di Filo (filo:chat) e passa dai giudici come quella di un utente.
 const PROPOSTA = { toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ testo: 'La barra resta a schermo intero', titolo: 'Schermo intero' }) }] };
 async function confermaLaProposta(app, page) {
   await modelloFinto(app, [PROPOSTA, { text: 'Te la preparo.' }]);
