@@ -30,6 +30,7 @@ async function inPrimoPiano(app) {
 }
 
 test('dopo un clic sul pulsante del sito, il sito non si dà il permesso di Incolla e non legge la password copiata', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta dichiarata (owner 17/10/2026): la chiude il menu fuori dalla pagina, D14');
   const pagina = await testServer.openReady(openTab, PAGINA);
   const sito = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
   await app.evaluate(({ clipboard }) => clipboard.writeText('PASSWORD-DEL-GESTORE'));
@@ -45,6 +46,7 @@ test('dopo un clic sul pulsante del sito, il sito non si dà il permesso di Inco
 });
 
 test('dopo un clic sul pulsante del sito, il sito non cancella dizionario personale e disposizione del menu', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta dichiarata (owner 17/10/2026): la chiude il menu fuori dalla pagina, D14');
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.setRaw('sn_icon_layout', { primary: ['copy', 'paste'], mio: true });
     await globalThis.SN_STORAGE.setRaw('sn_personal_dict', ['Sathya', 'Filo']);

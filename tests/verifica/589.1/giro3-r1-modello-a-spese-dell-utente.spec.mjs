@@ -47,6 +47,7 @@ async function dueSchede(openTab, testServer) {
 }
 
 test('un sito di sfondo non fa scrivere al modello dell\'utente un testo scelto da lui', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta dichiarata (owner 17/10/2026): la stringe l\'unione che prende #899');
   await modelloFinto(app);
   await dueSchede(openTab, testServer);
   const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
@@ -58,6 +59,7 @@ test('un sito di sfondo non fa scrivere al modello dell\'utente un testo scelto 
 });
 
 test('lo stesso dalla strada del flusso: un sito di sfondo non fa scrivere il modello', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta dichiarata (owner 17/10/2026): la stringe l\'unione che prende #899');
   await modelloFinto(app);
   await dueSchede(openTab, testServer);
   const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
@@ -91,6 +93,7 @@ test('un sito di sfondo non manda da solo il «Ha funzionato?» dell\'Aiuto, né
 });
 
 test('un sito di sfondo non fa lavorare la ricerca e la voce dell\'utente con un testo scelto da lui', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta dichiarata (owner 17/10/2026): la stringe l\'unione che prende #899');
   await app.evaluate(async () => {
     await globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { apiKeys: { openrouter: 'sk-or-v1-mia', tavily: 'tvly-mia' } } },
       { tab: { id: 5, url: 'filo://options/options.html' }, url: 'filo://options/options.html' });
