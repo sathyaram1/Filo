@@ -156,11 +156,13 @@ const lock = (dir) => { const t = leggi(resolve(dir, 'package-lock.json')); retu
  * stesso da cui il principale ha installato; altrimenti un'installazione privata (la cache di npm resta condivisa).
  * Da richiamare dopo che il clone è sul ramo del lavoro.
  */
-export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {}) {
+export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero, soloCollegati = false } = {}) {
   const nm = resolve(clone, 'node_modules');
   const lockClone = lock(clone);
   const lockPrincipale = lock(principale);
-  if (lockClone !== null && lockClone === lockPrincipale) {
+  // soloCollegati: chi non può aspettare un npm ci (dispatch) collega comunque, come la cartella unica di prima, e dice.
+  const stesso = lockClone !== null && lockClone === lockPrincipale;
+  if (stesso || soloCollegati) {
     if (!existsSync(resolve(principale, 'node_modules'))) return { ok: false, pacchetti: '', why: 'il principale non ha node_modules' };
     // Ogni volta da capo: il principale può aver aggiunto o tolto pacchetti da allora.
     scollegaPacchetti(nm);
@@ -168,7 +170,7 @@ export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {
     rmSync(nm, { recursive: true, force: true }); // un'installazione privata rimasta da un ramo prima
     // Al bersaglio vero: il node_modules di un worktree è già un collegamento a quello del principale.
     collegaVoci(realpathSync(resolve(principale, 'node_modules')), nm);
-    return { ok: true, pacchetti: 'collegati', why: '' };
+    return { ok: true, pacchetti: 'collegati', why: '', ...(stesso ? {} : { lockDiverso: true }) };
   }
   const daCollegati = eLink(nm) || collegatiVoceAVoce(nm);
   scollegaPacchetti(nm);
@@ -185,7 +187,7 @@ export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {
  * repo nudo locale e lasciano il registro ai worker veri.
  */
 export function preparaClone(principale, n, {
-  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi, registra = true,
+  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi, registra = true, soloCollegati = false,
 } = {}) {
   let i;
   try { i = indiceWorker(n); } catch (e) { return { ok: false, why: e.message }; }
@@ -228,7 +230,7 @@ export function preparaClone(principale, n, {
   }
   if (pushUrl) gitIn(dir, ['remote', 'set-url', '--push', 'origin', pushUrl]);
 
-  const pacchetti = allineaPacchetti(dir, radice, npmCi ? { npmCi } : {});
+  const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), soloCollegati });
   if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why };
 
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
