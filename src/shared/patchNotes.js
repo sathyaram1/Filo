@@ -293,6 +293,7 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
         'Con un modello Claude la chat costa meno: le istruzioni fisse si pagano per intero una volta e poi si rileggono a prezzo basso. In Preferenze, sotto «Quanto ricorda la chat», scegli per quanto restano da parte, cinque minuti o un\'ora. Lo puoi chiedere anche a Filo.',
         { testo: 'Mentre Filo lavora puoi già scrivergli il seguito e premere Invio. Il lavoro non si ferma, il messaggio compare in attesa e Filo lo legge al passo dopo, o appena ha finito di rispondere. Se lo fermi, il messaggio torna nella casella. Per fermarlo restano il quadrato e Invio con la casella vuota.', segnalazione: 1296 },
         'I comandi rapidi in chat, come «timer 10 minuti», «apri gmail» o «metti il tema scuro», finiscono qualche secondo prima: Filo li esegue e puoi già scrivere la richiesta dopo.',

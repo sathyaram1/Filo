@@ -1,6 +1,6 @@
 // Sanitizzazione dei feedback per la bacheca: pura, con l'LLM iniettato dal chiamante.
-// La parte deterministica è passata alla VISTA PUBBLICA (feedbackPublicView.js): qui resta
-// solo la redazione LLM del testo libero, che gira dove c'è la chiave privata.
+// La parte deterministica è passata alla VISTA PUBBLICA (feedbackPublicView.js); la redazione del testo
+// libero la fa il server alla chiusura (`publicText`, #987): questo modulo non lo chiama nessuno.
 
 (function (global) {
   'use strict';

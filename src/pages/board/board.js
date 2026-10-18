@@ -1,6 +1,6 @@
 // Bacheca utente (filo://board/): superficie a PERMESSI RIDOTTI, non owner-gated — gli
-// anonimi leggono, per votare serve il login.
-// Mostra SOLO i fix già usciti in una versione, col solo titolo breve: mai il testo grezzo.
+// anonimi leggono, per votare serve il login. Mostra SOLO i fix già usciti in una versione:
+// titolo breve e testo ripulito dal server alla chiusura (publicText, #987), mai il testo grezzo.
 
 (function () {
   'use strict';
@@ -35,11 +35,13 @@
   // sulla bacheca non si vedono, e quello che non arriva non si può nemmeno
   // leggere per sbaglio.
   const CAMPI = [
-    'name', 'seq', 'subSeq',
+    'name', 'seq', 'subSeq', 'publicText',
     'status', 'statusPublic', 'resolvedInVersion',
     'createdAt', 'publishedAt',
     'votes', 'reopenRequests',
   ];
+  // La copia su disco vale solo per la stessa domanda (patterns/una-cache-scade-con-la-richiesta-non-solo-con-l-orologio.md).
+  const CAMPI_FIRMA = CAMPI.join(',');
 
   // La copia su disco fa comparire la bacheca SUBITO, senza aspettare la rete.
   // Dopo questo tempo si ricomincia da capo: è il ritardo massimo con cui la
@@ -235,6 +237,40 @@
     return num ? `Miglioramento #${num}` : 'Miglioramento';
   }
 
+  // Dice a chi vota cosa provare (#987). Sempre testo, mai HTML; a poche righe, e quello che non ci sta
+  // si apre intero sopra la scheda al passaggio del puntatore o al fuoco, senza spostare le schede sotto.
+  function renderTesto(fb) {
+    const t = (fb && typeof fb.publicText === 'string') ? fb.publicText.trim() : '';
+    if (!t) return null;
+    const box = document.createElement('div');
+    box.className = 'bd-card-testo';
+    const corto = document.createElement('p');
+    corto.className = 'bd-card-text';
+    // Nelle tre righe una riga vuota sarebbe una riga persa (e i puntini da soli): gli a capo restano, i vuoti no.
+    corto.textContent = t.replace(/\n[ \t]*(?:\n[ \t]*)+/g, '\n');
+    const intero = document.createElement('div');
+    intero.className = 'bd-card-intero';
+    intero.setAttribute('aria-hidden', 'true'); // chi legge a voce ha già il testo intero nel paragrafo
+    intero.textContent = t;
+    box.append(corto, intero);
+    return box;
+  }
+
+  // Quali testi non ci stanno lo dice solo la lista posata, e cambia con la larghezza della finestra.
+  function segnaTestiLunghi() {
+    for (const box of bdList.querySelectorAll('.bd-card-testo')) {
+      const corto = box.firstElementChild;
+      const lungo = !!corto && corto.scrollHeight > corto.clientHeight + 1;
+      box.classList.toggle('lungo', lungo);
+      if (lungo) box.tabIndex = 0; else box.removeAttribute('tabindex');
+    }
+  }
+  let rimisura = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(rimisura);
+    rimisura = setTimeout(segnaTestiLunghi, 120);
+  });
+
   function renderList() {
     // Caricamento fallito e mai riuscito: la lista è vuota perché non l'abbiamo,
     // non perché non ci sia niente. Resta l'errore, con la via d'uscita.
@@ -272,6 +308,7 @@
     for (const fb of items) {
       bdList.appendChild(renderCard(fb));
     }
+    segnaTestiLunghi();
     montaSentinella();
 
     if (scrivevaIn && scrivevaIn.id) {
@@ -333,6 +370,8 @@
     title.className = 'bd-card-title';
     title.textContent = safeTitle(fb);
     main.appendChild(title);
+    const testo = renderTesto(fb);
+    if (testo) main.appendChild(testo);
     const num = FB.formatNum(fb.seq, fb.subSeq);
     if (num) {
       const sub = document.createElement('div');
@@ -746,6 +785,7 @@
       const r = await chrome.storage.local.get(CACHE_KEY);
       const c = r && r[CACHE_KEY];
       if (!c || !Array.isArray(c.cards) || !c.cards.length) return null;
+      if (c.campi !== CAMPI_FIRMA) return null;
       if (Date.now() - (Number(c.at) || 0) >= CACHE_TTL_MS) return null;
       return c;
     } catch (_) { return null; }
@@ -756,6 +796,7 @@
       const p = chrome.storage.local.set({
         [CACHE_KEY]: {
           at: Date.now(),
+          campi: CAMPI_FIRMA,
           // Un fix tornato in lavorazione non ricompare alla prossima apertura.
           cards: allFeedbacks.filter((c) => !(c && ritirate.has(c._id))),
           after: cursore,
