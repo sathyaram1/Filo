@@ -243,6 +243,98 @@ test('#1362 r3: due sessioni nella stessa cartella, ogni commit si dichiara col 
   assert.deepEqual(di(pulito.ticket), [p, o]);
 });
 
+/** Due sessioni locali nella stessa copia `d.pulita`, coi loro biglietti; `di(t)`: i commit dichiarati da `t`. */
+function dueSessioni(d) {
+  const biglietto = (nome, lettera) => {
+    const file = join(d.base, `${nome}.json`);
+    writeFileSync(file, JSON.stringify({ ticket: `${nome}-${lettera.repeat(40)}`, fp: lettera.repeat(64), natoIl: 1 }));
+    return { file, ticket: `${nome}-${lettera.repeat(40)}` };
+  };
+  const pulito = biglietto('pulito', 'a');
+  const sporco = biglietto('sporco', 'b');
+  return {
+    pulito, sporco,
+    envPulita: ambiente(d.origin, { FILO_BIGLIETTO_FILE: pulito.file }),
+    envSporca: ambiente(d.origin, { FILO_BIGLIETTO_FILE: sporco.file }),
+    di: (t) => coda(d.pulita).filter((v) => v.ticket === t).flatMap((v) => [...(v.commits || []), ...(v.riscritti || []).map((r) => r.sha)]),
+  };
+}
+
+/** Main che va avanti su origin, da un'altra copia. */
+function mainAvanti(d) {
+  g(d.altra, ['fetch', '-q', 'origin']);
+  g(d.altra, ['checkout', '-qB', 'main', 'origin/main']);
+  commit(d.altra, 'main-avanti.txt');
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', 'main']);
+  g(d.pulita, ['fetch', '-q', 'origin']);
+}
+
+test('#1362 giro 3 r1: la copia del rebase di un commit della sessione sporca non parte col biglietto pulito, e nemmeno quella di un amend', () => {
+  const d = deposito();
+  const x = dueSessioni(d);
+  const p = commit(d.pulita, 'p.txt', x.envPulita);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  // La sporca committa dalla shell e non spinge; main va avanti e la pulita si riallinea (come la verifica locale).
+  const s = commit(d.pulita, 's.txt', x.envSporca);
+  mainAvanti(d);
+  g(d.pulita, ['rebase', '-q', 'origin/main'], x.envPulita);
+  const s2 = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.notEqual(s2, s);
+  assert.deepEqual(S.autoriDi(d.pulita, s2).map((a) => a.ticket).sort(), [x.pulito.ticket, x.sporco.ticket].sort(),
+    'la copia porta anche chi aveva fatto l’originale');
+  assert.equal(spingi(d.pulita, x.envPulita, '--force-with-lease').status, 0);
+  assert.ok(!x.di(x.pulito.ticket).includes(s2), 'la copia del commit sporco non è della pulita');
+  // Il lavoro della pulita, riscritto dallo stesso rebase, resta suo.
+  const p2 = g(d.pulita, ['rev-parse', 'HEAD~1']);
+  assert.notEqual(p2, p);
+  assert.ok(x.di(x.pulito.ticket).includes(p2));
+
+  // Un amend della pulita sopra un commit della sporca: la modifica è di tutte e due, e il biglietto pulito non la copre.
+  const s3 = commit(d.pulita, 's3.txt', x.envSporca);
+  writeFileSync(join(d.pulita, 'p3.txt'), 'p3\n');
+  g(d.pulita, ['add', '-A']);
+  g(d.pulita, ['commit', '-q', '--amend', '--no-edit'], x.envPulita);
+  const s4 = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.notEqual(s4, s3);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  assert.ok(!x.di(x.pulito.ticket).includes(s4));
+});
+
+test('#1362 giro 3 r1: il cherry-pick di un commit mai partito della sessione sporca non parte col biglietto pulito', () => {
+  const d = deposito();
+  const x = dueSessioni(d);
+  commit(d.pulita, 'p.txt', x.envPulita);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  // La sporca lavora su un suo ramo nella stessa copia, senza spingere; la pulita ne prende il commit.
+  g(d.pulita, ['checkout', '-qb', 'claude/sporco'], x.envSporca);
+  const s = commit(d.pulita, 's.txt', x.envSporca);
+  g(d.pulita, ['checkout', '-q', 'claude/x'], x.envPulita);
+  const p1 = commit(d.pulita, 'p1.txt', x.envPulita);
+  g(d.pulita, ['cherry-pick', s], x.envPulita);
+  const s2 = g(d.pulita, ['rev-parse', 'HEAD']);
+  assert.notEqual(s2, s);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  assert.ok(!x.di(x.pulito.ticket).includes(s2));
+  assert.ok(x.di(x.pulito.ticket).includes(p1));
+  // Un commit della pulita che non copia niente resta suo.
+  const p2 = commit(d.pulita, 'p2.txt', x.envPulita);
+  assert.equal(spingi(d.pulita, x.envPulita).status, 0);
+  assert.ok(x.di(x.pulito.ticket).includes(p2));
+});
+
+test('#1362 giro 3 r1: le annotazioni di prima (una sessione sola) si leggono ancora, e il post-rewrite le porta sulla copia', () => {
+  const d = deposito();
+  const a = commit(d.pulita, 'a.txt');
+  const b = commit(d.pulita, 'b.txt');
+  const dir = join(S.cartellaCoda(d.pulita), '..', S.AUTORI);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${a}.json`), JSON.stringify({ tipo: 'locale', ticket: 'vecchio', fp: '', file: '' }));
+  assert.deepEqual(S.autoriDi(d.pulita, a).map((x) => x.ticket), ['vecchio']);
+  assert.equal(S.ereditaAutori(d.pulita, `${a} ${b}\n${'0'.repeat(40)} ${b}\nriga storta\n`), 1);
+  assert.deepEqual(S.autoriDi(d.pulita, b).map((x) => x.ticket), ['vecchio']);
+  assert.equal(S.autoreDi(d.pulita, b).ticket, 'vecchio');
+});
+
 test('il salvataggio automatico dichiara col biglietto della sessione che ha modificato (session_id dallo stdin)', () => {
   const s = scene();
   const sessione = 'sess-dello-stdin';

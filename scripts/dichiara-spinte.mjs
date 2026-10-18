@@ -1,6 +1,6 @@
 // dichiara-spinte.mjs — le spinte col biglietto di chi spinge (#1362). `--pre-push <app|server> <radice> [<url>]` accoda i
-// commit creati qui, ognuno col biglietto di chi l'ha fatto (`--post-commit <radice>` lo annota), e lancia l'invio; non
-// ferma mai git. `--invia <radice>`: dichiara la coda al server. Regole: scripts/lib/spinte.mjs.
+// commit creati qui, ognuno col biglietto di chi l'ha fatto (lo annotano `--post-commit` e `--post-rewrite <radice>`), e
+// lancia l'invio; non ferma mai git. `--invia <radice>`: dichiara la coda al server. Regole: scripts/lib/spinte.mjs.
 
 import { execFileSync, spawn } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -54,6 +54,15 @@ export function postCommit({ radice, env = process.env } = {}) {
   }
 }
 
+/** Il post-rewrite: la copia di un rebase o di un amend porta anche gli autori dell'originale. Mai un'eccezione verso git. */
+export function postRewrite({ radice, righe } = {}) {
+  try {
+    return S.ereditaAutori(radice, righe);
+  } catch (_) {
+    return 0;
+  }
+}
+
 function lancia(radice, env) {
   const figlio = spawn(process.execPath, [QUI, '--invia', radice, '--attendi', String(ATTESA_INVIO_MS)], {
     detached: true, stdio: 'ignore', env, windowsHide: true,
@@ -71,6 +80,10 @@ async function main(argv) {
     postCommit({ radice: resolve(a || process.cwd()) });
     return 0;
   }
+  if (modo === '--post-rewrite') {
+    postRewrite({ radice: resolve(a || process.cwd()), righe: await leggiStdin() });
+    return 0;
+  }
   if (modo === '--invia') {
     const i = resto.indexOf('--attendi');
     const attendiMs = b === '--attendi' ? Number(resto[0]) || 0 : i >= 0 ? Number(resto[i + 1]) || 0 : 0;
@@ -79,7 +92,7 @@ async function main(argv) {
     if (riga) console.error(riga);
     return 0;
   }
-  console.error('Uso: node scripts/dichiara-spinte.mjs --pre-push <app|server> <radice> [<url>] | --post-commit <radice> | --invia <radice>');
+  console.error('Uso: node scripts/dichiara-spinte.mjs --pre-push <app|server> <radice> [<url>] | --post-commit <radice> | --post-rewrite <radice> | --invia <radice>');
   return 2;
 }
 
