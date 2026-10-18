@@ -194,6 +194,27 @@ const SOTTOFONDO = [
 const W1 = lavoro('w1', H('10:01:10'), H('11:30:00'));
 const W2 = lavoro('w2', H('11:32:10'), H('12:00:00'), { esitoRilascio: null });
 
+test('#1170.1 un rilascio arrivato con l\'esito fuori vista (in un file, filtrato, in sottofondo) è un confine: i suoi turni non tornano nel rapporto dopo', async () => {
+  for (const [comando, uscita] of [
+    [`${RILASCIO} > /tmp/rilascio.log 2>&1; echo "exit=$?"`, 'exit=0'],
+    [`${RILASCIO} 2>&1 | head -1`, "ramo 'worker/x' spedito su origin"],
+    [RILASCIO, 'Command running in background with ID: b1. Output is being written to: /tmp/x.output'],
+  ]) {
+    const s = scena(SOTTOFONDO, { w1: lavoro('w1', H('10:01:10'), H('11:30:00'), { comando, esitoRilascio: uscita }), w2: W2 });
+    try {
+      assert.equal((await generaRapporto({ transcript: s.file.w2, role: 'verifier' })).orchestrator.turns, 4, `${comando} → ${uscita}: s4–s7, non s1–s3`);
+    } finally { togliCartella(s.base); }
+  }
+  // Un fallimento che si vede resta fuori: codice d'uscita stampato o segnato, righe del canale.
+  for (const [testo, errore] of [['exit=3', false], ['EXIT=1', false], ['Exit code 3\nguasto: canale', true], ['', true], ['NESSUN BIGLIETTO: …', false], ['Uso: …', false]]) {
+    assert.equal(rapportoArrivato('rilascio', testo, { errore }), false, testo);
+  }
+  assert.equal(rapportoArrivato('rilascio', 'exit=0'), true);
+  assert.equal(rapportoArrivato('chiusura', 'exit 0'), true);
+  assert.equal(rapportoArrivato('chiusura', 'Nessuna risposta su stdin — non ho mandato niente.'), false);
+  assert.equal(rapportoArrivato('rilascio', `${OK}\nexit=0`, { errore: false }), true);
+});
+
 test('worker in sottofondo: il turno d\'attesa dopo il lancio è del worker lanciato, il resto del rapporto dopo', async () => {
   const primo = scena(SOTTOFONDO.slice(0, 4), { w1: lavoro('w1', H('10:01:10'), H('11:30:00'), { esitoRilascio: null }) });
   const s = scena(SOTTOFONDO, { w1: W1, w2: W2 });

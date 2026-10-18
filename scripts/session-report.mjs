@@ -767,16 +767,22 @@ export function consegnaRapporto(comando) {
   return '';
 }
 
+const CONFERMA = { rilascio: /OK: biglietto rilasciato/, chiusura: /OK: risposta registrata/ };
+// Le righe con cui il canale dice che non ha consegnato, e un codice d'uscita diverso da zero stampato da chi chiama.
+const NON_CONSEGNATO = /rilascio non riuscito|NON è arrivato su origin|Non ho rilasciato niente|non ho mandato niente|risposta non arrivata|RIFIUTATO|NESSUN BIGLIETTO|Argomento non capito|Opzione non capita|^Uso:|\bexit(?:\s+code)?\s*[=:]?\s*[1-9]\d*\b/im;
+
 /**
- * L'uscita di una consegna dice che il rapporto è arrivato al server: la riga d'esito del canale, e nessuna
- * ritentata partita senza rapporto. Un rilascio rifiutato, o fermo prima del server, non ha portato niente. PURA.
+ * L'uscita di una consegna dice che il rapporto è arrivato al server. Un fallimento si vede (la riga del canale, il
+ * codice d'uscita, una ritentata partita senza rapporto); un esito che non si vede (uscita in un file, filtrata,
+ * comando in sottofondo) vale arrivato, come quasi sempre è: se no quei turni finirebbero in due rapporti (#1170.1).
+ * `errore`: il risultato dello strumento segnato come errore. PURA.
  */
-export function rapportoArrivato(tipo, testo) {
+export function rapportoArrivato(tipo, testo, { errore = false } = {}) {
   const t = String(testo || '');
-  if (/SENZA rapporto/.test(t)) return false;
-  if (tipo === 'rilascio') return /OK: biglietto rilasciato/.test(t);
-  if (tipo === 'chiusura') return /OK: risposta registrata/.test(t);
-  return false;
+  if (!CONFERMA[tipo] || /SENZA rapporto/.test(t)) return false;
+  if (CONFERMA[tipo].test(t)) return true;
+  if (errore || NON_CONSEGNATO.test(t)) return false;
+  return !Object.entries(CONFERMA).some(([altro, re]) => altro !== tipo && re.test(t));
 }
 
 /**
@@ -812,7 +818,7 @@ function raccoltaConsegne() {
           const a = b && b.type === 'tool_result' ? attese.get(String(b.tool_use_id || '')) : null;
           if (!a) continue;
           attese.delete(String(b.tool_use_id));
-          if (rapportoArrivato(a.tipo, testoDi(b.content))) arrivate.push(a.ms);
+          if (rapportoArrivato(a.tipo, testoDi(b.content), { errore: b.is_error === true })) arrivate.push(a.ms);
         }
       }
     },
