@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { statoCronologia, testiCronologia, cronologiaPronta } from './helpers/cronologiaAppunti.mjs';
+import { CONFIRM_HOST, clickConfirm, confermaSopraPagina, confirmState } from './helpers/confirm.mjs';
 
 const SEGRETO = 'pw-Segreta-589-undici';
 const MONDO_CONTENT_SCRIPT = 999;
