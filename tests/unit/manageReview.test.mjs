@@ -1831,3 +1831,14 @@ test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hove
     assert.deepEqual(MR.tastoFrase(vuota), { piena: false, titolo: 'Scrivi la riga che leggerà chi ha segnalato' });
   }
 });
+
+test('#597: le immagini che i giudici non hanno visto, una frase ciascuna col motivo del server', () => {
+  assert.deepEqual(MR.immaginiNonViste({ pipeline: { immaginiNonAperte: [
+    { n: 2, motivo: 'troppo grande (oltre 8 MB)' }, { n: 0, motivo: 'x' }, null, { n: 3 }, { n: '4', motivo: 'y' },
+  ] } }), [
+    'Immagine 2 non vista dai giudici: troppo grande (oltre 8 MB).',
+    'Immagine 3 non vista dai giudici: motivo non registrato.',
+  ]);
+  assert.deepEqual(MR.immaginiNonViste({}), []);
+  assert.deepEqual(MR.immaginiNonViste({ pipeline: 'FENC1:cifrato' }), []);
+});
