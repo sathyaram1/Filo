@@ -113,6 +113,23 @@ test('il filtro per creatore ha la pasticca dell’allarme, e il gruppo delle ro
   await expect(ricevuti).toHaveText('3');
 });
 
+test('anche la pagina dei feedback dice «Allarme della pubblicazione», non un modello di nome costruzione', async ({ openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
+  await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, [
+    { ...ALLARME, _id: 'fa-1', status: 'unlabeled' },
+    { ...ALLARME, _id: 'fa-2', seq: 1001, status: 'unlabeled', senderProof: undefined, fiducia: undefined, name: 'Finto allarme' },
+  ]);
+  await page.click('#refresh');
+  await page.locator('#agentOnly').check();
+  const vero = page.locator('.fb-card', { hasText: '#1000' });
+  await expect(vero.locator('.fb-badge--model')).toHaveText('🏗️ Allarme della pubblicazione');
+  await expect(vero.locator('.fb-badge--model')).toHaveAttribute('title', 'Aperto dal server quando una versione non si costruisce');
+  await expect(vero.locator('.fb-title')).toContainText('Controlli automatici rossi');
+  // Il nome senza la prova non è un ritrovamento automatico: il filtro non lo pesca.
+  await expect(page.locator('.fb-card', { hasText: 'Finto allarme' })).toHaveCount(0);
+});
+
 test('in Automazioni niente interruttore per l’esplorazione e gli allarmi: la descrizione dice che entrano comunque', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
