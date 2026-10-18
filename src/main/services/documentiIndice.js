@@ -37,6 +37,7 @@ const deps = {
   impostazioni: async () => (globalThis.SN_STORAGE ? globalThis.SN_STORAGE.getSettings() : {}),
   cartellaDati: () => process.env.FILO_USER_DATA || require('electron').app.getPath('userData'),
   estrai: (p) => require('./documentiLettore').estrai(p),
+  casa: () => os.homedir(),
 };
 function configura(d) { Object.assign(deps, d || {}); }
 
@@ -72,6 +73,33 @@ function dentro(figlio, padre) {
   return r === '' || (!!r && !r.startsWith('..') && !path.isAbsolute(r));
 }
 
+// Le cartelle che la lettura di un file tratta da private (la Libreria del Mac, AppData) la ricerca non le percorre,
+// se non è dentro una di loro che l'utente ha chiesto di cercare: la regola è quella della lettura, in cmdClassify.
+function classifica() {
+  const C = globalThis.SN_CMD_CLASSIFY || (require('../../shared/cmdClassify.js'), globalThis.SN_CMD_CLASSIFY);
+  const win = process.platform === 'win32';
+  return { C, ctx: { home: deps.casa(), win, maiuscole: win || process.platform === 'darwin' } };
+}
+function privata(cartella) {
+  try { const { C, ctx } = classifica(); return C.privato(cartella, ctx); } catch (_) { return false; }
+}
+function aperteDentro(cartella) {
+  try { const { C, ctx } = classifica(); return C.aperteDentro(cartella, ctx); } catch (_) { return []; }
+}
+function esclusa(cartella, radice) {
+  return !dentro(cartella, radice) || (privata(cartella) && !privata(radice));
+}
+// Un documento sta sotto una delle cartelle `cs` e il giro ce lo legge. La risposta si tiene per cartella: i file
+// accanto hanno la stessa.
+function sottoUna(cs) {
+  const visto = new Map();
+  return (p) => {
+    const dir = path.dirname(p);
+    if (!visto.has(dir)) visto.set(dir, cs.some((c) => !esclusa(dir, c)));
+    return visto.get(dir);
+  };
+}
+
 /** Le cartelle da leggere adesso: [{ voce, percorso, nome, esiste }]. */
 async function radici(impostazioni) {
   const s = impostazioni || await deps.impostazioni();
@@ -98,6 +126,9 @@ function daPercorrere(rs) {
 // ── L'indice in memoria e su disco ──────────────────────────────────────────
 
 let voci = null;          // percorso → { n, m, s, k, t, pg, vuoto, e, tp?, np?, pp? }
+// Le cartelle fuori elenco in cui l'utente ha chiesto di cercare: quello che se ne è letto resta finché il file non
+// cambia, così la richiesta dopo lì rilegge solo il nuovo. Si vedono e si dimenticano da Preferenze.
+let occasionali = new Map(); // percorso → quando ci si è cercato l'ultima volta
 let caricamento = null;
 let ultimoGiro = 0;
 let troppi = false;
@@ -118,6 +149,7 @@ async function carica() {
   if (!caricamento) {
     caricamento = (async () => {
       const m = new Map();
+      const o = new Map();
       let righe = 0;
       try {
         const testo = await fsp.readFile(fileIndice(), 'utf8');
@@ -126,11 +158,13 @@ async function carica() {
           let v = null;
           try { v = JSON.parse(riga); } catch (_) { continue; }
           righe += 1;
+          if (v && typeof v.o === 'string') { if (v.via) o.delete(v.o); else o.set(v.o, Number(v.q) || 0); continue; }
           if (!v || typeof v.p !== 'string') continue;
           if (v.via) m.delete(v.p); else m.set(v.p, v);
         }
       } catch (_) { /* nessun indice ancora: si fa */ }
       voci = m;
+      occasionali = o;
       righeSuDisco = righe;
       return m;
     })();
@@ -160,9 +194,12 @@ function accoda(righe) {
   });
 }
 
+const rigaOccasionale = (c, q) => JSON.stringify(q === false ? { o: c, via: true } : { o: c, q });
+
 function compatta() {
   if (righeSuDisco <= Math.max(voci.size * 2, 200)) return scrittura;
   const righe = [];
+  for (const [c, q] of occasionali) righe.push(rigaOccasionale(c, q));
   for (const [p, v] of voci) righe.push(rigaDi(p, v));
   righeSuDisco = righe.length;
   return inFila(async () => {
@@ -176,6 +213,7 @@ function compatta() {
 
 async function elimina() {
   voci = new Map();
+  occasionali = new Map();
   caricamento = Promise.resolve(voci);
   righeSuDisco = 0;
   await inFila(() => fsp.rm(fileIndice(), { force: true }));
@@ -199,8 +237,14 @@ async function elenca(cartelle) {
   const negate = [];
   let contati = 0;
   let pieno = false;
+  let radicePrivata = false;
   async function giro(dir, prof) {
     if (pieno || prof > PROFONDITA_MAX) return;
+    if (prof > 0 && !radicePrivata && privata(dir)) {
+      // Della Libreria del Mac solo le cartelle dei documenti nel cloud: elencarne il resto fa chiedere al sistema.
+      for (const n of aperteDentro(dir)) await giro(path.join(dir, n), prof + 1);
+      return;
+    }
     let elenco;
     try { elenco = await fsp.readdir(dir, { withFileTypes: true }); } catch (e) {
       if (prof === 0 && e && NEGATO.has(e.code)) negate.push(dir);
@@ -230,7 +274,7 @@ async function elenca(cartelle) {
       } catch (_) {}
     }
   }
-  for (const c of cartelle) await giro(c, 0);
+  for (const c of cartelle) { radicePrivata = privata(c); await giro(c, 0); }
   return { trovati, pieno, negate };
 }
 
@@ -249,20 +293,37 @@ function avvisa(stato) {
 async function eseguiGiro(extra) {
   await carica();
   const rs = await radici();
-  const cartelle = daPercorrere(rs).concat((extra || []).filter((c) => !daPercorrere(rs).some((r) => dentro(c, r))));
+  const lista = daPercorrere(rs);
+  const nuove = (extra || []).filter((c) => lista.every((r) => esclusa(c, r)));
+  const cartelle = lista.concat(nuove);
   avvisa({ fase: 'elenco', fatti: 0, totali: 0, nome: '' });
   const { trovati, pieno, negate: rifiutate } = await elenca(cartelle);
   troppi = pieno;
   negate = new Set(rifiutate.map((c) => path.resolve(c)));
-  // Via quello che non c'è più, o che sta in una cartella tolta dall'elenco.
-  const tolti = [];
+  // Via quello che non c'è più, o che sta in una cartella tolta dall'elenco. Quello di una cartella cercata per
+  // l'occasione resta anche se questo giro non ci passa.
+  const percorsa = sottoUna(cartelle);
+  const tenuta = sottoUna(Array.from(occasionali.keys()));
+  const righe = [];
   for (const p of Array.from(voci.keys())) {
-    if (!trovati.has(p) && !(pieno && cartelle.some((c) => dentro(p, c)) && fs.existsSync(p))) {
-      voci.delete(p);
-      tolti.push(JSON.stringify({ p, via: true }));
-    }
+    if (trovati.has(p) || (percorsa(p) ? (pieno && fs.existsSync(p)) : tenuta(p))) continue;
+    voci.delete(p);
+    righe.push(JSON.stringify({ p, via: true }));
   }
-  accoda(tolti);
+  const ora = Date.now();
+  for (const o of Array.from(occasionali.keys())) {
+    // Entrata nell'elenco: da lì in poi la segue l'elenco, e se ne esce, esce dall'indice.
+    if (lista.some((r) => !esclusa(o, r))) { occasionali.delete(o); righe.push(rigaOccasionale(o, false)); }
+  }
+  for (const c of nuove) {
+    if (negate.has(path.resolve(c)) || Array.from(occasionali.keys()).some((o) => !esclusa(c, o))) continue;
+    for (const o of Array.from(occasionali.keys())) {
+      if (!esclusa(o, c)) { occasionali.delete(o); righe.push(rigaOccasionale(o, false)); }
+    }
+    occasionali.set(c, ora);
+    righe.push(rigaOccasionale(c, ora));
+  }
+  accoda(righe);
   const daLeggere = [];
   for (const [p, st] of trovati) {
     const v = voci.get(p);
@@ -326,8 +387,9 @@ function aspettaStop(segnale) {
 
 function riassuntoIndice(rs, sotto) {
   let documenti = 0; let conTesto = 0; let scansioni = 0; let senzaTesto = 0;
+  const qui = sottoUna(sotto);
   for (const [p, v] of voci || new Map()) {
-    if (!sotto.some((c) => dentro(p, c))) continue;
+    if (!qui(p)) continue;
     documenti += 1;
     if (v.t) conTesto += 1;
     else if (v.vuoto) scansioni += 1;
@@ -361,7 +423,7 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     if (!esiste) cartellaMancante = String(cartella);
     else {
       sotto = [p];
-      if (!daPercorrere(rs).some((r) => dentro(p, r))) extra = [p];
+      if (daPercorrere(rs).every((r) => esclusa(p, r))) extra = [p];
     }
   }
   let fermata = false;
@@ -374,8 +436,9 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     smetti();
   }
   const candidati = [];
+  const qui = sottoUna(sotto);
   for (const [p, v] of voci) {
-    if (!sotto.some((c) => dentro(p, c))) continue;
+    if (!qui(p)) continue;
     if (v.tp == null) v.tp = Ricerca.piano(v.t);
     if (v.np == null) v.np = Ricerca.piano(v.n.replace(/\.[^.]+$/, ''));
     if (v.pp == null) v.pp = Ricerca.periodi(v.t);
@@ -439,14 +502,69 @@ async function cartelleMancanti(elenco) {
   return out;
 }
 
+function nomeOccasionale(c) {
+  const serie = Object.keys(DI_SERIE).find((k) => cartellaDiSerie(k) && path.resolve(cartellaDiSerie(k)) === path.resolve(c));
+  if (serie) return DI_SERIE[serie].nome;
+  if (deps.casa() && path.resolve(deps.casa()) === path.resolve(c)) return 'Cartella personale';
+  return path.basename(c) || c;
+}
+
+// Le cartelle cercate per l'occasione, con quanti documenti l'indice tiene solo per loro (quelli che «Dimentica» toglie).
+function elencoOccasionali(lista) {
+  const inLista = sottoUna(lista);
+  return Array.from(occasionali.keys()).sort((a, b) => occasionali.get(b) - occasionali.get(a)).map((c) => {
+    let documenti = 0;
+    for (const p of voci.keys()) if (dentro(p, c) && !inLista(p)) documenti += 1;
+    let esiste = false;
+    try { esiste = fs.statSync(c).isDirectory(); } catch (_) { esiste = false; }
+    return { percorso: c, nome: nomeOccasionale(c), documenti, esiste, quando: occasionali.get(c) || null };
+  });
+}
+
+/** Le cartelle cercate per l'occasione che le voci indicano (come le scrive l'elenco: «Download», «~/Archivio»). */
+async function occasionaliFra(elenco) {
+  await carica();
+  const out = [];
+  for (const v of Array.isArray(elenco) ? elenco : []) {
+    const voce = voceCartella(v);
+    const p = voce && DI_SERIE[voce] ? cartellaDiSerie(voce) : voce;
+    if (p && occasionali.has(p) && !out.includes(p)) out.push(p);
+  }
+  return out;
+}
+
 async function stato() {
   await carica();
   const rs = await radici();
   return {
     ...riassuntoIndice(rs, daPercorrere(rs)),
+    occasionali: elencoOccasionali(daPercorrere(rs)),
     aggiornato: ultimoGiro || null,
     inCorso: corsa && corsa.stato && corsa.stato.fase === 'lettura' ? { fatti: corsa.stato.fatti, totali: corsa.stato.totali } : null,
   };
+}
+
+/** Toglie dall'indice una cartella cercata per l'occasione e i documenti che teneva solo per lei. → { tolta, documenti } */
+async function dimentica(cartella) {
+  await carica();
+  // Un giro in corso su quella cartella la rimetterebbe appena finito.
+  while (corsa) await corsa.promessa;
+  const c = String(cartella || '');
+  if (!c || !occasionali.has(c)) return { tolta: false, documenti: 0 };
+  occasionali.delete(c);
+  const resta = sottoUna(daPercorrere(await radici()).concat(Array.from(occasionali.keys())));
+  const righe = [rigaOccasionale(c, false)];
+  let documenti = 0;
+  for (const p of Array.from(voci.keys())) {
+    if (!dentro(p, c) || resta(p)) continue;
+    voci.delete(p);
+    righe.push(JSON.stringify({ p, via: true }));
+    documenti += 1;
+  }
+  accoda(righe);
+  if (!voci.size) await elimina();
+  else await compatta();
+  return { tolta: true, documenti };
 }
 
 // Su macOS leggere Documenti, Scrivania e Download fa comparire la richiesta di permesso del sistema: la prima lettura
@@ -483,8 +601,8 @@ function avviaInSottofondo() {
 
 module.exports = {
   configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
-  cartellaDiSerie, elimina, comeDarePermesso, doveSta, DI_SERIE,
+  cartellaDiSerie, elimina, dimentica, occasionaliFra, comeDarePermesso, doveSta, DI_SERIE,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,
-  _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; negate = new Set(); },
+  _azzera: () => { voci = null; occasionali = new Map(); caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; negate = new Set(); },
 };

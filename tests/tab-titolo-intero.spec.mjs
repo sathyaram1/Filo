@@ -196,6 +196,24 @@ test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato'
   await openTab('filo://manage/manage.html');
   await shell.mouse.move(600, 500);
   await expect(shell.locator('.tab.active .title')).toHaveText('Gestione');
+  // Il posto lo dà la finestra misurata, non il carattere: col DejaVu Sans della suite le quattro in 1280px non ci
+  // stanno. Avanzano 24px, molto meno dello stacco che l'attiva vorrebbe dalla scheda tipica.
+  const delta = await shell.evaluate(() => {
+    const schede = [...document.querySelectorAll('#tabs .tab')];
+    schede.forEach((el) => el.classList.add('misura'));
+    const naturali = schede.reduce((s, el) => s + Math.ceil(el.getBoundingClientRect().width), 0);
+    schede.forEach((el) => el.classList.remove('misura'));
+    const striscia = getComputedStyle(document.getElementById('tabs'));
+    const spazio = document.querySelector('.tab-drag-spacer');
+    const posto = document.getElementById('tabs').getBoundingClientRect().width - parseFloat(striscia.paddingLeft)
+      - parseFloat(striscia.paddingRight) + spazio.getBoundingClientRect().width - parseFloat(getComputedStyle(spazio).minWidth);
+    return Math.ceil(naturali + 24 - posto);
+  });
+  await app.evaluate(({ BrowserWindow }, d) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const b = w.getBounds();
+    w.setSize(b.width + d, b.height);
+  }, delta);
   // Le quattro schede alla loro larghezza naturale ci stanno: nessun nome resta tagliato.
   await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab .title')]
     .filter((t) => t.scrollWidth > t.clientWidth + 0.5).map((t) => `${t.textContent} ${t.clientWidth}/${t.scrollWidth}`)), { timeout: 10_000 })

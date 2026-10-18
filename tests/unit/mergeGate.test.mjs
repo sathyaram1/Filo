@@ -14,6 +14,7 @@
 //        0 fuso · 10 bloccato (L5) · 20 conflitto · 1 errore/rifiuto.
 //      Server finto via FILO_ROUTINE_API, come in routineChain.test.mjs.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -29,7 +30,7 @@ const MERGE_GATE = resolve(__dirname, '..', '..', 'scripts', 'merge-gate.mjs');
 
 // ─── logica pura del CLI (niente git, niente rete) ───────────────────────────
 
-const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer } = await import('../../scripts/merge-gate.mjs');
+const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer, testoEsitoServer } = await import('../../scripts/merge-gate.mjs');
 
 test('parseArgs: solo il source; qualunque flag è sconosciuto', () => {
   assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', unknown: [] });
@@ -52,6 +53,11 @@ test('exitCodeFor: il contratto CLI su cui il ruolo secaudit decide le chiusure'
   assert.equal(exitCodeFor({ ok: true, result: 'merged', sha: 'abc' }), 0);
   assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }), 10);
   assert.equal(exitCodeFor({ ok: true, result: 'conflict' }), 20);
+  // Lavoro server (#1159 fase 2): la parte del server la segue il server, e chi chiede non fa niente.
+  assert.equal(exitCodeFor({ ok: true, result: 'server', esito: 'attesa_suite' }), 30);
+  assert.equal(exitCodeFor({ ok: true, result: 'merged', sha: 'abc', server: true }), 0, 'lavoro misto: app e server su main');
+  assert.match(testoEsitoServer('attesa_suite'), /aspetta la suite di filo-security.*rilascia il biglietto/);
+  assert.match(testoEsitoServer('boh'), /esito «boh»/);
   // Un RIFIUTO del server (verdetti non registrati, ramo che non combacia,
   // biglietto morto) è 1, non 10: non è un blocco di sicurezza da spiegare
   // all'owner, è una richiesta fuori perimetro già registrata dal server.

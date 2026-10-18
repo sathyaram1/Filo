@@ -17,11 +17,11 @@
 // COL TOKEN DELL'OWNER, SEMPRE (#595, #908)
 //   Si usa la STESSA strada dell'app (`src/shared/feedback.js`), testo cifrato
 //   verso l'owner, con la create autenticata che porta `senderProof: 'admin'`:
-//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Chi lo
+//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Porta l'impronta del biglietto della sessione
+//   (`bigliettoLocale`, #1148): la fiducia la decide il server da lì, e senza biglietto nasce non fidato. Chi lo
 //   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
-//   lavoro di questa sessione: nessuna routine lo prende, e `npm run finish` col
-//   suo numero salta L5), `--non-locale` lo apre per le routine. Con la prova
-//   tutti e due saltano i giudici (#914): il primo va nei Lavori locali, il
+//   lavoro di questa sessione: nessuna routine lo prende), `--non-locale` lo apre per le routine. Fidati,
+//   tutti e due saltano i giudici: il primo va nei Lavori locali, il
 //   secondo In coda. Una routine non lo usa. Senza scelta
 //   non parte niente. Senza token (o col token rifiutato) non parte niente:
 //   da anonimo sarebbe un feedback d'utente. `--priorita` nasce col documento.
@@ -31,6 +31,7 @@
 //                                                         [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
+//                                                         [--aspetta 676,663.2]
 //                                                         [--dry-run]
 //
 //   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
@@ -40,6 +41,9 @@
 //   dell'allowlist del gate L0 (md, txt, log, json, csv, tsv, yaml, pdf,
 //   immagini); un tipo diverso è un errore d'uso, non un feedback sospetto.
 //   node scripts/claude-feedback.mjs "<titolo>" -          ← testo da stdin
+//
+//   `--aspetta` (#903): nasce aspettando quei feedback; nessuna routine lo prende finché non sono tutti fusi.
+//   Numeri inesistenti e più di venti si rifiutano prima di aprire.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
 // "non l'ho scritto io male" da "il server non c'è")
@@ -52,6 +56,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PRIORITA_AMMESSE, parsePriorita } from './lib/priorita.mjs';
+import { trovaBiglietto } from './lib/biglietto-locale.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura, come in owner-feedback.mjs:
@@ -62,7 +67,9 @@ import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
+import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
+import { risolviFeedback } from './lib/pratica-locale.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
@@ -162,19 +169,21 @@ export { PRIORITA_AMMESSE, parsePriorita };
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null, attese = [] } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
   if (!text) return { ok: false, uso: true, motivo: 'testo mancante' };
 
   if (dryRun) {
-    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale };
+    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale, attese };
   }
   if (!idToken) {
     return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
   }
 
+  // Il biglietto della sessione; senza, o col server giù, il feedback nasce non fidato.
+  const b = biglietto || await trovaBiglietto().catch(() => null);
   let res;
   try {
     res = await FB.submit({
@@ -195,6 +204,9 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // Nasce col documento: il server alla nascita la vede e non la fa decidere al giudice (#914).
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
+      ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
+      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
+      ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
@@ -205,8 +217,9 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
   return {
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
-    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly),
+    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese,
     priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
+    biglietto: b && b.fp ? (b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
   };
 }
 
@@ -224,6 +237,29 @@ export const credenziale = {
     } catch (e) {
       return { idToken: '', motivo: String((e && e.message) || e) };
     }
+  },
+};
+
+/**
+ * I numeri di `--aspetta` → [{ id, num }], con le regole di Gestione (SN_FB_ATTESE.valida): un feedback che nasce non
+ * può aspettare sé stesso né chiudere un giro, quindi restano i numeri inesistenti e il tetto. Oggetto: i test lo sostituiscono.
+ */
+export const attese = {
+  async risolvi(testo, idToken) {
+    const ATT = globalThis.SN_FB_ATTESE;
+    const letti = ATT.leggiNumeri(testo);
+    if (!letti.ok || !letti.numeri.length) return letti.ok ? { ok: true, attese: [] } : letti;
+    const { FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    return ATT.valida({
+      id: '', numeri: letti.numeri,
+      risolvi: async (n) => {
+        const r = await risolviFeedback(n, { bearer: idToken, base: FIRESTORE_BASE });
+        if (r.ok) return r.id;
+        if (/^nessun feedback/.test(r.motivo)) return null;
+        throw new Error(r.motivo);
+      },
+      leggiAttese: async () => new Map(),
+    });
   },
 };
 
@@ -255,7 +291,7 @@ export const ambiente = {
 };
 
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--dry-run]');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
@@ -275,8 +311,8 @@ export async function main(argvIn) {
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--dry-run'],
-    conValore: ['--priorita', '--url', '--allega'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--aspetta', '--dry-run'],
+    conValore: ['--priorita', '--url', '--allega', '--aspetta'],
     ripetibili: ['--allega'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -317,7 +353,7 @@ export async function main(argvIn) {
   // parole «uguali al valore di un'opzione», e una parola del testo scritta
   // identica all'indirizzo passato spariva dal corpo senza dire niente — un
   // taglio muto sul testo di chi segnala (feedback #565).
-  const CON_VALORE = new Set(['--priorita', '--url', '--allega']);
+  const CON_VALORE = new Set(['--priorita', '--url', '--allega', '--aspetta']);
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -333,6 +369,10 @@ export async function main(argvIn) {
 
   const p = parsePriorita(prioritaRaw);
   if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo}`); return EXIT.USO; }
+  const aspettaRaw = flag('aspetta');
+  if (argv.includes('--aspetta') && !String(aspettaRaw || '').trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2). Non ho aperto niente.'); return EXIT.USO; }
+  const numeriAttesa = globalThis.SN_FB_ATTESE.leggiNumeri(aspettaRaw || '');
+  if (!numeriAttesa.ok) { console.error(`RIFIUTATO: --aspetta: ${numeriAttesa.motivo}. Non ho aperto niente.`); return EXIT.USO; }
 
   if (percorsiAllegati.length > MAX_ALLEGATI) {
     console.error(`USO: al più ${MAX_ALLEGATI} allegati`);
@@ -350,14 +390,22 @@ export async function main(argvIn) {
     console.error(`RIFIUTATO: ${cred.motivo || 'nessun token admin'}. Senza la prova del mittente non apro niente: node scripts/admin-login.mjs`);
     return EXIT.RIFIUTATO;
   }
-  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale });
+  // Le attese si controllano prima di aprire: un numero sbagliato non deve lasciare dietro un feedback senza.
+  let listaAttese = [];
+  if (deposita && numeriAttesa.numeri.length) {
+    let v;
+    try { v = await attese.risolvi(numeriAttesa.numeri, cred.idToken); } catch (e) { v = { ok: false, motivo: `lettura dei numeri fallita: ${String((e && e.message) || e)}`, rete: true }; }
+    if (!v.ok) { console.error(`RIFIUTATO: --aspetta: ${v.motivo}. Non ho aperto niente.`); return v.rete ? EXIT.IRRAGGIUNGIBILE : EXIT.RIFIUTATO; }
+    listaAttese = v.attese;
+  }
+  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale, attese: listaAttese });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -368,8 +416,13 @@ export async function main(argvIn) {
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
   console.log(locale
     ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
-    : 'Aperto per le routine: con la prova del mittente salta i giudici e va dritto In coda.');
+    : 'Aperto per le routine.');
+  // La fiducia la decide il server dal biglietto (#1148): pulito salta i giudici, sporco o assente ci passa.
+  console.log(r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'
+    : r.biglietto === 'sporco' ? 'Biglietto della sessione sporco: nasce non fidato, passa dai giudici e la fusione aspetta il tuo sì.'
+      : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
+  if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);

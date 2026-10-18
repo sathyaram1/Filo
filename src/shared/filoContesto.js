@@ -188,6 +188,12 @@
     if (oss) parti.push(oss);
     else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
     else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
+    // #778 — una finestra guardata resta un nome: quello che c'era non è conservato, e si riguarda se serve.
+    if (!oss && Array.isArray(m.guardate) && m.guardate.length) {
+      const E = global.SN_ESTERNO;
+      const nomi = m.guardate.map((n) => `«${E ? E.perCanaleSistema(n) : String(n)}»`).join(', ');
+      parti.push(`(qui avevo guardato ${nomi}: quello che c'era non è conservato)`);
+    }
     const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a
     // ogni turno un messaggio che la cache aveva già.
@@ -315,7 +321,8 @@
     const out = [];
     const aperti = new Map();
     for (const m of Array.isArray(messaggi) ? messaggi : []) {
-      if (!m || !m.chat) continue;
+      // La riga di una conversazione di un'altra app (#974) non è uno scambio: lo scambio si cerca, non si ripesca.
+      if (!m || !m.chat || m.riga) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
         t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };

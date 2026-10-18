@@ -64,7 +64,7 @@
   }
   async function setRaw(key, value) {
     await chrome.storage.local.set({ [key]: value });
-    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER) && onMemoriaCambiata) {
+    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER || key === KEYS.FILO_KEEP_OPEN) && onMemoriaCambiata) {
       try { onMemoriaCambiata(); } catch (_) {}
     }
   }
@@ -134,7 +134,7 @@
   }
 
   // La memoria come la rilegge l'utente nelle Preferenze (#592): i moduli in
-  // righe, e le lezioni ancora da riordinare.
+  // righe, le lezioni ancora da riordinare e i siti da tenere aperti (#823).
   async function viewForUser() {
     const mem = await getMemory();
     const moduli = Object.entries(mem || {})
@@ -143,17 +143,21 @@
     const lezioni = (await getLessonsBuffer())
       .filter((l) => l && typeof l.text === 'string' && l.text.trim())
       .map((l) => ({ ts: l.ts, text: l.text }));
-    return { moduli, lezioni };
+    const sempreAperte = Object.keys(await listKeepOpen()).sort();
+    return { moduli, lezioni, sempreAperte };
   }
+
+  const fraseSempreAperta = (host) => `Tieni sempre aperto ${host}`;
 
   // Le righe che una frase detta a voce indica (#592): quelle uguali, se ce ne
   // sono, altrimenti quelle che la contengono. Ognuna porta il `via` di
   // FILO_MEMORY_FORGET, così la voce toglie esattamente quello che toglie la ×.
   async function tutteLeRighe() {
-    const { moduli, lezioni } = await viewForUser();
+    const { moduli, lezioni, sempreAperte } = await viewForUser();
     return [
       ...moduli.flatMap((m) => m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } }))),
       ...lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })),
+      ...sempreAperte.map((host) => ({ testo: fraseSempreAperta(host), via: { sempreAperta: host } })),
     ];
   }
 
@@ -175,6 +179,7 @@
 
   async function forgetLine(via) {
     if (via && via.lezione && typeof via.lezione === 'object') return forgetLesson(via.lezione);
+    if (via && typeof via.sempreAperta === 'string') return (await removeKeepOpen(via.sempreAperta)).length > 0;
     if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') return forgetModuleLine(via.modulo, via.riga);
     return false;
   }
@@ -850,6 +855,46 @@
     return rules[normProxyDomain(domain)] || null;
   }
 
+  // ===== Siti sempre aperti (#823) =====
+  // La pulizia delle schede li legge senza passare dal modello. La voce (host) la calcola il main.
+
+  async function listKeepOpen() {
+    const r = await getRaw(KEYS.FILO_KEEP_OPEN, {});
+    return r && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  }
+
+  // Rilegge e riscrive la chiave intera: le scritture in fila, o due insieme si mangiano a vicenda
+  // (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+  let codaKeepOpen = Promise.resolve();
+  function inCodaKeepOpen(fn) {
+    const r = codaKeepOpen.then(fn, fn);
+    codaKeepOpen = r.then(() => {}, () => {});
+    return r;
+  }
+
+  function addKeepOpen(host) {
+    const h = normProxyDomain(host);
+    if (!h) return Promise.resolve(null);
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      voci[h] = { ts: (voci[h] && voci[h].ts) || new Date().toISOString() };
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return h;
+    });
+  }
+
+  // Torna le voci tolte davvero.
+  function removeKeepOpen(hosts) {
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      const tolte = (Array.isArray(hosts) ? hosts : [hosts]).map(normProxyDomain).filter((h) => h && h in voci);
+      if (!tolte.length) return [];
+      for (const h of tolte) delete voci[h];
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return tolte;
+    });
+  }
+
   // ===== Session =====
 
   async function getSession() {
@@ -900,6 +945,8 @@
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)
     listProxyRules, setProxyRule, removeProxyRule, getProxyRule,
+    // siti sempre aperti (#823)
+    listKeepOpen, addKeepOpen, removeKeepOpen, fraseSempreAperta,
     // session
     getSession, setSession, touchSession,
   };

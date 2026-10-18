@@ -74,6 +74,16 @@ test('col login Google l\'app scrive email, nome e consumi sul server, e il docu
   legame(consumi, privacy, 'escono i totali per funzione', 'consumi per funzione sul server');
 });
 
+test('l\'accesso Google si apre in una scheda di Filo, col browser come ripiego, e il documento sulla privacy lo dice', () => {
+  const auth = leggi('src', 'main', 'auth', 'google-auth.js');
+  const inScheda = /require\('\.\/accessoInScheda'\)\.apri\(/.test(auth);
+  const fidato = /trustedSites:\s*\[\.\.\.prima, G\.SITO_GOOGLE\]/.test(leggi('src', 'main', 'services', 'accessoGoogle.js'));
+  legame(inScheda, privacy, 'L\'accesso Google si apre in una scheda di Filo', 'accesso in una scheda');
+  legame(!inScheda, privacy, 'L\'accesso Google si apre nel browser;', 'accesso nel browser');
+  legame(inScheda, privacy, 'Se Google rifiuta l\'accesso dentro Filo, si apre nel browser', 'ripiego nel browser');
+  legame(fidato, privacy, 'Filo mette Google fra i siti fidati', 'Google fidato dopo un accesso in Privacy massima');
+});
+
 test('le ricerche su Google dal tasto destro sono fra gli altri servizi', () => {
   const azioni = leggi('src', 'content', 'actions.js');
   legame(/lens\.google\.com/.test(azioni), privacy, 'apre Google Lens', 'ricerca per immagine con Google Lens');
@@ -98,14 +108,15 @@ test('i pacchetti Mac e Linux ricostruiti dopo hanno la loro esecuzione, e il do
   legame(aParte, sicurezza, '«Aggiunto il pacchetto Mac a v0.2.231»', 'esecuzione a parte per i pacchetti ricostruiti');
 });
 
-test('lavoro locale e pre-approvazione fondono senza il clic e partono dal terminale, e il documento sulla sicurezza lo dice', () => {
-  const preapprova = /--preapprova/.test(leggi('scripts', 'owner-feedback.mjs'));
-  const localeSaltaL5 = /L5 saltato/.test(leggi('scripts', 'lib', 'owner-merge.mjs'));
-  legame(preapprova || localeSaltaL5, sicurezza, 'Due strade però non passano da quel clic', 'fusioni senza clic');
-  legame(preapprova || localeSaltaL5, sicurezza, 'Due strade saltano il mio clic', 'fusioni senza clic fra i punti deboli');
+test('il lavoro fidato fonde senza il clic, la pre-approvazione non c\'è più, e il documento sulla sicurezza lo dice', () => {
+  const fidatoSaltaL5 = /lavoro fidato, scritto solo da sessioni col biglietto pulito/.test(leggi('scripts', 'lib', 'owner-merge.mjs'));
+  const preapprovaTolta = /\['preapprova', SOLO_DA_GESTIONE_PREAPPROVA\]/.test(leggi('scripts', 'owner-feedback.mjs'));
+  legame(fidatoSaltaL5, sicurezza, 'Una strada però non passa da quel clic', 'fusioni senza clic');
+  legame(fidatoSaltaL5, sicurezza, '**Il lavoro fidato.**', 'il lavoro fidato salta i controlli deterministici');
+  legame(fidatoSaltaL5, sicurezza, '**Una strada salta il mio clic.**', 'fusioni senza clic fra i punti deboli');
+  legame(false, sicurezza, 'Due strade però non passano da quel clic', 'le due strade di prima');
   legame(false, sicurezza, 'Nessuno strumento da terminale lo fa', 'approvazione solo dall\'app');
-  legame(localeSaltaL5, sicurezza, '**Il lavoro locale.**', 'il lavoro locale salta i controlli deterministici');
-  legame(preapprova, sicurezza, '**Il segno «fondi senza chiedermelo».**', 'la pre-approvazione da terminale');
+  legame(!preapprovaTolta, sicurezza, 'fondi senza chiedermelo', 'la pre-approvazione');
 });
 
 test('il tasto destro su un link chiede da solo titolo e descrizione al sito e spiega il link con un modello, e il documento sulla privacy lo dice', () => {

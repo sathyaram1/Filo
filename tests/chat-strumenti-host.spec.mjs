@@ -21,7 +21,6 @@ async function newtabPage(app) {
 async function preparaRouter(app, modo, rifiuto = NO_PARAMS) {
   await app.evaluate(async (_e, { modo, rifiuto }) => {
     const C = globalThis.SN_CONST;
-    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       openWeightsOnly: false,
@@ -35,6 +34,11 @@ async function preparaRouter(app, modo, rifiuto = NO_PARAMS) {
     if (!globalThis.__fetchVero) {
       globalThis.__fetchVero = globalThis.fetch;
       globalThis.fetch = async (url, init) => {
+        // Gli host dichiarati dicono se manca chi regge gli strumenti o chi regge il tetto della risposta: qui gli strumenti.
+        if (/openrouter\.ai\/api\/v1\/models\/.+\/endpoints$/.test(String(url))) {
+          const endpoints = [{ provider_name: 'DeepInfra', tag: 'deepinfra', supported_parameters: ['max_tokens', 'reasoning'], max_completion_tokens: 65536 }];
+          return new Response(JSON.stringify({ data: { endpoints } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
         if (!String(url).includes('openrouter.ai/api/v1/chat/completions')) return globalThis.__fetchVero(url, init);
         const body = JSON.parse(init.body);
         globalThis.__corpi.push(body);

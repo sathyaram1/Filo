@@ -109,6 +109,11 @@ function wireWindowCommon(win, tabs) {
   // Spiega, Traduci, Salva per dopo e Aiuto anche col fuoco sulla barra.
   collegaScorciatoie(win.webContents, win);
 
+  // Il menu a comparsa nasce con la barra pronta: il primo clic lo trova carico (#1090). Il setTimeout fa partire prima il ripristino delle schede.
+  win.webContents.once('did-finish-load', () => {
+    setTimeout(() => { try { require('./popup-menu').preparaMenu(win); } catch (_) {} }, 0);
+  });
+
   // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
   // mai — Electron manda gli app-command su Windows e Linux, lo swipe su Mac —
   // quindi si ascoltano tutte e due senza ramo di piattaforma: una `if` su
@@ -150,7 +155,8 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,
@@ -207,7 +213,8 @@ function createIncognitoWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,

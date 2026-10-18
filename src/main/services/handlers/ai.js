@@ -113,17 +113,147 @@ module.exports = function register(on, ctx) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
+    // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
+    const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
+    if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
+      const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
+      if (d) esterno.documenti = d; else delete esterno.documenti;
+    }
+    // Quando è stata aperta la scheda lo sa il main (#826): il valore che manda la pagina non conta.
+    if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
+      msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
+      msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
+    }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
     // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
-    const chiedi = () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
+    const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+    const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    const chiedi = daSola
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
+      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
     const K = globalThis.SN_WALLET_MAIN;
     const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     if (lettura) await lettura;
     return { ok: true, ...r };
+  });
+
+  // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
+  // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
+  // pagina mostra i risultati mentre arrivano. Un giro per pagina: una ricerca nuova ferma quella di prima.
+  const { daFilo, soloFilo } = require('./origine');
+  const NON_ADMIN = () => ({ ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' });
+  const { settingsForOwnerAction } = require('../resolveSupportModel');
+  const giriRicerca = new Map(); // jobId → giro
+  let giriFatti = 0;
+  const GIRO_DIMENTICA_MS = 5 * 60 * 1000;
+  // Più dei feedback che la pagina carica, con margine: un elenco più lungo non viene da lei.
+  const RICERCA_MAX_CANDIDATI = 50000;
+
+  function fermaGiro(id) {
+    const g = giriRicerca.get(id);
+    if (!g) return;
+    giriRicerca.delete(id);
+    try { g.controller.abort(); } catch (_) {}
+  }
+
+  // Errori la cui frase è già per chi legge (dicono anche dove si imposta il modello).
+  const GIA_SCRITTI = ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_API_KEY', 'NO_ALLOWED_HOST', 'LIMIT_REACHED', 'PROVIDER_METHOD_MISSING'];
+  function fraseErrore(e) {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (e && GIA_SCRITTI.includes(e.code)) return String(e.message || e.code);
+    return CE && typeof CE.sentence === 'function' ? CE.sentence(e) : String((e && e.message) || e || 'errore');
+  }
+
+  function candidatiValidi(lista) {
+    const out = [];
+    const visti = new Set();
+    for (const c of Array.isArray(lista) ? lista : []) {
+      const id = c && c.id != null ? String(c.id) : '';
+      if (!id || visti.has(id)) continue;
+      visti.add(id);
+      out.push({ id, title: String((c && c.title) || '').slice(0, 500), text: String((c && c.text) || '') });
+    }
+    return out;
+  }
+
+  on(MSG.MANAGE_SEARCH_CLASSIFY, async (msg, sender, origin) => {
+    if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!isAdmin()) return NON_ADMIN();
+    const op = msg && msg.op;
+    const jobId = msg && typeof msg.jobId === 'string' ? msg.jobId : '';
+    if (op === 'stop') { fermaGiro(jobId); return { ok: true }; }
+    if (op === 'status') {
+      const g = giriRicerca.get(jobId);
+      if (!g) return { ok: false, code: 'NO_JOB', error: 'ricerca non trovata' };
+      if (g.finished) giriRicerca.delete(jobId);
+      const S = globalThis.SN_MANAGE_SEARCH;
+      return {
+        ok: true, done: g.done, total: g.total, hits: S.rankHits(g.hits), finished: g.finished,
+        skipped: g.skipped, error: g.error, code: g.code, model: g.model,
+      };
+    }
+    if (op !== 'start') return { ok: false, code: 'BAD_OP', error: 'operazione sconosciuta' };
+
+    const S = globalThis.SN_MANAGE_SEARCH;
+    const query = String((msg && msg.query) || '').trim();
+    if (!query) return { ok: false, code: 'EMPTY_QUERY', error: 'ricerca vuota' };
+    const lista = Array.isArray(msg && msg.candidates) ? msg.candidates : [];
+    if (lista.length > RICERCA_MAX_CANDIDATI) {
+      return { ok: false, code: 'TOO_MANY', error: `Troppi feedback per il classificatore: ${lista.length}, al massimo ${RICERCA_MAX_CANDIDATI}.` };
+    }
+    const candidati = candidatiValidi(lista);
+    const wcId = sender && sender.wc && typeof sender.wc.id === 'number' ? sender.wc.id : null;
+    for (const [id, g] of giriRicerca) if (g.wcId === wcId) fermaGiro(id);
+
+    const action = SN_CONST.ACTIONS.MANAGE_SEARCH_CLASSIFY;
+    let settings;
+    let attempts;
+    try {
+      settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
+      attempts = buildAttemptChain(settings, modelForAction(settings, action), action);
+    } catch (e) {
+      return { ok: false, code: (e && e.code) || 'NO_MODEL', error: fraseErrore(e) };
+    }
+    if (!attempts.some((a) => modelGate.supports(a.provider, 'decisions'))) {
+      return { ok: false, code: 'NO_DECISION_PROVIDER', error: 'Nessun fornitore del classificatore sa rispondere a domande chiuse.' };
+    }
+
+    const requests = S.buildDecisionRequests(query, candidati, S.CLASSIFIER.BATCH);
+    const id = `r${Date.now().toString(36)}${(++giriFatti).toString(36)}`;
+    const g = {
+      wcId, total: candidati.length, done: 0, hits: [], skipped: 0,
+      finished: false, error: null, code: null, model: attempts[0].model || '', controller: new AbortController(),
+    };
+    giriRicerca.set(id, g);
+    // La pagina chiusa a metà non paga il resto del giro.
+    try { if (sender && sender.wc && typeof sender.wc.once === 'function') sender.wc.once('destroyed', () => fermaGiro(id)); } catch (_) {}
+    const conta = (req, senza) => { g.done += req.ids.length; g.skipped += senza; };
+    modelGate.decideAll({
+      action, settings, attempts, requests, parallel: S.CLASSIFIER.PARALLEL, signal: g.controller.signal,
+      onAnswer: (i, answers) => {
+        const r = S.hitsFromAnswers(requests[i], answers, S.CLASSIFIER.THRESHOLD);
+        g.hits.push(...r.hits);
+        conta(requests[i], r.senza);
+      },
+    }).then((r) => {
+      for (const i of r.skipped || []) conta(requests[i], requests[i].ids.length);
+      if (r.model) g.model = r.model;
+      if (r.error) { g.error = fraseErrore(r.error); g.code = r.error.code || 'PARTIAL'; }
+    }).catch((e) => {
+      g.error = fraseErrore(e);
+      g.code = (e && e.code) || 'DECIDE_FAILED';
+      console.warn('[Filo ricerca] classificatore fermo:', (e && e.message) || e);
+    }).finally(() => {
+      g.finished = true;
+      const t = setTimeout(() => { if (giriRicerca.get(id) === g) giriRicerca.delete(id); }, GIRO_DIMENTICA_MS);
+      if (t && typeof t.unref === 'function') t.unref();
+    });
+    return { ok: true, jobId: id, total: g.total };
   });
 
   // Dedup dell'avviso "lettura a modello non disponibile → voce del browser": un motivo si annuncia
@@ -432,6 +562,41 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Lo stesso verdetto di ensureAllowedHost (openrouter.js), chiesto mentre si sceglie il modello.
+  // Da un sito vale solo un nickname del registro: un id qualunque lo mandano solo le pagine di Filo.
+  on(MSG.AUDIO_HOST_CHECK, async (msg, sender, origin) => {
+    const A = SN_CONST.ACTIONS;
+    const fn = msg.action === A.TTS ? 'audio_host_fn_tts' : (msg.action === A.TRANSCRIBE_AUDIO ? 'audio_host_fn_stt' : '');
+    if (!fn) return { ok: true, verdict: 'na' };
+    const s = await getEffectiveSettings();
+    const interna = daFilo(origin, sender);
+    let routing = providerRouting(s);
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando,
+    // senza la lista della chiave propria di chi la modifica (#962).
+    if (interna && Array.isArray(msg.excluded)) {
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string'), excludedProvidersOwnKey: null });
+    }
+    let entry = null;
+    if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
+      entry = { provider: msg.provider, model: msg.model.trim() };
+    } else {
+      const raw = (s.modelRegistry || {})[String(msg.nickname || '').trim()];
+      if (raw) entry = registryEntryToSingle(raw);
+    }
+    if (!entry || !entry.model) return { ok: true, verdict: 'na' };
+    const v = await modelGate.hostVerdict({
+      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing,
+    });
+    if (v.ok) return { ok: true, verdict: 'ok' };
+    const many = v.excluded.length > 1 ? '_many' : '';
+    const key = v.reason === 'unknown' ? 'audio_host_warn_unknown' : `audio_host_warn_${v.reason}${many}`;
+    const I18n = globalThis.SN_I18N;
+    const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
+    const nomi = new Intl.ListFormat('it', { type: 'conjunction' }).format(v.excluded);
+    const warning = I18n ? I18n.t(key, label, I18n.t(fn), nomi) : key;
+    return { ok: true, verdict: v.reason, hosts: v.excluded, warning };
+  });
+
   // Normalizza una entry del registry (nuovo schema { provider, model } o
   // vecchio duale { openrouter, … }) in { provider, model } — stessa logica
   // delle pagine Opzioni/admin.
@@ -527,7 +692,9 @@ module.exports = function register(on, ctx) {
     return (eff.apiKeys || {})[provider] || '';
   }
 
-  on(MSG.TEST_DEFAULT_MODEL, async (msg) => {
+  // Le prove spendono le chiavi predefinite: le chiedono solo le Opzioni e l'editor dei predefiniti,
+  // mai un sito visitato (#784.2).
+  on(MSG.TEST_DEFAULT_MODEL, soloFilo(async (msg) => {
     try {
       const nickname = (msg.nickname || '').trim();
       const explicitModel = (msg.model || '').trim();
@@ -538,9 +705,7 @@ module.exports = function register(on, ctx) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
         // riservato agli amministratori.
-        if (!isAdmin()) {
-          return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-        }
+        if (!isAdmin()) return NON_ADMIN();
         provider = 'openrouter';
         modelId = explicitModel;
       } else {
@@ -609,7 +774,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: provaFallita(e) };
     }
-  });
+  }));
 
   // Catalogo modelli di un provider, recuperato dal main con le chiavi
   // predefinite: la pagina admin non vede mai le chiavi vere, quindi non può
@@ -617,11 +782,9 @@ module.exports = function register(on, ctx) {
   // chiavi dell'utente). Solo metadati, nessuna inferenza. Ritorna
   // { ok, items: [{ id, label }] } già ordinati dal più recente e con
   // l'etichetta di categoria (Testo / Multimodale / Sintesi vocale / …).
-  on(MSG.DEFAULT_MODELS_LIST, async (msg) => {
+  on(MSG.DEFAULT_MODELS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
@@ -644,15 +807,23 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
+
+  // Le stime di costo accanto ai modelli (#819): la pagina le calcola col contesto che solo il main ha.
+  on(MSG.STIMA_COSTO_MODELLI, soloFilo(async (msg) => {
+    try {
+      const contesto = await require('../costoModelli').contesto({ Defaults, forzaListino: Boolean(msg && msg.forzaListino) });
+      return { ok: true, contesto };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
 
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
-  on(MSG.DEFAULT_PROVIDERS_LIST, async () => {
+  on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const res = await fetch('https://openrouter.ai/api/v1/providers');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -664,7 +835,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // La domanda esce verso il motore di ricerca: passa dalla porta delle uscite come la
   // ricerca della chat (#810). Solo il blocco: qui non c'è un popup per l'OK in più.
@@ -717,7 +888,7 @@ module.exports = function register(on, ctx) {
         // giro), e un token preso adesso a quel punto è scaduto. Chi manda se
         // lo fa dare al momento dell'invio, da `ottieniIdToken` (vedi l'init
         // della coda in handlers/misc.js).
-        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin, intera: true });
         const r = await PathsCollector.collectAndSave({ session: msg.payload?.session, invokeAI });
         if (r?.saved) console.info('[Filo] percorso in coda:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }

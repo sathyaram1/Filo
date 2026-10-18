@@ -7,6 +7,8 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSy
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { ensureSessionExcludes } from './branch-integrity.mjs';
+import { ensureCommentChar } from './carattere-commento.mjs';
+import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
 
@@ -232,6 +234,8 @@ export function preparaClone(principale, n, {
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
   writeFileSync(resolve(dir, MARCATORE_WORKER), `${JSON.stringify({ indice: i, paralleli: Number(paralleli) || 0, principale: radice })}\n`, 'utf8');
   ensureSessionExcludes(dir);
+  try { installaControlloSpedizione(dir); } catch (_) { /* senza, restano i controlli delle singole strade */ }
+  ensureCommentChar(dir);
 
   const registro = registra ? cartellaRegistro(radice) : '';
   if (registro) {

@@ -33,6 +33,16 @@ tests/agent/reports/
 test-results/
 .DS_Store
 *.log
+# Copie di lavoro dei dati del server (feedback, collezioni Firestore): il repo è pubblico e il
+# salvataggio spedisce tutto. Vanno in os.tmpdir(). Questi nomi li ferma git; con un altro nome la copia
+# la riconosce dalla forma il salvataggio automatico (scripts/copie-in-scena.mjs), e la sentinella dopo.
+*dump*.json
+*dump*.jsonl
+filo-copie/
+filo-feedback/
+# Il clone del server di un lavoro server (#1159) sta fuori dal repo: se finisse dentro, il salvataggio automatico
+# pubblicherebbe il codice privato di filo-security. Difese anche in dispatch (cloneDentroIlRepo).
+filo-security/
 # Scarti dei comandi andati storti: nascono in radice, restano vuoti, e finiscono
 # committati per sbaglio insieme al resto (`nf2.err` ha viaggiato in ogni copia
 # del repo per due settimane).
@@ -81,6 +91,13 @@ test-results/
 # posto da cui questa roba e' appena stata tolta.
 .claude/routine-state/
 
+# I biglietti delle sessioni locali (#1148, scripts/lib/biglietto-locale.mjs): SEGRETI come quello del giro.
+# Il salvataggio automatico committa tutto: senza questa riga un biglietto finirebbe sul repo pubblico.
+.claude/biglietti/
+
 # Diario locale delle interruzioni di sessione e dump di bash su Windows: macchina, non repo.
 .claude/cap-observations.jsonl
 *.stackdump
+# Il preload delle pagine web impacchettato per la sandbox (src/main/preloadPacchetto.js): lo rigenera
+# electron-builder a ogni pacchetto (build.beforePack), e senza pacchetto Filo lo compone da sé nella cartella dati.
+generato/

@@ -21,6 +21,9 @@ require(path.join(SHARED, 'contenutoEsterno.js'));
 require(path.join(SHARED, 'filoUi.js'));
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
+// Cronologia appunti: la chiave di una voce e i testi delle sue azioni, uguali
+// per il menu "Incolla", la pagina della Sicurezza e chi la tiene su disco (#256).
+require(path.join(SHARED, 'clipboardHistory.js'));
 // Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
 // serve a chiunque disegni un'etichetta, quindi sta in alto.
 require(path.join(SHARED, 'tasti.js'));
@@ -66,15 +69,20 @@ require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalo
 // Va PRIMA di services/filoChats.js, che ci si appoggia per scrivere.
 require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
+require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
+require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
 require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedback mandati da questa installazione
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
+require(path.join(SHARED, 'domande.js')); // #1149 — azioni delle domande all'owner come dati (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
+require(path.join(SHARED, 'feedbackAttese.js')); // #903 — «aspetta #N»: prima di manageReview, che ne fa una sezione
 require(path.join(SHARED, 'manageReview.js'));
+require(path.join(SHARED, 'manageSearch.js')); // #1118 — la ricerca fra i feedback: il classificatore gira nel main
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
 require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback hanno una scheda pubblica, e con quali campi (dopo manageReview: la usa)
 require(path.join(SHARED, 'preferences.js'));
@@ -84,16 +92,21 @@ require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti
 require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
+require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli
 require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: righe del registro, 402, messaggi
+require(path.join(SHARED, 'stimaCosto.js'));  // #819 — quanto costa un uso tipico di una funzione con un modello
+require(path.join(SHARED, 'creditiAvviso.js')); // #818 — proiezione dei crediti, soglie e rimedi
 // #652 — una manopola numerica: controllo del numero e frase di rifiuto. La
 // parte pura serve anche al main, che rifiuta gli stessi valori della pagina.
 require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
+require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
 require(path.join(SHARED, 'provenienzaImmagine.js'));
+require(path.join(SHARED, 'marchiInvisibili.js'));  // #889 — i marchi aperti nei pixel: li legge il thread di provenienzaIsolata
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 // #530 — la regola «Filo può fare X?» come dati: prima del registro, che le passa gli ingressi.
 require(path.join(SHARED, 'autonomia.js'));
@@ -114,6 +127,7 @@ if (process.env.NODE_ENV === 'test') {
 }
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
+require(path.join(SHARED, 'serviziEsterni.js'));  // #849 — i servizi esterni che Filo contatta, come dati
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente
 // per rispondere quando l'utente chiede conto di una scelta. Il gemello
 // transparencyUi.js NON si carica qui: è codice di pagina, tocca il DOM.
@@ -146,6 +160,7 @@ require(path.join(SVC, 'archivedTabs.js'));
 require(path.join(SVC, 'segnalazioniMie.js')); // #986 — la copia locale delle segnalazioni mandate da qui
 require(path.join(SVC, 'ilFilo.js'));     // #866 — la linea del tempo: l'unico che legge e scrive il suo file
 require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE e SN_IL_FILO
+require(path.join(SVC, 'conversazioniApp.js'));  // #974 — dipende da SN_FILO_APP, SN_IL_FILO e SN_FILO_CHATS
 require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)
 require(path.join(SVC, 'scryfall.js'));    // dipende da SN_SCRYFALL_Q (shared/scryfallQuery.js)
 require(path.join(SVC, 'deckOpinions.js')); // dipende da SN_DECK_OPINIONS + SN_SCRYFALL_Q

@@ -13,6 +13,8 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+test.use({ accoglienzaFatta: false });
+
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {

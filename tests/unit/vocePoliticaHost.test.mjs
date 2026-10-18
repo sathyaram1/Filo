@@ -1,6 +1,6 @@
 // Voce e dettatura: il router ignora il blocco `provider` sugli endpoint audio (#713),
 // quindi la lista di esclusione si applica prima di chiamare, sugli host che il
-// router dichiara. Senza un host ammesso la richiesta non parte e l'errore dice perché.
+// router dichiara. Si parte solo con host noti e TUTTI ammessi (#1141); se no l'errore dice perché.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -91,7 +91,7 @@ test('modello servito solo dal produttore escluso: la dettatura non parte', asyn
   });
 });
 
-test('basta un host ammesso: la richiesta parte, e l\'elenco host si legge una volta sola', async () => {
+test('host tutti ammessi: voce e dettatura partono, e l\'elenco host si legge una volta sola', async () => {
   const model = 'hexgrad/kokoro-82m';
   await withRouter({ [model]: endpoints(['DeepInfra', 'deepinfra/fp16'], ['Together', 'together']) }, async (calls) => {
     const [a, b] = await Promise.all([
@@ -100,17 +100,36 @@ test('basta un host ammesso: la richiesta parte, e l\'elenco host si legge una v
     ]);
     assert.ok(a.audioBase64 && b.audioBase64);
     await OR.synthesizeSpeech({ apiKey: 'k', model, text: 'Tre', providerRouting: ROUTING });
-    assert.equal(calls.audio.length, 3);
+    const r = await OR.transcribe({ apiKey: 'k', model, audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING });
+    assert.equal(r.text, 'ciao');
+    assert.equal(calls.audio.length, 4);
     assert.equal(calls.endpoints.length, 1, 'le chiamate in parallelo e quelle dopo usano lo stesso elenco');
   });
 });
 
-test('host misti (produttore e indipendente): la richiesta parte', async () => {
+test('host misti (escluso e ammesso): né voce né dettatura partono, e l\'errore nomina l\'escluso', async () => {
   const model = 'openai/whisper-large-v3';
   await withRouter({ [model]: endpoints(['OpenAI', 'openai'], ['Groq', 'groq']) }, async (calls) => {
-    const r = await OR.transcribe({ apiKey: 'k', model, audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING });
-    assert.equal(r.text, 'ciao');
-    assert.equal(calls.audio.length, 1);
+    for (const run of [
+      () => OR.transcribe({ apiKey: 'k', model, audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING }),
+      () => OR.synthesizeSpeech({ apiKey: 'k', model, text: 'Ciao', providerRouting: ROUTING }),
+    ]) {
+      await assert.rejects(run(), (e) => {
+        assert.equal(e.code, 'NO_ALLOWED_HOST');
+        assert.equal(e.reason, 'mixed');
+        assert.deepEqual(e.hosts, ['OpenAI'], 'solo l\'escluso, non Groq');
+        assert.match(e.message, /«openai\/whisper-large-v3» lo serve anche OpenAI, che Filo esclude/);
+        assert.match(e.message, /Non ho mandato niente/);
+        return true;
+      });
+    }
+    assert.deepEqual(calls.audio, [], 'nessuna richiesta audio è partita');
+  });
+  await withRouter({ 'acme/tre': endpoints(['OpenAI', 'openai'], ['Azure', 'azure'], ['Groq', 'groq']) }, async () => {
+    await assert.rejects(
+      OR.transcribe({ apiKey: 'k', model: 'acme/tre', audioBase64: 'QUJD', format: 'wav', providerRouting: { ignore: ['OpenAI', 'Azure'] } }),
+      (e) => e.code === 'NO_ALLOWED_HOST' && /lo servono anche OpenAI e Azure,/.test(e.message),
+    );
   });
 });
 
@@ -125,27 +144,72 @@ test('una variante del nome del produttore è esclusa come la forma base', async
   });
 });
 
-test('host sconosciuti (errore, 404, elenco vuoto): si chiama, e una lettura fallita non si ripete a ogni frase', async () => {
-  const model = 'acme/voce-nuova';
-  let n = 0;
-  await withRouter({ [model]: () => { n++; return jsonRes({ error: 'boom' }, 500); } }, async (calls) => {
-    await OR.synthesizeSpeech({ apiKey: 'k', model, text: 'x', providerRouting: ROUTING });
-    await OR.synthesizeSpeech({ apiKey: 'k', model, text: 'y', providerRouting: ROUTING });
-    assert.equal(calls.audio.length, 2);
-    assert.equal(n, 1);
+test('host sconosciuti (errore, 404, elenco vuoto, tempo scaduto): né voce né dettatura partono', async () => {
+  const unknown = (e) => e.code === 'NO_ALLOWED_HOST' && e.reason === 'unknown' && /^Non so chi serve il modello «acme\//.test(e.message);
+  await withRouter({ 'acme/rotto': () => jsonRes({ error: 'boom' }, 500) }, async (calls) => {
+    await assert.rejects(OR.synthesizeSpeech({ apiKey: 'k', model: 'acme/rotto', text: 'x', providerRouting: ROUTING }), unknown);
+    await assert.rejects(OR.transcribe({ apiKey: 'k', model: 'acme/rotto', audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING }), unknown);
+    assert.deepEqual(calls.audio, []);
+  });
+  await withRouter({}, async (calls) => {
+    await assert.rejects(OR.synthesizeSpeech({ apiKey: 'k', model: 'acme/assente', text: 'x', providerRouting: ROUTING }), unknown);
+    assert.deepEqual(calls.audio, []);
   });
   await withRouter({ 'acme/vuoto': endpoints() }, async (calls) => {
-    await OR.transcribe({ apiKey: 'k', model: 'acme/vuoto', audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING });
-    assert.equal(calls.audio.length, 1);
+    await assert.rejects(OR.transcribe({ apiKey: 'k', model: 'acme/vuoto', audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING }), unknown);
+    assert.deepEqual(calls.audio, []);
   });
+  await withRouter({ 'acme/lento': () => { throw new Error('The operation was aborted due to timeout'); } }, async (calls) => {
+    await assert.rejects(OR.transcribe({ apiKey: 'k', model: 'acme/lento', audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING }), unknown);
+    assert.deepEqual(calls.audio, []);
+  });
+});
+
+test('id che non si può chiedere (non in forma a/b): host null, né voce né dettatura partono', async () => {
+  await withRouter({}, async (calls) => {
+    for (const model of ['kokoro', 'a/b/c']) {
+      await assert.rejects(OR.synthesizeSpeech({ apiKey: 'k', model, text: 'x', providerRouting: ROUTING }), (e) => e.code === 'NO_ALLOWED_HOST');
+      await assert.rejects(
+        OR.transcribe({ apiKey: 'k', model, audioBase64: 'QUJD', format: 'wav', providerRouting: ROUTING }),
+        (e) => e.code === 'NO_ALLOWED_HOST',
+      );
+    }
+    assert.deepEqual(calls.endpoints, []);
+    assert.deepEqual(calls.audio, []);
+  });
+});
+
+test('una lettura fallita non si ripete a ogni frase, ma si ritenta presto: tornata la rete, la voce riparte', async () => {
+  const model = 'acme/voce-nuova';
+  const realNow = Date.now;
+  let offset = 0;
+  Date.now = () => realNow() + offset;
+  try {
+    let n = 0;
+    await withRouter({
+      [model]: () => { n++; return n === 1 ? jsonRes({ error: 'boom' }, 500) : endpoints(['DeepInfra', 'deepinfra']); },
+    }, async (calls) => {
+      for (const text of ['x', 'y']) {
+        await assert.rejects(OR.synthesizeSpeech({ apiKey: 'k', model, text, providerRouting: ROUTING }), (e) => e.code === 'NO_ALLOWED_HOST');
+      }
+      assert.equal(n, 1, 'due frasi di fila, una lettura sola');
+      offset = 60 * 1000;
+      await OR.synthesizeSpeech({ apiKey: 'k', model, text: 'z', providerRouting: ROUTING });
+      assert.equal(n, 2);
+      assert.equal(calls.audio.length, 1);
+    });
+  } finally {
+    Date.now = realNow;
+  }
 });
 
 test('un id che uscirebbe dal percorso non diventa una richiesta a un altro endpoint', async () => {
   await withRouter({}, async (calls) => {
     for (const model of ['../credits', 'a/../../auth/key', 'a/b/c', '..', '']) {
-      await OR.synthesizeSpeech({ apiKey: 'k', model, text: 'x', providerRouting: ROUTING }).catch(() => {});
+      await assert.rejects(OR.synthesizeSpeech({ apiKey: 'k', model, text: 'x', providerRouting: ROUTING }), (e) => e.code === 'NO_ALLOWED_HOST');
     }
     assert.deepEqual(calls.endpoints, []);
+    assert.deepEqual(calls.audio, []);
   });
   assert.equal(
     (await withRouter({ 'a b/c?d': endpoints(['DeepInfra', 'deepinfra']) }, async (calls) => {
@@ -204,6 +268,23 @@ test('Claude servito solo da un rivenditore: rifiutato anche senza lista di escl
       (e) => e.code === 'NO_ALLOWED_HOST',
     );
     assert.deepEqual(calls.audio, []);
+  });
+});
+
+test('hostVerdict: ok, misti, tutti esclusi, ignoti; senza niente da escludere non legge gli host', async () => {
+  await withRouter({
+    'a/ok': endpoints(['DeepInfra', 'deepinfra'], ['Groq', 'groq']),
+    'a/misto': endpoints(['DeepInfra', 'deepinfra'], ['OpenAI', 'openai'], ['OpenAI', 'openai/fast']),
+    'a/escluso': endpoints(['OpenAI', 'openai']),
+  }, async (calls) => {
+    const v = (model, providerRouting = ROUTING) => OR.hostVerdict({ apiKey: 'k', model, providerRouting });
+    assert.deepEqual(await v('a/ok'), { ok: true });
+    assert.deepEqual(await v('a/misto'), { ok: false, reason: 'mixed', excluded: ['OpenAI'] });
+    assert.deepEqual(await v('a/escluso'), { ok: false, reason: 'excluded', excluded: ['OpenAI'] });
+    assert.deepEqual(await v('a/assente'), { ok: false, reason: 'unknown', excluded: [] });
+    const prima = calls.endpoints.length;
+    assert.deepEqual(await v('a/misto', null), { ok: true });
+    assert.equal(calls.endpoints.length, prima);
   });
 });
 

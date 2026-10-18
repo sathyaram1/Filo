@@ -222,6 +222,7 @@ function creaFilo({ cartella } = {}) {
       return fn({
         incognito: incog,
         chat: (id) => (id ? v.stato.chat.get(id) || null : null),
+        tutte: () => [...v.stato.chat.values()],
         evento,
         scrivi: (eventi, o) => scrivi(incog, eventi, o),
       });

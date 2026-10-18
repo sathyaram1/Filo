@@ -5,8 +5,8 @@
 //     spellcheck, feedback)
 //   - espone chrome.* dentro il mondo isolato del preload (NON in main world:
 //     la pagina è codice non fidato; i content script girano qui)
-//   - carica i moduli SN_* (shared) via require()
-//   - carica i content script via require()
+//   - carica i moduli SN_* (shared) e i content script via require(): gira in
+//     sandbox, impacchettato con tutto ciò che richiede (src/main/preloadPacchetto.js)
 //
 // contextIsolation è TRUE per queste pagine, quindi globalThis qui è isolato
 // dal main world della pagina. Le scritture su globalThis NON sono visibili
@@ -15,6 +15,9 @@
 
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
+
+// Prima di qualunque HTML scritto da Filo: la CSP della pagina non è la sua (#1122).
+try { require('./mondo-esente.js')(webFrame); } catch (e) { console.error('[Filo CS] mondo esente', e); }
 
 // Prima di ogni ascoltatore: una pagina che si riscrive non spegne Filo (#686.1).
 let riscrittura = null;
@@ -91,29 +94,66 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
 // ha bisogno di settings/spellcheck/Menu) si installa più tardi via
 // __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
 let contextMenuHandler = null;
+// I siti col menu proprio (#975): la sonda va nel mondo della pagina prima dei suoi script. content.js dice, coi siti
+// scelti nelle impostazioni, se qui il tasto destro va prima alla pagina; Shift allora porta al menu di Filo.
+let MenuDelSito = null;
+try { MenuDelSito = require('./menu-del-sito.js').crea({ webFrame, riserva: (clic) => menuDiRiserva(clic) }); } catch (e) { console.error('[Filo CS] menu del sito', e); }
+let menuDelSitoPrima = () => false;
+try {
+  globalThis.__snMenuDelSito = MenuDelSito;
+  globalThis.__snSetMenuDelSitoPrima = (fn) => { if (typeof fn === 'function') menuDelSitoPrima = fn; };
+} catch (_) {}
+function sitoPrima() {
+  try { return !!MenuDelSito && menuDelSitoPrima() === true; } catch (_) { return false; }
+}
+// Ogni tasto destro dell'utente apre un menu: quello di Filo o, se non parte (guasto, pagina ancora in caricamento,
+// Filo spento sul sito, Shift), quello di riserva del main, salvo che la pagina mostri il suo (#1122).
+// `clic` è l'ora del gesto: il main la usa per accoppiarlo al suo `context-menu`, non a quello di un clic prima.
+function menuDiRiserva(clic, motivo = '') {
+  try { ipcRenderer.send('filo:menu-di-riserva', { clic, motivo: String(motivo || '').slice(0, 2000) }); } catch (_) {}
+}
+function riservaSeLaPaginaTace(e, clic) {
+  setTimeout(() => { if (!e.defaultPrevented) menuDiRiserva(clic); }, 0);
+}
+function apriMenuDiFilo(e, clic = Date.now(), opzioni = undefined) {
+  let esito;
+  try { esito = contextMenuHandler(e, opzioni); } catch (err) { esito = Promise.reject(err); }
+  Promise.resolve(esito).catch((err) => {
+    console.error('[Filo CS] menu del tasto destro', err);
+    menuDiRiserva(clic, (err && err.stack) || err || 'errore');
+  });
+}
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
     // Solo il tasto destro dell'utente: uno fabbricato dallo script del sito aprirebbe il menu, e con lui
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
+    const clic = Date.now();
+    // Filo spento sul sito (#843): il clic è della pagina, e se lei tace il menu di riserva offre di riaccenderlo.
+    if (globalThis.__snFiloSpento === true) { riservaSeLaPaginaTace(e, clic); return; }
+    const prima = typeof contextMenuHandler === 'function' && sitoPrima();
+    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sui siti dove il tasto
+    // destro apre il loro menu, Shift è la strada per quello di Filo.
+    if (e.shiftKey && !prima) { riservaSeLaPaginaTace(e, clic); return; }
+    if (prima && !e.shiftKey) {
+      MenuDelSito.lasciaAllaPagina(e, (copia) => apriMenuDiFilo(copia, clic));
+      return;
+    }
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
-      contextMenuHandler(e);
-      if (!e.shiftKey) { try { e.stopImmediatePropagation(); } catch (_) {} }
+      apriMenuDiFilo(e, clic, prima ? { conMaiusc: true } : undefined);
+      try { e.stopImmediatePropagation(); } catch (_) {}
       return;
     }
+    if (!IS_SUBFRAME) { riservaSeLaPaginaTace(e, clic); return; }
     // #405 — primo tasto destro dentro un riquadro: i content script non sono
     // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
     // stesso clic appena l'handler è pronto, così il primo tentativo apre il
     // menu invece di andare perso — l'utente non deve cliccare due volte.
-    if (!IS_SUBFRAME) return;
-    // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
-    // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
-    if (e.shiftKey) return;
     try { e.stopImmediatePropagation(); } catch (_) {}
-    replayContextMenu(e);
+    replayContextMenu(e, clic);
     ensureContentScripts();
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
@@ -122,37 +162,34 @@ try {
 // per questo l'ascolto nasce qui, a document_start. Lo smista SN_FILO_UI.tastoNelRiquadro (src/shared/filoUi.js).
 try {
   for (const tipo of ['keydown', 'keypress', 'keyup']) {
-    window.addEventListener(tipo, (e) => {
+    const ascolto = (e) => {
       const UI = globalThis.SN_FILO_UI;
+      // L'Esc va prima a ogni ascolto di Filo: un sito che lo ferma sulla finestra lasciava aperto il riquadro (#859).
+      if (tipo === 'keydown' && e.key === 'Escape') { escPrimaAFilo(e, ascolto, UI); return; }
       if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
-    }, { capture: true });
+    };
+    window.addEventListener(tipo, ascolto, { capture: true });
   }
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
-// Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
-// Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
-// fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
-// i dati che l'handler legge, così il menu si apre sull'elemento giusto.
-function replayContextMenu(e) {
-  let node = null;
-  try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
-  catch (_) { node = e.target; }
-  const copy = {
-    target: node,
-    currentTarget: node,
-    clientX: e.clientX, clientY: e.clientY,
-    pageX: e.pageX, pageY: e.pageY,
-    screenX: e.screenX, screenY: e.screenY,
-    button: e.button,
-    shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
-    defaultPrevented: false,
-    composedPath: () => (node ? [node] : []),
-    preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {},
-  };
+// Solo il tasto dell'utente, o quello che il main ci consegna sopra lo schermo pieno del sito: uno fabbricato dal sito
+// fa il giro di sempre.
+function escPrimaAFilo(e, ascolto, UI) {
+  try {
+    if (!riscrittura || typeof riscrittura.anticipa !== 'function') return;
+    if (!e.isTrusted && !(UI && typeof UI.veroONostro === 'function' && UI.veroONostro(e))) return;
+    if (riscrittura.anticipa(e, ascolto)) e.stopImmediatePropagation();
+  } catch (_) {}
+}
+
+// Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
+function replayContextMenu(e, clic) {
+  const copy = require('./menu-del-sito.js').copiaDelClic(e);
   const deadline = Date.now() + 3000;
   const tick = () => {
-    if (typeof contextMenuHandler === 'function') { try { contextMenuHandler(copy); } catch (_) {} return; }
-    if (Date.now() > deadline) return;
+    if (globalThis.__snFiloSpento === true) { menuDiRiserva(clic); return; }
+    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
+    if (Date.now() > deadline) { menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);
@@ -222,9 +259,18 @@ if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
   if (/^(https?|blob):/i.test(loc)) {
-    const { buildStatoPermessiSource } = require('./stato-permessi.js');
+    const { buildStatoPermessiSource, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE } = require('./stato-permessi.js');
     // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
     webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});
+    // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
+    const scrittura = () => {
+      ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
+        .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
+    };
+    // La riscrittura da capo (document.open) toglie gli ascolti della finestra: si rimettono.
+    const ascoltaScrittura = () => window.addEventListener(SCRITTURA, scrittura, true);
+    ascoltaScrittura();
+    new MutationObserver(ascoltaScrittura).observe(document, { childList: true });
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
@@ -237,6 +283,26 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// Le conferme di Filo su un sito le disegna il main sopra la scheda, fuori dal documento
+// che il sito può ridisegnare (#592.6): SN_CONFIRM_UI manda qui la domanda. Ai tasti che
+// l'utente batte sul popup mentre scriveva risponde il suo campo, in questo frame.
+const tastiConferme = new Map();
+let seqConferme = 0;
+ipcRenderer.on('filo:conferma-tasto', (_event, d) => {
+  const suTasto = d && tastiConferme.get(d.id);
+  if (suTasto) suTasto(d.tasto);
+});
+globalThis.SN_CONFERMA_FUORI = (richiesta, suTasto, segnale) => {
+  const id = ++seqConferme;
+  tastiConferme.set(id, suTasto);
+  const ritira = () => ipcRenderer.send('filo:conferma-ritira', { id });
+  const ascolta = segnale && typeof segnale.addEventListener === 'function';
+  if (ascolta) segnale.addEventListener('abort', ritira, { once: true });
+  return ipcRenderer.invoke('filo:conferma', { ...richiesta, id }).finally(() => {
+    tastiConferme.delete(id);
+    if (ascolta) segnale.removeEventListener('abort', ritira);
+  });
+};
 // ─── #664 — il collegamento d'invito cliccato dentro Filo ──────────────────
 // `filo://invito/<codice>` non è una pagina: da fuori lo consegna il sistema e
 // Filo riscatta. Dentro Filo lo stesso clic deve fare lo stesso, ma solo un
@@ -545,6 +611,15 @@ try {
     if (!SCHEMI_APRIBILI.test(url)) return;
     try { ipcRenderer.sendSync('filo:apertura-scelta', url); } catch (_) {}
   };
+  // Un collegamento file: da una pagina web lo rifiuta Chromium prima che Filo lo veda, senza dire niente (#482): il clic
+  // dell'utente che la pagina non ha fermato lo riferisce, e Filo lo dice. data: no: con «download» scarica davvero.
+  const rifiutato = (e) => {
+    if (!e.isTrusted || e.defaultPrevented || (e.type === 'auxclick' && e.button !== 1)) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href);
+    if (!a || !/^file:/i.test(String(a.href))) return;
+    try { ipcRenderer.send('filo:indirizzo-rifiutato', String(a.href)); } catch (_) {}
+  };
   const ascolta = (win) => {
     // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
     for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
@@ -554,6 +629,7 @@ try {
     for (const ev of ['click', 'auxclick']) {
       win.addEventListener(ev, scelto, { capture: true, passive: true });
       win.addEventListener(ev, scelto, { passive: true });
+      win.addEventListener(ev, rifiutato, { passive: true });
     }
     win.addEventListener('pointerover', confine, { capture: true, passive: true });
   };
@@ -733,11 +809,13 @@ function loadScripts() {
   // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
+  try { require(path.join(SHARED_DIR, 'clipboardHistory.js')); } catch (e) { console.error('[Filo CS] clipboardHistory', e); } // #256 — PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js

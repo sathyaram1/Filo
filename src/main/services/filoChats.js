@@ -193,13 +193,14 @@
   }
 
   // Le chat rimaste aperte perché l'app è stata chiusa di colpo: alla partenza dopo si chiudono e si classificano.
+  // Quelle delle altre app (#974) no: nome e tipo li hanno dalla nascita, e restano aperte finché l'app le continua.
   async function listDangling() {
-    return (await list()).filter((c) => !c.closedAt && c.messages.length);
+    return (await list()).filter((c) => !c.app && !c.closedAt && c.messages.length);
   }
 
   // Le chat chiuse ancora senza titolo e tipo (classificazione non riuscita, o conversazione andata avanti).
   async function listUntriaged() {
-    return (await list()).filter((c) => c.closedAt && needsTriage(c));
+    return (await list()).filter((c) => !c.app && c.closedAt && needsTriage(c));
   }
 
   async function clear() {

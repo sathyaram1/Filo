@@ -27,6 +27,10 @@
 
   function disegna(s) {
     stato = s;
+    // Durata delle animazioni e intensità delle ombre scelte dall'utente: solo numeri, solo variabili --sn-*.
+    for (const [k, v] of Object.entries((s && s.vars) || {})) {
+      if (/^--sn-[a-z-]+$/.test(k) && /^[0-9.]+$/.test(String(v))) root.style.setProperty(k, String(v));
+    }
     const pericoloso = s.level === 'pericoloso';
     root.dataset.livello = pericoloso ? 'pericoloso' : 'sospetto';
     titolo.textContent = s.title || (pericoloso ? 'Sito pericoloso' : 'Sito potenzialmente sospetto');

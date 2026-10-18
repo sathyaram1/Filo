@@ -7,14 +7,14 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import { pidMorto } from '../helpers/processi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
-  provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
+  provaUnitSullaFusione, chiediConProva, provaDaRiusare, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 import { pathToFileURL } from 'node:url';
 
@@ -38,18 +38,28 @@ test('esito: rosso anche su main fonde, ma non se la fusione rompe test che su m
   assert.equal(decidiEsito({ fusione: { ok: false, rossi: [] }, main: { ok: false, rossi: ['x'] } }).esito, 'rosso_anche_su_main');
 });
 
-test('lo stesso test rosso ha la stessa chiave in due cartelle diverse', () => {
-  const a = chiaveTest({ nome: 'n', file: join('/tmp/x/fusione', 'tests', 'unit', 'a.test.mjs') }, '/tmp/x/fusione');
-  const b = chiaveTest({ nome: 'n', file: join('/tmp/x/main', 'tests', 'unit', 'a.test.mjs') }, '/tmp/x/main');
-  assert.equal(a, 'tests/unit/a.test.mjs › n');
-  assert.equal(a, b);
-  // Fuori dalla cartella (forma corta e lunga di Windows): conta il pezzo da tests/.
-  assert.equal(chiaveTest({ nome: 'n', file: 'C:\\ALTRO~1\\fusione\\tests\\unit\\a.test.mjs' }, 'C:\\altro nome\\fusione'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: 'C:\\altro nome\\main\\tests\\unit\\a.test.mjs' }, 'C:\\ALTRO~1\\main'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '\\\\srv\\cond\\main\\tests\\unit\\a.test.mjs' }, 'D:\\main'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '/private/tmp/x/fusione/tests/unit/a.test.mjs' }, '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '/private/var/x/fusione/tests/unit/a.test.mjs' }, '/var/x/fusione'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '/altro/fusione/tests/unit/a.test.mjs' }, '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+// I percorsi li sceglie la prova: nata su Windows e verde lì, la stessa prova era rossa nei contenitori Linux (#737.3).
+for (const [so, p] of [['Linux', posix], ['Windows', win32]]) {
+  test(`lo stesso test rosso ha la stessa chiave in due cartelle diverse (percorsi di ${so})`, () => {
+    const chiave = (file, root) => chiaveTest({ nome: 'n', file }, root, p);
+    const a = chiave(p.join('/tmp/x/fusione', 'tests', 'unit', 'a.test.mjs'), '/tmp/x/fusione');
+    assert.equal(a, 'tests/unit/a.test.mjs › n');
+    assert.equal(a, chiave(p.join('/tmp/x/main', 'tests', 'unit', 'a.test.mjs'), '/tmp/x/main'));
+    assert.equal(chiave('C:\\x\\fusione\\tests\\unit\\a.test.mjs', 'C:\\x\\fusione'), 'tests/unit/a.test.mjs › n');
+    // Fuori dalla cartella (forma corta e lunga di Windows): conta il pezzo da tests/.
+    assert.equal(chiave('C:\\ALTRO~1\\fusione\\tests\\unit\\a.test.mjs', 'C:\\altro nome\\fusione'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('C:\\altro nome\\main\\tests\\unit\\a.test.mjs', 'C:\\ALTRO~1\\main'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('C:/altro nome/main/tests/unit/a.test.mjs', 'C:\\ALTRO~1\\main'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('\\\\srv\\cond\\main\\tests\\unit\\a.test.mjs', 'D:\\main'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('/private/tmp/x/fusione/tests/unit/a.test.mjs', '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('/private/var/x/fusione/tests/unit/a.test.mjs', '/var/x/fusione'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('/altro/fusione/tests/unit/a.test.mjs', '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+  });
+}
+
+test('senza percorsi scelti valgono quelli del sistema', () => {
+  const root = join(tmpdir(), 'fusione');
+  assert.equal(chiaveTest({ nome: 'n', file: join(root, 'tests', 'unit', 'a.test.mjs') }, root), 'tests/unit/a.test.mjs › n');
 });
 
 test('una chiave rimasta assoluta, in qualunque forma, non è un file da riprovare', () => {
@@ -94,6 +104,31 @@ test('main mosso: si rifà la prova fino al tetto, poi ci si ferma senza fondere
     fermaSe: (p) => p.esito === 'rosso_sulla_fusione', chiedi: async () => assert.fail('un rosso sulla fusione non si chiede'), mainMosso: () => false,
   });
   assert.equal(fermo.fermo, true);
+});
+
+test('la prova fatta per gli unit rossi del ramo vale al primo tentativo della richiesta, e solo lì (#1009)', async () => {
+  const P = '1'.repeat(40);
+  const verde = { esito: 'verde', mainSha: SHA };
+  assert.equal(provaDaRiusare({ fatta: { prova: verde, punta: P }, punta: P }), verde);
+  assert.equal(provaDaRiusare({ fatta: { prova: { esito: 'rosso_anche_su_main', mainSha: SHA }, punta: P }, punta: P }).esito, 'rosso_anche_su_main');
+  assert.equal(provaDaRiusare({ fatta: { prova: verde, punta: P }, punta: '2'.repeat(40) }), null, 'il ramo si è mosso: si riprova');
+  assert.equal(provaDaRiusare({ fatta: { prova: { ...verde, contenuto: true }, punta: P }, punta: P }), null, 'con main dentro la richiesta porta main_contenuto');
+  for (const p of [{ esito: 'rosso_sulla_fusione', mainSha: SHA }, { esito: 'conflitto', mainSha: SHA }, { errore: 'x' }, { saltata: true, motivo: 'm' }]) {
+    assert.equal(provaDaRiusare({ fatta: { prova: p, punta: P }, punta: P }), null);
+  }
+  assert.equal(provaDaRiusare({ fatta: null, punta: P }), null);
+
+  let prove = 0;
+  const chieste = [];
+  const r = await chiediConProva({
+    primaProva: verde, scrivi: () => {}, tentativi: 3,
+    prova: () => { prove++; return { esito: 'verde', mainSha: '3'.repeat(40) }; },
+    chiedi: async (campo) => { chieste.push(campo.mainSha); return { result: chieste.length < 2 ? 'main_moved' : 'merged' }; },
+    mainMosso: (x) => x.result === 'main_moved',
+  });
+  assert.equal(r.reply.result, 'merged');
+  assert.deepEqual(chieste, [SHA, '3'.repeat(40)], 'la prima richiesta porta la prova già fatta, la seconda una nuova');
+  assert.equal(prove, 1, 'una prova nuova solo dopo main mosso');
 });
 
 test('togliere il collegamento a node_modules non tocca la cartella a cui punta', () => {
@@ -216,6 +251,38 @@ test('prova vera: rosso solo sulla fusione ferma con l\'elenco, rosso anche su m
     const s = provaIn(r, punta);
     assert.equal(s.esito, 'rosso_sulla_fusione', JSON.stringify(s));
     assert.deepEqual(s.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+// Il finish giudica così un unit rosso sul ramo (#1009): con main già dentro, il risultato della fusione è il ramo.
+test('prova vera con ancheContenuto: il ramo che contiene main si prova lui, e un rosso si confronta con main da solo', () => {
+  const r = repoFinto();
+  try {
+    r.suMain(() => r.scrivi('tests/unit/valore.test.mjs', TEST_VALORE));
+    const verde = r.ramo('claude/verde', () => r.scrivi('innocuo.txt', 'x\n'));
+    const v = provaUnitSullaFusione({ root: r.lavoro, punta: verde, scrivi: () => {}, ancheContenuto: true });
+    assert.deepEqual([v.esito, v.contenuto], ['verde', true], JSON.stringify(v));
+    pulita(r);
+
+    const rompe = r.ramo('claude/rompe', () => r.scrivi('valore.txt', 'due\n'));
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta: rompe, scrivi: (s) => righe.push(s), ancheContenuto: true });
+    assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
+    assert.equal(p.contenuto, true);
+    assert.deepEqual(p.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
+    assert.ok(righe.some((s) => /sul ramo, che contiene già main/.test(s)), righe.join('\n'));
+    assert.match(testoProva(p), /^✗ Unit sul ramo, che contiene già main/);
+    pulita(r);
+    assert.equal(provaUnitSullaFusione({ root: r.lavoro, punta: rompe, scrivi: () => {} }).esito, 'main_contenuto', 'senza l\'opzione, come prima');
+
+    r.suMain(() => r.scrivi('tests/unit/rotto.test.mjs', TEST_ROTTO));
+    const innocuo = r.ramo('claude/innocuo', () => r.scrivi('altro.txt', 'y\n'));
+    const q = provaUnitSullaFusione({ root: r.lavoro, punta: innocuo, scrivi: () => {}, ancheContenuto: true });
+    assert.deepEqual([q.esito, q.contenuto], ['rosso_anche_su_main', true], JSON.stringify(q));
+    assert.doesNotMatch(testoProva(q), /si fonde/, 'qui non si sta fondendo niente');
     pulita(r);
   } finally {
     togliCartella(r.casa);

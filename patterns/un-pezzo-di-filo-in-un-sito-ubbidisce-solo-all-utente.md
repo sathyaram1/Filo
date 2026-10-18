@@ -29,7 +29,12 @@ il clic sul pulsante del sito.
      osservatore di riserva;
    - un ascoltatore su `window`/`document` che fa qualcosa di più che chiudere
      (il trascinamento delle icone) guarda `e.isTrusted` da sé, come fa già il
-     cartellino dello zoom (`gestoVero` in `src/preload/wheel-zoom.js`).
+     cartellino dello zoom (`gestoVero` in `src/preload/wheel-zoom.js`);
+   - un pezzo che sta nel documento senza cancello sulla radice (la pila degli
+     avvisi con la conferma di «Salva per dopo», il riquadro da scegliere per
+     catturare o trascrivere, il QR, i bottoni sotto le risposte dell'Aiuto)
+     chiede `SN_FILO_UI.gestoVero(e)` in **ogni** ascoltatore che fa avanzare
+     (#592.16): `tests/pezzi-nella-pagina-solo-utente.spec.mjs`.
 
    Un'azione nostra che apre un pannello chiama la funzione, non `el.click()`:
    il clic fabbricato da codice nostro è identico a quello del sito, e il

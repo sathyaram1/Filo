@@ -29,33 +29,30 @@
     render();
   }
 
-  // Popola il menu "filtra per tipo" con SOLO i tipi di azione realmente
-  // presenti in cronologia (niente opzioni per funzioni mai usate), ciascuno con
-  // la sua etichetta leggibile. Così il filtro copre da sé ogni azione — comprese
-  // quelle nuove — senza restare disallineato da una lista hard-coded.
+  // Il menu "filtra per tipo" elenca solo i tipi presenti, e per ETICHETTA, non
+  // per codice: più codici interni portano lo stesso nome (#481), e la voce deve
+  // tenere tutte le righe che mostrano quel nome.
   function buildFilterOptions() {
     const sel = $('filter');
     const current = sel.value;
     const seen = new Set();
     for (const it of items) {
-      if (it && it.action) seen.add(it.action);
+      if (it && it.action) seen.add(formatActionLabel(it.action));
     }
-    const opts = [...seen]
-      .map((a) => ({ value: a, label: formatActionLabel(a) }))
-      .sort((x, y) => x.label.localeCompare(y.label, 'it'));
+    seen.delete('');
+    const labels = [...seen].sort((x, y) => x.localeCompare(y, 'it'));
 
     sel.innerHTML = '';
     const all = document.createElement('option');
     all.value = '';
     all.textContent = I18n.t('history_filter_all');
     sel.appendChild(all);
-    for (const o of opts) {
+    for (const label of labels) {
       const opt = document.createElement('option');
-      opt.value = o.value;
-      opt.textContent = o.label;
+      opt.value = label;
+      opt.textContent = label;
       sel.appendChild(opt);
     }
-    // Mantieni la scelta corrente se ancora valida (es. dopo un reload dati).
     sel.value = seen.has(current) ? current : '';
   }
 
@@ -66,7 +63,7 @@
     list.innerHTML = '';
 
     let filtered = items;
-    if (filter) filtered = filtered.filter((it) => it.action === filter);
+    if (filter) filtered = filtered.filter((it) => it && it.action && formatActionLabel(it.action) === filter);
     if (q) {
       filtered = filtered.filter((it) => {
         // Cerca SOLO sui testi che la voce mostra davvero — non su
@@ -189,8 +186,12 @@
       const first = tm.firstTextMs != null ? tm.firstTextMs : tm.firstToolMs;
       const chip = document.createElement('span');
       chip.className = 'sn-history-timing';
-      chip.textContent = I18n.t('history_timing', fmt(tm.firstReasoningMs), fmt(first), fmt(tm.totalMs));
-      chip.title = I18n.t('history_timing_title');
+      // L'attesa prima della richiesta (stato del computer, saldo) la vive chi aspetta: compare per prima (#1097.1).
+      const prima = tm.preparazioneMs != null;
+      chip.textContent = (prima ? I18n.t('history_timing_prep', fmt(tm.preparazioneMs)) : '')
+        + I18n.t('history_timing', fmt(tm.firstReasoningMs), fmt(first), fmt(tm.totalMs));
+      chip.title = I18n.t('history_timing_title')
+        + (prima ? `\n${I18n.t('history_timing_prep_title', fmt(tm.preparazioneMs), fmt(tm.sistemaMs), fmt(tm.saldoMs))}` : '');
       right.appendChild(chip);
     }
 
@@ -272,7 +273,7 @@
   // Conteggi di token nel formato dei numeri italiano (1.234), per il
   // suggerimento del riuso.
   function formatTokens(n) {
-    return Number(n || 0).toLocaleString('it-IT');
+    return Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
   }
 
   document.addEventListener('DOMContentLoaded', () => {

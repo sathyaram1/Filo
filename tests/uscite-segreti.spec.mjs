@@ -31,6 +31,8 @@ const apertoVerso = (app, host) => app.windows().some((w) => {
 async function preparaModelli(app, apiKeys = { openrouter: 'k-test' }) {
   await app.evaluate(async (_electron, keys) => {
     const C = globalThis.SN_CONST;
+    // Col modello pronto la home aperta comincia l'intervista di benvenuto (#663), e a volte arriva prima del messaggio.
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: keys,

@@ -3,7 +3,7 @@
 // stanno nella barra, il profilo mostra l'avatar e App apre davvero il menu nativo accanto alla barra.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { barraPage, comandaBarra, menuAperto, pannelloFermo } from './helpers/barra.mjs';
 
 test('In alto a destra nella home restano Impostazioni e Profilo; le altre voci stanno nella barra laterale', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
@@ -71,9 +71,9 @@ test("Cliccare App nella barra apre il menu nativo della shell", async ({ app })
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
-  const popupBefore = app.windows().filter((w) => (w.url() || '').startsWith('data:text/html')).length;
   await barra.click('#fisse [data-comando="apps"]');
-  await expect
-    .poll(() => app.windows().filter((w) => (w.url() || '').startsWith('data:text/html')).length, { timeout: 6_000 })
-    .toBeGreaterThan(popupBefore);
+  // Il menu riusa una finestra nata con la barra (#1090): si guarda che compaia con le voci delle App.
+  const menu = await menuAperto(app, { tetto: 6_000 });
+  expect(menu, 'il menu App non si è aperto').toBeTruthy();
+  await expect(menu.locator('.menu')).toContainText('Editor');
 });

@@ -17,7 +17,10 @@ test('Preferenze: la sezione lettura ad alta voce esiste e la velocità persiste
   // Cambia la velocità a 1.5× e attende il salvataggio (debounced).
   await page.locator('#ttsRate').fill('1.5');
   await page.locator('#ttsRate').dispatchEvent('input');
-  await expect(page.locator('#ttsRateVal')).toHaveText('1.5×');
+  await expect(page.locator('#ttsRateVal')).toHaveText('1,5×');
+  await page.locator('#ttsPitch').fill('1.3');
+  await page.locator('#ttsPitch').dispatchEvent('input');
+  await expect(page.locator('#ttsPitchVal')).toHaveText('1,3');
   await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
   // Persiste nello storage come settings.tts.rate.
@@ -29,5 +32,5 @@ test('Preferenze: la sezione lettura ad alta voce esiste e la velocità persiste
   await page.reload();
   await page.waitForSelector('#ttsRate', { timeout: 8_000 });
   await expect(page.locator('#ttsRate')).toHaveValue('1.5');
-  await expect(page.locator('#ttsRateVal')).toHaveText('1.5×');
+  await expect(page.locator('#ttsRateVal')).toHaveText('1,5×');
 });

@@ -24,6 +24,41 @@ function confrontaVersioni(a, b) {
   return 0;
 }
 
+// Il numero che electron-updater confronta viene da latest.yml, l'etichetta dalla release segnata «latest»: diversi,
+// la release è stata spostata o riscritta e non si scarica (#1119). Senza etichetta non si può dire, quindi no.
+function etichettaCoincide(info) {
+  const versione = info && info.version;
+  const tag = info && info.tag;
+  if (typeof versione !== 'string' || !versione || typeof tag !== 'string') return false;
+  return tag.replace(/^v/, '') === versione;
+}
+
+// I file si scaricano dalla cartella della release etichettata: un «/», un «\», un «%» (un «..» codificato) o un «..»
+// nel nome li prenderebbe da un'altra release, con l'etichetta giusta e l'installatore sbagliato (#1119).
+function nomeNellaRelease(nome) {
+  return typeof nome === 'string' && /^[^/\\%]+$/.test(nome) && !nome.includes('..');
+}
+
+function fileDellaRelease(info) {
+  if (!info || typeof info !== 'object') return false;
+  const nomi = [];
+  if (info.files != null) {
+    if (!Array.isArray(info.files)) return false;
+    for (const f of info.files) nomi.push(f && f.url);
+  }
+  if (info.path != null) nomi.push(info.path);
+  if (info.packages != null) {
+    if (typeof info.packages !== 'object') return false;
+    for (const p of Object.values(info.packages)) nomi.push(p && p.path);
+  }
+  return nomi.every(nomeNellaRelease);
+}
+
+// L'unica domanda «questa versione si può scaricare?»: numero uguale all'etichetta e file dentro quella release.
+function releaseCoerente(info) {
+  return etichettaCoincide(info) && fileDellaRelease(info);
+}
+
 function modoScelto(impostazioni) {
   const m = impostazioni && impostazioni.aggiornamenti && impostazioni.aggiornamenti.installa;
   return MODI.includes(m) ? m : MODO_PREDEFINITO;
@@ -128,8 +163,40 @@ function fraseScaricato({ versione, piattaforma, modo, pronto, appImageScrivibil
   return `Filo ${v} è pronto: si installa quando chiudi Filo.`;
 }
 
+// Solo i tag v* sono protetti su GitHub, e l'aggiornatore prende la release «più recente» qualunque tag abbia:
+// una release sotto un altro tag, creata da un ramo, non si installa (#1073). Senza tag (provider non GitHub) passa.
+function tagAccettato(info) {
+  if (!info || info.tag == null) return true;
+  return String(info.tag) === `v${info.version}`;
+}
+
+// Il tag della release più recente come lo dice GitHub: il «tag:» di latest.yml lo scrive chi crea la release (#1073).
+function tagDiGitHubAccettato(tag, versione) {
+  return typeof tag === 'string' && !!parti(versione) && tag === `v${versione}`;
+}
+
+function segmento(s) {
+  try { return decodeURIComponent(s); } catch { return null; }
+}
+
+// Il tag e i percorsi dentro latest.yml li scrive chi ha creato la release: «tag: v99.0.0» e «../x1/…» portano
+// altrove. Conta dove stanno davvero i file da scaricare: solo sotto il tag protetto v<versione> del nostro repo (#1073).
+function fileDiRilascio({ versione, urls, owner, repo, host = 'github.com' } = {}) {
+  if (!parti(versione) || !owner || !repo || !Array.isArray(urls) || !urls.length) return false;
+  const attesi = [String(owner), String(repo), 'releases', 'download', `v${versione}`];
+  return urls.every((u) => {
+    let x;
+    try { x = new URL(String(u)); } catch { return false; }
+    if (x.protocol !== 'https:' || x.hostname !== host || x.username || x.password) return false;
+    const seg = x.pathname.split('/').slice(1).map(segmento);
+    const nome = seg[5];
+    return seg.length === 6 && attesi.every((a, i) => seg[i] === a)
+      && typeof nome === 'string' && nome !== '' && nome !== '.' && nome !== '..' && !/[/\\]/.test(nome);
+  });
+}
+
 module.exports = {
   MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI,
-  confrontaVersioni, modoScelto, piano, sceltaNonVale, haPulsante,
-  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato,
+  confrontaVersioni, etichettaCoincide, fileDellaRelease, releaseCoerente, modoScelto, piano, sceltaNonVale, haPulsante,
+  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, tagDiGitHubAccettato, fileDiRilascio,
 };

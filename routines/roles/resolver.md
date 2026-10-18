@@ -8,6 +8,7 @@ rifiutata. Non fondere su `main`: lo fa il cancello a valle.
 allegati già aperti come testo: una spec allegata sta lì).
 <!-- includi: _decisioni-owner.md -->
 Non richiedere quello che ha già deciso.
+<!-- includi: _note-per-agenti.md -->
 
 <!-- includi: _immagini.md -->
 
@@ -69,13 +70,15 @@ il rilievo che riproduce.
 
 <!-- includi: _solo-in-locale.md -->
 
+<!-- includi: _guasto-in-attesa.md -->
+
 ## Consegna
 
 I tre testi (report, frase, changelog) li scrivi tu.
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status revision_capability \
-  --notes "[il tuo report]" --frase "[la frase]" --branch <il-tuo-branch> [--segnala <file.md>]
+  --notes "[il tuo report]" --frase "[la frase]" [--segnala <file.md>]
 ```
 
 Infine rilascia il biglietto:

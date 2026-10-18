@@ -1,6 +1,6 @@
 /* Copia di src/styles/mergeApprovals.css, scritta da scripts/build-approvazioni.mjs: si cambia la sorgente, non questa. */
 /* Avviso delle fusioni in attesa di approvazione (src/shared/mergeApprovals.js).
-   Un foglio solo per le due rese — l'avviso in cima ai Ricevuti e la traccia in Automazioni — così non divergono.
+   Un foglio solo per le rese (quadrato, Automazioni, Log), così non divergono.
    Solo token `--sn-*`: gli override estetici valgono anche qui e il blocco regge il tema chiaro e quello scuro. */
 
 .sn-mac {
@@ -73,10 +73,13 @@
   font-size: 11px;
   font-weight: 600;
   padding: 1px 7px;
-  border-radius: 999px;
+  /* Su una riga resta una pastiglia; il raggio non da 999px fa di quella andata a capo un'etichetta, non un cerchio. */
+  border-radius: 10px;
   border: 1px solid var(--sn-border);
   color: var(--sn-muted);
-  white-space: nowrap;
+  /* Va a capo solo quando non ci sta nemmeno da sola sulla riga: nel pannello stretto usciva dalla card (#603.1). */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .sn-mac-card[data-origin='routine'] .sn-mac-origin {
   border-color: color-mix(in srgb, var(--sn-accent) 45%, transparent);
@@ -88,7 +91,7 @@
 button.sn-mac-origin-link {
   font-family: var(--sn-font);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 button.sn-mac-origin-link:hover {
   background: color-mix(in srgb, var(--sn-accent) 22%, transparent);
@@ -179,8 +182,11 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-status[data-kind='err']  { color: var(--sn-error); }
 
 
+/* Se i tasti non stanno affiancati va a capo la fila, non la scritta: una pillola su due righe è brutta
+   e cambia altezza quando l'etichetta armata sta in una. */
 .sn-mac-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -188,13 +194,14 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
   font-family: var(--sn-font);
   font-size: 12.5px;
   line-height: 1;
+  max-width: 100%;
   padding: 7px 12px;
   border-radius: 999px;
   border: 1px solid var(--sn-border);
   background: transparent;
   color: var(--sn-fg);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-mac-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sn-fg) 7%, transparent);

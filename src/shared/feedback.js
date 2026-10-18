@@ -705,7 +705,9 @@
     // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
     const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
-    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
+    // #903: le attese le scrive solo l'admin; da anonimo il feedback partirebbe senza, e senza dirlo.
+    const attese = (opts && Array.isArray(opts.waitsFor) && opts.waitsFor.length) ? attesePerScrittura(opts.waitsFor) : [];
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length);
     // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
     if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
@@ -867,12 +869,16 @@
     let authRefused = 0;
     if (idToken) {
       doc.fields.senderProof = toFsValue('admin');
+      // L'impronta del biglietto della sessione locale (#1148): il server ne legge la fiducia alla nascita.
+      const biglietto = opts && typeof opts.bigliettoLocale === 'string' && /^[0-9a-f]{64}$/.test(opts.bigliettoLocale) ? opts.bigliettoLocale : '';
+      if (biglietto) doc.fields.bigliettoLocale = toFsValue(biglietto);
       if (localOnly) {
         doc.fields.localOnly = toFsValue({
           by: String(localOnly.by || '').slice(0, 120),
           at: Math.round(Number(localOnly.at) || Date.now()),
         });
       }
+      if (attese.length) doc.fields.waitsFor = toFsValue(attese);
       // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
       // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
       const prioritaScelta = opts && opts.priority;
@@ -892,6 +898,7 @@
       if (res.status === 401 || res.status === 403) {
         authRefused = res.status;
         delete doc.fields.senderProof;
+        delete doc.fields.bigliettoLocale;
         delete doc.fields.priority;
         delete doc.fields.priorityManual;
         res = null;
@@ -978,14 +985,14 @@
   // `tests/unit/feedbackCampiLista.test.mjs` confronta questi due elenchi con
   // `firestore.rules` e diventa rossa se divergono.
   const CAMPI_LISTA = [
-    'archiveOverride', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
+    'archiveOverride', 'attesa', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
-    'clientIdHash', 'createdAt', 'localApproval', 'localMerges', 'localOnly', 'mergePreapproved', 'name', 'parentId', 'pipeline',
+    'clientIdHash', 'createdAt', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
-    'updatedAt', 'walletPseudonym', 'workingResets', 'workingSince',
+    'updatedAt', 'waitsFor', 'walletPseudonym', 'workingResets', 'workingSince',
   ];
 
   // Un documento letto con la proiezione della lista porta questo marchio: chi
@@ -1955,11 +1962,31 @@
     return fields;
   }
 
+  // Le attese (#903) nella forma che le regole ammettono: [{ id, num }], al più 20. Oltre si rifiuta, mai un taglio.
+  function attesePerScrittura(lista) {
+    const A = global.SN_FB_ATTESE;
+    const grezze = Array.isArray(lista) ? lista : [];
+    if (!A) {
+      if (grezze.length) throw new Error('attese non scritte: SN_FB_ATTESE non è caricato');
+      return [];
+    }
+    const pulite = A.atteseDi({ waitsFor: grezze });
+    if (pulite.length !== grezze.length) throw new Error('attese non scritte: c’è un id non valido o doppio');
+    if (pulite.length > A.MAX) throw new Error(`un feedback aspetta al più ${A.MAX} feedback: qui sono ${pulite.length}`);
+    return pulite.map((w) => ({ id: w.id, num: w.num }));
+  }
+
+  // Una pratica chiusa che torna aperta riparte col registro delle parti vuoto (#938): le parti già su main erano del
+  // giro chiuso, e lette nel giro nuovo lo chiuderebbero prima del tempo o ne rifiuterebbero le parti.
+  function riapre(statusPublicPrima, statusDopo) {
+    return statusPublicPrima === 'closed' && statusToPublic(statusDopo) === 'open';
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -2054,21 +2081,9 @@
     // Override owner per l'auto-archiviazione a punteggio (DC3, vedi
     // boardArchive.js): 'archived' | 'keep_open' | '' (nessun override).
     if (archiveOverride !== undefined) { fields.archiveOverride = toFsValue(archiveOverride); mask.push('archiveOverride'); }
-    // La pre-approvazione della fusione, per QUESTA pratica: `{ by, at }` per
-    // metterla, `null` per toglierla. Togliere è CANCELLARE il campo: la maschera
-    // lo nomina e i campi non lo portano, che per Firestore vuol dire "via".
-    // Un `null` scritto come valore resterebbe sul documento e le regole lo
-    // respingerebbero (vogliono una mappa, quando c'è).
-    if (mergePreapproved !== undefined) {
-      if (mergePreapproved && typeof mergePreapproved === 'object') {
-        fields.mergePreapproved = toFsValue({
-          by: String(mergePreapproved.by || '').slice(0, 120),
-          at: String(mergePreapproved.at || new Date().toISOString()).slice(0, 40),
-        });
-      }
-      mask.push('mergePreapproved');
-    }
-    // Il segno «solo in locale» (#908): stessa forma di scrittura, `at` in millisecondi.
+    // La fiducia (#1148) non si scrive da qui: la scrive solo il server, e le regole la vietano a ogni client.
+    // Il segno «solo in locale» (#908): `{ by, at }` per metterlo (`at` in millisecondi), `null` per toglierlo: la
+    // maschera lo nomina e i campi non lo portano, che per Firestore vuol dire "via".
     if (localOnly !== undefined) {
       if (localOnly && typeof localOnly === 'object') {
         fields.localOnly = toFsValue({
@@ -2088,11 +2103,14 @@
       }
       mask.push('localApproval');
     }
-    // La prova del mittente data dall'owner («È mio», #908): si aggiunge e basta, non si toglie da qui.
-    if (senderProof === 'admin') {
-      fields.senderProof = toFsValue('admin');
-      mask.push('senderProof');
+    // Le attese (#903): [{ id, num }] già controllate da SN_FB_ATTESE.valida; vuota o null le toglie (campo cancellato).
+    if (waitsFor !== undefined) {
+      const lista = attesePerScrittura(waitsFor);
+      if (lista.length) fields.waitsFor = toFsValue(lista);
+      mask.push('waitsFor');
     }
+    // Il registro delle parti dall'app si toglie e basta, alla riapertura: lo scrivono il server e server:fondi.
+    if (localMerges === null) mask.push('localMerges');
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
@@ -2368,6 +2386,8 @@
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
     // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.
     statusToPublic,
+    // La riapertura svuota il registro delle parti (#938).
+    riapre,
     // Voti di verifica (DB4): substrato letto da board (DC*) e archiviazione (DC3).
     castVote,
     clearVote,

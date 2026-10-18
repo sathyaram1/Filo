@@ -42,6 +42,11 @@
     }));
   }
 
+  // L'interruttore della chiave propria (#962) segue la chiave SALVATA, da qui o da Crediti: senza non ha effetto.
+  function mostraChiavePropria(settings) {
+    $('sec-own-key-providers').hidden = !window.SN_CONST.hasOwnOpenrouterKey(settings);
+  }
+
   function fillStaticText() {
     document.title = I18n.t('options_title');
     $('title').textContent = I18n.t('options_title');
@@ -49,6 +54,8 @@
     $('useDefaultModels-desc').textContent = I18n.t('options_use_default_models_desc');
     $('openWeightsOnly-label').textContent = I18n.t('options_open_weights_only');
     $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
+    $('ownKeyAllProviders-label').textContent = I18n.t('options_own_key_all_providers');
+    $('ownKeyAllProviders-desc').textContent = I18n.t('options_own_key_all_providers_desc');
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -56,6 +63,7 @@
 
     $('lbl-limit').textContent = I18n.t('options_monthly_limit');
     $('lbl-spent').textContent = I18n.t('options_current_spent');
+    $('lbl-cost-warn').textContent = I18n.t('options_cost_warn_ratio');
 
     $('savedHint').textContent = I18n.t('options_saved');
 
@@ -155,11 +163,6 @@
     };
   }
 
-  function actionLabelFor(action) {
-    const row = (ModelChain.actionLabels() || []).find(([a]) => a === action);
-    return row ? I18n.t(row[1]) : action;
-  }
-
   // Un "Prova" è una richiesta vera al modello della riga. Con l'interruttore
   // acceso quelli proprietari restano spenti: il main li rifiuta comunque, ma un
   // bottone premibile che poi dice di no è attrito inutile — e su questa pagina
@@ -242,7 +245,7 @@
       lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
     }
     if (impact.unavailable.length) {
-      const names = impact.unavailable.map((u) => actionLabelFor(u.action));
+      const names = impact.unavailable.map((u) => ModelChain.etichetta(u.action));
       lines.push(I18n.t('options_open_weights_unavailable', names.join(', ')));
     }
     if (!lines.length) { host.hidden = true; return; }
@@ -369,6 +372,8 @@
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
     $('openWeightsOnly').checked = settings.openWeightsOnly === true;
+    $('ownKeyAllProviders').checked = settings.ownKeyAllProviders === true;
+    mostraChiavePropria(settings);
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
@@ -379,6 +384,9 @@
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
+    $('costWarnRatio').value = String(window.SN_STIMA_COSTO.soglia(settings));
+    chiaveDelleStime = settings.apiKeys?.openrouter || '';
+    caricaStime();
 
     // Registry modelli PRIMA dell'editor a segmenti: le righe del registry sono
     // la sorgente dei nickname, e l'editor le legge già al primo render per
@@ -396,6 +404,8 @@
       // Registry LIVE (dalle righe correnti, anche non salvate) così la
       // validazione modello↔funzione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
+      avvisoDi: avvisoModello,
+      costoDi: costoModello,
     });
 
     // Costi
@@ -588,6 +598,40 @@
       }
     }
     populateNicknames(registry);
+  }
+
+  function avvisoModello(action, ref) {
+    return ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref]);
+  }
+
+  // ── Il costo accanto a ogni modello e nella tendina (#819) ─────────────────
+  // Listino, saldo, tariffa e token medi li dà il main; la stima è quella di SN_STIMA_COSTO, la stessa della chat.
+  // Registro e soglia si leggono dalla pagina, così una riga appena scritta ha già il suo costo.
+  let stimaCtx = null;
+  let stimaGiro = 0;
+  let chiaveDelleStime = null;
+  async function caricaStime(opts) {
+    const mio = ++stimaGiro;
+    if (!stimaCtx && modelChains) ModelChain.aggiornaCosti(modelChains);
+    let ctx = null;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.STIMA_COSTO_MODELLI, forzaListino: Boolean(opts && opts.forza) });
+      if (r && r.ok && r.contesto) ctx = r.contesto;
+    } catch (_) { ctx = null; }
+    if (mio !== stimaGiro) return;
+    // Il main non ha risposto: niente stima inventata, le righe lo dicono.
+    stimaCtx = ctx || { modo: 'crediti', listino: null, registro: {}, predefiniti: {}, saldo: null };
+    if (modelChains) ModelChain.aggiornaCosti(modelChains);
+  }
+  function sogliaDellaPagina() {
+    const v = $('costWarnRatio').value.trim();
+    return window.SN_STIMA_COSTO.soglia({ costoModelli: { soglia: v === '' ? undefined : Number(v) } });
+  }
+  function costoModello(action, ref) {
+    const S = window.SN_STIMA_COSTO;
+    if (!S || !ref) return null;
+    if (!stimaCtx) return { breve: '…', testo: 'Sto leggendo il listino di OpenRouter.' };
+    return S.valuta(action, ref, collectModelRegistry().registry, { ...stimaCtx, soglia: sogliaDellaPagina() });
   }
 
   // Oltre al registry valido, ritorna le righe DOM scartate (nickname mancante
@@ -839,13 +883,21 @@
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
       openWeightsOnly: $('openWeightsOnly').checked,
+      ownKeyAllProviders: $('ownKeyAllProviders').checked,
       apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
       monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
     };
+    // Una soglia scritta a metà o storta non si salva: resta quella di prima.
+    const soglia = $('costWarnRatio').value.trim();
+    if (soglia !== '' && Number.isFinite(Number(soglia)) && Number(soglia) >= 0) {
+      partial.costoModelli = { soglia: window.SN_STIMA_COSTO.soglia({ costoModelli: { soglia: Number(soglia) } }) };
+    }
 
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    // La chiave messa o tolta qui decide crediti o dollari accanto ai modelli.
+    if (apiKey !== chiaveDelleStime) { chiaveDelleStime = apiKey; caricaStime(); }
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
@@ -907,28 +959,28 @@
   // Lo stesso per gli altri campi semplici, che la chat cambia a parole (#949): le voci le dà la fonte unica.
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
+      // Il saldo è cambiato (una chiamata, la quota del giorno): i messaggi che bastano si ricontano.
+      if (msg && msg.type === MSG.CREDITS_CHANGED) { caricaStime(); return; }
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
       const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('options', msg.settings, {
         salta: (id, percorso, el) => staUsandoAdesso(el),
       });
       if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
+      mostraChiavePropria(msg.settings);
       if (toccati.length) renderOpenWeightsImpact();
-      // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza ridisegnare
-      // la griglia il salvataggio dopo lo rimanderebbe indietro. Non mentre qualcuno ci sta scrivendo dentro.
+      // Una chiave messa o tolta cambia crediti e dollari; la soglia cambia gli avvisi.
+      if (toccati.includes('apiKey') || toccati.includes('useDefaultModels')) caricaStime();
+      else if (toccati.includes('costWarnRatio')) ModelChain.aggiornaCosti(modelChains || {});
+      // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza riallineare
+      // la griglia il salvataggio dopo lo rimanderebbe indietro. Si riscrive solo la catena cambiata, e non quella
+      // in cui si sta scrivendo: ridisegnare tutto portava via la spiegazione del modello appena respinto (#667.7).
       const s = msg.settings;
-      const griglia = $('modelsGrid');
       const inUso = staUsandoAdesso(document.activeElement) ? document.activeElement : null;
-      // Si confrontano solo le azioni che la griglia mostra: le impostazioni ne hanno altre, e col confronto
-      // dell'oggetto intero ogni salvataggio ridisegnava, portando via l'avviso del modello appena respinto.
       const catena = (v) => String(v == null ? '' : v).split(',').map((x) => x.trim()).filter(Boolean).join(', ');
-      const diversa = Boolean(s.models)
-        && Object.keys(modelChains || {}).some((a) => catena(modelChains[a].getValue()) !== catena(s.models[a]));
-      if (s.models && griglia && !(inUso && griglia.contains(inUso)) && diversa) {
-        modelChains = ModelChain.renderGrid(griglia, {
-          models: s.models,
-          onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
-          getRegistry: () => collectModelRegistry().registry,
-        });
+      for (const [azione, ch] of Object.entries(modelChains || {})) {
+        const daFuori = s.models && !(inUso && ch.el.contains(inUso)) && catena(ch.getValue()) !== catena(s.models[azione]);
+        // Il modello di una riga del registro può cambiare sotto lo stesso nome: l'avviso si rifà anche così.
+        if (daFuori) ch.imposta(s.models[azione]); else ch.ricontrolla();
       }
     });
   }
@@ -958,7 +1010,8 @@
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
-    $('loadModels').addEventListener('click', loadModelsFromProvider);
+    $('loadModels').addEventListener('click', () => { loadModelsFromProvider(); caricaStime({ forza: true }); });
+    $('costWarnRatio').addEventListener('input', () => ModelChain.aggiornaCosti(modelChains || {}));
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));

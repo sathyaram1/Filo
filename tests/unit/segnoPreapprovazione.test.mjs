@@ -1,5 +1,6 @@
-// Il segno «fondi senza chiedermelo» ha due specie: a mano (copre tutto) e nato
-// da un sì a una richiesta (solo i blocchi già approvati). src/shared/mergeApprovals.js.
+// Le fuse senza chiedere e il perché, come le legge l'owner in Automazioni (src/shared/mergeApprovals.js). Dal #1148
+// la specie nuova è il lavoro fidato (motivo 'fiducia'); il segno a mano e quello nato da un sì restano leggibili per le
+// tracce dei rami di prima e per il segno del clic (#515), che il server tiene nello stato del giro.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,36 +18,16 @@ const ID = 'ab12cd34ef56ab12cd34ef56';
 const aMano = { by: 'owner@esempio.it', at: AT };
 const daSi = { by: `owner@esempio.it · approvazione ${ID}`, at: AT };
 
-test('le due specie si riconoscono dalla forma di `by`', () => {
+test('le due specie di segno si riconoscono dalla forma di `by`', () => {
   assert.deepEqual(UI.segnoPreapprovazione(aMano), { tipo: 'pieno', by: aMano.by, at: AT });
   assert.deepEqual(UI.segnoPreapprovazione(daSi), { tipo: 'approvazione', by: daSi.by, at: AT, richiesta: ID });
-  // Un id che non è di 24 cifre esadecimali non è la forma del server.
   assert.equal(UI.segnoPreapprovazione({ by: 'x · approvazione 123', at: AT }).tipo, 'pieno');
   assert.equal(UI.segnoPreapprovazione({ by: '  ', at: AT }), null);
   assert.equal(UI.segnoPreapprovazione(null), null);
 });
 
-test('il segno a mano si legge come prima', () => {
-  const t = UI.segnoTesti(UI.segnoPreapprovazione(aMano));
-  assert.equal(t.etichetta, 'senza chiedere');
-  assert.equal(t.titolo, 'Si fonde senza chiedere: segno messo da owner@esempio.it');
-});
-
-test('il segno da approvazione dice che vale solo per i blocchi già approvati, e da quando', () => {
-  const t = UI.segnoTesti(UI.segnoPreapprovazione(daSi));
-  const quando = UI.dateTimeText(Date.parse(AT));
-  assert.ok(!t.etichetta.includes('senza chiedere'));
-  for (const s of [t.titolo, t.riga]) {
-    assert.match(s, /solo coi blocchi che hai già approvato/);
-    assert.ok(s.includes(`dal tuo sì alla richiesta del ${quando}`), s);
-    assert.ok(!s.includes(ID) && !s.includes('owner@esempio.it'), s);
-  }
-});
-
-test('un clic: sul segno da approvazione mette quello pieno, sul pieno lo toglie', () => {
-  assert.equal(UI.segnoAlClic(null), true);
-  assert.equal(UI.segnoAlClic(UI.segnoPreapprovazione(daSi)), true);
-  assert.equal(UI.segnoAlClic(UI.segnoPreapprovazione(aMano)), false);
+test('gli strumenti del segno messo dalla pagina non ci sono più: la pagina non fonde da sé (#1148)', () => {
+  for (const nome of ['segnoTesti', 'segnoAlClic', 'chiaveSegno', 'richiesteCoperte']) assert.equal(UI[nome], undefined, nome);
 });
 
 test('fra le fusioni fatte senza chiedere, il segno da approvazione non si stampa grezzo', () => {
@@ -55,36 +36,31 @@ test('fra le fusioni fatte senza chiedere, il segno da approvazione non si stamp
   assert.equal(s, `pre-approvata dal tuo sì alla richiesta del ${UI.dateTimeText(Date.parse(AT))}`);
 });
 
-// #743: l'introduzione delle «Fuse senza chiedere» diceva «fondi senza chiedermelo» anche
-// per le fusioni nate da un sì, contraddicendo la riga sotto.
+test('il lavoro fidato si dice per quello che è: «lavoro fidato: controllo registrato»', () => {
+  const fidato = { skippedL5: true, motivo: 'fiducia', preapprovedBy: 'fiducia' };
+  assert.equal(UI.isFiducia(fidato), true);
+  assert.equal(UI.isFiducia({ skippedL5: true }), false, 'senza motivo è un ramo di prima');
+  assert.equal(UI.isFiducia({ motivo: 'fiducia' }), false, 'il motivo vale solo sopra L5');
+  assert.equal(UI.recentOutcome(fidato), 'lavoro fidato: controllo registrato');
+  assert.match(UI.skippedL5Hint(fidato), /^Lavoro fidato: feedback fidato, scritto solo da sessioni col biglietto pulito\./);
+  assert.match(UI.preapprovedIntro([fidato]), /fusi lo stesso\. Erano lavoro fidato/);
+});
+
+// #743: l'introduzione nomina solo le specie che l'elenco contiene.
 test('fra le fuse senza chiedere, l’introduzione nomina solo i segni che l’elenco contiene', () => {
   const daSiRiga = { preapprovedBy: daSi.by, preapprovedAt: AT };
   const aManoRiga = { preapprovedBy: aMano.by, preapprovedAt: AT };
   const locale = { skippedL5: true, preapprovedBy: aMano.by };
+  const fidato = { skippedL5: true, motivo: 'fiducia' };
 
   const soloSi = UI.preapprovedIntro([daSiRiga, daSiRiga]);
   assert.ok(!soloSi.includes('fondi senza chiedermelo'), soloSi);
   assert.match(soloSi, /fusi lo stesso\. Avevano solo blocchi che avevi già approvato, con un sì a una richiesta precedente/);
-  assert.ok(!soloSi.includes('lavoro locale'), soloSi);
 
   const soloMano = UI.preapprovedIntro([aManoRiga]);
   assert.match(soloMano, /fusi lo stesso\. Sulla pratica avevi messo «fondi senza chiedermelo»\./);
-  assert.ok(!soloMano.includes('già approvat'), soloMano);
 
-  const misto = UI.preapprovedIntro([daSiRiga, locale, aManoRiga]);
-  assert.match(misto, /^Lavori fermati dai controlli e fusi lo stesso\. Alcuni avevano sulla pratica il tuo «fondi senza chiedermelo»; altri avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente; altri ancora erano lavoro locale \(/);
-
-  // Un segno vuoto o senza la forma del server resta quello a mano, come nella riga.
-  assert.match(UI.preapprovedIntro([{ preapprovedBy: '' }]), /«fondi senza chiedermelo»/);
+  const misto = UI.preapprovedIntro([fidato, daSiRiga, locale, aManoRiga]);
+  assert.match(misto, /^Lavori fermati dai controlli e fusi lo stesso\. Alcuni erano lavoro fidato \(feedback fidato, scritto solo da sessioni col biglietto pulito\); altri avevano sulla pratica il tuo «fondi senza chiedermelo»; altri ancora avevano solo blocchi/);
   assert.match(UI.preapprovedIntro([]), /^Lavori fermati dai controlli e fusi lo stesso\. Qui c’è/);
-});
-
-test('la chiave del segno: rimesso è un altro segno, riletto è lo stesso (#701)', () => {
-  const k = UI.chiaveSegno(UI.segnoPreapprovazione(aMano));
-  assert.equal(k, UI.chiaveSegno(UI.segnoPreapprovazione({ ...aMano })));
-  // Lo stesso istante scritto con più cifre resta lo stesso segno.
-  assert.equal(k, UI.chiaveSegno({ by: aMano.by, at: '2026-09-26T10:26:00Z' }));
-  assert.notEqual(k, UI.chiaveSegno(UI.segnoPreapprovazione({ by: aMano.by, at: '2026-09-26T10:27:00.000Z' })));
-  assert.equal(UI.chiaveSegno(null), '');
-  assert.notEqual(UI.chiaveSegno({ by: 'owner', at: '' }), '');
 });

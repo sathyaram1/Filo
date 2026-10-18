@@ -7,7 +7,6 @@ import { test, expect } from './fixtures/electron.mjs';
 async function preparaModello(app, copione, { rifiuta = null } = {}) {
   await app.evaluate(async (_e, { copione, rifiuta }) => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },

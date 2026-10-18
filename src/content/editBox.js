@@ -95,11 +95,13 @@
     let currentResult = '';
     let inFlight = false;
     let $nota = null; // la riga del ripiego sui crediti di Filo, della proposta in vista
+    let $interrotta = null; // la riga della proposta fermata dal tetto di lunghezza (#1097.3)
     async function runEdit() {
       const instruction = $instr.value.trim();
       if (!instruction || inFlight) return;
       inFlight = true;
       if ($nota) { $nota.remove(); $nota = null; }
+      if ($interrotta) { $interrotta.remove(); $interrotta = null; }
       $prop.classList.add('sn-editbox-empty');
       $prop.textContent = I18n.t('edit_box_loading');
       $copy.disabled = true;
@@ -121,8 +123,10 @@
         $prop.classList.remove('sn-editbox-empty');
         renderDiff($prop, originalText, currentResult);
         $nota = Popup.notaRipiego($prop.parentNode, res.keyFallback);
+        $interrotta = Popup.notaInterrotta($prop.parentNode, res.finishReason);
         $copy.disabled = false;
-        $replace.disabled = false;
+        // Una riscrittura tagliata al posto del testo intero ne perderebbe la coda: si copia, non si sostituisce.
+        $replace.disabled = !!global.SN_CHAT_ERRORS?.troncata?.(res.finishReason);
       } catch (e) {
         $prop.textContent = Popup.frasePerLUtente({ message: e?.message });
       } finally {
@@ -159,12 +163,17 @@
       if (savedCtx.kind === 'input') {
         const el = savedCtx.el;
         const start = savedCtx.start, end = savedCtx.end;
-        el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
         const caret = start + currentResult.length;
-        el.setSelectionRange(start, caret);
-        // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
-        const ev = new Event('input', { bubbles: true });
-        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+        // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
+        if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, currentResult)) {
+          el.setSelectionRange(start, caret);
+        } else {
+          el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
+          el.setSelectionRange(start, caret);
+          // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
+          const ev = new Event('input', { bubbles: true });
+          el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+        }
       } else if (savedCtx.kind === 'ce') {
         try { document.execCommand('insertText', false, currentResult); } catch (_) {}
       }

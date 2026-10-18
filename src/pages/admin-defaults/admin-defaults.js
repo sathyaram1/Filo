@@ -25,6 +25,9 @@
   // `null` = non ancora caricato; lista = caricato.
   const providerModelCache = { openrouter: null };
 
+  // Il tetto delle risposte per famiglia di funzioni (#1097.3): famiglia → campo.
+  const CAMPI_LUNGHEZZA = [['conversazioni', 'lunghezzaConversazioni'], ['testi', 'lunghezzaTesti'], ['brevi', 'lunghezzaBrevi']];
+
   function $(id) { return document.getElementById(id); }
 
   // Id della datalist (combobox) associata a un provider.
@@ -110,6 +113,9 @@
     $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
     $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
     $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
+    $('h-lunghezza').textContent = I18n.t('admin_defaults_lunghezza');
+    $('lunghezza-desc').textContent = I18n.t('admin_defaults_lunghezza_desc');
+    for (const [f] of CAMPI_LUNGHEZZA) $(`l-lunghezza-${f}`).textContent = I18n.t(`admin_defaults_lunghezza_${f}`);
   }
 
   function keyStateText(present) {
@@ -136,6 +142,12 @@
     }
     const s = String(v == null ? '' : v).toLowerCase().trim();
     return s && s !== 'auto' && REASONING_LEVELS.includes(s) ? s : null;
+  }
+
+  function ricontrollaAvvisi() {
+    if (modelChains) ModelChain.ricontrolla(modelChains);
+    // Una riga del registro cambiata o tolta può essere il sostituto aperto di qualche funzione.
+    renderOpenWeightsImpact();
   }
 
   function makeModelRow(nick, entry) {
@@ -204,7 +216,8 @@
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = I18n.t('options_model_remove');
-    del.addEventListener('click', () => { row.remove(); });
+    del.addEventListener('click', () => { row.remove(); ricontrollaAvvisi(); });
+    for (const el of [nickIn, idIn]) el.addEventListener('change', ricontrollaAvvisi);
 
     const test = document.createElement('button');
     test.type = 'button';
@@ -518,6 +531,8 @@
   }
 
   function renderExcludedDrift() {
+    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue.
+    ricontrollaAvvisi();
     const box = $('excludedDrift');
     if (!box) return;
     const missing = excludedMissingFromBuild();
@@ -543,13 +558,81 @@
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
       getRegistry: () => collectModelRegistry(),
+      // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
+      avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry()[ref], collectExcluded()),
+      costoDi: costoModello,
+      // Mentre si scrive il segmento è a metà: l'avviso segue solo i valori confermati.
+      onChange: (scrivendo) => { if (!scrivendo) renderOpenWeightsImpact(); },
     });
     hiddenModels = Object.fromEntries(Object.entries(models || {})
       .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
+    renderOpenWeightsImpact();
+  }
+
+  // Il costo di un uso accanto a ogni modello (#819), come nelle Opzioni. Senza avviso: qui si decide il predefinito,
+  // che è proprio il metro dell'avviso.
+  let stimaCtx = null;
+  async function caricaStime() {
+    let ctx = null;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.STIMA_COSTO_MODELLI });
+      if (r && r.ok && r.contesto) ctx = r.contesto;
+    } catch (_) { ctx = null; }
+    stimaCtx = { ...(ctx || { modo: 'crediti', listino: null, registro: {} }), predefiniti: {} };
+    if (modelChains) ModelChain.aggiornaCosti(modelChains);
+  }
+  function costoModello(action, ref) {
+    const S = window.SN_STIMA_COSTO;
+    if (!S || !ref) return null;
+    if (!stimaCtx) return { breve: '…', testo: 'Sto leggendo il listino di OpenRouter.' };
+    return S.valuta(action, ref, collectModelRegistry(), stimaCtx);
   }
 
   function collectModels() {
     return { ...hiddenModels, ...ModelChain.collect(modelChains) };
+  }
+
+  // Cosa trova chi accende «Solo modelli a pesi aperti» con la config com'è sulla pagina, non salvata: lo stesso calcolo
+  // delle Opzioni sulle sole funzioni della griglia (#465). È un avviso, il salvataggio resta libero (#833).
+  function renderOpenWeightsImpact() {
+    const host = $('openWeightsImpact');
+    const C = window.SN_CONST;
+    if (!host) return;
+    const models = ModelChain.collect(modelChains);
+    // Senza nessun modello scelto non c'è niente da dire: «partono già da modelli aperti» sarebbe falso.
+    const conModello = Object.values(models).some((v) => String(v || '').trim());
+    if (!C || typeof C.openWeightsImpact !== 'function' || !conModello) { host.hidden = true; return; }
+    const impact = C.openWeightsImpact(models, collectModelRegistry());
+    const riga = (testo, cls) => {
+      const p = document.createElement('p');
+      p.textContent = testo;
+      if (cls) p.className = cls;
+      return p;
+    };
+    host.replaceChildren();
+    if (!impact.unavailable.length && !impact.substituted.length) {
+      host.className = 'sn-muted sn-ow-impact';
+      host.appendChild(riga(I18n.t('admin_defaults_open_weights_all_open')));
+      host.hidden = false;
+      return;
+    }
+    host.className = 'sn-info-box sn-ow-impact';
+    const titolo = document.createElement('div');
+    titolo.className = 'sn-info-box-title';
+    titolo.textContent = I18n.t('admin_defaults_open_weights_title');
+    host.appendChild(titolo);
+    if (impact.unavailable.length) {
+      const nomi = impact.unavailable.map((u) => ModelChain.etichetta(u.action));
+      host.appendChild(riga(I18n.t('options_open_weights_unavailable', nomi.join(', ')), 'sn-ow-stop'));
+    }
+    const perModello = new Map();
+    for (const s of impact.substituted) {
+      if (!perModello.has(s.to)) perModello.set(s.to, []);
+      perModello.get(s.to).push(ModelChain.etichetta(s.action));
+    }
+    for (const [to, nomi] of perModello) host.appendChild(riga(I18n.t('admin_defaults_open_weights_to', to, nomi.join(', '))));
+    if (!impact.unavailable.length) host.appendChild(riga(I18n.t('admin_defaults_open_weights_none_stop')));
+    host.hidden = false;
   }
 
   // ── Pagine delicate (#1004) ─────────────────────────────────────────────────
@@ -609,6 +692,25 @@
     return JSON.stringify(ora) === JSON.stringify(contestoCaricato) ? null : ora;
   }
 
+  // ── Quanto può essere lunga una risposta (#1097.3) ─────────────────────────
+  let lunghezzaCaricata = {};
+  function renderLunghezza(salvato, diSerie) {
+    lunghezzaCaricata = salvato || {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      $(id).value = lunghezzaCaricata[f] != null ? String(lunghezzaCaricata[f]) : '';
+      $(id).placeholder = diSerie && diSerie[f] != null ? String(diSerie[f]) : '';
+    }
+  }
+  // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
+  function collectLunghezza() {
+    const ora = {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      const v = $(id).value.trim();
+      if (v !== '' && Number.isFinite(Number(v))) ora[f] = Number(v);
+    }
+    return JSON.stringify(ora) === JSON.stringify(lunghezzaCaricata) ? null : ora;
+  }
+
   // ── Load / Save ─────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
     const present = cfg.apiKeysPresent || {};
@@ -617,11 +719,13 @@
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
+    caricaStime();
     // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
     // è quella che il salvataggio riscrive per intero.
     renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);
     renderDelicate(cfg.sitiDelicati, cfg.sitiDelicatiDiSerie);
     renderContesto(cfg.contestoFilo, cfg.contestoFiloDiSerie);
+    renderLunghezza(cfg.lunghezzaRisposte, cfg.lunghezzaRisposteDiSerie);
     ensureProviderCatalog();
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
@@ -688,6 +792,8 @@
     if (delicate) config.sitiDelicati = delicate;
     const contesto = collectContesto();
     if (contesto) config.contestoFilo = contesto;
+    const lunghezza = collectLunghezza();
+    if (lunghezza) config.lunghezzaRisposte = lunghezza;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();

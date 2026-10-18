@@ -836,11 +836,21 @@
     'convert-path', 'get-location', 'gl', 'pwd', 'test-path', 'get-date', 'where-object', 'where', '?',
     'sort-object', 'select-object', 'select', 'measure-object', 'measure',
   ]);
+  // Compongono un percorso: sul valore del tubo il risultato non si legge nel comando (#1072.4).
+  const CALCOLANO = new Set(['join-path', 'split-path']);
+  // Cercano il comando o lo script indicato anche nella cartella di lavoro (`.\x`).
+  const CERCANO_NOME = new Set(['get-command', 'get-help']);
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
+  // Dentro la Libreria del Mac stanno anche i documenti nel cloud dell'utente (iCloud Drive; Dropbox, OneDrive e
+  // Google Drive da macOS 12): si leggono come Documenti (#947.3).
+  const PROFILO_APERTE = { library: ['Mobile Documents', 'CloudStorage'] };
   const JOLLY = /[*?[\]{}\uFFFD]/;
   // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
   const SEGNAPOSTO = '$_\uE000';
+  // `'` e `\"` dove sono un carattere qualunque (vedi `comeLaShell`): nessun controllo li prende per virgolette.
+  const APICE_TESTO = '\u02BC';
+  const VIRGOLETTE_TESTO = '\u02BA';
   // Senza contesto: cartella di lavoro e home coincidono, un relativo si dà per interno.
   const SENZA_CONTESTO = { cwd: '/~', home: '/~', win: false, maiuscole: false };
 
@@ -989,7 +999,8 @@
   function contesto(ctx) {
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
     const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti) };
+    const shell = String(x.shell || '').toLowerCase();
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
@@ -1024,7 +1035,8 @@
       }
       if (i === 0) {
         const n = nomeNorm(s);
-        if (PROFILO.has(n) || n.startsWith('ntuser')) return MOTIVI.nascosto;
+        const aperta = sotto.length > 1 && (PROFILO_APERTE[n] || []).some((a) => nomeNorm(a) === nomeNorm(sotto[1]));
+        if ((PROFILO.has(n) || n.startsWith('ntuser')) && !aperta) return MOTIVI.nascosto;
       }
     }
     return '';
@@ -1037,6 +1049,18 @@
   function valoreDuePunti(t) {
     const m = /^-[A-Za-z]+:(.+)$/.exec(String(t || ''));
     return m ? m[1] : null;
+  }
+
+  // PowerShell accetta un parametro abbreviato a ogni prefisso non ambiguo: `-N` è `-NoQualifier` (#1072.4).
+  function parametro(t, nome, min) {
+    const m = /^-([A-Za-z]+)(?::|$)/.exec(String(t || ''));
+    return !!m && m[1].length >= min && nome.startsWith(m[1].toLowerCase());
+  }
+
+  // Ciò che `Split-Path -NoQualifier` lascia: via `Provider::` o il nome di un'unità qualsiasi (`C:`, `Env:`, `HKCU:`).
+  function senzaQualifica(q) {
+    const p = /^[^\\/]*?::/.exec(q);
+    return p ? q.slice(p[0].length) : q.replace(/^[^\\/:]+:/, '');
   }
 
   function primoFuori(lista, c) {
@@ -1139,14 +1163,18 @@
 
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
   function gitPerimetro(trimmed, c) {
-    if (subcommandOf(trimmed) === 'grep') return due(MOTIVI.ricorsivo);
+    const sub = subcommandOf(trimmed);
+    if (sub === 'grep') return due(MOTIVI.ricorsivo);
     const args = gitArgsAfterSub(trimmed);
     const libero = args.includes('--no-index');
     const sep = args.indexOf('--');
+    // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
+    // o come riferimento (`.git/refs/<nome>`). Lo si misura come un percorso, come `ls` (#1072.4).
+    const reteNome = !!(c.cwd && c.cwd.rete);
     const percorsi = [];
     args.forEach((a, i) => {
       if (a.startsWith('-')) return;
-      if (libero || (sep >= 0 && i > sep)) { percorsi.push(a); return; }
+      if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
       if (m && !/^[A-Za-z]:[\\/]/.test(a)) percorsi.push(m[1]);
     });
@@ -1172,6 +1200,84 @@
     });
   }
 
+  // Il testo che `Get-Date -Format` stampa: le sequenze di .NET (`\c` è `c`,
+  // `'...'`/`"..."` sono letterali) risolte, così un formato costruito per valere
+  // `\\host\x` si riconosce (#1072.4). I segnaposto di data (y, M…) restano com'erano:
+  // non possono creare `\`, quindi al più aggiungono testo innocuo.
+  function formatoData(fmt) {
+    let out = '';
+    for (let i = 0; i < fmt.length; i++) {
+      const ch = fmt[i];
+      if (ch === '\\') { out += fmt[i + 1] || ''; i += 1; } else if (ch === '\'' || ch === '"') {
+        const j = fmt.indexOf(ch, i + 1);
+        if (j < 0) { out += fmt.slice(i + 1); break; }
+        out += fmt.slice(i + 1, j);
+        i = j;
+      } else out += ch;
+    }
+    return out;
+  }
+
+  // Un cmdlet di lettura può COMPORRE un percorso di rete da pezzi che da soli non
+  // lo sono (#1072.4): Join-Path li concatena, Split-Path -NoQualifier toglie
+  // l'unità e scopre un `\\host`, Get-Date -Format stampa un testo fisso. Come
+  // echo, da solo stampa e resta libero; ma se lo apre (Join-Path -Resolve) o lo
+  // passa a chi lo apre (tubo, gruppo → `c.stampaLibera` è falso) chiede un OK.
+  function calcolaRete(prog, testi, c) {
+    const assoluto = { ...c, cwd: null };
+    const inRete = (p) => !!p && dove(p, assoluto) === MOTIVI.rete;
+    if (prog === 'join-path') {
+      const resolve = testi.some((t) => parametro(t, 'resolve', 1));
+      if (c.stampaLibera && !resolve) return false;
+      const parti = [];
+      for (const t of testi) {
+        if (parametro(t, 'resolve', 1)) continue; // `-Resolve:$true` non è un pezzo del percorso
+        const v = valoreDuePunti(t);
+        if (v != null) { parti.push(...v.split(',')); continue; }
+        if (!t.startsWith('-')) parti.push(...t.split(','));
+      }
+      return inRete(parti.join('\\'));
+    }
+    if (prog === 'split-path') {
+      if (c.stampaLibera || !testi.some((t) => parametro(t, 'noqualifier', 1))) return false;
+      for (const t of testi) {
+        const v = valoreDuePunti(t);
+        const cand = v != null ? v : (t.startsWith('-') ? null : t);
+        // Tolta la qualifica, ciò che resta può essere `\\host`.
+        if (cand != null && cand.split(',').some((q) => inRete(senzaQualifica(q)))) return true;
+      }
+      return false;
+    }
+    if (prog === 'get-date') {
+      if (c.stampaLibera) return false;
+      for (let i = 0; i < testi.length; i++) {
+        const t = testi[i];
+        if (!/^-f/i.test(t)) continue;
+        const v = valoreDuePunti(t);
+        if (v != null) { if (inRete(formatoData(v))) return true; continue; }
+        if ('format'.startsWith(t.slice(1).toLowerCase())) { if (inRete(formatoData(testi[i + 1] || ''))) return true; i += 1; }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  // Comandi "liberi" che risolvono un nome scelto dal modello contro la cartella
+  // di lavoro: in una cwd di rete lo mandano al remoto come farebbe `ls` (#1072.4).
+  // Get-Command/Get-Help cercano il file/comando indicato; where.exe (shell cmd)
+  // guarda prima nella cartella corrente. git lo fa in gitPerimetro.
+  function cercaNomeInRete(prog, testi, c) {
+    if (CERCANO_NOME.has(prog)) {
+      return testi.some((t) => {
+        const v = valoreDuePunti(t);
+        const nome = v != null ? v : (t.startsWith('-') ? null : t);
+        return nome != null && dove(nome, c) === MOTIVI.rete;
+      });
+    }
+    if (prog === 'where') return testi.some((t) => t && !/^[-/]/.test(t));
+    return false;
+  }
+
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
@@ -1184,6 +1290,8 @@
     // Il testo cercato non si apre mai: `grep "//TODO" a.js` non contatta nessuno, `echo //nota` che nessuno usa neanche.
     const stampaSoltanto = c.stampaLibera && STAMPANO.has(prog);
     if (!stampaSoltanto && scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
+    if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
+    if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
     if (prog === 'git') return gitPerimetro(dequote(raw), c);
@@ -1205,6 +1313,8 @@
         // Il valore di un gruppo può essere `env:` o `HKCU:`; Test-Path ne dice solo se esiste,
         // ma se viene dal contenuto di un file può essere un percorso di rete (#1072).
         if (t.includes(SEGNAPOSTO) && ((elenco && prog !== 'test-path') || c.valoriIgnoti)) return due(MOTIVI.ignoto);
+        // Il valore di un gruppo, se relativo, si risolve contro una cwd di rete (#1072.4).
+        if (t.includes(SEGNAPOSTO) && c.cwd && c.cwd.rete) return due(MOTIVI.rete);
         const d = dove(t, c);
         if (d === MOTIVI.rete || (elenco && d === MOTIVI.sistema)) return due(d);
       }
@@ -1450,7 +1560,10 @@
 
   function valoreNoto(testo) {
     if (/[({]/.test(String(testo).replace(/'[^']*'|"[^"]*"/g, ''))) return false;
-    return String(testo).split(/;|&&|\|\|?/).every((seg) => !seg.trim() || FONTI_NOTE.has(programOf(dequote(seg.trim()))));
+    return String(testo).split(/;|&&|\|\|/).every((istr) => istr.split('|').every((seg, i) => {
+      const prog = programOf(dequote(seg.trim()));
+      return !seg.trim() || (FONTI_NOTE.has(prog) && !(i > 0 && CALCOLANO.has(prog)));
+    }));
   }
 
   function classifica(cmd, c, prof) {
@@ -1479,20 +1592,54 @@
     return det;
   }
 
+  // cmd toglie ogni `^` fuori dalle virgolette prima di passare il comando: `^.ssh` è `.ssh`, `^\^\host` è
+  // `\\host`, `-^-force` è `--force` (#1072.1). null dove qui non si legge come cmd: un `^` in coda (si
+  // prende la riga dopo), su un separatore (diventa testo), accanto alle espansioni `%` (fatte prima) e `!`.
+  function comeCmd(cmd) {
+    let out = '';
+    let virgolette = false;
+    let tolti = false;
+    for (let i = 0; i < cmd.length; i++) {
+      const ch = cmd[i];
+      if (ch !== '^' || virgolette) {
+        if (ch === '"') virgolette = !virgolette;
+        out += ch;
+        continue;
+      }
+      const dopo = cmd[i + 1];
+      if (dopo === undefined || /[&|<>()%\r\n]/.test(dopo)) return null;
+      out += dopo; // `^"` non apre né chiude le virgolette
+      i += 1;
+      tolti = true;
+    }
+    if ((tolti && out.includes('%')) || (out.includes('!') && out.includes('^'))) return null;
+    return out;
+  }
+
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
   // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
-  // devono vedere il comando che la shell esegue, non la sua grafia (#1072).
+  // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
+  // Per cmd `'` è testo (`' \\host\x '` sono tre argomenti), per i programmi C anche `\"` (findstr); i programmi
+  // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello la prima (#1072.5).
   function comeLaShell(cmd, c) {
-    if (!c.win) return cmd;
-    return cmd.replace(/[\u201C-\u201F]/g, '"')
+    if (!c.win) return [cmd];
+    if (c.shell === 'cmd') {
+      const l = comeCmd(cmd);
+      if (l == null) return null;
+      const interni = l.replace(/'/g, APICE_TESTO);
+      const programmiC = interni.replace(/(\\+)"/g, (m, b) => (b.length % 2 ? '\\'.repeat(b.length >> 1) + VIRGOLETTE_TESTO : m));
+      return [...new Set([programmiC, interni, l])];
+    }
+    return [cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
-      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-');
+      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-')];
   }
 
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
-    return classifica(comeLaShell(cmd, c), c, 0);
+    const letture = comeLaShell(cmd, c);
+    return letture == null ? TRE : letture.map((l) => classifica(l, c, 0)).reduce(peggiore);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
@@ -1534,7 +1681,12 @@
         if (elenco && LETTI_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
         // Testo letto da un file, dato come percorso, può portare in rete (#1072).
         if (!noto && PERCORSO_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
-        if (!FONTI_NOTE.has(progs[i]) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
+        // Un nome dal tubo si risolve contro la cartella di lavoro: in rete lo riceve il remoto (#1072.4).
+        if (i > 0 && (PERCORSO_DAL_TUBO.has(progs[i]) || CERCANO_NOME.has(progs[i])) && cp.cwd && cp.cwd.rete) det = peggiore(det, due(MOTIVI.rete));
+        // Join-Path/Split-Path sul valore del tubo compongono ciò che nessun argomento scrive (`'\\' | Join-Path`):
+        // chi lo riceve come percorso chiede (noto), e Join-Path -Resolve lo apre da sé.
+        if (i > 0 && progs[i] === 'join-path' && argomenti(p, c.win).some((a) => parametro(a.testo, 'resolve', 1))) det = peggiore(det, due(MOTIVI.ignoto));
+        if (!FONTI_NOTE.has(progs[i]) || (i > 0 && CALCOLANO.has(progs[i])) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
         if (ELENCA_OGGETTI.has(progs[i]) || p.includes(SEGNAPOSTO)) elenco = true;
         if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, i < pipe.length - 1 ? { ...cp, stampaLibera: false } : cp));
       });
@@ -1559,5 +1711,19 @@
     return fuoriDa(p, contesto(ctx));
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, programOf, subcommandOf };
+  // Nella cartella personale ma privato per la lettura (nascosto, cartella di profilo come la Libreria del Mac): chi
+  // legge in blocco non ci entra se la cartella chiesta non è già lì dentro (#947.3).
+  function privato(percorso, ctx) {
+    return fuoriPerimetro(percorso, ctx) === MOTIVI.nascosto;
+  }
+
+  // Le cartelle aperte dentro `percorso`, se è proprio una cartella di profilo: chi legge in blocco scende solo lì.
+  function aperteDentro(percorso, ctx) {
+    const c = contesto(ctx);
+    const r = dove(String(percorso == null ? '' : percorso).trim(), c);
+    if (!r || typeof r !== 'object' || !dentroCasa(r, c) || r.segs.length !== c.home.segs.length + 1) return [];
+    return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
+  }
+
+  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, aperteDentro, programOf, subcommandOf, comeCmd };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -95,6 +95,19 @@ async function messaggiDelFilo(opts) {
   const chats = await F().chats(opts);
   const out = [];
   for (const c of chats) {
+    // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) entra come una riga all'ora in cui è cominciata:
+    // lo scambio si rilegge con CERCA_CHAT. Non è voce dell'utente né di Filo, e i ricordi non la ripescano.
+    if (c.app) {
+      const A = globalThis.SN_FILO_APP;
+      const t = A && A.eApp(c.app) && (c.messages || []).length ? A.inizio(c) : NaN;
+      if (Number.isFinite(t)) {
+        out.push({
+          chat: c.id, titolo: c.title || '', role: 'user', riga: true, text: A.testoPerModello(c),
+          ts: new Date(t).toISOString(), actions: [], _i: 0,
+        });
+      }
+      continue;
+    }
     (c.messages || []).forEach((m, i) => {
       if (!m) return;
       out.push({

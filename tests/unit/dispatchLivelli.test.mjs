@@ -13,6 +13,7 @@
 // Senza il fix tutti questi assert sono rossi: le opzioni non esistevano, e
 // `--record-secaudit` con un argomento in più usciva con «argomento non capito».
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFile } from 'node:child_process';
@@ -31,7 +32,7 @@ const {
   applySecaudit,
   defaultState,
   secauditPassato,
-  stripFileArg,
+  leggiOpzioniRegistrazione,
   leggiTestoLivello,
   fixedPayload,
   secauditPayload,
@@ -42,28 +43,29 @@ const {
 
 // ─── Parsing delle opzioni ────────────────────────────────────────────────────
 
-test('stripFileArg: toglie --segnala <file> e lascia il resto com\'è', () => {
-  const r = stripFileArg(['--record-fixed', 'ID1', 'il report', '--segnala', 'seg.md', '--frase', 'ciao'], 'segnala');
+test('leggiOpzioniRegistrazione: toglie --segnala <file> e lascia il resto com\'è', () => {
+  const r = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'il report', '--segnala', 'seg.md', '--frase', 'ciao']);
   assert.equal(r.error, '');
-  assert.equal(r.file, 'seg.md');
-  assert.deepEqual(r.args, ['--record-fixed', 'ID1', 'il report', '--frase', 'ciao']);
+  assert.equal(r.valori['--segnala'], 'seg.md');
+  assert.equal(r.valori['--frase'], 'ciao');
+  assert.deepEqual(r.args, ['--record-fixed', 'ID1', 'il report']);
 });
 
-test('stripFileArg: senza l\'opzione non cambia niente', () => {
-  const r = stripFileArg(['--record-secaudit', 'ID1', 'pass'], 'nota');
+test('leggiOpzioniRegistrazione: senza l\'opzione non cambia niente', () => {
+  const r = leggiOpzioniRegistrazione(['--record-secaudit', 'ID1', 'pass']);
   assert.equal(r.error, '');
-  assert.equal(r.file, '');
+  assert.deepEqual(r.valori, {});
   assert.deepEqual(r.args, ['--record-secaudit', 'ID1', 'pass']);
 });
 
-test('stripFileArg: l\'opzione in fondo senza file, o con un flag al posto del file, è un errore', () => {
-  assert.match(stripFileArg(['--record-fixed', 'ID1', 'rep', '--segnala'], 'segnala').error, /--segnala vuole il percorso/);
-  assert.match(stripFileArg(['--record-fixed', 'ID1', 'rep', '--segnala', '--frase', 'x'], 'segnala').error, /--segnala vuole il percorso/);
-  assert.match(stripFileArg(['--record-secaudit', 'ID1', 'pass', '--nota', '-h'], 'nota').error, /--nota vuole il percorso/);
+test('leggiOpzioniRegistrazione: l\'opzione in fondo senza file, o con un flag al posto del file, è un errore', () => {
+  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala']).error, /--segnala vuole il percorso/);
+  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala', '--frase', 'x']).error, /--segnala vuole il percorso/);
+  assert.match(leggiOpzioniRegistrazione(['--record-secaudit', 'ID1', 'pass', '--nota', '-h']).error, /--nota vuole il percorso/);
 });
 
-test('stripFileArg: l\'opzione ripetuta è un errore, non «vince l\'ultima»', () => {
-  const r = stripFileArg(['--record-fixed', 'ID1', 'rep', '--segnala', 'a.md', '--segnala', 'b.md'], 'segnala');
+test('leggiOpzioniRegistrazione: l\'opzione ripetuta è un errore, non «vince l\'ultima»', () => {
+  const r = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala', 'a.md', '--segnala', 'b.md']);
   assert.match(r.error, /una volta sola/);
 });
 

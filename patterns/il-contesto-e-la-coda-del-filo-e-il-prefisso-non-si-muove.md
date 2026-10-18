@@ -63,6 +63,9 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   contesto: solo cercate (decisione dell'owner, D56 la cambierà con un interruttore). Una pagina delicata dice solo
   il sito; gli indirizzi trovati si riaprono senza conferma, come i link di una ricerca.
 
+- **Le chat delle app entrano come una riga** all'ora in cui sono cominciate, mai lo scambio: vedi
+  [Il filo cresce solo in coda](il-filo-cresce-solo-in-coda-e-cancellare-e-un-evento.md), § chat delle altre app.
+
 - **Chi non ha il filo davanti lo riceve in breve**: la home e il creatore di lezioni hanno nello stato le
   CONVERSAZIONI RECENTI (ultime 24 ore, al più quaranta messaggi, il taglio dichiarato). La chat no: ha il tratto.
 

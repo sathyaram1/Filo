@@ -12,6 +12,12 @@
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <!-- #256 — cronologia appunti: chiave di una voce, etichetta e testo della
+       conferma, gli stessi che usa il menu "Incolla" del tasto destro. -->
+  <script src="filo://shared/clipboardHistory.js"></script>
+  <!-- Icone di Filo: serve il ripiego dell'immagine copiata che non si riesce a
+       disegnare, lo stesso che usa il menu "Incolla". -->
+  <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/nomiSito.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
@@ -121,7 +127,7 @@
           <span class="sn-muted" id="sec-safebrowse-llm-desc"></span>
         </div>
 
-        <div class="sn-toggle-row">
+        <div class="sn-toggle-row" id="sec-safebrowse-sandbox-row" hidden>
           <label>
             <input type="checkbox" id="sec-safebrowse-sandbox" />
             <span id="sec-safebrowse-sandbox-label"></span>
@@ -275,12 +281,35 @@
         </div>
       </section>
 
+      <section id="sec-clipboard" style="margin-top:28px">
+        <h2 id="sec-clip-title" style="font-size:1.05rem;margin-bottom:4px"></h2>
+        <p class="sn-muted" id="sec-clip-desc" style="margin-top:0"></p>
+        <div class="sn-muted" id="sec-clip-empty" style="display:none"></div>
+        <div class="sn-clip-search" id="sec-clip-search-row" style="display:none">
+          <input type="text" id="sec-clip-search" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="sec-clip-list" class="sn-clip-list"></div>
+        <div class="sn-muted sn-clip-noresults" id="sec-clip-noresults" style="display:none"></div>
+        <!-- Voci copiate col puntatore sulla lista: aspettano qui, SOTTO e mai sopra,
+             perché una riga in cima sposterebbe quelle sotto la mano. -->
+        <div class="sn-muted sn-clip-pending" id="sec-clip-pending" style="display:none"></div>
+        <div class="sn-clip-actions" id="sec-clip-actions">
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-clip-clear"></button>
+          <span class="sn-saved-indicator" id="sec-clip-hint"></span>
+        </div>
+      </section>
+
       <div class="sn-toggle-row" id="sec-export-row" style="margin-top:28px">
         <div>
           <button type="button" class="sn-btn sn-btn-secondary" id="sec-export-btn"></button>
           <span class="sn-muted" id="sec-export-desc" style="display:block;margin-top:6px"></span>
         </div>
         <span class="sn-saved-indicator" id="sec-export-hint"></span>
+      </div>
+      <!-- #905: senza la spunta l'archivio esce senza chiavi; la riga c'è solo se ci sono chiavi da portare. -->
+      <div class="sn-toggle-row" id="sec-export-keys-row" hidden>
+        <label><input type="checkbox" id="sec-export-keys"><span id="sec-export-keys-label"></span></label>
+        <span class="sn-muted" id="sec-export-keys-desc"></span>
       </div>
 
       <div class="sn-toggle-row" id="sec-import-row" style="margin-top:18px">
@@ -289,6 +318,39 @@
           <span class="sn-muted" id="sec-import-desc" style="display:block;margin-top:6px"></span>
         </div>
         <span class="sn-saved-indicator" id="sec-import-hint"></span>
+      </div>
+
+      <!-- #850: la conferma sta sotto il tasto, aperta da lui; cosa sparisce e la parola scritta prima del sì. -->
+      <div class="sn-toggle-row" id="sec-wipe-row" style="margin-top:18px">
+        <div>
+          <button type="button" class="sn-btn sn-btn-danger" id="sec-wipe-btn" aria-expanded="false" aria-controls="sec-wipe-box"></button>
+          <span class="sn-muted" id="sec-wipe-desc" style="display:block;margin-top:6px"></span>
+        </div>
+      </div>
+      <div class="sn-info-box sn-wipe-box" id="sec-wipe-box" role="group" aria-labelledby="sec-wipe-btn" hidden>
+        <p class="sn-wipe-par" id="sec-wipe-export-text"></p>
+        <div class="sn-row">
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-wipe-export"></button>
+          <span class="sn-saved-indicator" id="sec-wipe-export-hint"></span>
+        </div>
+        <div class="sn-toggle-row" id="sec-wipe-export-keys-row" hidden>
+          <label><input type="checkbox" id="sec-wipe-export-keys"><span id="sec-wipe-export-keys-label"></span></label>
+          <span class="sn-muted" id="sec-wipe-export-keys-desc"></span>
+        </div>
+        <div class="sn-info-box-title sn-wipe-title" id="sec-wipe-list-title"></div>
+        <p class="sn-wipe-par" id="sec-wipe-list"></p>
+        <p class="sn-wipe-par sn-muted" id="sec-wipe-server"></p>
+        <div class="sn-toggle-row" id="sec-wipe-identity-row" hidden>
+          <label><input type="checkbox" id="sec-wipe-identity"><span id="sec-wipe-identity-label"></span></label>
+          <span class="sn-muted" id="sec-wipe-identity-desc"></span>
+        </div>
+        <label class="sn-wipe-word-label" for="sec-wipe-word" id="sec-wipe-word-label"></label>
+        <input type="text" id="sec-wipe-word" class="sn-wipe-word" autocomplete="off" spellcheck="false">
+        <div class="sn-row sn-wipe-actions">
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-wipe-cancel"></button>
+          <button type="button" class="sn-btn sn-btn-danger" id="sec-wipe-go" disabled></button>
+        </div>
+        <span class="sn-saved-indicator sn-wipe-hint" id="sec-wipe-hint" role="status"></span>
       </div>
     </section>
 

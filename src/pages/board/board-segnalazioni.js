@@ -194,9 +194,10 @@
     menuAperto = menu;
     menu.tabIndex = -1;
     try { menu.focus(); } catch (_) {}
+    document.addEventListener('keydown', tasto, true);
     setTimeout(() => {
+      if (menuAperto !== menu) return;
       document.addEventListener('mousedown', fuori, true);
-      document.addEventListener('keydown', tasto, true);
       window.addEventListener('scroll', chiudiMenu, true);
       window.addEventListener('resize', chiudiMenu);
     }, 0);

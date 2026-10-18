@@ -135,7 +135,6 @@ test('il documento rientra nel prompt intero, fonti comprese', async ({ app, she
 
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -190,7 +189,6 @@ test('a «quali dati condividi?» il documento sulla privacy arriva al modello, 
 
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -254,7 +252,6 @@ test('a «quanto costa Filo?» la chat riceve la nota su come si sostiene', asyn
 
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },

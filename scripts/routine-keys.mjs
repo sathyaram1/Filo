@@ -23,6 +23,8 @@
 //   node scripts/routine-keys.mjs crea <nome> <routine|build> ["a cosa serve"]
 //   node scripts/routine-keys.mjs revoca <nome>
 //   node scripts/routine-keys.mjs account <nome> <A|B>
+//   node scripts/routine-keys.mjs rete <nome> <limitata|aperta>
+//   node scripts/routine-keys.mjs lavori <nome> <server|normali>
 
 import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
 
@@ -62,7 +64,8 @@ async function main() {
   // sembra un'opzione — «--dry-run», che ogni strumento vicino accetta —
   // veniva ignorata in silenzio e la parola d'ordine revocata davvero
   // (feedback #565).
-  const USO = 'Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome> | account <nome> <A|B>]';
+  const USO = 'Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome> | account <nome> <A|B>'
+    + ' | rete <nome> <limitata|aperta> | lavori <nome> <server|normali>]';
   // Chiedere aiuto non è un errore, e questo è lo strumento dove sbagliare
   // costa di più: l'aiuto si stampa e basta (feedback #565).
   if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) { console.log(USO); return; }
@@ -85,7 +88,10 @@ async function main() {
       const stato = k.revoked ? 'REVOCATA' : 'attiva';
       // L'account claude.ai della routine: senza, il suo consumo non va su nessun account (crediti, #1156).
       const account = k.scope === 'routine' ? `account ${k.account || '—'}`.padEnd(10) : ''.padEnd(10);
-      console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(8)} ${account} ${stato}`
+      // Solo a rete limitata i biglietti nascono puliti; la chiave server prende solo lavori server (#1253).
+      const rete = k.scope === 'routine' ? `rete ${k.rete || 'aperta'}`.padEnd(14) : ''.padEnd(14);
+      const lavori = k.scope === 'routine' && k.lavori === 'server' ? 'lavori server  ' : ''.padEnd(15);
+      console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(8)} ${account} ${rete} ${lavori}${stato}`
         + (k.lastUsedAt ? `  ultimo uso ${quando(k.lastUsedAt)}` : '')
         + (k.label ? `  — ${k.label}` : ''));
     }
@@ -99,10 +105,11 @@ async function main() {
     }
     const r = await chiama({ op: 'issue', slug: nome, scope: potere, label: resto.join(' ') });
     console.log(`\nParola d'ordine per "${r.slug}" (potere: ${r.scope}):\n`);
-    console.log(`    ${r.passphrase}\n`);
+    // Da sola sulla riga, senza rientro: si copia con la riga, e i quattro spazi finivano nel segreto (#1210).
+    console.log(`${r.passphrase}\n`);
     console.log('Copiala ADESSO dove serve: non si potrà più rileggere.');
     console.log(potere === 'build'
-      ? "Va nell'ambiente della costruzione, come FILO_BUILD_PASSPHRASE."
+      ? "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno."
       // Una parola d'ordine di routine NON va nell'ambiente: l'ambiente lo
       // eredita ogni lavoratore che parte da lì. Sta solo nel prompt della
       // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
@@ -133,7 +140,31 @@ async function main() {
     return;
   }
 
-  console.error('Uso: node scripts/routine-keys.mjs <elenco|crea|revoca|account> …');
+  if (cmd === 'rete') {
+    if (!nome || (potere !== 'limitata' && potere !== 'aperta') || resto.length) {
+      console.error('Uso: node scripts/routine-keys.mjs rete <nome> <limitata|aperta>');
+      process.exit(1);
+    }
+    await chiama({ op: 'rete', slug: nome, rete: potere });
+    console.log(potere === 'limitata'
+      ? `"${nome}" è a rete limitata: i suoi biglietti possono nascere puliti. Vale solo se l'ambiente della routine su claude.ai ha davvero la rete limitata.`
+      : `"${nome}" è a rete aperta: i suoi biglietti nascono sporchi e non prende lavori server.`);
+    return;
+  }
+
+  if (cmd === 'lavori') {
+    if (!nome || (potere !== 'server' && potere !== 'normali') || resto.length) {
+      console.error('Uso: node scripts/routine-keys.mjs lavori <nome> <server|normali>');
+      process.exit(1);
+    }
+    await chiama({ op: 'lavori', slug: nome, lavori: potere });
+    console.log(potere === 'server'
+      ? `"${nome}" è la chiave della routine server: riceve solo lavori server fidati, e solo a rete limitata.`
+      : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata.`);
+    return;
+  }
+
+  console.error('Uso: node scripts/routine-keys.mjs <elenco|crea|revoca|account|rete|lavori> …');
   process.exit(1);
 }
 

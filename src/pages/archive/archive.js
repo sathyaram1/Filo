@@ -37,24 +37,6 @@
     render();
   }
 
-  // Hue (0..360) del colore identità, per l'ordine cromatico. Le tab senza
-  // colore vanno in fondo (hue = Infinity), così i siti colorati guidano l'occhio.
-  function hueOf(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return Infinity;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return Infinity;
-    const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    if (mx === mn) return Infinity; // grigio → niente identità cromatica
-    const d = mx - mn;
-    let h;
-    if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-    else if (mx === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    return (h / 6) * 360;
-  }
-
   // Chip colorata con la stessa regola delle schede in alto (tabColor.js): tinta
   // del sito sul neutro della chip quanto dice opacita_tab, titolo per contrasto.
   const TabColor = window.SN_TAB_COLOR;
@@ -262,8 +244,12 @@
     // niente titolo generato, niente tipo, e al posto della data «In corso».
     // Senza questa riga si leggeva come una chat finita, e cliccarla apriva
     // una seconda copia della stessa conversazione.
-    const inCorso = !c.closedAt;
+    // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) non è «in corso» in una scheda della home:
+    // continua nella sua app, e da qui si guarda nel filo.
+    const app = appDi(c);
+    const inCorso = !c.closedAt && !app;
     if (inCorso) row.dataset.incorso = '1';
+    if (app) row.dataset.app = c.app;
 
     const date = document.createElement('div');
     date.className = 'arc-chat-date';
@@ -273,8 +259,8 @@
     row.title = [
       c.title || '',
       `${c.messageCount || 0} messaggi`,
-      inCorso ? 'Conversazione ancora aperta' : (c.kind === 'comando' ? 'Comando' : 'Conversazione'),
-      inCorso ? 'Clic per tornare dov’è aperta' : 'Clic per riaprirla e continuare a scrivere',
+      app ? `Conversazione ${app.nel}` : (inCorso ? 'Conversazione ancora aperta' : (c.kind === 'comando' ? 'Comando' : 'Conversazione')),
+      app ? 'Clic per guardarla nel filo' : (inCorso ? 'Clic per tornare dov’è aperta' : 'Clic per riaprirla e continuare a scrivere'),
     ].filter(Boolean).join('\n');
 
     row.addEventListener('click', (e) => {
@@ -309,7 +295,7 @@
   // fra loro — scrivi in una e l'altra resta indietro — e nell'archivio i due
   // fili finiscono mescolati.
   async function reopenChat(c) {
-    if (!c.closedAt) {
+    if (!c.closedAt && !appDi(c)) {
       try {
         const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_FOCUS, id: c.id });
         if (r && r.portato) return;
@@ -317,6 +303,17 @@
     }
     try { chrome.tabs.create({ url: `filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}` }); }
     catch (_) {}
+  }
+
+  function appDi(c) {
+    const A = window.SN_FILO_APP;
+    return c && c.app && A && A.APP[c.app] ? A.APP[c.app] : null;
+  }
+
+  // L'app dove la conversazione è nata, al documento, al mazzo o alla pagina di allora.
+  function apriApp(c) {
+    if (!c.dove) return;
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: c.dove })).catch(() => {}); } catch (_) {}
   }
 
   // Cancellazione manuale, con la conferma prevista per le azioni
@@ -404,8 +401,8 @@
 
     for (const k of orderedDays) {
       const items = groups.get(k);
-      // Ordine cromatico dentro il giorno (arcobaleno); i senza colore in fondo.
-      items.sort((a, b) => hueOf(a.identityColor) - hueOf(b.identityColor));
+      // Dentro il giorno lo stesso ordine arcobaleno della barra.
+      if (TabColor) items.sort((a, b) => TabColor.compareRainbow(a.identityColor, b.identityColor));
 
       const day = document.createElement('div');
       day.className = 'arc-day';
@@ -536,11 +533,12 @@
     fuocoPrimaDelMenu = document.activeElement;
     menu.tabIndex = -1;
     try { menu.focus(); } catch (_) {}
+    document.addEventListener('keydown', onMenuKeydown, true);
     // setTimeout: evita che il mousedown/click che ha aperto il menu lo chiuda
     // subito tramite il listener "outside click".
     setTimeout(() => {
+      if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      document.addEventListener('keydown', onMenuKeydown, true);
       window.addEventListener('scroll', closeCtxMenu, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);
@@ -561,6 +559,17 @@
   // menu del tasto destro.
   function openChatCtxMenu(x, y, c, row) {
     const versoComando = c.kind !== 'comando';
+    const app = appDi(c);
+    if (app) {
+      const VAI = { editor: 'Apri nell’Editor', mazzi: 'Apri nei Mazzi', aiuto: 'Apri la pagina' };
+      openMenuAt(x, y, [
+        { label: 'Apri nel filo', run: () => reopenChat(c) },
+        ...(c.dove && VAI[c.app] ? [{ label: VAI[c.app], run: () => apriApp(c) }] : []),
+        { label: 'Rinomina', run: () => rinominaChat(c, row) },
+        { label: 'Elimina la chat', run: () => removeChat(c) },
+      ]);
+      return;
+    }
     openMenuAt(x, y, [
       { label: 'Riapri la chat', run: () => reopenChat(c) },
       { label: 'Rinomina', run: () => rinominaChat(c, row) },

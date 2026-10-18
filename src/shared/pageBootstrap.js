@@ -37,6 +37,9 @@
     if (reg) reg.applyToDocument(document, tokens || {});
   }
 
+  // Il segno delle pagine di Filo: gli override dei token girano anche sui siti, e il font dei link vale solo qui.
+  document.documentElement.dataset.snPagina = '';
+
   // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.
   applyTheme('system');
 
@@ -234,7 +237,8 @@
     }
 
     function open() {
-      if (!pop.hidden) return;
+      // Il bottone non eredita `disabled` dal <select>: senza, una tendina spenta si apriva e cambiava valore.
+      if (!pop.hidden || select.disabled) return;
       buildOptions();
       pop.hidden = false;
       wrap.classList.add('sn-open');

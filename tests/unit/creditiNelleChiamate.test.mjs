@@ -2,6 +2,7 @@
 // fatto dopo l'ultimo battito arriva al rilascio, alla richiesta del biglietto e alla domanda di chiusura.
 // E lo strumento delle parole d'ordine dà a ogni routine il suo account, senza il quale il consumo non conta.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

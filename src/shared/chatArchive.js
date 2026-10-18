@@ -158,6 +158,8 @@
       closedAt: chat.closedAt || null,
       messageCount: messages.length,
       excerpt: excerptOf(messages, chat.title || fallbackTitle(messages)),
+      // Una conversazione di un'altra app (#974): si riapre nel filo o nella sua app, non si continua dalla home.
+      ...(chat.app ? { app: chat.app, dove: typeof chat.dove === 'string' ? chat.dove : '' } : {}),
     };
   }
 
@@ -387,9 +389,23 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
+      const guardate = [
+        ...(Array.isArray(turn.guardate) ? turn.guardate : []),
+        ...(Array.isArray(turn.actions) ? turn.actions : [])
+          .filter((a) => a && String(a.type || '').toUpperCase() === 'VEDI_SCHERMO' && a._executed !== false && a._output && a._output.testo)
+          .map((a) => a._output.finestra),
+      ].filter((n) => typeof n === 'string' && n.trim()).map((n) => n.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120));
+      if (guardate.length) out.guardate = [...new Set(guardate)].slice(0, 20);
       // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
       const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
       if (cambi.length) out.cambi = cambi;
+      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora.
+      const linkDaConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
+        .filter((x) => x && typeof x.url === 'string' && x.url)
+        .slice(0, 200)
+        .map((x) => ({ url: x.url, motivo: String(x.motivo || '').slice(0, 200) }));
+      if (linkDaConfermare.length) out.linkDaConfermare = linkDaConfermare;
     }
     return out;
   }

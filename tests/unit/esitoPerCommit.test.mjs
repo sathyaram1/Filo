@@ -33,6 +33,7 @@
 // richiesta di fusione porta solo il nome del ramo, e gli assert che cercano
 // il commit sono rossi.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -46,6 +47,7 @@ const {
   applySecaudit,
   applyVerifierVerdict,
   applyFixed,
+  fixedPayload,
   defaultState,
 } = await import('../../scripts/dispatch.mjs');
 
@@ -198,6 +200,39 @@ test('canale deliver secaudit: lo sha lo timbra lo strumento, e uno dichiarato p
     srv.close();
     togliCartella(dir);
   }
+});
+
+// #1148: il registro del ramo confronta la punta di chi consegna con quella che troverà chi viene dopo.
+test('canale deliver: correzione e revisione partono con lo sha timbrato, e uno dichiarato può solo confermarlo', async () => {
+  const { srv, ricevuti, port } = await fintoServer();
+  const { dir, punta } = deposito('filo-1148-canale-');
+  try {
+    const env = { ...process.env, FILO_REPO_ROOT: dir, FILO_TOOLS_ROOT: dir, FILO_NO_BEAT: '1', FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+    const lancia = (args) => new Promise((r) => execFile(process.execPath, [CANALE, ...args], { env, cwd: dir },
+      (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
+    const ultimo = () => (ricevuti.filter((x) => x.url.includes('routineDeliver')).at(-1).body.data || {});
+    const atteso = punta();
+    const f = await lancia(['deliver', 'biglietto-finto', 'fixed', '--report', 'corretto il difetto', '--frase', 'ora va']);
+    assert.equal(f.status, 0, f.stderr);
+    assert.equal(ultimo().sha, atteso);
+    const v = await lancia(['deliver', 'biglietto-finto', 'status', '--status', 'revision_capability', '--notes', 'fatto', '--frase', 'ora va']);
+    assert.equal(v.status, 0, v.stderr);
+    assert.equal(ultimo().sha, atteso);
+    const quanti = ricevuti.length;
+    const dettato = await lancia(['deliver', 'biglietto-finto', 'fixed', '--report', 'corretto', '--sha', 'f'.repeat(40)]);
+    assert.equal(dettato.status, 1);
+    assert.match(dettato.stderr, /consegna non registrata/);
+    assert.equal(ricevuti.length, quanti, 'il server non viene chiamato');
+  } finally {
+    srv.close();
+    togliCartella(dir);
+  }
+});
+
+test('dispatch --record-fixed: la correzione porta la punta intera della cartella', () => {
+  const sha = 'a'.repeat(40);
+  assert.equal(fixedPayload({ report: 'r', branch: 'worker/x', sha }).sha, sha);
+  assert.equal('sha' in fixedPayload({ report: 'r', branch: 'worker/x', sha: 'corto' }), false, 'senza sha intero non parte niente: il server segna il buco');
 });
 
 // ─── L'ultimo passo: la richiesta di fusione ────────────────────────────────
