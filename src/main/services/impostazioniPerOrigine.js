@@ -9,7 +9,10 @@ const OGNI_VOCE = '*';
 // terminale) rispondono solo alla cornice e alle pagine di Filo.
 const CANALI_WEB = Object.freeze(new Set([
   'filo:message', 'ai-stream:start', 'ai-stream:abort',
-  'filo:fp-config', 'filo:cookie-wipe', 'filo:permessi-stato', 'filo:frame-active',
+  'filo:fp-config', 'filo:cookie-wipe', 'filo:permessi-stato', 'filo:permessi-scrittura', 'filo:frame-active',
+  'filo:adblock-css', 'filo:adblock-tokens', 'filo:gesto-pagina', 'filo:gesto-di-filo', 'filo:apertura-scelta',
+  'filo:indirizzo-rifiutato', 'filo:menu-di-riserva', 'filo:chiudi-pagina', 'filo:cmd-freccia',
+  'filo:conferma', 'filo:conferma-ritira',
 ]));
 
 // Le domande (tipi di filo:message) che il codice di Filo dentro le pagine fa davvero:
@@ -30,7 +33,14 @@ const DOMANDE_WEB = Object.freeze(new Set([
   'fetch_link_meta', 'web_search', 'path_collectable', 'save_path',
   'filo_run_action', 'filo_confirm_action', 'shell_action',
   'cookies_config', 'cookies_rule', 'cookies_banner_tokens', 'cookies_frame_banner', 'cookies_outcome',
-  'safebrowse_get', 'safebrowse_proceed', 'safebrowse_dismiss', 'geo_propose_accept', 'geo_propose_dismiss',
+  'safebrowse_get', 'geo_propose_accept', 'geo_propose_dismiss',
+  'wallet_invite_open', 'campi_delicati', 'apri_collegamento_filo', 'key_fallback_shown', 'copy_text_to_clipboard',
+  'filo_aiuto_nuovo', 'filo_conversazione_app', 'apri_comunque', 'controlla_campo', 'aiuto_documenti_ferma',
+  'aiuto_cerca_documenti', 'filo_decidi_pagina', 'accesso_credenziali', 'riquadro_cookie_segnala',
+  'riquadro_cookie_stato', 'riquadro_cookie_cambia', 'riquadro_cookie_risposta', 'ad_skip_click', 'ad_skip_config',
+  'ad_skip_here', 'audio_host_check', 'spiegazione_anticipata_usata', 'image_provenance', 'image_bytes',
+  'image_copied', 'icon_layout_get', 'icon_layout_drop', 'barra_trascina', 'menu_del_sito_scelto',
+  'menu_del_sito_imposta', 'filo_spento_imposta', 'redteam_visibility', 'barra_etichette', 'shortcut_receipt',
 ]));
 
 // Le fotografie: da un sito le chiede solo la scheda in primo piano, che inquadra sé stessa;
@@ -77,7 +87,7 @@ function domandaAmmessaDaUnSito(type, { inVista = false, schedaInVista = false, 
 const DOMANDE_WEB_COL_GESTO = Object.freeze(new Set([
   'permesso_filo', 'save_page', 'save_link', 'set_saved_page_thumb', 'update_settings',
   'submit_feedback', 'credits_award_feedback', 'redteam_submit',
-  'download_image', 'download_media', 'download_link', 'geo_propose_accept', 'save_path',
+  'download_image', 'download_media', 'download_link', 'geo_propose_accept', 'save_path', 'icon_layout_drop',
 ]));
 const CHIAVI_STORAGE_WEB_COL_GESTO = Object.freeze(['sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout']);
 // Un gesto, una scrittura: la lista tiene le ultime mille, e un «Ha funzionato?» costa due chiamate al modello.
@@ -102,8 +112,19 @@ const CAMPI_WEB = Object.freeze({
     saturazione_tab: true, luminosita_tab: true, opacita_tab: true,
   }),
   blocklist: true,
-  featureFlags: Object.freeze({ spellcheck: true }),
+  // I siti dove il tasto destro apre il loro menu (#975): come i siti esclusi, arriva solo la voce del frame che chiede.
+  menuDelSito: Object.freeze({ siti: true }),
+  // L'Aiuto spento (#841) toglie la sua voce dal tasto destro anche sui siti.
+  featureFlags: Object.freeze({ spellcheck: true, help: true }),
+  // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
+  spiegaAnticipata: true,
+  // I tasti di Spiega e Aiuto scelti dall'utente (#842): il menu del tasto destro li scrive accanto alle voci.
+  scorciatoie: true,
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
+  // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
+  notifications: Object.freeze({ durationSec: true }),
+  // Il microfono dell'Aiuto su una pagina: finito di parlare, la richiesta parte da sola o resta da correggere.
+  dictation: Object.freeze({ autoSend: true, silenceSec: true, cancelSec: true }),
   models: Object.freeze({ transcribe_audio: true }),
   // Voci aperte (le scrive anche l'owner dalla config condivisa): di ognuna
   // passa solo quanto serve al menu della dettatura per scegliere il modello.
@@ -124,11 +145,13 @@ const CAMPI_WEB_SCRITTURA = Object.freeze({
 const SPINTE_WEB = Object.freeze(new Set([
   'settings_updated',
   'cookies_config_update',
+  'ad_skip_config_update',
   'feedback_draw_state',
   'show_toast',
   'tts_global_reading',
   'tts_stop',
   'fullscreen_changed',
+  'icon_layout_changed',
 ]));
 
 // Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno
@@ -144,11 +167,16 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
   'sn_icon_layout',
   'sn_qr_in_primary_migrated',
   'sn_feedback_client_id',
-  'sn_feedback_draft_text',
-  'sn_redteam_attack_draft',
-  'sn_redteam_desc_draft',
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
+
+// Le bozze dei riquadri (feedback, attacco red-team) scritte in un sito restano a quel sito (#1071): ognuno legge e
+// scrive solo le chiavi che portano la SUA origine, quella del riquadro che chiede e non della scheda (un riquadro
+// incorporato è un altro sito). Un documento senza origine (sandbox, data:) non ne ha: «null» è di tutti.
+const BOZZE_PER_SITO = Object.freeze(['sn_feedback_draft_text', 'sn_redteam_attack_draft', 'sn_redteam_desc_draft']);
+const chiaveDelSito = (k, origineRiquadro) => typeof k === 'string' && typeof origineRiquadro === 'string'
+  && origineRiquadro !== '' && origineRiquadro !== 'null'
+  && BOZZE_PER_SITO.some((b) => k === `${b}@${origineRiquadro}`);
 
 // Le azioni di Filo che il codice dentro un sito chiede: la barra d'aiuto propone un
 // feedback e apre i link («apri in una nuova scheda»). Il resto no, nemmeno confermato:
@@ -209,6 +237,7 @@ function impostazioniPerWeb(settings, indirizzi = []) {
   if (!settings || typeof settings !== 'object') return settings;
   const out = proietta(settings, CAMPI_WEB);
   if (own(out, 'blocklist')) out.blocklist = esclusiDelSito(out.blocklist, indirizzi);
+  if (out.menuDelSito && own(out.menuDelSito, 'siti')) out.menuDelSito.siti = esclusiDelSito(out.menuDelSito.siti, indirizzi);
   return out;
 }
 
@@ -224,10 +253,34 @@ function indirizziDelMittente(sender) {
   return [riquadro, String(sender?.tab?.url || sender?.url || '')];
 }
 
+// #843 — dall'Aiuto di un sito si spegne o si riaccende Filo solo lì: si aggiunge il nome del sito, si tolgono le voci
+// che lo coprono. Mai un altro sito, che il testo della pagina potrebbe far nominare.
+function filoSulSitoStesso(action, origine) {
+  const N = globalThis.SN_NOMI_SITO || require('../../shared/nomiSito.js');
+  const D = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
+  if (!globalThis.SN_PREF) require('../../shared/preferences.js');
+  const P = globalThis.SN_PREF;
+  const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
+  const setter = P.setterDellaChiave(chiave);
+  if (!setter || setter.scrive.length !== 1 || setter.scrive[0] !== 'blocklist') return false;
+  const host = hostDi(origine);
+  const sito = N.daScritto(host);
+  if (!sito) return false;
+  const r = D.risolviSchede(action.valore ?? action.value ?? action.valoreNuovo ?? action.val, { schede: [], attiva: origine });
+  const b = r.rifiuto ? null : P.buildPreferencePartial(chiave, r.valore);
+  const e = b && !b.rifiuto && b.elenco;
+  if (!e || !e.voci.length) return false;
+  if (e.op === 'aggiungi') return e.voci.every((v) => v === sito);
+  return e.op === 'togli' && e.voci.every((v) => N.copre(v, host));
+}
+
 function azioneAmmessaDa(action, origine) {
   if (isFilo(origine)) return true;
   if (!action || typeof action !== 'object') return false;
   const type = String(action.type || '').toUpperCase();
+  if (type === 'IMPOSTA_PREFERENZA') {
+    try { return filoSulSitoStesso(action, origine); } catch (_) { return false; }
+  }
   if (!AZIONI_WEB.has(type)) return false;
   return type !== 'NAVIGA' || indirizzoWeb(action.url ?? action.href ?? action.link);
 }
@@ -286,9 +339,9 @@ function spingiAllaFinestra(win, message) {
 
 // Le chiavi che un sito può chiedere al magazzino, nella stessa forma della
 // richiesta (null = tutte le sue, stringa, elenco, oggetto coi valori di ripiego).
-function chiaviStoragePerOrigine(keys, origine) {
+function chiaviStoragePerOrigine(keys, origine, origineRiquadro) {
   if (isFilo(origine)) return keys;
-  const ammessa = (k) => typeof k === 'string' && CHIAVI_STORAGE_WEB.includes(k);
+  const ammessa = (k) => typeof k === 'string' && (CHIAVI_STORAGE_WEB.includes(k) || chiaveDelSito(k, origineRiquadro));
   if (keys == null) return [...CHIAVI_STORAGE_WEB];
   if (typeof keys === 'string') return ammessa(keys) ? keys : [];
   if (Array.isArray(keys)) return keys.filter(ammessa);
@@ -301,10 +354,11 @@ function chiaviStoragePerOrigine(keys, origine) {
 }
 
 // Scrivere o togliere scomparti da un sito: solo quelli dei content script.
-function scritturaStorageAmmessa(keys, origine) {
+function scritturaStorageAmmessa(keys, origine, origineRiquadro) {
   if (isFilo(origine)) return true;
   const elenco = Array.isArray(keys) ? keys : [keys];
-  return elenco.every((k) => typeof k === 'string' && CHIAVI_STORAGE_WEB_SCRITTURA.includes(k));
+  return elenco.every((k) => typeof k === 'string'
+    && (CHIAVI_STORAGE_WEB_SCRITTURA.includes(k) || chiaveDelSito(k, origineRiquadro)));
 }
 
 // Letture dello storage grezzo (chrome.storage.local.get): la chiave `settings`
@@ -330,6 +384,7 @@ module.exports = {
   SPINTE_WEB,
   SPINTE_WEB_IN_VISTA,
   CHIAVI_STORAGE_WEB,
+  BOZZE_PER_SITO,
   AZIONI_WEB,
   isFilo,
   impostazioniPerWeb,

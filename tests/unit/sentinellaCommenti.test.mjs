@@ -5,10 +5,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -25,11 +26,11 @@ function corsa(albero) {
     const env = { ...process.env, FILO_COMMENTI_ROOT: dir };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, ['--test', 'tests/unit/commentiRegola.test.mjs'], {
-      cwd: ROOT, encoding: 'utf8', timeout: 240000, env,
+      cwd: ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS, env,
     });
     return `${r.stdout || ''}${r.stderr || ''}`;
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 }
 
@@ -108,6 +109,23 @@ test('un racconto attaccato in coda a una riga di codice non sfugge alla misura'
   });
   assert.ok(rosso(inPagina, 'un commento a sé non supera le due righe'),
     `tre righe attaccate in coda a un tag passano:\n${inPagina}`);
+});
+
+test('un .js senza intestazione in cima fa rossa la sentinella, col nome del file', () => {
+  const pulito = corsa({
+    'strict.js': "'use strict';\n// Il perché del modulo.\nconst a = 1;\n",
+    'eseguibile.js': '#!/usr/bin/env node\n/** Il perché del comando. */\n',
+  });
+  assert.doesNotMatch(pulito, /not ok \d+ -/, `#! o 'use strict' prima dell'intestazione la fanno rossa:\n${pulito}`);
+
+  const uscita = corsa({
+    'buono.js': '// Il perché del modulo.\nconst a = 1;\n',
+    'nudo.js': 'const a = 1;\n// un commento dopo il codice non è un’intestazione\n',
+    'sotto/vuoto.js': '',
+  });
+  assert.ok(rosso(uscita, 'ogni .js ha un commento d’intestazione in cima'), `un .js senza intestazione passa:\n${uscita}`);
+  assert.ok(uscita.includes('nudo.js') && uscita.includes('sotto/vuoto.js'), `la sentinella non nomina i file:\n${uscita}`);
+  assert.ok(!uscita.includes('buono.js'), `un .js in regola finisce fra i colpevoli:\n${uscita}`);
 });
 
 // La sentinella legge i commenti col lexer di TypeScript: se il progetto non lo

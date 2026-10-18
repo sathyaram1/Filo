@@ -32,6 +32,10 @@ test('FILO_CONFIRM_ACTION da pagina web esterna esegue azione livello 2 senza po
   const newtab = await openTab('filo://newtab/');
   await newtab.waitForLoadState('domcontentloaded');
 
+  // Il terminale è acceso di serie (#892): spento qui, altrimenti «attiva» non cambierebbe niente.
+  await newtab.evaluate(() => chrome.runtime.sendMessage({
+    type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { terminal: { enabled: false } },
+  }));
   // Leggiamo lo stato INIZIALE della modalità terminale.
   const settingsBefore = await newtab.evaluate(async () => {
     return new Promise((resolve) => {
@@ -41,6 +45,7 @@ test('FILO_CONFIRM_ACTION da pagina web esterna esegue azione livello 2 senza po
     });
   });
   const terminalBefore = !!(settingsBefore?.settings?.terminal?.enabled);
+  expect(terminalBefore, 'la prova parte col terminale spento').toBe(false);
 
   // Apriamo una pagina esterna (http://127.0.0.1) col content script Filo.
   const externalPage = await testServer.openReady(openTab, `

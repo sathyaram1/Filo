@@ -7,7 +7,7 @@
 //      non finge di averli trovati);
 //   3. il prompt filoChat include la sezione capacità + l'azione CAPACITA_DETTAGLIO
 //      + l'istruzione di onestà quando una capacità non esiste;
-//   4. l'azione CAPACITA_DETTAGLIO è registrata a livello 1 (sola lettura).
+//   4. l'azione CAPACITA_DETTAGLIO è registrata a costo 0 (sola lettura, resta in chat).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,8 +28,8 @@ const LEVELS = globalThis.SN_ACTION_LEVELS;
 const C = globalThis.SN_CONST;
 
 test('renderIndexForPrompt: una riga per capacità (titolo + id) sotto la sua categoria', () => {
-  const idx = CAP.renderIndexForPrompt();
-  // Ogni capacità del manifesto compare con titolo e id stabile.
+  const idx = CAP.renderIndexForPrompt({ redteam: true });
+  // Ogni capacità del manifesto compare con titolo e id stabile (tutti i cancelli aperti).
   for (const c of CAP.CAPABILITIES) {
     assert.ok(idx.includes(`${c.title} [${c.id}]`), `manca dall'indice: ${c.id}`);
   }
@@ -72,7 +72,7 @@ test('PROMPTS.filoChat: senza capacita non emette la sezione (retrocompatibile)'
   assert.doesNotMatch(p, /═══ COSA SA FARE FILO/);
 });
 
-test('CAPACITA_DETTAGLIO è registrata a livello 1 (sola lettura)', () => {
-  assert.equal(LEVELS.levelFor({ type: 'CAPACITA_DETTAGLIO', ids: ['save-for-later'] }), 1);
+test('CAPACITA_DETTAGLIO è registrata a costo 0 (sola lettura, resta in chat)', () => {
+  assert.equal(LEVELS.costoFor({ type: 'CAPACITA_DETTAGLIO', ids: ['save-for-later'] }), 0);
   assert.ok(LEVELS.describe({ type: 'CAPACITA_DETTAGLIO', ids: ['save-for-later'] }).length > 0);
 });

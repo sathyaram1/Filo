@@ -69,6 +69,7 @@ beforeEach(() => {
   };
   Collector._reset();
   Collector._setAuto(false);   // niente timer veri nei test
+  Collector._setAccesa(true);  // la coda di quando la raccolta riparte (#897)
 });
 
 afterEach(() => { globalThis.fetch = fetchOrig; Collector._reset(); });
@@ -89,16 +90,19 @@ test('il ritardo è sorteggiato dentro una finestra dichiarata, non fisso', asyn
   for (const sorte of [0, 0.25, 0.5, 0.75, 1]) {
     Collector._reset();
     Collector._setAuto(false);
+    Collector._setAccesa(true);
     Collector._setSorteggio(() => sorte);
     const prima = Date.now();
     await raccogli('https://esempio.it/x', 'una cosa');
+    const dopo = Date.now();
     const [voce] = Collector._peek();
-    attese.push(voce.nonPrimaDi - prima);
+    // Il ritardo parte da un istante fra prima e dopo: la finestra si controlla con quei due, a macchina carica come ferma.
+    attese.push({ almeno: voce.nonPrimaDi - dopo, alPiu: voce.nonPrimaDi - prima });
   }
-  for (const a of attese) {
-    assert.ok(a >= RITARDO_MIN_MS - 1000 && a <= RITARDO_MAX_MS + 1000, `ritardo fuori finestra: ${a}ms`);
+  for (const { almeno, alPiu } of attese) {
+    assert.ok(alPiu >= RITARDO_MIN_MS && almeno <= RITARDO_MAX_MS, `ritardo fuori finestra: fra ${almeno} e ${alPiu} ms`);
   }
-  assert.ok(new Set(attese).size > 1, 'un ritardo sempre uguale sarebbe di nuovo un orario');
+  assert.ok(new Set(attese.map((a) => a.alPiu)).size > 1, 'un ritardo sempre uguale sarebbe di nuovo un orario');
   assert.ok(RITARDO_MIN_MS >= 30 * 60 * 1000, 'meno di mezz’ora non stacca niente');
   assert.ok(RITARDO_MAX_MS >= 12 * 60 * 60 * 1000, 'la finestra deve essere larga ore, non minuti');
 });
@@ -185,6 +189,7 @@ test('la coda sopravvive alla chiusura dell’app: quello che c’era sul disco 
     // l'app si chiude e riapre: stessa coda, stesso ritardo già sorteggiato
     Collector._reset();
     Collector._setAuto(false);
+    Collector._setAccesa(true);
     assert.equal(await Collector.flush({ now: Date.now() }), 1, 'non è ancora maturo');
     assert.equal(scritture.length, 0);
     await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
@@ -254,6 +259,7 @@ test('un percorso salvato mentre la coda si sta ancora leggendo dal disco non la
   try {
     Collector._reset();
     Collector._setAuto(false);
+    Collector._setAccesa(true);
     Collector.init();                       // avvio: la lettura è partita
     await raccogli('https://nuovo-esempio.it/x', 'una cosa di adesso');
     await new Promise((r) => setTimeout(r, 60));

@@ -4,7 +4,7 @@
 // verdetti, riassunto) come un'unica stringa FENC1: prima di scriverlo sul
 // documento PUBBLICO `feedback/{id}` — altrimenti `action:'block_attack'` e i
 // reasoning dei giudici ri-esporrebbero il segnale "sei stato beccato". La
-// dashboard owner / le routine devono decifrarlo e re-idratarlo a OGGETTO prima
+// dashboard owner deve decifrarlo e re-idratarlo a OGGETTO prima
 // del render, così classifyBlock/listBoardTab continuano a leggere
 // `fb.pipeline.action` invariati.
 //

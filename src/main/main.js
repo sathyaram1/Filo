@@ -14,6 +14,12 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
+try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
+
+// Prima di qualsiasi sessione, che caricherebbe subito i dizionari del correttore scaricandoli da Google (#1084).
+try { require('./services/dizionari').prepara(app); } catch (_) {}
+
 // Su Windows serve un AppUserModelID esplicito perché la taskbar mostri
 // l'icona giusta (e non quella di Electron di default).
 if (process.platform === 'win32') {
@@ -43,6 +49,8 @@ try {
   });
   if (scelto) app.commandLine.appendSwitch('password-store', scelto);
 } catch (_) {}
+require('./test-window-mode').disegnaAncheFuoriSchermo(app);
+require('./test-window-mode').webglAncheSenzaScheda(app);
 
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
@@ -67,9 +75,17 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
+    globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
+    globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
+    globalThis.__filoDizionari = require('./services/dizionari');
+    globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
     globalThis.__filoShortcuts = require('./shortcuts');
+    globalThis.__filoAuth = require('./auth/google-auth');
+    globalThis.__filoUpdater = require('./updater');
+    globalThis.__filoAlarmWatcher = require('./services/alarmWatcher');
+    globalThis.__filoCancellaTutto = require('./cancellaTutto');
   } catch (_) {}
 }
 
@@ -77,11 +93,13 @@ if (process.env.NODE_ENV === 'test') {
 // che aprono Filo fuori dalla modalità test (vedi test-servizi-chiusi.js). No-op altrimenti.
 try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 
-const { createMainWindow, revealWindow } = require('./window');
+const {
+  createMainWindow, revealWindow, assicuraFinestraNormale, onFinestraNormale,
+} = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
 const { installaMenuApplicazione } = require('./menu');
-const { initAutoUpdater } = require('./updater');
+const { initAutoUpdater, installaAllAvvioSeServe } = require('./updater');
 
 // Permette al protocollo filo:// di caricarsi con privilegi standard (CORS
 // libero, fetch, ecc.) — deve essere chiamato PRIMA di app.whenReady.
@@ -116,11 +134,9 @@ function apriInvito(code) {
   // aspetta lì e parte appena la finestra c'è.
   if (!mainWindow) { invitoInAttesa = { code }; return true; }
   try { revealWindow(mainWindow); } catch (_) {}
-  // La pagina Crediti è dove l'esito si legge: il riscatto e l'apertura
-  // partono insieme, e la pagina si aggiorna da sé all'avviso di saldo
-  // cambiato.
-  try { globalThis.SN_WALLET_MAIN?.redeemFromInvite?.(code)?.catch?.(() => {}); } catch (_) {}
-  try { mainWindow._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+  // Riscatto e pagina Crediti partono insieme, e la pagina si aggiorna da sé
+  // all'avviso di saldo cambiato. È la stessa strada del clic dentro Filo.
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, mainWindow); } catch (_) {}
   return true;
 }
 
@@ -163,28 +179,28 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Configura le lingue del correttore ortografico NATIVO (Hunspell) di Electron.
-// Senza questa chiamata Electron usa solo la lingua di sistema: su molte
-// configurazioni i suggerimenti dietro lo zigzag rosso non arrivano (il main
-// li inoltra al menu di correzione via `_spell:native`, vedi tabs.js). La
-// vecchia estensione Chrome aveva i dizionari pronti d'ufficio; qui li
-// attiviamo esplicitamente — italiano (l'app è italiana) + lingua di sistema —
-// così la correzione in cima al menu funziona anche senza chiave LLM. NON
-// forziamo più l'inglese (#169): con il dizionario inglese sempre attivo le
-// parole italiane errate ricevevano suggerimenti inglesi ("funzion"→"function").
-// Su macOS la chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
+// Le lingue del correttore nativo: senza, Electron usa solo quella di sistema e la correzione in cima al menu
+// (`_spell:native`, tabs.js) manca sulle parole italiane. La scelta e il perché niente inglese forzato: spellLanguages.js.
 function configureSpellchecker() {
   try {
     const ses = session.defaultSession;
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
-    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale());
+    // Su Linux c'è solo Hunspell e si caricano solo i dizionari inclusi in Filo: un inglese non incluso resterebbe vuoto.
+    const inclusi = process.platform === 'linux' ? require('./services/dizionari').lingue() : [];
+    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale(), inclusi);
     if (want.length) ses.setSpellCheckerLanguages(want);
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }
 
 app.whenReady().then(async () => {
+  // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
+  // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
+  try { await require('./services/interruttoreAiuto').migra(); } catch (e) { console.warn('[Filo] interruttore dell\'Aiuto:', e?.message || e); }
+  let impostazioniAvvio = {};
+  try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
+  try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
   await registerFiloProtocol();
   registerIpcHandlers();
   configureSpellchecker();
@@ -192,15 +208,20 @@ app.whenReady().then(async () => {
   // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
   // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
   installaMenuApplicazione();
-  require('./tabs').inoltraTastiDegliOspiti(app);
 
   const Storage = globalThis.SN_STORAGE;
   try {
     const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
+    try { require('./movimento').segui(s); } catch (_) {}
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
+    // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
+    // nascere i cookie dei riquadri.
+    try { require('./services/cookieIncorporati').init(s); } catch (_) {}
+    try { require('./services/accessoGoogle').init(); } catch (_) {}
+    try { require('./services/riquadriRotti').init(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
     try { await require('./services/fingerprint').init(s); } catch (_) {}
@@ -213,13 +234,20 @@ app.whenReady().then(async () => {
     // blocco alla sessione di default, carica la cache e — se attivo e stantia —
     // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
+    try { require('./services/adSkip').configureFromSettings(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
     // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
     try { await require('./tabs/tabCookies').loadRemembered(); } catch (_) {}
+    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e
+    // la rinfresca in sottofondo quando è vecchia. Non blocca l'avvio.
+    try { await require('./services/firmatariC2pa').init(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
+    // Le scorciatoie scelte dall'utente (#842) valgono dal primo tasto premuto.
+    try { require('./shortcuts').configura(s); } catch (_) {}
+    require('./shortcuts').seguiModuliEditor().catch(() => {});
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
@@ -228,6 +256,10 @@ app.whenReady().then(async () => {
     // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
     // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
+    // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
+    setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
+    // La cronologia AI di storage.json passa ai suoi file subito, non alla prima richiesta: fino ad allora ogni scrittura la ripaga.
+    setTimeout(() => { globalThis.SN_HISTORY?.prepara().catch(() => {}); }, 2000);
   } catch (_) {}
 
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
@@ -251,7 +283,16 @@ app.whenReady().then(async () => {
   // aggancia will-download così la barra in alto ne mostra l'avanzamento.
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
+  // Una finestra normale può nascere anche senza di noi (la scadenza che deve
+  // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
+  onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  try { require('./cancellaTutto').annuncia(); } catch (_) {}
+  // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
+  // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
+  if (process.env.NODE_ENV !== 'test') {
+    setTimeout(() => { require('./auth/prodottiGoogle').invitaSeServe().catch(() => {}); }, 15_000).unref?.();
+  }
 
   // Il collegamento d'invito (#651): la dichiarazione al sistema, l'indirizzo
   // dell'avvio a freddo (Windows e Linux lo mettono fra gli argomenti) e
@@ -265,6 +306,8 @@ app.whenReady().then(async () => {
   // di finire una conversazione, quindi senza questo giro la chat più comune
   // di tutte resterebbe senza nome in cronologia. In sottofondo: non blocca
   // l'avvio, e se il modello non c'è si riprova alla partenza dopo.
+  // #866 — il filo si legge adesso, e alla prima partenza dopo l'aggiornamento le chat salvate diventano segmenti.
+  try { require('./services/ilFilo').carica().catch(() => {}); } catch (_) {}
   try { require('./services/handlers').sweepPendingChats().catch(() => {}); } catch (_) {}
 
   // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la
@@ -272,9 +315,8 @@ app.whenReady().then(async () => {
   // suoneria). Senza questo, una sveglia scatta solo se la newtab è aperta.
   try { require('./services/alarmWatcher').start(); } catch (_) {}
 
-  // Auto-update: controlla le GitHub Releases e applica la nuova versione
-  // al riavvio (no-op in dev/test — vedi updater.js).
-  initAutoUpdater();
+  // Controlla le GitHub Releases e scarica in sottofondo; quando installare lo dice updater.js (no-op in dev/test).
+  initAutoUpdater(impostazioniAvvio);
 
   // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
   // verifica che i content script si caricano in quest'ultima, cattura
@@ -355,9 +397,10 @@ app.whenReady().then(async () => {
           const captureWin = new BrowserWindow({
             width: 1280, height: 800, show: true,
             webPreferences: {
-              preload: path.join(__dirname, '..', 'preload', preloadName),
+              // Come le schede: la pagina web col preload impacchettato, in sandbox; quella interna col suo.
+              preload: preloadName === 'page-preload.js' ? require('./preloadPacchetto').percorsoDelPreload() : path.join(__dirname, '..', 'preload', preloadName),
               contextIsolation: preloadName !== 'internal-preload.js',
-              sandbox: false, nodeIntegration: false,
+              sandbox: preloadName !== 'internal-preload.js', nodeIntegration: false,
             },
           });
           captureWin.loadURL(url);
@@ -397,24 +440,23 @@ app.whenReady().then(async () => {
           ), 10_000, 'diagnostica content-script');
           console.log('[smoke] content-script diag:', JSON.stringify(csDiag, null, 2));
 
-          // Simula selezione + right-click per verificare che il menu compaia.
-          await entro(csWin.webContents.executeJavaScript(`(() => {
+          // Seleziona e fa un tasto destro come l'utente: uno fabbricato dallo script il menu lo ignora (#589.8).
+          const punto = await entro(csWin.webContents.executeJavaScript(`(() => {
             const span = document.querySelector('.selectable');
-            if (!span) return false;
+            if (!span) return null;
             const range = document.createRange();
             range.selectNodeContents(span);
             const sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
             const rect = span.getBoundingClientRect();
-            const evt = new MouseEvent('contextmenu', {
-              bubbles: true, cancelable: true, view: window,
-              clientX: rect.left + rect.width / 2,
-              clientY: rect.top + rect.height / 2,
-              button: 2,
-            });
-            return span.dispatchEvent(evt);
+            return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
           })()`), 10_000, 'tasto destro simulato');
+          if (punto) {
+            for (const type of ['mouseDown', 'mouseUp']) {
+              csWin.webContents.sendInputEvent({ type, x: punto.x, y: punto.y, button: 'right', clickCount: 1 });
+            }
+          }
           await new Promise((r) => setTimeout(r, 500));
           const menuDiag = await entro(csWin.webContents.executeJavaScript(
             "({ menu: !!document.querySelector('.sn-menu')," +
@@ -432,9 +474,7 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) assicuraFinestraNormale();
   });
 });
 
@@ -445,11 +485,11 @@ app.on('before-quit', () => {
   try {
     const tm = mainWindow?._filoTabs;
     const Storage = require('./shim/storage');
+    // setSync scrive già tutto il file: una seconda scrittura raddoppierebbe solo il tempo della chiusura.
     if (tm && Storage?.setSync) {
       const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
       Storage.setSync({ [key]: tm.sessionState() });
-    }
-    Storage?.flushSync?.();
+    } else Storage?.flushSync?.();
   } catch (_) {}
 });
 
@@ -464,6 +504,8 @@ app.on('before-quit', (e) => {
   if (cookieWipeDone) return;
   let pending;
   try { pending = require('./services/cookies').wipeOnExit(); } catch (_) { return; }
+  // #758 — i cookie partizionati dei riquadri non si possono declassare: quelli ancora in attesa escono qui.
+  try { pending = Promise.all([pending, require('./services/cookieIncorporati').allUscita()]); } catch (_) {}
   if (!pending || typeof pending.then !== 'function') return;
   e.preventDefault();
   const finish = () => { cookieWipeDone = true; app.quit(); };

@@ -138,3 +138,30 @@ test('un’immagine dentro un link normale non si prende l’avviso', async ({ o
   await page.waitForTimeout(800);
   await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
 });
+
+// #725.2 — le imitazioni più comuni nelle mail di phishing: il nome vero c'è
+// tutto, ma a comandare è un altro dominio; o è scritto con lettere di un altro
+// alfabeto che a schermo sembrano quelle vere (e nel link viaggia in punycode).
+const IMITAZIONI = {
+  'davanti a un altro dominio': ['https://paypal.com.accesso-sicuro.net/login', /paypal\.com.*accesso-sicuro\.net/],
+  'legato col trattino': ['https://secure-paypal.com/', /paypal\.com.*secure-paypal\.com/],
+  'nome e dominio col trattino': ['https://paypal-com.net/', /paypal\.com.*paypal-com\.net/],
+  'lettere cirilliche': ['https://раураl.com/', /paypal\.com.*lettere/],
+};
+
+for (const [forma, [href, atteso]] of Object.entries(IMITAZIONI)) {
+  test(`imitazione ${forma}: il menu la segnala e dice dove porta`, async ({ openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+      <p><a id="lnk" href="${href}">Verifica il tuo conto</a></p></body></html>`);
+    await page.locator('#lnk').click({ button: 'right' });
+    const avviso = page.locator('.sn-menu .sn-menu-link-warn');
+    await expect(avviso).toBeVisible({ timeout: 3000 });
+    const testo = ((await avviso.textContent()) || '').trim();
+    expect(testo).toMatch(atteso);
+    expect(testo).toMatch(/imitazione/);
+    expect(testo).not.toMatch(/nome_altrui|omografo|xn--|\|/);
+    if (forma === 'davanti a un altro dominio') {
+      await page.screenshot({ path: 'tests/.shots/725-2-nome-davanti.png' });
+    }
+  });
+}

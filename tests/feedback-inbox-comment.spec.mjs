@@ -90,7 +90,7 @@ test('Ricevuti: il commento viaggia con lo spostamento in "In coda"', async ({ a
   await page.evaluate(() => {
     document.querySelector('.fb-notes[data-id="mock-inbox-1"]').value = 'Ho riprodotto, è un bug reale';
   });
-  await page.locator('.fb-act[data-id="mock-inbox-1"][data-to="todo"]').click();
+  await page.locator('.fb-act[data-id="mock-inbox-1"][data-to="todo"]:not([data-local])').click();
 
   await expect.poll(() => page.evaluate(() => (window.__updates || []).length)).toBeGreaterThan(0);
   const upd = await page.evaluate(() => window.__updates.find((u) => u.status === 'todo'));

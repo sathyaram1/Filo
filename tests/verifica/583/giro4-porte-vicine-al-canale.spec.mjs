@@ -51,10 +51,10 @@ test('un sito visitato non scopre CHI sta usando Filo, e non lo fa uscire', asyn
   expect(out.chiSeiDalSito.uid, 'l\'identificativo dell\'account finisce a un sito visitato').toBeUndefined();
   expect(Object.keys(out.chiSeiDalSito).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
 
-  // Da una pagina di Filo la risposta resta intera: è da lì che le pagine
-  // mostrano chi è entrato.
+  // Da una pagina di Filo la risposta resta intera. Elenco minimo, non esatto: il
+  // confine chiuso è quello dei siti, un campo nuovo per Filo non è un rosso (#816.1).
   expect(out.chiSeiDaFilo.ok).toBe(true);
-  expect(Object.keys(out.chiSeiDaFilo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
+  expect(Object.keys(out.chiSeiDaFilo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']));
 
   expect(out.esci.ok, 'un sito visitato fa uscire dall\'account chi sta usando Filo').toBe(false);
   expect(String(out.esci.code || '')).toBe('forbidden');

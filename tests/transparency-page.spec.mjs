@@ -39,7 +39,9 @@ test('mostra il documento con le fonti numerate in fondo', async ({ openTab }) =
   }
 });
 
-test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', async ({ openTab }) => {
+test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', async ({ app, openTab }) => {
+  const nonScritte = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV
+    .filter((n) => !globalThis.SN_TRANSPARENCY.ids().includes(n.id)).length);
   const page = await openTab(URL + '?doc=models#i-punti-deboli');
 
   await expect(page.locator('h1')).toHaveText('Politica sui modelli');
@@ -51,8 +53,59 @@ test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', asy
   // La voce attiva della navigazione è quella del documento aperto, e le aree
   // non ancora scritte restano visibili e spente.
   await expect(page.locator('.sn-nav-item.is-active')).toHaveText('Modelli');
-  expect(await page.locator('.sn-nav-item.is-soon').count()).toBe(3);
+  expect(await page.locator('.sn-nav-item.is-soon').count()).toBe(nonScritte);
 });
+
+// #951 — Privacy e Sicurezza erano «non ancora scritte»: dalla barra si arriva al documento vero, con le sue sezioni.
+for (const { id, voce, sezione, frase } of [
+  { id: 'privacy', voce: 'Privacy', sezione: 'Cosa resta sul tuo computer', frase: 'Safe Browsing' },
+  { id: 'security', voce: 'Sicurezza', sezione: 'Da dove viene il file che hai scaricato', frase: 'SHA-256' },
+]) {
+  test(`la voce ${voce} della barra apre il suo documento, non il segnaposto`, async ({ openTab }) => {
+    const page = await openTab(URL);
+    await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+    const link = page.locator(`#nav a[href*="doc=${id}"]`);
+    await expect(link).not.toHaveClass(/is-soon/);
+    await link.click();
+
+    await expect(page.locator('#title')).toHaveText(voce);
+    await expect(page.locator('#subtitle')).not.toContainText('non è ancora scritta');
+    await expect(page.locator('.sn-nav-item.is-active')).toHaveText(voce);
+    await expect(page.locator('#doc-body h2', { hasText: sezione })).toHaveCount(1);
+    await expect(page.locator('#doc-body h2', { hasText: 'I punti deboli' })).toHaveCount(1);
+    await expect(page.locator('#doc-body')).toContainText(frase);
+    expect(await page.locator('#doc-body li').count()).toBeGreaterThan(5);
+    await page.screenshot({ path: `tests/.shots/trasparenza-${id}.png`, fullPage: false });
+  });
+}
+
+for (const tema of ['light', 'dark']) {
+  test(`i comandi per controllare il file scaricato si leggono come codice sul tema ${tema}`, async ({ openTab }) => {
+    const page = await openTab(`${URL}?doc=security#da-dove-viene-il-file-che-hai-scaricato`);
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    const codici = page.locator('#doc-body code');
+    await expect(codici).toHaveCount(3);
+    await expect(codici.first()).toHaveText('certutil -hashfile Filo-Setup.exe SHA256');
+    expect(await page.locator('#doc-body code .sn-gloss').count()).toBe(0);
+    const contrasto = await codici.first().evaluate((el) => {
+      const rgb = (s) => (String(s).match(/rgba?\(([^)]+)\)/) || [0, '0,0,0'])[1].split(',').slice(0, 3).map(parseFloat);
+      const lum = (c) => {
+        const l = c.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+        return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+      };
+      let sfondo = null;
+      for (let n = el; n && !sfondo; n = n.parentElement) {
+        const b = getComputedStyle(n).backgroundColor;
+        if (b && !/rgba\([^)]*,\s*0\)|transparent/.test(b)) sfondo = rgb(b);
+      }
+      sfondo = sfondo || rgb(getComputedStyle(document.documentElement).backgroundColor);
+      const [x, y] = [lum(rgb(getComputedStyle(el).color)), lum(sfondo)];
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    });
+    expect(contrasto, `contrasto ${contrasto.toFixed(2)}:1 sul tema ${tema}`).toBeGreaterThanOrEqual(4.5);
+    await page.screenshot({ path: `tests/.shots/trasparenza-security-comandi-${tema}.png`, fullPage: false });
+  });
+}
 
 test('le glosse sono in corsivo e si aprono al clic (non solo al passaggio del mouse)', async ({ openTab }) => {
   const page = await openTab(URL);
@@ -109,9 +162,9 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
 //    privacy leggeva la politica sui modelli credendo fosse quella (#515).
 test('una sezione non ancora scritta lo dice, invece di mostrarne un\'altra al suo posto', async ({ app, openTab }) => {
   const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
-  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.filter((n) => !n.nota).map((n) => n.id));
   const mancante = previsti.find((i) => !esistenti.includes(i));
-  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+  test.skip(!mancante, 'nessuna sezione mancante senza nota: quelle con la nota le prova il test del #888');
 
   const page = await openTab(`${URL}?doc=${mancante}`);
   await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
@@ -125,9 +178,9 @@ test('una sezione non ancora scritta lo dice, invece di mostrarne un\'altra al s
 // prima, dall'indirizzo si otteneva la spiegazione e dalla barra niente.
 test('una sezione non ancora scritta si spiega anche cliccandola nella barra', async ({ app, openTab }) => {
   const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
-  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.filter((n) => !n.nota).map((n) => n.id));
   const mancante = previsti.find((i) => !esistenti.includes(i));
-  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+  test.skip(!mancante, 'nessuna sezione mancante senza nota: quelle con la nota le prova il test del #888');
 
   const page = await openTab(URL);
   await expect(page.locator('#title')).toHaveText('Politica sui modelli');
@@ -144,6 +197,50 @@ test('una sezione non ancora scritta si spiega anche cliccandola nella barra', a
   }));
   expect(tab.tab, 'la voce non si raggiunge con il tabulatore').toBeGreaterThanOrEqual(0);
   expect(tab.nome).toMatch(/non ancora scritta/);
+});
+
+// #888 — «Come si sostiene» resta in arrivo, ma aperta dice quando arriverà e
+// com'è oggi, con le parole dell'owner. Dall'indirizzo e dalla barra uguale.
+test('la sezione su come Filo si sostiene dice com\'è oggi, invece del solo «non ancora scritta»', async ({ app, openTab }) => {
+  const nota = await app.evaluate(() => globalThis.SN_TRANSPARENCY.nota('business'));
+  expect(nota).toContain('Fino ad allora è tutto offerto');
+
+  const page = await openTab(URL);
+  await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+  const voce = page.locator('#nav a[href*="doc=business"]');
+  await expect(voce).toHaveClass(/is-soon/);
+  await voce.click();
+
+  await expect(page.locator('#title')).toHaveText('Come si sostiene');
+  await expect(page.locator('#doc-body p').first()).toHaveText(nota);
+  await expect(page.locator('#subtitle')).toHaveText('');
+  await expect(page.locator('#doc-body')).not.toContainText('non è ancora scritta');
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+  await expect(page.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-soon/);
+  await expect(page.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-active/);
+  await page.screenshot({ path: 'tests/.shots/888-trasparenza-business.png' });
+
+  // Dall'indirizzo, scritto come capita, la stessa pagina.
+  const diretta = await openTab(`${URL}?doc=%20Business%20`);
+  await expect(diretta.locator('#doc-body p').first()).toHaveText(nota);
+  // Col nome che si legge nella barra, la stessa sezione; e così anche un documento scritto.
+  const perNome = await openTab(`${URL}?doc=Come%20si%20sostiene`);
+  await expect(perNome.locator('#doc-body p').first()).toHaveText(nota);
+  await expect(perNome.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-active/);
+  const modelli = await openTab(`${URL}?doc=Modelli`);
+  await expect(modelli.locator('#title')).toHaveText('Politica sui modelli');
+
+  // In arrivo resta raggiungibile da tastiera e lo dice anche senza mouse (#515).
+  const raggiungibile = await page.locator('#nav a[href*="doc=business"]').evaluate((el) => ({
+    tab: el.tabIndex, nome: el.getAttribute('aria-label') || '',
+  }));
+  expect(raggiungibile.tab).toBeGreaterThanOrEqual(0);
+  expect(raggiungibile.nome).toMatch(/non ancora scritta/);
+
+  // Privacy ha il suo documento: la nota non ci finisce dentro.
+  const privacy = await openTab(`${URL}?doc=privacy`);
+  await expect(privacy.locator('#title')).toHaveText('Privacy');
+  await expect(privacy.locator('#doc-body')).not.toContainText(nota);
 });
 
 test('lo stesso documento chiesto con le maiuscole resta lo stesso documento', async ({ openTab }) => {

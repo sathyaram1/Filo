@@ -125,3 +125,15 @@ export function readRole(root, { now = Date.now() } = {}) {
   const m = readMarker(root, { now });
   return m ? normalizeRole(m.role) : '';
 }
+
+/**
+ * Questa istanza è una routine? Si dichiara con FILO_ROUTINE=1; il biglietto o il ruolo scritti da dispatch la
+ * riconoscono anche se se n'è dimenticata. Serve agli strumenti che una routine non deve usare (#914).
+ */
+export function isRoutineInstance(root, { env = process.env, now = Date.now() } = {}) {
+  const dichiarata = String((env && env.FILO_ROUTINE) || '').trim();
+  if (dichiarata && dichiarata !== '0') return true;
+  if (String((env && env.FILO_ROUTINE_TICKET) || '').trim()) return true;
+  if (normalizeRole(env && env.FILO_ROUTINE_ROLE)) return true;
+  return !!readMarker(root, { now });
+}

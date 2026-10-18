@@ -6,9 +6,10 @@ import { rmSync, mkdirSync, writeFileSync, chmodSync, readFileSync, existsSync }
 import { createServer } from 'node:http';
 import { resolve, dirname, join, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { cartellaTemporanea, cartellaInCasa } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
 import { chiudiApp } from './fixtures/electron.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -113,6 +114,35 @@ PAGINE['/schermi'] = dopoUnClic("window.getScreenDetails().then(() => m('schermi
 PAGINE['/presenza'] = dopoUnClic("IdleDetector.requestPermission().then((x) => m('presenza:' + x), (e) => m('presenza:' + e.name));");
 PAGINE['/font'] = dopoUnClic("window.queryLocalFonts().then((f) => m('font:' + (f.length ? 'letti' : 'vuoti')), (e) => m('font:' + e.name));");
 PAGINE['/spazio'] = dopoUnClic("navigator.storage.persist().then((x) => m('spazio:' + x), (e) => m('spazio:' + e.name));");
+// Un sito che carica foto (#1069): l'utente gli dà la cartella da leggere, e al clic su «Carica» il sito prova a scriverci.
+PAGINE['/cartella'] = `<!doctype html><meta charset="utf-8"><title>Carica foto</title>
+<style>body{margin:0}#zona{position:fixed;inset:0}#carica{position:fixed;top:200px;left:200px;z-index:1}</style>
+<div id="zona">trascina qui la cartella</div><button id="carica">Carica</button>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  let cartella = null;
+  const zona = document.getElementById('zona');
+  zona.addEventListener('dragover', (e) => e.preventDefault());
+  zona.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    try {
+      cartella = await e.dataTransfer.items[0].getAsFileSystemHandle();
+      m('cartella:' + cartella.kind + ':' + (await cartella.queryPermission({ mode: 'read' })) + '/' + (await cartella.queryPermission({ mode: 'readwrite' })));
+    } catch (err) { m('cartella:' + err.name); }
+  });
+  document.getElementById('carica').addEventListener('click', async () => {
+    const x = await cartella.requestPermission({ mode: 'readwrite' }).catch((err) => err.name);
+    m('scrittura:' + x);
+    if (x !== 'granted') return;
+    try {
+      const f = await cartella.getFileHandle('lasciato.txt', { create: true });
+      const w = await f.createWritable();
+      await w.write('cifrato');
+      await w.close();
+      m('scritto');
+    } catch (err) { m('scritto:' + err.name); }
+  });
+</script>`;
 
 let server;
 let origine;
@@ -156,7 +186,7 @@ async function avvia() {
     cwd: APP_ROOT,
     env: { ...process.env, PATH: join(userData, 'bin-finto') + delimiter + process.env.PATH, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  shell = await app.firstWindow();
+  shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
 }
 test.afterEach(async () => {
@@ -390,7 +420,9 @@ test('una pagina che si riscrive in un documento blob non ottiene niente senza d
   test.setTimeout(60_000);
   await app.evaluate(({ clipboard }) => clipboard.writeText('password-copiata'));
   await apri('/blob');
-  await expect(barra()).toContainText('microfono e fotocamera', { timeout: 10_000 });
+  // Quale domanda arriva prima dipende da quanto ci mette la fotocamera ad accendersi (nel contenitore delle routine oltre
+  // sei secondi): conta che il sito chieda col suo nome.
+  await expect(barra()).toContainText(/microfono e fotocamera|quello che hai copiato/, { timeout: 10_000 });
   await expect(barra().locator('strong')).toHaveText(new URL(origine).host);
   await new Promise((ok) => setTimeout(ok, 2500));
   expect(esiti).toContain('notifiche:default');
@@ -502,4 +534,80 @@ test('le risposte ricordate le legge e le toglie solo una pagina di Filo, non un
   expect(out.leggeSito).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
   expect(out.togliSito).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
   expect(out.leggeFilo).toEqual({ ok: true, scelte: [] });
+});
+
+// La domanda per la rete locale arriva con Electron 44 (#1068): la cornice la dice con le sue parole, non con quelle
+// del microfono, che sono quelle di ripiego per un tipo che non conosce.
+test('un sito che chiede la rete locale si vede chiedere proprio quella, col suo nome', async () => {
+  await apri('/vuota');
+  await expect.poll(() => app.windows().some((w) => w.url().startsWith(origine)), { timeout: 10_000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.webContents.send('tabs:permesso', {
+      id: 'prova-rete', tabId: w._filoTabs.activeId, host: 'router.example', sotto: '', dominio: 'router.example', tipo: 'rete', parti: ['rete'],
+    });
+  });
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await expect(barra()).toContainText('router.example');
+  await expect(barra()).toContainText('vuole collegarsi agli apparecchi della tua rete');
+  await expect(barra()).not.toContainText('microfono');
+});
+
+// #1069 — la cartella data da leggere non diventa scrivibile senza un sì. La si dà al sito trascinandola, come con il
+// selettore: la lettura è concessa, la scrittura no. Il trascinamento è quello vero del sistema, via DevTools.
+async function daiLaCartella() {
+  await apri('/cartella');
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/cartella'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.waitForLoadState('domcontentloaded');
+  const lasciato = await trascina(pagina, 'foto da caricare');
+  return { pagina, lasciato };
+}
+
+// Nella cartella personale: Chromium nasconde ai siti la cartella dei dati di Filo e quelle accanto, dove stanno le temporanee.
+async function trascina(pagina, nome) {
+  const dir = join(cartellaInCasa('filo-test-cartella-'), nome);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'mare.jpg'), 'foto');
+  const prima = esiti.length;
+  const s = await pagina.context().newCDPSession(pagina);
+  const data = { items: [], files: [dir], dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x: 60, y: 60, data });
+  await expect.poll(() => esiti.slice(prima), { timeout: 10_000 }).toEqual(['cartella:directory:granted/prompt']);
+  return join(dir, 'lasciato.txt');
+}
+
+test('una cartella data da leggere: il sito che vuole scriverci lo chiede col nome della cartella, e con Consenti scrive', async () => {
+  test.setTimeout(60_000);
+  const { pagina, lasciato } = await daiLaCartella();
+  await expect(barra()).toBeHidden();
+  await pagina.locator('#carica').click();
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await expect(barra()).toContainText(new URL(origine).host);
+  await expect(barra()).toContainText('vuole creare, modificare e cancellare file in «foto da caricare»');
+  await new Promise((ok) => setTimeout(ok, 500));
+  expect(esiti.slice(1), 'nessuna scrittura prima della risposta').toEqual([]);
+  expect(existsSync(lasciato)).toBe(false);
+  await shell.screenshot({ path: 'tests/.shots/permesso-cartella.png' });
+  await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['scrittura:granted', 'scritto']);
+  expect(readFileSync(lasciato, 'utf8')).toBe('cifrato');
+  await expect(barra()).toBeHidden();
+});
+
+test('Non consentire: il sito non scrive nella cartella data da leggere, e per quel sito la domanda non torna', async () => {
+  test.setTimeout(60_000);
+  const { pagina, lasciato } = await daiLaCartella();
+  await pagina.locator('#carica').click();
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['scrittura:denied']);
+  expect(existsSync(lasciato)).toBe(false);
+  // Un'altra cartella dello stesso sito: il no ricordato vale anche lì, senza domanda.
+  const altro = await trascina(pagina, 'documenti');
+  await pagina.locator('#carica').click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 })
+    .toEqual(['scrittura:denied', 'cartella:directory:granted/prompt', 'scrittura:denied']);
+  await expect(barra()).toBeHidden();
+  expect(existsSync(altro)).toBe(false);
 });

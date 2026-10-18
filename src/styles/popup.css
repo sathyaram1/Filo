@@ -21,7 +21,7 @@
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
   box-shadow: var(--sn-shadow);
-  animation: sn-fade-in 100ms ease-out;
+  animation: sn-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
   backdrop-filter: blur(4px);
 }
 
@@ -93,7 +93,8 @@
   max-width: 100%;
   word-wrap: break-word;
 }
-.sn-msg-assistant { justify-content: flex-start; }
+/* In colonna: sotto la risposta c'è la riga dei suoi comandi (Copia). */
+.sn-msg-assistant { flex-direction: column; align-items: flex-start; }
 .sn-msg-assistant .sn-msg-text {
   background: transparent;
   color: var(--sn-fg);
@@ -109,6 +110,84 @@
 .sn-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-msg-muted .sn-msg-text { color: var(--sn-muted); font-style: italic; }
 .sn-msg-error .sn-msg-text { color: var(--sn-error); }
+
+.sn-msg-rimedio {
+  all: unset;
+  cursor: pointer;
+  /* Su una riga sua: attaccato in coda alla frase sembrava una parola in più. */
+  display: block;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  color: var(--sn-fg);
+  font-size: 12px;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-msg-rimedio:hover { background: var(--sn-hover); }
+/* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
+.sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
+
+/* Comandi di una risposta finita: piccoli e quieti, l'icona allineata al bordo del testo. */
+.sn-msg-azioni {
+  display: flex;
+  margin: 2px 0 0 -4px;
+}
+.sn-msg-copia {
+  all: unset;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--sn-muted);
+  cursor: pointer;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-msg-copia:hover { background: var(--sn-hover); color: var(--sn-fg); }
+.sn-msg-copia:focus-visible { box-shadow: 0 0 0 2px var(--sn-accent); }
+.sn-msg-copia:active { transform: scale(0.92); }
+.sn-msg-copia.sn-copiato { color: var(--sn-success); }
+.sn-msg-copia.sn-non-copiato { color: var(--sn-error); }
+.sn-msg-copia svg { display: block; }
+/* L'etichetta sta a destra, fuori dal flusso: comparendo non sposta niente, e il corpo che scorre non la taglia. */
+.sn-msg-copia::after {
+  content: attr(data-etichetta);
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity calc(100ms * var(--sn-motion, 1)) ease, visibility 0s linear calc(100ms * var(--sn-motion, 1));
+}
+.sn-msg-copia:hover::after,
+.sn-msg-copia:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: calc(250ms * var(--sn-motion, 1));
+}
+/* L'esito si legge subito, senza aspettare il passaggio del mouse. */
+.sn-msg-copia.sn-copiato::after,
+.sn-msg-copia.sn-non-copiato::after {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.sn-msg-copia.sn-copiato::after { color: var(--sn-success); }
+.sn-msg-copia.sn-non-copiato::after { color: var(--sn-error); }
 
 .sn-msg-text p,
 .sn-menu-inline p { margin: 0 0 8px 0; }
@@ -230,11 +309,11 @@
 }
 .sn-popup-send:hover { filter: brightness(1.1); }
 
-/* Ogni riquadro che Filo ancora nell'angolo in basso a destra sta QUI DENTRO e si impila: da soli
-   erano tutti `position: fixed` sullo stesso punto e due avvisi ravvicinati si coprivano. */
+/* Ogni riquadro che Filo ancora in basso a destra sta QUI DENTRO e si impila (da soli due avvisi vicini
+   si coprivano), sopra la pila della barra quando c'è: la sua altezza la manda il main, --filo-avvisi-barra. */
 .sn-toasts {
   position: fixed;
-  bottom: 20px;
+  bottom: max(20px, var(--filo-avvisi-barra, 0px));
   right: 20px;
   z-index: 2147483647;
   display: flex;
@@ -244,7 +323,7 @@
   max-width: min(420px, calc(100vw - 40px));
   /* Rete di sicurezza per finestre molto basse: lo stack non esce mai dal
      viewport, al massimo scorre. */
-  max-height: calc(100vh - 40px);
+  max-height: calc(100vh - 20px - max(20px, var(--filo-avvisi-barra, 0px)));
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -275,14 +354,19 @@
   box-shadow: var(--sn-shadow);
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease;
+  transition: opacity calc(200ms * var(--sn-motion, 1)) ease, transform calc(200ms * var(--sn-motion, 1)) ease, background calc(150ms * var(--sn-motion, 1)) ease;
   pointer-events: none;
 }
 
+/* Visibile prende il puntatore (sopra, i tempi della pila aspettano; un clic lo chiude); il vuoto attorno
+   resta della pagina, e mentre sfuma torna trasparente. */
 .sn-toast.sn-toast-visible {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
+  cursor: pointer;
 }
+.sn-toast.sn-toast-visible:hover { background: var(--sn-hover); }
 
 /* Pill della dettatura: si comporta come un toast ma è interattiva, cliccandola si ferma la registrazione. */
 .sn-dictate-pill {
@@ -310,7 +394,7 @@
   height: 8px;
   border-radius: 50%;
   background: #e02b2b;
-  animation: sn-dictate-pulse 1.2s ease-in-out infinite;
+  animation: sn-dictate-pulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 .sn-dictate-pill:hover { border-color: var(--sn-accent); }
 .sn-dictate-pill-live {
@@ -350,7 +434,7 @@
   gap: 10px;
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease, border-color 120ms ease;
+  transition: opacity calc(200ms * var(--sn-motion, 1)) ease, transform calc(200ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-save-confirm.sn-save-confirm-visible { opacity: 1; transform: translateY(0); }
 .sn-save-confirm:hover,

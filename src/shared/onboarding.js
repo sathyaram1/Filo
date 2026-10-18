@@ -51,8 +51,8 @@
     + 'Se cambi idea la rifacciamo quando vuoi, da Preferenze → «Rifai '
     + 'l’intervista di benvenuto».';
 
-  // Cinque scambi in tutto, non di più, salvo che sia l'utente ad allungare.
-  const MAX_EXCHANGES = 5;
+  // Sei scambi in tutto, non di più, salvo che sia l'utente ad allungare: uno per voce da scoprire più le cose da dire.
+  const MAX_EXCHANGES = 6;
   // Tetto duro: l'intervista non può diventare infinita nemmeno se il modello
   // si dimentica di chiuderla. Oltre questo, la chiude il codice.
   const HARD_MAX_EXCHANGES = 12;
@@ -77,7 +77,15 @@
       kind: 'scoprire',
       label: 'Come vuole che Filo gli parli',
       detail: 'Breve o dettagliato, «tu» o «lei», formale o no.',
-      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così.',
+      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
+    },
+    {
+      // #1188: il livello di autonomia si sceglie qui e in Preferenze, non più dalla casella della home.
+      id: 'autonomia',
+      kind: 'scoprire',
+      label: 'Quanto vuole che Filo faccia da solo',
+      detail: 'Se preferisce che gli chieda prima di quasi tutto, che faccia da solo quello che si rimedia, o anche di più.',
+      applica: 'Chiediglielo con parole tue e nello stesso turno emetti ONBOARDING con "autonomia": true: sotto la tua risposta compaiono i livelli e sceglie lui con un clic, che ti arriva come suo messaggio. Il livello lo cambia solo lui, tu non hai un’azione per farlo: non dire di averlo cambiato. Se risponde a parole, rimostra la scelta e digli quale livello corrisponde a quello che ha detto. Spunta la voce quando ha scelto o ti ha detto che va bene com’è, non nel turno in cui mostri la scelta.',
     },
     {
       id: 'estetica',
@@ -89,7 +97,7 @@
       id: 'privacy',
       kind: 'dire',
       label: 'La privacy è protetta già così',
-      detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa.',
+      detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa. Se ti chiede quali dati escono dal suo computer e verso chi, leggi il documento con LEGGI_TRASPARENZA doc "privacy" prima di rispondere.',
     },
     {
       id: 'modelli',
@@ -101,7 +109,7 @@
       id: 'crediti',
       kind: 'dire',
       label: 'I crediti, in due righe',
-      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare e per il red team, non per i crediti.',
+      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare, non per i crediti.',
     },
   ];
 
@@ -230,11 +238,20 @@
     return Array.isArray(thread) && thread.some((m) => m && m.role === 'user');
   }
 
+  // `daFuori`: nel turno è entrato testo di altri. `autonomia`: sotto quel turno di Filo c'era la scelta del
+  // livello, e chi riprende l'intervista la ritrova lì.
+  function segni(m) {
+    return {
+      ...(m && m.daFuori === true ? { daFuori: true } : {}),
+      ...(m && m.role === 'filo' && m.autonomia === true ? { autonomia: true } : {}),
+    };
+  }
+
   function normalizeThread(raw) {
     return Array.isArray(raw)
       ? raw
         .filter((m) => m && typeof m === 'object')
-        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || '') }))
+        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || ''), ...segni(m) }))
         .filter((m) => m.text)
         .slice(-THREAD_CAP)
       : [];
@@ -273,7 +290,18 @@
       // 'early' = chiusa prima di aver finito: la home lo dice, con la strada
       // per rifarla. Si spegne appena l'utente l'ha letto.
       notice: s.notice === 'early' ? 'early' : '',
+      ...(s.fermato ? { fermato: true } : {}),
+      ...(s.autonomiaInSospeso === true ? { autonomiaInSospeso: true } : {}),
     };
+  }
+
+  // #1188 — la scelta dell'autonomia è a schermo e l'utente non ha ancora scritto: finché è così l'intervista
+  // non si chiude e la voce non si spunta, da qualunque azione arrivi. Il primo messaggio dell'utente la scioglie.
+  function mostraSceltaAutonomia(state) {
+    return { ...normalize(state), autonomiaInSospeso: true };
+  }
+  function autonomiaInSospeso(state) {
+    return normalize(state).autonomiaInSospeso === true;
   }
 
   function isActive(state) {
@@ -392,16 +420,27 @@
   }
 
   function appendTurn(state, turn) {
-    const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
     const text = String((turn && turn.text) || '');
-    if (!text) return cur;
+    if (!text) return normalize(state);
+    const tutto = togliFermato(state);
+    const { autonomiaInSospeso: _sospesa, ...senza } = tutto;
+    const cur = role === 'user' ? senza : tutto;
     const last = cur.thread[cur.thread.length - 1];
+    const nuovi = segni({ ...turn, role });
     if (last && last.role === role && last.text.trim() === text.trim()) {
-      return { ...cur, startedAt: cur.startedAt || new Date().toISOString() };
+      const mancanti = Object.keys(nuovi).some((k) => !last[k]);
+      const segnato = mancanti ? { thread: [...cur.thread.slice(0, -1), { ...last, ...nuovi }] } : {};
+      return { ...cur, ...segnato, startedAt: cur.startedAt || new Date().toISOString() };
     }
-    const thread = [...cur.thread, { role, text }].slice(-THREAD_CAP);
+    const thread = [...cur.thread, { role, text, ...nuovi }].slice(-THREAD_CAP);
     return { ...cur, thread, startedAt: cur.startedAt || new Date().toISOString() };
+  }
+
+  // Nella conversazione è entrato testo di altri (incollato, trascinato, un'immagine, una pagina o un file letto
+  // da Filo): da lì lo stile proposto torna a passare dal riquadro di conferma (#592.2).
+  function haTestoDiAltri(state) {
+    return normalize(state).thread.some((m) => m.daFuori === true);
   }
 
   // Quanti messaggi ha scritto l'utente: è il conto degli "scambi" del tetto.
@@ -415,7 +454,19 @@
   function hasPendingTurn(state) {
     const cur = normalize(state);
     const last = cur.thread[cur.thread.length - 1];
-    return !cur.done && !!last && last.role === 'user';
+    return !cur.done && !cur.fermato && !!last && last.role === 'user';
+  }
+
+  // Il turno a metà l'ha fermato l'utente col quadrato (#578): non riparte da solo, aspetta «riprendi» o un messaggio
+  // nuovo (appendTurn lo toglie). Sentinella: tests/unit/onboarding.test.mjs.
+  function segnaFermato(state) {
+    const cur = normalize(state);
+    const last = cur.thread[cur.thread.length - 1];
+    return !cur.done && last && last.role === 'user' ? { ...cur, fermato: true } : cur;
+  }
+  function togliFermato(state) {
+    const { fermato: _fermato, ...cur } = normalize(state);
+    return cur;
   }
 
   // Oltre il tetto duro l'intervista si chiude da sé, qualunque cosa faccia il
@@ -423,7 +474,7 @@
   function shouldForceClose(state) {
     const cur = normalize(state);
     if (cur.done) return false;
-    return isComplete(cur) || userTurns(cur) >= HARD_MAX_EXCHANGES;
+    return (isComplete(cur) && !cur.autonomiaInSospeso) || userTurns(cur) >= HARD_MAX_EXCHANGES;
   }
 
   // Elenco per il prompt: che cosa resta da scoprire e da dire, con la spunta
@@ -444,7 +495,8 @@
     MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
     ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
-    remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
+    remaining, isComplete, appendTurn, haTestoDiAltri, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
+    mostraSceltaAutonomia, autonomiaInSospeso,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
     chatId,
   };

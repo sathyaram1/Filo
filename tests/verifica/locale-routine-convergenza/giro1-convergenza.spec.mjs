@@ -117,14 +117,6 @@ test.describe('accorpamento minimo', () => {
 });
 
 test.describe('sforzo dei lavoratori', () => {
-  test('i due lavoratori delle routine dichiarano sforzo xhigh', () => {
-    for (const nome of ['routine-worker', 'routine-secaudit']) {
-      const testa = readFileSync(resolve(ROOT, '.claude', 'agents', `${nome}.md`), 'utf8').split('---')[1];
-      expect(testa).toMatch(/^effort:\s*xhigh\s*$/m);
-      expect(testa).toMatch(/^model:\s*opus\s*$/m);
-    }
-  });
-
   test('il rapporto di sessione conta lo sforzo dei turni', () => {
     const dir = cartellaTemporanea('rapporto-sforzo-');
     const file = join(dir, 'sessione.jsonl');

@@ -15,8 +15,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(resolve(ROOT, 'package.json'));
 const PKG = require('./package.json');
 
-const { PIATTAFORME, PASSI, passoFallito, leggiEsiti, componiAllarme, mancantiNoti, casella } =
+const { PIATTAFORME, PASSI, passoFallito, leggiEsiti, componiAllarme, mancantiNoti, casella, chiaviAllarme } =
   await import('../../scripts/release-platform-alarm.mjs');
+
+// Senza chiavi il server tornerebbe al «un feedback aperto per mittente», che ha
+// inghiottito tre settimane di allarmi dietro a un feedback parcheggiato.
+test('la chiave dell\'allarme nomina la metà che si è rotta', () => {
+  assert.deepEqual(chiaviAllarme('Mac'), ['piattaforma:mac']);
+  assert.deepEqual(chiaviAllarme(' Linux '), ['piattaforma:linux']);
+  assert.deepEqual(chiaviAllarme(''), ['piattaforma'], 'anche senza nome parte con una chiave');
+  for (const nome of Object.keys(PIATTAFORME)) assert.match(chiaviAllarme(nome)[0], /^piattaforma:[a-z]+$/);
+});
 
 const ESITI_ESEMPIO = JSON.stringify({
   checkout: { outcome: 'success', conclusion: 'success' },
@@ -213,5 +222,23 @@ test('i file attesi seguono i nomi che il pacchettizzatore produce davvero', () 
   for (const piatt of Object.values(PIATTAFORME)) {
     assert.ok(piatt.attesi.includes(piatt.scarica), 'il file del bottone «Scarica» deve stare fra gli attesi');
     assert.ok(piatt.attesi.includes(piatt.aggiornamento));
+  }
+});
+
+// #785: fermo alle impronte i file ci sono; il feedback non deve mandare a cercare un download rotto.
+test('fermo alle impronte: dice che i file ci sono e manca la sezione «Verifica», e come rimetterla', () => {
+  for (const piattaforma of ['Mac', 'Linux']) {
+    const esiti = { build: { outcome: 'success' }, istruzioni: { outcome: 'success' }, controllo: { outcome: 'success' }, impronte: { outcome: 'failure' } };
+    const { titolo, testo } = componiAllarme({
+      piattaforma, versione: 'v0.2.240', passo: passoFallito(esiti), esiti, mancanti: '',
+      esecuzione: 'https://github.com/sathyaram1/Filo/actions/runs/42', repo: 'sathyaram1/Filo',
+    });
+    assert.match(titolo, /impronte/);
+    assert.match(titolo, /v0\.2\.240/);
+    assert.doesNotMatch(titolo, /incompleta|non è nella release/);
+    assert.match(testo, /sezione «Verifica»/);
+    assert.match(testo, /actions\/runs\/42/);
+    assert.ok(testo.includes(casella(piattaforma)), 'il rimedio è la casella dell\'avvio a mano');
+    assert.doesNotMatch(testo, /risponde 404|non è riuscito a farlo/);
   }
 });

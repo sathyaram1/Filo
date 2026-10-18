@@ -75,8 +75,11 @@ test('Dettatura: a pesi aperti si ferma nominando il motivo, non con l\'errore g
   });
 
   // Il menu del tasto destro cattura il campo su cui si detta.
-  await page.locator('#input').focus();
-  await page.locator('#input').click({ button: 'right' });
+  // Un campo qualunque: nella casella della chat «Detta» passa la mano al suo microfono (tests/voce-chat.spec.mjs).
+  await page.evaluate(() => document.body.insertAdjacentHTML('beforeend',
+    '<textarea id="campoDetta" style="position:fixed;top:60px;left:20px;width:320px;height:60px;z-index:9"></textarea>'));
+  await page.locator('#campoDetta').focus();
+  await page.locator('#campoDetta').click({ button: 'right' });
   await expect(page.locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
 

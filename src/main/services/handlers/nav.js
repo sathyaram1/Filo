@@ -3,9 +3,10 @@
 // handlers.js e riceve (msg, sender, origin), ritornando l'oggetto risposta.
 
 const { app } = require('electron');
+const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf } = ctx;
+  const { MSG, winOf, apriDaFilo, SCHEMI_USCITA } = ctx;
 
   // SICUREZZA (#250): confine d'origine sui comandi distruttivi. Il canale
   // 'filo:message' è raggiungibile sia dalle pagine interne filo:// sia dai
@@ -72,9 +73,34 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.OPEN_URL, async (msg, sender) => {
+  on(MSG.OPEN_URL, async (msg, sender, origin) => {
     const win = winOf(sender);
-    if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url);
+    if (!win?._filoTabs || !msg.url) return { ok: true };
+    const url = String(msg.url);
+    // Da una pagina di Filo un indirizzo web o di posta passa dalla porta delle uscite (#810); `parole` = scritto dall'utente.
+    if (isFilo(origin) && SCHEMI_USCITA.test(url)) {
+      const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
+      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url) });
+      return { ok: true, ...r };
+    }
+    win._filoTabs.openTab(url);
+    return { ok: true };
+  });
+
+  // «Apri comunque» della chat (#590): da una pagina di Filo scavalca la lista come quello della notifica.
+  // L'assistente sta nel DOM della pagina web, che può guidargli clic e tasti: il suo bottone riporta la
+  // notifica «Sito bloccato», fuori dalla pagina, e il sì si dà lì. Solo per un'apertura sua fermata.
+  on(MSG.APRI_COMUNQUE, async (msg, sender, origin) => {
+    const win = winOf(sender);
+    const url = String((msg && msg.url) || '');
+    if (!win?._filoTabs || !/^https?:\/\//i.test(url)) return { ok: false };
+    if (isFilo(origin)) {
+      win._filoTabs.openBlockedPopup(url, { apriComunque: true });
+      return { ok: true };
+    }
+    if (!win._filoTabs.apribileDallAssistente(sender && sender.wc, url)) return { ok: false, error: 'forbidden' };
+    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta.
+    win._filoTabs.openTab(url);
     return { ok: true };
   });
 
@@ -83,6 +109,11 @@ module.exports = function register(on, ctx) {
     app.quit();
     return { ok: true };
   });
+
+  on(MSG.AGGIORNAMENTO_INSTALLA, soloFilo(async (msg) => {
+    const U = require('../../updater');
+    return msg && msg.avvisa === true ? U.riavviaDallaHome() : U.riavviaEAggiorna();
+  }));
 
   on(MSG.NAV_BACK, async (msg, sender) => {
     if (sender?.tab?.id) {
@@ -112,11 +143,9 @@ module.exports = function register(on, ctx) {
     if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
     const win = winOf(sender);
     const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
-    const wc = tab?.view?.webContents;
-    if (!wc) return { ok: false, canBack: false, canFwd: false };
-    const canBack = wc.navigationHistory?.canGoBack?.() ?? wc.canGoBack?.() ?? false;
-    const canFwd = wc.navigationHistory?.canGoForward?.() ?? wc.canGoForward?.() ?? false;
-    return { ok: true, canBack: !!canBack, canFwd: !!canFwd };
+    if (!tab?.view?.webContents) return { ok: false, canBack: false, canFwd: false };
+    const tabs = win._filoTabs;
+    return { ok: true, canBack: tabs.puoTornare(tab, 'indietro'), canFwd: tabs.puoTornare(tab, 'avanti') };
   });
 
   on(MSG.TOGGLE_FULLSCREEN, async (msg, sender) => {

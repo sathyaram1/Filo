@@ -7,11 +7,14 @@
 // funzione giusta viene invocata sull'elemento/selezione giusti, l'azione
 // esterna apre la scheda giusta, l'apertura link passa per il ponte NAVIGA),
 // non la semplice assenza d'errore. Le azioni che escono verso l'esterno
-// (cerca/condividi) passano dal popup di conferma di Filo.
+// (cerca/condividi) passano dal popup di conferma di Filo, e le ricerche anche
+// dal ponte NAVIGA (#810).
 //
 // Giriamo su filo://newtab/ (pagina interna, contextIsolation off → un solo
 // mondo) iniettando un'immagine e un link nel DOM: così possiamo stubbare
-// window.open / SN_ACTIONS nello stesso mondo del content script.
+// window.open / SN_ACTIONS nello stesso mondo del content script. Una pagina di
+// Filo non porta testo scritto da altri nel compito: perché le uscite chiedano
+// come su un sito, qui il livello è Conservativo (#530, la regola sta nel main).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
@@ -21,6 +24,9 @@ const NEWTAB = 'filo://newtab/';
 // Prepara la pagina: aspetta i content script, inietta img+link, installa le spie.
 async function prep(page) {
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 8000 });
+  await page.evaluate(() => chrome.runtime.sendMessage({
+    type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: 'conservativo' } },
+  }));
   await page.evaluate(() => {
     window.SN_SIDEBAR.open();
     // Elementi bersaglio.
@@ -60,11 +66,15 @@ async function prep(page) {
     T.__origRead = T.readAloud;
     T.readAloud = async (t) => { window.__calls.read.push(t); };
 
-    // Spia sul ponte azioni-Filo (per open_link → NAVIGA), delegando all'originale.
+    // Spia sul ponte azioni-Filo (per open_link → NAVIGA), delegando all'originale. `navFatte`: le aperture che
+    // il main ha eseguito davvero, dopo l'eventuale domanda che decide lui (#530).
+    window.__calls.navFatte = [];
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...rest) => {
+    chrome.runtime.sendMessage = async (msg, ...rest) => {
       if (msg && msg.type === 'filo_run_action') window.__calls.navItems.push(msg.action);
-      return orig(msg, ...rest);
+      const r = await orig(msg, ...rest);
+      if (msg && msg.action && msg.action.type === 'NAVIGA' && r && r.executed) window.__calls.navFatte.push(msg.action);
+      return r;
     };
   });
 }
@@ -111,18 +121,22 @@ test('testo: cerca sul web chiede conferma; Annulla non cerca, OK apre la ricerc
   await expect(host).toBeVisible();
   await clickConfirm(page, 'cancel');
   await expect(host).toHaveCount(0);
-  expect(await page.evaluate(() => window.__opened.length)).toBe(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('annullata');
+  expect(await page.evaluate(() => window.__calls.navFatte.length)).toBe(0);
 
-  // 2) OK → apre la ricerca Google con il testo.
+  // 2) OK → apre la ricerca Google con il testo, passando dal ponte NAVIGA: la domanda
+  // esce dalla porta delle uscite del main come ogni altra ricerca dell'assistente (#810).
   await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'gatti buffi' }); });
   await expect(host).toBeVisible();
   await clickConfirm(page, 'ok');
   await expect(host).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
-  const url = await page.evaluate(() => window.__opened[0]);
-  expect(url).toContain('google.com/search');
-  expect(url).toContain(encodeURIComponent('gatti buffi'));
+  await expect.poll(() => page.evaluate(() => window.__calls.navFatte.length)).toBe(1);
+  const nav = await page.evaluate(() => window.__calls.navFatte[0]);
+  expect(nav.type).toBe('NAVIGA');
+  expect(nav.url).toContain('google.com/search');
+  expect(nav.url).toContain(encodeURIComponent('gatti buffi'));
+  expect(await page.evaluate(() => window.__opened.length)).toBe(0);
+  await expect(page.locator('.sn-sidebar-log').last()).toContainText('cerca testo sul web: fatto');
 });
 
 test('immagine: cerca immagine risolve il selettore, chiede conferma e apre Lens con il src', async ({ openTab }) => {
@@ -131,10 +145,11 @@ test('immagine: cerca immagine risolve il selettore, chiede conferma e apre Lens
   await page.evaluate(() => { window.__filoSidebarTest.runPageAction({ op: 'search_image', selector: '#pic' }); });
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
   await clickConfirm(page, 'ok');
-  await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
-  const url = await page.evaluate(() => window.__opened[0]);
-  expect(url).toContain('lens.google.com');
-  expect(url).toContain(encodeURIComponent('https://example.com/cat.png'));
+  await expect.poll(() => page.evaluate(() => window.__calls.navItems.length)).toBe(1);
+  const nav = await page.evaluate(() => window.__calls.navItems[0]);
+  expect(nav.type).toBe('NAVIGA');
+  expect(nav.url).toContain('lens.google.com');
+  expect(nav.url).toContain(encodeURIComponent('https://example.com/cat.png'));
 });
 
 test('immagine: salva immagine è immediata e agisce sull\'immagine indicata', async ({ openTab }) => {

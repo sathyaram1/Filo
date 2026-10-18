@@ -50,10 +50,12 @@ test('#1 cwd dell’assistente: un cd persiste, il pwd successivo lo riflette', 
   expect(cdSub.executed).toBe(true);
   expect(real(cdSub.output.cwd)).toBe(path.join(base, 'sub'));
 
-  // Il `pwd` successivo riflette davvero la sottocartella (cwd persistita).
+  // Il `pwd` successivo riflette davvero la sottocartella (cwd persistita). PowerShell lo stampa come tabella
+  // («Path», «----», poi il percorso): il percorso è l'ultima riga piena in ogni shell.
   const pwd = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'pwd' });
   expect(pwd.executed).toBe(true);
-  expect(real(pwd.output.stdout.trim())).toBe(path.join(base, 'sub'));
+  const righePwd = pwd.output.stdout.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
+  expect(real(righePwd.at(-1))).toBe(path.join(base, 'sub'));
   // …e il percorso riportato coincide con la cartella reale.
   expect(real(pwd.output.cwd)).toBe(path.join(base, 'sub'));
 

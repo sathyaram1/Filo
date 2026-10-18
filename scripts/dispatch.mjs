@@ -54,8 +54,8 @@
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
-//   Nei --record-* il biglietto si rilegge dal promemoria (.claude/routine-ticket.json);
-//   `--ticket` è la scorta per quando il promemoria è andato perso.
+//   Nei --record-* le opzioni valgono in ogni posizione (leggiOpzioniRegistrazione). Il biglietto
+//   si rilegge dal promemoria (.claude/routine-ticket.json); `--ticket` è la scorta se è perso.
 //   Un argomento NON riconosciuto è un errore d'uso (exit 1) senza effetti
 //   collaterali: il promemoria si cancella solo all'avvio dichiarato di un giro
 //   locale senza biglietto, mai davanti a un argomento storpiato.
@@ -71,7 +71,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, dirname, resolve, relative, sep } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, withCheckpoint,
@@ -81,21 +82,25 @@ import {
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import {
-  baseDelConfronto, controllaProveTolte, controllaPulizia, numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero,
+  baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
+  ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
   leggiBigliettoAMano,
 } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
-import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
+import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
-import { scaricaPayload, STAMPA_MAX } from './lib/consegna-file.mjs';
+import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
+import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
+import { cloneDentroIlRepo } from './lib/git-server.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -310,6 +315,7 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   if (String(sha || '')) s.verifierSha = String(sha);
   // Una critica nuova apre un giro nuovo: la pulizia di quello prima non ne è la base.
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'stop';
@@ -326,6 +332,7 @@ export function applyFixed(state) {
   s.verifierCritique = '';
   s.verifierSha = '';
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   s.secauditDone = false;
   s.secauditVerdict = null;
   // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
@@ -337,10 +344,14 @@ export function applyFixed(state) {
 
 /**
  * La pulizia dopo la critica: le prove dei rilievi messi da parte tolte PRIMA di correggere. PURA.
- * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed.
+ * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed. Una pulizia dopo
+ * le correzioni non sposta la base: va in `pulizieDopo`, e la consegna non rilancia ciò che ha tolto.
  */
 export function applyPulizia(state, controllo) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
+  if (s.verifierVerdict === 'pass') {
+    return { ok: false, message: 'dopo una verifica superata la pulizia non si registra: basta il commit che toglie solo le prove, e il rilascio del biglietto la sigilla. Un riallineamento confronta da lì.' };
+  }
   if (s.verifierVerdict !== 'fix-pending' || !s.verifierSha) {
     return { ok: false, message: 'nessun giro di correzione aperto: la pulizia si registra subito dopo una critica a cui il server ha risposto «c\'è da correggere», prima di ogni correzione.' };
   }
@@ -351,7 +362,8 @@ export function applyPulizia(state, controllo) {
   if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
   const fuori = testoPuliziaFuoriNumero(controllo, md.numeri);
   if (fuori) return { ok: false, message: fuori };
-  s.puliziaSha = controllo.sha;
+  if (controllo.dopo) s.pulizieDopo = [...(Array.isArray(s.pulizieDopo) ? s.pulizieDopo : []).filter((x) => x !== controllo.sha), controllo.sha];
+  else s.puliziaSha = controllo.sha;
   return { ok: true, state: s, files: controllo.files };
 }
 
@@ -396,29 +408,81 @@ export function secauditPassato(verdict) {
 export { MAX_LIVELLO_CHARS, leggiTestoLivello };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
+// Si tolgono tutte PRIMA di leggere comando, identificativo e testo, come il biglietto: rimasta fra i
+// posizionali, la frase finiva nel report e il suo nome faceva da identificativo (#879).
+export const OPZIONI_REGISTRAZIONE = {
+  '--segnala': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
+  '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
+  '--frase': { tipo: 'testo', comandi: ['--record-fixed'] },
+  '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
+};
+const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
+
 /**
- * Toglie `--<nome> <file>` dagli argomenti, come stripTicketArg col biglietto.
- * PURA. `error` è la frase da stampare (opzione senza file dopo, o un flag al
- * posto del file, o l'opzione ripetuta).
+ * Anche come `--opzione=valore`, la forma del canale. PURA. `error`: valore mancante o storto, opzione
+ * ripetuta, o un'opzione che il comando non legge.
+ * @returns {{ args: string[], valori: Record<string, string|true>, error: string }}
  */
-export function stripFileArg(list, nome) {
-  const args = Array.isArray(list) ? [...list] : [];
-  const flag = `--${nome}`;
-  const i = args.indexOf(flag);
-  if (i === -1) return { args, file: '', error: '' };
-  const v = String(args[i + 1] ?? '').trim();
-  args.splice(i, 2);
-  if (!v || SEMBRA_OPZIONE(v)) return { args, file: '', error: `${flag} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.` };
-  if (args.includes(flag)) return { args, file: '', error: `${flag} va passato una volta sola: non ho consegnato niente.` };
-  return { args, file: v, error: '' };
+export function leggiOpzioniRegistrazione(list) {
+  const lista = Array.isArray(list) ? list.map((a) => String(a ?? '')) : [];
+  const args = [];
+  const valori = {};
+  const no = (error) => ({ args: lista, valori: {}, error });
+  for (let i = 0; i < lista.length; i++) {
+    const a = lista[i];
+    const nome = Object.keys(OPZIONI_REGISTRAZIONE).find((n) => a === n || a.startsWith(`${n}=`));
+    if (!nome) { args.push(a); continue; }
+    const { tipo } = OPZIONI_REGISTRAZIONE[nome];
+    if (tipo === 'bandiera') {
+      if (a !== nome) return no(`${nome} non vuole un valore: non ho consegnato niente.`);
+      valori[nome] = true;
+      continue;
+    }
+    if (nome in valori) return no(`${nome} va passato una volta sola: non ho consegnato niente.`);
+    const v = a === nome ? lista[++i] : a.slice(nome.length + 1);
+    if (tipo === 'file') {
+      const file = String(v ?? '').trim();
+      if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`);
+      valori[nome] = file;
+    } else {
+      // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
+      // l'identificativo sparivano dalla riga.
+      if (v === undefined || sembraOpzioneNelReport(v)) return no(`${nome} vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.`);
+      valori[nome] = v;
+    }
+  }
+  const comando = args[0];
+  for (const nome of Object.keys(valori)) {
+    const { comandi } = OPZIONI_REGISTRAZIONE[nome];
+    if (comandi.includes(comando)) continue;
+    const qui = Object.entries(OPZIONI_REGISTRAZIONE).filter(([, o]) => o.comandi.includes(comando))
+      .map(([n, o]) => `${n}${FORMA_OPZIONE[o.tipo]}`);
+    return no(String(comando || '').startsWith('--record-')
+      ? `${nome} non vale con ${comando}: ${qui.length ? `qui ci sono solo ${qui.join(', ')}` : 'qui non ci sono opzioni'}. Niente è stato toccato.`
+      : `${nome} vale solo con ${comandi.join(' e ')}. Niente è stato toccato.`);
+  }
+  return { args, valori, error: '' };
 }
 
-/** Il payload della consegna «corretto», con la segnalazione se c'è. PURA. */
-export function fixedPayload({ report, frase, branch, segnalazione, ferma } = {}) {
+/**
+ * Il payload della consegna «corretto», con la segnalazione se c'è. `sha`: la punta della cartella, che il registro del
+ * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
+ */
+export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
   if (ferma === true) p.stop = true;
+  if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
   return p;
+}
+
+/** Lo sha intero della punta della cartella, '' se git non risponde. */
+function puntaDellaCartella() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().toLowerCase();
+  } catch (_) {
+    return '';
+  }
 }
 
 /**
@@ -664,6 +728,25 @@ export function serialAwarenessNote(role, history, dropped = 0) {
   return '';
 }
 
+// ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ─────────────────────
+
+const LAVORO_SERVER_FILE = '_lavoro-server.md';
+
+/** Dove sta il clone di filo-security di un lavoro server: fuori dal checkout di Filo. PURA (legge l'ambiente). */
+export function cartellaCloneServer(env = process.env) {
+  return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
+}
+
+export { cloneDentroIlRepo };
+
+/** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
+export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
+  const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
+  if (!existsSync(f)) return '';
+  const avanti = (p) => String(p).split('\\').join('/');
+  return readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
+}
+
 // L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
 export { verifierScope };
 export function perimetroNote(scope, perimetro) {
@@ -679,7 +762,8 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
   const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
   if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
-  const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
+  // Il contratto ha pezzi in comune con halt (la domanda di fine sessione): si espande come i ruoli.
+  const contract = existsSync(c) ? espandiInclusioni(readFileSync(c, 'utf8'), ROLES_DIR) : '';
   const testo = contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
   // Le ricette dicono `node scripts/…`, che dalla cartella di lavoro porta agli
   // strumenti DEL RAMO. Quando gli strumenti sono la copia fissata, il percorso
@@ -693,7 +777,8 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
  *   - secaudit: SOLO il diff, MAI il feedback (isolamento strutturale).
  *   - verifier: il feedback (sintomo), MAI il diff (isolamento comportamentale).
  *   - fixer    (caso `riallineamento`): il feedback, per capire le intenzioni
- *              in conflitto. Nessuna critica: qui non si corregge niente.
+ *              in conflitto, e il perché scritto dal server (`critique`): un
+ *              conflitto, o gli unit rossi sulla fusione con il loro elenco (#929).
  *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
  *   - prober:   niente.
  *
@@ -704,6 +789,17 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
 // e corregge: il server le mette nel payload, e qui non si perdono per strada.
 function conDecisioni(ctx) {
   return Array.isArray(ctx && ctx.decisioni) && ctx.decisioni.length ? { decisioni: ctx.decisioni } : {};
+}
+// Le schermate della segnalazione e delle risposte (#900): le apre il server, `scaricaPayload` le scrive su file.
+function conImmagini(ctx) {
+  return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
+}
+
+// Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
+function testoDiffVuoto({ commitPropri = null } = {}) {
+  if (commitPropri === 0) return 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.';
+  const quanti = commitPropri > 0 ? `ha ${commitPropri} commit propri, ma ` : '';
+  return `Il diff è vuoto davvero: il ramo ${quanti}ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).`;
 }
 
 export function buildPayload(bucket, ctx = {}) {
@@ -716,6 +812,12 @@ export function buildPayload(bucket, ctx = {}) {
           diffBase: ctx.diffBase,
           ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
         } : {}),
+        ...(ctx.diffServer && typeof ctx.diffServer === 'object' ? {
+          diffServer: String(ctx.diffServer.diff || ''),
+          diffServerBase: ctx.diffServer.base || null,
+          diffServerHead: String(ctx.diffServer.head || ''),
+        } : {}),
+        ...(ctx.diffVuoto ? { diffVuoto: testoDiffVuoto(ctx.diffVuoto) } : {}),
       };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
@@ -726,6 +828,7 @@ export function buildPayload(bucket, ctx = {}) {
         branch: bucket.branch, id: bucket.id, num: bucket.num,
         feedback: ctx.feedback || null,
         ...conDecisioni(ctx),
+        ...conImmagini(ctx),
         history: Array.isArray(ctx.history) ? ctx.history : [],
         historyDropped: Number(ctx.historyDropped) || 0,
         scope: verifierScope(ctx.scope).scope,
@@ -739,25 +842,26 @@ export function buildPayload(bucket, ctx = {}) {
       if (rip) {
         return {
           case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx),
+          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx),
           history: Array.isArray(ctx.history) ? ctx.history : [],
           historyDropped: Number(ctx.historyDropped) || 0,
         };
       }
-      // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
-      // già verificato: niente critica e niente serie, o la consegna direbbe
-      // il contrario del testo di ruolo (che vieta di toccare altro).
+      // Riallineamento del ramo: il lavoro era già verificato, quindi niente serie. Il perché lo scrive il server
+      // (conflitto, o unit rossi sulla fusione con l'elenco dei test, #929): senza, chi riallinea non sa cosa far tornare verde.
       return {
         case: 'riallineamento',
         branch: bucket.branch,
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
+        ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
+        ...conImmagini(ctx),
       };
     }
     case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx) };
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
@@ -779,45 +883,58 @@ function tryGit(args) {
   catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
 }
 
-// Ritorna anche su quale base e su quale punta il diff è stato calcolato: chi lo ricalcola deve usare
-// quelle, non il `main` locale (nel clone delle routine è indietro e gonfia il diff).
-export function diffForBranch(branch, root = ROOT) {
+/**
+ * Il diff del ramo contro il main di GitHub, con la base e la punta su cui è calcolato: chi lo ricalcola usa
+ * quelle. Un diff che git non sa calcolare esce con `ok: false` e il motivo, mai come diff vuoto (#740); uno vuoto
+ * esce solo se il contenuto del ramo è davvero quello della base comune, e lo dichiara in `vuoto`.
+ * @returns {{ok:true, diff:string, base:{ref:string, sha:string}, head:string, vuoto?:{commitPropri:number|null}}
+ *   | {ok:false, motivo:string, diff:'', base:object|null, head:string}}
+ */
+export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi } = {}) {
   // Il diff non si ripulisce: gli spazi in fondo all'ultima riga fanno parte del ramo.
-  const tryGit = (args, { grezzo = false } = {}) => {
+  const git = (args, { grezzo = false } = {}) => {
     try {
-      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 30 });
+      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 30, timeout: TETTO_STORIA_MS });
       return { ok: true, out: grezzo ? out : out.trim() };
-    } catch (e) { return { ok: false, out: '' }; }
+    } catch (e) {
+      return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || String(e.message || e) };
+    }
   };
-  if (!branch) return { diff: '', base: null, head: '' };
-  // La base del confronto DEVE essere lo stato REMOTO di main. In cloud il clone
-  // è shallow e il ref locale `main` non viene mai aggiornato (l'orchestratore fa
-  // `pull --rebase origin main` sul branch driver `claude/*`, non fa avanzare il
-  // ref `main`), quindi un `git diff main...branch` userebbe un main vecchio di
-  // decine di versioni: il diff si gonfia con modifiche GIÀ in main e fa scattare
-  // falsi positivi L5/secaudit (file sensibili "toccati" che in realtà erano già
-  // su main). Il cancello di fusione (sul server) confronta con il main VERO di
-  // GitHub per lo stesso motivo; qui allineiamo la stessa logica per il diff
-  // che alimenta il secaudit.
-  tryGit(['fetch', 'origin', MAIN_BRANCH]);
-  const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
-    ? `origin/${MAIN_BRANCH}`
-    : MAIN_BRANCH;
-  // Il branch può esistere solo su origin (worker/* pushato ma non in locale).
-  const ref = tryGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok
-    ? branch
-    : (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]).ok
-        ? `origin/${branch}`
-        : branch);
-  const baseSha = tryGit(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
-  const headSha = tryGit(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
+  const guasto = (motivo, base = null, head = '') => ({ ok: false, motivo, diff: '', base, head });
+  if (!branch) return guasto('nessun ramo di cui calcolare il diff');
+  // La base è il main REMOTO: quello locale, nel clone delle routine, è indietro di decine di versioni e gonfia il
+  // diff di modifiche già fuse. Il refspec è esplicito perché in un clone a ramo singolo `fetch origin main` non
+  // crea origin/main; e niente ripiego sul main locale, che è proprio la base sbagliata.
+  const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
+  const baseSha = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`]);
+  if (!baseSha.ok) {
+    return guasto(`non ho origin/${main} da usare come base${f.ok ? '' : `, e scaricarlo non riesce (${primaRiga(f.out)})`}`);
+  }
+  // Senza download riuscito si usa l'ultimo origin/main scaricato: più vecchio, il diff può solo crescere.
+  if (!f.ok) process.stderr.write(`[dispatch] origin/${main} non si aggiorna (${primaRiga(f.out)}): diff calcolato sull'ultima copia scaricata\n`);
+  const base = { ref: `origin/${main}`, sha: baseSha.out };
+  // Il ramo può esistere solo su origin (worker/* pushato ma non in locale).
+  const ref = [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]
+    .find((r) => git(['rev-parse', '--verify', '--quiet', r]).ok);
+  const headSha = ref ? git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]) : { ok: false };
+  if (!headSha.ok) return guasto(`il ramo ${branch} non c'è, né qui né fra quelli scaricati da origin`, base);
+  const head = headSha.out;
+  // Un clone poco profondo non ha la base comune: si scarica la storia che manca, come per la fusione di prova.
+  const storia = assicuraStoria({ git, mainSha: base.sha, punta: head, main, ...(passi ? { passi } : {}) });
+  if (storia.errore) return guasto(storia.errore, base, head);
+  const comune = git(['merge-base', base.sha, head]);
+  if (!comune.ok) return guasto(`ramo e origin/${main} non hanno una base comune`, base, head);
   // Fra gli sha, non fra i nomi: il diff è esattamente quello del comando che il payload dichiara.
-  const r = baseSha.ok && headSha.ok ? tryGit(['diff', `${baseSha.out}...${headSha.out}`], { grezzo: true }) : { ok: false, out: '' };
-  return {
-    diff: r.ok ? r.out : '',
-    base: baseSha.ok ? { ref: base, sha: baseSha.out } : null,
-    head: headSha.ok ? headSha.out : '',
-  };
+  const r = git(['diff', `${base.sha}...${head}`], { grezzo: true });
+  if (!r.ok) return guasto(`git diff non riesce (${primaRiga(r.out)})`, base, head);
+  if (r.out) return { ok: true, diff: r.out, base, head };
+  // Vuoto vale solo se l'albero del ramo è quello della base comune: è la prova che non passa dal testo del diff.
+  const albero = (sha) => git(['rev-parse', '--verify', '--quiet', `${sha}^{tree}`]);
+  const [a, b] = [albero(comune.out.split('\n')[0]), albero(head)];
+  if (!a.ok || !b.ok || a.out !== b.out) return guasto('il diff è uscito vuoto ma il ramo cambia dei file rispetto alla base comune con main', base, head);
+  const propri = git(['rev-list', '--count', `${base.sha}..${head}`]);
+  return { ok: true, diff: '', base, head, vuoto: { commitPropri: propri.ok ? Number(propri.out) : null } };
 }
 
 // ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
@@ -1087,7 +1204,7 @@ export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 export const FERMA_NOTE = [
   'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
   'prodotto), scrivi la segnalazione e consegna quello che hai fatto:',
-  '  --record-fixed <id> "<report>" --segnala <file.md>',
+  '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --segnala <file.md>',
   'Una segnalazione FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
   'risposto. Senza segnalazione torna in coda per un\'altra verifica. Un difetto non è una segnalazione.',
 ].join('\n');
@@ -1180,10 +1297,11 @@ export function verifierReplyText(reply, id = '<id>') {
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
       derivatiRighe(derivati),
-      derivati.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi.' : null,
+      derivati.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi, e il suo caso resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).' : null,
       derivati.length ? daTogliere : null,
       derivati.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
       'Una prova del giro ancora rossa non si toglie e non si cambia mai: la consegna la rilancia com\'era e si ferma. Si toglie solo verde, insieme alla prova durevole che la sostituisce.',
+      ROSSO_ATTESO_CHIUSO,
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       '',
@@ -1267,14 +1385,25 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // Stessa guardia di «verify-local.mjs corretto»: una prova del giro cancellata ancora rossa è
   // una porta aperta che la verifica dopo non rilancerebbe più (#679).
   const shaCritica = String(guard.state?.verifierSha || '');
-  const baseTolte = baseDelConfronto(shaCritica, guard.state?.puliziaSha, ROOT);
+  // Dopo un «pass» la pulizia non si registra: senza questa base il riallineamento rilancia le prove dei
+  // rilievi diventati feedback, rosse per costruzione, e non si consegna mai (#880).
+  const puliziaPass = guard.state?.verifierVerdict === 'pass' ? puliziaDelPass(shaCritica, guard.state?.checkpoints, ROOT) : '';
+  const baseTolte = baseDelConfronto(shaCritica, guard.state?.puliziaSha || puliziaPass, ROOT);
+  if (puliziaPass && baseTolte === puliziaPass) {
+    process.stderr.write(`Dopo la verifica superata le prove del giro tolte in ${puliziaPass.slice(0, 8)} sono la pulizia: il confronto parte da lì.\n`);
+  }
   if (baseTolte && baseTolte !== headSha(ROOT)) {
-    const md = guard.state?.messiDaParteGiro;
+    const md = guard.state?.messiDaParteGiro && guard.state.messiDaParteGiro.sha === shaCritica ? guard.state.messiDaParteGiro : null;
     const tolte = controllaProveTolte({
       shaPrima: baseTolte, root: ROOT,
       conPulizia: baseTolte !== shaCritica,
-      messi: md && md.sha === shaCritica ? Number(md.n) || 0 : 0,
+      messi: md ? Number(md.n) || 0 : 0,
       shaCritica,
+      // Il numero nel nome dice quali rosse sono di un rilievo messo da parte: quelle escono con la pulizia (#747).
+      numeri: md && Array.isArray(md.numeri) ? md.numeri : undefined,
+      avvio: md ? md.avvio || '' : '',
+      pulizieDopo: guard.state?.pulizieDopo,
+      comando: `node scripts/dispatch.mjs --record-pulizia ${id}`,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
@@ -1288,7 +1417,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
   // scrive in `livelli.l3`, e la appende alle note come storia della chat.
-  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma }));
+  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma, sha: puntaDellaCartella() }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
@@ -1315,11 +1444,20 @@ async function recordPulizia(id) {
   if (stato.lines.length) return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'pulizia') };
   const st = { ...(guard.state || defaultState(id, '')), id };
   const avvio = st.messiDaParteGiro && st.messiDaParteGiro.sha === st.verifierSha ? st.messiDaParteGiro.avvio : '';
-  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT, avvio }) : null);
+  const controllo = st.verifierSha ? controllaPulizia({
+    shaCritica: st.verifierSha, root: ROOT, avvio, base: baseDelConfronto(st.verifierSha, st.puliziaSha, ROOT), pulizieDopo: st.pulizieDopo,
+  }) : null;
+  const r = applyPulizia(st, controllo);
   if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
+  const numeri = Array.isArray(st.messiDaParteGiro?.numeri) ? st.messiDaParteGiro.numeri : undefined;
+  const casi = controllaCasiDellaPulizia({
+    shaCritica: controllo.prima || st.verifierSha, sha: controllo.sha, root: ROOT, messi: numeri, dopo: !!controllo.dopo,
+    log: (m) => process.stderr.write(`${m}\n`),
+  });
+  if (casi.ferma) return { rejected: true, formatRejected: true, message: casi.testo };
   // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
   sealTransition(r.state, 'pulizia');
-  return { ...r.state, files: r.files };
+  return { ...r.state, files: r.files, sha: controllo.sha, dopo: !!controllo.dopo };
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
@@ -1544,6 +1682,11 @@ const SEMBRA_OPZIONE = (a) => {
   return s.length > 1 && ['-', '‐', '‑', '‒', '–', '—', '−'].includes(s[0]) && !/^[0-9]/.test(s.slice(1));
 };
 
+/** Un'opzione rimasta al posto dell'identificativo: lo stato locale finiva sotto il suo nome (#879). PURA. */
+function idCheSembraOpzione(id, ammesse) {
+  return `Argomento non capito al posto dell'identificativo: ${id} — non ho registrato niente. Qui le opzioni sono ${ammesse}, in qualunque posizione; poi vengono l'identificativo e il resto.`;
+}
+
 export function usageText() {
   return [
     'Uso: node scripts/dispatch.mjs <comando>',
@@ -1552,13 +1695,17 @@ export function usageText() {
     '                         promemoria del biglietto e avvia il battito',
     '  (nessun argomento)     giro locale, senza server (sceglie il bucket qui)',
     '  --preflight            prontezza del giro, PRIMA del setup (orchestratore)',
+    '  --linea-principale     dopo ogni worker, prima del biglietto (orchestratore): la cartella',
+    '                         torna su main, perché il prossimo worker parta con i suoi agenti',
     '  --record-verifier <id> "<critica>" [--segnala <file.md>] [--ticket <b>]   una riga per rilievo,',
     '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
     '  --record-pulizia  <id> [--ticket <b>]   dopo una critica che manda a correggere e mette rilievi',
-    '                         da parte: registra il commit che toglie SOLO le loro prove del giro',
+    '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
+    '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
+    '                         più tardi, per una prova dimenticata, il commit è l\'ultimo e da solo',
     '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
@@ -1576,9 +1723,11 @@ export function usageText() {
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
-    'Nei --record-* il biglietto si rilegge da solo dal promemoria',
-    '(.claude/routine-ticket.json): `--ticket` serve solo se il promemoria è perso.',
-    'Vale in ogni posizione, anche `--ticket=<b>` o `--biglietto <b>`, come nel canale.',
+    'Nei --record-* le opzioni (--frase, --segnala, --nota, --ferma, --ticket) valgono in ogni',
+    'posizione, anche come `--opzione=valore`, come nel canale; quello che resta, in ordine, è',
+    'comando, identificativo e testo.',
+    'Il biglietto si rilegge da solo dal promemoria (.claude/routine-ticket.json): `--ticket`',
+    '(o `--biglietto`) serve solo se il promemoria è perso.',
     '',
     'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
     '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
@@ -1681,6 +1830,23 @@ function prepareForProber() {
   } else {
     g(['checkout', MAIN_BRANCH]);
   }
+}
+
+// Fra un worker e l'altro la cartella torna sulla linea principale: la sessione legge gli agenti (e il loro
+// sforzo) dalla cartella, e il ramo vecchio lasciato dal worker prima li riporterebbe indietro (sforzo per ruolo).
+// Scarta le modifiche non salvate (il lavoro di un worker morto si butta): per questo solo nelle routine.
+export function tornaAllaLineaPrincipale() {
+  if (process.env.FILO_ROUTINE !== '1') {
+    return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1): scarta le modifiche non salvate della cartella' };
+  }
+  clearExpectation(ROOT);
+  tryGit(['fetch', 'origin', MAIN_BRANCH]);
+  const rif = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok ? `origin/${MAIN_BRANCH}` : MAIN_BRANCH;
+  const co = tryGit(['checkout', '-f', '-B', MAIN_BRANCH, rif]);
+  if (!co.ok || currentBranch(ROOT) !== MAIN_BRANCH) {
+    return { ok: false, message: `la cartella non torna su ${MAIN_BRANCH}: ${co.out.slice(0, 200)}` };
+  }
+  return { ok: true, head: headSha(ROOT) };
 }
 
 /**
@@ -1809,8 +1975,12 @@ export function serverCtx(bucket, fromServer, diff = '') {
   // non chiede nessuna chiave. Del feedback non riceve niente, e non è più una
   // consegna da rispettare — senza chiave, il testo cifrato per lui è un blob.
   if (role === 'secaudit') {
-    if (diff && typeof diff === 'object') return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '' };
-    return { diff };
+    // Un lavoro server porta anche il diff del server: lo scarica il server, perché qui il clone non c'è (#1159 fase 2).
+    const server = payload && payload.diffServer && typeof payload.diffServer === 'object' ? { diffServer: payload.diffServer } : {};
+    if (diff && typeof diff === 'object') {
+      return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '', ...(diff.vuoto ? { diffVuoto: diff.vuoto } : {}), ...server };
+    }
+    return { diff, ...server };
   }
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
@@ -1821,6 +1991,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     return {
       feedback: (payload && payload.feedback) || null,
       decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
+      immagini: Array.isArray(payload && payload.immagini) ? payload.immagini : [],
       history: Array.isArray(payload && payload.history) ? payload.history : [],
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
       // nell'avvertenza, così i giri mancanti non passano per inesistenti.
@@ -1828,7 +1999,10 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // La ripresa dopo la risposta dell'owner (solo per chi riprende: il
       // server non la manda a chi verifica).
       ripresa: payload && payload.ripresa && typeof payload.ripresa === 'object' ? payload.ripresa : null,
+      ...(role === 'fixer' && typeof (payload && payload.critique) === 'string' ? { critique: payload.critique } : {}),
       ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
+      // Il lavoro tocca anche filo-security (busta del server, #1159): le istruzioni del clone si accodano al ruolo.
+      ...(payload && payload.lavoroServer && typeof payload.lavoroServer === 'object' ? { lavoroServer: payload.lavoroServer } : {}),
     };
   }
   return {};
@@ -1842,6 +2016,11 @@ async function finalizeBucket(bucket, fromServer) {
     prepareForProber();
     emit(bucket, {});
     return { exit: 0 };
+  }
+
+  // Un lavoro server clona filo-security: dentro il checkout di Filo l'hook di salvataggio lo pubblicherebbe (#1159).
+  if (fromServer && fromServer.payload && fromServer.payload.lavoroServer && cloneDentroIlRepo(cartellaCloneServer(), ROOT)) {
+    return emitHalt('permanent', `il clone di filo-security (${cartellaCloneServer()}) cadrebbe dentro il checkout di Filo (${ROOT}), che si pubblica: imposta FILO_SERVER_CLONE fuori dal repo`);
   }
 
   // Il semaforo è del SERVER: l'ha preso lui rilasciando il biglietto, e vale
@@ -1903,8 +2082,13 @@ async function finalizeBucket(bucket, fromServer) {
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
-  const ctx = serverCtx(bucket, fromServer,
-    bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
+  let diff = '';
+  if (bucket.role === 'secaudit') {
+    diff = diffForBranch(bucket.branch);
+    // Un diff che non si calcola non arriva al controllo come se fosse vuoto: darebbe il via libera su niente (#740).
+    if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
+  }
+  const ctx = serverCtx(bucket, fromServer, diff);
 
   emit(bucket, ctx);
   return { exit: 0 };
@@ -1942,20 +2126,35 @@ export function emit(bucket, ctx) {
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
-  const instructions = serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base;
-  const stampaCon = (payload) => ({ role: bucket.role, payload, claim: bucket.id || null, instructions });
+  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
+  const instructions = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
+  const stampaCon = (payload, istr = instructions, file = '') => ({
+    role: bucket.role, payload, claim: bucket.id || null, instructions: istr, ...(file ? { istruzioniFile: file } : {}),
+  });
+  // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
+  const misuraCon = (istr, file) => (p) => JSON.stringify(stampaCon(p, istr, file), null, 2).length + 1;
+  const scarica = (misura) => scaricaPayload(pieno, { root: ROOT, sempre: ['diff', 'diffServer'], max: STAMPA_MAX, misura });
   let payload = pieno;
+  let istr = instructions;
+  let fileIstr = '';
   try {
-    // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
-    payload = scaricaPayload(pieno, {
-      root: ROOT, sempre: ['diff'], max: STAMPA_MAX,
-      misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
-    });
+    payload = scarica(misuraCon(instructions));
+    // Un ruolo lungo con un payload già tutto fuori (un verificatore di un lavoro server) passerebbe la soglia
+    // dell'harness: esce il ruolo, intero, e il payload si riscarica attorno al rimando.
+    if (misuraCon(instructions)(payload) > STAMPA_TETTO) {
+      const f = fileRuolo(ROOT);
+      const rimando = rimandoAlRuolo(instructions, f);
+      payload = scarica(misuraCon(rimando, f));
+      scriviRuolo(f, instructions);
+      [istr, fileIstr] = [rimando, f];
+    }
   } catch (e) {
-    // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché.
+    // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché. Le immagini
+    // no: megabyte di base64 in stampa non li legge nessuno, la voce porta il motivo.
     process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
+    payload = immaginiSenzaByte(pieno, e.message);
   }
-  const out = stampaCon(payload);
+  const out = stampaCon(payload, istr, fileIstr);
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }
@@ -1964,14 +2163,20 @@ export function emit(bucket, ctx) {
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMainModule) {
+  // Anche i comandi nei testi stampati (i nostri e quelli del server) portano alla copia fissata (#763).
+  absolutizeOutput(ROOT);
   // Il biglietto a mano si toglie PRIMA di tutto, con la regola del canale: l'ordine non conta (davanti
   // a un --record-* finiva «argomento non riconosciuto», #724.1, #545) e un codice storto o doppio si ferma qui.
   const mano = stripTicketArg(process.argv.slice(2));
   if (mano.error) { console.error(`${mano.errore} Niente è stato toccato.`); process.exit(1); }
-  const argv = mano.args;
+  // Con la stessa regola le opzioni dei --record-* (#879); chi chiede aiuto lo riceve comunque.
+  const reg = leggiOpzioniRegistrazione(mano.args);
+  const argv = reg.args;
+  const opz = reg.valori;
   const bigliettoAMano = mano.ticket;
   const flag = argv[0];
-  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state')) {
+  if (reg.error && flag !== '--help' && flag !== '-h') { console.error(reg.error); process.exit(1); }
+  if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale')) {
     console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
     process.exit(1);
   }
@@ -2007,12 +2212,9 @@ if (isMainModule) {
 
   try {
     if (flag === '--record-verifier') {
-      // `--segnala <file>` si toglie PRIMA di leggere i posizionali, come il
-      // biglietto: il resto è la critica, un testo solo.
-      const seg = stripFileArg(conBiglietto(argv), 'segnala');
-      if (seg.error) { console.error(seg.error); process.exit(1); }
-      const [, id, ...rest] = seg.args;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, con livello e sede davanti: [2i] …>"'); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--segnala <file.md>')); process.exit(1); }
       // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
       // più: veniva buttata via in silenzio, e senza rilievi la verifica
       // risulta superata — chi scriveva `fail` per bocciare registrava una
@@ -2051,7 +2253,7 @@ if (isMainModule) {
       }
       // Il file della segnalazione si legge qui, a critica già buona: un file
       // assente ferma con la frase giusta, e niente parte a metà.
-      const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
+      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
@@ -2059,28 +2261,18 @@ if (isMainModule) {
       console.log(verifierReplyText(s.reply, id));
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const seg = stripFileArg(conBiglietto(argv), 'segnala');
-      if (seg.error) { console.error(seg.error); process.exit(1); }
-      const ferma = seg.args.includes('--ferma');
-      const [, id, ...rest] = seg.args.filter((a) => a !== '--ferma');
+      const ferma = opz['--ferma'] === true;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
-      const senza = fermaSenzaSegnalazione(ferma, seg.file);
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
+      const senza = fermaSenzaSegnalazione(ferma, opz['--segnala']);
       if (senza) { console.error(senza); process.exit(1); }
-      // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
-      // resto è il report per l'owner, che il server cifra.
-      const fi = rest.indexOf('--frase');
-      const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
-      const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
-      // Qui l'unica opzione è `--frase`: qualunque altra cosa coi trattini
-      // davanti finirebbe sepolta dentro al report cifrato, e la frase per chi
-      // ha segnalato partirebbe vuota (#565).
-      // `--frase` in fondo alla riga, senza niente dopo: spariva, e la frase
-      // per chi ha segnalato partiva vuota (feedback #565).
-      if (fi !== -1 && rest[fi + 1] === undefined) {
-        console.error('--frase vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.');
-        process.exit(1);
-      }
-      const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => sembraOpzioneNelReport(a));
+      // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
+      // che il server cifra.
+      const frase = typeof opz['--frase'] === 'string' ? opz['--frase'] : '';
+      const report = rest.join(' ');
+      // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
+      const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
         console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
@@ -2093,7 +2285,7 @@ if (isMainModule) {
         console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: è quello che l\'owner legge, e non si riscrive più.');
         process.exit(1);
       }
-      const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
+      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
@@ -2108,14 +2300,15 @@ if (isMainModule) {
       }
       const s = await recordPulizia(id);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com'era è ancora rossa, la ferma.`);
+      const quante = s.files.length === 1 ? '1 prova toccata' : `${s.files.length} prove toccate`;
+      console.log(s.dopo
+        ? `stato ${id}: pulizia dopo le correzioni registrata su ${String(s.sha).slice(0, 8)} (${quante}). La consegna non le rilancia più com'erano: di quelle a cui ha tolto un caso rilancia quello che resta, e ogni altra prova del giro tolta o cambiata dalla pulizia di prima, se com'era è ancora rossa, la ferma.`
+        : `stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com'era è ancora rossa, la ferma.`);
       console.log(s.files.map((f) => `  · ${f}`).join('\n'));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
-      // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.
-      const nota = stripFileArg(conBiglietto(argv), 'nota');
-      if (nota.error) { console.error(nota.error); process.exit(1); }
-      const [, id, verdict, ...avanzo] = nota.args;
+      const [, id, verdict, ...avanzo] = conBiglietto(argv);
+      if (id && SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--nota <file.md>')); process.exit(1); }
       if (!id || !SECAUDIT_VERDICTS.includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail> --nota <file.md>'); process.exit(1); }
       // Qui non c'è altro da dire: un argomento in più veniva ignorato in
       // silenzio e il verdetto partiva lo stesso (feedback #565).
@@ -2123,7 +2316,7 @@ if (isMainModule) {
         console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci vanno solo l'identificativo, pass|fail e --nota <file.md>.`);
         process.exit(1);
       }
-      const testo = nota.file ? leggiTestoLivello(nota.file, 'nota') : { ok: true, testo: '' };
+      const testo = opz['--nota'] ? leggiTestoLivello(opz['--nota'], 'nota') : { ok: true, testo: '' };
       if (!testo.ok) { console.error(testo.message); process.exit(1); }
       // Un pass senza nota si ferma PRIMA di consegnare, con cosa scrivere.
       const ferma = secauditSenzaNota(verdict, testo.testo);
@@ -2183,6 +2376,17 @@ if (isMainModule) {
               `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
               + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
           }
+          // Chi ha passato il preflight è l'orchestratore: da qui la sua sessione non riceve il testo dei worker
+          // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
+          // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
+          const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '' })
+            : { ok: true, saltato: true };
+          if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
+          if (!cieco.ok) {
+            console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
+            process.exit(3);
+          }
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
             || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
@@ -2192,6 +2396,14 @@ if (isMainModule) {
         else console.error(`[dispatch] GUASTO (${r.kind}): ${r.message}`);
         process.exit(preflightExitCode(r));
       }).catch((e) => { console.error(`[dispatch] GUASTO (transient): ${e?.message || e}`); process.exit(3); });
+    } else if (flag === '--linea-principale') {
+      const r = tornaAllaLineaPrincipale();
+      if (!r.ok) {
+        console.error(`[dispatch] ${r.uso ? '' : 'GUASTO (transient): '}${r.message}`);
+        process.exit(r.uso ? 1 : 3);
+      }
+      console.log(`[dispatch] cartella sulla linea principale (${String(r.head).slice(0, 9)}): il prossimo worker parte con gli agenti di ${MAIN_BRANCH}.`);
+      process.exit(0);
     } else if (flag === '--clear-state') {
       const id = argv[1];
       if (!id) { console.error('Uso: --clear-state <id>'); process.exit(1); }
@@ -2232,7 +2444,7 @@ if (isMainModule) {
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
       // una lavorazione lunga (finish:check più le prove del giro) lo supera
       // — la suite completa, che lo superava sempre, dal 2026-09-15 gira solo
-      // in GitHub Actions nel lavoro di release, mai nelle routine —
+      // in GitHub Actions a ogni fusione su main, mai nelle routine —
       // quindi senza battito ogni lavorazione lunga arriva alla consegna con un
       // biglietto morto (è già costato un giro intero: venti commit spinti e
       // nessun esito registrato). Chiederlo al prompt del lavoratore è la

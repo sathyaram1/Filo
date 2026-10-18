@@ -25,8 +25,8 @@ aggiunge lì.
   Alt+lettera apre menu e schede negli altri programmi (Alt+H è la Home di Word): le
   scorciatoie di Filo si ascoltano sui suoi webContents (`before-input-event`), così valgono
   solo con Filo davanti (#838, sentinella `tests/unit/scorciatoieSoloInFilo.test.mjs`).
-  Il visore dei PDF è un webContents a sé che non passa da quell'evento: i suoi tasti li
-  porta agli ascolti della scheda `inoltraTastiDegliOspiti` (`src/main/tabs.js`).
+  Il visore dei PDF, da Electron 41, è un riquadro della scheda: i suoi tasti passano dallo
+  stesso evento.
 - **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
   rispondevano già a Cmd: a mentire erano le SCRITTE, una alla volta.
   `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')` dà `Ctrl+B` su
@@ -68,6 +68,14 @@ aggiunge lì.
 
 - **Ctrl resta Ctrl.** Su Linux non c'è Cmd e non c'è la barra dei menu
   dell'applicazione: `SN_TASTI` lo sa già, non servono rami per Linux.
+- **I caratteri sono più larghi di Segoe UI.** `--sn-font` lì cade su un altro font (Inter
+  nel contenitore delle routine): una scritta che su Windows sta in una riga va a capo, e
+  un tetto d'altezza fisso fa scorrere un testo che doveva leggersi tutto. Un'impaginazione
+  si regge sulla misura vera (la scatola presa prima di cambiare la scritta, un tetto
+  relativo allo spazio che c'è), mai sui pixel visti su Windows. Per lo stesso motivo un
+  rosso d'impaginazione nel contenitore è quello che vede un utente Linux, non un rosso
+  d'ambiente: si corregge, non si mette fra i rossi noti (#663.4: il tasto Approva armato
+  e la casella della chat dell'editor, corretti da #256.3 e #530.5).
 - **La modalità terminale non è PowerShell.** Fuori da Windows si parte da `/bin/sh`, o
   da `bash` se l'utente l'ha scelto nelle Preferenze. La regola sta solo in `resolveShell`
   di `src/main/services/terminal.js`: la sessione persistente
@@ -76,7 +84,11 @@ aggiunge lì.
 - **L'aggiornamento automatico può fermarsi, e allora lo dice.** electron-updater
   riscrive l'AppImage da cui Filo sta girando: riesce se il file è scrivibile e l'app è
   partita davvero come AppImage. Quando inciampa, `avvisaSeAggiornamentoBloccato` scrive
-  fra le notifiche che la versione nuova va presa a mano, come su Mac.
+  fra le notifiche che la versione nuova va presa a mano, come su Mac. «Riavvia e aggiorna»
+  compare solo dove l'installazione può riuscire (`haPulsante` in
+  `src/main/aggiornamentoRegole.js`): su Mac mai, su Linux solo con la cartella dell'AppImage
+  scrivibile. Lì Filo si riapre con `app.relaunch`, cioè a processo chiuso: lanciato subito, il
+  Filo nuovo troverebbe preso il lucchetto dell'istanza unica e si chiuderebbe.
 - **Il link d'invito passa dalla voce di menu.** `filo://` arriva a Filo solo se il
   `.desktop` dentro l'AppImage dichiara `x-scheme-handler/filo`, riga che
   electron-builder scrive solo perché `build.protocols` è dichiarato.
@@ -88,6 +100,11 @@ aggiunge lì.
   guarda le tre manopole del kernel e aggiunge `--no-sandbox` SOLO dove dicono di no:
   Filo è un browser, e dove la gabbia regge deve restare. Il lanciatore usa `exec -a` per
   non cambiare il nome del processo, da cui viene l'aggancio dell'icona nella barra.
+- **In una sessione Wayland Filo parte su X.** Da Electron 38 Chromium lì parte come
+  programma Wayland, dove una finestra non sceglie dove aprirsi: i menu e le anteprime di
+  Filo sono finestre a sé messe accanto al puntatore. Lo stesso lanciatore aggiunge
+  `--ozone-platform=x11` quando c'è un X (anche XWayland) e l'utente non ha scelto da sé.
+  `app.commandLine.appendSwitch` non basta: la piattaforma si sceglie prima che parta il JS.
 - **La ricetta**: `build.linux` in `package.json`, `scripts/after-pack-linux.js` e il
   lavoro `release-linux`. Il nome del file è **fisso** perché il sito ha un collegamento
   solo; `artifactName`, `category` e `desktop` non sono decorazioni: senza il primo il

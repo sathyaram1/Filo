@@ -8,6 +8,10 @@
   const Storage = window.SN_STORAGE;
   const ModelChain = window.SN_MODEL_CHAIN;
   const Caps = window.SN_MODEL_CAPS;
+  const staUsandoAdesso = (el) => {
+    const B = window.SN_PAGE_BOOTSTRAP;
+    return !!(B && B.staUsandoAdesso && B.staUsandoAdesso(el));
+  };
 
   // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
   let modelChains = {};
@@ -38,6 +42,11 @@
     }));
   }
 
+  // L'interruttore della chiave propria (#962) segue la chiave SALVATA, da qui o da Crediti: senza non ha effetto.
+  function mostraChiavePropria(settings) {
+    $('sec-own-key-providers').hidden = !window.SN_CONST.hasOwnOpenrouterKey(settings);
+  }
+
   function fillStaticText() {
     document.title = I18n.t('options_title');
     $('title').textContent = I18n.t('options_title');
@@ -45,6 +54,8 @@
     $('useDefaultModels-desc').textContent = I18n.t('options_use_default_models_desc');
     $('openWeightsOnly-label').textContent = I18n.t('options_open_weights_only');
     $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
+    $('ownKeyAllProviders-label').textContent = I18n.t('options_own_key_all_providers');
+    $('ownKeyAllProviders-desc').textContent = I18n.t('options_own_key_all_providers_desc');
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -52,6 +63,7 @@
 
     $('lbl-limit').textContent = I18n.t('options_monthly_limit');
     $('lbl-spent').textContent = I18n.t('options_current_spent');
+    $('lbl-cost-warn').textContent = I18n.t('options_cost_warn_ratio');
 
     $('savedHint').textContent = I18n.t('options_saved');
 
@@ -79,7 +91,8 @@
     if (!Usage || typeof Usage.byArea !== 'function') return;
 
     for (const group of Usage.byArea()) {
-      const rows = group.entries.filter((e) => e.from !== 'user');
+      // Una funzione che usa solo chi gestisce Filo (`action`) qui è rumore (#465).
+      const rows = group.entries.filter((e) => e.from !== 'user' && !e.action);
       if (!rows.length) continue;
 
       const head = document.createElement('div');
@@ -139,17 +152,15 @@
 
   function effectiveModelConfig() {
     if ($('useDefaultModels').checked) {
-      return defaultModelsPublic || { models: {}, modelRegistry: {} };
+      const cfg = defaultModelsPublic || { models: {}, modelRegistry: {} };
+      // La config condivisa può portare ancora funzioni che qui non ci sono più (#465).
+      const qui = new Set((ModelChain.actionLabels() || []).map(([a]) => a));
+      return { ...cfg, models: Object.fromEntries(Object.entries(cfg.models || {}).filter(([a]) => qui.has(a))) };
     }
     return {
       models: ModelChain.collect(modelChains || {}),
       modelRegistry: collectModelRegistry().registry,
     };
-  }
-
-  function actionLabelFor(action) {
-    const row = (ModelChain.actionLabels() || []).find(([a]) => a === action);
-    return row ? I18n.t(row[1]) : action;
   }
 
   // Un "Prova" è una richiesta vera al modello della riga. Con l'interruttore
@@ -234,7 +245,7 @@
       lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
     }
     if (impact.unavailable.length) {
-      const names = impact.unavailable.map((u) => actionLabelFor(u.action));
+      const names = impact.unavailable.map((u) => ModelChain.etichetta(u.action));
       lines.push(I18n.t('options_open_weights_unavailable', names.join(', ')));
     }
     if (!lines.length) { host.hidden = true; return; }
@@ -361,6 +372,8 @@
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
     $('openWeightsOnly').checked = settings.openWeightsOnly === true;
+    $('ownKeyAllProviders').checked = settings.ownKeyAllProviders === true;
+    mostraChiavePropria(settings);
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
@@ -371,6 +384,9 @@
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
+    $('costWarnRatio').value = String(window.SN_STIMA_COSTO.soglia(settings));
+    chiaveDelleStime = settings.apiKeys?.openrouter || '';
+    caricaStime();
 
     // Registry modelli PRIMA dell'editor a segmenti: le righe del registry sono
     // la sorgente dei nickname, e l'editor le legge già al primo render per
@@ -382,10 +398,14 @@
     // Editor a segmenti "Modelli per azione": una catena di fallback per azione.
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
-      onChange: saveDebounced,
+      // Mentre si scrive in un segmento basta l'`input` che sale alla pagina; una scelta dalla tendina, un segmento
+      // aggiunto o tolto e un valore confermato o respinto partono subito.
+      onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
       // Registry LIVE (dalle righe correnti, anche non salvate) così la
       // validazione modello↔funzione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
+      avvisoDi: avvisoModello,
+      costoDi: costoModello,
     });
 
     // Costi
@@ -580,6 +600,40 @@
     populateNicknames(registry);
   }
 
+  function avvisoModello(action, ref) {
+    return ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref]);
+  }
+
+  // ── Il costo accanto a ogni modello e nella tendina (#819) ─────────────────
+  // Listino, saldo, tariffa e token medi li dà il main; la stima è quella di SN_STIMA_COSTO, la stessa della chat.
+  // Registro e soglia si leggono dalla pagina, così una riga appena scritta ha già il suo costo.
+  let stimaCtx = null;
+  let stimaGiro = 0;
+  let chiaveDelleStime = null;
+  async function caricaStime(opts) {
+    const mio = ++stimaGiro;
+    if (!stimaCtx && modelChains) ModelChain.aggiornaCosti(modelChains);
+    let ctx = null;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.STIMA_COSTO_MODELLI, forzaListino: Boolean(opts && opts.forza) });
+      if (r && r.ok && r.contesto) ctx = r.contesto;
+    } catch (_) { ctx = null; }
+    if (mio !== stimaGiro) return;
+    // Il main non ha risposto: niente stima inventata, le righe lo dicono.
+    stimaCtx = ctx || { modo: 'crediti', listino: null, registro: {}, predefiniti: {}, saldo: null };
+    if (modelChains) ModelChain.aggiornaCosti(modelChains);
+  }
+  function sogliaDellaPagina() {
+    const v = $('costWarnRatio').value.trim();
+    return window.SN_STIMA_COSTO.soglia({ costoModelli: { soglia: v === '' ? undefined : Number(v) } });
+  }
+  function costoModello(action, ref) {
+    const S = window.SN_STIMA_COSTO;
+    if (!S || !ref) return null;
+    if (!stimaCtx) return { breve: '…', testo: 'Sto leggendo il listino di OpenRouter.' };
+    return S.valuta(action, ref, collectModelRegistry().registry, { ...stimaCtx, soglia: sogliaDellaPagina() });
+  }
+
   // Oltre al registry valido, ritorna le righe DOM scartate (nickname mancante
   // o duplicato di una riga precedente) così save() può segnalarle sul posto
   // invece di ignorarle in silenzio dietro un "Salvato" che non le riguarda
@@ -614,9 +668,16 @@
   }
 
   // Evidenzia (bordo + messaggio inline sotto la riga, niente alert bloccante)
-  // le righe scartate dall'ultimo save(); ripulisce tutte le altre.
-  function markRegistryRowIssues(missingNickRows, dupRows) {
+  // le righe scartate dall'ultimo save(); ripulisce tutte le altre. Con
+  // `soloTogliere` (mentre si scrive) una riga corretta si ripulisce ma una
+  // nuova non si accende: a metà, una riga senza nickname è solo incompleta.
+  function markRegistryRowIssues(missingNickRows, dupRows, soloTogliere) {
     const host = $('modelRegistryList');
+    const gia = soloTogliere ? new Set(host.querySelectorAll('.sn-model-row.sn-row-invalid')) : null;
+    if (gia) {
+      missingNickRows = (missingNickRows || []).filter((row) => gia.has(row));
+      dupRows = (dupRows || []).filter((d) => gia.has(d.row));
+    }
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       row.classList.remove('sn-row-invalid');
       row.querySelector('.sn-model-nick').classList.remove('sn-input-invalid');
@@ -700,6 +761,7 @@
       if (Caps) opt.label = Caps.categoryLabel(provider, it.id, it.meta);
       dl.appendChild(opt);
     }
+    if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
   // Semina i combobox con gli id già presenti nel registry (divisi per provider)
@@ -802,7 +864,10 @@
     $('modelsStatus').textContent = errors.length ? errors.join(' · ') : `${total} modelli`;
   }
 
-  async function save() {
+  // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora.
+  async function save(opts) {
+    caselle.spedita('pagina');
+    const avvisi = !(opts && opts.avvisi === false);
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
@@ -818,19 +883,28 @@
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
       openWeightsOnly: $('openWeightsOnly').checked,
+      ownKeyAllProviders: $('ownKeyAllProviders').checked,
       apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
       monthlyLimitEur: parseFloat($('monthlyLimit').value) || 0,
     };
+    // Una soglia scritta a metà o storta non si salva: resta quella di prima.
+    const soglia = $('costWarnRatio').value.trim();
+    if (soglia !== '' && Number.isFinite(Number(soglia)) && Number(soglia) >= 0) {
+      partial.costoModelli = { soglia: window.SN_STIMA_COSTO.soglia({ costoModelli: { soglia: Number(soglia) } }) };
+    }
 
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    // La chiave messa o tolta qui decide crediti o dollari accanto ai modelli.
+    if (apiKey !== chiaveDelleStime) { chiaveDelleStime = apiKey; caricaStime(); }
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
-    markRegistryRowIssues(missingNickRows, dupRows);
+    markRegistryRowIssues(missingNickRows, dupRows, !avvisi);
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
+    if (hasDiscarded && !avvisi) return;
     const hint = $('savedHint');
     hint.textContent = hasDiscarded ? I18n.t('options_model_row_not_saved') : I18n.t('options_saved');
     hint.classList.toggle('sn-hint-warn', !!hasDiscarded);
@@ -864,11 +938,17 @@
     }
   }
 
-  let saveTimer = null;
-  function saveDebounced() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 400);
-  }
+  // Chiavi, limite di spesa, righe del registro e modelli per azione non hanno un «Salva», e chiudere o cambiare
+  // scheda non avvisa la pagina (#590.5): tutto parte da qui. Uscendo si accendono gli avvisi sulle righe scartate.
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      if (modelChains) ModelChain.conferma(modelChains);
+      const { missingNickRows, dupRows } = collectModelRegistry();
+      markRegistryRowIssues(missingNickRows, dupRows);
+    },
+  });
+  caselle.registra('pagina', (avvisi) => save({ avvisi }));
+  const CASELLA = /^(text|password|number|search|url|email)$/;
 
   // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
   // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
@@ -876,27 +956,62 @@
   // chiave a com'era prima (o la cancellava, se all'apertura non c'era). Al
   // cambio arrivato da fuori il campo si riallinea, a meno che l'utente ci
   // stia scrivendo dentro proprio adesso.
+  // Lo stesso per gli altri campi semplici, che la chat cambia a parole (#949): le voci le dà la fonte unica.
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || !msg.settings.apiKeys) return;
-      const field = $('apiKey');
-      if (!field || document.activeElement === field) return;
-      const now = String(msg.settings.apiKeys.openrouter || '');
-      if (field.value !== now) field.value = now;
+      // Il saldo è cambiato (una chiamata, la quota del giorno): i messaggi che bastano si ricontano.
+      if (msg && msg.type === MSG.CREDITS_CHANGED) { caricaStime(); return; }
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
+      const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('options', msg.settings, {
+        salta: (id, percorso, el) => staUsandoAdesso(el),
+      });
+      if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
+      mostraChiavePropria(msg.settings);
+      if (toccati.length) renderOpenWeightsImpact();
+      // Una chiave messa o tolta cambia crediti e dollari; la soglia cambia gli avvisi.
+      if (toccati.includes('apiKey') || toccati.includes('useDefaultModels')) caricaStime();
+      else if (toccati.includes('costWarnRatio')) ModelChain.aggiornaCosti(modelChains || {});
+      // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza riallineare
+      // la griglia il salvataggio dopo lo rimanderebbe indietro. Si riscrive solo la catena cambiata, e non quella
+      // in cui si sta scrivendo: ridisegnare tutto portava via la spiegazione del modello appena respinto (#667.7).
+      const s = msg.settings;
+      const inUso = staUsandoAdesso(document.activeElement) ? document.activeElement : null;
+      const catena = (v) => String(v == null ? '' : v).split(',').map((x) => x.trim()).filter(Boolean).join(', ');
+      for (const [azione, ch] of Object.entries(modelChains || {})) {
+        const daFuori = s.models && !(inUso && ch.el.contains(inUso)) && catena(ch.getValue()) !== catena(s.models[azione]);
+        // Il modello di una riga del registro può cambiare sotto lo stesso nome: l'avviso si rifà anche così.
+        if (daFuori) ch.imposta(s.models[azione]); else ch.ricontrolla();
+      }
     });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    // Niente pulsante "Salva": ogni modifica viene applicata e persistita
-    // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
-    // altri (select/checkbox) immediatamente.
-    $('page').addEventListener('change', () => saveDebounced());
+    // Niente pulsante "Salva": un `change` (interruttore, tendina, campo lasciato) parte subito. Qui ogni casella a
+    // metà ha effetto (il tetto «1» scrivendo «15» ferma le richieste, una chiave tronca viene rifiutata, un modello
+    // che non esiste fallisce), quindi aspetta la pausa lunga; incollare parte subito.
+    $('page').addEventListener('input', (e) => {
+      const t = e.target;
+      if (!t || !(t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && CASELLA.test(t.type)))) return;
+      caselle.cambiato('pagina', e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS });
+      // L'avviso di una riga del registro si toglie mentre la si corregge; uno nuovo aspetta l'uscita.
+      if (t.closest('.sn-model-row.sn-row-invalid')) {
+        const { missingNickRows, dupRows } = collectModelRegistry();
+        markRegistryRowIssues(missingNickRows, dupRows, true);
+      }
+    });
+    // L'editor dei modelli per azione dice da sé quando un segmento è confermato.
+    $('page').addEventListener('change', (e) => {
+      if (e.target && e.target.closest && e.target.closest('.sn-chain')) return;
+      caselle.cambiato('pagina');
+      caselle.subito(true);
+    });
     // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
-    $('loadModels').addEventListener('click', loadModelsFromProvider);
+    $('loadModels').addEventListener('click', () => { loadModelsFromProvider(); caricaStime({ forza: true }); });
+    $('costWarnRatio').addEventListener('input', () => ModelChain.aggiornaCosti(modelChains || {}));
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
     $('addModelRow').addEventListener('click', () => {
       $('modelRegistryList').appendChild(makeModelRow('', {}));

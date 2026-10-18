@@ -103,9 +103,9 @@ test('il rombo mostra la segnalazione con titoli e voci, senza cancelletti né H
   await apri(page, [fb]);
   await page.locator('#mgForme .mg-forma[data-livello="l3"]').click();
   const body = page.locator('#mgSideBody');
-  const titoli = body.locator('.mg-liv-titolo');
+  const titoli = body.locator('.mg-liv-testo h4');
   await expect(titoli).toHaveText(['Problema', 'Scelte', 'Cosa ho fatto nel frattempo']);
-  await expect(body.locator('.mg-liv-elenco li')).toHaveText(['A: <img src=x onerror="window.__xss=1">', 'B: chiede']);
+  await expect(body.locator('.mg-liv-testo ul li')).toHaveText(['A: <img src=x onerror="window.__xss=1">', 'B: chiede']);
   const txt = await body.innerText();
   expect(txt).not.toContain('##');
   expect(txt).not.toMatch(/^- /m);

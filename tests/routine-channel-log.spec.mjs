@@ -12,6 +12,7 @@
 // (la sezione non esiste, quindi non contiene nessuna riga).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -29,7 +30,7 @@ test('i rifiuti del canale compaiono all owner, col motivo in chiaro e la routin
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
   // La scheda va aperta: il blocco vive dentro il pannello "Log".
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   await page.evaluate(({ rej, cmp }) => window.__mgTest.renderChannelLog(rej, cmp), { rej: REJECTIONS, cmp: COMPARISONS });
 
@@ -57,7 +58,7 @@ test('i confronti dicono quando le due strade scelgono lo stesso lavoro e quando
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
   // La scheda va aperta: il blocco vive dentro il pannello "Log".
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   await page.evaluate(({ rej, cmp }) => window.__mgTest.renderChannelLog(rej, cmp), { rej: [], cmp: COMPARISONS });
 
@@ -85,11 +86,50 @@ test('senza rifiuti e senza confronti il blocco lo dice, invece di restare vuoto
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
   // La scheda va aperta: il blocco vive dentro il pannello "Log".
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 
   await page.evaluate(() => window.__mgTest.renderChannelLog([], []));
 
   await expect(page.locator('#mgChannelSection')).toBeVisible();
   await expect(page.locator('#mgChannelEmpty')).toBeVisible();
   await expect(page.locator('#mgChannelList')).toBeHidden();
+});
+
+// #958: una prova degli unit sulla fusione che manca sempre non protegge niente. Le richieste senza prova si vedono
+// una per una, e quando il server le giudica frequenti un avviso sta in cima al blocco.
+const PROVE = {
+  righe: [
+    { at: '2026-10-04T10:00:00.000Z', via: 'routine', slug: 'notturna', branch: 'worker/42', esito: 'non_provata',
+      motivo: 'fusione di prova non riuscita (fatal: refusing to merge unrelated histories)', storia: { superficiale: true, approfondito: 0, intera: false } },
+    { at: '2026-10-04T09:00:00.000Z', via: 'routine', slug: 'notturna', branch: 'worker/41', esito: 'verde', mainSha: 'b'.repeat(40) },
+    { at: '2026-10-04T08:00:00.000Z', via: 'locale', branch: 'claude/x', esito: 'assente' },
+  ],
+  riepilogo: { ultime: 3, senzaProva: 2, frequente: true },
+};
+
+test('le fusioni senza prova degli unit compaiono all owner, e quando sono frequenti un avviso sta in cima', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  await apriScheda(page, 'log');
+
+  await page.evaluate((prove) => window.__mgTest.renderChannelLog([], [], prove), PROVE);
+  const rows = page.locator('#mgChannelList .mg-log-row');
+  // L'avviso più le due richieste senza prova: quella provata non è una notizia.
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText('2 delle ultime 3 richieste di fusione');
+  await expect(rows.nth(0).locator('.mg-log-role--deny')).toHaveCount(1);
+  await expect(rows.nth(1)).toContainText('Senza prova');
+  await expect(rows.nth(1)).toContainText('worker/42');
+  await expect(rows.nth(1)).toContainText('unrelated histories');
+  await expect(rows.nth(1)).toContainText('clone poco profondo');
+  await expect(rows.nth(2)).toContainText('fusione locale');
+  await expect(rows.nth(2)).toContainText('strumenti senza la prova degli unit');
+  await expect(page.locator('#mgChannelList')).not.toContainText('non_provata');
+  await expect(page.locator('#mgChannelList')).not.toContainText('worker/41');
+
+  // Rare: le righe restano, l'avviso no.
+  await page.evaluate((prove) => window.__mgTest.renderChannelLog([], [], { ...prove, riepilogo: { ultime: 20, senzaProva: 2, frequente: false } }), PROVE);
+  await expect(rows).toHaveCount(2);
+  await expect(page.locator('#mgChannelList')).not.toContainText('delle ultime');
 });

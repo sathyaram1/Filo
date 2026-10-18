@@ -1,10 +1,11 @@
-# FEEDBACK-STATES — Macchina a stati dei feedback (spec + piano di lavoro)
+# FEEDBACK-STATES — Macchina a stati dei feedback
 
 **Origine:** sessione di progettazione owner + Claude, 2026-07-02. Le decisioni della spec
-sono già prese dall'owner. Questo file è la copia in-repo della spec (l'originale era solo
-in chat, troncato a metà §7a.3) + il **piano a fasi con checklist** per implementarla su
-più sessioni. **Chi continua il lavoro riparte da qui**: leggi la checklist in fondo,
-prendi la prima fase non spuntata.
+sono già prese dall'owner. Questo file è il riferimento della macchina a stati: il racconto
+e il perché. Le tabelle stanno nel codice e vincono su questo testo: stati e transizioni in
+`src/shared/feedbackTransitions.js`, presentazione in `src/shared/feedbackStatus.js`, azioni
+dell'owner in `src/shared/manageReview.js` (`ownerActions`). Il piano a fasi in fondo è
+tutto spuntato: è la storia dell'implementazione, non lavoro da riprendere.
 
 ---
 
@@ -14,8 +15,8 @@ Lo *stato* di un feedback oggi è spalmato su più campi ricalcolati a display-t
 `status` (povero), `pipeline.*` (verdetti giudici), `reviewDecision`, `blockReason`, più
 la modalità automatica letta al volo. Conseguenza dimostrata: la dashboard
 (`manageReview.js → manageTabFor/isApproved`) mostrava 20 feedback "In coda" (autoMode ON
-+ aligned), ma `next-feedback.mjs` seleziona solo `status === 'todo'` → coda vuota per le
-routine. Due criteri diversi per "questo è lavorabile?" = bug strutturale.
++ aligned), ma `next-feedback.mjs` (oggi ritirato) selezionava solo `status === 'todo'` →
+coda vuota per le routine. Due criteri diversi per "questo è lavorabile?" = bug strutturale.
 
 **Obiettivo:** un unico campo `status` persistito su Firestore è la SOLA fonte di verità.
 Ogni evento SCRIVE lo status; dashboard, routine e agente leggono SOLO lo status. Nessun
@@ -44,8 +45,11 @@ consumer ricalcola lo stato dai campi grezzi.
 DB3 esistente), poi "Risolti".
 
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
-(string breve opzionale per il sottotesto in dashboard, MAI per la logica: `judges`,
-`clarify`, `loop`, `l1-identity`, `file-gate`, `legacy-ignored`…), `workingSince`
+(string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
+`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `attesa_origine`,
+`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8);
+il giudizio dei giudici non ne scrive: `judges` lo ricava solo la normalizzazione dello
+storico, e la frase «Panel incompleto…» la dashboard dai verdetti, `judgesNote`), `workingSince`
 (ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
 l'ultimo battito arrivato al server per quel lavoro, che lo specchia qui perché
 la dashboard i semafori non li vede — è l'unica cosa che le permette di dire il
@@ -64,16 +68,42 @@ il rombo e il pentagono della fila delle forme).
 
 ## 3. Transizioni legali (chi scrive cosa)
 
-- ingresso → gate file (filo-security, prima dei giudici): flag → `suspicious_file`;
-  pulito → `unlabeled`.
-- `unlabeled` —pipeline (panel completo)→ `attack` | `spam` | `design` | (sicuro:
-  automatica ON **e mittente ammesso** → `todo`, altrimenti → `aligned`).
-- `suspicious_file` —owner→ `todo` | `attack_confirmed` | `spam_confirmed` | `archived`.
-- `attack` —owner→ `attack_confirmed` | `todo` (falso positivo).
-- `spam` —owner→ `spam_confirmed` | `todo`.
-- `design` —owner (risponde in chat)→ `todo` | `archived`.
-- `aligned` —owner→ `todo` (anche bulk dalla dashboard) | `archived` (doppione, o non si fa).
-- `todo` —routine (claim §6)→ `working`.
+La tabella è codice: `TRANSITIONS` in `src/shared/feedbackTransitions.js`, da → a con gli
+attori (`owner`, `pipeline`, `routine`). Una coppia che non c'è è illegale e il writer la
+rifiuta. Il server la incorpora al deploy: una riga cambiata vale per lui dal rideploy delle
+functions. Qui sotto il perché dei passaggi, per attore.
+
+**Pipeline** (filo-security):
+- ingresso → gate file (prima dei giudici): flag → `suspicious_file`; pulito → `unlabeled`.
+- `unlabeled` —panel completo→ `attack` | `spam` | `design` | (sicuro: automatica ON **e
+  mittente ammesso** → `todo`, altrimenti → `aligned`).
+- `attack`/`spam` → `unlabeled`: un mittente fidato segnalato per errore torna al ri-giudizio
+  (sotto, «Mittenti fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
+  `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
+
+**Owner**: le sue righe sono le azioni di §4a, una per azione e nessuna in più (sentinella
+`tests/unit/ownerActionsTransizioni.test.mjs`). La tabella ammette all'owner gli stessi
+passaggi che Gestione e la pagina dei feedback offrono con un clic; `npm run feedback`
+(`scripts/owner-feedback.mjs`) la applica un passo alla volta, senza catene (una catena
+«archivia, poi ripristina» rimetterebbe in coda un lavoro in corso, che nessuna pagina
+offre; le catene valgono solo con `--come-routine`), e per regola non parte dai Ricevuti né
+dalle conferme (§4b). Resta fuori un caso: una richiesta di fusione in attesa porta nei Ricevuti
+anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In coda» da
+`working` o `revision_*` non ha una riga owner.
+- dai Ricevuti (`unlabeled`, `suspicious_file`, `attack`, `spam`, `design`, `aligned`) →
+  `todo` (approvazione; su `attack`/`spam` è il falso positivo, su `design` la risposta in
+  chat) | `archived` (doppione, o non si fa); da `attack` e `suspicious_file` →
+  `attack_confirmed`, da `spam` e `suspicious_file` → `spam_confirmed`. Il verdetto
+  (`attack`, `spam`, `design`, `aligned`) su un `unlabeled` resta dei giudici.
+- dall'iter (`todo`, `working`, `revision_capability`, `revision_security`) → `archived`, e
+  basta. «✓ Risolto» non è una riga owner → `done`: è la catena dell'iter delle routine, e da
+  riga di comando si scrive con `--come-routine` (aggiornamento 2026-08-19, sotto).
+- `done` → `archived` (verifica umana ok) | `todo` (riapertura: «manca qualcosa»).
+- `archived` → `todo` (ripristino); `attack_confirmed`/`spam_confirmed` → `todo` («era
+  legittimo»).
+
+**Routine** (canale autenticato: il server valida ogni mossa con la tabella incorporata):
+- `todo` —claim (§6)→ `working`.
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
@@ -112,20 +142,32 @@ il rombo e il pentagono della fila delle forme).
   dell'owner (il click di approvazione è la sua decisione) e il rientro
   `todo → revision_capability` della routine (#523: senza il primo passo il
   rientro veniva rifiutato e la pratica restava ferma nei Ricevuti).
-- `done` —owner verifica→ `archived`; —owner "manca qualcosa"→ `todo` (riapertura).
-- `archived` —owner ripristina→ `todo`.
-- `attack_confirmed`/`spam_confirmed` —owner "era legittimo"→ `todo`.
 - da todo/working/revision_* la routine con domande → `design` (+ domande nella chat,
   `statusReason: clarify`).
 
-**Regole dure:** solo l'owner fa uscire da `suspicious_file`, `attack`, `spam`, `design`,
-`aligned`, `done`, `archived`, `*_confirmed`. Solo la pipeline (filo-security) fa uscire
-da `unlabeled`. Solo le routine (via coda triage) muovono `todo→working→revision_*→done`
-e `revision_*→design(loop)`. Transizioni non elencate = illegali: il writer le rifiuta.
+**Regole dure:** da `unlabeled` il verdetto lo scrive solo la pipeline; l'owner lo mette in
+coda o lo archivia. Da `suspicious_file`, `done`, `archived` e `*_confirmed` esce solo
+l'owner; da `attack`, `spam`, `design`, `aligned` l'owner, e la pipeline nei soli casi dei
+mittenti fidati e dei derivati. L'iter `todo→working→revision_*→done` e `revision_*→design`
+lo muovono solo le routine; l'owner dall'iter può solo archiviare. Nessuna riga owner →
+`done`. Transizioni non elencate = illegali: il writer le rifiuta.
 
-**Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:`): mai `attack`/`spam`; se un
+**La fiducia** (#1148, SPEC-DOMANDE.md §1): `fiducia` (`fidato`|`non_fidato`, in chiaro) la
+scrive solo il server, le regole la vietano a ogni client. Alla nascita: fidato l'owner
+dall'app (`owner:` con la prova dell'admin), una sessione col biglietto pulito
+(`bigliettoLocale`), un biglietto pulito delle routine, il server (allarmi); tutto il resto
+non fidato. Dopo, solo «🤝 Segna fidato» in Gestione (callable `ownerFiducia`; da riga di
+comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nascono non fidati, e L5 torna a valere. Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
+(fidati prima) e L5 (§4b, e ROUTINE-AUTH-SPEC.md).
+
+**La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
+scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
+ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
+Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
+
+**Mittenti provati** (`owner:`/`routine:`/`agent:`/`local:` con la prova; per mittente fino al §10, non per fiducia): mai `attack`/`spam`; se un
 livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
-PANEL COMPLETO segnala un fidato (L2 dice attack/spam a verdetti pieni), lo status resta
+PANEL COMPLETO segnala un provato (L2 dice attack/spam a verdetti pieni), lo status resta
 `unlabeled` ma non c'è niente da ri-giudicare — la dashboard lo mostra con la categoria
 segnalata (rosso/arancio, frase "decidi tu") invece del bianco "non filtrato", e il
 bottone «Ri-valuta» lo salta (scelta owner 2026-08-29: la segnalazione resta visibile,
@@ -138,8 +180,8 @@ a dire.
 
 **Aggiornamento 2026-08-19 (smontaggio sotto-feedback, SPEC-RIDISEGNO-MAX.md §1).**
 L'estensione `todo→done` / `working→done` (attore routine), introdotta in F3 per il
-pianificatore che spezzava le spec in sub-feedback, è RITIRATA da entrambe le copie
-della macchina a stati: il pianificatore non esiste più. Le chiusure manuali senza
+pianificatore che spezzava le spec in sub-feedback, è RITIRATA dalla macchina a stati: il
+pianificatore non esiste più. Le chiusure manuali senza
 branch (`npm run feedback -- <id> done "…" --come-routine`) restano legali come
 CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done). I
 sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
@@ -147,7 +189,7 @@ possibilità di crearne di nuovi.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 
-Le tab sono QUATTRO e valgono per OGNI superficie che elenca feedback — la
+Le tab sono CINQUE e valgono per OGNI superficie che elenca feedback — la
 dashboard di gestione (`filo://manage`) e la pagina dei feedback
 (`filo://feedback`), che fino al #509 aveva una tassonomia sua (la vecchia
 new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
@@ -158,8 +200,107 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
+- Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
+- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
+
+### 4b. I lavori delle sessioni locali (#908)
+
+`localOnly: { by, at }` (in chiaro, `at` in millisecondi, scrive solo l'admin) dice
+che la pratica la lavora solo una sessione locale: la coda delle routine, il recupero
+degli arenati e il pacemaker la saltano, e le superfici la mostrano nei Lavori locali
+invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta comunque
+l'owner), con l'approvazione che dice `→ Lavori locali`.
+
+- Il segno si mette solo su un feedback **fidato** (#1148; lo fa l'owner con «🤝 Segna fidato»
+  in Gestione, da riga di comando no), a pratica aperta, non segnalata come
+  attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
+  solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
+  (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
+  --serve-locale`, e lì l'owner lo approva come lavoro locale (#913, sotto).
+- **L'approvazione dell'owner (#913)**: `localApproval: { by, at }` (stessa forma di
+  `localOnly`, scrive solo l'admin, `localApprovalValido` nelle regole). La scrive
+  «💻 Lavoro locale» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
+  feedback), insieme a `todo`, `reviewDecision: accepted` e `localOnly`: il feedback va
+  nei Lavori locali. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
+  hanno le credenziali dell'owner e un testo d'utente potrebbe convincerle a darselo. Le regole non distinguono la
+  pagina da uno script con lo stesso token: il limite sta negli strumenti (sentinella in
+  `tests/unit/lavoroLocaleApprovato.test.mjs`). Lo stesso clic segna anche fidato il
+  feedback (#1148, callable `ownerFiducia`): è la fiducia, non il segno, a far registrare L5
+  senza fermare (§4b); la sessione lo lega a `start`/`finish --feedback`. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
+  un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
+  segnalato l'hover lo dice e serve guardarlo prima.
+  Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic
+  (il sì si dà solo dai Ricevuti, dove la pratica non torna). Risolto, il feedback di un
+  utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
+  mandato vede la risoluzione; senza scheda resta solo il lavoro dell'owner e delle sessioni.
+- Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
+  scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
+  feedback aperti da `claude-feedback.mjs --locale` (`--non-locale` per le routine: la
+  scelta è obbligatoria, perché una segnalazione per le routine nata locale non la prende nessuno).
+- Le sessioni locali hanno le credenziali dell'owner. Per REGOLA (non per un blocco
+  tecnico) non spostano feedback dai Ricevuti né dalle conferme `*_confirmed`, non
+  lavorano feedback di utenti senza il sì dell'owner e non stampano testo di attacchi: `owner-feedback.mjs`
+  rifiuta prima di scrivere.
+  La priorità invece la cambiano su ogni stato, Ricevuti compresi, perché non sposta la pratica:
+  `owner-feedback.mjs <n> --priorita 0..3`, scritta come il pallino di Gestione (cifrata, `priorityManual`).
+- Alla nascita un lavoro locale fidato salta i giudici (`pipeline.skipped:
+  'local_proven'`, status `todo`). Alla fusione `npm run finish` manda `feedbackId`
+  (da `--feedback <N>` o da `verify-local.mjs start --feedback <N>`): se la pratica è
+  fidata e il ramo ha nel registro (`routine-branches`) solo sessioni col biglietto pulito,
+  con la punta che si fonde come ultima voce, il server esegue L5 solo per registrare i
+  blocchi (`skippedL5: true`, motivo `fiducia`), fonde senza chiedere e chiude la pratica.
+  `verify-local start` e `finish` scrivono la voce col biglietto della sessione
+  (`scripts/biglietto.mjs`). Manca una condizione → la richiesta aspetta il sì dell'owner in
+  Gestione, col motivo. I rami nati prima del registro, di pratiche migrate, seguono la
+  regola di prima (prova del mittente o `localApproval`) finché non si chiudono.
+
+### 4c. Chi nasce senza giudici (#914)
+
+Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
+**fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
+
+- lavoro locale fidato (§4b): `todo` nei Lavori locali, senza nemmeno L0;
+- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
+  coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
+  (`priorityManual`), senza scelta la decide il giudice;
+- ritrovamento fidato del server (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti,
+  derivati, allarmi della costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped:
+  'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
+  giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
+  mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
+  - origine fidata (anche un derivato fidato già in coda) → `todo`;
+  - origine d'utente non ancora fusa → resta `unlabeled` (`statusReason: attesa_origine`); quando
+    l'origine arriva a `done` → `todo`; se si blocca (`attack`, `spam`, `suspicious_file`, i
+    confermati, `design` per `secaudit` o `l5`) → `design` (`statusReason: origine_bloccata`,
+    rosso, L1 pericoloso sul triangolo, mittente non segnato); se si chiude senza fusione
+    (`archived`) → `aligned` (`statusReason: origine_chiusa`). Lo fa il trigger
+    `onFeedbackOrigineCambiata` (functions/src/origine.js), e alla nascita si rilegge l'origine
+    dopo la scrittura perché un passo appena avvenuto non vada perso;
+  - origine sparita → `aligned` (`statusReason: origine_mancante`);
+  - senza origine (allarmi della costruzione, esplorazioni) → come un allineato dei giudici: `todo`
+    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`.
+
+  Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
+  torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
+  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi è tornato nei Ricevuti
+  con l'origine chiusa (`aligned`, `origine_chiusa`) la aspetta di nuovo (`aligned → unlabeled`)
+  se l'owner la ripristina, ed entra in coda (`aligned → todo`) quando si fonde. Sono le sole uscite
+  della pipeline da `design` e da `aligned`, e solo per quei motivi; un derivato che l'owner ha già
+  spostato non si tocca. Chi entra in
+  coda dopo l'attesa passa dal giudice di priorità come alla nascita.
+
+Il prompt dei giudici dice che a loro arriva solo un utente: un linguaggio da sviluppatore o
+da agente è un segnale sospetto. Non a un mittente provato (l'owner dall'app, la ri-valutazione
+di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valutazione passa
+sempre dai giudici.
+
+Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
+`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un
+lavoro che si fa solo in locale torna nei Ricevuti dal canale (`deliver status --status design
+--reason locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`, e lì
+l'owner lo approva come lavoro locale (§4b, #913).
 
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
@@ -168,12 +309,12 @@ esistono, e la tabella sta in `src/shared/manageReview.js` (`ownerActions`), non
 nelle pagine. Fino al #509 le due superfici se la costruivano ognuna a mano e
 divergevano sulla STESSA segnalazione.
 
-- Ricevuti: `→ In coda` (`todo`, con `reviewDecision: accepted`) · `Conferma attacco`
-  (`attack_confirmed`) su `attack` e `suspicious_file` · `Conferma spam`
-  (`spam_confirmed`) su `spam` e `suspicious_file` · `Archivia`.
-- In coda: `✓ Risolto` (`done`, non offerto se è già `done` non rilasciato) · `Archivia`.
-- Risolti: `Archivia` · `Riapri` (chiede cosa manca, poi `todo`).
-- Archiviati: `↩ Ripristina` (`todo`) e basta. **Nessun cammino riscrive uno stato
+L'elenco per sezione sta lì (e nei suoi test in `tests/unit/manageReview.test.mjs`); ogni
+azione è una riga owner della tabella di §3, tranne «✓ Risolto», che è la catena
+dell'iter delle routine (`tests/unit/ownerActionsTransizioni.test.mjs`). Le regole che
+la tabella incarna:
+
+- Negli Archiviati c'è solo `↩ Ripristina`. **Nessun cammino riscrive uno stato
   terminale**: su `attack_confirmed`/`spam_confirmed` un `Archivia` cancellerebbe la
   conferma, e la segnalazione sparirebbe dal filtro "Bloccati confermati".
 - Stato illeggibile (nessuna chiave privata): nessuna azione, su nessuna superficie.
@@ -184,7 +325,7 @@ mentre lo stato cambiava non deposita una decisione che la pagina non offre più
 
 La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; sicuro + OFF
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco
-dalla dashboard (azione bulk `aligned→todo`, da aggiungere alla UI).
+dai Ricevuti con «Approva tutti gli allineati» (`aligned→todo`).
 
 **Per mittente (#446).** "ON" non è più un sì/no per tutti: l'interruttore master
 (`config/automation.enabled`) abilita l'auto-approvazione, e la mappa
@@ -230,7 +371,11 @@ dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
-arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
+arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
+aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
+lavoro locale: quello resta `locale`, e la sua nota dice quale regola lo tiene
+fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
@@ -317,10 +462,21 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 ### 7a. filo-security (repo `C:/Users/agenti AI/Desktop/Filo/filo-security`)
 1. La pipeline dei giudici scrive lo status nativamente: al completamento del panel UNO
    di `attack|spam|design|todo|aligned` (per todo/aligned legge la modalità automatica in
-   quel momento). Panel incompleto/degradato → `unlabeled` + `statusReason` col motivo.
-   I `pipeline.*` grezzi restano per audit, ma nessun consumer li legge più per lo stato.
+   quel momento). Panel incompleto/degradato → resta `unlabeled`, senza `statusReason`:
+   la frase «Panel incompleto…» la ricava la dashboard dai verdetti (`judgesNote`). I
+   `pipeline.*` grezzi restano per audit, pallini e frase, ma nessun consumer li legge per lo
+   stato.
 2. Mittenti fidati: mai attack/spam (come oggi in classifyBlock); flag identità su fidato
    → `unlabeled` per ri-giudizio.
+2b. **`updatedAt` su OGNI scrittura di un feedback** (#676), timestamp e mai testo,
+   anche `createdAt` (i sotto-feedback creati dal server lo avevano testo). La Gestione
+   legge tutto all'apertura e poi chiede «chi è stato scritto dopo questo istante?»:
+   app, script e server lo firmano. Finché il server non lo firma ovunque, il giro
+   guarda tre segni senza orologio (ora di Firestore dei feedback in mano alle
+   routine, contatore degli invii, registro dei worker col numero del feedback
+   preso). Le regole ammettono il campo nei tre rami (create, update admin, update
+   routine) e pretendono una data. Racconto:
+   patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
 3. Gate deterministico file sospetti (vive QUI, decisione owner): gira PRIMA dei giudici
    su ogni feedback con allegati; flag → `suspicious_file` e NON va al panel finché
    l'owner non decide. Contesto noto: il widget accetta via drag&drop tipi non ammessi
@@ -328,26 +484,28 @@ dashboard scriveva "in attesa di ripresa". Adesso:
    ⚠️ *La spec originale si troncava qui: i dettagli sotto (7b, 8) sono ricostruiti in
    questa sessione dai principi §1–§6 e dal codice esistente; decisioni marcate.*
 
-### 7b. Repo Filo (consumer) — ricostruito
-- **`src/shared/feedbackStatus.js`** (nuovo, IIFE `SN_FB_STATUS`): vocabolario unico —
-  lista stati, colori, `tabFor(status)`, tabella transizioni legali +
-  `canTransition(from,to,actor)`, normalizzazione legacy (`normalizeStatus(fb)` che
-  applica §8 in lettura durante la transizione). Unit test.
+### 7b. Repo Filo (consumer)
+- **`src/shared/feedbackTransitions.js`** (IIFE `SN_FB_TRANSITIONS`): le tabelle come
+  DATI (`STATUSES`, `TRANSITIONS`, `PUBLIC_MAP`). Fonte unica: la dashboard le legge, il
+  server le incorpora al deploy (`filo-security/functions/tools/bake-shared.js`), quindi
+  una riga cambiata vale per il server solo dopo il rideploy delle functions.
+- **`src/shared/feedbackStatus.js`** (IIFE `SN_FB_STATUS`): presentazione (colori,
+  etichette, `tabFor(status)`) e API sopra i dati (`canTransition`, `canReach`,
+  `transitionsFrom`), legacy semplice (§8). `normalizeStatus(fb)` sta in manageReview.js.
 - **`src/shared/manageReview.js`**: `manageTabFor` → lookup pura su status normalizzato;
   `classifyBlock`/`isAligned`/`isApproved` restano solo per (a) colore/label da status,
   (b) normalizzazione dello storico. Nessuna lettura di `pipeline` per decidere la tab.
-- **`src/shared/feedback.js`**: `STATUS_PUBLIC_MAP` esteso ai nuovi stati (tutti gli
-  aperti → `open`; `done|archived|*_confirmed` → `closed`; nota sicurezza: i confermati
-  DEVONO collassare su `closed` come i done, mai un valore distinto).
+- **`src/shared/feedback.js`**: `statusToPublic` legge `PUBLIC_MAP` di
+  feedbackTransitions.js per i canonici; la sua `STATUS_PUBLIC_MAP` resta solo per i
+  legacy. Nota sicurezza: i "beccati" collassano su valori dei feedback normali, mai uno
+  distinto, e i confermati su `open`, non su `closed` (#476): `closed` fa scattare premio e
+  annuncio «risolto» a chi ha mandato l'attacco.
 - **`src/pages/manage/*`**: colori per status, azione bulk `aligned→todo`, filtro
   "Bloccati confermati" in Archiviati, sottotesto da `statusReason`.
-- **`scripts/queue-triage.mjs` + `apply-triage.mjs`**: ALLOWED = nuovi stati; l'Action
-  valida le transizioni con `canTransition` (rifiuta le illegali); riconciliazione
-  `working` scaduti; scrittura `workingSince`/`statusReason`.
-- **`scripts/next-feedback.mjs`**: seleziona `todo` (invariato) ma ora la pipeline
-  scrive `todo` → la coda si riempie davvero; ignora `working` freschi.
-  *(Ritirato il 2026-08-19: la selezione vive solo nel server,
-  `filo-security/functions/src/routine/select.js`.)*
+- **Le mosse delle routine**: le valida il server, con le tabelle di
+  feedbackTransitions.js incorporate al deploy (`stateMachine.js`); la scelta del lavoro
+  vive in `filo-security/functions/src/routine/select.js`. La coda su git
+  (`queue-triage.mjs`, `apply-triage.mjs`) e `next-feedback.mjs` non esistono più (§6b).
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
   critica si registra coi livelli e l'esito lo calcola il server; le regole
@@ -357,10 +515,13 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   verifica locale li legge dal server e senza si ferma.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
-  `workingSince`. Deploy manuale (`firebase deploy --only firestore:rules`).
+  `workingSince`. Deploy manuale (`npm run regole:pubblica`).
 
-### 8. Migrazione legacy → nuovi stati — ricostruito, [CONFERMARE con owner]
-Script one-shot (o normalizzazione in lettura + riscrittura al primo write):
+### 8. Migrazione legacy → nuovi stati (confermata dall'owner ed eseguita il 2026-07-03, F5)
+Script una tantum, più la normalizzazione in lettura per lo storico (che resta). Lo
+script è stato tolto il 2026-10-15 (#1134), con quello dell'imbottitura dello `status`
+cifrato: una prova a vuoto su tutte le segnalazioni in produzione non trovava più
+niente da cambiare. La storia di git li conserva.
 - `new` → derivare dal pipeline con la STESSA logica di oggi (classifyBlock/isAligned):
   nessun pipeline o parziale → `unlabeled`; attacco → `attack`; spam → `spam`; design →
   `design`; aligned+`candidate_change` → `todo`; aligned senza → `aligned`.
@@ -375,10 +536,10 @@ Script one-shot (o normalizzazione in lettura + riscrittura al primo write):
 
 ---
 
-## PIANO A FASI (checklist di continuazione)
+## PIANO A FASI (storia)
 
-Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
-`.claude/worktrees/feedback-status-machine` (branch `claude/feedback-status-machine`).
+Tutte le fasi sono fatte; i dettagli sono quelli del giorno in cui si sono chiuse, e dove
+oggi il codice dice altro vale il codice (le sezioni sopra).
 
 - [x] **F1 — Vocabolario condiviso** (fatto 2026-07-02): `src/shared/feedbackStatus.js`
       (SN_FB_STATUS: stati, colori, tabFor, transizioni+canTransition, LEGACY_SIMPLE,
@@ -419,14 +580,15 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       --record-* riflettono lo status (pass→revision_security, fix→revision_
       capability), loop 3× → design/loop. Ruoli + ROUTINES.md aggiornati.
       Estensione documentata: todo/working→done (routine) per lavori senza branch
-      (es. pianificatore). Attore owner delegato: routine:auto-archive.
+      (es. pianificatore), ritirata il 2026-08-19 (§3). Attore owner delegato:
+      routine:auto-archive.
 - [x] **F4 — firestore.rules** (editate 2026-07-03): enum esteso ai canonici (legacy
       mantenuti per lo storico), statusReason/workingSince in hasOnly (admin e ramo
       routine, con size check); ramo routine: iter completo todo/working/revision_*/
       done/design (+clarify transizione). DEPLOYATE il 2026-07-03 (deploy ok su
       progetto filo-8b9cb).
 - [x] **F5 — Migrazione** (ESEGUITA 2026-07-03, owner ha confermato le scelte):
-      `scripts/migrate-status.mjs --apply` con token admin in tests/agent/.env
+      lo script una tantum (tolto con #1134, §8) con token admin in tests/agent/.env
       (gitignorato). 101 migrati / 226 già canonici / 0 errori: 40→aligned,
       2→attack, 1→spam, 3→design(judges), 4 clarify→design(clarify),
       21→unlabeled, 30 ignored→archived. Rilanciata a vuoto: 0 da migrare
@@ -450,7 +612,7 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       nessuna capacità utente cambiata (il gate file è moderazione, non un confine
       promesso) → non toccato.
 
-**Punti [DECIDERE/CONFERMARE] per l'owner:**
-1. Mappatura `ignored` → `archived` (con statusReason) vs `spam_confirmed`.
+**Punti confermati dall'owner il 2026-07-03 (F5):**
+1. Mappatura `ignored` → `archived` (con statusReason), non `spam_confirmed`.
 2. Mappatura `review` → `revision_capability`.
-3. `*_confirmed` in Archiviati sotto filtro (proposta della spec, adottata qui).
+3. `*_confirmed` in Archiviati sotto filtro.

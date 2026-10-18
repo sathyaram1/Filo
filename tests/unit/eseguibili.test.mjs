@@ -95,6 +95,9 @@ test('le righe scritte a mano si normalizzano, e le inservibili si scartano', ()
   // Niente etichetta singola, niente riga vuota: non corrisponderebbero mai.
   assert.deepEqual(E.normalizzaSiti(['mozilla', '   ', '...']), []);
   assert.deepEqual(E.normalizzaSiti('mozilla.org\napache.org'), ['mozilla.org', 'apache.org']);
+  // #590: un'estensione non latina (сайт.рф) è salvata nella forma «xn--» e resta valida.
+  assert.deepEqual(E.normalizzaSiti(['xn--80aswg.xn--p1ai']), ['xn--80aswg.xn--p1ai']);
+  assert.equal(E.fidato('https://сайт.рф/setup.exe', ['xn--80aswg.xn--p1ai']), true);
 });
 
 test('le frasi nominano il file e il sito: sono quelle su cui si decide', () => {
@@ -149,6 +152,27 @@ test('un sito incerto si dice incerto, in ogni frase che nomina il sito', () => 
   assert.ok(E.testoScarica('setup.exe', 'forum.it', true).includes(incerto));
   assert.ok(E.testoApri('setup.exe', 'forum.it', true).includes(incerto));
   assert.equal(E.provenienza('', true), '');
+});
+
+test('dopo un rimando la frase nomina il sito cliccato e quello che ha servito il file (#588.3)', () => {
+  const E = globalThis.SN_ESEGUIBILI;
+  const servito = 'https://objects.githubusercontent.com/release/setup.exe';
+  assert.equal(E.servitoDa('github.com', servito), 'objects.githubusercontent.com');
+  assert.equal(E.provenienza('github.com', false, servito, 'setup.exe'),
+    'da github.com, servito da objects.githubusercontent.com');
+  assert.ok(E.testoScarica('setup.exe', 'github.com', false, servito)
+    .includes('programma da github.com, servito da objects.githubusercontent.com.'));
+  assert.ok(E.testoApri('setup.exe', 'github.com', false, servito)
+    .includes('da github.com, servito da objects.githubusercontent.com.'));
+  assert.ok(E.testoScarica('ubuntu.iso', 'ubuntu.com', false, 'https://cdimage.example/u.iso')
+    .includes('da ubuntu.com, servita da cdimage.example.'));
+  // Stesso sito o un suo sottodominio: un nome solo, come per la fiducia.
+  for (const stesso of ['https://www.mozilla.org/x.exe', 'https://download.mozilla.org/x.exe', '', 'data:,x']) {
+    assert.equal(E.servitoDa('mozilla.org', stesso), '', stesso);
+    assert.equal(E.provenienza('mozilla.org', false, stesso), 'da mozilla.org');
+  }
+  // Il genitore di chi è stato cliccato è un altro nome: la fiducia non lo copre.
+  assert.equal(E.servitoDa('cdn.sito.it', 'https://sito.it/a.exe'), 'sito.it');
 });
 
 test('i formati che Windows monta o esegue senza essere un .exe sono nella lista (#588.1)', () => {

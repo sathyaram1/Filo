@@ -4,13 +4,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   proveTolte, percorsoRipristino, esitoProveTolte, controllaProveTolte, controllaPulizia, baseDelConfronto,
-  PREFISSO_RIPRISTINO, testoPuliziaFuoriNumero, numeriDelNome, nomeNumeratoStorto, numeraRilievi,
+  PREFISSO_RIPRISTINO, testoPuliziaFuoriNumero, numeriDelNome, nomeNumeratoStorto, numeraRilievi, puliziaDelPass,
 } from '../../scripts/lib/prove-tolte.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -133,7 +133,7 @@ test('in un repo vero la pulizia sa quali prove ha tolto, come, e quali c\'erano
     assert.match(testoPuliziaFuoriNumero(c, [2]), /giro1-r2-vecchia[^\n]*critica passata/);
     assert.equal(controllaPulizia({ shaCritica: critica, root: dir }).vecchie, null, 'senza avvio non lo si sa');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -178,7 +178,7 @@ test('la consegna rilancia solo le prove tolte, com\'erano, e respinge quella an
     assert.ok(visti.every((v) => v.args.includes('--retries=1')));
     assert.deepEqual(readdirSync(resolve(dir, 'tests', 'verifica')), ['679'], 'le copie se ne vanno dopo la corsa');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -192,7 +192,7 @@ test('cancellare una prova diventata verde passa, e senza prove tolte non si lan
     assert.deepEqual(controllaProveTolte({ shaPrima: critica, root: dir, lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
     assert.equal(visti.length, 1);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -209,7 +209,7 @@ test('togliere il caso rosso e tenere il file ferma la consegna come cancellare 
     assert.doesNotMatch(e.testo, /giro1-verde/, 'una prova cambiata che com\'era è verde non ferma niente');
     assert.equal(visti.length, 2);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -223,7 +223,7 @@ test('senza schermo e senza xvfb la consegna si ferma e dice perché, invece di 
     assert.equal(e.ferma, true);
     assert.match(e.testo, /xvfb-run non c'è/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -268,7 +268,7 @@ test('dopo un riallineamento le prove che ha cambiato main non entrano nel rilan
     assert.doesNotMatch(e.testo, /tests\/verifica\/99\//);
     assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-rossa.spec.mjs']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -281,7 +281,7 @@ test('dopo un riallineamento una prova già su main che il ramo cambia entra anc
     controllaProveTolte({ shaPrima: critica, root: dir, lancia: playwrightFinto(dir, visti), prepara: preparaFinto, log: () => {} });
     assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-cambiata.spec.mjs']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -290,7 +290,8 @@ test('le due consegne, locale e routine, passano da questo controllo, con la pul
   const routine = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
   assert.match(locale, /baseDelConfronto\(aperto\.pending\.sha, aperto\.pending\.shaPulizia/);
   assert.match(locale, /controllaProveTolte\(\{ shaPrima: base, root: ROOT,/);
-  assert.match(routine, /baseDelConfronto\(shaCritica, guard\.state\?\.puliziaSha/);
+  assert.match(routine, /baseDelConfronto\(shaCritica, guard\.state\?\.puliziaSha \|\| puliziaPass/);
+  assert.match(routine, /verifierVerdict === 'pass' \? puliziaDelPass\(shaCritica, guard\.state\?\.checkpoints/, 'dopo un pass la base è la pulizia sigillata (#880)');
   assert.match(routine, /controllaProveTolte\(\{\s*shaPrima: baseTolte/);
   assert.doesNotMatch(`${locale}\n${routine}`, /messiDaParte:/, 'nessuna delle due passa più un lasciapassare');
 });
@@ -314,7 +315,7 @@ test('la pulizia accetta solo prove o casi tolti, da una cartella del giro', () 
     assert.equal(no.ok, false);
     assert.match(no.motivo, /solo togliere prove del giro[\s\S]*src\/x\.js/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -325,7 +326,7 @@ test('una riga aggiunta a una prova del giro non è una pulizia', () => {
     g('commit', '-qam', 'marcatore');
     assert.equal(controllaPulizia({ shaCritica: critica, root: dir }).ok, false);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -350,7 +351,102 @@ test('dopo la pulizia la base è lei: la prova messa da parte non si rilancia, u
     assert.equal(e.ferma, true);
     assert.match(e.testo, /giro1-rossa\.spec\.mjs/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
+  }
+});
+
+// #880 (il caso di #591): verifica superata sulla vecchia base, la pulizia toglie la prova del rilievo diventato
+// feedback (rossa per costruzione), il rilascio la sigilla, poi main va avanti e il ramo si riallinea.
+function riallineatoDopoIlPass({ primaDelRebase = null } = {}) {
+  const dir = cartellaTemporanea('prove-tolte-pass-');
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('src/main.js', '1\n');
+  g('add', '-A'); g('commit', '-qm', 'main');
+  g('checkout', '-q', '-b', 'lavoro');
+  scrivi('src/x.js', 'lavoro\n');
+  scrivi('tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs', 'ROSSA\n');
+  scrivi('tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs', 'ROSSA\n');
+  g('add', '-A'); g('commit', '-qm', 'critica: verifica superata');
+  const critica = g('rev-parse', 'HEAD');
+  g('rm', '-q', 'tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs'); g('commit', '-qm', 'via le prove dei rilievi diventati feedback');
+  const pulizia = g('rev-parse', 'HEAD');
+  if (primaDelRebase) primaDelRebase({ g, scrivi });
+  g('checkout', '-q', 'main');
+  scrivi('src/main.js', '2\n'); g('commit', '-qam', 'main va avanti');
+  g('checkout', '-q', 'lavoro');
+  g('rebase', '-q', 'main');
+  const punti = [{ sha: critica, by: 'verifier:pass' }, { sha: pulizia, by: 'release:verifier' }];
+  return { dir, g, scrivi, critica, pulizia, punti };
+}
+
+test('#880: dopo un pass la pulizia sigillata è la base del riallineamento, e la prova del rilievo diventato feedback non si rilancia', () => {
+  const { dir, critica, pulizia, punti } = riallineatoDopoIlPass();
+  try {
+    assert.throws(() => execFileSync('git', ['merge-base', '--is-ancestor', critica, 'HEAD'], { cwd: dir, stdio: 'ignore' }), undefined, 'il rebase ha riscritto il ramo');
+    assert.equal(puliziaDelPass(critica, punti, dir), pulizia);
+    assert.equal(baseDelConfronto(critica, puliziaDelPass(critica, punti, dir), dir), pulizia);
+    const visti = [];
+    const lancia = playwrightFinto(dir, visti);
+    assert.deepEqual(controllaProveTolte({ shaPrima: pulizia, root: dir, lancia, prepara: preparaFinto, conPulizia: true, shaCritica: critica, log: () => {} }),
+      { ferma: false, testo: '' });
+    assert.equal(visti.length, 0, 'la prova uscita dopo il pass non si rilancia');
+    // Senza la pulizia come base, è il blocco di #591: la prova rossa per costruzione ferma ogni riallineamento.
+    const vecchio = controllaProveTolte({ shaPrima: critica, root: dir, lancia, prepara: preparaFinto, conPulizia: false, log: () => {} });
+    assert.equal(vecchio.ferma, true);
+    assert.match(vecchio.testo, /giro2-r1-diventato-feedback/);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('#880 senza riaprire #679: una prova rossa tolta da chi riallinea, prima o dopo il rebase, ferma ancora la consegna', () => {
+  const dopo = riallineatoDopoIlPass();
+  try {
+    dopo.g('rm', '-q', 'tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs'); dopo.g('commit', '-qm', 'riallineamento: tolta la rossa');
+    const visti = [];
+    const e = controllaProveTolte({ shaPrima: puliziaDelPass(dopo.critica, dopo.punti, dopo.dir), root: dopo.dir, lancia: playwrightFinto(dopo.dir, visti), prepara: preparaFinto, conPulizia: true, shaCritica: dopo.critica, log: () => {} });
+    assert.equal(e.ferma, true);
+    assert.match(e.testo, /giro1-rotta-dal-rebase/);
+    assert.doesNotMatch(e.testo, /giro2-r1-diventato-feedback/);
+    assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-rotta-dal-rebase.spec.mjs']);
+  } finally {
+    togliCartella(dopo.dir);
+  }
+  // Un commit che toglie solo prove, fatto da chi riallinea prima del rebase, non diventa la base nemmeno se il suo
+  // rilascio (o quello di chiunque non sia il verificatore) lo sigilla.
+  let diChiRiallinea = '';
+  const prima = riallineatoDopoIlPass({ primaDelRebase: ({ g }) => { g('rm', '-q', 'tests/verifica/591/giro1-rotta-dal-rebase.spec.mjs'); g('commit', '-qm', 'tolta prima del rebase'); diChiRiallinea = g('rev-parse', 'HEAD'); } });
+  try {
+    assert.equal(puliziaDelPass(prima.critica, prima.punti, prima.dir), prima.pulizia);
+    for (const by of ['release:fixer', 'release', 'fixer:checkout', 'deliver:status', 'pulizia']) {
+      assert.equal(puliziaDelPass(prima.critica, [...prima.punti, { sha: diChiRiallinea, by }], prima.dir), prima.pulizia, `sigillo «${by}»`);
+      assert.equal(puliziaDelPass(prima.critica, [prima.punti[0], { sha: diChiRiallinea, by }], prima.dir), '', `sigillo «${by}» senza pulizia del verificatore`);
+    }
+    const e = controllaProveTolte({ shaPrima: prima.pulizia, root: prima.dir, lancia: playwrightFinto(prima.dir, []), prepara: preparaFinto, conPulizia: true, shaCritica: prima.critica, log: () => {} });
+    assert.equal(e.ferma, true);
+    assert.match(e.testo, /giro1-rotta-dal-rebase/);
+  } finally {
+    togliCartella(prima.dir);
+  }
+});
+
+test('#880: è pulizia del pass solo un punto fermo che discende dalla critica e ne toglie soltanto prove del giro', () => {
+  const { dir, g, scrivi, critica, pulizia, punti } = riallineatoDopoIlPass();
+  try {
+    const riallineato = g('rev-parse', 'HEAD');
+    assert.equal(puliziaDelPass(critica, [...punti, { sha: riallineato, by: 'release:verifier' }], dir), pulizia, 'il ramo riscritto dal rebase non discende dalla critica');
+    assert.equal(puliziaDelPass(critica, [punti[0]], dir), '', 'senza il sigillo della pulizia non c\'è base nuova');
+    g('checkout', '-q', critica);
+    scrivi('src/x.js', 'cambiato dopo il verdetto\n');
+    g('rm', '-q', 'tests/verifica/591/giro2-r1-diventato-feedback.spec.mjs'); g('commit', '-qam', 'pulizia con del codice dentro');
+    assert.equal(puliziaDelPass(critica, [punti[0], { sha: g('rev-parse', 'HEAD'), by: 'release:verifier' }], dir), '', 'una riga di codice non è una pulizia');
+    for (const storto of [[], null, [{}], [{ sha: 'non-uno-sha' }]]) assert.equal(puliziaDelPass(critica, storto, dir), '');
+    assert.equal(puliziaDelPass('', punti, dir), '');
+  } finally {
+    togliCartella(dir);
   }
 });
 
@@ -408,7 +504,7 @@ test('con un rilievo esterno nel giro, una prova cancellata ancora rossa ferma l
     assert.match(r.testo, /giro1-rilievo\.spec\.mjs/);
     assert.equal(r.entry.verdict, 'fix-pending', 'la consegna respinta non chiude il giro');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -428,7 +524,7 @@ test('in locale la pulizia si registra, e la consegna dopo non rilancia la prova
     assert.equal(c.entry.verdict, 'fixed');
     assert.equal(c.entry.chiusura.shaPrima, pulizia, 'la verifica dopo guarda la correzione, non la pulizia');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -441,7 +537,7 @@ test('in locale la pulizia si rifiuta senza rilievi messi da parte, o se il comm
     assert.match(p.testo, /non ha messo da parte nessun rilievo/);
     assert.equal(p.entry.pending.shaPulizia, undefined);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
   const altro = giroLocaleAperto({ derived: [{ level: 1, sede: 'i', text: 'x', priority: 1 }] });
   try {
@@ -452,7 +548,7 @@ test('in locale la pulizia si rifiuta senza rilievi messi da parte, o se il comm
     assert.notEqual(p.status, 0);
     assert.match(p.testo, /codice\.js/);
   } finally {
-    rmSync(altro.dir, { recursive: true, force: true });
+    togliCartella(altro.dir);
   }
 });
 
@@ -529,7 +625,7 @@ test('una domanda per l\'owner senza prova sua non lascia uscire la prova rossa 
     assert.notEqual(c.status, 0, 'senza pulizia registrata la consegna rilancia la prova tolta, ancora rossa');
     assert.match(c.testo, /giro1-r3-c\.spec\.mjs/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -550,7 +646,7 @@ test('un rilievo esterno non allarga la pulizia fino alla prova rossa di un rili
     assert.equal(giusta.status, 0, giusta.testo);
     assert.equal(giusta.entry.pending.shaPulizia, g('rev-parse', 'HEAD'));
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -580,6 +676,43 @@ test('a una prova che copre anche un rilievo da correggere si toglie solo il cas
     assert.equal(verde.status, 0, verde.testo);
     assert.equal(verde.entry.verdict, 'fixed');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
+  }
+});
+
+test('#747 in locale: la prova dimenticata dalla pulizia manda alla pulizia, e quella dopo le correzioni la lascia uscire', () => {
+  const { dir, g, scrivi, cartella, vl, corretto } = giroCriticato({
+    prove: { 'giro1-r1-a': ['a'], 'giro1-r2-b': ['b'], 'giro1-r2-bis': ['b'] },
+    critica: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.',
+  });
+  const bis = `${cartella}/giro1-r2-bis.spec.mjs`;
+  try {
+    g('rm', '-q', `${cartella}/giro1-r2-b.spec.mjs`); g('commit', '-qm', 'pulizia che dimentica il bis');
+    const pulizia = g('rev-parse', 'HEAD');
+    assert.equal(vl('pulizia').status, 0);
+    corretto('a');
+    g('rm', '-q', bis); scrivi('codice.js', 'module.exports = 1;\n'); g('add', '-A'); g('commit', '-qm', 'correzione, e via anche il bis');
+    const no = vl('corretto', REPORT);
+    assert.notEqual(no.status, 0, no.testo);
+    assert.match(no.testo, /giro1-r2-bis\.spec\.mjs \(r2\)/);
+    assert.match(no.testo, /node scripts\/verify-local\.mjs pulizia/);
+    assert.doesNotMatch(no.testo, /correggi finché/i);
+    assert.equal(no.entry.verdict, 'fix-pending');
+    const mista = vl('pulizia');
+    assert.notEqual(mista.status, 0);
+    assert.match(mista.testo, /un commit a parte, l'ultimo/);
+    g('checkout', pulizia, '--', bis); g('commit', '-qm', 'rimessa com\'era');
+    g('rm', '-q', bis); g('commit', '-qm', 'pulizia dopo le correzioni');
+    const dopo = g('rev-parse', 'HEAD');
+    const p = vl('pulizia');
+    assert.equal(p.status, 0, p.testo);
+    assert.match(p.testo, /Pulizia dopo le correzioni registrata/);
+    assert.equal(p.entry.pending.shaPulizia, pulizia, 'la base della consegna resta la prima pulizia');
+    assert.deepEqual(p.entry.pending.pulizieDopo, [dopo]);
+    const si = vl('corretto', REPORT);
+    assert.equal(si.status, 0, si.testo);
+    assert.equal(si.entry.verdict, 'fixed');
+  } finally {
+    togliCartella(dir);
   }
 });

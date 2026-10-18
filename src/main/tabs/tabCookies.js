@@ -3,6 +3,7 @@
 // il menu che lo mostra è quello del tasto destro sulla scheda (src/renderer/shell.js).
 
 const Cookies = require('../services/cookies');
+const Sito = require('../services/stessoSito');
 
 // Chiavi della memoria della pagina che i CMP usano per ricordarsi la risposta (stessa idea di isConsentName),
 // più quelle che il clic sul banner ha creato. La stessa regola la applica il preload (takeCookieWipe).
@@ -67,6 +68,8 @@ function saveSoon() {
   if (saveTimer.unref) saveTimer.unref();
 }
 Cookies.setConfigChangeHandler(saveSoon);
+// Il jar Privacy del sito è stato buttato: il sito non si ricorda più niente, e nemmeno Filo di lui.
+Cookies.setJarWipeHandler((site) => { if (!Cookies.keepsSiteData(site)) remembered.delete(site); });
 
 function siteMemory(tm) {
   if (!tm.incognito) return remembered;
@@ -209,6 +212,8 @@ const cookieMethods = {
   // Una pagina nuova dello stesso sito tiene l'esito (il sito ricorda il rifiuto e il banner non torna); un altro sito no.
   _cookieOnNavigate(tab, url) {
     tab._cookieHold = false;
+    // #758 — una pagina di accesso aperta come sito principale: il cookie che arriva dopo dice che l'utente è entrato.
+    if (!tab.isInternal) { try { require('../services/cookieIncorporati').navigazione(url); } catch (_) {} }
     if (!tab.cookieOutcome) return;
     if (!isWeb(url) || Cookies.registrableOf(url) !== tab.cookieOutcome.site) tab.cookieOutcome = null;
   },
@@ -271,7 +276,9 @@ const cookieMethods = {
     if (!site) return { ok: false, error: 'no_site' };
     const Storage = globalThis.SN_STORAGE;
     const settings = await Storage.getSettings();
-    const list = Cookies.getBannerSites(settings).filter((d) => d !== site);
+    const prima = Cookies.getBannerSites(settings);
+    const copre = Sito.voceSalvata(tab.url, prima);
+    const list = prima.filter((d) => d !== site && d !== copre);
     if (show) list.push(site);
     list.sort();
     tab.cookieOutcome = null;

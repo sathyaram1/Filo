@@ -36,20 +36,23 @@
 //     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff): il feedback va
 //          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
 //          ramo non è perduto: il server apre una richiesta di approvazione
-//          che l'owner trova in cima alla dashboard di gestione.
-//     20 → conflitto di merge: serve risoluzione manuale. Nessuna fusione.
+//          che l'owner trova nel quadrato rosso della pratica, in cima ai Ricevuti.
+//     20 → conflitto di merge, o unit rossi sul risultato della fusione con main
+//          (#929): il server ha già instradato il riallineamento. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
 //          richiesta RIFIUTATA dal server (verdetti non registrati, ramo che
-//          non combacia col biglietto): il server l'ha già messa a registro.
+//          non combacia col biglietto, via libera che non copre la punta): il
+//          server l'ha già messa a registro.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
-import { merge } from './routine-channel.mjs';
+import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
+import { merge, heartbeat } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
 import { headSha, currentBranch, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { chiediConProva } from './lib/unit-sulla-fusione.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // FILO_REPO_ROOT: override della root (dove si cerca il biglietto). Esiste SOLO
@@ -138,6 +141,24 @@ export function testoEsitiDecaduti(decaduti, punta, ramo = '', id = '') {
     + 'Poi registra di nuovo il verdetto, che parte timbrato col contenuto nuovo (nella nota scrivi anche cosa hai letto in più):\n'
     + `  node scripts/dispatch.mjs --record-secaudit ${i} <pass|fail> --nota <file.md>\n`
     + 'e, se è pass, rilancia questo comando. La verifica funzionale non la rifai tu: se il pezzo nuovo non è fatto solo di prove del giro tolte, il server la rimette in giro da sé quando chiedi la fusione.';
+}
+
+/**
+ * Cosa fare dopo un rifiuto con cui il server ha GIÀ rimesso in giro la
+ * pratica (#773). PURA. '' per ogni altro motivo, che si stampa com'è.
+ */
+export function testoRifiutoServer(reason) {
+  const coda = 'Niente fusione. Il server ha azzerato il tuo via libera di sicurezza e rimanda da sé un nuovo controllo sulla punta: '
+    + 'non registrare altro, rilascia il biglietto.';
+  if (reason === 'secaudit_stale') {
+    return '[merge-gate] RIFIUTATO (secaudit_stale): il via libera di sicurezza registrato sul server non parla della punta del ramo '
+      + `(è stato dato su un altro commit, o registrato senza). ${coda}`;
+  }
+  if (reason === 'stale') {
+    return '[merge-gate] RIFIUTATO (stale): sul server la punta del ramo non è il commit per cui hai chiesto la fusione, quindi il ramo '
+      + `si è mosso nel frattempo. ${coda}`;
+  }
+  return '';
 }
 
 /**
@@ -295,12 +316,45 @@ export function testoRamoDiverso(nominato, corrente) {
     + 'Posizionati sul ramo del lavoro e rilancia, oppure nomina il ramo su cui sei.';
 }
 
+/**
+ * Tiene vivo il lavoro sul server finché gira la prova degli unit: dura minuti, a volte più dell'ora di silenzio dopo
+ * cui il semaforo cade, e in cloud nient'altro batte intanto (verifica #929 giro 3). Gli unit bloccano questo processo,
+ * quindi batte un figlio, fermato alla fine. Un battito subito: quello del figlio arriva solo dopo il suo avvio.
+ */
+export async function tieniVivo(ticket, { batti = heartbeat, avvia = spawn, script = resolve(__dirname, 'routine-channel.mjs') } = {}) {
+  try { await batti(ticket); } catch (_) { /* il figlio ci riprova */ }
+  let figlio = null;
+  try {
+    figlio = avvia(process.execPath, [script, 'heartbeat', '--loop'], {
+      env: { ...process.env, FILO_ROUTINE_TICKET: ticket, FILO_REPO_ROOT: ROOT }, stdio: 'ignore', windowsHide: true,
+    });
+    if (figlio && typeof figlio.on === 'function') figlio.on('error', () => {});
+  } catch (_) { figlio = null; }
+  const ferma = () => { try { if (figlio) figlio.kill(); } catch (_) { /* già uscito */ } };
+  process.once('exit', ferma);
+  return { ferma, figlio };
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
   if (r.ok === true && r.result === 'blocked') return 10;
-  if (r.ok === true && r.result === 'conflict') return 20;
+  // Unit rossi sul risultato della fusione (#929): come un conflitto, il server ha già instradato il riallineamento.
+  if (r.ok === true && (r.result === 'conflict' || r.result === 'unit_rossi')) return 20;
+  // Lavoro server (#1159 fase 2): la parte del server la segue il server, chi chiede non fa niente.
+  if (r.ok === true && r.result === 'server') return 30;
   return 1;
+}
+
+/** Cosa sta facendo il server con la parte del server di un lavoro server. PURA. */
+export function testoEsitoServer(esito) {
+  const testi = {
+    attesa_suite: 'il cancello aspetta la suite di filo-security verde sul commit da fondere, e riprova da sé (prima l’app, poi il server)',
+    attesa_pc: 'il lavoro lo porta su main il PC dell’owner, prima la parte dell’app e poi il ramo del server',
+    rimandato: 'il ramo del server torna alle routine (suite rossa o conflitto con main del server)',
+    all_owner: 'il lavoro sul server non è fidato: decide l’owner',
+  };
+  return `${testi[esito] || `esito «${String(esito || '?')}»`}. Niente da fare qui: rilascia il biglietto.`;
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
@@ -315,9 +369,10 @@ const USO = [
   '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
   '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
   '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
-  '        20 conflitto · 1 uso sbagliato, ramo diverso da quello della directory,',
+  '  Prima di chiedere fa girare gli unit sul risultato della fusione con origin/main.',
+  '        20 conflitto o unit rossi sulla fusione · 1 uso sbagliato, ramo diverso da quello della directory,',
   '           ramo mosso dopo il controllo di sicurezza, contenuto che non è quello in cima',
-  '           su origin, o rifiuto del server',
+  '           su origin, main mosso a ogni prova, o rifiuto del server',
 ].join('\n');
 
 async function main() {
@@ -388,10 +443,7 @@ async function main() {
   const statoRamo = idStato ? readBranchState(ROOT, idStato) : null;
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
-    // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
-    // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
-    // essere vecchia di giorni e non fare quello che chi legge crede.
-    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source, idStato || ''), TOOLS_ROOT, ROOT));
+    console.error(testoEsitiDecaduti(decaduti, punta, source, idStato || ''));
     process.exit(1);
   }
   const notaVerifica = notaVerificaSuAltroCommit(statoRamo, punta);
@@ -413,9 +465,7 @@ async function main() {
     process.exit(1);
   }
   if (pubblicazione.stato === 'piu_avanti') {
-    // Il rimedio con gli attrezzi del GIRO, come l'altro rifiuto che nomina un
-    // comando: `scripts/…` qui dentro è la copia del ramo.
-    console.error(absolutizeRecipe(testoPiuAvanti(punta, pubblicazione.suOrigin, source), TOOLS_ROOT, ROOT));
+    console.error(testoPiuAvanti(punta, pubblicazione.suOrigin, source));
     process.exit(1);
   }
   if (pubblicazione.stato === 'sconosciuto') {
@@ -425,22 +475,46 @@ async function main() {
     console.error('[merge-gate] nota: in questa directory non c\'è nessun origin, quindi non ho potuto guardare cosa troverà chi fonde. Decide il server.');
   }
 
-  const reply = await merge(ticket, source, { sha: punta });
+  // Gli unit sul RISULTATO della fusione con main di adesso (#929): due lavori verdi da soli possono rompere main
+  // insieme. Un rosso solo sulla fusione lo dice al server, che rimanda il lavoro al riallineamento con l'elenco.
+  const battito = await tieniVivo(ticket);
+  let giro;
+  try {
+    giro = await chiediConProva({
+      root: ROOT, punta,
+      chiedi: (provaUnit) => merge(ticket, source, provaUnit ? { sha: punta, provaUnit } : { sha: punta }),
+      mainMosso: (r) => !!(r && r.ok === true && r.result === 'main_moved'),
+      scrivi: (s) => console.error(`[merge-gate] ${s}`),
+    });
+  } finally {
+    battito.ferma();
+  }
+  const reply = giro.reply;
+  if (giro.esaurito) {
+    console.error(`[merge-gate] ERROR: main si è mosso a ogni prova (${giro.tentativi} tentativi): niente fusione. Il lavoro è intatto sul ramo; rilancia questo comando.`);
+    process.exit(1);
+  }
   const code = exitCodeFor(reply);
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
   else if (code === 10) {
     console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
     // Il blocco non è più un vicolo cieco: il server apre una richiesta che
-    // l'owner trova in cima alla dashboard di gestione. Dirlo qui evita che
+    // l'owner trova sulla scheda della pratica in Gestione. Dirlo qui evita che
     // chi legge il registro creda che il ramo sia perduto.
-    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
+    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
+  }
+  else if (code === 20 && reply.result === 'unit_rossi') {
+    console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
   }
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
-  else console.error(`[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
+  else if (code === 30) console.error(`[merge-gate] SERVER: ${testoEsitoServer(reply.esito)}`);
+  else console.error(testoRifiutoServer(reply.reason) || `[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
   process.exit(code);
 }
 
 // Esegui solo se invocato come script (non quando importato dai test).
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  // I comandi nei testi stampati, i nostri e i motivi del server, portano alla copia fissata (#763).
+  absolutizeOutput(ROOT);
   await main();
 }

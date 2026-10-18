@@ -171,3 +171,28 @@ test('quando Filo ha domande la risposta si invia col composer: appende lo stori
   // Il blob risultante riparsa in 2 turni: nota di Filo + risposta utente.
   expect(upd.notes).toMatch(/La tua risposta del/);
 });
+
+test('la nota di Filo si legge col markdown formattato, come in Gestione; il testo di chi risponde resta com’è', async ({ app, openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+  const notes = [
+    '## Scelte',
+    '- **A.** Dal sito, la *meno* invasiva.',
+    '- **B.** Chiesto ogni volta. <b>finto</b>',
+    '',
+    '--- Riaperto il 20/05/26, 19:37 ---',
+    'Preferisco la **B**.',
+  ].join('\n');
+  await setupAdmin(app, page, {
+    _id: 'mock-convo-md', status: 'done', text: 'il nome del file salvato', url: 'https://example.com',
+    clientId: 'tester-123', notes, createdAt: new Date().toISOString(),
+  });
+  await page.locator('[data-tab="resolved"]').click();
+  const filo = page.locator('.fb-bubble--model');
+  await expect(filo.locator('ul li strong')).toHaveText(['A.', 'B.']);
+  await expect(filo.locator('em')).toHaveText('meno');
+  await expect(filo.locator('h4')).toHaveText('Scelte');
+  await expect(filo).not.toContainText('**');
+  await expect(filo).toContainText('<b>finto</b>');
+  await expect(filo.locator('b')).toHaveCount(0);
+  await expect(page.locator('.fb-bubble--user:not(.fb-bubble--report)')).toContainText('Preferisco la **B**.');
+});

@@ -49,7 +49,7 @@ async function scarica(nome, { shell, openTab, testServer }) {
   } };
 }
 
-test('"Apri file" su un file cancellato risponde che non c\'è più (e l\'avviso lo mostra)', async ({ app, shell, openTab, testServer }) => {
+test('"Apri file" su un file cancellato risponde che non c\'è più (e l\'avviso lo mostra)', async ({ app, shell, openTab, testServer, avvisi }) => {
   test.setTimeout(90_000);
   const { rec, close } = await scarica('sparito.pdf', { shell, openTab, testServer });
   try {
@@ -90,10 +90,12 @@ test('"Apri file" su un file cancellato risponde che non c\'è più (e l\'avviso
     await expect(riga.locator('.dl-row-meta')).toContainText('Non più sul disco');
     await shell.locator('#dl-indicator').click();   // richiudi il pannello
 
-    const azione = shell.locator('.shell-notif-action', { hasText: 'Apri file' }).last();
+    await expect(shell.locator('.shell-notif-action', { hasText: 'Apri file' })).not.toHaveCount(0, { timeout: 10000 });
+    const vista = await avvisi();
+    const azione = vista.locator('.shell-notif-action', { hasText: 'Apri file' }).last();
     await expect(azione).toBeVisible({ timeout: 10000 });
     await azione.click();
-    await expect(shell.locator('.shell-notif-msg', { hasText: /non c[’']è più/ }))
+    await expect(vista.locator('.shell-notif-msg', { hasText: /non c[’']è più/ }))
       .toBeVisible({ timeout: 10000 });
   } finally { await close(); }
 });

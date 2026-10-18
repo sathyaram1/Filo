@@ -1,6 +1,6 @@
-// Sentinella: i commenti dentro src/ rispettano la regola di CLAUDE.md § Commenti nel codice
-// nelle parti che si misurano a macchina. Copre HTML e CSS, compresi gli script e gli stili
-// incorporati nelle pagine; per i .js basta aggiungere l'estensione a ESTENSIONI.
+// Sentinella: i commenti dentro src/ rispettano la regola di CLAUDE.md § Commenti nel codice nelle parti che si misurano a
+// macchina. Le quattro misure coprono HTML e CSS, script e stili incorporati compresi (per i .js basta aggiungere l'estensione
+// a ESTENSIONI); in più ogni .js ha l'intestazione da cui scripts/mappa-moduli.mjs ricava la mappa dei moduli.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { fileJs, intestazione } from '../../scripts/mappa-moduli.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // La prova di questa sentinella (tests/unit/sentinellaCommenti.test.mjs) le fa
@@ -151,7 +152,8 @@ function comments(file, text) {
 }
 
 const perFile = new Map(SRC.map((f) => {
-  const text = readFileSync(join(ROOT, f), 'utf8');
+  // Su un altro disco (Windows: repo su D:, temporanea su C:) il nome relativo è assoluto: `join` incollerebbe i due dischi.
+  const text = readFileSync(resolve(ROOT, f), 'utf8');
   return [f, { commenti: comments(f, text), righe: text.split('\n') }];
 }));
 
@@ -209,4 +211,11 @@ test('nessuna etichetta che ripete il nome di ciò che sta sotto', () => {
     if (nomi.some((n) => n && norm(c.rows[0]) === norm(n))) etichette.push(`${f}:${c.ls}`);
   }
   assert.deepEqual(etichette, [], 'etichette uguali al nome sotto');
+});
+
+// La mappa dei moduli si legge da qui: un .js senza intestazione ci entrerebbe muto, quindi lo ferma chi lo crea.
+test('ogni .js ha un commento d’intestazione in cima', () => {
+  const senza = fileJs(GUARDA).map((p) => relative(ROOT, p).replace(/\\/g, '/')).sort()
+    .filter((f) => !intestazione(readFileSync(resolve(ROOT, f), 'utf8')));
+  assert.deepEqual(senza, [], "file .js senza commento d'intestazione prima del codice (#! e 'use strict' non contano)");
 });

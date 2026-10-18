@@ -8,6 +8,8 @@
   const I18n = window.SN_I18N;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
+  // Si salva la forma «xn--…», si mostra il nome come l'utente l'ha scritto (münchen.de).
+  const leggibile = window.SN_NOMI_SITO.leggibile;
 
   function $(id) { return document.getElementById(id); }
 
@@ -34,6 +36,8 @@
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
     $('sec-adblock-label').textContent = I18n.t('options_security_adblock');
     $('sec-adblock-desc').textContent = I18n.t('options_security_adblock_desc');
+    $('sec-adskip-label').textContent = I18n.t('options_security_adskip');
+    $('sec-adskip-desc').textContent = I18n.t('options_security_adskip_desc');
     $('sec-siteblock-label').textContent = I18n.t('options_security_siteblock');
     $('sec-siteblock-desc').textContent = I18n.t('options_security_siteblock_desc');
     $('sec-siteblock-lists-label').textContent = I18n.t('options_security_siteblock_lists');
@@ -41,6 +45,10 @@
     $('sec-dl-exe-label').textContent = I18n.t('options_security_downloads');
     $('sec-dl-exe-desc').textContent = I18n.t('options_security_downloads_desc');
     $('sec-dl-trusted-label').textContent = I18n.t('options_security_downloads_trusted_label');
+    $('sec-delicate-label').textContent = I18n.t('options_security_delicate');
+    $('sec-delicate-desc').textContent = I18n.t('options_security_delicate_desc');
+    $('sec-delicate-sites-label').textContent = I18n.t('options_security_delicate_sites_label');
+    $('sec-delicate-campi-title').textContent = I18n.t('options_security_delicate_campi_title');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
@@ -68,6 +76,12 @@
     $('sec-cookies-trusted-note').textContent = I18n.t('options_cookies_trusted_note_other');
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
+    $('sec-cookies-accessi-title').textContent = I18n.t('options_cookies_accessi_title');
+    $('sec-cookies-accessi-desc').textContent = I18n.t('options_cookies_accessi_desc');
+    $('sec-cookies-riquadri-title').textContent = I18n.t('options_cookies_riquadri_title');
+    $('sec-cookies-riquadri-desc').textContent = I18n.t('options_cookies_riquadri_desc');
+    $('sec-riquadri-modello-label').textContent = I18n.t('options_cookies_riquadri_modello');
+    $('sec-riquadri-modello-desc').textContent = I18n.t('options_cookies_riquadri_modello_desc');
     $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
     $('sec-cookies-done-title').textContent = I18n.t('options_cookies_done_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
@@ -80,36 +94,205 @@
     $('fp-mode-privacy-desc').textContent = I18n.t('options_fp_mode_privacy_desc');
     $('sec-auto-feedback-label').textContent = I18n.t('options_security_auto_feedback');
     $('sec-auto-feedback-desc').textContent = I18n.t('options_security_auto_feedback_desc');
+    $('sec-visite-title').textContent = I18n.t('security_visite_title');
+    $('sec-visite-desc').textContent = I18n.t('security_visite_desc');
+    $('sec-visite-ora').textContent = I18n.t('security_visite_ora');
+    $('sec-visite-oggi').textContent = I18n.t('security_visite_oggi');
+    $('sec-visite-tutto').textContent = I18n.t('security_visite_tutto');
+    $('sec-clip-title').textContent = I18n.t('security_clipboard_title');
+    $('sec-clip-desc').textContent = I18n.t('security_clipboard_desc');
+    $('sec-clip-empty').textContent = I18n.t('security_clipboard_empty');
+    $('sec-clip-noresults').textContent = I18n.t('security_clipboard_no_results');
+    $('sec-clip-search').placeholder = I18n.t('security_clipboard_search');
+    $('sec-clip-search').setAttribute('aria-label', I18n.t('security_clipboard_search'));
+    $('sec-clip-clear').textContent = I18n.t('menu_paste_clear');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
+    for (const p of ['sec-export-keys', 'sec-wipe-export-keys']) {
+      $(`${p}-label`).textContent = I18n.t('security_export_keys_label');
+      $(`${p}-desc`).textContent = I18n.t('security_export_keys_desc');
+    }
     $('sec-import-btn').textContent = I18n.t('security_import_btn');
     $('sec-import-desc').textContent = I18n.t('security_import_desc');
+    $('sec-wipe-btn').textContent = I18n.t('security_wipe_btn');
+    $('sec-wipe-desc').textContent = I18n.t('security_wipe_desc');
+    $('sec-wipe-export-text').textContent = I18n.t('security_wipe_export_text');
+    $('sec-wipe-export').textContent = I18n.t('security_export_btn');
+    $('sec-wipe-list-title').textContent = I18n.t('security_wipe_list_title');
+    $('sec-wipe-list').textContent = I18n.t('security_wipe_list');
+    $('sec-wipe-server').textContent = I18n.t('security_wipe_server');
+    $('sec-wipe-identity-label').textContent = I18n.t('security_wipe_identity_label');
+    $('sec-wipe-identity-desc').textContent = I18n.t('security_wipe_identity_desc');
+    $('sec-wipe-word-label').textContent = I18n.t('security_wipe_word_label');
+    $('sec-wipe-word').placeholder = 'conferma';
+    $('sec-wipe-cancel').textContent = I18n.t('security_wipe_cancel');
+    $('sec-wipe-go').textContent = I18n.t('security_wipe_go');
     $('savedHint').textContent = I18n.t('options_saved');
   }
 
-  async function exportData() {
-    const btn = $('sec-export-btn');
-    const hint = $('sec-export-hint');
+  // Le chiavi escono solo con la spunta (#905), che vale anche dalla conferma di «Cancella tutto»: è la stessa scelta.
+  const CASELLE_CHIAVI = ['sec-export-keys', 'sec-wipe-export-keys'];
+  function mostraCaselleChiavi(settings) {
+    const ci = !!window.SN_CONST.haSegreti(settings);
+    for (const id of CASELLE_CHIAVI) {
+      $(`${id}-row`).hidden = !ci;
+      if (!ci) $(id).checked = false;
+    }
+  }
+
+  // `resta`: l'esito non sparisce (nella conferma di «Cancella tutto» dice che l'archivio c'è già).
+  async function exportData({ btn = $('sec-export-btn'), hint = $('sec-export-hint'), fatto = 'security_export_done', resta = false } = {}) {
     btn.disabled = true;
+    let riuscito = false;
     try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA });
+      const chiavi = CASELLE_CHIAVI.some((id) => !$(`${id}-row`).hidden && $(id).checked);
+      const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA, chiavi });
       if (res && res.ok) {
-        hint.textContent = I18n.t('security_export_done');
-        hint.classList.remove('sn-error');
+        riuscito = true;
+        hint.textContent = I18n.t(fatto);
+        hint.classList.remove('sn-error', 'sn-hint-warn');
         hint.classList.add('sn-show');
       } else if (res && res.canceled) {
         // L'utente ha annullato il dialog: nessun messaggio.
       } else {
         hint.textContent = I18n.t('security_export_fail');
-        hint.classList.add('sn-show', 'sn-error');
+        hint.classList.add('sn-show', 'sn-error', 'sn-hint-warn');
       }
     } catch (_) {
       hint.textContent = I18n.t('security_export_fail');
-      hint.classList.add('sn-show', 'sn-error');
+      hint.classList.add('sn-show', 'sn-error', 'sn-hint-warn');
     } finally {
       btn.disabled = false;
-      clearTimeout(exportData._t);
-      exportData._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
+      clearTimeout(hint._t);
+      if (!(resta && riuscito)) hint._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
+    }
+  }
+
+  // ── Cancella tutti i dati di Filo (#850) ────────────────────────────────
+  // Il tasto apre sotto di sé la conferma: prima l'esportazione, poi cosa sparisce, e il sì solo con la parola scritta.
+  // Il cancello vero sta nel main (cancellaTutto.js), che rifà lo stesso controllo sulla parola.
+  const PAROLA_CANCELLA = 'conferma';
+  const CONTROLLI_CANCELLA = ['sec-wipe-btn', 'sec-wipe-export', 'sec-wipe-export-keys', 'sec-wipe-identity', 'sec-wipe-word', 'sec-wipe-cancel'];
+  let cancellazioneInCorso = false;
+
+  const parolaScritta = () => $('sec-wipe-word').value.trim().toLowerCase() === PAROLA_CANCELLA;
+
+  function aggiornaTastoCancella() {
+    const go = $('sec-wipe-go');
+    go.disabled = cancellazioneInCorso || !parolaScritta();
+    go.title = parolaScritta() ? '' : I18n.t('security_wipe_go_spento');
+  }
+
+  function mostraEsitoCancella(testo, errore) {
+    const hint = $('sec-wipe-hint');
+    hint.textContent = testo;
+    hint.classList.toggle('sn-hint-warn', !!errore);
+    hint.classList.toggle('sn-show', !!testo);
+  }
+
+  async function apriCancellaTutto(e) {
+    // Un doppio clic aprirebbe e richiuderebbe subito: conta il primo.
+    if (e && e.detail > 1) return;
+    const box = $('sec-wipe-box');
+    if (!box.hidden) { chiudiCancellaTutto(); return; }
+    box.hidden = false;
+    $('sec-wipe-btn').setAttribute('aria-expanded', 'true');
+    aggiornaTastoCancella();
+    box.scrollIntoView({ block: 'nearest' });
+    $('sec-wipe-export').focus({ preventScroll: true });
+    // La scelta sull'identità compare solo se c'è un'identità: senza risposta resta nascosta, e l'identità resta.
+    let st = null;
+    try { st = await chrome.runtime.sendMessage({ type: MSG.CANCELLA_TUTTI_I_DATI_STATO }); } catch (_) {}
+    $('sec-wipe-identity-row').hidden = !(st && st.ok && st.identita);
+    if ($('sec-wipe-identity-row').hidden) $('sec-wipe-identity').checked = false;
+  }
+
+  function chiudiCancellaTutto() {
+    if (cancellazioneInCorso) return;
+    $('sec-wipe-box').hidden = true;
+    $('sec-wipe-btn').setAttribute('aria-expanded', 'false');
+    $('sec-wipe-word').value = '';
+    $('sec-wipe-identity').checked = false;
+    mostraEsitoCancella('', false);
+    aggiornaTastoCancella();
+  }
+
+  async function cancellaTutto(e) {
+    // La coda di un doppio clic non è un secondo sì.
+    if ((e && e.detail > 1) || cancellazioneInCorso || !parolaScritta()) return;
+    cancellazioneInCorso = true;
+    for (const id of CONTROLLI_CANCELLA) $(id).disabled = true;
+    aggiornaTastoCancella();
+    mostraEsitoCancella(I18n.t('security_wipe_in_corso'), false);
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({
+        type: MSG.CANCELLA_TUTTI_I_DATI,
+        parola: $('sec-wipe-word').value,
+        ancheIdentita: !$('sec-wipe-identity-row').hidden && $('sec-wipe-identity').checked,
+      });
+    } catch (_) {}
+    // Riuscito, Filo si chiude da sé: la pagina resta com'è fino all'ultimo.
+    if (r && r.ok) return;
+    cancellazioneInCorso = false;
+    for (const id of CONTROLLI_CANCELLA) $(id).disabled = false;
+    aggiornaTastoCancella();
+    mostraEsitoCancella(I18n.t('security_wipe_fail'), true);
+  }
+
+  // La chat porta qui con #cancella-tutto: sul tasto, che non cancella da solo.
+  function portaAlTasto() {
+    if (location.hash !== '#cancella-tutto') return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    const btn = $('sec-wipe-btn');
+    const centra = () => $('sec-wipe-row').scrollIntoView({ block: 'center' });
+    centra();
+    btn.focus({ preventScroll: true });
+    btn.classList.remove('sn-card-highlight');
+    void btn.offsetWidth;
+    btn.classList.add('sn-card-highlight');
+    btn.addEventListener('animationend', () => btn.classList.remove('sn-card-highlight'), { once: true });
+    // Le liste qui sopra arrivano dopo e spingono giù il tasto: lo si segue finché l'utente non si muove da sé.
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(centra) : null;
+    const GESTI = ['wheel', 'keydown', 'pointerdown', 'touchstart'];
+    const smetti = () => { ro?.disconnect(); for (const t of GESTI) removeEventListener(t, smetti, true); };
+    ro?.observe(document.body);
+    for (const t of GESTI) addEventListener(t, smetti, true);
+    setTimeout(smetti, 2000);
+  }
+
+  // #866 — le pagine visitate che il filo ricorda: si cancellano per periodo, e il popup dice quante prima del sì.
+  const PERIODO_DETTO = { ultima_ora: 'nell’ultima ora', oggi: 'oggi', tutto: 'da sempre' };
+  function showVisiteHint(text, isError) {
+    const hint = $('sec-visite-hint');
+    hint.textContent = text;
+    hint.classList.toggle('sn-error', !!isError);
+    hint.classList.add('sn-show');
+    clearTimeout(showVisiteHint._t);
+    showVisiteHint._t = setTimeout(() => hint.classList.remove('sn-show'), 4000);
+  }
+
+  async function cancellaVisite(btn) {
+    const periodo = btn.dataset.periodo;
+    btn.disabled = true;
+    try {
+      const conta = await chrome.runtime.sendMessage({ type: MSG.FILO_PAGINE_CONTA, periodo });
+      if (!conta || !conta.ok) { showVisiteHint(I18n.t('security_visite_fail'), true); return; }
+      if (!conta.n) { showVisiteHint(I18n.t('security_visite_nessuna'), false); return; }
+      const quali = conta.n === 1 ? 'la pagina visitata' : `le ${conta.n} pagine visitate`;
+      const ok = await window.SN_CONFIRM_UI.confirm({
+        title: I18n.t('security_visite_confirm_title'),
+        text: I18n.t('security_visite_confirm_text').replace('%1', quali).replace('%2', PERIODO_DETTO[periodo] || ''),
+        okLabel: I18n.t('security_visite_confirm_ok'),
+      });
+      if (!ok) return;
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_PAGINE_CANCELLA, periodo });
+      if (!r || !r.ok) { showVisiteHint(I18n.t('security_visite_fail'), true); return; }
+      showVisiteHint(r.n === 1 ? '1 pagina cancellata' : `${r.n} pagine cancellate`, false);
+    } catch (_) {
+      showVisiteHint(I18n.t('security_visite_fail'), true);
+    } finally {
+      btn.disabled = false;
     }
   }
 
@@ -133,10 +316,13 @@
       const prev = await chrome.runtime.sendMessage({ type: MSG.IMPORT_DATA_PREVIEW });
       if (!prev || !prev.ok) {
         if (prev && prev.canceled) return; // dialog annullato: nessun messaggio
-        showImportHint(
-          I18n.t(prev && prev.error === 'invalid_file' ? 'security_import_invalid' : 'security_import_fail'),
-          true,
-        );
+        const errori = {
+          invalid_file: 'security_import_invalid',
+          damaged_file: 'security_import_damaged',
+          compressed_file: 'security_import_compressed',
+          encrypted_file: 'security_import_encrypted',
+        };
+        showImportHint(I18n.t(errori[prev && prev.error] || 'security_import_fail'), true);
         return;
       }
 
@@ -150,11 +336,30 @@
       const immagini = prev.images === 0
         ? 'nessuna immagine'
         : (prev.images === 1 ? '1 immagine' : `${prev.images} immagini`);
+      const conta = (n, uno, molti) => (n === 1 ? `1 ${uno}` : `${n} ${molti}`);
+      const delFilo = [
+        prev.chats ? conta(prev.chats, 'chat con Filo', 'chat con Filo') : '',
+        prev.pagine ? conta(prev.pagine, 'pagina visitata', 'pagine visitate') : '',
+      ].filter(Boolean).join(' e ');
+      // Quello che del file non entra si dice prima del sì, col numero (#1088).
+      const manca = [
+        prev.immaginiPerse ? I18n.t('security_import_images_lost').replace('%1', String(prev.immaginiPerse)) : '',
+        prev.filoPerso ? I18n.t('security_import_filo_lost') : '',
+        prev.pagineFuori ? I18n.t('security_import_pages_out')
+          .replace('%1', String(prev.pagineFuori))
+          .replace('%2', String(prev.tettoPagine || ''))
+          + (prev.pagineMieFuori ? ' ' + I18n.t('security_import_pages_out_mine').replace('%1', String(prev.pagineMieFuori)) : '') : '',
+        prev.chiavi === false ? I18n.t('security_import_senza_chiavi') : '',
+        prev.proxySenzaCredenziali ? I18n.t('security_import_proxy_senza_credenziali') : '',
+      ].filter(Boolean);
       const text = I18n.t('security_import_confirm_text')
+        .replace('%6', I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
         .replace('%1', prev.fileName || '')
         .replace('%2', when)
         .replace('%3', sezioni)
-        .replace('%4', immagini);
+        .replace('%4', immagini)
+        .replace('%5', delFilo ? `, più ${delFilo}` : '')
+        + (manca.length ? `\n\n${manca.join('\n')}` : '');
 
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({
@@ -223,12 +428,418 @@
     }
   }
 
+  // ─── cronologia appunti (#256) ────────────────────────────────────────────
+  //
+  // Le stesse due azioni del menu "Incolla" (togli una voce, svuota tutto), ma
+  // raggiungibili SEMPRE. Nel menu del tasto destro la cronologia compare solo
+  // dentro un campo di testo: chi ha copiato una password mentre leggeva un
+  // articolo non ha nessun campo da cliccare, e finiva per non poterla togliere
+  // proprio quando gli premeva di più. Questa pagina è l'ingresso che mancava.
+  //
+  // La lista viene sempre da quella che risponde il main (che è anche quella su
+  // disco): dopo ogni rimozione riprendiamo `items` dalla risposta invece di
+  // togliere il nodo e sperare — così la pagina non può raccontare una
+  // cronologia diversa da quella che c'è davvero.
+
+  // Chiave ed etichetta di una voce le decide il modulo condiviso: la stessa
+  // regola vale nel menu "Incolla" e in chi tiene la cronologia su disco.
+  const Clip = window.SN_CLIPBOARD;
+  const clipKey = (entry) => Clip.chiave(entry);
+  const clipLabel = (entry) => Clip.etichetta(entry);
+
+  function showClipHint(text, isError) {
+    const hint = $('sec-clip-hint');
+    hint.textContent = text;
+    hint.classList.toggle('sn-error', !!isError);
+    hint.classList.add('sn-show');
+    clearTimeout(showClipHint._t);
+    showClipHint._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
+  }
+
+  // Filtro di ricerca: la cronologia tiene fino a cinquanta voci e nel riquadro
+  // se ne vedono sette per volta. Cercare "la password copiata stamattina"
+  // scorrendo a mano è lo stesso attrito che nel menu "Incolla" era già stato
+  // tolto con un campo di ricerca: qui è la stessa lista, quindi lo stesso campo.
+  // Quante voci VIVE la ricerca sta mostrando, oppure null quando nessuna
+  // ricerca è in corso: la conferma dello svuotamento parla del filtro solo se
+  // il filtro c'è davvero (vedi il commento su testoConferma nel modulo
+  // condiviso della cronologia).
+  let clipVisibili = null;
+
+  function applyClipFilter() {
+    const q = ($('sec-clip-search').value || '').trim().toLowerCase();
+    const righe = $('sec-clip-list').querySelectorAll('.sn-clip-item');
+    let aSchermo = 0;   // righe che il filtro lascia vedere, barrate comprese
+    let vive = 0;       // di quelle, le voci che ci sono ancora davvero
+    for (const r of righe) {
+      const match = !q || (r.dataset.snSearch || '').includes(q);
+      r.style.display = match ? '' : 'none';
+      if (!match) continue;
+      aSchermo++;
+      if (!r.classList.contains('sn-clip-gone')) vive++;
+    }
+    clipVisibili = q ? vive : null;
+    const nessuno = righe.length > 0 && aSchermo === 0;
+    $('sec-clip-noresults').style.display = nessuno ? '' : 'none';
+  }
+
+  // ── la lista non si muove sotto la mano ───────────────────────────────────
+  //
+  // Togliere una riga e ricompattare subito la lista sposta di una posizione
+  // tutte quelle sotto, e il clic successivo colpisce la voce sbagliata: un
+  // doppio clic sul "Rimuovi" ne portava via due (quella mirata e la vicina), e
+  // bastava che una copia fatta in un'altra scheda entrasse in cima mentre stavi
+  // mirando per cancellare il vicino di sopra. Su voci che spariscono per sempre
+  // è il danno peggiore possibile.
+  //
+  // Quindi: finché il puntatore è dentro la lista, NESSUNA riga cambia posto.
+  // La voce tolta resta al suo posto barrata, e le liste nuove aspettano. Appena
+  // il puntatore esce, la lista si ricompone.
+  let vociCorrenti = [];      // l'ultima lista vera arrivata dal main
+  let inAttesa = null;        // lista da disegnare appena il puntatore esce
+  let puntatoreDentro = false;
+
+  function segnaSparite(entries) {
+    const vive = new Set(entries.map(clipKey));
+    for (const row of $('sec-clip-list').querySelectorAll('.sn-clip-item')) {
+      if (row.classList.contains('sn-clip-gone')) continue;
+      if (vive.has(row.dataset.snKey)) continue;
+      row.classList.add('sn-clip-gone');
+      const copia = row.querySelector('.sn-clip-copy');
+      if (copia) {
+        copia.disabled = true;
+        copia.title = I18n.t('security_clipboard_gone');
+      }
+      const btn = row.querySelector('.sn-clip-remove');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = I18n.t('security_clipboard_gone');
+        btn.title = '';
+      }
+    }
+  }
+
+  // Avviso sotto la lista (mai sopra: una riga in più in cima sposterebbe di
+  // nuovo tutto) quando ci sono voci nuove che aspettano.
+  function aggiornaAvvisoInAttesa() {
+    const el = $('sec-clip-pending');
+    if (!el) return;
+    const nuove = inAttesa
+      ? inAttesa.filter((e) => !disegnate().has(clipKey(e))).length
+      : 0;
+    if (nuove > 0) {
+      el.textContent = nuove === 1
+        ? I18n.t('security_clipboard_pending_one')
+        : I18n.t('security_clipboard_pending').replace('%d', String(nuove));
+      el.style.display = '';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+  }
+
+  function disegnate() {
+    const s = new Set();
+    for (const row of $('sec-clip-list').querySelectorAll('.sn-clip-item')) s.add(row.dataset.snKey);
+    return s;
+  }
+
+  // I controlli intorno alla lista (svuota, ricerca) devono dire la verità sulle
+  // voci VERE, anche mentre la lista sta ferma sotto il puntatore e a schermo ci
+  // sono ancora righe barrate. Senza questo, tolte a mano tutte le voci senza
+  // uscire dalla lista, «Svuota cronologia» restava lì e, raggiunto col
+  // tabulatore, offriva di far sparire zero voci.
+  // Mentre la lista è ferma, però, quello che sparisce non deve spostarla: la
+  // ricerca (sopra) lascia il suo posto vuoto, e sotto si tiene l'altezza, così
+  // la pagina in fondo non si accorcia e lo scorrimento non trascina le righe.
+  function sincronizzaControlli(ferma) {
+    const vuota = vociCorrenti.length === 0;
+    const azioni = $('sec-clip-actions');
+    const ricerca = $('sec-clip-search-row');
+    if (ferma && vuota && !azioni.style.minHeight) azioni.style.minHeight = `${azioni.offsetHeight}px`;
+    if (!ferma) azioni.style.minHeight = '';
+    $('sec-clip-clear').style.display = vuota ? 'none' : '';
+    const tieniPosto = ferma && vuota && ricerca.style.display !== 'none';
+    ricerca.style.visibility = tieniPosto ? 'hidden' : '';
+    if (!tieniPosto) ricerca.style.display = vuota ? 'none' : '';
+    if (vuota) $('sec-clip-noresults').style.display = 'none';
+  }
+
+  function renderClipboard(items, opts) {
+    const list = $('sec-clip-list');
+    const entries = Array.isArray(items) ? items : [];
+    vociCorrenti = entries;
+    const giaDisegnata = !!list.querySelector('.sn-clip-item');
+    if (puntatoreDentro && giaDisegnata && !(opts && opts.forza)) {
+      inAttesa = entries;
+      segnaSparite(entries);
+      aggiornaAvvisoInAttesa();
+      applyClipFilter();
+      sincronizzaControlli(true);
+      return;
+    }
+    inAttesa = null;
+
+    // Se la lista che arriva è IDENTICA a quella già a schermo non si tocca
+    // niente. Ricostruirla per nulla azzererebbe lo scorrimento e butterebbe
+    // fuori il fuoco della tastiera — e succede a ogni rimozione, perché chi
+    // tiene la cronologia avvisa tutte le pagine quando cambia e l'avviso
+    // torna anche alla pagina che ha appena chiesto la modifica: la lista
+    // arriva due volte, la seconda uguale alla prima.
+    const disegnateOra = [...list.querySelectorAll('.sn-clip-item')];
+    const identica = disegnateOra.length > 0
+      && disegnateOra.length === entries.length
+      && !list.querySelector('.sn-clip-gone')
+      && disegnateOra.every((r, i) => r.dataset.snKey === clipKey(entries[i]));
+    if (identica) {
+      aggiornaAvvisoInAttesa();
+      applyClipFilter();
+      sincronizzaControlli();
+      return;
+    }
+
+    list.textContent = '';
+    // Vuota: niente lista e niente "Svuota cronologia" (non c'è nulla da
+    // svuotare), solo la riga che lo dice.
+    const empty = entries.length === 0;
+    $('sec-clip-empty').style.display = empty ? '' : 'none';
+    list.style.display = empty ? 'none' : '';
+    $('sec-clip-clear').style.display = empty ? 'none' : '';
+    $('sec-clip-search-row').style.display = empty ? 'none' : '';
+    $('sec-clip-search-row').style.visibility = '';
+    $('sec-clip-actions').style.minHeight = '';
+    if (empty) {
+      $('sec-clip-noresults').style.display = 'none';
+      // Cronologia svuotata: anche la ricerca riparte da zero. Altrimenti il
+      // campo resterebbe pieno di una parola che nessuno vede più, e la prima
+      // cosa copiata dopo comparirebbe già filtrata via.
+      $('sec-clip-search').value = '';
+    }
+
+    // Se in lista c'è almeno un'immagine, anche le righe di testo tengono il
+    // posto della miniatura: altrimenti il bordo sinistro va a zig-zag.
+    const conMiniature = entries.some((e) => e && e.type === 'image' && e.dataUrl);
+
+    for (const entry of entries) {
+      const row = document.createElement('div');
+      row.className = 'sn-clip-item';
+      row.dataset.snSearch = clipLabel(entry).toLowerCase();
+      row.dataset.snKey = clipKey(entry);
+
+      // La riga si illuminava al passaggio del mouse ma cliccarla non faceva
+      // niente: una promessa che non veniva mantenuta. Nel menu "Incolla" la
+      // riga cliccata incolla; qui non c'è un campo dove incollare, quindi la
+      // cosa equivalente è rimettere la voce negli appunti, pronta da incollare
+      // dove serve.
+      const copia = document.createElement('button');
+      copia.type = 'button';
+      copia.className = 'sn-clip-copy';
+      copia.title = I18n.t('security_clipboard_copy_title');
+
+      // Un'immagine si riconosce guardandola, non leggendo "Immagine": senza
+      // miniatura, con due schermate copiate in fila, l'utente non sa quale
+      // delle due sta togliendo. Il dato ce l'abbiamo già in mano.
+      if (entry.type === 'image' && entry.dataUrl) {
+        const thumb = document.createElement('img');
+        thumb.className = 'sn-clip-thumb';
+        thumb.alt = '';
+        // Un'immagine che non si riesce a disegnare lasciava l'iconcina rotta
+        // del browser: nel menu "Incolla" lo stesso caso rimette l'iconcina di
+        // Filo, ed è la stessa lista vista da due parti.
+        thumb.addEventListener('error', () => {
+          const icona = document.createElement('span');
+          icona.className = 'sn-clip-thumb sn-clip-thumb-fallback';
+          const svg = window.SN_ICONS && window.SN_ICONS.image;
+          if (svg) icona.innerHTML = svg(16);
+          else icona.textContent = '🖼';
+          thumb.replaceWith(icona);
+        });
+        thumb.src = entry.dataUrl;
+        copia.appendChild(thumb);
+      } else if (conMiniature) {
+        const spacer = document.createElement('span');
+        spacer.className = 'sn-clip-spacer';
+        copia.appendChild(spacer);
+      }
+
+      const label = clipLabel(entry);
+      const text = document.createElement('span');
+      text.className = 'sn-clip-text';
+      text.textContent = label;
+      text.title = label;
+      copia.appendChild(text);
+      copia.addEventListener('click', () => copiaVoce(entry, row));
+      row.appendChild(copia);
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'sn-clip-remove';
+      rm.textContent = I18n.t('security_clipboard_remove');
+      rm.title = I18n.t('security_clipboard_remove_title');
+      // `detail === 0` = premuto con Invio o barra, non col mouse: solo in quel
+      // caso il fuoco va rimesso da qualche parte dopo la rimozione.
+      rm.addEventListener('click', (ev) => removeClipEntry(entry, rm, ev.detail === 0));
+      row.appendChild(rm);
+
+      list.appendChild(row);
+    }
+    aggiornaAvvisoInAttesa();
+    // Il filtro in corso vale anche per la lista appena ridisegnata: se stavi
+    // cercando "pass" e nel frattempo hai tolto l'unica voce che corrispondeva,
+    // la lista deve dire che quella ricerca non ha risultati, non restare muta.
+    applyClipFilter();
+  }
+
+  // Le righe su cui si può ancora agire: quelle che il filtro lascia vedere e
+  // che non sono già state tolte. Sono le stesse prima e dopo una rimozione,
+  // meno quella tolta, quindi l'indice di una riga qui dentro resta confrontabile
+  // fra i due momenti anche quando la lista sta ferma sotto il puntatore e le
+  // righe tolte restano a schermo barrate.
+  function righeVive() {
+    return [...$('sec-clip-list').querySelectorAll('.sn-clip-item')]
+      .filter((r) => r.style.display !== 'none' && !r.classList.contains('sn-clip-gone'));
+  }
+
+  // Dopo una rimozione fatta da tastiera, il fuoco va sul "Rimuovi" della voce
+  // che ha preso quel posto in lista (o dell'ultima, se hai tolto quella in
+  // fondo). Se non resta niente da togliere va sul tasto per svuotare, e se
+  // nemmeno quello c'è più sul campo di ricerca: qualcosa sotto le dita resta
+  // sempre.
+  function fuocoDopoRimozione(indice) {
+    const righe = righeVive();
+    if (righe.length) {
+      const i = Math.min(Math.max(indice, 0), righe.length - 1);
+      const b = righe[i].querySelector('.sn-clip-remove');
+      if (b && !b.disabled) { metti(b); return; }
+    }
+    const svuota = $('sec-clip-clear');
+    if (svuota && svuota.style.display !== 'none') { metti(svuota); return; }
+    const cerca = $('sec-clip-search');
+    if (cerca && $('sec-clip-search-row').style.display !== 'none') metti(cerca);
+
+    function metti(el) {
+      try { el.focus({ preventScroll: true }); } catch (_) { try { el.focus(); } catch (__) {} }
+    }
+  }
+
+  // Rimette una voce negli appunti di sistema, pronta da incollare.
+  async function copiaVoce(entry, row) {
+    if (row && row.classList.contains('sn-clip-gone')) return;
+    try {
+      if (entry.type === 'image' && entry.dataUrl) {
+        const blob = await (await fetch(entry.dataUrl)).blob();
+        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      } else {
+        await navigator.clipboard.writeText(entry.text || '');
+      }
+      showClipHint(I18n.t('security_clipboard_copied'), false);
+    } catch (_) {
+      showClipHint(I18n.t('security_clipboard_fail'), true);
+    }
+  }
+
+  async function loadClipboard() {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
+      renderClipboard(res && res.ok ? res.items : []);
+    } catch (_) {
+      renderClipboard([]);
+    }
+  }
+
+  // Rimozione di UNA voce: puntuale di proposito. Chi ha copiato una password
+  // per sbaglio non deve pagare con tutto il resto della cronologia.
+  async function removeClipEntry(entry, btn, daTastiera) {
+    // Chi usa la tastiera non deve ripartire dall'inizio della pagina a ogni
+    // voce tolta. Disabilitare il bottone premuto butta il fuoco sul corpo
+    // della pagina, e per la voce dopo toccherebbe riattraversare col tabulatore
+    // tutta la pagina delle impostazioni.
+    //
+    // Il fuoco va rimesso in TUTTI e due i casi, e per un po' ne copriva uno
+    // solo: quando la lista si ricompone il bottone premuto sparisce, ma se il
+    // puntatore del mouse è fermo sulla lista la lista sta ferma e quel bottone
+    // resta a schermo disabilitato. Il vecchio controllo guardava solo se il
+    // bottone fosse ancora nella pagina, quindi con la mano ferma sul mouse il
+    // fuoco restava caduto. Adesso conta se il bottone è ancora PREMIBILE.
+    const indice = righeVive().findIndex((r) => r.contains(btn));
+    const avevaFuoco = !!daTastiera && document.activeElement === btn;
+    const rimettiFuoco = () => {
+      try { btn.focus({ preventScroll: true }); } catch (_) { try { btn.focus(); } catch (__) {} }
+    };
+    btn.disabled = true;
+    try {
+      const res = await chrome.runtime.sendMessage({
+        type: MSG.REMOVE_CLIPBOARD_ENTRY,
+        entry,
+      });
+      if (res && res.ok) {
+        // Le scritture non rispondono con l'elenco (#589.4): la lista vera si rilegge.
+        let dopo = null;
+        try { dopo = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY }); } catch (_) {}
+        renderClipboard(dopo && dopo.ok ? dopo.items : vociCorrenti.filter((x) => Clip.chiave(x) !== Clip.chiave(entry)));
+        if (avevaFuoco && (!document.contains(btn) || btn.disabled)) fuocoDopoRimozione(indice);
+        showClipHint(I18n.t('security_clipboard_removed'), false);
+      } else {
+        btn.disabled = false;
+        // La voce è ancora lì: il fuoco torna sul suo stesso "Rimuovi", così
+        // riprovare è un altro Invio e non un altro giro col tabulatore.
+        if (avevaFuoco) rimettiFuoco();
+        showClipHint(I18n.t('security_clipboard_fail'), true);
+      }
+    } catch (_) {
+      btn.disabled = false;
+      if (avevaFuoco) rimettiFuoco();
+      showClipHint(I18n.t('security_clipboard_fail'), true);
+    }
+  }
+
+  // Svuotamento: distruttivo e non annullabile → conferma prima, col popup di
+  // Filo (mai il confirm nativo). Stesso testo del menu del tasto destro: è la
+  // stessa azione, deve suonare uguale da dove la si faccia.
+  async function clearClipboard() {
+    const btn = $('sec-clip-clear');
+    // Niente da svuotare, niente conferma: il tasto in questo caso è già
+    // nascosto, ma chiedere «spariscono tutte e 0 le voci» resta una frase che
+    // non deve poter uscire da nessuna strada.
+    if (vociCorrenti.length === 0) return;
+    // La conferma dice QUANTE voci spariscono, e se una ricerca ne sta
+    // nascondendo una parte lo dichiara: con un filtro attivo la lista mostrava
+    // una riga sola e lo svuotamento le portava via tutte.
+    const text = Clip.testoConferma(vociCorrenti.length, clipVisibili);
+    const ok = window.SN_CONFIRM_UI
+      ? await window.SN_CONFIRM_UI.confirm({
+        title: I18n.t('menu_paste_clear'),
+        text,
+        okLabel: I18n.t('menu_paste_clear'),
+      })
+      : window.confirm(text);
+    if (!ok) return;
+    btn.disabled = true;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.CLEAR_CLIPBOARD_HISTORY });
+      if (res && res.ok) {
+        // Qui il ridisegno non aspetta il puntatore: l'utente ha appena chiesto
+        // lui di far sparire tutto, e la lista svuotata è la risposta.
+        renderClipboard([], { forza: true });
+        showClipHint(I18n.t('security_clipboard_cleared'), false);
+      } else {
+        showClipHint(I18n.t('security_clipboard_fail'), true);
+      }
+    } catch (_) {
+      showClipHint(I18n.t('security_clipboard_fail'), true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function load() {
     fillStaticText();
     renderSitePerms();
+    loadClipboard();
     const settings = await Storage.getSettings();
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
+    mostraCaselleChiavi(settings);
     const sec = settings.security || {};
     lastProxy = JSON.stringify(settings.proxy || {});
     renderProxyBox();
@@ -238,21 +849,28 @@
     $('sec-protect-ip').checked = sec.protectIpLeak !== false;
     $('sec-block-popups').checked = sec.blockPopups !== false;
     $('sec-adblock').checked = (sec.adblock || {}).enabled !== false;
+    $('sec-adskip').checked = (sec.adSkip || {}).enabled !== false;
     const sblk = sec.siteBlock || {};
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
-    $('sec-siteblock-blacklist').value = (Array.isArray(sblk.blacklist) ? sblk.blacklist : []).join('\n');
-    // Se ci sono voci salvate da prima del controllo (o non valide), avvisa
-    // subito che non bloccheranno nulla invece di lasciarle passare mute.
+    // Le righe che non sono domini si salvano a parte e tornano qui con l'avviso: chi ha scritto
+    // «facebook» e chiuso la scheda deve rivederla, non trovarla sparita (#590.2).
+    $('sec-siteblock-blacklist').value = righe(sblk.blacklist, sblk.righeScartate);
     setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     syncSiteBlockEnabled();
     // #588 — conferma prima di scaricare/aprire un programma. Default ON: la
     // chiave assente vale "chiedi", come nel main.
     const dl = sec.downloads || {};
     $('sec-dl-exe').checked = dl.confirmExecutables !== false;
-    $('sec-dl-trusted').value = (Array.isArray(dl.trustedSites) ? dl.trustedSites : []).join('\n');
+    $('sec-dl-trusted').value = righe(dl.trustedSites, dl.righeScartate);
     setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
     syncDownloadsEnabled();
+    const del = sec.pagineDelicate || {};
+    $('sec-delicate').checked = del.enabled !== false;
+    $('sec-delicate-sites').value = righe(del.siti, del.righeScartate);
+    setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+    syncDelicateEnabled();
+    loadDelicateCampi();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -267,8 +885,17 @@
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
+    cookieLoggedSites = Array.isArray(cookies.loggedSites) ? cookies.loggedSites.slice() : [];
+    cookieEmbedSites = Array.isArray(cookies.embedSites) ? cookies.embedSites.slice() : [];
+    $('sec-riquadri-modello').checked = !(sec.riquadriRotti && sec.riquadriRotti.modello === false);
     renderWhitelist();
     renderBannerSites();
+    renderLoggedSites();
+    renderEmbedSites();
+    // Il testo lasciato nella casella dei fidati torna lì: un sito valido è già nell'elenco, il resto con l'avviso.
+    const bozza = typeof cookies.bozza === 'string' ? cookies.bozza : '';
+    $('cookie-wl-input').value = bozza;
+    setWhitelistError(bozza.trim() && !cleanDomain(bozza) ? I18n.t('options_cookies_whitelist_invalid') : '');
     loadCookieDone();
     syncCookieMode();
 
@@ -279,6 +906,7 @@
 
     // F4 — Default ON quando il setting non è ancora stato scritto (undefined → true).
     $('sec-auto-feedback').checked = sec.autoFeedback === undefined ? true : !!sec.autoFeedback;
+    mostrata = leggiSicurezza();
   }
 
   // ─── protezione fingerprinting ─────────────────────────────────────────────
@@ -302,40 +930,34 @@
   let cookieWhitelist = [];
   // #754 — siti dove l'utente ha chiesto di rivedere i banner (dal menu della scheda): qui si vedono e si tolgono.
   let cookieBannerSites = [];
+  // #758 — siti dove Filo ha visto un tuo accesso: i loro contenuti incorporati tengono i cookie. Li scrive Filo,
+  // qui si vedono e si tolgono.
+  let cookieLoggedSites = [];
+  let cookieEmbedSites = [];
 
   function currentMode() {
     const checked = document.querySelector('input[name="cookie-mode"]:checked');
     return checked ? checked.value : 'default';
   }
 
-  // I "siti fidati" hanno effetto SOLO in "Privacy massima" (dove ogni sito è
-  // isolato/effimero): lì la lista è attiva. In "Automatico"/"Manuale" i login
-  // restano comunque, quindi la lista è informativa (disabilitata + nota).
+  // I "siti fidati" contano in "Privacy massima" (jar isolato ma persistente) e in "Automatico" (#758: i loro
+  // contenuti incorporati altrove tengono i cookie): lì la lista si usa. In "Manuale" Filo non gestisce niente.
   function syncCookieMode() {
-    const privacy = currentMode() === 'privacy';
-    $('sec-cookies-trusted-note').style.display = privacy ? 'none' : 'block';
+    const modo = currentMode();
+    const conta = modo !== 'manual';
+    $('sec-cookies-trusted-note').style.display = modo === 'default' ? 'block' : 'none';
     const wl = $('sec-cookies-whitelist');
-    wl.style.opacity = privacy ? '1' : '0.45';
-    $('cookie-wl-input').disabled = !privacy;
-    $('cookie-wl-add-btn').disabled = !privacy;
-    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !privacy;
+    wl.style.opacity = conta ? '1' : '0.45';
+    $('cookie-wl-input').disabled = !conta;
+    $('cookie-wl-add-btn').disabled = !conta;
+    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !conta;
+    // In Manuale Filo non rifiuta cookie, quindi nessun riquadro si rompe per colpa sua e il modello non parte.
+    $('sec-riquadri-modello-row').style.opacity = conta ? '1' : '0.45';
+    $('sec-riquadri-modello').disabled = !conta;
   }
 
-  // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
-  // www. e porta, lascia il bare host minuscolo. "https://www.Gmail.com/x" →
-  // "gmail.com". Ritorna '' se non estraibile.
-  function cleanDomain(raw) {
-    let s = String(raw || '').trim().toLowerCase();
-    if (!s) return '';
-    try {
-      if (s.includes('://')) s = new URL(s).hostname;
-      else s = new URL('http://' + s).hostname;
-    } catch (_) {
-      s = s.split('/')[0].split('?')[0];
-    }
-    s = s.replace(/^www\./, '');
-    return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s) ? s : '';
-  }
+  // "https://www.Gmail.com/x" → "gmail.com", '' se non è un sito: la riduzione di tutti gli elenchi di siti (#843).
+  const cleanDomain = window.SN_NOMI_SITO.daScritto;
 
   function renderWhitelist() {
     const list = $('cookie-wl-list');
@@ -351,7 +973,7 @@
     for (const domain of cookieWhitelist) {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.textContent = domain;
+      span.textContent = leggibile(domain);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';
@@ -375,7 +997,7 @@
     for (const domain of cookieBannerSites) {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.textContent = domain;
+      span.textContent = leggibile(domain);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';
@@ -383,6 +1005,58 @@
       btn.addEventListener('click', () => {
         cookieBannerSites = cookieBannerSites.filter((d) => d !== domain);
         renderBannerSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  function renderLoggedSites() {
+    const box = $('sec-cookies-accessi');
+    const list = $('cookie-accessi-list');
+    list.innerHTML = '';
+    // L'elenco si vede in tutte le modalità: è roba che Filo ha segnato su di te, e si toglie da qui anche quando
+    // la modalità di adesso non lo usa.
+    box.hidden = !cookieLoggedSites.length;
+    for (const domain of cookieLoggedSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(domain);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_accessi_remove');
+      btn.addEventListener('click', () => {
+        cookieLoggedSites = cookieLoggedSites.filter((d) => d !== domain);
+        renderLoggedSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // I servizi a cui hai riattivato i cookie dal riquadro rotto (#760): si vedono tutti e si tolgono da qui o dal
+  // tasto destro sul riquadro.
+  function renderEmbedSites() {
+    const box = $('sec-cookies-riquadri');
+    const list = $('cookie-riquadri-list');
+    list.innerHTML = '';
+    box.hidden = !cookieEmbedSites.length;
+    for (const domain of cookieEmbedSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(domain);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_riquadri_remove');
+      btn.addEventListener('click', () => {
+        cookieEmbedSites = cookieEmbedSites.filter((d) => d !== domain);
+        renderEmbedSites();
         saveCookies();
       });
       li.appendChild(span);
@@ -415,7 +1089,7 @@
     for (const it of cookieDoneSites) {
       const li = document.createElement('li');
       const span = document.createElement('span');
-      span.textContent = it.site;
+      span.textContent = leggibile(it.site);
       const what = document.createElement('span');
       what.className = 'sn-muted';
       what.style.marginLeft = '8px';
@@ -449,7 +1123,7 @@
     el.style.display = msg ? 'block' : 'none';
   }
 
-  function addWhitelistDomain() {
+  function addWhitelistDomain(opts) {
     const input = $('cookie-wl-input');
     const raw = String(input.value || '').trim();
     if (!raw) { setWhitelistError(''); return; }
@@ -458,26 +1132,39 @@
       // Input non vuoto ma non è un dominio valido: avvisa invece di svuotare
       // in silenzio. Lascia il testo nel campo così l'utente può correggerlo.
       setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
-      input.focus();
+      if (!(opts && opts.fuoco === false)) input.focus();
       return;
     }
     if (cookieWhitelist.includes(domain)) {
-      setWhitelistError(I18n.t('options_cookies_whitelist_dup', domain));
+      setWhitelistError(I18n.t('options_cookies_whitelist_dup', leggibile(domain)));
       input.value = '';
       return;
     }
     cookieWhitelist.push(domain);
     cookieWhitelist.sort();
     renderWhitelist();
-    saveCookies();
+    syncCookieMode();
     setWhitelistError('');
     input.value = '';
+    saveCookies();
   }
 
+  // Un sito lasciato nella casella vale già come fidato; quello che non è un dominio resta come `bozza`.
   async function saveCookies() {
+    caselle.spedita('fidato');
+    const bozza = String($('cookie-wl-input').value || '').trim();
+    const dominio = cleanDomain(bozza);
+    const fidati = dominio && !cookieWhitelist.includes(dominio) ? [...cookieWhitelist, dominio].sort() : cookieWhitelist.slice();
     const partial = {
       security: {
-        cookies: { mode: currentMode(), trustedSites: cookieWhitelist.slice(), bannerSites: cookieBannerSites.slice() },
+        cookies: {
+          mode: currentMode(),
+          trustedSites: fidati,
+          bannerSites: cookieBannerSites.slice(),
+          loggedSites: cookieLoggedSites.slice(),
+          embedSites: cookieEmbedSites.slice(),
+          bozza: dominio ? '' : bozza,
+        },
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
@@ -514,6 +1201,76 @@
     $('sec-dl-trusted').disabled = !on;
   }
 
+  // Spenta la protezione, l'elenco resta lì ma non vale: si vede attenuato, come quello dei siti fidati.
+  function syncDelicateEnabled() {
+    const on = !!$('sec-delicate').checked;
+    const sub = $('sec-delicate-sub');
+    if (sub) sub.style.opacity = on ? '1' : '0.45';
+    $('sec-delicate-sites').disabled = !on;
+  }
+
+  // I siti che Filo ha segnato da solo per un campo password o carta: tutti visibili, e ognuno si toglie e si rimette.
+  let delicateCampi = [];
+  let delicateCampiSig = '';
+  async function loadDelicateCampi() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.PAGINE_DELICATE_CAMPI }); } catch (_) {}
+    const siti = r && r.ok && Array.isArray(r.siti) ? r.siti : [];
+    const sig = siti.map((x) => x.sito + (x.tolto ? '-' : '')).join('\n');
+    if (sig === delicateCampiSig) return;
+    delicateCampiSig = sig;
+    delicateCampi = siti;
+    renderDelicateCampi();
+  }
+
+  function renderDelicateCampi() {
+    const box = $('sec-delicate-campi');
+    const list = $('sec-delicate-campi-list');
+    list.innerHTML = '';
+    box.hidden = !delicateCampi.length;
+    for (const it of delicateCampi) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(it.sito);
+      if (it.tolto) {
+        const what = document.createElement('span');
+        what.className = 'sn-muted';
+        what.style.marginLeft = '8px';
+        what.textContent = I18n.t('options_security_delicate_campi_tolto');
+        span.appendChild(what);
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t(it.tolto ? 'options_security_delicate_campi_rimetti' : 'options_security_delicate_campi_togli');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        // L'elenco ha già tutti i tolti: è da lì che si scrive quello nuovo.
+        const tolti = delicateCampi.filter((x) => x.tolto && x.sito !== it.sito).map((x) => x.sito);
+        if (!it.tolto) tolti.push(it.sito);
+        await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: { pagineDelicate: { nonDelicati: tolti.sort() } } } });
+        delicateCampiSig = '';
+        await loadDelicateCampi();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // Una riga che non è un dominio non protegge niente, e chi l'ha scritta crede di sì.
+  function setDelicateError(invalidRows) {
+    const el = $('sec-delicate-sites-error');
+    if (!el) return;
+    if (invalidRows && invalidRows.length) {
+      el.textContent = I18n.t('options_security_delicate_sites_invalid', invalidRows.join(', '));
+      el.style.display = 'block';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+  }
+
   // Le righe scartate si dicono, come per la blacklist: un dominio scritto male
   // qui non allenta nessuna difesa, ma chi l'ha scritto crede di sì.
   function setTrustedError(invalidRows) {
@@ -543,61 +1300,166 @@
     }
   }
 
-  // Normalizza e valida ogni riga della blacklist come il campo "siti fidati":
-  // scarta schema/path/www, minuscolo, e tiene solo domini con estensione
-  // (niente IP o nomi a etichetta singola come "facebook"). Ritorna i domini
-  // validi (deduplicati) e le righe scartate così com'erano, per l'avviso.
-  function parseBlacklist(raw) {
-    const valid = [];
-    const seen = new Set();
-    const invalid = [];
-    for (const line of String(raw || '').split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const domain = cleanDomain(trimmed);
-      if (!domain) { invalid.push(trimmed); continue; }
-      if (seen.has(domain)) continue;
-      seen.add(domain);
-      valid.push(domain);
-    }
-    return { valid, invalid };
+  // Ogni riga ridotta come i siti fidati (niente IP né nomi senza estensione): i validi e le righe scartate col loro posto.
+  const parseBlacklist = window.SN_NOMI_SITO.elencoDaTesto;
+  const righe = window.SN_NOMI_SITO.testoDaElenco;
+
+  // Le caselle di testo della pagina non hanno un «Salva» (#590.2): ognuna si iscrive qui e ne eredita pausa e uscite.
+  // L'uscita vera accende gli avvisi anche se il testo è già partito col Ctrl di Ctrl+Tab, e il sito lasciato
+  // nella casella dei fidati passa nell'elenco: tornando lo si trova dove si trova riaprendo la pagina.
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+      setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+      setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+      if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
+    },
+  });
+  caselle.registra('liste', (avvisi) => save({ avvisi }));
+  caselle.registra('fidato', (avvisi) => spedisciFidato(avvisi));
+  function spedisciFidato(avvisi) {
+    const raw = String($('cookie-wl-input').value || '').trim();
+    if (avvisi && raw && !cleanDomain(raw)) setWhitelistError(I18n.t('options_cookies_whitelist_invalid'));
+    saveCookies();
   }
 
-  async function save() {
-    const { valid: dlTrusted, invalid: dlInvalid } = parseBlacklist($('sec-dl-trusted').value);
-    setTrustedError(dlInvalid);
-    const { valid: blacklist, invalid } = parseBlacklist($('sec-siteblock-blacklist').value);
-    setBlacklistError(invalid);
-    const partial = {
-      security: {
-        protectIpLeak: !!$('sec-protect-ip').checked,
-        blockPopups: !!$('sec-block-popups').checked,
-        adblock: { enabled: !!$('sec-adblock').checked },
-        siteBlock: {
-          enabled: !!$('sec-siteblock').checked,
-          useAdblockLists: !!$('sec-siteblock-lists').checked,
-          blacklist,
-        },
-        safeBrowse: {
-          enabled: !!$('sec-safebrowse').checked,
-          networkSignals: !!$('sec-safebrowse-network').checked,
-          llmJudge: !!$('sec-safebrowse-llm').checked,
-          sandbox: !!$('sec-safebrowse-sandbox').checked,
-        },
-        // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
-        downloads: {
-          confirmExecutables: !!$('sec-dl-exe').checked,
-          trustedSites: dlTrusted,
-        },
-        // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
-        autoFeedback: !!$('sec-auto-feedback').checked,
+  // La sezione Sicurezza come la mostra la pagina adesso.
+  function leggiSicurezza() {
+    const blocco = parseBlacklist($('sec-siteblock-blacklist').value);
+    const fidati = parseBlacklist($('sec-dl-trusted').value);
+    const delicati = parseBlacklist($('sec-delicate-sites').value);
+    return {
+      protectIpLeak: !!$('sec-protect-ip').checked,
+      blockPopups: !!$('sec-block-popups').checked,
+      adblock: { enabled: !!$('sec-adblock').checked },
+      adSkip: { enabled: !!$('sec-adskip').checked },
+      siteBlock: {
+        enabled: !!$('sec-siteblock').checked,
+        useAdblockLists: !!$('sec-siteblock-lists').checked,
+        blacklist: blocco.valid,
+        righeScartate: blocco.scartate,
       },
+      safeBrowse: {
+        enabled: !!$('sec-safebrowse').checked,
+        networkSignals: !!$('sec-safebrowse-network').checked,
+        llmJudge: !!$('sec-safebrowse-llm').checked,
+        sandbox: !!$('sec-safebrowse-sandbox').checked,
+      },
+      // #588 — conferma sui programmi scaricati, e i siti che ne sono esenti.
+      downloads: {
+        confirmExecutables: !!$('sec-dl-exe').checked,
+        trustedSites: fidati.valid,
+        righeScartate: fidati.scartate,
+      },
+      // #1004 — le pagine delicate e i siti che l'utente aggiunge all'elenco di serie.
+      pagineDelicate: {
+        enabled: !!$('sec-delicate').checked,
+        siti: delicati.valid,
+        righeScartate: delicati.scartate,
+      },
+      // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
+      autoFeedback: !!$('sec-auto-feedback').checked,
+      riquadriRotti: { modello: !!$('sec-riquadri-modello').checked },
     };
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+  }
+
+  // Quello che la pagina ha letto o scritto l'ultima volta. Si salva solo ciò che l'utente ha
+  // cambiato qui: una pagina rimasta aperta da prima non riscrive la lista cambiata altrove (#590).
+  let mostrata = null;
+
+  function soloCambiati(ora, prima) {
+    const out = {};
+    for (const k of Object.keys(ora)) {
+      const n = ora[k];
+      const v = prima ? prima[k] : undefined;
+      if (n && typeof n === 'object' && !Array.isArray(n)) {
+        const d = soloCambiati(n, v && typeof v === 'object' ? v : null);
+        if (Object.keys(d).length) out[k] = d;
+      } else if (JSON.stringify(n) !== JSON.stringify(v)) {
+        out[k] = n;
+      }
+    }
+    return out;
+  }
+
+  // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora: «faceb» è una riga a metà.
+  async function save(opts) {
+    caselle.spedita('liste');
+    if (!(opts && opts.avvisi === false)) {
+      setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+      setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+      setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+    }
+    const ora = leggiSicurezza();
+    const cambi = soloCambiati(ora, mostrata);
+    mostrata = ora;
+    if (Object.keys(cambi).length) {
+      await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: cambi }, mentreScrive: !!(opts && opts.avvisi === false) });
+    }
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+  }
+
+  // Un cambio arrivato da altrove (la chat, un'altra scheda): la pagina mostra il valore nuovo, tranne nei
+  // campi che l'utente ha toccato qui e non sono ancora partiti. Le voci le dà la fonte unica (#949).
+  function foglieDi(o, base = '', out = []) {
+    for (const k of Object.keys(o || {})) {
+      const p = base ? `${base}.${k}` : k;
+      if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) foglieDi(o[k], p, out);
+      else out.push(p);
+    }
+    return out;
+  }
+  function dentroDi(o, percorso) {
+    return percorso.split('.').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
+  }
+  function mettiIn(o, percorso, v) {
+    const seg = percorso.split('.');
+    let n = o;
+    for (let i = 0; i < seg.length - 1; i++) { if (!n[seg[i]] || typeof n[seg[i]] !== 'object') n[seg[i]] = {}; n = n[seg[i]]; }
+    n[seg[seg.length - 1]] = v;
+  }
+  function riallinea(settings) {
+    if (!mostrata || !settings) return;
+    const Voci = window.SN_VOCI_IMPOSTAZIONI;
+    const pendenti = foglieDi(soloCambiati(leggiSicurezza(), mostrata));
+    // Le righe scartate sono la metà non valida della stessa casella.
+    const inSospeso = new Set(pendenti.map((p) => p.replace(/^siteBlock\.righeScartate$/, 'siteBlock.blacklist')
+      .replace(/^downloads\.righeScartate$/, 'downloads.trustedSites')
+      .replace(/^pagineDelicate\.righeScartate$/, 'pagineDelicate.siti')));
+    const sec = settings.security || {};
+    const scartate = {
+      'sec-siteblock-blacklist': (sec.siteBlock || {}).righeScartate,
+      'sec-dl-trusted': (sec.downloads || {}).righeScartate,
+      'sec-delicate-sites': (sec.pagineDelicate || {}).righeScartate,
+    };
+    const toccati = Voci.riallineaPagina('security', settings, {
+      // La casella dei siti fidati serve ad aggiungerne uno: l'elenco vero è sotto, e si riallinea qui dopo.
+      // Una casella che dice già lo stesso elenco, con altre righe vuote o a metà, non si riscrive: chi scrive
+      // perderebbe l'a capo appena battuto. Quello che non è ancora partito sta in `inSospeso`.
+      salta: (id, percorso, el) => id === 'cookie-wl-input' || inSospeso.has(percorso.replace(/^security\./, ''))
+        || (el.tagName === 'TEXTAREA'
+          && JSON.stringify(parseBlacklist(el.value).valid) === JSON.stringify(Voci.leggi(settings, percorso))),
+      elenco: (id, lista) => righe(lista, scartate[id]),
+    });
+    const fidati = Voci.leggi(settings, 'security.cookies.trustedSites');
+    if (Array.isArray(fidati) && fidati.join('\n') !== cookieWhitelist.join('\n')) {
+      cookieWhitelist = fidati.slice();
+      renderWhitelist();
+    }
+    if (toccati.includes('sec-siteblock-blacklist')) setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+    if (toccati.includes('sec-dl-trusted')) setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    if (toccati.includes('sec-delicate-sites')) setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+    syncSiteBlockEnabled();
+    syncDownloadsEnabled();
+    syncDelicateEnabled();
+    syncSafebrowseEnabled();
+    syncCookieMode();
+    const ora = leggiSicurezza();
+    for (const p of pendenti) mettiIn(ora, p, dentroDi(mostrata, p));
+    mostrata = ora;
   }
 
   // Un sito aggiunto dal menu della scheda mentre questa pagina è aperta deve comparire qui, e un
@@ -607,9 +1469,23 @@
       if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) {
         const p = JSON.stringify(msg.settings.proxy || {});
         if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
+        mostraCaselleChiavi(msg.settings);
+        riallinea(msg.settings);
+        loadDelicateCampi();
       }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
-      if (!c || !Array.isArray(c.bannerSites)) return;
+      if (!c) return;
+      // Un accesso visto da Filo entra nell'elenco mentre la pagina è aperta.
+      if (Array.isArray(c.loggedSites) && c.loggedSites.join('\n') !== cookieLoggedSites.join('\n')) {
+        cookieLoggedSites = c.loggedSites.slice();
+        renderLoggedSites();
+      }
+      // Un servizio riattivato dalla proposta sul riquadro entra nell'elenco mentre la pagina è aperta.
+      if (Array.isArray(c.embedSites) && c.embedSites.join('\n') !== cookieEmbedSites.join('\n')) {
+        cookieEmbedSites = c.embedSites.slice();
+        renderEmbedSites();
+      }
+      if (!Array.isArray(c.bannerSites)) return;
       if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;
       cookieBannerSites = c.bannerSites.slice();
       renderBannerSites();
@@ -617,28 +1493,49 @@
     });
   }
   // Filo rifiuta e nasconde mentre si naviga nelle altre schede: tornando qui l'elenco è quello di adesso.
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') loadCookieDone(); });
+  // In una scheda di Filo il cambio di scheda non passa da `visibilitychange` (resta per il
+  // ricaricamento): lo annuncia il main con TAB_IN_VISTA. L'uscita la ascolta SN_CASELLE.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { loadCookieDone(); loadDelicateCampi(); }
+  });
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { loadCookieDone(); loadDelicateCampi(); }
+      if (msg && msg.type === MSG.PERMESSI_SITI_CAMBIATI) renderSitePerms();
+    });
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
-    load();
+    load().catch((e) => console.warn('[Sicurezza] caricamento:', e)).finally(portaAlTasto);
+    // Tornando su questa scheda si rilegge, a meno che l'utente non abbia qui modifiche non salvate:
+    // un'altra pagina Sicurezza può aver cambiato le liste nel frattempo.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !mostrata) return;
+      if (Object.keys(soloCambiati(leggiSicurezza(), mostrata)).length) return;
+      load();
+    });
     // Niente pulsante "Salva": ogni toggle viene applicato e persistito subito.
     $('sec-protect-ip').addEventListener('change', save);
     $('sec-block-popups').addEventListener('change', save);
     $('sec-adblock').addEventListener('change', save);
+    $('sec-adskip').addEventListener('change', save);
     $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); save(); });
     $('sec-siteblock-lists').addEventListener('change', save);
+    // L'avviso sulle righe scartate si toglie mentre si corregge e torna quando si esce dal campo.
     $('sec-siteblock-blacklist').addEventListener('change', save);
-    // Mentre l'utente corregge le righe, togli l'avviso precedente (rivalutato
-    // al prossimo salvataggio su blur).
-    $('sec-siteblock-blacklist').addEventListener('input', () => setBlacklistError([]));
+    $('sec-siteblock-blacklist').addEventListener('input', (e) => { setBlacklistError([]); caselle.cambiato('liste', e); });
     $('sec-dl-exe').addEventListener('change', () => { syncDownloadsEnabled(); save(); });
     $('sec-dl-trusted').addEventListener('change', save);
-    $('sec-dl-trusted').addEventListener('input', () => setTrustedError([]));
+    $('sec-dl-trusted').addEventListener('input', (e) => { setTrustedError([]); caselle.cambiato('liste', e); });
+    $('sec-delicate').addEventListener('change', () => { syncDelicateEnabled(); save(); });
+    $('sec-delicate-sites').addEventListener('change', save);
+    $('sec-delicate-sites').addEventListener('input', (e) => { setDelicateError([]); caselle.cambiato('liste', e); });
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);
     $('sec-safebrowse-sandbox').addEventListener('change', save);
     $('sec-auto-feedback').addEventListener('change', save);
+    $('sec-riquadri-modello').addEventListener('change', save);
     for (const r of document.querySelectorAll('input[name="cookie-mode"]')) {
       r.addEventListener('change', () => { syncCookieMode(); saveCookies(); });
     }
@@ -649,9 +1546,62 @@
     $('cookie-wl-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); addWhitelistDomain(); }
     });
-    // Mentre l'utente corregge il valore, togli l'avviso d'errore precedente.
-    $('cookie-wl-input').addEventListener('input', () => setWhitelistError(''));
-    $('sec-export-btn').addEventListener('click', exportData);
+    // Mentre si corregge l'avviso sparisce, e il testo parte come quello delle due liste.
+    $('cookie-wl-input').addEventListener('input', (e) => { setWhitelistError(''); caselle.cambiato('fidato', e); });
+    $('cookie-wl-input').addEventListener('change', () => spedisciFidato(true));
+    for (const id of ['sec-visite-ora', 'sec-visite-oggi', 'sec-visite-tutto']) {
+      $(id).addEventListener('click', (e) => cancellaVisite(e.currentTarget));
+    }
+    $('sec-clip-clear').addEventListener('click', clearClipboard);
+    $('sec-clip-search').addEventListener('input', applyClipFilter);
+    // Finché il puntatore è dentro la lista, nessuna riga cambia posto: una
+    // riga tolta resta al suo posto barrata e le voci nuove aspettano. Appena
+    // esce, la lista si ricompone. Vedi il commento lungo su renderClipboard.
+    const lista = $('sec-clip-list');
+    lista.addEventListener('mouseenter', () => { puntatoreDentro = true; });
+    lista.addEventListener('mouseleave', () => {
+      puntatoreDentro = false;
+      if (inAttesa) renderClipboard(inAttesa, { forza: true });
+      else if (lista.querySelector('.sn-clip-gone')) renderClipboard(vociCorrenti, { forza: true });
+    });
+    $('sec-export-btn').addEventListener('click', () => exportData());
+    for (const id of CASELLE_CHIAVI) {
+      $(id).addEventListener('change', (e) => { for (const altra of CASELLE_CHIAVI) $(altra).checked = e.currentTarget.checked; });
+    }
     $('sec-import-btn').addEventListener('click', importData);
+    $('sec-wipe-btn').addEventListener('click', apriCancellaTutto);
+    $('sec-wipe-export').addEventListener('click', () => exportData({
+      btn: $('sec-wipe-export'), hint: $('sec-wipe-export-hint'), fatto: 'security_wipe_export_done', resta: true,
+    }));
+    $('sec-wipe-word').addEventListener('input', aggiornaTastoCancella);
+    $('sec-wipe-word').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); cancellaTutto(); }
+    });
+    $('sec-wipe-go').addEventListener('click', cancellaTutto);
+    $('sec-wipe-cancel').addEventListener('click', () => { chiudiCancellaTutto(); $('sec-wipe-btn').focus(); });
+    $('sec-wipe-box').addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || cancellazioneInCorso) return;
+      e.preventDefault();
+      chiudiCancellaTutto();
+      $('sec-wipe-btn').focus();
+    });
+    window.addEventListener('hashchange', portaAlTasto);
+    // La cronologia appunti cresce ALTROVE (ogni copia, in qualunque scheda) e
+    // si accorcia altrove (il "×" del menu "Incolla"): una pagina lasciata
+    // aperta mostrerebbe una lista vecchia, e su un dato che si va a
+    // controllare per privacy è la bugia peggiore. Ogni volta che la cronologia
+    // cambia, il main avvisa le pagine interne e qui la rileggiamo.
+    //
+    // Non poggiamo su "la scheda torna in primo piano": cambiare scheda in Filo
+    // NON spegne la pagina di prima (le schede in secondo piano restano
+    // "visibili" per Chromium, larghe zero), quindi quel momento non arriva mai
+    // e la lista restava ferma a com'era all'apertura. Il visibilitychange resta
+    // come rete di sicurezza per la finestra ridotta a icona, non come unica via.
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.CLIPBOARD_HISTORY_UPDATED) loadClipboard();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) loadClipboard();
+    });
   });
 })();

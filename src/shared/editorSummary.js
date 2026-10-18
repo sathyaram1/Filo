@@ -138,13 +138,19 @@
   }
 
   // Rende i riassunti in un blocco di testo per il prompt. Ogni riga porta l'id
-  // del file (serve a Filo per chiederne il contenuto con LEGGI_FILE).
+  // del file (serve a Filo per chiederne il contenuto con LEGGI_FILE). Titoli e
+  // riassunti arrivano recintati: un appunto lo può scrivere il modello (#592.4).
   function renderForPrompt(contextFiles) {
     const list = Array.isArray(contextFiles) ? contextFiles : [];
     if (!list.length) return '';
-    return list
-      .map((f) => `- [${f.id}] ${f.title}: ${f.summary}`)
-      .join('\n');
+    if (!global.SN_ESTERNO && typeof require === 'function') require('./contenutoEsterno.js');
+    const E = global.SN_ESTERNO;
+    if (!E) throw new Error('SN_ESTERNO mancante: carica shared/contenutoEsterno.js prima di editorSummary.js');
+    return E.imbusta({
+      tipo: 'TESTO_SALVATO',
+      conIntestazione: true,
+      testo: list.map((f) => E.neutralizza(`- [${f.id}] ${f.title}: ${f.summary}`, { unaRiga: true })).join('\n'),
+    });
   }
 
   global.SN_EDITOR_SUMMARY = {

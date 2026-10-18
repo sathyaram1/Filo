@@ -1,13 +1,13 @@
 /* Sidebar Aiuto (Fase 2) — overlay laterale destro full-height. */
 
 .sn-sidebar {
-  /* Ancorata al bottom: la barra di input resta fissa e la chat cresce verso l'alto. Al collasso sparisce
-     solo la parte superiore, l'input non si sposta. */
+  /* Ancorata al bottom (al collasso l'input non si sposta), sopra gli avvisi della barra quando ci sono:
+     --filo-avvisi-barra, tests/unit/angoloAvvisiBarra.test.mjs. */
   position: fixed;
-  bottom: 16px;
+  bottom: max(16px, var(--filo-avvisi-barra, 0px));
   right: 16px;
   width: 360px;
-  height: calc(100vh - 32px);
+  height: calc(100vh - 16px - max(16px, var(--filo-avvisi-barra, 0px)));
   /* z-index gestito inline da sidebar.js via Popup.registerStack — partecipa
      allo stacking condiviso con popup AI e modale feedback. */
   z-index: 2147483600;
@@ -19,9 +19,9 @@
   font-size: 13px;
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, calc(0.22 * var(--sn-ombra, 1)));
   backdrop-filter: blur(6px);
-  animation: sn-sidebar-in 160ms ease-out;
+  animation: sn-sidebar-in calc(160ms * var(--sn-motion, 1)) ease-out;
   overflow: hidden;
 }
 
@@ -147,7 +147,7 @@
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.2;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-sidebar-choice:hover {
   background: var(--sn-accent);
@@ -161,6 +161,56 @@
   border-color: var(--sn-border);
 }
 
+/* Il documento trovato (#947.3): un bottone che si apre o si trascina nella pagina, come il file in una cartella. */
+.sn-sidebar-files {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: -4px;
+  min-width: 0;
+}
+.sn-sidebar-file {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 7px 12px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: grab;
+  user-select: none;
+  /* `all: unset` toglie anche il trascinamento che `draggable` dà al bottone. */
+  -webkit-user-drag: element;
+  transition: border-color calc(120ms * var(--sn-motion, 1)) ease, background calc(120ms * var(--sn-motion, 1)) ease, transform calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-file:hover { border-color: var(--sn-accent); background: var(--sn-hover, rgba(127,127,127,0.10)); }
+.sn-sidebar-file:active { transform: scale(0.98); cursor: grabbing; }
+.sn-sidebar-file:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.sn-sidebar-file-icona { display: inline-flex; flex-shrink: 0; color: var(--sn-accent); }
+.sn-sidebar-file-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sn-sidebar-file-dove { color: var(--sn-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sn-sidebar-log-ferma {
+  all: unset;
+  cursor: pointer;
+  margin-left: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  color: var(--sn-fg);
+  font-size: 11px;
+  transition: border-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-log-ferma:hover { border-color: var(--sn-accent); }
+.sn-sidebar-log-ferma:disabled { opacity: 0.5; cursor: default; }
+
 .sn-sidebar-log {
   align-self: flex-start;
   color: var(--sn-muted);
@@ -171,6 +221,25 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  /* Col padding dentro il 100%: una riga lunga non fa scorrere il diario di lato. */
+  box-sizing: border-box;
+}
+/* Una riga che dice perché qualcosa non è successo va letta fino in fondo, non tagliata. */
+.sn-sidebar-log.sn-sidebar-log-intera {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Un'azione fermata (#810): la riga dice anche da dove veniva il segreto, quindi va a capo. */
+.sn-sidebar-log.sn-sidebar-log-fermata {
+  white-space: normal;
+  opacity: 0.9;
+}
+
+/* Gli avvisi in basso a destra stanno a sinistra dell'Aiuto rimasto nel suo angolo: sopra ne coprivano la casella
+   e l'invio, anche col pannello collassato (la conferma di «Salva per dopo» chiesta all'Aiuto, #845). */
+html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts {
+  right: calc(16px + 360px + 12px);
+  max-width: max(200px, calc(100vw - 408px));
 }
 
 /* Stato collassato: visibile solo la barra di input. Il pannello si rimpicciolisce
@@ -201,6 +270,8 @@
   gap: 8px;
   padding: 8px;
   border-top: 1px solid var(--sn-border);
+  /* Il microfono è grande quanto l'invio (src/styles/voce.css). */
+  --sn-voce-size: 32px;
 }
 
 .sn-sidebar-input textarea {
@@ -229,7 +300,7 @@
   box-shadow: none !important;
 }
 
-.sn-sidebar-input button {
+.sn-sidebar-input button[type="submit"] {
   all: unset;
   cursor: pointer;
   flex: 0 0 auto;
@@ -243,10 +314,10 @@
   border-radius: 50%;
   font-size: 14px;
   line-height: 1;
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease, opacity calc(120ms * var(--sn-motion, 1)) ease;
 }
-.sn-sidebar-input button:hover { transform: translateY(-1px); }
-.sn-sidebar-input button:active { transform: translateY(0); opacity: 0.85; }
+.sn-sidebar-input button[type="submit"]:hover { transform: translateY(-1px); }
+.sn-sidebar-input button[type="submit"]:active { transform: translateY(0); opacity: 0.85; }
 
 /* Tre righe di ragionamento che scorrono: la prima quasi trasparente sta uscendo, l'ultima è piena.
    Le frasi cambiano ogni ~900ms con uno shift verso l'alto. */
@@ -267,13 +338,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: opacity 350ms ease;
+  transition: opacity calc(350ms * var(--sn-motion, 1)) ease;
 }
 .sn-sidebar-thinking-line[data-slot="0"] { opacity: 0.25; }
 .sn-sidebar-thinking-line[data-slot="1"] { opacity: 0.55; }
 .sn-sidebar-thinking-line[data-slot="2"] { opacity: 0.95; }
 .sn-sidebar-thinking-line.sn-sidebar-thinking-enter {
-  animation: sn-thinking-enter 350ms ease-out;
+  animation: sn-thinking-enter calc(350ms * var(--sn-motion, 1)) ease-out;
 }
 @keyframes sn-thinking-enter {
   from { opacity: 0; transform: translateY(6px); }
@@ -311,43 +382,7 @@
   align-items: center;
 }
 
-.sn-sidebar-feedback-btn {
-  all: unset;
-  cursor: pointer;
-  padding: 5px 12px;
-  background: var(--sn-bg);
-  color: var(--sn-fg);
-  border: 1px solid var(--sn-border);
-  border-radius: 999px;
-  font-size: 12px;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-.sn-sidebar-feedback-btn:hover {
-  background: var(--sn-accent);
-  color: #fff;
-  border-color: var(--sn-accent);
-}
-.sn-sidebar-feedback-btn:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-.sn-sidebar-feedback-btn:disabled:hover {
-  background: var(--sn-bg);
-  color: var(--sn-fg);
-  border-color: var(--sn-border);
-}
-
-.sn-sidebar-feedback-skip {
-  all: unset;
-  cursor: pointer;
-  margin-left: auto;
-  padding: 0 6px;
-  color: var(--sn-muted);
-  font-size: 14px;
-  line-height: 1;
-}
-.sn-sidebar-feedback-skip:hover { color: var(--sn-fg); }
-.sn-sidebar-feedback-skip:disabled { opacity: 0.5; cursor: default; }
+/* I bottoni della risposta stanno in uno Shadow DOM chiuso, col loro stile: src/content/sidebar.js (#592.6). */
 
 .sn-sidebar-feedback-thanks {
   font-size: 11px;

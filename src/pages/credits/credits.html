@@ -15,6 +15,7 @@
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/wallet.js"></script>
+  <script src="filo://shared/creditiAvvisoUi.js"></script>
 </head>
 <body>
   <main class="sn-page">
@@ -34,6 +35,11 @@
       <p class="sn-muted sn-wallet-note" id="walletNote" role="status" hidden></p>
       <button type="button" class="sn-btn sn-btn-secondary" id="reissueBtn" hidden>Richiedi una nuova chiave</button>
       <button type="button" class="sn-btn sn-btn-secondary" id="resetIdentityBtn" hidden>Ricomincia con un nuovo invito</button>
+      <span class="sn-wallet-inline" id="resetIdentityConfirm" hidden>
+        <span class="sn-muted">I crediti di prima non torneranno su questa copia di Filo. Confermi?</span>
+        <button type="button" class="sn-btn sn-btn-danger" id="resetIdentityYes">Sì, ricomincia</button>
+        <button type="button" class="sn-btn sn-btn-secondary" id="resetIdentityNo">Annulla</button>
+      </span>
     </section>
 
     <section class="sn-credits-hero" id="hero">
@@ -45,9 +51,20 @@
     </section>
 
     <p class="sn-muted" id="refillHint">Ricevi +100 crediti ogni giorno a mezzanotte.</p>
+    <!-- Il nome con cui la persona si fa riconoscere da chi le regala crediti, senza dare l'email (#895). -->
+    <p class="sn-wallet-me" id="pseudonymRow" hidden>
+      <span class="sn-muted">Il tuo pseudonimo</span>
+      <button type="button" class="sn-wallet-code sn-wallet-me-code" id="pseudonym" title="Copia lo pseudonimo"></button>
+    </p>
     <p class="sn-muted" id="offlineHint" hidden>
       Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
     </p>
+    <!-- #818 — l'avviso prima che i crediti finiscano, coi rimedi: ci porta la notifica, e qui restano i «com'era». -->
+    <section class="sn-wallet-section sn-crediti-avviso" id="avviso" hidden>
+      <h2>Per farli durare di più</h2>
+      <p class="sn-crediti-avviso-testo" id="avvisoTesto" role="status"></p>
+      <div id="avvisoRimedi"></div>
+    </section>
 
     <!-- Stesso campo delle Impostazioni (settings.apiKeys.openrouter), gestito da qui perché è qui che si decide
        con cosa si paga: con la chiave si vedono spesa, residuo e ultimo rifiuto; senza, solo il campo. -->

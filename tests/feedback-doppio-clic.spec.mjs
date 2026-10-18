@@ -68,7 +68,7 @@ test('#509 — due clic su «→ In coda» spostano un feedback solo, e nessuno 
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(page, RICEVUTI, 'inbox');
 
-  await clicDueVolteStessoPunto(page, page.locator('.fb-act[data-id="r1"][data-to="todo"]'));
+  await clicDueVolteStessoPunto(page, page.locator('.fb-act[data-id="r1"][data-to="todo"]:not([data-local])'));
 
   const updates = await page.evaluate(() => window.__updates);
   // Una decisione, una sola: il secondo clic non deve trovare niente da premere.
@@ -101,7 +101,7 @@ test('#509 — due clic su «↩ Ripristina» rimettono in coda un feedback solo
     { _id: 'a2', seq: 22, status: 'archived', name: 'Archiviato due', text: 'Secondo archiviato, testo lungo uguale.', createdAt: '2026-08-19T10:00:00Z' },
   ], 'archived');
 
-  await clicDueVolteStessoPunto(page, page.locator('.fb-act[data-id="a1"][data-to="todo"]'));
+  await clicDueVolteStessoPunto(page, page.locator('.fb-act[data-id="a1"][data-to="todo"]:not([data-local])'));
 
   const ripristini = await page.evaluate(() => window.__updates);
   expect(ripristini).toHaveLength(1);
@@ -115,7 +115,7 @@ test('#509 — al clic si vede cosa è successo, e la scheda non sparisce da sot
 
   const prima = page.locator('.fb-card[data-id="r1"]');
   const box = await prima.boundingBox();
-  await page.locator('.fb-act[data-id="r1"][data-to="todo"]').click();
+  await page.locator('.fb-act[data-id="r1"][data-to="todo"]:not([data-local])').click();
 
   // La scheda resta al suo posto e DICE dove è andata.
   await expect(prima).toBeVisible();

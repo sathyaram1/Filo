@@ -22,8 +22,10 @@
   const Icons = global.SN_ICONS || {};
 
   const COST = 50; // crediti per tentativo (spec §8.1 / §11). Non rimborsabili.
-  const DRAFT_ATTACK_KEY = 'sn_redteam_attack_draft';
-  const DRAFT_DESC_KEY = 'sn_redteam_desc_draft';
+  // Le bozze restano al sito dove sono nate, come quella del feedback (#1071).
+  const bozza = (nome) => (global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza(nome) : null);
+  const DRAFT_ATTACK_KEY = bozza('sn_redteam_attack_draft');
+  const DRAFT_DESC_KEY = bozza('sn_redteam_desc_draft');
 
   let activeRoot = null;
   let activeStack = null;
@@ -37,7 +39,8 @@
     if (!activeRoot) return;
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
-    activeRoot.remove();
+    if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
+    else activeRoot.remove();
     activeRoot = null;
   }
 
@@ -56,6 +59,9 @@
       }
       case 'dormant':
         return { ok: false, text: 'Canale non ancora attivo. Riprova più tardi.' };
+      case 'paused':
+        // La frase del server, così com'è (#896): mai l'errore di trasporto.
+        return { ok: false, paused: true, text: String(r.error || 'Il Red Team è in pausa: tornerà dopo il rilascio') };
       case 'not_signed_in':
         return { ok: false, needLogin: true, text: 'Accedi al tuo account per inviare un attacco.' };
       case 'empty':
@@ -97,7 +103,7 @@
         </div>
       </div>
     `;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
     Popup?.attachZoomCompensation?.(root);
     activeStack = Popup?.registerStack?.(root) || null;
@@ -125,7 +131,8 @@
     }
 
     // Abilita/disabilita il bottone d'invio in base a stato login e testo.
-    function refreshSendState() {
+    // Solo chi scrive cancella un errore: un rifiuto appena arrivato (la pausa del server) deve restare leggibile.
+    function refreshSendState({ daInput = false } = {}) {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
       // Non loggato: il bottone resta cliccabile ma porta al login.
@@ -134,12 +141,13 @@
         return;
       }
       sendBtn.disabled = !hasText;
-      if (statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
+      if (daInput && statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
     }
 
     // ---- bozze persistenti (sopravvivono a chiusura/riapertura) ----
     let saveTimer = null;
     function saveDraft() {
+      if (!DRAFT_ATTACK_KEY) return;
       try {
         chrome.storage.local.set({
           [DRAFT_ATTACK_KEY]: attackEl.value,
@@ -148,17 +156,18 @@
       } catch (_) {}
     }
     function clearDraft() {
+      if (!DRAFT_ATTACK_KEY) return;
       try { chrome.storage.local.remove([DRAFT_ATTACK_KEY, DRAFT_DESC_KEY]); } catch (_) {}
     }
     const onInput = () => {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
-      refreshSendState();
+      refreshSendState({ daInput: true });
     };
     attackEl.addEventListener('input', onInput);
     descEl.addEventListener('input', onInput);
     try {
-      chrome.storage.local.get([DRAFT_ATTACK_KEY, DRAFT_DESC_KEY]).then((r) => {
+      if (DRAFT_ATTACK_KEY) chrome.storage.local.get([DRAFT_ATTACK_KEY, DRAFT_DESC_KEY]).then((r) => {
         if (activeRoot !== root) return;
         if (r?.[DRAFT_ATTACK_KEY] && !attackEl.value) attackEl.value = r[DRAFT_ATTACK_KEY];
         if (r?.[DRAFT_DESC_KEY] && !descEl.value) descEl.value = r[DRAFT_DESC_KEY];
@@ -175,8 +184,9 @@
       if (activeRoot === root) refreshSendState();
     })();
 
-    // ---- invio ----
-    sendBtn.addEventListener('click', async () => {
+    // ---- invio: costa crediti, parte solo dal clic dell'utente (#1071) ----
+    sendBtn.addEventListener('click', async (e) => {
+      if (!e.isTrusted) return;
       if (!signedIn) {
         // Invito a loggarsi: prova ad aprire il flusso login del main; se non
         // c'è, almeno spiega cosa fare.

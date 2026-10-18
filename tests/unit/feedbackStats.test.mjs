@@ -36,14 +36,19 @@ const S = globalThis.SN_FEEDBACK_STATS;
 const ORA = new Date('2026-09-19T15:00:00').getTime();
 const g = (n) => new Date(ORA - n * 24 * 60 * 60 * 1000).toISOString();
 
+// Un mittente riservato porta la prova di chi l'ha creato davvero (#912): senza, sarebbe un utente.
 function fb(over = {}) {
-  return Object.assign({
+  const f = Object.assign({
     _id: 'id-' + Math.random().toString(36).slice(2),
     seq: 1, subSeq: 0,
     clientId: 'utente-xyz',
     createdAt: g(1),
     status: 'todo',
   }, over);
+  if (!('senderProof' in over) && /^(owner|routine|agent|local):/.test(String(f.clientId))) {
+    f.senderProof = String(f.clientId).startsWith('routine:') ? 'server' : 'admin';
+  }
+  return f;
 }
 
 // ── La finestra di riferimento ──────────────────────────────────────────────

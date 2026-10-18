@@ -99,3 +99,17 @@ test('il nome che arriva dal server non può uscire dalla cartella scelta', () =
     DL.remove(h.id);
   }
 });
+
+test('«Salva come…» dopo un rimando nomina anche chi ha servito il file (#588.3)', () => {
+  require(join(ROOT, 'src', 'shared', 'eseguibili.js'));
+  const h = DL.beginManual({ url: 'https://github.com/x/setup.exe', filename: 'setup.exe', servedFrom: 'https://objects.githubusercontent.com/r/setup.exe' });
+  const g = DL.beginManual({ url: 'https://sito.test/a.exe', filename: 'a.exe', servedFrom: 'https://sito.test/a.exe' });
+  try {
+    assert.equal(find(h.id).site, 'github.com');
+    assert.equal(find(h.id).servedBy, 'objects.githubusercontent.com');
+    assert.equal(find(g.id).servedBy, '', 'senza rimando il nome è uno solo');
+  } finally {
+    DL.remove(h.id);
+    DL.remove(g.id);
+  }
+});

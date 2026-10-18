@@ -50,7 +50,7 @@ test('la home si aggiorna live al broadcast FILO_DASHBOARD_UPDATED', async ({ ap
 
   // Il messaggio centrale si è aggiornato (senza ricaricare la pagina)…
   await expect(page.locator('#homeMessage')).toHaveText('Messaggio ricalcolato in background', { timeout: 8_000 });
-  // …e così i suggerimenti nella colonna.
-  await expect(page.locator('.dash-suggestion'))
+  // …e così la carta dei suggerimenti.
+  await expect(page.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce'))
     .toContainText('Suggerimento ricalcolato', { timeout: 8_000 });
 });

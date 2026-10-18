@@ -27,11 +27,12 @@
 //     shell di default su Windows è PowerShell, e lì leggere significa scrivere
 //     pipeline. Un solo segmento non riconosciuto, o uno scriptblock che
 //     potrebbe invocare qualcosa, e la pipeline resta 3.
-//   • background (&), redirezioni (>, >>, <), sostituzioni ($(...), ${...},
-//     backtick) e newline NON sono semplici sequenze: il comando non è
-//     "interamente riconoscibile" → 3, sempre. Non proviamo a fare il parsing
-//     del quoting: un falso positivo qui costa solo più attrito (digitare
-//     "conferma"), mai un'esecuzione silenziosa indebita.
+//   • background (&), redirezioni (>, >>, <), `${...}`, backtick e newline NON
+//     sono semplici sequenze: il comando non è "interamente riconoscibile" → 3,
+//     sempre. Un falso positivo qui costa solo più attrito (digitare
+//     "conferma"), mai un'esecuzione silenziosa indebita. I gruppi `( )`,
+//     `@( )`, `$( )` e l'`if` di PowerShell si classificano per ciò che
+//     eseguono (vedi `smonta`).
 //   • le VIRGOLETTE vengono tolte prima di classificare (vedi `unquote`): tutte
 //     le shell supportate eseguono `git checkout "."`, `git checkout .""` e
 //     `git checkout .` allo stesso identico modo, quindi devono ricevere lo
@@ -64,8 +65,8 @@
 //     parsing di getopt e del quoting: fuori dal principio del file. Toglierla
 //     costa una conferma in più su un comando raro (per la sola verifica di un
 //     indirizzo c'è `curl -I`, che stampa a schermo e resta 2) e chiude la porta.
-//     curl invece, SENZA flag che scrivono, stampa a schermo e non fa atterrare
-//     niente: resta 2. Due programmi che si comportano diversamente prendono
+//     curl invece, SENZA flag che scrivono o mandano dati, stampa a schermo e non
+//     fa atterrare niente: resta 2. Due programmi che si comportano diversamente prendono
 //     regole diverse — è l'effetto a decidere. Salgono a 3 i flag curl che fanno
 //     atterrare qualcosa: output-su-file (-o/-O/--output/--remote-name…), i DATI
 //     ACCESSORI il cui contenuto è influenzato dal server (-D/--dump-header,
@@ -350,9 +351,8 @@
   // che pilota l'assistente da una pagina ostile), rendendolo un altro primitivo
   // di scrittura-su-file arbitraria → 3. Meno potente di `-o`/`-O` (byte header,
   // non corpo scelto liberamente) ma stessa classe: over-cautela = solo attrito.
-  // Check curl-specifico e case-SENSITIVE sulla `D`: `-d`/`--data` (corpo POST)
-  // è innocuo e NON deve salire; solo la `D` maiuscola (in curl = solo
-  // `--dump-header`) alza, anche in bundle (`-sD file`).
+  // Check curl-specifico e case-SENSITIVE sulla `D`: la `D` maiuscola in curl è
+  // solo `--dump-header`, anche in bundle (`-sD file`); `-d` è CURL_SEND_SHORT_RE.
   const CURL_DUMP_RE = /(^|\s)(--dump-header|-[a-zA-Z]*D)/;
 
   // curl con flag che SALVANO DATI ACCESSORI in un percorso scelto da chi lancia
@@ -400,6 +400,24 @@
   // maiuscola è solo `--config`, quindi anche in un bundle (`-sK cfg`) l'unica
   // lettura possibile è quella.
   const CURL_CONFIG_RE = /(^|\s)(--config(=|\s|$)|-[a-zA-Z]*K)/;
+
+  // curl che MANDA qualcosa al server (dati, un file, una mail, comandi FTP) o gli chiede di cambiare (un metodo
+  // diverso da GET/HEAD) non si disfa: un file uscito dal computer non torna indietro → 3 (#530). Case-sensitive:
+  // -d/-F/-T/-Q/-X in curl sono solo quelli, anche in un bundle; -x minuscolo è il proxy. Un'opzione lunga vale
+  // anche accorciata (`--uplo`): curl accetta un prefisso che non è ambiguo.
+  const CURL_SEND_SHORT_RE = /(^|\s)-[a-zA-Z]*[dFTQ]/;
+  const CURL_SEND_LONG = ['data', 'form', 'form-string', 'upload-file', 'json', 'mail-rcpt', 'mail-from', 'quote'];
+  const CURL_METHOD_RE = /(?:^|\s)(?:--request(?:=|\s+)|-[a-zA-Z]*X\s*)["']?([A-Za-z]*)/g;
+  function curlCambiaIlServer(cmd) {
+    if (CURL_SEND_SHORT_RE.test(cmd)) return true;
+    for (const m of cmd.matchAll(/(?:^|\s)--([a-z][a-z-]*)/g)) {
+      const w = m[1];
+      if (w.startsWith('data') || CURL_SEND_LONG.some((n) => n.startsWith(w))) return true;
+      if (w !== 'request' && 'request'.startsWith(w) && w.length >= 3) return true;
+    }
+    for (const m of cmd.matchAll(CURL_METHOD_RE)) if (!/^(GET|HEAD)$/i.test(m[1])) return true;
+    return false;
+  }
 
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
@@ -611,8 +629,11 @@
       const args = gitArgsAfterSub(cmd);
       const low = args.map((a) => a.toLowerCase());
       if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
-      if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
       const ops = args.filter((a) => !a.startsWith('-'));
+      // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
+      const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
+      if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
+      if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
       if (ops.length >= 2) return 2; // `chiave valore` imposta
       // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
       // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
@@ -627,7 +648,9 @@
       const action = ops[0].toLowerCase();
       if (action === 'show' || action === 'get-url') return 2; // stampano l'URL col token
       if (action === 'remove' || action === 'rm' || action === 'prune') return 3; // cancellazioni
-      return 2; // add, rename, set-url, set-head, set-branches, update…
+      // Un indirizzo nuovo decide dove andrà il codice al prossimo push: un server qualsiasi (#530).
+      if (action === 'add' || action === 'set-url') return 3;
+      return 2; // rename, set-head, set-branches, update…
     },
   };
 
@@ -639,6 +662,9 @@
     const dual = GIT_DUAL[sub];
     if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
     if (GIT_READ.has(sub)) return 1;
+    // Il push verso il remoto già configurato si rimedia; verso un indirizzo scritto nel comando manda il codice
+    // a un server qualsiasi, e non torna indietro (#530).
+    if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => /:\/\//.test(a) || /^(--repo=)?[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a))) return 3;
     if (GIT_WRITE.has(sub)) return 2;
     return 3; // sotto-comando git sconosciuto → cautela
   }
@@ -746,6 +772,7 @@
       // curl -K/--config: le opzioni (output compreso) arrivano da un file, quindi
       // l'effetto non si legge nel comando → 3.
       if (prog === 'curl' && CURL_CONFIG_RE.test(trimmed)) return 3;
+      if (prog === 'curl' && curlCambiaIlServer(trimmed)) return 3;
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
@@ -776,6 +803,7 @@
     variabili: "legge le variabili d'ambiente",
     sistema: 'legge dati del sistema che non sono file',
     processi: 'mostra i programmi aperti con i loro argomenti',
+    rete: 'si collega a un altro computer della rete',
   };
   // Stampano il contenuto dei file che ricevono come operandi.
   const LETTORI = new Set(['cat', 'type', 'more', 'head', 'tail', 'nl', 'cut', 'uniq', 'column', 'get-content', 'gc']);
@@ -792,9 +820,37 @@
   // Le righe di comando degli altri programmi portano token e password (`ps e` anche l'ambiente).
   const PROCESSI = new Set(['ps', 'get-process', 'gps', 'w']);
   const SPOSTAMENTI = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'popd']);
+  // Stampano i loro argomenti e basta: il testo conta solo se qualcuno lo usa (tubo, gruppo).
+  const STAMPANO = new Set(['echo', 'write-output', 'write-host', 'out-string', 'out-host']);
+  // Usano gli operandi come percorsi (i lettori hanno il loro controllo, `fuoriDa`).
+  const PRENDONO_PERCORSI = new Set([...ELENCHI, ...SPOSTAMENTI, 'split-path', 'join-path']);
+  // I cmdlet che legano al percorso ciò che arriva dal tubo (`cat`/`ls`/`cd` sono loro alias in PowerShell).
+  const PERCORSO_DAL_TUBO = new Set([
+    'test-path', 'get-childitem', 'gci', 'ls', 'dir', 'get-item', 'gi', 'get-itemproperty', 'gp',
+    'get-itempropertyvalue', 'resolve-path', 'convert-path', 'get-filehash', 'set-location', 'sl', 'cd',
+    'chdir', 'pushd', 'split-path', 'join-path', 'cat', 'type', 'gc', 'get-content',
+  ]);
+  // Danno valori che si leggono nel comando (o elencano file già misurati), non testo preso da un file.
+  const FONTI_NOTE = new Set([
+    ...ELENCA_OGGETTI, ...SPOSTAMENTI, 'echo', 'write-output', 'join-path', 'split-path', 'resolve-path',
+    'convert-path', 'get-location', 'gl', 'pwd', 'test-path', 'get-date', 'where-object', 'where', '?',
+    'sort-object', 'select-object', 'select', 'measure-object', 'measure',
+  ]);
+  // Compongono un percorso: sul valore del tubo il risultato non si legge nel comando (#1072.4).
+  const CALCOLANO = new Set(['join-path', 'split-path']);
+  // Cercano il comando o lo script indicato anche nella cartella di lavoro (`.\x`).
+  const CERCANO_NOME = new Set(['get-command', 'get-help']);
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
+  // Dentro la Libreria del Mac stanno anche i documenti nel cloud dell'utente (iCloud Drive; Dropbox, OneDrive e
+  // Google Drive da macOS 12): si leggono come Documenti (#947.3).
+  const PROFILO_APERTE = { library: ['Mobile Documents', 'CloudStorage'] };
   const JOLLY = /[*?[\]{}\uFFFD]/;
+  // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
+  const SEGNAPOSTO = '$_\uE000';
+  // `'` e `\"` dove sono un carattere qualunque (vedi `comeLaShell`): nessun controllo li prende per virgolette.
+  const APICE_TESTO = '\u02BC';
+  const VIRGOLETTE_TESTO = '\u02BA';
   // Senza contesto: cartella di lavoro e home coincidono, un relativo si dà per interno.
   const SENZA_CONTESTO = { cwd: '/~', home: '/~', win: false, maiuscole: false };
 
@@ -823,7 +879,8 @@
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
-  function argomenti(raw) {
+  // Su Windows `\` prima di uno spazio è la fine di un percorso (`src\ \\host\x` sono due operandi), non un escape.
+  function argomenti(raw, win) {
     const out = [];
     const s = String(raw);
     let cur = '';
@@ -853,7 +910,7 @@
       // così `.ss\x68/config` fa comunque affiorare il pezzo `.ss` riservato.
       if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
-      if (ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
+      if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
       cur += ch;
       espande += ch;
@@ -883,7 +940,14 @@
     const p = p0.replace(/^(\$env:userprofile|\$env:home|\$home|%userprofile%|%homedrive%%homepath%)(?=$|[\\/])/i, '~');
     const nomi = nomiVariabili(p);
     if (nomi.length) return nomi.every((n) => VAR_INNOCUE.has(n)) ? MOTIVI.ignoto : MOTIVI.variabili;
-    if (/^[\\/]{2}/.test(p)) return MOTIVI.fuori; // UNC, `\\?\`, `//server`
+    // `FileSystem::x` per PowerShell è il percorso `x`: stesse regole, rete compresa (#1072).
+    const prov = /^(?:microsoft\.powershell\.core\\)?filesystem::/i.exec(p);
+    if (prov) return dove(p.slice(prov[0].length), c);
+    // `\\?\C:\…` è il disco locale; ogni altro doppio separatore (UNC, `\\?\UNC\`, `//server`) e
+    // `\??\` fanno contattare a Windows un altro computer: anche solo guardarci chiede un OK (#1072, #810.13).
+    if (/^(?:[\\/]{2}[?.]|[\\/]\?\?)[\\/][A-Za-z]:/.test(p)) return MOTIVI.fuori;
+    // Senza il nome di un computer dopo le barre (`//`, `// TODO` cercato in un file) non si contatta nessuno.
+    if (/^(?:[\\/]{2,}|[\\/]\?\?[\\/]+)[^\s\\/]/.test(p)) return MOTIVI.rete;
     if (/^[A-Za-z][A-Za-z0-9]+:/.test(p)) return MOTIVI.sistema; // `env:`, `HKCU:`, `Registry::`
     let r;
     if (p === '~' || /^~[\\/]/.test(p)) {
@@ -899,13 +963,19 @@
     } else if (/^[\\/]/.test(p)) {
       if (!c.win) r = { radice: '/', segs: pezzi(p) };
       else if (c.cwd && c.cwd.radice) r = { radice: c.cwd.radice, segs: pezzi(p) };
-      else return MOTIVI.fuori;
+      else return c.cwd && c.cwd.rete ? MOTIVI.rete : MOTIVI.fuori;
     } else {
       if (!c.cwd) return MOTIVI.ignoto;
       if (c.cwd.provider) return MOTIVI.sistema;
+      if (c.cwd.rete) return MOTIVI.rete;
       r = { radice: c.cwd.radice, segs: c.cwd.segs.concat(pezzi(p)) };
     }
-    return { radice: r.radice, segs: normalizza(r.segs) };
+    // Una lettera d'unità che punta a un altro computer (`pushd \\host\x` in cmd ne crea una) è rete anche lei.
+    if (c.reti && c.reti.has(r.radice)) return MOTIVI.rete;
+    const segs = normalizza(r.segs);
+    // Su macOS `/net/<host>` monta da solo le cartelle condivise di quel computer.
+    if (!c.win && r.radice === '/' && segs.length > 1 && segs[0] === 'net') return MOTIVI.rete;
+    return { radice: r.radice, segs };
   }
 
   function dentroCasa(r, c) {
@@ -920,15 +990,23 @@
       .replace(/[ .]+$/, '').toLowerCase();
   }
 
+  function cartellaDa(r) {
+    if (r === MOTIVI.sistema) return { provider: true };
+    if (r === MOTIVI.rete) return { rete: true };
+    return r && typeof r === 'object' ? r : null;
+  }
+
   function contesto(ctx) {
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null };
+    const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
+    const shell = String(x.shell || '').toLowerCase();
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
     if (cw) {
       const r = dove(cw, c);
-      c.cwd = r === MOTIVI.sistema ? { provider: true } : (r && typeof r === 'object' ? r : null);
+      c.cwd = cartellaDa(r);
     }
     return c;
   }
@@ -957,7 +1035,8 @@
       }
       if (i === 0) {
         const n = nomeNorm(s);
-        if (PROFILO.has(n) || n.startsWith('ntuser')) return MOTIVI.nascosto;
+        const aperta = sotto.length > 1 && (PROFILO_APERTE[n] || []).some((a) => nomeNorm(a) === nomeNorm(sotto[1]));
+        if ((PROFILO.has(n) || n.startsWith('ntuser')) && !aperta) return MOTIVI.nascosto;
       }
     }
     return '';
@@ -970,6 +1049,18 @@
   function valoreDuePunti(t) {
     const m = /^-[A-Za-z]+:(.+)$/.exec(String(t || ''));
     return m ? m[1] : null;
+  }
+
+  // PowerShell accetta un parametro abbreviato a ogni prefisso non ambiguo: `-N` è `-NoQualifier` (#1072.4).
+  function parametro(t, nome, min) {
+    const m = /^-([A-Za-z]+)(?::|$)/.exec(String(t || ''));
+    return !!m && m[1].length >= min && nome.startsWith(m[1].toLowerCase());
+  }
+
+  // Ciò che `Split-Path -NoQualifier` lascia: via `Provider::` o il nome di un'unità qualsiasi (`C:`, `Env:`, `HKCU:`).
+  function senzaQualifica(q) {
+    const p = /^[^\\/]*?::/.exec(q);
+    return p ? q.slice(p[0].length) : q.replace(/^[^\\/:]+:/, '');
   }
 
   function primoFuori(lista, c) {
@@ -1072,51 +1163,164 @@
 
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
   function gitPerimetro(trimmed, c) {
-    if (subcommandOf(trimmed) === 'grep') return due(MOTIVI.ricorsivo);
+    const sub = subcommandOf(trimmed);
+    if (sub === 'grep') return due(MOTIVI.ricorsivo);
     const args = gitArgsAfterSub(trimmed);
     const libero = args.includes('--no-index');
     const sep = args.indexOf('--');
+    // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
+    // o come riferimento (`.git/refs/<nome>`). Lo si misura come un percorso, come `ls` (#1072.4).
+    const reteNome = !!(c.cwd && c.cwd.rete);
     const percorsi = [];
     args.forEach((a, i) => {
       if (a.startsWith('-')) return;
-      if (libero || (sep >= 0 && i > sep)) { percorsi.push(a); return; }
+      if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
       if (m && !/^[A-Za-z]:[\\/]/.test(a)) percorsi.push(m[1]);
     });
     return primoFuori(percorsi, c);
   }
 
+  // In git il testo cercato (`-S`, `--grep`, il modello di `git grep`) non si apre come percorso.
+  const TESTO_GIT = /^(?:-[SG]|--(?:grep|author|committer|format|pretty))$/;
+  function testiGit(testi) {
+    const sub = testi.findIndex((x) => !x.startsWith('-'));
+    if (sub >= 0 && testi[sub].toLowerCase() === 'grep') return testi.slice(0, sub).concat(operandiGrep(testi.slice(sub + 1)).file);
+    return testi.filter((t, i) => !/^(?:-[SG].|--(?:grep|author|committer|format|pretty)=)/.test(t) && !(i > 0 && TESTO_GIT.test(testi[i - 1])));
+  }
+
+  // Un percorso di rete scritto per intero, come operando o valore di un flag
+  // (`-Path:x`, `--from=x`, `-fx`), per QUALUNQUE lettura: anche `echo` lo passa a un tubo.
+  function scriveRete(testi, c) {
+    const assoluto = { ...c, cwd: null };
+    return testi.some((t) => {
+      const m = /^-{1,2}[A-Za-z][\w-]*[=:]?(.*)$/.exec(t);
+      const v = m ? m[1] : t;
+      return v.split(',').some((x) => dove(x, assoluto) === MOTIVI.rete);
+    });
+  }
+
+  // Il testo che `Get-Date -Format` stampa: le sequenze di .NET (`\c` è `c`,
+  // `'...'`/`"..."` sono letterali) risolte, così un formato costruito per valere
+  // `\\host\x` si riconosce (#1072.4). I segnaposto di data (y, M…) restano com'erano:
+  // non possono creare `\`, quindi al più aggiungono testo innocuo.
+  function formatoData(fmt) {
+    let out = '';
+    for (let i = 0; i < fmt.length; i++) {
+      const ch = fmt[i];
+      if (ch === '\\') { out += fmt[i + 1] || ''; i += 1; } else if (ch === '\'' || ch === '"') {
+        const j = fmt.indexOf(ch, i + 1);
+        if (j < 0) { out += fmt.slice(i + 1); break; }
+        out += fmt.slice(i + 1, j);
+        i = j;
+      } else out += ch;
+    }
+    return out;
+  }
+
+  // Un cmdlet di lettura può COMPORRE un percorso di rete da pezzi che da soli non
+  // lo sono (#1072.4): Join-Path li concatena, Split-Path -NoQualifier toglie
+  // l'unità e scopre un `\\host`, Get-Date -Format stampa un testo fisso. Come
+  // echo, da solo stampa e resta libero; ma se lo apre (Join-Path -Resolve) o lo
+  // passa a chi lo apre (tubo, gruppo → `c.stampaLibera` è falso) chiede un OK.
+  function calcolaRete(prog, testi, c) {
+    const assoluto = { ...c, cwd: null };
+    const inRete = (p) => !!p && dove(p, assoluto) === MOTIVI.rete;
+    if (prog === 'join-path') {
+      const resolve = testi.some((t) => parametro(t, 'resolve', 1));
+      if (c.stampaLibera && !resolve) return false;
+      const parti = [];
+      for (const t of testi) {
+        if (parametro(t, 'resolve', 1)) continue; // `-Resolve:$true` non è un pezzo del percorso
+        const v = valoreDuePunti(t);
+        if (v != null) { parti.push(...v.split(',')); continue; }
+        if (!t.startsWith('-')) parti.push(...t.split(','));
+      }
+      return inRete(parti.join('\\'));
+    }
+    if (prog === 'split-path') {
+      if (c.stampaLibera || !testi.some((t) => parametro(t, 'noqualifier', 1))) return false;
+      for (const t of testi) {
+        const v = valoreDuePunti(t);
+        const cand = v != null ? v : (t.startsWith('-') ? null : t);
+        // Tolta la qualifica, ciò che resta può essere `\\host`.
+        if (cand != null && cand.split(',').some((q) => inRete(senzaQualifica(q)))) return true;
+      }
+      return false;
+    }
+    if (prog === 'get-date') {
+      if (c.stampaLibera) return false;
+      for (let i = 0; i < testi.length; i++) {
+        const t = testi[i];
+        if (!/^-f/i.test(t)) continue;
+        const v = valoreDuePunti(t);
+        if (v != null) { if (inRete(formatoData(v))) return true; continue; }
+        if ('format'.startsWith(t.slice(1).toLowerCase())) { if (inRete(formatoData(testi[i + 1] || ''))) return true; i += 1; }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  // Comandi "liberi" che risolvono un nome scelto dal modello contro la cartella
+  // di lavoro: in una cwd di rete lo mandano al remoto come farebbe `ls` (#1072.4).
+  // Get-Command/Get-Help cercano il file/comando indicato; where.exe (shell cmd)
+  // guarda prima nella cartella corrente. git lo fa in gitPerimetro.
+  function cercaNomeInRete(prog, testi, c) {
+    if (CERCANO_NOME.has(prog)) {
+      return testi.some((t) => {
+        const v = valoreDuePunti(t);
+        const nome = v != null ? v : (t.startsWith('-') ? null : t);
+        return nome != null && dove(nome, c) === MOTIVI.rete;
+      });
+    }
+    if (prog === 'where') return testi.some((t) => t && !/^[-/]/.test(t));
+    return false;
+  }
+
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw).slice(1);
-    if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
-    if (PROCESSI.has(prog)) return due(MOTIVI.processi);
-    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    const args = argomenti(raw, c.win).slice(1);
     const testi = args.map((a) => a.testo);
-    if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     let cerca = null;
     if (prog === 'grep') cerca = operandiGrep(testi);
     else if (prog === 'findstr') cerca = operandiFindstr(testi);
     else if (prog === 'select-string' || prog === 'sls') cerca = operandiSls(testi);
+    // Il testo cercato non si apre mai: `grep "//TODO" a.js` non contatta nessuno, `echo //nota` che nessuno usa neanche.
+    const stampaSoltanto = c.stampaLibera && STAMPANO.has(prog);
+    if (!stampaSoltanto && scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
+    if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
+    if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
+    if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
+    if (PROCESSI.has(prog)) return due(MOTIVI.processi);
+    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     if (cerca) {
       if (cerca.ricorsivo) return due(MOTIVI.ricorsivo);
       if (cerca.ignoto) return due(MOTIVI.ignoto);
       return primoFuori(cerca.file, c);
     }
-    if (ELENCHI.has(prog)) {
+    if (PRENDONO_PERCORSI.has(prog)) {
       const ops = [];
       for (const t of testi) {
         const v = valoreDuePunti(t);
         if (v) ops.push(...v.split(','));
         else if (t && !t.startsWith('-')) ops.push(...t.split(','));
       }
+      const elenco = ELENCHI.has(prog);
       for (const t of ops) {
+        // Il valore di un gruppo può essere `env:` o `HKCU:`; Test-Path ne dice solo se esiste,
+        // ma se viene dal contenuto di un file può essere un percorso di rete (#1072).
+        if (t.includes(SEGNAPOSTO) && ((elenco && prog !== 'test-path') || c.valoriIgnoti)) return due(MOTIVI.ignoto);
+        // Il valore di un gruppo, se relativo, si risolve contro una cwd di rete (#1072.4).
+        if (t.includes(SEGNAPOSTO) && c.cwd && c.cwd.rete) return due(MOTIVI.rete);
         const d = dove(t, c);
-        if (d === MOTIVI.sistema) return due(d);
+        if (d === MOTIVI.rete || (elenco && d === MOTIVI.sistema)) return due(d);
       }
       if (!ops.length && ELENCA_CARTELLA.has(prog)) {
         if (c.cwd && c.cwd.provider) return due(MOTIVI.sistema);
+        if (c.cwd && c.cwd.rete) return due(MOTIVI.rete);
         if (!c.cwd) return due(MOTIVI.ignoto);
       }
     }
@@ -1131,7 +1335,7 @@
   // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw).slice(1);
+    const args = argomenti(raw, c.win).slice(1);
     if (prog === 'popd' || args.some((a) => a.variabile)) return { ...c, cwd: null };
     let dest = null;
     for (let i = 0; i < args.length; i++) {
@@ -1143,22 +1347,304 @@
       break;
     }
     if (dest === null) return { ...c, cwd: null };
-    const r = dove(dest, c);
-    if (r === MOTIVI.sistema) return { ...c, cwd: { provider: true } };
-    return { ...c, cwd: r && typeof r === 'object' ? r : null };
+    return { ...c, cwd: cartellaDa(dove(dest, c)) };
   }
 
   function chiaveCwd(c) {
     if (!c.cwd) return '?';
-    return c.cwd.provider ? 'P' : `${c.cwd.radice}/${c.cwd.segs.join('/')}`;
+    if (c.cwd.provider) return 'P';
+    return c.cwd.rete ? 'R' : `${c.cwd.radice}/${c.cwd.segs.join('/')}`;
+  }
+
+  // ── Gruppi, sottoespressioni e `if` di PowerShell (#516) ─────────────────
+  // `( )`, `@( )` e `$( )` ESEGUONO ciò che contengono, anche come argomento di
+  // un comando qualunque (`ls (Remove-Item x)` cancella). Ogni gruppo e ogni
+  // ramo di un `if` si classifica per ciò che esegue; il comando attorno, con
+  // SEGNAPOSTO al posto del gruppo. Una forma che `smonta` non riconosce è 3.
+  const PROF_MAX = 8;
+  const CD_RE = /(^|[^\w-])(cd|chdir|set-location|sl|pushd|popd)(?![\w-])/i;
+  const LETTERALE = String.raw`'[^']*'|"[^"]*"|-?\d+(?:\.\d+)?|\$(?:env:)?[A-Za-z_]\w*`;
+  const LETTERALI_RE = new RegExp(`^\\s*(?:${LETTERALE})(?:\\s*,\\s*(?:${LETTERALE}))*\\s*$`, 'i');
+  const LETTERALE_G = new RegExp(LETTERALE, 'gi');
+  const TERMINE_RE = /^(?:'[^']*'|"[^"]*"|-?\d+(?:\.\d+)?(?:kb|mb|gb|tb|pb)?|\$(?:env:)?[A-Za-z_]\w*)/i;
+  const MEMBRI_RE = /^(?:\.[A-Za-z_]\w*|\[-?\d+\])*/;
+  const OPERATORE_RE = /^\s*(?:-[ci]?(?:eq|ne|gt|ge|lt|le|like|notlike|match|notmatch|contains|notcontains|in|notin|join|and|or|xor)(?![\w-])|[+*/%,]|-(?=\s))/i;
+  const UNARIO_RE = /^\s*(?:!|-not(?![\w-]))/i;
+  const VALORE_RE = new RegExp(`${TERMINE_RE.source}$`, 'i');
+
+  const saltaSpazi = (s, k) => { while (k < s.length && /\s/.test(s[k])) k += 1; return k; };
+
+  // Indice della parentesi che chiude quella in `i`, saltando le stringhe; -1 se manca.
+  function chiusura(s, i) {
+    const apre = s[i];
+    const chiude = apre === '(' ? ')' : '}';
+    let prof = 0;
+    for (let k = i; k < s.length; k++) {
+      const ch = s[k];
+      if (ch === '"' || ch === "'") {
+        const j = s.indexOf(ch, k + 1);
+        if (j < 0) return -1;
+        k = j;
+      } else if (ch === apre) prof += 1;
+      else if (ch === chiude && (prof -= 1) === 0) return k;
+    }
+    return -1;
+  }
+
+  // Un gruppo si apre dopo uno spazio, una virgola, un `!` o il `-Nome:` di un
+  // parametro. Attaccato a un nome (`$f.MoveTo(`, `[IO.File]::Delete(`) è una
+  // chiamata di metodo, che non si classifica.
+  function apreGruppo(s, i) {
+    if (i === 0 || /[\s,!]/.test(s[i - 1])) return true;
+    if (s[i - 1] !== ':') return false;
+    let k = i - 2;
+    while (k >= 0 && /[A-Za-z]/.test(s[k])) k -= 1;
+    return k < i - 2 && s[k] === '-' && (k === 0 || /\s/.test(s[k - 1]));
+  }
+
+  // `if (…) {…} elseif (…) {…} else {…}`: condizioni e corpi diventano pezzi.
+  // Ritorna l'indice dopo l'ultima graffa, -1 se la forma non è questa.
+  function seIf(s, k, aggiungi) {
+    for (let ramo = 'if'; ;) {
+      if (ramo !== 'else') {
+        k = saltaSpazi(s, k);
+        const j = s[k] === '(' ? chiusura(s, k) : -1;
+        if (j < 0 || !s.slice(k + 1, j).trim()) return -1;
+        aggiungi(s.slice(k + 1, j), false);
+        k = j + 1;
+      }
+      k = saltaSpazi(s, k);
+      const j = s[k] === '{' ? chiusura(s, k) : -1;
+      if (j < 0) return -1;
+      aggiungi(s.slice(k + 1, j), true);
+      k = j + 1;
+      if (ramo === 'else') return k;
+      const m = /^\s*(elseif|else)(?=[\s({]|$)/i.exec(s.slice(k));
+      if (!m) return k;
+      ramo = m[1].toLowerCase();
+      k += m[0].length;
+    }
+  }
+
+  // Un'espressione a inizio istruzione (`(gci).Count -gt 0`, `-not (Test-Path x)`):
+  // apre con un gruppo, e fuori dai gruppi ammette solo operatori, proprietà,
+  // numeri, stringhe e variabili. `lasciato` è il testo che non si riclassifica.
+  function espressione(s, k, gruppo) {
+    let lasciato = '';
+    for (let primo = true; ; primo = false) {
+      let m;
+      while ((m = UNARIO_RE.exec(s.slice(k)))) k += m[0].length;
+      k = saltaSpazi(s, k);
+      if (s[k] === '(' || ((s[k] === '@' || s[k] === '$') && s[k + 1] === '(')) {
+        const j = gruppo(s[k] === '(' ? k : k + 1);
+        if (j < 0) return null;
+        k = j + 1;
+      } else if (!primo && (m = TERMINE_RE.exec(s.slice(k)))) {
+        lasciato += ` ${m[0]}`;
+        k += m[0].length;
+      } else return null;
+      k += MEMBRI_RE.exec(s.slice(k))[0].length;
+      if (!(m = OPERATORE_RE.exec(s.slice(k)))) return { fine: k, lasciato };
+      k += m[0].length;
+    }
+  }
+
+  // Il comando con ogni gruppo ed ogni `if` sostituiti (`testo`) e ciò che quei
+  // costrutti eseguono (`pezzi`). null senza gruppi; TRE se la forma non si
+  // riconosce. `mosso`: un pezzo cambia cartella, quindi dopo non la si conosce.
+  function smonta(s) {
+    let q = '';
+    let gruppi = false;
+    for (let k = 0; k < s.length; k++) {
+      const ch = s[k];
+      if (q) {
+        if (ch === q) q = '';
+        else if (q === '"' && ch === '$' && /[({]/.test(s[k + 1] || '')) return TRE;
+      } else if (ch === '"' || ch === "'") q = ch;
+      else if (ch === '(' || (ch === '@' && s[k + 1] === '{')) gruppi = true;
+    }
+    if (!gruppi) return null;
+    // Virgolette che qui non si leggono come le legge la shell (tipografiche, che
+    // PowerShell accetta; dopo un backslash, in bash; non chiuse), `@{` (i valori
+    // di una tabella sono comandi), `${…}` (in PowerShell legge un file).
+    if (q || /[`\r\n\u2018-\u201e]|\\['"]|\$\{|@\{/.test(s)) return TRE;
+    const pezzi = [];
+    let out = '';
+    let lasciato = '';
+    let spostato = false;
+    let mosso = false;
+    const aggiungi = (testo, corpo) => {
+      pezzi.push({ testo, corpo, spostato });
+      // Senza virgolette, come le legge la shell: `c""d` è `cd`.
+      if (CD_RE.test(unquote(testo))) { spostato = true; mosso = true; }
+    };
+    const gruppo = (a) => {
+      const j = chiusura(s, a);
+      if (j > a) aggiungi(s.slice(a + 1, j), false);
+      return j;
+    };
+    let i = 0;
+    while (i < s.length) {
+      while (i < s.length && /\s/.test(s[i])) out += s[i++];
+      if (i >= s.length) break;
+      const resto = s.slice(i);
+      if (/^if\s*\(/i.test(resto)) {
+        i = seIf(s, i + 2, aggiungi);
+        if (i < 0) return TRE;
+        out += `Write-Output ${SEGNAPOSTO}`;
+      } else if (/^(?:[@$]?\(|!|-not(?![\w-]))/i.test(resto)) {
+        const r = espressione(s, i, gruppo);
+        if (!r) return TRE;
+        lasciato += r.lasciato;
+        out += `Write-Output ${SEGNAPOSTO}`;
+        i = r.fine;
+      } else {
+        const prog = programOf(/^\S*/.exec(resto)[0]);
+        while (i < s.length) {
+          const ch = s[i];
+          if (ch === ';' || ch === '|' || (ch === '&' && s[i + 1] === '&')) break;
+          if (ch === ')' || ch === '}') return TRE;
+          let j;
+          if (ch === '"' || ch === "'") {
+            j = s.indexOf(ch, i + 1);
+            if (j < 0) return TRE;
+            out += s.slice(i, j + 1);
+          } else if (ch === '{') {
+            // Uno scriptblock resta com'è (lo giudica segmentIsRead), ma senza gruppi dentro.
+            j = chiusura(s, i);
+            if (j < 0 || /\(/.test(s.slice(i, j).replace(/'[^']*'|"[^"]*"/g, ''))) return TRE;
+            out += s.slice(i, j + 1);
+          } else if (ch === '(' || ((ch === '@' || ch === '$') && s[i + 1] === '(')) {
+            if (!apreGruppo(s, i)) return TRE;
+            const a = ch === '(' ? i : i + 1;
+            j = chiusura(s, a);
+            if (j < 0) return TRE;
+            const dentro = s.slice(a + 1, j);
+            // Un gruppo di soli letterali (`@("a","b")`) vale quei letterali: un cmdlet li riceve come
+            // un elenco, un programma esterno come argomenti separati (`git branch ("-D","x")`).
+            if (LETTERALI_RE.test(dentro)) out += dentro.match(LETTERALE_G).join(PS_READ.has(prog) ? ',' : ' ');
+            else { aggiungi(dentro, false); out += SEGNAPOSTO; }
+          } else {
+            out += ch;
+            j = i;
+          }
+          i = j + 1;
+        }
+        if (SPOSTAMENTI.has(prog)) spostato = true;
+      }
+      i = saltaSpazi(s, i);
+      if (i >= s.length) break;
+      const sep = /^(?:;|&&|\|\|?)/.exec(s.slice(i));
+      if (!sep) return TRE;
+      out += sep[0];
+      i += sep[0].length;
+    }
+    return { testo: out, pezzi, lasciato, mosso };
+  }
+
+  // Un gruppo come argomento vale qualcosa che si sa solo eseguendolo: verso un
+  // programma esterno (o in bash) può essere un flag (`git checkout $(echo .)`), in
+  // PowerShell uno scriptblock (`(Get-Command f).ScriptBlock`), che questi cmdlet
+  // eseguono, e con un input dal tubo qualunque cmdlet. Si accetta solo dove nessun
+  // valore cambia il livello o il perimetro, e in testa alla pipeline.
+  const ESEGUONO_BLOCCHI = new Set([
+    'select-object', 'select', 'sort-object', 'group-object', 'group', 'measure-object', 'measure',
+    'compare-object', 'format-table', 'ft', 'format-list', 'fl', 'format-wide', 'fw', 'where',
+  ]);
+  function gruppoComeArgomento(prog) {
+    return (PS_READ.has(prog) || LEVEL1.has(prog) || SPOSTAMENTI.has(prog)) && !ESEGUONO_BLOCCHI.has(prog)
+      && !LEVEL1_MUTATES[prog] && prog !== 'grep' && prog !== 'findstr';
+  }
+  const gruppiAlPosto = (testo) => testo.split(/;|&&|\|\|/).every((istr) => istr.split('|')
+    .every((seg, i) => !seg.includes(SEGNAPOSTO) || (i === 0 && gruppoComeArgomento(programOf(dequote(seg))))));
+
+  function valoreNoto(testo) {
+    if (/[({]/.test(String(testo).replace(/'[^']*'|"[^"]*"/g, ''))) return false;
+    return String(testo).split(/;|&&|\|\|/).every((istr) => istr.split('|').every((seg, i) => {
+      const prog = programOf(dequote(seg.trim()));
+      return !seg.trim() || (FONTI_NOTE.has(prog) && !(i > 0 && CALCOLANO.has(prog)));
+    }));
+  }
+
+  function classifica(cmd, c, prof) {
+    const trimmed = String(cmd).trim();
+    if (!trimmed || prof > PROF_MAX) return TRE;
+    const sm = smonta(trimmed);
+    if (sm === null) return classificaPiatta(trimmed, c);
+    // Il testo lasciato fuori non passa dai controlli dei separatori: non ne deve avere, neanche fra virgolette.
+    if (sm === TRE || /[;|&<>]/.test(sm.lasciato)) return TRE;
+    if (!gruppiAlPosto(sm.testo)) return TRE;
+    // Un gruppo che prende testo da un file può valere un percorso di rete (#1072).
+    if (sm.pezzi.some((p) => !valoreNoto(p.testo))) c = { ...c, valoriIgnoti: true };
+    const ignota = { ...c, cwd: null };
+    let det = classificaPiatta(sm.testo.trim(), sm.mosso ? ignota : c);
+    if (nomiVariabili(sm.lasciato).some((n) => !VAR_INNOCUE.has(n))) det = peggiore(det, due(MOTIVI.variabili));
+    for (const p of sm.pezzi) {
+      if (det.level === 3) break;
+      const t = p.testo.trim();
+      // Ciò che un gruppo stampa diventa l'argomento del comando attorno.
+      const cc = { ...(p.spostato ? ignota : c), stampaLibera: false };
+      // Il corpo di un `if` può essere vuoto o un valore solo (stringa, numero, variabile), che PowerShell stampa.
+      if (p.corpo && !t) continue;
+      const sub = p.corpo && VALORE_RE.test(t) ? `Write-Output ${t}` : t;
+      det = peggiore(det, classifica(sub, cc, prof + 1));
+    }
+    return det;
+  }
+
+  // cmd toglie ogni `^` fuori dalle virgolette prima di passare il comando: `^.ssh` è `.ssh`, `^\^\host` è
+  // `\\host`, `-^-force` è `--force` (#1072.1). null dove qui non si legge come cmd: un `^` in coda (si
+  // prende la riga dopo), su un separatore (diventa testo), accanto alle espansioni `%` (fatte prima) e `!`.
+  function comeCmd(cmd) {
+    let out = '';
+    let virgolette = false;
+    let tolti = false;
+    for (let i = 0; i < cmd.length; i++) {
+      const ch = cmd[i];
+      if (ch !== '^' || virgolette) {
+        if (ch === '"') virgolette = !virgolette;
+        out += ch;
+        continue;
+      }
+      const dopo = cmd[i + 1];
+      if (dopo === undefined || /[&|<>()%\r\n]/.test(dopo)) return null;
+      out += dopo; // `^"` non apre né chiude le virgolette
+      i += 1;
+      tolti = true;
+    }
+    if ((tolti && out.includes('%')) || (out.includes('!') && out.includes('^'))) return null;
+    return out;
   }
 
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
+  // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
+  // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
+  // Per cmd `'` è testo (`' \\host\x '` sono tre argomenti), per i programmi C anche `\"` (findstr); i programmi
+  // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello la prima (#1072.5).
+  function comeLaShell(cmd, c) {
+    if (!c.win) return [cmd];
+    if (c.shell === 'cmd') {
+      const l = comeCmd(cmd);
+      if (l == null) return null;
+      const interni = l.replace(/'/g, APICE_TESTO);
+      const programmiC = interni.replace(/(\\+)"/g, (m, b) => (b.length % 2 ? '\\'.repeat(b.length >> 1) + VIRGOLETTE_TESTO : m));
+      return [...new Set([programmiC, interni, l])];
+    }
+    return [cmd.replace(/[\u201C-\u201F]/g, '"')
+      .replace(/[\u2018-\u201B]/g, "'")
+      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-')];
+  }
+
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
-    const trimmed = cmd.trim();
+    const c = { ...contesto(ctx), stampaLibera: true };
+    const letture = comeLaShell(cmd, c);
+    return letture == null ? TRE : letture.map((l) => classifica(l, c, 0)).reduce(peggiore);
+  }
+
+  // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
+  function classificaPiatta(trimmed, c) {
     if (!trimmed) return TRE;
-    const c = contesto(ctx);
 
     // Sequenza pura di comandi (`&&`/`||`/`;`) → livello = massimo dei pezzi.
     // Vale anche con UN SOLO pezzo: `git checkout .;` (separatore in coda, forma
@@ -1190,10 +1676,19 @@
       const cp = progs.some((x) => SPOSTAMENTI.has(x)) ? { ...c, cwd: null } : c;
       let det = UNO;
       let elenco = false;
+      let noto = true;
       pipe.forEach((p, i) => {
         if (elenco && LETTI_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
-        if (ELENCA_OGGETTI.has(progs[i])) elenco = true;
-        if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, cp));
+        // Testo letto da un file, dato come percorso, può portare in rete (#1072).
+        if (!noto && PERCORSO_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
+        // Un nome dal tubo si risolve contro la cartella di lavoro: in rete lo riceve il remoto (#1072.4).
+        if (i > 0 && (PERCORSO_DAL_TUBO.has(progs[i]) || CERCANO_NOME.has(progs[i])) && cp.cwd && cp.cwd.rete) det = peggiore(det, due(MOTIVI.rete));
+        // Join-Path/Split-Path sul valore del tubo compongono ciò che nessun argomento scrive (`'\\' | Join-Path`):
+        // chi lo riceve come percorso chiede (noto), e Join-Path -Resolve lo apre da sé.
+        if (i > 0 && progs[i] === 'join-path' && argomenti(p, c.win).some((a) => parametro(a.testo, 'resolve', 1))) det = peggiore(det, due(MOTIVI.ignoto));
+        if (!FONTI_NOTE.has(progs[i]) || (i > 0 && CALCOLANO.has(progs[i])) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
+        if (ELENCA_OGGETTI.has(progs[i]) || p.includes(SEGNAPOSTO)) elenco = true;
+        if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, i < pipe.length - 1 ? { ...cp, stampaLibera: false } : cp));
       });
       return det;
     }
@@ -1216,5 +1711,19 @@
     return fuoriDa(p, contesto(ctx));
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, programOf, subcommandOf };
+  // Nella cartella personale ma privato per la lettura (nascosto, cartella di profilo come la Libreria del Mac): chi
+  // legge in blocco non ci entra se la cartella chiesta non è già lì dentro (#947.3).
+  function privato(percorso, ctx) {
+    return fuoriPerimetro(percorso, ctx) === MOTIVI.nascosto;
+  }
+
+  // Le cartelle aperte dentro `percorso`, se è proprio una cartella di profilo: chi legge in blocco scende solo lì.
+  function aperteDentro(percorso, ctx) {
+    const c = contesto(ctx);
+    const r = dove(String(percorso == null ? '' : percorso).trim(), c);
+    if (!r || typeof r !== 'object' || !dentroCasa(r, c) || r.segs.length !== c.home.segs.length + 1) return [];
+    return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
+  }
+
+  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, aperteDentro, programOf, subcommandOf, comeCmd };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

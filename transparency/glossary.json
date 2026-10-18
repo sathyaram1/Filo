@@ -11,5 +11,11 @@
   "LLM": "Large Language Model: il tipo di modello che sta dietro agli assistenti come Claude o ChatGPT.",
   "super PAC": "Negli Stati Uniti, un fondo che può raccogliere donazioni illimitate per sostenere un candidato senza limiti di spesa.",
   "open source": "Il codice di Filo è pubblico: chiunque può leggerlo, modificarlo e distribuirne una propria versione.",
-  "rischi esistenziali": "I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente."
+  "rischi esistenziali": "I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente.",
+  "Safe Browsing": "La lista di siti pericolosi mantenuta da Google e usata da quasi tutti i browser per avvisarti prima di aprire una pagina truffa.",
+  "ritenzione zero": "L'impegno di chi fa girare un modello a non conservare né la richiesta né la risposta, una volta risposto.",
+  "pseudonimo": "Un codice che tiene insieme i dati della stessa installazione senza dire di chi sono.",
+  "impronta": "Un numero calcolato da un dato con una formula a senso unico: dallo stesso dato esce sempre lo stesso numero, ma dal numero non si risale al dato.",
+  "Firebase": "Il servizio di Google su cui gira il server di Filo: database, accesso e funzioni.",
+  "red team": "Chi attacca un sistema apposta, con permesso, per trovarne i punti deboli prima che li trovi qualcun altro."
 }

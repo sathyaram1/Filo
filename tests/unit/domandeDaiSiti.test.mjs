@@ -19,15 +19,15 @@ const O = require(join(ROOT, 'src', 'main', 'services', 'handlers', 'origine.js'
 
 const leggi = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/^\s*\/\/.*$/gm, '');
 
-// Gli script che page-preload.js carica nelle pagine web, più il preload stesso e lo zoom.
+// Gli script che girano nelle pagine web: i moduli del preload impacchettato (preloadPacchetto.js).
+function moduliDelPreload() {
+  const { componi } = require(join(ROOT, 'src', 'main', 'preloadPacchetto.js'));
+  return componi().moduli.filter((m) => m.endsWith('.js')).map((f) => ({ f, src: leggi(f) }));
+}
 function scriptDeiSiti() {
-  const preload = readFileSync(join(ROOT, 'src', 'preload', 'page-preload.js'), 'utf8');
-  const file = ['src/preload/page-preload.js', 'src/preload/wheel-zoom.js'];
-  for (const m of preload.matchAll(/require\(path\.join\((CONTENT_DIR|SHARED_DIR), '([\w.-]+\.js)'\)\)/g)) {
-    file.push(`src/${m[1] === 'CONTENT_DIR' ? 'content' : 'shared'}/${m[2]}`);
-  }
-  assert.ok(file.some((f) => f.endsWith('content/content.js')) && file.length > 20, 'elenco degli script dei siti non trovato');
-  return [...new Set(file)].filter((f) => !f.endsWith('/messages.js')).map((f) => ({ f, src: leggi(f) }));
+  const file = moduliDelPreload().filter(({ f }) => /^src\/(?:preload|content|shared)\//.test(f) && !f.endsWith('/messages.js'));
+  assert.ok(file.some(({ f }) => f.endsWith('content/content.js')) && file.length > 20, 'elenco degli script dei siti non trovato');
+  return file;
 }
 
 function fileJs(dir, out = []) {
@@ -233,29 +233,28 @@ test('sentinella: le domande ammesse sono esattamente quelle del codice di Filo 
   for (const t of W.DOMANDE_WEB) assert.ok(registrati.has(t), `domanda ammessa senza handler: ${t}`);
 });
 
-// Canali che vivono sulla singola scheda e controllano da sé chi parla (tabs.js).
-const CANALI_DELLA_SCHEDA = ['filo:zoom-applicato', 'filo:zoom-proprio'];
-
 test('sentinella: i canali ammessi sono quelli che il preload delle pagine web usa', () => {
+  const ipc = leggi('src/main/ipc.js');
+  const registrati = new Set([...ipc.matchAll(/^\s+(?:handle|ascolta)\('([\w:-]+)'/gm)].map((m) => m[1]));
   const usati = new Set();
-  for (const f of ['src/preload/page-preload.js', 'src/preload/wheel-zoom.js']) {
-    for (const m of leggi(f).matchAll(/\b(?:ipcRenderer|ipc)\.(?:invoke|send|sendSync)\(\s*'([\w:-]+)'/g)) usati.add(m[1]);
+  for (const { src } of moduliDelPreload()) {
+    for (const m of src.matchAll(/'([\w-]+:[\w-]+)'/g)) if (registrati.has(m[1])) usati.add(m[1]);
   }
   assert.ok(usati.has('filo:message') && usati.has('filo:fp-config'), 'la sentinella non vede più i canali del preload');
-  const fuori = [...usati].filter((c) => !W.CANALI_WEB.has(c) && !CANALI_DELLA_SCHEDA.includes(c));
-  assert.deepEqual(fuori, [], 'canali usati dal preload delle pagine web ma non ammessi');
+  assert.deepEqual([...usati].filter((c) => !W.CANALI_WEB.has(c)), [], 'canali usati dal preload delle pagine web ma non ammessi');
   assert.deepEqual([...W.CANALI_WEB].filter((c) => !usati.has(c)), [], 'canali ammessi che il preload non usa');
 });
 
-// Ogni canale del main passa dalla regola del confine: in ipc.js tramite handle/ascolta,
-// altrove solo i canali della singola scheda, che controllano chi parla.
+// Ogni canale globale del main passa dalla regola del confine (handle/ascolta di ipc.js). Restano fuori quelli
+// della singola pagina (`wc.ipc`: parla solo lei, della sua scheda) e l'eco dello zoom, che controlla il mittente.
+const CANALI_CHE_CONTROLLANO_CHI_PARLA = ['filo:zoom-applicato'];
 test('sentinella: nessun canale si registra fuori dalla regola del confine', () => {
   const fuori = [];
   for (const f of fileJs('src/main')) {
     leggi(f).split('\n').forEach((r, i) => {
-      if (!/\bipcMain\.(?:handle|handleOnce|on|once|addListener)\(|\.ipc\.(?:handle|handleOnce|on|once)\(/.test(r)) return;
+      if (!/\bipcMain\.(?:handle|handleOnce|on|once|addListener)\(/.test(r)) return;
       if (f === 'src/main/ipc.js' && /^const (?:handle|ascolta) = \(canale, fn\) => ipcMain\.(?:handle|on)\(canale,/.test(r)) return;
-      if (f === 'src/main/tabs.js' && CANALI_DELLA_SCHEDA.some((c) => r.includes(`'${c}'`))) return;
+      if (f === 'src/main/tabs.js' && CANALI_CHE_CONTROLLANO_CHI_PARLA.some((c) => r.includes(`'${c}'`))) return;
       fuori.push(`${f}:${i + 1}: ${r.trim()}`);
     });
   }

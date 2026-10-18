@@ -1,5 +1,5 @@
 // La fila di schede in cima alla pagina dei feedback (Ricevuti, In coda,
-// Risolti, Archiviati — le stesse della dashboard di gestione, #509) deve
+// Lavori locali, Risolti, Archiviati — le stesse della dashboard di gestione, #509) deve
 // adattarsi alla larghezza della finestra: su finestre strette va a capo invece
 // di sforare il bordo destro e trascinare TUTTA la pagina in uno scorrimento
 // orizzontale. E ogni scheda resta di un pezzo solo: il numero non si stacca
@@ -22,7 +22,7 @@ const FEEDBACK_URL = 'filo://feedback/feedback.html';
 test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato', async ({ app, openTab }) => {
   // Restringe la BrowserWindow al caso segnalato (~720 punti di larghezza).
   await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (w) w.setContentSize(720, 800);
   });
 
@@ -33,11 +33,13 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
   // misurare, non quella dei soli nomi.
   await page.evaluate(() => window.__fbTest.setData([]));
 
-  // Le quattro sezioni della macchina a stati.
+  // Le sezioni della macchina a stati, con i Lavori server (#908) e quelli che aspettano (#903).
   const tabs = page.locator('.fb-tab');
-  await expect(tabs).toHaveCount(4);
+  await expect(tabs).toHaveCount(6);
+  await expect(tabs.nth(2)).toHaveText(/Lavori server/);
+  await expect(tabs.nth(3)).toHaveText(/Aspettano/);
 
-  // Larghezza stretta davvero: qui le quattro schede NON stanno su una riga.
+  // Larghezza stretta davvero: qui le sei schede NON stanno su una riga.
   await page.setViewportSize({ width: 360, height: 800 });
 
   // Il corpo della pagina NON produce scorrimento orizzontale.

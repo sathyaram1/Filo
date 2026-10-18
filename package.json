@@ -1,6 +1,6 @@
 {
   "name": "filo",
-  "version": "0.2.228",
+  "version": "0.2.242",
   "private": true,
   "license": "Apache-2.0",
   "description": "Filo — browser AI-native cross-device. Layer di interazione, non solo finestra.",
@@ -25,7 +25,9 @@
     "feedback:auto-archive": "node scripts/auto-archive.mjs",
     "feedback:vista-pubblica": "node scripts/publish-public-view.mjs",
     "feedback:login": "node scripts/admin-login.mjs",
-    "deploy:regole": "firebase deploy --only firestore:rules,firestore:indexes",
+    "regole:pubblica": "node scripts/regole-pubblica.mjs",
+    "server:fondi": "node scripts/server-fondi-pratica.mjs",
+    "orchestra": "node scripts/orchestratore-locale.mjs",
     "purga:percorsi-vecchi": "firebase firestore:delete paths --shallow",
     "build": "electron-builder --win --publish never",
     "release": "electron-builder --win --publish always",
@@ -34,11 +36,14 @@
     "build:linux": "electron-builder --linux --publish never",
     "release:linux": "electron-builder --linux --publish always",
     "feedback": "node scripts/owner-feedback.mjs",
-    "feedback:apri": "node scripts/claude-feedback.mjs"
+    "feedback:apri": "node scripts/claude-feedback.mjs",
+    "feedback:leggi": "node scripts/leggi-feedback.mjs",
+    "feedback:ripasso": "node scripts/ripasso-mittenti.mjs",
+    "fiducia:migra": "node scripts/fiducia-migra.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
-    "electron": "^33.2.0",
+    "electron": "^44.7.0",
     "electron-builder": "^25.1.8",
     "typescript": "^5.9.3"
   },
@@ -51,6 +56,7 @@
     "files": [
       "src/**/*",
       "assets/**/*",
+      "generato/**/*",
       "package.json"
     ],
     "protocols": [
@@ -94,6 +100,12 @@
       "category": "public.app-category.productivity",
       "identity": null,
       "darkModeSupport": true,
+      "extendInfo": {
+        "NSBluetoothAlwaysUsageDescription": "Filo usa il Bluetooth quando gli chiedi di accenderlo, di spegnerlo o di collegare un dispositivo.",
+        "NSDocumentsFolderUsageDescription": "Filo legge i documenti di questa cartella per ritrovarli quando glieli chiedi a parole. Il loro testo resta sul tuo computer.",
+        "NSDesktopFolderUsageDescription": "Filo legge i documenti della Scrivania per ritrovarli quando glieli chiedi a parole. Il loro testo resta sul tuo computer.",
+        "NSDownloadsFolderUsageDescription": "Filo legge i documenti scaricati per ritrovarli quando glieli chiedi a parole. Il loro testo resta sul tuo computer."
+      },
       "publish": [
         {
           "provider": "github",
@@ -154,10 +166,12 @@
         "repo": "Filo"
       }
     ],
+    "beforePack": "src/main/preloadPacchetto.js",
     "afterPack": "scripts/after-pack.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
+    "jpeg-js": "^0.4.4",
     "unpdf": "^1.8.1"
   }
 }

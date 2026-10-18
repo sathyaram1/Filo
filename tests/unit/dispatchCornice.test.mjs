@@ -13,6 +13,10 @@ const TMP = cartellaTemporanea('filo-dispatch-cornice-');
 process.env.FILO_DISPATCH_STATE_DIR = TMP;
 process.env.FILO_REPO_ROOT = TMP;
 process.env.FILO_TOOLS_ROOT = TMP;
+// Anche la temporanea, fuori dalla ROOT: dispatch ci scarica i pezzi grossi del payload, e una cartella nuova a
+// ogni corsa restava lì per sempre (#717).
+const TEMP = cartellaTemporanea('filo-dispatch-tmp-');
+Object.assign(process.env, { TMPDIR: TEMP, TEMP, TMP: TEMP });
 
 const { serverCtx, emit } = await import('../../scripts/dispatch.mjs');
 

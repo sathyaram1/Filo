@@ -19,12 +19,11 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer } from 'node:http';
-import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // La cartella temporanea si chiede sempre a questo aiuto (CLAUDE.md § Run/test).
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { spiegaChiaviMancanti, descriviEsitoServer } from '../../scripts/bake-default-config.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { spiegaChiaviMancanti, descriviEsitoServer, chiaviAllarmeBake } from '../../scripts/bake-default-config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RADICE = resolve(__dirname, '..', '..');
@@ -56,7 +55,7 @@ async function costruisci(ambiente) {
     stdout = e.stdout || '';
     stderr = e.stderr || '';
   }
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
   return { uscita, registro: `${stdout}\n${stderr}` };
 }
 
@@ -239,6 +238,21 @@ test('quando il server dà le chiavi non si grida al lupo', async () => {
   }
 });
 
+// #1210: il segreto incollato con la riga rientrata in cui routine-keys la stampava; il server lo rifiutava.
+test('una parola d’ordine con spazi ai bordi arriva pulita al server, e le chiavi vengono da lì', async () => {
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: true, apiKeys: { tavily: 't' }, safeBrowsingKey: 'g' } },
+  });
+  try {
+    const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: '    giusta\n' });
+    assert.equal(r.uscita, 0, r.registro);
+    assert.equal(srv.ricevute.find((x) => x.percorso === '/buildKeys').corpo.passphrase, 'giusta');
+    assert.doesNotMatch(r.registro, /segreti di riserva/);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
 test('se il feedback dell’allarme non viene consegnato, lo si viene a sapere', async () => {
   const srv = await serverFinto({
     '/buildKeys': { stato: 200, json: { ok: false, reason: 'bad_passphrase' } },
@@ -278,7 +292,15 @@ test('l’allarme porta le stesse informazioni del registro', async () => {
     assert.match(testo, /FILO_DEFAULT_TAVILY_KEY/);
     assert.match(testo, /bad_passphrase/,
       'anche il perché il server non l\'ha data deve arrivare nel feedback');
+    // Una chiave per chiave mancante: il server non riapre un feedback per un guasto già in coda.
+    assert.deepEqual(allarme.corpo.keys, ['bake:tavily']);
   } finally {
     await srv.chiudi();
   }
+});
+
+test('le chiavi dell’allarme del bake: una per chiave mancante, mai nessuna', () => {
+  assert.deepEqual(chiaviAllarmeBake([{ nome: 'tavily' }, { nome: 'tavily' }, { nome: 'altra' }]), ['bake:tavily', 'bake:altra']);
+  assert.deepEqual(chiaviAllarmeBake([]), ['bake']);
+  assert.deepEqual(chiaviAllarmeBake(undefined), ['bake']);
 });

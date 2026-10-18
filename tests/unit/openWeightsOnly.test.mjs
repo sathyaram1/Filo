@@ -226,8 +226,9 @@ test('i produttori ammessi dal documento sono gli stessi che l\'interruttore spe
   }
 
   // E al contrario: l'interruttore non spegne produttori che il documento non
-  // nomina più (Anthropic a parte, che non è un modello stretto).
-  const inPiu = spenti.filter((x) => x !== 'anthropic' && !nelDocumento.map(norma).includes(x));
+  // nomina più (gli host di Anthropic a parte, che non è un modello stretto).
+  const diAnthropic = C.PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts).map(norma);
+  const inPiu = spenti.filter((x) => !diAnthropic.includes(x) && !nelDocumento.map(norma).includes(x));
   assert.deepEqual(inPiu, [],
     'l\'interruttore spegne produttori che il documento non elenca più fra gli ammessi');
 });
