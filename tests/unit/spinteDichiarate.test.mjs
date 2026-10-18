@@ -117,6 +117,83 @@ test('#1194: il commit che un altro spinge sul ramo e la pulita incorpora non en
   assert.ok(!coda(d.pulita).flatMap((x) => x.commits).includes(z2), 'Z2 visto su origin resta di chi l’ha spinto');
 });
 
+/** Main va avanti e l'altra copia spinge Z sul ramo senza dichiararlo. → z */
+function mainAvantiEZ(d, file = 'z.txt') {
+  g(d.altra, ['fetch', '-q', 'origin']);
+  g(d.altra, ['checkout', '-q', '-B', 'main', 'origin/main']);
+  commit(d.altra, `main-${file}`);
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', 'main']);
+  g(d.altra, ['checkout', '-q', '-B', 'claude/x', 'origin/claude/x']);
+  const z = commit(d.altra, file);
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', 'claude/x']);
+  return z;
+}
+
+const idDi = (dir, sha) => S.patchIds(dir, [sha]).get(sha);
+
+test('#1362 giro 2 r1: il rebase della pulita sul ramo con dentro Z di un altro: la copia di Z va fra i riscritti con l’originale, Z fra i sostituiti', () => {
+  const d = deposito();
+  const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  const a = commit(d.pulita, 'a.txt');
+  spingi(d.pulita, env);
+  const z = mainAvantiEZ(d);
+  // Il riallineamento (git fetch, il ramo com'è su origin, git rebase origin/main) e la spinta della storia riscritta.
+  g(d.pulita, ['fetch', '-q', 'origin']);
+  g(d.pulita, ['reset', '-q', '--hard', 'origin/claude/x']);
+  g(d.pulita, ['rebase', '-q', 'origin/main']);
+  assert.equal(spingi(d.pulita, env, '--force-with-lease').status, 0);
+  const ultima = coda(d.pulita).at(-1);
+  const [a2, z2] = g(d.pulita, ['rev-list', '--reverse', 'origin/main..HEAD']).split('\n');
+  assert.deepEqual(ultima.commits, [], 'nessuna copia passa per un commit creato qui');
+  assert.deepEqual(new Set(ultima.riscritti.map((r) => `${r.sha}>${r.di}`)), new Set([`${a2}>${a}`, `${z2}>${z}`]));
+  assert.deepEqual(new Set(ultima.sostituiti), new Set([a, z]));
+  assert.equal(idDi(d.pulita, z2), idDi(d.pulita, z));
+});
+
+test('#1362 giro 2 r1: Z cambiato nel rebase resta fra i sostituiti; Z tolto da origin prima della spinta anche (lo storico del ref remoto)', () => {
+  const d = deposito();
+  const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  const a = commit(d.pulita, 'a.txt');
+  spingi(d.pulita, env);
+  const z = mainAvantiEZ(d);
+  g(d.pulita, ['fetch', '-q', 'origin']);
+  g(d.pulita, ['reset', '-q', '--hard', 'origin/claude/x']);
+  // Un rebase interattivo che ritocca Z: la copia ha un'altra modifica, nessun originale da indicare.
+  g(d.pulita, ['rebase', '-q', 'origin/main']);
+  writeFileSync(join(d.pulita, 'z.txt'), 'z ritoccato\n');
+  g(d.pulita, ['commit', '-q', '-a', '--amend', '--no-edit']);
+  // Chi ha spinto Z riporta origin a com'era: per git la spinta della pulita non toglie niente di nuovo.
+  g(d.altra, ['push', '-q', '--force', '--no-verify', 'origin', `${a}:refs/heads/claude/x`]);
+  g(d.pulita, ['fetch', '-q', 'origin']);
+  assert.equal(spingi(d.pulita, env, '--force').status, 0);
+  const ultima = coda(d.pulita).at(-1);
+  assert.ok(ultima.sostituiti.includes(z), 'Z visto su origin e non più nel ramo: chi spinge lo riscrive');
+  assert.ok(ultima.sostituiti.includes(a));
+});
+
+test('#1362 giro 2 r1: un rebase dei soli commit propri porta le copie con gli originali, e una spinta che avanza non sostituisce niente', () => {
+  const d = deposito();
+  const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  const a = commit(d.pulita, 'a.txt');
+  spingi(d.pulita, env);
+  const b = commit(d.pulita, 'b.txt');
+  spingi(d.pulita, env);
+  assert.equal(coda(d.pulita).at(-1).sostituiti, undefined);
+  assert.deepEqual(coda(d.pulita).at(-1).commits, [b]);
+  g(d.altra, ['fetch', '-q', 'origin']);
+  g(d.altra, ['checkout', '-q', '-B', 'main', 'origin/main']);
+  commit(d.altra, 'main.txt');
+  g(d.altra, ['push', '-q', '--no-verify', 'origin', 'main']);
+  g(d.pulita, ['fetch', '-q', 'origin']);
+  g(d.pulita, ['rebase', '-q', 'origin/main']);
+  const c = commit(d.pulita, 'c.txt');
+  assert.equal(spingi(d.pulita, env, '--force-with-lease').status, 0);
+  const ultima = coda(d.pulita).at(-1);
+  assert.deepEqual(ultima.commits, [c]);
+  assert.deepEqual(new Set(ultima.riscritti.map((r) => r.di)), new Set([a, b]));
+  assert.deepEqual(new Set(ultima.sostituiti), new Set([a, b]));
+});
+
 test('#1362 r1: alla spinta gira lo script di chi ha installato il pre-push, mai quello del ramo, che un commit spinto da altri può aver riscritto', () => {
   const d = deposito();
   const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
@@ -226,6 +303,22 @@ test('l’invio: le spinte di un biglietto partono insieme e in ordine; un guast
   // Un server di prima, senza l'indirizzo: niente a cui dichiarare, e niente che controlli.
   const vecchio = codaFinta([A]);
   assert.equal((await S.inviaSpinte({ root: vecchio, deps: finto([[404, {}]]).deps })).rifiutate, 1);
+});
+
+test('l’invio tiene l’ordine: dopo un guasto le voci seguenti, anche di altri biglietti, aspettano (la copia di un rebase dopo il suo originale)', async () => {
+  const A = 'a'.repeat(40); const B = 'b'.repeat(40);
+  const dir = cartellaTemporanea('filo-spinte-ordine-');
+  g(dir, ['init', '-q']);
+  S.accoda(dir, { tipo: 'routine', ticket: BIGLIETTO }, 'app', [{ ramo: 'claude/x', punta: A, commits: [A] }], 1000);
+  S.accoda(dir, { tipo: 'routine', ticket: `${BIGLIETTO}-2` }, 'app', [{ ramo: 'claude/x', punta: B, commits: [], riscritti: [{ sha: B, di: A }], sostituiti: [A] }], 1001);
+  const giu = finto([[503, {}], [200, { ok: true }]]);
+  const r = await S.inviaSpinte({ root: dir, deps: giu.deps });
+  assert.equal(giu.chiamate.length, 1);
+  assert.deepEqual([r.inviate, r.restano], [0, 2]);
+  const su = finto([[200, { ok: true }]]);
+  assert.equal((await S.inviaSpinte({ root: dir, deps: su.deps })).inviate, 2);
+  assert.deepEqual(su.chiamate.map((c) => c.corpo.ticket), [BIGLIETTO, `${BIGLIETTO}-2`]);
+  assert.deepEqual(su.chiamate[1].corpo.spinte[0], { repo: 'app', ramo: 'claude/x', commits: [], punta: B, sostituiti: [A], riscritti: [{ sha: B, di: A }] });
 });
 
 test('l’invio di una copia è uno alla volta: chi arriva mentre un altro manda aspetta, poi trova la coda vuota', async () => {

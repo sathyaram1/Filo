@@ -71,25 +71,93 @@ export function chiSpinge({ root, env = process.env } = {}) {
  * commit visto su origin l'ha spinto qualcun altro, anche se poi è stato tolto. → { commits, oltre } | null se git tace.
  */
 export function commitPropri(root, { locale, remoto = '', ramo = '' } = {}) {
-  const escludi = [];
-  if (remoto && !VUOTO.test(remoto)) {
-    try { git(root, ['cat-file', '-e', `${remoto}^{commit}`]); escludi.push(remoto); } catch (_) { /* non l'abbiamo: contano i ref remoti */ }
-  }
-  if (ramo) {
-    try {
-      for (const s of git(root, ['reflog', 'show', '--format=%H', `refs/remotes/origin/${ramo}`, '--']).split('\n')) {
-        if (SHA_RE.test(s.trim())) escludi.push(s.trim());
-      }
-    } catch (_) { /* nessuno storico del ref remoto */ }
-  }
+  const escludi = punteViste(root, { remoto, ramo });
   try {
-    const input = [locale, ...[...new Set(escludi)].map((s) => `^${s}`)].join('\n') + '\n';
+    const input = [locale, ...escludi.map((s) => `^${s}`)].join('\n') + '\n';
     const out = git(root, ['rev-list', `--max-count=${TETTO_COMMIT + 1}`, '--stdin', '--not', '--remotes'], input);
     const commits = out.split('\n').map((s) => s.trim()).filter((s) => SHA_RE.test(s));
     return { commits: commits.slice(0, TETTO_COMMIT), oltre: commits.length > TETTO_COMMIT };
   } catch (_) {
     return null;
   }
+}
+
+/** Le punte che `ramo` ha avuto su origin in questa copia: quella del remoto adesso (`remoto`, se l'abbiamo) e lo storico del ref remoto. */
+function punteViste(root, { remoto = '', ramo = '' } = {}) {
+  const punte = [];
+  if (remoto && !VUOTO.test(remoto)) {
+    try { git(root, ['cat-file', '-e', `${remoto}^{commit}`]); punte.push(remoto); } catch (_) { /* non l'abbiamo: contano i ref remoti */ }
+  }
+  if (ramo) {
+    try {
+      for (const s of git(root, ['reflog', 'show', '--format=%H', `refs/remotes/origin/${ramo}`, '--']).split('\n')) {
+        if (SHA_RE.test(s.trim())) punte.push(s.trim());
+      }
+    } catch (_) { /* nessuno storico del ref remoto */ }
+  }
+  return [...new Set(punte)];
+}
+
+/**
+ * I commit visti su origin per `ramo` che `locale` non porta più e main non ha: la spinta li riscrive (un rebase) o li
+ * toglie, e il server vuole che un biglietto pulito li avesse dichiarati (#1362 giro 2 r1). Senza le fusioni, che un
+ * rebase non ricopia. → { sostituiti, oltre } | null se git tace.
+ */
+export function commitSostituiti(root, { locale, remoto = '', ramo = '' } = {}) {
+  const punte = punteViste(root, { remoto, ramo });
+  if (!punte.length) return { sostituiti: [], oltre: false };
+  let main = '';
+  try { main = git(root, ['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main^{commit}']).trim(); } catch (_) { /* senza main resta tutto il visto */ }
+  try {
+    const input = [...punte, `^${locale}`, ...(SHA_RE.test(main) ? [`^${main}`] : [])].join('\n') + '\n';
+    const out = git(root, ['rev-list', '--no-merges', `--max-count=${TETTO_COMMIT + 1}`, '--stdin'], input);
+    const sostituiti = out.split('\n').map((s) => s.trim()).filter((s) => SHA_RE.test(s));
+    return { sostituiti: sostituiti.slice(0, TETTO_COMMIT), oltre: sostituiti.length > TETTO_COMMIT };
+  } catch (_) {
+    return null;
+  }
+}
+
+/** La modifica di ogni commit (git patch-id), che un rebase senza conflitti conserva. Map sha → id; vuota se git tace. */
+export function patchIds(root, shas) {
+  const out = new Map();
+  if (!shas.length) return out;
+  try {
+    const diff = git(root, ['diff-tree', '--stdin', '-p', '--root'], `${shas.join('\n')}\n`);
+    for (const riga of git(root, ['patch-id', '--stable'], diff).split('\n')) {
+      const [id, sha] = riga.trim().split(/\s+/);
+      if (id && SHA_RE.test(sha || '')) out.set(sha, id);
+    }
+  } catch (_) { /* le copie restano fra i commit propri: i sostituiti le coprono lo stesso */ }
+  return out;
+}
+
+/**
+ * Cosa dichiarare di una spinta di `locale` su `ramo`: i commit creati qui; fra questi le copie di un rebase vanno in
+ * `riscritti` con l'originale (entrano solo se quello era dichiarato); `sostituiti` i commit visti su origin che la
+ * spinta riscrive o toglie. null se non porta niente o git tace (i commit restano di nessuno, cioè buco).
+ */
+export function spintaDi(root, { locale, remoto = '', ramo }) {
+  const propri = commitPropri(root, { locale, remoto, ramo });
+  if (!propri) return null;
+  const sost = commitSostituiti(root, { locale, remoto, ramo });
+  let commits = propri.commits;
+  const riscritti = [];
+  if (sost && sost.sostituiti.length && commits.length) {
+    const originali = new Map();
+    for (const [sha, id] of patchIds(root, sost.sostituiti)) if (!originali.has(id)) originali.set(id, sha);
+    const ids = patchIds(root, commits);
+    commits = commits.filter((c) => {
+      const di = originali.get(ids.get(c));
+      if (di) riscritti.push({ sha: c, di });
+      return !di;
+    });
+  }
+  if (!commits.length && !riscritti.length && !propri.oltre) return null;
+  return Object.assign(
+    { ramo, punta: locale, commits }, propri.oltre ? { oltre: true } : {}, riscritti.length ? { riscritti } : {},
+    sost && sost.sostituiti.length ? { sostituiti: sost.sostituiti } : {}, !sost || sost.oltre ? { sostituitiOltre: true } : {},
+  );
 }
 
 // Chi ha fatto un commit, annotato dal post-commit: due sessioni nella stessa cartella non si dichiarano a vicenda i commit.
@@ -147,7 +215,8 @@ export function perAutore(root, chi, spinte) {
         altri.get(a.ticket).commits.push(c);
       } else propri.push(c);
     }
-    if (propri.length || s.oltre) gruppi.get(chi.ticket).spinte.push(Object.assign({}, s, { commits: propri }));
+    // Le copie di un rebase e i sostituiti restano a chi spinge: la riscrittura è sua.
+    if (propri.length || s.oltre || (s.riscritti || []).length) gruppi.get(chi.ticket).spinte.push(Object.assign({}, s, { commits: propri }));
     for (const [t, a] of altri) {
       if (!gruppi.has(t)) gruppi.set(t, { chi: a.chi, spinte: [] });
       gruppi.get(t).spinte.push({ ramo: s.ramo, commits: a.commits });
@@ -164,13 +233,15 @@ export function spinteDelPrePush(root, righe) {
     if (!locale || VUOTO.test(locale) || !SHA_RE.test(locale)) continue;
     const m = /^refs\/heads\/(.+)$/.exec(String(rif || ''));
     if (!m || /^(main|master)$/i.test(m[1])) continue;
-    const propri = commitPropri(root, { locale, remoto: SHA_RE.test(String(remoto || '')) ? remoto : '', ramo: m[1] });
     // Senza l'elenco la spinta non si dichiara: i suoi commit restano di nessuno, cioè buco al controllo.
-    if (!propri || (!propri.commits.length && !propri.oltre)) continue;
-    out.push(Object.assign({ ramo: m[1], punta: locale, commits: propri.commits }, propri.oltre ? { oltre: true } : {}));
+    const s = spintaDi(root, { locale, remoto: SHA_RE.test(String(remoto || '')) ? remoto : '', ramo: m[1] });
+    if (s) out.push(s);
   }
   return out;
 }
+
+/** Quanti sha porta una voce, per i tetti di una chiamata del server. PURA. */
+const shaDellaVoce = (v) => ['commits', 'sostituiti', 'riscritti'].reduce((n, k) => n + (Array.isArray(v[k]) ? v[k].length : 0), 0);
 
 /** Accoda le spinte di `chi` per `repo`. Lancia se non riesce a scrivere. */
 export function accoda(root, chi, repo, spinte, nowMs = Date.now()) {
@@ -214,7 +285,7 @@ export function gruppiDi(voci) {
   let cur = null;
   let commit = 0;
   for (const v of voci) {
-    const n = Array.isArray(v.commits) ? v.commits.length : 0;
+    const n = shaDellaVoce(v);
     if (!cur || cur.tipo !== v.tipo || cur.ticket !== v.ticket || cur.voci.length >= TETTO_SPINTE_CHIAMATA || commit + n > TETTO_COMMIT_CHIAMATA) {
       cur = { tipo: v.tipo, ticket: v.ticket, fp: v.fp || '', file: v.file || '', voci: [] };
       gruppi.push(cur);
@@ -230,6 +301,9 @@ function spinteDi(gruppo) {
   return gruppo.voci.map((v) => Object.assign(
     { repo: v.repo, ramo: v.ramo, commits: Array.isArray(v.commits) ? v.commits : [] },
     v.punta ? { punta: v.punta } : {}, v.oltre === true ? { oltre: true } : {},
+    Array.isArray(v.sostituiti) && v.sostituiti.length ? { sostituiti: v.sostituiti } : {},
+    v.sostituitiOltre === true ? { sostituitiOltre: true } : {},
+    Array.isArray(v.riscritti) && v.riscritti.length ? { riscritti: v.riscritti } : {},
   ));
 }
 
@@ -316,9 +390,11 @@ export async function inviaSpinte({ root, deps = {}, attesaMs = ATTESA_TURNO_MS 
           if (r.esito === 'ok') out.inviate += g.voci.length;
           else { out.rifiutate += g.voci.length; out.errori.push(r.motivo); }
         } else {
-          for (const v of g.voci) tenute.add(v._file);
+          // Quelle dopo aspettano con lei: la copia di un rebase passa solo se il suo originale è arrivato prima.
+          for (const v of voci) tenute.add(v._file);
           out.errori.push(r.motivo);
           if (r.esito === 'guasto') out.guasto = true;
+          break;
         }
       }
     }
