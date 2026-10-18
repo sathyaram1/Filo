@@ -256,7 +256,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
-test('mimeDiAllegato: solo i tipi dell\'allowlist del gate L0, dal nome', () => {
+test('mimeDiAllegato: solo i tipi dell\'allowlist del cancello degli allegati, dal nome', () => {
   assert.equal(SCRIPT.mimeDiAllegato('spec.md'), 'text/markdown');
   assert.equal(SCRIPT.mimeDiAllegato('SPEC.MD'), 'text/markdown');
   assert.equal(SCRIPT.mimeDiAllegato('errori.log'), 'text/plain');
