@@ -160,6 +160,16 @@ solo per l'indirizzo della pagina che lo chiede (#589.1, giro 3). Una
 domanda nuova di questo genere entra in `DOMANDE_WEB_COL_GESTO`, uno scomparto
 in `CHIAVI_STORAGE_WEB_COL_GESTO`.
 
+Due porte restano aperte per decisione dell'owner (17/10/2026), con le prove del
+giro segnate come rosso atteso. Un sito, con l'isolamento rotto, chiede al
+modello, alla voce e alla ricerca dell'utente un testo suo anche da una scheda
+di sfondo: la lista sa quali domande, non quali valori (la stringe l'unione che
+prende #899; un tetto di spesa per sito sarebbe un lavoro a parte). E il gesto
+che vale per Incolla, dizionario e menu è anche un clic sul sito, non solo verso
+Filo: lo chiude il menu fuori dalla pagina (D14). I rifiuti per provenienza
+dentro i singoli gestori restano come secondo strato; la regola su cosa un sito
+può chiedere è la lista.
+
 Ogni spinta che gira su più schede o finestre passa da `spingiAllaScheda` /
 `spingiAllaFinestra` di quel file, o si limita da sé alle superfici di Filo: una
 strada parallela (l'avviso dei dati dal vivo, quello degli scaricamenti, lo
