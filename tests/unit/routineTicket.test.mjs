@@ -8,10 +8,11 @@
 //   esattamente il buco che la spec viene a chiudere. È una riga di codice, ed
 //   è il cardine di tutto il pezzo.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -197,7 +198,7 @@ test('il biglietto scritto si rilegge', () => {
     assert.ok(existsSync(ticketFile(root)));
     clearTicket(root);
     assert.equal(readTicket(root), '');
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { togliCartella(root); }
 });
 
 test('un biglietto vecchio non viene riusato: il semaforo è certamente morto', () => {
@@ -220,7 +221,7 @@ test('un file illeggibile non fa saltare niente: si lavora senza biglietto', () 
   try {
     writeFileSync(ticketFile(root), '{ questo non è json', 'utf8');
     assert.equal(readTicket(root), '');
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { togliCartella(root); }
 });
 
 test('il marcatore del biglietto NON deve entrare nella storia: questo repo è pubblico', () => {
@@ -244,7 +245,7 @@ test('scrivere un biglietto vuoto non crea un marcatore fasullo', () => {
     assert.equal(writeTicket(root, ''), null);
     assert.equal(writeTicket(root, '   '), null);
     assert.equal(readTicket(root), '');
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { togliCartella(root); }
 });
 
 // ── La consegna dalla riga di comando ───────────────────────────────────────
@@ -256,7 +257,7 @@ test('scrivere un biglietto vuoto non crea un marcatore fasullo', () => {
 // Adesso un argomento non capito ferma la consegna invece di essere ignorato.
 
 import { spawnSync } from 'node:child_process';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const CANALE = resolve(fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url)));
 
@@ -301,9 +302,11 @@ test('#565 ticket --json stampa biglietto E ruolo (e il biglietto non si spreca)
   });
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
   const porta = srv.address().port;
+  // Il comando registra la decisione nelle impostazioni utente: qui una cartella usa-e-getta.
+  const utente = cartellaTemporanea('filo-ticket-utente-');
   const esegui = (argomenti) => new Promise((ok) => {
     const p = spawn(process.execPath, [CANALE, ...argomenti], {
-      env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${porta}` },
+      env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${porta}`, CLAUDE_CONFIG_DIR: utente },
     });
     let so = ''; let se = '';
     p.stdout.on('data', (c) => { so += c; });
@@ -328,5 +331,64 @@ test('#565 ticket --json stampa biglietto E ruolo (e il biglietto non si spreca)
     assert.equal(senza.so.trim(), 'b-123');
   } finally {
     await new Promise((ok) => srv.close(ok));
+    togliCartella(utente);
+  }
+});
+
+// #1189: il server decide modello e sforzo del worker; il comando li stampa e li registra per il gancio
+// dell'orchestratore cieco, che senza la voce rifiuta il lancio.
+test('#1189 ticket porta model ed effort del server e registra la decisione per il gancio, con l\'impronta', async () => {
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const { readFileSync } = await import('node:fs');
+  const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
+  const VERO = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
+  let risposta = { ok: true, work: true, ticket: VERO, role: 'new-work', model: 'fable', effort: 'max' };
+  const srv = createServer((req, res) => {
+    req.resume();
+    req.on('end', () => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(risposta)); });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  const utente = cartellaTemporanea('filo-ticket-utente-');
+  const esegui = (argomenti, dir = utente) => new Promise((ok) => {
+    const p = spawn(process.execPath, [CANALE, ...argomenti], {
+      env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, CLAUDE_CONFIG_DIR: dir },
+    });
+    let so = ''; let se = '';
+    p.stdout.on('data', (c) => { so += c; });
+    p.stderr.on('data', (c) => { se += c; });
+    p.on('close', (code) => ok({ code, so, se }));
+  });
+  const voci = () => JSON.parse(readFileSync(resolve(utente, FILE_REGISTRO), 'utf8')).voci;
+  try {
+    const r = await esegui(['ticket', 'parola-d-ordine', '--json']);
+    assert.equal(r.code, 0, r.se);
+    assert.deepEqual(JSON.parse(r.so.trim()), { ticket: VERO, role: 'new-work', model: 'fable', effort: 'max' });
+    const testo = readFileSync(resolve(utente, FILE_REGISTRO), 'utf8');
+    assert.ok(!testo.includes(VERO), 'mai il biglietto in chiaro');
+    const [v] = voci();
+    assert.deepEqual({ ...v, ora: undefined }, { impronta: impronta(VERO), ruolo: 'new-work', model: 'fable', effort: 'max', ora: undefined });
+    assert.ok(Math.abs(Date.parse(v.ora) - Date.now()) < 60_000);
+
+    // Server muto: niente model ed effort nel JSON né nella voce, e anche la forma senza --json registra.
+    risposta = { ok: true, work: true, ticket: `ZZZZ${VERO.slice(4)}`, role: 'verifier' };
+    const muto = await esegui(['ticket', 'parola-d-ordine']);
+    assert.equal(muto.code, 0, muto.se);
+    assert.equal(muto.so.trim(), `ZZZZ${VERO.slice(4)}`);
+    assert.deepEqual(voci().map((x) => [x.ruolo, x.model, x.effort]), [['new-work', 'fable', 'max'], ['verifier', undefined, undefined]]);
+    const conJson = await esegui(['ticket', '--json', 'parola-d-ordine']);
+    assert.deepEqual(JSON.parse(conJson.so.trim()), { ticket: `ZZZZ${VERO.slice(4)}`, role: 'verifier' });
+
+    // Registro non scrivibile: guasto, col comando per rilasciare il biglietto, mai un biglietto che il gancio rifiuterebbe.
+    const bloccata = resolve(utente, 'bloccata');
+    writeFileSync(bloccata, 'un file al posto della cartella');
+    const no = await esegui(['ticket', 'parola-d-ordine', '--json'], bloccata);
+    assert.equal(no.code, 3, no.se);
+    assert.equal(no.so, '');
+    assert.match(no.se, /non registrata per il gancio/);
+    assert.match(no.se, new RegExp(`release ZZZZ${VERO.slice(4)} --role orchestrator`));
+  } finally {
+    await new Promise((ok) => srv.close(ok));
+    togliCartella(utente);
   }
 });

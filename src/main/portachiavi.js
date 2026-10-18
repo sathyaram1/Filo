@@ -19,11 +19,11 @@ function portachiaviDaChiedere({ platform, env = {}, haSwitch = false } = {}) {
 
 // Si consiglia solo il portachiavi che Filo userebbe davvero su quel desktop (#708.1):
 // su KDE solo KWallet; con la cifratura di ripiego imposta da chi lancia, nessuno.
-function consiglioPortachiavi({ platform, backend } = {}) {
+function consiglioPortachiavi({ platform, backend, perChe = 'Per farlo ricordare' } = {}) {
   if (platform !== 'linux') return '';
   const b = String(backend || '');
-  if (/^kwallet/.test(b)) return 'Per farlo ricordare serve KWallet acceso: attivalo o installalo e riapri Filo.';
-  if (b === 'gnome_libsecret') return 'Per farlo ricordare serve un portachiavi acceso, come GNOME Keyring: installalo o avvialo e riapri Filo.';
+  if (/^kwallet/.test(b)) return `${perChe} serve KWallet acceso: attivalo o installalo e riapri Filo.`;
+  if (b === 'gnome_libsecret') return `${perChe} serve un portachiavi acceso, come GNOME Keyring: installalo o avvialo e riapri Filo.`;
   return '';
 }
 

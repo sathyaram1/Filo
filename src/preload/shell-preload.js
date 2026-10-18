@@ -166,7 +166,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   // Account "Accedi con Google". I token vivono nel main process: qui
   // arriva solo il profilo pubblico { email, name, picture }.
   auth: {
-    status: () => ipcRenderer.invoke('filo:message', { type: 'auth_status' }),
+    status: (opzioni) => ipcRenderer.invoke('filo:message', { type: 'auth_status', ...(opzioni && opzioni.senzaRete ? { senzaRete: true } : {}) }),
     signIn: () => ipcRenderer.invoke('filo:message', { type: 'auth_signin' }),
     signOut: () => ipcRenderer.invoke('filo:message', { type: 'auth_signout' }),
     onChanged: (fn) => {

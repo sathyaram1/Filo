@@ -30,6 +30,13 @@
   const GLIFO_RIPRENDI = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
+  const DOPO_OK = '[L\'utente ha dato l\'OK qui sopra: riprendi la sua richiesta da lì e rispondigli.]';
+  // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
+  const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
+    + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
+  // Una risposta fermata dal tetto di lunghezza (#1097.3) riprende dalla parola dove si è interrotta.
+  const CONTINUA_RISPOSTA = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
+    + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
   const dashDir = $('dashDir');
 
   // ===== Stato locale =====
@@ -43,9 +50,18 @@
   let chatId = null;
   let sending = false;
   // Il turno che sta lavorando adesso (#578): il quadrato lo ferma. `ripresa`: l'ultimo turno è stato fermato e il
-  // tasto d'invio offre di riprenderlo finché l'utente non scrive altro.
+  // tasto d'invio offre di riprenderlo finché l'utente non scrive altro. `tasto`: il «Continua» nella bolla di un
+  // turno finito senza risposta (#557), che se ne va quando l'offerta finisce.
   let turnoVivo = null;
   let ripresa = null;
+  const chiudiRipresa = () => {
+    if (ripresa && ripresa.tasto) {
+      const riga = ripresa.tasto.parentElement;
+      ripresa.tasto.remove();
+      if (riga && !riga.childElementCount) riga.remove();
+    }
+    ripresa = null;
+  };
   // Un turno fermato la cui azione in volo non è ancora tornata dal main: finché c'è, il turno dopo aspetta lei.
   let chiusuraInCorso = null;
   // Chi ferma lo fa di fretta e insiste (doppio clic, Invio ripetuto): per un attimo il secondo colpo trova ancora il
@@ -60,6 +76,8 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
+  // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
+  let testoIncollato = null;
   const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
@@ -88,20 +106,42 @@
 
   Att.init({
     send,
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url) => iconaDelSito(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
-    archiviaAzione: (type, cambi) => {
+    sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
+    // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
+    allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
+    archiviaAzione: (type, cambi, a) => {
       const id = chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
-      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}) }); } catch (_) {} }
+      // Di una finestra guardata resta il nome e basta (#778).
+      const guardata = type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
+      if (id) {
+        try {
+          send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}) });
+        } catch (_) {}
+      }
+    },
+    // #778 — dopo l'OK a guardare una finestra la richiesta riprende da sola: un turno interno, come «Riprendi».
+    prosegui: () => {
+      if (sending) return;
+      sending = true;
+      aggiornaTasto();
+      threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
+      runTurnAndContinue({ userMessage: DOPO_OK, internal: true }).catch(() => {});
     },
   });
   // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
   const Cambi = self.SN_DASH_CAMBI;
   Cambi.init({ send });
+  // Le conversazioni delle altre app, righe ripiegate del filo a schermo (#974).
+  const Righe = self.SN_DASH_RIGHE;
+  Righe.init({
+    send, bubblesEl, homeEl: $('righeApp'), inThread: () => body.dataset.state === 'thread', chatId: () => chatId,
+  });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -133,7 +173,7 @@
   // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
   const inChatAperta = (chat) => !chat || chat === chatId;
 
-  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS });
+  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS, bozza: () => !!($('input')?.value || '').trim() });
   Term.init({
     dashDir,
     inputEl,
@@ -174,7 +214,7 @@
     goThread: () => goThread(),
     resetHistory: (onbState) => {
       threadHistory = [];
-      ripresa = null;
+      chiudiRipresa();
       aggiornaTasto();
       // #525 — l'intervista è UNA conversazione: la sua targa la dà lo stato
       // dell'intervista, non il sorteggio di questo caricamento di pagina.
@@ -213,6 +253,12 @@
     },
     setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
+    // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
+    rispondi: (testo) => {
+      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length) return false;
+      submitMessage(testo);
+      return true;
+    },
   });
   Carte.init({
     send,
@@ -222,100 +268,11 @@
     refreshLive: () => refreshLive(),
     onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url, opz) => iconaDelSito(url, opz),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
     chatCorrente: () => chatId,
   });
-  // ===== Suoneria timer =====
-  // Singleton AudioContext + oscillatori per la suoneria del timer.
-  // Non usiamo file audio per non dover committare binari; generiamo
-  // sequenze di beep via WebAudio. La suoneria parte quando il primo
-  // timer passa in stato `ringing` e si ferma quando non ce ne sono più.
-  let _alarmCtx = null;
-  let _alarmPlaying = false;
-  let _alarmLoopTimeout = null;
-  let _timerRingTone = 'default'; // suoneria attiva (ID stringa)
-
-  // Catalogo suonerie: ogni voce è un array di note [ [freq, durMs], … ]
-  // seguite da un gap prima del loop successivo.
-  const RINGTONES = {
-    default: {
-      label: 'Standard',
-      notes: [[880, 150], [0, 80], [880, 150], [0, 80], [880, 150], [0, 400]],
-    },
-    gentle: {
-      label: 'Delicata',
-      notes: [[523, 200], [0, 100], [659, 200], [0, 100], [784, 300], [0, 600]],
-    },
-    urgent: {
-      label: 'Urgente',
-      notes: [[1047, 80], [0, 50], [1047, 80], [0, 50], [1047, 80], [0, 50],
-               [1047, 80], [0, 50], [1047, 80], [0, 300]],
-    },
-    chime: {
-      label: 'Carillon',
-      notes: [[1046, 120], [0, 60], [1318, 120], [0, 60], [1568, 120], [0, 60],
-               [2093, 200], [0, 700]],
-    },
-  };
-
-  function _getAlarmCtx() {
-    if (!_alarmCtx) _alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
-    return _alarmCtx;
-  }
-
-  // Suona UNA sequenza di note (non in loop). Ritorna una Promise che si
-  // risolve quando la sequenza è finita. Usata sia per la suoneria in loop
-  // sia per l'anteprima nelle opzioni (ma lì non in loop).
-  function _playSequence(toneId) {
-    const tone = RINGTONES[toneId] || RINGTONES.default;
-    const ctx = _getAlarmCtx();
-    // Risveglia il contesto se sospeso (politica autoplay browser).
-    const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-    return resume.then(() => {
-      return new Promise((resolve) => {
-        let t = ctx.currentTime;
-        for (const [freq, durMs] of tone.notes) {
-          if (freq > 0) {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.35, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + durMs / 1000 - 0.01);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(t);
-            osc.stop(t + durMs / 1000);
-          }
-          t += durMs / 1000;
-        }
-        // Risolvi al termine dell'ultima nota + gap.
-        setTimeout(resolve, Math.max(0, (t - ctx.currentTime) * 1000));
-      });
-    });
-  }
-
-  // Avvia la suoneria in loop continuo. Idempotente: se già suona, non fa nulla.
-  function startAlarm() {
-    if (_alarmPlaying) return;
-    _alarmPlaying = true;
-    async function loop() {
-      if (!_alarmPlaying) return;
-      try { await _playSequence(_timerRingTone); } catch (_) {}
-      if (_alarmPlaying) _alarmLoopTimeout = setTimeout(loop, 0);
-    }
-    loop();
-  }
-
-  // Ferma la suoneria. Idempotente.
-  function stopAlarm() {
-    _alarmPlaying = false;
-    clearTimeout(_alarmLoopTimeout);
-    _alarmLoopTimeout = null;
-  }
-
   // ===== Helpers messaggi =====
   function send(msg) {
     return new Promise((resolve) => {
@@ -388,16 +345,19 @@
     threadHistory = [];
     bubblesEl.innerHTML = '';
     inputEl.value = '';
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     autoGrowInput();
     inputEl.focus();
+    Righe.aggiorna().catch(() => {});
   }
 
   function goThread() {
+    const entra = body.dataset.state !== 'thread';
     body.dataset.state = 'thread';
     homeView.hidden = true;
     threadView.hidden = false;
+    if (entra) Righe.aggiorna().catch(() => {});
   }
 
   // #525 — riapertura di una chat archiviata (filo://archive → clic su una
@@ -419,9 +379,23 @@
     if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
     // Da una carta della home (#870): la conversazione a schermo si chiude come col ritorno alla home.
     if (chiudiPrima && chatId && chatId !== chat.id) { closeCurrentChat(); Term.nuovaChat(false); }
+    // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) si guarda aperta nel filo, non si continua da qui:
+    // quello che si scrive dopo apre una conversazione nuova della home, con quella riga davanti.
+    if (chat.app) {
+      if (chatId) { closeCurrentChat(); Term.nuovaChat(false); }
+      chatId = null;
+      threadHistory = [];
+      chiudiRipresa();
+      aggiornaTasto();
+      bubblesEl.innerHTML = '';
+      goThread();
+      const vista = await Righe.mostraSola(chat);
+      inputEl.focus();
+      return vista;
+    }
     chatId = chat.id;
     threadHistory = [];
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     bubblesEl.innerHTML = '';
     goThread();
@@ -430,8 +404,18 @@
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
-      if (text.trim()) {
+      // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
+      const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
+      if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        if (m.ts) b.dataset.ts = m.ts;
+        fotoViste.forEach((src, i) => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.className = 'dash-bubble-img';
+          attachImageLightbox(img, src);
+          b.insertBefore(img, b.childNodes[i] || null);
+        });
         bubblesEl.appendChild(b);
         if (isUser) bollaUtente = b;
       }
@@ -443,13 +427,15 @@
       // capisce più di cosa si parlasse — un taglio silenzioso su quello che
       // aveva mandato lui.
       const quante = Number(m.images) || 0;
-      if (quante > 0) {
+      const perse = Math.max(0, quante - fotoViste.length);
+      if (perse > 0) {
         const nota = document.createElement('div');
         nota.className = 'dash-bubble-note';
         nota.dataset.replay = '1';
-        nota.textContent = quante === 1
-          ? '1 immagine, non conservata'
-          : `${quante} immagini, non conservate`;
+        const altre = fotoViste.length > 0;
+        nota.textContent = perse === 1
+          ? (altre ? 'un\'altra immagine, non conservata' : '1 immagine, non conservata')
+          : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
         bubblesEl.appendChild(nota);
       }
       if (!isUser && types.length) {
@@ -459,14 +445,28 @@
         note.textContent = Att.summarizeActivity(types, false);
         bubblesEl.appendChild(note);
       }
+      // #778 — di una finestra guardata l'archivio tiene il nome: l'immagine e quello che c'era non si conservano.
+      const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
+      for (const nome of guardate) {
+        const nota = document.createElement('div');
+        nota.className = 'dash-bubble-note';
+        nota.dataset.replay = '1';
+        nota.textContent = `Ho guardato «${nome}»: l'immagine non è conservata`;
+        bubblesEl.appendChild(nota);
+      }
       // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
       const fuori = isUser ? {} : {
         ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+        ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
         ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       };
       threadHistory.push(isUser
-        ? { role: 'user', text, ...(m.daModello ? { daModello: true } : {}) }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
+        ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
+        : {
+          role: 'filo', text, ...fuori,
+          actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
+            ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
+        });
     }
     Term.nuovaChat(chat.messages.some((m) => (
       (m.role !== 'user' && Array.isArray(m.actions) && m.actions.includes('ESEGUI_COMANDO'))
@@ -474,6 +474,7 @@
     )));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
+    Righe.aggiorna({ riposa: true }).catch(() => {});
     return true;
   }
 
@@ -517,9 +518,6 @@
   }
 
   // ===== Suggerimenti =====
-  // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
-  // gratis, niente API key, regge i casi mancanti restituendo un'icona
-  // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
   // Quello che l'utente ha scritto in questa chat: un codice scritto da lui può uscire (#810). Il testo di un
   // suggerimento della home no, l'ha scritto un modello.
   function paroleUtente() {
@@ -528,9 +526,27 @@
 
   // Un indirizzo web che un modello ha proposto qui si apre solo dal main, dopo la porta delle uscite, con
   // l'indirizzo che si apre davvero (#810). Se si ferma, la riga lo dice accanto a ciò che è stato cliccato.
-  async function apriProposta(url, vicino = null) {
+  // Un collegamento che la risposta di Filo segnava da confermare chiede l'OK anche al clic (#868.6), riaperta compresa.
+  const formaLink = (u) => { try { return new URL(String(u || '')).href; } catch (_) { return String(u || ''); } };
+  function motivoDaConfermare(url) {
+    const k = formaLink(url);
+    for (const m of threadHistory) {
+      for (const x of (m && Array.isArray(m.linkDaConfermare) ? m.linkDaConfermare : [])) {
+        if (x && formaLink(x.url) === k) return String(x.motivo || 'da confermare');
+      }
+    }
+    return '';
+  }
+  async function apriProposta(url, vicino = null, chiedi = '') {
+    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url) };
     let r = null;
-    try { r = await send({ type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente() }); } catch (_) {}
+    try { r = await send(msg); } catch (_) {}
+    if (r && r.conferma) {
+      const Ui = window.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      if (!ok) return;
+      try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
     if (r && r.frase) notaFermata(r.frase, vicino);
   }
   function notaFermata(frase, vicino) {
@@ -562,13 +578,26 @@
     ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
   }, true);
 
-  function faviconUrl(rawUrl) {
-    if (!rawUrl) return '';
+  // L'icona di un sito la cerca il main, mai un servizio di terzi (#848). Si ricorda solo quella trovata:
+  // un sito che non ha risposto si richiede al giro dopo, e lì decide il main quando riprovare.
+  // `soloCopie`: l'indirizzo al clic chiede l'OK, quindi l'icona non contatta il sito prima (#848).
+  const iconeSiti = new Map();
+  function iconaDelSito(rawUrl, { soloCopie = false } = {}) {
+    let host = '';
     try {
-      const u = new URL(rawUrl);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(u.hostname)}&sz=64`;
-    } catch (_) { return ''; }
+      const u = new URL(String(rawUrl || ''));
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.host.toLowerCase();
+    } catch (_) {}
+    if (!host) return Promise.resolve('');
+    const chiave = `${soloCopie ? 'c' : 'r'}|${host}`;
+    if (!iconeSiti.has(chiave)) {
+      const dimentica = () => { iconeSiti.delete(chiave); return ''; };
+      iconeSiti.set(chiave, send({ type: MSG.ICONA_SITO, url: String(rawUrl), soloCopie }).then((r) => {
+        const dato = r && r.ok && typeof r.dato === 'string' && /^data:image\//.test(r.dato) ? r.dato : '';
+        return dato || dimentica();
+      }, dimentica));
+    }
+    return iconeSiti.get(chiave);
   }
 
   // I suggerimenti sono UNA carta fra le altre (#870): li disegna la parte delle carte.
@@ -582,24 +611,18 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: STESSA conferma del bottone chat.
-      // Popup Filo (SN_CONFIRM_UI), non il window.confirm nativo del browser
-      // (PATTERNS.md: niente default del browser). Fallback al nativo solo se il
-      // modulo non è caricato.
-      const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-        + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-      const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-        : window.confirm(`${text} Procedo?`);
-      if (!ok) return;
-      // L'esito si legge sul suggerimento stesso, come sul bottone in chat: un
-      // riordino che non risponde non si distingue da uno mai partito, e quando
-      // non c'è niente da archiviare non succede proprio nulla a schermo.
+      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530). L'esito si legge
+      // sul suggerimento stesso: un riordino mai partito non deve somigliare a uno in cui non c'era niente da chiudere.
       const testo = vicino && vicino.querySelector('.dash-carta-voce-testo');
+      const prima = testo ? testo.textContent : '';
       if (vicino) vicino.disabled = true;
       if (testo) testo.textContent = 'Riordino in corso…';
-      const r = await send({ type: MSG.RUN_TAB_TRIAGE });
-      const e = Att.esitoRiordino(r);
+      const e = await Att.riordinaSchede();
+      if (e.annullato) {
+        if (testo) testo.textContent = prima;
+        if (vicino) vicino.disabled = false;
+        return;
+      }
       if (testo) testo.textContent = `${e.ok ? '✓' : '✗'} ${e.testo}`;
       if (!e.ok && vicino) { vicino.disabled = false; vicino.title = `${e.motivo} Puoi riprovare.`; }
       return;
@@ -610,10 +633,10 @@
     if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
       send({ type: MSG.OPEN_URL, url: a.url });
     } else if (type === 'NAVIGA' && a.url) {
-      apriProposta(a.url, vicino);
+      apriProposta(a.url, vicino, s.chiedeOk || '');
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;
-      if (/^https?:/.test(url)) apriProposta(url, vicino);
+      if (/^https?:/.test(url)) apriProposta(url, vicino, s.chiedeOk || '');
     } else if (type === 'CHAT' && a.prompt) {
       submitMessage(String(a.prompt), { daModello: true });
     } else {
@@ -630,14 +653,6 @@
     const timers = (timersR?.ok && timersR.timers) || [];
     const notifications = (notiR?.ok && notiR.notifications) || [];
     Carte.setVive({ timers, notifiche: notifications });
-
-    // La suoneria parte se c'è almeno un timer che suona e si ferma quando non ce ne sono più.
-    const hasRinging = timers.some((t) => t.ringing);
-    if (hasRinging) {
-      startAlarm();
-    } else {
-      stopAlarm();
-    }
 
     // Il conto alla rovescia si ridisegna ogni secondo solo finché c'è qualcosa che scorre o suona.
     const hasActiveTimer = timers.some((t) => !t.paused || t.ringing);
@@ -676,11 +691,39 @@
     renderSuggestions();
   }
 
+  // Come loadDashboard, ma la home è già a schermo: niente passaggio dal vuoto, cambia solo se il main ha di meglio.
+  async function aggiornaDashboardInSilenzio() {
+    const giro = giroDashboard;
+    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD });
+    if (giro !== giroDashboard || !r?.ok) return;
+    const messaggio = r.message || 'Filo è in ascolto.';
+    if (homeMessageEl.textContent !== messaggio) homeMessageEl.textContent = messaggio;
+    const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
+    if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
+    suggestions = nuovi;
+    renderSuggestions();
+  }
+
+  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
+  // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
+  // c'è una conversazione in corso) si rifà almeno il messaggio della home,
+  // che altrimenti continua a spiegare un silenzio finito (#663).
+  async function risvegliaHome() {
+    await Accoglienza.maybeOpenOnboardingLater();
+    if (Accoglienza.isActive() || document.body.dataset.state !== 'home') return;
+    // Senza `force`: chi sa rispondere serve subito il saluto d'attesa e si
+    // rifà il messaggio nel giro in background, invece di far aspettare
+    // l'utente davanti a una chiamata al modello.
+    await loadDashboard();
+  }
+
   // ===== Bolle conversazione =====
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     if (pending) div.classList.add('dash-bubble-pending');
+    // L'ora la usa chi mette al loro posto nel tempo le righe delle altre app (dashboard-righe.js).
+    div.dataset.ts = new Date().toISOString();
     // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
     // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
     // la bolla così il CSS può stringere i margini quando è "solo azioni".
@@ -698,6 +741,9 @@
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
       el.classList.add('dash-bubble-md');
+      // La riga «interrotta» la scrive il main dentro la risposta: si legge come nota, non come parole del modello.
+      const ultimo = el.lastElementChild;
+      if (ultimo && self.SN_CHAT_ERRORS?.eFraseInterrotta?.(ultimo.textContent)) ultimo.classList.add('dash-bubble-interrotta');
     } else {
       el.textContent = text || '';
     }
@@ -727,6 +773,10 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    VEDI_SCHERMO: 'Guardo lo schermo…',
+    CERCA_DOCUMENTI: 'Cerco fra i tuoi documenti…',
+    CERCA_SALVATE: 'Cerco fra le pagine salvate…',
+    APRI_SALVATA: 'Apro la pagina salvata…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
@@ -747,15 +797,19 @@
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
+    RIMEDIO_CREDITI: 'Guardo i crediti…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
   }
-  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio.
-  function progressLabelFor(type, fatti, totali) {
-    const base = startLabelFor(type);
+  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio, e quale.
+  const PROGRESS_LABELS = { CERCA_DOCUMENTI: 'Leggo i documenti nuovi…' };
+  function progressLabelFor(type, fatti, totali, dettaglio) {
+    const base = PROGRESS_LABELS[String(type || '').toUpperCase()] || startLabelFor(type);
     const n = Number(totali);
-    return n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
+    const conto = n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
+    const quale = String(dettaglio || '').trim();
+    return quale ? `${conto} · ${quale.length > 60 ? `${quale.slice(0, 59)}…` : quale}` : conto;
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
@@ -805,6 +859,21 @@
     // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
     let streamBubble = null;
     let streamedText = '';
+    // La risposta scritta nei giri di soli bottoni (#1167) resta in testa alla bolla: i giri dopo scrivono sotto.
+    let rispostaPrima = '';
+    let giroIniziato = false;
+    const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+    const testoDelGiro = () => (globalThis.SN_CALC
+      ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
+      : streamedText);
+    const bollaDellaRisposta = () => {
+      if (!streamBubble) {
+        streamBubble = document.createElement('div');
+        streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+        bubblesEl.appendChild(streamBubble);
+      }
+      return streamBubble;
+    };
     const followBottomIfNear = () => {
       const nearBottom = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 48;
       if (nearBottom) bubblesEl.scrollTop = bubblesEl.scrollHeight;
@@ -814,24 +883,20 @@
       offAnswer = window.filo.onAnswer((data) => {
         if (!data || data.reqId !== reasoningReqId) return;
         if (data.reset) {
-          // Fallback provider a metà: butta ciò che era già a schermo, non accodare.
+          // Fallback provider a metà: butta ciò che il giro aveva già messo a schermo, non accodare.
           streamedText = '';
-          if (streamBubble) streamBubble.textContent = '';
+          if (streamBubble) streamBubble.textContent = rispostaPrima;
           return;
         }
         if (!data.delta || turno.fermato) return;
-        if (!streamBubble) {
+        if (!giroIniziato) {
+          giroIniziato = true;
           pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
-          streamBubble = document.createElement('div');
-          streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
-          bubblesEl.appendChild(streamBubble);
         }
         streamedText += data.delta;
         // Il marker del conto si vede già come numero mentre scorre: la
         // risposta finale lo avrà risolto nel main, e le due non devono differire.
-        streamBubble.textContent = globalThis.SN_CALC
-          ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
-          : streamedText;
+        bollaDellaRisposta().textContent = rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro();
         followBottomIfNear();
       });
     }
@@ -842,6 +907,19 @@
     // e la bolla riparte vuota per il giro dopo. Gli id delle chiamate già
     // raccontate qui non si ripetono a fine turno (renderActions).
     const shown = new Set();
+    // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
+    const chiudiGiro = (data) => {
+      if (data.risposta) {
+        rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
+        bollaDellaRisposta().textContent = rispostaPrima;
+      } else if (streamBubble && rispostaPrima) {
+        pending.aggiungiNota(testoDelGiro());
+        streamBubble.textContent = rispostaPrima;
+      } else if (streamBubble) {
+        if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
+        streamBubble = null;
+      }
+    };
     let offAction = null;
     if (window.filo?.onAction) {
       offAction = window.filo.onAction((data) => {
@@ -849,7 +927,7 @@
         if (data.kind === 'start') {
           pending.working(startLabelFor(data.type), String(data.callId || ''));
         } else if (data.kind === 'progress') {
-          pending.working(progressLabelFor(data.type, data.fatti, data.totali));
+          pending.working(progressLabelFor(data.type, data.fatti, data.totali, data.dettaglio));
         } else if (data.kind === 'done') {
           const a = data.action;
           if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
@@ -860,11 +938,10 @@
             pending.azioneSenzaRiga(a, { scartata: true });
           }
         } else if (data.kind === 'round') {
-          if (streamBubble) {
-            if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
-            streamBubble = null;
-          }
+          // Dopo lo stop la bolla è di apriTurnoFermato: il testo a metà resta dov'è.
+          if (!turno.fermato) chiudiGiro(data);
           streamedText = '';
+          giroIniziato = false;
           pending.fineGiro();
         }
       });
@@ -906,7 +983,7 @@
     // suo esito arriva nel blocco, che si chiude allora (patterns/il-filo-dell-attesa.md).
     const r = await Promise.race([inviato, turno.fermata]);
     if (turno.fermato) {
-      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText });
+      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, streamedText) });
       const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown }); });
       return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura };
     }
@@ -914,13 +991,21 @@
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
+      // La parte di risposta scritta coi bottoni era arrivata (#1167): resta nella bolla coi suoi bottoni, e l'errore
+      // dice sotto che il lavoro dopo non è riuscito. Il testo a metà del giro fallito invece se ne va.
+      if (rispostaPrima && streamBubble) {
+        streamBubble.classList.remove('dash-bubble-streaming');
+        setBubbleText(streamBubble, rispostaPrima, true);
+        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: goHome, activity: pending, shown });
+        streamBubble = null;
+      }
       pending.endTurn();
       if (ownsActivity) pending.finish();
       // Le azioni fatte PRIMA del guasto sono successe davvero: restano nello
       // storico, così un «Riprova» riparte sapendo che quel timer c'è già
       // invece di avviarne un secondo.
-      if (Array.isArray(r?.actions) && r.actions.length) {
-        threadHistory.push({ role: 'filo', text: '', actions: r.actions, interrotto: true });
+      if (rispostaPrima || (Array.isArray(r?.actions) && r.actions.length)) {
+        threadHistory.push({ role: 'filo', text: rispostaPrima, actions: Array.isArray(r?.actions) ? r.actions : [], interrotto: true });
       }
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
@@ -953,14 +1038,19 @@
       // lo status.
       const W = window.SN_WALLET;
       const keyRefused = r && 'keyRefused' in r ? Boolean(r.keyRefused) : Boolean(W && W.isKeyRefusalStatus(r?.status));
-      if (r?.code === 'NO_API_KEY' || keyRefused) {
-        const credits = document.createElement('button');
-        credits.type = 'button';
-        credits.className = 'dash-action-btn';
-        credits.textContent = 'Apri Crediti';
-        credits.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter';
-        credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
-        row.appendChild(credits);
+      // Dove si rimedia lo dice chi conosce i codici, non un elenco di casi
+      // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
+      // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
+      const CE = window.SN_CHAT_ERRORS;
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason }) : null;
+      if (pagina) {
+        const via = document.createElement('button');
+        via.type = 'button';
+        via.className = 'dash-action-btn';
+        via.textContent = pagina.label;
+        via.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : pagina.title;
+        via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
+        row.appendChild(via);
       }
       if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
@@ -976,6 +1066,8 @@
       // c'è testo ma ci sono azioni, la bolla in streaming non esiste (non è mai
       // arrivato un delta) e cadiamo nel ramo "solo azioni" come prima.
       let filoBubble;
+      // La nota che il main ha fatto diventare risposta esce dal blocco: la frase sta nella bolla e basta.
+      if (r.notaRisposta) pending.dropNote(r.notaRisposta);
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         if (r.text) {
@@ -990,9 +1082,8 @@
           bubblesEl.appendChild(filoBubble);
         }
       } else {
-        // Se il testo è la nota dell'ultimo giro con azioni (il giro finale era
-        // muto), la nota esce dal blocco: la frase sta nella bolla e basta.
-        if (r.text) pending.dropNote(r.text);
+        // Il testo uguale all'ultima nota (formato vecchio) non resta anche nel blocco.
+        if (r.text && !r.notaRisposta) pending.dropNote(r.text);
         filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
         bubblesEl.appendChild(filoBubble);
       }
@@ -1027,6 +1118,7 @@
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
+      if (Array.isArray(r.linkDaConfermare) && r.linkDaConfermare.length) entry.linkDaConfermare = r.linkDaConfermare;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
@@ -1054,7 +1146,7 @@
     if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
     sending = true;
     // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     const imagesToSend = pendingImages.slice();
     const daFuori = testoDaFuori || imagesToSend.length > 0 || pendingFiles.length > 0;
@@ -1069,8 +1161,13 @@
     // Prima query dalla home → entra in stato thread.
     if (body.dataset.state !== 'thread') goThread();
 
-    // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}) });
+    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
+    const domanda = text || 'Descrivi questa immagine.';
+    threadHistory.push({
+      role: 'user', text: domanda,
+      ...(imagesToSend.length ? { images: imagesToSend.length } : {}),
+      ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}),
+    });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
@@ -1082,7 +1179,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello, daFuori });
+    await runTurnAndContinue({ userMessage: domanda, images: imagesToSend, daModello, daFuori });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
@@ -1106,6 +1203,9 @@
     sending = false;
     // Riprendere ha senso solo nella conversazione che è ancora a schermo.
     if (r?.ok && r.stopped && activity.el.isConnected) ripresa = { nota: r._notaFermato || null, blocco: activity.el };
+    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) {
+      offriContinua(r._bubble, activity.el, { interrotta: r.senzaRisposta.interrotta === true });
+    }
     aggiornaTasto();
     inputEl.focus();
 
@@ -1125,7 +1225,7 @@
   async function retryTurn(errBubble, args) {
     if (sending) return;
     sending = true;
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     try { errBubble.remove(); } catch (_) {}
     await runTurnAndContinue(args);
@@ -1186,12 +1286,31 @@
   async function riprendi() {
     if (sending || !ripresa) return;
     const { nota } = ripresa;
-    ripresa = null;
+    const testo = ripresa.messaggio || RIPRENDI;
+    chiudiRipresa();
     sending = true;
     aggiornaTasto();
     if (nota && nota.isConnected) nota.remove();
-    threadHistory.push({ role: 'user', text: RIPRENDI, interno: true });
-    await runTurnAndContinue({ userMessage: RIPRENDI, internal: true });
+    threadHistory.push({ role: 'user', text: testo, interno: true });
+    await runTurnAndContinue({ userMessage: testo, internal: true });
+  }
+  // Un turno finito senza risposta (#557): la frase la scrive il main, qui il «Continua» sotto e lo stesso «riprendi»
+  // di un turno fermato sul tasto d'invio e nel tasto destro del blocco.
+  function offriContinua(bolla, blocco, { interrotta = false } = {}) {
+    let riga = bolla.querySelector('.dash-bubble-actions');
+    if (!riga) {
+      riga = document.createElement('div');
+      riga.className = 'dash-bubble-actions';
+      bolla.appendChild(riga);
+    }
+    const tasto = document.createElement('button');
+    tasto.type = 'button';
+    tasto.className = 'dash-action-btn dash-action-btn-primary dash-continua';
+    tasto.textContent = 'Continua';
+    tasto.title = interrotta ? 'Continua la risposta da dove si è interrotta' : 'Riprendi da dove si era fermato';
+    tasto.addEventListener('click', () => { riprendi(); inputEl.focus(); });
+    riga.appendChild(tasto);
+    ripresa = { nota: null, blocco, tasto, messaggio: interrotta ? CONTINUA_RISPOSTA : CONTINUA };
   }
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
@@ -1366,6 +1485,7 @@
     else if (percorso) addPendingFile(percorso);
   }
   inputForm.addEventListener('paste', (e) => {
+    testoIncollato = e.target === inputEl ? (e.clipboardData?.getData('text/plain') ?? null) : null;
     const items = e.clipboardData?.items;
     if (!items) return;
     // Incolla TUTTE le immagini presenti negli appunti (non solo la prima).
@@ -1393,6 +1513,9 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
+    // Un file trovato da Filo in chat, trascinato qui: entra come quelli trascinati dal disco.
+    const daChat = e.dataTransfer?.getData('application/x-filo-file') || '';
+    if (daChat) { addPendingFile(daChat); inputEl.focus(); return; }
     const files = e.dataTransfer?.files;
     if (files && files.length) {
       for (const f of files) handleDroppedFile(f);
@@ -1403,11 +1526,13 @@
     testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);
     const dopo = inputEl.value.slice(inputEl.selectionEnd);
-    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${dopo && !/^\s/.test(dopo) ? ' ' : ''}`;
+    const spazioDopo = dopo && !/^\s/.test(dopo) ? ' ' : '';
+    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${spazioDopo}`;
     inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
     inputEl.focus();
     autoGrowInput();
     Comandi.updateInputClass();
+    Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
   });
 
   // ===== Lightbox: click su un'immagine per ingrandirla =====
@@ -1489,12 +1614,20 @@
     inputEl.style.height = `${inputEl.scrollHeight}px`;
   }
 
+  inputEl.addEventListener('focus', () => Sistema.scrive({ entra: true }));
+
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
   inputEl.addEventListener('input', (e) => {
     if (!inputEl.value) testoDaFuori = false;
     else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
     Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto();
+    // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
+    if (e.inputType === 'insertFromPaste') {
+      const incollato = typeof e.data === 'string' ? e.data : testoIncollato;
+      testoIncollato = null;
+      Term.virgoletteSuInserito(incollato, inputEl.selectionEnd);
+    }
   });
 
   // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
@@ -1506,8 +1639,60 @@
   });
 
   // ===== Bridge cambio stato live dal background =====
+  // #818 — l'avviso prima che i crediti finiscano lo prende la home con una conversazione aperta, e arriva in fondo
+  // alla conversazione, dopo la risposta che sta arrivando. Senza conversazione lo lascia alla notifica della finestra.
+  // Un rimedio applicato altrove (pagina Crediti, o chiesto a parole) cambia anche i pulsanti sotto l'avviso in chat;
+  // la frase dell'ultimo clic resta sotto il suo rimedio anche dopo il riallineamento.
+  let rimediInChat = null;
+  let esitoInChat = null;
+  const opzRimediInChat = {
+    invia: send, classeBottone: 'dash-action-btn',
+    apriChiave: () => chrome.tabs.create({ url: 'filo://credits/credits.html#chiave' }),
+    onEsito: (id, frase) => { esitoInChat = frase ? { id, frase } : null; },
+  };
+  async function riallineaRimediInChat() {
+    if (!rimediInChat || !rimediInChat.isConnected) { rimediInChat = null; return; }
+    let st = null;
+    try { st = await send({ type: MSG.CREDITS_WARNING_STATE }); } catch (_) { st = null; }
+    if (!st || !st.ok || !st.mostra || !st.avviso || !rimediInChat) return;
+    // Senza la frase le soglie non dicono più niente e lo stato porta solo i rimedi applicati: gli altri in chat restano.
+    if (!st.avviso.testo) {
+      const applicati = new Map(st.avviso.rimedi.map((x) => [x.id, x]));
+      const correnti = Array.from(rimediInChat.children).map((li) => li._rimedio).filter(Boolean);
+      st.avviso = { rimedi: correnti.map((x) => applicati.get(x.id) || x) };
+    }
+    window.SN_CREDITI_AVVISO_UI.aggiorna(rimediInChat, { avviso: st.avviso, esito: esitoInChat, ...opzRimediInChat });
+  }
+
+  async function avvisoCrediti(id) {
+    if (body.dataset.state !== 'thread' || inRiserva === true || Accoglienza.isActive()) return;
+    let r = null;
+    try { r = await send({ type: MSG.CREDITS_WARNING_CLAIM, id }); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.avviso) return;
+    const chat = chatId;
+    const fine = Date.now() + 10 * 60 * 1000;
+    while (sending && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 250));
+    // Nel filo va l'avviso intero, rimedi compresi: a una risposta a parole Filo sa cosa ha proposto.
+    const perFilo = r.avviso.perFilo || r.avviso.testo;
+    archiviaRiga(perFilo, 'filo', chat);
+    // Tornata alla home mentre aspettava: la riga resta nella chat, e i rimedi nella pagina Crediti.
+    if (!inChatAperta(chat) || body.dataset.state !== 'thread') return;
+    const inFondo = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
+    const bolla = makeBubble({ role: 'filo', text: r.avviso.testo });
+    bolla.classList.add('dash-crediti-avviso');
+    const elenco = window.SN_CREDITI_AVVISO_UI.elenco({ avviso: r.avviso, ...opzRimediInChat });
+    bolla.appendChild(elenco);
+    rimediInChat = elenco;
+    esitoInChat = null;
+    bubblesEl.appendChild(bolla);
+    threadHistory.push({ role: 'filo', text: perFilo });
+    if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+    if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
+      avvisoCrediti(String(msg.id)).catch(() => {});
+    } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
@@ -1562,10 +1747,7 @@
         applyHomeMessageVisibility();
       }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
-      // Aggiorna suoneria in live se l'utente la cambia dalle opzioni.
-      if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
-        _timerRingTone = msg.settings.timerRingtone;
-      }
+      if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
@@ -1574,11 +1756,22 @@
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
       // scheda nuova.
       if (msg.signedIn) Accoglienza.maybeOpenOnboardingLater();
-    } else if (msg?.type === MSG.CREDITS_CHANGED && msg.walletNotice) {
+    } else if (msg?.type === MSG.CREDITS_CHANGED) {
+      if (msg.avvisoCrediti) riallineaRimediInChat().catch(() => {});
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
       // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
       inCodaPopup(chiediBenvenuto);
+      // Con i crediti arriva anche il modo di rispondere: l'accoglienza che
+      // aspettava parte adesso, come già fa all'accesso. Senza, chi entrava con
+      // un invito la vedeva solo alla scheda dopo (#663).
+      Accoglienza.maybeOpenOnboardingLater();
+    } else if (msg?.type === MSG.FILO_READY_CHANGED) {
+      // Adesso Filo ha (o non ha più) un modello da chiamare. La home aperta si
+      // rifà da sé: chi aspettava la configurazione condivisa, che arriva dalla
+      // rete dopo l'avvio, restava sul cartello «non posso rispondere» fino a
+      // un ricaricamento (#663).
+      risvegliaHome().catch(() => {});
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): la spinta arriva a ogni home, lo racconta chi lo prende (#664).
       inCodaPopup(chiediRegalo);
@@ -1660,9 +1853,8 @@
     }
   }
 
-  // Le fusioni in attesa del via libera dell'owner NON compaiono più qui: la
-  // decisione vive in cima ai Ricevuti della dashboard di gestione, insieme
-  // alle altre cose che aspettano lui (scelta owner 2026-08-26).
+  // Le fusioni in attesa del via libera dell'owner NON compaiono qui: la
+  // decisione vive in Gestione (scelta owner 2026-08-26), dove stanno le altre.
 
   // ===== Recap aggiornamento (C4) =====
   // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
@@ -1860,9 +2052,29 @@
   // all'apertura) e a ogni home aperta: lo racconta una scheda sola (#664),
   // la prima che l'utente ha davanti. Una home dietro aspetta di tornare
   // visibile, poi lo chiede al main, che lo dà a una sola.
-  function quandoVisibile() {
-    if (document.visibilityState !== 'hidden') return Promise.resolve();
-    return new Promise((ok) => {
+  // La home pronta per la scheda nuova (#1128) è caricata ma nessuno la guarda, e `document.hidden` in una scheda non
+  // cambia mai: lo sa dal main, e quello che va fatto davanti all'utente aspetta che diventi una scheda. Le home che
+  // sono già schede restano come prima.
+  let inRiserva = null;
+  const attesiConsegna = [];
+  function nonPiuRiserva() {
+    const era = inRiserva === true;
+    inRiserva = false;
+    for (const ok of attesiConsegna.splice(0)) ok();
+    if (era) allaComparsa();
+  }
+  send({ type: MSG.TAB_IN_VISTA_GET }).then((r) => !!(r && r.riserva), () => false).then((si) => {
+    if (inRiserva !== null) return;
+    if (si) inRiserva = true;
+    else nonPiuRiserva();
+  });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista && inRiserva !== false) nonPiuRiserva();
+  });
+  async function quandoVisibile() {
+    if (inRiserva !== false) await new Promise((ok) => attesiConsegna.push(ok));
+    if (document.visibilityState !== 'hidden') return;
+    await new Promise((ok) => {
       const guarda = () => {
         if (document.visibilityState === 'hidden') return;
         document.removeEventListener('visibilitychange', guarda);
@@ -1883,6 +2095,34 @@
       okLabel: 'Evviva!',
     });
   }
+  // Il conto OpenRouter che non regge i crediti vivi o il tetto (#820): l'owner lo sa all'avvio senza aprire la sua
+  // pagina. Per chi non è owner il main risponde null senza chiedere niente al server.
+  function finoAChiusura(id) {
+    return new Promise((ok) => {
+      if (!document.getElementById(id)) { ok(); return; }
+      const obs = new MutationObserver(() => { if (!document.getElementById(id)) { obs.disconnect(); ok(); } });
+      obs.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+  // Si scioglie quando questa home ha avuto risposta sull'allarme del conto: gli spec la aspettano prima di cambiare chi è owner.
+  let fineAllarmeOwner = () => {};
+  const allarmeOwnerChiesto = new Promise((ok) => { fineAllarmeOwner = ok; });
+  async function chiediAllarmeOwner() {
+    await quandoVisibile();
+    // Recap e ringraziamento non tengono la coda fino alla chiusura: si aspetta che se ne vadano, mai sopra di loro.
+    await ricompenseAvvio;
+    await finoAChiusura('recapOverlay');
+    await finoAChiusura('thanksOverlay');
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_OWNER_ALARM_PENDING }); } catch (_) { r = null; }
+    fineAllarmeOwner();
+    const a = r && r.ok && r.alarm;
+    if (!a || !window.SN_CONFIRM_UI?.confirm) return;
+    const apri = await window.SN_CONFIRM_UI.confirm({
+      title: a.title, text: a.text, okLabel: 'Apri Inviti e utenti', cancelLabel: 'Più tardi',
+    });
+    if (apri) send({ type: MSG.OPEN_URL, url: 'filo://credits/owner.html' });
+  }
   async function chiediBenvenuto() {
     await quandoVisibile();
     try {
@@ -1900,11 +2140,18 @@
     return codaPopup;
   }
 
+  // Si scioglie quando questa home ha avuto risposta sulle ricompense dell'avvio, o ha deciso di non chiederle:
+  // gli spec la aspettano invece di un tempo fisso (#1212).
+  let fineRicompenseAvvio = () => {};
+  const ricompenseAvvio = new Promise((ok) => { fineRicompenseAvvio = ok; });
+
   async function maybeShowFeedbackRewards() {
-    let res;
-    try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
-    if (!res || !res.ok || !Array.isArray(res.rewards) || !res.rewards.length) return;
-    renderFeedbackRewards(res.rewards, res.totalCredits || 0);
+    try {
+      let res;
+      try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
+      if (!res || !res.ok || !Array.isArray(res.rewards) || !res.rewards.length) return;
+      renderFeedbackRewards(res.rewards, res.totalCredits || 0);
+    } finally { fineRicompenseAvvio(); }
   }
 
   // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
@@ -1913,7 +2160,9 @@
     try {
       const reduce = !!(window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-      if (reduce) return;
+      // Token `motion`: moltiplica le durate; a 0 il volo non parte, come col movimento ridotto del sistema.
+      const k = self.SN_THEME_TOKENS ? self.SN_THEME_TOKENS.motionFactor(document) : 1;
+      if (reduce || !k) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
       const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
@@ -1933,7 +2182,7 @@
 
       const coinSvg = (self.SN_ICONS?.credits?.(22)) || '●';
       const count = Math.min(9, Math.max(5, Math.round(n / 40) + 4));
-      let maxEnd = 1000;
+      let maxEnd = 1000 * k;
       for (let i = 0; i < count; i++) {
         const c = document.createElement('div');
         c.innerHTML = coinSvg;
@@ -1947,8 +2196,8 @@
         const sy = oy + (Math.random() - 0.5) * 80;
         const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 80;
         const my = Math.min(sy, ty) - 50 - Math.random() * 50;
-        const delay = i * 45;
-        const dur = 700 + i * 50 + Math.random() * 140;
+        const delay = i * 45 * k;
+        const dur = (700 + i * 50 + Math.random() * 140) * k;
         maxEnd = Math.max(maxEnd, delay + dur);
         try {
           c.animate([
@@ -2101,6 +2350,14 @@
     }
   }
 
+  // La home pronta (#1128) arriva davanti con quello che gli annunci le hanno portato: rilegge solo ciò che una home
+  // nuova chiede aprendosi e che nessun annuncio porta.
+  function allaComparsa() {
+    richiestaDellAvviso(Accoglienza.isActive()).catch(() => {});
+    if (Accoglienza.isActive()) Accoglienza.riprendiAllaComparsa().catch(() => {});
+    else if (body.dataset.state === 'home') aggiornaDashboardInSilenzio().catch(() => {});
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
@@ -2110,9 +2367,6 @@
       Sistema.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
-      // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.
-      const saved = settings?.timerRingtone;
-      if (saved && RINGTONES[saved]) _timerRingTone = saved;
     } catch (_) {}
     applyHomeMessageVisibility();
     if (Term.isEnabled()) await Term.initCwd();
@@ -2138,6 +2392,7 @@
       const opened = await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
       if (!opened) await loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e));
     }
+    if (body.dataset.state !== 'thread') Righe.aggiorna().catch(() => {});
     if (onbState) await Accoglienza.openOnboarding(onbState);
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
@@ -2156,13 +2411,16 @@
     // nessuno. Chiederlo all'apertura non costa un giro dal server (l'avviso
     // è scritto in locale) e non dipende più da chi arriva prima.
     inCodaPopup(chiediBenvenuto);
-    if (onbState) return;
+    if (onbState) { fineRicompenseAvvio(); return; }
     inCodaPopup(async () => {
+      // Recap e ringraziamento non li prende la home pronta per la scheda nuova: si consumerebbero dove nessuno li guarda.
+      await quandoVisibile();
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
         if (!shown) await maybeShowFeedbackRewards();
       } catch (_) {}
     });
+    inCodaPopup(chiediAllarmeOwner);
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
@@ -2173,5 +2431,7 @@
     applyCommandCwd: Term.applyCommandCwd,
     getCwd: Term.getCwd,
     refreshAccountControl,
+    ricompenseAvvio: () => ricompenseAvvio,
+    allarmeOwnerChiesto: () => allarmeOwnerChiesto,
   };
 })();

@@ -338,9 +338,9 @@ async function leggiMac(esec = esegui) {
 }
 
 // ── Windows: un PowerShell solo, che resta aperto e scrive una riga quando qualcosa cambia ──
-// Ogni lettura con le API del sistema che non chiedono niente: lo stato di alimentazione, la rete secondo
-// il gestore delle reti (non le API del Wi-Fi, che da Windows 11 24H2 vogliono la posizione), le radio.
-// L'uscita è JSON tutto ASCII: la codifica della console non può storpiare un nome.
+// Ogni lettura con le API del sistema che non chiedono niente: lo stato di alimentazione, le connessioni e i loro
+// nomi (non le API del Wi-Fi, che da Windows 11 24H2 vogliono la posizione), le radio. Lo script raccoglie i fatti
+// della rete, la scelta la fa reteDaWindows. L'uscita è JSON tutto ASCII: la console non può storpiare un nome.
 
 const SCRIPT_WINDOWS = String.raw`
 $ErrorActionPreference = 'SilentlyContinue'
@@ -359,6 +359,8 @@ try { $null = [Windows.Devices.Radios.Radio,Windows.System.Devices,ContentType=W
 try { $null = [Windows.Devices.Bluetooth.BluetoothDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime] } catch {}
 try { $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime] } catch {}
 try { $null = [Windows.Devices.Enumeration.DeviceInformation,Windows.Devices.Enumeration,ContentType=WindowsRuntime] } catch {}
+$infoReti = $null
+try { $infoReti = [Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime] } catch {}
 $nlm = $null
 try { $nlm = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B')) } catch {}
 $conVolume = $false
@@ -386,32 +388,51 @@ while ($true) {
       $o.batteria = [ordered]@{ livello = [int][math]::Round($l * 100); inCarica = (($f -band 8) -ne 0); collegata = ([int]$p.PowerLineStatus -eq 1) }
     }
   } catch {}
+  $rete = [ordered]@{ schede = $null; profili = $null; principale = $null; connessioni = $null }
   try {
-    $tipi = @{}
-    $uscite = @{}
+    $schede = New-Object System.Collections.ArrayList
     foreach ($n in [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
-      $id = ([string]$n.Id).Trim('{}').ToLower()
-      $tipi[$id] = [string]$n.NetworkInterfaceType
+      if (([string]$n.OperationalStatus -ne 'Up') -or ([string]$n.NetworkInterfaceType -eq 'Loopback')) { continue }
       $gw = 0
       try { $gw = @($n.GetIPProperties().GatewayAddresses | Where-Object { $_.Address -and -not $_.Address.Equals([System.Net.IPAddress]::Any) -and -not $_.Address.Equals([System.Net.IPAddress]::IPv6Any) }).Count } catch {}
-      $uscite[$id] = $gw -gt 0
+      $null = $schede.Add([ordered]@{ id = ([string]$n.Id).Trim('{}').ToLower(); tipo = [string]$n.NetworkInterfaceType; gateway = ($gw -gt 0) })
     }
-    if ($nlm) {
-      $scelta = $null
+    $rete.schede = $schede
+  } catch {}
+  if ($infoReti) {
+    try {
+      $profili = New-Object System.Collections.ArrayList
+      foreach ($pr in @($infoReti::GetConnectionProfiles())) {
+        $ad = $pr.NetworkAdapter
+        if ($null -eq $ad) { continue }
+        $liv = [int]$pr.GetNetworkConnectivityLevel()
+        if ($liv -lt 1) { continue }
+        $nomeProfilo = $null
+        try { $nomeProfilo = [string]$pr.ProfileName } catch {}
+        $null = $profili.Add([ordered]@{ id = ([string]$ad.NetworkAdapterId).Trim('{}').ToLower(); livello = $liv; iana = [int]$ad.IanaInterfaceType; nome = $nomeProfilo })
+      }
+      $rete.profili = $profili
+    } catch {}
+    try {
+      $ip = $infoReti::GetInternetConnectionProfile()
+      if ($ip -and $ip.NetworkAdapter) { $rete.principale = ([string]$ip.NetworkAdapter.NetworkAdapterId).Trim('{}').ToLower() }
+    } catch {}
+  }
+  if ($nlm) {
+    try {
+      $connessioni = New-Object System.Collections.ArrayList
       foreach ($c in @($nlm.GetNetworkConnections())) {
         if (-not $c.IsConnected) { continue }
-        $a = ([string]$c.GetAdapterId()).Trim('{}').ToLower()
-        if ((-not $c.IsConnectedToInternet) -and (-not $uscite[$a])) { continue }
-        $t = $tipi[$a]
-        $v = @{ tipo = $null; nome = $null; peso = 0 }
-        if ($t -eq 'Wireless80211') { $v.tipo = 'wifi' } elseif ($t -like '*Ethernet*') { $v.tipo = 'cavo' }
-        if ($v.tipo -eq 'wifi') { try { $v.nome = [string]$c.GetNetwork().GetName() } catch {} }
-        $v.peso = ([int][bool]$c.IsConnectedToInternet) * 2 + [int][bool]$v.tipo
-        if ((-not $scelta) -or ($v.peso -gt $scelta.peso)) { $scelta = $v }
+        $a = $null
+        try { $a = ([string]$c.GetAdapterId()).Trim('{}').ToLower() } catch {}
+        $nome = $null
+        try { $nome = [string]$c.GetNetwork().GetName() } catch {}
+        $null = $connessioni.Add([ordered]@{ id = $a; internet = [bool]$c.IsConnectedToInternet; nome = $nome })
       }
-      if ($scelta) { $o.rete = [ordered]@{ tipo = $scelta.tipo; nome = $scelta.nome } } else { $o.rete = [ordered]@{ uscita = $false } }
-    }
-  } catch {}
+      $rete.connessioni = $connessioni
+    } catch {}
+  }
+  if (($null -ne $rete.profili) -or ($null -ne $rete.connessioni)) { $o.rete = $rete }
   if ($attendi) {
     $letto = $false
     try {
@@ -456,12 +477,80 @@ function scriptWindows(pid) {
   return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0)).replace('__VOLUME__', () => volume);
 }
 
+// Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}.
+function elencoWindows(v) {
+  if (Array.isArray(v)) return v.filter((x) => x && typeof x === 'object');
+  if (v && typeof v === 'object' && Array.isArray(v.value)) return elencoWindows(v.value);
+  return null;
+}
+const RE_GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const guidWindows = (v) => {
+  const s = typeof v === 'string' ? v.trim().replace(/^\{|\}$/g, '').toLowerCase() : '';
+  return RE_GUID.test(s) ? s : null;
+};
+// IANA 71 è 802.11, 6 è Ethernet: lo stesso numero che .NET chiama Wireless80211 ed Ethernet.
+const TIPO_IANA = { 71: 'wifi', 6: 'cavo' };
+function tipoSchedaWindows(t) {
+  const s = String(t || '');
+  if (s === 'Wireless80211') return 'wifi';
+  return /ethernet/i.test(s) ? 'cavo' : null;
+}
+
+// Vince chi ha Internet, poi chi sa come esce, poi quella che Windows usa. L'adattatore lo legano i profili di Windows
+// (Guid vero); il gestore delle reti è la riserva e dà i nomi, ma via PowerShell il suo Guid può mancare (#1114).
+function reteDaWindows(r) {
+  const schede = new Map();
+  for (const s of elencoWindows(r.schede) || []) {
+    const id = guidWindows(s.id);
+    if (id) schede.set(id, s);
+  }
+  const profili = elencoWindows(r.profili);
+  const connessioni = elencoWindows(r.connessioni);
+  if (!profili && !connessioni) return null;
+  const esce = (id) => !!(id && schede.get(id) && schede.get(id).gateway === true);
+  const tipoDi = (id) => tipoSchedaWindows(id && schede.get(id) && schede.get(id).tipo);
+  const daiProfili = [];
+  for (const p of profili || []) {
+    const id = guidWindows(p.id);
+    const livello = Number(p.livello);
+    // 1 solo la rete locale, 2 Internet limitata (un portale da accettare), 3 Internet.
+    if (!id || !(livello >= 1)) continue;
+    if (livello < 2 && !esce(id)) continue;
+    daiProfili.push({ id, internet: livello === 3, tipo: TIPO_IANA[Number(p.iana)] || tipoDi(id), nome: p.nome });
+  }
+  const daiCollegamenti = [];
+  for (const c of connessioni || []) {
+    const id = guidWindows(c.id);
+    const internet = c.internet === true;
+    if (!internet && !esce(id)) continue;
+    daiCollegamenti.push({ id, internet, tipo: tipoDi(id) });
+  }
+  const candidati = daiProfili.length ? daiProfili : daiCollegamenti;
+  if (!candidati.length) return { uscita: false };
+  const principale = guidWindows(r.principale);
+  const peso = (c) => (c.internet ? 4 : 0) + (c.tipo ? 2 : 0) + (c.id && c.id === principale ? 1 : 0);
+  let scelta = candidati[0];
+  for (const c of candidati) if (peso(c) > peso(scelta)) scelta = c;
+  return { tipo: scelta.tipo, nome: scelta.tipo === 'wifi' ? nomeDaWindows(scelta, candidati, connessioni || []) : null };
+}
+
+// Il nome lo dà il gestore delle reti per adattatore, se dice quale; se no il profilo di Windows legato all'adattatore
+// (con una VPN accesa escono su Internet in due, #1114). Senza nessuno dei due è certo solo con un'uscita sola.
+function nomeDaWindows(scelta, candidati, connessioni) {
+  const nome = (c) => (c && typeof c.nome === 'string' && c.nome.trim() ? c.nome : null);
+  const stessa = scelta.id && connessioni.find((c) => guidWindows(c.id) === scelta.id);
+  if (stessa && nome(stessa)) return nome(stessa);
+  if (nome(scelta)) return nome(scelta);
+  const conInternet = connessioni.filter((c) => c.internet === true);
+  if (!scelta.internet || conInternet.length !== 1 || candidati.filter((c) => c.internet).length !== 1) return null;
+  return nome(conInternet[0]);
+}
+
 function datiDaWindows(riga) {
   let j;
   try { j = JSON.parse(String(riga || '').trim()); } catch (_) { return null; }
   if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
-  let rete = j.rete && typeof j.rete === 'object' ? { tipo: j.rete.tipo || null, nome: j.rete.nome || null } : null;
-  if (rete && j.rete.uscita === false) rete = { uscita: false };
+  const rete = j.rete && typeof j.rete === 'object' && !Array.isArray(j.rete) ? reteDaWindows(j.rete) : null;
   let bluetooth = j.bluetooth && typeof j.bluetooth === 'object' ? { ...j.bluetooth } : null;
   // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}: si riprende l'elenco.
   const d = bluetooth && bluetooth.dispositivi;
@@ -874,5 +963,6 @@ module.exports = {
   SCRIPT_WINDOWS,
   scriptWindows,
   datiDaWindows,
+  reteDaWindows,
   lettoreWindows,
 };

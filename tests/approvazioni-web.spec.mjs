@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
 import { chiudiApp } from './fixtures/electron.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FIREBASE = JSON.parse(readFileSync(join(ROOT, 'firebase.json'), 'utf8'));
@@ -120,7 +121,7 @@ async function apri(url, finto) {
     args: [...argomentiScala, join(ROOT, 'tests', 'helpers', 'browserNudo.cjs')],
     env: { ...process.env, NODE_ENV: 'test', BROWSER_NUDO_URL: url, BROWSER_NUDO_DATI: dati },
   });
-  const page = await app.firstWindow();
+  const page = await primaFinestra(app);
   if (finto) await page.route(FUNZIONE, finto.gestisci);
   await page.waitForLoadState('domcontentloaded');
   return { app, page, chiudi: async () => { await chiudiApp(app); rmSync(dati, { recursive: true, force: true }); } };

@@ -260,13 +260,22 @@ test('parseAgentReply: budget — numero imposta, null rimuove, spazzatura si ig
 });
 
 test('parseAgentReply: prob — needs come oggetto o array, tag normalizzati, invalidi scartati', () => {
+  const noCond = { game: '', mulligans: 0, keep: [], extraDraws: 0 };
   const asObj = Q.parseAgentReply('{"prob":{"turn":10,"needs":{"Ramp":2,"terre":3}}}');
-  assert.deepEqual(asObj.prob, { turn: 10, needs: [{ tag: 'ramp', n: 2 }, { tag: 'terre', n: 3 }] });
+  assert.deepEqual(asObj.prob, { turn: 10, needs: [{ tag: 'ramp', n: 2 }, { tag: 'terre', n: 3 }], ...noCond });
   const asArr = Q.parseAgentReply('{"prob":{"turn":"4","needs":[{"tag":"Draw","n":"1"}]}}');
-  assert.deepEqual(asArr.prob, { turn: 4, needs: [{ tag: 'draw', n: 1 }] });
+  assert.deepEqual(asArr.prob, { turn: 4, needs: [{ tag: 'draw', n: 1 }], ...noCond });
   assert.equal(Q.parseAgentReply('{"prob":{"turn":0,"needs":{"a":1}}}').prob, null);
   assert.equal(Q.parseAgentReply('{"prob":{"turn":5,"needs":{"a":0}}}').prob, null);
   assert.equal(Q.parseAgentReply('{"prob":"domani"}').prob, null);
+});
+
+// #791: «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre» arriva intero al motore.
+test('parseAgentReply: prob — partita, mulligan con mano da tenere e pescate extra', () => {
+  const p = Q.parseAgentReply('{"prob":{"turn":3,"needs":{"terre":3},"game":" Draw ","mulligans":"1","keep":{"Terre":2},"extraDraws":2}}').prob;
+  assert.deepEqual(p, { turn: 3, needs: [{ tag: 'terre', n: 3 }], game: 'draw', mulligans: 1, keep: [{ tag: 'terre', n: 2 }], extraDraws: 2 });
+  const bad = Q.parseAgentReply('{"prob":{"turn":3,"needs":{"terre":3},"game":7,"mulligans":-2,"keep":"due terre","extraDraws":"tante"}}').prob;
+  assert.deepEqual(bad, { turn: 3, needs: [{ tag: 'terre', n: 3 }], game: '', mulligans: 0, keep: [], extraDraws: 0 });
 });
 
 test('parseAgentReply: evaluate — "deck"/"results" passano, true legacy → deck, altro si scarta', () => {

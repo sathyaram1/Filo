@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
-for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito',
+for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito', 'tasti',
   'ttsVoices', 'filoMemory', 'preferences', 'cambi', 'actionLevels', 'actionTools', 'capabilities', 'vociImpostazioni']) {
   require(`../../src/shared/${m}.js`);
 }
@@ -49,7 +49,7 @@ function foglie(o, base = '', out = []) {
 }
 const CAMPIONI = ['scuro', 'grande', 'sì', 'no', '12', '0,5', '1', 'privacy', 'automatico', 'off', 'openrouter',
   'sk-or-v1-abcdefgh1234', '20 euro', 'più vivaci', 'delicata', 'media', 'powershell', 'Rispondi breve.', 'automatica',
-  'aggiungi esempio.it', 'nessuno'];
+  'aggiungi esempio.it', 'nessuno', 'Chat con Filo: deepseek'];
 function percorsiScrittiDa(setter) {
   const out = new Set();
   for (const v of CAMPIONI) {
@@ -142,7 +142,7 @@ test('togliere un permesso dalla chat: per sito e sottodomini, per permesso o tu
   assert.deepEqual(Perm.togliPerChat('altro.it', 'microfono').tolte, []);
   assert.match(Perm.togliPerChat('altro.it', 'telepatia').errore, /non è un permesso/);
   assert.match(Perm.togliPerChat('', 'microfono').errore, /non è un sito/);
-  assert.equal(globalThis.SN_ACTION_LEVELS.levelFor({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }), 1);
+  assert.equal(globalThis.SN_ACTION_LEVELS.costoFor({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }), 1);
   const { azioneAmmessaDa } = require('../../src/main/services/impostazioniPerOrigine.js');
   assert.equal(azioneAmmessaDa({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }, 'https://esempio.it/'), false);
 });
@@ -180,10 +180,12 @@ test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e
     assert.ok(descr.includes(`• ${s.keys[0]}: `), `${s.keys[0]}: non compare nella descrizione di IMPOSTA_PREFERENZA`);
     const scritti = percorsiScrittiDa(s);
     for (const p of s.scrive || []) {
-      assert.ok(scritti.has(p), `${s.keys[0]} dichiara ${p} ma non lo scrive`);
+      // Un percorso jolly (`models.*`, una chiave per funzione) vale scritto se ne è scritta una foglia.
+      const jolly = p.endsWith('.*') ? p.slice(0, -1) : '';
+      assert.ok(scritti.has(p) || (jolly && [...scritti].some((x) => x.startsWith(jolly))), `${s.keys[0]} dichiara ${p} ma non lo scrive`);
       const voce = K.voce(p);
       assert.ok(voce, `${p}: nessuna frase per il suo evento in src/shared/cambi.js`);
-      if (!voce.segreto) assert.equal(voce.livello, s.level || 1, `${p}: l'annullo chiede un livello diverso dal cambio (${voce.livello} contro ${s.level || 1})`);
+      if (!voce.segreto) assert.equal(voce.livello, s.costo, `${p}: l'annullo chiede un livello diverso dal costo del cambio (${voce.livello} contro ${s.costo})`);
     }
   }
   assert.ok(descr.includes('LEGGI_IMPOSTAZIONI'), 'la descrizione dice come leggere il valore di adesso');
@@ -237,7 +239,7 @@ test('elenchi di siti: aggiungi, togli, solo, svuota; un nome senza estensione �
   const b = (v) => P.buildPreferencePartial('siti_bloccati', v);
   const a = b('aggiungi facebook.com e https://www.YouTube.com/watch?v=1');
   assert.deepEqual(a.elenco.voci, ['facebook.com', 'youtube.com']);
-  assert.equal(a.level, 2);
+  assert.equal(a.costo, 2);
   assert.match(a.risk, /Apri comunque/);
   assert.equal(b('togli tiktok.com').elenco.op, 'togli');
   assert.equal(b('solo a.it, b.it').elenco.op, 'sostituisci');
@@ -305,7 +307,7 @@ test('le ore di inattività con la virgola restano quelle: «1,5» non diventa 1
 
 test('LEGGI_IMPOSTAZIONI è uno strumento di sola lettura, e non lo chiede un sito', () => {
   const L = globalThis.SN_ACTION_LEVELS;
-  assert.equal(L.levelFor({ type: 'LEGGI_IMPOSTAZIONI', cerca: 'tema' }), 1);
+  assert.equal(L.costoFor({ type: 'LEGGI_IMPOSTAZIONI', cerca: 'tema' }), 0);
   assert.ok(Tools.haRisultato('LEGGI_IMPOSTAZIONI'));
   const { azioneAmmessaDa } = require('../../src/main/services/impostazioniPerOrigine.js');
   assert.equal(azioneAmmessaDa({ type: 'LEGGI_IMPOSTAZIONI' }, 'https://esempio.it/'), false);

@@ -151,3 +151,164 @@ test('sentence(): stessa frase con l\'iniziale maiuscola, per la bolla da sola',
   assert.equal(sentence.slice(1), clause.slice(1));
   assert.equal(sentence[0], clause[0].toUpperCase());
 });
+
+// ── I codici già scritti per l'utente ─────────────────────────────────────────
+//
+// Sentinella (#663): la chat mostra invariato il messaggio degli errori che il
+// main scrive già per l'utente. La lista di quei codici sta in un posto solo;
+// se il main ne solleva uno nuovo e nessuno lo aggiunge lì, l'utente legge
+// «qualcosa è andato storto» al posto della frase che gli dice cosa fare —
+// è così che l'interruttore dei pesi aperti è rimasto muto per mesi.
+
+test('il messaggio scritto per l’utente arriva in chat, non la frase generica', () => {
+  for (const code of CE.CODICI_GIA_SCRITTI) {
+    const e = new Error('«Chat» è ferma: scegli un modello in Opzioni.');
+    e.code = code;
+    assert.equal(CE.friendly(e), '«Chat» è ferma: scegli un modello in Opzioni.', code);
+  }
+});
+
+test('ogni errore che il main scrive per l’utente è nella lista dei codici già scritti', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const righe = src.split('\n');
+  for (let i = 0; i < righe.length; i += 1) {
+    const m = /\b\w+\.code\s*=\s*'([A-Z_]+)'/.exec(righe[i]);
+    if (!m) continue;
+    // Il messaggio è scritto per l'utente quando viene da i18n: un `new Error`
+    // con testo nudo è un dettaglio tecnico e in chat NON deve passare.
+    const intorno = righe.slice(Math.max(0, i - 12), i + 1).join('\n');
+    if (!/I18n\.t\(/.test(intorno)) continue;
+    assert.ok(
+      CE.CODICI_GIA_SCRITTI.includes(m[1]),
+      `${m[1]} porta un messaggio scritto per l'utente ma la chat lo butta: aggiungilo a CODICI_GIA_SCRITTI in src/shared/chatErrors.js`,
+    );
+  }
+});
+
+test('chi non porta da nessuna parte col solo «Riprova» dice dove si rimedia', () => {
+  assert.equal(CE.rimedio('NO_API_KEY'), 'crediti');
+  assert.equal(CE.rimedio('NO_MODEL_FOR_ACTION'), 'opzioni');
+  assert.equal(CE.rimedio('NO_OPEN_WEIGHTS_MODEL'), 'opzioni');
+  // Il limite mensile si alza nelle Opzioni, e la frase lo dice: senza questa
+  // riga «Riprova» restava l'unica uscita di uno stato che non cambia da sé.
+  assert.equal(CE.rimedio('LIMIT_REACHED'), 'opzioni');
+  assert.equal(CE.rimedio(''), '');
+  assert.equal(CE.rimedio(undefined), '');
+});
+
+// Sentinella (#663): l'indirizzo della pagina dove si rimedia sta in un posto
+// solo. Ogni riquadro che lo riscriveva a mano ne dimenticava metà, e una
+// frase che nomina la pagina Crediti senza portarci è muta per chi la legge da
+// un sito qualunque.
+test('dove si rimedia arriva già pronto: indirizzo interno ed etichetta', () => {
+  for (const code of ['NO_API_KEY', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'LIMIT_REACHED']) {
+    const p = CE.rimedioPagina(code);
+    assert.ok(p, `${code} non dice dove si rimedia`);
+    assert.equal(p.dove, CE.rimedio(code));
+    assert.match(p.url, /^filo:\/\/(credits|options)\//, code);
+    assert.ok(p.label && p.label.length > 3, code);
+  }
+  assert.equal(CE.rimedioPagina('UNKNOWN'), null);
+  assert.equal(CE.rimedioPagina(''), null);
+});
+
+// ── La risposta dell'IPC ricomposta (#663) ────────────────────────────────────
+// Chi mostra un errore venuto dal main riceve un oggetto piatto, non un Error.
+// Ricomporlo con `new Error(res.error)` perdeva il codice, e la frase già
+// scritta per l'utente tornava «qualcosa è andato storto» — sulla home no, nel
+// riquadro dell'Aiuto su una pagina web sì.
+
+test('fromResponse tiene il codice, e la frase già scritta arriva intera', () => {
+  const invito = 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti.';
+  const e = CE.fromResponse({ ok: false, error: invito, code: 'NO_API_KEY' });
+  assert.equal(e.code, 'NO_API_KEY');
+  assert.equal(CE.sentence(e), invito);
+  assert.equal(CE.rimedio(e.code), 'crediti');
+});
+
+test('fromResponse: ogni codice già scritto sopravvive al viaggio dall\'IPC', () => {
+  for (const code of CE.CODICI_GIA_SCRITTI) {
+    const testo = `Spiegazione per l'utente di ${code}.`;
+    assert.equal(CE.sentence(CE.fromResponse({ error: testo, code })), testo);
+  }
+});
+
+test('fromResponse: senza codice utile resta lo status, e «UNKNOWN» non diventa un codice', () => {
+  const e = CE.fromResponse({ error: 'OpenRouter 503: upstream', code: 'UNKNOWN', status: 503 });
+  assert.equal(e.code, undefined);
+  assert.equal(e.status, 503);
+  assert.match(CE.sentence(e), /sovraccarico|non disponibile/i);
+});
+
+test('fromResponse: risposta vuota o assente → il ripiego di chi chiama', () => {
+  assert.equal(CE.fromResponse(null, 'Il provider AI ha fallito.').message, 'Il provider AI ha fallito.');
+  assert.equal(CE.fromResponse({ ok: false }, 'ripiego').message, 'ripiego');
+});
+
+
+// Sentinella (#663): la frase che il main ha già scritto sapendo quale chiave
+// ha pagato (i crediti finiti) deve sopravvivere al viaggio. Senza, chi mostra
+// l'errore ricostruisce a indovinare e perde il caso giusto.
+test('fromResponse porta la frase che il main aveva già scritto', () => {
+  const scritta = 'i crediti di Filo sono finiti: puoi aspettare quelli di domani.';
+  const e = CE.fromResponse({ error: 'OpenRouter 402: {"error":{"message":"x"}}', status: 402, provider: 'openrouter', userMessage: scritta });
+  assert.equal(e.userMessage, scritta);
+  assert.equal(CE.sentence(e), scritta.charAt(0).toUpperCase() + scritta.slice(1));
+});
+
+// Sentinella (#663): lo stream d'errore dice quello che dice la risposta di
+// `filo:message`. Con i soli message e code il riquadro della spiegazione
+// stampava la riga grezza del servizio, parentesi graffe comprese; e basta un
+// preload che elenchi i campi invece di passarli tutti per rifare il danno.
+test('l’errore dello stream porta gli stessi campi della risposta dell’IPC, fino alla pagina', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const ipc = readFileSync(join(ROOT, 'src', 'main', 'ipc.js'), 'utf8');
+  const invio = /send\('error',\s*\{([\s\S]*?)\}\);/.exec(ipc);
+  assert.ok(invio, 'src/main/ipc.js non manda più un errore di stream');
+  for (const campo of ['message', 'code', 'status', 'provider', 'userMessage']) {
+    assert.match(invio[1], new RegExp(`\\b${campo}\\s*:`), `lo stream non manda più ${campo}`);
+  }
+  for (const f of ['page-preload.js', 'internal-preload.js']) {
+    const src = readFileSync(join(ROOT, 'src', 'preload', f), 'utf8');
+    const m = /onMessage\(\{\s*type:\s*'error',([^}]*)\}\)/.exec(src);
+    assert.ok(m, `${f} non inoltra più l'errore dello stream`);
+    assert.match(m[1], /\.\.\./, `${f} elenca i campi dell'errore invece di passarli tutti`);
+  }
+});
+
+// Sentinella (#663): il servizio che rifiuta la chiave (credito finito
+// compreso) manda alla pagina Crediti da ogni riquadro, non solo dalla home.
+// Chi decide cosa sia un rifiuto resta SN_WALLET, nel main: qui arriva già
+// deciso, perché il solo codice non basterebbe a saperlo.
+test('la chiave rifiutata manda ai Crediti, ovunque si legga l’errore', () => {
+  const res = { error: 'OpenRouter 402: {"error":{"message":"Insufficient credits"}}', code: 'UNKNOWN', status: 402, keyRefused: true };
+  assert.equal(CE.rimedio(res), 'crediti');
+  assert.equal(CE.rimedioPagina(res).url, 'filo://credits/credits.html');
+  assert.equal(CE.fromResponse(res).keyRefused, true);
+  assert.equal(CE.rimedio(CE.fromResponse(res)), 'crediti');
+  // Senza il rifiuto conta solo il codice: un errore qualunque non manda in giro.
+  assert.equal(CE.rimedio({ code: 'UNKNOWN', status: 500 }), '');
+  // E il codice da solo continua a funzionare, per chi lo passa così.
+  assert.equal(CE.rimedio('NO_API_KEY'), 'crediti');
+});
+
+// Sentinella (#663): la risposta d'errore dell'IPC dice anche se è la chiave
+// ad essere stata rifiutata. Senza, ogni riquadro dovrebbe tirare a indovinare
+// dallo status, e un 403 di moderazione finirebbe per mandare ai Crediti.
+test('la risposta d’errore del main porta il rifiuto della chiave già deciso', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const ipc = readFileSync(join(ROOT, 'src', 'main', 'ipc.js'), 'utf8');
+  assert.match(ipc, /keyRefusalOf/, 'src/main/ipc.js non chiede più a SN_WALLET se è un rifiuto della chiave');
+  const quante = (ipc.match(/keyRefused:/g) || []).length;
+  assert.ok(quante >= 2, `il rifiuto della chiave manca su un canale d'errore (trovato ${quante} volte su 2)`);
+});

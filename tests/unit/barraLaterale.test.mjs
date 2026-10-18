@@ -137,7 +137,7 @@ test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai lim
   assert.deepEqual(P.buildPreferencePartial('barra_striscia', 'nascondi').partial, { barraLaterale: { striscia: false } });
   assert.deepEqual(P.buildPreferencePartial('barra_attesa', '0,5 secondi').partial, { barraLaterale: { attesaMs: 500 } });
   assert.deepEqual(P.buildPreferencePartial('barra_uscita', '800 ms').partial, { barraLaterale: { uscitaMs: 800 } });
-  assert.match(P.buildPreferencePartial('barra_attesa', '10 secondi').rifiuto, /10000 ms.*100 a 3000/);
+  assert.match(P.buildPreferencePartial('barra_attesa', '10 secondi').rifiuto, /10\.000 ms.*100 a 3\.000/);
   assert.match(P.buildPreferencePartial('barra_uscita', '20').rifiuto, /20 ms/);
   // Un numero piccolo senza unità sono secondi: «metti l'attesa a 1» è un secondo, non un millisecondo.
   assert.deepEqual(P.buildPreferencePartial('barra_attesa', '1').partial, { barraLaterale: { attesaMs: 1000 } });
@@ -170,6 +170,6 @@ test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice 
   assert.match(p.icona.description, /screenshot \([^)]+\)/);
   assert.equal(D.nome('closeTab') !== 'closeTab', true, 'il nome del menu, non l\'id');
   const L = globalThis.SN_ACTION_LEVELS;
-  assert.equal(L.levelFor({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), 1);
+  assert.equal(L.costoFor({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), 1);
   assert.match(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), /nella barra laterale/);
 });

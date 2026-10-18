@@ -6,6 +6,8 @@
 
 const { session } = require('electron');
 const R = require('./cookieIncorporatiRegole');
+const Sito = require('./stessoSito');
+const Google = require('./dominiGoogle');
 require('../../shared/authPopup');
 
 // «Qualche minuto» dopo l'ultima scheda che ospitava il riquadro: chi riapre l'articolo un attimo dopo non perde
@@ -44,8 +46,8 @@ const inArrivo = new Map();
 const partizionati = new Map();
 
 let modo = 'default';
-let fidati = new Set();
-let accessi = new Set();
+let fidati = new Sito.ElencoSiti();
+let accessi = new Sito.ElencoSiti();
 // Servizi a cui l'utente ha riattivato i cookie dal riquadro rotto (#760): si trattano come quelli con accesso.
 let riattivati = new Set();
 let agganciata = null;
@@ -60,8 +62,9 @@ function sitoDi(url) {
 
 // Mentre si sta guardando un accesso a un sito (la sua pagina di accesso è aperta, o la finestrella «Continua
 // con…»), i suoi cookie non si toccano: declassare quelli del giro di accesso lo farebbe uscire al riavvio.
+// I domini di Google sono un accesso solo (#1123): protetto uno, lo sono tutti.
 function protetti() {
-  const out = new Set(accessi);
+  const out = new Google.ElencoConGoogle(accessi);
   for (const d of fidati) out.add(d);
   for (const d of riattivati) out.add(d);
   const ora = Date.now();
@@ -151,9 +154,17 @@ function urlDi(c) {
   return (c.secure ? 'https://' : 'http://') + dominio + (c.path || '/');
 }
 
+// Quello che serve per riscrivere un cookie al suo posto, senza valore né scadenza.
+function posto(c) {
+  return {
+    url: urlDi(c), name: c.name, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly, sameSite: c.sameSite,
+    ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
+  };
+}
+
 // Il cookie torna identico ma senza scadenza: vale per la visita e non oltre. Si riscrive il valore di adesso (un
-// avviso superato da uno più nuovo rimetterebbe uno stato che il riquadro aveva sostituito). Un partizionato si vede
-// solo per dominio, accanto all'eventuale cookie normale con lo stesso nome: torna 'partizionato' e quello non si tocca.
+// avviso superato da uno più nuovo rimetterebbe uno stato che il riquadro aveva sostituito). Un partizionato la
+// riscrittura non lo tocca: torna 'partizionato' e resta com'è.
 async function declassa(ses, c0) {
   const percorso = c0.path || '/';
   const stesso = (x) => x.name === c0.name && x.domain === c0.domain && (x.path || '/') === percorso;
@@ -163,17 +174,14 @@ async function declassa(ses, c0) {
     if (lista.some((x) => stesso(x) && !x.session && (!c || x.value !== c.value))) return 'partizionato';
   }
   if (!c || c.session) return false;
-  const dominio = String(c.domain || '').replace(/^\./, '');
-  await ses.cookies.set({
-    url: urlDi(c),
-    name: c.name,
-    value: c.value,
-    path: c.path || '/',
-    secure: !!c.secure,
-    httpOnly: !!c.httpOnly,
-    sameSite: c.sameSite,
-    ...(c.hostOnly ? {} : { domain: dominio }),
-  });
+  await ses.cookies.set({ ...posto(c), value: c.value });
+  // Da Electron 44 anche la ricerca per indirizzo trova i partizionati: se l'originale è ancora lì era partizionato, e
+  // la copia appena nata, un cookie di terza parte che varrebbe su ogni sito, si scade subito.
+  const dopo = await ses.cookies.get({ domain: String(c.domain || '').replace(/^\./, '') });
+  if (dopo.some((x) => stesso(x) && !x.session && x.value === c.value)) {
+    await ses.cookies.set({ ...posto(c), value: '', expirationDate: 1 });
+    return 'partizionato';
+  }
   return true;
 }
 
@@ -221,25 +229,29 @@ function navigazione(url) {
   paginaDiAccesso(url);
 }
 
-// La rimozione per indirizzo toglie anche il cookie normale con lo stesso nome: quello con scadenza si rimette.
+// La rimozione per indirizzo toglie anche il cookie normale con lo stesso nome, e nessuna lettura dice quale dei due è
+// partizionato. Lo dice una scrittura: un set già scaduto toglie solo il normale, quello che resta è partizionato e si
+// toglie per indirizzo. I normali con scadenza si rimettono com'erano.
 async function togliPartizionati(ses, sito, nomi) {
   let lista = [];
   try { lista = await ses.cookies.get({ domain: sito }); } catch (_) { return; }
+  const uguali = (a, b) => a.domain === b.domain && (a.path || '/') === (b.path || '/') && a.value === b.value
+    && !!a.session === !!b.session && a.expirationDate === b.expirationDate;
   for (const nome of nomi) {
-    for (const url of new Set(lista.filter((c) => c.name === nome).map(urlDi))) {
-      let normali = [];
-      try { normali = (await ses.cookies.get({ url, name: nome })).filter((c) => !c.session); } catch (_) {}
-      try { await ses.cookies.remove(url, nome); } catch (_) {}
-      for (const c of normali) {
-        preesistenti.set(chiaveCookie(c), Date.now());
-        try {
-          await ses.cookies.set({
-            url: urlDi(c), name: c.name, value: c.value, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly,
-            sameSite: c.sameSite, expirationDate: c.expirationDate,
-            ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
-          });
-        } catch (_) {}
-      }
+    const tutti = lista.filter((c) => c.name === nome);
+    for (const c of tutti) { try { await ses.cookies.set({ ...posto(c), value: '', expirationDate: 1 }); } catch (_) {} }
+    let partizionati = [];
+    try { partizionati = (await ses.cookies.get({ domain: sito })).filter((c) => c.name === nome); } catch (_) {}
+    for (const url of new Set(partizionati.map(urlDi))) { try { await ses.cookies.remove(url, nome); } catch (_) {} }
+    const restati = [...partizionati];
+    const normali = tutti.filter((c) => {
+      const i = restati.findIndex((p) => uguali(p, c));
+      if (i >= 0) { restati.splice(i, 1); return false; }
+      return !c.session;
+    });
+    for (const c of normali) {
+      preesistenti.set(chiaveCookie(c), Date.now());
+      try { await ses.cookies.set({ ...posto(c), value: c.value, expirationDate: c.expirationDate }); } catch (_) {}
     }
   }
 }
@@ -471,8 +483,8 @@ function configureFromSettings(settings) {
   const C = Cookies();
   const c = (settings && settings.security && settings.security.cookies) || {};
   modo = C.getMode(settings);
-  fidati = new Set(C.getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
-  accessi = new Set((Array.isArray(c.loggedSites) ? c.loggedSites : []).map((d) => String(d || '').toLowerCase()).filter(Boolean));
+  fidati = new Sito.ElencoSiti(C.getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
+  accessi = new Sito.ElencoSiti((Array.isArray(c.loggedSites) ? c.loggedSites : []).map((d) => String(d || '').toLowerCase()).filter(Boolean));
   const prima = riattivati;
   riattivati = new Set(C.getEmbedSites(settings));
   for (const s of [...accessi, ...fidati, ...riattivati]) { siti.delete(s); partizionati.delete(s); }
@@ -494,6 +506,8 @@ module.exports = {
   navigazione,
   paginaDiAccesso,
   credenziali,
+  // Torna la scrittura in corso: chi scrive altre impostazioni dopo la aspetta, o una delle due si perde.
+  accessoOsservato: (sito) => { segnaAccesso(sito); return scrittura; },
   giroDiPulizia,
   allUscita,
   margineTest,

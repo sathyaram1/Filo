@@ -46,6 +46,13 @@ la cartella.
   (`giro<k>-r<n>-<cosa>.spec.mjs`, il posto del rilievo nella critica): contare quante ne
   escono non bastava, perché un rilievo messo da parte senza prova sua lasciava uscire la
   prova rossa di uno da correggere.
+- **Una prova che la pulizia ha dimenticato** (#747) e chi corregge toglie ancora rossa ferma
+  la consegna lo stesso, ma il rifiuto la riconosce dallo stesso numero (nel nome, o nel titolo
+  del caso rosso) e manda a pulirla, non a correggere un rilievo che sta in un feedback suo. La
+  pulizia si registra anche dopo le correzioni: è l'ultimo commit da solo, toglie solo prove o
+  loro casi di rilievi messi da parte (niente righe di supporto), com'erano alla base, e un caso
+  di un rilievo da correggere non esce nemmeno verde. Non sposta la base: la consegna non rilancia
+  le prove che ha tolto per intero, e quelle a cui ha tolto un caso le rilancia com'erano dopo di lei.
 - **Un file di supporto della cartella** (un aiuto, una pagina, dei dati) non è una prova, ma
   le prove ne dipendono (#746): quale file carica una prova lo decide Playwright (un import
   senza estensione, una cartella col suo indice, un file nuovo che fa ombra), non il nome
@@ -68,9 +75,17 @@ la cartella.
 
 ## Il rosso atteso
 
-Nel commit di una correzione c'è anche il ripiego del rosso atteso
-(`test.fail(true, '<motivo>')` in testa al corpo). **Dopo un verdetto invece si può solo
-TOGLIERE**: una riga aggiunta lì fa decadere il verdetto e costa un giro intero, e i due
+Il segno (`test.fail(true, '<motivo>')` in testa al corpo) va solo sulla prova di un
+rilievo messo da parte che resta nel ramo, mai su quella di un rilievo che si corregge
+nello stesso giro: chi verifica committa le sue prove rosse, e chi corregge le vede
+diventare verdi. Pulizia e consegne leggono una prova per quello che fa il corpo, non per
+il segno (#932): una segnata che passa («Expected to fail, but passed», rossa per
+Playwright) è una porta chiusa, e le si toglie il segno o la si toglie con la prova
+durevole; una segnata che fallisce come previsto (verde per Playwright) è una porta
+ancora aperta, e tolta o cambiata ferma la consegna come ogni rossa. Prima la consegna rilanciava la
+prova col segno e respingeva proprio chi aveva corretto: l'unica strada era rimetterla
+com'era, rossa per il verificatore dopo. **Dopo un verdetto si può solo TOGLIERE**: una
+riga aggiunta lì, segno compreso, fa decadere il verdetto e costa un giro intero, e i due
 cancelli (la chiusura in locale, il cancello di fusione del server) lo controllano.
 
 ## Fuori dalla suite, davvero

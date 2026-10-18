@@ -81,6 +81,24 @@ test('chiudendo con la X le altre schede tengono la larghezza, e la X accanto re
   await expect.poll(() => verdettoAllargate(shell, prima, QUANTE - 2), { timeout: 8_000 }).toBe('allargate');
 });
 
+// Con le schede larghe quanto il nome (#429) quella che subentra prende la larghezza della chiusa: due clic, due chiusure.
+test('con nomi di lunghezza diversa due clic fermi sulla X chiudono due schede di fila', async ({ shell }) => {
+  const pagine = ['filo://manage/manage.html', 'filo://options/options.html', 'filo://history/history.html',
+    'filo://feedback/feedback.html', 'filo://downloads/downloads.html'];
+  for (const u of pagine) await shell.evaluate((x) => window.filoShell.tabs.open(x), u);
+  await expect(shell.locator('#tabs .tab')).toHaveCount(pagine.length + 1, { timeout: 15_000 });
+  await expect(shell.locator('#tabs .tab .spinner')).toHaveCount(0, { timeout: 15_000 });
+  await expect(shell.locator('#tabs .tab').nth(2)).toContainText('Modelli');
+  const punto = await centroChiudi(shell, await idInPosizione(shell, 1));
+  await shell.mouse.move(punto.x, punto.y);
+  await shell.mouse.click(punto.x, punto.y);
+  await expect(shell.locator('#tabs .tab')).toHaveCount(pagine.length, { timeout: 8_000 });
+  await shell.waitForTimeout(300);
+  await shell.mouse.click(punto.x, punto.y);
+  await expect(shell.locator('#tabs .tab')).toHaveCount(pagine.length - 1, { timeout: 8_000 });
+  await expect(shell.locator('#tabs .tab .title')).toHaveText(['Home', 'Cronologia AI', 'Feedback', 'Download']);
+});
+
 test('chiusa l’ultima scheda, il + resta dov’era e il clic seguente non apre una scheda', async ({ shell }) => {
   // Con 22 schede quelle inattive sono strette quanto il +: se il + scorresse a sinistra finirebbe sotto il puntatore.
   // Così strette non hanno la X (tests/tab-scheda-stretta.spec.mjs): si chiudono col clic centrale.

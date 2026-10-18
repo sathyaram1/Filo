@@ -33,6 +33,7 @@
 // richiesta di fusione porta solo il nome del ramo, e gli assert che cercano
 // il commit sono rossi.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -40,12 +41,13 @@ import { execFile, execFileSync } from 'node:child_process';
 import { rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const {
   applySecaudit,
   applyVerifierVerdict,
   applyFixed,
+  fixedPayload,
   defaultState,
 } = await import('../../scripts/dispatch.mjs');
 
@@ -160,8 +162,8 @@ test('dispatch --record-secaudit: il verdetto parte con lo sha del commit contro
     assert.equal(stato.secauditSha, atteso, 'lo specchio locale ricorda su cosa è stato dato');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -196,8 +198,41 @@ test('canale deliver secaudit: lo sha lo timbra lo strumento, e uno dichiarato p
     assert.equal((ricevuti[ricevuti.length - 1].body.data || {}).sha, atteso);
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
+});
+
+// #1148: il registro del ramo confronta la punta di chi consegna con quella che troverà chi viene dopo.
+test('canale deliver: correzione e revisione partono con lo sha timbrato, e uno dichiarato può solo confermarlo', async () => {
+  const { srv, ricevuti, port } = await fintoServer();
+  const { dir, punta } = deposito('filo-1148-canale-');
+  try {
+    const env = { ...process.env, FILO_REPO_ROOT: dir, FILO_TOOLS_ROOT: dir, FILO_NO_BEAT: '1', FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+    const lancia = (args) => new Promise((r) => execFile(process.execPath, [CANALE, ...args], { env, cwd: dir },
+      (err, so, se) => r({ status: err ? (err.code ?? 1) : 0, stdout: String(so || ''), stderr: String(se || '') })));
+    const ultimo = () => (ricevuti.filter((x) => x.url.includes('routineDeliver')).at(-1).body.data || {});
+    const atteso = punta();
+    const f = await lancia(['deliver', 'biglietto-finto', 'fixed', '--report', 'corretto il difetto', '--frase', 'ora va']);
+    assert.equal(f.status, 0, f.stderr);
+    assert.equal(ultimo().sha, atteso);
+    const v = await lancia(['deliver', 'biglietto-finto', 'status', '--status', 'revision_capability', '--notes', 'fatto', '--frase', 'ora va']);
+    assert.equal(v.status, 0, v.stderr);
+    assert.equal(ultimo().sha, atteso);
+    const quanti = ricevuti.length;
+    const dettato = await lancia(['deliver', 'biglietto-finto', 'fixed', '--report', 'corretto', '--sha', 'f'.repeat(40)]);
+    assert.equal(dettato.status, 1);
+    assert.match(dettato.stderr, /consegna non registrata/);
+    assert.equal(ricevuti.length, quanti, 'il server non viene chiamato');
+  } finally {
+    srv.close();
+    togliCartella(dir);
+  }
+});
+
+test('dispatch --record-fixed: la correzione porta la punta intera della cartella', () => {
+  const sha = 'a'.repeat(40);
+  assert.equal(fixedPayload({ report: 'r', branch: 'worker/x', sha }).sha, sha);
+  assert.equal('sha' in fixedPayload({ report: 'r', branch: 'worker/x', sha: 'corto' }), false, 'senza sha intero non parte niente: il server segna il buco');
 });
 
 // ─── L'ultimo passo: la richiesta di fusione ────────────────────────────────
@@ -263,8 +298,8 @@ test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo 
     assert.equal(buste.length, quante, 'e il server non viene nemmeno chiamato');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -304,8 +339,8 @@ test('la fusione di un ramo verificato su un commit più vecchio la chiede lo st
     assert.match(r.stderr, /la verifica ha dato l'ok su .* Lo giudica il server/, 'e chi legge sa perché non si è fermata');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -335,8 +370,8 @@ test('la fusione non si chiede con roba fuori dai commit: il salvataggio automat
     assert.equal(buste.length, 0, 'il server non deve nemmeno essere chiamato');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -366,7 +401,7 @@ test('lo stato della directory non si può leggere: il verdetto non si registra 
     assert.equal(existsSync(resolve(statoDir, 'ID1.json')), false, 'e non deve restare niente scritto');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -498,8 +533,8 @@ test('lo specchio locale lo scrivono tutte e due le strade, e una correzione lo 
   } finally {
     if (precedente === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
     else process.env.FILO_DISPATCH_STATE_DIR = precedente;
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(statoDir, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(statoDir);
   }
 });
 
@@ -726,7 +761,7 @@ test('la fusione non parte se su origin il ramo è più avanti del contenuto esa
     assert.equal(buste.length, quante, 'finché il controllo di sicurezza non ha letto il pezzo nuovo, il server non viene chiamato');
   } finally {
     srv.close();
-    for (const d of [dir, remoto, altra, fuori]) rmSync(d, { recursive: true, force: true });
+    for (const d of [dir, remoto, altra, fuori]) togliCartella(d);
   }
 });
 
@@ -760,6 +795,6 @@ test('la fusione non parte se il ramo nominato non è quello su cui sta la direc
     assert.equal(buste.length, 0);
   } finally {
     srv.close();
-    for (const d of [dir, fuori]) rmSync(d, { recursive: true, force: true });
+    for (const d of [dir, fuori]) togliCartella(d);
   }
 });

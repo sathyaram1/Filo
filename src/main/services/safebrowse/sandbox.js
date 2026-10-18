@@ -1,6 +1,6 @@
 // Stage 5 (detonation): apre un link sospetto in una finestra NASCOSTA e ISOLATA, segue i redirect e guarda dove finisce.
-// Non blocca mai il clic, e «sembra pulito» vale poco: può solo rinforzare un sospetto. Senza Electron torna null.
-// Finestre vive insieme, coda e vita massima hanno un tetto (#591): una pagina ostile non deve poterne aprire a volontà.
+// Solo un link non ancora aperto, mai una pagina già aperta (regola in index.js); non blocca mai il clic, e l'esito
+// può solo rinforzare un sospetto. Finestre vive, coda e vita massima hanno un tetto (#591): niente aperture a volontà.
 
 'use strict';
 

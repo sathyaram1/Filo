@@ -139,7 +139,7 @@ test('tanti dispositivi: il prompt li conta tutti e dice quanti ne ha lasciati f
 });
 
 function statoBase(sistema) {
-  return { time: { humanNow: '2026-10-03 sabato 10:00' }, tabs: [], timers: [], notifications: [], recentActions: [], dashboard: null, credits: null, sistema };
+  return { time: { humanNow: '2026-10-03 sabato 10:00' }, tabs: [], timers: [], notifications: [], dashboard: null, credits: null, sistema };
 }
 
 test('nello STATO della chat la sezione SISTEMA c\'è, e i nomi stanno nella loro busta', () => {
@@ -174,7 +174,7 @@ test('senza lettore (una pagina) la sezione non c\'è; con un lettore muto lo di
 test('assemble chiede al lettore del main, e per la home no', async () => {
   globalThis.SN_FILO_MEMORY = {
     getSession: async () => ({}), listTimers: async () => [], listNotifications: async () => [],
-    getDashboardCache: async () => null, listRaw: async () => [],
+    getDashboardCache: async () => null,
   };
   let chieste = 0;
   globalThis.SN_SISTEMA_MAIN = { statoPerChat: async () => { chieste += 1; return PIENO; } };
@@ -222,7 +222,7 @@ test('le voci si tolgono e si rimettono a parole, una alla volta', () => {
   for (const [chiave, voce] of [['ora_home', 'ora'], ['batteria_home', 'batteria'], ['rete_home', 'rete'], ['bluetooth_home', 'bluetooth'], ['orologio_home', 'ora'], ['wifi_home', 'rete'], ['volume_home', 'volume'], ['audio_home', 'volume']]) {
     const via = P.buildPreferencePartial(chiave, false);
     assert.deepEqual(via.partial, { homeSistema: { [voce]: false } }, chiave);
-    assert.equal(via.level, 1);
+    assert.equal(via.costo, 1);
     assert.deepEqual(P.buildPreferencePartial(chiave, 'mostra').partial, { homeSistema: { [voce]: true } }, chiave);
   }
   assert.equal(P.buildPreferencePartial('batteria_home', 'boh'), null);

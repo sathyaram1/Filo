@@ -21,6 +21,20 @@ vivono in `settings.themeTokens` e si applicano **live** su tutte le superfici
   nelle pagine esterne → la whitelist per tipo (`validate`) è obbligatoria e il
   choke point è `applySettingsUpdate` nel main. Non aggiungere percorsi di
   scrittura che la saltino.
+- **Durate (#837):** ogni transition/animation scrive `calc(<durata> * var(--sn-motion, 1))`, anche
+  nel CSS dentro i .js; le `.animate()` e i timer che aspettano un'animazione usano
+  `SN_THEME_TOKENS.motionMs()`/`motionFactor()`, lo scorrimento morbido `scrollBehavior()`, il main
+  `src/main/movimento.js`. A 0 non si anima niente. Fa eccezione solo un'animazione che misura un tempo
+  vero (l'anello per annullare la voce): sta fra le eccezioni della sentinella
+  `tests/unit/motionSentinella.test.mjs`.
+- **Ombre:** l'alfa di un'ombra scura scritta a mano si moltiplica per `var(--sn-ombra, 1)`, il rapporto
+  fra il token `shadow` e il suo 0.18; `--sn-shadow` lo usa già.
+- **Viste che non caricano theme.css** (barra laterale, avvisi, anteprima delle schede, avviso del sito,
+  menu a comparsa): `--sn-motion` e `--sn-ombra` arrivano dalla shell (`VAR_BARRA`, `VAR_TEMA`) o dal main
+  (`movimento.variabili()`). Una variabile nuova che deve arrivare lì va aggiunta a quelle liste.
+- **Un token che non basta come variabile** (il font dei link: senza override i link devono ereditare)
+  porta una `regola`, emessa da `pageCss` solo quando è sovrascritto. Le regole che valgono solo per le
+  pagine di Filo usano `html[data-sn-pagina]`: `[data-sn-theme]` sta anche sull'`<html>` dei siti.
 - **Dove:** registro `src/shared/themeTokens.js`; default CSS `src/styles/theme.css`
   (+ gemelli shell in `src/renderer/shell.css`); applicazione in `pageBootstrap.js`
   (filo://), `content.js` (pagine esterne), `shell.js` (shell). Test:

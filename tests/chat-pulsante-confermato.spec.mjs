@@ -19,7 +19,6 @@ test('cancellare le pagine di un sito dalla chat: dopo l\'OK il pulsante dice qu
   const chat = await homeDi(app);
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry, theme: 'light',

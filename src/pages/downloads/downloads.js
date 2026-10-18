@@ -62,7 +62,7 @@
       el.id = 'dl-flash';
       el.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);'
         + 'background:var(--sn-fg);color:var(--sn-bg);padding:8px 14px;border-radius:8px;'
-        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity .15s ease;pointer-events:none;'
+        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity calc(.15s * var(--sn-motion, 1)) ease;pointer-events:none;'
         + 'max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       document.body.appendChild(el);
     }
@@ -254,9 +254,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
     openMenu = menu;
+    document.addEventListener('keydown', onMenuKeydown, true);
     setTimeout(() => {
+      if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      document.addEventListener('keydown', onMenuKeydown, true);
       window.addEventListener('scroll', closeCtxMenu, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);
@@ -304,7 +305,7 @@
       // Da quale sito arriva è la cosa su cui si decide: sta nella riga, non
       // solo nell'avviso che l'utente può aver già chiuso.
       let da = r.site ? ` · da ${r.site}` : '';
-      try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); da = t ? ` · ${t}` : ''; } catch (_) {}
+      try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); da = t ? ` · ${t}` : ''; } catch (_) {}
       meta.textContent = `${stateLabel(r)}${da} · ${formatDate(r.startedAt)}`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
@@ -412,7 +413,7 @@
     if (!filtered.length) {
       const empty = $('empty');
       empty.textContent = (items.length && q)
-        ? 'Nessuno scaricamento corrisponde alla ricerca.'
+        ? 'Nessun download corrisponde alla ricerca.'
         : 'Non hai ancora scaricato nulla.';
       empty.hidden = false;
       list.textContent = '';
@@ -453,8 +454,8 @@
       // Una voce in attesa di conferma NON è conclusa: "Svuota" non deve
       // promettere di toglierla (il main la tiene, e giustamente) (#588).
       const hasTerminal = items.some((r) => !isActive(r) && r.state !== 'pending');
-      if (!hasTerminal) { flash('Nessuno scaricamento concluso da rimuovere'); return; }
-      const text = 'Rimuovere dall’elenco tutti gli scaricamenti conclusi? Gli scaricamenti in corso restano.';
+      if (!hasTerminal) { flash('Nessun download concluso da rimuovere'); return; }
+      const text = 'Rimuovere dall’elenco tutti i download conclusi? Quelli in corso restano.';
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({ title: 'Svuota elenco', text, okLabel: 'Svuota' })
         : window.confirm(text);

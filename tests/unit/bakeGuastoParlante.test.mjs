@@ -19,11 +19,10 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer } from 'node:http';
-import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // La cartella temporanea si chiede sempre a questo aiuto (CLAUDE.md § Run/test).
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { spiegaChiaviMancanti, descriviEsitoServer, chiaviAllarmeBake } from '../../scripts/bake-default-config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -56,7 +55,7 @@ async function costruisci(ambiente) {
     stdout = e.stdout || '';
     stderr = e.stderr || '';
   }
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
   return { uscita, registro: `${stdout}\n${stderr}` };
 }
 
@@ -234,6 +233,21 @@ test('quando il server dà le chiavi non si grida al lupo', async () => {
     assert.equal(r.uscita, 0);
     assert.equal(inEvidenza(r.registro), '',
       'un avviso che compare anche quando è tutto a posto smette di significare qualcosa');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+// #1210: il segreto incollato con la riga rientrata in cui routine-keys la stampava; il server lo rifiutava.
+test('una parola d’ordine con spazi ai bordi arriva pulita al server, e le chiavi vengono da lì', async () => {
+  const srv = await serverFinto({
+    '/buildKeys': { stato: 200, json: { ok: true, apiKeys: { tavily: 't' }, safeBrowsingKey: 'g' } },
+  });
+  try {
+    const r = await costruisci({ FILO_ROUTINE_API: srv.base, FILO_BUILD_PASSPHRASE: '    giusta\n' });
+    assert.equal(r.uscita, 0, r.registro);
+    assert.equal(srv.ricevute.find((x) => x.percorso === '/buildKeys').corpo.passphrase, 'giusta');
+    assert.doesNotMatch(r.registro, /segreti di riserva/);
   } finally {
     await srv.chiudi();
   }

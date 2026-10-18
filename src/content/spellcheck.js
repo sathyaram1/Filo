@@ -35,6 +35,7 @@
   // Stato per ogni editabile attualmente "agganciato" (focus). WeakMap per non
   // tenere riferimenti che impediscano GC se il sito rimuove l'elemento.
   const monitored = new WeakMap();
+  const ascoltate = new WeakSet(); // caselle con gli ascoltatori già messi
   let activeEl = null;
   let personalDict = new Set();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
@@ -66,6 +67,7 @@
     // Riallinea overlay attivo a scroll/resize della finestra.
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
+    document.addEventListener('visibilitychange', riprendiScanRimandato);
 
     // Riceve i suggerimenti del correttore nativo spinti dal main al click destro.
     try {
@@ -315,25 +317,64 @@
     return null;
   }
 
+  // Da un riquadro chiuso di Filo (feedback, spiegazione) il focus arriva all'host: il campo vero lo sa SN_FILO_UI,
+  // e l'overlay sta dentro lo stesso riquadro, perché ripete il testo e nel documento del sito lo leggerebbe (#1071).
+  function editabileDellEvento(e) {
+    const UI = global.SN_FILO_UI;
+    const t = e && e.target;
+    const riquadro = !!(UI && UI.bersaglio && t && t.hasAttribute && t.hasAttribute(UI.RIQUADRO));
+    return findSupportedEditable(riquadro ? UI.bersaglio(e) : t);
+  }
+  function radiceDi(el) {
+    try {
+      const r = el.getRootNode();
+      const UI = global.SN_FILO_UI;
+      if (r && r !== document && r.host && UI && r.host.hasAttribute(UI.RIQUADRO)) return r;
+    } catch (_) {}
+    return null;
+  }
+
   // ============================================================================
   // Focus lifecycle
   // ============================================================================
   function onFocusIn(e) {
     if (!isEnabled()) return;
-    const el = findSupportedEditable(e.target);
+    const el = editabileDellEvento(e);
     if (!el) return;
     attach(el);
   }
 
   function onFocusOut(e) {
-    const el = findSupportedEditable(e.target);
+    const el = editabileDellEvento(e);
     if (!el) return;
     // Mantieni l'overlay finché l'utente sta interagendo col popup correzione,
     // altrimenti il click destro su un range blu lo nasconde subito.
     setTimeout(() => {
-      if (document.activeElement === el) return;
+      if ((radiceDi(el) || document).activeElement === el) return;
       detach(el);
     }, 200);
+  }
+
+  function suInput(state) {
+    // 1) autocorrect istantaneo
+    tryAutocorrect(state);
+    // 2) gli issue blu seguono il testo fino al prossimo scan
+    seguiIlTesto(state);
+    // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Lo scan già chiesto
+    // da un gesto (un tasto tenuto premuto) si sposta soltanto: resta una chiamata, sul testo finale.
+    if (!prendeGesto(state)) {
+      if (state.timer) scheduleScan(state);
+      return;
+    }
+    // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
+    //    (boundary char), lancia subito il check ortografico così che al
+    //    click destro non ci sia attesa. Limitato e in background.
+    //    Solo il tasto con cui l'utente chiude una parola lo paga: una pagina che a ogni lettera aggiunge una parola
+    //    ne otterrebbe uno per tasto (#1070).
+    const G = global.SN_GESTO;
+    if (G.prendi('parola', G.CHIUDE, G.dentro(state.el))) prefetchJustCompletedWord(state);
+    // 4) il prossimo scan
+    scheduleScan(state);
   }
 
   function attach(el) {
@@ -343,6 +384,8 @@
         el,
         overlay: null,
         issues: [],
+        // Il testo a cui si riferiscono gli offset di `issues`.
+        testoIssues: '',
         lastScannedText: '',
         timer: null,
         ro: null,
@@ -351,26 +394,13 @@
         wordCache: new Map(),
       };
       monitored.set(el, state);
-      el.addEventListener('input', () => {
-        // 1) autocorrect istantaneo
-        tryAutocorrect(state);
-        // 2) gli issue blu hanno offset relativi al testo precedente: digitare anche
-        // un solo carattere prima della fine può sfasare l'intero set. Cancellali
-        // subito; verranno ricostruiti dal prossimo scan (debounce 1.5s). Senza
-        // questo, "Risolvi" può applicare il fix sul range sbagliato e "mangiare"
-        // la frase.
-        if (state.issues.length) {
-          state.issues = [];
-          renderOverlayContent(state);
-        }
-        // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
-        //    (boundary char), lancia subito il check ortografico così che al
-        //    click destro non ci sia attesa. Limitato e in background.
-        prefetchJustCompletedWord(state);
-        // 4) il prossimo scan
-        scheduleScan(state);
-      });
-      el.addEventListener('scroll', () => syncOverlay(state));
+      // Un ascoltatore per casella, che guarda lo stato vivo: chi esce e rientra non lascia indietro uno stato morto
+      // che si prende il gesto, e una casella lasciata non lavora più (#1070).
+      if (!ascoltate.has(el)) {
+        ascoltate.add(el);
+        el.addEventListener('input', () => { const vivo = monitored.get(el); if (vivo) suInput(vivo); });
+        el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo) syncOverlay(vivo); });
+      }
       // Resize observer per cambi di dimensione (autoresize textarea, ecc.)
       try {
         state.ro = new ResizeObserver(() => syncOverlay(state));
@@ -380,7 +410,9 @@
     activeEl = el;
     ensureOverlay(state);
     syncOverlay(state);
-    scheduleScan(state);
+    // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente, col
+    // mouse sulla casella o con Tab (che cade sul campo di prima: la casella la riceve solo al rilascio).
+    if (prendeGesto(state, (l) => l.tasto === 'Tab')) scheduleScan(state);
   }
 
   function detach(el) {
@@ -412,19 +444,19 @@
   ];
 
   function ensureOverlay(state) {
-    if (state.overlay && document.body.contains(state.overlay)) return;
+    if (state.overlay && state.overlay.isConnected) return;
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(o);
+    (radiceDi(state.el) || document.body).appendChild(o);
     state.overlay = o;
   }
 
   function syncOverlay(state) {
     const o = state.overlay;
     const el = state.el;
-    if (!o || !el || !document.body.contains(el)) return;
+    if (!o || !el || !el.isConnected) return;
 
     const cs = window.getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -504,49 +536,159 @@
     o.appendChild(frag);
   }
 
+  // Chi corregge una parola perde il segno di quella: gli altri restano dov'erano finché lo scan dopo non li rinnova
+  // (#1111), sugli offset giusti per «Risolvi».
+  function seguiIlTesto(state) {
+    const ora = getEditableText(state.el);
+    if (ora === state.testoIssues) return;
+    const prima = state.testoIssues;
+    state.testoIssues = ora;
+    if (!state.issues.length) return;
+    const { issues, perse } = riallineaIssues(state.issues, prima, ora);
+    state.issues = issues;
+    // Un segno perso torna solo da uno scan, anche se il testo ritorna quello già controllato.
+    if (perse) state.lastScannedText = '';
+    renderOverlayContent(state);
+  }
+
+  // I segni di una risposta dello scan su `inviato`, portati sul testo di `adesso`.
+  function segniDellaRisposta(risposta, inviato, adesso) {
+    return riallineaIssues(buildIssues(parseIssues(risposta), inviato), inviato, adesso);
+  }
+
+  // Le stesse parole a meno di spazi e punteggiatura: lo scan rifarebbe la stessa domanda (#1097.5). Due parole fuse
+  // o separate invece cambiano le parole, e così apostrofo e trattino («un amico» / «un'amico», «e-mail»).
+  const ossatura = (t) => String(t ?? '').replace(/\u2019/g, "'").replace(/\u2010/g, '-')
+    .replace(/(?:(?!['-])[\s\p{P}])+/gu, ' ').trim();
+  function soloSpaziOPunteggiatura(prima, dopo) {
+    return typeof prima === 'string' && !!prima && prima !== dopo && ossatura(prima) === ossatura(dopo);
+  }
+
+  // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
+  // (un bordo che passa da separatore a lettera), si perde.
+  function riallineaIssues(issues, vecchio, nuovo) {
+    const lista = Array.isArray(issues) ? issues : [];
+    vecchio = String(vecchio ?? '');
+    nuovo = String(nuovo ?? '');
+    if (!lista.length || vecchio === nuovo) return { issues: lista, perse: false };
+    const corto = Math.min(vecchio.length, nuovo.length);
+    let p = 0;
+    while (p < corto && vecchio[p] === nuovo[p]) p++;
+    let s = 0;
+    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
+    const fineCambio = vecchio.length - s;
+    const delta = nuovo.length - vecchio.length;
+    const out = [];
+    for (const it of lista) {
+      let da;
+      if (it.end <= p) da = it.start;
+      else if (it.start >= fineCambio) da = it.start + delta;
+      else continue;
+      const a = da + (it.end - it.start);
+      if (isWordCharLocal(vecchio[it.start - 1]) !== isWordCharLocal(nuovo[da - 1])) continue;
+      if (isWordCharLocal(vecchio[it.end]) !== isWordCharLocal(nuovo[a])) continue;
+      out.push(da === it.start ? it : { ...it, start: da, end: a });
+    }
+    return { issues: out, perse: out.length !== lista.length };
+  }
+
   // ============================================================================
   // Scan LLM (zigzag blu)
   // ============================================================================
+  // Solo un gesto vero caduto dentro la casella apre una chiamata al modello, e una volta sola: `input` e `focus` li
+  // fabbrica anche la pagina, e scrivere nella sua ricerca non deve pagare il controllo di un'altra casella (#1070).
+  function prendeGesto(state, oppure) {
+    const G = global.SN_GESTO;
+    if (!G) return false;
+    const qui = G.dentro(state.el);
+    return G.prendi('correttore', undefined, oppure ? (l) => qui(l) || oppure(l) : qui);
+  }
+
+  // Gli esiti già pagati, per testo e contesto (#1097.5): fuori dalla cache del main, un campo lasciato e ripreso, o un
+  // annulla che torna a un testo controllato, non ripagano la stessa domanda. Pochi e per pagina.
+  const ESITI_MAX = 30;
+  const esitiRecenti = new Map();
+  const chiaveEsito = (text, context) => `${JSON.stringify(context ?? null)}\u0000${text}`;
+  function ricordaEsito(chiave, risposta) {
+    esitiRecenti.delete(chiave);
+    esitiRecenti.set(chiave, risposta);
+    while (esitiRecenti.size > ESITI_MAX) esitiRecenti.delete(esitiRecenti.keys().next().value);
+  }
+  // Le domande ancora in viaggio, per la stessa chiave: rientrare nel campo mentre il controllo corre non lo ripaga.
+  const inViaggio = new Map();
+  function chiediScan(chiave, text, context) {
+    let p = inViaggio.get(chiave);
+    if (!p) {
+      p = Promise.resolve(chrome.runtime.sendMessage({
+        type: MSG.AI_REQUEST,
+        action: ACTIONS.SPELLCHECK_SEMANTIC,
+        payload: { text, context },
+      }));
+      inViaggio.set(chiave, p);
+      const via = () => { if (inViaggio.get(chiave) === p) inViaggio.delete(chiave); };
+      p.then(via, via);
+    }
+    return p;
+  }
+
   function scheduleScan(state) {
     if (!isEnabled()) return;
     if (state.timer) clearTimeout(state.timer);
-    state.timer = setTimeout(() => scanText(state), DEBOUNCE_MS);
+    state.timer = setTimeout(() => { state.timer = null; scanText(state); }, DEBOUNCE_MS);
+  }
+
+  // Lo scan chiesto dall'utente e arrivato a scheda nascosta parte quando la scheda torna davanti.
+  function riprendiScanRimandato() {
+    if (document.hidden || !activeEl) return;
+    const state = monitored.get(activeEl);
+    if (!state || !state.rimandato) return;
+    state.rimandato = false;
+    scheduleScan(state);
   }
 
   async function scanText(state) {
-    if (!state || !state.el || !document.body.contains(state.el)) return;
+    if (!state || !state.el || !state.el.isConnected) return;
+    if (document.hidden) { state.rimandato = true; return; }
+    state.rimandato = false;
     const text = getEditableText(state.el);
 
     // Reset se il testo è troppo corto o invariato
     if (!text || text.length < MIN_TEXT_LENGTH) {
       state.issues = [];
-      state.lastScannedText = text;
+      state.testoIssues = text;
+      // Mai controllato: un segno che lo porta alla lunghezza minima deve far partire lo scan, non saltarlo.
+      state.lastScannedText = '';
+      // Una risposta ancora in viaggio parlava del testo di prima: non riporta i segni.
+      state.scanMostrato = state.scanInviati || 0;
       renderOverlayContent(state);
       return;
     }
     if (text === state.lastScannedText) return;
+    if (soloSpaziOPunteggiatura(state.lastScannedText, text)) return;
+    // Lo stesso testo, o solo un segno in più, è già in viaggio: la sua risposta arriva su quello di adesso.
+    if (state.testoInViaggio && (text === state.testoInViaggio || soloSpaziOPunteggiatura(state.testoInViaggio, text))) return;
     if (text.length > MAX_TEXT_LENGTH) {
       // Niente scan continuo su testi enormi: lasciamo invariati gli issue precedenti.
       return;
     }
 
     const context = extractContext(state.el);
+    const numero = (state.scanInviati || 0) + 1;
+    state.scanInviati = numero;
+    const chiave = chiaveEsito(text, context);
     let res;
-    try {
-      res = await chrome.runtime.sendMessage({
-        type: MSG.AI_REQUEST,
-        action: ACTIONS.SPELLCHECK_SEMANTIC,
-        payload: { text, context },
-      });
-    } catch (err) {
-      console.error('[SN] scan blu — sendMessage fallito:', err);
-      return;
+    if (esitiRecenti.has(chiave)) res = { ok: true, text: esitiRecenti.get(chiave) };
+    else {
+      state.testoInViaggio = text;
+      try {
+        res = await chiediScan(chiave, text, context);
+      } catch (err) {
+        console.error('[SN] scan blu — sendMessage fallito:', err);
+        return;
+      } finally {
+        if (state.testoInViaggio === text) state.testoInViaggio = '';
+      }
     }
-
-    // Se nel frattempo l'utente ha modificato il testo, scarta la risposta:
-    // sarebbe disallineata. Il prossimo input rilancerà lo scan.
-    const currentText = getEditableText(state.el);
-    if (currentText !== text) return;
 
     if (!res?.ok) {
       console.error('[SN] scan blu — provider error:', res?.code, res?.error);
@@ -556,9 +698,21 @@
       console.warn('[SN] scan blu — risposta senza text:', res);
       return;
     }
-    const allIssues = buildIssues(parseIssues(res.text), text);
-    state.issues = allIssues;
-    state.lastScannedText = text;
+    // Ricordata prima di guardare la casella: arrivata a campo lasciato, serve a chi ci rientra.
+    ricordaEsito(chiave, res.text);
+    // Una risposta più vecchia di quella già in vista non la sovrascrive.
+    if (numero < (state.scanMostrato || 0)) return;
+    const currentText = getEditableText(state.el);
+    if (!currentText || currentText.length < MIN_TEXT_LENGTH) return;
+    // Il testo è tornato a uno già controllato (un annulla): i suoi segni sono quelli giusti, non quelli dell'abbandonato.
+    if (currentText !== text && currentText === state.lastScannedText) return;
+    state.scanMostrato = numero;
+    // Arrivata mentre l'utente scriveva, la risposta pagata non si butta (#1097.5): i segni passano sul testo di adesso
+    // come quelli già in vista; quelli che il cambio tocca li rifà lo scan che segue.
+    const { issues, perse } = segniDellaRisposta(res.text, text, currentText);
+    state.issues = issues;
+    state.testoIssues = currentText;
+    state.lastScannedText = perse ? '' : text;
     renderOverlayContent(state);
     // Prefetch delle correzioni a singola parola: per ogni issue blu su 1 parola
     // chiediamo subito allo stesso modello la verifica ortografica e mettiamo in
@@ -569,7 +723,7 @@
     // italiane reali ma usate male). Il blu resta stabile; per evitare la
     // sovrapposizione con il rosso nativo lo zigzag blu è leggermente offsettato
     // verticalmente in CSS.
-    prefetchSingleWordSuggestions(state, text).catch((e) => {
+    prefetchSingleWordSuggestions(state, currentText).catch((e) => {
       console.warn('[SN] prefetch single-word failed:', e);
     });
   }
@@ -600,7 +754,7 @@
   // appena chiuso (ultimo carattere = boundary), così quando fa click destro
   // sulla parola la correzione è già pronta in cache.
   async function prefetchJustCompletedWord(state) {
-    if (!isEnabled()) return;
+    if (!isEnabled() || document.hidden) return;
     const el = state.el;
     const text = getEditableText(el);
     if (!text || text.length < 2) return;
@@ -1079,6 +1233,31 @@
   // ============================================================================
   // Applicazione correzioni
   // ============================================================================
+  // Come una battuta, dall'editing del browser: il correttore nativo sposta i segni delle altre parole invece di
+  // perderli (riscrivere il valore cancella tutto lo zigzag rosso del campo, #1111), e Ctrl+Z annulla la correzione.
+  // Falso se il campo è rimasto com'era: allora lo si riscrive.
+  function sostituisciComeBattuta(el, range, testo, cursorMode) {
+    testo = String(testo ?? '');
+    const prima = el.value;
+    const caret = el.selectionEnd;
+    // Una battuta rispetta maxlength e taglierebbe la correzione a metà.
+    if (el.maxLength >= 0 && prima.length - (range.end - range.start) + testo.length > el.maxLength) return false;
+    try {
+      const radice = el.getRootNode();
+      if (radice.activeElement !== el) el.focus({ preventScroll: true });
+      if (radice.activeElement !== el) return false;
+      el.setSelectionRange(range.start, range.end);
+      if (testo) document.execCommand('insertText', false, testo);
+      else if (range.end > range.start) document.execCommand('delete', false);
+    } catch (_) {}
+    if (el.value === prima) return false;
+    if (cursorMode === 'preserve' && typeof caret === 'number') {
+      const dove = caret >= range.end ? caret + testo.length - (range.end - range.start) : caret;
+      try { el.setSelectionRange(dove, dove); } catch (_) {}
+    }
+    return true;
+  }
+
   function applyFix(el, range, replacement, opts = {}) {
     const safeReplacement = String(replacement == null ? '' : replacement);
     // 'end' = caret a fine inserzione (popup correttore manuale).
@@ -1108,18 +1287,19 @@
         console.warn('[SN] applyFix: range fuori bounds, skip', { range, length: v.length });
         return;
       }
-      // Usa setRangeText (API standard): più robusta del concat manuale e
-      // mantiene correttamente l'undo stack del browser.
-      try {
-        el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
-      } catch (_) {
-        const before = v.slice(0, range.start);
-        const after = v.slice(range.end);
-        el.value = before + safeReplacement + after;
-        const caret = before.length + safeReplacement.length;
-        try { el.setSelectionRange(caret, caret); } catch (_) {}
+      if (!sostituisciComeBattuta(el, range, safeReplacement, cursorMode)) {
+        try {
+          el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
+        } catch (_) {
+          const before = v.slice(0, range.start);
+          const after = v.slice(range.end);
+          el.value = before + safeReplacement + after;
+          const caret = before.length + safeReplacement.length;
+          try { el.setSelectionRange(caret, caret); } catch (_) {}
+        }
+        // Segnato come nostro: un campo di un riquadro di Filo, chiuso ai finti, deve sentire la correzione.
+        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
       }
-      el.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
       const text = el.textContent || '';
       if (range.start < 0 || range.end > text.length || range.end <= range.start) {
@@ -1202,10 +1382,13 @@
         }
       }
     }
-    // Rimuovi l'issue dallo stato e ridisegna; il prossimo scan rivaluterà.
+    // L'issue corretto cade col testo che cambia (anche se l'input non è arrivato); il prossimo scan rivaluterà.
     const state = monitored.get(el);
     if (state) {
-      state.issues = (state.issues || []).filter((i) => !(i.start === range.start && i.end === range.end));
+      seguiIlTesto(state);
+      if (getEditableText(el) === currentText) {
+        state.issues = state.issues.filter((i) => !(i.start === range.start && i.end === range.end));
+      }
       state.lastScannedText = '';
       renderOverlayContent(state);
       scheduleScan(state);
@@ -1216,12 +1399,14 @@
   // Richiesta on-demand: parola sotto cursore → suggerimento LLM
   // ============================================================================
   // Restituisce { misspelled, correction } o null se la chiamata fallisce.
-  async function requestWordSuggestion({ word, sentence, prev, next }) {
+  // `suRichiesta`: il tasto destro dell'utente, che il tetto del main sulle chiamate automatiche non ferma.
+  async function requestWordSuggestion({ word, sentence, prev, next }, { suRichiesta = false } = {}) {
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.SPELLCHECK_WORD,
         payload: { word, sentence, prev, next },
+        ...(suRichiesta ? { suRichiesta: true } : {}),
       });
       if (!res?.ok) {
         console.error('[SN] word check — provider error:', res?.code, res?.error);
@@ -1336,6 +1521,10 @@
     getInputWordAt,
     requestWordSuggestion,
     applyFix,
+    sostituisciComeBattuta,
+    riallineaIssues,
+    soloSpaziOPunteggiatura,
+    segniDellaRisposta,
     addToDictionary,
     isInDictionary,
     setAutocorrect,

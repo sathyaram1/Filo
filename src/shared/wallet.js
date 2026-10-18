@@ -30,15 +30,20 @@
     return /^OpenRouter(?:\s+\S+)?\s+402\b/.test(raw) || /insufficient credits|key limit exceeded/i.test(raw);
   }
 
-  // Quanti crediti vale una spesa in dollari, coi parametri del server
-  // (euro per credito, cambio). Per eccesso al decimo: ciò che si scala al
-  // saldo mostrato non deve essere meno di ciò che OpenRouter conta.
-  function creditsForUsd(costUsd, { eurPerCredit, eurUsd } = {}) {
-    const usd = Number(costUsd);
-    if (!Number.isFinite(usd) || usd <= 0) return 0;
+  // Quanti crediti vale un dollaro, coi parametri del server (euro per
+  // credito, cambio): la stessa tariffa scala il saldo e fa le stime (#819).
+  function creditsPerUsd({ eurPerCredit, eurUsd } = {}) {
     const e = Number(eurPerCredit) || 0.0007;
     const fx = Number(eurUsd) || 1.1;
-    return Math.ceil((usd / (e * fx)) * 10 - 1e-6) / 10;
+    return 1 / (e * fx);
+  }
+
+  // Quanti crediti vale una spesa in dollari. Per eccesso al decimo: ciò che
+  // si scala al saldo mostrato non deve essere meno di ciò che OpenRouter conta.
+  function creditsForUsd(costUsd, params = {}) {
+    const usd = Number(costUsd);
+    if (!Number.isFinite(usd) || usd <= 0) return 0;
+    return Math.ceil(usd * creditsPerUsd(params) * 10 - 1e-6) / 10;
   }
 
   // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
@@ -174,7 +179,7 @@
   // (`account`: { credits, usage } da `GET /api/v1/credits`), e senza nemmeno
   // quello resta la sola spesa.
   function ownKeyBalanceLine({ limit, usage, limit_remaining, account } = {}) {
-    const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+    const usd = (n) => `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
     const spesa = `Spesi ${usd(usage)}`;
     const conto = account && Number.isFinite(Number(account.credits))
       ? Math.max(0, Number(account.credits) - (Number(account.usage) || 0))
@@ -219,24 +224,14 @@
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
   }
 
-  // La frase del riscatto riuscito, coi numeri che il server manda: quanti
-  // crediti d'ingresso, quanti del vecchio conteggio locale sono passati e,
-  // se non tutti, perché. Chi aveva 12.000 crediti e ne ritrova 10.000 deve
-  // leggerlo qui, non scoprirlo dal saldo (primo giro di verifica del ramo -b).
   function fmtInt(n) {
     return String(Math.max(0, Math.floor(Number(n) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
-  function redeemOkMessage({ entryCredits, migrated, localRequested, cutReason } = {}) {
+  // La frase del riscatto riuscito dice solo i crediti d'ingresso: il conteggio
+  // locale non passa (#1138), e «nessuno dei 1.000 che avevi» si leggeva come un furto.
+  function redeemOkMessage({ entryCredits } = {}) {
     const entry = Math.max(0, Math.floor(Number(entryCredits) || 0));
-    const got = Math.max(0, Math.floor(Number(migrated) || 0));
-    const asked = Math.max(0, Math.floor(Number(localRequested) || 0));
-    if (!entry || !asked) return REDEEM_MESSAGES.ok;
-    if (got >= asked) return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più i ${fmtInt(got)} che avevi già.`;
-    const why = cutReason === 'global_cap'
-      ? 'oltre non c’è posto in questo periodo'
-      : 'oltre non si portano';
-    const passati = got > 0 ? `${fmtInt(got)} dei ${fmtInt(asked)} che avevi già` : `nessuno dei ${fmtInt(asked)} che avevi già`;
-    return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più ${passati} (${why}).`;
+    return entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
   }
 
   // Il codice dentro quello che l'utente incolla. Il codice arriva per
@@ -453,7 +448,7 @@
   }
 
   // ── Le manopole dei crediti (#652) ─────────────────────────────────────────
-  // Le sette impostazioni che l'owner può cambiare in `config/credits`: come si
+  // Le impostazioni che l'owner può cambiare in `config/credits`: come si
   // chiamano nella pagina e quanto possono valere. Stanno qui perché le usano
   // in due — la pagina per disegnare i campi, il main per rifiutare un numero
   // storto prima di scriverlo sul server. I tetti sono larghi di proposito: il
@@ -464,6 +459,8 @@
     { chiave: 'dailyCredits', etichetta: 'Crediti al giorno', min: 0, max: 1000000, aiuto: 'La quota che arriva ogni notte a chi ha un portafoglio.' },
     { chiave: 'invitesPerUser', etichetta: 'Inviti per persona', min: 0, max: 1000, aiuto: 'Quanti codici riceve chi entra, da dare ad altri.' },
     { chiave: 'invitesMaxUses', etichetta: 'Persone per invito', min: 1, max: 1000, aiuto: 'Quante persone possono entrare con lo stesso codice. Vale anche per i link già in giro.' },
+    // Il server lo scala di uno a ogni riscatto: è un contatore, ma lo decide l'owner (#854).
+    { chiave: 'invitesRemaining', etichetta: 'Ingressi con invito rimasti', min: 0, max: 10000000, aiuto: 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
@@ -495,7 +492,7 @@
   // italiana. La chat lo scrive uguale, così i due numeri non divergono.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
 
   // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────
@@ -537,8 +534,239 @@
       : 'Sei entrato con un invito: i tuoi crediti sono pronti.';
   }
 
+  // ── Chi usa Filo e se il conto OpenRouter regge (#820) ───────────────────
+  // Per la pagina «Inviti e utenti» e per l'avviso all'owner all'avvio, dalla vista del server. Un cambio che manca
+  // dà null, mai un cambio inventato: il numero che ne viene è un trattino, non uno zero.
+  const GIORNO_MS = 24 * 60 * 60 * 1000;
+  const GIORNO_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const giornoUtc = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const numeroO = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+
+  function creditiDaUsd(usd, cfg = {}) {
+    const u = numeroO(usd); const e = numeroO(cfg.eurPerCredit); const fx = numeroO(cfg.eurUsd);
+    return u == null || !(e > 0) || !(fx > 0) ? null : u / (e * fx);
+  }
+  function usdDaCrediti(crediti, cfg = {}) {
+    const c = numeroO(crediti); const e = numeroO(cfg.eurPerCredit); const fx = numeroO(cfg.eurUsd);
+    return c == null || !(e > 0) || !(fx > 0) ? null : c * e * fx;
+  }
+  function euroDaCrediti(crediti, cfg = {}) {
+    const c = numeroO(crediti); const e = numeroO(cfg.eurPerCredit);
+    return c == null || !(e > 0) ? null : c * e;
+  }
+  function euroDaUsd(usd, cfg = {}) {
+    const u = numeroO(usd); const fx = numeroO(cfg.eurUsd);
+    return u == null || !(fx > 0) ? null : u / fx;
+  }
+
+  // Attivo vuol dire almeno una riga nel registro d'uso nella finestra: un giorno presente in `usage.byDay` conta
+  // anche se la sua spesa è zero. I giorni sono quelli del server (UTC); oggi compreso, 7 giorni sono oggi e i sei prima.
+  function usoPersone(users, now = Date.now()) {
+    const da7 = giornoUtc(now - 6 * GIORNO_MS);
+    const da30 = giornoUtc(now - 29 * GIORNO_MS);
+    const ultimo = Object.create(null);
+    const attivi7 = [];
+    const attivi30 = [];
+    let spesoUsd = 0;
+    let spesoIgnoti = 0;
+    for (const u of Array.isArray(users) ? users : []) {
+      if (!u || typeof u.pseudonym !== 'string') continue;
+      const perGiorno = u.usage && u.usage.byDay && typeof u.usage.byDay === 'object' ? u.usage.byDay : {};
+      const giorni = Object.keys(perGiorno).filter((k) => GIORNO_RE.test(k)).sort();
+      const fine = giorni.length ? giorni[giorni.length - 1] : null;
+      ultimo[u.pseudonym] = fine;
+      if (fine && fine >= da7) attivi7.push(u.pseudonym);
+      if (fine && fine >= da30) attivi30.push(u.pseudonym);
+      const s = numeroO(u.balance && u.balance.usageUsd);
+      if (s == null) spesoIgnoti += 1;
+      else spesoUsd += s;
+    }
+    const nessuno = spesoIgnoti > 0 && spesoIgnoti === (Array.isArray(users) ? users.length : 0);
+    return { attivi7, attivi30, ultimo, spesoUsd: nessuno ? null : spesoUsd, spesoIgnoti };
+  }
+
+  function usd2(n) {
+    return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+  }
+  function crediti0(n) {
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 0 }).format(Math.floor(Number(n) || 0));
+  }
+
+  // Il conto lo legge il server (`overview.account`, contratto in messages.js accanto a WALLET_OWNER_OVERVIEW). Senza
+  // il campo, o con un errore, il conto non è letto: nessun numero e nessun allarme, perché non si sa.
+  function contoOwner(overview) {
+    const o = overview && typeof overview === 'object' ? overview : {};
+    const cfg = o.config || {};
+    const tot = o.totals || {};
+    const a = o.account;
+    if (!a || typeof a !== 'object') return { letto: false, motivo: 'assente', allarmi: [] };
+    const caricatoUsd = numeroO(a.totalCreditsUsd);
+    const spesoUsd = numeroO(a.totalUsageUsd);
+    if (a.error || caricatoUsd == null || spesoUsd == null) return { letto: false, motivo: 'errore', allarmi: [] };
+    const restaUsd = Math.max(0, caricatoUsd - spesoUsd);
+    const restaCrediti = creditiDaUsd(restaUsd, cfg);
+    const vivi = numeroO(tot.liveCredits);
+    const margine = restaCrediti != null && vivi != null ? restaCrediti - vivi : null;
+    const tettoUsd = numeroO(tot.maxGrantUsd) != null ? numeroO(tot.maxGrantUsd) : usdDaCrediti(tot.maxGrantCredits, cfg);
+    const allarmi = [];
+    if (margine != null && margine < -1e-6) {
+      allarmi.push({
+        kind: 'vivi_oltre_conto',
+        testo: `Sul conto OpenRouter restano ${usd2(restaUsd)}, cioè ${crediti0(restaCrediti)} crediti, e le persone ne hanno ${crediti0(vivi)} da spendere: se li spendessero tutti il conto si svuoterebbe e Filo smetterebbe di rispondere a tutti, anche a chi ha ancora crediti. Ricarica il conto.`,
+      });
+    }
+    if (tettoUsd != null && tettoUsd > caricatoUsd + 1e-9) {
+      allarmi.push({
+        kind: 'tetto_oltre_caricato',
+        testo: `Il tetto dei crediti da regalare vale ${usd2(tettoUsd)}, più dei ${usd2(caricatoUsd)} caricati sul conto OpenRouter: abbassa il tetto o ricarica il conto.`,
+      });
+    }
+    return {
+      letto: true, caricatoUsd, spesoUsd, restaUsd, restaCrediti, caricatoCrediti: creditiDaUsd(caricatoUsd, cfg),
+      vivi, margine, tettoUsd, readAt: typeof a.readAt === 'string' ? a.readAt : '', allarmi,
+    };
+  }
+
+  // Quali allarmi dire all'owner all'avvio: gli accesi che l'avviso precedente non aveva già detto. Un conto non
+  // letto non cambia niente; uno letto senza allarmi li azzera, così un allarme che torna si ridice.
+  function allarmiDaDire(detti, conto) {
+    const prima = Array.isArray(detti) ? detti.filter((k) => typeof k === 'string') : [];
+    if (!conto || !conto.letto) return { dire: [], detti: prima };
+    const accesi = (conto.allarmi || []).map((a) => a.kind);
+    return { dire: (conto.allarmi || []).filter((a) => !prima.includes(a.kind)), detti: accesi };
+  }
+
+  // ── Gli avvisi all'owner fra le notifiche della home (#855) ─────────────────
+  // Un caso per ogni cosa che ferma gli utenti, un marcatore per ogni soglia superata. Un caso che la vista non dice
+  // (campo assente) non è rientrato: non compare nell'elenco, e la sua carta resta com'era.
+  const AVVISO_OWNER = 'crediti-owner';
+  const PAGINA_OWNER = 'filo://credits/owner.html';
+  const SOGLIE_TETTO = Object.freeze([80, 95]);
+  const INVITI_POCHI = 2;
+  const PSEUDONIMI_DETTI = 3;
+  const DOVE = 'nella pagina Inviti e utenti';
+  const TITOLI_OWNER = Object.freeze({
+    tetto: 'Tetto dei regali', giornaliera: 'Quota del giorno', inviti: 'Ingressi con invito', scarto: 'Registro d’uso',
+  });
+
+  const alPercento = (p) => (/^(1|8|11|8\d)$/.test(String(p)) ? `all'${p}%` : `al ${p}%`);
+  function elencoBreve(nomi) {
+    const altri = nomi.length - PSEUDONIMI_DETTI;
+    const primi = nomi.slice(0, PSEUDONIMI_DETTI).join(', ');
+    return altri > 0 ? `${primi} e ${altri === 1 ? 'un altro' : `altri ${altri}`}` : primi;
+  }
+
+  function avvisiOwner(overview) {
+    const o = overview && typeof overview === 'object' ? overview : null;
+    if (!o) return [];
+    const cfg = o.config && typeof o.config === 'object' ? o.config : {};
+    const tot = o.totals && typeof o.totals === 'object' ? o.totals : {};
+    // In ordine di gravità: scritti insieme, la home li mostra in quest'ordine.
+    const casi = [];
+
+    const tetto = numeroO(tot.maxGrantCredits);
+    const dati = numeroO(tot.grantedCredits);
+    if (tetto != null && dati != null) {
+      // Un tetto a zero non lascia regalare niente: è già pieno.
+      const cento = (tetto > 0 ? dati / tetto : 1) * 100 + 1e-9;
+      const p = Math.floor(cento);
+      const quanti = `${crediti0(dati)} su ${crediti0(tetto)}`;
+      casi.push({
+        caso: 'tetto', numero: p,
+        marcatori: SOGLIE_TETTO.filter((s) => cento >= s).map((s) => `tetto:${s}`),
+        testo: p >= 100
+          ? `I crediti regalati hanno raggiunto il tetto, ${quanti}. Il server rifiuta la quota del giorno e i nuovi ingressi finché non alzi il tetto ${DOVE}.`
+          : `I crediti regalati sono ${alPercento(p)} del tetto, ${quanti}. Alza il tetto ${DOVE}, o il server rifiuterà la quota del giorno e i nuovi ingressi.`,
+      });
+    }
+
+    const giorno = o.daily && typeof o.daily === 'object' && o.daily.summary && typeof o.daily.summary === 'object' ? o.daily.summary : null;
+    if (giorno) {
+      const r = Math.max(0, Math.floor(numeroO(giorno.refused) || 0));
+      casi.push({
+        caso: 'giornaliera', numero: r,
+        marcatori: r > 0 ? ['giornaliera:rifiuti'] : [],
+        testo: `L'ultima quota del giorno non è arrivata a ${r === 1 ? '1 persona' : `${r} persone`} perché il tetto dei crediti elargibili era pieno. Alza il tetto ${DOVE}.`,
+      });
+    }
+
+    const inviti = numeroO(cfg.invitesRemaining);
+    if (inviti != null) {
+      const n = Math.max(0, Math.floor(inviti));
+      casi.push({
+        caso: 'inviti', numero: n,
+        marcatori: n <= INVITI_POCHI ? [`inviti:${INVITI_POCHI}`] : [],
+        testo: n === 0
+          ? `Gli ingressi con invito sono finiti, e chi riceve un invito adesso non riesce a entrare. Aggiungine ${DOVE}.`
+          : `${n === 1 ? 'Resta 1 ingresso' : `Restano ${n} ingressi`} con invito, poi chi riceve un invito non riesce più a entrare. Aggiungine ${DOVE}.`,
+      });
+    }
+
+    // Ogni portafoglio segnato è un marcatore: uno nuovo si ridice anche se un altro era già segnato.
+    const utenti = Array.isArray(o.users) ? o.users : null;
+    const rs = o.reconcile && typeof o.reconcile === 'object' && o.reconcile.summary && typeof o.reconcile.summary === 'object' ? o.reconcile.summary : null;
+    const riassunto = rs ? numeroO(rs.flagged) : null;
+    if (utenti || riassunto != null) {
+      const segnati = [...new Set((utenti || [])
+        .filter((u) => u && u.reconcile && u.reconcile.flagged && typeof u.pseudonym === 'string' && u.pseudonym)
+        .map((u) => u.pseudonym))].sort();
+      const n = segnati.length || Math.max(0, Math.floor(riassunto || 0));
+      casi.push({
+        caso: 'scarto', numero: n,
+        marcatori: segnati.length ? segnati.map((p) => `scarto:${p}`) : (n > 0 ? ['scarto:?'] : []),
+        testo: `La riconciliazione ha trovato uno scarto su ${n === 1 ? '1 portafoglio' : `${n} portafogli`}${segnati.length ? ` (${elencoBreve(segnati)})` : ''}. Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate ${DOVE}.`,
+      });
+    }
+    return casi;
+  }
+
+  // Un marcatore mai detto scrive una carta nuova al posto di quella del suo caso; gli stessi marcatori riscrivono
+  // solo il numero; un caso letto senza marcatori toglie la carta e li scorda, così quando torna si ridice.
+  function avvisiOwnerPiano(detti, casi) {
+    const prima = Array.isArray(detti) ? detti.filter((k) => typeof k === 'string') : [];
+    const elenco = Array.isArray(casi) ? casi.filter((c) => c && typeof c.caso === 'string' && Array.isArray(c.marcatori)) : [];
+    const letti = new Set(elenco.map((c) => c.caso));
+    const piano = { scrivi: [], riscrivi: [], togli: [] };
+    for (const c of elenco) {
+      if (!c.marcatori.length) piano.togli.push(c.caso);
+      else if (c.marcatori.some((k) => !prima.includes(k))) piano.scrivi.push(c);
+      else piano.riscrivi.push(c);
+    }
+    const restano = prima.filter((k) => !letti.has(k.split(':')[0]));
+    return { ...piano, detti: [...restano, ...elenco.flatMap((c) => c.marcatori)] };
+  }
+
+  // Il piano sulle notifiche: `mem` è SN_FILO_MEMORY nel main, un finto negli unit test. I marcatori da salvare li
+  // restituisce: li scrive chi chiama, dopo le notifiche, così una scrittura fallita si rifà alla lettura dopo.
+  async function applicaAvvisiOwner(mem, detti, overview) {
+    const piano = avvisiOwnerPiano(detti, avvisiOwner(overview));
+    const vive = ((await mem.listNotifications()) || []).filter((n) => n && n.action && n.action.tipo === AVVISO_OWNER);
+    const delCaso = (caso) => vive.filter((n) => n.action.caso === caso);
+    let cambiato = false;
+    const togli = async (caso) => {
+      for (const n of delCaso(caso)) { await mem.dismissNotification(n.id); cambiato = true; }
+    };
+    for (const caso of piano.togli) await togli(caso);
+    // Le notifiche nuove vanno davanti: dall'ultimo, così il più grave resta in cima.
+    for (const c of piano.scrivi.slice().reverse()) {
+      await togli(c.caso);
+      await mem.addNotification({
+        kind: 'alert', text: c.testo,
+        action: {
+          tipo: AVVISO_OWNER, caso: c.caso, marcatori: c.marcatori, titolo: TITOLI_OWNER[c.caso] || '',
+          apri: PAGINA_OWNER, etichetta: 'Apri Inviti e utenti',
+        },
+      });
+      cambiato = true;
+    }
+    for (const c of piano.riscrivi) {
+      for (const n of delCaso(c.caso)) { if (await mem.setNotificationText(n.id, c.testo)) cambiato = true; }
+    }
+    return { detti: piano.detti, cambiato };
+  }
+
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
@@ -549,5 +777,9 @@
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
     formatCredits, PREMIO_ATTESA_MS, resolutionReward,
+    // Chi usa Filo e se il conto OpenRouter regge (#820)
+    creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
+    // Gli avvisi all'owner nella home (#855)
+    AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano, applicaAvvisiOwner,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

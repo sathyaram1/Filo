@@ -79,26 +79,45 @@ function contenutoAFuoco() {
 
 // L'utente sta scrivendo in un campo di testo? La regola è una sola e sta in
 // src/shared/campoTesto.js: qui la mandiamo a valutare dentro la pagina.
-// #405: la domanda va fatta al RIQUADRO con cui l'utente ha interagito per
-// ultimo (un commento dentro un iframe è un campo di testo tanto quanto uno
-// nella pagina che lo ospita).
+// Si parte sempre dalla pagina principale, che segue il fuoco fin dentro i
+// riquadri della sua origine; un riquadro d'altra origine (null) si interroga a
+// parte (#405, #685.1): l'ultimo riquadro toccato non è dove sta il fuoco.
 async function staScrivendo(wc) {
   if (!wc) return false;
-  let dove = wc;
-  try {
-    const frame = wc._filoActiveFrame;
-    if (frame && !frame.detached) dove = frame;
-  } catch (_) { dove = wc; }
   const sorgente = globalThis.SN_CAMPO_TESTO && globalThis.SN_CAMPO_TESTO.sorgenteScriveQui();
   if (!sorgente) return true;
   try {
-    return !!(await dove.executeJavaScript(sorgente, false));
+    const qui = await wc.executeJavaScript(sorgente, false);
+    if (qui !== null) return !!qui;
+    const riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || [];
+    const risposte = await Promise.all(riquadri
+      .filter((f) => f !== wc.mainFrame && !f.detached)
+      .map((f) => f.executeJavaScript(sorgente, false).catch(() => true)));
+    return risposte.some((r) => r === true);
   } catch (_) {
     // Nel dubbio si annulla, non si naviga: annullare quando non c'è niente da
     // annullare non fa nulla, mentre andare indietro mentre si scrive porta via
     // il testo appena battuto.
     return true;
   }
+}
+
+// Le Preferenze stanno registrando una scorciatoia (#842): su Mac la barra vede il tasto prima della pagina, che
+// deve poterlo rifiutare col perché invece di vedere aprirsi una scheda. Il tasto le arriva com'è stato premuto.
+function oRegistra(accel, fa, mac, aFuoco = contenutoAFuoco) {
+  return (...args) => {
+    const wc = aFuoco();
+    if (!wc || !require('./shortcuts').staRegistrandoTasti(wc)) return fa(...args);
+    const pezzi = String(accel).split('+');
+    const keyCode = pezzi.pop();
+    const nomi = { commandorcontrol: mac ? 'meta' : 'control', cmd: 'meta', command: 'meta', ctrl: 'control', control: 'control', alt: 'alt', shift: 'shift' };
+    const modifiers = pezzi.map((m) => nomi[m.toLowerCase()]).filter(Boolean);
+    try {
+      wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+      wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+    } catch (_) {}
+    return undefined;
+  };
 }
 
 // ─── le azioni, le stesse delle scorciatoie ─────────────────────────────────
@@ -151,8 +170,10 @@ function zoom(verso) {
   try { c.tab.view.webContents.send('filo:zoom-key', verso); } catch (_) {}
 }
 
-function schermoIntero() {
+// Dal tasto, lo schermo pieno chiesto dalla pagina a fuoco (un video) resta suo, come in src/main/shortcuts.js.
+function schermoIntero(_voce, _finestra, evento) {
   const win = finestra();
+  if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.schermoPienoDi(contenutoAFuoco())) return;
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
 }
 
@@ -274,10 +295,8 @@ function template(piattaforma) {
       { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: () => zoom('out'), ...SOLO_SCRITTA },
       { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: () => zoom('reset'), ...SOLO_SCRITTA },
       { type: 'separator' },
-      // Senza acceleratore, e non è una dimenticanza: in questa barra ci vanno
-      // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
-      // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
-      { label: 'Schermo intero', click: schermoIntero },
+      // Il tasto abituale di ogni sistema (F11, su Mac Control+Cmd+F): lo ascolta src/main/shortcuts.js ovunque.
+      { label: 'Schermo intero', accelerator: globalThis.SN_TASTI.etichettaSchermoIntero(MAC ? 'darwin' : 'win32'), click: schermoIntero, ...SOLO_SCRITTA },
       { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
     ],
   };
@@ -298,45 +317,15 @@ function template(piattaforma) {
     label: 'Aiuto',
     role: 'help',
     submenu: [
-      { label: 'Assistente laterale', click: assistenteLaterale },
+      { id: 'assistente-laterale', label: 'Assistente laterale', click: assistenteLaterale },
     ],
   };
 
-  return [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
-}
-
-// La barra esegue da sé i suoi tasti registrati quando nessuna pagina li ha usati:
-// chi inoltra tasti lo chiede qui per non far fare la stessa cosa due volte (#838).
-const formeDellaBarra = new Map();
-function formaTasto(mods, tasto) {
-  const NOMI = { plus: '+', left: 'arrowleft', right: 'arrowright' };
-  const k = String(tasto || '').toLowerCase();
-  return `${[...new Set(mods)].sort().join('+')}|${NOMI[k] || k}`;
-}
-function tastoDellaBarra(input, piattaforma = process.platform) {
-  if (!input) return false;
-  if (!formeDellaBarra.has(piattaforma)) {
-    const MAC = piattaforma === 'darwin';
-    const MOD = [
-      [/^(commandorcontrol|cmdorctrl)$/, MAC ? 'meta' : 'control'],
-      [/^(command|cmd|meta|super)$/, 'meta'], [/^(control|ctrl)$/, 'control'],
-      [/^(alt|option)$/, 'alt'], [/^shift$/, 'shift'],
-    ];
-    const forme = new Set();
-    const scendi = (voci) => {
-      for (const v of voci) {
-        if (v.submenu) scendi(v.submenu);
-        if (!v.accelerator || v.registerAccelerator === false) continue;
-        const parti = String(v.accelerator).split('+');
-        const mods = parti.slice(0, -1).map((p) => (MOD.find(([re]) => re.test(p.toLowerCase())) || [])[1]);
-        forme.add(formaTasto(mods, parti[parti.length - 1]));
-      }
-    };
-    scendi(template(piattaforma));
-    formeDellaBarra.set(piattaforma, forme);
+  const barra = [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
+  for (const m of barra) {
+    for (const v of m.submenu || []) if (v.accelerator && typeof v.click === 'function') v.click = oRegistra(v.accelerator, v.click, MAC);
   }
-  const mods = ['meta', 'control', 'alt', 'shift'].filter((m) => input[m]);
-  return formeDellaBarra.get(piattaforma).has(formaTasto(mods, input.key));
+  return barra;
 }
 
 // Da chiamare una volta sola, dopo `app.whenReady()`.
@@ -350,6 +339,15 @@ function installaMenuApplicazione() {
   } catch (e) {
     console.warn('[Filo] barra dei menu non installata', e && e.message);
   }
+  // L'Aiuto spento (#841) non resta nel menu: la voce segue l'interruttore.
+  try {
+    const segui = (s) => {
+      const voce = Menu.getApplicationMenu()?.getMenuItemById('assistente-laterale');
+      if (voce) voce.visible = require('./services/interruttoreAiuto').acceso(s);
+    };
+    globalThis.SN_STORAGE.getSettings().then(segui, () => {});
+    require('./shim/storage').onChanged((changes) => { if (changes && changes.settings) segui(changes.settings.newValue); });
+  } catch (_) {}
 }
 
-module.exports = { installaMenuApplicazione, template, tastoDellaBarra, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo, oRegistra };

@@ -49,7 +49,7 @@ describe('un segreto custodito da Filo non esce da nessuna uscita, a nessun live
     { type: 'CERCA_WEB', domanda: CHIAVE },
   ];
   for (const a of azioni) {
-    test(`${a.type} (livello ${L.levelFor(a)}) ${JSON.stringify(a).slice(0, 60)}`, () => {
+    test(`${a.type} (costo ${L.costoFor(a)}) ${JSON.stringify(a).slice(0, 60)}`, () => {
       const v = X.valutaUscita(a, { segreti: SEGRETI });
       assert.equal(v.blocca, true);
       assert.match(v.frase, /^non ho /);
@@ -718,7 +718,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   test('executeFiloAction chiama la porta prima del gate dei livelli e di ogni esecuzione', () => {
     const porta = esegui.indexOf('controllaUscita(');
     assert.ok(porta > 0, 'executeFiloAction non passa dalla porta delle uscite');
-    assert.ok(porta < esegui.indexOf('Levels.levelFor(action)'), 'la porta deve venire prima del gate dei livelli');
+    assert.ok(porta < esegui.indexOf('Levels.ingressi(action'), 'la porta deve venire prima del gate dell\'autonomia');
     assert.ok(porta < esegui.indexOf('switch (type)'), 'la porta deve venire prima di ogni esecuzione');
   });
 
@@ -734,7 +734,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
       if (PRIMITIVE.some((re) => re.test(c)) && !X.USCITE[tipo]) mancanti.push(tipo);
     }
     assert.deepEqual(mancanti, [], `uscite che saltano la porta: ${mancanti.join(', ')}`);
-    for (const t of Object.keys(X.USCITE)) assert.ok(L.levelFor({ type: t }) >= 1, `${t} non è nel registro dei livelli`);
+    for (const t of Object.keys(X.USCITE)) assert.ok(L.costoFor({ type: t }) != null, `${t} non è nel registro delle azioni`);
   });
 
   // Un bottone della chat che apre un indirizzo scelto dal modello è un'uscita come NAVIGA: l'azione che lo
@@ -812,7 +812,8 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     prima(finestre, 'SN_USCITA_DA_FILO(', 'openExternalScheme(', 'una pagina di Filo passa la posta al sistema prima della porta');
     assert.match(finestre.slice(0, finestre.indexOf('return { action: \'deny\' }')), /SN_USCITA_DA_FILO\(url, wc, \(\) => \{\s*this\.apriDaCollegamento\(/);
     const apre = corpo(tabs, '  apriDaCollegamento(url');
-    for (const passo of ['openExternalScheme(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
+    for (const passo of ['fermaNavigazione(', '_maybeBlockNavigation(', 'this.openTab(']) assert.ok(apre.includes(passo), `apriDaCollegamento senza ${passo}`);
+    assert.ok(corpo(tabs, 'function fermaNavigazione(').includes('openExternalScheme('), 'fermaNavigazione non passa la posta al sistema');
     prima(corpo(src('main', 'services', 'handlers', 'misc.js'), "on('fetch_link_meta'"), 'controllaUscita(', 'safeFetch(', 'leggere un collegamento lo chiede al sito prima della porta');
     const dash = src('pages', 'dashboard', 'dashboard.js');
     assert.ok(/document\.addEventListener\('click', apriDaCollegamento, true\)/.test(dash), 'i collegamenti della pagina non passano da apriProposta');
@@ -862,7 +863,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.equal((clic.match(/submitMessage\(.*\{ daModello: true \}\)/g) || []).length, 2);
     assert.match(corpo(dash, 'function paroleUtente('), /!m\.daModello/);
     const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
-    assert.match(handlers, /const paroleUtente = cleanHistory\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
+    assert.match(handlers, /const paroleUtente = \[\.\.\.vistiDalFilo, \.\.\.codaScheda\]\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
     assert.match(handlers, /concat\(internal \|\| daModello \? \[\] :/);
   });
 

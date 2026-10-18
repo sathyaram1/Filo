@@ -55,7 +55,15 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   stessa animazione al contrario. Il riassunto si sposta quanto serve a
   lasciare a un gomitolo grosso l'aria di uno piccolo (prova J dello spec).
   Se dopo il testo arriva un'azione, quel
-  testo era una nota: il gomitolo si srotola e il lavoro continua.
+  testo era una nota: il gomitolo si srotola e il lavoro continua. Non se il
+  giro ha solo azioni che mettono un bottone e basta (APRI_FILE,
+  EVENTO_CALENDARIO): il loro esito si sa già, quindi quel testo è la risposta e
+  resta nella bolla, e quello dei giri dopo continua sotto. Resta anche se un
+  giro dopo fallisce o viene fermato: la bolla e l'archivio la tengono (#1167).
+  Gli esiti dicono sempre al modello dove è finito il testo del giro: «non
+  ripeterlo» solo se è rimasto nella bolla; finito fra le note, con qualunque
+  azione nel giro, «riscrivilo per intero se era la risposta» (una volta per
+  giro, in coda all'ultimo esito).
 - **Fermare.** Mentre Filo lavora il posto dell'invio lo prende un quadrato
   (`#stopBtn`, stesso posto, colore d'accento) e Invio fa la stessa cosa:
   fermare è urgente, e sul telefono il passaggio del mouse non esiste. Il filo
@@ -81,6 +89,14 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   azioni fatte (`interrotto`, `fermato`), il modello le vede come già fatte e
   riparte con un turno interno. Rimandare una mail già mandata è un danno, non
   uno spreco.
+- **Finito senza risposta è come fermato.** Al tetto dei giri, o muto dopo sole
+  letture (ricerche, file, impostazioni), il main scrive «Mi sono fermato dopo N
+  passi senza arrivare a una risposta» e la bolla ha «Continua»: è lo stesso
+  «riprendi» (tasto d'invio, tasto destro sul blocco), con un messaggio interno
+  che chiede di non rifare i passi. Vale anche quando l'ultima frase di lavoro
+  («cerco ancora…») sale nella bolla: resta, e la frase si aggiunge sotto. Il
+  tasto sparisce quando l'offerta finisce (#557, prove E, F e G di
+  `tests/dashboard-chat-strumenti.spec.mjs`).
 - **Lo stop resta scritto dove si decide di riprendere.** Ogni meccanismo che
   ricostruisce il lavoro in sospeso deve sapere che è stato fermato, o lo rifà
   da solo. L'accoglienza riparte da sé quando trova in fondo un messaggio

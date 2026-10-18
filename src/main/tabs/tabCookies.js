@@ -3,6 +3,7 @@
 // il menu che lo mostra è quello del tasto destro sulla scheda (src/renderer/shell.js).
 
 const Cookies = require('../services/cookies');
+const Sito = require('../services/stessoSito');
 
 // Chiavi della memoria della pagina che i CMP usano per ricordarsi la risposta (stessa idea di isConsentName),
 // più quelle che il clic sul banner ha creato. La stessa regola la applica il preload (takeCookieWipe).
@@ -275,7 +276,9 @@ const cookieMethods = {
     if (!site) return { ok: false, error: 'no_site' };
     const Storage = globalThis.SN_STORAGE;
     const settings = await Storage.getSettings();
-    const list = Cookies.getBannerSites(settings).filter((d) => d !== site);
+    const prima = Cookies.getBannerSites(settings);
+    const copre = Sito.voceSalvata(tab.url, prima);
+    const list = prima.filter((d) => d !== site && d !== copre);
     if (show) list.push(site);
     list.sort();
     tab.cookieOutcome = null;

@@ -41,27 +41,49 @@
     return !Number(err && err.status) && /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|socket hang up/i.test(m);
   }
 
-  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  // #1097.3 — un 429 o un 5xx è un servizio che risponde: prima del ripiego si riprova una volta lo stesso tentativo,
+  // dopo l'attesa che chiede (Retry-After) o una breve. Mai un 402 (crediti finiti), mai dopo che il testo ha
+  // cominciato ad arrivare; un'attesa più lunga del tetto non si fa: c'è il ripiego apposta.
+  const RETRY_SERVIZIO_MAX = 1;
+  const ATTESA_SERVIZIO_MS = 1000;
+  const ATTESA_SERVIZIO_MAX_MS = 10000;
+  function attesaServizio(err) {
+    const s = Number(err && err.status);
+    if (!(s === 429 || (s >= 500 && s <= 599))) return null;
+    const chiesta = Number(err.retryAfterMs);
+    const ms = Number.isFinite(chiesta) && chiesta >= 0 ? chiesta : ATTESA_SERVIZIO_MS;
+    return ms <= ATTESA_SERVIZIO_MAX_MS ? ms : null;
+  }
 
-  // Esegue `once()` ritentandolo sui guasti di rete passeggeri. `canRetry()`
-  // decide se il ritentativo è ancora lecito (in streaming non lo è più una
-  // volta che dei delta sono usciti, se il chiamante non sa azzerare il buffer).
-  async function withNetworkRetry(once, canRetry) {
-    let lastErr = null;
-    for (let t = 0; t <= RETRY_NETWORK_MAX; t++) {
+  // L'attesa finisce prima se chi aspetta ha fermato la richiesta.
+  const sleep = (ms, signal) => new Promise((res) => {
+    if (signal && signal.aborted) { res(); return; }
+    const t = setTimeout(() => { if (signal) signal.removeEventListener('abort', fine); res(); }, ms);
+    function fine() { clearTimeout(t); res(); }
+    if (signal) signal.addEventListener('abort', fine, { once: true });
+  });
+
+  // Esegue `once()` ritentandolo sui guasti di rete passeggeri e, una volta, su un 429/5xx. `canRetry(tipo)` decide se
+  // il ritentativo è ancora lecito ('rete' | 'servizio'): in streaming non lo è più una volta che dei delta sono usciti,
+  // se il chiamante non sa azzerare il buffer, e per 'servizio' mai.
+  async function withNetworkRetry(once, canRetry, signal) {
+    let rete = 0;
+    let servizio = 0;
+    for (;;) {
       try {
         return await once();
       } catch (err) {
-        lastErr = err;
-        const again = t < RETRY_NETWORK_MAX
-          && isTransientNetwork(err)
-          && (!canRetry || canRetry());
-        if (!again) throw err;
-        console.warn('[SN] guasto di rete passeggero, ritento tra', RETRY_NETWORK_DELAY_MS, 'ms:', err.message || err);
-        await sleep(RETRY_NETWORK_DELAY_MS);
+        let tipo = null;
+        let ms = null;
+        if (isTransientNetwork(err) && rete < RETRY_NETWORK_MAX) { tipo = 'rete'; ms = RETRY_NETWORK_DELAY_MS; }
+        else if (servizio < RETRY_SERVIZIO_MAX) { ms = attesaServizio(err); if (ms != null) tipo = 'servizio'; }
+        if (!tipo || (signal && signal.aborted) || (canRetry && !canRetry(tipo))) throw err;
+        if (tipo === 'rete') rete++; else servizio++;
+        console.warn(`[SN] ${tipo === 'rete' ? 'guasto di rete passeggero' : `servizio ${err.status}`}, ritento tra`, ms, 'ms:', err.message || err);
+        await sleep(ms, signal);
+        if (signal && signal.aborted) throw err;
       }
     }
-    throw lastErr;
   }
 
   // Crediti finiti (#598): OpenRouter risponde 402 finché il tetto della
@@ -77,12 +99,12 @@
   // `tools` / `toolChoice` (tool calling nativo, vedi src/shared/actionTools.js)
   // e `onToolCall` (una chiamata appena il modello ne pronuncia il nome, in
   // streaming) passano tali e quali al provider.
-  async function complete({ provider, apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
-    return getProvider(provider).complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal });
+  async function complete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
+    return getProvider(provider).complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal });
   }
 
-  async function streamComplete({ provider, apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
+  async function streamComplete({ provider, apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    return getProvider(provider).streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal });
   }
 
   async function listModels({ provider, apiKey }) {
@@ -100,9 +122,9 @@
       const aModel = a.model || model;
       try {
         const r = await withNetworkRetry(() => getProvider(a.provider).complete({
-          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
+          apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
           providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
-        }));
+        }), null, signal);
         // `...r` porta con sé `servedBy` (chi ha davvero servito, se il provider
         // lo riporta): il chiamante lo usa per registrare e verificare la politica.
         return { ...r, provider: a.provider, model: aModel };
@@ -144,19 +166,20 @@
         // provider (#273): se non sa farlo, non ritentiamo.
         const r = await withNetworkRetry(
           () => Promise.resolve(getProvider(a.provider).streamComplete({
-            apiKey: a.apiKey, model: aModel, reasoning: a.reasoning,
+            apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
             providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
             onToolCall: onToolCall ? (c) => { emitted = true; onToolCall(c); } : onToolCall,
           })).catch((err) => { noteBroken(err, a, aModel); throw err; }),
-          () => {
+          (tipo) => {
             if (!emitted) return true;
-            if (!onReset) return false;
+            if (tipo !== 'rete' || !onReset) return false;
             try { onReset({ failed: a.provider, next: a.provider }); } catch (_) {}
             emitted = false;
             return true;
           },
+          signal,
         );
         return { ...r, provider: a.provider, model: aModel, ...(broken.length ? { brokenAttempts: broken } : {}) };
       } catch (err) {
@@ -178,6 +201,7 @@
   }
 
   global.SN_PROVIDERS = {
+    attesaServizio,
     complete,
     streamComplete,
     listModels,

@@ -21,6 +21,7 @@
   <!-- Stessa allowlist dei tipi allegabili del riquadro di segnalazione dentro i siti, così le due strade
      rifiutano le stesse cose con le stesse parole. -->
   <script src="filo://shared/feedbackAttachTypes.js"></script>
+  <script src="filo://shared/feedbackAttese.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/feedbackLive.js"></script>
   <script src="filo://shared/feedbackLivePagina.js"></script>
@@ -43,7 +44,7 @@
     .fb-imgs img.fb-img-loading {
       width: 140px; height: 100px; object-fit: contain; cursor: default;
       background: var(--sn-surface-2, rgba(127,127,127,.08));
-      animation: fbImgPulse 1.2s ease-in-out infinite;
+      animation: fbImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes fbImgPulse { 0%,100% { opacity: .55; } 50% { opacity: .85; } }
     .fb-img-broken {
@@ -92,7 +93,23 @@
       font-size: 12px; color: var(--sn-muted); cursor: pointer;
     }
     .fb-filter:hover { color: var(--sn-fg); }
-    .fb-actions { margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
+    /* La riga dei tasti: a sinistra la frase (fissa, qualunque sia il numero di azioni), a destra le azioni di stato. */
+    .fb-tasti { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .fb-actions { flex: 1 1 auto; display: flex; justify-content: flex-end; gap: 8px; }
+    /* Il tasto della frase ha la resa di Gestione: la freccia si gira da aperto, pallino e accento se una frase c'è già. */
+    .fb-usernote-toggle::after {
+      content: '▾'; display: inline-block; margin-left: 6px;
+      font-size: 11px; color: var(--sn-muted);
+      transition: transform calc(0.12s * var(--sn-motion, 1));
+    }
+    .fb-usernote-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
+    .sn-page button.fb-usernote-toggle.fb-usernote-piena {
+      border-color: var(--sn-accent, #c8763c);
+      color: var(--sn-accent, #c8763c);
+    }
+    .fb-usernote-toggle.fb-usernote-piena::before {
+      content: '●'; margin-right: 6px; font-size: 9px; vertical-align: middle;
+    }
     /* UN CLIC, UNA SCHEDA: mentre la scrittura è in volo la scheda si spegne, così il clic si VEDE — non vedendo
        niente veniva naturale premere una seconda volta — e poi resta al suo posto, con l'esito scritto. */
     .fb-card--busy { opacity: 0.55; }
@@ -100,7 +117,7 @@
     .fb-act--busy { position: relative; }
     .fb-act--busy::after {
       content: '…'; margin-left: 6px;
-      animation: fb-pulse 900ms ease-in-out infinite;
+      animation: fb-pulse calc(900ms * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes fb-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
     .fb-card--decisa { opacity: 0.55; }
@@ -193,7 +210,7 @@
     .fb-attach-thumb img.fb-img-loading {
       object-fit: contain; cursor: default;
       background: var(--sn-surface-2, rgba(127,127,127,.08));
-      animation: fbImgPulse 1.2s ease-in-out infinite;
+      animation: fbImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     .fb-attach-thumb .fb-img-broken {
       width: 64px; height: 64px; font-size: 10px; line-height: 1.2;
@@ -252,8 +269,27 @@
       font-size: 10.5px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap;
       border: 1px solid color-mix(in srgb, #c0392b 55%, transparent); color: #c0392b;
     }
+    /* «Aspetta #N» (#903): la forma del chip qui sopra, nella tinta d'accento come in Gestione. */
+    .fb-attesa {
+      display: inline-block; max-width: 100%; box-sizing: border-box;
+      font-size: 10.5px; line-height: 1.25; padding: 2px 6px; border-radius: 9px; white-space: normal; overflow-wrap: anywhere;
+      border: 1px solid color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent); color: var(--sn-accent, #c8763c);
+    }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
     .fb-num { color: var(--sn-muted); font-weight: 600; }
+    /* Il segno dei Ricevuti: la forma del livello che ha fermato la pratica, come nella gestione. */
+    .fb-segno {
+      display: inline-block; vertical-align: -1px;
+      width: var(--fb-segno-size, 11px); height: var(--fb-segno-size, 11px); color: var(--sn-muted); cursor: help;
+    }
+    .fb-segno svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .fb-segno svg path { fill: currentColor; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+    .fb-segno--vuoto svg path { fill: none; stroke-width: 1.6; stroke-dasharray: 3 2; }
+    .fb-segno--attack  { color: #c0392b; }
+    .fb-segno--spam    { color: #e08e0b; }
+    .fb-segno--design  { color: #2e9e5b; }
+    .fb-segno--aligned { color: #5b6ee0; }
+    .fb-segno--locale  { color: #26c9fc; }
     .fb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
     .fb-badge {
       font-size: 11px; padding: 1px 7px; border-radius: 999px;
@@ -289,7 +325,7 @@
     .fb-dot {
       width: 13px; height: 13px; padding: 0; border-radius: 50%;
       border: 1px solid var(--sn-muted); background: transparent;
-      cursor: pointer; box-sizing: border-box; transition: background 0.1s, border-color 0.1s;
+      cursor: pointer; box-sizing: border-box; transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
     }
     .fb-dot:hover { border-color: var(--sn-accent); }
     .fb-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }
@@ -346,7 +382,8 @@
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
       <button type="button" class="fb-tab" data-tab="queue">In coda</button>
-      <button type="button" class="fb-tab" data-tab="local">Lavori locali</button>
+      <button type="button" class="fb-tab" data-tab="local">Lavori server</button>
+      <button type="button" class="fb-tab" data-tab="waiting">Aspettano</button>
       <button type="button" class="fb-tab" data-tab="resolved">Risolti</button>
       <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>
     </div>

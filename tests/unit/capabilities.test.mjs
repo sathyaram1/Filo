@@ -87,25 +87,38 @@ test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né acc
 
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
 
-test('ogni comando delle scorciatoie di Filo è coperto dal manifesto', () => {
-  // shortcuts.js definisce i 4 comandi; ognuno deve esistere come capacità.
-  const src = readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8');
-  const commands = [...src.matchAll(/'(Alt\+[A-Z])':\s*'([a-z-]+)'/g)].map((m) => ({ accel: m[1], cmd: m[2] }));
-  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 scorciatoie');
-  // Mappa comando-shortcut → id capacità che lo descrive.
+test('ogni comando delle scorciatoie di Filo è coperto dal manifesto, coi tasti scelti', () => {
+  // Le quattro azioni stanno in SN_TASTI (#842): ognuna è una capacità, e il manifesto cita il tasto IN USO.
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
   const cmdToCap = {
     'explain-selection': 'explain-selection',
     'translate-selection': 'translate-selection',
     'save-for-later': 'save-for-later',
     'open-help-sidebar': 'help-sidebar',
   };
-  for (const { accel, cmd } of commands) {
-    const capId = cmdToCap[cmd];
-    assert.ok(capId, `shortcut ${accel} → comando "${cmd}" non mappato nel test: aggiorna manifesto+test`);
-    const cap = CAP.get(capId);
-    assert.ok(cap, `manca la capacità "${capId}" per lo shortcut ${accel} (${cmd})`);
-    // l'invocazione deve citare lo shortcut, così il manifesto non mente su come si attiva.
-    assert.ok(cap.invoke.includes(accel), `la capacità "${capId}" non cita lo shortcut ${accel} in invoke`);
+  assert.equal(T.AZIONI_FILO.length, 4);
+  const cita = (scelte) => {
+    T.usaScorciatoieFilo(scelte);
+    for (const a of T.AZIONI_FILO) {
+      const capId = cmdToCap[a.id];
+      assert.ok(capId, `comando "${a.id}" non mappato nel test: aggiorna manifesto+test`);
+      const cap = CAP.get(capId);
+      assert.ok(cap, `manca la capacità "${capId}" per il comando ${a.id}`);
+      const accel = T.scorciatoiaFilo(a.id);
+      for (const sistema of ['win32', 'darwin']) {
+        assert.ok(cap.invoke.includes(T.etichettaFilo(accel, sistema)), `«${capId}» non cita ${T.etichettaFilo(accel, sistema)} (${sistema}): ${cap.invoke}`);
+      }
+      assert.ok(!/\{tasto:/.test(cap.invoke + (cap.doesNot || '') + cap.desc), `«${capId}»: segnaposto rimasto nel testo`);
+    }
+  };
+  try {
+    cita({});
+    cita({ 'translate-selection': 'Ctrl+Shift+Y', 'open-help-sidebar': 'Alt+Shift+K' });
+    assert.ok(!CAP.get('translate-selection').invoke.includes('Alt+T'), 'il manifesto cita ancora il tasto di serie');
+    assert.match(CAP.renderDetailForPrompt(['help-sidebar']), /Alt\+Shift\+K \(Ctrl\+Alt\+Shift\+K su Mac\)/);
+  } finally {
+    T.usaScorciatoieFilo({});
   }
 });
 
@@ -137,6 +150,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_STOP: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
+    // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
+    FILO_DECIDI_PAGINA: 'autonomy-levels',
+    FILO_AIUTO_NUOVO: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
@@ -162,6 +178,11 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // #866 — le pagine visitate che il filo ricorda: contarle e cancellarle dalla pagina Sicurezza.
     FILO_PAGINE_CONTA: 'visited-pages',
     FILO_PAGINE_CANCELLA: 'visited-pages',
+    // #974 — le chat dell'Editor, dei Mazzi e dell'Aiuto entrano nel filo come righe ripiegate.
+    FILO_CONVERSAZIONE_APP: 'app-chats-in-filo',
+    FILO_CONVERSAZIONE_APP_DIMENTICA: 'app-chats-in-filo',
+    FILO_CONVERSAZIONE_APP_RINOMINA: 'app-chats-in-filo',
+    FILO_RIGHE_APP: 'app-chats-in-filo',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',
@@ -257,7 +278,8 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // manifesto dice a un utente qualunque cosa sa fare Filo, e la posta delle
   // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
   // admin, per questo l'indirizzo compare ancora nel file.
-  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
+  // «Inviti e utenti» si apre dall'allarme del conto che arriva solo all'owner (#820).
+  const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html', 'filo://credits/owner.html']);
   // Le icone che stavano in alto a destra nella home sono nella barra laterale (#871): stessa regola.
   const barra = readFileSync(join(ROOT, 'src', 'main', 'barraLaterale.js'), 'utf8');
   const pagineBarra = barra.match(/const PAGINE_FISSE = \{([\s\S]*?)\};/)?.[1] || '';
@@ -336,7 +358,7 @@ test('nessuna capacità promette un\'icona del menu del tasto destro che non c\'
 
 test('ogni voce del menu «App» citata dal manifesto esiste davvero nel launcher', () => {
   // Simmetrico al test precedente sul lato "positivo": il manifesto indica il
-  // menu App come strada per alcune pagine (Scaricamenti, Aperti per dopo…).
+  // menu App come strada per alcune pagine (Download, Aperti per dopo…).
   // Se quella voce non è nel launcher, l'indicazione è falsa.
   //
   // Dal 2026-09 (#583) il registro è una FUNZIONE, perché "Feedback" e
@@ -428,6 +450,8 @@ function menuVoiceLabels() {
   pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
   // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
+  // E il menu di riserva, che il tasto destro apre dove quello di Filo non parte (Filo spento sul sito, #843).
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'main', 'menuDiRiserva.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);

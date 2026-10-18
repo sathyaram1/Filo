@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
+import { motiviDiLettura, rigaSporco } from './lib/biglietto-locale.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
@@ -23,7 +24,7 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
 const IMG = globalThis.SN_FEEDBACK_IMAGE;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval'];
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval', 'fiducia'];
 // Un documento testuale si stampa nella cornice fino a qui; oltre va in un file (con la cornice), e la riga lo dice.
 const MAX_IN_LINEA = 60000;
 const TIPO_TESTO = /^(text\/|application\/(json|x-yaml|yaml)\b)/i;
@@ -207,7 +208,9 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     apriByte: apriByte || (async (b) => (await import('./lib/decrypt-feedback-fields.mjs')).decryptAttachmentBytes(b)),
     cartella: cartella || join(tmpdir(), 'filo-feedback', `${numero}-${s}`),
   });
-  return { codice: 0, testo: [testoDaStampare(fb, s), ...allegati].join('\n') };
+  // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
+  const motivi = motiviDiLettura({ fiducia: f.fiducia?.stringValue || '', notes: pieno.notes });
+  return { codice: 0, testo: [testoDaStampare(fb, s), ...allegati].join('\n'), motivi, numero };
 }
 
 async function main(argv) {
@@ -219,6 +222,7 @@ async function main(argv) {
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
     const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq });
     if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
+    if (esito.motivi.length) console.error(await rigaSporco(`letto #${esito.numero}`, esito.motivi));
     console.log(esito.testo);
     return 0;
   } catch (e) {

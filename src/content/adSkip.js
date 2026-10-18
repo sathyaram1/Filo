@@ -99,7 +99,7 @@
   function utenteOccupato() {
     if (premuto) return true;
     const ct = global.SN_CAMPO_TESTO;
-    try { return !!(ct && ct.scriveQui(document)); } catch (_) { return false; }
+    try { return !!(ct && ct.scriveQui(document) !== false); } catch (_) { return false; }
   }
 
   // Il centro del pulsante, se lì sopra c'è proprio lui: un clic vero nel punto sbagliato aprirebbe la pubblicità.

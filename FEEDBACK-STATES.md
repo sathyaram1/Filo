@@ -152,15 +152,22 @@ mittenti fidati e dei derivati. L'iter `todo→working→revision_*→done` e `r
 lo muovono solo le routine; l'owner dall'iter può solo archiviare. Nessuna riga owner →
 `done`. Transizioni non elencate = illegali: il writer le rifiuta.
 
+**La fiducia** (#1148, SPEC-DOMANDE.md §1): `fiducia` (`fidato`|`non_fidato`, in chiaro) la
+scrive solo il server, le regole la vietano a ogni client. Alla nascita: fidato l'owner
+dall'app (`owner:` con la prova dell'admin), una sessione col biglietto pulito
+(`bigliettoLocale`), un biglietto pulito delle routine, il server (allarmi); tutto il resto
+non fidato. Dopo, solo «🤝 Segna fidato» in Gestione (callable `ownerFiducia`; da riga di
+comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nascono non fidati, e L5 torna a valere. Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
+(fidati prima) e L5 (§4b, e ROUTINE-AUTH-SPEC.md).
+
 **La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
 scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
-Il ripasso non dà più la prova al solo nome; sui feedback nati prima, col nome ancora
-intero, l'owner può dire che è suo con «🙋 È mio» in Gestione (da riga di comando no, #957).
+Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
 
-**Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:` con la prova): mai `attack`/`spam`; se un
+**Mittenti provati** (`owner:`/`routine:`/`agent:`/`local:` con la prova; per mittente fino al §10, non per fiducia): mai `attack`/`spam`; se un
 livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
-PANEL COMPLETO segnala un fidato (L2 dice attack/spam a verdetti pieni), lo status resta
+PANEL COMPLETO segnala un provato (L2 dice attack/spam a verdetti pieni), lo status resta
 `unlabeled` ma non c'è niente da ri-giudicare — la dashboard lo mostra con la categoria
 segnalata (rosso/arancio, frase "decidi tu") invece del bianco "non filtrato", e il
 bottone «Ri-valuta» lo salta (scelta owner 2026-08-29: la segnalazione resta visibile,
@@ -194,6 +201,7 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
 - Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
+- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
 
@@ -205,10 +213,8 @@ degli arenati e il pacemaker la saltano, e le superfici la mostrano nei Lavori l
 invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta comunque
 l'owner), con l'approvazione che dice `→ Lavori locali`.
 
-- Il segno si mette solo su feedback dell'owner o di una sessione (`owner:`/`local:`)
-  **con la prova** `senderProof: 'admin'` (la dà il ripasso dai segni che un falso non ha, o
-  l'owner con «🙋 È mio» in Gestione; da riga di comando no, #957: salterebbe L5 come il sì
-  qui sotto), a pratica aperta, non segnalata come
+- Il segno si mette solo su un feedback **fidato** (#1148; lo fa l'owner con «🤝 Segna fidato»
+  in Gestione, da riga di comando no), a pratica aperta, non segnalata come
   attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
   solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
   (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
@@ -220,10 +226,9 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   nei Lavori locali. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
   hanno le credenziali dell'owner e un testo d'utente potrebbe convincerle a darselo. Le regole non distinguono la
   pagina da uno script con lo stesso token: il limite sta negli strumenti (sentinella in
-  `tests/unit/lavoroLocaleApprovato.test.mjs`). Vale quanto la prova del
-  mittente (`isProvenLocalWork` nell'app, `localMergeEligibility` sul server), quindi la
-  sessione lo lega a `start`/`finish --feedback` e alla fusione L5 registra senza
-  fermare. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
+  `tests/unit/lavoroLocaleApprovato.test.mjs`). Lo stesso clic segna anche fidato il
+  feedback (#1148, callable `ownerFiducia`): è la fiducia, non il segno, a far registrare L5
+  senza fermare (§4b); la sessione lo lega a `start`/`finish --feedback`. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
   un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
   segnalato l'hover lo dice e serve guardarlo prima.
   Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic
@@ -238,28 +243,34 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   tecnico) non spostano feedback dai Ricevuti né dalle conferme `*_confirmed`, non
   lavorano feedback di utenti senza il sì dell'owner e non stampano testo di attacchi: `owner-feedback.mjs`
   rifiuta prima di scrivere.
-- Alla nascita un lavoro locale provato salta i giudici (`pipeline.skipped:
+  La priorità invece la cambiano su ogni stato, Ricevuti compresi, perché non sposta la pratica:
+  `owner-feedback.mjs <n> --priorita 0..3`, scritta come il pallino di Gestione (cifrata, `priorityManual`).
+- Alla nascita un lavoro locale fidato salta i giudici (`pipeline.skipped:
   'local_proven'`, status `todo`). Alla fusione `npm run finish` manda `feedbackId`
-  (da `--feedback <N>` o da `verify-local.mjs start --feedback <N>`): se il documento
-  è un lavoro locale provato il server esegue L5 solo per registrare i blocchi
-  (`skippedL5: true`), fonde senza chiedere e chiude la pratica. Manca una condizione →
-  la richiesta aspetta il sì dell'owner in Gestione, col motivo.
+  (da `--feedback <N>` o da `verify-local.mjs start --feedback <N>`): se la pratica è
+  fidata e il ramo ha nel registro (`routine-branches`) solo sessioni col biglietto pulito,
+  con la punta che si fonde come ultima voce, il server esegue L5 solo per registrare i
+  blocchi (`skippedL5: true`, motivo `fiducia`), fonde senza chiedere e chiude la pratica.
+  `verify-local start` e `finish` scrivono la voce col biglietto della sessione
+  (`scripts/biglietto.mjs`). Manca una condizione → la richiesta aspetta il sì dell'owner in
+  Gestione, col motivo. I rami nati prima del registro, di pratiche migrate, seguono la
+  regola di prima (prova del mittente o `localApproval`) finché non si chiudono.
 
 ### 4c. Chi nasce senza giudici (#914)
 
-Alla nascita (solo il trigger di creazione) L1 e L2 non girano per chi porta la prova
-scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js`):
+Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
+**fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
 
-- lavoro locale (§4b): `todo` nei Lavori locali, senza nemmeno L0;
-- sessione per le routine (`local:` + `senderProof: 'admin'`, senza segno: `claude-feedback.mjs
-  --non-locale`): L0, poi `todo` In coda (`pipeline.skipped: 'session_proven'`); la priorità
-  scelta con `--priorita` nasce col documento (`priorityManual`), senza scelta la decide il giudice;
-- routine (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti, derivati, allarmi della
-  costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped: 'routine_proven'`, decisione
-  dell'owner del 04/10). L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
+- lavoro locale fidato (§4b): `todo` nei Lavori locali, senza nemmeno L0;
+- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
+  coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
+  (`priorityManual`), senza scelta la decide il giudice;
+- ritrovamento fidato del server (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti,
+  derivati, allarmi della costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped:
+  'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
+  giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
-  - origine dell'owner, di una sessione o del server (mittente provato, anche un derivato già in
-    coda) → `todo`;
+  - origine fidata (anche un derivato fidato già in coda) → `todo`;
   - origine d'utente non ancora fusa → resta `unlabeled` (`statusReason: attesa_origine`); quando
     l'origine arriva a `done` → `todo`; se si blocca (`attack`, `spam`, `suspicious_file`, i
     confermati, `design` per `secaudit` o `l5`) → `design` (`statusReason: origine_bloccata`,
@@ -360,7 +371,11 @@ dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
-arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
+arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
+aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
+lavoro locale: quello resta `locale`, e la sua nota dice quale regola lo tiene
+fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
@@ -503,7 +518,10 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   `workingSince`. Deploy manuale (`npm run regole:pubblica`).
 
 ### 8. Migrazione legacy → nuovi stati (confermata dall'owner ed eseguita il 2026-07-03, F5)
-Script one-shot, più la normalizzazione in lettura per lo storico:
+Script una tantum, più la normalizzazione in lettura per lo storico (che resta). Lo
+script è stato tolto il 2026-10-15 (#1134), con quello dell'imbottitura dello `status`
+cifrato: una prova a vuoto su tutte le segnalazioni in produzione non trovava più
+niente da cambiare. La storia di git li conserva.
 - `new` → derivare dal pipeline con la STESSA logica di oggi (classifyBlock/isAligned):
   nessun pipeline o parziale → `unlabeled`; attacco → `attack`; spam → `spam`; design →
   `design`; aligned+`candidate_change` → `todo`; aligned senza → `aligned`.
@@ -570,7 +588,7 @@ oggi il codice dice altro vale il codice (le sezioni sopra).
       done/design (+clarify transizione). DEPLOYATE il 2026-07-03 (deploy ok su
       progetto filo-8b9cb).
 - [x] **F5 — Migrazione** (ESEGUITA 2026-07-03, owner ha confermato le scelte):
-      `scripts/migrate-status.mjs --apply` con token admin in tests/agent/.env
+      lo script una tantum (tolto con #1134, §8) con token admin in tests/agent/.env
       (gitignorato). 101 migrati / 226 già canonici / 0 errori: 40→aligned,
       2→attack, 1→spam, 3→design(judges), 4 clarify→design(clarify),
       21→unlabeled, 30 ignored→archived. Rilanciata a vuoto: 0 da migrare

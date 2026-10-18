@@ -21,13 +21,30 @@ delle chat. Regole che ne seguono:
   riporta lì. Senza questo riscontro la lista di esclusione è solo una speranza.
 - **Sugli endpoint audio il router ignora il blocco `provider`** (#713:
   `ignore`, `only` e `order` lì non valgono). Per voce e dettatura la lista di
-  esclusione si applica PRIMA di chiamare: `ensureAllowedHost` (openrouter.js)
-  legge chi serve il modello da `/models/{id}/endpoints` (un'ora di cache; un
-  elenco scaduto si usa mentre si rilegge) e, se nessun host è ammesso
-  (`hostPolicyViolation`, constants.js), non chiama e lancia `NO_ALLOWED_HOST`,
-  un messaggio che lettura, dettatura e «Prova» mostrano così com'è. Se gli host
-  non si sanno si chiama comunque; con host misti il router può ancora scegliere
-  quello escluso. In entrambi i casi resta il riscontro a posteriori.
+  esclusione si applica PRIMA di chiamare: `hostVerdict` (openrouter.js) legge
+  chi serve il modello da `/models/{id}/endpoints` (un'ora di cache; un elenco
+  scaduto si usa mentre si rilegge) e **si parte solo se gli host sono noti e
+  TUTTI ammessi** (`hostPolicyViolation`, constants.js; decisione dell'owner,
+  #1141): con host misti il router sceglie per prezzo e può dare l'audio proprio
+  all'escluso. Altrimenti `ensureAllowedHost` non chiama e lancia
+  `NO_ALLOWED_HOST` con un motivo per caso (tutti esclusi, misti, ignoti), che
+  lettura, dettatura e «Prova» mostrano così com'è. Una lettura fallita si
+  ritenta dopo pochi secondi, non a ogni frase. Lo stesso verdetto arriva
+  mentre si sceglie il modello (`AUDIO_HOST_CHECK`: Opzioni, Modelli
+  predefiniti, «Detta ▸» dal tasto destro), come avviso che non blocca la
+  scelta. Senza niente da escludere non si legge niente. Resta il riscontro a
+  posteriori.
+- **La lista la sceglie la chiave con cui la chiamata parte** (#962): con la
+  chiave propria e «Con la mia chiave, usa anche i fornitori esclusi» vale
+  `ownKeyIgnore` del routing, coi crediti di Filo sempre l'intera. Il ripiego
+  dalla chiave rifiutata ai crediti riparte quindi con l'intera, e su voce,
+  dettatura e classificatori, dove il router non la applica, parte solo se gli
+  host passano il controllo dei crediti (`hostCheckedFetch`); altrimenti risale
+  il rifiuto della chiave. Prove: `tests/unit/chiavePropriaFornitori.test.mjs`.
+- **Gli embedding non hanno il controllo preventivo**: la documentazione del
+  router dice che lì il blocco `provider` vale, e la risposta porta chi ha
+  servito. Non è provato con una chiamata vera: se un riscontro a posteriori
+  marchia un vettore servito da un escluso, vale la stessa regola dell'audio.
 - **Il costo dell'audio è quello del router**, non un listino a token:
   `usage.costUsd` ha la precedenza in `estimateCostEur` (costTracker.js).
 - **I vettori portano il nome del modello che li ha fatti** (`embedModel` sulla

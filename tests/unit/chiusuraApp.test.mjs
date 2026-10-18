@@ -8,6 +8,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chiudiApp } from '../fixtures/electron.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const RADICE = fileURLToPath(new URL('../..', import.meta.url));
 
@@ -47,7 +48,7 @@ test('chiudiApp ammazza anche i figli rimasti, così le pipe si chiudono', { ski
   const app = { process: () => capo, close: () => new Promise(() => {}) };
   try {
     await chiudiApp(app, { tetto: 200 });
-    const esito = await Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), 5000))]);
+    const esito = await Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), TETTO_ATTESA_MS).unref())]);
     assert.equal(esito, true, 'le pipe dell\'app non si sono chiuse: Playwright resterebbe ad aspettare');
   } finally {
     try { process.kill(pidFiglio, 'SIGKILL'); } catch (_) {}

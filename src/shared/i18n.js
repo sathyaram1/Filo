@@ -24,13 +24,18 @@
     menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
     menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
     menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
+    // #889 — la riga viene da un marchio nei pixel, non da un'etichetta del file.
+    menu_origin_hint_mark: 'Il programma che ha generato l’immagine ha scritto questo marchio nei pixel. Un ritaglio o un ridimensionamento lo cancellano, e molti generatori non lo mettono.',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
     menu_paste_no_results: 'Nessun risultato',
     menu_paste_remove: 'Rimuovi dalla cronologia',
     menu_paste_clear: 'Svuota cronologia',
-    menu_paste_clear_confirm: 'Vuoi svuotare tutta la cronologia degli appunti? Le voci copiate finora verranno eliminate.',
+    menu_paste_clear_confirm_one: 'Vuoi svuotare la cronologia degli appunti? Sparisce l\'unica voce copiata finora, e non si può riavere.',
+    menu_paste_clear_confirm_n: 'Vuoi svuotare la cronologia degli appunti? Spariscono tutte e %d le voci copiate finora, e non si possono riavere.',
+    menu_paste_clear_confirm_hidden: 'La ricerca che hai scritto ne mostra %d: spariscono anche le altre.',
+    menu_paste_removed: 'Rimossa',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
@@ -98,6 +103,18 @@
     // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
     err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    // Host misti o ignoti (#1141): sugli endpoint audio il router sceglie per prezzo, anche l'host escluso.
+    err_audio_mixed_host: 'Il modello «%s» lo serve anche %s, che Filo esclude, e con l\'audio non posso impedire che tocchi a lui. Non ho mandato niente: scegli un altro modello.',
+    err_audio_mixed_host_many: 'Il modello «%s» lo servono anche %s, che Filo esclude, e con l\'audio non posso impedire che tocchi a loro. Non ho mandato niente: scegli un altro modello.',
+    err_audio_hosts_unknown: 'Non so chi serve il modello «%s»: potrebbe essere un fornitore che Filo esclude. Non ho mandato niente: riprova fra poco o scegli un altro modello.',
+    // Lo stesso verdetto mentre si sceglie il modello (Opzioni, «Detta» dal tasto destro). %s = modello, funzione, host.
+    audio_host_fn_tts: 'la lettura ad alta voce',
+    audio_host_fn_stt: 'la dettatura',
+    audio_host_warn_excluded: 'Con «%s» %s non parte: lo serve solo %s, che Filo esclude.',
+    audio_host_warn_excluded_many: 'Con «%s» %s non parte: lo servono solo %s, che Filo esclude.',
+    audio_host_warn_mixed: 'Con «%s» %s non parte: lo serve anche %s, che Filo esclude.',
+    audio_host_warn_mixed_many: 'Con «%s» %s non parte: lo servono anche %s, che Filo esclude.',
+    audio_host_warn_unknown: 'Con «%s» %s non parte finché non so chi lo serve, e ora non riesco a saperlo.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -168,7 +185,6 @@
     edit_box_copy_new: 'Copia la nuova',
     edit_box_cancel: 'Annulla',
     edit_box_loading: 'Sto pensando…',
-    edit_box_error: 'Errore nella generazione',
     edit_box_replaced: 'Testo sostituito',
 
     // Coming soon
@@ -188,13 +204,17 @@
     popup_calc_result: 'Risultato',
     popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
     popup_send: 'Invia',
+    popup_copy: 'Copia',
+    popup_copied: 'Copiato',
+    popup_copy_failed: 'Non copiato',
 
     // Errori
     err_no_api_key: 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti. In alternativa, lì puoi mettere una tua chiave OpenRouter.',
     err_provider_failed: 'Il provider AI ha fallito. Controlla la connessione e la API key.',
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
-    err_blocked_domain: 'Estensione disabilitata su questo dominio.',
+    err_blocked_domain: 'Filo è spento su questo sito.',
     err_no_selection: 'Nessuna selezione di testo.',
+    help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.
@@ -202,13 +222,16 @@
     err_unknown_model_for_action: '«%s» usa un modello che non esiste (%s): forse è stato rinominato o eliminato. %s',
     err_open_weights_only_no_model:
       '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Opzioni → Modelli per azione, oppure spegnere «Solo modelli a pesi aperti».',
+    // Le funzioni di chi gestisce Filo non stanno nelle Opzioni: il modello si cambia in Gestione (#1118).
+    err_open_weights_only_no_model_owner:
+      '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Gestione → Automazioni, fra i Modelli di supporto, oppure spegnere «Solo modelli a pesi aperti».',
     err_open_weights_only_provider_blocked:
       'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_open_weights_only_model_blocked:
       'Hai scelto solo modelli a pesi aperti: «%s» non lo è, quindi la prova non parte. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
-    err_model_where_owner: 'Lo imposti in Gestione → Modelli di supporto.',
+    err_model_where_owner: 'Lo imposti in Gestione → Automazioni, fra i Modelli di supporto.',
 
     // Toast
     toast_saved: 'Salvata in: %s',
@@ -256,6 +279,11 @@
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_open_weights_violated:
       'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',
+    // Il tetto per scheda sulle chiamate automatiche (#1070): il numero è quello del tetto.
+    toast_tetto_spiegazioni:
+      'Da questa pagina sono partite più di %s spiegazioni automatiche in un minuto. Le fermo per un minuto, col tasto destro funzionano sempre.',
+    toast_tetto_correttore:
+      'Da questa pagina sono partiti più di %s controlli del correttore in un minuto. Li fermo per un minuto, col tasto destro le correzioni funzionano sempre.',
     toast_pasted_image: 'Immagine incollata',
     toast_image_saved: 'Immagine salvata',
     toast_image_save_failed: 'Non sono riuscito a salvare l\'immagine',
@@ -263,6 +291,10 @@
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
+    // Una selezione di soli spazi (o a capo, o tabulazioni) si copia per
+    // sbaglio: senza un'etichetta diventa una riga vuota che non si capisce.
+    clipboard_only_spaces: 'Spazi vuoti (%d caratteri)',
+    clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
 
@@ -277,6 +309,9 @@
     options_open_weights_only: 'Solo modelli a pesi aperti',
     options_open_weights_only_desc:
       'Spegne tutti i modelli proprietari — Anthropic compresa — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche con i modelli predefiniti. Le funzioni che partivano da un modello proprietario passano al suo equivalente aperto; quelle senza equivalente si fermano e lo dicono, invece di tornare di nascosto su un modello proprietario.',
+    options_own_key_all_providers: 'Con la mia chiave, usa anche i fornitori esclusi',
+    options_own_key_all_providers_desc:
+      'Le richieste pagate con la tua chiave OpenRouter possono andare anche ai fornitori che Filo esclude, come Google o xAI. Così funzionano anche Gemini e Grok. Se OpenRouter rifiuta la tua chiave e Filo passa ai suoi crediti, l\'esclusione torna a valere.',
     options_open_weights_switched: 'Cambiano modello %s funzioni, che passano a: %s',
     options_open_weights_unavailable: 'Si fermano (nessun equivalente a pesi aperti): %s',
     options_open_weights_test_blocked:
@@ -295,7 +330,9 @@
     options_more_link: 'Altre opzioni →',
     options_costs: 'Costi e limiti',
     options_shortcuts: 'Scorciatoie da tastiera',
-    options_blocklist: 'Domini esclusi',
+    options_blocklist: 'Siti dove Filo è spento',
+    options_blocklist_desc: 'Lì Filo non mette il suo menu del tasto destro, il correttore né le sue azioni sulla pagina. Un sito per riga.',
+    options_blocklist_invalid: 'Queste righe non sono siti e non spengono Filo da nessuna parte (scrivi il sito con la sua estensione, es. docs.google.com): %s',
     options_categories: 'Categorie',
     options_features: 'Funzionalità sperimentali (Fase 2)',
     options_save: 'Salva',
@@ -306,13 +343,14 @@
     options_theme_dark: 'Scuro',
     options_monthly_limit: 'Limite mensile (€)',
     options_current_spent: 'Speso questo mese',
+    options_cost_warn_ratio: 'Avviso sui modelli costosi: oltre quante volte il costo del predefinito (0 = mai)',
     options_action_explain: 'Spiega (inline)',
     options_action_explain_deep: 'Approfondisci',
     options_action_translate_sel: 'Traduci selezione',
     options_action_translate_page: 'Traduci pagina',
     options_action_help: 'Aiuto',
     options_action_categorize: 'Categorizza',
-    options_action_describe_image: 'Descrizione immagini (cronologia incolla)',
+    options_action_describe_image: 'Descrizione immagini (cronologia incolla, finestre guardate dalla chat)',
     options_action_transcribe_image: 'Trascrizione (OCR) di una regione dello schermo',
     options_action_transcribe_audio: 'Dettatura (trascrizione audio dal microfono)',
     options_action_tts: 'Lettura ad alta voce (sintesi vocale)',
@@ -439,11 +477,29 @@
     admin_defaults_delicate_posta: 'Posta',
     admin_defaults_delicate_banche: 'Banche',
     admin_defaults_delicate_sanita: 'Sanità',
+    // Quanto filo ha davanti la chat (#868)
+    admin_defaults_contesto: 'Quanto ricorda la chat',
+    admin_defaults_contesto_desc:
+      'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
+    admin_defaults_contesto_giorni: 'Giorni',
+    admin_defaults_contesto_token: 'Tetto in token',
+    // Quanto può essere lunga una risposta dei modelli (#1097.3)
+    admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
+    admin_defaults_lunghezza_desc:
+      'Il tetto in token di ogni risposta, per famiglia di funzioni: ferma il modello che si incarta, e una risposta che lo tocca si vede interrotta. Un fornitore che non regge il tetto viene scartato. Vale per chi non l\'ha cambiato in Preferenze; un campo vuoto segue il codice.',
+    admin_defaults_lunghezza_conversazioni: 'Chat e conversazioni',
+    admin_defaults_lunghezza_testi: 'Traduzioni, riscritture, riassunti',
+    admin_defaults_lunghezza_brevi: 'Risposte brevi',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_open_weights_title: 'Per chi accende «Solo modelli a pesi aperti»',
+    admin_defaults_open_weights_to: 'Passano a %s: %s',
+    admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',
+    admin_defaults_open_weights_all_open:
+      'Con «Solo modelli a pesi aperti» acceso non cambia niente. Tutte le funzioni partono già da modelli a pesi aperti.',
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
@@ -520,30 +576,34 @@
     options_security_popup_dismiss: 'Chiudi',
     // Rilevamento siti pericolosi
     options_security_safebrowse: 'Avvisa sui siti pericolosi',
+    // Ogni frase qui sotto descrive il rilevatore com'è oggi: tests/unit/safebrowseSpiegazione.test.mjs.
     options_security_safebrowse_desc:
-      'Riconosce i siti che fingono di essere un altro marchio (es. una finta pagina di login), ' +
-      'i domini appena creati e le connessioni non sicure, e ti avvisa prima che tu inserisca password ' +
-      'o dati di pagamento. I controlli di base sono gratuiti e attivi sempre; non bloccano mai la ' +
-      'navigazione, ti mostrano solo un avviso che puoi ignorare.',
+      'Ti avvisa quando un sito imita un marchio noto, è nella lista nera di Google per phishing o malware, ' +
+      'ha un certificato che non torna o ti chiede la password su una connessione non protetta. L\'avviso ' +
+      'copre la pagina finché non scegli. Su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
+      '«confermo». La scelta vale per quel sito in quella scheda, finché resta aperta. Spento, Filo non ' +
+      'chiede più niente fuori dal computer, ma ti avvisa ancora sui sosia e sulle password chieste senza ' +
+      'connessione protetta, che riconosce da solo.',
     options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
     options_security_safebrowse_network_desc:
-      'Interroga servizi pubblici per sapere da quanto tempo esiste il dominio e il suo certificato: ' +
-      'un sito "di un marchio noto" creato pochi giorni fa è un forte segnale di truffa. Non richiede ' +
-      'alcuna chiave. Disattivalo se non vuoi che Filo faccia queste richieste esterne.',
+      'Quando un sito ha già un indizio sospetto, Filo chiede a due registri pubblici (rdap.org e crt.sh) ' +
+      'da quanto esistono il dominio e il suo certificato. Manda solo il nome del sito. Un sito "di un ' +
+      'marchio noto" nato pochi giorni fa è un forte segnale di truffa. Non serve nessuna chiave. ' +
+      'Disattivalo se non vuoi che Filo faccia queste richieste.',
     options_security_safebrowse_llm: 'Giudizio AI sui casi sospetti',
     options_security_safebrowse_llm_desc:
-      'Solo quando un sito resta dubbio, un modello AI valuta i soli indizi di identità del dominio ' +
-      '(mai il contenuto della pagina) per decidere se avvisarti. Usa i modelli e le chiavi che hai già ' +
-      'configurato.',
-    options_security_safebrowse_sandbox: 'Apri i link sospetti in una finestra isolata',
+      'Solo quando un sito resta dubbio, un modello AI guarda i dati del suo indirizzo (il nome, il marchio ' +
+      'a cui somiglia, l\'età, il certificato, se la pagina chiede una password), mai il contenuto della ' +
+      'pagina. Può solo renderlo sospetto, mai dichiararlo sicuro o pericoloso, e in incognito non parte. ' +
+      'Usa il modello scelto in Modelli alla voce «Rilevamento siti pericolosi — giudizio».',
+    options_security_safebrowse_sandbox: 'Prova i link sospetti in una finestra isolata',
     options_security_safebrowse_sandbox_desc:
-      'Per i link accorciati o con molti redirect, Filo li apre prima in una finestra nascosta e senza ' +
-      'i tuoi dati, segue dove portano davvero e blocca i download automatici, così può avvisarti sulla ' +
-      'destinazione reale.',
+      'La finestra nascosta e senza i tuoi dati in cui Filo proverebbe un link sospetto prima che tu lo ' +
+      'apra. Oggi nessuna funzione la usa, e una pagina che hai già aperto non ci torna mai.',
     options_security_safebrowse_key_managed:
-      'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
-      'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
-      'account, non devi configurare nulla qui.',
+      'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma. ' +
+      'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
+      'arriva solo un pezzo dell\'impronta degli indirizzi che apri, mai gli indirizzi.',
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
     options_security_delicate_desc:
@@ -609,12 +669,35 @@
     options_cookies_riquadri_title: 'Contenuti incorporati con i cookie riattivati',
     options_cookies_riquadri_desc: 'Post, video e mappe di questi servizi, dentro le pagine di altri siti, tengono i loro cookie.',
     options_cookies_riquadri_remove: 'Togli',
+    options_cookies_riquadri_modello: 'Riconosci con un modello i contenuti incorporati rotti',
+    options_cookies_riquadri_modello_desc:
+      'Se un post, un video o una mappa di un altro sito resta vuoto e Filo non lo conosce, a un modello va la foto ' +
+      'del solo riquadro. Spento, quel riquadro lo riattivi col tasto destro.',
     riquadro_cookie_domanda: 'Attivo i cookie di %s per questo contenuto?',
     riquadro_cookie_si: 'Sì',
     riquadro_cookie_no: 'No',
+    riquadro_cookie_conferma: 'I contenuti di %s dentro le pagine di altri siti terranno i loro cookie, e questo si ricarica. '
+      + 'Li togli dal tasto destro sul contenuto.',
+    riquadro_cookie_attiva: 'Attiva',
     riquadro_cookie_fatto: 'Cookie di %s attivi: ricarico il contenuto',
     riquadro_cookie_menu_attiva: 'Attiva i cookie di %s qui',
     riquadro_cookie_menu_togli: 'Togli i cookie riattivati di %s',
+    // #975 — il menu che un sito si disegna da sé. Il nome viene dalla pagina: si sostituisce con una funzione.
+    menu_del_sito: 'Menu di %s',
+    menu_del_sito_scelta: 'Cosa apre il tasto destro qui',
+    menu_del_sito_sempre: 'Aprilo subito col tasto destro',
+    menu_del_sito_torna_filo: 'Col tasto destro apri il menu di Filo',
+    menu_del_sito_proposta: 'Su %s scegli spesso il menu del sito. Te lo apro subito col tasto destro? Quello di Filo resta a %s + tasto destro.',
+    menu_del_sito_si: 'Sì',
+    menu_del_sito_no: 'No',
+    menu_del_sito_fatto: 'Su %s il tasto destro apre il menu del sito; quello di Filo resta a %s + tasto destro.',
+    menu_del_sito_annulla: 'Annulla',
+    menu_del_sito_tolto: 'Su %s il tasto destro apre di nuovo il menu di Filo.',
+    menu_spegni_filo: 'Spegni Filo su questo sito',
+    menu_riaccendi_filo: 'Riaccendi Filo su questo sito',
+    filo_spento_fatto: 'Filo è spento su %s.',
+    filo_riacceso_fatto: 'Filo è di nuovo acceso su %s.',
+    filo_spento_annulla: 'Annulla',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
     options_cookies_banners_remove: 'Rifiuta in automatico',
     options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
@@ -635,6 +718,8 @@
     options_site_perms_part_schermi: 'Schermi',
     options_site_perms_part_presenza: 'Presenza al computer',
     options_site_perms_part_strumenti: 'Strumenti musicali',
+    options_site_perms_part_rete: 'Rete locale',
+    options_site_perms_part_file: 'Modifica dei file',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:
@@ -652,6 +737,28 @@
     options_fp_mode_privacy_desc:
       'Come l\'Automatico, ma cambi "impronta" a ogni avvio di Filo: i siti non possono riconoscerti ' +
       'nemmeno fra una sessione e l\'altra. In rari casi qualche CAPTCHA in più.',
+    // Cronologia appunti nella pagina Sicurezza (#256). Il menu del tasto destro
+    // la mostra solo dentro un campo di testo: chi ha appena copiato una password
+    // leggendo un articolo non ha nessun campo da cliccare. Qui è sempre
+    // raggiungibile, con le stesse due azioni del menu (togli una voce, svuota).
+    security_clipboard_title: 'Cronologia appunti',
+    security_clipboard_desc:
+      'Quello che hai copiato di recente: Filo lo tiene da parte per riproportelo ' +
+      'quando incolli. Se ci è finita una password o un testo privato, toglilo da qui.',
+    security_clipboard_empty: 'Non c\'è niente: nessun testo o immagine copiato di recente.',
+    security_clipboard_image: 'Immagine',
+    security_clipboard_search: 'Cerca fra le voci copiate…',
+    security_clipboard_no_results: 'Nessuna voce copiata corrisponde.',
+    security_clipboard_remove: 'Rimuovi',
+    security_clipboard_remove_title: 'Rimuovi questa voce dalla cronologia',
+    security_clipboard_removed: 'Voce rimossa',
+    security_clipboard_gone: 'Rimossa',
+    security_clipboard_copy_title: 'Rimetti questa voce negli appunti',
+    security_clipboard_copied: 'Rimessa negli appunti',
+    security_clipboard_pending: 'Hai copiato altre %d cose: allontana il puntatore dalla lista e compaiono.',
+    security_clipboard_pending_one: 'Hai copiato un\'altra cosa: allontana il puntatore dalla lista e compare.',
+    security_clipboard_cleared: 'Cronologia svuotata',
+    security_clipboard_fail: 'Non è riuscito',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
@@ -660,6 +767,8 @@
       '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
       'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
       'su un altro computer.',
+    security_export_keys_label: 'Includi le chiavi',
+    security_export_keys_desc: 'Chi ha il file può usare le tue chiavi API. Trattalo come una password.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
@@ -682,17 +791,58 @@
     security_visite_nessuna: 'Nessuna pagina da cancellare',
     security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto,
+    // %6 = security_import_nulla_perso o security_import_escono_mie
     security_import_confirm_text:
       'Da "%1"%2: %3 e %4%5.\n\n' +
-      'Nulla di ciò che hai ora viene cancellato: le liste (chat, pagine visitate, pagine salvate, ' +
+      '%6le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
-      'quello del backup. Le impostazioni del backup diventano attive subito.',
+      'quello del backup. Le impostazioni del backup diventano attive subito. ' +
+      'Della spesa resta, mese per mese, la più alta fra adesso e il backup. ' +
+      'I crediti e le schede aperte restano quelli di adesso.',
+    // Righe in fondo alla conferma, solo quando servono. %1 = numero
+    security_import_images_lost: 'Immagini che non si leggono: %1. Al loro posto non ci sarà niente.',
+    security_import_filo_lost: 'Le chat e le pagine visitate del backup non si leggono.',
+    // %1 = quante restano fuori, %2 = il tetto
+    security_import_pages_out: 'Pagine salvate che non entrano: %1. L’elenco ne tiene %2, le più recenti.',
+    security_import_pages_out_mine: 'Fra queste, pagine che hai salvato adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_senza_chiavi: 'Le chiavi API non sono nell’archivio. Quelle salvate qui restano come sono.',
+    security_import_proxy_senza_credenziali: 'Il proxy arriva senza utente e password: per usarlo, scrivi di nuovo a Filo il suo indirizzo intero.',
+    security_import_nulla_perso: 'Nulla di ciò che hai ora viene cancellato: ',
+    security_import_escono_mie: 'Di ciò che hai ora escono solo le pagine salvate più vecchie, contate qui sotto: ',
     security_import_confirm_ok: 'Importa',
     security_import_done: 'Dati importati',
     security_import_invalid: 'Non è un archivio esportato da Filo',
+    security_import_damaged: 'L’archivio è rovinato e Filo non ne legge i dati',
+    security_import_compressed: 'L’archivio è compresso in un formato che Filo non legge (bzip2 o LZMA): ricomprimilo come zip normale e riprova',
+    security_import_encrypted: 'L’archivio è protetto da una password: scompattalo, ricomprimilo senza password e riprova',
     security_import_fail: 'Importazione non riuscita',
+    security_wipe_btn: 'Cancella tutti i dati di Filo',
+    security_wipe_desc: 'Toglie da questo computer tutto quello che Filo sa di te. Dopo, Filo riparte come appena installato.',
+    security_wipe_export_text:
+      'Prima esporta i tuoi dati. Dopo la cancellazione non si recuperano, ma con l’archivio li rimetti ' +
+      'dentro quando vuoi, anche su un altro computer.',
+    security_wipe_export_done: 'Archivio salvato',
+    security_wipe_list_title: 'Cosa sparisce',
+    security_wipe_list:
+      'Memorie, conversazioni e il loro archivio, cronologia AI, appunti e file dell’editor, pagine salvate, ' +
+      'pagine visitate, schede aperte e archiviate, download registrati, cronologia degli appunti copiati, ' +
+      'timer e notifiche, dizionario personale, impostazioni, cookie e dati dei siti, chiavi e accessi salvati, ' +
+      'la copia delle segnalazioni che hai mandato. I file che hai scaricato e i tuoi documenti restano dove sono. ' +
+      'Filo si chiude e si riapre vuoto, come appena installato.',
+    security_wipe_server:
+      'I feedback che hai già mandato restano sul server di Filo. Per toglierli scrivi a chi sviluppa Filo, ' +
+      'anche con un feedback, e li cancella a mano. L’archivio esportato tiene l’elenco di quelli che hai mandato.',
+    security_wipe_identity_label: 'Cancella anche l’identità dei crediti',
+    security_wipe_identity_desc:
+      'Se non la spunti resta, e con lei i crediti che hai sul server. Se la cancelli, quei crediti non si raggiungono più.',
+    security_wipe_word_label: 'Scrivi «conferma» per cancellare. Non si torna indietro.',
+    security_wipe_cancel: 'Annulla',
+    security_wipe_go: 'Cancella tutto e riavvia',
+    security_wipe_go_spento: 'Scrivi «conferma» nel campo qui sopra',
+    security_wipe_in_corso: 'Cancello e riavvio Filo…',
+    security_wipe_fail: 'Non sono riuscito a cominciare, e non ho cancellato niente. Riprova.',
 
     // Home
     home_title: 'Aperti per dopo',
@@ -700,6 +850,18 @@
     home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
     home_no_results: 'Nessun risultato per la ricerca.',
     home_remove: 'Rimuovi',
+    home_menu_open: 'Apri',
+    home_menu_open_keep: 'Apri e tienila in lista',
+    home_menu_copy_link: 'Copia link',
+    home_menu_move: 'Sposta in…',
+    home_menu_new_category: 'Nuova categoria…',
+    home_new_category_placeholder: 'Nome della nuova categoria',
+    home_removed: '«%s» rimossa.',
+    home_undo: 'Annulla',
+    home_link_copied: 'Link copiato',
+    home_link_copy_failed: 'Il link non si è copiato: riprova.',
+    home_moved: 'Spostata in «%s»',
+    home_move_failed: 'Non si è spostata: nel frattempo l’elenco è cambiato. Riprova da qui.',
 
     // History
     history_title: 'Cronologia AI',
@@ -718,6 +880,8 @@
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
     history_timing_title: 'Dalla partenza della richiesta: primo pezzo di ragionamento, prima parola (o prima azione), fine della risposta.',
+    history_timing_prep: 'prepara %s · ',
+    history_timing_prep_title: 'Prima della richiesta il turno ha aspettato %s, di cui stato del computer %s e saldo %s.',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
     history_empty: 'Nessuna interazione AI registrata.',
     history_no_results: 'Nessun risultato per la ricerca.',
@@ -764,8 +928,10 @@
   function t(key, ...args) {
     let s = STRINGS[key];
     if (s === undefined) return key;
-    for (const a of args) s = s.replace('%s', String(a));
-    return s;
+    // In un solo passaggio e con una funzione: un argomento scritto da qualcuno (un nickname) che contiene «%s» o
+    // «$&» non deve finire riscritto dal segnaposto dopo.
+    let i = 0;
+    return s.replace(/%s/g, (m) => (i < args.length ? String(args[i++]) : m));
   }
 
   global.SN_I18N = { t, STRINGS };

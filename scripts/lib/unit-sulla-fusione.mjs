@@ -8,9 +8,9 @@ import {
   unlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve, win32 } from 'node:path';
+import path, { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sommaRiepiloghi, perLaRiga, allaLettera, NODE_LEGGE_MODELLI } from '../run-unit-tests.mjs';
+import { sommaRiepiloghi, perLaRiga, SOLO } from '../run-unit-tests.mjs';
 
 // Il reporter è quello di QUESTI strumenti, non dell'albero provato: se l'albero lo rompesse, ogni prova uscirebbe
 // «rossa anche su main» e fonderebbe tutto.
@@ -18,8 +18,6 @@ const REPORTER = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), 
 
 /** Quante volte si rifà la prova quando il server risponde che main si è mosso. */
 export const TENTATIVI = 3;
-// Ampio: in locale gli unit durano 6–20 minuti con la macchina carica. Scaduto, la prova non c'è, e lo si dice.
-export const TETTO_UNIT_MS = 60 * 60 * 1000;
 // La storia intera del repo da una rete lenta: due minuti non bastano.
 export const TETTO_STORIA_MS = 15 * 60 * 1000;
 export const ESITI = Object.freeze(['verde', 'main_contenuto', 'rosso_anche_su_main', 'rosso_sulla_fusione', 'conflitto']);
@@ -32,9 +30,9 @@ const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) ||
 // Linux «C:\…» restava intero e la stessa chiave usciva diversa.
 const assoluto = (p) => win32.isAbsolute(p);
 
-/** Un test rosso in una riga che due cartelle diverse scrivono uguale. PURA. */
-export function chiaveTest(r, root) {
-  let file = r && r.file ? perLaRiga(String(r.file), root) : '?';
+/** Un test rosso in una riga che due cartelle diverse, anche di sistemi diversi, scrivono uguale. `p` come perLaRiga. PURA. */
+export function chiaveTest(r, root, p = path) {
+  let file = r && r.file ? perLaRiga(String(r.file), root, p) : '?';
   // Fuori dalla cartella (forma corta e lunga dello stesso percorso su Windows): conta il pezzo da tests/ in poi.
   if (assoluto(file)) {
     const barre = file.replace(/\\/g, '/');
@@ -102,25 +100,26 @@ function campoStoria(s) {
 export function testoProva(prova) {
   const p = prova || {};
   const m = String(p.mainSha || '').slice(0, 8);
+  const dove = p.contenuto ? `sul ramo, che contiene già main ${m}` : `sulla fusione con main ${m}`;
   if (p.saltata) return `▸ Unit sulla fusione: non provati (${p.motivo}). Il server lo registra.`;
   if (p.errore) return `▸ Unit sulla fusione: prova non riuscita (${p.errore}).`;
   switch (p.esito) {
     case 'main_contenuto': return `▸ Unit sulla fusione: il ramo contiene già main (${m}), il risultato è il ramo stesso.`;
     case 'verde': {
       const ins = Array.isArray(p.instabili) ? p.instabili : [];
-      if (!ins.length) return `▸ Unit sulla fusione con main ${m}: verdi.`;
-      return [`▸ Unit sulla fusione con main ${m}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non della fusione:`,
+      if (!ins.length) return `▸ Unit ${dove}: verdi.`;
+      return [`▸ Unit ${dove}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non ${p.contenuto ? 'del ramo' : 'della fusione'}:`,
         ...ins.map((r) => `    ~ ${r}`)].join('\n');
     }
     case 'conflitto': return `▸ Unit sulla fusione con main ${m}: non provati, la fusione va in conflitto${p.file && p.file.length ? ` su ${p.file.join(', ')}` : ''}.`;
     case 'rosso_anche_su_main':
-      return `▸ Unit sulla fusione con main ${m}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo: si fonde.`;
+      return `▸ Unit ${dove}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo${p.contenuto ? '.' : ': si fonde.'}`;
     case 'rosso_sulla_fusione': {
       const rossi = Array.isArray(p.rossi) ? p.rossi : [];
       return [
-        `✗ Unit sulla fusione con main ${m}: rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}.`,
+        `✗ Unit ${dove}: rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}.`,
         ...(rossi.length ? rossi.map((r) => `    ✖ ${r}`) : ['    (nessun test rosso registrato: la causa è nell\'uscita qui sotto)']),
-        ...(p.coda ? ['  Ultime righe dell\'uscita sulla fusione:', ...String(p.coda).split('\n').map((r) => `    ${r}`)] : []),
+        ...(p.coda ? [`  Ultime righe dell'uscita ${p.contenuto ? 'sul ramo' : 'sulla fusione'}:`, ...String(p.coda).split('\n').map((r) => `    ${r}`)] : []),
       ].join('\n');
     }
     default: return `▸ Unit sulla fusione: esito ${p.esito}.`;
@@ -164,7 +163,7 @@ export function chiudiAlbero(git, dir) {
   if (!c.ok) return c;
   git(['worktree', 'unlock', dir]);
   if (!git(['worktree', 'remove', '--force', dir]).ok) {
-    try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* resta: lo dice il controllo sotto */ }
+    try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* resta: lo dice il controllo sotto */ }
     git(['worktree', 'prune']);
   }
   return existsSync(dir) ? { ok: false, motivo: `non riesco a togliere ${dir}` } : { ok: true };
@@ -181,7 +180,7 @@ function cartellaModuli(root) {
 const NOME_BASE = /^filo-fusione-[A-Za-z0-9]{6}$/;
 const FILE_PID = 'pid';
 // Una cartella di prova senza pid (o illeggibile) si considera viva finché è più giovane di così.
-const VIVA_SENZA_PID_MS = 3 * TETTO_UNIT_MS;
+const VIVA_SENZA_PID_MS = 3 * 60 * 60 * 1000;
 
 function apriAlbero(git, base, nome, sha) {
   const dir = join(base, nome);
@@ -194,7 +193,8 @@ function apriAlbero(git, base, nome, sha) {
 function togliBase(base) {
   const c = togliCollegamento(join(base, 'node_modules'));
   if (!c.ok) return c;
-  try { rmSync(base, { recursive: true, force: true }); } catch (_) { /* lo dice il controllo sotto */ }
+  // I tentativi: su Windows un processo appena uscito tiene la cartella ancora per un poco (#1063).
+  try { rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* lo dice il controllo sotto */ }
   return existsSync(base) ? { ok: false, motivo: `non riesco a togliere ${base}` } : { ok: true };
 }
 
@@ -271,9 +271,9 @@ export function fileDellaChiave(chiave) {
  * `npm run test:unit` dell'albero provato, con l'uscita su file; con `file`, solo quei file (la riprova dei rossi).
  * { ok, rossi, coda } | { errore }.
  */
-export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = null } = {}) {
+export function lanciaUnit(dir, base, nome, { file = null } = {}) {
   const runner = join(dir, 'scripts', 'run-unit-tests.mjs');
-  if (!file && !existsSync(runner)) return { errore: 'nell\'albero provato manca scripts/run-unit-tests.mjs' };
+  if (!existsSync(runner)) return { errore: 'nell\'albero provato manca scripts/run-unit-tests.mjs' };
   const dest = join(base, `${nome}.jsonl`);
   const log = join(base, `${nome}.log`);
   const fd = openSync(log, 'w');
@@ -282,23 +282,23 @@ export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = 
   let r;
   try {
     const reporter = ['--test-reporter=spec', '--test-reporter-destination=stdout', `--test-reporter=${REPORTER}`, `--test-reporter-destination=${dest}`];
-    const args = file
-      ? ['--test', ...reporter, ...file.map((f) => (NODE_LEGGE_MODELLI ? allaLettera(f) : f))]
-      : [runner, ...reporter];
-    r = spawnSync(process.execPath, args, { cwd: dir, env, stdio: ['ignore', fd, fd], timeout: timeoutMs, windowsHide: true });
+    // Nessun tempo d'orologio qui sopra: un file fermo lo chiude la guardia del lanciatore, anche nella riprova (#1063).
+    const args = file ? [runner, ...reporter, SOLO, ...file] : [runner, ...reporter];
+    r = spawnSync(process.execPath, args, { cwd: dir, env, stdio: ['ignore', fd, fd], windowsHide: true });
   } finally { closeSync(fd); }
-  if (r.error && r.error.code === 'ETIMEDOUT') return { errore: `unit oltre il tetto di ${Math.round(timeoutMs / 60000)} minuti` };
   if (r.error) return { errore: `non riesco a lanciare gli unit (${r.error.message})` };
   if (r.status === null) return { errore: `unit interrotti (${r.signal || 'segnale'})` };
   return { ok: r.status === 0, rossi: rossiDa(leggiRighe(dest), dir), coda: coda(log) };
 }
 
 /**
- * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda? } | { saltata, motivo } | { errore, mainSha? }.
- * `lancia` è iniettabile solo per i test.
+ * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda?, contenuto? } | { saltata, motivo } | { errore, mainSha? }.
+ * `ancheContenuto`: con main già dentro il ramo si prova il ramo stesso invece di rispondere `main_contenuto`
+ * (serve a giudicare un unit rosso sul ramo, #1009). `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
-  root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s), timeoutMs = TETTO_UNIT_MS,
+  root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
+  ancheContenuto = false,
 } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
@@ -318,7 +318,7 @@ export function provaUnitSullaFusione({
   const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
   if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
   if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
-  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha }), storia: storia.storia };
+  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto }), storia: storia.storia };
 }
 
 /** Quanta storia scaricare a ogni passo prima di prenderla tutta. */
@@ -326,17 +326,18 @@ export const PASSI_STORIA = Object.freeze([50, 200, 1000]);
 
 /**
  * Su un clone poco profondo (le routine in cloud) ramo e main non hanno una base comune in locale e la fusione di
- * prova fallisce con «unrelated histories» (#958): si scarica storia a passi finché la base compare, poi tutta.
- * `storia` va al server, che la registra: è la misura della profondità dei cloni veri.
+ * prova fallisce con «unrelated histories» (#958), e il diff del controllo di sicurezza esce vuoto (#740): si scarica
+ * storia a passi finché la base compare, poi tutta. `storia` va al server, che la registra: è la misura della
+ * profondità dei cloni veri.
  */
-export function assicuraStoria({ git, mainSha, punta, passi = PASSI_STORIA } = {}) {
+export function assicuraStoria({ git, mainSha, punta, passi = PASSI_STORIA, main = MAIN } = {}) {
   const superficiale = () => { const r = git(['rev-parse', '--is-shallow-repository']); return r.ok && r.out.trim() === 'true'; };
   if (!superficiale()) return { storia: { superficiale: false } };
   const base = () => git(['merge-base', mainSha, punta]).ok;
   const storia = { superficiale: true, approfondito: 0, intera: false };
   if (base()) return { storia };
   // --deepen sposta TUTTI i confini del clone, anche quello del ramo, che è il lato tagliato.
-  const prendi = (extra) => git(['fetch', '--quiet', ...extra, 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  const prendi = (extra) => git(['fetch', '--quiet', ...extra, 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
   for (const n of passi) {
     const f = prendi([`--deepen=${n}`]);
     if (!f.ok) return { errore: `non riesco a scaricare la storia che manca (${primaRiga(f.out)})`, storia };
@@ -363,8 +364,12 @@ export function testoStoria(s) {
   return '▸ Clone poco profondo, ma la base comune con main c\'era già.';
 }
 
-function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha }) {
-  if (git(['merge-base', '--is-ancestor', mainSha, punta]).ok) return { esito: 'main_contenuto', mainSha };
+function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto = false }) {
+  // Con main già dentro, il risultato della fusione è il ramo stesso: si prova lui.
+  const contenuto = git(['merge-base', '--is-ancestor', mainSha, punta]).ok;
+  if (contenuto && !ancheContenuto) return { esito: 'main_contenuto', mainSha };
+  const segno = contenuto ? { contenuto: true } : {};
+  const sulla = contenuto ? 'sul ramo' : 'sulla fusione';
 
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
   try { writeFileSync(join(base, FILE_PID), String(process.pid)); } catch (_) { /* senza pid la cartella vale viva per età */ }
@@ -379,37 +384,40 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
       return { errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})`, mainSha };
     }
   }
-  const opz = { timeoutMs };
   try {
-    const a = apriAlbero(git, base, 'fusione', mainSha);
+    const a = apriAlbero(git, base, 'fusione', contenuto ? punta : mainSha);
     if (a.dir) alberi.push(a.dir);
     if (a.errore) return { errore: a.errore, mainSha };
-    const ga = gitIn(a.dir);
-    const fusa = ga([...IDENTITA, '-c', `core.hooksPath=${nessunHook}`, 'merge', '--no-ff', '--no-edit', '--quiet', punta]);
-    if (!fusa.ok) {
-      const u = ga(['diff', '--name-only', '--diff-filter=U']);
-      const file = u.ok ? u.out.split(/\r?\n/).filter(Boolean) : [];
-      if (file.length) return { ...decidiEsito({ conflitto: file }), mainSha };
-      return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
+    if (!contenuto) {
+      const ga = gitIn(a.dir);
+      const fusa = ga([...IDENTITA, '-c', `core.hooksPath=${nessunHook}`, 'merge', '--no-ff', '--no-edit', '--quiet', punta]);
+      if (!fusa.ok) {
+        const u = ga(['diff', '--name-only', '--diff-filter=U']);
+        const file = u.ok ? u.out.split(/\r?\n/).filter(Boolean) : [];
+        if (file.length) return { ...decidiEsito({ conflitto: file }), mainSha };
+        return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
+      }
     }
-    scrivi(`▸ Unit sul risultato della fusione con main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`);
-    let fusione = lancia(a.dir, base, 'fusione', opz);
+    scrivi(contenuto
+      ? `▸ Unit sul ramo, che contiene già main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`
+      : `▸ Unit sul risultato della fusione con main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`);
+    let fusione = lancia(a.dir, base, 'fusione');
     if (fusione.errore) return { errore: fusione.errore, mainSha };
     // Un rosso si riprova prima di giudicarlo: i test a tempo cedono con la macchina carica, e un instabile non è
     // colpa della fusione. Si rilanciano solo i loro file, sullo stesso albero.
     let instabili = [];
     const daRiprovare = [...new Set((fusione.ok ? [] : fusione.rossi).map(fileDellaChiave).filter(Boolean))];
     if (daRiprovare.length) {
-      scrivi(`▸ Unit rossi sulla fusione (${fusione.rossi.length}): riprovo i loro file da soli`);
-      const ri = lancia(a.dir, base, 'riprova', { ...opz, file: daRiprovare });
+      scrivi(`▸ Unit rossi ${sulla} (${fusione.rossi.length}): riprovo i loro file da soli`);
+      const ri = lancia(a.dir, base, 'riprova', { file: daRiprovare });
       let ancora = ri.errore || ri.ok ? [] : fusione.rossi.filter((k) => ri.rossi.includes(k));
       if (!ri.errore && (ri.ok || ancora.length)) {
         let forse = fusione.rossi.filter((k) => !ancora.includes(k));
         if (forse.length) {
           // Verde da solo non vuol dire instabile: due test che si pestano i piedi solo girando insieme passano sempre
           // da soli (verifica #929 giro 3). Instabile è solo ciò che torna verde rifacendo la suite intera.
-          scrivi(`▸ Verdi da soli (${forse.length}): rifaccio la suite intera sulla fusione per distinguere un instabile da due test che si rompono solo insieme`);
-          const di = lancia(a.dir, base, 'di-nuovo', opz);
+          scrivi(`▸ Verdi da soli (${forse.length}): rifaccio la suite intera ${sulla} per distinguere un instabile da due test che si rompono solo insieme`);
+          const di = lancia(a.dir, base, 'di-nuovo');
           if (di.errore) return { errore: di.errore, mainSha };
           const ripetuti = !di.ok && !di.rossi.length ? forse : forse.filter((k) => di.rossi.includes(k));
           ancora = [...ancora, ...ripetuti];
@@ -421,15 +429,15 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
     }
     let d = decidiEsito({ fusione });
     if (d.serveMain) {
-      scrivi(`▸ Unit rossi sulla fusione (${fusione.rossi.length}): li riprovo su main da solo`);
+      scrivi(`▸ Unit rossi ${sulla} (${fusione.rossi.length}): li riprovo su main da solo`);
       const b = apriAlbero(git, base, 'main', mainSha);
       if (b.dir) alberi.push(b.dir);
       if (b.errore) return { errore: b.errore, mainSha };
-      const main = lancia(b.dir, base, 'main', opz);
+      const main = lancia(b.dir, base, 'main');
       if (main.errore) return { errore: main.errore, mainSha };
       d = decidiEsito({ fusione, main });
     }
-    return { ...d, mainSha, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
+    return { ...d, mainSha, ...segno, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
   } finally {
     const collegamento = togliCollegamento(join(base, 'node_modules'));
     const rimasti = [...alberi.map((dir) => chiudiAlbero(git, dir)), collegamento].filter((r) => !r.ok);
@@ -443,14 +451,26 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
 }
 
 /**
+ * La prova fatta per giudicare gli unit rossi del ramo da solo, se vale anche per la richiesta di fusione: stessa
+ * punta, ramo senza main dentro (lì la richiesta porta `main_contenuto`, che non costa una corsa), esito che fa
+ * proseguire. Rifarla sullo stesso main era una corsa intera degli unit pagata due volte (#1009). PURA.
+ */
+export function provaDaRiusare({ fatta, punta } = {}) {
+  const p = fatta && fatta.prova;
+  if (!p || !punta || fatta.punta !== punta || p.contenuto || p.errore || p.saltata) return null;
+  return p.esito === 'verde' || p.esito === 'rosso_anche_su_main' ? p : null;
+}
+
+/**
  * Prova, chiede, e rifà la prova se il server risponde che main si è mosso, fino a `tentativi` volte.
  * `fermaSe(prova)` true = non si chiede niente (il finish locale si ferma da sé su un rosso o su una prova mancata).
+ * `primaProva`: una prova già fatta su questa punta vale per il primo tentativo; se main si è mosso lo dice il server.
  * @returns {Promise<{ prova, reply?, fermo?, tentativi, esaurito? }>}
  */
-export async function chiediConProva({ root, punta, chiedi, mainMosso, fermaSe = () => false, tentativi = TENTATIVI, prova = provaUnitSullaFusione, scrivi = (s) => console.log(s) } = {}) {
+export async function chiediConProva({ root, punta, chiedi, mainMosso, fermaSe = () => false, tentativi = TENTATIVI, prova = provaUnitSullaFusione, scrivi = (s) => console.log(s), primaProva = null } = {}) {
   let ultima = null;
   for (let i = 1; i <= tentativi; i++) {
-    ultima = prova({ root, punta, scrivi });
+    ultima = i === 1 && primaProva ? primaProva : prova({ root, punta, scrivi });
     scrivi(testoProva(ultima));
     if (fermaSe(ultima)) return { prova: ultima, fermo: true, tentativi: i };
     const reply = await chiedi(campoPerIlServer(ultima));

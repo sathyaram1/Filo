@@ -28,10 +28,13 @@
   // Candidati per chiamata del giudice: i lotti partono insieme, e uno corto risponde prima e sbaglia meno.
   const FILTER_BATCH = 50;
   const FILTER_PARALLEL = 8;
-  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_API_KEY', 'LIMIT_REACHED']);
+  // Errori che riprovare non cura: configurazione, e un lotto tagliato o rifiutato per il tetto della risposta.
+  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY', 'LIMIT_REACHED', 'RISPOSTA_TAGLIATA', 'TETTO_RISPOSTA']);
   // Un «troppe richieste» o un servizio sovraccarico si aspetta, con meno lotti insieme. Quando un lotto finisce
-  // queste attese (15 s in tutto) il servizio è giù davvero, e gli altri non aspettano più.
+  // queste attese (15 s in tutto, contando anche quelle che ogni chiamata fa già da sé) il servizio è giù davvero,
+  // e gli altri non aspettano più.
   const BUSY_WAITS_MS = [1000, 2000, 4000, 8000];
+  const BUSY_TOTAL_MS = BUSY_WAITS_MS.reduce((a, b) => a + b, 0);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // Giudizi salvati: circa venti ricerche larghe. Oltre si perdono i più vecchi, e rifarne uno costa una chiamata
@@ -158,6 +161,7 @@
         action: ACTIONS.DECKS_OPINION,
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
+        intera: true,
       });
       const parsed = P.parseOpinionBatch(r.text);
       sintesi = parsed.sintesi;
@@ -207,6 +211,7 @@
         action: ACTIONS.DECKS_AUTOTAG,
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
+        intera: true,
       });
       const raw = P.parseTagBatch(r.text);
       // Solo id davvero richiesti e solo tag davvero richiesti.
@@ -263,12 +268,14 @@
     let pauseUntil = 0;
     let serviceDown = false;
     const judgeWithWaits = async (i) => {
+      const inizio = Date.now();
       for (let wait = 0; ; wait += 1) {
         const pause = pauseUntil - Date.now();
         if (pause > 0) await sleep(pause);
         const r = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest });
         if (!r.busy) return r;
-        if (serviceDown || wait >= BUSY_WAITS_MS.length) { serviceDown = true; return r; }
+        const finite = wait >= BUSY_WAITS_MS.length || Date.now() - inizio + BUSY_WAITS_MS[wait] > BUSY_TOTAL_MS;
+        if (serviceDown || finite) { serviceDown = true; return r; }
         limit = Math.max(1, Math.ceil(limit / 2));
         pauseUntil = Math.max(pauseUntil, Date.now() + BUSY_WAITS_MS[wait]);
       }
@@ -325,6 +332,7 @@
           action: ACTIONS.DECKS_SEARCH_FILTER,
           payload: { messages: [{ role: 'user', content: sys }] },
           origin: 'filo://decks',
+          intera: true,
         });
         const keep = P.parseSearchKeep(r && r.text, ids);
         if (keep) return { keep };
