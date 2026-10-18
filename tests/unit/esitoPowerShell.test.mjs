@@ -32,6 +32,8 @@ const RIMEDIA = join(TMP, 'rimedia.ps1');
 writeFileSync(COSTRUISCI, `Write-Output costruisco\n${esce(3)}\n`, 'utf8');
 writeFileSync(RIMEDIA, `${esce(3)}\nexit 0\n`, 'utf8');
 const MANCA = `Get-Content "${join(TMP, 'manca.txt')}"`;
+// Relativo alla cartella di lavoro: un percorso lungo PowerShell lo tronca nella riga dell'errore.
+const MANCA_CORTO = 'Get-Content manca-corto.txt';
 
 // [comando, codice atteso ('fallito' = diverso da 0), stdout atteso o null]
 const CASI = [
