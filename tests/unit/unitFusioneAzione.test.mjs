@@ -9,6 +9,7 @@ import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } fro
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { MARCA, leggiArgomenti, campoEsito, rigaEsito, codiceUscita } from '../../scripts/unit-fusione-azione.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -109,7 +110,7 @@ function repoFinto() {
 function azione(r, ramo, main) {
   const { NODE_TEST_CONTEXT: _figlio, GITHUB_STEP_SUMMARY: _riassunto, ...env } = process.env;
   const p = spawnSync(process.execPath, [join(ROOT, 'scripts', 'unit-fusione-azione.mjs'), '--root', r.lavoro, '--ramo', ramo, '--main', main], {
-    cwd: r.casa, env, encoding: 'utf8', timeout: 600000,
+    cwd: r.casa, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS,
   });
   const righe = String(p.stdout || '').split('\n').filter((l) => l.startsWith(`${MARCA} `));
   return { codice: p.status, campo: righe.length ? JSON.parse(righe[righe.length - 1].slice(MARCA.length + 1)) : null, uscita: `${p.stdout}${p.stderr}` };
