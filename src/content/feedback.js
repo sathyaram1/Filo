@@ -12,9 +12,11 @@
   // Allowlist condivisa dei tipi di allegato: decide qui, prima della cifratura.
   const AttachTypes = global.SN_FEEDBACK_ATTACH;
 
-  // Vale sia per «Allega» sia per il drag & drop.
+  // Vale sia per «Allega» sia per il drag & drop. Senza la lista condivisa classifyAttachment ammette solo immagini
+  // raster: selettore e rifiuto dicono lo stesso.
   const ATTACH_REJECT_MSG = (AttachTypes && AttachTypes.MESSAGGIO_TIPO)
-    || 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+    || 'Tipo di file non supportato. Ammessi: immagini PNG, JPEG, GIF, WebP e BMP.';
+  const ATTACH_ACCEPT = AttachTypes ? AttachTypes.ACCEPT : 'image/png,image/jpeg,image/gif,image/webp,image/bmp';
 
   // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini
   // raster note.
@@ -28,6 +30,8 @@
 
   // La bozza sopravvive a chiusura/riapertura del box e al riavvio di Filo, ma resta al sito dove è nata (#1071).
   const DRAFT_KEY = global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza('sn_feedback_draft_text') : null;
+  // Il testo di un invio che la coda ha buttato (src/main/services/segnalazioneRimessa.js): torna nel campo all'apertura.
+  const RIMESSA_KEY = global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza('sn_feedback_rimessa') : null;
   // Colore/tratto del disegno di annotazione.
   const STROKE_COLOR = '#ff3b30';
   const STROKE_WIDTH = 3;
@@ -245,7 +249,7 @@
           <button type="button" class="sn-fb-clear" aria-pressed="false">Allega screenshot</button>
           <button type="button" class="sn-fb-btn sn-fb-send">Invia</button>
         </div>
-        <input type="file" class="sn-fb-file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,application/json,text/plain,text/markdown,text/csv,.png,.jpg,.jpeg,.gif,.webp,.bmp,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml" multiple hidden />
+        <input type="file" class="sn-fb-file" accept="${ATTACH_ACCEPT}" multiple hidden />
       </div>
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
@@ -279,7 +283,6 @@
     const cancelBtn = root.querySelector('.sn-fb-cancel');
     const canvas = root.querySelector('.sn-fb-canvas');
     const fileInput = root.querySelector('.sn-fb-file');
-    if (AttachTypes && AttachTypes.ACCEPT) fileInput.accept = AttachTypes.ACCEPT;
 
     const LIMITI = (AttachTypes && AttachTypes.LIMITI) || { immagini: 5, file: 5, byte: 4 * 1024 * 1024 };
     const images = [];
@@ -327,16 +330,24 @@
     // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
     const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
     if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
+    const accoda = (testo) => { textEl.value = Feedback.accodaTesto(textEl.value, testo); };
     try {
-      if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+      if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY, RIMESSA_KEY].filter(Boolean)).then((r) => {
         const saved = inVolo.has(r?.[DRAFT_KEY]) ? '' : r?.[DRAFT_KEY];
+        const rimessa = RIMESSA_KEY && typeof r?.[RIMESSA_KEY] === 'string' ? r[RIMESSA_KEY].trim() : '';
         if (activeRoot !== root) return;
         if (saved && !textEl.value) textEl.value = saved;
-        else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
-          textEl.value = `${saved}\n\n${proposta}`;
+        else if (saved && proposta && textEl.value === proposta) {
+          // La bozza che contiene già la proposta resta intera: salvare la sola proposta ne butterebbe il resto.
+          textEl.value = saved.includes(proposta) ? saved : `${saved}\n\n${proposta}`;
           inFondo();
         }
-        if (proposta) saveDraft();
+        if (rimessa) {
+          accoda(rimessa);
+          inFondo();
+          try { chrome.storage.local.remove([RIMESSA_KEY]); } catch (_) {}
+        }
+        if (proposta || rimessa) saveDraft();
       }).catch(() => {});
     } catch (_) {}
 
@@ -537,6 +548,7 @@
       if (kind === 'image') return addImageFromBlob(file);
       if (files.length >= MAX_FILES) return scarto(file, `oltre i ${MAX_FILES} file ammessi`, 'allegato');
       if (file.size > MAX_ATTACH_BYTES) return scarto(file, 'troppo grande (max 4 MB)', 'allegato');
+      // Il tipo con cui si dichiara lo decide l'invio (SN_FEEDBACK.tipoAllegato), per ogni casella che allega.
       const dataUrl = await blobToDataUrl(file);
       files.push({
         name: file.name || 'allegato',

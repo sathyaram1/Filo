@@ -102,6 +102,10 @@
         { testo: 'Se chiudi la finestra di Filo mentre resta aperta un\'altra sua finestra, come quella dell\'accesso a Google, riaprendo Filo torna la finestra con le tue schede, anche col clic sul Dock su Mac. Prima compariva un errore di JavaScript e Filo restava bloccato.', segnalazione: 1606 },
         { testo: 'Nella home gli avvisi in basso a destra non coprono più il tasto Invia: finché ci sono, il campo si stringe e li lascia passare.', segnalazione: 1551 },
         { testo: 'Il correttore non manda più al modello le password che scrivi in chat a chi te le chiede, né quelle scritte accanto al nome utente o dopo il nome del wifi.', segnalazione: 1446 },
+        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
+        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
+        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
+        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
     },
     {

@@ -6,6 +6,7 @@ require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l
 const { perContoDellaScheda } = require('../perContoDellaScheda');
 const { avvisoNellaFinestra, avvisoQuandoPronta } = require('../avvisoFinestra');
 const { luogoDownload } = require('../contatoriFinestra');
+const Rimessa = require('../segnalazioneRimessa');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
@@ -649,13 +650,19 @@ module.exports = function register(on, ctx) {
       // secondo piano, su una pagina interna o appena avviato non li vedeva
       // nessuno, e la segnalazione spariva in silenzio lo stesso. Va nella
       // cornice della finestra, dove resta finché non la si chiude.
+      // Il riquadro aveva già svuotato il campo: il testo torna lì, e l'avviso dice dove ritrovarlo (#602.1).
       onGiveUp: (item, motivo) => {
         try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
-        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'), { errore: 'segnalazione_non_partita' });
+        const payload = item?.payload || {};
+        Rimessa.rimetti(payload).catch((e) => console.warn('[Filo feedback] testo non rimesso nel riquadro:', e?.message || e));
+        const dove = Rimessa.fraseRimessa(payload);
+        return avvisoNellaFinestra(`${String(motivo || 'La tua segnalazione non è partita.')}${dove ? ` ${dove}` : ''}`, { errore: 'segnalazione_non_partita' });
       },
       // Dopo un giorno di soli tentativi la coda rinuncia: nell'elenco locale non resta «in partenza».
       onScaduta: (item) => {
         try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
+        Rimessa.rimetti(item?.payload).catch((e) => console.warn('[Filo feedback] testo non rimesso nel riquadro:', e?.message || e));
+        return avvisoNellaFinestra(Rimessa.fraseScaduta(item?.payload), { errore: 'segnalazione_non_partita' });
       },
       // Chiesto al momento della spedizione: fra l'accodamento e l'invio
       // possono passare ore (offline), e l'owner può aver chiuso la sessione.

@@ -56,26 +56,38 @@
       return '';
     }
 
+    // Più file di un gesto e la cifratura che si rompe a metà: quelli già saliti restano attaccati, e la frase dice quali
+    // mancano e quali no invece di «non ho mandato niente» (#602.1), come nella pagina dei feedback.
     async function aggiungi(k, files) {
+      const FB = window.SN_FEEDBACK;
+      const allegati = [];
+      const mancati = [];
+      const altre = [];
+      let motivo = null;
       for (const file of Array.from(files || [])) {
+        const nome = file.name || 'allegato';
         const no = motivoRifiuto(k, file);
-        if (no) { avvisa(k, no); continue; }
+        if (no) { altre.push(no); continue; }
         inCarico.set(k, caricando(k) + 1);
         cambia(k);
         try {
-          const att = await window.SN_FEEDBACK.uploadAttachment(file, file.name);
-          if (att && att.url) liste.set(k, di(k).concat([att]));
-          avvisa(k, '');
+          const att = await FB.uploadAttachment(file, file.name);
+          if (att && att.url) { liste.set(k, di(k).concat([att])); allegati.push(nome); }
         } catch (e) {
-          const FB = window.SN_FEEDBACK;
-          const cifratura = !!(FB && typeof FB.isEncryptionError === 'function' && FB.isEncryptionError(e));
-          avvisa(k, cifratura ? String(e.message) : `Allegato non caricato: ${(e && e.message) || e}`);
+          if (FB && typeof FB.isEncryptionError === 'function' && FB.isEncryptionError(e)) {
+            mancati.push(nome);
+            if (motivo === null) motivo = e.motivo || '';
+          } else altre.push(`Allegato «${nome}» non caricato: ${(e && e.message) || e}`);
         } finally {
           const n = caricando(k) - 1;
           if (n > 0) inCarico.set(k, n); else inCarico.delete(k);
           cambia(k);
         }
       }
+      const cifratura = mancati.length
+        ? (typeof FB.encryptionBlockedForFiles === 'function' ? FB.encryptionBlockedForFiles(motivo, mancati, allegati) : FB.encryptionBlockedMessage(motivo))
+        : '';
+      avvisa(k, [cifratura, ...new Set(altre)].filter(Boolean).join(' '));
     }
 
     function togli(k, i) {
