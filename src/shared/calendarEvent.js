@@ -76,6 +76,8 @@
   const leggibile = (dt) => `${dt.getUTCDate()}/${DUE_CIFRE(dt.getUTCMonth() + 1)}/${dt.getUTCFullYear()}`;
   const orario = (dt) => `${DUE_CIFRE(dt.getUTCHours())}:${DUE_CIFRE(dt.getUTCMinutes())}`;
   const vuoto = (v) => v == null || String(v).trim() === '';
+  // Il valore sbagliato torna nel perché, accorciato: lo scrive il modello, e un rifiuto non deve diventare un muro di testo.
+  const citato = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t.length > 40 ? `${t.slice(0, 39)}…` : t; };
   const oltreUnAnno = (giorni) => `dura ${giorni} giorni, più di un anno: non è un evento che il calendario possa tenere`;
 
   // Una fine che non si può rispettare si RIFIUTA col suo perché, che arriva al modello e alla riga del diario:
@@ -90,9 +92,9 @@
     if (!titolo) return { errore: 'manca il titolo' };
     const tutto = senzaOra(o, ora);
     const giorno = pezziData(data, '00:00');
-    if (!giorno) return { errore: `data o ora non valide: «${String(data ?? '')}» non è un giorno` };
+    if (!giorno) return { errore: `data o ora non valide: «${citato(data)}» non è un giorno` };
     const ultimo = vuoto(dataFine) ? null : pezziData(dataFine, '00:00');
-    if (!vuoto(dataFine) && !ultimo) return { errore: `ultimo giorno non valido: «${String(dataFine)}» non è un giorno` };
+    if (!vuoto(dataFine) && !ultimo) return { errore: `ultimo giorno non valido: «${citato(dataFine)}» non è un giorno` };
     if (ultimo && ultimo < giorno) {
       return { errore: `l'ultimo giorno (${leggibile(ultimo)}) viene prima del primo (${leggibile(giorno)})` };
     }
@@ -129,8 +131,8 @@
       };
     }
     const inizio = pezziData(data, ora);
-    if (!inizio) return { errore: `data o ora non valide: «${String(ora)}» non è un'ora` };
-    if (!vuoto(oraFine) && !pezziData(data, oraFine)) return { errore: `ora di fine non valida: «${String(oraFine)}» non è un'ora` };
+    if (!inizio) return { errore: `data o ora non valide: «${citato(ora)}» non è un'ora` };
+    if (!vuoto(oraFine) && !pezziData(data, oraFine)) return { errore: `ora di fine non valida: «${citato(oraFine)}» non è un'ora` };
     // La fine detta a parole (l'ultimo giorno, l'ora di fine) vince sulla durata. Senza l'ora di fine l'ultimo giorno
     // si occupa tutto: «torno il 15» non dice a che ora.
     let fine = null;

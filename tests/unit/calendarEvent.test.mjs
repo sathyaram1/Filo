@@ -187,4 +187,7 @@ test('una fine che non si può rispettare si rifiuta col suo perché', () => {
     assert.match(v.errore, motivo, JSON.stringify(ev));
     assert.equal(C.normalize(ev), null);
   }
+  // Il valore sbagliato si cita accorciato: lo ha scritto il modello, e può essere lunghissimo.
+  const lungo = C.verifica({ titolo: 'F', data: 'x'.repeat(5000), ora: '10:00' }).errore;
+  assert.ok(lungo.length < 120, lungo);
 });
