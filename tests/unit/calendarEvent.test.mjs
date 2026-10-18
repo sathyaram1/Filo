@@ -177,8 +177,8 @@ test('una fine che non si può rispettare si rifiuta col suo perché', () => {
     [{ titolo: 'F', data: '2026-08-10', data_fine: 'il 15' }, /ultimo giorno non valido/],
     [{ titolo: 'F', data: '2026-08-10', ora: '10:00', data_fine: '2026-08-10', ora_fine: '09:00' }, /viene prima dell'inizio/],
     [{ titolo: 'F', data: '2026-08-10', ora: '10:00', ora_fine: 'tardi' }, /ora di fine non valida/],
-    [{ titolo: 'F', data: '2026-02-31', ora: '10:00' }, /data non valida/],
-    [{ titolo: 'F', data: '2026-08-10', ora: '25:00' }, /ora non valida/],
+    [{ titolo: 'F', data: '2026-02-31', ora: '10:00' }, /^data o ora non valide: «2026-02-31» non è un giorno$/],
+    [{ titolo: 'F', data: '2026-08-10', ora: '25:00' }, /^data o ora non valide: «25:00» non è un'ora$/],
     [{ titolo: '  ', data: '2026-08-10' }, /manca il titolo/],
   ];
   for (const [ev, motivo] of casi) {

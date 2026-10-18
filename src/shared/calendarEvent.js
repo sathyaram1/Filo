@@ -90,9 +90,9 @@
     if (!titolo) return { errore: 'manca il titolo' };
     const tutto = senzaOra(o, ora);
     const giorno = pezziData(data, '00:00');
-    if (!giorno) return { errore: `data non valida («${String(data ?? '')}»: serve AAAA-MM-GG)` };
+    if (!giorno) return { errore: `data o ora non valide: «${String(data ?? '')}» non è un giorno` };
     const ultimo = vuoto(dataFine) ? null : pezziData(dataFine, '00:00');
-    if (!vuoto(dataFine) && !ultimo) return { errore: `ultimo giorno non valido («${String(dataFine)}»: serve AAAA-MM-GG)` };
+    if (!vuoto(dataFine) && !ultimo) return { errore: `ultimo giorno non valido: «${String(dataFine)}» non è un giorno` };
     if (ultimo && ultimo < giorno) {
       return { errore: `l'ultimo giorno (${leggibile(ultimo)}) viene prima del primo (${leggibile(giorno)})` };
     }
@@ -129,8 +129,8 @@
       };
     }
     const inizio = pezziData(data, ora);
-    if (!inizio) return { errore: `ora non valida («${String(ora)}»: serve HH:MM)` };
-    if (!vuoto(oraFine) && !pezziData(data, oraFine)) return { errore: `ora di fine non valida («${String(oraFine)}»: serve HH:MM)` };
+    if (!inizio) return { errore: `data o ora non valide: «${String(ora)}» non è un'ora` };
+    if (!vuoto(oraFine) && !pezziData(data, oraFine)) return { errore: `ora di fine non valida: «${String(oraFine)}» non è un'ora` };
     // La fine detta a parole (l'ultimo giorno, l'ora di fine) vince sulla durata. Senza l'ora di fine l'ultimo giorno
     // si occupa tutto: «torno il 15» non dice a che ora.
     let fine = null;

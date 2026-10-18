@@ -483,6 +483,46 @@ test('G2 — l\'evento senza ora si aggiunge come evento di tutto il giorno', as
   await restore(app, '__fakeG2');
 });
 
+// Con l'ora, l'ultimo giorno si buttava via in silenzio; date al contrario facevano un giorno solo (#567, nono giro).
+test('G3 — il ritorno di un viaggio arriva nel calendario, e una fine impossibile dice perché', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await app.evaluate(({ shell: sh }) => { sh.openPath = async () => ''; });
+
+  await fakeProvider(app, [
+    { toolCalls: [
+      { id: 'g3a', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Parigi","data":"2026-08-10","ora":"08:00","data_fine":"2026-08-15"}' },
+      { id: 'g3b', name: 'EVENTO_CALENDARIO', arguments: '{"titolo":"Mostra","data":"2026-08-15","data_fine":"2026-08-10"}' },
+    ] },
+    { text: 'Ecco il viaggio.' },
+  ], '__fakeG3');
+  await page.locator('#input').fill('segnami il viaggio a Parigi: parto il 10 agosto alle 8 e torno il 15, e la mostra dal 15 al 10');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco il viaggio.' })).toBeVisible({ timeout: 10_000 });
+
+  const activity = page.locator('.dash-activity');
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Evento proposto' }))
+    .toContainText('dal 10/08/2026 alle 08:00 al 15/08/2026');
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Evento non proposto' }))
+    .toContainText('viene prima del primo');
+  await expect(page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' })).toHaveCount(1);
+
+  await page.locator('.dash-action-btn', { hasText: 'Aggiungi al calendario' }).click();
+  await expect(page.locator('.dash-action-btn', { hasText: '✓' })).toHaveCount(1, { timeout: 10_000 });
+  const dir = join(await app.evaluate(({ app: elApp }) => elApp.getPath('temp')), 'filo-eventi');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.ics'));
+  const ultimo = files.map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs })).sort((a, b) => b.t - a.t)[0].f;
+  const ics = readFileSync(join(dir, ultimo), 'utf8');
+  expect(ics).toContain('DTSTART:20260810T080000');
+  expect(ics).toContain('DTEND:20260816T000000');
+
+  await restore(app, '__fakeG3');
+});
+
 test('H — l\'azione confermata lascia la sua riga, e il bottone diventa una ricevuta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
