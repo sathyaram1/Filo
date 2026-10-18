@@ -525,8 +525,15 @@
   // respinta dalle regole subito dopo: il feedback diventava immobile (nessun
   // cambio di stato, nessun commento) mentre il server, che le regole le
   // bypassa, continuava a gonfiarlo — cioè il guaio che questo tetto esiste per
-  // impedire. 44.000 byte diventano 58.798 cifrati: ci stanno.
-  const NOTES_MAX = 44000;
+  // impedire. 400.000 byte diventano 533.465 cifrati: le regole ne ammettono
+  // 540.000, e il documento intero resta sotto il MiB di Firestore.
+  //
+  // Dimensionato sul caso peggiore realistico (#1333): dieci giri di bocciatura
+  // con critica al suo tetto (anch'esso in byte, scripts/lib/tetto-critica.mjs)
+  // e report lunghi, più segnalazioni e domande, in qualunque lingua, devono
+  // lasciare leggibile il primo turno. La sentinella è
+  // tests/unit/tettiConversazione.test.mjs.
+  const NOTES_MAX = 400000;
   const TRIM_MARK = '--- (i turni più vecchi sono stati rimossi: conversazione troppo lunga) ---';
 
   // Spezza il blob in blocchi grezzi: il primo è il testo prima di qualsiasi
@@ -571,12 +578,19 @@
     if (byteLen(s) <= limit) return s;
     const blocks = rawBlocks(s);
     // Toglie i blocchi più vecchi finché il resto (+ la riga che dichiara il
-    // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno.
-    while (blocks.length > 1) {
-      blocks.shift();
-      const candidate = `${TRIM_MARK}\n\n${blocks.join('\n').replace(/^\n+/, '')}`;
+    // taglio) rientra nel tetto. Tiene sempre almeno l'ultimo turno. Le misure
+    // si sommano una volta sola: col tetto a centinaia di KB, ricomporre il
+    // testo a ogni turno tolto costava secondi a ogni scrittura.
+    const misure = blocks.map(byteLen);
+    const testa = byteLen(`${TRIM_MARK}\n\n`);
+    let resto = misure.reduce((a, b) => a + b, 0) + blocks.length - 1;
+    for (let i = 1; i < blocks.length; i++) {
+      resto -= misure[i - 1] + 1;
+      if (testa + resto > limit) continue;
+      const candidate = `${TRIM_MARK}\n\n${blocks.slice(i).join('\n').replace(/^\n+/, '')}`;
       if (byteLen(candidate) <= limit) return candidate;
     }
+    blocks.splice(0, blocks.length - 1);
     // Un turno solo, più lungo del tetto: tiene l'inizio (marcatore compreso) e
     // taglia la coda. Si taglia a byte e si arretra finché non si è spezzato un
     // carattere a metà: un troncamento in mezzo a una lettera accentata

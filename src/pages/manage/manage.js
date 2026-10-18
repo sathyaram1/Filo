@@ -5071,6 +5071,42 @@
     }).join('\n\n');
   }
 
+  // Le note lunghe della lavorazione si mostrano ripiegate, l'inizio visibile e un tocco per aprirle (#559):
+  // una critica di duecento righe non deve nascondere il turno dopo. Aperte e chiuse sopravvivono ai ridisegni.
+  const NOTA_RIGHE_MAX = 24;
+  let noteAperte = { id: null, chiavi: new Set() };
+
+  function righeStimate(testo) {
+    return String(testo || '').split('\n').reduce((n, riga) => n + Math.max(1, Math.ceil(riga.length / 100)), 0);
+  }
+
+  function ripiegaNota(bolla, chiave) {
+    const corpo = bolla.querySelector('.mg-bubble-body');
+    const tasto = document.createElement('button');
+    tasto.type = 'button';
+    tasto.className = 'mg-bubble-apri';
+    corpo.after(tasto);
+    const mostra = (aperta) => {
+      bolla.classList.toggle('mg-bubble--ripiegata', !aperta);
+      tasto.setAttribute('aria-expanded', String(aperta));
+      tasto.textContent = aperta ? 'Riduci' : 'Mostra tutto';
+      if (aperta) noteAperte.chiavi.add(chiave);
+      else noteAperte.chiavi.delete(chiave);
+    };
+    tasto.addEventListener('click', () => {
+      const apri = bolla.classList.contains('mg-bubble--ripiegata');
+      mostra(apri);
+      // Richiusa dal fondo di una nota lunga, la bolla tornerebbe fuori vista: la si riporta sotto gli occhi.
+      if (!apri) bolla.scrollIntoView({ block: 'nearest' });
+    });
+    corpo.addEventListener('click', (e) => {
+      if (!bolla.classList.contains('mg-bubble--ripiegata')) return;
+      if (e.target.closest('a') || String(window.getSelection() || '')) return;
+      mostra(true);
+    });
+    mostra(noteAperte.chiavi.has(chiave));
+  }
+
   // La conversazione COMPLETA del feedback, un turno per bolla: segnalazione
   // originale → parere di Filo (giudici) → commento dell'owner alla revisione →
   // tutti i turni della lavorazione (report delle istanze, esiti del verifier,
@@ -5192,12 +5228,19 @@
       if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
-    for (const seg of TH.splitNotes(notes)) {
+    if (noteAperte.id !== fb._id) noteAperte = { id: fb._id, chiavi: new Set() };
+    const turni = TH.splitNotes(notes);
+    turni.forEach((seg, i) => {
       const when = seg.ts ? ` — ${seg.ts}` : '';
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       const corpo = seg.role === 'user' ? esc(seg.body) : markdownHtml(seg.body);
-      appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
-    }
+      const b = appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
+      const chiave = `${i}:${seg.body.length}`;
+      // L'ultima nota è quella che si legge: resta aperta, e resta aperta anche quando un turno nuovo
+      // arriva mentre la si legge (niente che si richiude da solo).
+      if (i === turni.length - 1) noteAperte.chiavi.add(chiave);
+      else if (righeStimate(seg.body) > NOTA_RIGHE_MAX) ripiegaNota(b, chiave);
+    });
     appendFraseBubble(fb);
     // La copia che si sta leggendo è rimasta indietro e il tentativo di
     // rileggerla non è tornato: si dice in coda alla conversazione, dove
