@@ -123,9 +123,11 @@
     const testo = `${chi} in pausa fino ${quando}: ${motivoPausa(v.perche)}.${msg ? ` «${msg}»` : ''}`;
     const strikes = Math.max(1, Math.floor(Number(v.strikes) || 1));
     const oggi = Math.max(0, Math.floor(Number(v.oggi) || 0));
+    // Un giro nato morto non è un rifiuto di claude.ai: l'accensione era passata.
+    const [tanti, uno] = v.perche === 'dead_round' ? ['accensioni di fila senza sessione', 'fallimento'] : ['rifiuti di fila', 'rifiuto'];
     const righe = [
-      strikes > 1 ? `${strikes} rifiuti di fila: la pausa raddoppia a ogni rifiuto, fino a un giorno.`
-        : 'La pausa raddoppia a ogni rifiuto di fila, fino a un giorno.',
+      strikes > 1 ? `${strikes} ${tanti}: la pausa raddoppia a ogni ${uno}, fino a un giorno.`
+        : `La pausa raddoppia a ogni ${uno} di fila, fino a un giorno.`,
     ];
     // La routine server senza un account noto non ha un conto del giorno da dire.
     if (v.account === undefined || v.account === 'A' || v.account === 'B') righe.push(`Accensioni di oggi su quell'account: ${oggi}.`);

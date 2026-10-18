@@ -131,7 +131,12 @@ test('pause lunghe: domani, o la data; scadute o sporche non diventano una riga'
   assert.match(RS.pausaInParole('Account A', { finoMs: sera + 12 * ORE, perche: 'dead_round', strikes: 3 }, sera).testo,
     /^Account A in pausa fino a domani alle 10:00: accesa, ma la sessione non è partita\.$/);
   assert.match(RS.pausaInParole('Account A', { finoMs: ORA + 50 * ORE, perche: 'network' }, ORA).testo, /fino al 19 ottobre alle 12:00/);
-  assert.match(RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'dead_round', strikes: 3 }, ORA).dettaglio, /^3 rifiuti di fila/);
+  // Giri nati morti: claude.ai non ha rifiutato niente, e l'hover non lo dice.
+  const morti = RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'dead_round', strikes: 3 }, ORA).dettaglio;
+  assert.match(morti, /^3 accensioni di fila senza sessione/);
+  assert.doesNotMatch(morti, /rifiut/i);
+  assert.doesNotMatch(RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'dead_round', strikes: 1 }, ORA).dettaglio, /rifiut/i);
+  assert.match(RS.pausaInParole('Account A', { finoMs: ORA + ORE, perche: 'http_429', strikes: 3 }, ORA).dettaglio, /^3 rifiuti di fila/);
   assert.equal(RS.pausaInParole('Account A', { finoMs: ORA - 1, perche: 'http_429' }, ORA), null);
   assert.equal(RS.pausaInParole('Account A', null, ORA), null);
   assert.equal(RS.pausaInParole('Account A', { finoMs: 'domani' }, ORA), null);
