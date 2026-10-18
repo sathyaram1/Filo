@@ -100,10 +100,10 @@ del worker ti risveglia, e solo allora riparti dal passo 0. Il passo successivo
 lo decidi SOLO così:
 
 0. **Riporta la cartella su `main`, prima di tutto il resto**:
-   `node scripts/dispatch.mjs --linea-principale`. Gli agenti e il loro
-   sforzo la sessione li legge dalla cartella del progetto, e il worker appena
-   finito l'ha lasciata sul suo ramo: se è nato prima dell'ultima modifica agli
-   agenti, il prossimo worker partirebbe con quelli vecchi, o non partirebbe.
+   `node scripts/dispatch.mjs --linea-principale`. Agenti, impostazioni e
+   copioni dei ganci la sessione li legge dalla cartella del progetto: se un
+   worker l'ha toccata comunque (un ramo, un file nuovo in `.claude`), il
+   prossimo partirebbe con quello che ha lasciato lui.
    Exit diverso da 0 → chiudi il giro, come un guasto. **Exit 5** vuol dire
    che nella cartella lavora ancora qualcuno (il messaggio dice chi: biglietto,
    processi, ultimo commit): chiudi il giro, non insistere e non ripetere il
