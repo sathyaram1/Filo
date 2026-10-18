@@ -1,6 +1,7 @@
 // Il worker di un giro lavora in un clone suo: la cartella da cui la sessione dell'orchestratore legge impostazioni,
 // agenti e ganci resta su main e intatta (#1182). Giro vero contro un server finto, in cartelle usa-e-getta.
-
+import '../helpers/senzaSessione.mjs';
+import { senzaSessione } from '../helpers/sessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -65,7 +66,7 @@ function lancia(s, script, args, port) {
     const p = spawn(process.execPath, [resolve(s.strumenti, 'scripts', script), ...args], {
       cwd: s.sessione,
       env: {
-        ...process.env,
+        ...senzaSessione(process.env),
         FILO_ROUTINE: '1',
         FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
         FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
