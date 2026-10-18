@@ -3,7 +3,7 @@
 // tiene il server (fiduciaRamo.commitDichiarati): qui un guasto lascia la coda com'è, e niente decide la fiducia.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { trovaBiglietti, chiamaGrezzo, consegnaSporchi, sporchiInAttesa } from './biglietto-locale.mjs';
@@ -117,7 +117,10 @@ export function accoda(root, chi, repo, spinte, nowMs = Date.now()) {
   for (const s of spinte) {
     const nome = `${String(Math.round(Number(nowMs) || Date.now())).padStart(14, '0')}-${process.pid}-${String(n).padStart(3, '0')}-${randomBytes(3).toString('hex')}.json`;
     const voce = Object.assign({ tipo: chi.tipo, ticket: chi.ticket, repo, at: nowMs }, chi.fp ? { fp: chi.fp } : {}, chi.file ? { file: chi.file } : {}, s);
-    writeFileSync(join(dir, nome), `${JSON.stringify(voce)}\n`, { encoding: 'utf8', mode: 0o600 });
+    // Prima con un altro nome, poi al suo posto: chi legge la coda intanto non trova mai una voce a metà.
+    const tmp = join(dir, `${nome}.tmp`);
+    writeFileSync(tmp, `${JSON.stringify(voce)}\n`, { encoding: 'utf8', mode: 0o600 });
+    renameSync(tmp, join(dir, nome));
     n += 1;
   }
   return n;
