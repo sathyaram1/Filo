@@ -693,6 +693,9 @@
     // `freni`: 'attivi', o 'numeri_assenti' (senza riserva di A né tetto di B i crediti non frenano niente).
     ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
     ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
+    // Le pause in corso di A, B e della routine server, col motivo del rifiuto (#996): sola lettura, dal server
+    // (routineStateAdmin op:'pause'). Owner-only, solo pagine di Filo.
+    AUTOMATION_PAUSE_GET: 'automation_pause_get', // → { ok, pause: { A?, B?, server? }, oraMs } | { ok:false, error }
     // Modello e sforzo del worker per fase (doc config/routines, campo
     // `roleModels` = { ruolo: { model?, effort? } }; regole in
     // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore

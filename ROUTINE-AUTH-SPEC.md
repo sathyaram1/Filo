@@ -309,8 +309,8 @@ lo ritenta, perché è una risposta, non un'interruzione di rete.
 **I giri li accende il pacemaker.** Una funzione schedulata nel progetto
 filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
 (`config/routines.enabled`) acceso? nessun **battito di sistema** fresco
-(qualcuno sta già lavorando)? run giornalieri rimasti (tetto di default 12,
-`config/routines.pacemakerDailyCap`)? l'ultimo giro non è **nato morto** e
+(qualcuno sta già lavorando)? l'account non è in pausa (un'accensione rifiutata
+da claude.ai la mette, crescente; nessun tetto giornaliero, #996)? l'ultimo giro non è **nato morto** e
 nessun guasto è stato dichiarato (periodo di rispetto ≥ 1h)? c'è lavoro (stessa
 domanda del sondaggio di prontezza, fatta dentro il server)? Solo se tutto dice
 sì, una POST accende la routine su claude.ai (id in

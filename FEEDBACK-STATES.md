@@ -454,7 +454,7 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   (che `applyStatus` azzera da sé alla prima consegna vera).
   Alla **3ª volta** il feedback esce dal giro automatico → `design`
   (`statusReason: arenato`) con nota per l'owner, o un guasto che si ripete ogni
-  ora si mangia il tetto giornaliero di accensioni entro sera.
+  ora si mangia le accensioni e i crediti dell'account entro sera.
 
 ### 6b. Storia: la riconciliazione dell'Action (smontata)
 

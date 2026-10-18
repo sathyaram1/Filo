@@ -858,6 +858,17 @@ module.exports = function register(on, ctx) {
     } catch (_) { /* scritto sì: lo stato si rilegge alla prossima apertura */ }
     return out;
   }));
+  // Le pause in corso degli account e della routine server, col motivo (#996). Lo stato del pacemaker non lo legge
+  // nessun client: passa dalla callable, con le credenziali dell'owner.
+  on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
+    try {
+      const r = await callSecurityFunction('routineStateAdmin', { op: 'pause' });
+      const pause = r && r.pause && typeof r.pause === 'object' ? r.pause : {};
+      return { ok: true, pause, oraMs: Number(r && r.oraMs) || Date.now() };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
 
   // Modello e sforzo del worker per fase (config/routines.roleModels). Owner-only. Le legge il server
   // quando consegna un biglietto: cambiarle qui vale dal prossimo.

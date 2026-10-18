@@ -772,8 +772,9 @@ migrazione le mappa. Il codice che decide in base al prefisso
   - la coda è vuota;
   - il suo contesto supera il 70%;
   - c'è un guasto o arriva un limite di sessione.
-- Il pacemaker ne riaccende un altro dai battiti. Ogni accensione conta nel
-  tetto giornaliero (12 per account).
+- Il pacemaker ne riaccende un altro dai battiti. Nessun tetto giornaliero
+  (#996): un'accensione che claude.ai rifiuta mette l'account in pausa, e
+  Gestione → Automazioni ne dice il motivo.
 - L'orchestratore gira col modello della sessione, e la sua rilettura del
   contesto fra un biglietto e l'altro è buona parte del 40% di consumo che i
   biglietti non contano.
