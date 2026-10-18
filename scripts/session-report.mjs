@@ -201,6 +201,7 @@ function testoDi(content) {
 export function rapportoVuoto({ role = '', ticket = '' } = {}) {
   return {
     v: 3,
+    listino: LISTINO,
     role: String(role || ''),
     ticket: String(ticket || ''),
     sessionId: '',
