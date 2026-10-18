@@ -503,7 +503,7 @@ export async function releaseConRapporto(t, fault, report, opts) {
     if (Array.isArray(rep.notes)) senza.notes = [...rep.notes, `listino ${listino}`];
     const r2 = await tenta(senza);
     if (malformato(r2)) return r;
-    avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
+    if (r2.ok) avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
     return r2;
   };
   const conAvvisi = (r, rapporto, avviso) => {
