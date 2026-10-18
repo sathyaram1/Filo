@@ -274,11 +274,14 @@
     });
   }
 
-  function copiaChat(c) {
+  // `dispositivi`: per la home (#869), il dispositivo da cui è arrivato ogni messaggio, allineato a `messages`.
+  function copiaChat(c, { dispositivi = false } = {}) {
     if (!c) return null;
     const out = { ...c, messages: c.messages.map((m) => ({ ...m })) };
     if (Array.isArray(c.fonti)) out.fonti = c.fonti.map((f) => ({ ...f }));
     delete out._pos;
+    delete out._disp;
+    if (dispositivi) out.dispositivi = c.messages.map((_, i) => (c._disp && c._disp[i]) || '');
     return out;
   }
 
