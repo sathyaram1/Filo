@@ -20,6 +20,7 @@ const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
+const FiloParla = require('./filoParla');
 const Schermo = require('./schermo').crea();
 const SempreAperte = require('./sempreAperte');
 
@@ -58,10 +59,6 @@ const FiloState = globalThis.SN_FILO_STATE;
 const Onboarding = globalThis.SN_ONBOARDING;
 const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
 
-// #155 — intervallo minimo tra due ricalcoli in background della home: la nuova
-// scheda serve sempre la cache all'istante; il ricalcolo (costoso, con l'LLM)
-// avviene al massimo una volta ogni 2 minuti, accorpando le modifiche.
-const DASHBOARD_MIN_INTERVAL_MS = 2 * 60 * 1000;
 
 // Finestra principale di Filo, quella che possiede il TabManager. NON usare
 // getAllWindows()[0]: le finestre figlie (tooltip, popup-menu — create con
@@ -3377,8 +3374,8 @@ function releaseOnboardingResume() { onbResumeClaimedAt = 0; }
 // La chiusura dell'intervista, in un posto solo. L'ordine non è un dettaglio:
 // prima l'agente-lezioni estrae quello che l'ultimo turno ha insegnato, POI la
 // compattazione lo porta dentro PROFILO/PREFERENZE (forzata: senza aspettare la
-// soglia), e solo allora Filo genera la PRIMA home personale — che è l'ultimo
-// atto dell'accoglienza, al posto di un "fatto".
+// soglia), e solo allora Filo scrive il primo messaggio della home personale — che è
+// l'ultimo atto dell'accoglienza, al posto di un "fatto".
 // Vale per tutte e tre le strade che la chiudono: il modello che dichiara
 // `fine`, la parola di stop riconosciuta dall'app, il pulsante «Salta».
 function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true } = {}) {
@@ -3391,7 +3388,8 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
     : Promise.resolve();
   first
     .then(() => maybeRunCompactor())
-    .then(() => handleFiloGenerateDashboard({ force: true }))
+    // Il primo messaggio della home personale è il primo turno di Filo nel filo (#869), dopo l'accoglienza.
+    .then(() => FiloParla.giro({ subito: [{ tipo: 'accoglienza' }] }))
     .then(done)
     .catch((e) => {
       console.warn('[Filo] chiusura onboarding', e);
@@ -5663,12 +5661,6 @@ function savedSuggestions(saved) {
   }));
 }
 
-// Saluto neutro mentre la home vera si calcola: Filo può rispondere, il
-// messaggio su misura no. La nuova scheda non aspetta mai l'LLM.
-function buildWaitingDashboard(saved) {
-  return { message: 'Buongiorno. Filo è qui.', suggestions: savedSuggestions(saved) };
-}
-
 // Home senza AI: istantanea, dalle pagine salvate. Dice PERCHÉ Filo non parla,
 // perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
 function buildNoKeyDashboard(settings, saved) {
@@ -5704,14 +5696,14 @@ function buildNoKeyDashboard(settings, saved) {
   return { message, suggestions };
 }
 
-// Genera il messaggio della home con l'LLM e lo mette in cache (con la firma).
-// Questa è la parte COSTOSA: non va mai sul cammino di apertura di una scheda
-// (tranne il primissimo caricamento, quando non c'è ancora nulla in cache).
-async function generateDashboardFromInputs(inputs) {
+// Genera il messaggio di Filo e i suggerimenti della home con l'LLM, e li mette in cache. È la parte COSTOSA: parte solo
+// quando è successo qualcosa (src/main/services/filoParla.js) o quando l'utente chiede suggerimenti nuovi, mai
+// all'apertura di una scheda (#869). `precedente`: il messaggio di Filo che questo sostituisce, se si fondono.
+async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
   const cached = await FiloMem.getDashboardCache();
   const r = await handleAIRequest({
     action: ACTIONS.FILO_DASHBOARD,
-    payload: { ...inputs.payload, ultimoMessaggio: cached?.message || '' },
+    payload: { ...inputs.payload, ultimoMessaggio: precedente != null ? precedente : (cached?.message || '') },
     origin: 'filo:dashboard',
     intera: true,
   });
@@ -5731,7 +5723,6 @@ async function generateDashboardFromInputs(inputs) {
         .filter((s) => s.text);
     }
   }
-  if (!message) message = 'Filo è in ascolto.';
   // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): la home
   // chiede l'icona del sito appena lo mostra, prima di ogni clic, e al clic deve dire cosa ha fermato.
   for (let i = 0; i < suggestions.length; i++) {
@@ -5746,81 +5737,74 @@ async function generateDashboardFromInputs(inputs) {
     try { chiede = await linkCheChiedonoOk('', { parole: inputs.parole || '', sempre: true, indirizzi: [url] }); } catch (_) { chiede = []; }
     if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
-  await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
+  await FiloMem.setDashboardCache({ message: message || cached?.message || '', suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
 }
 
-// Scheduler throttle+coalesce per il ricalcolo in background (#155): al massimo
-// un ricalcolo ogni DASHBOARD_MIN_INTERVAL_MS, accorpando tutte le richieste.
-// Creato pigramente (SN_DASHBOARD_REFRESH è caricato dal loader).
-let _dashboardScheduler = null;
-function dashboardScheduler() {
-  if (_dashboardScheduler) return _dashboardScheduler;
-  _dashboardScheduler = DashboardRefresh.createScheduler({
-    minIntervalMs: DASHBOARD_MIN_INTERVAL_MS,
-    now: () => Date.now(),
-    setTimer: (fn, ms) => setTimeout(fn, ms),
-    clearTimer: (h) => clearTimeout(h),
-    run: async (openTabsCount) => {
-      // Ri-raccoglie gli input ORA: accorpa tutte le modifiche della finestra.
-      await FiloMem.gcTimers();
-      const inputs = await gatherDashboardInputs({ openTabsCount: openTabsCount || 0 });
-      if (!inputs.canServe) return;
-      const cached = await FiloMem.getDashboardCache();
-      // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
-      if (cached && !cached.senzaChiave && cached.signature === inputs.signature) return;
-      // Un giro fallito (rete giù, modello che rifiuta) lascia la home com'è e
-      // basta: qui siamo dentro un timer, e rilanciare porterebbe giù il main.
-      let result = null;
-      try { result = await generateDashboardFromInputs(inputs); }
-      catch (e) { console.warn('[Filo] ricalcolo home fallito', e); return; }
-      // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
-      broadcastToTabs({
-        type: MSG.FILO_DASHBOARD_UPDATED,
-        message: result.message, suggestions: result.suggestions, ts: result.ts,
-      });
-    },
-  });
-  return _dashboardScheduler;
+function schedeWebAperte() {
+  let n = 0;
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      const tabs = win && win._filoTabs && Array.isArray(win._filoTabs.tabs) ? win._filoTabs.tabs : [];
+      n += tabs.filter((t) => !t.isInternal && /^https?:\/\//i.test(t.url || '')).length;
+    }
+  } catch (_) {}
+  return n;
 }
 
-async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
-  // Pulisce i timer scaduti PRIMA di leggere la cache: gcTimers() invalida
-  // la cache dashboard quando rimuove qualcosa, così evitiamo di riservire
-  // un messaggio cached che parlava di un timer ormai scaduto (bug alpha
-  // tester: "Filo non dovrebbe menzionare il timer in alto a sinistra").
+// Le cose successe come le legge il modello: i nomi (un file scaricato, un avviso, una sveglia messa da un modello) li
+// scrivono altri, e restano imbustati come ogni testo salvato (#592.4).
+const COSA_E_SUCCESSO = {
+  timer: 'è suonato',
+  download: 'è finito il download di',
+  avviso: 'è arrivato un avviso:',
+  giornata: 'è l\'inizio della giornata: l\'utente apre Filo per la prima volta oggi',
+  accoglienza: 'l\'utente ha appena finito di presentarsi a te: da qui comincia la vostra conversazione di tutti i giorni',
+};
+function testoEventi(eventi) {
+  const E = globalThis.SN_ESTERNO;
+  const righe = (Array.isArray(eventi) ? eventi : []).filter((e) => e && COSA_E_SUCCESSO[e.tipo])
+    .map((e) => `- ${COSA_E_SUCCESSO[e.tipo]}${e.testo ? ` ${E.neutralizza(e.testo, { unaRiga: true })}` : ''}`);
+  return righe.length ? E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: righe.join('\n') }) : '';
+}
+
+// Il turno di Filo nel filo (#869): messaggio e suggerimenti nascono dalla stessa chiamata.
+async function generaPerFiloParla({ eventi, fondi, precedente }) {
   await FiloMem.gcTimers();
-  const inputs = await gatherDashboardInputs({ openTabsCount });
+  const inputs = await gatherDashboardInputs({ openTabsCount: schedeWebAperte() });
+  if (!inputs.canServe) return null;
+  inputs.payload = { ...inputs.payload, eventi: testoEventi(eventi), fondi: !!fondi };
+  const r = await generateDashboardFromInputs(inputs, { precedente: fondi ? precedente : null });
+  broadcastToTabs({ type: MSG.FILO_DASHBOARD_UPDATED, suggestions: r.suggestions, ts: r.ts });
+  return r;
+}
+
+async function filoPuoParlare() {
+  const settings = await getEffectiveSettings();
+  if (settings.showHomeMessage === false) return false;
+  if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) return false;
+  const onb = Onboarding ? await FiloMem.getOnboarding().catch(() => null) : null;
+  return !onb || !!onb.done;
+}
+
+// La home chiede i suggerimenti aprendosi: quelli in cache, senza mai chiamare il modello (#869). Il modello parte solo
+// con `force` («Aggiorna» sulla carta, la fine dell'accoglienza, i crediti arrivati). Senza un modello servibile, la
+// frase che dice perché e la strada ai Crediti.
+async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
+  await FiloMem.gcTimers();
+  const settings = await getEffectiveSettings();
+  if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) {
+    const saved = await SavedPages.list();
+    const payload = buildNoKeyDashboard(settings, saved);
+    return { ...payload, senzaChiave: true, cached: false, ts: new Date().toISOString() };
+  }
+  if (force) {
+    const inputs = await gatherDashboardInputs({ openTabsCount });
+    const result = await generateDashboardFromInputs(inputs);
+    return { suggestions: result.suggestions, cached: false, ts: result.ts };
+  }
   const cached = await FiloMem.getDashboardCache();
-
-  // Senza un modello servibile: messaggio istantaneo dalle pagine salvate.
-  if (!inputs.canServe) {
-    const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
-    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature, senzaChiave: true });
-    return { ...payload, cached: false, ts: new Date().toISOString() };
-  }
-
-  // La chiave è arrivata dopo (#651): la firma non la vede. Il messaggio vero si chiede in background,
-  // ma non a chi deve ancora fare l'intervista, che parte nella home aperta.
-  if (cached && cached.senzaChiave && !force) {
-    const onb = Onboarding ? await FiloMem.getOnboarding() : null;
-    if (!onb || onb.done) dashboardScheduler().request(openTabsCount);
-    return { ...buildWaitingDashboard(inputs.saved), cached: false, ts: new Date().toISOString() };
-  }
-
-  // C'è già una cache e non è un refresh esplicito: la serviamo SUBITO — la
-  // nuova scheda non aspetta MAI l'LLM. Se gli input sono cambiati, accodiamo
-  // un ricalcolo in background (throttle + coalesce); quando è pronto, la home
-  // si aggiorna da sola via FILO_DASHBOARD_UPDATED.
-  if (cached && cached.message && !force) {
-    if (cached.signature !== inputs.signature) dashboardScheduler().request(openTabsCount);
-    return { message: cached.message, suggestions: cached.suggestions, cached: true, ts: cached.ts };
-  }
-
-  // Primo caricamento (nessuna cache) o refresh forzato: genera ora.
-  const result = await generateDashboardFromInputs(inputs);
-  dashboardScheduler().markRan(); // il run sincrono conta per il throttle
-  return { ...result, cached: false };
+  return { suggestions: (cached && !cached.senzaChiave && cached.suggestions) || [], cached: !!cached, ts: cached?.ts || null };
 }
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {
@@ -6793,6 +6777,13 @@ ConversazioniApp.collega({
     else broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED });
   },
   tetti: async () => globalThis.SN_FILO_CONTESTO.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo),
+});
+
+// Filo parla per primo (#869): cosa genera il messaggio, quando può farlo, e a chi lo dice.
+FiloParla.collega({
+  genera: (o) => generaPerFiloParla(o),
+  puoParlare: () => filoPuoParlare(),
+  annuncia: (m) => broadcastToTabs({ type: MSG.FILO_PARLA, ...m }),
 });
 
 function broadcastToTabs(message) {

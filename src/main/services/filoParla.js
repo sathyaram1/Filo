@@ -2,6 +2,8 @@
 // giornata, la fine dell'accoglienza) scrive un turno suo in coda al filo. Mai all'apertura di una scheda. Due suoi
 // messaggi di fila si fondono (src/shared/filoEventi.js). Regole: patterns/la-home-e-la-coda-del-filo.md.
 
+const Coda = require('./codaFilo');
+
 const TIPI = Object.freeze(['timer', 'download', 'avviso', 'giornata', 'accoglienza']);
 // Gli eventi che arrivano insieme (due timer allo stesso minuto, un download che finisce mentre suona) fanno un giro solo.
 const ATTESA_MS = 1200;
@@ -39,7 +41,7 @@ async function giroOra(subito) {
   if (!nuovi.length) return null;
   if (!(await app.puoParlare())) return null;
   const Chats = globalThis.SN_FILO_CHATS;
-  const corrente = await globalThis.SN_CODA_FILO.chatCorrente();
+  const corrente = await Coda.chatCorrente();
   const ultimo = corrente && corrente.messages[corrente.messages.length - 1];
   const fondi = !!(ultimo && ultimo.spontaneo && ultimo.role === 'filo');
   const motivi = [...(fondi && Array.isArray(ultimo.motivi) ? ultimo.motivi : []), ...nuovi];
@@ -54,10 +56,17 @@ async function giroOra(subito) {
   return r;
 }
 
-// La prima apertura della giornata: se nella home oggi non si è detto ancora niente.
+// La prima apertura della giornata: se nella home oggi non si è detto ancora niente. Una volta al giorno: dieci schede
+// aperte mentre il saluto si scrive non ne chiedono altri dieci.
+let giornataChiesta = '';
 async function forseGiornata() {
+  const d = new Date();
+  const oggi = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  if (giornataChiesta === oggi) return;
   try {
-    if (await globalThis.SN_CODA_FILO.serveGiornata()) segnala({ tipo: 'giornata' });
+    if (!(await Coda.serveGiornata()) || giornataChiesta === oggi) return;
+    giornataChiesta = oggi;
+    segnala({ tipo: 'giornata' });
   } catch (_) {}
 }
 

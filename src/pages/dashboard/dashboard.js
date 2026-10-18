@@ -1,13 +1,8 @@
 // Dashboard Filo (new tab). Controller UI.
 //
-// Stati visibili:
-//   - "home"   → messaggio centrale proattivo
-//   - "thread" → conversazione in corso (bolle)
-// Ai lati, in tutti e due gli stati, le carte (#870): le disegna dashboard-carte.js.
-//
-// Ogni nuova query dalla home apre un nuovo thread (vedi spec sezione 2.1).
-// Niente persistenza cross-tab del thread: ad ogni nuovo new-tab si riparte
-// dalla home. Il "raw log" tiene memoria delle interazioni lato background.
+// Il centro è la coda del filo (#869): gli ultimi scambi di tutte le schede, le azioni fatte dall'interfaccia, le pagine
+// visitate ripiegate; sotto, il campo. Aprire una scheda o tornare alla home non apre né chiude una chat: la coda la
+// disegna dashboard-coda.js, la ricerca dashboard-cerca.js, qui restano chat e turni. Ai lati le carte (#870).
 
 (function () {
   'use strict';
@@ -18,7 +13,6 @@
   const $ = (id) => document.getElementById(id);
   const body = document.body;
   const homeMessageEl = $('homeMessage');
-  const homeView = $('homeView');
   const threadView = $('threadView');
   const bubblesEl = $('bubbles');
   const accadeEl = $('accade');
@@ -41,7 +35,6 @@
 
   // ===== Stato locale =====
   let suggestions = [];
-  let showHomeMessage = true; // commento centrale (disattivabile da Preferenze)
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
   // a scrivere la conversazione su disco, turno per turno, così una chat
@@ -49,6 +42,8 @@
   // si chiude (ritorno alla home, chat nuova), e il messaggio dopo ne apre una.
   let chatId = null;
   let sending = false;
+  // L'utente ha scritto in questa scheda: da qui in poi c'è una conversazione da non interrompere (l'accoglienza aspetta).
+  let scrittoQui = false;
   // Il turno che sta lavorando adesso (#578): il quadrato lo ferma. `ripresa`: l'ultimo turno è stato fermato e il
   // tasto d'invio offre di riprenderlo finché l'utente non scrive altro. `tasto`: il «Continua» nella bolla di un
   // turno finito senza risposta (#557), che se ne va quando l'offerta finisce.
@@ -121,7 +116,8 @@
       const guardata = type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
       if (id) {
         try {
-          send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}) });
+          send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}) })
+            .then(() => Coda.allinea()).catch(() => {});
         } catch (_) {}
       }
     },
@@ -142,6 +138,18 @@
   Righe.init({
     send, bubblesEl, homeEl: $('righeApp'), inThread: () => body.dataset.state === 'thread', chatId: () => chatId,
   });
+  // La coda del filo al centro (#869) e il campo per cercarci dentro.
+  const Coda = self.SN_DASH_CODA;
+  Coda.init({
+    send,
+    bubblesEl,
+    rendiMessaggi: (lista, dove) => rendiMessaggi(lista, dove),
+    setBubbleText: (el, t) => setBubbleText(el, t, true),
+    righe: Righe,
+    chatId: () => chatId,
+    occupata: () => sending || Accoglienza.isActive(),
+  });
+  self.SN_DASH_CERCA.init({ send, coda: Coda, input: $('cercaFilo') });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -165,7 +173,7 @@
     // finire: le sue righe le archivia lei.
     if (Accoglienza.isActive()) return null;
     const id = chat || ensureChatId();
-    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}) }); } catch (_) {}
+    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}) }).then(() => Coda.allinea()).catch(() => {}); } catch (_) {}
     return id;
   };
   const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
@@ -189,7 +197,7 @@
     bubblesEl,
     inputEl,
     makeBubble: (o) => makeBubble(o),
-    goHome: () => goHome(),
+    goHome: (o) => goHome(o),
     goThread: () => goThread(),
     autoGrowInput: () => autoGrowInput(),
     refreshLive: () => refreshLive(),
@@ -207,10 +215,10 @@
     bubblesEl,
     threadView,
     inputEl,
-    homeMessageEl,
     makeBubble: (o) => makeBubble(o),
     stepTrace: (text) => Att.stepTrace(text),
-    goHome: () => goHome(),
+    // L'accoglienza ha ridisegnato il centro: finita, il filo si rilegge e lei ne è il primo tratto (#869).
+    goHome: () => goHome({ ricarica: true }),
     goThread: () => goThread(),
     resetHistory: (onbState) => {
       threadHistory = [];
@@ -245,7 +253,8 @@
     },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
-    isHomeMessageVisible: () => showHomeMessage,
+    // Niente da interrompere: in questa scheda l'utente non ha ancora scritto.
+    nienteInCorso: () => !scrittoQui && !sending,
     soloRisposteSenzaCrediti: () => {
       const bolle = [...bubblesEl.children];
       return bolle.some((b) => b.dataset.senzaCrediti === '1')
@@ -333,74 +342,62 @@
   }
 
   // ===== Stato UI =====
-  function goHome() {
-    // Tornare alla home CHIUDE la chat: è il gesto che la finisce, insieme a
-    // "chat nuova" e alla chiusura dell'app. Prima di svuotare le bolle,
-    // perché da qui in poi la conversazione non esiste più in questa pagina.
-    closeCurrentChat();
-    Term.nuovaChat(false);
-    body.dataset.state = 'home';
-    homeView.hidden = false;
-    threadView.hidden = true;
-    threadHistory = [];
-    bubblesEl.innerHTML = '';
+  // Il centro è sempre il filo (#869): «home» vuol dire tornare in fondo, col campo pronto. `ricarica`: la vista è stata
+  // ridisegnata da altri (l'accoglienza che finisce) e il filo si rilegge da capo.
+  function goHome({ ricarica = false, nuova = false } = {}) {
+    if (nuova && !ricarica) {
+      closeCurrentChat();
+      Term.nuovaChat(false);
+      threadHistory = [];
+      chiudiRipresa();
+      aggiornaTasto();
+    }
+    if (ricarica) {
+      Term.nuovaChat(false);
+      chatId = null;
+      threadHistory = [];
+      bubblesEl.innerHTML = '';
+      chiudiRipresa();
+      aggiornaTasto();
+      caricaFilo().catch((e) => console.warn('[Filo] coda del filo', e));
+    } else {
+      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    }
+    goThread();
     inputEl.value = '';
-    chiudiRipresa();
-    aggiornaTasto();
     autoGrowInput();
     inputEl.focus();
-    Righe.aggiorna().catch(() => {});
   }
 
   function goThread() {
-    const entra = body.dataset.state !== 'thread';
     body.dataset.state = 'thread';
-    homeView.hidden = true;
     threadView.hidden = false;
-    if (entra) Righe.aggiorna().catch(() => {});
   }
 
-  // #525 — riapertura di una chat archiviata (filo://archive → clic su una
-  // chat, oppure un link con ?chat=<id>). La conversazione torna per intero e
-  // si continua a scrivere DENTRO la stessa chat: i messaggi nuovi si
-  // accodano a quelli di prima, non aprono una chat gemella.
-  //
-  // Quello che NON torna sono i bottoni delle azioni: un'azione in attesa di
-  // conferma non si può ri-offrire tre giorni dopo come se fosse di adesso.
-  // Al loro posto resta la riga che racconta cosa Filo aveva fatto.
+  // La coda del filo all'apertura: la conversazione che una scheda nuova continua la riprende anche lo storico, così il
+  // turno dopo è nella stessa chat (#869).
+  async function caricaFilo() {
+    const corrente = await Coda.carica();
+    if (corrente && !chatId && !Accoglienza.isActive()) await adotta(corrente).catch(() => false);
+    Righe.aggiorna().catch(() => {});
+    return corrente;
+  }
+
+  // #525 — riapertura di una chat archiviata (Cronologia, un link con ?chat=<id>, una carta della home): il filo va a
+  // quel punto, e si continua a scrivere DENTRO la stessa chat. I bottoni delle azioni non tornano: un'azione in attesa
+  // di conferma non si può ri-offrire tre giorni dopo come se fosse di adesso.
   function chatIdFromUrl() {
     try { return new URLSearchParams(self.location.search).get('chat') || null; }
     catch (_) { return null; }
   }
 
-  async function reopenChat(id, { chiudiPrima = false } = {}) {
-    const r = await send({ type: MSG.FILO_CHAT_GET, id });
-    const chat = r && r.ok && r.chat;
-    if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
-    // Da una carta della home (#870): la conversazione a schermo si chiude come col ritorno alla home.
-    if (chiudiPrima && chatId && chatId !== chat.id) { closeCurrentChat(); Term.nuovaChat(false); }
-    // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) si guarda aperta nel filo, non si continua da qui:
-    // quello che si scrive dopo apre una conversazione nuova della home, con quella riga davanti.
-    if (chat.app) {
-      if (chatId) { closeCurrentChat(); Term.nuovaChat(false); }
-      chatId = null;
-      threadHistory = [];
-      chiudiRipresa();
-      aggiornaTasto();
-      bubblesEl.innerHTML = '';
-      goThread();
-      const vista = await Righe.mostraSola(chat);
-      inputEl.focus();
-      return vista;
-    }
-    chatId = chat.id;
-    threadHistory = [];
-    chiudiRipresa();
-    aggiornaTasto();
-    bubblesEl.innerHTML = '';
-    goThread();
+  // Le bolle di una serie di messaggi del filo, com'erano: testo, immagini (quelle ancora in memoria), le righe delle
+  // azioni e il segno dei cambi. `storia`, se c'è, riceve lo storico che il turno dopo manda al main.
+  function rendiMessaggi(messaggi, dove, { storia = null } = {}) {
     let bollaUtente = null;
-    for (const m of chat.messages) {
+    for (const m of messaggi) {
+      const nodi = [];
+      const metti = (n) => { dove.appendChild(n); nodi.push(n); };
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
@@ -408,7 +405,7 @@
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
       if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
-        if (m.ts) b.dataset.ts = m.ts;
+        if (m.spontaneo) b.dataset.spontaneo = '1';
         fotoViste.forEach((src, i) => {
           const img = document.createElement('img');
           img.src = src;
@@ -416,16 +413,13 @@
           attachImageLightbox(img, src);
           b.insertBefore(img, b.childNodes[i] || null);
         });
-        bubblesEl.appendChild(b);
+        metti(b);
         if (isUser) bollaUtente = b;
       }
       // I cambi chiesti con quel messaggio ritrovano il loro segno, col loro stato di adesso.
       if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) Cambi.segna(bollaUtente, m.cambi);
-      // Le immagini incollate non stanno nell'archivio (sono data URL da
-      // centinaia di KB l'una), ma il loro NUMERO sì: va detto. Senza, chi
-      // rilegge trova «cosa vedi in questo grafico?» riferito al nulla e non
-      // capisce più di cosa si parlasse — un taglio silenzioso su quello che
-      // aveva mandato lui.
+      // Le immagini incollate non stanno nell'archivio (sono data URL da centinaia di KB l'una), ma il loro NUMERO sì:
+      // senza, chi rilegge trova «cosa vedi in questo grafico?» riferito al nulla.
       const quante = Number(m.images) || 0;
       const perse = Math.max(0, quante - fotoViste.length);
       if (perse > 0) {
@@ -436,14 +430,14 @@
         nota.textContent = perse === 1
           ? (altre ? 'un\'altra immagine, non conservata' : '1 immagine, non conservata')
           : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
-        bubblesEl.appendChild(nota);
+        metti(nota);
       }
       if (!isUser && types.length) {
         const note = document.createElement('div');
         note.className = 'dash-bubble-note';
         note.dataset.replay = '1';
         note.textContent = Att.summarizeActivity(types, false);
-        bubblesEl.appendChild(note);
+        metti(note);
       }
       // #778 — di una finestra guardata l'archivio tiene il nome: l'immagine e quello che c'era non si conservano.
       const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
@@ -452,29 +446,78 @@
         nota.className = 'dash-bubble-note';
         nota.dataset.replay = '1';
         nota.textContent = `Ho guardato «${nome}»: l'immagine non è conservata`;
-        bubblesEl.appendChild(nota);
+        metti(nota);
       }
-      // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
-      const fuori = isUser ? {} : {
-        ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
-        ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
-        ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
-      };
-      threadHistory.push(isUser
-        ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
-        : {
-          role: 'filo', text, ...fuori,
-          actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
-            ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
-        });
+      if (m.altrove && nodi.length) {
+        const nota = document.createElement('div');
+        nota.className = `dash-altrove dash-altrove-${isUser ? 'user' : 'filo'}`;
+        nota.textContent = 'da un altro dispositivo';
+        metti(nota);
+      }
+      for (const n of nodi) {
+        if (m.ts) n.dataset.ts = m.ts;
+        if (m.chat) n.dataset.chat = m.chat;
+      }
+      if (m.key && nodi[0]) nodi[0].dataset.key = m.key;
+      if (storia) storia.push(rigaDiStoria(m, { quante, guardate, types }));
     }
+  }
+
+  // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
+  function rigaDiStoria(m, { quante, guardate, types }) {
+    const text = String(m.text || '');
+    if (m.role === 'user') {
+      return { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) };
+    }
+    return {
+      role: 'filo', text,
+      ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+      ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
+      ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
+      ...(m.spontaneo ? { spontaneo: true } : {}),
+      actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
+        ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
+    };
+  }
+
+  // La conversazione che da qui si continua: lo storico per il turno dopo, il terminale com'era. Le bolle le ha già la coda.
+  async function adotta(id) {
+    const r = await send({ type: MSG.FILO_CHAT_GET, id });
+    const chat = r && r.ok && r.chat;
+    if (!chat || chat.app || !Array.isArray(chat.messages) || !chat.messages.length) return false;
+    chatId = chat.id;
+    threadHistory = chat.messages.map((m) => rigaDiStoria(m, {
+      quante: Number(m.images) || 0,
+      guardate: m.role !== 'user' && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [],
+      types: Array.isArray(m.actions) ? m.actions : [],
+    }));
+    chiudiRipresa();
+    aggiornaTasto();
     Term.nuovaChat(chat.messages.some((m) => (
       (m.role !== 'user' && Array.isArray(m.actions) && m.actions.includes('ESEGUI_COMANDO'))
       || (m.role === 'user' && /^\//.test(String(m.text || '').trim()) && Comandi.classifyInput(String(m.text)) !== 'filo')
     )));
-    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    return true;
+  }
+
+  // Una conversazione riaperta: il filo va al suo punto e, se è della home e si vuole riprenderla (`riprendi`), da qui
+  // si continua lei.
+  async function reopenChat(id, { riprendi = true } = {}) {
+    const r = await send({ type: MSG.FILO_CHAT_GET, id });
+    const chat = r && r.ok && r.chat;
+    if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
+    const trovata = await Coda.vaiA({ chat: chat.id, app: !!chat.app, ts: chat.messages[0].ts, i: 0 });
+    if (chat.app) {
+      if (!trovata) await Righe.mostraSola(chat);
+      inputEl.focus();
+      return true;
+    }
+    if (!trovata && !riprendi) return false;
+    if (riprendi && chatId !== chat.id) {
+      if (chatId) closeCurrentChat();
+      await adotta(chat.id);
+    }
     inputEl.focus();
-    Righe.aggiorna({ riposa: true }).catch(() => {});
     return true;
   }
 
@@ -484,25 +527,19 @@
   async function apriNelFilo({ chat = null, testo = '', esterno = '' } = {}) {
     if (Accoglienza.isActive()) return 'accoglienza';
     if (sending) return 'risponde';
-    if (chat && chat === chatId && body.dataset.state === 'thread') { inputEl.focus(); return true; }
-    if (chat && chat !== chatId) {
-      const r = await send({ type: MSG.FILO_CHAT_FOCUS, id: chat });
-      if (r && r.portato) return true;
-      if (await reopenChat(chat, { chiudiPrima: true }).catch(() => false)) return true;
-    }
+    if (chat && chat === chatId) { goHome(); return true; }
+    // La conversazione che l'ha fatta nascere è nel filo: ci si va, senza chiudere quella in corso (#869).
+    if (chat && await reopenChat(chat, { riprendi: false }).catch(() => false)) return true;
     if (!testo) return false;
     // La stessa carta aperta due volte non ripete la frase: è già l'ultima cosa che Filo ha detto qui.
     const ultimo = threadHistory[threadHistory.length - 1];
-    if (body.dataset.state === 'thread' && ultimo && ultimo.role === 'filo' && ultimo.text === testo) {
-      bubblesEl.scrollTop = bubblesEl.scrollHeight;
-      inputEl.focus();
-      return true;
-    }
+    if (ultimo && ultimo.role === 'filo' && ultimo.text === testo) { goHome(); return true; }
     const DA_FUORI = { download: 'dal nome di un file scaricato' };
     archiviaRiga(testo, 'filo', null, esterno);
     threadHistory.push({ role: 'filo', text: testo, actions: [], ...(DA_FUORI[esterno] ? { esterno: DA_FUORI[esterno] } : {}) });
     goThread();
     bubblesEl.appendChild(makeBubble({ role: 'filo', text: testo }));
+    Coda.segnaGiorni();
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
     return true;
@@ -652,13 +689,14 @@
     }
   }
 
-  // Mostra/nasconde il commento centrale di Filo (Preferenze → "Commento nella
-  // home"). I suggerimenti nella colonna sinistra restano comunque visibili.
-  function applyHomeMessageVisibility() {
-    homeMessageEl.hidden = !showHomeMessage;
+  // ===== Suggerimenti, e la frase quando Filo non ha un modello =====
+  // Aprendosi la home non chiama il modello (#869): i suggerimenti sono quelli dell'ultima volta che Filo ha scritto.
+  // Senza un modello servibile la frase che dice perché, con la strada ai Crediti, sta in fondo al filo.
+  function mostraSenzaModello(testo) {
+    homeMessageEl.textContent = testo || '';
+    homeMessageEl.hidden = !testo;
   }
 
-  // ===== Generazione dashboard (messaggio centro + suggerimenti) =====
   // Un ricalcolo spinto dal main mentre la richiesta è in volo è più nuovo della sua risposta, e uno arrivato
   // prima vale quanto la cache che la risposta servirebbe: i suggerimenti che ha portato restano («Aggiorna» no).
   let giroDashboard = 0;
@@ -666,14 +704,9 @@
   async function loadDashboard({ force = false } = {}) {
     const giro = ++giroDashboard;
     renderSuggestions({ pronti: false });
-    if (showHomeMessage) {
-      homeMessageEl.classList.add('dash-home-msg-loading');
-      homeMessageEl.textContent = '…';
-    }
     const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force });
     if (giro !== giroDashboard) return;
-    homeMessageEl.classList.remove('dash-home-msg-loading');
-    homeMessageEl.textContent = (r?.ok && r.message) || 'Filo è in ascolto.';
+    mostraSenzaModello(r?.ok && r.senzaChiave ? r.message : '');
     if (!force && spinteDashboard) { renderSuggestions(); return; }
     suggestions = (r?.ok && Array.isArray(r.suggestions)) ? r.suggestions : [];
     renderSuggestions();
@@ -684,24 +717,18 @@
     const giro = giroDashboard;
     const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD });
     if (giro !== giroDashboard || !r?.ok) return;
-    const messaggio = r.message || 'Filo è in ascolto.';
-    if (homeMessageEl.textContent !== messaggio) homeMessageEl.textContent = messaggio;
+    mostraSenzaModello(r.senzaChiave ? r.message : '');
     const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
     if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
     suggestions = nuovi;
     renderSuggestions();
   }
 
-  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
-  // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
-  // c'è una conversazione in corso) si rifà almeno il messaggio della home,
-  // che altrimenti continua a spiegare un silenzio finito (#663).
+  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è ciò che l'utente aspetta al primo avvio;
+  // se resta chiusa si rifà almeno la frase in fondo, che altrimenti continua a spiegare un silenzio finito (#663).
   async function risvegliaHome() {
     await Accoglienza.maybeOpenOnboardingLater();
-    if (Accoglienza.isActive() || document.body.dataset.state !== 'home') return;
-    // Senza `force`: chi sa rispondere serve subito il saluto d'attesa e si
-    // rifà il messaggio nel giro in background, invece di far aspettare
-    // l'utente davanti a una chiamata al modello.
+    if (Accoglienza.isActive()) return;
     await loadDashboard();
   }
 
@@ -1133,6 +1160,7 @@
   async function submitMessage(text, { daModello = false } = {}) {
     if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
     sending = true;
+    scrittoQui = true;
     // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
     chiudiRipresa();
     aggiornaTasto();
@@ -1166,6 +1194,8 @@
       userBubble.insertBefore(img, userBubble.childNodes[i] || null);
     });
     bubblesEl.appendChild(userBubble);
+    Coda.segnaGiorni();
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
     await runTurnAndContinue({ userMessage: domanda, images: imagesToSend, daModello, daFuori });
   }
@@ -1204,6 +1234,8 @@
 
     // Aggiorna live (potrebbe esserci un timer/sveglia appena creato).
     refreshLive().catch(() => {});
+    // Le pagine che il turno ha aperto e i cambi fatti altrove entrano nel filo a schermo; i messaggi del turno ci sono già.
+    Coda.allinea().catch(() => {});
     return r;
   }
 
@@ -1677,6 +1709,18 @@
     if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
+  // Filo ha scritto di sua iniziativa (#869): il suo turno in fondo al filo, o al posto del suo messaggio di prima.
+  function filoParla(msg) {
+    if (Accoglienza.isActive()) return;
+    const voce = { key: `m:${msg.chat}:${msg.i}`, chat: msg.chat, role: 'filo', text: String(msg.testo || ''), ts: msg.ts, spontaneo: true };
+    Coda.metti(voce);
+    if (!chatId && !sending) chatId = msg.chat;
+    if (msg.chat !== chatId) return;
+    const ultimo = threadHistory[threadHistory.length - 1];
+    if (msg.fuso && ultimo && ultimo.spontaneo) ultimo.text = voce.text;
+    else threadHistory.push({ role: 'filo', text: voce.text, actions: [], spontaneo: true });
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
       avvisoCrediti(String(msg.id)).catch(() => {});
@@ -1687,7 +1731,10 @@
       refreshLive().catch(() => {});
     } else if (msg?.type === MSG.SISTEMA_AGGIORNATO) {
       Sistema.aggiornato(msg.stato);
+    } else if (msg?.type === MSG.FILO_PARLA && msg.chat) {
+      filoParla(msg);
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
+      Coda.togliChat(msg.cancellata);
       // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
       // sta ancora qui a schermo. Continuare a scriverci dentro la farebbe
       // rinascere con la stessa targa e i messaggi di prima persi: l'opposto
@@ -1718,10 +1765,8 @@
       if (Accoglienza.isActive()) return; // l'intervista è ancora a schermo
       giroDashboard++;
       spinteDashboard++;
-      if (showHomeMessage) {
-        homeMessageEl.classList.remove('dash-home-msg-loading');
-        homeMessageEl.textContent = msg.message || 'Filo è in ascolto.';
-      }
+      // La frase arriva solo senza un modello (handlers/wallet.js): con un modello se ne va.
+      mostraSenzaModello(msg.message || '');
       suggestions = Array.isArray(msg.suggestions) ? msg.suggestions : [];
       renderSuggestions();
       // La home si rifà da sola anche quando arriva un modello (invito, chiave propria): l'intervista
@@ -1730,10 +1775,6 @@
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
       if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
-      if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {
-        showHomeMessage = msg.settings.showHomeMessage;
-        applyHomeMessageVisibility();
-      }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
@@ -2343,7 +2384,10 @@
   function allaComparsa() {
     richiestaDellAvviso(Accoglienza.isActive()).catch(() => {});
     if (Accoglienza.isActive()) Accoglienza.riprendiAllaComparsa().catch(() => {});
-    else if (body.dataset.state === 'home') aggiornaDashboardInSilenzio().catch(() => {});
+    else {
+      aggiornaDashboardInSilenzio().catch(() => {});
+      Coda.allinea({ daAltrove: true }).catch(() => {});
+    }
   }
 
   (async function init() {
@@ -2351,12 +2395,10 @@
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
-      showHomeMessage = settings?.showHomeMessage !== false;
       Sistema.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
     } catch (_) {}
-    applyHomeMessageVisibility();
     if (Term.isEnabled()) await Term.initCwd();
     Term.applyTerminalMode();
     // #524 — intervista di benvenuto aperta (primo avvio, o ripresa a metà, o
@@ -2369,18 +2411,14 @@
     // benvenuto ha comunque la precedenza: è la PRIMA conversazione e va
     // finita, e durante l'intervista in archivio non c'è ancora niente.
     const reopenId = onbState ? null : chatIdFromUrl();
-    // Carico in parallelo dashboard cache e live state per non sequenziare.
+    // Suggerimenti, stato vivo e coda del filo insieme: niente di questo chiama il modello (#869).
     await Promise.all([
-      (onbState || reopenId) ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
+      onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
       refreshLive().catch((e) => console.warn('[Filo] live', e)),
+      onbState ? Promise.resolve() : caricaFilo().catch((e) => console.warn('[Filo] coda del filo', e)),
     ]);
-    // Una chat che non c'è più (cancellata da un'altra scheda) non deve
-    // lasciare una pagina vuota: si ricade sulla home normale.
-    if (reopenId) {
-      const opened = await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
-      if (!opened) await loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e));
-    }
-    if (body.dataset.state !== 'thread') Righe.aggiorna().catch(() => {});
+    // Una chat che non c'è più (cancellata da un'altra scheda) lascia il filo com'è.
+    if (reopenId) await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
     if (onbState) await Accoglienza.openOnboarding(onbState);
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
