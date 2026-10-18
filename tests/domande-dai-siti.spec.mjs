@@ -286,6 +286,12 @@ test('un sito non legge né spinge fuori le pagine salvate, e non cancella dizio
   });
   const sfondo = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
   const vista = dalPreload(app, (u) => u.startsWith('http://127.0.0.1'));
+  // Filo riscrive la disposizione alla prima lettura (migrazioni): conta quella che c'è prima del sito.
+  const layoutPrima = await shell.evaluate(async () => {
+    await window.filoShell.message({ type: 'icon_layout_get' });
+    return (await window.filoShell.message({ type: '_storage:get', keys: ['sn_icon_layout'] })).value?.sn_icon_layout;
+  });
+  expect(layoutPrima).toBeTruthy();
 
   const sonda = await sfondo(chiedi('save_page', { page: { url: 'https://banca.example/conto' } }));
   expect(sonda.nonTrovata || sonda.errore).toBeFalsy();
@@ -308,7 +314,7 @@ test('un sito non legge né spinge fuori le pagine salvate, e non cancella dizio
     magazzino: (await window.filoShell.message({ type: '_storage:get', keys: ['sn_icon_layout', 'sn_personal_dict'] })).value,
   }));
   expect(resta.salvate).toContain(SALVATA);
-  expect(resta.magazzino?.sn_icon_layout?.mio).toBe(true);
+  expect(resta.magazzino?.sn_icon_layout).toEqual(layoutPrima);
   expect(resta.magazzino?.sn_personal_dict).toEqual(['Sathya']);
 });
 
