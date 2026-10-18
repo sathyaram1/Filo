@@ -67,9 +67,10 @@ rules_version = '2';
 //   Niente `update`, niente `delete`: un allegato, una volta scritto, è
 //   immutabile. Il `resource == null` è ciò che lo dice, ed è anche ciò che
 //   rende la cancellazione impossibile (in una delete `resource` c'è).
-//   Conseguenza da tenere presente: cancellare un allegato non è permesso a
-//   nessuno, owner compreso, quindi un file caricato per dispetto si toglie
-//   solo dalla console del progetto.
+//   Conseguenza: da queste regole non cancella nessuno, owner compreso. Il
+//   deposito lo tiene il server (Admin SDK, #601): ogni ora toglie i file che
+//   nessun feedback cita, e all'arrivo di un feedback cambia il codice di
+//   scarico dei suoi allegati, così il link di chi li ha caricati non apre più.
 // - Il nome deve portare ENTROPIA (un uuid), così non lo si indovina e non lo
 //   si riusa: il pattern è quello che genera `SN_FEEDBACK.attachmentPath`
 //   (src/shared/feedback.js), e una sentinella negli unit test

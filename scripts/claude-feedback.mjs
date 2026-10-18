@@ -78,34 +78,16 @@ const FB = globalThis.SN_FEEDBACK;
 /** Il mittente con cui si firma una sessione locale. Fonte unica: shared. */
 export const CLIENT_ID = (THREAD && THREAD.LOCAL_CLIENT_ID) || 'local:claude';
 
-// Tipo dichiarato per estensione; se ammetterlo lo decide `SN_FEEDBACK_ATTACH.classify`, l'elenco
-// unico del riquadro e della pagina dei feedback, a cui resta allineato il cancello degli allegati del server
-// (filo-security, cancelloAllegati). Fuori da lì il feedback diventerebbe `suspicious_file`.
-// ⚠️ Tabella SENZA eredità, per lo stesso motivo di `PREFISSI_ALLEGATO` in
-// src/shared/feedback.js (#582, giro 7): la chiave è l'estensione di un nome di
-// file, e una tabella normale contiene già `__proto__` e `constructor` senza che
-// nessuno ce li abbia messi. Un file chiamato `note.__proto__` si faceva
-// dichiarare un tipo che non è una stringa, e partiva verso il deposito con
-// `data:[object Object]` al posto del tipo, invece di essere respinto qui.
-const MIME_PER_ESTENSIONE = Object.freeze(Object.assign(Object.create(null), {
-  md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain', log: 'text/plain',
-  json: 'application/json', csv: 'text/csv', tsv: 'text/tab-separated-values',
-  yaml: 'application/x-yaml', yml: 'application/x-yaml', pdf: 'application/pdf',
-  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
-}));
+// Tipo dichiarato per estensione dalla lista unica dei tipi di allegato (src/shared/feedbackAttachTypes.js), a cui
+// resta allineato il cancello degli allegati del server (filo-security, cancelloAllegati): fuori da lì il feedback
+// diventerebbe `suspicious_file`, meglio fermarsi prima.
+const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
 export const MAX_ALLEGATI = 5;
 export const MAX_ALLEGATO_BYTES = 4 * 1024 * 1024; // lo storage rifiuta oltre
 
 /** Il tipo di un allegato dal nome, o '' se non è ammesso. PURA. */
 export function mimeDiAllegato(nome) {
-  const ext = extname(String(nome || '')).slice(1).toLowerCase();
-  const tipo = MIME_PER_ESTENSIONE[ext];
-  // `typeof === 'string'` e non `|| ''`: da qui esce il tipo che finisce nel
-  // `data:` dell'allegato e poi nella richiesta al deposito. Quello che non è
-  // una stringa non è un tipo, ed è un allegato da rifiutare.
-  if (typeof tipo !== 'string') return '';
-  const ATTACH = globalThis.SN_FEEDBACK_ATTACH;
-  return ATTACH && ATTACH.classify({ name: String(nome || ''), type: tipo }) ? tipo : '';
+  return ATTACH.mimeDaEstensione(extname(String(nome || '')).slice(1));
 }
 
 /**
@@ -119,7 +101,7 @@ export function leggiAllegato(percorso) {
   try { size = statSync(p).size; } catch (_) { throw new Error(`allegato non trovato: ${percorso}`); }
   const name = basename(p);
   const type = mimeDiAllegato(name);
-  if (!type) throw new Error(`allegato di tipo non ammesso: ${name} (ammessi: ${Object.keys(MIME_PER_ESTENSIONE).join(', ')})`);
+  if (!type) throw new Error(`allegato di tipo non ammesso: ${name} (ammessi: ${[...ATTACH.IMAGE_EXT, ...ATTACH.DOC_EXT].join(', ')})`);
   if (size > MAX_ALLEGATO_BYTES) throw new Error(`allegato troppo grande: ${name} (max 4 MB)`);
   if (size === 0) throw new Error(`allegato vuoto: ${name}`);
   const b64 = readFileSync(p).toString('base64');

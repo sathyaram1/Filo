@@ -568,7 +568,7 @@ test('le bozze dei riquadri: un sito legge e scrive solo quelle con la sua origi
   const b = 'https://b.example';
   const suaB = `sn_feedback_draft_text@${b}`;
   const diA = 'sn_feedback_draft_text@https://a.example';
-  assert.deepEqual(W.BOZZE_PER_SITO, ['sn_feedback_draft_text', 'sn_redteam_attack_draft', 'sn_redteam_desc_draft']);
+  assert.deepEqual(W.BOZZE_PER_SITO, ['sn_feedback_draft_text', 'sn_feedback_rimessa', 'sn_redteam_attack_draft', 'sn_redteam_desc_draft']);
   for (const bozza of W.BOZZE_PER_SITO) {
     assert.equal(W.scritturaStorageAmmessa([`${bozza}@${b}`], pagina, b), true, bozza);
     assert.equal(W.scritturaStorageAmmessa([bozza], pagina, b), false, `${bozza} senza origine`);

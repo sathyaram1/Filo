@@ -416,7 +416,7 @@
     },
     {
       id: 'feedback', title: 'Manda un feedback', category: 'assistant',
-      desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche con immagini allegate. Quello che scrivi lo legge solo chi lavora i feedback; quando il tuo è risolto Filo te lo dice all’avvio, con una frase scritta per te e, se c’è, il premio in crediti{se:bacheca}, e il miglioramento compare in bacheca (filo://board/){/se}. Se hai un portafoglio, anche l’invio dà un premio in crediti dopo i controlli, ma solo per le prime segnalazioni del giorno (il tetto è nella capacità dei crediti): oltre, il messaggio d’invio lo dice. Quello che hai mandato lo ritrovi in «Le tue segnalazioni»{se:bacheca}, in cima alla Bacheca{/se}, con la data e lo stato. L’invio è immediato: se sei senza connessione Filo tiene da parte il feedback e lo spedisce da solo appena la rete torna, anche dopo aver chiuso e riaperto l’app. Puoi anche chiederlo a Filo in chat ("segnala che X non funziona") e ci pensa lui a scriverlo; e quando è Filo a dirti che una cosa non sa farla, che non ha un dato che gli hai chiesto, oppure quando ti spiega come fare a mano qualcosa che Filo sa fare ma che l’assistente non riesce ad azionare, la segnalazione compare già scritta e ti viene mostrata subito per intero in un riquadro di conferma (una volta per conversazione, e niente parte senza il tuo OK).',
+      desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche allegando immagini e documenti ({tipiAllegato}): uno screenshot, un file di log, una tabella. Quello che scrivi lo legge solo chi lavora i feedback; quando il tuo è risolto Filo te lo dice all’avvio, con una frase scritta per te e, se c’è, il premio in crediti{se:bacheca}, e il miglioramento compare in bacheca (filo://board/){/se}. Se hai un portafoglio, anche l’invio dà un premio in crediti dopo i controlli, ma solo per le prime segnalazioni del giorno (il tetto è nella capacità dei crediti): oltre, il messaggio d’invio lo dice. Quello che hai mandato lo ritrovi in «Le tue segnalazioni»{se:bacheca}, in cima alla Bacheca{/se}, con la data e lo stato. L’invio è immediato: se sei senza connessione Filo tiene da parte il feedback e lo spedisce da solo appena la rete torna, anche dopo aver chiuso e riaperto l’app. Puoi anche chiederlo a Filo in chat ("segnala che X non funziona") e ci pensa lui a scriverlo; e quando è Filo a dirti che una cosa non sa farla, che non ha un dato che gli hai chiesto, oppure quando ti spiega come fare a mano qualcosa che Filo sa fare ma che l’assistente non riesce ad azionare, la segnalazione compare già scritta e ti viene mostrata subito per intero in un riquadro di conferma (una volta per conversazione, e niente parte senza il tuo OK).',
       invoke: 'Menu del tasto destro → "Invia feedback"; in chat basta chiederlo a parole.',
     },
     {
@@ -812,6 +812,12 @@
     const mac = T.etichettaFilo(accel, 'darwin');
     return pc === mac ? pc : `${pc} (${mac} su Mac)`;
   }
+  // I documenti che si allegano a una segnalazione stanno come {tipiAllegato}: li dice la lista unica dei tipi di allegato.
+  function tipiAllegato() {
+    if (!global.SN_FEEDBACK_ATTACH && typeof require === 'function') require('./feedbackAttachTypes.js');
+    const A = global.SN_FEEDBACK_ATTACH;
+    return A ? A.NOMI_DOCUMENTI : '';
+  }
   function conTasti(c, aperti) {
     const out = { ...c };
     for (const k of ['desc', 'invoke', 'doesNot']) {
@@ -819,7 +825,8 @@
       out[k] = c[k]
         .replace(/\{se:([a-z-]+)\}([\s\S]*?)(?:\{altrimenti\}([\s\S]*?))?\{\/se\}/g,
           (_, nome, si, no) => (aperto(aperti, nome) ? si : (no || '')))
-        .replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id));
+        .replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id))
+        .replace(/\{tipiAllegato\}/g, tipiAllegato);
     }
     return out;
   }

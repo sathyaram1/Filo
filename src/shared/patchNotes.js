@@ -168,6 +168,8 @@
         'Detta e Incolla funzionano anche sui siti a cui hai negato microfono o appunti, e il sito non li riceve nemmeno mentre detti o incolli.',
         'Un riquadro di un altro sito dentro una pagina non può più chiederti le notifiche col nome del sito che stai guardando.',
         'La pulizia delle schede, automatica o chiesta con /pulisci, non chiude più una scheda in cui hai scritto o incollato un testo senza inviarlo: un modulo, un commento, un editor di testo o di codice, anche dentro un riquadro. Il testo resta lì finché non lo mandi o non chiudi tu la scheda.',
+        'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».',
+        'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.',
         'L\'archivio che esporti da Sicurezza non porta più le tue chiavi API, nemmeno quelle copiate o scritte in chat, a meno che tu non spunti «Includi le chiavi». Importarlo non tocca le chiavi che hai già. Gli archivi fatti prima le contengono, quindi trattali come una password. Su un computer senza portachiavi di sistema, Filo ti dice una volta che salva le chiavi in chiaro.',
         'Filo non chiede più a Google le icone dei siti che ti suggerisce nella home o che apre per te in chat, e Google non vede più quali siti frequenti. Usa quelle già viste nelle tue schede, nell\'archivio e nelle pagine salvate, o le chiede al sito stesso.',
         'Il menu del tasto destro non esegue più un clic su una voce che la pagina stava coprendo con qualcosa di suo: il menu si chiude e te lo dice.',

@@ -83,7 +83,7 @@ const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k)
 // Le bozze dei riquadri (feedback, attacco red-team) scritte in un sito restano a quel sito (#1071): ognuno legge e
 // scrive solo le chiavi che portano la SUA origine, quella del riquadro che chiede e non della scheda (un riquadro
 // incorporato è un altro sito). Un documento senza origine (sandbox, data:) non ne ha: «null» è di tutti.
-const BOZZE_PER_SITO = Object.freeze(['sn_feedback_draft_text', 'sn_redteam_attack_draft', 'sn_redteam_desc_draft']);
+const BOZZE_PER_SITO = Object.freeze(['sn_feedback_draft_text', 'sn_feedback_rimessa', 'sn_redteam_attack_draft', 'sn_redteam_desc_draft']);
 const chiaveDelSito = (k, origineRiquadro) => typeof k === 'string' && typeof origineRiquadro === 'string'
   && origineRiquadro !== '' && origineRiquadro !== 'null'
   && BOZZE_PER_SITO.some((b) => k === `${b}@${origineRiquadro}`);

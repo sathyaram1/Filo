@@ -116,3 +116,45 @@ test('il tipo di un allegato è sempre una stringa, anche coi nomi di serie', ()
   assert.equal(mimeDiAllegato('a.png'), 'image/png');
   assert.equal(mimeDiAllegato('a.yaml'), 'application/x-yaml');
 });
+
+// ── Una lista sola: selettori, controllo, manifesto e `feedback:apri` leggono la stessa (#582.2) ──
+
+test('il selettore offre esattamente i tipi che il controllo accetta, senza famiglie con l\'asterisco', () => {
+  const voci = A.ACCEPT.split(',');
+  assert.ok(!voci.some((v) => v.includes('*')), `famiglia con asterisco nel selettore: ${A.ACCEPT}`);
+  for (const v of voci) {
+    const prova = v.startsWith('.') ? f(`x${v}`, '') : f('x', v);
+    assert.ok(prova, `il selettore offre ${v}, che il controllo rifiuta`);
+  }
+  for (const t of A.TIPI) {
+    for (const m of t.mime) assert.ok(voci.includes(m), `${m} accettato ma non offerto`);
+    for (const e of t.ext) assert.ok(voci.includes(`.${e}`), `.${e} accettato ma non offerto`);
+  }
+  assert.ok(voci.includes('.tsv') && voci.includes('text/tab-separated-values'), 'la tabella .tsv è offerta');
+  for (const attivo of ['image/svg+xml', '.svg', 'text/html', '.html', 'text/*', 'image/*']) {
+    assert.ok(!voci.includes(attivo), `${attivo} offerto`);
+  }
+});
+
+test('i nomi dei documenti per le frasi vengono dalla stessa lista', () => {
+  for (const t of A.TIPI.filter((x) => x.kind === 'file')) assert.ok(A.NOMI_DOCUMENTI.includes(t.nome), t.nome);
+  assert.match(A.NOMI_DOCUMENTI, /TSV/);
+  assert.match(A.NOMI_DOCUMENTI, / e YAML$/);
+});
+
+test('il tipo dichiarato da un\'estensione è sempre una stringa, e vuota fuori lista', () => {
+  assert.equal(A.mimeDaEstensione('TSV'), 'text/tab-separated-values');
+  assert.equal(A.mimeDaEstensione('yml'), 'application/x-yaml');
+  assert.equal(A.mimeDaEstensione('jpg'), 'image/jpeg');
+  for (const e of ['__proto__', 'constructor', 'svg', 'html', '', undefined]) assert.equal(A.mimeDaEstensione(e), '', String(e));
+});
+
+test('il manifesto dice che a una segnalazione si allegano anche documenti, coi nomi della lista', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'capabilities.js'));
+  const CAP = globalThis.SN_CAPABILITIES;
+  const desc = CAP.get('feedback').desc;
+  assert.ok(desc.includes(A.NOMI_DOCUMENTI), desc.slice(0, 200));
+  for (const c of CAP.all({ redteam: true })) {
+    for (const k of ['desc', 'invoke', 'doesNot']) assert.ok(!String(c[k] || '').includes('{tipiAllegato}'), `${c.id}.${k}`);
+  }
+});
