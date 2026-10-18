@@ -379,6 +379,26 @@ test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di ris
   await expect(page.locator('#mgSideBody')).toContainText('Due strade con costi diversi');
 });
 
+test('una segnalazione che non ha fermato il lavoro: il rombo dice in quale feedback aspetta la risposta (#1202)', async ({ openTab }) => {
+  const fb = {
+    _id: 'fb-livelli-derivata', text: 'Il menu si apre lento.', name: 'Menu lento',
+    seq: 705, subSeq: 0, status: 'revision_capability', branch: 'worker/fb-livelli-derivata',
+    clientId: 'user:abc', createdAt: '2026-10-12T10:00:00Z', images: [],
+    notes: 'Fatto con la strada A.\n\nSegnalazione per l\'owner (chi risolve), uscita senza fermare il lavoro nel feedback derivato #705.1:\n## Problema\nPrecaricare costa qualche credito.',
+    livelli: { l3: { esito: 'segnalato', ruolo: 'resolver', at: '2026-10-12T10:05:00Z', testo: '## Problema\nPrecaricare costa qualche credito.', derivato: '#705.1' } },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  await rombo.click();
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).toContainText('Precaricare costa qualche credito');
+  await expect(corpo.locator('.mg-liv-riga', { hasText: 'Domanda nel feedback' })).toContainText('#705.1 (il lavoro non si è fermato)');
+  await page.screenshot({ path: 'tests/.shots/livelli-rombo-segnalazione-derivata.png' });
+});
+
 test('nel rombo, nel pentagono e nella conversazione il markdown della segnalazione si legge formattato, non come simboli; l’HTML resta testo', async ({ openTab }) => {
   // «**A.**» è la forma che il modello della segnalazione prescrive per le scelte (#703).
   const SEGNALAZIONE = '## Problema\nIl nome del file salvato: dal sito o chiesto ogni volta?\n\n## Scelte\n- **A.** Dal sito: zero attrito.\n- **B.** Chiesto: un passaggio in più.\n\n## Cosa ho fatto nel frattempo\nHo preso la **A.**, la *meno* invasiva. <b>finto</b> <img src=x onerror="window.__xss=1">\n1. Primo passo.\n2. Secondo passo.';

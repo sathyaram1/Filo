@@ -1578,7 +1578,7 @@
     if (ruolo) righe.push(riga('Chi ha segnalato', L3_RUOLI[ruolo] || ruolo));
     if (l.at) righe.push(riga('Quando', String(l.at)));
     // Una segnalazione che non ferma il lavoro aspetta la risposta nel suo feedback derivato (#1202).
-    if (String(l.derivato || '').trim()) righe.push(riga('Non ha fermato il lavoro: si risponde in', String(l.derivato).trim()));
+    if (String(l.derivato || '').trim()) righe.push(riga('Domanda nel feedback', `${String(l.derivato).trim()} (il lavoro non si è fermato)`));
     const testo = String(l.testo || '').trim() || 'La segnalazione è arrivata senza testo.';
     // Segnalazione registrata E domande in attesa: chi clicca il verde cerca
     // la cosa a cui rispondere adesso, quindi va per prima. Fermo per una

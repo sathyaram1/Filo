@@ -1422,12 +1422,12 @@ test('livelli L3: grigio senza segnalazione, verde con il testo di chi ha lavora
   const righe = con.pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
   assert.match(righe, /chi ha verificato il fix/);
   assert.match(righe, /2026-09-12/);
-  assert.doesNotMatch(righe, /Non ha fermato il lavoro/);
+  assert.doesNotMatch(righe, /Domanda nel feedback/);
   // Una segnalazione che non ferma (#1202): il rombo dice dove si risponde.
   const derivata = MR.livelloL3({
     livelli: { l3: { esito: 'segnalato', ruolo: 'resolver', testo: 'Problema: due strade.', derivato: '#12.3' } },
   });
-  assert.ok(derivata.pannello.righe.some((r) => r.etichetta === 'Non ha fermato il lavoro: si risponde in' && r.valore === '#12.3'));
+  assert.ok(derivata.pannello.righe.some((r) => r.etichetta === 'Domanda nel feedback' && r.valore === '#12.3 (il lavoro non si è fermato)'));
 });
 
 test('livelli L3: fermo per un guasto, arenato o in loop, il rombo dice quello che dice il segno in lista', () => {
