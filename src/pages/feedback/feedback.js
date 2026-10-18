@@ -592,7 +592,8 @@
       if (!window.SN_FEEDBACK?.uploadAttachment) return no('Upload non disponibile.');
       uploading++; btn.disabled = true; setStatus('Caricamento…');
       try {
-        const att = await SN_FEEDBACK.uploadAttachment(file, file.name);
+        const tipo = AttachTypes?.tipoDichiarato?.(file) || file.type;
+        const att = await SN_FEEDBACK.uploadAttachment(file.type === tipo ? file : file.slice(0, file.size, tipo), file.name);
         // La copia in chiaro è qui, ed è l'anteprima: quella che sta nel
         // deposito è cifrata e in un <img> non compare (#602).
         if (att && att.kind === 'img') ricordaAnteprimaLocale(att.url, file);

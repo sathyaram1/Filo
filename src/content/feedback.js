@@ -518,10 +518,11 @@
         statusEl.textContent = 'File troppo grande (max 4 MB).';
         return;
       }
-      const dataUrl = await blobToDataUrl(file);
+      const tipo = AttachTypes?.tipoDichiarato?.(file) || file.type || 'application/octet-stream';
+      const dataUrl = await blobToDataUrl(file.type === tipo ? file : file.slice(0, file.size, tipo));
       files.push({
         name: file.name || 'allegato',
-        type: file.type || 'application/octet-stream',
+        type: tipo,
         size: file.size || 0,
         dataUrl,
       });

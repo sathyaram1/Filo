@@ -80,6 +80,29 @@ test('con MIME vuoto/generico un\'estensione non in allowlist è rifiutata', () 
   assert.equal(f('senza-estensione', ''), null);
 });
 
+test('#1337: il nome che il sistema dà a un documento ammesso vale con l\'estensione della sua voce, e si dichiara col tipo della lista', () => {
+  const casi = [
+    ['diario.log', 'text/x-log', 'file', 'text/plain'],
+    ['config.yaml', 'application/yaml', 'file', 'application/x-yaml'],
+    ['config.yml', 'text/yaml', 'file', 'application/x-yaml'],
+    ['misure.csv', 'application/vnd.ms-excel', 'file', 'text/csv'],
+    ['note.md', 'text/x-markdown', 'file', 'text/markdown'],
+    ['schema.json', 'application/schema+json', 'file', 'application/json'],
+    ['vecchia.bmp', 'image/x-ms-bmp', 'image', 'image/bmp'],
+    ['note.md', '', 'file', 'text/markdown'],
+    ['shot.png', 'application/octet-stream', 'image', 'image/png'],
+    ['n.txt', 'text/plain', 'file', 'text/plain'],
+  ];
+  for (const [name, type, kind, dichiarato] of casi) {
+    assert.equal(f(name, type), kind, `${name} ${type}`);
+    assert.equal(A.tipoDichiarato({ name, type }), dichiarato, `${name} ${type}`);
+  }
+  for (const [name, type] of [['conti.xls', 'application/vnd.ms-excel'], ['a.txt', 'application/yaml'], ['a.csv', 'text/x-log'], ['x.html', 'text/x-log'], ['travestito.txt', 'text/html']]) {
+    assert.equal(f(name, type), null, `${name} ${type}`);
+    assert.equal(A.tipoDichiarato({ name, type }), '', `${name} ${type}`);
+  }
+});
+
 test('input mancanti/degeneri non esplodono e sono rifiutati', () => {
   assert.equal(A.classify(null), null);
   assert.equal(A.classify(undefined), null);
