@@ -32,9 +32,8 @@ function server() {
   const require = createRequire(join(SRV, 'index.js'));
   const { memFirestore } = require(join(SRV, 'test', 'fixtures', 'firestore-mem'));
   const fsMod = require(join(SRV, 'src', 'data', 'firestore'));
-  // Il registro del server prende `db` al primo require: ogni caso passa dalla stessa porta, che punta alla sua memoria.
-  globalThis.__memSessioniParallele = memFirestore({});
-  fsMod.db = () => globalThis.__memSessioniParallele();
+  const mem = memFirestore({});
+  fsMod.db = () => mem();
   const store = require(join(SRV, 'src', 'routine', 'store'));
   const { runLocalTicket } = require(join(SRV, 'src', 'routine', 'localTicket'));
   let n = 0;
