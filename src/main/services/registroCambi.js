@@ -152,6 +152,17 @@ async function leggi(ids) {
   return lista.filter((e) => voluti.has(e.id)).map((e) => vista(e, lista));
 }
 
+// Tutti, con lo stato di adesso, per la home (#869): vista() rilegge gli annulli una volta per tutti.
+async function tutti() {
+  await attesa();
+  const lista = await leggiLista();
+  const chiusi = K().annullati(lista);
+  return lista.map((e) => ({
+    id: e.id, ts: e.agg || e.ts, tipo: e.tipo, via: e.via || 'filo', frase: K().frase(e), provenienza: K().provenienza(e),
+    annulla: e.annulla || null, annullatoDa: chiusi.get(e.id) || null, annullabile: K().annullabile(daRimettere(e, lista)),
+  }));
+}
+
 async function ultimi({ max = 40 } = {}) {
   await attesa();
   const lista = await leggiLista();
@@ -226,5 +237,5 @@ async function annullaOra(id, prov = {}) {
   return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
 }
 
-module.exports = { avvia, con, corrente, registra, registraZoom, leggi, ultimi, livelloDi, annulla, collega, attesa };
+module.exports = { avvia, con, corrente, registra, registraZoom, leggi, tutti, ultimi, livelloDi, annulla, collega, attesa };
 globalThis.SN_REGISTRO_CAMBI = module.exports;
