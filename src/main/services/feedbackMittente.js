@@ -17,10 +17,13 @@ async function tokenOwner() {
 }
 
 // Il nome con cui parte: per l'owner il suo nome riservato, che senza la prova vale come utente (feedbackThread.js).
-function firma(clientId) {
+// `perConto`: scritta da Filo dopo aver letto testo di altri (#953). Porta la prova dell'owner ma resta di Filo: non
+// fidata, passa dai giudici; l'owner la segna fidata in Gestione se vuole.
+function firma(clientId, { perConto = false } = {}) {
   const c = String(clientId || '');
   const TH = globalThis.SN_FEEDBACK_THREAD;
   if (!dallOwner() || !TH || typeof TH.ownerize !== 'function') return { clientId: c, dallOwner: false };
+  if (perConto) return { clientId: c.replace(/^owner:/, ''), dallOwner: true };
   const firmato = TH.ownerize(c);
   return { clientId: firmato, dallOwner: firmato.startsWith('owner:') };
 }
