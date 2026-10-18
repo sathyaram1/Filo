@@ -11,6 +11,7 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Al centro della home adesso c\'è il filo delle tue conversazioni con Filo, di tutte le schede. Apri una scheda nuova e in fondo trovi l\'ultimo scambio, da continuare. Risalendo vedi i giorni prima, le pagine che hai visitato raccolte in una riga e i cambi fatti dalle impostazioni, con «annulla». In cima cerchi una parola nel filo senza scriverla a Filo. Filo ti scrive per primo solo quando succede qualcosa, come un timer che suona o un download finito, e aprire una scheda non consuma più crediti.',
         'Se paghi con una tua chiave OpenRouter, nelle Opzioni trovi «Con la mia chiave, usa anche i fornitori esclusi». Acceso, le richieste pagate con la tua chiave possono andare anche ai fornitori che Filo esclude, quindi funzionano anche modelli come Gemini o Grok. È spento di serie e lo accendi anche chiedendolo a Filo. Coi crediti di Filo l\'esclusione resta.',
         'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
       ],

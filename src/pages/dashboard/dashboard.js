@@ -1713,7 +1713,7 @@
   // Filo ha scritto di sua iniziativa (#869): il suo turno in fondo al filo, o al posto del suo messaggio di prima.
   function filoParla(msg) {
     if (Accoglienza.isActive()) return;
-    const voce = { key: `m:${msg.chat}:${msg.i}`, chat: msg.chat, role: 'filo', text: String(msg.testo || ''), ts: msg.ts, spontaneo: true };
+    const voce = { k: 'msg', key: `m:${msg.chat}:${msg.i}`, chat: msg.chat, role: 'filo', text: String(msg.testo || ''), ts: msg.ts, spontaneo: true };
     Coda.metti(voce);
     if (!chatId && !sending) chatId = msg.chat;
     if (msg.chat !== chatId) return;

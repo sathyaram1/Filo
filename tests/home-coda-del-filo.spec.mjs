@@ -5,9 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi } from './helpers/chatFinta.mjs';
-import { clickConfirm } from './helpers/confirm.mjs';
 import { readFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 
 const SHOTS = 'tests/.shots';
 mkdirSync(SHOTS, { recursive: true });
@@ -118,13 +116,23 @@ test('«risali» carica il pezzo prima senza far saltare la posizione, e all’i
   await expect(bolle.last()).toHaveText('domanda numero 89');
   const prima = await bolle.count();
   expect(prima).toBeLessThan(90);
-  const fermo = bolle.first();
-  const testoFermo = await fermo.textContent();
-  const yPrima = await page.locator('.dash-bubble-user', { hasText: testoFermo }).evaluate((n) => n.getBoundingClientRect().top);
-  await page.locator('.dash-risali-btn').click();
+  // Fermi poco sotto la cima, il primo messaggio a vista: il pezzo nuovo entra sopra e quello che si guarda non si sposta.
+  const testoFermo = await bolle.first().textContent();
+  const fermo = page.locator('.dash-bubble-user', { hasText: testoFermo });
+  const yPrima = await page.evaluate(() => {
+    const a = document.getElementById('bubbles');
+    a.scrollTop = 120;
+    return null;
+  }).then(() => fermo.evaluate((n) => n.getBoundingClientRect().top));
+  await page.evaluate(() => document.querySelector('.dash-risali-btn').click());
   await expect.poll(() => bolle.count()).toBeGreaterThan(prima);
-  const yDopo = await page.locator('.dash-bubble-user', { hasText: testoFermo }).evaluate((n) => n.getBoundingClientRect().top);
+  const yDopo = await fermo.evaluate((n) => n.getBoundingClientRect().top);
   expect(Math.abs(yDopo - yPrima)).toBeLessThan(3);
+  // Scorrendo fino in cima il filo continua a risalire da sé, fino all'inizio.
+  for (let i = 0; i < 5 && await page.locator('.dash-risali-btn').isEnabled(); i++) {
+    await page.evaluate(() => { document.getElementById('bubbles').scrollTop = 0; });
+    await page.waitForTimeout(400);
+  }
   await expect(page.locator('.dash-risali-btn')).toHaveText('l’inizio del filo');
   await expect(page.locator('.dash-risali-btn')).toBeDisabled();
   await expect(bolle).toHaveCount(90);
@@ -193,16 +201,20 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
     const t = s.tabs.filter((x) => String(x.url).startsWith('filo://newtab')).pop();
     await window.filoShell.tabs.activate(t.id);
   });
+  const visita = await balene.getAttribute('data-id');
   await balene.click({ button: 'right' });
   await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect(balene).toHaveCount(0);
   await expect(riga.locator('.dash-pagine-testo')).toHaveText('2 pagine, fra cui delfini');
-  const sulDisco = await app.evaluate(async () => {
+  const file = await app.evaluate(async () => {
     await globalThis.SN_IL_FILO.quandoFermo();
-    return require('node:fs').readFileSync(globalThis.SN_IL_FILO.percorso(), 'utf8');
+    return globalThis.SN_IL_FILO.percorso();
   });
-  expect(sulDisco).not.toContain(urls[1]);
+  const sulDisco = readFileSync(file, 'utf8');
+  // Via quella visita, col suo titolo; resta la visita nuova che il clic di prima ha aperto, e restano le altre pagine.
+  expect(sulDisco).not.toContain(visita);
   expect(sulDisco).toContain(urls[2]);
+  expect(await app.evaluate(async (_e, id) => (await globalThis.SN_IL_FILO.pagine()).some((p) => p.id === id), visita)).toBe(false);
   void casa;
 });
 
@@ -289,4 +301,3 @@ for (const tema of ['light', 'dark']) {
   });
 }
 
-void join; void readFileSync; void clickConfirm;

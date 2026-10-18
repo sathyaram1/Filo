@@ -1,4 +1,4 @@
-# La home è la coda del filo, e Filo parla per primo solo quando succede qualcosa
+# La home è la coda del filo
 
 [← Tutti i pattern](../PATTERNS.md)
 
