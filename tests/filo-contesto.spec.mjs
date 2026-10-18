@@ -152,7 +152,8 @@ test('una conversazione di cinque giorni fa non è davanti, ma «riprendi la dis
     { text: 'Avevamo detto che le orche sono delfini.' },
   ]);
   await scrivi(page, 'riprendi la discussione sulle orche');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'le orche sono delfini' })).toBeVisible({ timeout: 15_000 });
+  // La risposta nuova, non lo scambio di lunedì che il filo a schermo mostra già (#869).
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Avevamo detto che le orche sono delfini.' })).toBeVisible({ timeout: 15_000 });
 
   const [primo, secondo] = await chiamate(app);
   const k = posContesto(primo);
