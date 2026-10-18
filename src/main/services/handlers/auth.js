@@ -1511,13 +1511,14 @@ module.exports = function register(on, ctx) {
   // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
   // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
   // torna è l'esito VERO di quel cancello, non un "fatto" generico.
-  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente'];
+  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner'];
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
     const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
     if (!r || r.ok === false) {
-      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha saltato il controllo.' };
+      // `error` è la frase del server per l'owner; `reason` il codice, solo se la frase manca.
+      return { ok: false, error: (r && (r.error || r.detail || r.reason)) || 'Il server non ha saltato il controllo.' };
     }
     // Un esito che questo client non conosce non si traduce in «fatto»: passa
     // com'è, e la pagina lo scrive invece di inventarsi un successo.

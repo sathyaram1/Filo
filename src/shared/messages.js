@@ -723,7 +723,7 @@
     // entrato in main o se si è aperta una richiesta da approvare.
     // Stessa origine e stesso cancello delle approvazioni di fusione: solo
     // pagine `filo://`, solo il proprietario.
-    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente', requestId? } | { ok:false, error }
+    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente'|'attesa_server'|'server_al_pc'|'rimandato'|'all_owner', requestId? } | { ok:false, error }
     // Il segno di mittente pericoloso di chi ha mandato quel feedback (#922), dalla callable ownerSenderFlag.
     // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
     // Solo pagine `filo://`, solo il proprietario.

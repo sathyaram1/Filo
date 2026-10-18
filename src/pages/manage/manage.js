@@ -5410,6 +5410,11 @@
     non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
     non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
     guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
+    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
+    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
+    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
+    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
   };
 
   function pannelloSaltaAudit(fb) {
