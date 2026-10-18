@@ -104,6 +104,26 @@ test('un comando che contiene la chiusura della here-string arriva intero', { sk
   assert.equal(righe(sonda.stdout), 'unodue');
 });
 
+// Riga e testo che PowerShell mostra nell'errore: «Line | / 3 |  testo» (7) o «At line:3 char:1 / + testo» (5.1).
+function rigaErrore(stderr) {
+  const s = stderr.replace(/\r/g, '');
+  const m = s.match(/Line \|\n\s*(\d+) \|\s(.*)/) || s.match(/At line:(\d+) char:\d+\n\+\s(.*)/);
+  return m ? { riga: Number(m[1]), testo: m[2].trim() } : null;
+}
+
+test('un errore indica la riga e il testo che l\'utente ha scritto, non quelli delle sonde', { skip: salta }, () => {
+  const comando = `Write-Output uno\nWrite-Output due; ${MANCA_CORTO}\nWrite-Output tre`;
+  const { r } = assistente(comando);
+  assert.deepEqual(rigaErrore(r.stderr), { riga: 2, testo: `Write-Output due; ${MANCA_CORTO}` }, r.stderr);
+
+  const riga = `Write-Output x; ${MANCA_CORTO}`;
+  const stdin = T.PREPARA_STDIN_POWERSHELL + T.righePowerShell(riga, 'FILO_META_riga718', S.comandoPerPowerShell) + 'exit\n';
+  const d = spawnSync(POWERSHELL, ['-NoLogo', '-NoProfile', '-Command', '-'], { cwd: TMP, env: ENV, input: stdin, encoding: 'utf8', timeout: 60_000 });
+  assert.match(d.stderr, /manca-corto\.txt/);
+  const pos = rigaErrore(d.stderr);
+  if (pos) assert.deepEqual(pos, { riga: 1, testo: riga }, d.stderr);
+});
+
 test('la shell persistente incarta i comandi con la stessa regola dell\'assistente', () => {
   const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'shell.js'), 'utf8');
   assert.match(src, /wrap: \(command\) => righePowerShell\(command, `FILO_META_\$\{sid\}`, comandoPerPowerShell\)/);
