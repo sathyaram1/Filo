@@ -49,6 +49,7 @@ import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { marcatoreWorker } from './lib/dati-worker.mjs';
 
 // ─── Prezzi ($ per milione di token) ─────────────────────────────────────────
 // Fonte: skill `claude-api` (tabella modelli del 2026-06-24 e note su cache):
@@ -245,6 +246,9 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
  * sessione è partita: chi lavora in `.claude/worktrees/<nome>` li trova lì.
  */
 export function checkoutPrincipale(cwd) {
+  // Il clone di un worker ha la sua .git: la sessione è partita dalla cartella che il marcatore nomina (#1182).
+  const worker = marcatoreWorker(cwd);
+  if (worker) return resolve(worker.principale);
   try {
     const comune = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();

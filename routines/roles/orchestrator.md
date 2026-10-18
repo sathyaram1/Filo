@@ -73,8 +73,10 @@ registrato, il gancio lo rifiuta col motivo: è uno spawn fallito. Mai
 degradare: se lo spawn fallisce, chiudi.
 Se quei tipi di agente non risultano disponibili (cartella caricata solo al
 riavvio della sessione), ripiega su `general-purpose`.
-MAI worker in parallelo: due worker nella stessa cartella si pestano sui lock
-(il clone per worker c'e', `scripts/clone-worker.mjs`; l'accensione e' del #1158).
+Il worker non lavora in questa cartella: dispatch lo porta nel suo clone, che
+il preflight ha acceso, così quello che scrive non arriva alle impostazioni di
+questa sessione. MAI worker in parallelo: il clone è uno solo (gli altri li
+accende il #1158).
 
 Prompt del worker (minimo): dichiarati routine (`export FILO_ROUTINE=1`),
 lancia `node scripts/dispatch.mjs --ticket <biglietto>`, diventa il ruolo che
