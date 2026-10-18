@@ -61,9 +61,18 @@ test('risolviFeedback: numero che non esiste, id che non esiste, rete che rispon
 });
 
 test('avvisoDaCampi: dice cosa manca perché L5 si salti, e tace se non manca niente', () => {
-  const pieno = { senderProof: { stringValue: 'admin' }, localOnly: { mapValue: { fields: {} } }, statusPublic: { stringValue: 'open' } };
+  const pieno = { fiducia: { stringValue: 'fidato' }, localOnly: { mapValue: { fields: {} } }, statusPublic: { stringValue: 'open' } };
   assert.equal(avvisoDaCampi(pieno), '');
-  assert.match(avvisoDaCampi({ ...pieno, senderProof: undefined }), /prova del mittente/);
+  // #1148: con la fiducia scritta conta lei, non la prova del mittente; ignota vale non fidato.
+  for (const fiducia of [{ stringValue: 'non_fidato' }, { stringValue: 'FIDATO' }, { stringValue: '' }]) {
+    assert.match(avvisoDaCampi({ ...pieno, fiducia, senderProof: { stringValue: 'admin' } }), /manca la fiducia .*Segna fidato/);
+  }
+  // Campo non ancora scritto dalla migrazione: la regola di prima, mittente provato o sì dell'owner (decisione dell'11/10).
+  for (const fiducia of [undefined, { nullValue: null }]) {
+    assert.equal(avvisoDaCampi({ ...pieno, fiducia, senderProof: { stringValue: 'admin' } }), '');
+    assert.equal(avvisoDaCampi({ ...pieno, fiducia, localApproval: { mapValue: {} } }), '');
+    assert.match(avvisoDaCampi({ ...pieno, fiducia }), /prova del mittente/);
+  }
   assert.match(avvisoDaCampi({ ...pieno, localOnly: undefined }), /solo in locale/);
   assert.match(avvisoDaCampi({ ...pieno, statusPublic: { stringValue: 'closed' } }), /chiusa/);
   // Chiusa dalla parte del server dello stesso lavoro da poco: per l'app vale ancora, e si dice fino a quando (#915).

@@ -19,7 +19,7 @@
 // La lista (normalmente da Firestore via rete) è stubbata nel main così il
 // test è deterministico e offline.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 
 const CLIENT_ID = 'test-client-c5';
 
@@ -66,13 +66,22 @@ function balanceOf(app) {
   return app.evaluate(async () => (await globalThis.SN_CREDITS.getPublic()).balance);
 }
 
-test('feedback risolto: popup di ringraziamento + ricompensa', async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
-  // esaurisca PRIMA di seminare, così è il reload — l'unica esecuzione con il
-  // clientId impostato — ad accreditare la ricompensa e mostrare il popup.
-  await page.waitForTimeout(500);
+// La home ha avuto la risposta sulle ricompense dell'avvio: finché non si ricarica non ne chiede altre.
+async function risposta(page) {
+  await page.waitForFunction(() => window.__filoDashActions && window.__filoDashActions.ricompenseAvvio, null, { timeout: 0 });
+  await page.evaluate(() => window.__filoDashActions.ricompenseAvvio());
+}
+
+// Si semina solo a home quieta, e la home è una sola: quella dell'avvio. Con una seconda (openTab) erano due a
+// chiedere le ricompense, e la domanda ancora in volo si prendeva il premio seminato per l'altra (#1212).
+async function laHome(app) {
+  const page = await aspettaFinestra(app, (w) => w.url().startsWith('filo://newtab'), 'la home dell\'avvio non è nata');
+  await risposta(page);
+  return page;
+}
+
+test('feedback risolto: popup di ringraziamento + ricompensa', async ({ app }) => {
+  const page = await laHome(app);
 
   await seed(app, [
     {
@@ -82,7 +91,7 @@ test('feedback risolto: popup di ringraziamento + ricompensa', async ({ app, ope
     },
   ]);
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
+  await risposta(page);
 
   const overlay = page.locator('#thanksOverlay');
   await expect(overlay).toBeVisible();
@@ -98,15 +107,13 @@ test('feedback risolto: popup di ringraziamento + ricompensa', async ({ app, ope
   await expect.poll(() => balanceOf(app)).toBe(1050);
 });
 
-test('la ricompensa segue quanto contava la segnalazione, non la fascia minima', async ({ app, openTab }) => {
+test('la ricompensa segue quanto contava la segnalazione, non la fascia minima', async ({ app }) => {
   // Una segnalazione che l'owner aveva messo in cima vale 300 crediti, non 50.
   // La sua macchina la priorità non la vede (è cifrata, e la scheda pubblica
   // non la porta): la cifra gliela dice la scheda. Senza quel campo il popup
   // annuncia 50 a tutti, in silenzio, e non si rimedia dopo — un feedback
   // premiato resta premiato (#583, giro 2 di verifica).
-  const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(500);
+  const page = await laHome(app);
 
   // La cifra non è scritta a mano: è quella che il publisher mette sulla scheda
   // di un feedback di priorità 3, cioè la stessa tabella del portafoglio.
@@ -121,20 +128,15 @@ test('la ricompensa segue quanto contava la segnalazione, non la fascia minima',
     },
   ]);
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
+  await risposta(page);
 
   await expect(page.locator('#thanksOverlay')).toBeVisible();
   await expect(page.locator('.dash-thanks-total')).toContainText(`+${attesa}`);
   await expect.poll(() => balanceOf(app)).toBe(1000 + attesa);
 });
 
-test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
-  // esaurisca PRIMA di seminare, così è il reload — l'unica esecuzione con il
-  // clientId impostato — ad accreditare la ricompensa e mostrare il popup.
-  await page.waitForTimeout(500);
+test('aggrega più feedback risolti e somma la ricompensa', async ({ app }) => {
+  const page = await laHome(app);
 
   await seed(app, [
     { _id: 'fb1', mia: true, status: 'done', statusPublic: 'closed', name: 'Uno', seq: 1, subSeq: 0, userNote: 'Sistemato uno.' },
@@ -146,7 +148,7 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
     { _id: 'fb4', clientIdTag: 'b'.repeat(32), status: 'done', statusPublic: 'closed', name: 'Quattro', seq: 4, subSeq: 0, userNote: '' },
   ]);
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
+  await risposta(page);
 
   await expect(page.locator('#thanksOverlay')).toBeVisible();
   // Solo i due feedback done DI QUESTO utente.
@@ -155,8 +157,11 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   await expect(page.locator('.dash-thanks-total')).toContainText('+100');
   await expect.poll(() => balanceOf(app)).toBe(1100);
   // Il titolo su due righe spinge il totale in basso a destra: la X di
-  // chiusura non gli finisce sopra (#816).
-  await page.waitForTimeout(300);
+  // chiusura non gli finisce sopra (#816). Si misura a riquadro fermo: entra animato.
+  await page.locator('#thanksOverlay').evaluate(async (el) => {
+    await document.fonts.ready;
+    await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished));
+  });
   const totale = await page.locator('.dash-thanks-total').boundingBox();
   const x = await page.locator('.dash-recap-x').boundingBox();
   expect(x.x, `X ${JSON.stringify(x)} sopra il totale ${JSON.stringify(totale)}`).toBeGreaterThanOrEqual(totale.x + totale.width);
@@ -169,10 +174,8 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
 // ordinata per data quell'ordine glielo dava il database. La scena qui sotto
 // mette i due ordini uno contro l'altro: l'identificativo dice «prima la
 // vecchia», la data dice «prima la recente» (#583, giro 7).
-test('con due fix insieme l\'annuncio parte dal più recente, non dal primo identificativo', async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(500);
+test('con due fix insieme l\'annuncio parte dal più recente, non dal primo identificativo', async ({ app }) => {
+  const page = await laHome(app);
 
   await seed(app, [
     {
@@ -187,7 +190,7 @@ test('con due fix insieme l\'annuncio parte dal più recente, non dal primo iden
     },
   ]);
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
+  await risposta(page);
 
   await expect(page.locator('#thanksOverlay')).toBeVisible();
   const titoli = page.locator('.dash-thanks-item-title');
@@ -196,7 +199,7 @@ test('con due fix insieme l\'annuncio parte dal più recente, non dal primo iden
   await expect(titoli.nth(1)).toContainText('Vecchia');
 });
 
-test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'ha mandato', async ({ app, openTab }) => {
+test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'ha mandato', async ({ app }) => {
   // Il feedback dell'attaccante, visto DALLA SUA macchina: lo status fine è
   // cifrato (non ha la chiave), quindi l'unica cosa leggibile è l'enum
   // grossolano — che qui prendiamo dalla mappa vera invece di scriverlo a mano.
@@ -206,9 +209,7 @@ test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'h
   const publicOf = (fine) => app.evaluate((_e, s) => globalThis.SN_FB_STATUS.PUBLIC_MAP[s], fine);
   const statusPublic = await publicOf('attack_confirmed');
 
-  const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(500);
+  const page = await laHome(app);
 
   // (Oggi una scheda così non verrebbe nemmeno pubblicata — #583: la vista
   // esclude tutto ciò che è passato dalle mani della sicurezza. Qui la si
@@ -222,26 +223,20 @@ test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'h
     },
   ]);
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(600);
+  await risposta(page);
 
   await expect(page.locator('#thanksOverlay')).toHaveCount(0);
   expect(await balanceOf(app)).toBe(1000); // saldo fresco, nessun accredito
 });
 
-test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  // Lascia che l'init iniziale (clientId ancora assente → nessun premio) si
-  // esaurisca PRIMA di seminare, così è il reload — l'unica esecuzione con il
-  // clientId impostato — ad accreditare la ricompensa e mostrare il popup.
-  await page.waitForTimeout(500);
+test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async ({ app }) => {
+  const page = await laHome(app);
 
   await seed(app, [
     { _id: 'fbZ', mia: true, status: 'done', statusPublic: 'closed', name: 'Una cosa', seq: 7, subSeq: 0, userNote: 'Fatto.' },
   ]);
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
+  await risposta(page);
 
   await expect(page.locator('#thanksOverlay')).toBeVisible();
   await expect.poll(() => balanceOf(app)).toBe(1050); // 1000 + 50 (ricompensa di base)
@@ -251,13 +246,12 @@ test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async
 
   // Riapertura: il feedback è già stato premiato → niente popup, saldo invariato.
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(400);
+  await risposta(page);
   await expect(page.locator('#thanksOverlay')).toHaveCount(0);
   expect(await balanceOf(app)).toBe(1050);
 });
 
-test('una segnalazione VECCHIA risolta oggi paga chi l\'ha mandata come una recente', async ({ app, openTab }) => {
+test('una segnalazione VECCHIA risolta oggi paga chi l\'ha mandata come una recente', async ({ app }) => {
   // #583, giri 3, 4 e 5 di verifica: lo stesso danno rientrato da tre porte.
   // Il popup non chiedeva la propria scheda per nome: ne chiedeva una PAGINA,
   // le più recenti per DATA D'INVIO. Una segnalazione vecchia ha una data
@@ -270,9 +264,7 @@ test('una segnalazione VECCHIA risolta oggi paga chi l\'ha mandata come una rece
   // Qui la sorgente si comporta come Firestore: senza cursore torna la pagina
   // per data d'invio, col cursore riparte dal nome del documento. La scheda di
   // questa installazione è messa apposta OLTRE la prima pagina.
-  const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(500);
+  const page = await laHome(app);
 
   await app.evaluate(async (_electron, { clientId }) => {
     await globalThis.chrome.storage.local.set({ sn_feedback_client_id: clientId });
@@ -330,7 +322,7 @@ test('una segnalazione VECCHIA risolta oggi paga chi l\'ha mandata come una rece
   expect(await app.evaluate(() => globalThis.__fuoriPagina)).toBe(true);
 
   await page.reload();
-  await page.waitForLoadState('domcontentloaded');
+  await risposta(page);
 
   await expect(page.locator('#thanksOverlay')).toBeVisible();
   await expect(page.locator('.dash-thanks-item')).toHaveCount(1);

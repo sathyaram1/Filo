@@ -172,3 +172,31 @@ l'utente **perde del tutto** quelle azioni, senza alternative (#400).
   `tests/context-menu-image-link.spec.mjs`,
   `tests/context-menu-media-link.spec.mjs`,
   `tests/context-menu-video-preview-link.spec.mjs`.
+
+## Il menu che il sito si disegna da sé (#975)
+
+Rimpiazzare il menu nativo copre anche quello che il sito disegna da sé (Google
+Docs, Figma): il sito non vede il tasto destro che apre Filo, quindi il suo menu
+diventa una voce in cima, «Menu di <sito>», e su richiesta il primo posto (allora
+quello di Filo sta a Shift).
+
+- **Chi ascolta il tasto destro non si scopre dandoglielo.** Darlo alla pagina per
+  vedere se lo annulla aprirebbe il suo menu insieme a quello di Filo. Lo dice una
+  sonda nel mondo della pagina, messa prima dei suoi script: segna chi si iscrive
+  a `contextmenu` (con una sostituta di `addEventListener` che a chi la ispeziona
+  sembra nativa, come nella guardia anti-fingerprint) e risponde a un evento dal
+  nome segreto lanciato sul nodo cliccato.
+- **Chi ascolta tutto non è un menu.** La radice di React si iscrive a ogni
+  evento: conta solo con un `onContextMenu` sul cammino. Lo stesso ascoltatore su
+  finestra o documento per otto o più tipi di evento è un registratore di sessione,
+  o gli strumenti di Playwright, che appena una prova legge la pagina se ne mettono
+  uno per dodici eventi: senza questa regola ogni pagina di prova avrebbe la voce.
+- **Il clic si rigioca solo quando l'utente sceglie la voce**, dopo il clic sulla
+  voce e non dentro (il clic che risale al documento chiuderebbe il menu appena
+  aperto). Il sito annulla e un menu compare vicino al cursore: è suo. Non lo
+  annulla, o lo annulla e basta (i siti che bloccano il tasto destro): compare il
+  menu del browser, come con Shift, e chi ascoltava lì non conta più.
+- **Dove:** `src/preload/menu-del-sito.js`, il ponte in `src/preload/page-preload.js`,
+  la voce in `src/content/content.js` (`statoMenuDelSito`, `conMenuDelSito`), la
+  scelta per sito in `menuDelSito.siti` (`src/main/services/menuDelSito.js`).
+  Test: `tests/unit/menuDelSito.test.mjs`, `tests/menu-del-sito.spec.mjs`.

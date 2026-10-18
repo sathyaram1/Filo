@@ -100,6 +100,43 @@ module.exports = function register(on, ctx) {
 
   const Indice = require('../documentiIndice');
   on(MSG.DOCUMENTI_STATO, soloFilo(async () => ({ ok: true, ...(await Indice.stato()) })));
+  on(MSG.DOCUMENTI_DIMENTICA, soloFilo(async (msg) => {
+    const p = msg && typeof msg.percorso === 'string' ? msg.percorso : '';
+    return { ok: true, ...(await Indice.dimentica(p)) };
+  }));
+
+  // #947.3 — l'Aiuto di una scheda: aperti ai siti, perché l'Aiuto vive nella pagina. Il sì e le chiavi li tiene
+  // aiutoDocumenti; qui solo la porta: una scheda, e dal suo documento principale (un riquadro è un altro sito).
+  const AiutoDoc = require('../aiutoDocumenti');
+  const daScheda = (fn) => async (msg, sender) => {
+    const wc = sender && sender.wc;
+    const frame = sender && sender.frame;
+    let principale = false;
+    try { principale = !!wc && !wc.isDestroyed() && (!frame || !frame.parent); } catch (_) { principale = false; }
+    if (!principale) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    return fn(msg || {}, sender, wc);
+  };
+  on(MSG.AIUTO_CERCA_DOCUMENTI, daScheda(async (msg, sender, wc) => {
+    const origine = String(sender.tab?.url || sender.url || '');
+    const r = await AiutoDoc.cerca(wc, {
+      cosa: msg.cosa,
+      cartella: msg.cartella,
+      origine,
+      avanzamento: (fatti, totali) => {
+        try { (sender.frame || wc).send('filo:broadcast', { type: MSG.AIUTO_DOCUMENTI_AVANZAMENTO, fatti, totali }); } catch (_) {}
+      },
+    });
+    if (r.ok) {
+      // Quello che il modello vede dei documenti sporca il compito come un documento letto in chat (#530).
+      const scaricato = r.candidati.some((c) => ctx.fileScaricato(AiutoDoc.percorsoDi(wc, c.chiave)));
+      try { ctx.segnaLetturaAiuto(sender, { type: 'CERCA_DOCUMENTI', cosa: r.cercato, _output: { cercato: r.cercato, risultati: r.candidati, scaricato } }); } catch (_) {}
+    }
+    return r;
+  }));
+  on(MSG.AIUTO_DOCUMENTI_FERMA, daScheda(async (_msg, _sender, wc) => ({ ok: AiutoDoc.ferma(wc) })));
+  on(MSG.AIUTO_APRI_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.apri(wc, msg.chiave)));
+  on(MSG.AIUTO_MOSTRA_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.mostra(wc, msg.chiave)));
+  on(MSG.AIUTO_TRASCINA_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.trascina(wc, msg.chiave)));
   on(MSG.DOCUMENTI_SCEGLI_CARTELLA, soloFilo(async (msg, sender) => {
     const { dialog, BrowserWindow } = electron();
     const win = (sender && sender.win) || BrowserWindow.getFocusedWindow() || undefined;

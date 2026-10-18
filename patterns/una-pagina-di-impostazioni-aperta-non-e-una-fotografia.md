@@ -64,12 +64,18 @@ diciannove manopole, l'ha ripetuta su tutte.
   peggiore: il volume della suoneria appena trascinato a zero teneva il fuoco,
   il volume rialzato a parole non compariva sulla manopola, e il primo altro
   tocco lo rimandava a zero. Timer di nuovo muto, cioè la segnalazione.
+- **Ridisegnare tutta la griglia dei modelli per azione.** Porta via quello che
+  la pagina sta dicendo in un'altra funzione, come il perché di un modello
+  appena respinto (#667.7); e confrontando l'oggetto intero la ridisegnava
+  anche al ritorno del proprio salvataggio. Si riscrive solo la catena che è
+  cambiata, e si salta solo quella in cui si sta scrivendo.
 
 ## Dove sta
 
 `src/shared/pageBootstrap.js` (`staUsandoAdesso`, la regola condivisa), il
-`salta` di `riallineaPagina` in `src/pages/options/options.js` (che ridisegna
-anche la griglia dei modelli per azione) e, per il box in chat,
+`salta` di `riallineaPagina` in `src/pages/options/options.js` (che riscrive
+anche le catene dei modelli per azione cambiate, con `imposta` di
+`src/shared/modelChainEditor.js`) e, per il box in chat,
 `src/shared/aestheticRefiner.js` con `src/pages/dashboard/dashboard-attivita.js`.
 Sentinella: `tests/unit/paginaImpostazioniViva.test.mjs`. Le prove dal punto
 di vista dell'utente sono `tests/preferences-pagina-viva.spec.mjs`,

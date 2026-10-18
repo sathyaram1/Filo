@@ -67,12 +67,14 @@ test('pagina Sicurezza: controlli personali default ON e persistenti; nessun cam
   await expect(page.locator('#sec-safebrowse-llm')).toBeChecked();
   await expect(page.locator('#sec-safebrowse-sandbox')).toBeChecked();
 
-  // La chiave NON è più un campo per-utente: il vecchio input è sparito e al suo
-  // posto c'è la nota che dice che è gestita centralmente in "Modelli predefiniti".
+  // La chiave NON è un campo per-utente: arriva col programma e vale anche senza accesso (#815).
   await expect(page.locator('#sec-safebrowse-key')).toHaveCount(0);
   const note = page.locator('#sec-safebrowse-key-managed');
   await expect(note).toBeVisible();
-  await expect(note).toContainText('Modelli predefiniti');
+  await expect(note).toContainText('anche senza aver fatto l\'accesso');
+  await expect(note).not.toContainText('amministratore');
+  await expect(page.locator('#sec-safebrowse-desc')).toContainText('«confermo»');
+  await expect(page.locator('#sec-safebrowse-desc')).not.toContainText('ignorare');
 
   // I toggle personali restano e si persistono: spegni il giudizio AI, ricarica.
   await page.locator('#sec-safebrowse-llm').uncheck();
@@ -964,12 +966,14 @@ test('la pagina in lista apre da sola una finestrella di accesso del suo sito: d
   expect(await accesso.evaluate(() => ({ k: window.__k, pw: document.getElementById('pw').value }))).toEqual({ k: '', pw: '' });
 });
 
+// La finestrella di accesso la apre solo il clic dell'utente (#1066), anche col blocco dei popup spento.
+const BOTTONE_ACCESSO = (js) => `<button id="accedi" style="width:200px;height:60px" onclick='${js}'>Accedi con…</button>`;
+
 test('una finestrella di accesso che apre un sito in lista torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
-  await senzaBloccoPopup(app);
   const h = 'conto-in-finestrella.com';
   await serviInCaricamento(app, {
-    'pagina-con-accesso.it/': '<title>Negozio</title><script>setTimeout(function(){'
-      + `window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")},1000)</script>`,
+    'pagina-con-accesso.it/': '<title>Negozio</title>'
+      + BOTTONE_ACCESSO(`window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")`),
     [h + '/oauth/authorize']: BLOB_MODULO,
   });
   await app.evaluate((_e, host) => {
@@ -978,7 +982,7 @@ test('una finestrella di accesso che apre un sito in lista torna in una scheda, 
       rdap: null, ct: null, sandbox: null, llm: async () => ({ suspicious: false, reason: null }),
     });
   }, h);
-  await apriSenzaAspettare(app, shell, 'https://pagina-con-accesso.it/');
+  await (await apriSenzaAspettare(app, shell, 'https://pagina-con-accesso.it/')).click('#accedi');
   const avviso = await vistaAvviso(app, 12_000);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => urlAttiva(app)).toContain(`${h}/oauth/authorize`);
@@ -997,17 +1001,17 @@ async function gsbInRitardo(app, host, ms) {
 }
 
 test('finestrella aperta prima del verdetto e poi riscritta dal sito in lista in una pagina vuota: torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
-  await senzaBloccoPopup(app);
   const h = 'conto-vuota.com';
   const idp = 'accesso-esempio.org';
   await serviInCaricamento(app, {
     [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F=' + JSON.stringify(BLOB_MODULO).replace(/<\//g, '<\\/')
-      + `;if(!localStorage.aperta){localStorage.aperta=1;var p=window.open("https://${idp}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600");`
-      + 'setTimeout(function(){p.location="about:blank";setTimeout(function(){p.document.open();p.document.write(F);p.document.close()},700)},3000)}</script>',
+      + ';function accedi(){var p=window.open("https://' + idp + '/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600");'
+      + 'setTimeout(function(){p.location="about:blank";setTimeout(function(){p.document.open();p.document.write(F);p.document.close()},700)},3000)}</script>'
+      + BOTTONE_ACCESSO('accedi()'),
     [idp + '/oauth/authorize']: '<title>Accedi con</title><p>Accesso</p>',
   });
-  await gsbInRitardo(app, h, 800);
-  await apriSenzaAspettare(app, shell, `https://${h}/login`);
+  await gsbInRitardo(app, h, 2500);
+  await (await apriSenzaAspettare(app, shell, `https://${h}/login`)).click('#accedi');
   await expect.poll(() => finestreFuoriDaFilo(app), { timeout: 8_000 }).toEqual([expect.stringContaining(idp)]);
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
@@ -1020,15 +1024,15 @@ test('finestrella aperta prima del verdetto e poi riscritta dal sito in lista in
 });
 
 test('finestrella del sito in lista che cambia indirizzo sul posto prima del verdetto: torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
-  await senzaBloccoPopup(app);
   const h = 'conto-sposta.com';
   await serviInCaricamento(app, {
-    [h + '/login']: `<title>Attendere</title><p>Caricamento…</p><script>if(!localStorage.aperta){localStorage.aperta=1;window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")}</script>`,
+    [h + '/login']: '<title>Attendere</title><p>Caricamento…</p>'
+      + BOTTONE_ACCESSO(`window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")`),
     [h + '/oauth/authorize']: BLOB_MODULO + '<script>var i=0;setInterval(function(){history.replaceState(null,"",'
       + 'location.pathname+"?client_id=1&redirect_uri=x&t="+(++i))},150)</script>',
   });
-  await gsbInRitardo(app, h, 1500);
-  await apriSenzaAspettare(app, shell, `https://${h}/login`);
+  await gsbInRitardo(app, h, 2500);
+  await (await apriSenzaAspettare(app, shell, `https://${h}/login`)).click('#accedi');
   const avviso = await vistaAvviso(app, 12_000);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => finestreFuoriDaFilo(app), { timeout: 8_000 }).toEqual([]);

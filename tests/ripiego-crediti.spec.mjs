@@ -85,9 +85,19 @@ test.beforeAll(async () => {
         // (la home si rigenera con la conversazione dentro), e quelle non sono
         // il turno di chat.
         const msgs = Array.isArray(body.messages) ? body.messages : [];
+        // Il saluto della home non arriva, come a rete giù: non è una chiamata di queste prove, e non deve né
+        // pagare coi crediti né far ricordare o dimenticare un rifiuto della chiave propria.
+        if (JSON.stringify(msgs).includes('preparare la dashboard')) { req.socket.destroy(); return; }
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
+        // In streaming OpenRouter apre subito la risposta e la tiene viva con dei commenti finché il modello non
+        // scrive: il ritardo sta nel corpo, a ripiego già avvenuto. Senza streaming la risposta arriva tutta alla fine.
+        const aperta = body.stream === true && status === 200;
+        if (aperta) {
+          res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          res.write(': OPENROUTER PROCESSING\n\n');
+        }
         if (personalDelayMs && bearer === PERSONAL_KEY) await new Promise((r) => setTimeout(r, personalDelayMs));
         // Il 403 è quello della moderazione, come lo scrive OpenRouter: non è la chiave.
         if (status === 403) return json(res, 403, { error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } });
@@ -97,7 +107,6 @@ test.beforeAll(async () => {
         if (body.stream !== true) {
           return json(res, 200, { id: 'gen-1', provider: 'Fake', choices: [{ message: { content: `Ciao: ${who}.` }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.00021 } });
         }
-        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         res.write(`data: ${JSON.stringify({ id: 'gen-1', provider: 'Fake', choices: [{ delta: { content: `Ciao: ${who}.` } }] })}\n\n`);
         res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.00021 } })}\n\n`);
         res.write('data: [DONE]\n\n');
@@ -172,7 +181,6 @@ async function prepare(app, { ownKey = OWN_KEY } = {}) {
   await redirectHosts(app);
   await app.evaluate(async (_, k) => {
     const C = globalThis.SN_CONST;
-    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: k },
@@ -973,21 +981,27 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
     await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 10_000 }).toContain(PERSONAL_KEY);
   };
 
-  // Selezionata col mouse, come fa l'utente: la spiegazione anticipata parte solo dietro un gesto vero (#1070), ed è
-  // lei la risposta pagata che nessuno legge; il riquadro chiuso prima della sua risposta ferma la sua chiamata.
+  // «spiega» chiuso mentre la risposta pagata arriva: OpenRouter ha già aperto lo stream con la chiave personale, il
+  // riquadro chiuso ferma la sua chiamata, e l'avviso deve venire da lei. Selezione da script, senza gesto: nessuna
+  // spiegazione anticipata (#1070) che lo dica al posto suo (#1071.4).
   let prima = seen.completions.length;
-  await selezionaColMouse(page, '#t');
-  await expect.poll(() => seen.completions.slice(prima).some((c) => c.lastText.includes('ha selezionato un testo')),
-    { timeout: 10_000 }).toBe(true);
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup'))?.visibile, { timeout: 10000 }).toBe(true);
   await allaPersonale(prima);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('walletOwnKeyRefusal', null))?.usedCredits === true),
+    { timeout: 10_000 }).toBe(true);
   await clicca(app, page, '.sn-popup .sn-popup-close');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+  expect(seen.completions.slice(prima).filter((c) => c.lastText.includes('ha selezionato un testo'))).toEqual([]);
 
   // Il riquadro di modifica, chiuso con Esc prima della proposta. L'avviso sopra ha già parlato:
   // si riparte da una chiave nuova, come chi la cambia, per sentirlo di nuovo.

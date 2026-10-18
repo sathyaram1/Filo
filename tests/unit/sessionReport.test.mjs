@@ -6,6 +6,7 @@
 // `usage` ripetuta — si conta una volta; una riga può non essere JSON — si
 // salta e si annota.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, utimesSync } from 'node:fs';
@@ -15,7 +16,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const {
   analizzaRighe, generaRapporto, trovaTranscript, slugProgetto, chiaveSicura,
-  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente, finestraOrchestratore, eRilascio,
+  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente, finestraOrchestratore, eRilascio, valutaUso,
 } = await import('../../scripts/session-report.mjs');
 
 const T = (s) => `2026-09-16T10:${s}.000Z`;
@@ -141,7 +142,9 @@ test('una versione che il listino non conosce per nome lascia la nota, col costo
   const letture = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 1000000, output_tokens: 0 };
   for (const [model, tariffa, costo] of [
     ['claude-opus-6', 'Opus 5', 0.5], ['claude-opus-5-6', 'Opus 5', 0.5], ['claude-opus-4-1', 'Opus 5', 0.5],
-    ['claude-sonnet-6', 'Sonnet 5', 0.2], ['claude-haiku-5', 'Haiku 4.5', 0.1], ['claude-fable-6', 'Fable 5.1', 0.25],
+    ['claude-sonnet-6', 'Sonnet 5', 0.2], ['claude-fable-6', 'Fable 5.1', 0.25],
+    // Una Haiku di quinta generazione o dopo: listino di 5.5, e il milione di token letti passa la soglia.
+    ['claude-haiku-5', 'Haiku 5.5', 0.05], ['claude-haiku-5-6', 'Haiku 5.5', 0.05], ['claude-haiku-6', 'Haiku 5.5', 0.05],
   ]) {
     const rep = await analizzaRighe([assistant('n', model, letture, [], T('00:00'))]);
     assert.equal(rep.costUsd, costo, model);
@@ -151,7 +154,136 @@ test('una versione che il listino non conosce per nome lascia la nota, col costo
     'claude-opus-5-5', 'claude-opus-5-5[1m]', 'us.anthropic.claude-opus-5-5-v1:0', 'claude-opus-5', 'claude-opus-4-8',
     'claude-opus-4-5-20251101', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-20250514', 'claude-haiku-4-5',
     'claude-fable-5', 'claude-fable-5-1', 'claude-mythos-5-1',
+    'claude-haiku-5-5', 'claude-haiku-5-5[1m]', 'us.anthropic.claude-haiku-5-5-v1:0', 'claude-sonnet-5-5', 'claude-sonnet-5-5[1m]',
   ]) assert.equal(famigliaPrezzo(model).known, true, model);
+});
+
+// #883: un turno veloce contato a tariffa normale faceva dire al rapporto la metà del costo vero.
+const UN_MILIONE = (speed) => ({
+  input_tokens: 1e6, cache_creation_input_tokens: 2e6,
+  cache_creation: { ephemeral_5m_input_tokens: 1e6, ephemeral_1h_input_tokens: 1e6 },
+  cache_read_input_tokens: 1e6, output_tokens: 1e6, ...(speed === undefined ? {} : { speed }),
+});
+
+test('un turno in modalità veloce costa la sua tariffa: il doppio su Opus 5.5, Opus 5 e Opus 4.8, senza nota', async () => {
+  for (const [model, normale] of [['claude-opus-5-5', 37.2], ['claude-opus-5-5[1m]', 37.2], ['claude-opus-5', 46.75], ['claude-opus-4-8', 46.75]]) {
+    const veloce = await analizzaRighe([assistant('v', model, UN_MILIONE('fast'), [], T('00:00'))]);
+    assert.equal(veloce.costUsd, normale * 2, model);
+    assert.deepEqual(veloce.notes, [], model);
+    for (const speed of ['standard', undefined]) {
+      const rep = await analizzaRighe([assistant('n', model, UN_MILIONE(speed), [], T('00:00'))]);
+      assert.equal(rep.costUsd, normale, `${model} ${speed}`);
+      assert.deepEqual(rep.notes, [], `${model} ${speed}`);
+    }
+  }
+  const misto = await analizzaRighe([
+    assistant('a', 'claude-opus-5-5', UN_MILIONE('standard'), [], T('00:00')),
+    assistant('b', 'claude-opus-5-5', UN_MILIONE('fast'), [], T('00:01')),
+  ]);
+  assert.equal(misto.costUsd, 111.6, 'in una sessione mista raddoppia solo il turno veloce');
+  assert.match(riassunto(misto)[3], /costo stimato: \$111\.6000/);
+});
+
+test('modalità veloce che il listino non conosce per quel modello: il doppio, e la nota come per un modello sconosciuto', async () => {
+  for (const [model, tariffa, normale] of [
+    ['claude-opus-4-7', 'Opus 5', 46.75], ['claude-sonnet-5-5', 'Sonnet 5', 18.7], ['claude-haiku-4-5', 'Haiku 4.5', 9.35],
+    ['claude-fable-5-1', 'Fable 5.1', 92.75], ['claude-opus-6', 'Opus 5', 46.75],
+  ]) {
+    const rep = await analizzaRighe([
+      assistant('v', model, UN_MILIONE('fast'), [], T('00:00')),
+      assistant('w', model, UN_MILIONE('fast'), [], T('00:01')),
+    ]);
+    assert.equal(rep.costUsd, normale * 4, model);
+    assert.ok(rep.notes.includes(`velocità «fast» non a listino per «${model}»: 2 turni calcolati a 2× la tariffa ${tariffa}`), `${model}: ${JSON.stringify(rep.notes)}`);
+  }
+  const ignota = await analizzaRighe([assistant('t', 'claude-opus-5-5', UN_MILIONE('Turbo'), [], T('00:00'))]);
+  assert.equal(ignota.costUsd, 37.2, 'una velocità che il listino non ha affatto resta a tariffa normale');
+  assert.deepEqual(ignota.notes, ['velocità «turbo» non a listino per «claude-opus-5-5»: 1 turno calcolato a tariffa Opus 5.5']);
+  assert.match(riassunto(ignota)[4], /note: velocità «turbo»/);
+  assert.equal(valutaUso(UN_MILIONE(42), 'claude-opus-5-5').costo, 37.2, 'un campo che non è testo non è una velocità');
+});
+
+// L'orchestratore delle routine gira su Haiku 5.5: prezzato come Haiku 4.5, il suo costo usciva dieci volte tanto.
+test('Haiku 5.5 e Sonnet 5.5 si riconoscono per nome, ognuno col suo listino e senza nota', async () => {
+  for (const [model, key] of [
+    ['claude-haiku-5-5', 'haiku-5-5'], ['claude-haiku-5-5-20261001', 'haiku-5-5'], ['anthropic.claude-haiku-5-5', 'haiku-5-5'],
+    ['claude-haiku-4-5', 'haiku'], ['claude-haiku-4-5-20251001', 'haiku'], ['claude-3-5-haiku-20241022', 'haiku'],
+    ['claude-sonnet-5-5', 'sonnet'], ['claude-sonnet-5', 'sonnet'], ['claude-sonnet-4-6', 'sonnet-4'],
+  ]) assert.equal(famigliaPrezzo(model).key, key, model);
+  const u = { input_tokens: 1000000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 };
+  const sonnet = await analizzaRighe([assistant('s', 'claude-sonnet-5-5', { ...u, input_tokens: 0, cache_read_input_tokens: 1000000, output_tokens: 1000000 }, [], T('00:00'))]);
+  assert.equal(sonnet.costUsd, 10.2, 'Sonnet 5.5: lettura 0,20 e output 10 $/M, nessuna soglia');
+  assert.deepEqual(sonnet.notes, []);
+  assert.deepEqual(sonnet.oltreSoglia, {});
+  const haiku = await analizzaRighe([assistant('h', 'claude-haiku-5-5', { ...u, input_tokens: 90000, output_tokens: 10000 }, [], T('00:00'))]);
+  assert.equal(haiku.costUsd, 0.014, 'Haiku 5.5 sotto soglia: 90.000 × 0,10 + 10.000 × 0,50');
+  assert.deepEqual(haiku.notes, [], 'un modello conosciuto non porta la nota della tariffa di ripiego');
+});
+
+test('Haiku 5.5: sotto i 100.000 token di prompt il listino basso, sopra TUTTA la richiesta a cinque volte, cache compresa', () => {
+  const vicino = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-12, `${msg}: ${a} invece di ${b}`);
+  const uso = (input, cw5m, cw1h, cr, out) => ({
+    input_tokens: input, cache_read_input_tokens: cr, output_tokens: out, cache_creation_input_tokens: cw5m + cw1h,
+    cache_creation: { ephemeral_5m_input_tokens: cw5m, ephemeral_1h_input_tokens: cw1h },
+  });
+  const H55 = 'claude-haiku-5-5';
+  // Sotto soglia, con cache: 1000·0,10 + 20.000·0,125 + 10.000·0,20 + 60.000·0,01 + 2000·0,50 = 6200
+  let v = valutaUso(uso(1000, 20000, 10000, 60000, 2000), H55);
+  vicino(v.costo, 6200 / 1e6, 'sotto soglia con cache');
+  assert.equal(v.oltreSoglia, false);
+  // Esattamente 100.000: ancora il listino basso. Uno in più, e cambia tutto.
+  v = valutaUso(uso(0, 0, 0, 100000, 0), H55);
+  vicino(v.costo, 100000 * 0.01 / 1e6, 'a 100.000 tondi');
+  assert.equal(v.oltreSoglia, false);
+  v = valutaUso(uso(1, 0, 0, 100000, 0), H55);
+  vicino(v.costo, (1 * 0.5 + 100000 * 0.05) / 1e6, 'a 100.001');
+  assert.equal(v.oltreSoglia, true);
+  // Sopra soglia senza cache: 120.000·0,50 + 1000·2,50
+  v = valutaUso(uso(120000, 0, 0, 0, 1000), H55);
+  vicino(v.costo, 62500 / 1e6, 'sopra soglia senza cache');
+  // Sopra soglia con cache: 5000·0,50 + 30.000·0,625 + 20.000·1 + 150.000·0,05 + 4000·2,50 = 58.750
+  v = valutaUso(uso(5000, 30000, 20000, 150000, 4000), H55);
+  vicino(v.costo, 58750 / 1e6, 'sopra soglia con cache');
+  assert.equal(v.oltreSoglia, true);
+  // La soglia somma le tre voci del prompt, non una sola: 40.000 + 40.000 + 30.000 la passano.
+  assert.equal(valutaUso(uso(40000, 40000, 0, 30000, 0), H55).oltreSoglia, true);
+  // L'output non è prompt.
+  assert.equal(valutaUso(uso(1000, 0, 0, 0, 500000), H55).oltreSoglia, false);
+  // Solo dove il listino la prevede: Opus 5.5, Sonnet 5.5 e Haiku 4.5 restano lineari a qualunque misura.
+  for (const [model, atteso] of [['claude-opus-5-5', 500000 * 0.2], ['claude-sonnet-5-5', 500000 * 0.2], ['claude-haiku-4-5', 500000 * 0.1]]) {
+    v = valutaUso(uso(0, 0, 0, 500000, 0), model);
+    vicino(v.costo, atteso / 1e6, model);
+    assert.equal(v.oltreSoglia, false, model);
+  }
+  for (const [k, p] of Object.entries(PREZZI)) {
+    if (!p.oltre) continue;
+    assert.ok(p.soglia > 0, `${k}: un listino alto vuole la sua soglia`);
+    for (const voce of ['input', 'cacheWrite', 'cacheWrite1h', 'cacheRead', 'output']) assert.equal(typeof p.oltre[voce], 'number', `${k}.oltre.${voce}`);
+  }
+});
+
+test('le richieste oltre soglia si contano per modello, si sommano coi sotto-agenti e si leggono nel riassunto', async () => {
+  const sopra = { input_tokens: 0, cache_creation_input_tokens: 2000, cache_read_input_tokens: 120000, output_tokens: 100 };
+  const sotto = { input_tokens: 0, cache_creation_input_tokens: 2000, cache_read_input_tokens: 50000, output_tokens: 100 };
+  const righe = [
+    assistant('a', 'claude-haiku-5-5', sopra, [], T('00:00')),
+    assistant('b', 'claude-haiku-5-5', sotto, [], T('00:01')),
+    assistant('c', 'claude-haiku-5-5', sopra, [], T('00:02')),
+    assistant('d', 'claude-opus-5-5', sopra, [], T('00:03')),
+  ];
+  const rep = await analizzaRighe(righe);
+  assert.deepEqual(rep.oltreSoglia, { 'claude-haiku-5-5': 2 }, 'Opus 5.5 non ha soglia: non si conta');
+  // a, c: 120.000·0,05 + 2000·0,625 + 100·2,50 = 7500; b: 50.000·0,01 + 2000·0,125 + 100·0,50 = 800;
+  // d (Opus 5.5): 120.000·0,2 + 2000·5 + 100·20 = 36.000
+  assert.equal(rep.costUsd, Math.round(((7500 * 2 + 800 + 36000) / 1e6) * 10000) / 10000);
+  assert.match(riassunto(rep)[3], /richieste oltre la soglia del prompt: claude-haiku-5-5 2/);
+  assert.doesNotMatch(riassunto(await analizzaRighe([righe[1]]))[3], /oltre la soglia/, 'senza richieste oltre soglia la riga non cambia');
+  assert.deepEqual(rapportoVuoto().oltreSoglia, {});
+  const sessione = await analizzaRighe([righe[0]]);
+  sommaSottoAgente(sessione, rep);
+  assert.deepEqual(sessione.oltreSoglia, { 'claude-haiku-5-5': 3 });
+  sommaSottoAgente(sessione, { costUsd: 0, tokens: {}, tools: {} });
+  assert.deepEqual(sessione.oltreSoglia, { 'claude-haiku-5-5': 3 }, 'un sotto-agente senza il campo (rapporto vecchio) non rompe la somma');
 });
 
 test('lo slug della cartella dei transcript e le chiavi ammesse da Firestore', () => {
@@ -395,8 +527,9 @@ test('una scrittura in cache a un\'ora è prezzata a 2× l\'input, quella a cinq
   const d = await analizzaRighe(storto);
   assert.equal(d.costUsd, Math.round((40000 * 10 + 60000 * 6.25) / 1e6 * 10000) / 10000);
   assert.equal(d.tokens.cacheWrite, 100000);
-  for (const k of ['opus', 'sonnet', 'sonnet-4', 'haiku', 'fable', 'fable-5']) {
+  for (const k of ['opus', 'opus-5-5', 'sonnet', 'sonnet-4', 'haiku', 'haiku-5-5', 'fable', 'fable-5']) {
     assert.equal(PREZZI[k].cacheWrite1h, PREZZI[k].input * 2, `${k}: la scrittura a un'ora è 2× l'input`);
+    if (PREZZI[k].oltre) assert.equal(PREZZI[k].oltre.cacheWrite1h, PREZZI[k].oltre.input * 2, `${k}: anche oltre la soglia`);
   }
 });
 
@@ -597,6 +730,81 @@ test('il rapporto del worker porta a parte i turni dell\'orchestratore, e la cac
     assert.equal(o.maxContextTokens, 35000);
     assert.equal(rep.costUsd, 0.4096, 'costUsd resta quello del worker, senza l’orchestratore');
     assert.match(riassunto(rep)[3], /orchestratore \$/);
+    assert.doesNotMatch(riassunto(rep)[3], /oltre/, 'tutto Opus 5.5: nessuna soglia');
+  } finally { togliCartella(base); }
+});
+
+test('orchestratore su Haiku 5.5: prezzato col suo listino, e le sue richieste oltre soglia a parte da quelle del worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-haiku-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const riga = (id, model, ts, { cw = 0, cr = 0, out = 10, tool = null } = {}) => JSON.stringify({
+      type: 'assistant', timestamp: ts, sessionId: id.startsWith('h') ? 'orch' : 'w4',
+      message: { id, model, usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: out }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+    });
+    const H55 = 'claude-haiku-5-5';
+    writeFileSync(join(dir, 'orch.jsonl'), [
+      riga('h1', H55, H('09:00:00'), { cw: 30000 }),
+      riga('h2', H55, H('09:01:00'), { cr: 30000, tool: { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} } }),
+      fine('ag1', H('09:30:00')),
+      riga('h3', H55, H('09:30:10'), { cr: 120000, cw: 2000 }),
+      riga('h4', H55, H('09:31:00'), { cr: 40000, tool: { type: 'tool_use', id: 'ag2', name: 'Agent', input: {} } }),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w4.jsonl'), [
+      riga('w1', H55, H('09:32:00'), { cw: 110000 }),
+      riga('w2', 'claude-sonnet-5-5', H('09:33:00'), { cr: 150000 }),
+    ].join('\n') + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'resolver', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w4');
+    const o = rep.orchestrator;
+    assert.equal(o.turns, 2, 'h3 e h4: la finestra dalla fine del worker di prima');
+    // h3 passa la soglia (122.000): 120.000·0,05 + 2000·0,625 + 10·2,50 = 7275; h4 no: 40.000·0,01 + 10·0,50 = 405.
+    // A tariffa Haiku 4.5 sarebbe uscito 0,0186.
+    assert.equal(o.costUsd, 0.0077);
+    assert.deepEqual(o.oltreSoglia, { 'claude-haiku-5-5': 1 });
+    // w1: 110.000·0,625 + 10·2,50 = 68.775; w2 (Sonnet 5.5, lineare): 150.000·0,2 + 10·10 = 30.100.
+    assert.equal(rep.costUsd, Math.round(((68775 + 30100) / 1e6) * 10000) / 10000);
+    assert.deepEqual(rep.oltreSoglia, { 'claude-haiku-5-5': 1 });
+    assert.ok(!rep.notes.some((n) => /sconosciuto/.test(n)), JSON.stringify(rep.notes));
+    assert.match(riassunto(rep)[3], /orchestratore \$0\.0077 \([^)]*oltre soglia: claude-haiku-5-5 1\)/);
+    assert.match(riassunto(rep)[3], /richieste oltre la soglia del prompt: claude-haiku-5-5 1$/);
+  } finally { togliCartella(base); }
+});
+
+test('orchestratore in modalità veloce: costa la sua tariffa, e la nota di una tariffa di ripiego arriva nel rapporto del worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-veloce-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const riga = (id, model, ts, tool = null) => JSON.stringify({
+      type: 'assistant', timestamp: ts, sessionId: id.startsWith('o') ? 'orch' : 'w5',
+      message: { id, model, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1000000, speed: 'fast' }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+    });
+    writeFileSync(join(dir, 'orch.jsonl'), [
+      riga('o1', 'claude-sonnet-5-5', H('09:00:00')),
+      riga('o2', 'claude-opus-5-5', H('09:01:00'), { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} }),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w5.jsonl'), riga('w1', 'claude-opus-5-5', H('09:02:00')) + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'resolver', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w5');
+    assert.equal(rep.costUsd, 40, 'un milione in uscita su Opus 5.5 veloce: 40 $');
+    assert.equal(rep.orchestrator.costUsd, 60, 'Sonnet 5.5 veloce, non a listino, al doppio (20 $) più Opus 5.5 veloce (40 $)');
+    assert.deepEqual(rep.notes.filter((n) => /velocità/.test(n)),
+      ['orchestratore: velocità «fast» non a listino per «claude-sonnet-5-5»: 1 turno calcolato a 2× la tariffa Sonnet 5']);
+    assert.match(riassunto(rep)[4], /note: .*orchestratore: velocità «fast»/);
   } finally { togliCartella(base); }
 });
 

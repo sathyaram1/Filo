@@ -107,8 +107,6 @@ async function newtabPage(app) {
 async function configureModel(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    // Col modello pronto la home aperta comincia l'intervista di benvenuto (#663): qui l'utente è già stato accolto.
-    await chrome.storage.local.set({ filo_onboarding: { done: true } });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -265,6 +263,10 @@ test('#592 — in Preferenze uno stile oltre il tetto non si salva e lo dice', a
   await expect(nota).toBeVisible();
   await expect(nota).toContainText(`${troppo.length} caratteri, il massimo è ${max}`);
   await expect(nota).toHaveClass(/agent-style-over/);
+  // Dalle quattro cifre il conto prende il punto delle migliaia, come ogni numero di Filo.
+  await page.fill('#agentStyleText', 'a'.repeat(1234));
+  await expect(nota).toContainText('Troppo lungo: 1.234 caratteri');
+  await page.fill('#agentStyleText', troppo);
   await expect(page.locator('#agentStyleText')).toHaveValue(troppo);
   await page.waitForTimeout(800);
   expect(await storedStyle(app)).toBe(quasi);

@@ -23,6 +23,7 @@
 //   SN_FILO_UI.is(el)       → è la radice di un pezzo di UI di Filo?
 //   SN_FILO_UI.inside(el)   → sta dentro (o è) un pezzo di UI di Filo?
 //   SN_FILO_UI.aperti()     → le radici NOSTRE attaccate al documento adesso
+//   SN_FILO_UI.gestoVero(e) → l'evento viene dall'utente, non dal codice del sito?
 //   SN_FILO_UI.soloGestiVeri(el) → i gesti fabbricati dallo script del sito non lo toccano
 //   SN_FILO_UI.ombra(host)  → shadow root chiuso di un riquadro; bersaglio(e) ci scende dentro
 //
@@ -104,6 +105,12 @@
       if (is(el)) return true;
       return !!(el && el.closest && el.closest(SELECTOR));
     } catch (_) { return false; }
+  }
+
+  // Un clic o un tasto dell'utente, non del codice del sito: i nostri pezzi nel suo documento li preme
+  // anche lui. Chi fa avanzare qualcosa di Filo da lì passa di qui (#592.6).
+  function gestoVero(e) {
+    return !!(e && e.isTrusted === true);
   }
 
   // Lo script del sito raggiunge ogni nodo del suo documento e sa fabbricarci sopra clic, passaggi e tasti:
@@ -240,7 +247,7 @@
   }
 
   global.SN_FILO_UI = {
-    ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, nostro, veroONostro,
+    ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
     ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

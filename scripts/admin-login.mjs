@@ -23,7 +23,6 @@
 //   (si apre il browser; accedi con l'account OWNER; il token viene stampato)
 
 import { createRequire } from 'node:module';
-import { createServer } from 'node:http';
 import { exec } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,39 +31,14 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cfg = require(resolve(__dirname, '..', 'src', 'main', 'auth', 'config.js'));
 const pkce = require(resolve(__dirname, '..', 'src', 'main', 'auth', 'pkce.js'));
+// Lo stesso ritorno loopback dell'app: le sue regole (lo state prima di tutto) valgono anche qui.
+const { startLoopback } = require(resolve(__dirname, '..', 'src', 'main', 'auth', 'google-auth.js'))._internals;
 
 function openBrowser(url) {
   const cmd = process.platform === 'win32'
     ? `cmd /c start "" "${url}"`
     : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`;
   exec(cmd, () => {});
-}
-
-function startLoopback(expectedState) {
-  return new Promise((resolveSrv) => {
-    let resolveCode, rejectCode;
-    const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej; });
-    const server = createServer((req, res) => {
-      const url = new URL(req.url, 'http://127.0.0.1');
-      const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
-      const error = url.searchParams.get('error');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
-        + (error || !code ? 'Login non riuscito. Puoi chiudere questa scheda.'
-          : 'Login admin completato. Torna al terminale: il refresh token è stato stampato.')
-        + '</body>');
-      server.close();
-      if (error) return rejectCode(new Error('OAuth: ' + error));
-      if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
-      if (state !== expectedState) return rejectCode(new Error('OAuth: state non corrispondente (CSRF?)'));
-      resolveCode(code);
-    });
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address();
-      resolveSrv({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise });
-    });
-  });
 }
 
 async function main() {
@@ -82,8 +56,7 @@ async function main() {
     code_challenge: challenge,
     code_challenge_method: method,
     state,
-    access_type: 'offline',
-    prompt: 'consent',
+    prompt: 'select_account',
   }).toString();
 
   console.log('\nApro il browser per il login dell\'account OWNER (admin).');
@@ -117,12 +90,12 @@ async function main() {
     body: JSON.stringify({
       postBody: `id_token=${googleTok.id_token}&providerId=google.com`,
       requestUri: 'http://localhost',
-      returnIdpCredential: true,
       returnSecureToken: true,
     }),
   });
   if (!fbRes.ok) throw new Error(`Firebase signInWithIdp fallito (${fbRes.status}): ${(await fbRes.text()).slice(0, 300)}`);
   const fb = await fbRes.json();
+  if (fb.errorMessage || !fb.refreshToken) throw new Error(`Firebase signInWithIdp senza refresh token: ${fb.errorMessage || 'token assenti'}`);
 
   const isAdmin = cfg.isAdminEmail(fb.email);
   console.log('\n──────────────────────────────────────────────────────────────');

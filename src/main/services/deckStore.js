@@ -43,8 +43,14 @@
     const decks = await list();
     const i = decks.findIndex((d) => d.id === clean.id);
     if (i < 0) return null;
+    const prima = decks[i].nome;
     decks[i] = clean;
     await saveAll(decks);
+    // Rinominato (a mano o dal commander): la riga della sua chat nel filo dice il nome nuovo (#974).
+    if (clean.nome !== prima) {
+      try { await global.SN_CONVERSAZIONI_APP?.rinomina({ app: 'mazzi', rif: clean.id, soggetto: clean.nome }); }
+      catch (e) { console.warn('[Filo] nome del mazzo nel filo:', e?.message || e); }
+    }
     return clean;
   }
 

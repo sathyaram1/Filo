@@ -1,7 +1,8 @@
 // La pagina «Inviti e utenti» (#598, solo owner): i due moduli rifiutano con
 // una frase di Filo i numeri che non vanno (zero codici, crediti con la
 // virgola, pseudonimo vuoto) invece di lasciare parlare la bolla del browser,
-// e la riga dei totali conta al singolare quando l'utente è uno.
+// un guasto del server si dice a parole con un «Riprova», e la riga dei totali
+// conta al singolare quando l'utente è uno.
 //
 // Server dei crediti e identità sono un HTTP locale, come in
 // wallet-credits.spec.mjs; l'accesso dell'owner si simula scrivendo la sua
@@ -16,6 +17,10 @@ const OWNER_REFRESH = 'rt-owner';
 let server;
 const seen = { invites: [], grants: [], codes: [] };
 let extraInvites = [];
+// `giu`: le funzioni dei crediti rispondono 500, come quando il servizio è fermo. `taglia`: il regalo cade a metà,
+// la connessione si chiude senza risposta, 'dopo' il regalo fatto o 'prima' di farlo.
+const guasto = { giu: false, taglia: null };
+const ricevuti = () => 5000 + seen.grants.reduce((a, g) => a + (Number(g.credits) || 0), 0);
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
@@ -44,6 +49,13 @@ test.beforeAll(async () => {
         return json(res, 200, { id_token: jwt('anon-1'), refresh_token: rt, expires_in: '3600', user_id: 'anon-1' });
       }
       if (url === '/walletState') return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
+      if (guasto.giu && (url === '/walletCreateInvites' || url === '/walletGrant')) {
+        return json(res, 500, { error: { message: 'boom', status: 'INTERNAL' } });
+      }
+      if (url === '/walletGrant' && guasto.taglia) {
+        if (guasto.taglia === 'dopo') seen.grants.push(body.data);
+        return req.socket.destroy();
+      }
       if (url === '/walletOverview') {
         return json(res, 200, {
           result: {
@@ -52,7 +64,7 @@ test.beforeAll(async () => {
             // I codici generati fin qui: la pagina rilegge la vista dopo «Genera».
             // `extraInvites` serve agli inviti a più posti (#651).
             ownerInvites: seen.codes.map((code) => ({ code, used: false, createdAt: '2026-09-10T09:00:00.000Z' })).concat(extraInvites),
-            users: [{ pseudonym: 'abcdef0123456789', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0 }, invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z', usage: { rows: 0 } }],
+            users: [{ pseudonym: 'abcdef0123456789', balance: { credits: ricevuti(), creditsGranted: ricevuti(), usageUsd: 0 }, invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z', usage: { rows: 0 } }],
           },
         });
       }
@@ -142,6 +154,12 @@ test('i moduli dell’owner rifiutano con parole di Filo zero codici, crediti co
   await expect(msg).toHaveText('Quanti crediti? Un numero intero, almeno 1.');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('ownerGrantCredits');
   expect(seen.grants.length).toBe(0);
+  // Scritta alla italiana (#854): con il sistema in inglese il campo buttava via la virgola e regalava 25.
+  await page.fill('#ownerGrantCredits', '');
+  await page.locator('#ownerGrantCredits').pressSequentially('2,5');
+  await page.click('#ownerGrantBtn');
+  await expect(msg).toHaveText('Quanti crediti? Un numero intero, almeno 1.');
+  expect(seen.grants.length).toBe(0);
 
   // Con un intero il regalo parte e la conferma arriva.
   await page.fill('#ownerGrantCredits', '10');
@@ -190,5 +208,95 @@ test('un invito con un posto occupato su tre resta da dare, col suo link e il co
     await expect(pieno.locator('.sn-wallet-invite-link')).toBeDisabled();
   } finally {
     extraInvites = [];
+  }
+});
+
+// #666 — i due moduli in mezzo alla pagina rispondevano col testo tecnico del server («callable walletGrant 500: …») e
+// senza niente da premere. Adesso una frase, e un «Riprova» che rifà la stessa richiesta.
+const TECNICO = /callable|walletCreateInvites|walletGrant|INTERNAL|boom|\b(4\d\d|5\d\d)\b|[{}]|fetch failed|ECONN|UND_ERR/i;
+const MIO = 'abcdef0123456789';
+
+async function apriPaginaOwner(app, openTab) {
+  expect(await simulaOwner(app)).toBe(true);
+  const page = await openTab('filo://credits/owner.html');
+  await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
+  await expect(page.locator('#ownerUsers tr.sn-wallet-user')).toHaveCount(1, { timeout: 15_000 });
+  return page;
+}
+
+test('col servizio dei crediti fermo «Genera» e «Regala» lo dicono a parole, e il loro «Riprova» rifà la richiesta', async ({ app, openTab }) => {
+  const page = await apriPaginaOwner(app, openTab);
+  const msg = page.locator('#ownerMsg');
+  const riprova = msg.getByRole('button', { name: 'Riprova' });
+  try {
+    guasto.giu = true;
+    const inviti = seen.invites.length;
+    await page.fill('#ownerInviteCount', '3');
+    await page.click('#ownerInvitesBtn');
+    await expect(msg).toHaveClass(/is-error/, { timeout: 15_000 });
+    await expect(msg).toContainText('Codici non generati: il server dei crediti non risponde.');
+    expect(await msg.innerText()).not.toMatch(TECNICO);
+    await expect(riprova).toBeVisible();
+
+    // Tornato il servizio, il tasto rifà la richiesta fallita: tre codici, anche se nel campo adesso c'è altro.
+    guasto.giu = false;
+    await page.fill('#ownerInviteCount', '7');
+    await riprova.click();
+    await expect(msg).toContainText('3 codici nuovi', { timeout: 15_000 });
+    await expect(msg).toHaveClass(/is-ok/);
+    await expect(riprova).toHaveCount(0);
+    expect(seen.invites.slice(inviti)).toEqual([{ count: 3 }]);
+
+    guasto.giu = true;
+    const regali = seen.grants.length;
+    await page.fill('#ownerGrantPseudonym', MIO);
+    await page.fill('#ownerGrantCredits', '25');
+    await page.click('#ownerGrantBtn');
+    await expect(msg).toContainText('Regalo non fatto: il server dei crediti non risponde.', { timeout: 15_000 });
+    await expect(msg).toHaveClass(/is-error/);
+    expect(await msg.innerText()).not.toMatch(TECNICO);
+
+    guasto.giu = false;
+    await riprova.click();
+    await expect(msg).toContainText(`+25 crediti a ${MIO}`, { timeout: 15_000 });
+    expect(seen.grants.slice(regali)).toEqual([{ pseudonym: MIO, credits: 25, why: 'owner' }]);
+  } finally {
+    guasto.giu = false;
+  }
+});
+
+// Un regalo la cui risposta non torna può essere arrivato: il «Riprova» guarda prima, e due clic non valgono due regali.
+test('un regalo rimasto senza risposta: «Riprova» non lo rifà se è arrivato, e lo rifà se non è arrivato', async ({ app, openTab }) => {
+  const page = await apriPaginaOwner(app, openTab);
+  const msg = page.locator('#ownerMsg');
+  const riprova = msg.getByRole('button', { name: 'Riprova' });
+  try {
+    const regali = seen.grants.length;
+    guasto.taglia = 'dopo';
+    await page.fill('#ownerGrantPseudonym', MIO);
+    await page.fill('#ownerGrantCredits', '40');
+    await page.click('#ownerGrantBtn');
+    await expect(msg).toContainText('Non so se il regalo è arrivato', { timeout: 15_000 });
+    expect(await msg.innerText()).not.toMatch(TECNICO);
+    guasto.taglia = null;
+    await riprova.click();
+    await expect(msg).toContainText(`Il regalo era arrivato: +40 crediti a ${MIO}.`, { timeout: 15_000 });
+    expect(seen.grants.slice(regali)).toEqual([{ pseudonym: MIO, credits: 40, why: 'owner' }]);
+
+    guasto.taglia = 'prima';
+    await page.fill('#ownerGrantPseudonym', MIO);
+    await page.fill('#ownerGrantCredits', '15');
+    await page.click('#ownerGrantBtn');
+    await expect(msg).toContainText('Non so se il regalo è arrivato', { timeout: 15_000 });
+    guasto.taglia = null;
+    await riprova.click();
+    await expect(msg).toContainText(`+15 crediti a ${MIO}.`, { timeout: 15_000 });
+    await expect(msg).not.toContainText('era arrivato');
+    expect(seen.grants.slice(regali)).toEqual([
+      { pseudonym: MIO, credits: 40, why: 'owner' },
+      { pseudonym: MIO, credits: 15, why: 'owner' },
+    ]);
+  } finally {
+    guasto.taglia = null;
   }
 });

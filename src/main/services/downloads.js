@@ -35,6 +35,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { spingiAllaScheda } = require('./impostazioniPerOrigine');
+const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 
 // Tetto della cronologia persistita: teniamo le voci più recenti. 200 è ampio
 // per l'uso reale e non gonfia storage.json (poche centinaia di byte a voce).
@@ -391,10 +392,7 @@ function notifyTabs(scope = '') {
     const type = (globalThis.SN_MSG && globalThis.SN_MSG.MSG.DOWNLOADS_UPDATED) || 'downloads_updated';
     const msg = { type };
     for (const win of windowsOf(scope)) {
-      const tm = win._filoTabs;
-      if (tm && Array.isArray(tm.tabs)) {
-        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg, { inVista: t.id === tm.activeId });
-      }
+      for (const { wc, inVista } of vistePerAnnunci(win._filoTabs)) spingiAllaScheda(wc, msg, { inVista });
     }
   } catch (_) {}
 }

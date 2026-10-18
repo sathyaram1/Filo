@@ -39,12 +39,58 @@
       $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
     }
 
-    // Le due letture non dipendono l'una dall'altra: partono insieme.
+    // Le due letture non dipendono l'una dall'altra: partono insieme. L'avviso viene dopo, dal saldo appena letto.
     const [r, w] = await Promise.all([
       chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }),
       chrome.runtime.sendMessage({ type: MSG.WALLET_STATE }).catch(() => null),
     ]);
     render(r || {}, w || null);
+    renderAvviso(await chrome.runtime.sendMessage({ type: MSG.CREDITS_WARNING_STATE }).catch(() => null));
+    seguiAncora();
+  }
+
+  // ── L'avviso prima che i crediti finiscano (#818) ──────────────────────────
+  // C'è finché le soglie lo dicono, o finché c'è un rimedio applicato da poter rimettere com'era. La frase
+  // dell'ultimo clic resta sotto il suo rimedio anche quando la pagina si ridisegna da sola.
+  let esitoAvviso = null;
+  function renderAvviso(a) {
+    const sez = $('avviso');
+    const avviso = a && a.ok && a.mostra ? a.avviso : null;
+    sez.hidden = !avviso;
+    if (!avviso) return;
+    $('avvisoTesto').textContent = avviso.testo || '';
+    $('avvisoTesto').hidden = !avviso.testo;
+    const host = $('avvisoRimedi');
+    const opz = {
+      avviso,
+      invia: (m) => chrome.runtime.sendMessage(m),
+      classeBottone: 'sn-btn sn-btn-secondary',
+      apriChiave: apriCampoChiave,
+      esito: esitoAvviso,
+      onEsito: (id, frase) => { esitoAvviso = frase ? { id, frase } : null; },
+    };
+    // La pagina si ridisegna a ogni saldo cambiato: l'elenco si aggiorna sul posto, così un clic non va a vuoto.
+    const ul = host.querySelector(':scope > .sn-crediti-rimedi');
+    if (ul) window.SN_CREDITI_AVVISO_UI.aggiorna(ul, opz);
+    else host.appendChild(window.SN_CREDITI_AVVISO_UI.elenco(opz));
+  }
+
+  // «Metti la chiave»: il campo della chiave propria, qui sotto.
+  function apriCampoChiave() {
+    const sez = $('ownKeySection');
+    if (sez.hidden || $('ownKeyForm').hidden) return;
+    sez.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
+    $('ownKeyInput').focus();
+  }
+
+  // Arrivati dalla notifica (#avviso) o da «Metti la chiave» in chat (#chiave): una volta, al primo disegno.
+  let ancora = String(location.hash || '').slice(1);
+  function seguiAncora() {
+    if (!ancora) return;
+    const a = ancora;
+    ancora = '';
+    if (a === 'chiave') apriCampoChiave();
+    else if (a === 'avviso' && !$('avviso').hidden) $('avviso').scrollIntoView({ block: 'start' });
   }
 
   function render(r, w) {
@@ -207,8 +253,12 @@
     const box = $('wallet');
     const reissue = $('reissueBtn');
     const resetBtn = $('resetIdentityBtn');
+    const resetConfirm = $('resetIdentityConfirm');
+    // Un ridisegno che arriva mentre la domanda è aperta non la richiude sotto il dito.
+    const domandaAperta = !resetConfirm.hidden;
     reissue.hidden = true;
     resetBtn.hidden = true;
+    resetConfirm.hidden = true;
     const server = w && w.ok ? w.server : null;
     const has = Boolean(server && server.hasWallet);
     // Quello del server vince: è il nome con cui la persona compare all'owner.
@@ -248,7 +298,9 @@
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
-        note.textContent = 'Ultimo saldo letto: il server dei crediti non risponde adesso.';
+        note.textContent = w.identity && w.identity.unreadable
+          ? 'Ultimo saldo letto: questo computer non riesce più a leggere l\'identità di Filo salvata qui.'
+          : 'Ultimo saldo letto: il server dei crediti non risponde adesso.';
         note.hidden = false;
       } else if (server.stale) {
         note.textContent = 'Saldo dell\'ultima lettura: il servizio dei modelli non risponde adesso.';
@@ -266,17 +318,22 @@
     $('invitesSection').hidden = true;
     const form = $('redeemForm');
     form.hidden = false;
-    if (w.identity && !w.identity.ok && w.identity.lost) {
-      // Il server ha annullato l'identità: il portafoglio legato a essa non
-      // si raggiunge più. Si dice, e ricominciare è una scelta dell'utente.
+    if (w.identity && !w.identity.ok && (w.identity.lost || w.identity.unreadable)) {
+      // Il portafoglio legato all'identità non si raggiunge: si dice, e
+      // ricominciare è una scelta dell'utente, confermata.
       form.hidden = true;
-      note.textContent = 'L\'identità di questa installazione è stata annullata sul server, e con lei i crediti che aveva. Puoi ricominciare con un nuovo invito.';
+      note.textContent = w.identity.lost
+        ? 'L\'identità di questa installazione è stata annullata sul server, e con lei i crediti che aveva. Puoi ricominciare con un nuovo invito.'
+        : 'Questo computer non riesce più a leggere l\'identità di Filo salvata qui, e con lei i crediti. Succede quando cambia la cifratura del sistema. Se torna com\'era, al prossimo avvio Filo riparte da solo. Altrimenti puoi ricominciare con un nuovo invito.';
       note.hidden = false;
-      resetBtn.hidden = false;
+      if (domandaAperta) resetConfirm.hidden = false;
+      else resetBtn.hidden = false;
     } else if (w.identity && !w.identity.ok) {
       note.textContent = w.identity.offline
         ? 'Sei offline: per riscattare un invito serve la connessione.'
-        : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
+        : w.identity.unreachable
+          ? 'Il servizio di accesso non risponde adesso. Riprova fra poco.'
+          : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
       note.textContent = noKey
@@ -363,9 +420,10 @@
     menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
     menuAperto = menu;
     voce.focus();
+    document.addEventListener('keydown', tastoSulMenu, true);
     setTimeout(() => {
+      if (menuAperto !== menu) return;
       document.addEventListener('mousedown', fuoriDalMenu, true);
-      document.addEventListener('keydown', tastoSulMenu, true);
       window.addEventListener('wheel', fuoriDalMenu, true);
       window.addEventListener('resize', chiudiMenu);
     }, 0);
@@ -476,12 +534,20 @@
   }
 
   async function resetIdentity() {
-    const btn = $('resetIdentityBtn');
-    btn.disabled = true;
+    const yes = $('resetIdentityYes');
+    yes.disabled = true;
     let r = null;
-    try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_RESET_IDENTITY }); } catch (_) { r = null; }
-    btn.disabled = false;
-    if (r && r.ok) render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
+    try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_RESET_IDENTITY, confermato: true }); } catch (_) { r = null; }
+    yes.disabled = false;
+    $('resetIdentityConfirm').hidden = true;
+    if (r && r.state) {
+      render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state);
+      return;
+    }
+    $('resetIdentityBtn').hidden = false;
+    const note = $('walletNote');
+    note.textContent = 'Non ci sono riuscito: riprova.';
+    note.hidden = false;
   }
 
   async function redeem(ev) {
@@ -660,7 +726,7 @@
   }
 
   function formatInt(n) {
-    return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
+    return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(Math.round(Number(n) || 0));
   }
   // Crediti con al più un decimale, così un consumo sotto il credito resta
   // visibile. La regola è una sola con la chat (#816): SN_WALLET.formatCredits.
@@ -694,7 +760,21 @@
     ev.preventDefault();
     apriMenuPseudonimo(ev.clientX, ev.clientY);
   });
-  $('resetIdentityBtn').addEventListener('click', () => { resetIdentity().catch(() => {}); });
+  // Ricominciare stacca il portafoglio di prima: chiede il sì sul posto, col fuoco su «Annulla».
+  $('resetIdentityBtn').addEventListener('click', () => {
+    $('resetIdentityBtn').hidden = true;
+    $('resetIdentityConfirm').hidden = false;
+    $('resetIdentityNo').focus();
+  });
+  $('resetIdentityNo').addEventListener('click', () => {
+    $('resetIdentityConfirm').hidden = true;
+    $('resetIdentityBtn').hidden = false;
+  });
+  // La coda di un doppio clic sul «Ricomincia» non è un sì.
+  $('resetIdentityYes').addEventListener('click', (ev) => {
+    if (ev.detail > 1) return;
+    resetIdentity().catch(() => {});
+  });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
   if (chrome.runtime && chrome.runtime.onMessage) {

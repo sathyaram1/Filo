@@ -20,6 +20,11 @@
   const CARATTERI_PER_TOKEN = 3.5;
   // Oltre il tetto il taglio scende un quarto sotto: i turni dopo trovano lo stesso inizio, e la cache lo riusa.
   const RIENTRO = 0.75;
+  // Le immagini mandate in chat tornano col loro messaggio finché vive come una lettura (#1166). Una foto pesa per i
+  // tetti quanto una media fra i fornitori; i due tetti tengono la richiesta sotto i limiti dei fornitori.
+  const TOKEN_PER_IMMAGINE = 1500;
+  const MAX_IMMAGINI_RIMANDATE = 16;
+  const MAX_CARATTERI_IMMAGINI = 24 * 1024 * 1024;
 
   function numeroIn(v, [min, max]) {
     if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
@@ -45,6 +50,39 @@
 
   function stimaToken(testo) {
     return Math.ceil(String(testo == null ? '' : testo).length / CARATTERI_PER_TOKEN);
+  }
+
+  // Un contenuto a parti (testo e immagini): le immagini contano per quello che costano, non per i caratteri del data URL.
+  const parti = (c) => (Array.isArray(c) ? c.filter((p) => p && typeof p === 'object') : null);
+  const soloImmagini = (p) => p.type === 'image_url';
+  function tokenDi(content) {
+    const ps = parti(content);
+    if (!ps) return stimaToken(content);
+    return ps.reduce((n, p) => n + (soloImmagini(p) ? TOKEN_PER_IMMAGINE : stimaToken(p.text)), 0);
+  }
+  function caratteriDi(messaggi) {
+    return (Array.isArray(messaggi) ? messaggi : []).reduce((n, m) => {
+      const c = m && m.content;
+      const ps = parti(c);
+      if (ps) return n + ps.reduce((k, p) => k + (soloImmagini(p) ? TOKEN_PER_IMMAGINE * CARATTERI_PER_TOKEN : String(p.text || '').length), 0);
+      return n + (typeof c === 'string' ? c.length : JSON.stringify(c || '').length);
+    }, 0);
+  }
+
+  function numeroImmagini(m) {
+    const n = Math.floor(Number(m && m.images) || 0);
+    return n > 0 ? Math.min(n, 999) : 0;
+  }
+  // Al posto delle immagini che non tornano: senza, il modello rinnegava quello che ne aveva letto (#1166).
+  function notaImmagini(n, { altre = false } = {}) {
+    if (altre) {
+      return n === 1
+        ? "(qui l'utente aveva mandato anche un'altra immagine che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederla, chiedi di rimandarla.)"
+        : `(qui l'utente aveva mandato anche altre ${n} immagini che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederle, chiedi di rimandarle.)`;
+    }
+    return n === 1
+      ? "(qui l'utente aveva mandato un'immagine che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederla, chiedi di rimandarla.)"
+      : `(qui l'utente aveva mandato ${n} immagini che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederle, chiedi di rimandarle.)`;
   }
 
   // Il taglio per giorni si muove a scatti (un'ora per un giorno, sei ore oltre i tre): fra uno scatto e l'altro due
@@ -120,11 +158,28 @@
 
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
-  function rendi(m, prima, { tetto, esito, osserva }) {
+  // `foto`: le immagini del messaggio che tornano davanti al modello in questo turno (la finestra decide quali).
+  function rendi(m, prima, { tetto, esito, osserva, foto = null }) {
     const cambia = !prima || prima.chat !== m.chat;
     const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : tienilo(m.text, tetto, m.chat);
-    if (m.role === 'user') return { role: 'user', content: `${intestazione(m.ts, m.chat)} ${testo}`.trim() };
+    if (m.role === 'user') {
+      const detto = `${intestazione(m.ts, m.chat)} ${testo}`.trim();
+      const quante = numeroImmagini(m);
+      if (!quante) return { role: 'user', content: detto };
+      if (Array.isArray(foto) && foto.length) {
+        const mancano = quante - foto.length;
+        return {
+          role: 'user',
+          content: [
+            { type: 'text', text: detto },
+            ...foto.map((url) => ({ type: 'image_url', image_url: { url } })),
+            ...(mancano > 0 ? [{ type: 'text', text: notaImmagini(mancano, { altre: true }) }] : []),
+          ],
+        };
+      }
+      return { role: 'user', content: `${detto}\n${notaImmagini(quante)}` };
+    }
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
     if (testo.trim()) parti.push(testo);
@@ -133,6 +188,12 @@
     if (oss) parti.push(oss);
     else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
     else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
+    // #778 — una finestra guardata resta un nome: quello che c'era non è conservato, e si riguarda se serve.
+    if (!oss && Array.isArray(m.guardate) && m.guardate.length) {
+      const E = global.SN_ESTERNO;
+      const nomi = m.guardate.map((n) => `«${E ? E.perCanaleSistema(n) : String(n)}»`).join(', ');
+      parti.push(`(qui avevo guardato ${nomi}: quello che c'era non è conservato)`);
+    }
     const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a
     // ogni turno un messaggio che la cache aveva già.
@@ -143,7 +204,8 @@
 
   // Il tratto del filo che il modello ha davanti. `messaggi` è tutto il filo in ordine di tempo, senza la domanda di
   // adesso; `ancora` è l'inizio scelto al turno prima, che si tiene finché i tetti lo permettono.
-  function finestra(messaggi, { ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null } = {}) {
+  // `immagini(m)`: i data URL ancora in memoria del messaggio, o null.
+  function finestra(messaggi, { ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null } = {}) {
     const lista = Array.isArray(messaggi) ? messaggi : [];
     const n = lista.length;
     const t0 = taglio(ora, giorni);
@@ -172,9 +234,33 @@
       const fuori = letturaDaFuori(lista[i], comandi[i]);
       return fuori ? { ...(e || {}), azioni: [...((e && e.azioni) || []), fuori] } : e;
     };
+    // Le immagini tornano con la vita delle letture, dalle più nuove: oltre i tetti quelle prima lasciano la nota.
+    const fotoDi = new Map();
+    if (typeof immagini === 'function') {
+      let quante = 0;
+      let caratteri = 0;
+      for (let i = n - 1; i >= 0; i--) {
+        const m = lista[i];
+        if (!recente[i] || m.role !== 'user' || !numeroImmagini(m)) continue;
+        const date = immagini(m);
+        const urls = (Array.isArray(date) ? date : []).filter((u) => typeof u === 'string' && u);
+        if (!urls.length) continue;
+        // Un messaggio che non ci sta intero tiene le sue prime foto che ci stanno: le altre lasciano la nota.
+        const tenute = [];
+        for (const u of urls) {
+          if (quante + 1 > MAX_IMMAGINI_RIMANDATE || caratteri + u.length > MAX_CARATTERI_IMMAGINI) break;
+          quante += 1;
+          caratteri += u.length;
+          tenute.push(u);
+        }
+        if (tenute.length) fotoDi.set(i, tenute);
+        if (tenute.length < urls.length) break;
+      }
+    }
+    const rendiIl = (i, prima) => rendi(lista[i], prima, { tetto: token, esito: esitoDi(i), osserva, foto: fotoDi.get(i) || null });
     const memo = new Map();
     const pesa = (i) => {
-      if (!memo.has(i)) memo.set(i, stimaToken(rendi(lista[i], lista[i - 1], { tetto: token, esito: esitoDi(i), osserva }).content));
+      if (!memo.has(i)) memo.set(i, tokenDi(rendiIl(i, lista[i - 1]).content));
       return memo.get(i);
     };
     // La conversazione di questa scheda, se è ripresa da prima dei tetti: i suoi ultimi messaggi restano davanti,
@@ -212,7 +298,7 @@
     for (const i of indici) {
       const m = lista[i];
       const e = esitoDi(i);
-      out.push(rendi(m, prima, { tetto: token, esito: e, osserva }));
+      out.push(rendiIl(i, prima));
       if (e && Array.isArray(e.azioni)) azioni.push(...e.azioni);
       visti.push(m);
       prima = m;
@@ -235,7 +321,8 @@
     const out = [];
     const aperti = new Map();
     for (const m of Array.isArray(messaggi) ? messaggi : []) {
-      if (!m || !m.chat) continue;
+      // La riga di una conversazione di un'altra app (#974) non è uno scambio: lo scambio si cerca, non si ripesca.
+      if (!m || !m.chat || m.riga) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
         t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
@@ -322,6 +409,15 @@
     };
   }
 
+  // Il rifiuto di una richiesta per le immagini che porta: modello di solo testo, troppe immagini, richiesta troppo grossa.
+  function rifiutaImmagini(err) {
+    const st = Number(err && err.status);
+    if (st === 413) return true;
+    if (Number.isFinite(st) && st > 0 && ![400, 404, 415, 422].includes(st)) return false;
+    const s = String((err && (err.message || err.error)) || err || '');
+    return /imag|vision|multi-?modal|content must be a string|payload too large|entity too large/i.test(s);
+  }
+
   // Il tetto in token con cui riprovare dopo quel rifiuto. `caratteri`: tutta la richiesta; `caratteriTratto`: la
   // parte che si può stringere. Con le misure si va un po' sotto la finestra; senza, il tratto si dimezza.
   const MARGINE_FINESTRA = 0.85;
@@ -381,8 +477,9 @@
 
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
+    TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
-    coda, assembla, troppoLungo, tettoDopoRifiuto,
+    coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -34,6 +34,7 @@
     btn.type = 'button';
     btn.className = 'sn-msg-rimedio';
     btn.textContent = pagina.label;
+    if (pagina.title) btn.title = pagina.title;
     btn.addEventListener('click', () => {
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
     });
@@ -83,10 +84,16 @@
   async function apriCollegamento(a, { sfondo = false } = {}) {
     const url = a && a.getAttribute ? a.getAttribute('href') : '';
     if (!url) return;
+    const msg = { type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo };
     let r = null;
-    try {
-      r = await chrome.runtime.sendMessage({ type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo });
-    } catch (_) {}
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    // Un dato dell'utente in un link scritto sopra una pagina chiede l'OK, come se lo aprisse l'assistente (#868.6).
+    if (r && r.conferma) {
+      const Ui = global.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : false;
+      if (!ok) return;
+      try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
     if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
   }
 
@@ -1102,6 +1109,75 @@
     return el;
   }
 
+  // Una risposta fermata dal tetto di lunghezza (#1097.3) non passa per intera: lo si dice sotto, e dove la
+  // conversazione può andare avanti c'è «Continua».
+  function notaInterrotta(parent, finishReason, onContinua = null) {
+    const CE = global.SN_CHAT_ERRORS;
+    const frase = CE && CE.rispostaInterrotta ? CE.rispostaInterrotta(finishReason) : '';
+    if (!parent || !frase) return null;
+    const el = document.createElement('div');
+    el.className = 'sn-key-fallback sn-risposta-interrotta';
+    el.textContent = frase;
+    if (typeof onContinua === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-msg-rimedio';
+      btn.textContent = 'Continua';
+      btn.title = 'Continua la risposta da dove si è interrotta';
+      btn.addEventListener('click', () => { btn.remove(); onContinua(); });
+      el.appendChild(btn);
+    }
+    parent.appendChild(el);
+    return el;
+  }
+
+  // «Copia» sotto ogni risposta: una traduzione si chiede quasi sempre per usarla altrove (#846). Nasce a risposta
+  // finita, quindi non copia mai un pezzo, e copia il testo come si legge, senza marcature né note sotto.
+  const COPIATO_MS = 1600;
+  // Gli appunti li scrive il main, che mette il testo anche in cronologia come il «Copia» del tasto destro: in un
+  // riquadro incorporato di un altro sito la pagina non ne ha il permesso. Se il main dice no, ci prova la pagina.
+  async function copiaTesto(testo) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text: testo });
+      if (r && r.ok) return true;
+    } catch (_) {}
+    try { await navigator.clipboard.writeText(testo); return true; } catch (_) { return false; }
+  }
+  const iconaCopia = (nome) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](14) : '');
+  function tastoCopia(wrap, sorgente) {
+    const Md = global.SN_MARKDOWN;
+    const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
+    if (!wrap || !testo.trim()) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-msg-copia';
+    const mostra = (stato) => {
+      const chiave = stato === 'ok' ? 'popup_copied' : stato === 'no' ? 'popup_copy_failed' : 'popup_copy';
+      btn.dataset.etichetta = I18n.t(chiave);
+      btn.setAttribute('aria-label', I18n.t(chiave));
+      btn.classList.toggle('sn-copiato', stato === 'ok');
+      btn.classList.toggle('sn-non-copiato', stato === 'no');
+      const svg = iconaCopia(stato === 'ok' ? 'check' : 'copy');
+      if (svg) btn.innerHTML = svg; else btn.textContent = I18n.t(chiave);
+    };
+    mostra(null);
+    let timer = null;
+    // Il fuoco resta nella riga per scrivere: copiare non vuol dire aver finito di fare domande.
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', async (e) => {
+      if (!e.isTrusted) return;
+      const ok = await copiaTesto(testo);
+      clearTimeout(timer);
+      mostra(ok ? 'ok' : 'no');
+      timer = setTimeout(() => mostra(null), COPIATO_MS);
+    });
+    const riga = document.createElement('div');
+    riga.className = 'sn-msg-azioni';
+    riga.appendChild(btn);
+    wrap.appendChild(riga);
+    return btn;
+  }
+
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
   // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
   // posa), l'informazione resta comunque: passando sopra l'intestazione.
@@ -1187,8 +1263,10 @@
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
+            tastoCopia(bubble.wrap, daMostrare);
           }
           notaRipiego(bubble.text, m.keyFallback);
+          notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
@@ -1225,7 +1303,17 @@
     if (popup.activePort) return; // già in streaming
     popup.inputEl.value = '';
     popup.inputEl.style.height = 'auto';
+    chiedi(popup, txt);
+  }
 
+  // «Continua» sotto una risposta interrotta è una domanda come le altre, già scritta.
+  const CONTINUA_RISPOSTA = global.SN_CHAT_ERRORS?.CHIEDI_SEGUITO || 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  function continuaRisposta(popup) {
+    if (!popup || popup.activePort) return;
+    chiedi(popup, CONTINUA_RISPOSTA);
+  }
+
+  function chiedi(popup, txt) {
     // Mostra bolla utente
     const userBubble = appendBubble(popup, 'user');
     userBubble.text.textContent = txt;
@@ -1408,7 +1496,7 @@
       // Marcato in uscita: non occupa più uno slot del tetto mentre sfuma.
       t.dataset.snClosing = '1';
       t.classList.remove('sn-toast-visible');
-      setTimeout(() => unmountToast(t), 250);
+      setTimeout(() => unmountToast(t), self.SN_THEME_TOKENS?.motionMs(250) ?? 250);
     };
     // Sotto il puntatore il toast prende i clic: chiuderlo è la risposta, e l'unica strada con la durata a 0.
     // Chi ne sta selezionando il testo non lo perde.
@@ -1427,7 +1515,7 @@
 
   global.SN_POPUP = {
     openStreaming,
-    notaRipiego, ripiegoMostrato,
+    notaRipiego, ripiegoMostrato, notaInterrotta,
     close,
     closeTopmost,
     showToast,

@@ -7,6 +7,8 @@
 //                                  di rete (GSB/RDAP/CT/sandbox/LLM); quando un
 //                                  dato arriva e cambia il verdetto, richiama
 //                                  onUpdate(verdict). Le chiamate NON bloccano.
+//                                  ctx.daAprire: un link non ancora aperto (solo
+//                                  lì la sandbox); ctx.incognito: niente LLM né sandbox.
 //   recordCert(host, st)           registra l'esito del certificato visto da
 //                                  Electron (certificate-error / did-navigate).
 //   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
@@ -346,12 +348,16 @@ function analyze(url, ctx = {}, onUpdate) {
     if (!deepWorth(verdict)) return [];
     const siteKey = key + '|' + cluesOf(norm, ctx, verdict);
     const out = [];
+    // In incognito nessun lavoro che consuma crediti o visita il sito di nuovo (#1081).
+    if (ctx.incognito) return out;
     if (providers.llm && llmCache.get(key) === undefined) {
       const llm = providers.llm;
       const meta = buildLlmMeta(norm, ctx, verdict);
       out.push(deepen('llm', bKey, key, siteKey, () => llm(meta), (r) => llmCache.set(key, r)));
     }
-    if (providers.sandbox && sandboxCache.get(key) === undefined) {
+    // Riaprire una pagina già aperta è una seconda visita, senza cookie, che ripete quello che il suo indirizzo fa al
+    // GET (una conferma, un token monouso): la finestra nascosta prova solo un link prima che si apra (#1081).
+    if (providers.sandbox && ctx.daAprire === true && sandboxCache.get(key) === undefined) {
       const detonate = providers.sandbox;
       out.push(deepen('sb', bKey, key, siteKey, () => detonate(url, norm), (r) => sandboxCache.set(key, r)));
     }

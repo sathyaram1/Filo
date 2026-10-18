@@ -135,35 +135,39 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Le porte del proprietario: prima DA DOVE (un sito visitato sulla macchina dell'owner direbbe sì
+  // a «sei l'owner?»), poi il permesso col suo motivo. La prova: tests/feedback-canali-origine.spec.mjs.
+  const soloOwner = (handler) => soloFilo(async (msg, sender, origin) => {
+    if (!auth.isAdmin()) return { ok: false, code: 'not_admin', error: 'Comando riservato al proprietario.' };
+    return handler(msg, sender, origin);
+  });
+
   // Generazione codici (SOLO owner). { count } → { ok, codes }.
-  on(MSG.REDTEAM_GEN_CODES, async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_GEN_CODES, soloOwner(async (msg) => {
     const count = Math.max(1, Math.min(200, Math.floor(Number(msg?.count) || 1)));
     try {
       const r = await callable('redteamGenerateCodes', { count });
       return { ok: true, codes: (r && r.codes) || [] };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  });
+  }));
 
   // Elenco codici esistenti (SOLO owner) per il pannello di gestione. { } →
   // { ok, codes:[{ code, used, usedAt?, createdAt?, handle? }] }.
-  on(MSG.REDTEAM_LIST_CODES, async () => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_LIST_CODES, soloOwner(async () => {
     try {
       const r = await callable('redteamListCodes', {});
       return { ok: true, codes: (r && r.codes) || [] };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  });
+  }));
 
   // Revoca di un codice ancora libero (SOLO owner). { code } → { ok } |
   // { ok:false, status } se non esiste o è già stato usato (non revocabile).
-  on(MSG.REDTEAM_REVOKE_CODE, async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_REVOKE_CODE, soloOwner(async (msg) => {
     try {
       const r = await callable('redteamRevokeCode', { code: String(msg?.code || '') });
       return Object.assign({ ok: true }, r);
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  });
+  }));
 
   // Il Red Team si mostra? A un sito visitato solo il sì/no: chi è owner lo chiede una superficie di Filo.
   // Una copia scaduta si rilegge in sottofondo; `attendi` aspetta la prima lettura.
@@ -174,14 +178,12 @@ module.exports = function register(on, ctx) {
   });
 
   // L'interruttore di Gestione: lettura fresca e scrittura, solo all'owner e solo da Filo.
-  on(MSG.REDTEAM_OPEN_GET, soloFilo(async () => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_OPEN_GET, soloOwner(async () => {
     const s = await Gate.rileggiOra();
     return { ok: true, openToAll: s.openToAll, letto: s.letto };
   }));
 
-  on(MSG.REDTEAM_OPEN_SET, soloFilo(async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_OPEN_SET, soloOwner(async (msg) => {
     if (typeof msg?.openToAll !== 'boolean') return { ok: false, error: 'openToAll deve essere vero o falso.' };
     try {
       const s = await Gate.impostaApertoATutti(msg.openToAll);

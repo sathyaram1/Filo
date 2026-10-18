@@ -16,7 +16,7 @@ dipinge sopra senza toccare l'albero.
   però va in uno stylesheet del documento: lo si inietta come `<style>` con un
   fallback letterale sul token (`var(--sn-accent,#c45a3b)`) così rende anche su
   pagine senza il theme.css di Filo.
-- **Disponibilità:** Electron 33 (Chromium ~130) la supporta; fai comunque
+- **Disponibilità:** Chromium la supporta dalla 105, cioè ogni Electron che Filo ha usato; fai comunque
   feature-detect (`CSS.highlights && typeof window.Highlight === 'function'`) e
   degrada silenziosamente (la feature audio resta, salta solo l'evidenziazione).
 - **Dove:** controller in `src/content/tts.js` (`ensureReadStyle`, `setHighlight`,

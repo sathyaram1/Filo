@@ -11,6 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { barraPage, statoBarra, premi, comandaBarra, menuAperto, vociDelMenu, scegliNelMenu } from './helpers/barra.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -50,7 +51,7 @@ async function avvia({ xFinestra = 80 } = {}) {
   const env = { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test', FILO_TEST_VISIBLE: '1' };
   delete env.FILO_HIDE_WINDOW;
   const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env });
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   await expect.poll(() => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);

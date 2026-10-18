@@ -119,7 +119,9 @@ class AvvisoSito {
     const m = a.message || {};
     let host = '';
     try { host = new URL(a.url).hostname; } catch (_) {}
-    return { scheda: testo(tab.id), level: a.level, title: testo(m.title), body: testo(m.body), host };
+    let vars = {};
+    try { vars = require('./movimento').variabili(); } catch (_) {}
+    return { scheda: testo(tab.id), level: a.level, title: testo(m.title), body: testo(m.body), host, vars };
   }
 
   _invia() {

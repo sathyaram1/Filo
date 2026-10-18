@@ -370,10 +370,10 @@ test('un movimento del portafoglio si legge in italiano, anche con l’id attacc
 // la usano sia la pagina (per disegnare i campi) sia il main (per rifiutare un
 // numero storto prima di scriverlo): se divergessero, il main accetterebbe
 // quello che la pagina rifiuta.
-test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () => {
-  assert.equal(W.OWNER_KNOBS.length, 7);
+test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => {
+  assert.equal(W.OWNER_KNOBS.length, 8);
   assert.deepEqual(W.OWNER_KNOB_KEYS, [
-    'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses',
+    'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses', 'invitesRemaining',
     'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackClosed',
   ]);
   for (const k of W.OWNER_KNOBS) {
@@ -385,12 +385,34 @@ test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () =>
   // Un invito per zero persone non è un invito: quella manopola parte da 1.
   assert.equal(W.knobOf('invitesMaxUses').min, 1);
   assert.equal(W.knobOf('non-esiste'), null);
+  // #854 — gli ingressi con invito si possono chiudere (zero) e aprire a molti: il tetto ferma un errore di
+  // battitura, non un lancio.
+  const ingressi = W.knobOf('invitesRemaining');
+  assert.equal(ingressi.etichetta, 'Ingressi con invito rimasti');
+  assert.equal(ingressi.aiuto, 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.');
+  assert.equal(ingressi.min, 0);
+  assert.ok(ingressi.max >= 1000000);
+});
+
+// #854 — il main rifà il controllo della pagina con la stessa tabella: un numero storto per gli ingressi
+// non arriva a config/credits nemmeno se la pagina venisse saltata.
+test('gli ingressi con invito si rifiutano come le altre manopole: negativi, decimali e parole no', () => {
+  require('../../src/shared/campoNumero.js');
+  const CN = globalThis.SN_CAMPO_NUMERO;
+  const k = W.knobOf('invitesRemaining');
+  const regole = { min: k.min, max: k.max, intero: true, etichetta: k.etichetta };
+  assert.deepEqual(CN.controlla('20', regole), { ok: true, valore: 20 });
+  assert.deepEqual(CN.controlla('0', regole), { ok: true, valore: 0 });
+  assert.equal(CN.controlla('-1', regole).testo, 'Ingressi con invito rimasti: non può essere negativo.');
+  assert.equal(CN.controlla('2,5', regole).testo, 'Ingressi con invito rimasti: un numero intero, senza virgola.');
+  assert.equal(CN.controlla('venti', regole).testo, 'Ingressi con invito rimasti: ci vuole un numero.');
 });
 
 // ── #816: le cifre dette fuori dalla pagina Crediti ─────────────────────────
 
 test('formatCredits scrive il saldo come la pagina Crediti: un decimale al più, alla italiana', () => {
-  assert.equal(W.formatCredits(4321.5), new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(4321.5));
+  assert.equal(W.formatCredits(4321.5), new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(4321.5));
+  assert.equal(W.formatCredits(4321.5), '4.321,5');
   assert.equal(W.formatCredits(12345.44), '12.345,4');
   assert.equal(W.formatCredits(0.3), '0,3');
   assert.equal(W.formatCredits(null), '0');

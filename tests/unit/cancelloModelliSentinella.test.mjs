@@ -21,8 +21,8 @@ const VIETATI = [
   { re: /\bgetProvider\s*\(/, cosa: 'getProvider()' },
   { re: /\b(?:stream)?[cC]ompleteWithFallback\b/, cosa: 'completeWithFallback / streamCompleteWithFallback' },
   // Sul cancello gli stessi nomi sono ammessi: Gate.complete, modelGate.keyInfo…
-  { re: /(?<![Gg]ate)\.(?:complete|streamComplete|synthesizeSpeech|transcribe|embed|lookupServedBy|keyInfo)\s*\(/, cosa: 'un metodo di un fornitore' },
-  { re: /openrouter\.ai\/api\/v1\/(?:chat\/completions|completions|audio\/|embeddings|generation)/, cosa: 'un endpoint che fa lavorare un modello' },
+  { re: /(?<![Gg]ate)\.(?:complete|streamComplete|synthesizeSpeech|transcribe|embed|decisions|lookupServedBy|keyInfo)\s*\(/, cosa: 'un metodo di un fornitore' },
+  { re: /openrouter\.ai\/api\/(?:v1\/(?:chat\/completions|completions|audio\/|embeddings|generation)|alpha\/decisions)/, cosa: 'un endpoint che fa lavorare un modello' },
   { re: /require\([^)]*['"/]providers\b/, cosa: 'un modulo fornitore caricato a mano', tranne: LOADER },
 ];
 
@@ -74,11 +74,14 @@ test('la sentinella riconosce le chiamate dirette che c\'erano prima del cancell
     'const result = await Providers.streamComplete({ provider, apiKey, model, messages });',
     'const P = globalThis.SN_PROVIDER_OPENROUTER;',
     "await fetch('https://openrouter.ai/api/v1/chat/completions', init);",
+    'const r = await P.decisions({ apiKey, model, state, questions });',
+    "await fetch('https://openrouter.ai/api/alpha/decisions', init);",
   ];
   for (const riga of vecchie) assert.equal(violazioni(riga, 'src/x.js').length > 0, true, riga);
   for (const riga of [
     'const r = await Gate.complete({ action, messages });',
     "const info = await Gate.keyInfo({ provider: 'openrouter', apiKey: key });",
+    'const r = await Gate.decideAll({ action, attempts, requests });',
     '// Providers.completeWithFallback era la porta vecchia',
     "const res = await fetch('https://openrouter.ai/api/v1/models' + q, { headers });",
   ]) assert.deepEqual(violazioni(riga, 'src/x.js'), [], riga);

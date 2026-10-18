@@ -3,7 +3,7 @@
 // dashboard che riordina la striscia per colore (§1.3, lo stesso riordino della
 // riapertura di Filo) SENZA archiviare/chiudere nulla — a differenza di /pulisci.
 //
-// Sei garanzie, tutte ASSERISCONO il successo:
+// Sette garanzie, tutte ASSERISCONO il successo:
 //   1) "/riordina" è classificato come comando Filo (arancione), non
 //      shell/sconosciuto;
 //   2) inviato dalla nuova scheda, riordina davvero le tab web per tinta
@@ -11,12 +11,15 @@
 //   3) con una scheda sola risponde "già in ordine" invece di tacere;
 //   4) la scheda su cui eri resta quella attiva anche dopo il riordino;
 //   5) riordinare due volte di fila: la seconda è un non-fare, e lo dice;
-//   6) "/riordina" con parole in più resta un comando riconosciuto.
+//   6) "/riordina" con parole in più resta un comando riconosciuto;
+//   7) i siti col favicon bianco o nero vanno alle due estremità dell'arcobaleno
+//      e quelli senza favicon in coda (#822), anche con saturazione_tab a 0.
 //
 // I casi 3-6 stavano in uno spec a parte, nato per una verifica e finito nel
 // repo per sbaglio: cancellandolo sono spariti quattro controlli che nessun
 // altro test rifà. Stanno qui perché è qui che si va a cercarli.
 
+import { createRequire } from 'node:module';
 import { test, expect } from './fixtures/electron.mjs';
 
 const NEWTAB = 'filo://newtab/';
@@ -26,23 +29,9 @@ const mk = (title, color) =>
   + `${color ? `<meta name="theme-color" content="${color}">` : ''}</head>`
   + `<body style="margin:0"><div style="height:1200px;background:#fff"></div></body></html>`;
 
-// Replica di hueOf del main per calcolare l'ordine cromatico atteso dai colori
-// REALI assegnati dall'app.
-function hueOf(rgbStr) {
-  const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-  if (!m) return Infinity;
-  const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-  if (p.length < 3 || p.some((n) => Number.isNaN(n))) return Infinity;
-  const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  if (mx === mn) return Infinity;
-  const d = mx - mn;
-  let h;
-  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-  else if (mx === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  return (h / 6) * 360;
-}
+// La regola d'ordine della barra, dal modulo condiviso: l'ordine atteso si calcola dai colori REALI assegnati.
+createRequire(import.meta.url)('../src/shared/tabColor.js');
+const { compareRainbow } = globalThis.SN_TAB_COLOR;
 
 async function submit(page, command) {
   await page.evaluate((cmd) => {
@@ -70,8 +59,8 @@ test('"/riordina" riordina le schede per colore senza chiuderne nessuna', async 
   await testServer.openReady(openTab, mk('Verde', 'rgb(40,200,80)'));
   await testServer.openReady(openTab, mk('Rosso', 'rgb(200,40,40)'));
 
-  // La nuova scheda da cui invieremo il comando (pagina interna: hue Infinity,
-  // resta in coda al riordino, non disturba l'ordine delle tab web).
+  // La nuova scheda da cui invieremo il comando: il filtro sulle schede web la
+  // lascia fuori dal confronto.
   const dash = await openTab(NEWTAB);
   await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
 
@@ -88,7 +77,7 @@ test('"/riordina" riordina le schede per colore senza chiuderne nessuna', async 
   });
   const insertionOrder = before.map((t) => t.title);
   const expectedOrder = [...before]
-    .sort((a, b) => hueOf(a.identityColor) - hueOf(b.identityColor))
+    .sort((a, b) => compareRainbow(a.identityColor, b.identityColor))
     .map((t) => t.title);
   // Sanity: scenario non-banale, altrimenti passerebbe anche senza riordino.
   expect(expectedOrder).not.toEqual(insertionOrder);
@@ -221,4 +210,47 @@ test('"/riordina" con parole in più resta un comando riconosciuto', async ({ op
   await input.fill('/riordina adesso per favore');
   await expect(input).toHaveClass(/is-cmd-filo/);
   await expect(input).not.toHaveClass(/is-cmd-unknown/);
+});
+
+// #822: un favicon bianco o nero è un colore identità (grigio) e sta all'estremità; senza favicon si va in coda.
+const iconaPiena = (fill) => `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="${fill}"/></svg>`)}`;
+const conIcona = (title, fill) =>
+  `<!doctype html><html><head><title>${title}</title>`
+  + `${fill ? `<link rel="icon" href="${iconaPiena(fill)}">` : ''}</head>`
+  + '<body style="margin:0"><div style="height:1200px;background:#fff"></div></body></html>';
+// In ordine di apertura, che non è quello arcobaleno.
+const SCHEDE = [
+  ['Nero', 'rgb(0,0,0)', 'rgb(0, 0, 0)'],
+  ['Senza', null, null],
+  ['Blu', 'rgb(0,0,255)', 'rgb(0, 0, 255)'],
+  ['Bianco', 'rgb(255,255,255)', 'rgb(255, 255, 255)'],
+  ['Rosso', 'rgb(255,0,0)', 'rgb(255, 0, 0)'],
+];
+
+async function riordinaBiancoNeroEColori({ shell, openTab, testServer }) {
+  for (const [titolo, fill] of SCHEDE) await testServer.openReady(openTab, conIcona(titolo, fill));
+  const dash = await openTab(NEWTAB);
+  await expect(dash.locator('#input')).toBeVisible({ timeout: 8_000 });
+  const webTabs = () => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    return s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || '')).map((t) => ({ title: t.title, identityColor: t.identityColor || null }));
+  });
+  // Ognuna col SUO colore: appena aperta, una scheda porta quello in cache per l'host, cioè della sorella.
+  await expect.poll(async () => Object.fromEntries((await webTabs()).map((t) => [t.title, t.identityColor])), {
+    timeout: 15_000, message: 'le cinque schede non hanno ancora il loro colore identità',
+  }).toEqual(Object.fromEntries(SCHEDE.map(([titolo, , identita]) => [titolo, identita])));
+
+  await submit(dash, '/riordina');
+  await expect.poll(async () => (await webTabs()).map((t) => t.title), { timeout: 15_000 })
+    .toEqual(['Bianco', 'Rosso', 'Blu', 'Nero', 'Senza']);
+}
+
+test('"/riordina": il bianco in testa, il nero in fondo ai colori, senza favicon in coda', async ({ shell, openTab, testServer }) => {
+  await riordinaBiancoNeroEColori({ shell, openTab, testServer });
+});
+
+test('"/riordina" con saturazione_tab a 0: le schede grigie a schermo restano in ordine di tinta', async ({ shell, openTab, testServer }) => {
+  await shell.evaluate((st) => window.filoShell.message({ type: 'update_settings', settings: st }), { tabColor: { saturazione_tab: 0 } });
+  await riordinaBiancoNeroEColori({ shell, openTab, testServer });
 });

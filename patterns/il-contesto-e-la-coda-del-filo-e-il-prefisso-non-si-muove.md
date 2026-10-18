@@ -33,6 +33,13 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   lettura anche quando torna dall'archivio (un ricordo, una ricerca, una rilettura con l'id): l'azione che lo riporta
   lo dichiara in `_output.daFuori`, e uscite (`contestoDaAzioni`) e conferme (`fonteDi`) lo contano per tutte le
   azioni allo stesso modo. Una regola sul messaggio segnato, non una per strada: tre giri l'avevano messa sulla strada.
+- **Le immagini mandate in chat tornano col loro messaggio** (#1166), con la vita delle letture, dalle più nuove: al
+  più sedici e 24 milioni di caratteri per richiesta (sotto i limiti dei fornitori); per i tetti in token una pesa
+  1.500 token, non i caratteri del data URL. Stanno in memoria, mai su disco, e se ne vanno con la loro chat. Quando
+  non tornano (vecchie, oltre i tetti, Filo riaperto, modello che le rifiuta) al loro posto c'è una nota: quante
+  erano, e che quello che il modello ne ha scritto l'aveva letto da lì. Senza, al turno dopo diceva di non vederle e
+  ritrattava letture giuste. Un modello che rifiuta le immagini dei turni passati (solo testo, una per richiesta)
+  rifà lo stesso giro con la nota, e da lì quel modello riceve solo la nota.
 - **Un messaggio tagliato si rilegge davvero**: oltre un quarto del tetto restano testa e coda, con l'id intero della
   chat; CERCA_CHAT con l'id rilegge la conversazione intera fino al tetto in token, oltre dà testa, coda e il
   numero da cui leggere il mezzo, e con `da` lo dà a pezzi. Nessun secondo taglio nella busta.
@@ -55,6 +62,9 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   la pagina mentre la chat si trova. Le pagine non entrano mai da sole nel
   contesto: solo cercate (decisione dell'owner, D56 la cambierà con un interruttore). Una pagina delicata dice solo
   il sito; gli indirizzi trovati si riaprono senza conferma, come i link di una ricerca.
+
+- **Le chat delle app entrano come una riga** all'ora in cui sono cominciate, mai lo scambio: vedi
+  [Il filo cresce solo in coda](il-filo-cresce-solo-in-coda-e-cancellare-e-un-evento.md), § chat delle altre app.
 
 - **Chi non ha il filo davanti lo riceve in breve**: la home e il creatore di lezioni hanno nello stato le
   CONVERSAZIONI RECENTI (ultime 24 ore, al più quaranta messaggi, il taglio dichiarato). La chat no: ha il tratto.

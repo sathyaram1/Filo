@@ -95,12 +95,17 @@
   menuDi(striscia, { striscia: true });
 
   // ── suggerimenti ─────────────────────────────────────────────────────────
+  // L'etichetta vive quanto il puntatore sull'icona, a barra aperta e con l'icona ferma (#1201):
+  // patterns/un-riquadro-che-si-riempie-dopo-va-rimisurato-dopo-la-posa.md.
   let suggTimer = null;
+  let suggDi = null;
   function programmaSuggerimento(el) {
     nascondiSuggerimento();
+    suggDi = el;
     suggTimer = setTimeout(() => {
       suggTimer = null;
-      if (!el.isConnected || trascina) return;
+      // Chiusa nel frattempo, o la vista stretta sotto il puntatore: nessun pointerleave lo direbbe.
+      if (!el.isConnected || trascina || !stato.aperta || !el.matches(':hover')) { suggDi = null; return; }
       const r = el.getBoundingClientRect();
       const p = pannello.getBoundingClientRect();
       api.suggerimento({ testo: el.dataset.sugg || el.getAttribute('aria-label') || '', x: Math.round(p.right + 8), y: Math.round(r.top + r.height / 2 - 11) });
@@ -108,6 +113,7 @@
   }
   function nascondiSuggerimento() {
     if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; }
+    suggDi = null;
     api.suggerimento({ testo: '' });
   }
 
@@ -117,13 +123,16 @@
     b.type = 'button';
     b.className = classe;
     b.addEventListener('pointerenter', (e) => { if (e.isTrusted) programmaSuggerimento(b); });
-    b.addEventListener('pointerleave', () => { if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; } });
+    b.addEventListener('pointerleave', () => { if (suggDi === b) nascondiSuggerimento(); });
+    b.addEventListener('pointerdown', () => { if (suggDi === b) nascondiSuggerimento(); });
     return b;
   }
 
   function aggiornaIcona(b, it) {
     b.dataset.id = it.id;
     b.setAttribute('aria-label', it.etichetta);
+    if (it.tasto) b.dataset.sugg = `${it.etichetta} (${it.tasto})`;
+    else delete b.dataset.sugg;
     b.setAttribute('aria-disabled', it.spenta ? 'true' : 'false');
     b.classList.toggle('accesa', !!it.accesa);
     if (b.dataset.icona !== it.icona) {
@@ -160,6 +169,7 @@
       if (it.pagina) b.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.chiedi(); });
       nav.appendChild(b);
     }
+    if (suggDi && !suggDi.isConnected) nascondiSuggerimento();
     // L'icona appena arrivata si fa vedere anche se il gruppo scorre: senza, sembra che il trascinamento non abbia fatto niente.
     const arrivata = prima.size ? [...nav.querySelectorAll('.ico')].find((b) => !prima.has(b.dataset.id)) : null;
     if (arrivata) {
@@ -183,7 +193,10 @@
     api.misure({ icone });
   }
   window.addEventListener('resize', misura);
-  nav.addEventListener('scroll', misura, { passive: true });
+  nav.addEventListener('scroll', () => {
+    if (suggDi && nav.contains(suggDi)) nascondiSuggerimento();
+    misura();
+  }, { passive: true });
 
   // ── il sistema: ora e voci fisse ─────────────────────────────────────────
   const FISSE = [

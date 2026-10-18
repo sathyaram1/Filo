@@ -39,7 +39,8 @@
 //     Lo lancia chi ha registrato una critica che manda a correggere e mette
 //     rilievi da parte, SUBITO dopo: registra il commit che toglie SOLO le
 //     loro prove del giro, se nessun caso rosso si è spento. Da lì la consegna
-//     blocca ogni prova tolta rossa.
+//     blocca ogni prova tolta rossa. Una dimenticata esce anche dopo le
+//     correzioni: allora il commit della pulizia è l'ultimo, e da solo.
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
@@ -81,10 +82,12 @@ import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifie
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
-import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { numeraRilievi, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
 } from './lib/ramo-server.mjs';
+import { registraRamo } from './lib/biglietto-locale.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
 
@@ -594,7 +597,8 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
 /**
  * Registra il commit della pulizia: le prove dei rilievi messi da parte tolte PRIMA di correggere.
  * Da lì parte il confronto della consegna, e ogni prova tolta dopo che è ancora rossa la ferma. PURA:
- * `controllo` è l'esito di controllaPulizia (lib/prove-tolte.mjs).
+ * `controllo` è l'esito di controllaPulizia (lib/prove-tolte.mjs). Una pulizia dopo le correzioni non
+ * sposta la base: va in `pulizieDopo`, e la consegna non rilancia ciò che ha tolto.
  */
 export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
@@ -608,11 +612,22 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   }
   if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles, 'pulizia') };
   if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
-  const numeri = numeraRilievi(ROUND.parseFindings(prev.critique || '').findings, parte).map((f) => f.n);
+  const numeri = numeriMessiDaParte(prev);
   const fuori = testoPuliziaFuoriNumero(controllo, numeri);
   if (fuori) return { ok: false, reason: fuori };
-  s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
+  const dopo = Array.isArray(prev.pending.pulizieDopo) ? prev.pending.pulizieDopo.filter((x) => x !== controllo.sha) : [];
+  const pending = controllo.dopo
+    ? { ...prev.pending, pulizieDopo: [...dopo, controllo.sha] }
+    : { ...prev.pending, shaPulizia: controllo.sha };
+  s[branch] = { ...prev, pending };
   return { ok: true, state: s, files: controllo.files, numeri };
+}
+
+/** I posti nella critica dei rilievi che il giro ha messo da parte: le loro prove escono con la pulizia. PURA. */
+export function numeriMessiDaParte(prev) {
+  const p = (prev && prev.pending) || {};
+  const parte = [p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : []));
+  return numeraRilievi(ROUND.parseFindings((prev && prev.critique) || '').findings, parte).map((f) => f.n);
 }
 
 /**
@@ -764,6 +779,7 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     'li tiene chiusi (se non ne scrive una, la prova del giro resta). Una prova del giro ancora rossa non si toglie e non si',
     'cambia mai: la consegna la rilancia com\'era e si ferma. Restano anche le prove dei rilievi che fermano il lavoro: le',
     'tratta chi riprende.',
+    ROSSO_ATTESO_CHIUSO,
     '',
     testo,
   );
@@ -944,6 +960,8 @@ function realignBeforeStart(root = ROOT) {
   // frattempo sullo stesso ramo. La destinazione è nel refspec, per intero:
   // non la sceglie la configurazione locale di git (stessa forma di ogni altra
   // spedizione del repo).
+  // Il riallineamento spedisce anche i commit locali non ancora partiti: il pre-push ferma una copia dei dati (#1108).
+  try { installaControlloSpedizione(root); } catch (_) { /* senza, il push parte come prima */ }
   const push = tryGit(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], root);
   if (!push.ok) {
     console.error(`Ramo riallineato qui, ma non riesco a rispedirlo su origin:\n${push.out.slice(0, 300)}`);
@@ -973,6 +991,28 @@ export function shaPrimaAllineato(shaPrima, root = ROOT, base = `origin/${MAIN}`
 
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
 export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); }
+
+/** La riga che dice com'è andata la registrazione del ramo nel registro del server (#1148). PURA. */
+export function rigaRegistro(repo, r) {
+  const chi = repo === 'server' ? 'del server' : 'dell’app';
+  const sporcata = r && r.sporcato ? ` Questa sessione si è sporcata (${String(r.sporcato).slice(0, 200)}): da qui ciò che scrive nasce non fidato.` : '';
+  if (r && r.ok) return `Registro del ramo ${chi}: ${r.ramoFidato ? 'lavoro fidato, scritto solo da sessioni pulite' : 'non fidato: se i controlli lo fermano, la fusione aspetterà il tuo sì'}.${sporcata}`;
+  if (r && r.senzaBiglietto) return `Registro del ramo ${chi}: questa sessione non ha un biglietto (node scripts/biglietto.mjs stato), il lavoro non risulta fidato.`;
+  return `Registro del ramo ${chi} non scritto (${String((r && r.errore) || 'motivo sconosciuto').slice(0, 160)}): il lavoro non risulta fidato.`;
+}
+
+/**
+ * Questa sessione ha scritto la punta di adesso (#1148): una voce nel registro dei rami, con la fiducia del suo
+ * biglietto in questo momento e i commit del ramo letti nel suo deposito. La chiamano start e finish. Mai un'eccezione:
+ * senza voce il lavoro non è fidato.
+ */
+export async function registraNelRegistro({ ramo, sha, feedbackId = '', server = null, root = ROOT }, registra = registraRamo) {
+  const righe = [rigaRegistro('app', await registra({ repo: 'app', ramo, sha, feedbackId, cartella: root }))];
+  if (server && server.ramo && server.sha) {
+    righe.push(rigaRegistro('server', await registra({ repo: 'server', ramo: server.ramo, sha: server.sha, feedbackId, cartella: server.radice || server.checkout || '' })));
+  }
+  return righe;
+}
 /** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
 export function isDirty(root = ROOT) { return git(['status', '--porcelain'], root).length > 0; }
 
@@ -1094,7 +1134,9 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
     `del giro è \`${cartellaProveGiro(branch)}\` — dove la recipe qui sotto dice`,
     '`tests/verifica/<numero>/`, in locale si legge quella. Come si chiamano lo dice la',
-    'recipe (il numero del rilievo nel nome), e si committano prima della critica. Sei tu',
+    'recipe (il numero del rilievo nel nome), e si committano prima della critica, rosse',
+    'come le trovi: il segno di rosso atteso (`test.fail`) non va mai sulla prova di un',
+    'rilievo che stai per registrare, e quando va lo dice la recipe. Sei tu',
     'l\'unico a rilanciare quelle dei giri passati, e il momento è ADESSO, in partenza:',
     'sono il controllo delle porte riaperte, e dopo di te nessuno le rilancia. Se la',
     'cartella non c\'è, non c\'era niente da rilanciare — ma guarda la cartella, non il',
@@ -1299,6 +1341,7 @@ if (isMain) {
       }
     }
     writeState(state);
+    for (const riga of await registraNelRegistro({ ramo: b, sha: state[b].requestedSha || headSha(), feedbackId: state[b].feedbackId || '', server: srvStart })) console.error(riga);
     // La pratica racconta il lavoro: presa in carico al primo giro, e a ogni giro com'è andato quello prima.
     if (state[b].feedbackId) {
       const { annotaPratica } = await import('./owner-feedback.mjs');
@@ -1423,15 +1466,24 @@ if (isMain) {
     const aperto = readState()[branch];
     const statoP = statoDirectory(ROOT);
     if (!statoP.ok) { console.error(statoIllegibileText(statoP.motivo)); process.exit(1); }
-    const { controllaPulizia, controllaCasiDellaPulizia } = await import('./lib/prove-tolte.mjs');
+    const { controllaPulizia, controllaCasiDellaPulizia, baseDelConfronto } = await import('./lib/prove-tolte.mjs');
     const controllo = aperto && aperto.pending && !statoP.lines.length
-      ? controllaPulizia({ shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch), avvio: aperto.requestedSha })
+      ? controllaPulizia({
+        shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch), avvio: aperto.requestedSha,
+        base: baseDelConfronto(aperto.pending.sha, aperto.pending.shaPulizia, ROOT), pulizieDopo: aperto.pending.pulizieDopo,
+      })
       : null;
     const r = withPulizia(readState(), branch, { controllo, dirtyFiles: statoP.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
-    const casi = controllaCasiDellaPulizia({ shaCritica: aperto.pending.sha, sha: controllo.sha, root: ROOT, messi: r.numeri });
+    const casi = controllaCasiDellaPulizia({ shaCritica: controllo.prima || aperto.pending.sha, sha: controllo.sha, root: ROOT, messi: r.numeri, dopo: !!controllo.dopo });
     if (casi.ferma) { console.error(casi.testo); process.exit(1); }
     writeState(r.state);
+    if (controllo.dopo) {
+      console.log(`Pulizia dopo le correzioni registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'toccata 1 prova' : `toccate ${r.files.length} prove`} dei rilievi messi da parte.`);
+      console.log(r.files.map((f) => `  · ${f}`).join('\n'));
+      console.log('La consegna non le rilancia più com\'erano: di quelle a cui ha tolto un caso rilancia quello che resta, e ogni altra prova del giro tolta o cambiata dalla pulizia di prima, se com\'era è ancora rossa, la ferma.');
+      process.exit(0);
+    }
     console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);
     console.log(r.files.map((f) => `  · ${f}`).join('\n'));
     console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com\'era è ancora rossa, la ferma.');
@@ -1457,7 +1509,10 @@ if (isMain) {
       const base = baseDelConfronto(aperto.pending.sha, aperto.pending.shaPulizia, ROOT);
       const messi = [aperto.pending.derived, aperto.pending.external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
       const tolte = base !== sha
-        ? controllaProveTolte({ shaPrima: base, root: ROOT, conPulizia: base !== aperto.pending.sha, messi, shaCritica: aperto.pending.sha })
+        ? controllaProveTolte({ shaPrima: base, root: ROOT, conPulizia: base !== aperto.pending.sha, messi, shaCritica: aperto.pending.sha,
+          // Il numero nel nome dice quali rosse sono di un rilievo messo da parte: quelle escono con la pulizia (#747).
+          numeri: numeriMessiDaParte(aperto), avvio: aperto.requestedSha, pulizieDopo: aperto.pending.pulizieDopo,
+          comando: 'node scripts/verify-local.mjs pulizia' })
         : { ferma: false, testo: '' };
       if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
       if (tolte.testo) console.log(tolte.testo);

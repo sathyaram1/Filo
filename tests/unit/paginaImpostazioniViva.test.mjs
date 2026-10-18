@@ -37,10 +37,11 @@ test('Opzioni: si salta solo il controllo che l\'utente ha sotto le dita adesso,
   );
 });
 
-test('Opzioni: il modello di un\'azione scelto altrove ridisegna la griglia da cui riparte il salvataggio', () => {
+test('Opzioni: il modello di un\'azione scelto altrove riscrive la sua catena, non tutta la griglia', () => {
   const s = leggi('src/pages/options/options.js');
   const ascolto = s.slice(s.indexOf("riallineaPagina('options'"), s.indexOf("document.addEventListener('DOMContentLoaded'"));
-  assert.match(ascolto, /modelChains\s*=\s*ModelChain\.renderGrid/, 'senza, il salvataggio dopo rimanda indietro il modello scelto altrove');
+  assert.match(ascolto, /\.imposta\(s\.models\[/, 'senza, il salvataggio dopo rimanda indietro il modello scelto altrove');
+  assert.doesNotMatch(ascolto, /renderGrid/, 'ridisegnare tutta la griglia porta via la spiegazione del modello appena respinto (#667.7)');
 });
 
 test('la regola condivisa salta il campo in cui si scrive e il controllo premuto, non il fuoco da solo', () => {

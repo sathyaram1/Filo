@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -338,6 +340,87 @@ test('#1072 — stampare un testo con due barre non apre niente; usato da un alt
   }
 });
 
+// #1072.4 — un percorso di rete che nessun pezzo del comando scrive per intero,
+// ma che un comando "innocuo" CALCOLA e poi apre (o passa a chi lo apre), chiede
+// un OK: la cura guarda il risultato di Join-Path/Split-Path/Get-Date, non i pezzi.
+test('#1072.4 — un percorso di rete calcolato da un comando innocuo chiede un OK', () => {
+  const rete = /altro computer della rete/;
+  for (const cmd of [
+    "Join-Path '\\\\' 'evil\\x' -Resolve", "Join-Path -Path '\\\\' -ChildPath 'evil\\x' -Resolve",
+    "Join-Path '\\\\' 'evil\\x' | cd", "Join-Path -Path '\\\\' -ChildPath evil -AdditionalChildPath x | cd",
+    'Split-Path -NoQualifier C:\\\\evil\\x | cd', "Split-Path -NoQualifier 'C:\\\\evil\\x' | Test-Path",
+    'Split-Path C:\\\\evil\\x -NoQualifier | Test-Path', 'Split-Path -NoQualifier C:/\\evil/x | cd',
+    'Get-Date -Format "\'\'\\\\\\\\evil\\\\x" | Get-ChildItem', 'cd (Split-Path -NoQualifier C:\\\\evil\\x)',
+  ]) {
+    const d = C.classifyDetail(cmd, WIN);
+    assert.equal(d.level, 2, `"${cmd}" compone un percorso di rete: chiede un OK (è ${d.level})`);
+    assert.match(d.motivo, rete, cmd);
+  }
+  // Lo stesso comando su un percorso locale, o che solo STAMPA il testo, resta libero.
+  for (const cmd of [
+    'Join-Path C:\\Users\\Mario x', 'Split-Path -Leaf C:\\Users\\Mario\\x.txt', 'Join-Path C:\\Users\\Mario p | cd',
+    "Join-Path '\\\\' 'evil\\x'", 'Get-Date -Format yyyy-MM-dd', 'Test-Path (Join-Path $env:USERPROFILE "Downloads")',
+  ]) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
+// #1072.4 giro 1 — il calcolo sfugge se i pezzi arrivano dal tubo, il parametro è abbreviato o la qualifica non è
+// una lettera d'unità (`Env:`, `HKCU:`, `Provider::`): ognuna di queste forme compone `\\evil\x` e chiede un OK.
+test('#1072.4 — un percorso di rete composto dal tubo, con parametri abbreviati o altre qualifiche chiede un OK', () => {
+  for (const cmd of [
+    "Write-Output '\\\\' | Join-Path -ChildPath evil\\x | cd", "Get-Date -Format '\\\\\\\\' | Join-Path -ChildPath evil\\x | cd",
+    "Split-Path -NoQualifier 'C:\\\\' | Join-Path -ChildPath evil\\x | cd", "Write-Output '\\\\' | Join-Path -ChildPath evil\\x -Resolve",
+    "Write-Output 'C:\\\\evil\\x' | Split-Path -NoQualifier | cd", 'echo C:\\\\evil\\x | Split-Path -NoQualifier | Test-Path',
+    'Split-Path -N C:\\\\evil\\x | cd', 'Split-Path -No C:\\\\evil\\x | cd', "Join-Path '\\\\' 'evil\\x' -Resolve:$true",
+    'Split-Path -NoQualifier Env:\\\\evil\\x | cd', 'Split-Path -NoQualifier HKCU:\\\\evil\\x | cd',
+    "Split-Path -NoQualifier 'Foo::\\\\evil\\x' | cd", "Test-Path (Write-Output '\\\\' | Join-Path -ChildPath evil\\x)",
+  ]) {
+    assert.ok(lvl(cmd, WIN) >= 2, `"${cmd}" compone un percorso di rete: chiede un OK`);
+  }
+  for (const cmd of ["Write-Output 'C:\\x' | Join-Path -ChildPath docs | Sort-Object", 'Get-ChildItem | Split-Path -Leaf | Sort-Object',
+    'Split-Path -NoQualifier HKCU:\\Software | Sort-Object', 'Split-Path -N C:\\Users\\Mario\\x | cd']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
+// #1072.4 giro 1 — in una cwd di rete il nome arriva al remoto anche come riferimento git (`.git/refs/<nome>`,
+// per ogni sotto-comando) e come valore passato col tubo o da un gruppo a chi lo cerca nella cartella.
+test('#1072.4 — in una cwd di rete un nome dato a git, dal tubo o da un gruppo chiede un OK', () => {
+  const NOMI = ['git cat-file -t segreto', 'git reflog segreto', 'git reflog show segreto', 'git name-rev segreto',
+    'git ls-tree segreto', 'git symbolic-ref segreto', 'git describe segreto', 'Write-Output segreto | Test-Path',
+    'Write-Output segreto | Get-Item', 'Write-Output segreto | Resolve-Path', 'Write-Output segreto | Get-Content',
+    'Write-Output segreto | Get-FileHash', 'echo segreto | cat', 'Write-Output .\\segreto | Get-Command',
+    'Test-Path (Write-Output segreto)', 'Get-Content (Write-Output segreto)'];
+  for (const ctx of [{ ...WIN, cwd: '\\\\host\\x' }, { ...WIN, cwd: 'Z:\\', reti: ['Z:'] }]) {
+    for (const cmd of NOMI) assert.ok(lvl(cmd, ctx) >= 2, `"${cmd}" in ${ctx.cwd} manda il nome al remoto: chiede un OK`);
+  }
+  for (const cmd of ['git cat-file -t HEAD', 'git reflog', 'Write-Output a.txt | Test-Path', 'Test-Path (Write-Output a.txt)']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
+// #1072.4 — con la cartella di lavoro su un altro computer anche i comandi "liberi"
+// che risolvono un NOME contro la cartella (Get-Command/Get-Help, where di cmd,
+// git log/show/diff/rev-parse/blame) lo mandano al remoto: l'OK che vale per `ls`.
+test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK', () => {
+  const NOMI = ['Get-Command .\\segreto', 'Get-Command -Name .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto',
+    'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log -- segreto'];
+  for (const ctx of [{ ...WIN, cwd: '\\\\host\\x' }, { ...WIN, cwd: 'Z:\\', reti: ['Z:'] }]) {
+    assert.equal(C.classifyDetail('ls segreto', ctx).level, 2, `ls in ${ctx.cwd}`);
+    for (const cmd of NOMI) {
+      const d = C.classifyDetail(cmd, ctx);
+      assert.equal(d.level, 2, `"${cmd}" in ${ctx.cwd} manda il nome al remoto: chiede un OK (è ${d.level})`);
+      assert.match(d.motivo, /altro computer della rete/, `${cmd} in ${ctx.cwd}`);
+    }
+  }
+  // Gli stessi comandi in una cartella del disco restano liberi.
+  for (const cmd of ['Get-Command .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto', 'where node',
+    'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
 test('#1072 — su Windows si legge il comando come lo spezza PowerShell: virgolette tipografiche, trattini lunghi, `\\` in coda', () => {
   for (const cmd of ['cd “\\\\evil\\x”', 'cd ‘\\\\evil\\x’', 'Test-Path „\\\\evil\\x”', 'Get-ChildItem ‛\\\\evil\\x‛', 'cd -Path:“\\\\evil\\x”',
     'Set-Location —Path:\\\\evil\\x', 'Get-ChildItem –LiteralPath:\\\\evil\\x', 'findstr a src\\ \\\\evil\\x\\a', 'dir C:\\ \\\\evil\\x',
@@ -350,4 +433,122 @@ test('#1072 — su Windows si legge il comando come lo spezza PowerShell: virgol
   assert.equal(lvl('Get-Content “notes.txt”', WIN), 1);
   // In bash `\ ` protegge lo spazio: è un nome solo, nella cartella di lavoro.
   assert.equal(lvl('cat my\\ file.txt', { win: false, maiuscole: false, home: '/home/a', cwd: '/home/a/p' }), 1);
+});
+
+// #1072.1 — con cmd scelto nelle Preferenze il `^` protegge il carattere dopo e sparisce: i controlli guardano il
+// comando che cmd passa al programma, non la sua grafia. Con PowerShell `^` è un carattere come un altro.
+const WIN_CMD = { ...WIN, shell: 'cmd' };
+
+test('#1072.1 — con cmd il `^` non nasconde un percorso di rete', () => {
+  for (const cmd of ['dir ^\\^\\host\\x', 'dir ^\\\\host\\x', 'type ^\\^\\host\\x\\a.txt', 'cd ^\\^\\host\\x', 'pushd ^\\^\\host\\x',
+    'dir ^/^/host/x', 'type ^"\\\\host\\x\\a.txt^"', 'tree ^\\^\\host\\x']) {
+    const d = C.classifyDetail(cmd, WIN_CMD);
+    assert.equal(d.level, 2, `"${cmd}" con cmd contatta un altro computer: chiede un OK`);
+    assert.match(d.motivo, /altro computer della rete/, cmd);
+  }
+});
+
+test('#1072.1 — con cmd il `^` non nasconde un file nascosto o una cartella di profilo', () => {
+  for (const cmd of ['type C:\\Users\\Mario\\^.ssh\\id_rsa', 'type ^.ssh\\id_rsa', 'more ^.aws\\credentials',
+    'type ^"C:\\Users\\Mario\\^.ssh\\id_rsa^"', 'type C:\\Users\\Mario\\App^Data\\Roaming\\Filo\\storage.json',
+    'type ^_netrc', 'findstr password ^.git-credentials']) {
+    const d = C.classifyDetail(cmd, WIN_CMD);
+    assert.equal(d.level, 2, `"${cmd}" con cmd legge un file nascosto: chiede un OK`);
+    assert.match(d.motivo, /nascosto/, cmd);
+  }
+  const a = { type: 'ESEGUI_COMANDO', comando: 'type C:\\Users\\Mario\\^.ssh\\id_rsa', _perimetro: WIN_CMD };
+  assert.equal(AL.costoFor(a), 2);
+  assert.match(AL.describe(a), /Perché te lo chiedo: legge un file nascosto/);
+});
+
+test('#1072.1 — con cmd il `^` non nasconde un flag pericoloso, e le forme che cmd legge diverse restano «conferma»', () => {
+  for (const cmd of ['git push -^-force', 'git push origin ^-^-force', 'git checkout ^.', 'git reset -^-hard']) {
+    assert.equal(lvl(cmd, WIN_CMD), 3, `"${cmd}" con cmd è il comando distruttivo`);
+  }
+  // Un `^` in coda prende la riga dopo; su un separatore lo fa diventare testo, che finisce a un altro programma;
+  // le espansioni `%` vengono prima dei `^`, quelle `!` dopo.
+  for (const cmd of ['dir ^', 'findstr x a.txt ^&^& findstr \\\\host\\y b.txt', 'type a.txt ^| findstr x \\\\host\\y',
+    'type ^(a.txt^)', 'type a.txt ^> b.txt', 'type %US^ERPROFILE%\\x.txt', 'type ^^.ssh\\id_rsa!']) {
+    assert.equal(lvl(cmd, WIN_CMD), 3, cmd);
+  }
+});
+
+test('#1072.1 — con cmd le letture di tutti i giorni restano libere; con PowerShell `^` resta un carattere', () => {
+  for (const cmd of ['dir', 'dir Documenti', 'type nota.txt', 'git log HEAD^^', 'git show HEAD^^:src/a.js', 'echo ^\\^\\host\\x',
+    'dir ^"Documenti personali^"', 'type "^.ssh"', 'findstr /r "^errore" log.txt']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN_CMD), { level: 1, motivo: '' }, cmd);
+  }
+  for (const ctx of [WIN, { ...WIN, shell: 'powershell' }]) {
+    for (const cmd of ['git diff HEAD^', 'git log HEAD^..HEAD', 'type C:\\Users\\Mario\\^.ssh\\id_rsa']) {
+      assert.equal(lvl(cmd, ctx), 1, `"${cmd}" con PowerShell legge un nome che contiene davvero ^`);
+    }
+  }
+  // Le virgolette tipografiche le converte PowerShell, non cmd: per cmd sono testo e `^` dopo resta un escape.
+  assert.match(C.classifyDetail('type C:\\Users\\Mario\\“x” ^.ssh\\id_rsa', WIN_CMD).motivo, /nascosto/);
+});
+
+// #1072.5 — per cmd l'apice singolo è un carattere: `' \\host\x '` sono tre argomenti, e il percorso in mezzo arriva
+// al programma da solo. I programmi MSYS (cat, ls di Git) invece lo leggono come virgolette: valgono tutte le letture.
+test('#1072.5 — con cmd un percorso fra apici singoli non sfugge ai controlli su rete e file nascosti', () => {
+  for (const [cmd, motivo] of [
+    ['findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \'', /nascosto/],
+    ['type \' C:\\Users\\Mario\\.ssh\\id_rsa \'', /nascosto/],
+    ['findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \' | more', /nascosto/],
+    ['dir \' \\\\host\\x \'', /altro computer della rete/],
+    ['findstr a \' \\\\host\\x\\a.txt \'', /altro computer della rete/],
+    ['dir \' \\\\host\\x \' && dir', /altro computer della rete/],
+    ['dir ^\' \\\\host\\x ^\'', /altro computer della rete/],
+    // Per findstr e gli altri programmi C `\"` è una `"` dentro l'argomento, non l'inizio di un gruppo.
+    ['findstr /v \\" x C:\\Users\\Mario\\.ssh\\id_rsa \\"', /nascosto/],
+    ['findstr a \\" \\\\host\\x\\a.txt \\"', /altro computer della rete/],
+    // Letti come virgolette, come fa un programma MSYS.
+    ['type \'C:\\Users\\Mario\\.ssh\\id_rsa\'', /nascosto/],
+    ['dir \'\\\\host\\x\'', /altro computer della rete/],
+  ]) {
+    const d = C.classifyDetail(cmd, WIN_CMD);
+    assert.equal(d.level, 2, `"${cmd}" con cmd chiede un OK`);
+    assert.match(d.motivo, motivo, cmd);
+  }
+  const a = { type: 'ESEGUI_COMANDO', comando: 'findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \'', _perimetro: WIN_CMD };
+  assert.equal(AL.costoFor(a), 2);
+  assert.match(AL.describe(a), /Perché te lo chiedo: legge un file nascosto/);
+  // Per PowerShell gli apici fanno una stringa sola: lì le stesse righe sono innocue.
+  for (const ctx of [WIN, { ...WIN, shell: 'powershell' }]) {
+    assert.equal(lvl('findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \'', ctx), 1);
+    assert.equal(lvl('dir \' \\\\host\\x \'', ctx), 1);
+  }
+  for (const cmd of ['echo l\'errore', 'findstr "l\'errore" log.txt', 'findstr \'errore\' log.txt', 'dir \'Documenti personali\'',
+    'git log --oneline -- \'src/a b.js\'', 'findstr /c:"a \\"b\\"" log.txt']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN_CMD), { level: 1, motivo: '' }, cmd);
+  }
+  // `'dir'` per cmd è un programma che si chiama così, non `dir`.
+  assert.equal(lvl('\'dir\'', WIN_CMD), 3);
+});
+
+test('#1072.1 — un download scritto con `^` o con le virgolette resta testo del web, non l\'uscita di un comando', () => {
+  const fonte = (comando, stdout = '<html>') => AL.fonteDi({ type: 'ESEGUI_COMANDO', comando, _output: { stdout } });
+  for (const comando of ['c^url h^ttps://x.it', 'w^get x.it/a', 'c"u"rl x.it', 'Invoke-We^bRequest x.it', 'curl ht""tps://x.it']) {
+    assert.equal(fonte(comando).classe, 5, comando);
+    assert.equal(fonte(comando).chiave, 'web:comando', comando);
+  }
+  assert.equal(fonte('type nota.txt', 'ciao').chiave, 'terminale:uscita');
+});
+
+// Su Linux cmd non c'è (la shell si risolve in sh): resta la regola del main, scritta.
+test('#1072.1 — il comando dell\'assistente si giudica con la shell delle Preferenze, e parte con quella stessa', () => {
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  assert.match(src, /if \(type === 'ESEGUI_COMANDO'\) action\._perimetro\.shell = await shellDeiComandi\(\);/);
+  const esegui = src.slice(src.indexOf("case 'ESEGUI_COMANDO': {")).slice(0, 1500);
+  assert.match(esegui, /const shell = \(action\._perimetro && action\._perimetro\.shell\) \|\| await shellDeiComandi\(\);/);
+  assert.match(esegui, /runCommand\(cmd, \{ shell,/);
+});
+
+// Su Windows la prova contro cmd vero: `echo` stampa il comando come cmd lo passa al programma.
+test('#1072.1 — la lettura dei `^` è quella di cmd vero', { skip: process.platform !== 'win32' && 'cmd esiste solo su Windows' }, async () => {
+  const T = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'terminal.js'));
+  for (const x of ['dir ^\\^\\host\\x', 'type C:\\Users\\nome\\^.ssh\\id_rsa', 'a^^b', '^"a ^.b^" ^.c', '"a ^.b" ^.c', 'git push -^-force']) {
+    const out = await T.runCommand(`echo ${x}`, { shell: 'cmd', timeoutMs: TETTO_ATTESA_MS });
+    assert.equal(out.code, 0, out.stderr);
+    assert.equal(out.stdout.trim(), C.comeCmd(x), x);
+  }
 });

@@ -16,6 +16,8 @@ module.exports = function register(on, ctx) {
   // economico. Una rete più larga di così la chat la dichiara col numero e chiede un vincolo in più.
   const JUDGE_MAX_CARDS = 1050;
   const SORT_WORDS = { cmc: 'costo di mana', name: 'nome', price: 'prezzo' };
+  // Lotti della probabilità in chat: dieci tengono l'errore sotto i tre decimi di punto e la risposta sotto il mezzo secondo.
+  const CHAT_PROB_BATCHES = 10;
 
   // Identity del mazzo per il filtro automatico (§4): dai colori del
   // commander. Senza commander nessun vincolo (si cerca in tutto Scryfall).
@@ -283,6 +285,9 @@ module.exports = function register(on, ctx) {
       // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
+      // Fermata al tetto di lunghezza (#1097.3): lo dice la risposta stessa.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);
+      if (interrotta) reply = [reply, interrotta].filter(Boolean).join('\n');
       let deckOut = null;
       // La frase che il modello dà alla lista (#788); quella della query corretta al secondo tentativo, se c'è.
       let title = parsed.title;
@@ -574,15 +579,38 @@ module.exports = function register(on, ctx) {
       }
 
       // Calcolatore di probabilità via chat (§9.3): la simulazione Monte Carlo
-      // gira QUI, locale e gratis; il risultato si accoda alla reply.
+      // gira QUI, locale e gratis, con le condizioni e i lotti del riquadro (stessi
+      // seed: a parità di condizioni il numero coincide entro l'errore); fra un
+      // lotto e l'altro il main respira.
       if (parsed.prob) {
         const Stats = globalThis.SN_DECK_STATS;
-        const library = Stats.buildLibrary(draft || deck, known);
-        const r2 = Stats.simulate({ library, want: parsed.prob.needs, turn: parsed.prob.turn });
-        const pct = (r2.probability * 100).toFixed(1).replace('.', ',');
-        const wantsTxt = parsed.prob.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
-        reply = [reply, `Probabilità di avere ${wantsTxt} al turno ${parsed.prob.turn}: ≈ ${pct}% (${r2.iterations.toLocaleString('it-IT')} mani simulate).`]
-          .filter(Boolean).join('\n');
+        const base = draft || deck;
+        const p = parsed.prob;
+        const cats = Stats.categoriesOf(base, known);
+        // Una categoria che il mazzo non ha darebbe 0% o mulligan infiniti: si dice.
+        const missing = [...new Set([...p.needs, ...p.keep].map((w) => w.tag))].filter((t) => !cats.includes(t));
+        let probTxt;
+        if (missing.length) {
+          probTxt = `Nel mazzo non c'è la categoria ${missing.map((t) => `«${t}»`).join(', ')}`
+            + (cats.length ? `: puoi chiedere ${cats.join(', ')}.` : '. Tagga le carte per averne.');
+        } else {
+          const library = Stats.buildLibrary(base, known);
+          // Un mulligan detto senza la mano da tenere parte da quella del riquadro (#791).
+          const keep = p.mulligans > 0 && !p.keep.length && Stats.DEFAULT_KEEP.every((w) => cats.includes(w.tag))
+            ? Stats.DEFAULT_KEEP : p.keep;
+          const cond = { game: p.game, mulligans: p.mulligans, keep, extraDraws: p.extraDraws };
+          let hits = 0; let iters = 0;
+          for (let seed = 1; seed <= CHAT_PROB_BATCHES && !signal.aborted; seed++) {
+            const r2 = Stats.simulate({ library, want: p.needs, turn: p.turn, ...cond, iterations: Stats.PROB_BATCH, seed });
+            hits += r2.hits; iters += r2.iterations;
+            if (hits === 0 || hits === iters) break; // caso certo o impossibile
+            await new Promise((res) => setImmediate(res));
+          }
+          const pct = (hits / Math.max(1, iters) * 100).toFixed(1).replace('.', ',');
+          const wantsTxt = p.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
+          probTxt = `Probabilità di avere ${wantsTxt} al turno ${p.turn} (${Stats.describeConditions(cond)}): ≈ ${pct}% (${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate).`;
+        }
+        reply = [reply, probTxt].filter(Boolean).join('\n');
       }
 
       // Auto-tag via chat (§7): "tagga il mazzo con ramp, draw, removal…".

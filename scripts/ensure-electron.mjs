@@ -3,15 +3,14 @@
 //
 // PERCHÉ ESISTE
 //   Nell'ambiente cloud delle routine l'installer nativo di Electron
-//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy,
-//   quindi il postinstall di `electron` fallisce e `npm install` esce con errore.
+//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy.
+//   Da Electron 42 `npm install` non scarica più il binario: lo scarica
+//   `require('electron')` al primo uso, con quello stesso installer, e lì cade.
 //   Questo script, idempotente, procura lo zip del binario da una delle sorgenti
 //   qui sotto e lo estrae dove Electron lo cerca, così `require('electron')` e
 //   Playwright (`_electron.launch`) funzionano senza toccare l'installer rotto.
 //
-//   Va lanciato DOPO `npm install`. Per non far fallire l'install in partenza,
-//   installa con ELECTRON_SKIP_BINARY_DOWNLOAD=1 e poi lancia questo script:
-//     ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs
+//   Va lanciato DOPO `npm install`: npm install && node scripts/ensure-electron.mjs
 //
 // SORGENTI DEL BINARIO (provate in quest'ordine — prima quelle SENZA rete esterna,
 // che sono le uniche affidabili quando la policy di egress blocca github):
@@ -54,7 +53,7 @@ if (process.platform !== 'linux' || process.arch !== 'x64') {
 }
 
 if (!existsSync(ELECTRON_DIR)) {
-  log('node_modules/electron assente: lancia prima `npm install` (con ELECTRON_SKIP_BINARY_DOWNLOAD=1). Nessuna azione.');
+  log('node_modules/electron assente: lancia prima `npm install`. Nessuna azione.');
   process.exit(0);
 }
 
@@ -64,6 +63,16 @@ try {
 } catch {
   log('impossibile leggere la versione di electron da node_modules/electron/package.json. Nessuna azione.');
   process.exit(0);
+}
+
+// Un pacchetto rimasto indietro rispetto al lock non si ripara col binario: «già pronto» qui sarebbe falso. La guardia
+// di chi lancia le prove (tests/helpers/motoreDelleProve.mjs) sta fuori dalla copia degli strumenti: qui non si importa.
+let delLock = null;
+try { delLock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'))?.packages?.['node_modules/electron']?.version || null; } catch { /* senza lock niente da confrontare */ }
+if (delLock && delLock !== version) {
+  log(`node_modules ha Electron ${version} e package-lock.json chiede la ${delLock}: il binario non lo ripara.`
+    + ' Reinstalla i pacchetti (`npm ci`) e rilancia questo script.');
+  process.exit(1);
 }
 
 function isInstalled() {
@@ -151,5 +160,5 @@ if (!isInstalled()) {
   process.exit(1);
 }
 
-log(`Electron v${version} pronto in node_modules/electron/dist. Nota: in cloud (root) i test si lanciano con node scripts/lancia-electron.mjs <comando>, che mette davanti ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a con la base di display del worker.`);
+log(`Electron v${version} pronto in node_modules/electron/dist. Nota: in cloud (root, senza schermo) npx playwright test si accende da solo lo schermo virtuale con la sandbox spenta; gli altri comandi che aprono Electron si lanciano con node scripts/lancia-electron.mjs <comando>.`);
 process.exit(0);

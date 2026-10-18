@@ -5,7 +5,10 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const Psl = require('./safebrowse/psl');
+const { tastoPremuto } = require('../tastoDelMouse');
 
 // Ciò che Chrome chiede all'utente: si chiede anche qui. Ogni nome che Electron può mandare sta in uno dei gruppi sotto,
 // e la sentinella in tests/unit/permessiPagine.test.mjs lo confronta con quelli che Electron dichiara.
@@ -14,23 +17,39 @@ const TIPI = {
   'clipboard-read': 'appunti',
   'deprecated-sync-clipboard-read': 'appunti',
   geolocation: 'posizione',
+  'geolocation-approximate': 'posizione',
   notifications: 'notifiche',
   'window-management': 'schermi',
   'idle-detection': 'presenza',
   midiSysex: 'strumenti',
+  'local-network-access': 'rete',
+  'local-network': 'rete',
+  'loopback-network': 'rete',
 };
+// File e cartelle (#1069): leggere quello che l'utente ha scelto nel selettore passa, la scelta è il consenso; scriverci
+// si chiede. Da Electron 39 il controllo È lo stato del file (sì o no, mai «da chiedere»): la scrittura passa solo dopo
+// un sì, la domanda la fa partire la pagina (chiediScrittura) e il salvataggio lo riconosce `salvataggio`.
+const SECONDO_L_ACCESSO = { fileSystem: (d) => (d && d.fileAccessType === 'readable' ? null : 'file') };
+// Il file scelto in «Salva con nome» Chromium lo crea o lo svuota prima di darlo alla pagina: vuoto e appena toccato.
+const SALVATAGGIO_MS = 60_000;
 // Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
-  'speaker-selection', 'storage-access', 'top-level-storage-access', 'fileSystem', 'midi',
+  'speaker-selection', 'storage-access', 'top-level-storage-access', 'midi',
   'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage',
 ]);
 // Ciò che Filo non sa dare è no, senza domanda: condividere lo schermo e i dispositivi collegati vogliono una scelta
-// (quale finestra, quale dispositivo) che Filo non ha.
-const NON_DISPONIBILI = new Set(['display-capture', 'unknown', 'hid', 'serial', 'usb']);
+// (quale finestra, quale dispositivo) che Filo non ha; realtà virtuale, NFC, stampa diretta e app web installate Filo non
+// le ha; e quello che Chrome lascia solo alle app installate (schermo intero senza gesto, sincronia periodica) qui non c'è.
+const NON_DISPONIBILI = new Set([
+  'display-capture', 'captured-surface-control', 'unknown', 'hid', 'serial', 'usb', 'smart-card', 'nfc', 'ar', 'vr',
+  'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync',
+  'system-wake-lock',
+]);
 // Il controllo dice sì solo dopo un sì vero: la lettura sincrona degli appunti non sa chiedere, le notifiche Electron le
-// mostra a chi il controllo dà per concesse, e chi sa che sei al computer lo saprebbe senza domanda.
-const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifications', 'idle-detection']);
+// mostra a chi il controllo dà per concesse, chi sa che sei al computer lo saprebbe senza domanda, e un file o una
+// cartella con il controllo a sì si scrivono senza domanda.
+const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifications', 'idle-detection', 'fileSystem']);
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
 // Notifiche: si chiedono solo subito dopo un gesto dell'utente sulla pagina.
 const DOPO_UN_GESTO = new Set(['notifications']);
@@ -89,6 +108,41 @@ function origineDi(wc, altro) {
   return r.origine ? r : c;
 }
 
+function tipoDi(permission, details) {
+  if (Object.hasOwn(SECONDO_L_ACCESSO, permission)) return SECONDO_L_ACCESSO[permission](details);
+  return Object.hasOwn(TIPI, permission) ? TIPI[permission] : null;
+}
+
+function senzaTipoPassa(permission) {
+  return INNOCUI.has(permission) || Object.hasOwn(SECONDO_L_ACCESSO, permission);
+}
+
+// Il nome della cartella o del file nella domanda: chi l'ha scelto per farlo leggere riconosce cosa sta per cambiare.
+function oggettoDi(tipo, details) {
+  if (tipo !== 'file') return undefined;
+  const percorso = String((details && details.filePath) || '');
+  return { nome: path.basename(percorso) || percorso, percorso, cartella: Boolean(details && details.isDirectory) };
+}
+
+// Il file o la cartella su cui il sito ha appena chiesto di scrivere: è quello che la domanda nomina (chiediScrittura).
+function segnaFile(ses, origine, details) {
+  if (!details || !details.filePath) return;
+  (ses._filoUltimoFile ||= new Map()).set(origine, { percorso: String(details.filePath), cartella: Boolean(details.isDirectory), alle: Date.now() });
+}
+
+// Un file scelto per salvarci è scrivibile come in Chrome, anche dopo un no alla modifica dei file del sito.
+function salvataggio(ses, origine, details) {
+  if (!details || details.isDirectory || !details.filePath) return false;
+  const chiave = `${origine}|${details.filePath}`;
+  const salvati = (ses._filoSalvati ||= new Set());
+  if (salvati.has(chiave)) return true;
+  let st;
+  try { st = fs.statSync(String(details.filePath)); } catch (_) { return false; }
+  if (!st.isFile() || st.size !== 0 || Math.abs(Date.now() - st.mtimeMs) > SALVATAGGIO_MS) return false;
+  salvati.add(chiave);
+  return true;
+}
+
 function partiNote(details) {
   const d = details || {};
   const tipi = Array.isArray(d.mediaTypes) ? d.mediaTypes : (d.mediaType ? [d.mediaType] : []);
@@ -142,8 +196,7 @@ function lasciapassare(wc, tipo) {
 
 function tastoDelMenu(input) {
   const type = input.type;
-  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
-  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
+  if (type === 'mouseDown') return tastoPremuto(input) === 'right';
   return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
 }
 
@@ -390,7 +443,7 @@ function seguiPagina(wc) {
 }
 
 // La domanda resta finché l'utente risponde o la pagina se ne va: una scadenza toglieva il sì a chi rispondeva con calma.
-function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
+function chiedi({ ses, wc, origine, tipo, parti, oggetto, callback, schedaDi }) {
   const dove = schedaDi(wc);
   if (!dove || typeof dove.avvisa !== 'function') { callback(false); return; }
   for (const p of inAttesa.values()) {
@@ -402,7 +455,7 @@ function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
   const { sotto, dominio } = nomeDaMostrare(origine);
   let host = origine;
   try { host = new URL(origine).host; } catch (_) {}
-  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti });
+  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti, ...(oggetto ? { oggetto } : {}) });
 }
 
 // `schedaDi(wc)` → { tabId, avvisa(evento, dati) } della finestra che mostra la pagina, o null.
@@ -411,7 +464,7 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
   if (!ses || ses._filoPermessi) return;
   ses._filoPermessi = true;
   try {
-    ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+    ses.setPermissionRequestHandler(ses._filoRichiesta = (wc, permission, callback, details) => {
       if (typeof prima === 'function' && prima(wc, permission, callback, details)) return;
       const chi = origineDi(wc, details && details.requestingUrl);
       if (chi.filo) { callback(true); return; }
@@ -422,8 +475,8 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
         callback(Boolean(typeof esterno === 'function' && esterno(url) && gestoRecente(wc)));
         return;
       }
-      const tipo = TIPI[permission];
-      if (!tipo) { callback(INNOCUI.has(permission)); return; }
+      const tipo = tipoDi(permission, details);
+      if (!tipo) { callback(senzaTipoPassa(permission)); return; }
       // Una richiesta di media senza microfono né fotocamera è la condivisione dello schermo, che Filo non sa dare.
       if (tipo === 'media' && !partiNote(details).length) { callback(false); return; }
       const parti = partiDi(tipo, details);
@@ -432,7 +485,7 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       if (decise.every((x) => x === true)) { callback(true); return; }
       if (decise.some((x) => x === false) || SOLO_CONTROLLO.has(permission)) { callback(false); return; }
       if (DOPO_UN_GESTO.has(permission) && !gestoRecente(wc)) { callback(false); return; }
-      chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi: schedaDi || (() => null) });
+      chiedi({ ses, wc, origine, tipo, parti, oggetto: oggettoDi(tipo, details), callback, schedaDi: schedaDi || (() => null) });
     });
   } catch (_) {}
   try {
@@ -443,12 +496,13 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       const origine = chi.origine;
       if (!origine) return false;
       if (COL_GESTO_SENZA_DOMANDA.has(permission)) return gestoRecente(wc);
-      const tipo = TIPI[permission];
-      if (!tipo) return INNOCUI.has(permission);
+      const tipo = tipoDi(permission, details);
+      if (!tipo) return senzaTipoPassa(permission);
+      if (tipo === 'file') segnaFile(ses, origine, details);
       const parti = partiDi(tipo, details);
       if (lasciapassareValido(wc, tipo, parti)) return true;
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
-      if (CONTROLLO_SOLO_COL_SI.has(permission)) return decise.every((x) => x === true);
+      if (CONTROLLO_SOLO_COL_SI.has(permission)) return decise.every((x) => x === true) || (tipo === 'file' && salvataggio(ses, origine, details));
       return !decise.some((x) => x === false);
     });
   } catch (_) {}
@@ -462,6 +516,20 @@ function negaTutto(ses) {
     if (typeof ses.setPermissionCheckHandler === 'function') ses.setPermissionCheckHandler(() => false);
     ses._filoPermessiNegati = true;
   } catch (_) {}
+}
+
+// La pagina che vuole scrivere su ciò che ha già lo chiede da qui (preload/stato-permessi.js): Chromium non chiama più il
+// gestore delle richieste. Vale dopo un gesto vero e per il file su cui il controllo ha appena detto no; null = non chiesto.
+function chiediScrittura(wc) {
+  return new Promise((ok) => {
+    const ses = wc && wc.session;
+    const origine = origineWeb(urlDi(wc));
+    const ultimo = origine && ses && ses._filoUltimoFile && ses._filoUltimoFile.get(origine);
+    if (!ultimo || Date.now() - ultimo.alle > GESTO_MS || typeof ses._filoRichiesta !== 'function' || !gestoRecente(wc)) { ok(null); return; }
+    ses._filoRichiesta(wc, 'fileSystem', (si) => ok(Boolean(si)), {
+      fileAccessType: 'writable', filePath: ultimo.percorso, isDirectory: ultimo.cartella, requestingUrl: urlDi(wc),
+    });
+  });
 }
 
 function rispondi(id, si) {
@@ -519,6 +587,8 @@ const PAROLE_PARTE = {
   camera: 'video', video: 'video', appunti: 'appunti', posizione: 'posizione', geolocalizzazione: 'posizione',
   localizzazione: 'posizione', notifiche: 'notifiche', notifica: 'notifiche', schermi: 'schermi', schermo: 'schermi',
   presenza: 'presenza', 'presenza al computer': 'presenza', strumenti: 'strumenti', 'strumenti musicali': 'strumenti', midi: 'strumenti',
+  rete: 'rete', 'rete locale': 'rete', 'rete di casa': 'rete', lan: 'rete',
+  file: 'file', cartella: 'file', cartelle: 'file', 'modifica dei file': 'file', 'modificare i file': 'file', scrittura: 'file',
 };
 function nomeParte(parte) {
   const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
@@ -546,7 +616,7 @@ function togliPerChat(sito, permesso) {
   const p = String(permesso || '').trim().toLowerCase();
   const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
   const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
-  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti)` };
+  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete, file)` };
   const delSito = scelteRicordate().filter((s) => {
     let h = '';
     try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
@@ -568,7 +638,7 @@ function statoNotifiche(ses, url) {
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, perUnaFinestra,
-  TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
+  gestoDiFilo, aperturaScelta, perUnaFinestra, chiediScrittura,
+  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

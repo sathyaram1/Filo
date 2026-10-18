@@ -18,6 +18,7 @@
 //   vedrebbe un campo scartato dalla riga di comando, che è esattamente il modo
 //   in cui il report era già sparito una volta.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

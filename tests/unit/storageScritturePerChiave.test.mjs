@@ -8,8 +8,8 @@ import Module, { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
-import fsp from 'node:fs/promises';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { rapportoFraCosti } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,9 +36,11 @@ Module._load = function (request, parent, isMain) {
 const Storage = require(join(__dirname, '..', '..', 'src', 'main', 'shim', 'storage.js'));
 const FILE = join(userData, 'storage.json');
 
+// Il file lo scrive scritturaAtomica (#1087): si contano le sue scritture, non quelle di fs.
+const Disco = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'scritturaAtomica.js'));
 let scritture = 0;
-const writeFileVero = fsp.writeFile;
-fsp.writeFile = function (...a) { scritture++; return writeFileVero.apply(this, a); };
+const scriviVero = Disco.scrivi;
+Disco.scrivi = function (...a) { if (a[0] === FILE) scritture++; return scriviVero.apply(this, a); };
 
 const leggiFile = () => readFileSync(FILE, 'utf8');
 
@@ -57,35 +59,52 @@ function grandeStorage() {
   return voci;
 }
 
-test('4 MB di storage: una scritta su una chiave piccola non riserializza il resto e il flush resta sotto 15 ms', async () => {
+// Un orologio che corre solo nel flush, dalla partenza a quando passa il file al disco: è il lavoro del processo
+// principale. Il disco qui non scrive, così la misura non paga 4 MB di I/O a campione.
+let nelFlush = 0;
+async function flushSenzaDisco() {
+  const vero = Disco.scrivi;
+  const t0 = performance.now();
+  Disco.scrivi = function (p, ...r) {
+    if (p !== FILE) return vero.call(this, p, ...r);
+    nelFlush += performance.now() - t0;
+    return Promise.resolve(true);
+  };
+  try { await Storage.flushNow(); } finally { Disco.scrivi = vero; }
+}
+
+test('4 MB di storage: una scritta su una chiave piccola non riserializza il resto e il flush costa una frazione di uno pieno', async () => {
   const grande = grandeStorage();
   await Storage.set({ cronologiaGrande: grande, piccola: 0 });
   await Storage.whenSettled();
   assert.ok(leggiFile().length > 4 * 1024 * 1024, 'il file di prova deve pesare almeno 4 MB');
 
-  const tempi = [];
   for (let i = 1; i <= 5; i++) {
+    let testo = '';
     const caratteri = await caratteriSerializzati(async () => {
       await Storage.set({ piccola: i });
-      const t0 = performance.now();
-      const testo = await new Promise((resolve) => {
-        // Il tempo che conta è quello del processo principale: dalla partenza del flush a quando passa il file al disco.
-        const vero = fsp.writeFile;
-        fsp.writeFile = function (p, txt, ...r) { tempi.push(performance.now() - t0); fsp.writeFile = vero; resolve(txt); return vero.call(this, p, txt, ...r); };
-        Storage.flushNow();
-      });
-      assert.ok(testo.length > 4 * 1024 * 1024);
-      await Storage.whenSettled();
+      const vero = Disco.scrivi;
+      Disco.scrivi = function (p, txt, ...r) { if (p === FILE) testo = txt; return vero.call(this, p, txt, ...r); };
+      try { await Storage.flushNow(); } finally { Disco.scrivi = vero; }
     });
+    assert.ok(testo.length > 4 * 1024 * 1024, 'il flush deve passare al disco il file intero');
     assert.ok(caratteri < 1000, `una chiave piccola ha fatto riserializzare ${caratteri} caratteri`);
   }
-  tempi.sort((a, b) => a - b);
-  const mediana = tempi[Math.floor(tempi.length / 2)];
-  assert.ok(mediana < 15, `il flush prende ${mediana.toFixed(1)} ms prima di scrivere`);
 
+  // Non millisecondi fissi (#1228): riserializzare o clonare i 4 MB porterebbe il flush piccolo vicino al pieno, e
+  // misurati a turno il carico pesa su tutti e due. Visto: 0,1–0,2 volte il pieno, anche a macchina carica.
+  let giro = 0;
+  const pieno = async () => { grande[0].quando = ++giro; await Storage.set({ cronologiaGrande: grande }); await flushSenzaDisco(); };
+  const piccolo = async () => { await Storage.set({ piccola: `giro ${++giro}` }); await flushSenzaDisco(); };
+  const costo = await rapportoFraCosti(pieno, piccolo, { tetto: 0.5, ora: () => nelFlush });
+  assert.ok(costo.entro, `il flush di una chiave piccola costa quanto riscrivere tutto: ${costo.come}`);
+
+  await Storage.set({ piccola: 'fine' });
+  await Storage.whenSettled();
   const suDisco = JSON.parse(leggiFile());
-  assert.equal(suDisco.piccola, 5);
+  assert.equal(suDisco.piccola, 'fine');
   assert.equal(suDisco.cronologiaGrande.length, grande.length);
+  assert.equal(suDisco.cronologiaGrande[0].quando, grande[0].quando);
   await Storage.remove('cronologiaGrande');
   await Storage.whenSettled();
 });

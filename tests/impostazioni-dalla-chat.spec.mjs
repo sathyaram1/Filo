@@ -21,7 +21,6 @@ const homeDi = (app) => trovaPagina(app, (u) => u.startsWith('filo://newtab') &&
 async function configura(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -254,8 +253,8 @@ test('E — chi scrive nella lista dei siti bloccati non perde l\'a capo quando 
 });
 
 // La pagina Altro rimanda tutta la casella a ogni salvataggio: senza riallinearsi toglieva il dominio della chat.
+// Spegnere Filo su un sito è un costo 1 (#843): parte senza popup.
 test('F — un dominio escluso aggiunto dalla chat compare nella pagina Altro aperta, e scriverci dopo non lo toglie', async ({ app, shell, openTab }) => {
-  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
@@ -265,9 +264,8 @@ test('F — un dominio escluso aggiunto dalla chat compare nella pagina Altro ap
   const casella = altro.locator('#blocklist');
   await expect(casella).toHaveValue('banca.it', { timeout: 8_000 });
 
-  await modelloFinto(app, [imposta('domini_esclusi', 'aggiungi esempio.org'), { text: 'Ti chiedo conferma.' }]);
+  await modelloFinto(app, [imposta('domini_esclusi', 'aggiungi esempio.org'), { text: 'Fatto.' }]);
   await scrivi(chat, 'non intervenire su esempio.org');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
   await expect.poll(async () => (await impostazioni(app)).blocklist, { timeout: 5_000 }).toEqual(['banca.it', 'esempio.org']);
   await altro.bringToFront();
   await expect(casella).toHaveValue('banca.it\nesempio.org', { timeout: 3_000 });

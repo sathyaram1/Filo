@@ -7,6 +7,7 @@
 // il ramo alla base parcheggiando la consegna su discarded/ (#502, #495).
 // Rosso senza il fix: il punto fermo resterebbe alla base.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
