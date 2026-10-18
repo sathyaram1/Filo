@@ -136,9 +136,8 @@ test('l\'evento senza ora che dura più giorni li occupa tutti, detto con la dur
   // A cavallo d'anno, e una durata che non fa giorni interi arrotonda in su.
   const capodanno = C.normalize({ titolo: 'Neve', data: '2026-12-30', durata_min: 2 * 24 * 60 + 1 });
   assert.equal(capodanno.fine, '20270102');
-  // L'ultimo giorno vince sulla durata; uno prima dell'inizio non accorcia niente.
+  // L'ultimo giorno vince sulla durata.
   assert.equal(C.normalize({ titolo: 'F', data: '2026-08-10', data_fine: '2026-08-11', durata_min: 9999 }).fine, '20260812');
-  assert.equal(C.normalize({ titolo: 'F', data: '2026-08-10', data_fine: '2026-08-01' }).fine, '20260811');
   // Oltre un anno non è un evento vero: si rifiuta invece di tagliarlo.
   assert.equal(C.normalize({ titolo: 'F', data: '2026-08-10', data_fine: '2028-08-10' }), null);
   // Con l'ora, la durata resta quella di prima.
@@ -146,4 +145,46 @@ test('l\'evento senza ora che dura più giorni li occupa tutti, detto con la dur
   // Né tagliata a una settimana: un viaggio di dieci giorni con l'ora resta di dieci giorni.
   assert.equal(C.normalize({ titolo: 'Viaggio', data: '2026-08-01', ora: '09:00', durata_min: 10 * 24 * 60 }).fine, '20260811T090000');
   assert.equal(C.normalize({ titolo: 'Viaggio', data: '2026-08-01', ora: '09:00', durata_min: 400 * 24 * 60 }), null);
+});
+
+// La fine detta a parole si rispetta anche con l'ora, e quando non si può il rifiuto dice perché: ignorata o
+// accorciata in silenzio, nel calendario entrava un altro evento (#567, nono giro).
+test('con l\'ora, l\'ultimo giorno e l\'ora di fine si rispettano, e tornano uguali dal bottone', () => {
+  const viaggio = C.normalize({ titolo: 'Parigi', data: '2026-08-10', ora: '08:00', data_fine: '2026-08-15' });
+  assert.equal(viaggio.tuttoIlGiorno, false);
+  assert.equal(viaggio.inizio, '20260810T080000');
+  assert.equal(viaggio.fine, '20260816T000000'); // «torno il 15» senza ora: il 15 si occupa tutto
+  assert.equal(viaggio.quando, 'dal 10/08/2026 alle 08:00 al 15/08/2026');
+  assert.deepEqual(C.normalize(viaggio), viaggio);
+  const conOra = C.normalize({ titolo: 'Parigi', data: '2026-08-10', ora: '08:00', data_fine: '2026-08-15', ora_fine: '19:30' });
+  assert.equal(conOra.fine, '20260815T193000');
+  assert.equal(conOra.quando, 'dal 10/08/2026 alle 08:00 al 15/08/2026 alle 19:30');
+  assert.deepEqual(C.normalize(conOra), conOra);
+  // L'ora di fine vince sulla durata, e «dalle 22 alle 2» passa la mezzanotte.
+  const festa = C.normalize({ titolo: 'Festa', data: '2026-08-10', ora: '22:00', ora_fine: '02:00', durata_min: 30 });
+  assert.equal(festa.fine, '20260811T020000');
+  assert.deepEqual(C.normalize(festa), festa);
+  const riunione = C.normalize({ titolo: 'Riunione', data: '2026-08-10', ora: '10:00', ora_fine: '11:15' });
+  assert.equal(riunione.quando, '10/08/2026 alle 10:00, fino alle 11:15');
+});
+
+test('una fine che non si può rispettare si rifiuta col suo perché', () => {
+  const casi = [
+    [{ titolo: 'Mostra', data: '2026-08-15', data_fine: '2026-08-10' }, /ultimo giorno \(10\/08\/2026\) viene prima del primo \(15\/08\/2026\)/],
+    [{ titolo: 'Mostra', data: '2026-08-15', ora: '10:00', data_fine: '2026-08-10' }, /viene prima del primo/],
+    [{ titolo: 'Viaggio', data: '2026-08-01', ora: '09:00', durata_min: 400 * 24 * 60 }, /più di un anno/],
+    [{ titolo: 'F', data: '2026-08-10', data_fine: '2028-08-10' }, /più di un anno/],
+    [{ titolo: 'F', data: '2026-08-10', data_fine: 'il 15' }, /ultimo giorno non valido/],
+    [{ titolo: 'F', data: '2026-08-10', ora: '10:00', data_fine: '2026-08-10', ora_fine: '09:00' }, /viene prima dell'inizio/],
+    [{ titolo: 'F', data: '2026-08-10', ora: '10:00', ora_fine: 'tardi' }, /ora di fine non valida/],
+    [{ titolo: 'F', data: '2026-02-31', ora: '10:00' }, /data non valida/],
+    [{ titolo: 'F', data: '2026-08-10', ora: '25:00' }, /ora non valida/],
+    [{ titolo: '  ', data: '2026-08-10' }, /manca il titolo/],
+  ];
+  for (const [ev, motivo] of casi) {
+    const v = C.verifica(ev);
+    assert.equal(v.evento, undefined, JSON.stringify(ev));
+    assert.match(v.errore, motivo, JSON.stringify(ev));
+    assert.equal(C.normalize(ev), null);
+  }
 });

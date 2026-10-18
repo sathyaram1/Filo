@@ -2736,9 +2736,9 @@ async function eseguiAzioneFilo(action, {
         // lo dice alla chat, che senza lo racconterebbe come non riuscito; data
         // e ora si controllano qui, non nel calendario dell'utente.
         const C = globalThis.SN_CALENDAR;
-        const evento = C ? C.normalize(action) : null;
-        if (!evento) return { executed: false, kept: false, output: { event: 'invalid' } };
-        return { executed: false, kept: true, output: { proposta: true, evento } };
+        const v = C ? C.verifica(action) : { errore: 'calendario non disponibile' };
+        if (!v.evento) return { executed: false, kept: false, output: { event: 'invalid', error: v.errore } };
+        return { executed: false, kept: true, output: { proposta: true, evento: v.evento } };
       }
       case 'CAPACITA_DETTAGLIO': {
         // Lookup del manifesto delle capacità (F2): l'agente chiede il dettaglio

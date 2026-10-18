@@ -74,84 +74,111 @@
   const MAX_GIORNI = 366;
   const isoGiorno = (dt) => `${dt.getUTCFullYear()}-${DUE_CIFRE(dt.getUTCMonth() + 1)}-${DUE_CIFRE(dt.getUTCDate())}`;
   const leggibile = (dt) => `${dt.getUTCDate()}/${DUE_CIFRE(dt.getUTCMonth() + 1)}/${dt.getUTCFullYear()}`;
+  const orario = (dt) => `${DUE_CIFRE(dt.getUTCHours())}:${DUE_CIFRE(dt.getUTCMinutes())}`;
+  const vuoto = (v) => v == null || String(v).trim() === '';
+  const oltreUnAnno = (giorni) => `dura ${giorni} giorni, più di un anno: non è un evento che il calendario possa tenere`;
 
-  // Quanti giorni occupa un evento senza ora: le ferie dal 10 al 15 sono sei,
-  // non il solo primo (#567, ottavo giro). L'ultimo giorno vince sulla durata;
-  // oltre un anno è un errore del modello, e si rifiuta invece di tagliarlo.
-  function giorniDiFila(o, giorno) {
-    const fineData = o.data_fine ?? o.dataFine ?? o.fino_al ?? o.end_date ?? o.endDate;
-    const ultimo = fineData != null && String(fineData).trim() ? pezziData(fineData, '00:00') : null;
-    let giorni = 1;
-    if (ultimo && ultimo >= giorno) {
-      giorni = Math.round((ultimo - giorno) / GIORNO_MS) + 1;
-    } else {
-      const durata = Number(o.durata_min ?? o.durataMin ?? o.durata ?? o.duration);
-      if (Number.isFinite(durata) && durata > 0) giorni = Math.ceil(durata / (24 * 60));
-    }
-    return giorni <= MAX_GIORNI ? giorni : 0;
-  }
-
-  // L'evento come lo ha chiamato il modello → i campi che servono, o null se
-  // manca l'essenziale. I sinonimi sono quelli che i modelli usano davvero.
-  function normalize(a) {
+  // Una fine che non si può rispettare si RIFIUTA col suo perché, che arriva al modello e alla riga del diario:
+  // tagliata o ignorata in silenzio, nel calendario entrava un altro evento (#567, nono giro).
+  function verifica(a) {
     const o = a || {};
     const titolo = String(o.titolo ?? o.title ?? o.nome ?? o.name ?? '').replace(/\s+/g, ' ').trim();
     const data = o.data ?? o.date ?? o.giorno;
     const ora = o.ora ?? o.orario ?? o.time ?? o.hour;
-    const comune = () => ({
+    const dataFine = o.data_fine ?? o.dataFine ?? o.fino_al ?? o.end_date ?? o.endDate;
+    const oraFine = o.ora_fine ?? o.oraFine ?? o.end_time ?? o.endTime;
+    if (!titolo) return { errore: 'manca il titolo' };
+    const tutto = senzaOra(o, ora);
+    const giorno = pezziData(data, '00:00');
+    if (!giorno) return { errore: `data non valida («${String(data ?? '')}»: serve AAAA-MM-GG)` };
+    const ultimo = vuoto(dataFine) ? null : pezziData(dataFine, '00:00');
+    if (!vuoto(dataFine) && !ultimo) return { errore: `ultimo giorno non valido («${String(dataFine)}»: serve AAAA-MM-GG)` };
+    if (ultimo && ultimo < giorno) {
+      return { errore: `l'ultimo giorno (${leggibile(ultimo)}) viene prima del primo (${leggibile(giorno)})` };
+    }
+    const c = {
       titolo: titolo.slice(0, 200),
       dettagli: String(o.dettagli ?? o.details ?? o.descrizione ?? o.description ?? o.note ?? '').trim().slice(0, 2000),
       luogo: String(o.luogo ?? o.location ?? o.dove ?? '').trim().slice(0, 200),
-    });
-    if (titolo && senzaOra(o, ora)) {
-      const giorno = pezziData(data, '00:00');
-      if (!giorno) return null;
-      const giorni = giorniDiFila(o, giorno);
-      if (!giorni) return null;
-      const ultimo = new Date(giorno.getTime() + (giorni - 1) * GIORNO_MS);
-      const dopo = new Date(giorno.getTime() + giorni * GIORNO_MS);
-      const c = comune();
+    };
+    const durataScritta = Number(o.durata_min ?? o.durataMin ?? o.durata ?? o.duration);
+    const durataValida = Number.isFinite(durataScritta) && durataScritta > 0;
+    if (tutto) {
+      // L'ultimo giorno vince sulla durata: le ferie dal 10 al 15 sono sei giorni (#567, ottavo giro).
+      let giorni = 1;
+      if (ultimo) giorni = Math.round((ultimo - giorno) / GIORNO_MS) + 1;
+      else if (durataValida) giorni = Math.ceil(durataScritta / (24 * 60));
+      if (giorni > MAX_GIORNI) return { errore: oltreUnAnno(giorni) };
+      const fineGiorno = new Date(giorno.getTime() + (giorni - 1) * GIORNO_MS);
       return {
-        titolo: c.titolo,
-        data: isoGiorno(giorno),
-        ora: '',
-        tuttoIlGiorno: true,
-        dataFine: isoGiorno(ultimo),
-        dettagli: c.dettagli,
-        luogo: c.luogo,
-        inizio: stampaGiorno(giorno),
-        fine: stampaGiorno(dopo),
-        durataMin: giorni * 24 * 60,
-        quando: giorni > 1
-          ? `dal ${leggibile(giorno)} al ${leggibile(ultimo)}, tutto il giorno`
-          : `${leggibile(giorno)}, tutto il giorno`,
+        evento: {
+          titolo: c.titolo,
+          data: isoGiorno(giorno),
+          ora: '',
+          tuttoIlGiorno: true,
+          dataFine: isoGiorno(fineGiorno),
+          dettagli: c.dettagli,
+          luogo: c.luogo,
+          inizio: stampaGiorno(giorno),
+          fine: stampaGiorno(new Date(giorno.getTime() + giorni * GIORNO_MS)),
+          durataMin: giorni * 24 * 60,
+          quando: giorni > 1
+            ? `dal ${leggibile(giorno)} al ${leggibile(fineGiorno)}, tutto il giorno`
+            : `${leggibile(giorno)}, tutto il giorno`,
+        },
       };
     }
     const inizio = pezziData(data, ora);
-    if (!titolo || !inizio) return null;
-    let durata = Number(o.durata_min ?? o.durataMin ?? o.durata ?? o.duration ?? 60);
-    if (!Number.isFinite(durata) || durata <= 0) durata = 60;
-    // Come per i giorni: una durata assurda si rifiuta, non si accorcia in silenzio.
-    durata = Math.round(durata);
-    if (durata > MAX_GIORNI * 24 * 60) return null;
-    const fine = new Date(inizio.getTime() + durata * 60_000);
-    const c = comune();
+    if (!inizio) return { errore: `ora non valida («${String(ora)}»: serve HH:MM)` };
+    if (!vuoto(oraFine) && !pezziData(data, oraFine)) return { errore: `ora di fine non valida («${String(oraFine)}»: serve HH:MM)` };
+    // La fine detta a parole (l'ultimo giorno, l'ora di fine) vince sulla durata. Senza l'ora di fine l'ultimo giorno
+    // si occupa tutto: «torno il 15» non dice a che ora.
+    let fine = null;
+    if (ultimo || !vuoto(oraFine)) {
+      const base = ultimo || giorno;
+      fine = vuoto(oraFine)
+        ? new Date(base.getTime() + GIORNO_MS)
+        : pezziData(isoGiorno(base), oraFine);
+      // «dalle 22 alle 2» senza un ultimo giorno passa la mezzanotte.
+      if (!ultimo && fine <= inizio) fine = new Date(fine.getTime() + GIORNO_MS);
+      if (fine <= inizio) return { errore: `la fine (${leggibile(fine)} alle ${orario(fine)}) viene prima dell'inizio` };
+    } else {
+      fine = new Date(inizio.getTime() + (durataValida ? Math.round(durataScritta) : 60) * 60_000);
+    }
+    const durata = Math.round((fine - inizio) / 60_000);
+    if (durata > MAX_GIORNI * 24 * 60) return { errore: oltreUnAnno(Math.ceil(durata / (24 * 60))) };
+    const ultimoGiorno = new Date(fine.getTime() - 60_000);
+    const piuGiorni = isoGiorno(ultimoGiorno) !== isoGiorno(inizio);
+    let quando = `${leggibile(inizio)} alle ${orario(inizio)}`;
+    if (ultimo || !vuoto(oraFine)) {
+      if (piuGiorni) quando = `dal ${quando} al ${leggibile(vuoto(oraFine) ? ultimoGiorno : fine)}${vuoto(oraFine) ? '' : ` alle ${orario(fine)}`}`;
+      else quando = `${quando}, fino alle ${orario(fine)}`;
+    }
     return {
-      titolo: c.titolo,
-      // In forma canonica, così l'evento già normalizzato può tornare al main
-      // dal bottone della chat e ripassare di qui senza perdere niente.
-      data: `${inizio.getUTCFullYear()}-${DUE_CIFRE(inizio.getUTCMonth() + 1)}-${DUE_CIFRE(inizio.getUTCDate())}`,
-      ora: `${DUE_CIFRE(inizio.getUTCHours())}:${DUE_CIFRE(inizio.getUTCMinutes())}`,
-      tuttoIlGiorno: false,
-      dettagli: c.dettagli,
-      luogo: c.luogo,
-      inizio: stampaLocale(inizio),
-      fine: stampaLocale(fine),
-      durataMin: durata,
-      // Per l'utente: «21/09/2026 alle 10:00».
-      quando: `${inizio.getUTCDate()}/${DUE_CIFRE(inizio.getUTCMonth() + 1)}/${inizio.getUTCFullYear()}`
-        + ` alle ${DUE_CIFRE(inizio.getUTCHours())}:${DUE_CIFRE(inizio.getUTCMinutes())}`,
+      evento: {
+        titolo: c.titolo,
+        // In forma canonica, così l'evento già normalizzato può tornare al main
+        // dal bottone della chat e ripassare di qui senza perdere niente.
+        data: isoGiorno(inizio),
+        ora: orario(inizio),
+        tuttoIlGiorno: false,
+        dataFine: ultimo ? isoGiorno(ultimo) : '',
+        oraFine: vuoto(oraFine) ? '' : orario(fine),
+        dettagli: c.dettagli,
+        luogo: c.luogo,
+        inizio: stampaLocale(inizio),
+        fine: stampaLocale(fine),
+        durataMin: durata,
+        // Per l'utente: «21/09/2026 alle 10:00».
+        quando,
+      },
     };
+  }
+
+  // L'evento come lo ha chiamato il modello → i campi che servono, o null. I sinonimi sono quelli che i modelli usano
+  // davvero; il perché di un null lo dice `verifica`.
+  function normalize(a) {
+    return verifica(a).evento || null;
   }
 
   // Ora in UTC per DTSTAMP/UID. L'evento invece resta in ora «fluttuante»
@@ -209,5 +236,5 @@
     return `${base || 'evento'}.ics`;
   }
 
-  global.SN_CALENDAR = { normalize, buildIcs, fileName, uidPer, esc };
+  global.SN_CALENDAR = { normalize, verifica, buildIcs, fileName, uidPer, esc };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

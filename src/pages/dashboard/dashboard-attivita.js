@@ -1035,7 +1035,7 @@
     if (!o) return '';
     if (o.blocked === 'disabled') return 'la modalità terminale è spenta';
     if (o.blocked === 'empty') return 'comando vuoto';
-    if (o.event === 'invalid') return 'data o ora non valide';
+    if (o.event === 'invalid') return o.error ? pulito(o.error) : 'data o ora non valide';
     if (isType(a, 'VEDI_SCHERMO')) {
       if (o.spenta) return 'è spento in Preferenze';
       if (o.permesso === 'mac') return 'serve il permesso «Registrazione schermo»';
