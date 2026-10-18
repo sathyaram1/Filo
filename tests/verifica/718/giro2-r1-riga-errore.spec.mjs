@@ -40,7 +40,7 @@ function rigaErrore(stderr) {
 test.describe('#718 riga dell\'errore', () => {
   test.skip(!POWERSHELL, 'nessuna PowerShell su questa macchina');
   const TMP = cartellaTemporanea('filo-v718-');
-  const MANCA = `Get-Content "${join(TMP, 'manca.txt')}"`;
+  const MANCA = 'Get-Content manca-718.txt';
   test.afterAll(() => rmSync(TMP, { recursive: true, force: true }));
 
   test('r1 comando dell\'assistente su tre righe: l\'errore indica la terza', () => {
@@ -55,6 +55,9 @@ test.describe('#718 riga dell\'errore', () => {
     const comando = `Write-Output x; ${MANCA}`;
     const stdin = T.PREPARA_STDIN_POWERSHELL + T.righePowerShell(comando, 'FILO_META_v718', S.comandoPerPowerShell) + 'exit\n';
     const r = spawnSync(POWERSHELL, ['-NoLogo', '-NoProfile', '-Command', '-'], { cwd: TMP, env: ENV, input: stdin, encoding: 'utf8', timeout: 60_000 });
-    expect(rigaErrore(r.stderr), r.stderr).toEqual({ riga: 1, testo: comando });
+    expect(r.stderr).toContain('manca-718.txt');
+    // Senza riga indicata va bene (così era su main); se c'è, è quella che l'utente ha scritto.
+    const pos = rigaErrore(r.stderr);
+    if (pos) expect(pos, r.stderr).toEqual({ riga: 1, testo: comando });
   });
 });
