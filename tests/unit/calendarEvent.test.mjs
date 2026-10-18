@@ -168,6 +168,22 @@ test('con l\'ora, l\'ultimo giorno e l\'ora di fine si rispettano, e tornano ugu
   assert.equal(riunione.quando, '10/08/2026 alle 10:00, fino alle 11:15');
 });
 
+test('l\'ultimo giorno dice in che giorno finisce, la durata a che ora: uguale al primo non allunga niente', () => {
+  const cena = C.normalize({ titolo: 'Cena', data: '2026-10-23', ora: '20:30', durata_min: 120, data_fine: '2026-10-23' });
+  assert.equal(cena.fine, '20261023T223000');
+  assert.equal(cena.quando, '23/10/2026 alle 20:30, fino alle 22:30');
+  assert.deepEqual(C.normalize(cena), cena);
+  const senzaDurata = C.normalize({ titolo: 'Cena', data: '2026-10-23', ora: '20:30', data_fine: '2026-10-23' });
+  assert.equal(senzaDurata.fine, '20261023T213000'); // l'ora di sempre, non fino a mezzanotte
+  // Una durata che cade nell'ultimo giorno ne dice l'ora; una che non ci cade lascia l'ultimo giorno intero.
+  const viaggio = C.normalize({ titolo: 'Parigi', data: '2026-08-10', ora: '08:00', data_fine: '2026-08-15', durata_min: 7200 });
+  assert.equal(viaggio.fine, '20260815T080000');
+  assert.equal(viaggio.quando, 'dal 10/08/2026 alle 08:00 al 15/08/2026 alle 08:00');
+  assert.deepEqual(C.normalize(viaggio), viaggio);
+  const corta = C.normalize({ titolo: 'Parigi', data: '2026-08-10', ora: '08:00', data_fine: '2026-08-15', durata_min: 60 });
+  assert.equal(corta.fine, '20260816T000000');
+});
+
 test('una fine che non si può rispettare si rifiuta col suo perché', () => {
   const casi = [
     [{ titolo: 'Mostra', data: '2026-08-15', data_fine: '2026-08-10' }, /ultimo giorno \(10\/08\/2026\) viene prima del primo \(15\/08\/2026\)/],
