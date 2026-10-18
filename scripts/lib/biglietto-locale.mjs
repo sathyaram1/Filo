@@ -221,10 +221,10 @@ export function messaggioErrore(status, body) {
 }
 
 /**
- * Una op della callable con il token dell'owner. deps: { fetchImpl, idToken() → Promise<string>, url, tempoMs }.
- * → il risultato del server; lancia un Error col motivo (anche «non ancora pubblicata») se non va.
+ * Una op della callable con il token dell'owner, com'è arrivata: { status, body }. deps: { fetchImpl, idToken() →
+ * Promise<string>, url, tempoMs }. Lancia solo senza credenziale, dentro una prova, o se la rete non risponde.
  */
-export async function chiama(op, data = {}, deps = {}) {
+export async function chiamaGrezzo(op, data = {}, deps = {}) {
   // Dentro una prova (node --test) il server vero non si tocca mai: un ramo di prova finirebbe nel registro vero.
   if (!deps.fetchImpl && process.env.NODE_TEST_CONTEXT) throw new Error('niente server vero dentro una prova');
   const fetchImpl = deps.fetchImpl || fetch;
@@ -240,12 +240,16 @@ export async function chiama(op, data = {}, deps = {}) {
   });
   let body = {};
   try { body = await res.json(); } catch (_) { body = {}; }
-  if (!res.ok || (body.result && body.result.ok === false)) {
-    const e = new Error(messaggioErrore(res.status, body));
-    // Il server ha risposto no (biglietto sconosciuto, già chiuso): riprovare non cambia niente, a differenza di un guasto.
-    if (res.ok) e.rifiuto = true;
-    throw e;
-  }
+  return { status: res.status, ok: res.ok, body };
+}
+
+/**
+ * Una op della callable con il token dell'owner. deps: { fetchImpl, idToken() → Promise<string>, url, tempoMs }.
+ * → il risultato del server; lancia un Error col motivo (anche «non ancora pubblicata») se non va.
+ */
+export async function chiama(op, data = {}, deps = {}) {
+  const { status, ok, body } = await chiamaGrezzo(op, data, deps);
+  if (!ok || (body.result && body.result.ok === false)) throw new Error(messaggioErrore(status, body));
   return body.result || {};
 }
 
@@ -383,17 +387,17 @@ export async function prendi({ sporco = false, riservato = false, motivo = '', s
 export const TETTO_COMMIT = 5000;
 
 /**
- * I commit del ramo oltre main fino a `sha`, con la data d'autore in ms: il server ci controlla che li abbia scritti una
- * sessione pulita registrata (fiduciaRamo.commitCoperti). null se git non risponde (il server lo legge come sporco).
+ * I commit del ramo oltre main fino a `sha`, coi genitori: il server ci controlla che fra l'ultimo sha registrato e la
+ * punta li abbia dichiarati tutti, spingendoli, un biglietto pulito (#1362). null se git non risponde (vale sporco).
  */
 export function commitDelRamo(cartella, sha) {
   try {
-    const out = execFileSync('git', ['log', '--format=%H %at', `-n${TETTO_COMMIT + 1}`, String(sha), '--not', 'origin/main'], {
+    const out = execFileSync('git', ['log', '--format=%H %P', `-n${TETTO_COMMIT + 1}`, String(sha), '--not', 'origin/main'], {
       cwd: cartella, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 16 * 1024 * 1024,
     });
     return out.split('\n').filter((r) => r.trim()).map((r) => {
-      const [s, t] = r.trim().split(/\s+/);
-      return { sha: s, at: Number(t) * 1000 };
+      const [s, ...genitori] = r.trim().split(/\s+/);
+      return { sha: s, parents: genitori };
     });
   } catch (_) {
     return null;
@@ -402,24 +406,29 @@ export function commitDelRamo(cartella, sha) {
 
 /**
  * Registra nel registro dei rami la punta che questa sessione ha scritto (verify-local start, finish), coi commit del
- * ramo letti in `cartella`. Se la sessione continua un lavoro sporco o di chi il server non sa nominare, il server la
- * sporca (`sporcato`). Mai un'eccezione: senza biglietto o con un guasto il ramo resta senza la voce, cioè non fidato.
- * @returns {Promise<{ ok: boolean, ramoFidato?: boolean, fiducia?: string, sporcato?: string, senzaBiglietto?: true, errore?: string }>}
+ * ramo letti in `cartella`. Prima dichiara le spinte rimaste in coda in quella cartella, di questa sessione e delle
+ * altre (#1362). Se la sessione continua un lavoro sporco, o con commit che nessun biglietto pulito ha dichiarato, il
+ * server la sporca (`sporcato`). Mai un'eccezione: senza biglietto o con un guasto il ramo resta senza voce, non fidato.
+ * @returns {Promise<{ ok: boolean, ramoFidato?: boolean, fiducia?: string, sporcato?: string, spinte?: string, senzaBiglietto?: true, errore?: string }>}
  */
 export async function registraRamo({ repo, ramo, sha, feedbackId = '', cartella, env, cwd, deps = {} } = {}) {
   try {
     const b = await trovaBiglietto({ env, cwd, deps });
     if (!b) return { ok: false, senzaBiglietto: true };
     if (b.inAttesa) return { ok: false, errore: 'una lettura esterna è annotata solo in locale (il server non l’ha ricevuta): il ramo resta senza la voce, cioè non fidato' };
-    const commits = (deps.commitDelRamo || commitDelRamo)(cartella || cwd || process.cwd(), sha);
+    const dove = cartella || cwd || process.cwd();
+    const S = await import('./spinte.mjs');
+    const spinte = S.rigaSpinte(await (deps.inviaSpinte || S.inviaSpinte)({ root: dove, deps }));
+    const commits = (deps.commitDelRamo || commitDelRamo)(dove, sha);
     const r = await chiama('ramo', Object.assign(
       { ticket: b.ticket, repo, ramo, sha },
       feedbackId ? { feedbackId } : {},
-      Array.isArray(commits) ? { commits, ora: Date.now() } : {},
+      Array.isArray(commits) ? { commits } : {},
     ), deps);
     return Object.assign(
       { ok: true, ramoFidato: r.ramoFidato === true, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato' },
       r.sporcato ? { sporcato: String(r.sporcato) } : {},
+      spinte ? { spinte } : {},
     );
   } catch (e) {
     return { ok: false, errore: String((e && e.message) || e) };
@@ -471,7 +480,17 @@ export async function fondiApp(feedbackId, deps = {}) {
 /** Chiude i biglietti di questa sessione e ne toglie i file. */
 export async function chiudi({ env, cwd, deps = {} } = {}) {
   const out = { chiusi: 0, errori: [] };
-  for (const b of trovaBiglietti({ env, cwd })) {
+  const trovati = trovaBiglietti({ env, cwd });
+  // Le spinte in coda partono prima: da chiuso il biglietto non le dichiara più, e i loro commit sarebbero di nessuno (#1362).
+  if (trovati.length) {
+    try {
+      const S = await import('./spinte.mjs');
+      const radice = radiceRepo(cwd);
+      const riga = radice ? S.rigaSpinte(await (deps.inviaSpinte || S.inviaSpinte)({ root: radice, deps })) : '';
+      if (riga) out.spinte = riga;
+    } catch (_) { /* restano in coda: valgono di nessuno */ }
+  }
+  for (const b of trovati) {
     // Prima lo sporco annotato: la storia del biglietto lo deve avere anche da chiuso.
     await consegnaSporchi(b, { deps });
     let chiuso = false;
@@ -489,180 +508,17 @@ export async function chiudi({ env, cwd, deps = {} } = {}) {
   return out;
 }
 
-// ── La fine dei biglietti (#1208): a fine sessione se sporchi, per età tutti ──
-
-// Come la pulizia delle trascrizioni di Claude Code (cleanupPeriodDays, 30 di serie): una sessione ferma da più di
-// così non si riprende, e chiudere prima farebbe nascere sporca la ripresa di una sessione pulita.
-export const SCADENZA_MS = 30 * 24 * 60 * 60 * 1000;
-// Nessuno aspetta i processi in sottofondo della fine e della scadenza: il tetto serve solo a non lasciarli appesi.
-export const TETTO_SOTTOFONDO_MS = 60000;
-
-/** L'ultimo segno di vita della sessione del biglietto: il file o la trascrizione della sessione, il più recente. */
-export function ultimaAttivita(b) {
-  let t = 0;
-  for (const p of [b && b.path, b && b.trascrizione]) {
-    if (!p) continue;
-    try { t = Math.max(t, statSync(p).mtimeMs); } catch (_) { /* sparita: vale l'altro */ }
-  }
-  return t;
-}
-
-/** La sessione che riprende il suo biglietto ne rinnova il segno di vita. Mai un'eccezione. */
-function segnaVivo(b, trascrizione) {
+/** Mette il pre-push di Filo nel repo di `cwd` e, se c'è, nel clone di filo-security accanto. Mai un'eccezione. */
+export async function installaPrePush(cwd = process.cwd()) {
   try {
-    if (trascrizione && b.trascrizione !== trascrizione) scriviFile(b.path, Object.assign({}, b, { trascrizione }));
-    else { const ora = new Date(); utimesSync(b.path, ora, ora); }
-  } catch (_) { /* resta il segno di prima */ }
-}
-
-/** Un token solo per tutte le chiamate di un giro in sottofondo: se no ognuna ne conia uno. */
-function conTokenUnico(deps) {
-  if (deps.idToken) return deps;
-  let token = null;
-  return Object.assign({}, deps, { idToken: () => (token = token || tokenOwner()) });
-}
-
-/** Chiude `b` sul server. Un rifiuto (sconosciuto, già chiuso) vale chiuso: riprovare non cambierebbe niente. */
-async function chiudiSulServer(b, deps) {
-  try {
-    await chiama('chiudi', { ticket: b.ticket }, deps);
-    return { chiuso: true };
-  } catch (e) {
-    return e && e.rifiuto ? { chiuso: true } : { chiuso: false, errore: String((e && e.message) || e) };
-  }
-}
-
-function togliFile(path) {
-  try { rmSync(path, { force: true }); return true; } catch (_) { return false; }
-}
-
-function togliSporchi(b) {
-  try { rmSync(cartellaSporchi(b), { recursive: true, force: true }); } catch (_) { /* resta, inerte */ }
-}
-
-/** Lo stesso biglietto sta in un altro file: nella sua cartella (chi ha lanciato, un figlio) o in quello di chi ha lanciato. */
-function inAltriFile(b, { env, cwd, sessione }) {
-  let nomi = [];
-  try { nomi = readdirSync(dirname(b.path)).filter((n) => n.endsWith('.json')); } catch (_) { /* solo chi ha lanciato */ }
-  const percorsi = nomi.map((n) => join(dirname(b.path), n)).concat([percorsoDiChiLancia({ env, cwd, sessioneCheNasce: sessione })]);
-  return percorsi.some((p) => p && resolve(p) !== resolve(b.path) && (leggiFile(p) || {}).fp === b.fp);
-}
-
-/**
- * Il gancio di fine sessione (in sottofondo): il biglietto sporco della sessione `input.session_id` si chiude sul server
- * e il suo file sparisce. Uno pulito resta, perché la sessione si può riprendere: lo chiude la scadenza. Uno che vive
- * anche in un altro file resta aperto, e si toglie solo il file della sessione. Server giù: resta tutto. Mai un'eccezione.
- * @returns {Promise<{ esito: string, errore?: string }>}
- */
-export async function fineSessione({ input = {}, env = process.env, cwd = process.cwd(), deps = {}, haCredenziale = haCredenzialeOwner } = {}) {
-  try {
-    if (env.FILO_ROUTINE) return { esito: 'routine' };
-    const sessione = String((input && input.session_id) || '').trim();
-    if (!ID_RE.test(sessione)) return { esito: 'senza sessione' };
-    const radice = radiceCondivisa(cwd);
-    const b = radice ? leggiFile(join(cartellaBiglietti(radice), `${sessione}.json`)) : null;
-    if (!b) return { esito: 'senza biglietto' };
-    if (!(await haCredenziale())) return { esito: 'senza credenziale' };
-    const d = conTokenUnico(deps);
-    const consegna = await consegnaSporchi(b, { deps: d });
-    if (consegna.restano) return { esito: 'resta', errore: consegna.errore || 'sporco annotato non consegnato' };
-    let s;
-    try { s = await chiama('stato', { ticket: b.ticket }, d); } catch (e) { return { esito: 'resta', errore: String((e && e.message) || e) }; }
-    if (s.fiducia === 'fidato' && s.chiuso !== true) return { esito: 'pulito' };
-    if (inAltriFile(b, { env, cwd, sessione })) {
-      togliFile(b.path);
-      return { esito: 'file tolto' };
-    }
-    if (s.chiuso !== true) {
-      const r = await chiudiSulServer(b, d);
-      if (!r.chiuso) return { esito: 'resta', errore: r.errore };
-    }
-    togliFile(b.path);
-    togliSporchi(b);
-    return { esito: 'chiuso' };
-  } catch (e) {
-    return { esito: 'guasto', errore: String((e && e.message) || e) };
-  }
-}
-
-/**
- * La scadenza (sessioni morte senza il gancio di fine): chiude i biglietti fermi da più di SCADENZA_MS e ne toglie i
- * file. Un biglietto che ha ancora un file vivo resta aperto, e se ne tolgono solo i file scaduti; restano sempre quello
- * della sessione e quello di chi l'ha lanciata. Al primo guasto del server si ferma: riprova la volta dopo.
- * @returns {Promise<{ chiusi: number, tolti: number, errori: string[] }>}
- */
-export async function chiudiScaduti({ env = process.env, cwd = process.cwd(), nowMs = Date.now(), deps = {} } = {}) {
-  const out = { chiusi: 0, tolti: 0, errori: [] };
-  try {
-    const radice = radiceCondivisa(cwd);
-    if (!radice) return out;
-    const dir = cartellaBiglietti(radice);
-    let nomi = [];
-    try { nomi = readdirSync(dir).filter((n) => n.endsWith('.json')); } catch (_) { return out; }
-    const sessione = String(env[ENV_SESSIONE] || '').trim();
-    const tieni = new Set([String(env[ENV_FILE] || '').trim(), ID_RE.test(sessione) ? join(dir, `${sessione}.json`) : '']
-      .filter(Boolean).map((p) => resolve(p)));
-    const scaduto = (b) => !tieni.has(resolve(b.path)) && nowMs - ultimaAttivita(b) > SCADENZA_MS;
-    const gruppi = new Map();
-    for (const nome of nomi) {
-      const path = join(dir, nome);
-      const b = leggiFile(path);
-      if (!b) {
-        if (scaduto({ path }) && togliFile(path)) out.tolti += 1;
-        continue;
-      }
-      const g = gruppi.get(b.fp) || { vivo: false, scaduti: [] };
-      if (scaduto(b)) g.scaduti.push(b); else g.vivo = true;
-      gruppi.set(b.fp, g);
-    }
-    for (const g of gruppi.values()) {
-      if (g.vivo) for (const b of g.scaduti) if (togliFile(b.path)) out.tolti += 1;
-    }
-    const d = conTokenUnico(deps);
-    for (const g of gruppi.values()) {
-      if (g.vivo || !g.scaduti.length) continue;
-      const b = g.scaduti[0];
-      const consegna = await consegnaSporchi(b, { deps: d });
-      const r = consegna.restano ? { chiuso: false, errore: consegna.errore || 'sporco annotato non consegnato' } : await chiudiSulServer(b, d);
-      if (!r.chiuso) { out.errori.push(r.errore); break; }
-      out.chiusi += 1;
-      togliSporchi(b);
-      for (const s of g.scaduti) if (togliFile(s.path)) out.tolti += 1;
-    }
-    // Lo sporco annotato di un biglietto che non ha più file non parte più: col tempo se ne va anche lui.
-    const sporchi = join(dir, 'sporchi');
-    let impronte = [];
-    try { impronte = readdirSync(sporchi).filter((n) => FP_RE.test(n) && !gruppi.has(n)); } catch (_) { /* nessuno */ }
-    for (const fp of impronte) {
-      const c = join(sporchi, fp);
-      if (nowMs - ultimaAttivita({ path: c }) > SCADENZA_MS) { try { rmSync(c, { recursive: true, force: true }); } catch (_) { /* la prossima volta */ } }
-    }
-  } catch (e) {
-    out.errori.push(String((e && e.message) || e));
-  }
-  return out;
-}
-
-/** Lancia `node scripts/biglietto.mjs <argomenti>` staccato: chi chiama non aspetta, e il processo sopravvive alla sessione. */
-export function avviaInSottofondo(argomenti, { cwd = process.cwd(), env = process.env } = {}) {
-  const script = fileURLToPath(new URL('../biglietto.mjs', import.meta.url));
-  const figlio = spawn(process.execPath, [script, ...argomenti], { cwd, env, detached: true, stdio: 'ignore', windowsHide: true });
-  figlio.on('error', () => {});
-  figlio.unref();
-}
-
-/**
- * Il gancio SessionEnd: Claude Code gli lascia poco tempo, quindi passa la chiusura a un processo in sottofondo.
- * @returns {boolean} se l'ha lanciata
- */
-export function avviaFine({ input = {}, env = process.env, avvia = avviaInSottofondo } = {}) {
-  if (env.FILO_ROUTINE) return false;
-  const sessione = String((input && input.session_id) || '').trim();
-  if (!ID_RE.test(sessione)) return false;
-  // Il progetto prima della cartella corrente, che può essere un worktree già tolto: il biglietto sta nel progetto.
-  const cwd = [env.CLAUDE_PROJECT_DIR, input && input.cwd].map((c) => String(c || '').trim()).find((c) => c && existsSync(c));
-  avvia(['chiusura', sessione], { cwd: cwd || process.cwd(), env });
-  return true;
+    const radice = radiceRepo(cwd);
+    if (!radice) return;
+    const { installaControlloSpedizione, installaSpinteServer } = await import('./copie-di-dati.mjs');
+    installaControlloSpedizione(radice);
+    const { cartellaDelServer } = await import('./ramo-server.mjs');
+    const server = cartellaDelServer(radiceCondivisa(cwd) || radice);
+    if (server) installaSpinteServer(server);
+  } catch (_) { /* senza, le spinte di questa sessione restano da dichiarare: non fidate */ }
 }
 
 /**
@@ -727,6 +583,8 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       path = p.path;
       fiducia = p.fiducia;
     }
+    // Il pre-push che dichiara le spinte col biglietto (#1362) c'è da subito, anche nel clone di filo-security accanto.
+    await (deps.installaPrePush || installaPrePush)(cwd);
     const envFile = String(env.CLAUDE_ENV_FILE || '').trim();
     if (envFile) {
       try { writeFileSync(envFile, `export ${ENV_FILE}='${path.replace(/'/g, "'\\''")}'\n`, { flag: 'a', encoding: 'utf8' }); } catch (_) { /* resta la ricerca col nome della sessione */ }
