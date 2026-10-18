@@ -996,7 +996,8 @@ export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); 
 export function rigaRegistro(repo, r) {
   const chi = repo === 'server' ? 'del server' : 'dell’app';
   const sporcata = r && r.sporcato ? ` Questa sessione si è sporcata (${String(r.sporcato).slice(0, 200)}): da qui ciò che scrive nasce non fidato.` : '';
-  if (r && r.ok) return `Registro del ramo ${chi}: ${r.ramoFidato ? 'lavoro fidato, scritto solo da sessioni pulite' : 'non fidato: se i controlli lo fermano, la fusione aspetterà il tuo sì'}.${sporcata}`;
+  const spinte = r && r.spinte ? ` ${String(r.spinte).slice(0, 300)}` : '';
+  if (r && r.ok) return `Registro del ramo ${chi}: ${r.ramoFidato ? 'lavoro fidato, scritto solo da sessioni pulite' : 'non fidato: se i controlli lo fermano, la fusione aspetterà il tuo sì'}.${sporcata}${spinte}`;
   if (r && r.senzaBiglietto) return `Registro del ramo ${chi}: questa sessione non ha un biglietto (node scripts/biglietto.mjs stato), il lavoro non risulta fidato.`;
   return `Registro del ramo ${chi} non scritto (${String((r && r.errore) || 'motivo sconosciuto').slice(0, 160)}): il lavoro non risulta fidato.`;
 }

@@ -264,19 +264,39 @@ export function copieNelPush(root, righe) {
   return trovate;
 }
 
-// Il segno che riconosce il pre-push di Filo: uno con un altro contenuto è di qualcun altro e non si tocca.
-export const SEGNO_PRE_PUSH = 'filo-copie-di-dati';
-// Di riserva, se la cartella che spedisce non ha il controllo (un ramo vecchio): quello di chi ha installato.
+// Il segno che riconosce il pre-push di Filo. Quello di prima si riconosce ancora, per sostituirlo; il nuovo non lo porta,
+// così gli strumenti di un ramo vecchio lo vedono altrui e non lo riscrivono senza le spinte.
+export const SEGNO_PRE_PUSH = 'filo-pre-push';
+const SEGNO_VECCHIO = 'filo-copie-di-dati';
+// Di riserva, se la cartella che spedisce non ha lo script (un ramo vecchio): quello di chi ha installato.
 const RISERVA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'copie-in-scena.mjs').replace(/\\/g, '/');
-const PRE_PUSH = `#!/bin/sh
-# ${SEGNO_PRE_PUSH}: una copia dei dati del server non parte per nessuna strada, nemmeno un git push a mano (#1108).
-# Lo scrive scripts/lib/copie-di-dati.mjs; il controllo è quello della cartella che spedisce.
-radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-controllo="$radice/scripts/copie-in-scena.mjs"
-[ -f "$controllo" ] || controllo='${RISERVA.replace(/'/g, "'\\''")}'
-[ -f "$controllo" ] && command -v node >/dev/null 2>&1 || exit 0
+const RISERVA_SPINTE = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dichiara-spinte.mjs').replace(/\\/g, '/');
+const tra = (s) => `'${s.replace(/'/g, "'\\''")}'`;
+
+/** Il pezzo che accoda le spinte (#1362). `soloRiserva`: lo script è sempre quello di chi installa (il clone del server). */
+function bloccoSpinte(repo, soloRiserva) {
+  const scelta = soloRiserva ? `spinte=${tra(RISERVA_SPINTE)}`
+    : `spinte="$radice/scripts/dichiara-spinte.mjs"\n  [ -f "$spinte" ] || spinte=${tra(RISERVA_SPINTE)}`;
+  return `radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+command -v node >/dev/null 2>&1 || exit 0
 righe=$(cat)
-# node costa a ogni push: si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.
+# Le spinte col biglietto di chi spinge (#1362): node costa a ogni push, quindi solo se c'e' un biglietto da cui farlo.
+principale=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); principale=\${principale%/.git}
+if [ -n "$CLAUDE_CODE_SESSION_ID$FILO_BIGLIETTO_FILE$FILO_ROUTINE_TICKET" ] || [ -f "$radice/.claude/routine-ticket.json" ] || [ -f "$principale/.claude/routine-ticket.json" ]; then
+  ${scelta}
+  [ -f "$spinte" ] && printf '%s\\n' "$righe" | node "$spinte" --pre-push ${repo} "$radice" "$2" >/dev/null 2>&1
+fi
+`;
+}
+
+const PRE_PUSH = `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: su ogni strada che spinge, anche un git push a mano, accoda le spinte col biglietto di chi spinge (#1362)
+# e ferma una copia dei dati del server (#1108). Lo scrive scripts/lib/copie-di-dati.mjs; gli script sono quelli della
+# cartella che spedisce, o di chi l'ha installato.
+${bloccoSpinte('app', false)}controllo="$radice/scripts/copie-in-scena.mjs"
+[ -f "$controllo" ] || controllo=${tra(RISERVA)}
+[ -f "$controllo" ] || exit 0
+# Il controllo delle copie si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.
 dati=$(printf '%s\\n' "$righe" | while read -r _ locale _ _; do
   case "$locale" in *[!0]*) ;; *) continue ;; esac
   git log --format= --name-only --diff-filter=ACMR "$locale" --not --remotes 2>/dev/null
@@ -285,20 +305,36 @@ done | grep -vE '\\.(js|mjs|cjs|ts|css|html|md|sh|ps1|png|jpe?g|gif|webp|svg|ico
 printf '%s\\n' "$righe" | node "$controllo" --pre-push "$radice"
 `;
 
+// Nel clone di filo-security delle sessioni locali: solo le spinte, con lo script di Filo di chi installa.
+const PRE_PUSH_SERVER = `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: su ogni strada che spinge su filo-security accoda le spinte col biglietto della sessione di Filo che
+# spinge (#1362). Lo scrive scripts/lib/copie-di-dati.mjs di Filo.
+${bloccoSpinte('server', true)}exit 0
+`;
+
+function installa(root, contenuto) {
+  try { if (gitTesto(root, ['config', '--get', 'core.hooksPath']).trim()) return 'altrove'; } catch (_) { /* non impostato */ }
+  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', 'hooks/pre-push']).trim());
+  let attuale = null;
+  try { attuale = readFileSync(dove, 'utf8'); } catch (_) { /* non c'è */ }
+  if (attuale === contenuto) return 'presente';
+  if (attuale !== null && !attuale.includes(SEGNO_PRE_PUSH) && !attuale.includes(SEGNO_VECCHIO)) return 'altrui';
+  mkdirSync(dirname(dove), { recursive: true });
+  writeFileSync(dove, contenuto, { mode: 0o755 });
+  try { chmodSync(dove, 0o755); } catch (_) { /* su Windows git lo lancia comunque */ }
+  return 'installato';
+}
+
 /**
  * Mette il controllo prima di ogni push nella copia del repo di `root` (gli hook di git valgono per tutte le sue cartelle).
  * 'installato' | 'presente' | 'altrui' (un pre-push non nostro: non si tocca) | 'altrove' (core.hooksPath: la cartella
  * degli hook è condivisa con altri repo, non ci si scrive).
  */
 export function installaControlloSpedizione(root) {
-  try { if (gitTesto(root, ['config', '--get', 'core.hooksPath']).trim()) return 'altrove'; } catch (_) { /* non impostato */ }
-  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', 'hooks/pre-push']).trim());
-  let attuale = null;
-  try { attuale = readFileSync(dove, 'utf8'); } catch (_) { /* non c'è */ }
-  if (attuale === PRE_PUSH) return 'presente';
-  if (attuale !== null && !attuale.includes(SEGNO_PRE_PUSH)) return 'altrui';
-  mkdirSync(dirname(dove), { recursive: true });
-  writeFileSync(dove, PRE_PUSH, { mode: 0o755 });
-  try { chmodSync(dove, 0o755); } catch (_) { /* su Windows git lo lancia comunque */ }
-  return 'installato';
+  return installa(root, PRE_PUSH);
+}
+
+/** Lo stesso nel clone di filo-security di una sessione locale: le sue spinte si dichiarano come quelle di Filo (#1362). */
+export function installaSpinteServer(root) {
+  return installa(root, PRE_PUSH_SERVER);
 }

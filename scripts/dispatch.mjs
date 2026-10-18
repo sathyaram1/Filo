@@ -72,7 +72,6 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve, sep } from 'node:path';
-import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, withCheckpoint,
@@ -100,7 +99,7 @@ import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
-import { cloneDentroIlRepo } from './lib/git-server.mjs';
+import { cartellaCloneServer, cloneDentroIlRepo } from './lib/git-server.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -732,12 +731,7 @@ export function serialAwarenessNote(role, history, dropped = 0) {
 
 const LAVORO_SERVER_FILE = '_lavoro-server.md';
 
-/** Dove sta il clone di filo-security di un lavoro server: fuori dal checkout di Filo. PURA (legge l'ambiente). */
-export function cartellaCloneServer(env = process.env) {
-  return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
-}
-
-export { cloneDentroIlRepo };
+export { cloneDentroIlRepo, cartellaCloneServer };
 
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
 export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {

@@ -2,7 +2,8 @@
 // Il token vive solo nell'ambiente del git figlio, come credenziale nell'URL riscritto (scelta owner su #1233): mai in
 // argv, nel clone o a video. Sentinella: tests/unit/gitServer.test.mjs.
 
-import { isAbsolute, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
+import { homedir } from 'node:os';
 
 export const URL_SERVER = 'https://github.com/sathyaram1/filo-security.git';
 const URL_NUDO = URL_SERVER.replace(/\.git$/, '');
@@ -21,6 +22,11 @@ export function voceDiAccesso(chiave) {
   return k.startsWith('credential.') || k === 'core.askpass'
     || (k.startsWith('http.') && k.endsWith('.extraheader'))
     || (k.startsWith('url.') && (k.endsWith('.insteadof') || k.endsWith('.pushinsteadof')));
+}
+
+/** Dove sta il clone di filo-security di un lavoro server: fuori dal checkout di Filo. PURA (legge l'ambiente). */
+export function cartellaCloneServer(env = process.env) {
+  return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
 }
 
 /** L'origin di un clone è filo-security, con o senza `.git`? PURA. */

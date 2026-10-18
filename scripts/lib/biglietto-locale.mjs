@@ -216,10 +216,10 @@ export function messaggioErrore(status, body) {
 }
 
 /**
- * Una op della callable con il token dell'owner. deps: { fetchImpl, idToken() → Promise<string>, url, tempoMs }.
- * → il risultato del server; lancia un Error col motivo (anche «non ancora pubblicata») se non va.
+ * Una op della callable con il token dell'owner, com'è arrivata: { status, body }. deps: { fetchImpl, idToken() →
+ * Promise<string>, url, tempoMs }. Lancia solo senza credenziale, dentro una prova, o se la rete non risponde.
  */
-export async function chiama(op, data = {}, deps = {}) {
+export async function chiamaGrezzo(op, data = {}, deps = {}) {
   // Dentro una prova (node --test) il server vero non si tocca mai: un ramo di prova finirebbe nel registro vero.
   if (!deps.fetchImpl && process.env.NODE_TEST_CONTEXT) throw new Error('niente server vero dentro una prova');
   const fetchImpl = deps.fetchImpl || fetch;
@@ -235,7 +235,16 @@ export async function chiama(op, data = {}, deps = {}) {
   });
   let body = {};
   try { body = await res.json(); } catch (_) { body = {}; }
-  if (!res.ok || (body.result && body.result.ok === false)) throw new Error(messaggioErrore(res.status, body));
+  return { status: res.status, ok: res.ok, body };
+}
+
+/**
+ * Una op della callable con il token dell'owner. deps: { fetchImpl, idToken() → Promise<string>, url, tempoMs }.
+ * → il risultato del server; lancia un Error col motivo (anche «non ancora pubblicata») se non va.
+ */
+export async function chiama(op, data = {}, deps = {}) {
+  const { status, ok, body } = await chiamaGrezzo(op, data, deps);
+  if (!ok || (body.result && body.result.ok === false)) throw new Error(messaggioErrore(status, body));
   return body.result || {};
 }
 
@@ -344,17 +353,17 @@ export async function prendi({ sporco = false, motivo = '', sessionId = '', cwd 
 export const TETTO_COMMIT = 5000;
 
 /**
- * I commit del ramo oltre main fino a `sha`, con la data d'autore in ms: il server ci controlla che li abbia scritti una
- * sessione pulita registrata (fiduciaRamo.commitCoperti). null se git non risponde (il server lo legge come sporco).
+ * I commit del ramo oltre main fino a `sha`, coi genitori: il server ci controlla che fra l'ultimo sha registrato e la
+ * punta li abbia dichiarati tutti, spingendoli, un biglietto pulito (#1362). null se git non risponde (vale sporco).
  */
 export function commitDelRamo(cartella, sha) {
   try {
-    const out = execFileSync('git', ['log', '--format=%H %at', `-n${TETTO_COMMIT + 1}`, String(sha), '--not', 'origin/main'], {
+    const out = execFileSync('git', ['log', '--format=%H %P', `-n${TETTO_COMMIT + 1}`, String(sha), '--not', 'origin/main'], {
       cwd: cartella, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 16 * 1024 * 1024,
     });
     return out.split('\n').filter((r) => r.trim()).map((r) => {
-      const [s, t] = r.trim().split(/\s+/);
-      return { sha: s, at: Number(t) * 1000 };
+      const [s, ...genitori] = r.trim().split(/\s+/);
+      return { sha: s, parents: genitori };
     });
   } catch (_) {
     return null;
@@ -363,24 +372,29 @@ export function commitDelRamo(cartella, sha) {
 
 /**
  * Registra nel registro dei rami la punta che questa sessione ha scritto (verify-local start, finish), coi commit del
- * ramo letti in `cartella`. Se la sessione continua un lavoro sporco o di chi il server non sa nominare, il server la
- * sporca (`sporcato`). Mai un'eccezione: senza biglietto o con un guasto il ramo resta senza la voce, cioè non fidato.
- * @returns {Promise<{ ok: boolean, ramoFidato?: boolean, fiducia?: string, sporcato?: string, senzaBiglietto?: true, errore?: string }>}
+ * ramo letti in `cartella`. Prima dichiara le spinte rimaste in coda in quella cartella, di questa sessione e delle
+ * altre (#1362). Se la sessione continua un lavoro sporco, o con commit che nessun biglietto pulito ha dichiarato, il
+ * server la sporca (`sporcato`). Mai un'eccezione: senza biglietto o con un guasto il ramo resta senza voce, non fidato.
+ * @returns {Promise<{ ok: boolean, ramoFidato?: boolean, fiducia?: string, sporcato?: string, spinte?: string, senzaBiglietto?: true, errore?: string }>}
  */
 export async function registraRamo({ repo, ramo, sha, feedbackId = '', cartella, env, cwd, deps = {} } = {}) {
   try {
     const b = await trovaBiglietto({ env, cwd, deps });
     if (!b) return { ok: false, senzaBiglietto: true };
     if (b.inAttesa) return { ok: false, errore: 'una lettura esterna è annotata solo in locale (il server non l’ha ricevuta): il ramo resta senza la voce, cioè non fidato' };
-    const commits = (deps.commitDelRamo || commitDelRamo)(cartella || cwd || process.cwd(), sha);
+    const dove = cartella || cwd || process.cwd();
+    const S = await import('./spinte.mjs');
+    const spinte = S.rigaSpinte(await (deps.inviaSpinte || S.inviaSpinte)({ root: dove, deps }));
+    const commits = (deps.commitDelRamo || commitDelRamo)(dove, sha);
     const r = await chiama('ramo', Object.assign(
       { ticket: b.ticket, repo, ramo, sha },
       feedbackId ? { feedbackId } : {},
-      Array.isArray(commits) ? { commits, ora: Date.now() } : {},
+      Array.isArray(commits) ? { commits } : {},
     ), deps);
     return Object.assign(
       { ok: true, ramoFidato: r.ramoFidato === true, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato' },
       r.sporcato ? { sporcato: String(r.sporcato) } : {},
+      spinte ? { spinte } : {},
     );
   } catch (e) {
     return { ok: false, errore: String((e && e.message) || e) };
@@ -432,7 +446,17 @@ export async function fondiApp(feedbackId, deps = {}) {
 /** Chiude i biglietti di questa sessione e ne toglie i file. */
 export async function chiudi({ env, cwd, deps = {} } = {}) {
   const out = { chiusi: 0, errori: [] };
-  for (const b of trovaBiglietti({ env, cwd })) {
+  const trovati = trovaBiglietti({ env, cwd });
+  // Le spinte in coda partono prima: da chiuso il biglietto non le dichiara più, e i loro commit sarebbero di nessuno (#1362).
+  if (trovati.length) {
+    try {
+      const S = await import('./spinte.mjs');
+      const radice = radiceRepo(cwd);
+      const riga = radice ? S.rigaSpinte(await (deps.inviaSpinte || S.inviaSpinte)({ root: radice, deps })) : '';
+      if (riga) out.spinte = riga;
+    } catch (_) { /* restano in coda: valgono di nessuno */ }
+  }
+  for (const b of trovati) {
     // Prima lo sporco annotato: la storia del biglietto lo deve avere anche da chiuso.
     await consegnaSporchi(b, { deps });
     let chiuso = false;
@@ -448,6 +472,19 @@ export async function chiudi({ env, cwd, deps = {} } = {}) {
     if (chiuso) { try { rmSync(cartellaSporchi(b), { recursive: true, force: true }); } catch (_) { /* resta, inerte */ } }
   }
   return out;
+}
+
+/** Mette il pre-push di Filo nel repo di `cwd` e, se c'è, nel clone di filo-security accanto. Mai un'eccezione. */
+export async function installaPrePush(cwd = process.cwd()) {
+  try {
+    const radice = radiceRepo(cwd);
+    if (!radice) return;
+    const { installaControlloSpedizione, installaSpinteServer } = await import('./copie-di-dati.mjs');
+    installaControlloSpedizione(radice);
+    const { cartellaDelServer } = await import('./ramo-server.mjs');
+    const server = cartellaDelServer(radiceCondivisa(cwd) || radice);
+    if (server) installaSpinteServer(server);
+  } catch (_) { /* senza, le spinte di questa sessione restano da dichiarare: non fidate */ }
 }
 
 /**
@@ -507,6 +544,8 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       path = p.path;
       fiducia = p.fiducia;
     }
+    // Il pre-push che dichiara le spinte col biglietto (#1362) c'è da subito, anche nel clone di filo-security accanto.
+    await (deps.installaPrePush || installaPrePush)(cwd);
     const envFile = String(env.CLAUDE_ENV_FILE || '').trim();
     if (envFile) {
       try { writeFileSync(envFile, `export ${ENV_FILE}='${path.replace(/'/g, "'\\''")}'\n`, { flag: 'a', encoding: 'utf8' }); } catch (_) { /* resta la ricerca col nome della sessione */ }

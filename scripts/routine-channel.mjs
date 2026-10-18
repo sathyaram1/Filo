@@ -128,7 +128,9 @@ import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticke
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
-import { URL_SERVER, ambienteGitServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
+import { URL_SERVER, ambienteGitServer, cartellaCloneServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
+import { accoda, commitPropri, inviaSpinte, rigaSpinte } from './lib/spinte.mjs';
+import { commitDelRamo } from './lib/biglietto-locale.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 
@@ -771,6 +773,31 @@ export function classifyReply(status, body) {
   return 'refused';
 }
 
+/** Le consegne dopo cui la punta è di chi consegna, come le conta il server (deliver.consegnaCheSpinge). PURA. */
+export function consegnaCheSpinge(intent, data) {
+  return intent === 'fixed' || intent === 'verdict' || (intent === 'status' && !!data && data.status === 'revision_capability');
+}
+
+/**
+ * Prima di una consegna che spinge (#1362): le spinte in coda partono, col biglietto ancora vivo, e la consegna porta i
+ * commit del ramo oltre main fino allo sha timbrato. Il server controlla che li abbia dichiarati tutti un biglietto
+ * pulito: un guasto qui non ferma la consegna, lascia il lavoro non fidato e lo dice. Dentro una prova solo con `root`.
+ */
+export async function conSpinteDichiarate(intent, data, opts = {}) {
+  const o = opts || {};
+  const corpo = Object.assign({}, data);
+  if (!consegnaCheSpinge(intent, corpo) || !/^[0-9a-f]{40}$/i.test(String(corpo.sha || ''))) return corpo;
+  if (!o.root && process.env.NODE_TEST_CONTEXT) return corpo;
+  const root = o.root || ROOT;
+  const riga = rigaSpinte(await (o.inviaSpinte || inviaSpinte)({ root, deps: o.fetchImpl ? { fetchImpl: o.fetchImpl } : {} }));
+  if (riga) console.error(riga);
+  if (!Array.isArray(corpo.commits)) {
+    const commits = (o.commitDelRamo || commitDelRamo)(root, corpo.sha);
+    if (Array.isArray(commits)) corpo.commits = commits;
+  }
+  return corpo;
+}
+
 /**
  * Consegna un intento al server. `data` NON contiene mai il feedback su cui si
  * agisce: quello il server lo legge dal biglietto.
@@ -780,7 +807,8 @@ export function classifyReply(status, body) {
  * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num?, reply? }}
  */
 export async function deliver(t, intent, data, opts) {
-  const { status, body } = await call('routineDeliver', { ticket: t, intent, data: data || {} }, opts);
+  const corpo = await conSpinteDichiarate(intent, data || {}, opts);
+  const { status, body } = await call('routineDeliver', { ticket: t, intent, data: corpo }, opts);
   const outcome = classifyReply(status, body);
   return {
     outcome,
@@ -825,9 +853,10 @@ export async function gitToken(t, opts) {
 }
 
 /** Il ramo spinto su filo-security entra nel registro (routineRamoServer). → { outcome, sha?, ramoFidato?, reason? } */
-export async function ramoServer(t, ramo, sha, opts) {
-  const { status, body } = await call('routineRamoServer', { ticket: t, ramo: String(ramo || ''), sha: String(sha || '') }, opts);
-  if (status === 200 && body && body.ok) return { outcome: 'ok', sha: String(body.sha || ''), ramoFidato: body.ramoFidato === true, fiducia: body.fiducia };
+export async function ramoServer(t, ramo, sha, opts, commits) {
+  const corpo = Object.assign({ ticket: t, ramo: String(ramo || ''), sha: String(sha || '') }, Array.isArray(commits) ? { commits } : {});
+  const { status, body } = await call('routineRamoServer', corpo, opts);
+  if (status === 200 && body && body.ok) return { outcome: 'ok', sha: String(body.sha || ''), ramoFidato: body.ramoFidato === true, fiducia: body.fiducia, motivo: String(body.motivo || '') };
   if (status === 404 && !(body && body.reason)) return { outcome: 'fault', reason: 'routineRamoServer non è ancora pubblicata sul server' };
   return {
     outcome: status >= 500 || status === 0 ? 'fault' : 'refused',
@@ -843,7 +872,7 @@ export async function ramoServer(t, ramo, sha, opts) {
 export async function eseguiGitServer({
   azione, cartella, ramo, biglietto, root = ROOT, env = process.env,
   lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
-  eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo),
+  eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo), spinte = dichiaraSpintaServer,
 } = {}) {
   const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
   const piano = pianoGitServer({ azione, cartella, ramo, root, clonato });
@@ -868,6 +897,8 @@ export async function eseguiGitServer({
     scrivi(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
     return t.outcome === 'refused' ? 4 : 3;
   }
+  // I commit che il worker ha creato si leggono prima della spinta: dopo, il ref remoto li contiene già (#1362).
+  const propri = azione === 'push' ? spinte.prima(piano.dir, String(ramo || '').trim()) : null;
   const { env: figlio, tolte } = ambienteGitServer(env, t.token);
   const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
   scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv[0] === 'clone' ? 'clone' : piano.argv[2]} su filo-security.`);
@@ -886,8 +917,33 @@ export async function eseguiGitServer({
     scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, nell'URL di ${URL_SERVER} per questa sola chiamata: ${chi}`);
     return 1;
   }
+  if (propri) {
+    const riga = await spinte.dopo(piano.dir, biglietto, propri);
+    if (riga) scrivi(`git-server: ${riga}`);
+  }
   return 0;
 }
+
+/** La spinta di un worker su filo-security, dichiarata col suo biglietto (#1362): i commit prima, l'invio dopo. */
+export const dichiaraSpintaServer = {
+  prima(dir, ramo) {
+    try {
+      const locale = execFileSync('git', ['-C', dir, 'rev-parse', `refs/heads/${ramo}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const p = commitPropri(dir, { locale, ramo });
+      return p && (p.commits.length || p.oltre) ? Object.assign({ ramo, punta: locale, commits: p.commits }, p.oltre ? { oltre: true } : {}) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+  async dopo(dir, biglietto, spinta) {
+    try {
+      accoda(dir, { tipo: 'routine', ticket: biglietto }, 'server', [spinta]);
+      return rigaSpinte(await inviaSpinte({ root: dir }));
+    } catch (e) {
+      return `spinta non dichiarata (${String((e && e.message) || e)}): i suoi commit valgono di nessuno e il lavoro non risulta fidato.`;
+    }
+  },
+};
 
 /**
  * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
@@ -1431,6 +1487,9 @@ if (isMain) {
       if (p.avviso) console.error(p.avviso);
       console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
     }
+    // Le spinte in coda partono col biglietto ancora vivo: dopo il rilascio il server non le accetta più (#1362).
+    const spinteRiga = rigaSpinte(await inviaSpinte({ root: ROOT }));
+    if (spinteRiga) console.error(spinteRiga);
     // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
     // solo qui. Se lo script fallisce si rilascia comunque, con la nota.
     let rapporto = null;
@@ -1694,9 +1753,17 @@ if (isMain) {
     const { readTicket } = await import('./lib/routine-ticket.mjs');
     const biglietto = mano.ticket || readTicket(ROOT);
     if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
-    const r = await ramoServer(biglietto, ramo, sha);
+    // Le spinte rimaste in coda nel clone partono prima, e la registrazione porta i commit del ramo oltre main (#1362).
+    const clone = String(data.cartella || '').trim() ? resolve(String(data.cartella)) : cartellaCloneServer();
+    let commits = null;
+    if (existsSync(join(clone, '.git'))) {
+      const riga = rigaSpinte(await inviaSpinte({ root: clone }));
+      if (riga) console.error(riga);
+      commits = sha ? commitDelRamo(clone, sha) : null;
+    }
+    const r = await ramoServer(biglietto, ramo, sha, undefined, commits);
     if (r.outcome === 'ok') {
-      console.log(`Ramo del server registrato: ${ramo} a ${r.sha.slice(0, 12)}${r.ramoFidato ? '' : ' (il registro dice: non fidato)'}.`);
+      console.log(`Ramo del server registrato: ${ramo} a ${r.sha.slice(0, 12)}${r.ramoFidato ? '' : ` (il registro dice: non fidato${r.motivo ? `, ${r.motivo}` : ''})`}.`);
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }

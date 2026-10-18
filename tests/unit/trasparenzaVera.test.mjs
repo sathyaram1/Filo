@@ -119,6 +119,15 @@ test('il lavoro fidato fonde senza il clic, la pre-approvazione non c\'è più, 
   legame(!preapprovaTolta, sicurezza, 'fondi senza chiedermelo', 'la pre-approvazione');
 });
 
+test('ogni invio al ramo lo dichiara chi l’ha fatto col suo biglietto, l’ora del commit non conta più, e il documento sulla sicurezza lo dice', () => {
+  const prePush = /node "\$spinte" --pre-push \$\{repo\} "\$radice" "\$2"/.test(leggi('scripts', 'lib', 'copie-di-dati.mjs'));
+  const salvataggio = /export CLAUDE_CODE_SESSION_ID="\$HOOK_SESSION"/.test(leggi('.claude', 'hooks', 'auto-commit-merge.sh'));
+  const dichiara = prePush && salvataggio;
+  legame(dichiara, sicurezza, 'Ogni invio al ramo lo dichiara al server chi l\'ha fatto, col suo biglietto.', 'il lavoro fidato e le spinte dichiarate');
+  legame(dichiara, sicurezza, 'ognuno lo dichiara la sessione che l\'ha fatto, col suo biglietto', 'le spinte dichiarate fra i punti deboli');
+  legame(!dichiara, sicurezza, 'Lo attribuisce in base all\'ora', 'il buco dell\'ora (#1181)');
+});
+
 test('il tasto destro su un link chiede da solo titolo e descrizione al sito e spiega il link con un modello, e il documento sulla privacy lo dice', () => {
   const azioni = leggi('src', 'content', 'actions.js');
   const daSolo = /onMount[\s\S]{0,1500}fetch_link_meta/.test(azioni);

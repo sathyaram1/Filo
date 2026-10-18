@@ -95,6 +95,7 @@ async function main() {
   }
   // chiudi
   const r = await B.chiudi();
+  if (r.spinte) console.error(r.spinte);
   if (r.errori.length) console.error(`Non chiusi sul server: ${r.errori.join('; ')}`);
   console.log(r.chiusi ? `Biglietti chiusi: ${r.chiusi}.` : 'Nessun biglietto da chiudere.');
   return 0;

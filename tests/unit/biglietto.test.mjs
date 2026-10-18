@@ -158,14 +158,21 @@ test('prendi scrive il file; registra il ramo col biglietto della sessione; chiu
     assert.equal(p.path, join(B.cartellaBiglietti(dir), 'sess-1.json'));
     assert.deepEqual(JSON.parse(readFileSync(p.path, 'utf8')).natoIl, 7);
     assert.equal(s.chiamate[0].sessione, 'sess-1');
-    const commits = [{ sha: 'a'.repeat(40), at: 1000 }];
-    const conCommit = { ...s.deps, commitDelRamo: (cartella, sha) => (cartella === dir && sha === 'a'.repeat(40) ? commits : null) };
+    const commits = [{ sha: 'a'.repeat(40), parents: [] }];
+    // Prima di registrare partono le spinte in coda nella cartella (#1362): qui l'invio si guarda, non si fa.
+    const inviate = [];
+    const conCommit = {
+      ...s.deps,
+      commitDelRamo: (cartella, sha) => (cartella === dir && sha === 'a'.repeat(40) ? commits : null),
+      inviaSpinte: async ({ root }) => { inviate.push(root); return { inviate: 0, rifiutate: 0, restano: 0, errori: [] }; },
+    };
     const sess = { CLAUDE_CODE_SESSION_ID: 'sess-1' };
     const r = await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', env: sess, cwd: dir, deps: conCommit });
     assert.deepEqual(r, { ok: true, ramoFidato: true, fiducia: 'fidato' });
-    const { ora, ...resto } = s.chiamate.at(-1);
-    assert.ok(Math.abs(ora - Date.now()) < 60000, 'l’ora della macchina, per portare le date dei commit sull’orologio del server');
-    assert.deepEqual(resto, { op: 'ramo', ticket: JSON.parse(readFileSync(p.path, 'utf8')).ticket, repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', commits });
+    assert.deepEqual(inviate, [dir]);
+    assert.deepEqual(s.chiamate.at(-1), { op: 'ramo', ticket: JSON.parse(readFileSync(p.path, 'utf8')).ticket, repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', commits });
+    const restate = await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', env: sess, cwd: dir, deps: { ...conCommit, inviaSpinte: async () => ({ inviate: 0, rifiutate: 0, restano: 2, errori: ['rete giù'] }) } });
+    assert.match(restate.spinte, /2 in coda: rete giù/, 'una spinta non dichiarata si dice: il lavoro non risulterà fidato');
     const c = await B.chiudi({ env: sess, cwd: dir, deps: s.deps });
     assert.equal(c.chiusi, 1);
     assert.equal(existsSync(p.path), false);
@@ -277,7 +284,7 @@ test('l’hook di avvio chiama il biglietto solo fuori dalle routine, e non esce
 
 // ── Chi continua un lavoro ne eredita la sporcizia (#1148, rilievo 2 del giro 1) ──
 
-test('commitDelRamo: i commit oltre origin/main con la data d’autore in ms; git che non risponde → null', () => {
+test('commitDelRamo: i commit oltre origin/main coi genitori; git che non risponde → null', () => {
   const dir = repo();
   try {
     const g = (args, env = {}) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: { ...process.env, ...env } }).trim();
@@ -289,7 +296,7 @@ test('commitDelRamo: i commit oltre origin/main con la data d’autore in ms; gi
     writeFileSync(join(dir, 'b.txt'), 'uno\n');
     g(['add', '-A']); g(['commit', '-qm', 'uno'], { GIT_AUTHOR_DATE: '2026-10-01T10:00:00Z' });
     const punta = g(['rev-parse', 'HEAD']);
-    assert.deepEqual(B.commitDelRamo(dir, punta), [{ sha: punta, at: Date.parse('2026-10-01T10:00:00Z') }]);
+    assert.deepEqual(B.commitDelRamo(dir, punta), [{ sha: punta, parents: [g(['rev-parse', 'origin/main'])] }]);
     assert.equal(B.commitDelRamo(join(dir, 'non-esiste'), punta), null);
   } finally { togliCartella(dir); }
 });

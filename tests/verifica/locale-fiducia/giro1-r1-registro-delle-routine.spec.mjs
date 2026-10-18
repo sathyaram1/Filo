@@ -51,12 +51,21 @@ async function server() {
   const live = (fp) => ({ ok: true, fp, ticket: mem.doc(`routine-tickets/${fp}`) });
   // Come in channel.issueTicket: chi può spingere entra nel registro con la punta che trova.
   const emissione = (fp, punta) => store.registraSulRamo({ repo: 'app', ramo: RAMO, feedbackId: 'fid', fp, sha: punta, punta, via: fiduciaRamo.VIA.EMISSIONE });
+  // Dal #1362 il pre-push accoda i commit che la sessione crea e la consegna li dichiara prima di partire, poi porta i
+  // commit del ramo oltre main coi genitori: la prova li segue.
+  const dichiara = (fp, sha) => store.dichiaraSulRamo({ repo: 'app', ramo: RAMO, fp, spinte: [{ punta: sha, commits: [sha] }] });
+  const STORIA = { [H1]: [], [F1]: [H1] };
+  const oltreMain = (sha) => (sha === F1 ? [F1, H1] : [H1]).map((c) => ({ sha: c, parents: STORIA[c] }));
   // routine-channel deliver status --status revision_capability --notes … --frase … --branch …
   // Dal giro 2 lo strumento timbra la punta anche su revisione e correzione: la prova lo segue.
-  const revisione = (sha) => deliver.applyDelivery(live('t1'), 'status', { status: 'revision_capability', notes: 'report', userNote: 'frase', branch: RAMO, sha }, {}, Date.now());
+  const revisione = async (sha) => {
+    await dichiara('t1', sha);
+    return deliver.applyDelivery(live('t1'), 'status', { status: 'revision_capability', notes: 'report', userNote: 'frase', branch: RAMO, sha, commits: oltreMain(sha) }, {}, Date.now());
+  };
   const correzione = async (fp, sha) => {
     await mem().doc('feedback/fid').update({ status: 'revision_capability' });
-    return deliver.applyDelivery(live(fp), 'fixed', fixedPayload({ report: 'corretto', frase: 'f', branch: RAMO, sha }), {}, Date.now());
+    await dichiara(fp, sha);
+    return deliver.applyDelivery(live(fp), 'fixed', Object.assign(fixedPayload({ report: 'corretto', frase: 'f', branch: RAMO, sha }), { commits: oltreMain(sha) }), {}, Date.now());
   };
   return { store, fiduciaRamo, emissione, revisione, correzione };
 }

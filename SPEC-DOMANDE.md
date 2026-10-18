@@ -162,7 +162,9 @@ lo può scrivere anche un agente pulito.
 - `fiducia` su feedback, domande, compiti e biglietti. La scrive solo l'Admin
   SDK; le regole la vietano ai client.
 - `genitori: [id…]` sul feedback derivato.
-- `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
+- `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5, e `dichiarati`: i commit che i
+  biglietti puliti hanno dichiarato spingendoli (#1362). Un commit fra l'ultimo sha registrato e la punta
+  che nessuno di loro ha dichiarato è un buco, e il lavoro non è fidato.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
   server, prefisso owner/local) e quelli con `mergePreapproved`; tutti gli
   altri non fidati, `routine:residuo` compreso. I rami già in lavorazione
