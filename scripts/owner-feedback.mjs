@@ -48,13 +48,13 @@
 //   Un segno locale su una pratica chiusa ne toglie la scheda dalla bacheca pubblica: era un lavoro locale.
 //
 //   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
-//   routine la prende, e in Gestione sta nei Lavori locali. Solo sui feedback
+//   routine la prende (segno `locale:<chi>`, #1424), e in Gestione sta In coda col segno «locale». Solo sui feedback
 //   dell'owner o di una sessione con la prova del mittente (#595).
 //   `--non-locale` lo toglie. Su un feedback di un utente il segno si rifiuta:
 //   se richiede lavoro locale, `--serve-locale` lo riporta nei Ricevuti
 //   (stato design, nota «Richiede lavoro locale») e decide l'owner.
 //   Il sì dell'owner a un feedback di un utente o di una routine (`localApproval`, #913) qui non si dà: solo il
-//   tasto «💻 Lavoro server» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
+//   tasto «💻 Lavoro locale» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
 //   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
 //   stessa ragione la fiducia (#1148): «Segna fidato» lo dà solo l'owner, in Gestione, dopo aver letto il testo.
 //   `--riconosci`, `--preapprova` e `--chiedi-prima` non ci sono più e si rifiutano col perché.
@@ -130,6 +130,14 @@ function toFsValue(v) {
  * il token dell'owner, o l'account di servizio. Un bearer che non è un JWT
  * (token di accesso OAuth) non dice chi è: si scrive che è lo script.
  */
+/**
+ * Il `by` del segno che mette una sessione: `locale:` davanti dice lavoro locale, che nessuna routine prende; senza,
+ * il server lo prenderebbe per un lavoro server (#1424, localWork.isLavoroServer in filo-security). PURA.
+ */
+export function segnoLocaleDi(bearer) {
+  return `locale:${chiScrive(bearer)}`.slice(0, 120);
+}
+
 export function chiScrive(bearer) {
   try {
     const parti = String(bearer || '').split('.');
@@ -235,7 +243,7 @@ export async function segnaLocale(id, valore, opts = {}) {
   if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica' };
   const check = MR.localSignCheck(fb, valore);
   if (!check.ok) return { ok: false, motivo: check.motivo, utente: !!check.utente, routine: !!check.routine, senzaProva: !!check.senzaProva, ...contestoDelRifiuto(fb) };
-  const segno = valore ? { by: chiScrive(bearer), at: Date.now() } : null;
+  const segno = valore ? { by: segnoLocaleDi(bearer), at: Date.now() } : null;
   const chiusa = !!check.chiusa;
   // Il feedback di un utente approvato tiene la scheda: è da lì che chi l'ha mandato vede la risoluzione.
   const tieneScheda = MR.isLocalApproved(fb);
@@ -521,7 +529,7 @@ export function rifiutoPratica(id, r) {
 }
 
 /** Il sì come lavoro locale a un feedback non dell'owner (#957): nessuno strumento delle sessioni lo scrive. */
-export const SOLO_DA_GESTIONE = 'Come lavoro server lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro server» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
+export const SOLO_DA_GESTIONE = 'Come lavoro locale lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro locale» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
 /** La fiducia (#1148): salta giudici e L5, quindi la dà solo l'owner, dalla finestra di Filo. */
 export const SOLO_DA_GESTIONE_MIO = 'La fiducia la dà solo l’owner, in Gestione, col tasto «🤝 Segna fidato» dopo aver letto il testo: da riga di comando non si può.';
 /** «Fondi senza chiedermelo» non esiste più: al suo posto «Segna fidato», che vale prima del lavoro (#1148). */

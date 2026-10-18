@@ -77,16 +77,19 @@ test('«richiede lavoro locale» dice il vero secondo la fiducia del feedback', 
   const primaDellaMigrazione = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin' })).text;
   const approvato = MR.judgesNote(rimandato({ clientId: 'utente-2', localApproval: { by: 'owner', at: 1 } })).text;
   for (const t of [owner, sessione, approvato, primaDellaMigrazione]) {
-    assert.match(t, /con «💻 Lavoro server» passa nei Lavori server/);
+    assert.match(t, /con «💻 Lavoro locale» lo prende una sessione sul tuo computer/);
     assert.doesNotMatch(t, /decidi tu/);
   }
   // Routine e utenti (#913): la frase porta al sì dell'owner, che è anche il tasto principale nei Ricevuti.
   for (const t of [routine, utente, senzaProva, mioNonFidato]) {
-    assert.match(t, /decidi tu. Con «💻 Lavoro server» passa nei Lavori server/);
+    assert.match(t, /decidi tu. Con «💻 Lavoro locale» lo prende una sessione sul tuo computer/);
     assert.doesNotMatch(t, /non si lavorano/);
   }
+  // #1424: il lavoro locale non è più «Lavori server», né come tasto né come scheda.
+  for (const t of [owner, utente]) assert.doesNotMatch(t, /Lavori server|Lavoro server/);
   const tasto = MR.ownerActions(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).find((a) => a.key === 'accept_local');
-  assert.ok(tasto && tasto.primary, 'su una routine rimandata «💻 Lavoro server» è il tasto principale');
+  assert.ok(tasto && tasto.primary, 'su una routine rimandata «💻 Lavoro locale» è il tasto principale');
+  assert.equal(tasto.label, '💻 Lavoro locale');
 });
 
 // Decisione dell'owner del 04/10: un lavoro di routine nato da un feedback d'utente aspetta la sua fusione.

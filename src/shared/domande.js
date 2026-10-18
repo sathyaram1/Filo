@@ -55,7 +55,6 @@
     riprendi: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
     priorita: tipo({ feedbackId: 'feedbackId', valore: 'valorePriorita' }, { bulk: true, consenso: false, attivo: true }),
     archivia: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
-    approva_locale: tipo({ feedbackId: 'feedbackId' }, { bulk: false, consenso: true, attivo: true }),
     automazione: tipo({ chiave: 'chiave', valore: 'valoreBooleano' }, { bulk: false, consenso: false, attivo: true }),
     ambito: tipo({}, { bulk: false, consenso: true, attivo: false }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
@@ -220,7 +219,6 @@
     if (!r) return null;
     if (a.tipo === 'riprendi') return `Riprendi ${r.num} con questa scelta`;
     if (a.tipo === 'archivia') return `Archivia ${r.num}`;
-    if (a.tipo === 'approva_locale') return `Approva come lavoro locale ${r.num}`;
     if (a.tipo === 'priorita') return Number.isInteger(r.priorita) ? `Priorità di ${r.num}: ${r.priorita} → ${a.valore}` : null;
     return null;
   }

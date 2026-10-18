@@ -16,22 +16,24 @@ const {
   writeBranchState, withCheckpoint, writeExpectation, readBranchState, ensureSessionExcludes,
   IDENTITY_REJECT_LIMIT, escalationNote, guardiaConsegna, checkDelivery,
 } = await import('../../scripts/lib/branch-integrity.mjs');
-const { testoConsegnaFuoriRamo } = await import('../../scripts/routine-channel.mjs');
+const { testoConsegnaFuoriRamo, testoRispostaServer } = await import('../../scripts/routine-channel.mjs');
 
 const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
 const ASSEGNATO = 'worker/772-20261015T035107Z';
 const ID = 'fid-772';
 const REPORT = 'Corretto il salvataggio col titolo vuoto: ora salva anche senza titolo.';
 
-// Le quattro consegne che valgono per un commit; le altre non guardano il ramo.
+// Le consegne che valgono per un commit (la richiesta del server passa il ramo a un'altra routine, #1424); le altre
+// non guardano il ramo.
 const CONSEGNE = {
   revisione: ['status', '--status', 'revision_capability', '--notes', REPORT, '--frase', 'ora va'],
   correzione: ['fixed', '--report', REPORT],
   critica: ['verdict', '--critique', REPORT],
   sicurezza: ['secaudit', '--verdict', 'pass'],
+  richiesta: ['server', '--motivo', 'serve una regola nuova del database'],
 };
 
-function fintoServer() {
+function fintoServer(risposta = { ok: true, id: ID, num: '#772' }) {
   const ricevuti = [];
   const srv = createServer((req, res) => {
     let body = '';
@@ -41,7 +43,7 @@ function fintoServer() {
       try { j = body ? JSON.parse(body) : {}; } catch (_) { /* lo dicono gli assert */ }
       ricevuti.push({ url: String(req.url || ''), body: j });
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, id: ID, num: '#772' }));
+      res.end(JSON.stringify(risposta));
     });
   });
   return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, ricevuti, port: srv.address().port })));
@@ -85,7 +87,7 @@ const consegne = (ricevuti) => ricevuti.filter((x) => x.url.includes('routineDel
 const rifiuti = (work) => readBranchState(work, ID)?.identityRejects;
 const azzera = (work) => { const s = readBranchState(work, ID); delete s.identityRejects; writeBranchState(work, s); };
 
-test('dalla cartella su un altro ramo nessuna delle quattro consegne parte, e il rifiuto dice dove è e dove tornare', async () => {
+test('dalla cartella su un altro ramo nessuna delle consegne su un commit parte, e il rifiuto dice dove è e dove tornare', async () => {
   const { srv, ricevuti, port } = await fintoServer();
   const { base, work, g, committa } = deposito();
   try {
@@ -283,4 +285,34 @@ test('guardiaConsegna non tocca il contatore quando non conosce il lavoro', () =
   try {
     assert.deepEqual(guardiaConsegna(work), { ok: true, branch: ASSEGNATO, id: '', assigned: '' });
   } finally { togliCartella(base); }
+});
+
+test('deliver server (#1424): senza --motivo non parte; con, arriva l\'intento col ramo e la punta, e la risposta dice cosa fare', async () => {
+  const { srv, ricevuti, port } = await fintoServer({ ok: true, reply: { outcome: 'server', esito: 'concesso', status: 'todo' } });
+  const { base, work, g, committa } = deposito();
+  try {
+    committa('lavoro.txt', 'fatto\n');
+    const lancia = lanciatore(work, port);
+    for (const args of [['server'], ['server', '--motivo', '   '], ['server', '--motivo', 'x', '--notes', REPORT], ['status', '--status', 'design', '--motivo', 'x']]) {
+      const r = await lancia(args);
+      assert.equal(r.code, 1, `${args.join(' ')}: ${r.so}`);
+      assert.match(r.se, /--motivo/);
+    }
+    assert.equal(ricevuti.length, 0, 'al server non parte niente');
+    const r = await lancia(CONSEGNE.richiesta);
+    assert.equal(r.code, 0, r.se);
+    const c = consegne(ricevuti).at(-1).body;
+    assert.equal(c.intent, 'server');
+    assert.equal(c.data.motivo, 'serve una regola nuova del database');
+    assert.equal(c.data.branch, ASSEGNATO);
+    assert.equal(c.data.sha, g(['rev-parse', 'HEAD']));
+    assert.match(g(['ls-remote', 'origin', ASSEGNATO]), new RegExp(`^${c.data.sha}`), 'chi riprende trova il ramo su origin, con quella punta');
+    assert.match(r.so, /concesso.*routine dei lavori server.*non consegnare altro, rilascialo/);
+  } finally { srv.close(); togliCartella(base); }
+});
+
+test('la risposta a deliver server dice a chi lavora se si continua o si rilascia', () => {
+  assert.match(testoRispostaServer({ esito: 'chiesto', perche: ['feedback_non_fidato'] }, '#9'), /^OK: #9: il lavoro è FERMO.*Ricevuti \(feedback_non_fidato\).*rilascialo/);
+  assert.match(testoRispostaServer({ esito: 'gia' }), /già un lavoro server: continua/);
+  assert.match(testoRispostaServer({}), /^ATTENZIONE/);
 });

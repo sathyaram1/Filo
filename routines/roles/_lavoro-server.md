@@ -4,6 +4,9 @@ Questo lavoro tocca il server, il repo privato `sathyaram1/filo-security`. Il tu
 `server`: finché resta pulito, il server ti dà un token da un'ora, solo per quel repo. Qui il codice del server lo
 tocchi: il resto di «Se il lavoro si fa solo in locale» (deploy, segreti, credenziali dell'owner) vale ancora.
 
+Se `payload.lavoroServer.richiesta` c'è, il lavoro l'ha cominciato la corsia normale, che ha chiesto il server con
+quel motivo (sezione «Se il lavoro ha bisogno del server»): il ramo è il suo, e si riparte da lì.
+
 Il clone sta **fuori** dal checkout di Filo, in `<CLONE>`. L'hook di salvataggio pubblica tutto quello che sta
 dentro Filo: un file del server copiato lì finisce sul repo pubblico. Non copiare mai niente del server dentro Filo.
 

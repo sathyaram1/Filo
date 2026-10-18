@@ -31,3 +31,12 @@ poi bocciato). Due regole (#462, #238):
   famiglia del motivo. Il segno sparisce quando la pratica esce dai Ricevuti
   (una risposta partita la rimette in coda). Stessa regola nella pagina dei
   feedback. Fonte unica: `segnoFermata` in `manageReview.js`.
+- **La fiducia ha un canale suo** (#1424): il bordo sinistro è già la decisione, quindi
+  se una pratica è fidata lo dicono il bordo DESTRO e uno scudo in fondo alla riga,
+  pieno se fidata e vuoto tratteggiato se no (mai il solo colore), in tutte le schede,
+  nella ricerca, nel pannello del mittente e nelle Domande. Muschio e prugna, token
+  `--mg-fidata-color`/`--mg-nonfidata-color` con la variante scura: lontani dai colori
+  delle decisioni. Quando la decisione chiesta È la fiducia (il lavoro chiede il
+  server a chi non è fidato) il rombo prende la prugna. «Solo non fidate» filtra e
+  conta con `filtraFiducia`, la stessa funzione per pratiche e domande. Prove:
+  `tests/manage-fiducia.spec.mjs`, `tests/unit/segnoFermata.test.mjs`.

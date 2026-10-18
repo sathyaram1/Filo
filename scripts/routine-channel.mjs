@@ -76,7 +76,7 @@
 //
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
-//         note, feedback. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
+//         note, feedback, domanda, server. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
 //         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
@@ -86,6 +86,9 @@
 //         e scritta dal server nel livello L3 del feedback.
 //         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
 //         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
+//         `deliver server --motivo "…"` (#1424): il lavoro ha bisogno del server. Il server lo concede (lavoro server
+//         da dov'era) o lo manda all'owner, e chiude il biglietto in tutti e due i casi; parte dal ramo assegnato,
+//         con la cartella pulita, come una revisione.
 //
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
@@ -1043,10 +1046,23 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
 }
 
 /** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
-export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda'];
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda', 'server'];
 
 // Quante parole vogliono questi comandi DOPO il biglietto (che sta sempre davanti).
 const POSIZIONALI_DOPO_BIGLIETTO = { work: 0, heartbeat: 0, release: 0, compare: 2, deliver: 1 };
+
+/**
+ * Cosa ha deciso il server su `deliver server` (#1424), detto a chi lavora: dopo «concesso» e «chiesto» il biglietto è
+ * chiuso e non si consegna altro. Una risposta senza esito è un server vecchio: lo dice, non finge un «OK». PURA.
+ */
+export function testoRispostaServer(reply, num = '') {
+  const r = reply && typeof reply === 'object' ? reply : {};
+  const chi = num ? `${num}: ` : '';
+  if (r.esito === 'concesso') return `OK: ${chi}il server l'ha concesso. Il lavoro passa alla routine dei lavori server dal tuo ramo, e il biglietto è chiuso: non consegnare altro, rilascialo.`;
+  if (r.esito === 'chiesto') return `OK: ${chi}il lavoro è FERMO. La richiesta del server aspetta l'owner nei Ricevuti${Array.isArray(r.perche) && r.perche.length ? ` (${r.perche.join(', ')})` : ''}, e il biglietto è chiuso: non consegnare altro, rilascialo.`;
+  if (r.esito === 'gia') return `OK: ${chi}è già un lavoro server: continua.`;
+  return `ATTENZIONE: ${chi}il server ha accettato la richiesta ma non ha detto cosa ne ha fatto (server vecchio?): non consegnare altro e rilascia il biglietto col motivo.`;
+}
 
 /** «Manca l'intento, o è scritto storto»: il testo è uno, per chi passa il biglietto a mano e per chi no. PURA. */
 export function testoIntentoNonCapito(parola) {
@@ -1108,7 +1124,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda', 'motivo',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -1133,7 +1149,7 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda', 'motivo',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1551,14 +1567,27 @@ if (isMain) {
     // correzione, la critica e il verdetto del controllo di sicurezza. Con
     // modifiche non salvate la punta si sposta dopo la registrazione e l'esito
     // finisce a parlare di un contenuto diverso da quello esaminato.
-    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed' || intento === 'secaudit'
+    // Chi chiede il server (#1424) passa il ramo alla routine dei lavori server: vale per un commit come una revisione.
+    if (intento === 'server') {
+      const altri = Object.keys(data).filter((k) => !['motivo', 'branch', 'sha'].includes(k));
+      if (typeof data.motivo !== 'string' || !data.motivo.trim() || altri.length) {
+        console.error(`deliver server vuole --motivo "<cosa del server serve e perché>"${altri.length ? ` e nient'altro (non ${altri.map((k) => `--${k}`).join(', ')})` : ''}: non ho chiesto niente.`);
+        process.exit(1);
+      }
+    }
+    if (data.motivo !== undefined && intento !== 'server') {
+      console.error('--motivo vale solo su deliver server: non ho consegnato niente.');
+      process.exit(1);
+    }
+    const passaAllaVerifica = intento === 'verdict' || intento === 'fixed' || intento === 'secaudit' || intento === 'server'
       || (intento === 'status' && data.status === 'revision_capability');
     let guardia = null;
     if (passaAllaVerifica) {
       const cosa = intento === 'verdict' ? 'critica'
         : intento === 'fixed' ? 'consegna'
-          : intento === 'secaudit' ? 'verdetto' : 'revisione';
-      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
+          : intento === 'secaudit' ? 'verdetto' : intento === 'server' ? 'richiesta' : 'revisione';
+      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato'
+        : intento === 'server' ? 'richiesta non registrata' : 'consegna non registrata';
       // Parte solo dal ramo assegnato, e al server va il ramo VERO della cartella (#772; regola in guardiaConsegna).
       let sospensione = null;
       guardia = guardiaConsegna(ROOT, {
@@ -1611,6 +1640,16 @@ if (isMain) {
       }
       data.sha = punta;
     }
+    // Dopo un «concesso» la routine dei lavori server riparte da questo ramo, magari prima del rilascio: deve già
+    // stare su origin, con la punta appena timbrata.
+    if (intento === 'server') {
+      const p = pushRamoCorrente(ROOT);
+      if (!p.ok) {
+        console.error(`richiesta non registrata: il ramo non va su origin (${p.reason || 'push fallito'}), e chi riprende non lo troverebbe.`);
+        console.error('Niente è stato chiesto: sistema il push e rilancia lo stesso comando.');
+        process.exit(1);
+      }
+    }
     // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
     if (intento === 'domanda') {
       const altri = Object.keys(data).filter((k) => k !== 'domanda');
@@ -1646,7 +1685,7 @@ if (isMain) {
         }
       } catch (_) { /* best-effort: l'esito è già registrato */ }
     }
-    if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed')) {
+    if (r.outcome === 'ok' && (intento === 'status' || intento === 'fixed' || intento === 'server')) {
       // La consegna è REGISTRATA dal server: da questo istante il contenuto
       // della directory è la consegna, e il punto fermo va sigillato qui
       // (#507). Era la simmetria mancante: le consegne via dispatch
@@ -1659,6 +1698,10 @@ if (isMain) {
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
     if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
+    if (r.outcome === 'ok' && intento === 'server') {
+      console.log(testoRispostaServer(r.reply, r.num));
+      process.exit(0);
+    }
     if (r.outcome === 'ok') {
       // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
       // adesso, o crede di averlo mandato in verifica.

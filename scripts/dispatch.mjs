@@ -794,6 +794,11 @@ function conDecisioni(ctx) {
 function conImmagini(ctx) {
   return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
 }
+// Il motivo di chi ha chiesto il server dalla corsia normale (#1424): a chi riprende nella corsia del server.
+function conRichiestaServer(ctx) {
+  const r = ctx && ctx.lavoroServer && ctx.lavoroServer.richiesta;
+  return r && typeof r === 'object' && String(r.motivo || '').trim() ? { lavoroServer: { richiesta: r } } : {};
+}
 
 // Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
 function testoDiffVuoto({ commitPropri = null } = {}) {
@@ -842,7 +847,7 @@ export function buildPayload(bucket, ctx = {}) {
       if (rip) {
         return {
           case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx),
+          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx), ...conRichiestaServer(ctx),
           history: Array.isArray(ctx.history) ? ctx.history : [],
           historyDropped: Number(ctx.historyDropped) || 0,
         };
@@ -858,10 +863,11 @@ export function buildPayload(bucket, ctx = {}) {
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
+        ...conRichiestaServer(ctx),
       };
     }
     case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx), ...conRichiestaServer(ctx) };
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;

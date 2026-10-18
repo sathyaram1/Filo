@@ -33,6 +33,8 @@ test('ogni motivo dei Ricevuti ha un segno, con la forma del suo livello', () =>
     [{ status: 'design', statusReason: 'arenato' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'guasto' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'locale' }, 'rombo', 'l3'],
+    [{ status: 'design', statusReason: 'server' }, 'rombo', 'l3'],
+    [{ status: 'design', statusReason: 'server', fiducia: 'fidato' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'judges' }, 'cerchio', 'l2'],
     [{ status: 'design' }, 'cerchio', 'l2'],
     [{ status: 'attack', pipeline: { action: 'block_attack', l1Category: 'dangerous' } }, 'triangolo', 'l1'],
@@ -136,6 +138,19 @@ test('richiede lavoro locale: con una segnalazione salvata le mostra tutte e due
   const senzaNote = MR.livelloL3({ ...LOCALE, notes: '' });
   assert.equal(senzaNote.classe, 'locale');
   assert.match(senzaNote.pannello.righe[0].valore, /lavoro locale/);
+});
+
+// #1424: il rombo di chi chiede la fiducia ha il colore del segno «Non fidata» in lista, nelle due pagine e nei due temi.
+test('il colore della fiducia è uno solo: rombo, bordo e scudo «Non fidata» lo dividono', () => {
+  const pagina = (p) => readFileSync(join(__dirname, '..', '..', 'src', 'pages', p), 'utf8');
+  for (const [html, nome] of [[pagina('manage/manage.html'), '--mg-nonfidata-color'], [pagina('feedback/feedback.html'), '--fb-nonfidata-color']]) {
+    const chiaro = html.match(new RegExp(`${nome}:\\s*(#[0-9a-f]{6})`, 'i'));
+    assert.ok(chiaro, `${nome} manca`);
+    assert.equal(chiaro[1].toLowerCase(), MR.LIVELLO_COLORI.nonfidata.toLowerCase(), nome);
+  }
+  assert.equal(MR.REASONS.server.color, MR.LIVELLO_COLORI.nonfidata);
+  // Lontano dai colori che dicono già un'altra decisione.
+  for (const k of ['attack', 'spam', 'design', 'aligned', 'locale']) assert.notEqual(MR.LIVELLO_COLORI[k], MR.LIVELLO_COLORI.nonfidata, k);
 });
 
 test('ogni colore dei livelli ha la sua regola CSS, uguale, in gestione e nella pagina dei feedback', () => {

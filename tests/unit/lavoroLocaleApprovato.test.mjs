@@ -50,7 +50,7 @@ test('una sessione lavora in locale solo il fidato o l’approvato dall’owner;
 test('i rifiuti dicono perché e la strada: utente, routine, e il proprio non fidato', () => {
   assert.equal(MR.localSenderCheck({ clientId: 'utente-7' }).ok, false);
   assert.equal(MR.localSenderCheck({ clientId: 'utente-7' }).utente, true);
-  assert.match(MR.localSenderCheck({ clientId: 'utente-7' }).motivo, /approva come lavoro server/);
+  assert.match(MR.localSenderCheck({ clientId: 'utente-7' }).motivo, /approva come lavoro locale/);
   const routine = MR.localSenderCheck({ clientId: 'routine:worker', senderProof: 'server' });
   assert.deepEqual([routine.ok, routine.routine], [false, true]);
   assert.equal(MR.localSenderCheck({ clientId: 'local:claude', senderProof: 'admin' }).ok, true, 'prima della migrazione');
@@ -65,19 +65,20 @@ test('i rifiuti dicono perché e la strada: utente, routine, e il proprio non fi
   assert.equal(MR.localSignCheck({ clientId: 'utente-7', status: 'todo' }, true).ok, false);
 });
 
-test('il tasto dei Ricevuti: c’è su chi non è fidato, non su un fidato, non fuori dai Ricevuti', () => {
+test('il tasto dei Ricevuti: c’è sul rimando per lavoro locale, col sì a chi non è fidato, mai fuori dai Ricevuti', () => {
   const ricevuto = { clientId: 'utente-7', status: 'design', statusReason: 'locale', statusPublic: 'open' };
   const az = MR.ownerActionFor(ricevuto, 'accept_local');
   assert.ok(az, 'utente nei Ricevuti');
-  assert.deepEqual([az.kind, az.to, az.locale, az.primary], ['accept', 'todo', true, true], 'rimandato per lavoro locale: è la scelta attesa');
+  assert.deepEqual([az.kind, az.to, az.locale, az.primary, az.approva], ['accept', 'todo', true, true, true], 'rimandato per lavoro locale: è la scelta attesa');
   const qualunque = MR.ownerActions({ ...ricevuto, statusReason: '' });
-  assert.deepEqual(qualunque.filter((a) => a.primary).map((a) => a.key), ['accept'], 'altrimenti resta secondario');
+  assert.deepEqual(qualunque.filter((a) => a.primary).map((a) => a.key), ['accept'], 'altrimenti non c’è (#1424: il lavoro server non si decide a mano)');
+  assert.equal(MR.ownerActionFor({ ...ricevuto, statusReason: '' }, 'accept_local'), null);
   assert.ok(MR.ownerActionAllowsStatus(ricevuto, 'todo'));
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'routine:worker', senderProof: 'server' }, 'accept_local'), 'routine (#914)');
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'local:claude' }, 'accept_local'), 'prefisso senza prova = utente');
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin' }, 'accept_local'), 'il proprio non fidato: il clic lo segna fidato');
-  assert.equal(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' }, 'accept_local'), null, 'a un fidato basta il segno');
-  assert.equal(MR.ownerActionFor({ ...ricevuto, localOnly: SEGNO, localApproval: SI }, 'accept_local'), null, 'già approvato');
+  assert.equal(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' }, 'accept_local').approva, false, 'a un fidato basta il segno, senza il sì');
+  assert.equal(MR.ownerActionFor({ ...ricevuto, localOnly: { by: 'locale:owner@esempio', at: 1 }, localApproval: SI }, 'accept_local'), null, 'già lavoro locale');
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'todo' }, 'accept_local'), null, 'in coda');
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'archived' }, 'accept_local'), null);
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'FENC1:xyz' }, 'accept_local'), null, 'stato illeggibile');
@@ -90,7 +91,7 @@ test('il tasto dei Ricevuti: c’è su chi non è fidato, non su un fidato, non 
 
 test('l’avviso della sessione segue la fiducia: approvato e fidato in lavorazione → niente avviso su L5', () => {
   const approvato = { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: SEGNO, localApproval: SI, fiducia: 'fidato' };
-  assert.equal(MR.manageTabFor(approvato), 'local');
+  assert.equal(MR.manageTabFor(approvato), 'queue', 'i lavori col segno stanno In coda (#1424)');
   assert.equal(MR.localSenderCheck(approvato).ok, true);
   assert.equal(avvisoDaCampi({ fiducia: { stringValue: 'fidato' }, localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), '');
   // Senza il campo (prima della migrazione) il sì dell'owner basta come prima; un non_fidato scritto no.
@@ -146,7 +147,7 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
     const mio = /riconosci/.test(nome);
     assert.equal(r.status, 1, `${nome}: ${r.stderr}`);
     assert.match(r.stderr, mio ? /RIFIUTATO: --riconosci non c'è più/ : /RIFIUTATO: --approva-locale non c'è più/, nome);
-    assert.match(r.stderr, mio ? /in Gestione, col tasto «🤝 Segna fidato»/ : /in Gestione, col tasto «💻 Lavoro server»/, nome);
+    assert.match(r.stderr, mio ? /in Gestione, col tasto «🤝 Segna fidato»/ : /in Gestione, col tasto «💻 Lavoro locale»/, nome);
     assert.doesNotMatch(r.stdout, /^Auth:/m, `${nome}: non deve nemmeno prendere le credenziali`);
   }
 });
@@ -201,7 +202,7 @@ test('approvato: start/finish --feedback e i passaggi del lavoro lo accettano; s
     assert.equal(r.utente, true);
     const rifiuto = of.rifiutoPratica('913', r);
     assert.doesNotMatch(rifiuto, /--approva-locale/);
-    assert.match(rifiuto, /in Gestione, col tasto «💻 Lavoro server».*da riga di comando non si può/);
+    assert.match(rifiuto, /in Gestione, col tasto «💻 Lavoro locale».*da riga di comando non si può/);
   });
   const routine = documento('r1', { clientId: 'routine:worker', senderProof: 'server', status: 'design', statusPublic: 'open' });
   await conRete(routine, async () => {

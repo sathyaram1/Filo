@@ -18,7 +18,7 @@ process.env.FILO_REPO_ROOT = TMP;
 process.env.FILO_TOOLS_ROOT = REPO;
 process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 
-const { cartellaCloneServer, cloneDentroIlRepo, testoLavoroServer, serverCtx, readRoleInstructions } = await import('../../scripts/dispatch.mjs');
+const { cartellaCloneServer, cloneDentroIlRepo, testoLavoroServer, serverCtx, readRoleInstructions, buildPayload } = await import('../../scripts/dispatch.mjs');
 
 test('il clone del server non si committa: .gitignore lo esclude ovunque stia', () => {
   const righe = readFileSync(join(REPO, '.gitignore'), 'utf8').split(/\r?\n/).map((l) => l.trim());
@@ -78,4 +78,16 @@ test('la busta del server passa il segno `lavoroServer` ai ruoli che lavorano, m
   }
   assert.equal(serverCtx({ role: 'verifier' }, { payload: { feedback: { text: 'x' } } }).lavoroServer, undefined);
   assert.equal(serverCtx({ role: 'secaudit' }, busta).lavoroServer, undefined);
+});
+
+test('il motivo di chi ha chiesto il server (#1424) arriva nel fascicolo di chi riprende, a nessun altro', () => {
+  const richiesta = { motivo: 'serve una regola nuova del database', ruolo: 'new-work', at: 1 };
+  const busta = { payload: { feedback: { text: 'x' }, lavoroServer: { repo: 'sathyaram1/filo-security', richiesta } } };
+  const nw = buildPayload({ role: 'new-work', id: 'f1', num: '#1' }, serverCtx({ role: 'new-work' }, busta));
+  assert.deepEqual(nw.lavoroServer, { richiesta });
+  const rip = buildPayload({ role: 'fixer', id: 'f1', num: '#1', branch: 'w/x' }, { ...serverCtx({ role: 'fixer' }, busta), ripresa: { motivo: 'server' } });
+  assert.deepEqual([rip.case, rip.lavoroServer], ['ripresa', { richiesta }]);
+  const senza = buildPayload({ role: 'new-work', id: 'f1', num: '#1' }, serverCtx({ role: 'new-work' }, { payload: { feedback: { text: 'x' } } }));
+  assert.equal(senza.lavoroServer, undefined);
+  assert.equal(buildPayload({ role: 'verifier', id: 'f1', num: '#1', branch: 'w/x' }, serverCtx({ role: 'verifier' }, busta)).lavoroServer, undefined);
 });

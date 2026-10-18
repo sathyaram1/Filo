@@ -143,9 +143,11 @@ lo può scrivere anche un agente pulito.
 ### 1.6 Cos'altro cambia con la fiducia
 
 - **Lavori server.** Un lavoro che tocca filo-security, le regole del database o
-  i segreti dev'essere fidato (§ 7). Se un feedback non fidato ne ha bisogno,
-  il worker si ferma e il feedback va in Ricevuti come «chiede di diventare
-  fidato».
+  i segreti dev'essere fidato (§ 7). Non lo decide chi apre o smista il
+  feedback: lo scopre il worker e lo chiede dal canale (#1424). Con biglietto
+  pulito e feedback fidato il server lo concede da solo; altrimenti il feedback
+  va in Ricevuti come «chiede di diventare fidato», e il sì dell'owner lo fa
+  ripartire.
 - **Giudici alla nascita (L2):** restano per i soli non fidati.
 - **Ordine della coda:** fiducia e figli sono gradini dell'urgenza dentro la
   casella di priorità e fase (§ 6.3): prima i fidati, poi i principali prima
@@ -178,7 +180,7 @@ una **barra di sezioni**, ciascuna con le sue schede:
 | Sezione | Schede | Quando |
 |---|---|---|
 | **Domande** | Da rispondere · In lavorazione · Risposte automatiche · Archivio | adesso |
-| **Feedback** | Ricevuti · In coda · Lavori server · Risolti · Archiviati · Statistiche · Red Team | adesso (spostate) |
+| **Feedback** | Ricevuti · In coda · Aspettano · Risolti · Archiviati · Statistiche · Red Team | adesso (spostate) |
 | **Routine** | Automazioni · Crediti · Monitoraggio · Log · Compiti · Compiti ricorrenti | adesso (spostate più le nuove) |
 | **Impostazioni predefinite** | Modelli di supporto, poi tutte le impostazioni predefinite di Filo | ora solo lo spostamento |
 | **Statistiche d'uso** | — | lavoro a parte |
@@ -187,6 +189,12 @@ una **barra di sezioni**, ciascuna con le sue schede:
   di sicurezza, altrimenti sull'ultima sezione usata.
 - Ogni sezione ha un contatore.
 - Le schede esistenti si spostano senza essere rifatte.
+- I lavori server non hanno una scheda (#1424): stanno In coda come gli altri,
+  con un'etichetta piccola, «server» o «locale» (il lavoro di una sessione).
+- **Fiducia a colpo d'occhio (#1424).** Ogni pratica dice se è fidata, in tutte
+  le schede e nelle Domande, con la grammatica di attacco e spam: un segno della
+  riga col suo colore, mai il colore da solo. Un filtro mostra solo le non
+  fidate, e i conteggi lo seguono.
 
 ### 2.2 Ricevuti: solo i blocchi di sicurezza
 
@@ -275,13 +283,16 @@ Tipi ammessi:
   `payload.decisioni`, come oggi);
 - `priorita`;
 - `archivia`;
-- `approva_locale`;
 - `automazione` (accendi o spegni una voce);
 - `ambito` (approva un ambito nuovo, § 5.3);
 - `esperimento` (approva un esperimento del monitor, § 4.3);
 - `compito` (l'opzione richiede lavoro: nasce il compito della § 3.5).
 
 Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
+`approva_locale` non c'è più (#1424): il lavoro server non si approva, si chiede
+(§ 1.6). Le domande aperte che la usavano le chiude il server alla prima lista
+dell'owner: se il feedback è fidato diventa lavoro server, altrimenti va in
+Ricevuti come «chiede di diventare fidato».
 
 ### 3.4 Rispondere
 
@@ -338,7 +349,8 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 | Oggi | Dove va |
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
-| `design` + `locale` | domanda «lavoro server?» se il feedback è fidato; Ricevuti («rendere fidato») se non lo è |
+| `design` + `locale` | Ricevuti: lavoro locale per regola (deploy, segreti, la macchina dell'owner), che l'owner approva come lavoro locale |
+| `design` + `server` | Ricevuti, «chiede di diventare fidato» (§ 1.6): il sì segna fidato e fa ripartire il lavoro |
 | `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241) |
 | `attesa_chiusa`, `loop`, `arenato` | domanda, azioni `riprendi` / `archivia` |
 | `design` + `secaudit`, `l5`; attacchi, spam, sospetti | Ricevuti |
@@ -593,7 +605,8 @@ scrive: con i compiti quella lettura si toglie.
 - I feedback a bassa priorità che si accumulano sono normali: aspettano i
   crediti (§ 8).
 - I lavori `localOnly` di oggi diventano **lavori server**: lavori che hanno
-  bisogno di altro oltre al repo pubblico.
+  bisogno di altro oltre al repo pubblico. Il segno resta un dato interno per
+  instradare il lavoro (§ 7), e lo mette il server.
 
 ## 7. Lavori server dalla cloud
 
@@ -642,6 +655,26 @@ scrive: con i compiti quella lettura si toglie.
     tetto dell'account della sua parola d'ordine (senza, `accountServer`;
     assente = B), si ferma con `accountServerOff`, con l'account escluso o in
     riserva dei crediti; il tetto delle sessioni è comune.
+- **Chi lo decide (#1424).** Il worker, quando lo scopre:
+  `routine-channel.mjs deliver server --motivo "…"`. Il server guarda il
+  biglietto e il feedback:
+  - biglietto pulito, feedback fidato e niente scritto da un biglietto sporco:
+    scrive il segno (`localOnly.by: 'server'`), chiude il biglietto senza
+    contarlo come giro fallito, e il lavoro passa alla routine dei lavori server
+    da dov'era. Dalla presa in carico torna in coda col segnalibro di ripresa
+    sul ramo, che entra nel registro col biglietto pulito; da un ramo in
+    revisione resta com'è. Chi riprende riceve il motivo
+    (`payload.lavoroServer.richiesta`);
+  - altrimenti: `design` col motivo `server`, nei Ricevuti, senza segno e con
+    una nota scritta dal server, non dal biglietto, così dopo il sì chi riparte
+    nasce pulito. Il sì è «Segna fidato» (callable `ownerFiducia`, `segna`): sul
+    feedback che aspetta il server mette anche il segno e lo rimette in coda da
+    capo, anche se era già fidato. Se sul feedback c'è testo di un biglietto
+    sporco, la risposta dice che nessuna routine lo prenderà pulito.
+
+  Il segno dice anche chi lavora: `local:` o `locale:` davanti a `by` è il
+  lavoro di una sessione locale, che nessuna routine prende; ogni altro segno è
+  un lavoro server.
 - **Su `main` di filo-security** scrive solo il cancello di fusione (regola come
   per Filo):
   - una suite su GitHub Actions prova i rami;

@@ -1,27 +1,22 @@
-// I LAVORI LOCALI IN GESTIONE (#908).
+// I LAVORI LOCALI E SERVER IN GESTIONE (#908, #1424).
 //
 // COSA DEVE ESSERE VERO
-//   1. Un feedback col segno `localOnly` nell'iter di lavorazione non sta «In coda»
-//      (le routine non lo prendono): sta nei «Lavori locali», con il suo numero.
-//   2. Sui feedback fidati (#1148) il segno si mette e si toglie dal dettaglio (tasto
-//      «Locale») e col tasto destro sulla scheda; il gesto arriva al main come sì/no.
-//   3. Su un feedback non fidato (utente, falso local: senza prova, o il proprio non
-//      ancora fidato) non c'è né il tasto né la voce.
-//   4. Nei Ricevuti un feedback col segno resta lì, lo dice sulla scheda, e
-//      l'approvazione dice dove va.
-//   5. Automazioni: una fusione locale che ha saltato L5 si legge come tale.
-//   6. La pagina gemella dei feedback ha la stessa sezione con lo stesso numero.
-//   7. «Fondi senza chiedermelo» e «È mio» non ci sono più: c'è «Segna fidato», che arriva
-//      al main come richiesta al server; da fidato il segno si mette.
-//   8. Su un lavoro locale chiuso togliere il segno lo rimette nella bacheca pubblica, non alle
-//      routine, e i testi lo dicono; «Copia» nomina finish solo dove il numero lo lega a un lavoro.
+//   1. Un feedback col segno `localOnly` resta «In coda» con gli altri: non c'è una scheda a parte, e la riga
+//      dice dove va («server» o «locale», col nome intero nell'hover).
+//   2. Il segno nessuno lo mette a mano: né un tasto nel dettaglio né una voce del tasto destro, su nessuna pratica.
+//   3. Nei Ricevuti un feedback col segno resta lì, lo dice sulla scheda, e l'approvazione porta «In coda».
+//   4. Log: una fusione locale che ha saltato L5 si legge come tale.
+//   5. La pagina gemella dei feedback ha le stesse sezioni, con gli stessi numeri.
+//   6. «Fondi senza chiedermelo» e «È mio» non ci sono: c'è «Segna fidato», che arriva al main come richiesta al server.
+//   7. Un lavoro locale in lavorazione dice che lo porta avanti una sessione; «Copia» nomina finish solo dove serve.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const FEEDBACK = 'filo://feedback/feedback.html';
-const SEGNO = { by: 'owner@esempio', at: Date.parse('2026-09-30T08:00:00Z') };
+const SEGNO = { by: 'locale:owner@esempio', at: Date.parse('2026-09-30T08:00:00Z') };
+const SERVER = { by: 'server', at: Date.parse('2026-09-30T08:00:00Z') };
 
 function fb(over = {}) {
   return Object.assign({
@@ -41,7 +36,7 @@ async function stubMain(page, { preapproved = [], fiduciaErr = '' } = {}) {
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'feedback_update') {
         window.__updates.push(msg);
-        return msg.localOnly ? { ok: true, by: 'owner@esempio', at: 1790000000000 } : { ok: true };
+        return msg.localOnly ? { ok: true, by: 'locale:owner@esempio', at: 1790000000000 } : { ok: true };
       }
       if (t === 'fiducia_segna') {
         window.__updates.push(msg);
@@ -66,129 +61,58 @@ async function apri(page, lista, { tab = 'queue', ...opts } = {}) {
 
 const tabBtn = (page, tab) => page.locator(`.mg-tab[data-tab="${tab}"]`);
 
-test('la sezione «Lavori locali» tiene i feedback col segno, fuori dalla coda', async ({ openTab }) => {
+test('col segno la pratica resta «In coda» e la riga dice dove va: nessuna scheda «Lavori server»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const locale = fb({ localOnly: SEGNO, pipeline: { skipped: 'local_proven' } });
+  const server = fb({ _id: 'srv-1', seq: 909, name: 'Le regole del database', localOnly: SERVER });
   const inCoda = fb({ _id: 'q-1', seq: 700, name: 'Una cosa per le routine', clientId: 'utente-x', senderProof: undefined, fiducia: undefined });
-  await apri(page, [locale, inCoda]);
+  await apri(page, [locale, server, inCoda]);
 
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
-  // «In coda» mostra solo quello delle routine.
-  await expect(page.locator('.mg-item')).toHaveCount(1);
-  await expect(page.locator('.mg-item')).toContainText('#700');
-
-  await apriScheda(page, 'local');
-  await expect(page.locator('#mgListHead')).toContainText('Lavori server');
-  await expect(page.locator('.mg-item')).toHaveCount(1);
-  await expect(page.locator('.mg-item')).toContainText('#908');
-  // Nella sua sezione il segno non si ripete sulla scheda.
-  await expect(page.locator('.mg-item .mg-local-badge')).toHaveCount(0);
+  await expect(tabBtn(page, 'local')).toHaveCount(0);
+  await expect(page.locator('.mg-tab', { hasText: /Lavori server/ })).toHaveCount(0);
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (3)');
+  await expect(page.locator('.mg-item')).toHaveCount(3);
+  await expect(page.locator('.mg-item[data-id="loc-1"] .mg-local-badge')).toHaveText('locale');
+  await expect(page.locator('.mg-item[data-id="loc-1"] .mg-local-badge')).toHaveAttribute('title', 'Lavoro locale');
+  await expect(page.locator('.mg-item[data-id="srv-1"] .mg-local-badge')).toHaveText('server');
+  await expect(page.locator('.mg-item[data-id="srv-1"] .mg-local-badge')).toHaveAttribute('title', 'Lavoro server');
+  await expect(page.locator('.mg-item[data-id="q-1"] .mg-local-badge')).toHaveCount(0);
   // Le azioni sono quelle della coda.
-  await page.locator('.mg-item').click();
+  await page.locator('.mg-item[data-id="loc-1"]').click();
   await expect(page.locator('#mgActionsRow')).toContainText('Risolto');
   // Nato come lavoro locale provato, i giudici li ha saltati: la conversazione lo dice.
   await expect(page.locator('#mgThread')).toContainText(/giudici non servono/i);
 });
 
-test('dal dettaglio: il tasto «Locale» mette il segno, la pratica passa nei Lavori locali, e si toglie', async ({ openTab }) => {
+test('il segno non si mette a mano: niente tasto nel dettaglio, niente voce col tasto destro', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  const pratica = fb({ clientId: 'owner:me' });
-  await apri(page, [pratica]);
-  await page.evaluate((id) => window.__mgTest.openDetail(id), pratica._id);
-
-  const btn = page.locator('#mgLocalBtn');
-  await expect(btn).toBeVisible();
-  await expect(btn).toHaveAttribute('aria-pressed', 'false');
-  await expect(btn).toHaveAttribute('title', /Passa nei Lavori server\. Lo lavorano le routine se in Automazioni i lavori server sono accesi/);
-  await btn.click();
-  await expect(btn).toHaveAttribute('aria-pressed', 'true');
-  await expect(btn).toHaveText('💻 Lavoro server');
-  await expect(page.locator('#mgManageMsg')).toContainText('Lavori server');
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (0)');
-  let updates = await page.evaluate(() => window.__updates);
-  expect(updates).toEqual([{ type: 'feedback_update', id: pratica._id, localOnly: true }]);
-  // L'hover dice chi l'ha messo.
-  await expect(btn).toHaveAttribute('title', /owner@esempio/);
-
-  // Se si può mettere si può togliere.
-  await btn.click();
-  await expect(btn).toHaveAttribute('aria-pressed', 'false');
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
-  updates = await page.evaluate(() => window.__updates);
-  expect(updates[1]).toEqual({ type: 'feedback_update', id: pratica._id, localOnly: false });
-});
-
-test('tasto destro sulla scheda: la voce del segno, che apre la pratica e la sposta', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  const pratica = fb();
-  await apri(page, [pratica]);
-  await page.locator('.mg-item').click({ button: 'right' });
-  const menu = page.locator('.mg-ctxmenu');
-  await expect(menu).toBeVisible();
-  await expect(menu).toContainText('Apri');
-  await expect(menu).toContainText('Copia #908');
-  const voce = menu.locator('.sn-select-option', { hasText: '💻 Lavoro server' });
-  await expect(voce).toHaveAttribute('title', /Passa nei Lavori server/);
-  await voce.click();
-  await expect(menu).toHaveCount(0);
-  await expect(page.locator('#mgDetail')).toBeVisible();
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
-  const updates = await page.evaluate(() => window.__updates);
-  expect(updates).toEqual([{ type: 'feedback_update', id: pratica._id, localOnly: true }]);
-
-  // Dalla sua sezione, la stessa voce lo rimette alle routine.
-  await apriScheda(page, 'local');
-  await page.locator('.mg-item').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Non è un lavoro server' }).click();
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
-});
-
-test('sui feedback degli utenti, e sui falsi local: senza prova, niente tasto e niente voce', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  const utente = fb({ _id: 'u-1', seq: 801, clientId: 'utente-abc', senderProof: undefined, fiducia: undefined });
-  const falso = fb({ _id: 'f-1', seq: 802, clientId: 'local:claude', senderProof: undefined, fiducia: undefined });
-  await apri(page, [utente, falso]);
-  for (const id of ['u-1', 'f-1']) {
+  const mio = fb({ _id: 'm-1', seq: 801, clientId: 'owner:me' });
+  const utente = fb({ _id: 'u-1', seq: 802, clientId: 'utente-abc', senderProof: undefined, fiducia: undefined });
+  const segnato = fb({ _id: 's-1', seq: 803, localOnly: SERVER });
+  await apri(page, [mio, utente, segnato]);
+  await expect(page.locator('#mgLocalBtn')).toHaveCount(0);
+  for (const id of ['m-1', 'u-1', 's-1']) {
     await page.evaluate((i) => window.__mgTest.openDetail(i), id);
     await expect(page.locator('#mgStarBtn')).toBeVisible();
-    await expect(page.locator('#mgLocalBtn')).toBeHidden();
+    await expect(page.locator('#mgOwnerBar')).not.toContainText(/💻|[Ll]avoro server|[Ll]avoro locale/);
     await page.locator(`.mg-item[data-id="${id}"]`).click({ button: 'right' });
     await expect(page.locator('.mg-ctxmenu')).toBeVisible();
-    await expect(page.locator('.mg-ctxmenu')).not.toContainText(/[Ll]avoro server/);
+    await expect(page.locator('.mg-ctxmenu')).not.toContainText(/💻|[Ll]avoro server|[Ll]avoro locale/);
     await page.keyboard.press('Escape');
     await expect(page.locator('.mg-ctxmenu')).toHaveCount(0);
   }
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
 
-test('una pratica che una routine sta lavorando (battito fresco): il tasto dice perché no, e il clic non scrive', async ({ openTab }) => {
+test('nei Ricevuti col segno: resta lì, la scheda lo dice, l’approvazione porta «In coda»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  const adesso = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const presa = fb({ clientId: 'owner:me', status: 'working', workingSince: adesso, beatAt: adesso });
-  await apri(page, [presa]);
-  await page.evaluate((id) => window.__mgTest.openDetail(id), presa._id);
-  const btn = page.locator('#mgLocalBtn');
-  await expect(btn).toBeVisible();
-  await expect(btn).toHaveAttribute('title', /Adesso non si può: una routine la sta lavorando/);
-  await btn.click();
-  await expect(page.locator('#mgManageMsg')).toContainText('Segno non messo');
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (0)');
-  expect(await page.evaluate(() => window.__updates)).toEqual([]);
-});
-
-test('nei Ricevuti col segno: resta lì, la scheda lo dice, l’approvazione dice dove va', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  const pratica = fb({ status: 'aligned', localOnly: SEGNO });
+  const pratica = fb({ status: 'aligned', localOnly: SERVER });
   await apri(page, [pratica], { tab: 'inbox' });
   await expect(tabBtn(page, 'inbox')).toHaveText('Ricevuti (1)');
-  await expect(page.locator('#mgAlignedBtn')).toHaveText('Approva tutti gli allineati (1) → Lavori server');
-  const badge = page.locator('.mg-item .mg-local-badge');
-  await expect(badge).toHaveText('server');
-  await expect(badge).toHaveAttribute('title', /Lavoro server\. Lo prendono le routine.*owner@esempio/);
+  await expect(page.locator('#mgAlignedBtn')).toHaveText('Approva tutti gli allineati (1) → In coda');
+  await expect(page.locator('.mg-item .mg-local-badge')).toHaveText('server');
   await page.locator('.mg-item').click();
-  await expect(page.locator('#mgAcceptBtn')).toHaveText('→ Lavori server');
+  await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
 });
 
 test('Log: la fusione locale che ha saltato L5 dice perché non ha chiesto', async ({ openTab }) => {
@@ -214,7 +138,7 @@ test('Log: la fusione locale che ha saltato L5 dice perché non ha chiesto', asy
   await expect(page.locator('#mgDetail')).toBeVisible();
 });
 
-test('la pagina gemella dei feedback ha la stessa sezione, con lo stesso numero', async ({ openTab }) => {
+test('la pagina gemella dei feedback ha le stesse sezioni, con gli stessi numeri', async ({ openTab }) => {
   const page = await openTab(FEEDBACK);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
@@ -222,19 +146,20 @@ test('la pagina gemella dei feedback ha la stessa sezione, con lo stesso numero'
     fb({ localOnly: SEGNO }),
     fb({ _id: 'q-1', seq: 700, clientId: 'utente-x', senderProof: undefined, fiducia: undefined }),
   ]);
-  await expect(page.locator('#tabs [data-tab="local"]')).toHaveText('Lavori server (1)');
-  await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
+  await expect(page.locator('#tabs [data-tab="local"]')).toHaveCount(0);
+  await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (2)');
+  await page.locator('#tabs [data-tab="queue"]').click();
+  await expect(page.locator('.fb-card[data-id="loc-1"] .fb-dove')).toHaveText('locale');
 });
 
 test('lavoro locale fidato: il tasto della fiducia è premuto e dice da dove viene; i tasti di prima non ci sono', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const daSessione = fb({ localOnly: SEGNO, fiduciaDa: { by: 'nascita', at: SEGNO.at } });
-  await apri(page, [daSessione], { tab: 'local' });
+  await apri(page, [daSessione]);
   await page.evaluate(() => window.__mgTest.openDetail('loc-1'));
-  await expect(page.locator('#mgLocalBtn')).toBeVisible();
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /^Fidato: scritto da te o da una sessione pulita\./);
-  for (const via of ['#mgPreapproveBtn', '#mgPreapproveRevokeBtn', '#mgPreapprovedInfo', '#mgSenderBtn']) {
+  for (const via of ['#mgPreapproveBtn', '#mgPreapproveRevokeBtn', '#mgPreapprovedInfo', '#mgSenderBtn', '#mgLocalBtn']) {
     await expect(page.locator(via)).toHaveCount(0);
   }
   await page.locator('.mg-item[data-id="loc-1"]').click({ button: 'right' });
@@ -245,17 +170,7 @@ test('lavoro locale fidato: il tasto della fiducia è premuto e dice da dove vie
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
 
-test('il segno messo da una sessione dice chi l’ha messo come la testata, non col mittente grezzo', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  await apri(page, [fb({ localOnly: { by: 'local:claude', at: SEGNO.at } })], { tab: 'local' });
-  await page.evaluate(() => window.__mgTest.openDetail('loc-1'));
-  const tasto = page.locator('#mgLocalBtn');
-  await expect(tasto).toBeVisible();
-  await expect(tasto).toHaveAttribute('title', /Segno messo da Claude \(sessione locale\)/);
-  await expect(tasto).not.toHaveAttribute('title', /local:claude/);
-});
-
-test('il proprio non fidato: niente «Locale» finché non è fidato; «Segna fidato» va al main e il segno si può mettere', async ({ openTab }) => {
+test('il proprio non fidato: «Segna fidato» va al main e il tasto si preme', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const mio = fb({ _id: 's-1', seq: 908, status: 'todo', fiducia: undefined });
   await apri(page, [mio]);
@@ -263,60 +178,25 @@ test('il proprio non fidato: niente «Locale» finché non è fidato; «Segna fi
   const btn = page.locator('#mgFiduciaBtn');
   await expect(btn).toBeVisible();
   await expect(btn).toHaveAttribute('title', /i giudici non servono più/);
-  await expect(page.locator('#mgLocalBtn')).toBeHidden();
   await btn.click();
   await expect(page.locator('#mgManageMsg')).toContainText('Da ora (#908) è fidato.');
   await expect(btn).toHaveAttribute('aria-pressed', 'true');
   await expect(btn).toHaveAttribute('title', /^Fidato: l’hai segnato tu/);
-  await expect(page.locator('#mgLocalBtn')).toBeVisible();
   expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'fiducia_segna', feedbackId: 's-1' }]);
 });
 
-test('un lavoro locale già chiuso si segna dal dettaglio e dal tasto destro: esce dalla bacheca pubblica', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  const chiuso = fb({ _id: 'c-1', seq: 544, status: 'done', statusPublic: 'closed' });
-  await apri(page, [chiuso], { tab: 'resolved' });
-  await page.evaluate((i) => window.__mgTest.openDetail(i), 'c-1');
-  const btn = page.locator('#mgLocalBtn');
-  await expect(btn).toBeVisible();
-  await expect(btn).toHaveAttribute('title', /bacheca pubblica/);
-  await btn.click();
-  await expect(page.locator('#mgManageMsg')).toContainText('fuori dalla bacheca pubblica');
-  await expect(btn).toHaveAttribute('aria-pressed', 'true');
-  // Se si può mettere si può togliere, anche da chiusa; e dal tasto destro la voce lo dice.
-  await btn.click();
-  await expect(btn).toHaveAttribute('aria-pressed', 'false');
-  await page.locator('.mg-item[data-id="c-1"]').click({ button: 'right' });
-  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Era un lavoro server' }).click();
-  await expect(btn).toHaveAttribute('aria-pressed', 'true');
-  const updates = await page.evaluate(() => window.__updates);
-  expect(updates.map((u) => u.localOnly)).toEqual([true, false, true]);
-});
-
-test('segnalato dai giudici o dal filtro: «Segna fidato» dal tasto destro avverte come il tasto, e il segno locale non si mette', async ({ openTab }) => {
+test('segnalato dai giudici: «Segna fidato» dal tasto destro avverte come il tasto', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const senza = fb({ _id: 's-4', seq: 833, status: 'unlabeled', senderProof: undefined, fiducia: undefined,
     pipeline: { verdicts: [{ judge: 'A', class: 'attack' }, { judge: 'B', class: 'attack' }], expectedJudges: ['A', 'B'] } });
-  const provato = fb({ _id: 's-5', seq: 834, status: 'unlabeled', pipeline: { stage: 'L1', action: 'block_attack', l1Category: 'dangerous' } });
-  await apri(page, [senza, provato], { tab: 'inbox' });
+  await apri(page, [senza], { tab: 'inbox' });
   await page.evaluate((i) => window.__mgTest.openDetail(i), 's-4');
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
   await page.locator('.mg-item[data-id="s-4"]').click({ button: 'right' });
   const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Segna fidato' });
   await expect(voce).toHaveAttribute('title', /Attenzione: .*attacco.*guardalo prima/);
   await page.keyboard.press('Escape');
-  await page.locator('.mg-item[data-id="s-5"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toBeVisible();
-  await expect(page.locator('.mg-ctxmenu')).not.toContainText(/[Ll]avoro server/);
-  await page.keyboard.press('Escape');
-  await page.evaluate((i) => window.__mgTest.openDetail(i), 's-5');
-  const tasto = page.locator('#mgLocalBtn');
-  if (await tasto.isVisible()) {
-    await expect(tasto).toHaveAttribute('title', /Adesso non si può: .*attacco.*Ricevuti/);
-    await tasto.click();
-    await expect(page.locator('#mgManageMsg')).toContainText('Segno non messo');
-  }
-  expect(await page.evaluate(() => window.__updates.filter((u) => 'localOnly' in u))).toEqual([]);
+  expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
 
 // Giro 4 della verifica locale: un lavoro locale preso in carico non riceve le frasi delle routine.
@@ -328,7 +208,6 @@ test('un lavoro locale «In lavorazione» dice che lo porta avanti una sessione,
   await apri(page, [preso, routine]);
   // Il lavoro di una routine resta com'era.
   await expect(page.locator('.mg-item[data-id="r-1"]')).toContainText('rientra in coda da solo');
-  await apriScheda(page, 'local');
   const scheda = page.locator('.mg-item[data-id="loc-1"]');
   await expect(scheda).toContainText('In lavorazione in una sessione locale');
   await expect(scheda).not.toContainText(/rientra in coda|Controllo sicurezza/);
@@ -337,24 +216,13 @@ test('un lavoro locale «In lavorazione» dice che lo porta avanti una sessione,
   await expect(page.locator('#mgWorkState')).not.toContainText('rientra in coda');
 });
 
-test('lavoro locale chiuso: togliere il segno lo rimette nella bacheca, non alle routine; «Copia» sui feedback degli utenti non parla di finish', async ({ openTab }) => {
+test('«Copia» sui feedback degli utenti non parla di finish, su un lavoro fidato sì', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  const chiuso = fb({ _id: 'loc-chiuso', seq: 909, status: 'done', statusPublic: 'closed', localOnly: SEGNO });
   const utente = fb({ _id: 'u-1', seq: 911, clientId: 'abc', senderProof: undefined, fiducia: undefined });
-  await apri(page, [chiuso, utente], { tab: 'resolved' });
-  await page.evaluate((id) => window.__mgTest.openDetail(id), 'loc-chiuso');
-  const tasto = page.locator('#mgLocalBtn');
-  await expect(tasto).toHaveAttribute('title', /Era un lavoro server.*torna nella bacheca pubblica/);
-  await expect(tasto).not.toHaveAttribute('title', /routine/);
-  await expect(page.locator('#mgFiduciaBtn')).toBeHidden();
-  await page.locator('.mg-item[data-id="loc-chiuso"]').click({ button: 'right' });
-  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Non era un lavoro server' });
-  await expect(voce).toHaveAttribute('title', /torna nella bacheca pubblica/);
-  await voce.click();
-  await expect(page.locator('#mgManageMsg')).toContainText('torna nella bacheca pubblica');
-  expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'feedback_update', id: 'loc-chiuso', localOnly: false }]);
-
-  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  await apri(page, [utente, fb({ localOnly: SEGNO })]);
   await page.locator('.mg-item[data-id="u-1"]').click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Copia #911' })).toHaveAttribute('title', 'Il numero con cui parlarne');
+  await page.keyboard.press('Escape');
+  await page.locator('.mg-item[data-id="loc-1"]').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Copia #908' })).toHaveAttribute('title', /npm run finish/);
 });

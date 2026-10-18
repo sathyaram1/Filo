@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
-import { chiScrive } from './owner-feedback.mjs';
+import { segnoLocaleDi } from './owner-feedback.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
@@ -404,7 +404,7 @@ const scrittoreFirestore = (bearer) => {
       }).catch(rete);
     },
     async locale(d) {
-      const segno = { mapValue: { fields: { by: { stringValue: chiScrive(bearer) }, at: { integerValue: String(Date.now()) } } } };
+      const segno = { mapValue: { fields: { by: { stringValue: segnoLocaleDi(bearer) }, at: { integerValue: String(Date.now()) } } } };
       const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=localOnly&updateMask.fieldPaths=updatedAt&currentDocument.exists=true`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },

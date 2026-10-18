@@ -68,6 +68,8 @@ il rilievo che riproduce.
 
 <!-- includi: _segnala.md -->
 
+<!-- includi: _chiedi-server.md -->
+
 <!-- includi: _solo-in-locale.md -->
 
 <!-- includi: _guasto-in-attesa.md -->

@@ -15,7 +15,11 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   della domanda);
 - `rilievi`: i rilievi che erano rimasti aperti quando il lavoro si è fermato,
   col loro livello e la sede. Vanno chiusi adesso, alla luce della risposta;
-- `ruolo`: chi si è fermato (chi risolveva, o chi verificava e correggeva).
+- `ruolo`: chi si è fermato (chi risolveva, o chi verificava e correggeva);
+- `motivo`: `server` se chi ti ha preceduto non aveva domande ma ha chiesto il
+  server e l'ha avuto. Allora `domanda` e `risposta` sono vuote, il suo motivo
+  sta in `payload.lavoroServer.richiesta`, e il server lo tocchi tu, con le
+  istruzioni del lavoro server più sotto: continua il lavoro dal ramo.
 
 `payload.feedback` è la richiesta originale; `payload.history` le critiche dei
 giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
@@ -43,6 +47,8 @@ porta solo l'ultima.
 <!-- includi: _criteri-verifica.md -->
 
 <!-- includi: _segnala.md -->
+
+<!-- includi: _chiedi-server.md -->
 
 <!-- includi: _solo-in-locale.md -->
 

@@ -415,13 +415,14 @@ module.exports = function register(on, ctx) {
       // metà dei due testi (il report, cifrato, è `notes`). Va inoltrata, o la
       // dashboard resta l'unica strada da cui quella metà si perde.
       const { id, status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
-      // «Solo in locale» (#908): la pagina manda solo sì/no, il CHI lo mette il main dalla sessione (l'email del
-      // token, la stessa che le regole vedono). La fiducia non passa di qui: la scrive il server (FIDUCIA_SEGNA).
+      // «💻 Lavoro locale» (#908, #1424): la pagina manda solo sì/no, il CHI lo mette il main dalla sessione (l'email
+      // del token). `locale:` lo fa lavoro locale: un `by` senza prefisso vale lavoro server, che concede solo il server.
+      // La fiducia non passa di qui: la scrive il server (FIDUCIA_SEGNA).
       let localOnly;
       if (typeof msg.localOnly === 'boolean') {
         let email = '';
         if (msg.localOnly) { try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {} }
-        localOnly = msg.localOnly ? { by: email || 'owner', at: Date.now() } : null;
+        localOnly = msg.localOnly ? { by: `locale:${email || 'owner'}`.slice(0, 120), at: Date.now() } : null;
       }
       // #913: «approvalo come lavoro locale» su un feedback non tuo. Resta anche se il segno si toglie: senza, il
       // segno non si rimetterebbe più, perché il sì si dà solo dai Ricevuti.
@@ -1641,7 +1642,12 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
-    return { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
+    // Su un lavoro che chiedeva il server (#1424) il sì lo fa anche ripartire: la pagina lo dice, con l'avviso del server.
+    const out = { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
+    if (r.gia === true) out.gia = true;
+    if (r.ripartito === true) out.ripartito = true;
+    if (typeof r.avviso === 'string' && r.avviso.trim()) out.avviso = r.avviso.trim();
+    return out;
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {

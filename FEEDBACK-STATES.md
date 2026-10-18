@@ -46,7 +46,8 @@ DB3 esistente), poi "Risolti".
 
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
-`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `attesa_origine`,
+`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `server` (§4d: lo legge anche
+`ownerFiducia`, che sul sì fa ripartire il lavoro), `attesa_origine`,
 `origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8);
 il giudizio dei giudici non ne scrive: `judges` lo ricava solo la normalizzazione dello
 storico, e la frase «Panel incompleto…» la dashboard dai verdetti, `judgesNote`), `workingSince`
@@ -200,7 +201,8 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
-- Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
+- Il segno `localOnly` non ha una scheda sua (#1424): la pratica sta In coda come le altre, con l'etichetta «server»
+  o «locale» (§4b, §4d).
 - Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
@@ -209,9 +211,10 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 
 `localOnly: { by, at }` (in chiaro, `at` in millisecondi, scrive solo l'admin) dice
 che la pratica la lavora solo una sessione locale: la coda delle routine, il recupero
-degli arenati e il pacemaker la saltano, e le superfici la mostrano nei Lavori locali
-invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta comunque
-l'owner), con l'approvazione che dice `→ Lavori locali`.
+degli arenati e il pacemaker la saltano, e le superfici la mostrano In coda con l'etichetta «locale». Negli
+stati dei Ricevuti resta nei Ricevuti (aspetta comunque l'owner). Lo dice `by` (#1424): `local:` o `locale:`
+davanti è il lavoro di una sessione; `server` lo scrive solo il server quando concede il server (§4d); un altro
+valore (i segni a mano di prima) vale lavoro server.
 
 - Il segno si mette solo su un feedback **fidato** (#1148; lo fa l'owner con «🤝 Segna fidato»
   in Gestione, da riga di comando no), a pratica aperta, non segnalata come
@@ -235,10 +238,11 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   (il sì si dà solo dai Ricevuti, dove la pratica non torna). Risolto, il feedback di un
   utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
   mandato vede la risoluzione; senza scheda resta solo il lavoro dell'owner e delle sessioni.
-- Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
-  scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
-  feedback aperti da `claude-feedback.mjs --locale` (`--non-locale` per le routine: la
-  scelta è obbligatoria, perché una segnalazione per le routine nata locale non la prende nessuno).
+- Nessuno lo mette a mano in Gestione (#1424): lo scrive «💻 Lavoro locale» dei Ricevuti sul solo lavoro locale
+  per regola (`design`, motivo `locale`), una sessione con `owner-feedback.mjs --solo-locale | --non-locale`
+  (segno `locale:<chi>`), e nasce già messo sui feedback aperti da `claude-feedback.mjs --locale` (`--non-locale`
+  per le routine: la scelta è obbligatoria, perché una segnalazione per le routine nata locale non la prende
+  nessuno). Il segno del lavoro server lo mette solo il server (§4d).
 - Le sessioni locali hanno le credenziali dell'owner. Per REGOLA (non per un blocco
   tecnico) non spostano feedback dai Ricevuti né dalle conferme `*_confirmed`, non
   lavorano feedback di utenti senza il sì dell'owner e non stampano testo di attacchi: `owner-feedback.mjs`
@@ -261,7 +265,7 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
 **fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
 
-- lavoro locale fidato (§4b): `todo` nei Lavori locali, senza nemmeno L0;
+- lavoro locale fidato (§4b): `todo`, In coda con l'etichetta «locale», senza nemmeno L0;
 - owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
   coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
   (`priorityManual`), senza scelta la decide il giudice;
@@ -296,11 +300,33 @@ da agente è un segnale sospetto. Non a un mittente provato (l'owner dall'app, l
 di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valutazione passa
 sempre dai giudici.
 
-Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
+Le routine non aprono lavoro locale: il canale non scrive il segno di una sessione (quello del server lo scrive il
+server quando concede il server, §4d), e dentro una routine
 `claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un
 lavoro che si fa solo in locale torna nei Ricevuti dal canale (`deliver status --status design
 --reason locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`, e lì
 l'owner lo approva come lavoro locale (§4b, #913).
+
+### 4d. Il lavoro server si chiede (#1424)
+
+Chi apre o smista un feedback non sa se servirà il server: lo scopre il worker (chi risolve o chi corregge) e lo
+chiede dal canale, `routine-channel.mjs deliver server --motivo "…"` (intento `server`,
+`filo-security/functions/src/routine/chiediServer.js`). Il server guarda biglietto e feedback:
+
+- **concesso** (biglietto pulito, feedback fidato, nessun contenuto scritto da un biglietto sporco): prima il segno
+  `localOnly { by: 'server', at }`, poi la nota col motivo; da `working` il feedback torna `todo` (attore routine)
+  col ramo e il segnalibro di ripresa `motivo: server`, da un ramo in revisione o in ripresa resta com'è. La
+  consegna entra nel registro del ramo col biglietto pulito, il biglietto si chiude senza guasto e senza
+  arenamento, e il lavoro lo riprende la routine dei lavori server (SPEC-DOMANDE.md §7), che riceve il motivo;
+- **chiesto all'owner**: `design` col motivo `server` (attore routine), nei Ricevuti a L3 («chiede di diventare
+  fidato»), senza segno. La nota è del server: il testo del biglietto non entra nel feedback, perché dopo il sì chi
+  riparte deve nascere pulito. Anche qui il biglietto si chiude;
+- **già lavoro server**: niente cambia.
+
+Il sì dell'owner è «Segna fidato» (`ownerFiducia`, `segna`), dal tasto della richiesta nei Ricevuti o dal dettaglio:
+sul feedback in `design` col motivo `server` segna fidato (se non lo era), scrive il segno del server, azzera il giro
+e lo porta `design → todo` (attore owner), da capo. Se c'è contenuto scritto da un biglietto sporco la risposta lo dice:
+nessuna routine lo prenderà pulito.
 
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
@@ -375,7 +401,8 @@ arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
 corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
 aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
 lavoro locale: quello resta `locale`, e la sua nota dice quale regola lo tiene
-fuori dalla cloud. La risposta dell'owner appende
+fuori dalla cloud; (7, #1424) chi lavorava ha chiesto il server e non gli è stato concesso (`statusReason:
+server`, §4d), nei Ricevuti: il sì è «Segna fidato», che fa anche ripartire il lavoro. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul

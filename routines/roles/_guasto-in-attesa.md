@@ -1,7 +1,7 @@
 ## Il feedback fermo per un guasto
 
 La domanda di guasto (sezione «Un guasto dell'ambiente si dice con una
-domanda») di chi risolve o corregge porta anche le tre strade sul feedback, e
+domanda») di chi risolve o corregge porta anche le due strade sul feedback, e
 il consiglio:
 
 ```json
@@ -14,8 +14,6 @@ il consiglio:
   "opzioni": [
     { "testo": "Riprendere quando il guasto è riparato", "pro": "<…>", "contro": "<…>",
       "azione": { "tipo": "riprendi", "feedbackId": "<payload.id>" } },
-    { "testo": "Farlo in locale", "pro": "<…>", "contro": "<…>",
-      "azione": { "tipo": "approva_locale", "feedbackId": "<payload.id>" } },
     { "testo": "Archiviare il feedback", "pro": "<…>", "contro": "<…>",
       "azione": { "tipo": "archivia", "feedbackId": "<payload.id>" } }
   ],

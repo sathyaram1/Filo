@@ -290,6 +290,29 @@
     .fb-segno--design  { color: #2e9e5b; }
     .fb-segno--aligned { color: #5b6ee0; }
     .fb-segno--locale  { color: #26c9fc; }
+    .fb-segno--nonfidata { color: #a8418a; }
+    :root[data-sn-theme="dark"] .fb-segno--nonfidata { color: var(--fb-nonfidata-color); }
+    /* La fiducia (#1424), con gli stessi colori e lo stesso scudo di Gestione: il bordo sinistro dice già da chi viene. */
+    :root { --fb-fidata-color: #6f8f2e; --fb-nonfidata-color: #a8418a; }
+    :root[data-sn-theme="dark"] { --fb-fidata-color: #a6bb68; --fb-nonfidata-color: #d070b4; }
+    .fb-card.fb-fiducia--fidata { border-right: 3px solid var(--fb-fidata-color); }
+    .fb-card.fb-fiducia--nonfidata { border-right: 3px solid var(--fb-nonfidata-color); }
+    .fb-scudo[hidden] { display: none; }
+    .fb-scudo {
+      display: inline-block; vertical-align: -1px; cursor: help;
+      width: var(--fb-segno-size, 11px); height: var(--fb-segno-size, 11px);
+    }
+    .fb-scudo svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .fb-scudo svg path { stroke-width: 1.5; stroke-linejoin: round; }
+    .fb-scudo--fidata { color: var(--fb-fidata-color); }
+    .fb-scudo--fidata svg path { fill: currentColor; stroke: currentColor; }
+    .fb-scudo--nonfidata { color: var(--fb-nonfidata-color); }
+    .fb-scudo--nonfidata svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 3 2; }
+    /* «server» o «locale»: dove si lavora la pratica, nel muted come in Gestione. */
+    .fb-dove {
+      font-size: 10.5px; line-height: 1; padding: 2px 6px; border-radius: 999px; align-self: center;
+      border: 1px solid color-mix(in srgb, var(--sn-fg) 30%, transparent); color: var(--sn-muted);
+    }
     .fb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
     .fb-badge {
       font-size: 11px; padding: 1px 7px; border-radius: 999px;
@@ -382,7 +405,6 @@
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
       <button type="button" class="fb-tab" data-tab="queue">In coda</button>
-      <button type="button" class="fb-tab" data-tab="local">Lavori server</button>
       <button type="button" class="fb-tab" data-tab="waiting">Aspettano</button>
       <button type="button" class="fb-tab" data-tab="resolved">Risolti</button>
       <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>

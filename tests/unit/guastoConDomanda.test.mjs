@@ -90,12 +90,11 @@ function domandaDelModello() {
   return d;
 }
 
-test('il modello della domanda passa i controlli del server, con le tre strade e il feedback legato', () => {
+test('il modello della domanda passa i controlli del server, con le due strade e il feedback legato', () => {
   const v = D.validaDomanda(domandaDelModello(), { conOrigine: false });
   assert.ok(v.ok, `${v.errore}: ${v.dettaglio}`);
   assert.deepEqual(v.domanda.opzioni.map((o) => o.azione), [
     { tipo: 'riprendi', feedbackId: FEEDBACK_ID },
-    { tipo: 'approva_locale', feedbackId: FEEDBACK_ID },
     { tipo: 'archivia', feedbackId: FEEDBACK_ID },
   ]);
   assert.deepEqual(v.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);

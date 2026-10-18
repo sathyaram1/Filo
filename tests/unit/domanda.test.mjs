@@ -11,7 +11,7 @@ const DOMANDA = {
   titolo: 'Archiviare il doppione?', priorita: 'importante', contesto: 'Due feedback uguali.',
   opzioni: [
     { testo: 'Archivia', azione: { tipo: 'archivia', feedbackId: 'f1' } },
-    { testo: 'Approva come locale', azione: { tipo: 'approva_locale', feedbackId: 'f1' } },
+    { testo: 'Spegni l’account B', azione: { tipo: 'automazione', chiave: 'routine.accountBOff', valore: true } },
     { testo: 'Spegni le routine', azione: { tipo: 'automazione', chiave: 'routine.enabled', valore: false } },
   ],
   consiglio: { opzione: 0, perche: 'è un doppione' },
@@ -81,6 +81,7 @@ test('chiedi: senza biglietto va a ownerDomande, col biglietto delle routine pas
 });
 
 test('rispondi: un’azione di consenso o da fare una per una non parte da una sessione', async () => {
+  // Un tipo che non c'è più (approva_locale, #1424) non diventa applicabile da una sessione.
   assert.equal(soloDaFilo({ tipo: 'approva_locale', feedbackId: 'f1' }), true);
   assert.equal(soloDaFilo({ tipo: 'automazione', chiave: 'routine.enabled', valore: false }), true);
   assert.equal(soloDaFilo({ tipo: 'archivia', feedbackId: 'f1' }), false);

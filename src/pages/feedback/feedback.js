@@ -82,17 +82,16 @@
 
   // Le sezioni della macchina a stati, le stesse della dashboard di
   // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
-  // In coda (l'iter di lavorazione), 'local' Lavori locali (la stessa coda, che
-  // le routine non prendono: #908), 'waiting' Aspettano (in coda dopo altri feedback: #903), 'resolved' Risolti (fix usciti davvero in
-  // una versione rilasciata), 'archived' Archiviati.
-  const TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
+  // In coda (l'iter di lavorazione, anche i lavori locali e server: #1424), 'waiting' Aspettano (in coda dopo altri
+  // feedback: #903), 'resolved' Risolti (fix usciti davvero in una versione rilasciata), 'archived' Archiviati.
+  const TABS = ['inbox', 'queue', 'waiting', 'resolved', 'archived'];
+  const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
-    local: 'Nessun lavoro server.',
     waiting: 'Nessun feedback aspetta un altro.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
@@ -289,6 +288,18 @@
     const cls = 'fb-segno' + (s.classe ? ` fb-segno--${s.classe}` : ' fb-segno--vuoto');
     return `<span class="${escapeHtml(cls)}" data-forma="${escapeHtml(s.forma)}" title="${escapeHtml(s.testo)}" aria-label="${escapeHtml(s.testo)}" role="img">`
       + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${MR.FORME_SVG[s.forma]}"/></svg></span> `;
+  }
+
+  // La fiducia e dove si lavora (#1424), gemelli di quelli di Gestione: lo scudo pieno o vuoto, «server» o «locale».
+  function scudoHtml(f) {
+    const s = MR.segnoFiducia(f);
+    return `<span class="fb-scudo fb-scudo--${s.classe}" title="${s.testo}" aria-label="${s.testo}" role="img">`
+      + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${MR.FORME_SVG.scudo}"/></svg></span>`;
+  }
+  function doveHtml(f) {
+    if (MR.isLavoroServer(f)) return '<span class="fb-dove" title="Lavoro server">server</span>';
+    if (MR.isLavoroLocale(f)) return '<span class="fb-dove" title="Lavoro locale">locale</span>';
+    return '';
   }
 
   function fmtTs(ts) {
@@ -803,10 +814,10 @@
       const r = await sendToMain({ type: 'feedback_update', id, ...payload });
       if (!r || r.ok === false) throw new Error(r?.error || 'aggiornamento rifiutato');
       // Il sì come lavoro locale, dato leggendo il testo, è anche fiducia (#1148, come nella gemella): la scrive il server.
-      if (payload.localApproval === true && item.fiducia !== 'fidato') {
-        const f = await sendToMain({ type: (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna', feedbackId: id }).catch((err) => ({ ok: false, error: err?.message }));
+      if (payload.localOnly === true && item.fiducia !== 'fidato') {
+        const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err?.message }));
         if (f && f.ok) item.fiducia = 'fidato';
-        else alert(`Nei Lavori server, ma non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}. Alla fusione ti chiederà il via libera.`);
+        else alert(`In coda come lavoro locale, ma non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}. Alla fusione ti chiederà il via libera.`);
       }
       return true;
     } catch (e) {
@@ -826,7 +837,9 @@
   // dashboard di gestione legge la stessa tabella, quindi sulla stessa
   // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
   // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
+  const TITOLO_LAVORO_LOCALE = 'Si finisce solo sul tuo computer: lo prende una sessione locale, mai le routine.';
+  const TITOLO_LAVORO_SERVER = { fidato: 'Il server lo rimette in coda da capo e lo passa alla routine del server.',
+    nonFidato: 'Lo segni fidato: il server lo rimette in coda e lo passa alla routine del server.' };
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
@@ -843,8 +856,14 @@
       if (a.kind === 'reopen') {
         return `<button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">${escapeHtml(a.label)}</button>`;
       }
-      // #913: «Lavoro locale» scrive anche il segno e il sì dell'owner, come nella gemella.
-      const locale = a.locale ? ` data-local="1" title="${escapeHtml(TITOLO_LAVORO_LOCALE)}"` : '';
+      // #913: «💻 Lavoro locale» scrive anche il segno e, a chi serve, il sì dell'owner, come nella gemella.
+      const locale = a.locale ? ` data-local="1"${a.approva ? ' data-approva="1"' : ''} title="${escapeHtml(TITOLO_LAVORO_LOCALE)}"` : '';
+      // #1424: «🤝 Rendi fidato» / «↻ Fai ripartire» mandano solo il sì al server, come nella gemella.
+      if (a.fiducia) {
+        const t = TITOLO_LAVORO_SERVER[MR.isFidato(f) ? 'fidato' : 'nonFidato'];
+        return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act-fiducia" data-id="${id}"`
+          + ` title="${escapeHtml(t)}">${escapeHtml(a.label)}</button>`;
+      }
       return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act"`
         + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}${locale}>${escapeHtml(a.label)}</button>`;
     }).join('\n');
@@ -1013,6 +1032,35 @@
     provaRidisegno();
   }
 
+  // «🤝 Rendi fidato» / «↻ Fai ripartire» (#1424): solo il sì al server, che segna il lavoro server e lo rimette in coda.
+  // La scheda scrive solo quello che il server conferma, come la gemella.
+  async function azioneFiducia(btn, id) {
+    if (!isAdmin || !id || inScrittura.has(id) || decise.has(id)) return;
+    const item = all.find((f) => f._id === id);
+    if (!item) return;
+    const card = btn.closest('.fb-card');
+    inScrittura.add(id);
+    btn.classList.add('fb-act--busy');
+    spegniScheda(card);
+    const r = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err?.message }));
+    inScrittura.delete(id);
+    const viva = card && card.isConnected ? card : null;
+    if (r && r.ok && r.ripartito) {
+      Object.assign(item, { fiducia: 'fidato', localOnly: { by: 'server', at: Date.now() }, status: 'todo', statusReason: null });
+      const esito = `${esitoDi(item, {})}${r.avviso ? `. ${r.avviso}` : ''}`;
+      decise.set(id, esito);
+      marcaDecisa(viva, esito, item);
+    } else {
+      if (r && r.ok) item.fiducia = 'fidato';
+      if (viva) { btn.classList.remove('fb-act--busy'); riaccendiScheda(viva); }
+      alert(r && r.ok ? `Segnato fidato, ma il server non l’ha fatto ripartire.${r.avviso ? ` ${r.avviso}` : ''}`
+        : `Non ripartito: ${(r && r.error) || 'il server non ha risposto'}.`);
+    }
+    updateTabCounts();
+    aggiornaTotale();
+    provaRidisegno();
+  }
+
   // Cattura il campo (textarea/input) attualmente a fuoco dentro la lista, se
   // identificabile da data-id, così da poterlo riselezionare dopo un re-render.
   // Senza questo, salvare le note (patch → applyFilter → render rigenera tutto
@@ -1157,7 +1205,7 @@
       // ci si scrive dentro non si può salvare (sostituirebbe il report), e
       // offrirla vorrebbe dire far scrivere l'owner per niente.
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
-        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting');
+        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'waiting');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
@@ -1266,10 +1314,12 @@
            </div>`
         : '';
       return `
-        <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}${arrivata(f) ? ' fb-card--arrivata' : ''}" data-id="${escapeHtml(f._id)}">
+        <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}${arrivata(f) ? ' fb-card--arrivata' : ''} fb-fiducia--${MR.segnoFiducia(f).classe}" data-id="${escapeHtml(f._id)}">
           <div class="fb-meta">
+            ${scudoHtml(f)}
             <span>${escapeHtml(when)}</span>
             ${stateBadgeHtml(f)}
+            ${doveHtml(f)}
             ${fusioneChipHtml(f)}
             ${attesaChipHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
@@ -1343,6 +1393,9 @@
   // pallini della priorità) — che è l'unico modo di aggiornarla senza
   // rimescolare la lista sotto il puntatore.
   function bindCardActions(root) {
+    root.querySelectorAll('.fb-act-fiducia').forEach((b) => {
+      b.addEventListener('click', () => azioneFiducia(b, b.dataset.id));
+    });
     root.querySelectorAll('.fb-act').forEach((b) => {
       b.addEventListener('click', () => {
         const to = b.dataset.to; // stato CANONICO (todo | done | archived | *_confirmed)
@@ -1359,9 +1412,11 @@
         }
         if (b.dataset.local) {
           payload.localOnly = true;
-          payload.localApproval = true;
-          ottimistico.localOnly = { by: 'te', at: Date.now() };
-          ottimistico.localApproval = { by: 'te', at: Date.now() };
+          ottimistico.localOnly = { by: 'locale:te', at: Date.now() };
+          if (b.dataset.approva) {
+            payload.localApproval = true;
+            ottimistico.localApproval = { by: 'te', at: Date.now() };
+          }
         }
         if (b.dataset.reject) {
           payload.reviewDecision = 'rejected';
