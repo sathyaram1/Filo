@@ -56,9 +56,12 @@ test('l’owner firma col suo nome ovunque nasca il feedback; chi non lo è part
   // Buttato fuori da un rinnovo fallito resta l'owner: quello che manda aspetta che rientri (#912).
   Object.assign(accesso, { admin: false, caduto: true });
   assert.deepEqual(Mittente.firma('filo:chat'), { clientId: 'owner:filo:chat', dallOwner: true });
+  // Scritta da Filo dopo aver letto testo di altri: la prova dell'owner, il nome di Filo (#953, scelta C).
+  assert.deepEqual(Mittente.firma('filo:chat', { perConto: true }), { clientId: 'filo:chat', dallOwner: true });
   Object.assign(accesso, { caduto: false });
   for (const c of ['filo:chat', 'uid:abc', 'abc123', 'auto:complaint']) {
     assert.deepEqual(Mittente.firma(c), { clientId: c, dallOwner: false }, c);
+    assert.deepEqual(Mittente.firma(c, { perConto: true }), { clientId: c, dallOwner: false }, c);
   }
 });
 

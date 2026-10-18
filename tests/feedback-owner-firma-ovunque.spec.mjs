@@ -1,10 +1,11 @@
 // #953 — quello che parte dalla copia dell'owner porta la sua prova anche quando non lo scrive nel riquadro: la
-// segnalazione che Filo scrive in chat e lui conferma parte col suo nome (owner:filo:chat), quella automatica col nome
-// di Filo e la sua prova, la riapertura dalla bacheca come la sua. Mai col ripiego anonimo. Per gli altri non cambia.
+// segnalazione che Filo scrive in chat e lui conferma parte col suo nome (owner:filo:chat) se Filo non ha letto testo di
+// altri, quella automatica col nome di Filo e la sua prova, la riapertura dalla bacheca come la sua. Mai anonimo.
 // Finti: l'accesso Google e la rete; coda, conferma, chat e bacheca sono quelle vere.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
+import { home, modelloFinto, chiedi } from './helpers/chatFinta.mjs';
 
 const TOKEN = 'tok-owner-953';
 
@@ -59,6 +60,58 @@ test('per chi non è l’owner la segnalazione dalla chat resta di Filo per cont
   await confermaDallaChat(openTab, 'A schermo intero resta la barra in alto');
   await expect.poll(() => inviati(app)).toEqual([{ clientId: 'filo:chat', name: 'Schermo intero', opts: null }]);
   expect((await app.evaluate(() => globalThis.__accesso)).tokenChiesti).toBe(0);
+});
+
+// Scelta dell'owner (#953): è sua, fidata e senza giudici, solo se in quel compito Filo non ha letto testo di altri.
+// Altrimenti parte con la sua prova ma resta di Filo (filo:chat), e passa dai giudici come quella di un utente.
+const PROPOSTA = { toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: JSON.stringify({ testo: 'La barra resta a schermo intero', titolo: 'Schermo intero' }) }] };
+async function confermaLaProposta(app, page) {
+  await modelloFinto(app, [PROPOSTA, { text: 'Te la preparo.' }]);
+  await chiedi(page, 'a schermo intero la barra non sparisce');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
+  await clickConfirm(page, 'ok');
+}
+
+test('chat della home senza letture: la proposta confermata dall’owner è sua', async ({ app }) => {
+  await accesso(app, { admin: true });
+  await confermaLaProposta(app, await home(app));
+  await expect.poll(() => inviati(app)).toEqual([
+    { clientId: 'owner:filo:chat', name: 'Schermo intero', opts: { idToken: TOKEN, soloAdmin: true } },
+  ]);
+});
+
+test('chat che ha letto il web: la proposta confermata dall’owner parte con la sua prova ma resta di Filo', async ({ app, openTab }) => {
+  await accesso(app, { admin: true });
+  const letta = await app.evaluate(async () => {
+    const C = globalThis.SN_FILO_CHATS;
+    const c = await C.append(null, [
+      { role: 'user', text: 'cercami il meteo' },
+      { role: 'filo', text: 'Ho trovato il meteo: domani sole.', actions: [{ type: 'CERCA_WEB' }] },
+    ]);
+    await C.segnaFonti(c.id, [{ classe: 5, campo: 'web', chiave: 'web:ricerca', motivo: 'ho fatto una ricerca sul web' }]);
+    await C.close(c.id);
+    return c.id;
+  });
+  const dash = await openTab(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(letta)}`);
+  await expect(dash.locator('.dash-bubble').filter({ hasText: 'domani sole' })).toBeVisible({ timeout: 10000 });
+  await confermaLaProposta(app, dash);
+  await expect.poll(() => inviati(app)).toEqual([
+    { clientId: 'filo:chat', name: 'Schermo intero', opts: { idToken: TOKEN, soloAdmin: true } },
+  ]);
+});
+
+test('Aiuto su un sito: la segnalazione confermata dall’owner porta la sua prova ma resta di Filo', async ({ app }) => {
+  await accesso(app, { admin: true });
+  const r = await app.evaluate(async () => {
+    const { MSG } = globalThis.SN_MSG;
+    const action = () => ({ type: 'INVIA_FEEDBACK', testo: 'Scritto dopo aver letto la pagina', titolo: 'Dal sito' });
+    const sender = { url: 'https://esempio.invalid/articolo' };
+    const prima = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_RUN_ACTION, assistente: true, action: action() }, sender);
+    if (!prima.needsConfirm) return { prima };
+    return globalThis.SN_HANDLE_MESSAGE({ type: MSG.FILO_CONFIRM_ACTION, assistente: true, action: action() }, sender);
+  });
+  expect(r.executed, JSON.stringify(r)).toBe(true);
+  expect(await inviati(app)).toEqual([{ clientId: 'filo:chat', name: 'Dal sito', opts: { idToken: TOKEN, soloAdmin: true } }]);
 });
 
 // Come dal riquadro (#912): l'owner senza accesso valido non parte da utente; aspetta, lo sa, e parte quando rientra.

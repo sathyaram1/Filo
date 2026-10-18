@@ -15,6 +15,8 @@ const FBS = [
   { ...base, _id: 'oau', seq: 9908, name: 'Automatica dell’owner', clientId: 'auto:complaint', senderProof: 'admin' },
   { ...base, _id: 'fch', seq: 9909, name: 'Dalla chat di un utente', clientId: 'filo:chat' },
   { ...base, _id: 'fin', seq: 9910, name: 'Chat dell’owner senza prova', clientId: 'owner:filo:chat' },
+  // Scritta dopo aver letto testo di altri: porta la prova ma resta di Filo, e passa dai giudici.
+  { ...base, _id: 'fco', seq: 9911, name: 'Chat dell’owner dopo una pagina', clientId: 'filo:chat', senderProof: 'admin' },
 ];
 
 test('la prima bolla dice lo stesso autore della testata, per ogni mittente', async ({ openTab }) => {
@@ -40,6 +42,7 @@ test('la prima bolla dice lo stesso autore della testata, per ogni mittente', as
   expect(visti.fil).toBe('Filo (per conto di un utente)');
   expect(visti.fch).toBe('Filo (per conto di un utente)');
   expect(visti.fin).toBe('Utente');
+  expect(visti.fco).toBe('Filo (per conto dell\'owner)');
 });
 
 test('in lista l’icona dice per conto di chi ha scritto Filo', async ({ openTab }) => {

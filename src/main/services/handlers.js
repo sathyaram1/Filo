@@ -1935,7 +1935,6 @@ function ricordaSegnalazione(sender, action, pulita) {
 function segnalazioneConfermataPulita(sender, action) {
   const key = pendingConfirmKey(sender, action);
   const scade = segnalazioniPulite.get(key);
-  segnalazioniPulite.delete(key);
   return !!scade && scade > Date.now();
 }
 
@@ -2393,6 +2392,7 @@ async function eseguiAzioneFilo(action, {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
+    if (type === 'INVIA_FEEDBACK') ricordaSegnalazione(sender, action, compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni }));
     return sospesa();
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -2618,7 +2618,7 @@ async function eseguiAzioneFilo(action, {
         // questo punto la conferma è già passata (il gate sopra ha lasciato
         // procedere solo con confirmed:true). Il feedback parte come quelli
         // inviati dal box: stesso schema, ma clientId 'filo:chat' così in
-        // dashboard si vede che l'ha mandato Filo. L'owner lo firma come dal riquadro (#953).
+        // dashboard si vede che l'ha mandato Filo. Dall'owner porta la sua prova; è suo solo a compito pulito (#953).
         const testo = String(action.testo ?? action.text ?? action.messaggio ?? '').trim();
         if (!testo) return { executed: false, kept: false };
         const FB = globalThis.SN_FEEDBACK;
@@ -2629,7 +2629,10 @@ async function eseguiAzioneFilo(action, {
         try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
         try {
           const Mittente = require('./feedbackMittente');
-          const firmato = Mittente.firma('filo:chat');
+          const pulita = confirmed
+            ? segnalazioneConfermataPulita(sender, action)
+            : compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni });
+          const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
           const payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
           const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
           // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
