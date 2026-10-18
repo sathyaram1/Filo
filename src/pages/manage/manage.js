@@ -6319,6 +6319,7 @@
       }
       renderSupportModelsEditor(r.models || {});
       smLoaded = true;
+      caricaGiudici();
     } catch (e) {
       mgSmLoading.hidden = true;
       mgSmDenied.hidden  = false;
@@ -6330,6 +6331,112 @@
 
   function rileggiModelliRifiutati() {
     if (!smLoaded && !smLoading && mgSmDenied && !mgSmDenied.hidden) loadSupportModels();
+  }
+
+  // ── Giudici sul server (#1384): riserve entrate, pausa, versione del dinamico ──
+  // Le riserve entrano da sole quando un attacco passa i fissi: qui l'owner le vede tutte e le toglie, e toglie la
+  // pausa, anche dopo aver risposto alle domande che le annunciavano.
+  const GIRO_DINAMICO = {
+    promossa: 'è entrata una versione nuova',
+    respinta: 'la versione proposta non è entrata',
+    incompleta: 'esame incompleto, si rifà la notte dopo',
+    non_valida: 'il file delle istruzioni non è valido',
+    invariata: 'nessuna versione nuova',
+    gia_esaminata: 'nessuna versione nuova',
+    nessuna_istruzione: 'il repo non ha ancora istruzioni',
+    sorgente_non_raggiungibile: 'il repo del giudice dinamico non si raggiunge',
+    giudice_assente: 'giudice dinamico spento',
+  };
+  const MOTIVO_RESPINTA = { peggiora: 'fa meno punti', pari: 'fa gli stessi punti', piu_falsi_allarmi: 'dà più falsi allarmi' };
+  let giudiciInCorso = false;
+
+  async function caricaGiudici(op, nome) {
+    if (giudiciInCorso) return;
+    giudiciInCorso = true;
+    try {
+      const r = await sendToMain(Object.assign({ type: 'giudici_panel', op: op || 'stato' }, nome ? { nome } : {}));
+      if (!r || r.ok === false) { renderGiudici(null, (r && r.error) || 'Lo stato dei giudici non si legge.'); return; }
+      renderGiudici(r.stato || null);
+    } catch (e) {
+      renderGiudici(null, e.message || 'Lo stato dei giudici non si legge.');
+    } finally {
+      giudiciInCorso = false;
+    }
+  }
+
+  function nodoGiudici(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function renderGiudici(stato, errore) {
+    const boxR = document.getElementById('mgSmRiserva');
+    const boxD = document.getElementById('mgSmDinamico');
+    if (!boxR || !boxD) return;
+    boxR.innerHTML = '';
+    boxD.innerHTML = '';
+    if (!stato) {
+      boxR.appendChild(nodoGiudici('span', 'mg-sm-giudici-err', errore || ''));
+      boxR.hidden = !errore;
+      boxD.hidden = true;
+      return;
+    }
+    const riserva = stato.riserva || {};
+    const pausa = riserva.pausa;
+    if (pausa) {
+      const riga = nodoGiudici('div', 'mg-sm-giudici-pausa');
+      riga.appendChild(nodoGiudici('span', '', pausa.illeggibile
+        ? 'Lo stato della riserva non si legge: per prudenza i feedback che entrerebbero in coda da soli aspettano te.'
+        : `Dal ${formatDate(pausa.dal)} i feedback che entrerebbero in coda da soli aspettano te: un attacco ha passato tutti i giudici fissi.`));
+      if (!pausa.illeggibile) {
+        const b = nodoGiudici('button', 'sn-btn sn-btn-secondary', 'Togli la pausa');
+        b.type = 'button';
+        b.id = 'mgSmRiprendi';
+        b.title = 'Riprendi la coda automatica';
+        b.addEventListener('click', () => caricaGiudici('riprendi'));
+        riga.appendChild(b);
+      }
+      boxR.appendChild(riga);
+    }
+    const attivi = Array.isArray(riserva.attivi) ? riserva.attivi : [];
+    if (attivi.length) {
+      boxR.appendChild(nodoGiudici('span', 'mg-sm-giudici-nota', 'Nel panel ora:'));
+      for (const a of attivi) {
+        const chip = nodoGiudici('span', 'mg-sm-giudice');
+        chip.dataset.nome = a.nome;
+        chip.title = `${a.nome}, entrato il ${formatDate(a.aggiuntoIl)}`;
+        chip.appendChild(nodoGiudici('span', '', a.modello));
+        chip.appendChild(nodoGiudici('span', 'mg-sm-giudice-quando', formatDate(a.aggiuntoIl)));
+        const x = nodoGiudici('button', 'sn-chain-rm', '×');
+        x.type = 'button';
+        x.title = 'Togli dal panel';
+        x.setAttribute('aria-label', `Togli ${a.modello} dal panel`);
+        x.addEventListener('click', () => caricaGiudici('togli', a.nome));
+        chip.appendChild(x);
+        boxR.appendChild(chip);
+      }
+    }
+    if (errore) boxR.appendChild(nodoGiudici('span', 'mg-sm-giudici-err', errore));
+    boxR.hidden = !pausa && !attivi.length && !errore;
+
+    const d = stato.dinamico;
+    if (d) {
+      const testo = d.versione > 0
+        ? `Istruzioni: versione ${d.versione}, dal ${formatDate(d.attivataIl)}.`
+        : 'Istruzioni: quelle di base, nessuna versione entrata.';
+      boxD.appendChild(nodoGiudici('span', '', testo));
+      const g = d.ultimoGiro;
+      if (g && g.esito) {
+        let ultima = GIRO_DINAMICO[g.esito] || g.esito.replace(/_/g, ' ');
+        if (g.esito === 'respinta' && MOTIVO_RESPINTA[g.motivo]) ultima += `: ${MOTIVO_RESPINTA[g.motivo]}`;
+        boxD.appendChild(nodoGiudici('span', 'mg-sm-giudici-nota', `Ultimo controllo, ${formatDate(g.at)}: ${ultima}.`));
+      }
+      boxD.hidden = false;
+    } else {
+      boxD.hidden = true;
+    }
   }
 
   // Render dell'editor (chiave + registro giudici + nickname + slot) e reveal.
@@ -7857,6 +7964,7 @@
   // Render diretto dell'editor con dati finti (bypassa il canale main: i test
   // non hanno una sessione admin né Firestore).
   window.__mgTest.renderSupportModelsEditor = (models) => { renderSupportModelsEditor(models); smLoaded = true; };
+  window.__mgTest.caricaGiudici = caricaGiudici;
   window.__mgTest.collectJudgeRegistry = collectJudgeRegistry;
   // L'immagine a tutta pagina: gli spec la aprono e la chiudono dalla stessa
   // porta dell'utente, così passano anche dall'avviso al main (#514).

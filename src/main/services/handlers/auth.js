@@ -1706,4 +1706,18 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.message || String(e) };
     }
   }));
+
+  // Riserve dei giudici, pausa e versione del dinamico (#1384): li tiene il server, qui si passa la richiesta e basta.
+  on(MSG.GIUDICI_PANEL, ownerOnly(async (msg) => {
+    const op = ['stato', 'togli', 'riprendi'].includes(msg && msg.op) ? msg.op : '';
+    if (!op) return { ok: false, error: 'Operazione sconosciuta.' };
+    try {
+      const r = await callSecurityFunction('ownerGiudici', op === 'togli' ? { op, nome: String(msg.nome || '') } : { op });
+      return { ok: true, stato: (r && r.stato) || null };
+    } catch (e) {
+      const detail = String(e?.detail || '').trim();
+      if (detail) return { ok: false, error: detail };
+      return { ok: false, error: e?.httpStatus ? `Il server ha risposto con un errore ${e.httpStatus}.` : 'Il server non si raggiunge: riprova fra poco.' };
+    }
+  }));
 };

@@ -2312,6 +2312,7 @@ const FAKE_SUPPORT_MODELS = {
   judge2:       'flash',
   judge3:       'flash',
   judgeDynamic: 'flash',
+  judgeReserve: 'flash, flash-or',
   judgeRedTeam: 'flash',
   judgePriority: '',
 };
@@ -2349,9 +2350,10 @@ test('DD1: i Modelli di supporto (in Automazioni) renderizzano tutti gli slot co
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
-  // 9 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
+  // 10 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + riserva, #1384, + red-team +
   // priorità, la ricerca fra i feedback spostata qui dalle Opzioni, #465, e il suo classificatore, #1118).
-  await expect(page.locator('.mg-sm-slot')).toHaveCount(9);
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(10);
+  await expect(page.locator('[data-slot="judgeReserve"] label')).toHaveText('Giudici di riserva');
   await expect(page.locator('[data-slot="manageSearch"] label')).toHaveText('Ricerca fra i feedback');
   await expect(page.locator('[data-slot="manageSearchClassifier"] label')).toHaveText('Classificatore della ricerca');
   await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
@@ -2439,6 +2441,8 @@ test('DD1: il bottone Salva invia support_models_update con i valori corretti', 
   expect(sent.judge2).toBe('flash');
   expect(sent.judge3).toBe('flash');
   expect(sent.judgeDynamic).toBe('flash');
+  // La riserva (#1384) è una lista: si salva intera, nell'ordine.
+  expect(sent.judgeReserve).toBe('flash, flash-or');
 
   // I valori tornati dal mock vengono confermati (status "Salvato.").
   await expect(page.locator('#mgSmStatus')).toHaveText('Salvato.');

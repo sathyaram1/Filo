@@ -157,6 +157,9 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       registroRoutine: { type: MSG.ROUTINE_LOG_GET, limit: 5 },
       giudiciLettura: { type: MSG.SUPPORT_MODELS_GET },
       giudiciScrittura: { type: MSG.SUPPORT_MODELS_UPDATE, models: {} },
+      // Togliere una riserva o la pausa dei giudici (#1384).
+      giudiciRiserva: { type: MSG.GIUDICI_PANEL, op: 'togli', nome: 'reserve_1' },
+      giudiciPausa: { type: MSG.GIUDICI_PANEL, op: 'riprendi' },
       fusioniElenco: { type: MSG.MERGE_APPROVALS_GET },
       fusioniApprova: { type: MSG.MERGE_APPROVAL_APPROVE, id: 'ab12cd34ef56ab12cd34ef56' },
       fusioniScarta: { type: MSG.MERGE_APPROVAL_DISCARD, id: 'ab12cd34ef56ab12cd34ef56' },

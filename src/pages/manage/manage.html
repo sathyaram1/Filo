@@ -1528,6 +1528,27 @@
       grid-column: 2; font-size: 12px; color: var(--sn-muted);
       margin-top: -4px;
     }
+    /* Lo stato vero dei giudici sul server (#1384): chi è entrato nel panel, la pausa, la versione del dinamico. */
+    .mg-sm-giudici {
+      grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+      font-size: 12px; color: var(--sn-fg);
+    }
+    .mg-sm-giudici[hidden] { display: none; }
+    .mg-sm-giudici-pausa {
+      flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+      padding: 8px 10px; border-radius: 8px;
+      border: 1px solid var(--sn-accent); color: var(--sn-fg);
+    }
+    .mg-sm-giudici-pausa .sn-btn { padding: 4px 10px; font-size: 12px; }
+    .mg-sm-giudice {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 4px 3px 9px; border-radius: 999px;
+      border: 1px solid var(--sn-border); background: var(--sn-surface, transparent);
+      white-space: nowrap; transition: border-color calc(0.15s * var(--sn-motion, 1));
+    }
+    .mg-sm-giudice:hover { border-color: var(--sn-accent); }
+    .mg-sm-giudice-quando, .mg-sm-giudici-nota { color: var(--sn-muted); }
+    .mg-sm-giudici-err { flex-basis: 100%; color: #c0392b; }
     .mg-sm-toolbar {
       display: flex; align-items: center; gap: 12px;
       margin-top: 24px;
@@ -2280,6 +2301,7 @@
                     <span class="mg-sm-slot-desc">
                       Quarto giudice del panel, con prompt mutevole.
                     </span>
+                    <div class="mg-sm-giudici" id="mgSmDinamico" hidden></div>
                   </div>
 
                   <div class="mg-sm-slot" data-slot="judgeReserve">
@@ -2288,6 +2310,7 @@
                     <span class="mg-sm-slot-desc">
                       Provati in ordine quando un attacco passa tutti i giudici fissi: entra nel panel il primo che lo respinge. Vuoto: la lista del server.
                     </span>
+                    <div class="mg-sm-giudici" id="mgSmRiserva" hidden></div>
                   </div>
 
                   <div class="mg-sm-slot" data-slot="judgeRedTeam">

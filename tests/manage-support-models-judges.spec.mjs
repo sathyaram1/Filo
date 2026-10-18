@@ -116,3 +116,81 @@ test('il registro raccoglie le righe (anche quelle aggiunte) come voci OpenRoute
   // La chiave digitata è nel campo (verrà inviata dal save).
   await expect(page.locator('#mgSmKeyOpenrouter')).toHaveValue('sk-or-v1-nuova');
 });
+
+// #1384: le riserve entrate da sole, la pausa e la versione del dinamico si vedono, e riserve e pausa si tolgono da qui.
+test('giudici sul server: riserve nel panel e pausa si vedono e si tolgono, la versione del dinamico si legge', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.caricaGiudici && window.filo);
+  await page.evaluate(() => {
+    const giorno = Date.parse('2026-10-18T10:00:00Z');
+    window.__giudici = {
+      riserva: {
+        attivi: [
+          { nome: 'reserve_1', modello: 'minimax/minimax-m3', aggiuntoIl: giorno },
+          { nome: 'reserve_2', modello: 'deepseek/deepseek-v4-flash', aggiuntoIl: giorno },
+        ],
+        pausa: { dal: giorno, buchi: 1, illeggibile: false },
+      },
+      dinamico: { versione: 3, attivataIl: giorno, ultimoGiro: { at: giorno, esito: 'respinta', motivo: 'piu_falsi_allarmi' } },
+    };
+    window.__giudiciRichieste = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'giudici_panel') {
+        window.__giudiciRichieste.push(Object.assign({ op: msg.op }, msg.nome ? { nome: msg.nome } : {}));
+        const s = window.__giudici;
+        if (msg.op === 'togli') s.riserva.attivi = s.riserva.attivi.filter((a) => a.nome !== msg.nome);
+        if (msg.op === 'riprendi') s.riserva.pausa = null;
+        return { ok: true, stato: JSON.parse(JSON.stringify(s)) };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate(() => window.__mgTest.setTab('automation'));
+  await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), FAKE_MODELS);
+  await page.evaluate(() => window.__mgTest.caricaGiudici());
+
+  const riserva = page.locator('#mgSmRiserva');
+  await expect(riserva).toBeVisible();
+  await expect(riserva.locator('.mg-sm-giudici-pausa')).toContainText('aspettano te');
+  await expect(riserva.locator('.mg-sm-giudice')).toHaveCount(2);
+  await expect(riserva.locator('.mg-sm-giudice').first()).toContainText('minimax/minimax-m3');
+  const dinamico = page.locator('#mgSmDinamico');
+  await expect(dinamico).toContainText('versione 3');
+  await expect(dinamico).toContainText('dà più falsi allarmi');
+  await riserva.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/1384-giudici-stato.png' });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(400); // il tema passa con una transizione dei bordi
+  await page.screenshot({ path: 'tests/.shots/1384-giudici-stato-scuro.png' });
+  await page.emulateMedia({ colorScheme: 'light' });
+
+  await riserva.locator('.mg-sm-giudice[data-nome="reserve_1"] button').click();
+  await expect(riserva.locator('.mg-sm-giudice')).toHaveCount(1);
+  await expect(riserva.locator('.mg-sm-giudice')).toContainText('deepseek/deepseek-v4-flash');
+  await page.locator('#mgSmRiprendi').click();
+  await expect(riserva.locator('.mg-sm-giudici-pausa')).toHaveCount(0);
+  const richieste = await page.evaluate(() => window.__giudiciRichieste);
+  expect(richieste).toEqual([{ op: 'stato' }, { op: 'togli', nome: 'reserve_1' }, { op: 'riprendi' }]);
+
+  // Tolto tutto: niente righe vuote.
+  await riserva.locator('.mg-sm-giudice button').click();
+  await expect(riserva).toBeHidden();
+});
+
+test('giudici sul server: se lo stato non si legge la riga lo dice, non resta vuota', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.caricaGiudici && window.filo);
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => (msg && msg.type === 'giudici_panel'
+      ? { ok: false, error: 'Il server non si raggiunge: riprova fra poco.' } : orig(msg));
+  });
+  await page.evaluate(() => window.__mgTest.setTab('automation'));
+  await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), FAKE_MODELS);
+  await page.evaluate(() => window.__mgTest.caricaGiudici());
+  await expect(page.locator('#mgSmRiserva .mg-sm-giudici-err')).toHaveText('Il server non si raggiunge: riprova fra poco.');
+  await expect(page.locator('#mgSmDinamico')).toBeHidden();
+});
