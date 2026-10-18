@@ -1907,6 +1907,38 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
   return fonti;
 }
 
+// #953 — la segnalazione che Filo scrive e l'owner conferma è sua (fidata, senza giudici) solo se il compito non ha
+// letto testo di altri: lo stato dei livelli di autonomia, mai più largo della classe 2; dall'Aiuto di un sito mai.
+function compitoSenzaTestoDiAltri(sender, { contesto = null, fontiLette = null, assistente = false, impostazioni = null } = {}) {
+  try {
+    if (/^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))) return false;
+    const A = globalThis.SN_AUTONOMIA;
+    const aut = (impostazioni && impostazioni.autonomia) || {};
+    const attivo = A.livelloAttivo(aut.livello);
+    const livello = A.SOGLIA_PULITO[attivo] <= A.SOGLIA_PULITO.default ? attivo : 'default';
+    const fonti = fontiDelCompito(sender, contesto, fontiLette, assistente);
+    return A.stato({ fonti, livello, spostamenti: aut.fonti, manopole: aut.manopole }).stato === 'pulito';
+  } catch (_) { return false; }
+}
+// L'OK arriva senza il contesto del turno: vale il segno preso quando la proposta è stata mostrata, legato al suo
+// testo. Senza segno (scaduto, altra scheda, proposta mai vista) è contaminata.
+const segnalazioniPulite = new Map(); // pendingConfirmKey → scade
+const SEGNALAZIONE_PULITA_TTL = 24 * 60 * 60 * 1000;
+function ricordaSegnalazione(sender, action, pulita) {
+  const key = pendingConfirmKey(sender, action);
+  segnalazioniPulite.delete(key);
+  if (!pulita) return;
+  const now = Date.now();
+  for (const [k, scade] of segnalazioniPulite) if (scade <= now) segnalazioniPulite.delete(k);
+  segnalazioniPulite.set(key, now + SEGNALAZIONE_PULITA_TTL);
+}
+function segnalazioneConfermataPulita(sender, action) {
+  const key = pendingConfirmKey(sender, action);
+  const scade = segnalazioniPulite.get(key);
+  segnalazioniPulite.delete(key);
+  return !!scade && scade > Date.now();
+}
+
 // Ciò che una chat ha letto resta suo anche fuori dallo storico che la pagina rimanda a ogni turno (riaperta
 // dall'archivio, oltre gli ultimi venti messaggi): lo tiene il main, per la sessione e nell'archivio (#530).
 const fontiPerChat = new Map();   // chatId → fonti lette dalla chat
