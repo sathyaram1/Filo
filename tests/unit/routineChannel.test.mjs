@@ -156,6 +156,13 @@ test('merge: blocked e conflict arrivano col motivo; una risposta senza esito è
     sleep: async () => {},
   });
   assert.equal(conRichiesta.approval, 'req-7');
+  // …e se quella richiesta era già decisa (#486), con come.
+  const decisa = await merge('t', 'worker/1', {
+    fetchImpl: async () => reply(200, { ok: true, result: 'blocked', reason: 'g', approval: 'req-7', approvalState: 'used', approvalOutcome: 'conflict' }),
+    sleep: async () => {},
+  });
+  assert.equal(decisa.approvalState, 'used');
+  assert.equal(decisa.approvalOutcome, 'conflict');
   const conflict = await merge('t', 'worker/1', {
     fetchImpl: async () => reply(200, { ok: true, result: 'conflict' }), sleep: async () => {},
   });

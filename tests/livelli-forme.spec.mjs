@@ -838,6 +838,35 @@ test('GitHub giù: il salto è registrato e lo si può ripremere', async ({ open
   await expect(page.locator('#mgSaltaL4Btn')).toBeEnabled();
 });
 
+// #486: il cancello ferma di nuovo una versione la cui richiesta era già stata decisa. Il server non ne apre una
+// nuova, e la scheda non deve mandare l'owner a un via libera che non c'è.
+test('salta su una versione già decisa: la scheda dice che non c’è niente da approvare, e come era stata decisa', async ({ openTab }) => {
+  const casi = [
+    [{ ok: true, esito: 'bloccato', requestId: 'r1', requestState: 'discarded' }, /già stata scartata.*non c’è niente da approvare/],
+    [{ ok: true, esito: 'bloccato', requestId: 'r1', requestState: 'used', requestOutcome: 'conflict' }, /già stata approvata, ma la fusione era finita in conflitto/],
+    [{ ok: true, esito: 'bloccato', requestId: '', error: 'la richiesta di fusione non si è registrata' }, /non si è registrata/],
+  ];
+  const page = await openTab(MANAGE);
+  for (const [saltaReply, frase] of casi) {
+    await apri(page, [FB_BOCCIATO], { saltaReply });
+    await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+    await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+    await page.locator('#mgSaltaL4Btn').click();
+    await page.locator('#mgSaltaL4Btn').click();
+    const esito = page.locator('#mgSideBody .mg-liv-esito');
+    await expect(esito).toContainText(frase, { timeout: 8_000 });
+    await expect(esito).not.toContainText(/via libera/);
+    await expect(page.locator('#mgToast')).toContainText(frase);
+  }
+  // In attesa davvero: la frase di sempre.
+  await apri(page, [FB_BOCCIATO], { saltaReply: { ok: true, esito: 'bloccato', requestId: 'r1', requestState: 'pending' } });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  await page.locator('#mgSaltaL4Btn').click();
+  await page.locator('#mgSaltaL4Btn').click();
+  await expect(page.locator('#mgSideBody .mg-liv-esito')).toContainText(/aspetta il tuo via libera sul quadrato/, { timeout: 8_000 });
+});
+
 // ── 5. In lista: una fusione ferma si riconosce e sta in cima ───────────────
 
 test('una segnalazione con la fusione ferma si riconosce nella lista e sale in cima', async ({ openTab }) => {

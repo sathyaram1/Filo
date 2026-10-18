@@ -938,7 +938,7 @@ export async function eseguiGitServer({
  * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
  * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
  *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
+ * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, approvalState?, approvalOutcome?, mainSha? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
@@ -954,6 +954,9 @@ export async function merge(t, branch, opts) {
       reason: String(body.reason || ''),
       sha: String(body.sha || ''),
       approval: String(body.approval || ''),
+      // In attesa o già decisa (#486): merge-gate lo dice a chi scrive la spiegazione.
+      ...(body.approvalState ? { approvalState: String(body.approvalState).slice(0, 20) } : {}),
+      ...(body.approvalOutcome ? { approvalOutcome: String(body.approvalOutcome).slice(0, 40) } : {}),
       ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
       ...(body.esito ? { esito: String(body.esito) } : {}),
     };

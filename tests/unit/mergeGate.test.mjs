@@ -30,7 +30,23 @@ const MERGE_GATE = resolve(__dirname, '..', '..', 'scripts', 'merge-gate.mjs');
 
 // ─── logica pura del CLI (niente git, niente rete) ───────────────────────────
 
-const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer, testoEsitoServer } = await import('../../scripts/merge-gate.mjs');
+const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer, testoEsitoServer, righeDelBlocco } = await import('../../scripts/merge-gate.mjs');
+
+test('righeDelBlocco: una versione già decisa non manda l’owner a un via libera che non c’è (#486)', () => {
+  const testo = (r) => righeDelBlocco({ ok: true, result: 'blocked', reason: 'guard_the_guards', ...r }).join('\n');
+  assert.match(testo({ approval: 'r', approvalState: 'pending' }), /BLOCKED: guard_the_guards\n.*aspetta il via libera dell’owner/);
+  // Un server che non dice lo stato: come prima.
+  assert.match(testo({ approval: 'r' }), /aspetta il via libera dell’owner/);
+  for (const [r, re] of [
+    [{ approval: 'r', approvalState: 'discarded' }, /NESSUNA richiesta in attesa.*già scartato questa versione/],
+    [{ approval: 'r', approvalState: 'used', approvalOutcome: 'conflict' }, /già approvato questa versione, ma la fusione era finita in conflitto/],
+    [{ approval: 'r', approvalState: 'used', approvalOutcome: 'merged' }, /già approvato questa versione, ed è già su main/],
+    [{}, /NON si è aperta/],
+  ]) {
+    assert.match(testo(r), re);
+    assert.doesNotMatch(testo(r), /aspetta il via libera/);
+  }
+});
 
 test('parseArgs: solo il source; qualunque flag è sconosciuto', () => {
   assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', unknown: [] });

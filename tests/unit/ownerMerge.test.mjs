@@ -442,4 +442,22 @@ describe('una richiesta già decisa non si annuncia in attesa (#486)', () => {
     assert.equal(senza.chiamate.length, 1);
     assert.equal(senza.r.requestState, undefined);
   });
+
+  test('il server dice da sé com’era decisa: il terminale gli crede e non rilegge l’elenco', async () => {
+    const nonRileggere = async () => { throw new Error('non doveva rileggere'); };
+    const scartata = await conServer(nonRileggere, { ok: true, result: 'blocked', reason: 'x', trips: [], requestId: ID, requestState: 'discarded' });
+    assert.equal(scartata.chiamate.length, 1);
+    assert.equal(scartata.r.requestState, 'discarded');
+    assert.match(messageForOwnerMerge(scartata.r, 'claude/x'), /già stata SCARTATA/);
+    const usata = await conServer(nonRileggere, { ok: true, result: 'blocked', reason: 'x', trips: [], requestId: ID, requestState: 'used', requestOutcome: 'conflict' });
+    assert.equal(usata.r.requestOutcome, 'conflict');
+    assert.match(messageForOwnerMerge(usata.r, 'claude/x'), /era finita in conflitto/);
+    const attesa = await conServer(nonRileggere, { ok: true, result: 'blocked', reason: 'x', trips: [], requestId: ID, requestState: 'pending' });
+    assert.match(messageForOwnerMerge(attesa.r, 'claude/x'), /L'ho messa IN ATTESA/);
+    // Uno stato che il terminale non conosce non vale come risposta: si rilegge l'elenco.
+    const strano = await conServer(async () => ({ status: 200, text: async () => JSON.stringify({ result: elenco({ recent: [vista({ discarded: true })] }) }) }),
+      { ok: true, result: 'blocked', reason: 'x', trips: [], requestId: ID, requestState: 'boh' });
+    assert.equal(strano.chiamate.length, 2);
+    assert.equal(strano.r.requestState, 'discarded');
+  });
 });

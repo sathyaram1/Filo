@@ -386,6 +386,46 @@
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }
 
+  // «Salta il controllo»: ogni esito del server in italiano, uguale nella scheda di Filo e nella pagina da browser.
+  var SALTA_ESITI = {
+    fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
+    conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
+    ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
+    feedback_assente: { kind: 'err', text: 'Il server non trova questa segnalazione.' },
+    non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
+    non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
+    guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
+    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
+    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
+    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
+    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
+  };
+
+  /**
+   * L'esito di «Salta il controllo», detto all'owner. PURA. Un esito sconosciuto si scrive grezzo, mai come un «fatto».
+   * Sul blocco del cancello conta lo stato della richiesta (#486): in attesa, già decisa, o non registrata.
+   * `opts.doveSiApprova` dice dove sta il via libera sulla superficie che chiama.
+   */
+  function skipOutcomeMessage(reply, opts) {
+    var r = reply || {};
+    var esito = String(r.esito || '');
+    if (esito !== 'bloccato') return SALTA_ESITI[esito] || { kind: 'err', text: 'Il server ha risposto: ' + (esito || 'niente') + '.' };
+    var base = 'Saltato, ma il cancello di fusione ha fermato il ramo';
+    var stato = String(r.requestState || '');
+    if (!r.requestId) return { kind: 'err', text: base + ', e la richiesta di fusione non si è registrata: nessuna fusione è avvenuta.' };
+    if (stato === 'discarded') {
+      return { kind: 'warn', text: base + ', e questa versione era già stata scartata: una richiesta decisa non si riapre, non c’è niente da approvare.' };
+    }
+    if (stato === 'used') {
+      if (r.requestOutcome === 'merged') return { kind: 'warn', text: base + ', e questa versione era già stata approvata e fusa su main: non c’è niente da approvare.' };
+      var come = r.requestOutcome === 'conflict' ? ', ma la fusione era finita in conflitto' : '';
+      return { kind: 'warn', text: base + ', e questa versione era già stata approvata' + come + ': un’approvazione vale una volta sola, non c’è niente da approvare.' };
+    }
+    var dove = (opts && opts.doveSiApprova) || 'sul quadrato';
+    return { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera ' + dove + '.' };
+  }
+
   // ── Costruzione (DOM) ─────────────────────────────────────────────────────
 
   function el(tag, cls, text) {
@@ -811,6 +851,172 @@
     return list.length + failed.length;
   }
 
+  // ── «Salta il controllo» fuori da Filo (#489) ─────────────────────────────
+
+  var SALTA_ETICHETTA = 'Salta il controllo';
+  var ATTESA_SALTA = { kind: 'wait', text: 'Chiedo al server…' };
+
+  /** Il titolo dell'elenco delle bocciature. PURA. */
+  function skipsHeadline(count) {
+    var n = Number(count) || 0;
+    if (n <= 0) return '';
+    return n === 1 ? 'Un lavoro bocciato dal controllo di sicurezza' : n + ' lavori bocciati dal controllo di sicurezza';
+  }
+
+  /** Cosa dice la card del perché, quando il perché non c'è per intero. PURA. '' se c'è tutto. */
+  function skipReasonNote(b) {
+    var v = b || {};
+    if (v.motivoIlleggibile) return 'La spiegazione del controllo non si apre qui: leggila nella scheda della pratica in Filo.';
+    if (!String(v.motivo || '').trim()) return 'Il controllo non ha lasciato una spiegazione per questa pratica.';
+    if (v.motivoTagliato) return 'La spiegazione continua: il resto lo leggi nella scheda della pratica in Filo.';
+    return '';
+  }
+
+  /**
+   * Una bocciatura del controllo = una card, con lo stesso gesto della scheda di Filo: «Salta il controllo»
+   * con la conferma sul posto. Il cancello di fusione gira comunque dopo il salto.
+   */
+  function buildSkipCard(b, opts) {
+    var o = opts || {};
+    var now = Number(o.nowMs) || Date.now();
+    var card = el('div', 'sn-mac-card sn-mac-card-skip');
+    card.dataset.feedbackId = String(b.feedbackId || '');
+    card.dataset.origin = 'routine';
+
+    var head = el('div', 'sn-mac-head');
+    var num = String(b.num || '').replace(/^#+/, '');
+    var origin = el('span', 'sn-mac-origin', num ? 'automazione · feedback #' + num : 'automazione');
+    origin.title = 'Lavoro di un’automazione: l’ha fermato il suo controllo di sicurezza.';
+    head.appendChild(origin);
+    head.appendChild(el('span', 'sn-mac-branch', b.branch || '(ramo sconosciuto)'));
+    if (b.atMs) head.appendChild(el('span', 'sn-mac-when', timeAgo(b.atMs, now)));
+    card.appendChild(head);
+
+    if (String(b.titolo || '').trim()) card.appendChild(el('p', 'sn-mac-skip-title', b.titolo));
+    card.appendChild(el('p', 'sn-mac-why', 'Cosa ha trovato il controllo:'));
+    if (String(b.motivo || '').trim()) card.appendChild(el('p', 'sn-mac-skip-reason', b.motivo));
+    var nota = skipReasonNote(b);
+    if (nota) card.appendChild(el('p', 'sn-mac-status', nota));
+
+    var status = el('p', 'sn-mac-status');
+    status.setAttribute('role', 'status');
+    status.hidden = true;
+    var actions = el('div', 'sn-mac-actions');
+    var btn = el('button', 'sn-mac-btn sn-mac-btn-go', SALTA_ETICHETTA);
+    btn.type = 'button';
+    btn.title = 'Hai letto cosa ha trovato il controllo e vai avanti lo stesso. Il cancello di fusione resta: può fermare il ramo comunque.';
+
+    var armed = false;
+    var armTimer = null;
+    function disarm() {
+      armed = false;
+      btn.textContent = SALTA_ETICHETTA;
+      btn.classList.remove('is-armed');
+      btn.style.minWidth = '';
+      btn.style.minHeight = '';
+      if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      liberata(card);
+    }
+    function say(msg) {
+      status.hidden = !msg;
+      status.textContent = msg ? msg.text : '';
+      if (msg) status.dataset.kind = msg.kind; else delete status.dataset.kind;
+    }
+    function messaggio(reply) {
+      var r = reply || {};
+      if (r.ok === false) return { kind: 'err', text: String(r.error || 'Non è riuscito.') };
+      return skipOutcomeMessage(r, { doveSiApprova: o.doveSiApprova });
+    }
+    // Il salto ha cambiato la pratica (fusa, ferma al cancello, in riallineamento): la rilettura toglie la card.
+    function definitivo(reply) {
+      var e = reply && reply.ok !== false ? String(reply.esito || '') : '';
+      return e === 'fuso' || e === 'bloccato' || e === 'conflitto';
+    }
+
+    btn.addEventListener('click', function (e) {
+      // La coda di un doppio clic non è la conferma: salterebbe il controllo in un gesto solo.
+      if (armed && e && e.detail > 1) return;
+      if (!armed) {
+        armed = true;
+        var scatola = btn.getBoundingClientRect();
+        btn.style.minWidth = scatola.width + 'px';
+        btn.style.minHeight = scatola.height + 'px';
+        btn.textContent = 'Confermi?';
+        btn.classList.add('is-armed');
+        armTimer = setTimeout(disarm, 5000);
+        return;
+      }
+      disarm();
+      btn.disabled = true;
+      card.classList.add('is-busy');
+      say(ATTESA_SALTA);
+      Promise.resolve(o.onSkip ? o.onSkip(b) : null)
+        .then(function (reply) {
+          say(messaggio(reply));
+          if (definitivo(reply)) {
+            card.classList.add('is-done');
+            liberata(card);
+            if (o.onDone) o.onDone(b, reply, messaggio(reply));
+            return;
+          }
+          btn.disabled = false;
+          card.classList.remove('is-busy');
+          liberata(card);
+        })
+        .catch(function (err) {
+          say({ kind: 'err', text: (err && err.message) || String(err) });
+          btn.disabled = false;
+          card.classList.remove('is-busy');
+          liberata(card);
+        });
+    });
+
+    actions.appendChild(btn);
+    card.appendChild(actions);
+    card.appendChild(status);
+    var prima = o.esitoIniziale ? o.esitoIniziale(b) : null;
+    if (prima) say(prima);
+    return card;
+  }
+
+  /**
+   * Le bocciature del controllo dentro `host`; niente da mostrare = `host` vuoto e nascosto. Come `render`, non
+   * ridisegna sotto una conferma a metà. `o.illeggibili`: pratiche ferme che il server non ha potuto aprire.
+   * @returns {number} quante card sono state disegnate
+   */
+  function renderSkips(host, opts) {
+    if (!host) return 0;
+    var o = opts || {};
+    var list = Array.isArray(o.skips) ? o.skips : [];
+    var illeggibili = Number(o.illeggibili) || 0;
+    if (occupata(host)) {
+      quandoLibera(host, function () { renderSkips(host, o); });
+      return list.length;
+    }
+    host.__snMacDopo = null;
+    host.replaceChildren();
+    host.hidden = list.length === 0 && illeggibili === 0;
+    if (host.hidden) return 0;
+    var box = el('section', 'sn-mac sn-mac-skips');
+    box.setAttribute('aria-label', 'Lavori bocciati dal controllo di sicurezza');
+    var title = el('div', 'sn-mac-title');
+    var ico = el('span', 'sn-mac-ico');
+    var icons = global.SN_ICONS;
+    ico.innerHTML = (icons && typeof icons.warning === 'function') ? icons.warning(18) : '';
+    title.appendChild(ico);
+    title.appendChild(el('span', 'sn-mac-title-text', skipsHeadline(list.length) || 'Lavori bocciati dal controllo di sicurezza'));
+    box.appendChild(title);
+    if (list.length) box.appendChild(el('p', 'sn-mac-intro', 'Saltare il controllo non fonde da solo: il cancello di fusione gira comunque.'));
+    for (var i = 0; i < list.length; i++) box.appendChild(buildSkipCard(list[i], o));
+    if (illeggibili) {
+      box.appendChild(el('p', 'sn-mac-status', (illeggibili === 1 ? 'Una pratica ferma per il controllo non si apre' : illeggibili + ' pratiche ferme per il controllo non si aprono')
+        + ' qui: la chiave del server non le legge. Le vedi in Filo, nei Ricevuti di Gestione.'));
+    }
+    if (o.oltre) box.appendChild(el('p', 'sn-mac-status', 'Ce ne sono altre oltre queste: le vedi in Filo, nei Ricevuti di Gestione.'));
+    host.appendChild(box);
+    return list.length;
+  }
+
   /**
    * Le decisioni passate, in righe minute. Traccia dell'eccezione: un'apertura
    * di questo tipo che non lascia segno non è verificabile.
@@ -1076,6 +1282,10 @@
     blockLabel: blockLabel,
     blockItems: blockItems,
     outcomeMessage: outcomeMessage,
+    skipOutcomeMessage: skipOutcomeMessage,
+    skipsHeadline: skipsHeadline,
+    skipReasonNote: skipReasonNote,
+    renderSkips: renderSkips,
     render: render,
     occupata: occupata,
     quandoLibera: quandoLibera,

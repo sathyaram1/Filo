@@ -723,12 +723,16 @@ fila delle forme della scheda):
   secaudit`).
 
 Il salto di L4 è un'azione dell'owner (callable `ownerSkipSecaudit
-{ feedbackId }`, dal tasto «Salta il controllo» della dashboard): il server
+{ feedbackId }`, dal tasto «Salta il controllo» della dashboard o della pagina
+da browser, che con `{ op: 'list' }` ne legge le bocciature): il server
 verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
 conservando il testo del fail, segna nello stato del giro `secauditVerdict:
 saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
-richiesta aperta, `conflitto`, `ramo assente`). Un lavoro server non si fonde
+la richiesta e il suo stato, `conflitto`, `ramo assente`). Lo stato
+(`requestState`: `pending`, o `discarded`/`used` se quella versione era già
+decisa e la richiesta non si riapre) lo danno anche `ownerMerge` e il cancello
+(`approvalState`), e ogni strada lo racconta (#486). Un lavoro server non si fonde
 da lì (#1230): la pratica torna in revisione e passa dal cancello del server,
 prima l'app e poi il server (esiti in più: `attesa_server`, `server_al_pc`,
 `rimandato`, `all_owner`); allo stesso modo il sì a un suo blocco L5 la chiude

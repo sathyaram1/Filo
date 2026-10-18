@@ -1571,6 +1571,9 @@ module.exports = function register(on, ctx) {
     const esito = String(r.esito || r.result || '').trim();
     const out = { ok: true, esito: ESITI_SALTA.includes(esito) ? esito : esito };
     if (r.requestId) out.requestId = String(r.requestId);
+    // In attesa o già decisa (#486): la scheda non annuncia un via libera che non c'è.
+    if (r.requestState) out.requestState = String(r.requestState).slice(0, 20);
+    if (r.requestOutcome) out.requestOutcome = String(r.requestOutcome).slice(0, 40);
     if (r.sha) out.sha = String(r.sha);
     if (r.error) out.error = String(r.error);
     return out;

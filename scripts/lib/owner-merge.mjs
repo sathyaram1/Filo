@@ -49,8 +49,8 @@ export const OWNER_MERGE_APPROVALS_URL = `${BASE}/ownerMergeApprovals`;
 
 /**
  * In che stato è la richiesta `id` secondo l'elenco del deposito (`ownerMergeApprovals`, op list). PURA.
- * Il server dà il nome della richiesta anche quando il deposito ha rifiutato di riaprirla perché già decisa (#486):
- * una richiesta rinfrescata adesso è la più nuova, quindi se non sta fra quelle in attesa è stata decisa.
+ * Il ripiego per un server che non dice `requestState` (#486): una richiesta rinfrescata adesso è la più nuova,
+ * quindi se non sta fra quelle in attesa è stata decisa.
  * @returns {{ state: 'pending'|'discarded'|'used'|'decided'|'', outcome?: string, motivo?: string }} '' = elenco illeggibile
  */
 export function statoDellaRichiesta(id, elenco) {
@@ -97,7 +97,10 @@ export function classifyOwnerMerge(status, body) {
     // (deposito non raggiungibile, oppure server non ancora rideployato): sono
     // due situazioni diverse per chi legge, e vanno dette diverse.
     if (r.result === 'blocked') {
-      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || ''), ...campiLocali(r) };
+      // Il server dice da sé se la richiesta aspetta o era già decisa (#486); uno vecchio no, e allora si rilegge l'elenco.
+      const stato = ['pending', 'discarded', 'used'].includes(r.requestState) ? { requestState: r.requestState } : {};
+      if (stato.requestState === 'used' && r.requestOutcome) stato.requestOutcome = String(r.requestOutcome).slice(0, 40);
+      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || ''), ...stato, ...campiLocali(r) };
     }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
@@ -350,7 +353,7 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
     const reply = classifyOwnerMerge(res.status, body);
-    if (reply.outcome !== 'blocked' || !reply.requestId) return reply;
+    if (reply.outcome !== 'blocked' || !reply.requestId || reply.requestState) return reply;
     const stato = await statoDalDeposito({ id: reply.requestId, idToken, fetchImpl, listUrl });
     return Object.assign(reply, { requestState: stato.state },
       stato.outcome ? { requestOutcome: stato.outcome } : {}, stato.motivo ? { requestCheck: stato.motivo } : {});

@@ -273,6 +273,31 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-card-failed .sn-mac-why { color: var(--sn-fg); }
 
 
+/* Bocciature del controllo di sicurezza (pagina da browser): la spiegazione del controllo è il "Bloccata perché"
+   di questa card, e si legge intera; oltre qualche riga scorre nella sua scatola invece di allungare la pagina. */
+.sn-mac-skip-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--sn-fg);
+  overflow-wrap: anywhere;
+}
+.sn-mac-skip-reason {
+  margin: 0;
+  max-height: 16em;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--sn-radius, 6px);
+  background: color-mix(in srgb, var(--sn-fg) 4%, transparent);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--sn-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+
 /* Il controllo a posteriori: l'elenco di ciò che era stato segnalato si legge per intero, una voce per
    riga. Stessa grammatica della scheda ma senza tasti: non c'è più niente da decidere. */
 .sn-mac-preapproved-intro {

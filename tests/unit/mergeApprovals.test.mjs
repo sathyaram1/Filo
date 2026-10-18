@@ -450,3 +450,49 @@ describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
     assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
   });
 });
+
+// «Salta il controllo»: le frasi sono le stesse nella scheda di Filo e nella pagina da browser (#489), e sul blocco
+// del cancello dicono lo stato vero della richiesta (#486).
+describe('esito di «Salta il controllo»', () => {
+  test('in attesa: il via libera, dove sta sulla superficie che chiama', () => {
+    const r = { ok: true, esito: 'bloccato', requestId: 'r1', requestState: 'pending' };
+    assert.deepEqual(UI.skipOutcomeMessage(r), { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera sul quadrato.' });
+    assert.match(UI.skipOutcomeMessage(r, { doveSiApprova: 'qui, fra le fusioni da approvare' }).text, /via libera qui, fra le fusioni da approvare\.$/);
+    // Un server che non dice lo stato: come prima, in attesa.
+    assert.match(UI.skipOutcomeMessage({ esito: 'bloccato', requestId: 'r1' }).text, /aspetta il tuo via libera/);
+  });
+
+  test('già decisa o non registrata: niente via libera promesso', () => {
+    const casi = [
+      [{ requestId: 'r1', requestState: 'discarded' }, 'warn', /già stata scartata: una richiesta decisa non si riapre, non c’è niente da approvare/],
+      [{ requestId: 'r1', requestState: 'used', requestOutcome: 'conflict' }, 'warn', /già stata approvata, ma la fusione era finita in conflitto: un’approvazione vale una volta sola/],
+      [{ requestId: 'r1', requestState: 'used', requestOutcome: 'merged' }, 'warn', /già stata approvata e fusa su main/],
+      [{ requestId: '' }, 'err', /non si è registrata/],
+    ];
+    for (const [r, kind, re] of casi) {
+      const m = UI.skipOutcomeMessage({ ok: true, esito: 'bloccato', ...r });
+      assert.equal(m.kind, kind);
+      assert.match(m.text, re);
+      assert.doesNotMatch(m.text, /via libera/);
+    }
+  });
+
+  test('gli altri esiti: una frase ciascuno, e uno sconosciuto si scrive grezzo, mai come un fatto', () => {
+    assert.equal(UI.skipOutcomeMessage({ esito: 'fuso' }).kind, 'ok');
+    for (const e of ['conflitto', 'ramo_assente', 'feedback_assente', 'non_saltabile', 'non_owner', 'guasto']) {
+      assert.equal(UI.skipOutcomeMessage({ esito: e }).kind, 'err', e);
+    }
+    assert.deepEqual(UI.skipOutcomeMessage({ esito: 'boh' }), { kind: 'err', text: 'Il server ha risposto: boh.' });
+    assert.deepEqual(UI.skipOutcomeMessage(null), { kind: 'err', text: 'Il server ha risposto: niente.' });
+  });
+
+  test('elenco delle bocciature: titolo, e cosa si dice quando la spiegazione non c’è per intero', () => {
+    assert.equal(UI.skipsHeadline(0), '');
+    assert.equal(UI.skipsHeadline(1), 'Un lavoro bocciato dal controllo di sicurezza');
+    assert.equal(UI.skipsHeadline(3), '3 lavori bocciati dal controllo di sicurezza');
+    assert.equal(UI.skipReasonNote({ motivo: 'tutto qui' }), '');
+    assert.match(UI.skipReasonNote({ motivo: 'x', motivoTagliato: true }), /continua/);
+    assert.match(UI.skipReasonNote({ motivo: '', motivoIlleggibile: true }), /non si apre/);
+    assert.match(UI.skipReasonNote({ motivo: '   ' }), /non ha lasciato una spiegazione/);
+  });
+});

@@ -364,6 +364,25 @@ export function testoUnitRossi() {
     + 'segue. Da qui non c\'è altro da fare.';
 }
 
+/**
+ * Le righe di un blocco: il perché, e se la richiesta aspetta l'owner o era già decisa (#486). PURA.
+ * Uno stato vuoto con la richiesta è un server che non lo dice: vale l'attesa, come prima.
+ */
+export function righeDelBlocco(reply) {
+  const r = reply || {};
+  const righe = [`[merge-gate] BLOCKED: ${r.reason || 'cancello di sicurezza'}`];
+  const gia = 'NESSUNA richiesta in attesa: l’owner aveva già';
+  const riproponi = ' Per riproporla serve una versione nuova del ramo. Scrivilo nella spiegazione: in Gestione non c’è niente da approvare.';
+  if (!r.approval) righe.push('[merge-gate] la richiesta di approvazione NON si è aperta: scrivilo nella spiegazione, in Gestione non c’è niente da approvare');
+  else if (r.approvalState === 'discarded') righe.push(`[merge-gate] ${gia} scartato questa versione, e una richiesta decisa non si riapre.${riproponi}`);
+  else if (r.approvalState === 'used' && r.approvalOutcome === 'merged') righe.push(`[merge-gate] ${gia} approvato questa versione, ed è già su main. Scrivilo nella spiegazione.`);
+  else if (r.approvalState === 'used') {
+    const come = r.approvalOutcome === 'conflict' ? ', ma la fusione era finita in conflitto' : '';
+    righe.push(`[merge-gate] ${gia} approvato questa versione${come}: un’approvazione vale una volta sola.${riproponi}`);
+  } else righe.push('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
+  return righe;
+}
+
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 const USO = [
@@ -503,13 +522,8 @@ async function main() {
   }
   const code = exitCodeFor(reply);
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
-  else if (code === 10) {
-    console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
-    // Il blocco non è più un vicolo cieco: il server apre una richiesta che
-    // l'owner trova sulla scheda della pratica in Gestione. Dirlo qui evita che
-    // chi legge il registro creda che il ramo sia perduto.
-    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
-  }
+  // Dove sta la richiesta per l'owner, o perché non c'è: chi scrive la spiegazione la legge da qui.
+  else if (code === 10) for (const riga of righeDelBlocco(reply)) console.error(riga);
   else if (code === 20 && reply.result === 'unit_rossi') console.error(testoUnitRossi());
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
   else if (code === 30) console.error(`[merge-gate] SERVER: ${testoEsitoServer(reply.esito)}`);

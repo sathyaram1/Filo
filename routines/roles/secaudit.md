@@ -138,7 +138,9 @@ server un verdetto raccontato non lo legge).
      pentagono verde, il quadrato rosso). Il ramo NON è perduto: il server apre una richiesta in attesa che l'owner
      trova nel quadrato rosso della pratica, in cima ai Ricevuti di Gestione, e da lì può dare il via libera
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
-     legge per decidere: scrivila per lui, non per il registro.
+     legge per decidere: scrivila per lui, non per il registro. Se il gate
+     scrive «NESSUNA richiesta in attesa» (versione già scartata o approvata,
+     o richiesta non aperta), nella spiegazione va quella frase, non il via libera.
    - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
      solo; oppure gli unit, che il gate fa girare sul risultato della fusione
      con main prima di chiederla, lì sono rossi e su main da solo no.
