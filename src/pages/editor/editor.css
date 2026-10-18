@@ -376,7 +376,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
    riga; oltre scorre. Tasti messi sotto contati: in una chat bassa vincono microfono e invio interi (owner, #256.4). */
 .ed-chat-input textarea {
   flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px;
-  max-height: max(34px, min(84px, calc(100cqh - 30px - var(--ed-chat-tasti, 0px))), calc(100cqh - 72px - var(--ed-chat-tasti, 0px)));
+  max-height: max(34px, min(84px, calc(100cqh - 28px - var(--ed-chat-tasti, 0px))), calc(100cqh - 72px - var(--ed-chat-tasti, 0px)));
   overflow-y: auto; scrollbar-width: thin; padding: 7px 8px; line-height: 1.4;
   border: 1px solid var(--sn-border); border-radius: 8px;
   background: var(--sn-bg); color: var(--sn-fg); font-size: 12px;

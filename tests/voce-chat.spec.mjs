@@ -499,28 +499,41 @@ test('editor: con la finestra piccola la casella della chat prende tutta la riga
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-stretta.png` });
 });
 
-// In una chat bassa la casella si ferma prima di spingere fuori i tasti messi sotto (#256.4).
-for (const [w, h] of [[900, 520], [800, 500]]) {
+// In una chat bassa la casella scorre (decisione dell'owner, #256.4) ma non spinge fuori i tasti messi sotto, e
+// sopra resta in vista la fine dell'ultima risposta di Filo; a 1024x640 la richiesta di una frase e mezza ci sta intera.
+for (const [w, h, intera] of [[1024, 640, true], [960, 600, false], [900, 520, false], [800, 500, false]]) {
   test(`editor: a ${w}x${h} microfono e invio restano dentro la chat anche con una richiesta lunga`, async ({ app, shell, openTab }) => {
     test.setTimeout(60_000);
     await app.evaluate(({ BrowserWindow }, [w, h]) => { BrowserWindow.getAllWindows()[0].setSize(w, h); }, [w, h]);
     await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await prepara(app);
+    await rispostaFinta(app, 'Ultima risposta del documento, abbastanza lunga da andare a capo.');
     const ed = await openTab('filo://editor/editor.html');
     await ed.waitForSelector('.ed-module[data-type="switch"]');
     await ed.locator('.ed-switch-icon').nth(1).click();
     const chat = ed.locator('.ed-module[data-type="chat"]');
     await expect(chat.locator('.sn-voce-btn')).toBeVisible();
     const casella = chat.locator('[data-chat="input"]');
+    await casella.fill('domanda');
+    await casella.press('Enter');
+    await expect(chat.locator('.ed-chat-msg.assistant')).toHaveCount(1, { timeout: 8_000 });
     const dentro = () => ed.evaluate(() => {
       const mod = document.querySelector('.ed-module[data-type="chat"]');
       const fondo = mod.getBoundingClientRect().bottom + 0.5;
       const sta = (s) => mod.querySelector(s).getBoundingClientRect().bottom <= fondo;
-      return { casella: sta('[data-chat="input"]'), invio: sta('[data-chat="send"]'), microfono: sta('.sn-voce-btn') };
+      const l = mod.querySelector('[data-chat="log"]').getBoundingClientRect();
+      const r = mod.querySelector('.ed-chat-msg.assistant').getBoundingClientRect();
+      return {
+        casella: sta('[data-chat="input"]'), invio: sta('[data-chat="send"]'), microfono: sta('.sn-voce-btn'),
+        rispostaInVista: l.height >= 18 && r.bottom <= l.bottom + 1 && r.bottom - 14 >= l.top,
+      };
     });
-    for (const testo of ['riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera', 'una richiesta lunga '.repeat(30)]) {
-      await casella.fill(testo);
-      expect(await dentro()).toEqual({ casella: true, invio: true, microfono: true });
-    }
+    const tutti = { casella: true, invio: true, microfono: true, rispostaInVista: true };
+    await casella.fill('riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera');
+    expect(await dentro()).toEqual(tutti);
+    if (intera) expect(await casella.evaluate((t) => t.scrollHeight <= t.clientHeight)).toBe(true);
+    await casella.fill('una richiesta lunga '.repeat(30));
+    expect(await dentro()).toEqual(tutti);
     await chat.locator('[data-chat="send"]').click({ trial: true });
     mkdirSync(SHOTS, { recursive: true });
     await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-bassa-${w}.png` });
