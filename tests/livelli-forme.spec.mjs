@@ -975,6 +975,7 @@ test('una pratica fermata prima dei giudici si ri-giudica dal triangolo, e il pa
   await expect(page.locator('#mgSideBody .mg-liv-esito')).toContainText('Giudicata');
   const chiamate = await page.evaluate(() => window.__chiamate.filter((m) => m.type === 'feedback_reevaluate'));
   expect(chiamate).toEqual([{ type: 'feedback_reevaluate', feedbackIds: [fermata._id] }]);
+  await page.screenshot({ path: 'tests/.shots/livelli-rigiudica.png' }).catch(() => {});
 });
 
 test('ri-giudica: se il server non riesce ancora a leggerla lo dice, senza contarla come fatta', async ({ openTab }) => {
