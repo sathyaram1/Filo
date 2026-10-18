@@ -55,6 +55,9 @@ const CASI = [
   ["$x = @'\nriga\n'@\nWrite-Output $x", 0, 'riga'],
   ["if ($true) {\n  Write-Output dentro\n}\nelse { Write-Output fuori }", 0, 'dentro'],
   ["Write-Output 'città — ok'", 0, 'città — ok'],
+  ["trap { Write-Output preso; continue }\nGet-Content nessuno -ErrorAction Stop\nWrite-Output dopo", 0, 'preso\ndopo'],
+  ['class C718 { [int] F() { return 2 } }\n[C718]::new().F()', 0, '2'],
+  [`using namespace System.Text\n${esce(3)}; [StringBuilder]::new('u').ToString()`, 3, 'u'],
   ['Write-Output prima; throw "fermo"', 'fallito', null],
   ['Write-Output (1 +', 'fallito', null],
 ];
