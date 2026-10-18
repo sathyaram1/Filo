@@ -200,6 +200,67 @@
     return null;
   }
 
+  // Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto (#842), come le cambiano le Preferenze: lettura e
+  // controlli stanno in SN_TASTI. «Traduci: Ctrl+Maiusc+Y», «Aiuto: di serie», «tutte di serie».
+  const NOMI_AZIONE_FILO = {
+    'explain-selection': ['spiega', 'spiegazione', 'spiegare', 'approfondisci', 'approfondimento'],
+    'translate-selection': ['traduci', 'traduzione', 'tradurre'],
+    'save-for-later': ['salva per dopo', 'salvare per dopo', 'salva'],
+    'open-help-sidebar': ['aiuto', 'assistente laterale', 'barra dell aiuto'],
+  };
+  const DI_SERIE = /^(?:(?:tutte|tutti|le scorciatoie|scorciatoie)\s+)?(?:di serie|come di serie|predefinit[aeio]|default|originali?|standard|come prima|ripristina(?:te)?|azzera(?:te)?|reset)$/;
+  function azioneFiloDetta(testo) {
+    const t = pianoChiave(testo).replace(/[«»"']/g, ' ').replace(/\s+/g, ' ').trim();
+    const trovate = Object.keys(NOMI_AZIONE_FILO).filter((id) => NOMI_AZIONE_FILO[id].some((n) => (` ${t} `).includes(` ${n} `)));
+    return trovate.length === 1 ? trovate[0] : null;
+  }
+  function tastiDiFilo() {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    return global.SN_TASTI;
+  }
+  function scorciatoiaFiloDetta(v) {
+    const T = tastiDiFilo();
+    const testo = String(v == null ? '' : v).trim();
+    if (!T || !testo || testo.length > 200) return null;
+    const nomeDi = (id) => T.AZIONI_FILO.find((a) => a.id === id).nome;
+    if (DI_SERIE.test(pianoChiave(testo)) || VOCE_AUTOMATICA.test(pianoChiave(testo))) {
+      // Quella il cui tasto di serie è ormai di un modulo dell'Editor resta com'è, e si dice perché.
+      const serie = Object.fromEntries(T.AZIONI_FILO.map((a) => [a.id, a.serie]));
+      const no = T.AZIONI_FILO.map((a) => [a, T.rifiutoScorciatoiaFilo(a.id, a.serie, undefined, serie)]).filter(([, r]) => r);
+      const buone = T.AZIONI_FILO.filter((a) => !no.some(([x]) => x === a));
+      if (!buone.length) return { rifiuto: no.map(([a, r]) => `«${a.nome}»: ${T.testoRifiutoFilo(r)}`).join(' ') };
+      const tranne = no.length ? ` (tranne ${no.map(([a, r]) => `«${a.nome}»: ${T.testoRifiutoFilo(r)}`).join(' ')})` : '';
+      return {
+        partial: { scorciatoie: Object.fromEntries(buone.map((a) => [a.id, ''])) },
+        label: `Scorciatoie di ${buone.map((a) => a.nome).join(', ').replace(/, ([^,]*)$/, ' e $1')} → di serie${tranne}`,
+      };
+    }
+    const sep = testo.search(/[:=→]/);
+    if (sep <= 0) return null;
+    const id = azioneFiloDetta(testo.slice(0, sep));
+    if (!id) {
+      return {
+        rifiuto: 'non capisco di quale azione cambiare la scorciatoia',
+        perModello: `Le azioni sono ${T.AZIONI_FILO.map((a) => `«${a.nome}»`).join(', ')}: scrivi "<azione>: <combinazione>".`,
+      };
+    }
+    const combo = testo.slice(sep + 1).replace(/^>/, '').trim();
+    if (DI_SERIE.test(pianoChiave(combo)) || VOCE_AUTOMATICA.test(pianoChiave(combo))) {
+      const serie = T.AZIONI_FILO.find((a) => a.id === id).serie;
+      const presa = T.rifiutoScorciatoiaFilo(id, serie);
+      if (presa) return { rifiuto: T.testoRifiutoFilo(presa) };
+      return { partial: { scorciatoie: { [id]: '' } }, label: `Scorciatoia di «${nomeDi(id)}» → ${T.etichettaFilo(serie)}, quella di serie` };
+    }
+    const d = T.scorciatoiaDaScritta(combo);
+    if (!d) return null;
+    const no = d.rifiuto || T.rifiutoScorciatoiaFilo(id, d.accel);
+    if (no) return { rifiuto: T.testoRifiutoFilo(no) };
+    return {
+      partial: { scorciatoie: { [id]: T.valoreDaSalvare(id, d.accel) } },
+      label: `Scorciatoia di «${nomeDi(id)}» → ${T.etichettaFilo(d.accel)}`,
+    };
+  }
+
   // «predefinito», «di serie», «come prima»: torna al valore dei Modelli predefiniti.
   function predefinito(v) {
     if (v === null) return true;
@@ -233,14 +294,10 @@
   function nomiSito() {
     return global.SN_NOMI_SITO || (typeof require === 'function' ? require('./nomiSito.js') : null);
   }
+  // La riduzione delle pagine (Sicurezza, Altro): «https://www.Sito.it/x» → «sito.it» (#843).
   function dominioDa(raw) {
-    let s = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
-    if (!s) return '';
-    // Come la pagina Sicurezza: URL scrive un nome accentato (münchen.de) nella forma ASCII con cui il sito si confronta.
-    try { s = new URL(s.includes('://') ? s : `http://${s}`).hostname; } catch (_) { if (s.includes('://')) return ''; }
-    s = s.split('/')[0].split('?')[0].split(':')[0].replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
     const N = nomiSito();
-    return N && N.valido(s) ? s : '';
+    return N ? N.daScritto(raw) : '';
   }
   function opElenco(v) {
     const s = String(v == null ? '' : v).trim();
@@ -295,6 +352,40 @@
       },
     };
   }
+  // #843 — spegnere Filo su un sito si disfa con una parola e non spegne protezioni (lì tacciono menu, correttore e
+  // azioni sulla pagina): costo 1 nei due versi. Un sito alla volta: a costo 1 l'elenco intero non si riscrive.
+  function sitiFiloSpento() {
+    const base = elenco({
+      keys: ['siti_filo_spento', 'domini_esclusi', 'siti dove filo è spento', 'spegni filo sul sito', 'riaccendi filo sul sito',
+        'filo spento sul sito', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
+      percorso: 'blocklist',
+      nome: 'Siti dove Filo è spento',
+      aiuto: 'siti dove Filo non mette il suo menu del tasto destro, il correttore e le sue azioni sulla pagina; «aggiungi» spegne '
+        + 'Filo su quel sito e sui suoi sottodomini, «togli» lo riaccende. Per il sito aperto: «questo sito» (la scheda web davanti)',
+      risk: 'Cambia i siti dove Filo si spegne: lì il tasto destro apre il menu del sito, e non ci sono il correttore né le '
+        + 'azioni di Filo sulla pagina.',
+    });
+    return {
+      ...base,
+      aiuto: base.aiuto.replace(' | "solo <siti>" | "svuota"', ''),
+      costo: 1,
+      build(v) {
+        const o = opElenco(v);
+        if (!o || o.rifiuto) return o;
+        if (o.op === 'sostituisci') {
+          return {
+            rifiuto: 'l\'elenco dei siti dove Filo è spento si cambia un sito alla volta',
+            perModello: 'Usa «aggiungi <sito>» per spegnere Filo su un sito e «togli <sito>» per riaccenderlo (più siti separati da '
+              + 'virgole): l\'elenco intero non si riscrive. Per svuotarlo togli i siti che contiene.',
+          };
+        }
+        const lista = o.voci.map(sitoLeggibile).join(', ');
+        const label = o.op === 'aggiungi' ? `Filo spento su ${lista}` : `Filo riacceso su ${lista}`;
+        return { partial: nidifica('blocklist', o.voci), label, elenco: { percorso: 'blocklist', op: o.op, voci: o.voci, nome: 'Siti dove Filo è spento' } };
+      },
+    };
+  }
+
   // Si salva la forma «xn--» con cui il sito si confronta; a una persona si mostra münchen.de, come fa la pagina.
   function sitoLeggibile(x) {
     const N = nomiSito();
@@ -667,6 +758,25 @@
       },
     },
     {
+      scrive: ['schermo.guarda'],
+      aiuto: 'true | false (Filo guarda una finestra o lo schermo quando glielo chiedi in chat)',
+      keys: ['guarda_schermo', 'filo può guardare lo schermo', 'filo puo guardare lo schermo', 'guardare lo schermo',
+        'guarda lo schermo', 'vedi schermo', 'vedi_schermo', 'guarda le finestre'],
+      costo: 2,
+      // Accenderla vuole sempre un OK, a ogni livello di autonomia: un clic, non la parola (#778). Non abbassa una
+      // difesa: anche accesa, la prima occhiata a ogni finestra di un'altra app chiede.
+      chiede: (r) => r.partial.schermo.guarda === true,
+      risk: 'Da accesa, quando glielo chiedi in chat Filo cattura l\'immagine di una finestra o dello schermo e la fa leggere '
+        + 'a un modello che vede le immagini, insieme alla tua domanda. Quello che si vede in quella finestra arriva quindi al modello. '
+        + 'La prima volta che guarda una finestra di un\'altra app, a ogni tua richiesta, ti chiede l\'OK dicendoti quale. '
+        + 'Filo guarda soltanto: non clicca, non scrive e non salva l\'immagine. Da spenta, non guarda niente fuori dalla chat.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { schermo: { guarda: b } }, label: `Guardare lo schermo → ${b ? 'acceso' : 'spento'}` };
+      },
+    },
+    {
       scrive: ['nomiSensati.scaricamenti'],
       aiuto: 'true | false (nome sensato da solo ai file scaricati col nome che non dice niente)',
       keys: ['nomi_sensati_scaricamenti', 'nome sensato agli scaricamenti', 'nomi sensati', 'rinomina scaricamenti',
@@ -862,13 +972,13 @@
     },
     {
       scrive: ['featureFlags.help'],
-      aiuto: 'true | false (barra laterale dell\'Aiuto)',
+      aiuto: 'true | false (l\'Aiuto nelle pagine: la sua voce nel tasto destro e la sua scorciatoia)',
       costo: 1,
-      keys: ['sidebar_aiuto', 'sidebar aiuto', 'pannello aiuto', 'aiuto', 'help', 'assistente aiuto'],
+      keys: ['sidebar_aiuto', 'sidebar aiuto', 'pannello aiuto', 'aiuto', 'help', 'assistente aiuto', 'aiuto nelle pagine', 'assistente di pagina', 'assistente della pagina'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { featureFlags: { help: b } }, label: `Sidebar Aiuto → ${b ? 'attiva' : 'disattivata'}` };
+        return { partial: { featureFlags: { help: b } }, label: `Aiuto nelle pagine → ${b ? 'acceso' : 'spento'}` };
       },
     },
     {
@@ -1053,6 +1163,18 @@
       },
     },
     {
+      scrive: ['scorciatoie.explain-selection', 'scorciatoie.translate-selection', 'scorciatoie.save-for-later', 'scorciatoie.open-help-sidebar'],
+      aiuto: () => {
+        const T = tastiDiFilo();
+        const esempio = T ? T.etichettaFilo('Ctrl+Shift+Y') : '';
+        return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. "Traduci: ${esempio}"); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
+      },
+      keys: ['scorciatoia', 'scorciatoie', 'scorciatoia da tastiera', 'scorciatoie da tastiera', 'tasto di scelta rapida',
+        'scorciatoia di spiega', 'scorciatoia di traduci', 'scorciatoia di salva per dopo', 'scorciatoia di aiuto'],
+      costo: 1,
+      build: scorciatoiaFiloDetta,
+    },
+    {
       scrive: ['openWeightsOnly'],
       aiuto: 'true | false (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)',
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
@@ -1069,6 +1191,25 @@
         return {
           partial: { openWeightsOnly: b },
           label: `Solo modelli a pesi aperti → ${b ? 'attivo' : 'disattivato'}`,
+        };
+      },
+    },
+    {
+      // Vale solo con una chiave OpenRouter propria: senza, il main lo rifiuta prima della conferma (SENZA_CHIAVE_PROPRIA).
+      scrive: ['ownKeyAllProviders'],
+      aiuto: 'true | false (con una chiave OpenRouter propria, le richieste pagate con lei possono andare anche ai fornitori che Filo esclude; coi crediti di Filo l\'esclusione vale sempre)',
+      keys: ['fornitori_esclusi', 'fornitori esclusi', 'usa anche i fornitori esclusi', 'con la mia chiave usa anche i fornitori esclusi',
+        'fornitori esclusi con la mia chiave', 'lista di esclusione', 'lista dei fornitori esclusi', 'esclusione dei fornitori'],
+      costo: 2,
+      allenta: (r) => r.partial.ownKeyAllProviders === true,
+      risk: 'Le richieste pagate con la tua chiave OpenRouter potranno andare anche ai fornitori che Filo esclude '
+        + '(come Google, OpenAI o xAI), che riceveranno i testi che mandi. Coi crediti di Filo restano esclusi.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { ownKeyAllProviders: b },
+          label: `Fornitori esclusi con la tua chiave → ${b ? 'usati' : 'esclusi'}`,
         };
       },
     },
@@ -1429,14 +1570,7 @@
         + 'ricordare di te fra una visita e l’altra, toglierlo fa durare i suoi cookie solo per la visita.',
     }),
     elencoCartelle(),
-    elenco({
-      keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
-      percorso: 'blocklist',
-      nome: 'Domini dove Filo non interviene',
-      aiuto: 'siti dove Filo non aggiunge niente alle pagine',
-      risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì non aggiunge niente alla pagina, '
-        + 'né i suoi menu né i suoi aiuti.',
-    }),
+    sitiFiloSpento(),
     // #975 — non abbassa niente: cambia quale menu arriva per primo, e l'altro resta a Shift. Costo 1, come un tema.
     {
       ...elenco({
@@ -1749,10 +1883,13 @@
     if (!b) return null;
     let allenta = false;
     try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(b, attuali) : false; } catch (_) { allenta = true; }
+    let chiede = false;
+    try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     return {
       ...b,
       costo: setter.costo,
       allenta,
+      ...(chiede ? { chiede: true } : {}),
       elencoFisso: setter.elencoFisso || '',
       dove: setter.dove || '',
       risk: setter.risk || '',
@@ -1802,8 +1939,13 @@
     return (r && r.setter) || null;
   }
 
+  // Il rifiuto dell'interruttore dei fornitori esclusi chiesto senza una chiave propria (#962): lo legge l'utente.
+  const SENZA_CHIAVE_PROPRIA = 'serve una tua chiave OpenRouter, da mettere nella pagina Crediti. Senza, le richieste '
+    + 'le pagano i crediti di Filo, e lì i fornitori esclusi restano esclusi';
+
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
     applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
+    SENZA_CHIAVE_PROPRIA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

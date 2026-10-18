@@ -148,7 +148,7 @@ class BarraLaterale {
     this._nascondiSuggerimento();
     this._invia();
     this._ferma('stringi');
-    this.timer.stringi = setTimeout(() => { this.timer.stringi = null; if (!this.aperta) this.posa(); }, CHIUSURA_MS);
+    this.timer.stringi = setTimeout(() => { this.timer.stringi = null; if (!this.aperta) this.posa(); }, require('./movimento').ms(CHIUSURA_MS));
     if (avevaFuoco) this._restituisciTastiera();
     // Chiusa col puntatore fermo sul bordo (scorciatoia, Esc): si riapre solo se il puntatore si muove.
     this.puntoFermo = this._punto();
@@ -474,7 +474,8 @@ class BarraLaterale {
       if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
       const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
         || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && !nav.pagina);
-      out.push({ id, icona, etichetta, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
+      const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
+      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
     }
     return out;
   }

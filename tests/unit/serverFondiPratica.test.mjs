@@ -233,7 +233,8 @@ test('la parte dell’app già fusa una volta ma con un ramo legato ancora fuori
   }
 });
 
-test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il server la usa, non la riapre, la annota', async () => {
+// Con un ramo dell'app ancora in arrivo la pratica si riapre invece (#938): tests/unit/praticaRiaperta.test.mjs.
+test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro, e nessun suo ramo in arrivo: il server la usa, non la riapre, la annota', async () => {
   const d = doc('p', { status: 'done', parti: { app: ORA - 3 * ORE, ramo: 'claude/x' } });
   const prova = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p', '--dry-run'] });
   assert.equal(prova.k, 0, prova.testo);
@@ -241,7 +242,7 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il se
   assert.match(prova.testo, /non si riapre e, a fusione riuscita, resterebbe chiusa/);
   assert.doesNotMatch(prova.testo, /andrebbe in lavorazione/);
 
-  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
   assert.equal(r.scritture.length, 2, 'nessuna presa in carico: la parte e la nota');

@@ -79,7 +79,7 @@
   function apriCampoChiave() {
     const sez = $('ownKeySection');
     if (sez.hidden || $('ownKeyForm').hidden) return;
-    sez.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    sez.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
     $('ownKeyInput').focus();
   }
 

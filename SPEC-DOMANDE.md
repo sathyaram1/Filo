@@ -1,8 +1,8 @@
 # Domande all'owner, fiducia e lavoro che si organizza da solo
 
-Specifica decisa con l'owner l'08–09/10/2026. È il riferimento per i feedback che
-la realizzano: chi ne lavora uno legge la sezione che gli tocca, non tutto il
-file.
+Specifica decisa con l'owner l'08–09/10/2026; compiti e urgenze (§ 6) il 12/10.
+È il riferimento per i feedback che la realizzano: chi ne lavora uno legge la
+sezione che gli tocca, non tutto il file.
 
 ## 0. Perché
 
@@ -51,7 +51,7 @@ Feedback, domande, compiti e biglietti hanno un campo `fiducia`: `fidato` o
 - **un'approvazione dell'owner**: un feedback che l'owner segna come fidato
   dopo aver letto il testo originale (in Ricevuti, § 2.2);
 - **un biglietto pulito** (§ 1.2);
-- **il server**: allarmi, compiti ricorrenti nati da un modello dell'owner.
+- **il server**: allarmi, istanze dei compiti ricorrenti scritti dall'owner.
 
 Tutto il resto è **non fidato**: i feedback degli utenti, quelli che Filo apre
 per conto di un utente, e ogni cosa scritta da un biglietto sporco.
@@ -147,15 +147,20 @@ lo può scrivere anche un agente pulito.
   il worker si ferma e il feedback va in Ricevuti come «chiede di diventare
   fidato».
 - **Giudici alla nascita (L2):** restano per i soli non fidati.
-- **Spareggio della coda:** a pari priorità prima i fidati, poi la
-  generazione, poi l'età. Sostituisce `senderClass` in `selectTodoWinner`
-  (filo-security `functions/src/routine/select.js`). La regola «prima si
-  finisce un ramo in revisione» (`REVIEW_RANK`) resta.
+- **Ordine della coda:** fiducia e figli sono gradini dell'urgenza dentro la
+  casella di priorità e fase (§ 6.3): prima i fidati, poi i principali prima
+  dei figli, poi l'età. Finché i compiti (§ 13, punto 5) non ci sono, lo
+  stesso ordine fa da spareggio provvisorio a pari priorità, al posto di
+  `senderClass` in `selectTodoWinner` (filo-security
+  `functions/src/routine/select.js`); fino ad allora non si tocca nemmeno la
+  precedenza assoluta dei rami in revisione (`REVIEW_RANK`). Con i compiti
+  spariscono tutti e due: un feedback iniziato passa davanti a uno nuovo solo
+  con un gradino di priorità in più, e la priorità 3 passa sopra tutto.
 
 ### 1.7 Dati
 
-- `fiducia` su feedback, domande e biglietti. La scrive solo l'Admin SDK; le
-  regole la vietano ai client.
+- `fiducia` su feedback, domande, compiti e biglietti. La scrive solo l'Admin
+  SDK; le regole la vietano ai client.
 - `genitori: [id…]` sul feedback derivato.
 - `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
@@ -174,7 +179,7 @@ una **barra di sezioni**, ciascuna con le sue schede:
 |---|---|---|
 | **Domande** | Da rispondere · In lavorazione · Risposte automatiche · Archivio | adesso |
 | **Feedback** | Ricevuti · In coda · Lavori server · Risolti · Archiviati · Statistiche · Red Team | adesso (spostate) |
-| **Routine** | Automazioni · Crediti · Monitoraggio · Log · Compiti ricorrenti | adesso (spostate più le nuove) |
+| **Routine** | Automazioni · Crediti · Monitoraggio · Log · Compiti · Compiti ricorrenti | adesso (spostate più le nuove) |
 | **Impostazioni predefinite** | Modelli di supporto, poi tutte le impostazioni predefinite di Filo | ora solo lo spostamento |
 | **Statistiche d'uso** | — | lavoro a parte |
 
@@ -291,8 +296,8 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
 
 ### 3.5 Il compito «Gestisci la risposta»
 
-- Un feedback a priorità 3, tipo `risposta`. L'orchestratore lo prende appena
-  può.
+- Un compito senza feedback (§ 6), urgenza 47: passa davanti a tutto tranne i
+  feedback a priorità 3.
 - Lo lavora **Opus col repo**: una decisione capita male costa più di qualunque
   risparmio sul modello.
 - Il biglietto nasce con la fiducia della domanda (§ 1.2).
@@ -334,6 +339,7 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
 | `design` + `locale` | domanda «lavoro server?» se il feedback è fidato; Ricevuti («rendere fidato») se non lo è |
+| `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241) |
 | `attesa_chiusa`, `loop`, `arenato` | domanda, azioni `riprendi` / `archivia` |
 | `design` + `secaudit`, `l5`; attacchi, spam, sospetti | Ricevuti |
 
@@ -346,22 +352,24 @@ porta alla domanda, e non in Ricevuti.
 
 ### 4.1 Compiti ricorrenti
 
-Un compito ricorrente è un **modello** scritto dall'owner (quindi fidato): un
-testo di istruzioni, una cadenza e un ambito. All'ora giusta il server ne crea
-un'istanza: un feedback fidato, priorità 3, tipo `compito`, con `nonPrimaDi`.
-L'orchestratore lo prende come ogni altro lavoro.
+Un compito ricorrente lo scrive l'owner (quindi è fidato): un testo di
+istruzioni, una cadenza, un ambito, un'urgenza, un modello e uno sforzo.
+All'ora giusta il server ne crea un'istanza: un compito fidato (§ 6) con
+`nonPrimaDi`. L'orchestratore lo prende come ogni altro lavoro. Un'istanza non
+ancora iniziata quando nasce la successiva si chiude come «superata»: le
+istanze non si accumulano.
 
-Un ruolo generico `compito` esegue il testo del modello. I permessi li dà
+Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
 l'ambito, non il ruolo.
 
-| Quando (ora italiana) | Compito | Ambito |
-|---|---|---|
-| ogni giorno | revisione delle domande (§ 3.6) | `domande` |
-| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` |
-| ogni giorno | monitoraggio (§ 4.3) | `monitor` |
-| lunedì | riordino della coda (§ 6) | `coda` |
-| lunedì | potatura dei rami fusi | `rami` |
-| domenica | audit di sicurezza | `lavoro` |
+| Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
+|---|---|---|---|---|
+| ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus |
+| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus |
+| ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
+| lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
+| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare |
+| domenica | audit di sicurezza | `lavoro` | 45 | Opus |
 
 Si vedono e si cambiano in Routine → Compiti ricorrenti.
 
@@ -452,10 +460,130 @@ vale per tutti i compiti di quel tipo.
   biglietto, la priorità la decide la revisione. Una richiesta di permessi la
   revisione la trasforma in una proposta d'ambito (§ 5.3).
 
-## 6. Feedback: una cosa da fare
+## 6. Feedback e compiti
 
-- Un feedback è una cosa da fare. Unire vuol dire creare un feedback nuovo con
-  `genitori`, per delega (§ 1.3).
+Due oggetti, decisi dall'owner il 12/10:
+
+- **Feedback**: una cosa da fare, segnalata da un utente, da un agente o
+  dall'owner. Ha una **priorità** da 0 a 3 e, se è un cambio di codice, il suo
+  ciclo: ramo, verifica, controllo cieco, fusione. Non porta un modello.
+- **Compito**: una chiamata di un agente. Ha **urgenza**, **modello**,
+  **sforzo**, **ambito**, fiducia e, se c'è, il feedback a cui è legato con la
+  sua **fase**. Il biglietto è un tentativo di eseguire un compito: un compito
+  ne può avere più di uno, per esempio dopo un arenamento.
+
+### 6.1 Da dove nascono i compiti
+
+**Dalle fasi di un feedback.** Quale compito serve a un feedback lo dice una
+funzione sola e pura, dallo stato del feedback: è la scelta del ruolo che il
+server fa già oggi. Le fasi sono primo lavoro, verifica, correzione come ripresa
+e controllo cieco. La funzione gira in due momenti:
+
+- a ogni modifica del feedback, con un trigger: copre anche le modifiche che
+  l'owner fa da Gestione senza passare dal server;
+- ogni 10 minuti nel pacemaker, come rete. Un feedback che ha bisogno di un
+  compito e non ce l'ha lo riceve. Un compito aperto il cui feedback è andato
+  avanti si chiude come «superato».
+
+Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
+Invariante, con sentinella: al massimo un compito aperto per feedback.
+
+**Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
+(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), l'esplorazione a coda
+vuota, e i compiti creati a mano dall'owner o da una sessione locale.
+
+**Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
+server), il blocco di sicurezza (diventa una domanda), la segnalazione (diventa
+un feedback, § 5.4).
+
+### 6.2 Le fasi di un cambio di codice
+
+- **Primo lavoro.**
+- **Verifica:** un compito solo, compresa la correzione dei rilievi trovati nel
+  giro.
+- **Correzione**, solo come ripresa: dopo una risposta dell'owner, o dopo un
+  conflitto con main (riallineamento). Da valutare: riprendere da qui anche
+  quando l'agente della verifica muore a metà correzione, invece di rifare la
+  verifica.
+- **Controllo cieco.**
+
+### 6.3 Urgenza
+
+Il server dà il biglietto al compito pronto con l'urgenza più alta; a pari
+urgenza, al più vecchio.
+
+**Compiti di un feedback.** Ogni casella va dalla priorità del feedback e dalla
+fase:
+
+| Fase | p0 | p1 | p2 | p3 |
+|---|---|---|---|---|
+| Primo lavoro | 0–3 | 5–8 | 20–23 | 50–53 |
+| Verifica | 10–13 | 25–28 | 35–38 | 55–58 |
+| Correzione (ripresa) | 10–13 | 25–28 | 35–38 | 55–58 |
+| Controllo cieco | 15–18 | 30–33 | 40–43 | 60–63 |
+
+Dentro la casella il gradino lo dà la provenienza, al posto degli spareggi di
+oggi: +3 fidato, +2 fidato e figlio di un altro feedback, +1 non fidato, +0 non
+fidato e figlio. I nipoti contano come figli.
+
+**Compiti senza feedback:**
+
+| Compito | Urgenza |
+|---|---|
+| Gestisci la risposta | 47 |
+| Invio di una mail approvata | 46 |
+| Monitoraggio, audit di sicurezza, riordino della coda | 45 |
+| Revisione delle domande, posta | 30 |
+| Unione di feedback | 20 |
+| Potatura dei rami | 5 |
+| Esplorazione | sotto tutto, solo a coda vuota |
+
+Cosa garantisce la scala:
+
+- **La priorità 3 passa sopra tutto**, in qualunque fase, compresi i cicli già
+  avviati degli altri feedback e i ricorrenti. Un agente già partito finisce il
+  suo compito: il 3 prende il primo posto libero. Per ora il 3 vale anche per
+  il lavoro sul processo (routine, gestione dei feedback, strumenti): finché non
+  ci sono utenti conta più della sicurezza.
+- **Sotto il 3, un feedback iniziato** passa davanti a uno nuovo con un gradino
+  di priorità in più, non con due.
+- **Fiducia e figli** non scavalcano mai una casella: fra una casella e l'altra
+  c'è sempre almeno un numero libero.
+
+La tabella delle fasi vive sul server come dati e si regola lì; l'urgenza dei
+ricorrenti si cambia su ciascuno. Quando cambia la priorità di un feedback, il
+trigger ricalcola l'urgenza del suo compito aperto.
+
+### 6.4 Modello e sforzo
+
+- Il compito porta modello (gli alias `opus`, `sonnet`, `haiku`, `fable`, che
+  seguono da soli l'ultima versione) e sforzo. Il server li manda col biglietto,
+  e il gancio dell'orchestratore li impone al lancio, qualunque cosa abbia
+  scritto l'orchestratore.
+- **Fasi di un feedback:** modello e sforzo per fase, scelti dall'owner in
+  Routine → Automazioni. Oggi: primo lavoro Opus `xhigh`, le altre Opus `high`.
+- **Compiti senza feedback:** dal ricorrente o da chi crea il compito. «Gestisci
+  la risposta» resta Opus (§ 3.5).
+- Ogni agente può lanciare sotto-agenti, fino a tre livelli sotto la sessione
+  principale, e sceglierne il modello.
+
+Transizione: dal 12/10 il server manda modello e sforzo col biglietto (#1192)
+e li legge da `config/routines.roleModels` (la scelta per fase, scrivibile in
+Automazioni con #1193). Il gancio che li impone è #1189. Il server legge anche
+`model` ed `effort` sul feedback, per primo lavoro e correzione, ma nessuno li
+scrive: con i compiti quella lettura si toglie.
+
+### 6.5 Numerazione e dove si vedono
+
+- I feedback tengono la loro numerazione (#N, #N.k). I compiti ne hanno una
+  loro; quelli di un feedback si mostrano come «#N · fase».
+- I feedback restano in Gestione → Feedback. I compiti hanno una scheda loro,
+  Routine → Compiti: aperti, in corso e storico, con modello, costo ed esito di
+  ogni chiamata. L'owner la guarda di rado.
+
+### 6.6 La coda dei feedback
+
+- Unire vuol dire creare un feedback nuovo con `genitori`, per delega (§ 1.3).
 - Il riordino del lunedì lavora tutta la coda insieme:
   - unisce i doppioni;
   - archivia gli stantii e i già fatti;
@@ -478,8 +606,15 @@ vale per tutti i compiti di quel tipo.
 
   Un token di applicazione GitHub dura al massimo un'ora: è un limite di
   GitHub, non una scelta. Per il worker vale **finché il lavoro serve**:
-  - git chiede il token a un aiutante di credenziali (`biglietto.mjs token`),
-    che ne chiede uno nuovo al server quando quello vecchio sta per scadere;
+  - ogni git che parla con GitHub passa da un comando fisso del canale
+    (`routine-channel.mjs git-server`, #1233), che chiede il token al server e
+    lo dà solo a quella chiamata: niente aiutante di credenziali, che il
+    controllo dei permessi della sessione cloud blocca. Il token viaggia
+    nell'URL riscritto solo per quella chiamata (scelta dell'owner su #1233),
+    perché il proxy della sessione sostituisce l'intestazione di
+    autorizzazione; se a respingerlo è il proxy e non GitHub, il comando lo
+    dice. La prova vera da una sessione cloud la fa il primo lavoro server
+    dopo la fusione (#1221);
   - il worker non se ne accorge;
   - alla chiusura del biglietto il server revoca il token in corso.
 
@@ -489,6 +624,24 @@ vale per tutti i compiti di quel tipo.
   Il server lo dà solo a un biglietto pulito su un feedback fidato, e non lo
   rinnova a un biglietto che si è sporcato. Il worker clona filo-security con
   quel token e spinge il suo ramo.
+- **Una routine a parte (#1253).** Dalla cloud il clone passa solo se la routine
+  ha filo-security fra i suoi repo: il proxy della sessione vede solo quelli.
+  Quindi i lavori server li fa una routine dedicata, con Filo e filo-security
+  collegati e la rete limitata:
+  - la sua parola d'ordine ha `lavori: server` (`routine-keys.mjs lavori`) e
+    riceve solo lavori server fidati, mai l'esplorazione; le altre chiavi non
+    ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
+    diff dal server senza clonare;
+  - il pacemaker la accende con una voce sua (`routineIdServer` in config,
+    segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
+    se c'è un lavoro server che nascerebbe pulito. Decide prima di A/B, che
+    altrimenti riempirebbero ogni posto anche con l'esplorazione, e prende i
+    posti che le spettano nell'ordine di priorità della coda: a pari priorità
+    il server, e un lavoro normale più urgente non lo ferma se A/B non
+    possono accendere. Conta nel
+    tetto dell'account della sua parola d'ordine (senza, `accountServer`;
+    assente = B), si ferma con `accountServerOff`, con l'account escluso o in
+    riserva dei crediti; il tetto delle sessioni è comune.
 - **Su `main` di filo-security** scrive solo il cancello di fusione (regola come
   per Filo):
   - una suite su GitHub Actions prova i rami;
@@ -543,9 +696,9 @@ I numeri restano dell'owner, in Routine → Crediti.
   barra di stato entrano nel conto da sole. L'account B può arrivare al 100%.
 - **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
   mancano al rinnovo, così la settimana non finisce il martedì.
-- **Ordine:**
-  1. i compiti fidati (risposte, ricorrenti);
-  2. i feedback per priorità.
+- **Ordine:** quello della coda, cioè l'urgenza dei compiti (§ 6.3). Il passo
+  e la riserva dicono quanto si spende, non cosa viene prima: la priorità 3
+  resta sopra le risposte e i ricorrenti.
 - **Fine settimana:** nelle ultime 24 ore prima del rinnovo la quota non spesa
   si perderebbe, quindi si apre alle priorità basse (0 e 1).
 - **Controllo:** il monitoraggio confronta speso e passo, e apre una domanda se
@@ -624,7 +777,8 @@ migrazione le mappa. Il codice che decide in base al prefisso
 ### 12.2 Domani
 
 - **Un orchestratore Haiku.** Non legge feedback e non sceglie niente: lancia,
-  aspetta e rilascia. I worker restano Opus, dalle definizioni degli agenti.
+  aspetta e rilascia. Modello e sforzo di ogni worker vengono dal compito, col
+  biglietto (§ 6.4).
 - **Lavori in parallelo dentro la stessa sessione.** Chiede un biglietto, lancia
   il worker in sottofondo, e ripete finché il server dice di sì.
 - **I posti li conta solo il server.** Un biglietto nuovo esce solo se i lavori
@@ -654,12 +808,15 @@ Da sistemare prima dei worker in parallelo:
   salvataggio automatico passa da tutte le cartelle. Quindi ogni worker ha il
   suo **clone**, con la cache dei pacchetti condivisa, e il salvataggio salva
   solo la cartella di chi ha modificato.
-- **Sotto-lavori.** Un worker è già un sotto-agente dell'orchestratore, e un
-  sotto-agente non può lanciarne altri. Quando un lavoro va diviso (una
-  revisione grande, per esempio), il worker chiede al server dei biglietti
-  figli, col ruolo e i numeri, mai testo libero, come per l'unione (§ 1.3).
-  L'orchestratore li lancia come gli altri, dentro N e K. I figli ereditano la
-  fiducia del padre in quel momento. Il padre aspetta i loro esiti dal server.
+- **Sotto-lavori.** Un worker può lanciare sotto-agenti suoi (fino a tre
+  livelli sotto la sessione principale) per il lavoro interno: esplorazioni,
+  raccolte, prove. Quando invece un lavoro va diviso in pezzi che contano nei
+  posti e hanno un biglietto loro (una revisione grande, per esempio), il worker
+  chiede al server dei compiti figli (§ 6), col ruolo e i numeri, mai testo
+  libero, come per l'unione (§ 1.3). Ognuno ha il suo biglietto, e
+  l'orchestratore li lancia come gli altri, dentro N e K. I figli ereditano
+  l'urgenza del padre e la sua fiducia in quel momento. Il padre aspetta i loro
+  esiti dal server.
   Le chiusure a metà e i crash li segue il monitoraggio.
 - **Le prove** non devono contendersi display virtuali, porte o cartelle: vanno
   provate con 2, 3 e 4 worker insieme.
@@ -671,25 +828,30 @@ Da sistemare prima dei worker in parallelo:
 Ogni punto è un feedback fidato. Finché il § 7 non è fatto, i punti *server* si
 lavorano in locale.
 
-1. *server*: biglietti che si sporcano, campo `fiducia`, migrazione, spareggio,
-   L5 decisa dalla fiducia, fine di `mergePreapproved`.
+1. *server*: biglietti che si sporcano, campo `fiducia`, migrazione, spareggio
+   provvisorio (§ 1.6; lo sostituisce l'urgenza al punto 5), L5 decisa dalla
+   fiducia, fine di `mergePreapproved`.
 2. *server*: collezione `domande`, regole, operazioni, azioni strutturate.
 3. App: barra delle sezioni, sezione Domande, Ricevuti coi filtri L1–L5.
 4. Le attese di oggi diventano domande (§ 3.8); `domanda.mjs` per tutti.
-5. Compito «Gestisci la risposta», chiarimenti, «discutiamone», note per gli
+5. *server*: compiti (§ 6): collezione, funzione delle fasi col trigger e il
+   controllo nel pacemaker, urgenza al posto dell'ordine di oggi, biglietto
+   legato al compito, modello e sforzo dal compito; app: scheda Routine →
+   Compiti. Serve ai punti 6 e 8.
+6. Compito «Gestisci la risposta», chiarimenti, «discutiamone», note per gli
    agenti.
-6. Registro, revisione quotidiana, risposte automatiche.
-7. Compiti ricorrenti, ruolo `compito`, ambiti `coda`/`unisci`/`domande`/
+7. Registro, revisione quotidiana, risposte automatiche.
+8. Compiti ricorrenti, ruolo `compito`, ambiti `coda`/`unisci`/`domande`/
    `monitor`/`rami`, segnalazioni, domanda di fine turno per tutti i ruoli.
-8. Monitoraggio: taccuino, sveglie, esperimenti.
-9. Crediti (§ 8), dopo la conferma dei numeri.
-10. Lavori server dalla cloud (§ 7).
-11. Istruzioni dei ruoli sul server (§ 9).
-12. Canale stabile (§ 4.2).
-13. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
-14. Mittenti normalizzati (§ 10).
-15. Cartella padre per le sessioni cloud (§ 11).
-16. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
+9. Monitoraggio: taccuino, sveglie, esperimenti.
+10. Crediti (§ 8), dopo la conferma dei numeri.
+11. Lavori server dalla cloud (§ 7).
+12. Istruzioni dei ruoli sul server (§ 9).
+13. Canale stabile (§ 4.2).
+14. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
+15. Mittenti normalizzati (§ 10).
+16. Cartella padre per le sessioni cloud (§ 11).
+17. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
     il salvataggio per cartella.
 
 I punti 1–4 danno già il risultato principale: un posto solo, con le domande

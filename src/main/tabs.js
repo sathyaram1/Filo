@@ -34,7 +34,7 @@ require('../shared/tabColor');
 const { compareRainbow } = globalThis.SN_TAB_COLOR;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
-const { collegaScorciatoie } = require('./shortcuts');
+const { collegaScorciatoie, staRegistrandoTasti } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
@@ -165,7 +165,8 @@ function filoSingletonKey(url) {
   return u.hostname + u.pathname;
 }
 
-const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
+// Le pagine web girano nella sandbox di Chromium: il loro preload è page-preload.js impacchettato in un file (#834).
+const { percorsoDelPreload } = require('./preloadPacchetto');
 // Esito di una scheda aperta da NAVIGA (#590): quanto si aspetta, dopo l'arrivo della prima pagina,
 // che la pagina si sposti da sé su un sito della lista. Tetto e margine dopo il caricamento.
 const ASSESTAMENTO_MS = 1500;
@@ -647,6 +648,14 @@ class TabManager {
     return this.setContentFullscreen(!this.contentFullscreen);
   }
 
+  // Lo schermo pieno l'ha chiesto questa pagina col suo pulsante (un video): il tasto dello schermo intero
+  // premuto lì è suo, come l'Esc. Da un'altra scheda o dalla barra vale il tasto di Filo.
+  schermoPienoDi(wc) {
+    if (!this.pageFullscreen || !wc) return false;
+    const t = this.tabs.find((x) => x.id === this.pageFullscreenTabId);
+    return !!(t && t.view && t.view.webContents === wc);
+  }
+
   // Fa uscire dal fullscreen HTML5 la pagina che l'aveva chiesto, quando a
   // spegnere lo schermo intero è stato qualcun altro. Best-effort: se la scheda
   // non c'è più (chiusa, processo caduto) resta solo da dimenticarla, così la
@@ -889,13 +898,15 @@ class TabManager {
   _preferenzeWeb(url, partition, opts = {}) {
     const isInternal = url.startsWith('filo://');
     const webPreferences = {
-      preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
+      preload: isInternal ? INTERNAL_PRELOAD : percorsoDelPreload(),
       // Per le pagine interne (filo://) usiamo contextIsolation:false così
       // possiamo overwritare window.chrome direttamente — i file portati
       // dall'estensione si aspettano chrome.* in scope globale. Le pagine
       // web esterne mantengono l'isolation (codice non fidato).
       contextIsolation: !isInternal,
-      sandbox: false,
+      // Un buco nell'isolamento di una pagina web troverebbe un processo chiuso, non Node (#834). Le pagine interne
+      // si decidono a parte: il loro preload richiede ancora i moduli da disco.
+      sandbox: !isInternal,
       nodeIntegration: false,
       webSecurity: true,
       // #405 — i riquadri incorporati (video, mappe, commenti, moduli) sono
@@ -905,8 +916,9 @@ class TabManager {
       // destro non produceva nulla. Con nodeIntegrationInSubFrames il preload
       // parte in ogni sottoframe; `nodeIntegration` resta false e
       // contextIsolation true, quindi il codice della pagina (incluso quello
-      // di terze parti dentro l'iframe) NON guadagna alcun accesso a Node né
-      // allo shim chrome.*, che vivono solo nel mondo isolato del preload.
+      // di terze parti dentro l'iframe) NON guadagna alcun accesso allo shim
+      // chrome.*, che vive solo nel mondo isolato del preload; e con la
+      // sandbox nemmeno quel mondo ha Node.
       // Il costo si paga solo dove serve: nei sottoframe page-preload.js
       // carica i content script alla PRIMA interazione, non al caricamento.
       ...(isInternal ? {} : { nodeIntegrationInSubFrames: true }),
@@ -1574,10 +1586,25 @@ class TabManager {
   _triageCandidates() {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
-      if (t.id === this.activeId || t.audible) return false;
+      if (t.id === this.activeId || t.audible || this._sempreAperta(t)) return false;
       if (T) return T.isTriageableUrl(t.url);
       return !t.isInternal && /^https?:\/\//i.test(t.url || '');
     });
+  }
+
+  // «Tieni sempre aperto X» (#823): la regola la applica Filo, qualunque cosa risponda il modello.
+  async _caricaSempreAperte() {
+    try {
+      const FM = globalThis.SN_FILO_MEMORY;
+      this._sempreAperte = FM ? Object.keys(await FM.listKeepOpen()) : [];
+    } catch (_) {
+      this._sempreAperte = this._sempreAperte || [];
+    }
+  }
+
+  _sempreAperta(tab) {
+    const T = globalThis.SN_TAB_TRIAGE;
+    return !!(T && tab && T.voceTenuta(tab.url, this._sempreAperte));
   }
 
   async _gatherTriageInput(cands) {
@@ -1622,10 +1649,11 @@ class TabManager {
   // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
   async runAutoTriage({ trigger = 'idle' } = {}) {
     if (this.incognito || this._triageRunning) return { archived: 0 };
-    const cands = this._triageCandidates();
-    if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
     try {
+      await this._caricaSempreAperte();
+      const cands = this._triageCandidates();
+      if (!cands.length) return { archived: 0 };
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
@@ -1678,7 +1706,8 @@ class TabManager {
     cands.forEach((tab, i) => {
       const d = byIndex.get(i);
       if (!d || d.action !== 'archive') return;
-      if (tab.id === this.activeId || tab.audible) return; // salvaguardia dura
+      // Salvaguardia dura. Durante la decisione la scheda può essere andata su un sito da tenere aperto.
+      if (tab.id === this.activeId || tab.audible || this._sempreAperta(tab)) return;
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
@@ -1836,7 +1865,10 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     if (this.activeId !== id) this.activate(id);
-    if (this.avvisoSito.coperta() === tab) { this._sbScelta(tab, 'chiedi'); return; }
+    if (this.avvisoSito.coperta() === tab) {
+      require('./services/interruttoreAiuto').seAcceso(this.win, () => this._sbScelta(tab, 'chiedi'));
+      return;
+    }
     try {
       tab.view.webContents.send('shortcut:triggered', {
         command: 'open-help-sidebar',
@@ -2468,6 +2500,7 @@ class TabManager {
       // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
       // dentro quel giro che la pagina chiede.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      if (staRegistrandoTasti(wc)) return;
       // La barra laterale prima di tutto: il suo tasto, e l'Esc che la chiude prima della modalità.
       if (this.barra.tasto(input)) {
         event.preventDefault();
@@ -3095,9 +3128,9 @@ class TabManager {
         frame: true,
         titleBarStyle: 'default',
         webPreferences: {
-          preload: PAGE_PRELOAD,
+          preload: percorsoDelPreload(),
           contextIsolation: true,
-          sandbox: false,
+          sandbox: true,
           nodeIntegration: false,
           webSecurity: true,
           // #405 — stesse regole di una scheda esterna: anche dentro il popup

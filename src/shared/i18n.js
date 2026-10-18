@@ -204,13 +204,17 @@
     popup_calc_result: 'Risultato',
     popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
     popup_send: 'Invia',
+    popup_copy: 'Copia',
+    popup_copied: 'Copiato',
+    popup_copy_failed: 'Non copiato',
 
     // Errori
     err_no_api_key: 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti. In alternativa, lì puoi mettere una tua chiave OpenRouter.',
     err_provider_failed: 'Il provider AI ha fallito. Controlla la connessione e la API key.',
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
-    err_blocked_domain: 'Estensione disabilitata su questo dominio.',
+    err_blocked_domain: 'Filo è spento su questo sito.',
     err_no_selection: 'Nessuna selezione di testo.',
+    help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.
@@ -305,6 +309,9 @@
     options_open_weights_only: 'Solo modelli a pesi aperti',
     options_open_weights_only_desc:
       'Spegne tutti i modelli proprietari — Anthropic compresa — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche con i modelli predefiniti. Le funzioni che partivano da un modello proprietario passano al suo equivalente aperto; quelle senza equivalente si fermano e lo dicono, invece di tornare di nascosto su un modello proprietario.',
+    options_own_key_all_providers: 'Con la mia chiave, usa anche i fornitori esclusi',
+    options_own_key_all_providers_desc:
+      'Le richieste pagate con la tua chiave OpenRouter possono andare anche ai fornitori che Filo esclude, come Google o xAI. Così funzionano anche Gemini e Grok. Se OpenRouter rifiuta la tua chiave e Filo passa ai suoi crediti, l\'esclusione torna a valere.',
     options_open_weights_switched: 'Cambiano modello %s funzioni, che passano a: %s',
     options_open_weights_unavailable: 'Si fermano (nessun equivalente a pesi aperti): %s',
     options_open_weights_test_blocked:
@@ -323,7 +330,9 @@
     options_more_link: 'Altre opzioni →',
     options_costs: 'Costi e limiti',
     options_shortcuts: 'Scorciatoie da tastiera',
-    options_blocklist: 'Domini esclusi',
+    options_blocklist: 'Siti dove Filo è spento',
+    options_blocklist_desc: 'Lì Filo non mette il suo menu del tasto destro, il correttore né le sue azioni sulla pagina. Un sito per riga.',
+    options_blocklist_invalid: 'Queste righe non sono siti e non spengono Filo da nessuna parte (scrivi il sito con la sua estensione, es. docs.google.com): %s',
     options_categories: 'Categorie',
     options_features: 'Funzionalità sperimentali (Fase 2)',
     options_save: 'Salva',
@@ -341,7 +350,7 @@
     options_action_translate_page: 'Traduci pagina',
     options_action_help: 'Aiuto',
     options_action_categorize: 'Categorizza',
-    options_action_describe_image: 'Descrizione immagini (cronologia incolla)',
+    options_action_describe_image: 'Descrizione immagini (cronologia incolla, finestre guardate dalla chat)',
     options_action_transcribe_image: 'Trascrizione (OCR) di una regione dello schermo',
     options_action_transcribe_audio: 'Dettatura (trascrizione audio dal microfono)',
     options_action_tts: 'Lettura ad alta voce (sintesi vocale)',
@@ -684,6 +693,11 @@
     menu_del_sito_fatto: 'Su %s il tasto destro apre il menu del sito; quello di Filo resta a %s + tasto destro.',
     menu_del_sito_annulla: 'Annulla',
     menu_del_sito_tolto: 'Su %s il tasto destro apre di nuovo il menu di Filo.',
+    menu_spegni_filo: 'Spegni Filo su questo sito',
+    menu_riaccendi_filo: 'Riaccendi Filo su questo sito',
+    filo_spento_fatto: 'Filo è spento su %s.',
+    filo_riacceso_fatto: 'Filo è di nuovo acceso su %s.',
+    filo_spento_annulla: 'Annulla',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
     options_cookies_banners_remove: 'Rifiuta in automatico',
     options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
@@ -753,6 +767,8 @@
       '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
       'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
       'su un altro computer.',
+    security_export_keys_label: 'Includi le chiavi',
+    security_export_keys_desc: 'Chi ha il file può usare le tue chiavi API. Trattalo come una password.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
@@ -791,6 +807,8 @@
     // %1 = quante restano fuori, %2 = il tetto
     security_import_pages_out: 'Pagine salvate che non entrano: %1. L’elenco ne tiene %2, le più recenti.',
     security_import_pages_out_mine: 'Fra queste, pagine che hai salvato adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_senza_chiavi: 'Le chiavi API non sono nell’archivio. Quelle salvate qui restano come sono.',
+    security_import_proxy_senza_credenziali: 'Il proxy arriva senza utente e password: per usarlo, scrivi di nuovo a Filo il suo indirizzo intero.',
     security_import_nulla_perso: 'Nulla di ciò che hai ora viene cancellato: ',
     security_import_escono_mie: 'Di ciò che hai ora escono solo le pagine salvate più vecchie, contate qui sotto: ',
     security_import_confirm_ok: 'Importa',
@@ -800,6 +818,31 @@
     security_import_compressed: 'L’archivio è compresso in un formato che Filo non legge (bzip2 o LZMA): ricomprimilo come zip normale e riprova',
     security_import_encrypted: 'L’archivio è protetto da una password: scompattalo, ricomprimilo senza password e riprova',
     security_import_fail: 'Importazione non riuscita',
+    security_wipe_btn: 'Cancella tutti i dati di Filo',
+    security_wipe_desc: 'Toglie da questo computer tutto quello che Filo sa di te. Dopo, Filo riparte come appena installato.',
+    security_wipe_export_text:
+      'Prima esporta i tuoi dati. Dopo la cancellazione non si recuperano, ma con l’archivio li rimetti ' +
+      'dentro quando vuoi, anche su un altro computer.',
+    security_wipe_export_done: 'Archivio salvato',
+    security_wipe_list_title: 'Cosa sparisce',
+    security_wipe_list:
+      'Memorie, conversazioni e il loro archivio, cronologia AI, appunti e file dell’editor, pagine salvate, ' +
+      'pagine visitate, schede aperte e archiviate, download registrati, cronologia degli appunti copiati, ' +
+      'timer e notifiche, dizionario personale, impostazioni, cookie e dati dei siti, chiavi e accessi salvati, ' +
+      'la copia delle segnalazioni che hai mandato. I file che hai scaricato e i tuoi documenti restano dove sono. ' +
+      'Filo si chiude e si riapre vuoto, come appena installato.',
+    security_wipe_server:
+      'I feedback che hai già mandato restano sul server di Filo. Per toglierli scrivi a chi sviluppa Filo, ' +
+      'anche con un feedback, e li cancella a mano. L’archivio esportato tiene l’elenco di quelli che hai mandato.',
+    security_wipe_identity_label: 'Cancella anche l’identità dei crediti',
+    security_wipe_identity_desc:
+      'Se non la spunti resta, e con lei i crediti che hai sul server. Se la cancelli, quei crediti non si raggiungono più.',
+    security_wipe_word_label: 'Scrivi «conferma» per cancellare. Non si torna indietro.',
+    security_wipe_cancel: 'Annulla',
+    security_wipe_go: 'Cancella tutto e riavvia',
+    security_wipe_go_spento: 'Scrivi «conferma» nel campo qui sopra',
+    security_wipe_in_corso: 'Cancello e riavvio Filo…',
+    security_wipe_fail: 'Non sono riuscito a cominciare, e non ho cancellato niente. Riprova.',
 
     // Home
     home_title: 'Aperti per dopo',
@@ -807,6 +850,18 @@
     home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
     home_no_results: 'Nessun risultato per la ricerca.',
     home_remove: 'Rimuovi',
+    home_menu_open: 'Apri',
+    home_menu_open_keep: 'Apri e tienila in lista',
+    home_menu_copy_link: 'Copia link',
+    home_menu_move: 'Sposta in…',
+    home_menu_new_category: 'Nuova categoria…',
+    home_new_category_placeholder: 'Nome della nuova categoria',
+    home_removed: '«%s» rimossa.',
+    home_undo: 'Annulla',
+    home_link_copied: 'Link copiato',
+    home_link_copy_failed: 'Il link non si è copiato: riprova.',
+    home_moved: 'Spostata in «%s»',
+    home_move_failed: 'Non si è spostata: nel frattempo l’elenco è cambiato. Riprova da qui.',
 
     // History
     history_title: 'Cronologia AI',

@@ -37,6 +37,7 @@
 //   gate proprietario si verificano invece SENZA stub, sul main vero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const NEWTAB = 'filo://newtab/';
 const MANAGE = 'filo://manage/manage.html';
@@ -127,13 +128,13 @@ async function apriGestione(page, opts) {
   await page.evaluate((admin) => window.__mgTest.setAdmin(admin), opts?.admin !== false);
   await page.evaluate(() => window.__mgTest.setData([]));
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 }
 
 /** Gestione → Log: dove vive la traccia delle decisioni passate (#1110). */
 async function apriLog(page, opts) {
   await apriGestione(page, opts);
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
 }
 
 // ── 1. Una fusione senza segnalazione l'owner la trova in Automazioni ───────
@@ -292,13 +293,13 @@ test('l’elenco vive in Automazioni: sulle schede-lista non c’è', async ({ o
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible({ timeout: 8_000 });
 
   for (const scheda of ['inbox', 'queue', 'local', 'resolved', 'archived']) {
-    await page.locator(`.mg-tab[data-tab="${scheda}"]`).click();
+    await apriScheda(page, scheda);
     await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).not.toBeVisible();
     await expect(page.locator('#panel-list .sn-mac')).toHaveCount(0);
   }
 
   // Tornando in Automazioni è ancora lì, senza ricaricare niente.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible();
 });
 
@@ -642,7 +643,7 @@ test('se la segnalazione c’è, la richiesta NON sta in Automazioni: sta sulla 
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(0);
 
   // …e riconoscibile nella lista, dove aspetta una decisione.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   const card = page.locator('.mg-item', { hasText: 'Menu copertina' });
   await expect(card).toBeVisible({ timeout: 8_000 });
   await expect(card.locator('.mg-fusione-badge')).toBeVisible();

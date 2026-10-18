@@ -54,8 +54,8 @@
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
-//   Nei --record-* il biglietto si rilegge dal promemoria (.claude/routine-ticket.json);
-//   `--ticket` è la scorta per quando il promemoria è andato perso.
+//   Nei --record-* le opzioni valgono in ogni posizione (leggiOpzioniRegistrazione). Il biglietto
+//   si rilegge dal promemoria (.claude/routine-ticket.json); `--ticket` è la scorta se è perso.
 //   Un argomento NON riconosciuto è un errore d'uso (exit 1) senza effetti
 //   collaterali: il promemoria si cancella solo all'avvio dichiarato di un giro
 //   locale senza biglietto, mai davanti a un argomento storpiato.
@@ -71,7 +71,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, dirname, isAbsolute, join, resolve, relative, sep } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
@@ -83,7 +83,7 @@ import {
 import { writeRole, clearRole, readRole } from './lib/routine-role.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, numeraRilievi, puliziaDelPass, rigaNumerata,
-  testoPuliziaFuoriNumero,
+  ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
@@ -97,9 +97,10 @@ import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, a
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
-import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX } from './lib/consegna-file.mjs';
+import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
+import { cloneDentroIlRepo } from './lib/git-server.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -407,21 +408,60 @@ export function secauditPassato(verdict) {
 export { MAX_LIVELLO_CHARS, leggiTestoLivello };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
+// Si tolgono tutte PRIMA di leggere comando, identificativo e testo, come il biglietto: rimasta fra i
+// posizionali, la frase finiva nel report e il suo nome faceva da identificativo (#879).
+export const OPZIONI_REGISTRAZIONE = {
+  '--segnala': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
+  '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
+  '--frase': { tipo: 'testo', comandi: ['--record-fixed'] },
+  '--ferma': { tipo: 'bandiera', comandi: ['--record-fixed'] },
+};
+const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
+
 /**
- * Toglie `--<nome> <file>` dagli argomenti, come stripTicketArg col biglietto.
- * PURA. `error` è la frase da stampare (opzione senza file dopo, o un flag al
- * posto del file, o l'opzione ripetuta).
+ * Anche come `--opzione=valore`, la forma del canale. PURA. `error`: valore mancante o storto, opzione
+ * ripetuta, o un'opzione che il comando non legge.
+ * @returns {{ args: string[], valori: Record<string, string|true>, error: string }}
  */
-export function stripFileArg(list, nome) {
-  const args = Array.isArray(list) ? [...list] : [];
-  const flag = `--${nome}`;
-  const i = args.indexOf(flag);
-  if (i === -1) return { args, file: '', error: '' };
-  const v = String(args[i + 1] ?? '').trim();
-  args.splice(i, 2);
-  if (!v || SEMBRA_OPZIONE(v)) return { args, file: '', error: `${flag} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.` };
-  if (args.includes(flag)) return { args, file: '', error: `${flag} va passato una volta sola: non ho consegnato niente.` };
-  return { args, file: v, error: '' };
+export function leggiOpzioniRegistrazione(list) {
+  const lista = Array.isArray(list) ? list.map((a) => String(a ?? '')) : [];
+  const args = [];
+  const valori = {};
+  const no = (error) => ({ args: lista, valori: {}, error });
+  for (let i = 0; i < lista.length; i++) {
+    const a = lista[i];
+    const nome = Object.keys(OPZIONI_REGISTRAZIONE).find((n) => a === n || a.startsWith(`${n}=`));
+    if (!nome) { args.push(a); continue; }
+    const { tipo } = OPZIONI_REGISTRAZIONE[nome];
+    if (tipo === 'bandiera') {
+      if (a !== nome) return no(`${nome} non vuole un valore: non ho consegnato niente.`);
+      valori[nome] = true;
+      continue;
+    }
+    if (nome in valori) return no(`${nome} va passato una volta sola: non ho consegnato niente.`);
+    const v = a === nome ? lista[++i] : a.slice(nome.length + 1);
+    if (tipo === 'file') {
+      const file = String(v ?? '').trim();
+      if (!file || SEMBRA_OPZIONE(file)) return no(`${nome} vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.`);
+      valori[nome] = file;
+    } else {
+      // Un'opzione al posto della frase vuol dire frase dimenticata: presa per frase, il comando o
+      // l'identificativo sparivano dalla riga.
+      if (v === undefined || sembraOpzioneNelReport(v)) return no(`${nome} vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.`);
+      valori[nome] = v;
+    }
+  }
+  const comando = args[0];
+  for (const nome of Object.keys(valori)) {
+    const { comandi } = OPZIONI_REGISTRAZIONE[nome];
+    if (comandi.includes(comando)) continue;
+    const qui = Object.entries(OPZIONI_REGISTRAZIONE).filter(([, o]) => o.comandi.includes(comando))
+      .map(([n, o]) => `${n}${FORMA_OPZIONE[o.tipo]}`);
+    return no(String(comando || '').startsWith('--record-')
+      ? `${nome} non vale con ${comando}: ${qui.length ? `qui ci sono solo ${qui.join(', ')}` : 'qui non ci sono opzioni'}. Niente è stato toccato.`
+      : `${nome} vale solo con ${comandi.join(' e ')}. Niente è stato toccato.`);
+  }
+  return { args, valori, error: '' };
 }
 
 /**
@@ -697,12 +737,7 @@ export function cartellaCloneServer(env = process.env) {
   return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
 }
 
-/** Il clone cade dentro il checkout di Filo? L'hook di salvataggio lo pubblicherebbe intero. PURA. */
-export function cloneDentroIlRepo(clone, root) {
-  const norm = (p) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
-  const r = relative(norm(root), norm(clone));
-  return r === '' || (!r.startsWith('..') && !isAbsolute(r));
-}
+export { cloneDentroIlRepo };
 
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
 export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
@@ -1266,6 +1301,7 @@ export function verifierReplyText(reply, id = '<id>') {
       derivati.length ? daTogliere : null,
       derivati.length ? `  Se ne hai tolte, poi \`git add -A && git commit -m "pulizia del giro"\` e \`node scripts/dispatch.mjs --record-pulizia ${id}\`: da quel commit parte il confronto della consegna.` : null,
       'Una prova del giro ancora rossa non si toglie e non si cambia mai: la consegna la rilancia com\'era e si ferma. Si toglie solo verde, insieme alla prova durevole che la sostituisce.',
+      ROSSO_ATTESO_CHIUSO,
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
       '',
@@ -1646,6 +1682,11 @@ const SEMBRA_OPZIONE = (a) => {
   return s.length > 1 && ['-', '‐', '‑', '‒', '–', '—', '−'].includes(s[0]) && !/^[0-9]/.test(s.slice(1));
 };
 
+/** Un'opzione rimasta al posto dell'identificativo: lo stato locale finiva sotto il suo nome (#879). PURA. */
+function idCheSembraOpzione(id, ammesse) {
+  return `Argomento non capito al posto dell'identificativo: ${id} — non ho registrato niente. Qui le opzioni sono ${ammesse}, in qualunque posizione; poi vengono l'identificativo e il resto.`;
+}
+
 export function usageText() {
   return [
     'Uso: node scripts/dispatch.mjs <comando>',
@@ -1682,9 +1723,11 @@ export function usageText() {
     '  --clear-state     <id> rimuove la copia locale dello stato',
     '  --help                 questa schermata',
     '',
-    'Nei --record-* il biglietto si rilegge da solo dal promemoria',
-    '(.claude/routine-ticket.json): `--ticket` serve solo se il promemoria è perso.',
-    'Vale in ogni posizione, anche `--ticket=<b>` o `--biglietto <b>`, come nel canale.',
+    'Nei --record-* le opzioni (--frase, --segnala, --nota, --ferma, --ticket) valgono in ogni',
+    'posizione, anche come `--opzione=valore`, come nel canale; quello che resta, in ordine, è',
+    'comando, identificativo e testo.',
+    'Il biglietto si rilegge da solo dal promemoria (.claude/routine-ticket.json): `--ticket`',
+    '(o `--biglietto`) serve solo se il promemoria è perso.',
     '',
     'Exit: 0 ok · 1 uso sbagliato (niente è stato toccato) · 2 niente da fare',
     '      3 guasto · 4 rifiutato dal server (leggere il motivo, non aggirare)',
@@ -2085,21 +2128,33 @@ export function emit(bucket, ctx) {
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
   const instructions = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
-  const stampaCon = (payload) => ({ role: bucket.role, payload, claim: bucket.id || null, instructions });
+  const stampaCon = (payload, istr = instructions, file = '') => ({
+    role: bucket.role, payload, claim: bucket.id || null, instructions: istr, ...(file ? { istruzioniFile: file } : {}),
+  });
+  // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
+  const misuraCon = (istr, file) => (p) => JSON.stringify(stampaCon(p, istr, file), null, 2).length + 1;
+  const scarica = (misura) => scaricaPayload(pieno, { root: ROOT, sempre: ['diff', 'diffServer'], max: STAMPA_MAX, misura });
   let payload = pieno;
+  let istr = instructions;
+  let fileIstr = '';
   try {
-    // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
-    payload = scaricaPayload(pieno, {
-      root: ROOT, sempre: ['diff', 'diffServer'], max: STAMPA_MAX,
-      misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
-    });
+    payload = scarica(misuraCon(instructions));
+    // Un ruolo lungo con un payload già tutto fuori (un verificatore di un lavoro server) passerebbe la soglia
+    // dell'harness: esce il ruolo, intero, e il payload si riscarica attorno al rimando.
+    if (misuraCon(instructions)(payload) > STAMPA_TETTO) {
+      const f = fileRuolo(ROOT);
+      const rimando = rimandoAlRuolo(instructions, f);
+      payload = scarica(misuraCon(rimando, f));
+      scriviRuolo(f, instructions);
+      [istr, fileIstr] = [rimando, f];
+    }
   } catch (e) {
     // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché. Le immagini
     // no: megabyte di base64 in stampa non li legge nessuno, la voce porta il motivo.
     process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
     payload = immaginiSenzaByte(pieno, e.message);
   }
-  const out = stampaCon(payload);
+  const out = stampaCon(payload, istr, fileIstr);
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }
@@ -2114,9 +2169,13 @@ if (isMainModule) {
   // a un --record-* finiva «argomento non riconosciuto», #724.1, #545) e un codice storto o doppio si ferma qui.
   const mano = stripTicketArg(process.argv.slice(2));
   if (mano.error) { console.error(`${mano.errore} Niente è stato toccato.`); process.exit(1); }
-  const argv = mano.args;
+  // Con la stessa regola le opzioni dei --record-* (#879); chi chiede aiuto lo riceve comunque.
+  const reg = leggiOpzioniRegistrazione(mano.args);
+  const argv = reg.args;
+  const opz = reg.valori;
   const bigliettoAMano = mano.ticket;
   const flag = argv[0];
+  if (reg.error && flag !== '--help' && flag !== '-h') { console.error(reg.error); process.exit(1); }
   if (bigliettoAMano && (flag === '--preflight' || flag === '--clear-state' || flag === '--linea-principale')) {
     console.error(`--ticket non vale con ${flag}: lì un biglietto non serve. Niente è stato toccato.`);
     process.exit(1);
@@ -2153,12 +2212,9 @@ if (isMainModule) {
 
   try {
     if (flag === '--record-verifier') {
-      // `--segnala <file>` si toglie PRIMA di leggere i posizionali, come il
-      // biglietto: il resto è la critica, un testo solo.
-      const seg = stripFileArg(conBiglietto(argv), 'segnala');
-      if (seg.error) { console.error(seg.error); process.exit(1); }
-      const [, id, ...rest] = seg.args;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, con livello e sede davanti: [2i] …>"'); process.exit(1); }
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--segnala <file.md>')); process.exit(1); }
       // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
       // più: veniva buttata via in silenzio, e senza rilievi la verifica
       // risulta superata — chi scriveva `fail` per bocciare registrava una
@@ -2197,7 +2253,7 @@ if (isMainModule) {
       }
       // Il file della segnalazione si legge qui, a critica già buona: un file
       // assente ferma con la frase giusta, e niente parte a metà.
-      const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
+      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
@@ -2205,28 +2261,18 @@ if (isMainModule) {
       console.log(verifierReplyText(s.reply, id));
       process.exit(0);
     } else if (flag === '--record-fixed') {
-      const seg = stripFileArg(conBiglietto(argv), 'segnala');
-      if (seg.error) { console.error(seg.error); process.exit(1); }
-      const ferma = seg.args.includes('--ferma');
-      const [, id, ...rest] = seg.args.filter((a) => a !== '--ferma');
+      const ferma = opz['--ferma'] === true;
+      const [, id, ...rest] = conBiglietto(argv);
       if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
-      const senza = fermaSenzaSegnalazione(ferma, seg.file);
+      if (SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--frase "…", --segnala <file.md> e --ferma')); process.exit(1); }
+      const senza = fermaSenzaSegnalazione(ferma, opz['--segnala']);
       if (senza) { console.error(senza); process.exit(1); }
-      // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
-      // resto è il report per l'owner, che il server cifra.
-      const fi = rest.indexOf('--frase');
-      const frase = fi !== -1 ? (rest[fi + 1] || '') : '';
-      const report = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).join(' ');
-      // Qui l'unica opzione è `--frase`: qualunque altra cosa coi trattini
-      // davanti finirebbe sepolta dentro al report cifrato, e la frase per chi
-      // ha segnalato partirebbe vuota (#565).
-      // `--frase` in fondo alla riga, senza niente dopo: spariva, e la frase
-      // per chi ha segnalato partiva vuota (feedback #565).
-      if (fi !== -1 && rest[fi + 1] === undefined) {
-        console.error('--frase vuole la riga per chi ha segnalato dopo di sé — non ho consegnato niente.');
-        process.exit(1);
-      }
-      const altra = (fi !== -1 ? rest.slice(0, fi).concat(rest.slice(fi + 2)) : rest).find((a) => sembraOpzioneNelReport(a));
+      // La frase è la riga in chiaro per chi ha mandato il feedback; il resto è il report per l'owner,
+      // che il server cifra.
+      const frase = typeof opz['--frase'] === 'string' ? opz['--frase'] : '';
+      const report = rest.join(' ');
+      // Un'altra cosa coi trattini davanti finirebbe sepolta nel report cifrato (#565).
+      const altra = rest.find((a) => sembraOpzioneNelReport(a));
       if (altra) {
         console.error(`Argomento non capito: ${altra} — non ho consegnato niente. Qui ci sono solo --frase "…", --segnala <file.md> e --ferma; il resto è il report, un testo solo fra virgolette.`);
         process.exit(1);
@@ -2239,7 +2285,7 @@ if (isMainModule) {
         console.error('Scrivi cosa hai corretto e cosa hai lasciato stare: è quello che l\'owner legge, e non si riscrive più.');
         process.exit(1);
       }
-      const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
+      const segnalazione = opz['--segnala'] ? leggiTestoLivello(opz['--segnala'], 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
@@ -2261,10 +2307,8 @@ if (isMainModule) {
       console.log(s.files.map((f) => `  · ${f}`).join('\n'));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
-      // `--nota <file>` è l'unica opzione, e si toglie prima dei posizionali.
-      const nota = stripFileArg(conBiglietto(argv), 'nota');
-      if (nota.error) { console.error(nota.error); process.exit(1); }
-      const [, id, verdict, ...avanzo] = nota.args;
+      const [, id, verdict, ...avanzo] = conBiglietto(argv);
+      if (id && SEMBRA_OPZIONE(id)) { console.error(idCheSembraOpzione(id, '--nota <file.md>')); process.exit(1); }
       if (!id || !SECAUDIT_VERDICTS.includes(verdict)) { console.error('Uso: --record-secaudit <id> <pass|fail> --nota <file.md>'); process.exit(1); }
       // Qui non c'è altro da dire: un argomento in più veniva ignorato in
       // silenzio e il verdetto partiva lo stesso (feedback #565).
@@ -2272,7 +2316,7 @@ if (isMainModule) {
         console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci vanno solo l'identificativo, pass|fail e --nota <file.md>.`);
         process.exit(1);
       }
-      const testo = nota.file ? leggiTestoLivello(nota.file, 'nota') : { ok: true, testo: '' };
+      const testo = opz['--nota'] ? leggiTestoLivello(opz['--nota'], 'nota') : { ok: true, testo: '' };
       if (!testo.ok) { console.error(testo.message); process.exit(1); }
       // Un pass senza nota si ferma PRIMA di consegnare, con cosa scrivere.
       const ferma = secauditSenzaNota(verdict, testo.testo);

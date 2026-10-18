@@ -87,25 +87,38 @@ test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né acc
 
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
 
-test('ogni comando delle scorciatoie di Filo è coperto dal manifesto', () => {
-  // shortcuts.js definisce i 4 comandi; ognuno deve esistere come capacità.
-  const src = readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8');
-  const commands = [...src.matchAll(/'(Alt\+[A-Z])':\s*'([a-z-]+)'/g)].map((m) => ({ accel: m[1], cmd: m[2] }));
-  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 scorciatoie');
-  // Mappa comando-shortcut → id capacità che lo descrive.
+test('ogni comando delle scorciatoie di Filo è coperto dal manifesto, coi tasti scelti', () => {
+  // Le quattro azioni stanno in SN_TASTI (#842): ognuna è una capacità, e il manifesto cita il tasto IN USO.
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
   const cmdToCap = {
     'explain-selection': 'explain-selection',
     'translate-selection': 'translate-selection',
     'save-for-later': 'save-for-later',
     'open-help-sidebar': 'help-sidebar',
   };
-  for (const { accel, cmd } of commands) {
-    const capId = cmdToCap[cmd];
-    assert.ok(capId, `shortcut ${accel} → comando "${cmd}" non mappato nel test: aggiorna manifesto+test`);
-    const cap = CAP.get(capId);
-    assert.ok(cap, `manca la capacità "${capId}" per lo shortcut ${accel} (${cmd})`);
-    // l'invocazione deve citare lo shortcut, così il manifesto non mente su come si attiva.
-    assert.ok(cap.invoke.includes(accel), `la capacità "${capId}" non cita lo shortcut ${accel} in invoke`);
+  assert.equal(T.AZIONI_FILO.length, 4);
+  const cita = (scelte) => {
+    T.usaScorciatoieFilo(scelte);
+    for (const a of T.AZIONI_FILO) {
+      const capId = cmdToCap[a.id];
+      assert.ok(capId, `comando "${a.id}" non mappato nel test: aggiorna manifesto+test`);
+      const cap = CAP.get(capId);
+      assert.ok(cap, `manca la capacità "${capId}" per il comando ${a.id}`);
+      const accel = T.scorciatoiaFilo(a.id);
+      for (const sistema of ['win32', 'darwin']) {
+        assert.ok(cap.invoke.includes(T.etichettaFilo(accel, sistema)), `«${capId}» non cita ${T.etichettaFilo(accel, sistema)} (${sistema}): ${cap.invoke}`);
+      }
+      assert.ok(!/\{tasto:/.test(cap.invoke + (cap.doesNot || '') + cap.desc), `«${capId}»: segnaposto rimasto nel testo`);
+    }
+  };
+  try {
+    cita({});
+    cita({ 'translate-selection': 'Ctrl+Shift+Y', 'open-help-sidebar': 'Alt+Shift+K' });
+    assert.ok(!CAP.get('translate-selection').invoke.includes('Alt+T'), 'il manifesto cita ancora il tasto di serie');
+    assert.match(CAP.renderDetailForPrompt(['help-sidebar']), /Alt\+Shift\+K \(Ctrl\+Alt\+Shift\+K su Mac\)/);
+  } finally {
+    T.usaScorciatoieFilo({});
   }
 });
 
@@ -437,6 +450,8 @@ function menuVoiceLabels() {
   pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
   // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
+  // E il menu di riserva, che il tasto destro apre dove quello di Filo non parte (Filo spento sul sito, #843).
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'main', 'menuDiRiserva.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);

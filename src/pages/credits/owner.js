@@ -39,7 +39,10 @@
     renderOwner(w);
   }
 
+  // Le manopole prendono solo l'ultima lettura chiesta: una partita prima di un salvataggio riporterebbe il valore vecchio.
+  let letturaOverview = 0;
   async function loadOverview() {
+    const mia = ++letturaOverview;
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OVERVIEW });
     const o = r && r.ok && r.overview;
     if (!o) {
@@ -58,7 +61,7 @@
       ? `Un credito vale ${formatDecimale(cfg.eurPerCredit, 6)} €, e un euro ${formatDecimale(cfg.eurUsd, 4)} $`
         + `${quando ? ` (cambio del ${quando})` : ''}.`
       : 'Manca il cambio del giorno: finché non arriva, Filo non regala crediti a nessuno.';
-    riempiManopole(cfg, tot);
+    if (mia === letturaOverview) riempiManopole(cfg, tot);
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
     // con quelli usati barrati, così chi ne genera cinque e chiude la pagina sa
     // ancora quali ha già dato.
@@ -276,8 +279,6 @@
     const posti = buoni.reduce((a, v) => a + Math.max(0, (Number(v.max) || 0) - (Number(v.used) || 0)), 0);
     lista.appendChild(riquadro(formatInt(buoni.length), buoni.length === 1 ? 'tuo invito da dare' : 'tuoi inviti da dare',
       `Codici usciti da qui con ancora un posto libero: ${formatInt(posti)} ${posti === 1 ? 'persona può entrare' : 'persone possono entrare'}.`));
-    lista.appendChild(riquadro(formatInt(cfg.invitesRemaining || 0), 'riscatti rimasti',
-      'Quante volte si può ancora entrare con un invito, in tutto.'));
   }
 
   // ── Chi ha usato Filo: il numero apre le persone che ha contato ────────────
@@ -435,7 +436,7 @@
   }
 
   // ── Le manopole ────────────────────────────────────────────────────────────
-  // Sette campi identici: nome, limiti e spiegazione stanno nella tabella di
+  // Campi identici: nome, limiti e spiegazione stanno nella tabella di
   // src/shared/wallet.js, il comportamento in src/shared/campoNumero.js. Qui
   // resta solo il cucito.
   const campi = new Map();
@@ -539,13 +540,12 @@
     for (const k of W.OWNER_KNOBS) {
       const campo = campi.get(k.chiave);
       if (!campo) continue;
-      // Non si riscrive un campo che qualcuno sta usando, né uno che ha ancora
-      // un salvataggio da poter rimettere com'era: la rilettura arriva anche
-      // mentre si digita (il server avvisa a ogni cambio di crediti).
+      // Non si riscrive un campo che qualcuno sta usando: la rilettura arriva anche mentre si digita. Uno salvato
+      // segue il server (gli ingressi li scala lui, #854) e tiene il suo «rimetti com'era».
       const st = campo.stato();
-      if (!primaLettura && (!st.pulito || st.disfabile)) continue;
+      if (!primaLettura && !st.pulito) continue;
       const v = valoreManopola(k.chiave, cfg, tot);
-      campo.mostra(v == null ? '' : v, { daCapo: true });
+      campo.mostra(v == null ? '' : v, { daCapo: primaLettura });
     }
     primaLettura = false;
   }
@@ -613,7 +613,7 @@
         $('ownerGrantPseudonym').value = u.pseudonym;
         const quanti = $('ownerGrantCredits');
         quanti.focus();
-        quanti.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        quanti.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
       }],
     ], x, y);
   }
@@ -1058,14 +1058,12 @@
 
   // Il numero intero scritto in un campo numerico, o null se non è un intero
   // (vuoto, testo che il browser non traduce in numero, decimali: «10,7» non
-  // sono crediti). Niente arrotondamenti muti.
+  // sono crediti). Niente arrotondamenti muti. Le migliaia col punto le legge
+  // `leggi`, come nelle manopole: «10.000» non è 10.
   function numeroIntero(input) {
     if (!input || (input.validity && input.validity.badInput)) return null;
-    const raw = String(input.value || '').trim();
-    if (!raw) return null;
-    const n = Number(raw);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
-    return n;
+    const esito = window.SN_CAMPO_NUMERO.leggi(input.value, { intero: true });
+    return esito.ok ? esito.valore : null;
   }
   function rifiuta(msg, input, testo) {
     msg.hidden = false;
@@ -1135,6 +1133,8 @@
 
   $('ownerInvitesForm').addEventListener('submit', (ev) => { Promise.resolve(ownerInvites(ev)).catch(() => {}); });
   $('ownerGrantForm').addEventListener('submit', (ev) => { Promise.resolve(ownerGrant(ev)).catch(() => {}); });
+  window.SN_CAMPO_NUMERO.virgolaComePunto($('ownerInviteCount'));
+  window.SN_CAMPO_NUMERO.virgolaComePunto($('ownerGrantCredits'));
 
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {

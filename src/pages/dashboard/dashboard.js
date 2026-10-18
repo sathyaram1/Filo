@@ -30,6 +30,7 @@
   const GLIFO_RIPRENDI = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
+  const DOPO_OK = '[L\'utente ha dato l\'OK qui sopra: riprendi la sua richiesta da lì e rispondigli.]';
   // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
   const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
     + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
@@ -105,7 +106,7 @@
 
   Att.init({
     send,
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url) => iconaDelSito(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
@@ -113,10 +114,24 @@
     sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
-    archiviaAzione: (type, cambi) => {
+    archiviaAzione: (type, cambi, a) => {
       const id = chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
-      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}) }); } catch (_) {} }
+      // Di una finestra guardata resta il nome e basta (#778).
+      const guardata = type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
+      if (id) {
+        try {
+          send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}) });
+        } catch (_) {}
+      }
+    },
+    // #778 — dopo l'OK a guardare una finestra la richiesta riprende da sola: un turno interno, come «Riprendi».
+    prosegui: () => {
+      if (sending) return;
+      sending = true;
+      aggiornaTasto();
+      threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
+      runTurnAndContinue({ userMessage: DOPO_OK, internal: true }).catch(() => {});
     },
   });
   // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
@@ -253,7 +268,7 @@
     refreshLive: () => refreshLive(),
     onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url, opz) => iconaDelSito(url, opz),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
     chatCorrente: () => chatId,
@@ -430,6 +445,15 @@
         note.textContent = Att.summarizeActivity(types, false);
         bubblesEl.appendChild(note);
       }
+      // #778 — di una finestra guardata l'archivio tiene il nome: l'immagine e quello che c'era non si conservano.
+      const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
+      for (const nome of guardate) {
+        const nota = document.createElement('div');
+        nota.className = 'dash-bubble-note';
+        nota.dataset.replay = '1';
+        nota.textContent = `Ho guardato «${nome}»: l'immagine non è conservata`;
+        bubblesEl.appendChild(nota);
+      }
       // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
       const fuori = isUser ? {} : {
         ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
@@ -438,7 +462,11 @@
       };
       threadHistory.push(isUser
         ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
+        : {
+          role: 'filo', text, ...fuori,
+          actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
+            ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
+        });
     }
     Term.nuovaChat(chat.messages.some((m) => (
       (m.role !== 'user' && Array.isArray(m.actions) && m.actions.includes('ESEGUI_COMANDO'))
@@ -490,9 +518,6 @@
   }
 
   // ===== Suggerimenti =====
-  // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
-  // gratis, niente API key, regge i casi mancanti restituendo un'icona
-  // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
   // Quello che l'utente ha scritto in questa chat: un codice scritto da lui può uscire (#810). Il testo di un
   // suggerimento della home no, l'ha scritto un modello.
   function paroleUtente() {
@@ -553,13 +578,26 @@
     ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
   }, true);
 
-  function faviconUrl(rawUrl) {
-    if (!rawUrl) return '';
+  // L'icona di un sito la cerca il main, mai un servizio di terzi (#848). Si ricorda solo quella trovata:
+  // un sito che non ha risposto si richiede al giro dopo, e lì decide il main quando riprovare.
+  // `soloCopie`: l'indirizzo al clic chiede l'OK, quindi l'icona non contatta il sito prima (#848).
+  const iconeSiti = new Map();
+  function iconaDelSito(rawUrl, { soloCopie = false } = {}) {
+    let host = '';
     try {
-      const u = new URL(rawUrl);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(u.hostname)}&sz=64`;
-    } catch (_) { return ''; }
+      const u = new URL(String(rawUrl || ''));
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.host.toLowerCase();
+    } catch (_) {}
+    if (!host) return Promise.resolve('');
+    const chiave = `${soloCopie ? 'c' : 'r'}|${host}`;
+    if (!iconeSiti.has(chiave)) {
+      const dimentica = () => { iconeSiti.delete(chiave); return ''; };
+      iconeSiti.set(chiave, send({ type: MSG.ICONA_SITO, url: String(rawUrl), soloCopie }).then((r) => {
+        const dato = r && r.ok && typeof r.dato === 'string' && /^data:image\//.test(r.dato) ? r.dato : '';
+        return dato || dimentica();
+      }, dimentica));
+    }
+    return iconeSiti.get(chiave);
   }
 
   // I suggerimenti sono UNA carta fra le altre (#870): li disegna la parte delle carte.
@@ -723,7 +761,10 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    VEDI_SCHERMO: 'Guardo lo schermo…',
     CERCA_DOCUMENTI: 'Cerco fra i tuoi documenti…',
+    CERCA_SALVATE: 'Cerco fra le pagine salvate…',
+    APRI_SALVATA: 'Apro la pagina salvata…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
@@ -2107,7 +2148,9 @@
     try {
       const reduce = !!(window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-      if (reduce) return;
+      // Token `motion`: moltiplica le durate; a 0 il volo non parte, come col movimento ridotto del sistema.
+      const k = self.SN_THEME_TOKENS ? self.SN_THEME_TOKENS.motionFactor(document) : 1;
+      if (reduce || !k) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
       const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
@@ -2127,7 +2170,7 @@
 
       const coinSvg = (self.SN_ICONS?.credits?.(22)) || '●';
       const count = Math.min(9, Math.max(5, Math.round(n / 40) + 4));
-      let maxEnd = 1000;
+      let maxEnd = 1000 * k;
       for (let i = 0; i < count; i++) {
         const c = document.createElement('div');
         c.innerHTML = coinSvg;
@@ -2141,8 +2184,8 @@
         const sy = oy + (Math.random() - 0.5) * 80;
         const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 80;
         const my = Math.min(sy, ty) - 50 - Math.random() * 50;
-        const delay = i * 45;
-        const dur = 700 + i * 50 + Math.random() * 140;
+        const delay = i * 45 * k;
+        const dur = (700 + i * 50 + Math.random() * 140) * k;
         maxEnd = Math.max(maxEnd, delay + dur);
         try {
           c.animate([

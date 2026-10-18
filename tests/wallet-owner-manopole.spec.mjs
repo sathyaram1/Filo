@@ -1,4 +1,4 @@
-// La pagina «Inviti e utenti» dell'owner (#652): le sette manopole dei crediti
+// La pagina «Inviti e utenti» dell'owner (#652): le manopole dei crediti
 // si cambiano da qui, i numeri che il server calcola si guardano e basta, e
 // ogni riga della tabella apre la scheda della persona.
 //
@@ -35,6 +35,8 @@ const patch = [];
 // comporta Firestore quando le regole non lasciano scrivere.
 let rifiutaPatch = false;
 const detailChiesti = [];
+// Quante volte la pagina ha chiesto i numeri calcolati: dopo un salvataggio li rilegge.
+let overviewChiesti = 0;
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
@@ -118,6 +120,7 @@ test.beforeAll(async () => {
 
       if (url === '/walletState') return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
       if (url === '/walletOverview') {
+        overviewChiesti += 1;
         const cfg = { ...configDoc, eurUsdAt: '2026-09-18', maxGrantUsd: 57.33, migrateLocalMax: 10000 };
         return json(res, 200, {
           result: {
@@ -188,6 +191,7 @@ test.beforeEach(() => {
   patch.length = 0;
   rifiutaPatch = false;
   detailChiesti.length = 0;
+  overviewChiesti = 0;
 });
 
 async function simulaOwner(app) {
@@ -238,13 +242,13 @@ async function apriOwner(app) {
   return page;
 }
 
-test('le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
+test('le manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
-  // Ci sono tutte e sette, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(7, { timeout: 15_000 });
+  // Ci sono tutte, col valore che ha il server adesso.
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(8, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
@@ -313,13 +317,139 @@ test('le sette manopole si salvano davvero, un numero storto non arriva al serve
   expect(patch.length).toBe(2);
 });
 
+// #854 — gli ingressi con invito erano un numero in sola lettura: per aprire Filo a più persone l'owner
+// doveva passare dalla console di Firebase.
+test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre manopole', async ({ app }) => {
+  configDoc.invitesRemaining = 0;
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+
+  const campo = page.locator('#knob-invitesRemaining');
+  const msg = page.locator('#knob-invitesRemaining-msg');
+  const riga = page.locator('.sn-manopola[data-chiave="invitesRemaining"]');
+  await expect(campo).toHaveValue('0', { timeout: 15_000 });
+  await expect(riga.locator('label')).toHaveText('Ingressi con invito rimasti');
+  await expect(campo).toHaveAttribute('title', 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.');
+  // Il numero sta in un posto solo: la manopola.
+  await expect(page.locator('#ownerNumeri')).not.toContainText('riscatti');
+
+  await page.fill('#knob-invitesRemaining', '-1');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: non può essere negativo.');
+  await expect(msg).toHaveClass(/is-error/);
+
+  // Scritto alla italiana, con la virgola: con il sistema in inglese il campo numerico buttava via la virgola,
+  // e «2,5» partiva come 25. Scritto o incollato, è un decimale.
+  await page.fill('#knob-invitesRemaining', '');
+  await campo.pressSequentially('2,5');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: un numero intero, senza virgola.');
+  await page.fill('#knob-invitesRemaining', '');
+  await app.evaluate(({ clipboard }) => clipboard.writeText('2,5'));
+  await campo.focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: un numero intero, senza virgola.');
+  await page.fill('#knob-invitesRemaining', '');
+  await campo.pressSequentially('venti');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: ci vuole un numero.');
+  expect(patch.length).toBe(0);
+
+  // Il main rifà il controllo: una parola, un negativo o un decimale non arrivano a config/credits nemmeno
+  // saltando la pagina.
+  const diretti = await page.evaluate(async (valori) => {
+    const out = [];
+    for (const v of valori) {
+      const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_OWNER_KNOBS_SET, patch: { invitesRemaining: v } });
+      out.push({ ok: Boolean(r && r.ok), error: String((r && r.error) || '') });
+    }
+    return out;
+  }, ['venti', -1, 2.5]);
+  expect(diretti.map((d) => d.ok)).toEqual([false, false, false]);
+  expect(diretti[0].error).toContain('ci vuole un numero');
+  expect(diretti[1].error).toContain('non può essere negativo');
+  expect(diretti[2].error).toContain('un numero intero');
+  expect(patch.length).toBe(0);
+  expect(configDoc.invitesRemaining).toBe(0);
+
+  // Da 0 a 20: arriva al server solo quel campo, e i numeri calcolati accanto si rileggono.
+  const letturePrima = overviewChiesti;
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch.length).toBe(1);
+  expect(patch[0].mask).toEqual(['invitesRemaining']);
+  expect(patch[0].valori).toEqual({ invitesRemaining: 20 });
+  expect(configDoc.dailyCredits).toBe(100);
+  await expect(campo).toHaveValue('20');
+  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(letturePrima);
+
+  // «Rimetti com'era» riporta lo zero, sul server.
+  await page.click('#knob-invitesRemaining-rimetti');
+  await expect(msg).toHaveText('Rimesso com’era.', { timeout: 15_000 });
+  await expect(campo).toHaveValue('0');
+  expect(patch[1].valori).toEqual({ invitesRemaining: 0 });
+  expect(configDoc.invitesRemaining).toBe(0);
+
+  // Risalvato a 20 e riaperta la pagina, si legge 20.
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(20);
+  await page.reload();
+  await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
+  await expect(page.locator('#knob-invitesRemaining')).toHaveValue('20', { timeout: 15_000 });
+  expect(patch.length).toBe(3);
+
+  // Mille scritto alla italiana è mille, non uno.
+  await page.locator('#knob-invitesRemaining').fill('');
+  await page.locator('#knob-invitesRemaining').pressSequentially('1.000');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(page.locator('#knob-invitesRemaining-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(1000);
+  await expect(page.locator('#knob-invitesRemaining')).toHaveValue('1000');
+});
+
+// #854 — il contatore degli ingressi lo scala il server a ogni riscatto: una manopola appena salvata restava ferma
+// sul numero salvato finché non si riapriva la pagina.
+test('dopo un salvataggio la manopola degli ingressi segue il numero che il server ha scalato, e si può ancora rimettere com’era', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  const campo = page.locator('#knob-invitesRemaining');
+  const msg = page.locator('#knob-invitesRemaining-msg');
+  await expect(campo).toHaveValue('9', { timeout: 15_000 });
+
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+
+  // Tre persone entrano con un invito; poi l'owner cambia un'altra manopola e la pagina rilegge i numeri.
+  configDoc.invitesRemaining = 17;
+  const prima = overviewChiesti;
+  await page.fill('#knob-dailyCredits', '120');
+  await page.click('#knob-dailyCredits-salva');
+  await expect(page.locator('#knob-dailyCredits-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(prima);
+  await expect(campo).toHaveValue('17', { timeout: 10_000 });
+  // Il campo salvato prima resta lì col suo valore e col suo «rimetti com'era».
+  await expect(page.locator('#knob-dailyCredits')).toHaveValue('120');
+
+  await page.click('#knob-invitesRemaining-rimetti');
+  await expect(msg).toHaveText('Rimesso com’era.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(9);
+  await expect(campo).toHaveValue('9');
+});
+
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
   const numeri = page.locator('#ownerNumeri .sn-wallet-numero');
-  await expect(numeri).toHaveCount(9, { timeout: 15_000 });
+  await expect(numeri).toHaveCount(8, { timeout: 15_000 });
   // Un utente si conta al singolare.
   await expect(numeri.nth(0)).toContainText('utente');
   await expect(numeri.nth(0)).not.toContainText('utenti');
@@ -336,9 +466,9 @@ test('i numeri che il server calcola si leggono in cima, e non si possono toccar
   await expect(numeri.nth(6)).toContainText('crediti spesi');
   // Inviti ancora da dare: uno dei due ha posti liberi.
   await expect(numeri.nth(7)).toContainText('tuo invito da dare');
-  // Riscatti rimasti.
-  await expect(numeri.nth(8)).toContainText('9');
-  await expect(numeri.nth(8)).toContainText('riscatti rimasti');
+  // Gli ingressi con invito rimasti sono una manopola (#854): fra i numeri non si ripetono.
+  await expect(page.locator('#ownerNumeri')).not.toContainText('riscatti');
+  await expect(page.locator('#ownerNumeri')).not.toContainText('Ingressi con invito');
   // Sono numeri, non campi: nessuno di questi si scrive.
   expect(await page.locator('#ownerNumeri input').count()).toBe(0);
 });
@@ -409,7 +539,7 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
 
   const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -453,7 +583,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
 
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
@@ -534,7 +664,7 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
     await page.reload();
     await page.waitForFunction(() => {
       const s = document.getElementById('ownerSection');
-      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7;
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8;
     }, null, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);

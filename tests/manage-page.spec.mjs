@@ -12,6 +12,7 @@
 //   - un feedback in `clarify` mostra il box risposta dell'owner sotto Ricevuti.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -43,9 +44,10 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 9 tab: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni (#1110).
-  await expect(page.locator('.mg-tab')).toHaveCount(9);
-  // Con i feedback caricati (qui: nessuno) le cinque schede-lista dicono
+  // 9 schede: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni
+  // (#1110); più le tre della sezione Domande (#1150) e «Aspettano» (#903).
+  await expect(page.locator('.mg-tab')).toHaveCount(13);
+  // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
@@ -53,6 +55,7 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
   await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori server (0)');
+  await expect(page.locator('.mg-tab[data-tab="waiting"]')).toHaveText('Aspettano (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
@@ -82,19 +85,19 @@ test('le tab-lista condividono panel-list; le altre hanno il loro pannello (DB1)
   // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo
   // l'intestazione — che dice anche quanti feedback sta mostrando (#495).
   for (const [tab, head] of [['queue', 'In coda'], ['resolved', 'Risolti'], ['archived', 'Archiviati'], ['inbox', 'Ricevuti']]) {
-    await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
+    await apriScheda(page, tab);
     await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
     await expect(page.locator('#mgListHead')).toHaveText(`${head} (0)`);
   }
 
   // Red Team → l'interruttore «aperto a tutti» (#896).
-  await page.locator('.mg-tab[data-tab="stats"]').click();
+  await apriScheda(page, 'stats');
   await expect(page.locator('#panel-stats')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#panel-stats #mgRtOpenSwitch')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 
   // Modelli di supporto → dentro Automazioni (#1110).
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#panel-automation #mgSmSection')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
@@ -109,17 +112,17 @@ test('lo switch "Modalità automatica" vive nella tab Automazioni ed è read-onl
 
   // Lo switch non è più nella barra in alto: è dentro la tab "Automazioni".
   await expect(sw).toBeHidden();
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
   await expect(sw).toBeVisible();
 
   // Cambiando tab lo switch non è più visibile (è una sezione, non globale).
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(sw).toBeHidden();
 
   // Da non-admin (userData pulito → nessuna sessione) lo switch è disabilitato:
   // stesso contratto di sola lettura del banner.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(input).toBeDisabled();
   await expect(sw).toHaveClass(/mg-switch--disabled/);
 });
@@ -129,7 +132,7 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   await page.waitForLoadState('domcontentloaded');
 
   // Lo switch vive nella tab Automazioni.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const input = page.locator('#mgAutoToggle');
   const state = page.locator('#mgAutoState');
 
@@ -205,7 +208,7 @@ test("se il salvataggio fallisce lo switch NON resta acceso a vuoto", async ({ o
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await page.evaluate(() => {
     const orig = window.filo.message.bind(window.filo);
@@ -276,7 +279,7 @@ test('#446 — gli interruttori per mittente scrivono nella config, uno alla vol
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await stubAutomation(page, { enabled: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
@@ -306,7 +309,7 @@ test('ogni istanza di Claude si spegne da sola, senza trascinare le altre', asyn
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await stubAutomation(page, { enabled: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
@@ -335,7 +338,7 @@ test('una config salvata prima dello sdoppiamento non riaccende le istanze spent
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   // La mappa vecchia: un solo interruttore per tutte le istanze di Claude, spento.
   await stubAutomation(page, {
@@ -358,7 +361,7 @@ test('#446 — con l\'automatica spenta gli interruttori per mittente restano mo
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   await stubAutomation(page, { enabled: false });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
@@ -381,7 +384,7 @@ test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle ro
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   // Il checkbox è visivamente nascosto (switch custom: la levetta è il fratello
   // .mg-switch-track), quindi si asserisce sul controllo reale, non sulla resa.
@@ -412,7 +415,7 @@ test('l\'interruttore master spegne le routine e le impostazioni che valgono per
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   const sw = page.locator('#mgRoutinesToggle');
   // La levetta si vede davvero (il checkbox è nascosto per costruzione: se si
@@ -487,7 +490,7 @@ test('se il salvataggio dell\'interruttore fallisce, le routine NON risultano sp
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubAutomation(page);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
@@ -541,7 +544,7 @@ async function apriAutomazioni(openTab) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   return page;
 }
 
@@ -769,7 +772,7 @@ test('il timeout dei giudici è editabile (in secondi) e il salvataggio lo scriv
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const input = page.locator('#mgJudgeTimeout');
   await expect(input).toBeVisible();
 
@@ -797,7 +800,7 @@ test('il timeout dei giudici viene clampato nel range consentito', async ({ open
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubJudgeTimeout(page, 60000);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   const input = page.locator('#mgJudgeTimeout');
@@ -822,7 +825,7 @@ test('i quattro bilanci dei giri di correzione e le loro istruzioni sono editabi
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const cap3 = page.locator('#mgCap3');
   const cap2 = page.locator('#mgCap2');
   const cap1 = page.locator('#mgCap1');
@@ -886,7 +889,7 @@ test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const giro = page.locator('#mgGiroStretto');
   const etichetta = page.locator('#mgGiroStrettoSwitch');
   await expect(etichetta).toBeVisible();
@@ -943,7 +946,7 @@ test('i bilanci dei giri di correzione vengono clampati nel range [0, 10] al sal
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
 
@@ -1710,26 +1713,26 @@ test('la modalità automatica NON sposta gli allineati: restano nei Ricevuti fin
   // Owner + dati: l'allineato (in attesa di approvazione) è nei Ricevuti.
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_ALIGNED);
   await expect(page.locator('.mg-item')).toHaveCount(1);
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item')).toHaveCount(0);
 
   // Accendi l'automatica: NON deve cambiare nulla nelle liste.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await page.evaluate(() => {
     const el = document.getElementById('mgAutoToggle');
     el.disabled = false; el.checked = true;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item')).toHaveCount(0);
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
   // È l'APPROVAZIONE (che scrive lo status todo) a spostarlo in coda.
   const approved = { ...FAKE_FB_ALIGNED, status: 'todo' };
   await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('queue'); }, approved);
   await expect(page.locator('.mg-item')).toHaveCount(1);
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
@@ -1798,7 +1801,7 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   // e ricompare sotto "In coda".
   await expect(page.locator('#mgDetail')).toBeHidden();
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(0);
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 
@@ -1856,7 +1859,7 @@ test('tab Archiviati: OFF mostra i soli archiviati, il filtro ⭐ mostra tutti i
   await expect(page.locator('.mg-item-title')).toHaveText('Preferito in coda');
 
   // Il filtro sparisce sulle altre tab.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('#mgArchiveFilter')).toBeHidden();
 });
 
@@ -2341,7 +2344,7 @@ test('DD1: i Modelli di supporto (in Automazioni) renderizzano tutti gli slot co
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
 
   // Clicca la tab: innesca il caricamento lazy.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
@@ -2382,7 +2385,7 @@ test('DD1: i valori caricati popolano i campi (slot con catena ha più segmenti)
   await page.waitForFunction(() => window.__mgTest && window.filo);
 
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
   // Lo slot "sanitizer" ha valore "flash" → un solo input con "flash".
@@ -2408,7 +2411,7 @@ test('DD1: il bottone Salva invia support_models_update con i valori corretti', 
   await page.waitForFunction(() => window.__mgTest && window.filo);
 
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
   // Salva senza modifiche.
@@ -2448,7 +2451,7 @@ test('DD1: per i non-admin la sezione mostra il messaggio di accesso negato', as
 
   // Stub con admin=false.
   await stubSupportModels(page, {}, false);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   // Aspetta che il caricamento finisca (il denied appare subito dopo la risposta).
   await expect(page.locator('#mgSmDenied')).toBeVisible({ timeout: 5000 });
@@ -2615,7 +2618,7 @@ test('il testo delle istruzioni di correzione oltre il tetto non viene salvato m
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: 'PRIMA' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
@@ -2638,7 +2641,7 @@ test('un bilancio salvato col campo vuoto NON si salva (non c\'è un default, e 
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page, { cap2: 3, cap1: 2, cap0: 0, fixInstructions: '' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
@@ -2670,7 +2673,7 @@ test('giro stretto: se la config non si legge l’interruttore resta com’era e
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubCaps(page, { cap2: 5, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());

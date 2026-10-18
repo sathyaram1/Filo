@@ -383,7 +383,7 @@ function apri(parentWin, r) {
   s.mostratoAlle = Date.now();
   inVista = s;
   // La finestra compare quando la pagina conferma le voci nuove (popup-menu:pronto), mai con quelle di prima.
-  invia(s, { n: s.giro, html: vociHTML(voci), scuro: !!nativeTheme.shouldUseDarkColors });
+  invia(s, { n: s.giro, html: vociHTML(voci), scuro: !!nativeTheme.shouldUseDarkColors, vars: require('./movimento').variabili() });
 }
 
 // La finestra madre è pronta: il menu nasce adesso, così il primo clic lo trova già caricato.
@@ -446,6 +446,9 @@ const SCRIPT_MENU = `(() => {
     giro = (d && Number(d.n)) || 0;
     i = -1;
     document.documentElement.classList.toggle('scuro', !!(d && d.scuro));
+    for (const [k, v] of Object.entries((d && d.vars) || {})) {
+      if (/^--sn-[a-z-]+$/.test(k) && /^[0-9.]+$/.test(String(v))) document.documentElement.style.setProperty(k, String(v));
+    }
     const prima = document.querySelector('.menu');
     if (prima) prima.remove();
     if (d && d.html) {
@@ -500,7 +503,7 @@ function vociHTML(entries) {
 
 function stile(margin) {
   return `*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:rgba(248,246,240,0.98);--fg:#1a1918;--muted:#6e6b63;--border:#e0dcd4}
+:root{--bg:rgba(248,246,240,0.98);--fg:#1a1918;--muted:#6e6b63;--border:#e0dcd4;--sn-ombra:calc(var(--sn-shadow-opacity, 0.18) / 0.18)}
 :root.scuro{--bg:rgba(30,29,27,0.98);--fg:#e5e3dc;--muted:#8a8780;--border:#3a3835}
 html,body{background:transparent;overflow:hidden;height:100%}
 .menu{
@@ -508,13 +511,13 @@ html,body{background:transparent;overflow:hidden;height:100%}
   background:var(--bg);
   border:1px solid var(--border);
   border-radius:8px;
-  box-shadow:0 4px 20px rgba(0,0,0,0.20);
+  box-shadow:0 4px 20px rgba(0,0,0,calc(0.20 * var(--sn-ombra, 1)));
   padding:4px 0;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   font-size:13px;
   color:var(--fg);
   backdrop-filter:blur(8px);
-  animation:fadeIn 100ms ease-out;
+  animation:fadeIn calc(100ms * var(--sn-motion, 1)) ease-out;
 }
 @keyframes fadeIn{
   from{opacity:0;transform:translateY(-3px)}

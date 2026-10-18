@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
-for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito',
+for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito', 'tasti',
   'ttsVoices', 'filoMemory', 'preferences', 'cambi', 'actionLevels', 'actionTools', 'capabilities', 'vociImpostazioni']) {
   require(`../../src/shared/${m}.js`);
 }

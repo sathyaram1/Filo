@@ -443,10 +443,12 @@
   // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
   // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca, `esterni` = i
   // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810), `scritto` = le conversazioni
-  // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6).
+  // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6), `salvate` = le pagine di «Aperti per
+  // dopo» lette (#845).
   function contestoDaAzioni(actions) {
     const pezzi = [];
     const conversazioni = [];
+    const salvate = [];
     let nonFidato = false;
     const linkNoti = new Set();
     const esterni = [];
@@ -465,6 +467,12 @@
         if (out.blocked) continue;
         const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
+      } else if (type === 'VEDI_SCHERMO') {
+        // #778 — quello che si vede in una finestra (e i titoli delle finestre aperte) l'hanno scritto altri.
+        const titoli = [out.finestra, ...(Array.isArray(out.elenco) ? out.elenco.map((v) => v && v.nome) : [])]
+          .map(testo).filter((t) => t.trim()).join('\n');
+        const t = [testo(out.testo), titoli].filter((x) => x.trim()).join('\n');
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, 'da una finestra guardata sullo schermo'); }
       } else if (type === 'LEGGI_DOCUMENTO') {
         if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
       } else if (type === 'CERCA_DOCUMENTI') {
@@ -488,6 +496,17 @@
         const pagine = (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
         for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
         daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.url)}\n${testo(p.riassunto)}`).join('\n'), 'dalle pagine visitate');
+      } else if (type === 'CERCA_SALVATE' || type === 'APRI_SALVATA') {
+        // #845 — cosa ha salvato l'utente, con titoli scritti dai siti. Una pagina si riapre tale e quale, come i link di
+        // una ricerca; i suoi pezzi dentro un altro indirizzo chiedono l'OK (`salvate`, in assess). Gli indirizzi non
+        // vanno fra i testi di fuori: un codice nel loro indirizzo fermerebbe la pagina stessa, anche dalla lista.
+        const pagine = type === 'APRI_SALVATA'
+          ? (out.aperta ? [{ title: out.titolo, url: out.url }] : [])
+          : (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
+        if (pagine.length) nonFidato = true;
+        for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
+        for (const p of pagine) salvate.push(`${testo(p.title)}\n${testo(p.url)}\n${testo(p.categoria)}`);
+        daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.categoria)}`).join('\n'), 'dalle pagine salvate per dopo');
       } else if (type === 'CERCA_WEB') {
         const results = Array.isArray(out.results) ? out.results : [];
         if (results.length) nonFidato = true;
@@ -500,7 +519,7 @@
     if (letto.length > MAX_LETTO) letto = letto.slice(-MAX_LETTO);
     let scritto = conversazioni.filter(Boolean).join('\n');
     if (scritto.length > MAX_LETTO) scritto = scritto.slice(-MAX_LETTO);
-    return { letto, nonFidato, linkNoti, esterni, scritto };
+    return { letto, nonFidato, linkNoti, esterni, scritto, salvate: salvate.join('\n').slice(-MAX_LETTO) };
   }
 
   // Verdetto: { exfil, reason }. corpus = memoria e appunti (dati personali
@@ -508,15 +527,16 @@
   // scritto = ciò che l'utente ha scritto in chat, tranne `domanda` (quella di adesso).
   // fromUntrusted = nel contesto è entrato testo scritto da altri: allora anche
   // la forma dell'URL conta, salvo i link citati tali e quali da una ricerca
-  // (aprirli non porta fuori niente che la ricerca non contenesse già).
+  // (aprirli non porta fuori niente che la ricerca non contenesse già). `salvate` = le pagine salvate lette: un loro
+  // indirizzo si riapre tale e quale, un altro che ne porta dei pezzi chiede l'OK (#845).
   function assess(url, {
-    corpus = '', letto = '', fromUntrusted = false, linkNoti = null, scritto = '', domanda = '',
+    corpus = '', letto = '', fromUntrusted = false, linkNoti = null, scritto = '', domanda = '', salvate = '',
   } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
-    const t = taint(link, corpus) || taintLetto(link, letto);
-    if (t) return { exfil: true, reason: t.reason };
     const noto = !!(linkNoti && linkNoti.has(chiaveLink(link)));
+    const t = taint(link, corpus) || taintLetto(link, letto) || (noto ? null : taintLetto(link, salvate));
+    if (t) return { exfil: true, reason: t.reason };
     const s = noto ? null : taintScritto(link, scritto, domanda) || (fromUntrusted ? structural(link) : null);
     if (s) return { exfil: true, reason: s.reason };
     return { exfil: false, reason: '' };
@@ -533,6 +553,7 @@
       linkNoti: ctx.linkNoti,
       scritto: [String(parole || ''), ctx.scritto].filter(Boolean).join('\n'),
       domanda,
+      salvate: ctx.salvate,
     });
   }
 
@@ -560,6 +581,7 @@
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
+    APRI_SALVATA: 'non ho aperto la pagina salvata',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo

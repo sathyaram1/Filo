@@ -82,8 +82,8 @@
   function plainNoteServed(settings, action, result) {
     const servedBy = (result && result.servedBy) || null;
     const C = global.SN_CONST;
-    const violation = Boolean(servedBy && C && typeof C.servedPolicyViolation === 'function'
-      && C.servedPolicyViolation(servedBy, result.model, (settings && settings.excludedProviders) || []));
+    const violation = Boolean(servedBy && C && typeof C.servedViolationOf === 'function'
+      && C.servedViolationOf(settings, result));
     return { servedBy, violation };
   }
 
@@ -110,7 +110,7 @@
       let funzione = '';
       let rimedio = '';
       try { funzione = funzioneDi(action) || ''; } catch (_) {}
-      try { rimedio = rimedioDi(s, action) || ''; } catch (_) {}
+      try { rimedio = rimedioDi(s, action, err) || ''; } catch (_) {}
       err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoHostEsclusi(err.hosts), rimedio });
       return err;
     }
@@ -224,7 +224,7 @@
           await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
         }
         if (!r || !r.servedBy) { schedule(); return; }
-        const seen = noteServed(s, action, { servedBy: r.servedBy, model });
+        const seen = noteServed(s, action, { servedBy: r.servedBy, model, keySource: keySource || '' });
         if (typeof onServedBy === 'function') {
           try { await onServedBy(seen); } catch (_) {}
         }
@@ -341,7 +341,7 @@
         let seen = { servedBy: null, violation: false };
         let costEur = 0;
         if (risposte) {
-          seen = noteServed(s, action, { servedBy, model: a.model });
+          seen = noteServed(s, action, { servedBy, model: a.model, keySource: somma.keySource });
           costEur = await recordCost(s, action, a.provider, a.model, somma);
         }
         if (esito.fermo && fineCrediti(esito.fermo) && !risposte) throw esito.fermo;

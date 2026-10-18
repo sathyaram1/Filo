@@ -352,7 +352,7 @@
     }
     // Il clic su OK prima della fine porta avanti il testo di una pagina: un
     // bottone che non risponde sembra rotto, e il perché stava solo nel title.
-    const avanti = () => el.scrollBy({ top: Math.max(el.clientHeight - 24, 24), behavior: 'smooth' });
+    const avanti = () => el.scrollBy({ top: Math.max(el.clientHeight - 24, 24), behavior: globalThis.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
     return { visto: visto_, avanti };
   }
 

@@ -29,6 +29,7 @@
     GET_SETTINGS: 'get_settings',
     UPDATE_SETTINGS: 'update_settings',           // { settings }
     RESET_SETTINGS: 'reset_settings',             // → riporta TUTTE le impostazioni ai predefiniti
+    REGISTRA_TASTI: 'registra_tasti',             // { attivo } → i tasti premuti arrivano alla pagina (Preferenze, #842)
     EXPORT_DATA: 'export_data',                   // → salva tutti i dati come .zip
     // Reimportazione del .zip di EXPORT_DATA, in due passi: prima si sceglie e
     // si LEGGE il file (anteprima con quante sezioni/immagini contiene), poi si
@@ -37,13 +38,18 @@
     // né riscrivere lo storage (comprese le chiavi API).
     IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
     IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
+    // Solo dalla pagina Sicurezza (#850): Filo si chiude e al riavvio svuota la cartella dei dati.
+    CANCELLA_TUTTI_I_DATI: 'cancella_tutti_i_dati',             // { parola: 'conferma', ancheIdentita } → { ok } | { ok:false, error }
+    CANCELLA_TUTTI_I_DATI_STATO: 'cancella_tutti_i_dati_stato', // → { ok, identita, inCorso }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
     REMOVE_HISTORY_ENTRY: 'remove_history_entry', // { id }
     CLEAR_HISTORY: 'clear_history',
     GET_SAVED_PAGES: 'get_saved_pages',
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }
+    RESTORE_SAVED_PAGE: 'restore_saved_page',     // { id } — l'«Annulla» di una rimozione: la voce la tiene il main
     CONSUME_SAVED_PAGE: 'consume_saved_page',     // { id }
+    APRI_PAGINA_SALVATA: 'apri_pagina_salvata',   // { id, tieni } — dalla chat: apre con l'indirizzo in elenco e la toglie (#845)
     SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id } — il main fotografa la scheda di chi chiede e ne fa la miniatura
 
     // §3.1/§3.3 — archivio tab chiuse (metadati). La scrittura avviene nel main
@@ -64,6 +70,8 @@
     ARCHIVIO_DA_CANCELLARE_AVANZAMENTO: 'archivio_da_cancellare_avanzamento',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
+    // #848 — l'icona di un sito per la home e la chat, senza servizi di terzi. { url } → { ok, dato } (data:image/… o '')
+    ICONA_SITO: 'icona_sito',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
     // locale nel main (deckStore). Usati dalla pagina filo://decks.
     DECKS_LIST: 'decks_list',
@@ -259,7 +267,8 @@
     //   OpenRouter non ha risposto. Senza il campo la pagina dice che il conto non è letto.
     WALLET_OWNER_OVERVIEW: 'wallet_owner_overview',
     // WALLET_OWNER_ALARM_PENDING (#820): gli allarmi del conto OpenRouter da dire all'owner all'avvio, una volta
-    //   finché la situazione resta quella. Chi non è owner non fa partire nessuna lettura.
+    //   finché la situazione resta quella. Chi non è owner non fa partire nessuna lettura. La risposta arriva quando
+    //   gli avvisi della home nati dalla stessa lettura (#855) sono già fra le notifiche.
     //   { } → { ok, alarm: { title, text } | null }
     WALLET_OWNER_ALARM_PENDING: 'wallet_owner_alarm_pending',
     // WALLET_OWNER_GRANT: alza il tetto di un utente. { pseudonym, credits, why } → { ok, result }
@@ -567,7 +576,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, localOnly?: bool, localApproval?: true }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, localOnly?: bool, localApproval?: true, waitsFor?: '#12, #13' ('' le toglie), waitsTieni?: [id] (già scritte, tenute come sono) }
     // #583 — LETTURA dei feedback per le superfici dell'owner. La collezione
     // non è più pubblica: leggono solo l'admin e il server. L'ID token vive nel
     // main e non deve arrivare in una pagina, quindi la pagina CHIEDE la
@@ -825,6 +834,8 @@
     // dice quale.
     MENU_DEL_SITO_SCELTO: 'menu_del_sito_scelto',   // (sito) {} → { ok, proposto }: «Menu di <sito>» ha aperto il suo menu
     MENU_DEL_SITO_IMPOSTA: 'menu_del_sito_imposta', // { attivo, sito? (solo da Filo), avvisa? } → { ok, sito, siti }
+    // Filo spento o riacceso su un sito dal tasto destro (#843): da un sito vale per la sua scheda, che ricava il main.
+    FILO_SPENTO_IMPOSTA: 'filo_spento_imposta', // { spento, siti? (solo da Filo), avvisa? } → { ok, sito, siti, cambiati }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
@@ -839,6 +850,7 @@
     // lo dà solo GET; le scritture rispondono { ok } e basta.
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
+    COPY_TEXT_TO_CLIPBOARD: 'copy_text_to_clipboard', // { text } → { ok }: appunti di sistema e cronologia, dal «Copia» delle risposte (#846); cancello di PUSH
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
@@ -855,7 +867,7 @@
     RENAME_CATEGORY: 'rename_category',         // { id, name, unisci? } — unisci:false non fonde con un'omonima
     DELETE_CATEGORY: 'delete_category',         // { id }
     MERGE_CATEGORIES: 'merge_categories',       // { fromId, toId }
-    MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId }
+    MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId } o { pageId, nome } per una categoria nuova
 
     // === Filo dashboard ===
     // Filo Chat: invio messaggio utente all'agente conversazionale

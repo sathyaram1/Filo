@@ -201,6 +201,7 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
 - Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
+- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
 
@@ -370,7 +371,11 @@ dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
-arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
+arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
+aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
+lavoro locale: quello resta `locale`, e la sua nota dice quale regola lo tiene
+fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul

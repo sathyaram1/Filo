@@ -102,6 +102,24 @@ async function staScrivendo(wc) {
   }
 }
 
+// Le Preferenze stanno registrando una scorciatoia (#842): su Mac la barra vede il tasto prima della pagina, che
+// deve poterlo rifiutare col perché invece di vedere aprirsi una scheda. Il tasto le arriva com'è stato premuto.
+function oRegistra(accel, fa, mac, aFuoco = contenutoAFuoco) {
+  return (...args) => {
+    const wc = aFuoco();
+    if (!wc || !require('./shortcuts').staRegistrandoTasti(wc)) return fa(...args);
+    const pezzi = String(accel).split('+');
+    const keyCode = pezzi.pop();
+    const nomi = { commandorcontrol: mac ? 'meta' : 'control', cmd: 'meta', command: 'meta', ctrl: 'control', control: 'control', alt: 'alt', shift: 'shift' };
+    const modifiers = pezzi.map((m) => nomi[m.toLowerCase()]).filter(Boolean);
+    try {
+      wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+      wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+    } catch (_) {}
+    return undefined;
+  };
+}
+
 // ─── le azioni, le stesse delle scorciatoie ─────────────────────────────────
 
 function nuovaScheda() {
@@ -152,8 +170,10 @@ function zoom(verso) {
   try { c.tab.view.webContents.send('filo:zoom-key', verso); } catch (_) {}
 }
 
-function schermoIntero() {
+// Dal tasto, lo schermo pieno chiesto dalla pagina a fuoco (un video) resta suo, come in src/main/shortcuts.js.
+function schermoIntero(_voce, _finestra, evento) {
   const win = finestra();
+  if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.schermoPienoDi(contenutoAFuoco())) return;
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
 }
 
@@ -275,10 +295,8 @@ function template(piattaforma) {
       { label: 'Rimpicciolisci', accelerator: 'CommandOrControl+-', click: () => zoom('out'), ...SOLO_SCRITTA },
       { label: 'Dimensione reale', accelerator: 'CommandOrControl+0', click: () => zoom('reset'), ...SOLO_SCRITTA },
       { type: 'separator' },
-      // Senza acceleratore, e non è una dimenticanza: in questa barra ci vanno
-      // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
-      // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
-      { label: 'Schermo intero', click: schermoIntero },
+      // Il tasto abituale di ogni sistema (F11, su Mac Control+Cmd+F): lo ascolta src/main/shortcuts.js ovunque.
+      { label: 'Schermo intero', accelerator: globalThis.SN_TASTI.etichettaSchermoIntero(MAC ? 'darwin' : 'win32'), click: schermoIntero, ...SOLO_SCRITTA },
       { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
     ],
   };
@@ -299,11 +317,15 @@ function template(piattaforma) {
     label: 'Aiuto',
     role: 'help',
     submenu: [
-      { label: 'Assistente laterale', click: assistenteLaterale },
+      { id: 'assistente-laterale', label: 'Assistente laterale', click: assistenteLaterale },
     ],
   };
 
-  return [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
+  const barra = [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
+  for (const m of barra) {
+    for (const v of m.submenu || []) if (v.accelerator && typeof v.click === 'function') v.click = oRegistra(v.accelerator, v.click, MAC);
+  }
+  return barra;
 }
 
 // Da chiamare una volta sola, dopo `app.whenReady()`.
@@ -317,6 +339,15 @@ function installaMenuApplicazione() {
   } catch (e) {
     console.warn('[Filo] barra dei menu non installata', e && e.message);
   }
+  // L'Aiuto spento (#841) non resta nel menu: la voce segue l'interruttore.
+  try {
+    const segui = (s) => {
+      const voce = Menu.getApplicationMenu()?.getMenuItemById('assistente-laterale');
+      if (voce) voce.visible = require('./services/interruttoreAiuto').acceso(s);
+    };
+    globalThis.SN_STORAGE.getSettings().then(segui, () => {});
+    require('./shim/storage').onChanged((changes) => { if (changes && changes.settings) segui(changes.settings.newValue); });
+  } catch (_) {}
 }
 
-module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo, oRegistra };

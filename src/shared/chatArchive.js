@@ -389,6 +389,14 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
+      const guardate = [
+        ...(Array.isArray(turn.guardate) ? turn.guardate : []),
+        ...(Array.isArray(turn.actions) ? turn.actions : [])
+          .filter((a) => a && String(a.type || '').toUpperCase() === 'VEDI_SCHERMO' && a._executed !== false && a._output && a._output.testo)
+          .map((a) => a._output.finestra),
+      ].filter((n) => typeof n === 'string' && n.trim()).map((n) => n.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120));
+      if (guardate.length) out.guardate = [...new Set(guardate)].slice(0, 20);
       // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
       const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
       if (cambi.length) out.cambi = cambi;

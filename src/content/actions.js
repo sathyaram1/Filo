@@ -683,7 +683,7 @@
           const arrow = document.createElement('button');
           arrow.type = 'button';
           arrow.className = 'sn-menu-inline-arrow';
-          arrow.title = Tasti.frase(I18n.t('menu_explain_deep'), 'Alt+E');
+          arrow.title = `${I18n.t('menu_explain_deep')} (${Tasti.etichettaFilo(Tasti.scorciatoiaFilo('explain-selection'))})`;
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -951,13 +951,32 @@
     };
   }
 
-  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
-  let salvataggioInCorso = false;
+  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per
+  // chiudersi, e chi chiede riceve lo stesso esito (la voce salvata, o null).
+  let salvataggioInCorso = null;
   const confermeMostrate = new Set();
 
-  async function savePage() {
-    if (salvataggioInCorso) return;
-    salvataggioInCorso = true;
+  function savePage() {
+    if (!salvataggioInCorso) {
+      salvataggioInCorso = salva().then((entry) => {
+        if (!entry) salvataggioInCorso = null;
+        return entry;
+      }, () => {
+        salvataggioInCorso = null;
+        return null;
+      });
+    }
+    return salvataggioInCorso;
+  }
+
+  // La miniatura è della pagina: l'Aiuto aperto sopra non ci finisce dentro.
+  function nascondiPannelli() {
+    const aperti = [...document.querySelectorAll('.sn-sidebar')].filter((el) => el.style.visibility !== 'hidden');
+    for (const el of aperti) el.style.visibility = 'hidden';
+    return () => { for (const el of aperti) el.style.visibility = ''; };
+  }
+
+  async function salva() {
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
     // della miniatura attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
@@ -971,18 +990,16 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        salvataggioInCorso = false;
         Popup.showToast(I18n.t('toast_save_failed'));
-        return;
+        return null;
       }
       entry = res.entry;
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
-      salvataggioInCorso = false;
       console.error('[SN] savePage', e);
       Popup.showToast(I18n.t('toast_save_failed'));
-      return;
+      return null;
     }
 
     // Miniatura best-effort: la scatta il main (piccola, #839) dopo che il menu
@@ -990,14 +1007,17 @@
     // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
     // risposta. Se la pagina è già cambiata la cattura può fallire: il
     // salvataggio resta comunque valido, solo senza anteprima.
+    const rimetti = nascondiPannelli();
     try {
       await attendiCompositor();
       if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
     } catch (_) { /* miniatura opzionale */ }
+    rimetti();
 
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
     showSaveConfirm(entry);
+    return entry;
   }
 
   // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
@@ -1041,11 +1061,11 @@
     const finish = (openList) => {
       if (done) return;
       done = true;
-      if (chiudiScheda) salvataggioInCorso = false;
+      if (chiudiScheda) salvataggioInCorso = null;
       if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
-      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
+      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, self.SN_THEME_TOKENS?.motionMs(220) ?? 220);
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
@@ -1895,7 +1915,7 @@
       b.textContent = label;
       const base = [
         'flex:1', 'padding:9px 12px', 'border-radius:8px', 'font-size:13px',
-        'font-family:inherit', 'cursor:pointer', 'transition:background .12s,border-color .12s',
+        'font-family:inherit', 'cursor:pointer', 'transition:background calc(.12s * var(--sn-motion, 1)),border-color calc(.12s * var(--sn-motion, 1))',
       ];
       if (primary) {
         base.push('border:1px solid var(--sn-accent,#c45a3b)', 'background:var(--sn-accent,#c45a3b)', 'color:#fff');

@@ -91,10 +91,10 @@
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
 //         repo). Da lì ciò che scrivi nasce non fidato. Exit 0 = registrato, 4 = rifiutato, 3 = guasto.
 //
-//   node scripts/routine-channel.mjs git-credenziali <get|store|erase>
-//       → aiutante di credenziali di git per il clone di filo-security di un lavoro server (#1159): lo configura
-//         routines/roles/_lavoro-server.md nel clone, mai globale. Risponde solo a https://github.com/sathyaram1/filo-security
-//         col token da un'ora del biglietto; un no è uno stdout vuoto (exit 0), il motivo su stderr.
+//   node scripts/routine-channel.mjs git-server <clone|ls-remote|fetch|push> <cartella-del-clone> [<ramo>]
+//       → l'unica strada di git verso filo-security in un lavoro server (#1159, #1233): chiede il token del biglietto e
+//         lo dà a quella sola chiamata di git (lib/git-server.mjs). Exit 0 = fatto, 1 = uso o git fallito, 4 = token
+//         rifiutato, 3 = guasto.
 //
 //   node scripts/routine-channel.mjs ramo-server <ramo> [<sha>]
 //       → dopo il push su filo-security: il server legge la punta e la registra (registro dei rami). Exit come sporca.
@@ -118,7 +118,7 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT } from './lib/branch-integrity.mjs';
@@ -128,6 +128,7 @@ import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticke
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
+import { URL_SERVER, ambienteGitServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 
@@ -811,36 +812,6 @@ export async function sporca(t, motivo, opts) {
 
 // ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ────────────────────
 
-export const REPO_SERVER = 'sathyaram1/filo-security';
-
-/** Le righe `chiave=valore` che git manda a un aiutante di credenziali. PURA. */
-export function leggiRichiestaGit(testo) {
-  const out = {};
-  for (const riga of String(testo || '').split(/\r?\n/)) {
-    const i = riga.indexOf('=');
-    if (i > 0) out[riga.slice(0, i)] = riga.slice(i + 1);
-  }
-  return out;
-}
-
-/**
- * La richiesta è per filo-security, in https su github.com? Il percorso lo manda git solo con
- * `credential.useHttpPath=true` (nel clone): senza, si risponde a nessuno. PURA.
- */
-export function richiestaPerServer(r) {
-  const x = r || {};
-  return x.protocol === 'https' && String(x.host || '').toLowerCase() === 'github.com'
-    && /^sathyaram1\/filo-security(\.git)?\/?$/i.test(String(x.path || ''));
-}
-
-/** Le righe con cui git riceve il token. `scadeIl` in ms. PURA. */
-export function rigaCredenziali(token, scadeIl) {
-  const righe = ['username=x-access-token', `password=${token}`];
-  const s = Math.floor(Number(scadeIl) / 1000);
-  if (Number.isFinite(s) && s > 0) righe.push(`password_expiry_utc=${s}`);
-  return `${righe.join('\n')}\n`;
-}
-
 /** Il token di filo-lavori per il biglietto (routineGitToken). → { outcome:'ok', token, scadeIl } | { outcome, reason } */
 export async function gitToken(t, opts) {
   const { status, body } = await call('routineGitToken', { ticket: t, repo: 'server' }, opts);
@@ -865,14 +836,57 @@ export async function ramoServer(t, ramo, sha, opts) {
   };
 }
 
-function leggiStdin() {
-  return new Promise((ok) => {
-    let testo = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (c) => { testo += c; });
-    process.stdin.on('end', () => ok(testo));
-    process.stdin.on('error', () => ok(testo));
-  });
+/**
+ * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security col token del biglietto, dato a quella sola
+ * chiamata. → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token` ed `eco` per le prove.
+ */
+export async function eseguiGitServer({
+  azione, cartella, ramo, biglietto, root = ROOT, env = process.env,
+  lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
+  eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo),
+} = {}) {
+  const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
+  const piano = pianoGitServer({ azione, cartella, ramo, root, clonato });
+  if (piano.errore) { scrivi(`git-server: ${piano.errore} Il server non è stato chiamato.`); return 1; }
+  if (piano.nota) scrivi(`git-server: ${piano.nota}`);
+  if (piano.controllaOrigin) {
+    const { env: ambienteNudo } = ambienteGitServer(env, '');
+    const url = (dove) => {
+      const r = lancia(['-C', piano.dir, 'remote', 'get-url', ...dove, 'origin'], { env: ambienteNudo, encoding: 'utf8' });
+      return r && r.status === 0 ? String(r.stdout || '').trim() : '';
+    };
+    for (const u of [url([]), url(['--push'])]) {
+      if (originDelServer(u)) continue;
+      scrivi(`git-server: l'origin del clone è «${urlSenzaSegreti(u) || 'assente'}», non ${URL_SERVER}: il token non esce. Il server non è stato chiamato.`);
+      return 1;
+    }
+  }
+  if (!biglietto) { scrivi('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); return 1; }
+  const t = await token(biglietto);
+  if (t.outcome !== 'ok') {
+    const motivo = `${t.reason}${t.detail ? `: ${t.detail}` : ''}`;
+    scrivi(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
+    return t.outcome === 'refused' ? 4 : 3;
+  }
+  const { env: figlio, tolte } = ambienteGitServer(env, t.token);
+  const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
+  scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv[0] === 'clone' ? 'clone' : piano.argv[2]} su filo-security.`);
+  if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
+  // L'URL con dentro il token può finire in un messaggio di git: l'uscita passa da qui, ripulita, mai diretta.
+  const r = lancia(piano.argv, { env: figlio, stdio: ['inherit', 'pipe', 'pipe'], encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  if (r && r.stdout) eco('out', senzaToken(r.stdout, t.token));
+  if (r && r.stderr) eco('err', senzaToken(r.stderr, t.token));
+  if (r && r.error) { scrivi(`git-server: git non parte o si è fermato (${r.error.code || r.error.message}).`); return 1; }
+  if (!r || r.status !== 0) {
+    const chi = {
+      proxy: 'a respingerlo è il proxy della sessione, non GitHub: il token non è arrivato a GitHub. Il testo esatto, sopra, è quello da riportare.',
+      github: 'GitHub l\'ha respinto (scaduto, revocato, o il biglietto non porta il repo).',
+      ignoto: 'il rifiuto non dice chi lo manda: può essere GitHub o il proxy della sessione. Il testo esatto, sopra, è quello da riportare.',
+    }[chiHaRespinto(r && r.stderr)] || 'il motivo è nel testo di git, sopra.';
+    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, nell'URL di ${URL_SERVER} per questa sola chiamata: ${chi}`);
+    return 1;
+  }
+  return 0;
 }
 
 /**
@@ -1242,7 +1256,7 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|sporca|git-credenziali|ramo-server|compare|domanda|risposta> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
@@ -1668,22 +1682,11 @@ if (isMain) {
     if (r.outcome === 'ok') { console.log('Biglietto sporcato: da qui ciò che scrivi nasce non fidato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
-  } else if (cmd === 'git-credenziali') {
-    // Lo chiama git, mai una persona: stdout porta solo le credenziali, e un no è uno stdout vuoto (git non si autentica).
-    const azione = args[0];
-    const richiesta = await leggiStdin();
-    if (azione !== 'get') process.exit(0);
-    if (!richiestaPerServer(leggiRichiestaGit(richiesta))) process.exit(0);
+  } else if (cmd === 'git-server') {
     const { readTicket } = await import('./lib/routine-ticket.mjs');
-    const biglietto = mano.ticket || readTicket(ROOT);
-    if (!biglietto) { console.error('git-credenziali: nessun biglietto del giro, niente token per filo-security.'); process.exit(0); }
-    const r = await gitToken(biglietto);
-    if (r.outcome !== 'ok') {
-      console.error(`git-credenziali: niente token per filo-security (${r.reason}${r.detail ? `: ${r.detail}` : ''}).`);
-      process.exit(0);
-    }
-    process.stdout.write(rigaCredenziali(r.token, r.scadeIl));
-    process.exit(0);
+    const [azione, cartella, ramo, ...troppi] = args;
+    if (troppi.length) { console.error(`git-server prende azione, cartella e al più un ramo: «${troppi.join(' ')}» è di troppo. Il server non è stato chiamato.`); process.exit(1); }
+    process.exit(await eseguiGitServer({ azione, cartella, ramo, biglietto: mano.ticket || readTicket(ROOT) }));
   } else if (cmd === 'ramo-server') {
     const ramo = String(args[0] || '').trim();
     const sha = String(args[1] || data.sha || '').trim();

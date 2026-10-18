@@ -478,7 +478,7 @@
   }
   // La barra laterale si disegna in una vista sua: le arrivano da qui i colori già calcolati
   // (tema, token dell'utente, incognito) e il profilo da mostrare.
-  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius'];
+  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius', '--sn-motion', '--sn-ombra'];
   function rispecchiaBarra() {
     if (!api.barra) return;
     const cs = getComputedStyle(document.documentElement);
@@ -569,7 +569,7 @@
   const ANTEPRIMA = (() => {
     const RITARDO = 200;
     const CALDA = 600;
-    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius'];
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     let timer = null;
     let attesaDi = null;
     let puntatore = null;
@@ -927,10 +927,11 @@
     const mio = ++ctxGiro;
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
-    // Le due domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
-    const [proxy, permessi] = await Promise.all([
+    // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
+    const [proxy, permessi, impostazioni] = await Promise.all([
       senzaErrore(() => api.tabs.proxyStatus()),
       senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
+      senzaErrore(() => api.message({ type: 'get_settings' })),
     ]);
     // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
     if (mio !== ctxGiro) return;
@@ -940,8 +941,10 @@
       t.muted
         ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
-      { label: 'Aiuto', icon: 'help', action: 'tab-help' },
     ];
+    // L'Aiuto spento (#841) non ha la sua voce.
+    const ff = impostazioni && impostazioni.settings && impostazioni.settings.featureFlags;
+    if (!(ff && ff.help === false)) entries.push({ label: 'Aiuto', icon: 'help', action: 'tab-help' });
     // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
     // configurato — una voce che non può funzionare non deve comparire.
     // Il click diretto usa il default (ultima location usata, altrimenti USA);
@@ -1492,7 +1495,7 @@
     }
     // Questa pila è il modello e non si disegna (la coprirebbe la scheda): a schermo la disegna la
     // vista sopra la pagina (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
-    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius'];
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
       const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
@@ -1544,7 +1547,7 @@
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
       if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
-      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
+      setTimeout(() => { try { card.remove(); } catch (_) {} }, ThemeTokens ? ThemeTokens.motionMs(220) : 220);
     }
     // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3). Stanno prima della X.
     function azioni(card, actions) {
@@ -1713,6 +1716,14 @@
             return {
               label: a.label,
               onClick: () => api.message({ type: 'menu_del_sito_imposta', sito, attivo: attivo === true, avvisa: attivo === true }).catch(() => {}),
+            };
+          }
+          // #843 — «Annulla» dopo aver spento o riacceso Filo su un sito: rimette i siti di quel cambio.
+          if (a && a.filoSpento && !a.onClick) {
+            const { siti, spento } = a.filoSpento;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'filo_spento_imposta', siti: Array.isArray(siti) ? siti : [], spento: spento === true }).catch(() => {}),
             };
           }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.

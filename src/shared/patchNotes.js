@@ -9,12 +9,45 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.243', date: '2026-10-16',
+      features: [
+        'Se paghi con una tua chiave OpenRouter, nelle Opzioni trovi «Con la mia chiave, usa anche i fornitori esclusi». Acceso, le richieste pagate con la tua chiave possono andare anche ai fornitori che Filo esclude, quindi funzionano anche modelli come Gemini o Grok. È spento di serie e lo accendi anche chiedendolo a Filo. Coi crediti di Filo l\'esclusione resta.',
+        'Quando un sito ti chiede l\'email o il nome utente, per esempio la pagina di accesso di Google, sotto il campo compare l\'email del tuo account Filo: un clic, oppure freccia giù e Invio, e la trovi scritta. Il sito la vede solo dopo che l\'hai scelta. Se non la vuoi, la spegni col tasto destro sulla proposta o in Preferenze, nelle impostazioni avanzate.',
+        'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
+      ],
+      fixes: [
+        'L\'archivio che esporti da Sicurezza non porta più le tue chiavi API, nemmeno quelle copiate o scritte in chat, a meno che tu non spunti «Includi le chiavi». Importarlo non tocca le chiavi che hai già. Gli archivi fatti prima le contengono, quindi trattali come una password. Su un computer senza portachiavi di sistema, Filo ti dice una volta che salva le chiavi in chiaro.',
+        'Filo non chiede più a Google le icone dei siti che ti suggerisce nella home o che apre per te in chat, e Google non vede più quali siti frequenti. Usa quelle già viste nelle tue schede, nell\'archivio e nelle pagine salvate, o le chiede al sito stesso.',
+      ],
+    },
+    {
+      version: '0.2.242', date: '2026-10-16',
+      features: [
+        'Puoi togliere dal computer, in un colpo, tutto quello che Filo sa di te. In Sicurezza, sotto Esporta e Importa, c\'è «Cancella tutti i dati di Filo». Ti propone di esportare prima, ti dice cosa sparisce e parte solo quando scrivi «conferma». Poi Filo si riapre come appena installato. I tuoi crediti restano, a meno che tu non scelga di cancellare anche la loro identità. Se lo chiedi in chat, Filo ti porta a quel tasto.',
+        'Sotto ogni risposta nel riquadro di Spiega e Traduci c\'è «Copia». Un clic mette il testo negli appunti senza asterischi o simboli di formattazione, pronto da incollare dove ti serve.',
+        'Le pagine salvate per dopo si ritrovano chiedendolo a Filo. Scrivi in chat «dov\'era quella ricetta che avevo salvato?» o «aprimi le pagine salvate sul campeggio» e Filo ti mostra quelle giuste da cliccare, o ti dice che non ce ne sono. «Aprila» la apre e la toglie da «Aperti per dopo», come il clic sulla lista. Sopra una pagina basta dire all\'Aiuto «salvala per dopo». La mette da parte con l\'anteprima, come il menu, e chiude la scheda.',
+        'In «Aperti per dopo» il tasto destro su una pagina salvata ti lascia aprirla tenendola in lista, copiarne il link, spostarla in un\'altra categoria o in una nuova, e rimuoverla. Se la rimuovi per sbaglio, «Annulla» nell\'avviso la rimette dov\'era. Il menu si apre anche da tastiera, col tasto Menu o Maiusc+F10.',
+        'Puoi spegnere Filo su un sito col tasto destro sulla pagina, «Spegni Filo su questo sito», o chiedendolo a Filo («spegni Filo su docs.google.com»). Lì il tasto destro lascia il clic al sito, e dove il sito non ha un suo menu trovi «Riaccendi Filo su questo sito». Le schede già aperte cambiano subito, senza ricaricare. Nella pagina Altro, sotto «Siti dove Filo è spento», puoi incollare un indirizzo intero e Filo lo riduce al nome del sito. Prima un indirizzo incollato lì non spegneva niente.',
+        'F11 mette Filo a schermo intero, come negli altri browser, e premuto di nuovo lo toglie. Su Mac il tasto è Ctrl+Cmd+F. Funziona su qualunque pagina, anche mentre scrivi, ed Esc continua a farti uscire.',
+        'Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto adesso le scegli tu. In Preferenze, nelle impostazioni avanzate, clicchi la combinazione e premi i tasti nuovi, oppure lo chiedi a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl). Se quei tasti li usa già Filo o il sistema, Filo te lo dice e tiene quelli di prima. Il menu del tasto destro e l\'elenco in Opzioni → Altro mostrano i tasti che hai scelto.',
+      ],
+      fixes: [
+        'Su alcuni siti Esc non chiudeva il menu del tasto destro né gli altri riquadri di Filo, e a schermo intero ti faceva uscire lasciandoli aperti sopra la pagina. Adesso il primo Esc chiude il riquadro e lo schermo intero resta. Con l\'Esc dopo esci.',
+        'Nell\'Editor Ctrl+Shift+T, W, L e R non si possono più dare a un modulo: Filo ti dice che aprono una scheda, la chiudono, portano alla home o ricaricano la pagina. Prima si salvavano senza avvisi e alla pressione facevano quello invece del modulo.',
+      ],
+    },
+    {
       version: '0.2.241', date: '2026-10-15',
       features: [
         'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',
-        'Quando un sito ti chiede l\'email o il nome utente, per esempio la pagina di accesso di Google, sotto il campo compare l\'email del tuo account Filo: un clic, oppure freccia giù e Invio, e la trovi scritta. Il sito la vede solo dopo che l\'hai scelta. Se non la vuoi, la spegni col tasto destro sulla proposta o in Preferenze, nelle impostazioni avanzate.',
+        'Puoi cambiare anche il font dei link, la durata delle animazioni e l\'intensità delle ombre, dalle Preferenze o chiedendolo a Filo. «Togli le animazioni» le spegne in tutta l\'app, «animazioni più lente» le rallenta.',
+        'Filo può guardare una finestra aperta sul computer, o lo schermo intero, e dirti cosa c\'è scritto. Chiedilo in chat, per esempio «cosa mi sta chiedendo questa finestra?» o «leggimi l\'errore di Word». Si accende in Preferenze, alla voce «Guardare lo schermo», e la prima volta che guarda la finestra di un\'altra app ti chiede l\'OK. Guarda soltanto: non clicca e non salva l\'immagine.',
+        'Di\' a Filo «tienimi sempre aperta WhatsApp» e la pulizia automatica delle schede non la archivia più, nemmeno quando riapri Filo o usi /pulisci. I siti che tieni aperti li trovi in Preferenze, sotto «Memoria di Filo»: li togli da lì o dicendo «non tenerla più aperta».',
       ],
-      fixes: [],
+      fixes: [
+        'Se chiedi a Filo di spegnere l\'Aiuto, adesso si spegne davvero. La voce «Aiuto» sparisce dal tasto destro sulla pagina e sulla linguetta, e la scorciatoia non lo apre più. Prima Filo diceva «fatto» e l\'Aiuto restava. Lo riaccendi chiedendolo, o con l\'interruttore in Preferenze, nelle Impostazioni avanzate, dove trovi anche quelli del correttore ortografico e delle categorie automatiche di «Aperti per dopo».',
+        'La protezione dal fingerprinting copre anche l\'impronta audio calcolata come fa la maggior parte degli script di tracciamento. Prima quegli script leggevano il suono della tua macchina prima che Filo ci aggiungesse il rumore, e potevano riconoscerti da un sito all\'altro.',
+      ],
     },
     {
       version: '0.2.240', date: '2026-10-15',

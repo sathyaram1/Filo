@@ -415,6 +415,36 @@
         return `Cercare nel filo${q ? ` ("${q}")` : ''}`;
       },
     },
+    // #845 — la lista «Aperti per dopo»: l'ha fatta l'utente, ma titoli e indirizzi li hanno scritti i siti che ha
+    // scelto di tenere (classe 3, come i siti segnati da lui). Sola lettura, niente esce → costo 0.
+    CERCA_SALVATE: {
+      costo: 0,
+      campo: null,
+      fonte: (a, out) => (Array.isArray(out.pagine) && out.pagine.length
+        ? { classe: 3, campo: 'web', chiave: 'salvate:titoli', motivo: 'ho letto i titoli delle pagine che hai salvato per dopo, scritti dai siti' }
+        : null),
+      describe: (a) => {
+        const q = String((a && (a.cerca ?? a.query ?? a.testo)) || '').replace(/\s+/g, ' ').trim();
+        return q ? `Cercare fra le pagine salvate per dopo «${q.slice(0, 60)}»` : 'Guardare le pagine salvate per dopo';
+      },
+    },
+    // Come il clic sulla lista: apre la pagina e la toglie, che si rimette salvandola di nuovo → costo 1.
+    // L'indirizzo è quello in elenco, mai uno scritto dal modello.
+    APRI_SALVATA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        const quale = t ? `«${t}»` : 'una pagina salvata per dopo';
+        return a && a.tieni === true ? `Aprire ${quale}, lasciandola in «Aperti per dopo»` : `Aprire ${quale} e toglierla da «Aperti per dopo»`;
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const titolo = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (!o.aperta) return 'Pagina salvata non aperta';
+        return `Aperta «${titolo || 'la pagina salvata'}»${o.tolta ? ' e tolta da «Aperti per dopo»' : ', ancora in «Aperti per dopo»'}`;
+      },
+    },
     LEGGI_FILE: {
       // Filo apre per intero un file dell'EDITOR di cui vede solo il riassunto
       // (#379.5). Sola lettura di dati che sono già in parte nel contesto (i
@@ -451,6 +481,48 @@
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
         const perche = documentoFuori(a);
         return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+      },
+    },
+    VEDI_SCHERMO: {
+      // #778 — guardare una finestra non cambia niente: costo 0. Leggere fuori da Filo è un fatto di privacy, quindi
+      // la prima lettura di ogni finestra esterna (o di una pagina delicata in Filo) in una richiesta sta fuori dal
+      // perimetro e chiede a ogni livello; le letture dopo della stessa finestra partono da sole. `_finestra` e
+      // `_approvata` li scrive il main (src/main/services/schermo.js), mai il modello.
+      costo: 0,
+      campo: null,
+      perimetro: (a) => {
+        const f = a && a._finestra;
+        if (!f) return false;
+        return (f.filo === true && !f.delicata) || a._approvata === true;
+      },
+      perchePerimetro: (a) => (a && a._finestra && a._finestra.delicata
+        ? 'Te lo chiedo perché in quella scheda c\'è una pagina delicata.'
+        : 'Te lo chiedo la prima volta che guardo una finestra fuori da Filo, a ogni tua richiesta.'),
+      fonte: (a, out) => {
+        if (out.testo) {
+          if (out.filo && !out.web) return null;
+          return { classe: 5, campo: null, chiave: 'schermo:finestra', motivo: out.filo ? 'ho guardato una pagina web' : 'ho guardato una finestra fuori da Filo' };
+        }
+        return Array.isArray(out.elenco) && out.elenco.some((v) => v && !v.filo)
+          ? { classe: 5, campo: null, chiave: 'schermo:titoli', motivo: 'ho letto i titoli delle finestre aperte' }
+          : null;
+      },
+      describe: (a) => {
+        const f = (a && a._finestra) || {};
+        const nome = String(f.nome || (a && a.finestra) || '').trim();
+        let quale = nome ? `la finestra «${nome}»` : 'una finestra';
+        if (f.tipo === 'schermo') quale = nome ? `«${nome}»` : 'lo schermo';
+        else if (f.tipo === 'selettore') quale = 'una finestra o lo schermo, che scegli tu nel selettore del sistema';
+        else if (f.filo) quale = `la finestra di Filo «${nome}»`;
+        return `Filo vuole guardare ${quale}.\n\nNe cattura l'immagine e la fa leggere al modello che descrive le immagini, `
+          + 'insieme alla tua domanda. Non clicca, non scrive e non salva l\'immagine.';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const nome = String(o.finestra || (a && a._finestra && a._finestra.nome) || '').trim();
+        if (Array.isArray(o.elenco) && !o.testo) return 'Ho guardato quali finestre sono aperte';
+        if (!nome) return 'Ho guardato lo schermo';
+        return o.tipo === 'schermo' ? `Ho guardato «${nome}»` : `Ho guardato la finestra «${nome}»`;
       },
     },
     CERCA_DOCUMENTI: {
@@ -573,6 +645,13 @@
         return !!(built && !built.rifiuto && built.allenta);
       },
       dove: (a) => { const built = prefBuilt(a); return (built && built.dove) || ''; },
+      // Un setter che vuole sempre l'OK (`chiede` in preferences.js) sta fuori dal perimetro: un clic, a ogni livello.
+      perimetro: (a) => {
+        if (a && a._invariato) return true;
+        const built = prefBuilt(a);
+        return !(built && !built.rifiuto && built.chiede);
+      },
+      perchePerimetro: 'Te lo chiedo sempre prima di accenderla.',
       describe: (a) => {
         const built = prefBuilt(a);
         if (!built || built.rifiuto) return 'Modificare una preferenza';
@@ -689,6 +768,23 @@
       costo: 1,
       campo: 'web',
       describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
+    },
+    // «Tieni sempre aperto X» (#823): la pulizia delle schede non lo archivia più. Si vede e si toglie in
+    // Preferenze → Memoria. `_voce`/`_voci` le risolve il main prima del gate, mai l'LLM.
+    TIENI_APERTA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => `Tenere sempre aperto ${(a && (a._voce || a._detto)) || proxyDomain(a || {}) || 'questo sito'}`,
+      describeDone: (a) => `Da ora la pulizia delle schede non archivia ${(a && a._voce) || 'questo sito'}`,
+    },
+    NON_TENERE_APERTA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => {
+        const voci = Array.isArray(a && a._voci) ? a._voci : [];
+        return `Non tenere più sempre aperto ${voci.length ? voci.join(', ') : ((a && a._detto) || proxyDomain(a || {}) || 'questo sito')}`;
+      },
+      describeDone: (a) => `La pulizia delle schede può di nuovo archiviare ${(Array.isArray(a && a._voci) && a._voci.join(', ')) || 'questo sito'}`,
     },
     // ── comandi della finestra / barra di Filo via chat (#419) ────────────────
     // L'agente della home aziona i controlli del browser stesso (schermo intero,
@@ -941,6 +1037,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+    'VEDI_SCHERMO', 'CERCA_SALVATE',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -974,7 +1071,10 @@
     try { dove = String(valore(entry.dove, action, ctx) || ''); } catch (_) { dove = ''; }
     let dentroPerimetro = true;
     try { dentroPerimetro = typeof entry.perimetro === 'function' ? !!entry.perimetro(action, ctx) : true; } catch (_) { dentroPerimetro = false; }
-    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro };
+    // La frase del popup quando chiede perché l'azione sta fuori dal perimetro: la dice chi conosce l'azione.
+    let perchePerimetro = '';
+    try { perchePerimetro = dentroPerimetro ? '' : String(valore(entry.perchePerimetro, action, ctx) || ''); } catch (_) { perchePerimetro = ''; }
+    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro, perchePerimetro };
   }
 
   // Spiegazione in chiaro di cosa Filo sta tentando, per il popup di conferma.

@@ -147,6 +147,8 @@
     opzioni: 'Scegline un altro in Opzioni → Modelli per azione.',
     predefiniti: 'Per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni e impostalo in Modelli per azione.',
     gestione: 'Scegline un altro in Gestione → Automazioni, fra i Modelli di supporto.',
+    // In coda agli altri quando la richiesta l'ha pagata la chiave propria con l'interruttore spento (#962).
+    chiavePropria: 'Visto che paghi con la tua chiave, puoi anche accendere «Con la mia chiave, usa anche i fornitori esclusi» in Opzioni.',
   };
   const NOMI_MOSTRATI = 5;
   const breve = (s, max = 120) => {
@@ -169,6 +171,13 @@
     const { testo, quanti } = elencoNomi(hosts);
     if (!quanti) return NESSUN_HOST_MOTIVO;
     return `${NESSUN_HOST_MOTIVO}. ${quanti > 1 ? 'Lo servono' : 'Lo serve'} solo ${testo}, che Filo esclude`;
+  }
+  // Il rimedio per dove si sceglie il modello ('opzioni' | 'predefiniti' | 'gestione'); se l'ha pagata la chiave
+  // propria con l'interruttore dei fornitori esclusi spento (#962), anche la strada di accenderlo.
+  function rimedioNessunHost(dove, err, effettive) {
+    const base = RIMEDI_NESSUN_HOST[dove] || RIMEDI_NESSUN_HOST.opzioni;
+    const spento = Boolean(err && err.keySource === 'own') && !Array.isArray(effettive && effettive.excludedProvidersOwnKey);
+    return spento ? `${base} ${RIMEDI_NESSUN_HOST.chiavePropria}` : base;
   }
   function fraseNessunHost({ modello, funzione, motivo, rimedio: dove } = {}) {
     const m = breve(modello);
@@ -408,7 +417,7 @@
 
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
-    fraseNessunHost, motivoHostEsclusi, NESSUN_HOST_MOTIVO, RIMEDI_NESSUN_HOST,
+    fraseNessunHost, motivoHostEsclusi, NESSUN_HOST_MOTIVO, RIMEDI_NESSUN_HOST, rimedioNessunHost,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

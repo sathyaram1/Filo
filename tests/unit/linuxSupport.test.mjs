@@ -561,6 +561,15 @@ test('su Linux le scorciatoie si chiamano e funzionano come su Windows', () => {
   assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'linux'), null);
   assert.equal(T.riservato('Ctrl+0', 'linux'), false,
     'su Linux lo zoom arriva alla pagina: quel tasto non è riservato');
+  // Lo schermo intero è F11 come su Windows (#858), e Filo se lo prende prima della pagina.
+  assert.equal(T.etichettaSchermoIntero('linux'), 'F11');
+  assert.equal(T.riservato('F11', 'linux'), true);
+  assert.equal(T.riservato('Ctrl+Cmd+F', 'linux'), false);
+  assert.equal(T.comandoSchermoIntero({ type: 'keyDown', key: 'F11', code: 'F11' }, 'linux'), true);
+  assert.equal(T.comandoSchermoIntero({ type: 'keyDown', key: 'F11', code: 'F11', shift: true }, 'linux'), false);
+  const { template } = require(join(ROOT, 'src', 'main', 'menu.js'));
+  const voce = template('linux').flatMap((m) => m.submenu || []).find((v) => v.label === 'Schermo intero');
+  assert.equal(voce.accelerator, 'F11');
 });
 
 test('su Linux il clic centrale in un campo resta all\'incolla del sistema, non apre lo zoom', () => {
@@ -598,4 +607,23 @@ test('su Linux volume, Bluetooth e Wi-Fi si comandano con la shell di sistema e 
   assert.match(C.SCRIPT.linux['wifi-collega'], /nmcli --wait \d+ connection up uuid "\$U"/, 'la rete si sceglie col suo identificativo, non col nome');
   // La shell vera la decide resolveShell: su Linux «sh» resta la shell di sistema anche se l'utente preferisce PowerShell.
   if (process.platform === 'linux') assert.equal(resolveShell('sh'), 'sh');
+});
+
+// #778 — su una sessione Wayland Chromium cattura dal selettore del sistema anche con Filo su X: lì le finestre non si
+// elencano, la scelta la fa l'utente nel selettore, e ogni sessione X normale resta col suo elenco.
+test('su Linux con Wayland guardare lo schermo passa dal selettore del sistema', async () => {
+  const Schermo = require(join(ROOT, 'src', 'main', 'services', 'schermo.js'));
+  assert.equal(Schermo.sessioneWayland({ XDG_SESSION_TYPE: 'wayland', WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' }, 'linux'), true);
+  assert.equal(Schermo.sessioneWayland({ XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' }, 'linux'), false);
+  let fonti = 0;
+  const S = Schermo.crea({
+    sistema: {
+      piattaforma: () => 'linux', wayland: () => true, permessoMac: () => 'granted',
+      fonti: async () => { fonti += 1; return []; },
+      finestreFilo: () => [], maniglieFilo: () => [], schermi: () => ({}), delicata: async () => '',
+    },
+  });
+  const r = await S.prepara({ type: 'VEDI_SCHERMO' }, { settings: { schermo: { guarda: true } }, chiave: 't' });
+  assert.deepEqual(r.esito.output.elenco.map((v) => v.tipo), ['selettore']);
+  assert.equal(fonti, 0, 'elencare non apre il selettore');
 });
