@@ -64,7 +64,8 @@ async function forseGiornata() {
   const oggi = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
   if (giornataChiesta === oggi) return;
   try {
-    if (!(await Coda.serveGiornata()) || giornataChiesta === oggi) return;
+    // Senza un modello adesso (la configurazione arriva dalla rete dopo l'avvio) il saluto aspetta la scheda dopo.
+    if (!(await app.puoParlare()) || !(await Coda.serveGiornata()) || giornataChiesta === oggi) return;
     giornataChiesta = oggi;
     segnala({ tipo: 'giornata' });
   } catch (_) {}

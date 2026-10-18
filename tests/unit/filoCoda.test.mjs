@@ -94,7 +94,7 @@ test('la conversazione che una scheda nuova continua: entro un’ora, o se l’u
   const vecchia = chat('v', [m('user', 'ciao', fa(200))]);
   assert.equal(C.chatCorrente([vecchia, recente], { ora: ORA }).id, 'r');
   assert.equal(C.chatCorrente([vecchia], { ora: ORA }), null);
-  const spontanea = chat('s', [m('filo', 'Il timer è suonato.', fa(300), { spontaneo: true })]);
+  const spontanea = chat('s', [m('filo', 'Il timer è suonato.', fa(150), { spontaneo: true })]);
   assert.equal(C.chatCorrente([vecchia, spontanea], { ora: ORA }).id, 's');
   const acc = chat('o', [m('user', 'mi chiamo Ada', fa(5))], { onboarding: true });
   const app = chat('e', [m('user', 'x', fa(2))], { app: 'editor', rif: 'f' });
