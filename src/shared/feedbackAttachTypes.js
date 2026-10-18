@@ -1,76 +1,62 @@
-// Allowlist dei tipi di allegato ammessi nel box "Invia feedback".
-//
-// Perché esiste: il box permette di allegare file sia con il pulsante "Allega"
-// sia trascinandoli dentro (drag & drop). L'attributo `accept` di un <input
-// type=file> è solo un suggerimento per il picker e NON vincola né la selezione
-// "Tutti i file" del picker né i file letti da `dataTransfer.files` nel drop.
-// Serve quindi un gate deterministico lato client, condiviso da ENTRAMBI i
-// cammini, che rifiuti i tipi "attivi" (eseguibili nel dominio di Google
-// Storage quando chi fa triage apre il link): text/html, image/svg+xml, ecc.
-//
-// Questa è la prima linea (UX: rifiuto immediato con messaggio). La cintura
-// vera è `storage.rules` (stessa allowlist lato server). Tieni le due liste
-// allineate.
-//
-// classify({ name, type }) -> 'image' | 'file' | null
-//   'image' → anteprima immagine (raster)
-//   'file'  → pillola allegato (pdf/txt/md/csv/json…)
-//   null    → tipo NON ammesso, va rifiutato
+// Tipi di allegato dei feedback: la lista UNICA da cui leggono il controllo (classify), i selettori di file (ACCEPT),
+// il manifesto delle capacità (NOMI_DOCUMENTI) e `npm run feedback:apri` (mimeDaEstensione).
+// Mai tipi attivi (text/html, image/svg+xml): la cintura è storage.rules, allineata da tests/unit/storageRulesAllegati.test.mjs.
 
 (function (global) {
   'use strict';
 
-  // Immagini raster ammesse. NIENTE image/svg+xml: l'SVG è un documento attivo
-  // (può contenere <script>) e non va accettato come "immagine".
-  const RASTER_IMAGE_MIME = new Set([
-    'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp',
-  ]);
+  // `mime[0]` è il tipo con cui si dichiara un file riconosciuto solo dall'estensione.
+  const TIPI = Object.freeze([
+    { nome: 'PNG', kind: 'image', mime: ['image/png'], ext: ['png'] },
+    { nome: 'JPEG', kind: 'image', mime: ['image/jpeg', 'image/jpg'], ext: ['jpg', 'jpeg'] },
+    { nome: 'GIF', kind: 'image', mime: ['image/gif'], ext: ['gif'] },
+    { nome: 'WebP', kind: 'image', mime: ['image/webp'], ext: ['webp'] },
+    { nome: 'BMP', kind: 'image', mime: ['image/bmp'], ext: ['bmp'] },
+    { nome: 'PDF', kind: 'file', mime: ['application/pdf'], ext: ['pdf'] },
+    { nome: 'testo', kind: 'file', mime: ['text/plain'], ext: ['txt', 'log'] },
+    { nome: 'markdown', kind: 'file', mime: ['text/markdown'], ext: ['md', 'markdown'] },
+    { nome: 'CSV', kind: 'file', mime: ['text/csv'], ext: ['csv'] },
+    { nome: 'TSV', kind: 'file', mime: ['text/tab-separated-values'], ext: ['tsv'] },
+    { nome: 'JSON', kind: 'file', mime: ['application/json'], ext: ['json'] },
+    { nome: 'YAML', kind: 'file', mime: ['application/x-yaml'], ext: ['yaml', 'yml'] },
+  ].map((t) => Object.freeze({ ...t, mime: Object.freeze(t.mime.slice()), ext: Object.freeze(t.ext.slice()) })));
 
-  // Documenti passivi ammessi per MIME esplicito. Deve combaciare con
-  // storage.rules. NIENTE text/html / application/xhtml+xml / text/xml.
-  const DOC_MIME = new Set([
-    'text/plain', 'text/markdown', 'text/csv', 'application/pdf', 'application/json',
-    // `.tsv` e `.yaml` col loro tipo esplicito. Le storage.rules li ammettono
-    // già e `npm run feedback:apri` li manda; senza questi due, un .yaml che il
-    // sistema operativo tipizza `application/x-yaml` veniva rifiutato qui
-    // mentre il deposito lo avrebbe accettato, e lo strumento a riga di comando
-    // poteva mandare quello che una persona non poteva allegare (#582, giro 7).
-    'text/tab-separated-values', 'application/x-yaml',
-  ]);
+  const di = (kind, campo) => new Set(TIPI.filter((t) => t.kind === kind).flatMap((t) => t[campo]));
+  const RASTER_IMAGE_MIME = di('image', 'mime');
+  const DOC_MIME = di('file', 'mime');
+  const IMAGE_EXT = di('image', 'ext');
+  const DOC_EXT = di('file', 'ext');
 
-  // Estensioni ammesse SOLO quando il MIME è vuoto o generico
-  // (application/octet-stream): il sistema operativo non sempre mappa .md/.yml/
-  // .log/.csv a un MIME, e il picker le elenca via `accept`. Non usiamo mai
-  // l'estensione per "salvare" un MIME esplicito e pericoloso (es. un .txt che
-  // il SO tipizza text/html resta rifiutato).
-  const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
-  const DOC_EXT = new Set(['txt', 'md', 'markdown', 'json', 'csv', 'tsv', 'log', 'yml', 'yaml', 'pdf']);
+  // Map e non oggetto: la chiave è l'estensione di un nome di file, e `note.__proto__` non deve trovare niente.
+  const MIME_PER_EXT = new Map(TIPI.flatMap((t) => t.ext.map((e) => [e, t.mime[0]])));
+
+  // Tipi esatti ed estensioni, mai famiglie con l'asterisco: `image/*` e `text/*` offrono SVG e HTML, che classify rifiuta.
+  const ACCEPT = [
+    ...TIPI.flatMap((t) => t.mime),
+    ...TIPI.flatMap((t) => t.ext.map((e) => `.${e}`)),
+  ].join(',');
+
+  const nomiDoc = TIPI.filter((t) => t.kind === 'file').map((t) => t.nome);
+  const NOMI_DOCUMENTI = `${nomiDoc.slice(0, -1).join(', ')} e ${nomiDoc[nomiDoc.length - 1]}`;
 
   function extOf(name) {
     const m = /\.([a-z0-9]+)$/i.exec(String(name || ''));
     return m ? m[1].toLowerCase() : '';
   }
 
-  // Un MIME "generico" non dice nulla sul contenuto: solo in questo caso ci
-  // fidiamo dell'estensione.
-  function isGenericMime(t) {
-    return !t || t === 'application/octet-stream';
+  function mimeDaEstensione(ext) {
+    return MIME_PER_EXT.get(String(ext || '').toLowerCase()) || '';
   }
 
+  // Un MIME vuoto o generico non dice niente sul contenuto: solo allora decide l'estensione (il SO non sempre
+  // tipizza .md/.yml/.log). Un MIME esplicito fuori lista resta rifiutato anche con un'estensione benigna.
   function classify(file) {
     if (!file) return null;
     const type = String(file.type || '').toLowerCase().trim();
-    const ext = extOf(file.name);
-
-    // 1) MIME esplicito e ammesso → decide da solo (nessun override via estensione).
     if (RASTER_IMAGE_MIME.has(type)) return 'image';
     if (DOC_MIME.has(type)) return 'file';
-
-    // 2) MIME esplicito ma NON in allowlist (text/html, image/svg+xml, …) → rifiuta,
-    //    a prescindere dall'estensione. È il caso del .html trascinato.
-    if (!isGenericMime(type)) return null;
-
-    // 3) MIME vuoto/generico → decidi dall'estensione dell'allowlist.
+    if (type && type !== 'application/octet-stream') return null;
+    const ext = extOf(file.name);
     if (IMAGE_EXT.has(ext)) return 'image';
     if (DOC_EXT.has(ext)) return 'file';
     return null;
@@ -78,6 +64,10 @@
 
   global.SN_FEEDBACK_ATTACH = {
     classify,
+    mimeDaEstensione,
+    TIPI,
+    ACCEPT,
+    NOMI_DOCUMENTI,
     RASTER_IMAGE_MIME,
     DOC_MIME,
     IMAGE_EXT,
