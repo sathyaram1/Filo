@@ -92,6 +92,70 @@ export function commitPropri(root, { locale, remoto = '', ramo = '' } = {}) {
   }
 }
 
+// Chi ha fatto un commit, annotato dal post-commit: due sessioni nella stessa cartella non si dichiarano a vicenda i commit.
+export const AUTORI = 'filo-spinte-autori';
+// Un commit mai spinto non tiene la sua annotazione per sempre.
+const AUTORE_SCADUTO_MS = 30 * 24 * 60 * 60 * 1000;
+
+function cartellaAutori(root) {
+  const coda = cartellaCoda(root);
+  return coda ? join(coda, '..', AUTORI) : '';
+}
+
+/** Il post-commit: annota che `sha` l'ha fatto la sessione locale `chi`. Le routine no: una per copia. → vero se annotato. */
+export function annotaAutore(root, chi, sha, nowMs = Date.now()) {
+  const dir = cartellaAutori(root);
+  if (!dir || !chi || chi.tipo !== 'locale' || !SHA_RE.test(String(sha || ''))) return false;
+  mkdirSync(dir, { recursive: true });
+  const tmp = join(dir, `${sha}.${process.pid}.tmp`);
+  writeFileSync(tmp, `${JSON.stringify({ tipo: chi.tipo, ticket: chi.ticket, fp: chi.fp || '', file: chi.file || '' })}\n`, { encoding: 'utf8', mode: 0o600 });
+  renameSync(tmp, join(dir, `${sha}.json`));
+  try {
+    for (const n of readdirSync(dir)) {
+      const f = join(dir, n);
+      if (nowMs - statSync(f).mtimeMs > AUTORE_SCADUTO_MS) rmSync(f, { force: true });
+    }
+  } catch (_) { /* si ripulisce al prossimo */ }
+  return true;
+}
+
+/** La sessione che ha fatto `sha`, se il post-commit l'ha annotata. null altrimenti. */
+export function autoreDi(root, sha) {
+  const dir = cartellaAutori(root);
+  if (!dir || !SHA_RE.test(String(sha || ''))) return null;
+  try {
+    const v = JSON.parse(readFileSync(join(dir, `${sha}.json`), 'utf8'));
+    return v && v.tipo === 'locale' && typeof v.ticket === 'string' && v.ticket ? { tipo: 'locale', ticket: v.ticket, fp: v.fp || '', file: v.file || '' } : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Le spinte divise per chi ha fatto i commit: quelli annotati da un'altra sessione vanno col biglietto di quella, il resto
+ * con quello di chi spinge. → [{ chi, spinte }], prima chi spinge.
+ */
+export function perAutore(root, chi, spinte) {
+  const gruppi = new Map([[chi.ticket, { chi, spinte: [] }]]);
+  for (const s of spinte) {
+    const altri = new Map();
+    const propri = [];
+    for (const c of s.commits) {
+      const a = autoreDi(root, c);
+      if (a && a.ticket !== chi.ticket) {
+        if (!altri.has(a.ticket)) altri.set(a.ticket, { chi: a, commits: [] });
+        altri.get(a.ticket).commits.push(c);
+      } else propri.push(c);
+    }
+    if (propri.length || s.oltre) gruppi.get(chi.ticket).spinte.push(Object.assign({}, s, { commits: propri }));
+    for (const [t, a] of altri) {
+      if (!gruppi.has(t)) gruppi.set(t, { chi: a.chi, spinte: [] });
+      gruppi.get(t).spinte.push({ ramo: s.ramo, commits: a.commits });
+    }
+  }
+  return [...gruppi.values()].filter((x) => x.spinte.length);
+}
+
 /** Le spinte di un pre-push di git (righe «<ref locale> <sha> <ref remoto> <sha>») da accodare. PURA a parte git. */
 export function spinteDelPrePush(root, righe) {
   const out = [];

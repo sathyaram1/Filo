@@ -273,17 +273,23 @@ const RISERVA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'copie-in
 const RISERVA_SPINTE = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dichiara-spinte.mjs').replace(/\\/g, '/');
 const tra = (s) => `'${s.replace(/'/g, "'\\''")}'`;
 
-/** Il pezzo che accoda le spinte (#1362). `soloRiserva`: lo script è sempre quello di chi installa (il clone del server). */
-function bloccoSpinte(repo, soloRiserva) {
-  const scelta = soloRiserva ? `spinte=${tra(RISERVA_SPINTE)}`
-    : `spinte="$radice/scripts/dichiara-spinte.mjs"\n  [ -f "$spinte" ] || spinte=${tra(RISERVA_SPINTE)}`;
+/**
+ * Lo script delle spinte (#1362): quello di chi installa, mai quello del ramo, che un commit spinto da altri può aver
+ * riscritto e che girerebbe col biglietto di chi spinge (#1362 giro 1 r1). Sparito (una cartella di lavoro tolta), quello
+ * della copia principale, se si spinge da un'altra; sennò nessuno, e la spinta resta non dichiarata.
+ */
+const SCELTA_SPINTE = `principale=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); principale=\${principale%/.git}
+spinte=${tra(RISERVA_SPINTE)}
+[ -f "$spinte" ] || { [ "$principale" != "$radice" ] && spinte="$principale/scripts/dichiara-spinte.mjs"; }
+`;
+
+/** Il pezzo che accoda le spinte (#1362). */
+function bloccoSpinte(repo) {
   return `radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 command -v node >/dev/null 2>&1 || exit 0
 righe=$(cat)
-# Le spinte col biglietto di chi spinge (#1362): node costa a ogni push, quindi solo se c'e' un biglietto da cui farlo.
-principale=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); principale=\${principale%/.git}
+${SCELTA_SPINTE}# Le spinte col biglietto di chi spinge: node costa a ogni push, quindi solo se c'e' un biglietto da cui farlo.
 if [ -n "$CLAUDE_CODE_SESSION_ID$FILO_BIGLIETTO_FILE$FILO_ROUTINE_TICKET" ] || [ -f "$radice/.claude/routine-ticket.json" ] || [ -f "$principale/.claude/routine-ticket.json" ]; then
-  ${scelta}
   [ -f "$spinte" ] && printf '%s\\n' "$righe" | node "$spinte" --pre-push ${repo} "$radice" "$2" >/dev/null 2>&1
 fi
 `;
@@ -291,9 +297,9 @@ fi
 
 const PRE_PUSH = `#!/bin/sh
 # ${SEGNO_PRE_PUSH}: su ogni strada che spinge, anche un git push a mano, accoda le spinte col biglietto di chi spinge (#1362)
-# e ferma una copia dei dati del server (#1108). Lo scrive scripts/lib/copie-di-dati.mjs; gli script sono quelli della
-# cartella che spedisce, o di chi l'ha installato.
-${bloccoSpinte('app', false)}controllo="$radice/scripts/copie-in-scena.mjs"
+# e ferma una copia dei dati del server (#1108). Lo scrive scripts/lib/copie-di-dati.mjs; le spinte le accoda lo script
+# di chi l'ha installato, il controllo delle copie è quello della cartella che spedisce.
+${bloccoSpinte('app')}controllo="$radice/scripts/copie-in-scena.mjs"
 [ -f "$controllo" ] || controllo=${tra(RISERVA)}
 [ -f "$controllo" ] || exit 0
 # Il controllo delle copie si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.
@@ -309,12 +315,25 @@ printf '%s\\n' "$righe" | node "$controllo" --pre-push "$radice"
 const PRE_PUSH_SERVER = `#!/bin/sh
 # ${SEGNO_PRE_PUSH}: su ogni strada che spinge su filo-security accoda le spinte col biglietto della sessione di Filo che
 # spinge (#1362). Lo scrive scripts/lib/copie-di-dati.mjs di Filo.
-${bloccoSpinte('server', true)}exit 0
+${bloccoSpinte('server')}exit 0
 `;
 
-function installa(root, contenuto) {
+// Chi ha fatto il commit, solo per le sessioni locali: alla spinta il commit si dichiara col suo biglietto, non con quello
+// di un'altra sessione nella stessa cartella che lo spinge (#1362 giro 1 r3).
+const POST_COMMIT = `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: annota la sessione locale che ha fatto il commit, per dichiararlo col suo biglietto quando parte (#1362).
+# Lo scrive scripts/lib/copie-di-dati.mjs.
+[ -n "$CLAUDE_CODE_SESSION_ID$FILO_BIGLIETTO_FILE" ] && [ -z "$FILO_ROUTINE_TICKET" ] || exit 0
+radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+command -v node >/dev/null 2>&1 || exit 0
+${SCELTA_SPINTE}[ -f "$principale/.claude/routine-ticket.json" ] && exit 0
+[ -f "$spinte" ] && node "$spinte" --post-commit "$radice" >/dev/null 2>&1
+exit 0
+`;
+
+function installa(root, contenuto, gancio = 'pre-push') {
   try { if (gitTesto(root, ['config', '--get', 'core.hooksPath']).trim()) return 'altrove'; } catch (_) { /* non impostato */ }
-  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', 'hooks/pre-push']).trim());
+  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', `hooks/${gancio}`]).trim());
   let attuale = null;
   try { attuale = readFileSync(dove, 'utf8'); } catch (_) { /* non c'è */ }
   if (attuale === contenuto) return 'presente';
@@ -331,7 +350,9 @@ function installa(root, contenuto) {
  * degli hook è condivisa con altri repo, non ci si scrive).
  */
 export function installaControlloSpedizione(root) {
-  return installa(root, PRE_PUSH);
+  const esito = installa(root, PRE_PUSH);
+  try { installa(root, POST_COMMIT, 'post-commit'); } catch (_) { /* senza, i commit valgono di chi li spinge */ }
+  return esito;
 }
 
 /** Lo stesso nel clone di filo-security di una sessione locale: le sue spinte si dichiarano come quelle di Filo (#1362). */
