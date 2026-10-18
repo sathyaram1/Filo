@@ -1499,7 +1499,7 @@
     // Un indirizzo che la porta delle uscite vuole confermato si conferma qui, come i collegamenti della chat.
     if (r && r.conferma) {
       const Ui = window.SN_CONFIRM_UI;
-      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : window.confirm(String(r.conferma));
       r = null;
       if (ok) { try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; } }
       if (!ok) { delete btn.dataset.inCorso; return; }

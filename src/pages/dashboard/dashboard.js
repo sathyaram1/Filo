@@ -543,7 +543,7 @@
     try { r = await send(msg); } catch (_) {}
     if (r && r.conferma) {
       const Ui = window.SN_CONFIRM_UI;
-      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : window.confirm(String(r.conferma));
       if (!ok) return;
       try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; }
     }

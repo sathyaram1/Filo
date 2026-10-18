@@ -1667,7 +1667,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
       if (chiesti && !confermato) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
       const Levels = globalThis.SN_ACTION_LEVELS;
       const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
-      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
+      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo, ...(Levels ? { parti: Levels.describeParts(azione) } : {}) };
     }
   }
   if (typeof apri === 'function') apri();
@@ -3691,7 +3691,7 @@ async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = tru
   let tabId = null;
   if (porta) {
     const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
-    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma, parti: r.parti } : {}), ...(r.frase ? { frase: r.frase } : {}) };
   } else {
     tabId = tm.openTab(voce.url, { activate: true });
   }
