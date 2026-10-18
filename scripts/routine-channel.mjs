@@ -131,6 +131,7 @@ import { quotaFile } from './statusline.mjs';
 import { URL_SERVER, ambienteGitServer, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
+import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -1402,6 +1403,9 @@ if (isMain) {
       process.exit(1);
     }
     const guasto = typeof data.guasto === 'string' ? data.guasto : '';
+    // Il rilascio di un worker morto chiesto dall'orchestratore: ramo, promemoria e battito stanno nel clone (#1182).
+    const nelClone = cloneDelBiglietto(ROOT, args[0]);
+    if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
     // PRIMA del server: il ramo corrente va su origin. Un commit fatto a mano
     // dal worker non passa dall'hook, e senza questo push moriva col
     // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e

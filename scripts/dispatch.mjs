@@ -87,6 +87,7 @@ import {
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
+import { accendi as accendiClone, cloneDelGiro, preparaIntestazione, preparaPerIlGiro, rilancia } from './lib/worker-nel-clone.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
@@ -1832,9 +1833,9 @@ function prepareForProber() {
   }
 }
 
-// Fra un worker e l'altro la cartella torna sulla linea principale: la sessione legge gli agenti (e il loro
-// sforzo) dalla cartella, e il ramo vecchio lasciato dal worker prima li riporterebbe indietro (sforzo per ruolo).
-// Scarta le modifiche non salvate (il lavoro di un worker morto si butta): per questo solo nelle routine.
+// Fra un worker e l'altro la cartella torna sulla linea principale: la sessione legge agenti, impostazioni e copioni
+// dei ganci dalla cartella, e quello che un worker ci ha lasciato (un ramo, un file in .claude) non deve arrivare al
+// prossimo. Scarta le modifiche non salvate: per questo solo nelle routine.
 export function tornaAllaLineaPrincipale() {
   if (process.env.FILO_ROUTINE !== '1') {
     return { ok: false, uso: true, message: 'solo nelle routine (FILO_ROUTINE=1): scarta le modifiche non salvate della cartella' };
@@ -1846,6 +1847,9 @@ export function tornaAllaLineaPrincipale() {
   if (!co.ok || currentBranch(ROOT) !== MAIN_BRANCH) {
     return { ok: false, message: `la cartella non torna su ${MAIN_BRANCH}: ${co.out.slice(0, 200)}` };
   }
+  // I file nuovi in .claude (impostazioni, agenti, skill, ganci) li legge la sessione; i marcatori ignorati restano (#1182).
+  const pulita = tryGit(['clean', '-fdq', '--', '.claude']);
+  if (!pulita.ok) return { ok: false, message: `.claude non torna com'è su ${MAIN_BRANCH}: ${pulita.out.slice(0, 200)}` };
   return { ok: true, head: headSha(ROOT) };
 }
 
@@ -2127,7 +2131,9 @@ export function emit(bucket, ctx) {
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
-  const instructions = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
+  const corpo = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
+  const cartella = preparaIntestazione(ROOT);
+  const instructions = cartella ? `${cartella}\n\n${corpo}` : corpo;
   const stampaCon = (payload, istr = instructions, file = '') => ({
     role: bucket.role, payload, claim: bucket.id || null, instructions: istr, ...(file ? { istruzioniFile: file } : {}),
   });
@@ -2387,6 +2393,14 @@ if (isMainModule) {
             console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
             process.exit(3);
           }
+          // Stessa porta del gancio: in cloud ogni worker lavora in un clone suo, fuori da questa cartella (#1182).
+          if (!cieco.saltato) {
+            const acceso = accendiClone(tools);
+            if (!acceso.ok) {
+              console.error(`[dispatch] GUASTO (transient): clone dei worker non acceso in ${tools} (${acceso.why})`);
+              process.exit(3);
+            }
+          }
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
             || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
@@ -2439,6 +2453,17 @@ if (isMainModule) {
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
       // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
+      // Nel giro acceso dal preflight il worker non lavora qui ma nel suo clone: lo stesso comando riparte da lì,
+      // e lì vanno promemoria e battito. Senza clone si ferma: la cartella della sessione resta fuori (#1182).
+      const giro = ticket ? cloneDelGiro(ROOT) : null;
+      if (giro) {
+        const c = preparaPerIlGiro(ROOT, giro);
+        if (!c.ok) {
+          console.error(`[dispatch] GUASTO: il clone del worker non è pronto (${c.why}). Nella cartella della sessione non si lavora: dichiaralo come guasto (gruppo «guasto: clone git»).`);
+          process.exit(1);
+        }
+        process.exit(rilancia(c.strumenti, 'dispatch.mjs', ['--ticket', ticket]));
+      }
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e

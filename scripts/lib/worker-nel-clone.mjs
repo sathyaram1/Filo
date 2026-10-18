@@ -5,7 +5,8 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { MARCATORE_WORKER, allineaPacchetti, elencoCloni, preparaClone } from './clone-worker.mjs';
+import { allineaPacchetti, elencoCloni, preparaClone } from './clone-worker.mjs';
+import { marcatoreWorker } from './dati-worker.mjs';
 import { pinnedDir, pinnedDirWorker, pinnedRepoRoot } from './tools-pin.mjs';
 import { ticketFile } from './routine-ticket.mjs';
 
@@ -15,6 +16,8 @@ export const INDICE_GIRO = 1;
 // Il figlio deve ricavare cartella e strumenti dalla SUA copia: queste due li sovrascriverebbero.
 const AMBIENTE_TOLTO = ['FILO_REPO_ROOT', 'FILO_TOOLS_ROOT'];
 
+export { marcatoreWorker };
+
 const leggiJson = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch (_) { return null; } };
 
 /** Il preflight: da qui i worker di questo giro lavorano nel clone. */
@@ -23,12 +26,6 @@ export function accendi(toolsDir, { indice = INDICE_GIRO } = {}) {
     writeFileSync(resolve(toolsDir, MARCA_GIRO), `${JSON.stringify({ indice })}\n`, 'utf8');
     return { ok: true, why: '' };
   } catch (e) { return { ok: false, why: e.message }; }
-}
-
-/** Il marcatore del clone di worker in `root`, o null se `root` non è un clone di worker. */
-export function marcatoreWorker(root) {
-  const m = leggiJson(resolve(root, MARCATORE_WORKER));
-  return m && typeof m === 'object' && typeof m.principale === 'string' && m.principale ? m : null;
 }
 
 /**
