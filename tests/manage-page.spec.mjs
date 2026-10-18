@@ -1235,12 +1235,13 @@ test('colori giudici: scala rosso→giallo→verde→blu; "design" è verde e co
   expect(a[2]).toBeGreaterThan(a[1]); // blu > verde
 });
 
-// Caso #261: un feedback dell'automazione dell'owner (routine:) che era stato
+// Caso #261: un feedback FIDATO dell'automazione dell'owner che era stato
 // bloccato a L1 (identità flaggata per errore) NON deve apparire come attacco
 // (rosso) ma come "da ri-giudicare" (bianco), con il panel atteso tratteggiato.
+// Dal §10 lo dice la fiducia, non il nome del mittente.
 const FAKE_FB_TRUSTED_BLOCKED = {
   _id: 'test-fb-routine-blocked', text: 'Regole proxy per dominio: nessuna UI per vederle.',
-  name: 'Regole proxy', seq: 261, subSeq: 0, status: 'new',
+  name: 'Regole proxy', seq: 261, subSeq: 0, status: 'new', fiducia: 'fidato',
   clientId: 'routine:routine', senderProof: 'server', createdAt: '2026-06-29T10:00:00Z', images: [],
   pipeline: { action: 'human_review', l1Category: 'dangerous', l1Reasons: ['linked_prior_attack'], verdicts: [], stage: 'L1' },
 };
@@ -1250,9 +1251,11 @@ test('feedback di routine bloccato a L1 → bianco (non rosso) e panel atteso tr
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_MANAGE_REVIEW);
 
-  // Logica pura: mittente fidato senza verdetti → unfiltered, non attack.
+  // Logica pura: fidato senza verdetti → unfiltered, non attack; lo stesso mittente non fidato resta rosso.
   const cl = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock(fb), FAKE_FB_TRUSTED_BLOCKED);
   expect(cl.reason).toBe('unfiltered');
+  const nonFidato = await page.evaluate((fb) => window.SN_MANAGE_REVIEW.classifyBlock({ ...fb, fiducia: 'non_fidato' }), FAKE_FB_TRUSTED_BLOCKED);
+  expect(nonFidato.reason).toBe('attack');
 
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); }, FAKE_FB_TRUSTED_BLOCKED);
   await expect(page.locator('.mg-item--unfiltered')).toHaveCount(1);
