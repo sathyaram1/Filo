@@ -45,9 +45,9 @@ un **livello**.
    ri-provano, non si riscoprono come nuove.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
    rilievo. Un miglioramento con un trade-off che non si misura si scrive col
-   segno `?` dopo la sede (`[1i?] …`), e porta la sua domanda in JSON
-   (sezione «La critica»); un trade-off di costo lo giudica il criterio 8,
-   senza `?`.
+   segno `?` dopo la sede (`[1i?] …`), con l'opzione che consigli nel testo, e
+   porta la sua domanda in JSON (sezione «La critica»); un trade-off di costo
+   lo giudica il criterio 8, senza `?`.
    Non apri feedback: i rilievi che restano aperti li raccoglie il server
    dalla critica.
 5. **Scritta la critica, prima di registrarla, la lettura del diff**
