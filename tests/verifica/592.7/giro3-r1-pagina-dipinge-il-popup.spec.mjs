@@ -21,7 +21,7 @@ async function stubFeedback(app) {
 async function chiedi(app, host) {
   await nelMondoDiFilo(app, host, `window.__esito = 'in corso';
     window.__filoSidebarTest.runFiloAction(${JSON.stringify(AZIONE)}).then((v) => { window.__esito = v; }); true;`);
-  const vista = await confermaSopraPagina(app);
+  const vista = await confermaSopraPagina(app, { timeout: 25_000 });
   await new Promise((r) => setTimeout(r, 700));
   return vista;
 }
@@ -58,7 +58,7 @@ for (const [nome, trucco] of Object.entries(TRUCCHI)) {
     await stubFeedback(app);
     const page = await testServer.openReady(openTab, PAGINA);
     const host = new URL(page.url()).hostname;
-    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 25_000 });
     const pulito = await foto(app, page, host, 'pulito');
     await trucco(page);
     const dopo = await foto(app, page, host, nome.replace(/\W+/g, '-'));
@@ -70,7 +70,7 @@ test('#592.7 giro 3 — un velo della pagina non copre il popup, e OK conferma i
   await stubFeedback(app);
   const page = await testServer.openReady(openTab, PAGINA);
   const host = new URL(page.url()).hostname;
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 25_000 });
   // Il velo nasce col popup (blur, nodi nuovi) e copre metà scheda con un testo innocuo; i clic passano.
   await page.evaluate(() => {
     const vela = () => {

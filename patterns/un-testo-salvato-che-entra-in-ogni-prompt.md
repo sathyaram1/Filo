@@ -29,15 +29,16 @@ Valgono insieme queste regole:
   La descrizione del popup è a pezzi: stringhe per le parole di Filo e
   `{ citazione }` / `{ elenco }` per il testo del modello o salvato, che il
   popup disegna su un foglietto tinto d'accento. Vale per ogni popup che mostra
-  un testo non di Filo (feedback a suo nome, righe da dimenticare, comando,
-  link, ricerca, sveglie, documento). Il segno del riquadro non può dipendere
-  da un colore che cambia chi scrive il testo: l'accento il modello lo cambia
-  senza chiedere nello stesso turno. Per questo il filo a sinistra è per metà
-  colore del testo: chi lo spegne spegne anche le parole. Su un sito la pagina
-  riscrive le variabili del tema, e una che non è un colore annullava sfondo,
-  bordo e filo insieme: lì il popup non eredita nessuna variabile, le fissa sul
-  suo overlay dentro il root chiuso dal tema e dai token dell'utente
-  (sentinella `tests/unit/confirmUiVariabili.test.mjs`).
+  un testo non di Filo, da costo 1 in su perché un livello prudente chiede anche
+  lì (feedback a suo nome, righe da dimenticare, comando, link, ricerca, sveglie,
+  timer, documento, la ricerca fra i documenti dell'Aiuto, titoli di chat e
+  mazzi). Il segno del riquadro non può dipendere da un colore che cambia chi
+  scrive il testo: l'accento il modello lo cambia senza chiedere nello stesso
+  turno. Per questo il filo a sinistra è per metà colore del testo: chi lo
+  spegne spegne anche le parole. Su un sito la pagina riscriveva le variabili,
+  il filtro e i caratteri del popup: lì il popup sta sopra la scheda (vedi
+  [la conferma su un sito](una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md)),
+  e le parti gli arrivano dal canale come dati, ripulite di nuovo dal main.
 - **Si conferma quello che si è visto.** La pulizia dei caratteri non basta da
   sola: tre giri di verifica di fila hanno spinto l'istruzione sotto il bordo
   con righe vuote, poi di spazi a larghezza zero, poi di righe innocue o di un
