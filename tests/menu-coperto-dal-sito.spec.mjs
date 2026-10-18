@@ -251,15 +251,15 @@ test('i pezzi di Filo sopra il menu non contano come velo: etichetta delle icone
   expect(sotto.every((s) => s === 'visibile')).toBe(true);
   await page.keyboard.press('Escape');
 
-  // Svuota → Annulla: la conferma di Filo copriva la cronologia, e chi torna subito su una voce incolla.
+  // Svuota → Annulla: la conferma sta sopra la scheda (#592.6), e chi torna subito su una voce incolla.
   await page.locator('#campo').click({ button: 'right' });
   await page.locator('.sn-menu-paste-arrow').click();
   const stato = await cronologiaPronta(app, page);
   await page.mouse.click(stato.svuota.x, stato.svuota.y);
-  await expect(page.locator('.sn-confirm-host')).toBeVisible();
-  await expect.poll(async () => (await statoCronologia(app, page)).voci.every((v) => !v.pronta)).toBe(true);
-  expect(await nelMondo(app, page, `SN_CONFIRM_UI._test.click('cancel')`)).toBe(true);
-  await expect(page.locator('.sn-confirm-host')).toHaveCount(0);
+  const sopra = await confermaSopraPagina(app);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  await clickConfirm(sopra, 'cancel');
+  await expect.poll(() => confirmState(sopra).catch(() => null)).toBeNull();
   // Scoperta senza attesa: a coprirla era Filo, non il sito.
   await expect.poll(async () => (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO)?.libera).toBe(true);
   const voce = (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO);
