@@ -47,7 +47,10 @@ DB3 esistente), poi "Risolti".
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
 `loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `attesa_origine`,
-`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8);
+`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8),
+`riallineamento` (il rientro in `revision_capability` dopo un conflitto di fusione: lo
+scrive solo il server, resta col rebase e con la sua verifica, lo toglie il verdetto; non
+è un blocco, e `blockReason` resta vuoto);
 il giudizio dei giudici non ne scrive: `judges` lo ricava solo la normalizzazione dello
 storico, e la frase «Panel incompleto…» la dashboard dai verdetti, `judgesNote`), `workingSince`
 (ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
@@ -135,10 +138,12 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (`sospesi`): chi riprende li chiude, il giro dopo non li riscopre.
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
   (`statusReason: loop`); —conflitto di fusione, o unit rossi sul risultato
-  della fusione→ `revision_capability` (riallineamento: main è avanzato e il
-  merge non passa più da solo — non è una bocciatura di qualità, il contatore M
-  non si muove; il ramo viene ribasato e ripassa verifica e sicurezza sul
-  contenuto nuovo). Chi ribasa non corregge gli unit rossi: li elenca, e chi
+  della fusione→ `revision_capability` (`statusReason: riallineamento`: main è
+  avanzato e il merge non passa più da solo — non è una bocciatura di qualità,
+  il contatore M non si muove; il ramo viene ribasato e ripassa verifica e
+  sicurezza sul contenuto nuovo. In dashboard lo stato si chiama
+  «Riallineamento» e nel registro dei worker il lancio porta `motivo:
+  riallineamento`). Chi ribasa non corregge gli unit rossi: li elenca, e chi
   verifica ne fa rilievi interni (#1204).
 - `design` —fusione bloccata da L5, approvata dall'owner e finita in conflitto→
   `revision_capability` in DUE passi: la riapertura `design → todo` a nome

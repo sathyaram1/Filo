@@ -11,7 +11,7 @@
 //   · i FEEDBACK (`allFeedbacks` in pagina) hanno la data di INVIO
 //     (`createdAt`): rispondono a «quanti ne sono arrivati»;
 //   · il REGISTRO DEI WORKER (`config/automation.workerLog`, che il server
-//     scrive al rilascio di ogni biglietto: `{ role, startedAt, num }`) ha la
+//     scrive al rilascio di ogni biglietto: `{ role, startedAt, num, motivo? }`) ha la
 //     data di LAVORAZIONE: risponde a «quanto lavoro è stato fatto», «quante
 //     esplorazioni sono partite» e «quanti giri è costato un fix».
 //   Contare i lavorati sulla data d'invio sarebbe una risposta sbagliata data
@@ -24,7 +24,8 @@
 //   volte un verificatore è stato lanciato sullo stesso numero: il primo giro
 //   è la verifica, ogni giro in più è una critica che ha rimandato indietro il
 //   lavoro. Quindi «critiche prima del via libera» = lanci del verificatore
-//   meno uno. Non c'è un contatore sul documento: il conto dei giri vive sul
+//   meno uno, senza quelli col motivo `riallineamento` (la verifica di un rebase
+//   dopo un conflitto su main). Non c'è un contatore sul documento: il conto dei giri vive sul
 //   server, e questa è l'unica traccia che arriva al client.
 //
 // IL REGISTRO È UNA FINESTRA, E LO DICE
@@ -273,10 +274,21 @@
       if (!e || typeof e !== 'object') continue;
       var t = ms(e.startedAt);
       if (t == null) continue;
-      out.push({ role: String(e.role || '').trim(), t: t, num: normNum(e.num) });
+      out.push({ role: String(e.role || '').trim(), t: t, num: normNum(e.num), motivo: String(e.motivo || '').trim() });
     }
     out.sort(function (a, b) { return a.t - b.t; });
     return out;
+  }
+
+  // Il motivo del lancio (#532) che il server scrive accanto al ruolo: il rebase dopo un conflitto di fusione e la sua
+  // verifica non sono una correzione e una critica, e non contano fra i giri.
+  var MOTIVO_RIALLINEAMENTO = 'riallineamento';
+
+  /** La chiave del mestiere di una voce: il ruolo, o `ruolo/motivo` quando il server ne ha scritto uno. PURA. */
+  function mestiereDi(e) {
+    var role = String((e && e.role) || '').trim();
+    var motivo = String((e && e.motivo) || '').trim();
+    return motivo ? role + '/' + motivo : role;
   }
 
   // I ruoli che LAVORANO su una segnalazione (l'esplorazione no: gira sull'app,
@@ -503,7 +515,7 @@
    *
    * @param {object} input
    *   feedbacks  la lista dei feedback (già decifrata)
-   *   workerLog  il registro dei worker (`{ role, startedAt, num }`)
+   *   workerLog  il registro dei worker (`{ role, startedAt, num, motivo? }`)
    *   range      la finestra (da `rangeOf`)
    *   creatori   array di classi di mittente da tenere; vuoto/assente = tutte
    *   feedbackParziali  true se la lista dei feedback ha toccato il tetto di
@@ -650,9 +662,10 @@
     // quanto è costato un lavoro è un fatto suo, non del periodo che si sta
     // guardando. Contando solo dentro la finestra, lo stesso lavoro risultava
     // «passato subito» da «Oggi» e «2 critiche» da «30 giorni».
+    // La verifica di un rebase dopo un conflitto non è una critica in più: un lavoro passato subito resta tale.
     var verifichePerNumero = Object.create(null);
     for (i = 0; i < log.length; i++) {
-      if (log[i].role === 'verifier' && log[i].num) conta(verifichePerNumero, log[i].num);
+      if (log[i].role === 'verifier' && log[i].num && log[i].motivo !== MOTIVO_RIALLINEAMENTO) conta(verifichePerNumero, log[i].num);
     }
     for (i = 0; i < log.length; i++) {
       var e = log[i];
@@ -662,7 +675,7 @@
       // dal totale mentre la scheda Log, che legge lo stesso registro, la
       // mostrava. Senza mestiere la chiave resta vuota e chi disegna la
       // chiama «Sconosciuto», con la stessa parola della scheda Log.
-      if (inRange(e.t, range)) { lanciTot += 1; conta(perRuolo, e.role); }
+      if (inRange(e.t, range)) { lanciTot += 1; conta(perRuolo, mestiereDi(e)); }
       if (e.role === 'prober') {
         if (inRange(e.t, range)) proberLanciati += 1;
         continue;
@@ -1007,7 +1020,7 @@
   }
 
   global.SN_FEEDBACK_STATS = {
-    PRESETS, CREATORI, CLASSI_META, GRUPPI_CREATORI, RUOLI_LAVORO,
+    PRESETS, CREATORI, CLASSI_META, GRUPPI_CREATORI, RUOLI_LAVORO, mestiereDi, MOTIVO_RIALLINEAMENTO,
     CREATORE_ILLEGGIBILE, ETICHETTA_ILLEGGIBILE,
     presetOf, rangeOf, inRange, giornoDi, dataBreve, durata, mediana,
     normNum, numeroDi, numeroPadre, normalizeLog,

@@ -1309,6 +1309,36 @@ test('ownerActionAllowsStatus: passa solo ciò che la segnalazione offre ORA', (
   assert.equal(MR.ownerActionAllowsStatus({ status: 'archived' }, 'done'), false);
 });
 
+// ── Il riallineamento dopo un conflitto di fusione non è una correzione (#532) ──
+
+test('#532: un rientro per riallineamento si chiama così sull\'etichetta, nei passaggi e nel motivo', () => {
+  const fb = { status: 'revision_capability', statusReason: 'riallineamento' };
+  assert.equal(MR.inRiallineamento(fb), true);
+  const b = MR.stateBadge(fb);
+  assert.equal(b.label, 'Riallineamento', 'non «Verifica fix»: il verificatore non ha bocciato niente');
+  assert.equal(b.showReason, true);
+  assert.match(b.reasonText, /non è una bocciatura/);
+  assert.match(b.hint, /^Stato: Riallineamento/);
+  assert.match(JSON.stringify(MR.righeStato(fb)), /Riallineamento — main è andato avanti, non è una bocciatura/, 'anche il pannello del triangolo');
+  const p = MR.workProgress(fb, { now: Date.parse('2026-07-09T12:00:00Z') });
+  assert.deepEqual(p.steps.map((s) => s.label), ['Implementazione', 'Riallineamento', 'Controllo sicurezza']);
+  assert.equal(p.current.label, 'Riallineamento');
+  assert.equal(p.motivo, 'riallineamento');
+  // Una correzione vera resta quella di sempre.
+  const corr = { status: 'revision_capability' };
+  assert.equal(MR.inRiallineamento(corr), false);
+  assert.equal(MR.stateBadge(corr).label, 'Verifica fix');
+  assert.equal(MR.workProgress(corr).steps[1].label, 'Controllo funzionalità');
+  assert.equal(MR.workProgress(corr).motivo, '');
+  // Il segno vale solo dove il server lo scrive: su un altro stato non dice più niente.
+  const altrove = { status: 'todo', statusReason: 'riallineamento' };
+  assert.equal(MR.normalizeStatus(altrove).statusReason, null);
+  assert.equal(MR.inRiallineamento(altrove), false);
+  assert.equal(MR.stateBadge(altrove).label, 'In coda');
+  assert.equal(MR.stateBadge(altrove).showReason, false);
+  assert.equal(MR.inRiallineamento({ status: CIFRATO, statusReason: 'riallineamento' }), false);
+});
+
 // ── stateBadge: le stesse parole su tutte e due le pagine ─────────────────
 
 test('stateBadge: etichetta, colore e motivo dal vocabolario unico', () => {

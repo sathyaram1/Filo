@@ -500,6 +500,10 @@
     }
     .mg-log-when { color: var(--sn-fg); }
     .mg-log-abs { margin-left: auto; color: var(--sn-muted); font-size: 12px; }
+    /* La colonna del ruolo prende la larghezza dell'etichetta più lunga («Verifica del riallineamento»): l'istante
+       resta allineato su tutte le righe. */
+    #mgLogList:not([hidden]) { display: grid; grid-template-columns: max-content max-content 1fr; column-gap: 12px; }
+    #mgLogList .mg-log-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
     /* Il canale autenticato delle routine, stessa griglia delle righe dei worker: cambia solo il colore del
        ruolo, che qui segnala un tentativo respinto. */
     .mg-log-section { margin-top: 32px; }

@@ -779,6 +779,34 @@ test('con la chiave lo stesso lavoro torna in una fetta', () => {
 
 // ── Un'esecuzione senza mestiere scritto resta nel conto (giro 19) ──────────
 
+test('#532: la verifica di un riallineamento non è una critica, e il rebase è un mestiere suo', () => {
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [fb({ seq: 509, status: 'done' })],
+    workerLog: [
+      { role: 'new-work', startedAt: g(6), num: '509' },
+      { role: 'verifier', startedAt: g(5), num: '509' },
+      { role: 'secaudit', startedAt: g(5), num: '509' },
+      // La fusione trova un conflitto: rebase e verifica del rebase.
+      { role: 'fixer', startedAt: g(4), num: '509', motivo: 'riallineamento' },
+      { role: 'verifier', startedAt: g(3), num: '509', motivo: 'riallineamento' },
+      { role: 'secaudit', startedAt: g(3), num: '509' },
+    ],
+  });
+  const fette = Object.fromEntries(r.giri.fette.map((f) => [f.key, f.n]));
+  assert.equal(fette.g0, 1, 'il lavoro era passato al primo giro: il conflitto su main non lo boccia');
+  assert.equal(r.giri.media, 0);
+  assert.equal(r.lavorati.verifiche, 2, 'le verifiche partite restano due');
+  const perRuolo = Object.fromEntries(r.lanci.perRuolo.map((v) => [v.role, v.n]));
+  assert.equal(perRuolo['fixer/riallineamento'], 1, 'il rebase non si conta fra le correzioni');
+  assert.equal(perRuolo.fixer, undefined);
+  assert.equal(perRuolo['verifier/riallineamento'], 1);
+  assert.equal(perRuolo.verifier, 1);
+  assert.equal(S.mestiereDi({ role: 'fixer' }), 'fixer');
+  assert.equal(S.mestiereDi({ role: 'fixer', motivo: ' riallineamento ' }), 'fixer/riallineamento');
+  assert.equal(S.mestiereDi(null), '');
+});
+
 test('un lancio senza mestiere si conta lo stesso, in una voce sua', () => {
   const r = S.compute({
     range: S.rangeOf('30g', ORA),

@@ -708,9 +708,9 @@
     AUTOMATION_ROLE_MODELS_SET: 'automation_role_models_set', // { ruolo, campo, valore } → { ok, letto, scritto, roleModels? } | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
-    // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
+    // scrive il server al rilascio di ogni biglietto; lo legge la tab "Log" della
     // dashboard Gestione. Owner-only, sola lettura dal client.
-    WORKER_LOG_GET: 'worker_log_get',              // → { ok, entries:[{role,startedAt,num}] } | { ok:false, error }
+    WORKER_LOG_GET: 'worker_log_get',              // → { ok, entries:[{role,startedAt,num,motivo?}] } | { ok:false, error }
     // Registri del canale autenticato delle routine (spec ROUTINE-AUTH-SPEC.md):
     // i RIFIUTI (una richiesta fuori dal perimetro del biglietto è il segnale
     // che qualcuno ha manipolato un lavoratore) e i CONFRONTI fra la scelta del

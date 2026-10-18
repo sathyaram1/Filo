@@ -1305,7 +1305,8 @@
   // config/automation.workerLog, scritto dal server al rilascio di ogni
   // biglietto; qui è di sola lettura via il canale main (owner-gated).
   const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
-  // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
+  // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo). Le chiavi `ruolo/motivo` sono lo stesso
+  // mestiere su un lavoro diverso (SN_FEEDBACK_STATS.mestiereDi): il rebase dopo un conflitto non è una correzione.
   const ROLE_LABELS = {
     'new-work': 'Nuovo lavoro',
     verifier:   'Verifica',
@@ -1314,11 +1315,17 @@
     prober:     'Esplorazione',
     idle:       'Fermo',
     off:        'Routine spente',
+    'fixer/riallineamento':    'Riallineamento',
+    'verifier/riallineamento': 'Verifica del riallineamento',
   };
   function roleLabel(role) {
     const r = String(role || '').trim();
-    return ROLE_LABELS[r] || (r || 'Sconosciuto');
+    if (ROLE_LABELS[r]) return ROLE_LABELS[r];
+    // Un motivo che questa versione non conosce non cancella il mestiere.
+    const base = r.split('/')[0];
+    return ROLE_LABELS[base] || (r || 'Sconosciuto');
   }
+  const mestiereDi = (e) => window.SN_FEEDBACK_STATS.mestiereDi(e);
   let logLoaded  = false;   // true dopo il primo caricamento riuscito
   let logLoading = false;
 
@@ -1359,7 +1366,7 @@
     const list = Array.isArray(entries) ? entries : [];
     if (!list.length) { setLogView('empty'); mgLogList.innerHTML = ''; return; }
     mgLogList.innerHTML = list.map((e) => {
-      const role = roleLabel(e && e.role);
+      const role = roleLabel(mestiereDi(e));
       const num  = e && e.num ? ` · #${esc(String(e.num))}` : '';
       const rel  = timeAgo(e && e.startedAt);
       const abs  = formatDateTime(e && e.startedAt);
@@ -2821,6 +2828,8 @@
             ? 'Nessuna istanza al lavoro: riparte quando quelli che aspetta sono fusi'
             : progress.current.key === 'impl'
             ? 'Nessuna istanza al lavoro: rientra in coda da solo'
+            : progress.motivo === 'riallineamento'
+            ? 'Nessuna istanza al lavoro: il riallineamento riparte da solo'
             : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;
     return `<div class="mg-item-state">${steps}${who}</div>`;

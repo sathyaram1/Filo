@@ -329,6 +329,22 @@
     return verdicts.length > 0 && verdicts.every((v) => v.class === 'aligned');
   }
 
+  // Il rientro dopo un conflitto di fusione (#532): lo scrive il server col ritorno in `revision_capability`, e il
+  // verdetto dopo lo toglie. Rimasto su un altro stato (un'altra mano che sposta lo status) non dice più niente di vero.
+  const MOTIVO_RIALLINEAMENTO = 'riallineamento';
+  const ETICHETTA_RIALLINEAMENTO = 'Riallineamento';
+  function motivoDelloStato(status, statusReason) {
+    const r = statusReason || null;
+    return r === MOTIVO_RIALLINEAMENTO && status !== 'revision_capability' ? null : r;
+  }
+
+  /** La pratica è nel giro di riallineamento su main (rebase e sua verifica), non in una correzione? PURA. */
+  function inRiallineamento(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    const { status, statusReason } = normalizeStatus(fb);
+    return status === 'revision_capability' && statusReason === MOTIVO_RIALLINEAMENTO;
+  }
+
   // ── normalizeStatus: la SOLA porta d'ingresso allo stato di un feedback ───
   // Ritorna sempre uno status CANONICO (spec FEEDBACK-STATES.md §2) + il
   // sottotesto statusReason. Tre casi:
@@ -341,7 +357,7 @@
   function normalizeStatus(fb) {
     const fs = FS();
     const s = fb && fb.status;
-    if (fs.isCanonical(s)) return { status: s, statusReason: (fb && fb.statusReason) || null };
+    if (fs.isCanonical(s)) return { status: s, statusReason: motivoDelloStato(s, fb && fb.statusReason) };
 
     const simple = fs.LEGACY_SIMPLE[s];
     if (simple) return { status: simple.status, statusReason: (fb && fb.statusReason) || simple.statusReason };
@@ -636,6 +652,7 @@
     attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',
     guasto: 'fermo per un guasto',
+    riallineamento: 'main è andato avanti, non è una bocciatura',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
   };
@@ -983,10 +1000,12 @@
       return { label: 'In attesa', color: null, hint: `Stato: In attesa (${reasonText(statusReason)})`, reason: statusReason, reasonText: reasonText(statusReason), showReason: true, encrypted: false };
     }
     const txt = statusReason ? reasonText(statusReason) : '';
+    // Un conflitto su main ha lo stato di una correzione ma non lo è: lo dice l'etichetta, non solo il sottotesto.
+    const label = inRiallineamento(fb) ? ETICHETTA_RIALLINEAMENTO : info.label;
     return {
-      label: info.label,
+      label,
       color: info.color || null,
-      hint: `Stato: ${info.label}${statusReason ? ` (${txt})` : ''}`,
+      hint: `Stato: ${label}${statusReason ? ` (${txt})` : ''}`,
       reason: statusReason || null,
       reasonText: txt,
       showReason: !!txt && txt !== String(statusReason),
@@ -1031,6 +1050,9 @@
       key: s.key, label: s.label,
       state: i < idx ? 'done' : (i === idx ? 'current' : 'pending'),
     }));
+    // Il riallineamento prende il posto del controllo: rebase e sua verifica, prima di tornare all'audit.
+    const motivo = inRiallineamento(fb) ? MOTIVO_RIALLINEAMENTO : '';
+    if (motivo) steps[1].label = ETICHETTA_RIALLINEAMENTO;
     const now = (opts && opts.now) != null ? opts.now : Date.now();
     return {
       status,
@@ -1038,6 +1060,7 @@
       current: steps[idx],
       active: FS().isBeating(fb, now),
       by: String((fb && fb.claimedBy) || ''),
+      motivo,
     };
   }
 
@@ -1983,7 +2006,7 @@
   }
 
   global.SN_MANAGE_REVIEW = {
-    normalizeStatus,
+    normalizeStatus, inRiallineamento, MOTIVO_RIALLINEAMENTO,
     tastoFrase,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
     // grezzi. Lo usa listBoardTab qui dentro, e lo usa feedbackPublicView.js

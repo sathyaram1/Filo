@@ -881,8 +881,8 @@ async function setCreditsKnobs(patch, idToken) {
 }
 
 // Log dei worker delle routine (config/automation, campo `workerLog`): elenco
-// delle ultime esecuzioni di scripts/dispatch.mjs, ciascuna { role, startedAt,
-// num }. Lo scrive dispatch a ogni worker spawnato; qui lo LEGGIAMO soltanto
+// delle ultime esecuzioni, ciascuna { role, startedAt, num, motivo? }. Lo scrive
+// il server al rilascio di ogni biglietto; qui lo LEGGIAMO soltanto
 // (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
 // PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
 // campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
@@ -895,11 +895,12 @@ async function getWorkerLog(idToken, { severo = false } = {}) {
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
   const entries = raw
     .filter((e) => e && typeof e === 'object')
-    .map((e) => ({
+    .map((e) => Object.assign({
       role: typeof e.role === 'string' ? e.role : '',
       startedAt: typeof e.startedAt === 'string' ? e.startedAt : '',
       num: e.num == null ? '' : String(e.num),
-    }))
+    // Il motivo del lancio (#532): il rebase dopo un conflitto non si legge come una correzione.
+    }, typeof e.motivo === 'string' && e.motivo.trim() ? { motivo: e.motivo.trim().slice(0, 40) } : {}))
     // Più recenti prima: dispatch le accoda in ordine cronologico.
     .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
   return entries;
