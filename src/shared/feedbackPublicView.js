@@ -39,6 +39,12 @@
   // Il publisher scrive sempre con la maschera sui CARD_FIELDS, o li cancellerebbe tutti.
   const USER_FIELDS = Object.freeze(['votes', 'reopenRequests']);
 
+  // Il testo della segnalazione entra solo ripulito e corretto dal server alla chiusura (#987), mai com'è
+  // arrivato. Fuori dalla maschera del publisher, come i voti: una ripubblicazione non lo cancella.
+  const SERVER_FIELDS = Object.freeze(['publicText']);
+  // Il tetto delle regole: è quello del testo del feedback, quindi non taglia una segnalazione vera.
+  const PUBLIC_TEXT_MAX = 10000;
+
   // `archived` c'è perché il popup ricompense premia anche ciò che l'owner ha archiviato.
   // Gli stati terminali della sicurezza non sono qui, e il guard sotto li rifiuta comunque.
   const PUBLISHABLE_STATUSES = Object.freeze(['done', 'archived']);
@@ -241,6 +247,8 @@
     COLLECTION,
     CARD_FIELDS,
     USER_FIELDS,
+    SERVER_FIELDS,
+    PUBLIC_TEXT_MAX,
     PUBLISHABLE_STATUSES,
     isFlagged,
     rewardFor,

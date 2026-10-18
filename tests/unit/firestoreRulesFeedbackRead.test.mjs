@@ -124,9 +124,18 @@ test('la vista pubblica ammette SOLO i campi della scheda (le regole sono la ret
   // E l'elenco delle regole deve combaciare con quello del codice che le
   // scrive: se divergono, o una scrittura legittima viene respinta, o un campo
   // nuovo passa senza che nessuno l'abbia deciso.
-  const attesi = [...VIEW.CARD_FIELDS, ...VIEW.USER_FIELDS].slice().sort();
+  const attesi = [...VIEW.CARD_FIELDS, ...VIEW.USER_FIELDS, ...VIEW.SERVER_FIELDS].slice().sort();
   assert.deepEqual(ammessi.slice().sort(), attesi,
     'i campi ammessi dalle regole e quelli di SN_FEEDBACK_PUBLIC_VIEW devono essere gli stessi');
+});
+
+test('il testo ripulito del server (#987) ha nelle regole il tetto della vista, ed è una stringa', () => {
+  const tetto = VISTA.match(/get\('publicText', ''\)\.size\(\) <= (\d+)/);
+  assert.ok(tetto, 'le regole devono dichiarare il tetto di publicText');
+  assert.equal(Number(tetto[1]), VIEW.PUBLIC_TEXT_MAX);
+  assert.match(VISTA, /get\('publicText', ''\) is string/);
+  // Il publisher dell'owner non lo scrive: una ripubblicazione cancellerebbe il testo del server.
+  for (const f of VIEW.SERVER_FIELDS) assert.ok(!VIEW.CARD_FIELDS.includes(f) && !VIEW.USER_FIELDS.includes(f), f);
 });
 
 test('la vista pubblica ammette solo stati CHIUSI', () => {
