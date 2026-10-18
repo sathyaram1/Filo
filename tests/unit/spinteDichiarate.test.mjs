@@ -2,12 +2,14 @@
 // ha creato, mai quelli visti su origin; l'invio li dichiara al server, una coda per copia; il salvataggio e la consegna
 // li portano col biglietto giusto. Server finto: le regole sul registro le prova il server.
 
+import '../helpers/senzaSessione.mjs';
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { aspettaChe, TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { scene, togliScene, runHookRaw, stdinEdit } from '../helpers/scenaHook.mjs';
 import * as S from '../../scripts/lib/spinte.mjs';
 import { installaControlloSpedizione, installaSpinteServer, SEGNO_PRE_PUSH } from '../../scripts/lib/copie-di-dati.mjs';
@@ -183,9 +185,9 @@ test('l’invio di una copia è uno alla volta: chi arriva mentre un altro manda
   const lento = { fetchImpl: async () => { await new Promise((r) => { sblocca = r; }); return { status: 200, ok: true, json: async () => ({ ok: true }) }; } };
   const dir = codaFinta([A]);
   const primo = S.inviaSpinte({ root: dir, deps: lento });
-  await new Promise((r) => setTimeout(r, 50));
-  const secondo = S.inviaSpinte({ root: dir, deps: finto([[500, {}]]).deps, attesaMs: 5000 });
-  await new Promise((r) => setTimeout(r, 300));
+  await aspettaChe(() => typeof sblocca === 'function', { cosa: 'il primo invio in volo' });
+  // Se il secondo non aspettasse il turno manderebbe la stessa voce a un server giù, e la terrebbe in coda.
+  const secondo = S.inviaSpinte({ root: dir, deps: finto([[500, {}]]).deps, attesaMs: TETTO_ATTESA_MS });
   sblocca();
   assert.equal((await primo).inviate, 1);
   assert.deepEqual(await secondo, { inviate: 0, rifiutate: 0, restano: 0, errori: [] });
