@@ -31,8 +31,8 @@ function comeSuWindows(fn) {
 const NODE = `& "${process.execPath}"`;
 const esce = (n) => `${NODE} -e "process.exit(${n})"`;
 const COMANDI = [
-  `using namespace System.Text\n${esce(3)}\nWrite-Output fatto`,
-  `param($quanti = 1)\n${esce(3)}\nWrite-Output fatto`,
+  `using namespace System.Text\n${esce(3)}\n${esce(0)}\nWrite-Output fatto`,
+  `param($quanti = 1)\n${esce(3)}\n${esce(0)}\nWrite-Output fatto`,
 ];
 
 test.describe('#718 programma fallito a metà, con using o param in testa', () => {
