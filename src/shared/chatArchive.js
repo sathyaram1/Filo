@@ -389,6 +389,14 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // Un messaggio che Filo ha scritto di sua iniziativa (#869), e le cose successe che l'hanno fatto nascere.
+      if (turn.spontaneo) {
+        out.spontaneo = true;
+        const motivi = (Array.isArray(turn.motivi) ? turn.motivi : [])
+          .filter((m) => m && typeof m.tipo === 'string')
+          .map((m) => ({ tipo: m.tipo.slice(0, 20), testo: String(m.testo == null ? '' : m.testo).slice(0, 300) }));
+        if (motivi.length) out.motivi = motivi.slice(-50);
+      }
       // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
       const guardate = [
         ...(Array.isArray(turn.guardate) ? turn.guardate : []),
