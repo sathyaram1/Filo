@@ -474,6 +474,9 @@ service cloud.firestore {
         // testi che resta leggibile da tutti, e un tetto stretto la tiene tale.
         && request.resource.data.get('userNote', '') is string
         && request.resource.data.get('userNote', '').size() <= 500
+        // Il testo della segnalazione ripulito e corretto dal server (D80): il tetto è quello del testo del feedback.
+        && request.resource.data.get('publicText', '') is string
+        && request.resource.data.get('publicText', '').size() <= 10000
         // S1.priority: priority accetta int 0-3 (legacy in chiaro) OPPURE
         // una stringa ciphertext FENC1: (gate on). Retrocompatibile.
         && (
@@ -676,11 +679,13 @@ service cloud.firestore {
       // Un lavoro locale (#908) non ha scheda, ma qui NON si respinge: un'app
       // rimasta alla versione di prima si fermerebbe alla prima scheda rifiutata
       // e non pubblicherebbe più niente. La toglie il server (onPublicCardWrite).
+      // `publicText` (#987) lo scrive solo il server, con l'Admin SDK: è qui perché la regola guarda il documento
+      // INTERO dopo la scrittura, e senza di lui ogni ripubblicazione dell'owner dopo la sua verrebbe respinta.
       allow create, update: if (isAdmin() || isRoutine())
         && request.resource.data.keys().hasOnly(
              ['name', 'seq', 'subSeq', 'status', 'statusPublic', 'resolvedInVersion',
               'createdAt', 'resolvedAt', 'clientIdTag', 'userNote', 'reward',
-              'publishedAt', 'votes', 'reopenRequests'])
+              'publishedAt', 'votes', 'reopenRequests', 'publicText'])
         // `status` solo fra quelli CHIUSI: un feedback aperto (e a maggior
         // ragione uno fermato dalla sicurezza) non ha una scheda pubblica.
         && request.resource.data.get('status', 'done') in ['done', 'verified', 'archived', 'ignored']
@@ -692,6 +697,9 @@ service cloud.firestore {
         // è lo stesso della collezione vera.
         && request.resource.data.get('userNote', '') is string
         && request.resource.data.get('userNote', '').size() <= 500
+        // Il testo della segnalazione ripulito e corretto dal server (D80): il tetto è quello del testo del feedback.
+        && request.resource.data.get('publicText', '') is string
+        && request.resource.data.get('publicText', '').size() <= 10000
         && request.resource.data.get('resolvedInVersion', '') is string
         && request.resource.data.get('resolvedInVersion', '').size() <= 40
         // `clientIdTag` è l'impronta di QUESTA scheda per chi l'ha segnalata,

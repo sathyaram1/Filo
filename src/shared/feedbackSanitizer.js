@@ -19,10 +19,10 @@
 //   gli occhi di chiunque, e per quali feedback» — è diventata la VISTA
 //   PUBBLICA: `src/shared/feedbackPublicView.js` decide e
 //   `feedback-public/{id}` la contiene, scritta dal main dell'owner. La board
-//   legge di lì e il documento vero non lo apre più nessuno. Questo modulo
-//   resta per il passo che quella vista NON fa: redigere con un LLM il TESTO
-//   libero di un feedback, se un giorno si vorrà mostrarne una riga in
-//   bacheca. Finché quel giorno non arriva, la bacheca mostra solo il titolo.
+//   legge di lì e il documento vero non lo apre più nessuno. Il passo che
+//   quella vista NON fa, ripulire e correggere il TESTO libero, lo fa il server
+//   alla chiusura e lo scrive sulla scheda (`publicText`, #987): questo modulo
+//   non lo chiama nessuno e il server non lo segue.
 //
 // DOVE GIRA (raccomandazione — vedi report)
 //   La sanitizzazione DEVE girare lato backend (Admin SDK / filo-security) o

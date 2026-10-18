@@ -20,6 +20,8 @@
 //   che ha entrambe.
 //
 // COSA NON ENTRA MAI
+//   Il testo della segnalazione com'è arrivato: sulla scheda va solo quello che
+//   il server ha ripulito e corretto (`publicText`, #987, SERVER_FIELDS).
 //   text, url, title, userAgent, images, files, notes (il report per l'owner),
 //   clientId, priority, pipeline, reviewComment/reviewDecision/reviewedAt,
 //   branch, blockReason, claim*. Non per dimenticanza: l'allowlist è la
@@ -81,6 +83,14 @@
   // sempre con una maschera sui soli CARD_FIELDS, o il primo aggiornamento di
   // una scheda cancellerebbe i voti di tutti.
   const USER_FIELDS = Object.freeze(['votes', 'reopenRequests']);
+
+  // I campi della scheda che scrive solo il server (filo-security, Admin SDK):
+  // `publicText` è il testo della segnalazione senza dati personali e corretto
+  // da un modello piccolo alla chiusura (#987). Fuori dalla maschera del
+  // publisher, come i voti: una ripubblicazione non lo cancella.
+  const SERVER_FIELDS = Object.freeze(['publicText']);
+  // Il tetto delle regole: è quello del testo del feedback, quindi non taglia una segnalazione vera.
+  const PUBLIC_TEXT_MAX = 10000;
 
   // Stati CHIUSI che meritano una scheda. `done` è il fix uscito (o in attesa
   // della sua versione: il gate DB3 lo applica la bacheca); `archived` serve al
@@ -358,6 +368,8 @@
     COLLECTION,
     CARD_FIELDS,
     USER_FIELDS,
+    SERVER_FIELDS,
+    PUBLIC_TEXT_MAX,
     PUBLISHABLE_STATUSES,
     isFlagged,
     rewardFor,

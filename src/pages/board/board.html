@@ -44,7 +44,7 @@
        una riga per OGNI classe. patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
     .bd-auth[hidden], .bd-loading[hidden], .bd-error[hidden], .bd-retry[hidden], .bd-list[hidden],
     .bd-more[hidden], .bd-card[hidden], .bd-vote[hidden], .bd-vote-btn[hidden],
-    .bd-reopen-actions[hidden], .bd-spinner[hidden] { display: none; }
+    .bd-reopen-actions[hidden], .bd-spinner[hidden], .bd-card-text[hidden] { display: none; }
     .bd-spinner {
       width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
       border: 2px solid var(--sn-border); border-top-color: var(--sn-accent);
@@ -90,6 +90,31 @@
       overflow-wrap: anywhere;
     }
     .bd-card-sub { margin-top: 3px; font-size: 12px; color: var(--sn-muted); }
+
+    /* Testo della segnalazione (#987): tre righe; il resto si apre intero sopra le schede sotto, che non si
+       spostano, dopo una breve attesa perché chi scorre col puntatore non accenda ogni scheda che attraversa. */
+    .bd-card-testo { position: relative; margin-top: 5px; border-radius: 8px; outline: none; }
+    .bd-card-text, .bd-card-intero {
+      font-size: 13px; line-height: 1.5; color: var(--sn-fg);
+      white-space: pre-line; overflow-wrap: anywhere;
+    }
+    .bd-card-text {
+      margin: 0; overflow: hidden;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    }
+    .bd-card-intero {
+      position: absolute; z-index: 5; top: -7px; left: -10px; right: -10px;
+      padding: 6px 10px 8px; max-height: min(60vh, 520px); overflow-y: auto; overscroll-behavior: contain;
+      background: var(--sn-overlay-bg); border: 1px solid var(--sn-border); border-radius: 10px; box-shadow: var(--sn-shadow);
+      visibility: hidden; opacity: 0;
+      transition: opacity calc(.12s * var(--sn-motion, 1)) ease, visibility 0s linear calc(.12s * var(--sn-motion, 1));
+    }
+    .bd-card-testo.lungo:hover .bd-card-intero,
+    .bd-card-testo.lungo:focus-within .bd-card-intero {
+      visibility: visible; opacity: 1;
+      transition: opacity calc(.12s * var(--sn-motion, 1)) ease calc(.25s * var(--sn-motion, 1)), visibility 0s linear calc(.25s * var(--sn-motion, 1));
+    }
+    .bd-card-testo.lungo:focus-visible .bd-card-intero { border-color: var(--sn-accent); }
 
     /* I conteggi riflettono il tally reale su Firestore, non solo la scelta locale dell'utente. */
     .bd-vote { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }

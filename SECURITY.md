@@ -312,10 +312,13 @@ Le regole (Firebase Security Rules) dicono:
   vecchio link non apre più niente.
 - Quello che tutti possono vedere è la **bacheca dei miglioramenti**, e sono
   solo i campi pensati per stare lì: il titolo breve di un problema già
-  risolto, il suo numero, le date, lo stato, la versione in cui è uscito, la
-  frase scritta per chi l'aveva segnalato, il premio, i voti e le richieste di
-  riapertura. Non il testo, non l'indirizzo della pagina, non gli screenshot,
-  non le note di lavorazione. Quei campi vivono in una raccolta separata, una
+  risolto, il testo della segnalazione riscritto dal server alla chiusura
+  senza email, nomi e altri dati che identificano qualcuno e con gli errori
+  corretti, il suo numero, le date, lo
+  stato, la versione in cui è uscito, la frase scritta per chi l'aveva
+  segnalato, il premio, i voti e le richieste di riapertura. Non il testo
+  com'è arrivato, non l'indirizzo della pagina, non gli screenshot, non le
+  note di lavorazione. Quei campi vivono in una raccolta separata, una
   vetrina che riempie chi gestisce i feedback. La raccolta vera resta chiusa.
 - **Gli amministratori** (un elenco ristretto di email autorizzate) possono
   **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
