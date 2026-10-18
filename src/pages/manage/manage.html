@@ -39,6 +39,7 @@
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
   <script src="filo://shared/routineSessioni.js"></script>
+  <script src="filo://shared/routineCrediti.js"></script>
   <script src="filo://shared/routineModelli.js"></script>
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
@@ -1430,6 +1431,27 @@
     }
     /* Il Red Team ha un riquadro solo: la griglia di Automazioni lo stirerebbe a due terzi della finestra. */
     #mgRtRoot { display: block; max-width: 640px; }
+    /* Crediti: un riquadro per account più la taratura, affiancati finché c'è posto. */
+    .mg-crediti {
+      padding: 24px 0 32px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 20px; align-items: start;
+    }
+    .mg-crediti > .mg-cr-avviso { grid-column: 1 / -1; margin: 0; }
+    .mg-cr-riga { font-size: 12px; color: var(--sn-muted); margin: 0 0 14px; min-height: 1.4em; }
+    .mg-cr-campo + .mg-cr-campo { margin-top: 16px; }
+    .mg-cr-account .mg-auto-field-label { font-size: 13px; }
+    .mg-crediti .mg-auto-field-row { flex-wrap: wrap; }
+    .mg-cr-account .mg-cr-campo .mg-auto-field-row { margin-top: 6px; }
+    .mg-cr-unita { font-size: 13px; color: var(--sn-muted); margin-left: -4px; }
+    .sn-page .mg-crediti input.mg-auto-number { width: 96px; }
+    .sn-page input.mg-cr-data {
+      font: inherit; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--sn-border); background: var(--sn-bg, transparent); color: var(--sn-fg);
+    }
+    :root[data-sn-theme="dark"] .mg-cr-data { color-scheme: dark; }
+    :root[data-sn-theme="light"] .mg-cr-data { color-scheme: light; }
+    .mg-crediti h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: var(--sn-fg); }
+    .mg-cr-data:disabled, .mg-crediti .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
     .mg-automation h2 {
       font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--sn-fg);
     }
@@ -1579,6 +1601,7 @@
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
+      <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
     </nav>
 
@@ -1891,6 +1914,73 @@
           </label>
           <p class="mg-auto-block-desc mg-rt-stato" id="mgRtOpenMsg" role="status"></p>
         </section>
+      </div>
+    </section>
+
+    <!-- I crediti delle routine (#1356, SPEC-DOMANDE.md §8.2): i numeri dell'owner li legge e li scrive manageCrediti.js. -->
+    <section class="mg-panel" id="panel-crediti" data-panel="crediti">
+      <div class="mg-crediti" id="mgCrRoot">
+        <section class="mg-auto-block mg-cr-account" data-account="A">
+          <h2>Account A</h2>
+          <p class="mg-cr-riga" id="mgCrRigaA" role="status"></p>
+          <div class="mg-cr-campo" data-campo="riservaA">
+            <label class="mg-auto-field-label" for="mgCrRiservaA"
+              title="La parte della settimana di A che resta alle tue sessioni: le routine si fermano prima. Vuoto: nessuna riserva.">Riserva</label>
+            <div class="mg-auto-field-row">
+              <input type="text" id="mgCrRiservaA" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+                placeholder="nessuna" aria-describedby="mgCrRiservaAMsg" />
+              <span class="mg-cr-unita">%</span>
+              <button type="button" class="sn-btn" id="mgCrRiservaASave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRiservaAMsg" role="status"></span>
+            </div>
+          </div>
+          <div class="mg-cr-campo" data-campo="rinnovoA">
+            <label class="mg-auto-field-label" for="mgCrRinnovoA"
+              title="Un rinnovo qualsiasi della settimana di A, se è cambiato: vale ogni sette giorni da lì. Vuoto: martedì alle 19 (ora di Roma).">Rinnovo</label>
+            <div class="mg-auto-field-row">
+              <input type="datetime-local" id="mgCrRinnovoA" class="mg-cr-data" aria-describedby="mgCrRinnovoAMsg" />
+              <button type="button" class="sn-btn" id="mgCrRinnovoASave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRinnovoAMsg" role="status"></span>
+            </div>
+          </div>
+        </section>
+        <section class="mg-auto-block mg-cr-account" data-account="B">
+          <h2>Account B</h2>
+          <p class="mg-cr-riga" id="mgCrRigaB" role="status"></p>
+          <div class="mg-cr-campo" data-campo="tettoB">
+            <label class="mg-auto-field-label" for="mgCrTettoB"
+              title="Fin dove le routine possono usare la settimana di B. Vuoto: nessun tetto.">Tetto</label>
+            <div class="mg-auto-field-row">
+              <input type="text" id="mgCrTettoB" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+                placeholder="nessuno" aria-describedby="mgCrTettoBMsg" />
+              <span class="mg-cr-unita">%</span>
+              <button type="button" class="sn-btn" id="mgCrTettoBSave">Salva</button>
+              <span class="mg-action-msg" id="mgCrTettoBMsg" role="status"></span>
+            </div>
+          </div>
+          <div class="mg-cr-campo" data-campo="rinnovoB">
+            <label class="mg-auto-field-label" for="mgCrRinnovoB"
+              title="Un rinnovo qualsiasi della settimana di B, se è cambiato: vale ogni sette giorni da lì. Vuoto: mercoledì alle 9 (ora di Roma).">Rinnovo</label>
+            <div class="mg-auto-field-row">
+              <input type="datetime-local" id="mgCrRinnovoB" class="mg-cr-data" aria-describedby="mgCrRinnovoBMsg" />
+              <button type="button" class="sn-btn" id="mgCrRinnovoBSave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRinnovoBMsg" role="status"></span>
+            </div>
+          </div>
+        </section>
+        <section class="mg-auto-block mg-cr-campo" data-campo="usdPer100">
+          <h2 id="mgCrTaraturaTitolo"
+            title="Quanti dollari di listino valgono una settimana intera di un account: senza una lettura della barra di stato la percentuale si stima così. Vuoto: 2.150 $.">Taratura</h2>
+          <p class="mg-cr-riga">Dollari per una settimana intera, su A e su B.</p>
+          <div class="mg-auto-field-row">
+            <input type="text" id="mgCrTaratura" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+              placeholder="2150" aria-labelledby="mgCrTaraturaTitolo" aria-describedby="mgCrTaraturaMsg" />
+            <span class="mg-cr-unita">$</span>
+            <button type="button" class="sn-btn" id="mgCrTaraturaSave">Salva</button>
+            <span class="mg-action-msg" id="mgCrTaraturaMsg" role="status"></span>
+          </div>
+        </section>
+        <p class="mg-action-msg mg-cr-avviso" id="mgCrAvviso" role="status" hidden></p>
       </div>
     </section>
 
@@ -2388,5 +2478,6 @@
   <script src="manageDomande.js"></script>
   <script src="manage.js"></script>
   <script src="manageRedteam.js"></script>
+  <script src="manageCrediti.js"></script>
 </body>
 </html>

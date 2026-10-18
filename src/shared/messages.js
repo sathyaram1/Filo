@@ -679,6 +679,12 @@
     // Le legge il SERVER quando accende le sessioni. Owner-only.
     AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff } | { ok:false, error }
     AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff? } → come sopra | { ok:false, error }
+    // I numeri dell'owner sui crediti delle routine (ownerCrediti sul server, regole in src/shared/routineCrediti.js):
+    // riserva di A, tetto di B, taratura, rinnovi; `null` toglie un numero. Lo stato dice per account percentuale,
+    // limite, passo del giorno e rinnovo. Owner-only.
+    // `freni`: 'attivi', o 'numeri_assenti' (senza riserva di A né tetto di B i crediti non frenano niente).
+    ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
+    ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
     // Modello e sforzo del worker per fase (doc config/routines, campo
     // `roleModels` = { ruolo: { model?, effort? } }; regole in
     // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore

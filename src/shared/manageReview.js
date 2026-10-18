@@ -1867,7 +1867,7 @@
   const SEZIONI = Object.freeze([
     { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
     { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
-    { id: 'routine', nome: 'Routine', schede: ['automation', 'log'] },
+    { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
   ]);
 
   function sezioneDiScheda(tab) {
