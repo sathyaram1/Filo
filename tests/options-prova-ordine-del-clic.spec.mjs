@@ -1,5 +1,5 @@
 // La misura del «Prova» nelle Opzioni va all'ordinamento degli host con cui la prova è partita, e la chiamata
-// usa proprio quello: cambiare la tendina mentre gira non deve mettere i numeri sotto un'altra scelta (#1121).
+// usa proprio quello: cambiare la tendina mentre la prova gira non deve mettere i numeri sotto un'altra scelta (#1121).
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -43,8 +43,10 @@ test('modello proprio: cambiando «Host dei modelli» mentre il «Prova» gira, 
   await page.selectOption('#ordineHost', 'throughput');
   expect(await app.evaluate(() => globalThis.__prove[0].sort)).toBe('price');
 
+  // Il pulsante torna premibile solo a prova finita: da lì, sotto «Più veloce» non deve leggersi la misura.
+  await expect(riga.locator('.sn-model-test')).toBeDisabled();
   await expect(riga.locator('.sn-model-test')).toBeEnabled({ timeout: 10_000 });
-  await expect(riga.locator('.sn-model-row-status')).not.toHaveText(/TTFT\s+\d/);
+  await expect(riga.locator('.sn-model-row-status')).toHaveText(/Non ancora testato/);
   await page.selectOption('#ordineHost', 'price');
   await expect(riga.locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 5_000 });
 });

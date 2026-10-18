@@ -170,7 +170,8 @@
   // centimetri più su.
   function markTestBlocked(btn, blocked) {
     if (!btn) return;
-    btn.disabled = blocked;
+    // Una prova in corso resta spenta: il cancello gira a ogni modifica della pagina e la riaccendeva a metà.
+    btn.disabled = blocked || btn.dataset.inCorso === '1';
     if (blocked) btn.title = I18n.t('options_open_weights_test_blocked');
     else btn.removeAttribute('title');
   }
@@ -386,6 +387,7 @@
     const statusEl = row.querySelector('.sn-model-row-status');
     statusEl.textContent = I18n.t('options_test_running');
     btn.disabled = true;
+    btn.dataset.inCorso = '1';
     // Fissata al clic e mandata con la richiesta: la tendina cambiata mentre la prova gira non si prende i suoi numeri.
     const conf = configurazioneRiga(row);
     try {
@@ -409,6 +411,7 @@
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
+      delete btn.dataset.inCorso;
       btn.disabled = false;
       // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
       // rimetterebbe premibile un "Prova" che la politica tiene spento.
@@ -762,6 +765,7 @@
     if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
+    btn.dataset.inCorso = '1';
     // Come per le righe predefinite: la prova chiama, e la misura si attribuisce, con la configurazione del clic.
     const conf = configurazioneRiga(row);
     try {
@@ -793,6 +797,7 @@
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
+      delete btn.dataset.inCorso;
       btn.disabled = false;
       // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
       // rimetterebbe premibile un "Prova" che la politica tiene spento.
