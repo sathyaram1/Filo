@@ -1932,6 +1932,7 @@
                 <p class="mg-auto-block-desc">
                   Quando è attiva, i feedback giudicati sicuri entrano in coda da soli.
                   Spenta, li approvi tu uno per uno.
+                  Gli allarmi della pubblicazione e i ritrovamenti dell'esplorazione entrano in coda comunque.
                   <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
                 </p>
 
@@ -1953,24 +1954,19 @@
                     <input type="checkbox" id="mgAutoApproveLocal" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice">
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
                     <span class="mg-switch-text">🔧 Claude (sviluppo)</span>
                     <input type="checkbox" id="mgAutoApproveWorker" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza">
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
                     <span class="mg-switch-text">🧪 Claude (verifica)</span>
                     <input type="checkbox" id="mgAutoApproveVerifier" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro">
+                  <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
                     <span class="mg-switch-text">🧹 Claude (rilievi residui)</span>
                     <input type="checkbox" id="mgAutoApproveResiduo" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi esplora l'app in cerca di problemi che nessuno ha segnalato">
-                    <span class="mg-switch-text">🔍 Claude (esplorazione)</span>
-                    <input type="checkbox" id="mgAutoApproveProber" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                   <label class="mg-switch mg-switch--sm" title="Automazioni che non dichiarano il proprio ruolo (feedback storici)">

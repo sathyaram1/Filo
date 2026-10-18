@@ -27,6 +27,11 @@ codice e l'etichetta dell'interruttore che la copre deve dire onestamente cosa c
 Una mappa salvata prima non deve mai riaccendere da sola ciò che l'owner aveva spento:
 chi sdoppia un interruttore scrive anche il ripiego sul vecchio.
 
+**L'eccezione già decisa:** chi nasce senza origine con la prova del server (l'allarme
+della pubblicazione `agent:costruzione`, i ritrovamenti dell'esplorazione) va in coda
+comunque (#1035): categoria d'autore sì, interruttore no (`SENZA_INTERRUTTORE` in
+`feedbackThread.js`). Un interruttore che non decide niente non si mostra.
+
 **Perché il test:** senza, la scelta la fa il `return` in fondo alla funzione — e "è
 finita lì da sola" e "l'abbiamo deciso" diventano indistinguibili il giorno dopo.
 Precedenti: `routine:residuo` (SPEC-RIDISEGNO-MAX.md §13), `local:` (la sessione locale,

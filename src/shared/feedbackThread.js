@@ -177,6 +177,10 @@
   //                                      prober e NON verifier: spacciarlo per uno
   //                                      dei due falserebbe la lettura di dove
   //                                      nascono i ritrovamenti
+  //   agent:costruzione     → 'costruzione' l'allarme della pubblicazione (#1002): lo
+  //                                      apre il SERVER quando costruzione o suite di
+  //                                      una versione sono rosse; non è un'istanza di
+  //                                      Claude e il testo è una coda di registro
   //   agent:/routine:<altro>→ 'claude'   automazione di ruolo ignoto (storico: fino
   //                                      al 2026-08-08 nessuno si firmava)
   //   <altro>               → 'user'     un utente / alpha tester esterno
@@ -195,6 +199,7 @@
     verifier: 'verifier',
     secaudit: 'verifier',
     residuo: 'residuo',
+    costruzione: 'costruzione',
   };
   function authorKind(fb) {
     var c = senderOf(fb);
@@ -220,7 +225,8 @@
   // distingueva con cinque icone diverse ma la fiducia era una sola, quindi
   // per non far entrare da solo l'esploratore bisognava fermare anche la
   // sessione locale. I due assi ora coincidono: chi si vede separato si regola
-  // separato.
+  // separato, salvo chi nasce senza origine (SENZA_INTERRUTTORE, sotto): il
+  // gruppo `prober` resta per il gemello del server, ma non decide più niente.
   //
   // `filo` resta SEPARATO dalle automazioni: un feedback che nasce da Filo è
   // la voce di un utente vero filtrata da un modello, non un processo
@@ -240,10 +246,15 @@
   // riaprirebbe da solo cinque porte che l'owner aveva chiuso.
   var CLAUDE_GROUPS = ['local', 'worker', 'verifier', 'residuo', 'prober', 'claude'];
 
+  // Chi nasce senza origine (esplorazione, allarmi della pubblicazione) il server lo mette in coda comunque (#1035,
+  // functions/src/nascita.js): in Gestione niente interruttore. La costruzione resta nel gruppo che le dà il gemello.
+  var SENZA_INTERRUTTORE = { costruzione: 'claude' };
+
   // Il gruppo di fiducia di un mittente = la sua categoria d'autore, quella che
   // la dashboard mostra come icona. Una funzione sola per i due assi.
   function autoApproveGroup(clientId) {
-    return authorKind(clientId);
+    var k = authorKind(clientId);
+    return SENZA_INTERRUTTORE[k] || k;
   }
 
   /**
