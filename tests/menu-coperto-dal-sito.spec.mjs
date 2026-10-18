@@ -260,7 +260,7 @@ test('i pezzi di Filo sopra il menu non contano come velo: etichetta delle icone
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   await clickConfirm(sopra, 'cancel');
   await expect.poll(() => confirmState(sopra).catch(() => null)).toBeNull();
-  // Scoperta senza attesa: a coprirla era Filo, non il sito.
+  // Nessuna attesa: la vista sopra la scheda è di Filo, non un velo del sito.
   await expect.poll(async () => (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO)?.libera).toBe(true);
   const voce = (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO);
   await page.mouse.move(voce.incolla.x, voce.incolla.y, { steps: 2 });
