@@ -246,6 +246,18 @@ function creaFilo({ cartella } = {}) {
     return E().copiaChat(v.stato.chat.get(id));
   }
 
+  // Per la home (#869): tutte le chat col dispositivo di ogni messaggio, le pagine e il dispositivo di qui. `pos` cambia a
+  // ogni evento: chi ne ricava qualcosa di costoso lo tiene finché non cambia.
+  async function perLaCoda(opts) {
+    const v = await vista(opts);
+    return {
+      pos: v.stato.pos,
+      qui: normale.dispositivo,
+      chats: E().elencoChat(v.stato).map((c) => E().copiaChat(c, { dispositivi: true })),
+      pagine: E().pagineNelPeriodo(v.stato, { da: null, a: null }).map((p) => ({ ...p })),
+    };
+  }
+
   async function pagine(periodo, opts) {
     const v = await vista(opts);
     return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
