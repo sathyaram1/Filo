@@ -1700,7 +1700,8 @@
       return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
         titolo,
         righe: [],
-        testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
+        // Non promette un via libera: con la versione già decisa la richiesta non arriva mai (#486).
+        testo: 'I controlli del server l’hanno fermata, e qui non c’è (ancora) una richiesta da approvare: se non arriva, le note della pratica dicono perché.',
         azioni: [],
       }, { richiesta: null, richieste: [], conflitto: false });
     }

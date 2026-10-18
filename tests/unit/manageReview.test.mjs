@@ -1551,6 +1551,10 @@ test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenc
   const l5 = MR.livelloL5({ status: 'design', statusReason: 'l5' }, {});
   assert.equal(l5.esito, 'bloccato');
   assert.equal(l5.colore, MR.REASONS.attack.color);
+  // Senza richiesta in vista non promette un via libera: può non arrivare mai, perché quella versione era già
+  // decisa (#486), e allora lo dicono le note della pratica.
+  assert.doesNotMatch(l5.pannello.testo, /col tuo via libera/);
+  assert.match(l5.pannello.testo, /le note della pratica dicono perché/);
 });
 
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
