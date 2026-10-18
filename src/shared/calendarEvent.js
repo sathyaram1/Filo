@@ -133,20 +133,22 @@
     const inizio = pezziData(data, ora);
     if (!inizio) return { errore: `data o ora non valide: «${citato(ora)}» non è un'ora` };
     if (!vuoto(oraFine) && !pezziData(data, oraFine)) return { errore: `ora di fine non valida: «${citato(oraFine)}» non è un'ora` };
-    // La fine detta a parole (l'ultimo giorno, l'ora di fine) vince sulla durata. Senza l'ora di fine l'ultimo giorno
-    // si occupa tutto: «torno il 15» non dice a che ora.
+    // Una regola sola per la fine: l'ultimo giorno dice IN CHE GIORNO finisce, l'ora di fine o la durata A CHE ORA.
+    // L'ora di fine vince sulla durata; la durata (o l'ora di default) vale se cade nell'ultimo giorno, altrimenti
+    // l'ultimo giorno si occupa tutto («torno il 15» non dice a che ora). Un ultimo giorno uguale al primo non
+    // allunga niente (#567, decimo giro).
     let fine = null;
-    if (ultimo || !vuoto(oraFine)) {
-      const base = ultimo || giorno;
-      fine = vuoto(oraFine)
-        ? new Date(base.getTime() + GIORNO_MS)
-        : pezziData(isoGiorno(base), oraFine);
+    if (!vuoto(oraFine)) {
+      fine = pezziData(isoGiorno(ultimo || giorno), oraFine);
       // «dalle 22 alle 2» senza un ultimo giorno passa la mezzanotte.
       if (!ultimo && fine <= inizio) fine = new Date(fine.getTime() + GIORNO_MS);
-      if (fine <= inizio) return { errore: `la fine (${leggibile(fine)} alle ${orario(fine)}) viene prima dell'inizio` };
     } else {
       fine = new Date(inizio.getTime() + (durataValida ? Math.round(durataScritta) : 60) * 60_000);
+      if (ultimo && isoGiorno(new Date(fine.getTime() - 60_000)) !== isoGiorno(ultimo)) {
+        fine = new Date(ultimo.getTime() + GIORNO_MS);
+      }
     }
+    if (fine <= inizio) return { errore: `la fine (${leggibile(fine)} alle ${orario(fine)}) viene prima dell'inizio` };
     const durata = Math.round((fine - inizio) / 60_000);
     if (durata > MAX_GIORNI * 24 * 60) return { errore: oltreUnAnno(Math.ceil(durata / (24 * 60))) };
     const ultimoGiorno = new Date(fine.getTime() - 60_000);
