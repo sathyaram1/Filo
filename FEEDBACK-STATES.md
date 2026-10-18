@@ -692,7 +692,8 @@ alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
 ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
-di fusione in attesa; conflitto → riallineamento). Non serve una transizione
+di fusione in attesa, o la nota che quella versione era già decisa; conflitto →
+riallineamento). Lo stesso gesto c'è sulla pagina da browser. Non serve una transizione
 nuova: è `design` → `todo` con attore owner, e da lì il cancello. Il salto vale
 solo per la versione letta da verifica e audit (#1040.1): se la punta del ramo
 non è più quella, o il giro non dice quale fosse, il server non salta, non fonde
