@@ -145,8 +145,14 @@ test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?,
 
   const blocco = rules.slice(rules.indexOf('match /feedback/{'), rules.indexOf('match /feedback-public/{'));
   const rami = [...blocco.matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g)].map((x) => x[2].replace(/\s+/g, ' ').trim());
+  // Il create e l'update dell'admin, e nessun altro: nato malformato, l'update lo rifiuterebbe per sempre (#939).
   const conCampo = rami.filter((c) => c.includes('localMerges'));
-  assert.equal(conCampo.length, 1, 'un solo ramo nomina localMerges');
-  assert.match(conCampo[0], /^isAdmin\(\)/);
-  assert.match(conCampo[0], /localMergesValido\(request\.resource\.data\)/);
+  assert.equal(conCampo.length, 2, 'due rami nominano localMerges: create e update dell’admin');
+  for (const c of conCampo) {
+    assert.match(c, /^isAdmin\(\)/);
+    assert.match(c, /localMergesValido\(request\.resource\.data\)/);
+  }
+  const verbi = [...blocco.matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g)]
+    .filter((x) => x[2].includes('localMerges')).map((x) => x[1].replace(/\s+/g, ''));
+  assert.deepEqual(verbi.sort(), ['create', 'update'].sort());
 });

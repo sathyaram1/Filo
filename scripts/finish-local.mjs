@@ -70,7 +70,7 @@ import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaF
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
-import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
+import { NOME_PARTE, dopoLaFusione, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
@@ -542,6 +542,31 @@ export async function riapriPerIlServer({ id, ramo, pendingParts = [] }, { of, o
   return `  pratica riaperta${presa.ok ? ' («In lavorazione»)' : ''}: ${perche}`;
 }
 
+/**
+ * La fusione dell'app ha lasciato la pratica aperta per la parte del server, che può essere arrivata su main mentre
+ * questa si fondeva (#939): si ricontano i rami del server fuori da main (`inSospeso`, riletti adesso) e, se non ne
+ * resta nessuno, la pratica si chiude qui. `of`: owner-feedback.mjs. → la risposta da raccontare e la riga in più.
+ */
+export async function dopoLaFusioneDellApp({ reply, id, ramo }, { of, inSospeso }) {
+  if (!id || !reply || reply.outcome !== 'merged' || reply.late || !(reply.pending && reply.pending.length)) return { reply, riga: '' };
+  const letta = await of.partiDellaPratica(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e).slice(0, 200) }));
+  if (!letta.ok) {
+    return { reply, riga: `  ! la pratica non si rilegge dopo la fusione (${letta.motivo}): se intanto la parte ${NOME_PARTE.server} è arrivata su main, rilancia server:fondi e la chiude` };
+  }
+  const esito = dopoLaFusione({ status: letta.status, ultima: !inSospeso().length });
+  if (esito === 'aperta') return { reply, riga: '' };
+  const { pending: _fuori, noted: _nota, ...resto } = reply;
+  if (esito === 'chiusa') {
+    return { reply: { ...resto, closed: true }, riga: `  la parte ${NOME_PARTE.server} è arrivata su main mentre questa si fondeva, e la sua fusione ha chiuso la pratica` };
+  }
+  const nota = `Parte ${NOME_PARTE.app} (${ramo}) su main. La parte ${NOME_PARTE.server} è arrivata su main mentre questa si fondeva: era l'ultima.`;
+  const chiusa = await of.scrivi(id, 'done', nota, { attore: 'routine' }).catch((e) => ({ ok: false, motivo: String((e && e.message) || e).slice(0, 200) }));
+  if (!chiusa.ok) {
+    return { reply: { ...resto, closed: false }, riga: `  la parte ${NOME_PARTE.server} è arrivata su main mentre questa si fondeva, ma la pratica non si è chiusa (${chiusa.motivo})` };
+  }
+  return { reply: { ...resto, closed: true }, riga: `  la parte ${NOME_PARTE.server} è arrivata su main mentre questa si fondeva: era l'ultima` };
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});
@@ -867,7 +892,13 @@ async function main() {
     console.error(`\n${fermoDopoLaProva(giro.prova)}`);
     process.exit(1);
   }
-  const reply = giro.reply;
+  const dopo = pratica && pratica.id
+    ? await dopoLaFusioneDellApp({ reply: giro.reply, id: pratica.id, ramo: branch }, {
+      of: await import('./owner-feedback.mjs'),
+      inSospeso: () => partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }),
+    })
+    : { reply: giro.reply, riga: '' };
+  const reply = dopo.reply;
   // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
@@ -878,6 +909,7 @@ async function main() {
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
+  if (dopo.riga) console.log(dopo.riga);
   if (pratica && pratica.id) {
     const { fraseDaScrivere } = await import('./owner-feedback.mjs');
     const frase = await fraseDaScrivere(pratica.id, pratica.seq ? `#${pratica.seq}` : pratica.id);

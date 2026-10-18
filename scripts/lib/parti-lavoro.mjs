@@ -83,6 +83,25 @@ export function riaperturaConAltraInArrivo({ status, parti = {}, parte, ramo = '
 }
 
 /**
+ * La parte del server, fusa, è l'ultima: quella dell'app è registrata su main e dell'app non resta fuori nessun ramo
+ * legato alla pratica (un seguito, o una parte ancora in arrivo). PURA.
+ */
+export function serverUltimaParte({ parti = {}, ramiApp = [] } = {}) {
+  return !!parti.app && !ramiApp.length;
+}
+
+/**
+ * Chi fonde una parte decide prima di fondere se è l'ultima: con due fusioni sovrapposte ciascuna decide prima che
+ * l'altra registri la sua, e la pratica resterebbe aperta con tutto su main (#939). Dopo la fusione si rilegge la
+ * pratica e si rifà il conto (`ultima`, con le parti rilette). PURA.
+ * @returns {'chiusa'|'chiudi'|'aperta'} chiusa = l'ha già chiusa l'altra fusione
+ */
+export function dopoLaFusione({ status = '', ultima = false } = {}) {
+  if (status === 'done') return 'chiusa';
+  return ultima ? 'chiudi' : 'aperta';
+}
+
+/**
  * La parte del server che manca: il ramo di filo-security con lo stesso nome di quello dell'app, se c'è e non è
  * ancora su origin/main del server. `cartellaServer` = filo-security/functions ('' = server assente).
  * @returns {{ part: 'server', branch: string }[]}

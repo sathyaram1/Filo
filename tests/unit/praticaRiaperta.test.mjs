@@ -1,12 +1,13 @@
-// Il registro delle parti di un lavoro locale (#915) non sopravvive a una riapertura (#938), e una parte tardiva che
-// trova un ramo dell'altra parte ancora in arrivo riapre la pratica invece di lasciarla chiusa. Rete finta che applica
-// le scritture come Firestore; la strada di Gestione sta in tests/pratica-riaperta-parti.spec.mjs.
+// Il registro delle parti di un lavoro locale (#915) non sopravvive a una riapertura (#938), una parte tardiva che
+// trova un ramo dell'altra parte ancora in arrivo riapre la pratica, e due fusioni sovrapposte la chiudono (#939). Rete
+// finta che applica le scritture come Firestore; la strada di Gestione sta in tests/pratica-riaperta-parti.spec.mjs.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as of from '../../scripts/owner-feedback.mjs';
 import { esegui } from '../../scripts/server-fondi-pratica.mjs';
-import { riapriPerIlServer } from '../../scripts/finish-local.mjs';
+import { dopoLaFusioneDellApp, riapriPerIlServer } from '../../scripts/finish-local.mjs';
+import { messageForOwnerMerge } from '../../scripts/lib/owner-merge.mjs';
 import { partiDaCampi } from '../../scripts/lib/parti-lavoro.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
 
@@ -80,14 +81,15 @@ function fondeLApp(d, { ramo, at, chiude }) {
   if (chiude) Object.assign(d.fields, { status: { stringValue: 'done' }, statusPublic: { stringValue: 'closed' } });
 }
 
-async function serverFondi(argv, { ramiAperti = [] } = {}) {
+// `durante`: quello che succede mentre girano i test del server; `ramiAperti` anche come funzione, riletta a ogni conto.
+async function serverFondi(argv, { ramiAperti = [], durante = null } = {}) {
   const righe = [];
   const lanci = [];
   const k = await esegui(argv, {
     env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
     log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
-    lancia: (_c, args) => { lanci.push(args); return 0; },
-    punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => null,
+    lancia: (_c, args) => { lanci.push(args); if (durante) durante(); return 0; },
+    punta: () => 'a'.repeat(40), ramiAperti: () => (typeof ramiAperti === 'function' ? ramiAperti() : ramiAperti), ora: () => ORA, verdetto: () => null,
     fissa: (_c, ramo) => ({ ok: true, ramo, togli: () => ({ ok: true }) }),
     lavoroDelRamo: async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: '' }),
     puntaRamo: () => 'c'.repeat(40), allinea: () => {}, deployDaGitHub: () => false,
@@ -292,4 +294,82 @@ test('server:fondi: il seguito del server, a pratica chiusa con le due parti gi�
     assert.match(r.testo, /già su main/);
     assert.equal(scritture.length, 0);
   });
+});
+
+// ── Fusioni sovrapposte (#939): chi finisce per ultimo rilegge le parti e chiude ─────────────────────────────────────
+
+const ofConBearer = {
+  partiDellaPratica: (id) => of.partiDellaPratica(id, OPTS),
+  scrivi: (id, to, nota, o = {}) => of.scrivi(id, to, nota, { ...OPTS, ...o }),
+};
+// La risposta del server al finish che aveva contato la parte del server ancora fuori da main.
+const FUSA_COL_SERVER_FUORI = Object.freeze({
+  outcome: 'merged', sha: 'c'.repeat(40), localNum: '938', closed: false, noted: true, pending: [{ part: 'server', branch: 'claude/x' }],
+});
+
+test('fusioni sovrapposte: l’app arriva su main mentre server:fondi prova il server, e server:fondi chiude la pratica', async () => {
+  const docs = { p: pratica('p', { status: 'working' }) };
+  let ramiApp = ['claude/x'];
+  await conRete(docs, async (scritture) => {
+    const r = await serverFondi(['claude/x', '--feedback', 'p'], {
+      ramiAperti: () => ramiApp,
+      // npm run finish: il server fonde l'app e la segna lasciando aperto per il server; il ramo dell'app è su main.
+      durante: () => { fondeLApp(docs.p, { ramo: 'claude/x', at: ORA, chiude: false }); ramiApp = []; },
+    });
+    assert.equal(r.k, 0, r.testo);
+    assert.ok(chiusa(scritture), 'chi finisce per ultimo chiude');
+    assert.equal(stato(docs.p), 'done');
+    assert.match(r.testo, /Pratica #938 chiusa/);
+    assert.deepEqual(conServer(docs.p), { app: ORA, ramo: 'claude/x' });
+    // Il finish la ritrova chiusa: lo dice e non scrive altro.
+    const prima = scritture.length;
+    const dopo = await dopoLaFusioneDellApp({ reply: FUSA_COL_SERVER_FUORI, id: 'p', ramo: 'claude/x' }, { of: ofConBearer, inSospeso: () => [] });
+    assert.equal(scritture.length, prima);
+    assert.equal(dopo.reply.closed, true);
+    assert.match(dopo.riga, /la sua fusione ha chiuso la pratica/);
+    assert.match(messageForOwnerMerge(dopo.reply, 'claude/x', { feedbackId: 'p', feedbackNum: 938 }), /Pratica #938 chiusa\./);
+  });
+});
+
+test('fusioni sovrapposte: server:fondi finisce mentre il server fonde l’app, e il finish chiude la pratica', async () => {
+  const docs = { p: pratica('p', { status: 'working' }) };
+  await conRete(docs, async (scritture) => {
+    // server:fondi vede il ramo dell'app ancora fuori: fonde, registra il server e lascia aperta.
+    const r = await serverFondi(['claude/x', '--feedback', 'p'], { ramiAperti: ['claude/x'] });
+    assert.equal(r.k, 0, r.testo);
+    assert.equal(chiusa(scritture), false);
+    assert.match(r.testo, /resta aperta/);
+    // Intanto il server ha fuso l'app con la parte del server che il finish aveva contato fuori.
+    fondeLApp(docs.p, { ramo: 'claude/x', at: ORA, chiude: false });
+    const dopo = await dopoLaFusioneDellApp({ reply: FUSA_COL_SERVER_FUORI, id: 'p', ramo: 'claude/x' }, { of: ofConBearer, inSospeso: () => [] });
+    assert.ok(chiusa(scritture), 'il finish ricontrolla i rami del server e chiude');
+    assert.equal(stato(docs.p), 'done');
+    assert.equal(dopo.reply.closed, true);
+    assert.equal(dopo.reply.pending, undefined);
+    assert.match(dopo.riga, /arrivata su main mentre questa si fondeva: era l'ultima/);
+    const messaggio = messageForOwnerMerge(dopo.reply, 'claude/x', { feedbackId: 'p', feedbackNum: 938 });
+    assert.match(messaggio, /Pratica #938 chiusa\./);
+    assert.doesNotMatch(messaggio, /resta aperta/);
+  });
+});
+
+test('il finish dopo la fusione: col ramo del server ancora fuori resta aperta; senza parti in sospeso non rilegge niente', async () => {
+  const docs = { p: pratica('p', { status: 'working', parti: { app: ORA, ramo: 'claude/x' } }) };
+  await conRete(docs, async (scritture) => {
+    const fuori = await dopoLaFusioneDellApp({ reply: FUSA_COL_SERVER_FUORI, id: 'p', ramo: 'claude/x' }, {
+      of: ofConBearer, inSospeso: () => [{ part: 'server', branch: 'claude/x' }],
+    });
+    assert.deepEqual(fuori, { reply: FUSA_COL_SERVER_FUORI, riga: '' });
+    assert.equal(scritture.length, 0);
+  });
+  const nonLeggere = { partiDellaPratica: async () => { throw new Error('non doveva leggere'); } };
+  for (const reply of [{ outcome: 'merged', closed: true }, { outcome: 'blocked', pending: FUSA_COL_SERVER_FUORI.pending },
+    { ...FUSA_COL_SERVER_FUORI, late: { part: 'server', at: '2026-10-03T08:00:00.000Z' } }]) {
+    const r = await dopoLaFusioneDellApp({ reply, id: 'p', ramo: 'claude/x' }, { of: nonLeggere, inSospeso: () => [] });
+    assert.deepEqual(r, { reply, riga: '' }, JSON.stringify(reply));
+  }
+  const guasta = { partiDellaPratica: async () => { throw new Error('rete giù'); } };
+  const g = await dopoLaFusioneDellApp({ reply: FUSA_COL_SERVER_FUORI, id: 'p', ramo: 'claude/x' }, { of: guasta, inSospeso: () => [] });
+  assert.equal(g.reply, FUSA_COL_SERVER_FUORI);
+  assert.match(g.riga, /non si rilegge dopo la fusione \(rete giù\)/);
 });
