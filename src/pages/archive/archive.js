@@ -322,7 +322,13 @@
     const text = `Cancella per sempre la chat «${c.title || 'senza titolo'}». `
       + 'L’operazione non si può annullare.';
     const ok = window.SN_CONFIRM_UI
-      ? await window.SN_CONFIRM_UI.confirm({ title: 'Elimina la chat', text, okLabel: 'Elimina' })
+      ? await window.SN_CONFIRM_UI.confirm({
+        title: 'Elimina la chat',
+        text,
+        // Il titolo lo scrive il modello: nel suo riquadro, fuori dalle parole di Filo (#592.7).
+        parti: c.title ? ['Cancella per sempre la chat', { citazione: c.title }, 'L’operazione non si può annullare.'] : null,
+        okLabel: 'Elimina',
+      })
       : window.confirm(`${text} Procedo?`); // fallback se il modulo non è caricato
     if (!ok) return;
     try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_DELETE, id: c.id }); } catch (_) {}
