@@ -211,6 +211,7 @@
     testoScarica,
     testoApri,
     partiApri,
+    partiScarica,
     TITOLO_APRI,
     titoloApri,
   };
