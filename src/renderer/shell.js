@@ -2222,9 +2222,27 @@
       return r.site ? `da ${r.site}` : '';
     }
 
-    function testoScarica(r) {
-      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
-      return `«${r.filename}» è un programma. Scaricarlo?`;
+    // Le domande sui programmi a pezzi: il nome lo sceglie il sito, e fra le parole di Filo potrebbe chiudere le
+    // virgolette e continuare con la sua voce. Sta in un riquadro suo, come nei popup di conferma (#592.7).
+    function partiScarica(r) {
+      try { return window.SN_ESEGUIBILI.partiScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
+      return ['Il file', { citazione: String(r.filename || '') }, 'è un programma. Scaricarlo?'];
+    }
+
+    function riempiDomanda(el, parti) {
+      for (const p of parti) {
+        if (typeof p === 'string') {
+          if (!p.trim()) continue;
+          const t = document.createElement('div');
+          t.textContent = p.trim();
+          el.appendChild(t);
+        } else if (p && typeof p === 'object' && p.citazione != null) {
+          const q = document.createElement('div');
+          q.className = 'dl-row-ask-nome';
+          q.textContent = String(p.citazione);
+          el.appendChild(q);
+        }
+      }
     }
 
     // Apre il pannello (che fa spazio sopra la pagina) e porta in vista la riga.
