@@ -25,7 +25,11 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   `http(s)`, e si tolgono **per id** (`FILO_CODA_TOGLI_PAGINE`): l'ora e il sito della cancellazione li prende il main
   dalla pagina che il filo ha, mai dalla scheda che chiede. Una pagina cancellata (da qui, dalla Sicurezza, dalla chat) se ne va anche
   dalle schede chiuse, che la ricerca legge, e una scheda ancora aperta su quella pagina non ci rientra chiudendosi.
-  Dalla ricerca, dove una pagina è un indirizzo, si tolgono tutte le sue visite.
+  Dalla ricerca, dove una pagina è un indirizzo, si tolgono tutte le sue visite. Al contrario, una scheda chiusa
+  eliminata dalla Cronologia (una, scelte dalla chat, o «Svuota archivio») porta via le visite del suo indirizzo mentre
+  era aperta. Ogni cancellazione passa da un punto solo del filo, che la annuncia (`FILO_PAGINE_TOLTE`): le home aperte
+  rifanno le righe delle pagine su quelle che il filo ha adesso. Un gruppo si chiama come la sua prima pagina, quindi
+  tolta quella la riga prende il nome nuovo invece di doppiarsi.
 - **I cambi**: quelli chiesti in chat hanno il segno sulla bolla; tutti gli altri sono una riga col loro «annulla».
 - **La conversazione che una scheda continua** (`chatCorrente`): l'ultima della home se non è passata un'ora di
   silenzio, o se l'ultima parola è di Filo che ha scritto da sé. L'accoglienza e le chat delle altre app non si

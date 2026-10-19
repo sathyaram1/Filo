@@ -245,8 +245,9 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
   const visita = await balene.getAttribute('data-id');
   await balene.click({ button: 'right' });
   await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
-  await expect(balene).toHaveCount(0);
-  await expect(riga.locator('.dash-pagine-testo')).toHaveText('2 pagine, fra cui delfini');
+  // Via quella visita; la riga si rifà sul filo, dove c'è anche la visita nuova che il clic ha aperto.
+  await expect(riga.locator(`.dash-pagina[data-id="${visita}"]`)).toHaveCount(0);
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui balene');
   const file = await app.evaluate(async () => {
     await globalThis.SN_IL_FILO.quandoFermo();
     return globalThis.SN_IL_FILO.percorso();
@@ -416,7 +417,7 @@ test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue
   await voce.click({ button: 'right' });
   await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(0);
-  expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(0);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(0);
   await expect(page.locator('.dash-pagine')).toHaveCount(0);
   await page.locator('#cercaInput').fill('');
   await page.locator('#cercaInput').fill('orche');
@@ -425,8 +426,10 @@ test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue
 
 // Le pagine aperte in schede vere, una dopo l'altra; tornare alla home la fa rileggere come quando torna in vista.
 async function visita(openTab, testServer, nome) {
-  const p = await openTab(testServer.html(`<title>${nome}</title><p>${nome}</p>`));
+  const url = testServer.html(`<title>${nome}</title><p>${nome}</p>`);
+  const p = await openTab(url);
   await p.waitForFunction((n) => document.title === n, nome);
+  return url;
 }
 async function tornaAllaHome(shell, page) {
   await shell.evaluate(async () => {
@@ -480,7 +483,7 @@ test('pagine cancellate dalla Sicurezza escono subito dalla home già aperta', a
 test('una scheda chiusa eliminata dalla Cronologia esce dal filo: niente riga nella home, niente ricerca', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await home(app);
-  await visita(openTab, testServer, 'delfini');
+  const delfini = await visita(openTab, testServer, 'delfini');
   const url = testServer.html('<title>orche marine</title><p>le orche</p>');
   const p = await openTab(url);
   await p.waitForFunction(() => document.title === 'orche marine');
@@ -503,11 +506,10 @@ test('una scheda chiusa eliminata dalla Cronologia esce dal filo: niente riga ne
   await page.locator('#cercaInput').fill('orche');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
   // «Svuota archivio»: anche le visite delle altre schede chiuse.
-  await shell.evaluate(async () => {
+  await shell.evaluate(async (u) => {
     const s = await window.filoShell.tabs.snapshot();
-    const t = s.tabs.find((x) => /delfini/.test(x.title || ''));
-    if (t) await window.filoShell.tabs.close(t.id);
-  });
+    await window.filoShell.tabs.close(s.tabs.find((x) => x.url === u).id);
+  }, delfini);
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(1);
   await cron.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.CLEAR_ARCHIVED_TABS }));
   await expect(page.locator('.dash-pagine')).toHaveCount(0);
