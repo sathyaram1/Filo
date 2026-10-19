@@ -996,9 +996,21 @@
     // in righe e lezioni ancora da riordinare. Solo pagine filo://.
     // Risposta: { ok, moduli: [{ nome, righe }], lezioni: [{ ts, text }] }
     FILO_MEMORY_VIEW: 'filo_memory_view',
-    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }.
+    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }. La riga resta nascosta nel quaderno (#872).
     // Solo pagine filo://. Risposta: { ok, tolta } (false: non c'era più).
     FILO_MEMORY_FORGET: 'filo_memory_forget',
+    // Il quaderno delle memorie (#872): righe con data e fonti risolte nel filo, lezioni, siti tenuti aperti e
+    // righe nascoste. Solo pagine filo://.
+    // Risposta: { ok, moduli: [{ nome, righe: [{ testo, via, nata, corretta, fonti: [{ id, ts, chat?, i? }] }] }], lezioni, sempreAperte, nascoste }
+    FILO_QUADERNO: 'filo_quaderno',
+    // La correzione di una riga: { via: { modulo, riga } | { lezione }, testo }. Risposta: { ok, corretta } o { ok:false, error }.
+    FILO_MEMORY_EDIT: 'filo_memory_edit',
+    // Una riga nascosta torna in memoria: { id }. Risposta: { ok, rimessa }.
+    FILO_MEMORY_RESTORE: 'filo_memory_restore',
+    // Una riga nascosta si cancella per sempre: { id }. Risposta: { ok, cancellata }.
+    FILO_MEMORY_FOREVER: 'filo_memory_forever',
+    // Dov'è un evento del filo, per saltarci dalla home (#872): { id }. Risposta: { ok, dove: { tipo, chat, i, ts, app } | null }.
+    FILO_DOVE: 'filo_dove',
     // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
     // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
     FILO_MEMORY_CHANGED: 'filo_memory_changed',

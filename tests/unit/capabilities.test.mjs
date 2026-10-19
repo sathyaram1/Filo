@@ -157,9 +157,15 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
-    // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
+    // #592 — la memoria riga per riga: rileggerla e toglierne una. #872 — il quaderno: correggere, rimettere,
+    // cancellare per sempre, e il salto della home al punto del filo da cui una riga è nata.
     FILO_MEMORY_VIEW: 'filo-memory',
     FILO_MEMORY_FORGET: 'filo-memory',
+    FILO_QUADERNO: 'filo-memory',
+    FILO_MEMORY_EDIT: 'filo-memory',
+    FILO_MEMORY_RESTORE: 'filo-memory',
+    FILO_MEMORY_FOREVER: 'filo-memory',
+    FILO_DOVE: 'filo-memory',
     // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
     // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle
     // azioni (FILO_RUN_ACTION → CERCA_CHAT) ed è la capacità gemella

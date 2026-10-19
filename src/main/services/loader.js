@@ -63,6 +63,7 @@ require(path.join(SHARED, 'paths.js'));
 // Elenco e stato della micro-intervista di benvenuto (#524): logica pura, va
 // PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
 require(path.join(SHARED, 'onboarding.js'));
+require(path.join(SHARED, 'quaderno.js')); // #872 — fonti delle memorie e righe tolte (logica pura), prima di filoMemory
 require(path.join(SHARED, 'filoMemory.js'));
 // Ora, batteria, rete e Bluetooth a parole: lo legge filoState per lo STATO, e la home per le sue voci.
 require(path.join(SHARED, 'sistema.js'));

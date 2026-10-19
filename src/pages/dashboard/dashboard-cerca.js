@@ -63,8 +63,12 @@
   }
 
   async function apri(r) {
+    if (r.k === 'significato') return significato(r);
     if (r.k === 'pagina') {
-      if (/^https?:\/\//i.test(String(r.url || ''))) d.send({ type: MSG.OPEN_URL, url: r.url });
+      if (!/^https?:\/\//i.test(String(r.url || ''))) return;
+      // Una scheda chiusa si riapre com'era (scroll, paese); se la sua voce non c'è più, come una pagina qualunque.
+      const riaperta = r.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio }) : null;
+      if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: r.url });
       return;
     }
     chiudi();
@@ -76,6 +80,48 @@
     if (!res || !res.ok) return;
     if (d.coda.togliIndirizzo) d.coda.togliIndirizzo(r.url);
     if (!pannello.hidden) await cerca();
+  }
+
+  // La ricerca per significato fra le schede chiuse (quella che faceva la Cronologia, #872): spende una chiamata ai
+  // vettori, quindi parte solo a richiesta, e i risultati si aggiungono sotto quelli per parole.
+  function vocePerSignificato(q) {
+    const b = el('button', 'dash-cerca-voce dash-cerca-significato');
+    b.type = 'button';
+    b.setAttribute('role', 'option');
+    const ic = el('span', 'dash-cerca-ico');
+    ic.innerHTML = icona('sparkles', 13);
+    const corpo = el('span', 'dash-cerca-corpo');
+    corpo.append(el('span', 'dash-cerca-titolo', 'Cerca per significato fra le schede chiuse'));
+    b.append(ic, corpo);
+    b.title = 'Trova anche le pagine che parlano di questo con altre parole';
+    b._risultato = { k: 'significato', q, el: b };
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => { apri(b._risultato).catch(() => {}); });
+    return b;
+  }
+
+  async function significato(r) {
+    const mio = giro;
+    const b = r.el;
+    if (!b || b.disabled) return;
+    b.disabled = true;
+    b.querySelector('.dash-cerca-titolo').textContent = 'Cerco per significato…';
+    const res = await d.send({ type: MSG.SEARCH_ARCHIVED_TABS, query: r.q });
+    if (mio !== giro || !b.isConnected) return;
+    const gia = new Set(voci.map((v) => v._risultato && v._risultato.url).filter(Boolean));
+    const nuove = (res && res.ok && Array.isArray(res.results) ? res.results : [])
+      .filter((t) => t && /^https?:\/\//i.test(String(t.url || '')) && !gia.has(t.url));
+    const i = voci.indexOf(b);
+    if (i >= 0) voci.splice(i, 1);
+    const dopo = nuove.map((t) => voce({ k: 'pagina', url: t.url, titolo: t.title || '', ts: t.closedAt || t.openedAt || '', estratto: t.summary || t.snippet || '', ...(t.id ? { archivio: t.id } : {}) }));
+    if (dopo.length) {
+      b.replaceWith(...dopo);
+      voci.splice(i >= 0 ? i : voci.length, 0, ...dopo);
+    } else {
+      b.replaceWith(el('div', 'dash-cerca-niente', res && res.noEmbed
+        ? 'Senza un modello per i vettori cerco solo per parole'
+        : 'Niente di più per significato'));
+    }
   }
 
   function disegna(res, q) {
@@ -94,6 +140,14 @@
       }
       const altri = (Number(res.tanti) || 0) - voci.length;
       if (altri > 0) pannello.append(el('div', 'dash-cerca-niente', `e altri ${altri}: aggiungi una parola per trovarli`));
+      if (res.allargata && Array.isArray(res.termini)) {
+        pannello.insertBefore(el('div', 'dash-cerca-niente', `Niente con tutte le parole: ecco cosa c'è con «${res.termini.join(' ')}»`), pannello.firstChild);
+      }
+    }
+    if (q.length >= 3) {
+      const s = vocePerSignificato(q);
+      voci.push(s);
+      pannello.append(s);
     }
     pannello.hidden = false;
     campo.setAttribute('aria-expanded', 'true');

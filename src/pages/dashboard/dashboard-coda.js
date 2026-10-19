@@ -153,7 +153,7 @@
       a.title = p.url;
       a.append(el('span', 'dash-pagina-titolo', String(p.titolo || '').trim() || sito(p.url)), el('span', 'dash-pagina-sito', `${sito(p.url)} · ${ora(p.ts)}`));
       if (p.altrove) a.append(el('span', 'dash-pagina-sito', 'da un altro dispositivo'));
-      a.addEventListener('click', (e) => { e.preventDefault(); riapri(p); });
+      a.addEventListener('click', (e) => { e.preventDefault(); riapri(p).catch(() => {}); });
       return a;
     }));
   }
@@ -164,8 +164,11 @@
     r.querySelector('.dash-pagine-elenco').hidden = !aperta;
   }
   // Un indirizzo che il filo ricorda l'ha scritto un sito: si riapre solo se è una pagina web.
-  function riapri(p) {
-    if (/^https?:\/\//i.test(String(p.url || ''))) d.send({ type: MSG.OPEN_URL, url: p.url });
+  // Una scheda chiusa prima del filo si riapre com'era (scroll, paese), dalla sua voce d'archivio (#872).
+  async function riapri(p) {
+    if (!/^https?:\/\//i.test(String(p.url || ''))) return;
+    const riaperta = p.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
+    if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: p.url });
   }
 
   async function togliPagine(r, ids) {
@@ -460,7 +463,7 @@
       const p = gruppo._gruppo.pagine.find((x) => x.id === pagina.dataset.id);
       if (!p) return [];
       return [
-        { type: 'item', icon: icona('globe', 16), label: 'Riapri la pagina', onClick: () => riapri(p) },
+        { type: 'item', icon: icona('globe', 16), label: 'Riapri la pagina', onClick: () => { riapri(p).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(p.url).catch(() => {}); } },
         { type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => { togliPagine(gruppo, [p.id]).catch(() => {}); } },
       ];
@@ -479,7 +482,24 @@
       if (v.annullatoDa) return [{ type: 'item', icon: icona('undo', 16), label: `Rifai · ${v.frase}`, onClick: () => annullaCambio(cambio) }];
       if (v.annullabile) return [{ type: 'item', icon: icona('undo', 16), label: `Annulla · ${v.frase}`, onClick: () => annullaCambio(cambio) }];
     }
+    // Una conversazione della home si toglie dal filo da una sua bolla: la Cronologia, che lo faceva, non c'è più (#872).
+    const bolla = e.closest('.dash-bubble[data-chat]');
+    if (bolla && bolla.dataset.chat) {
+      return [{ type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', onClick: () => { togliConversazione(bolla.dataset.chat).catch(() => {}); } }];
+    }
     return [];
+  }
+
+  async function togliConversazione(id) {
+    const C = global.SN_CONFIRM_UI;
+    const ok = C ? await C.confirm({
+      title: 'Togliere la conversazione dal filo?',
+      text: 'Tutti i suoi messaggi spariscono dal filo e dal computer, e Filo non la ritrova più cercando.',
+      okLabel: 'Togli',
+    }) : false;
+    if (!ok) return;
+    await d.send({ type: MSG.FILO_CHAT_DELETE, id });
+    togliChat(id);
   }
 
   let attesaCambi = null;

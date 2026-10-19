@@ -185,20 +185,28 @@ module.exports = function register(on, ctx) {
     return { ok: true, dato };
   }));
 
-  on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender) => {
-    // Riapre la scheda archiviata, ripristinando lo scroll registrato.
+  // Riapre una scheda chiusa com'era: lo scroll e il paese da cui passava. Dal #872 la chiede la ricerca del filo con
+  // l'id della voce d'archivio, e indirizzo, scroll e paese li legge il main; solo le pagine di Filo.
+  on(MSG.REOPEN_ARCHIVED_TAB, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
-    if (win && win._filoTabs && msg.url) {
-      const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
-      const id = win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
+    let voce = null;
+    if (msg && typeof msg.id === 'string' && msg.id) {
+      try { voce = (await ArchivedTabs.list()).find((t) => t.id === msg.id) || null; } catch (_) {}
+      if (!voce) return { ok: false, error: 'not_found' };
+    }
+    const url = voce ? voce.url : msg.url;
+    if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
+      const scroll = voce ? voce.scrollPosition : msg.scrollPct;
+      const pct = typeof scroll === 'number' ? scroll : null;
+      const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct });
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.
-      const px = msg.proxy;
+      const px = voce ? voce.proxy : msg.proxy;
       if (id && px && px.country) {
         try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined }); } catch (_) {}
       }
     }
     return { ok: true };
-  });
+  }));
 };

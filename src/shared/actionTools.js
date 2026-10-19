@@ -177,7 +177,7 @@
       required: ['testo', 'contesto'],
     },
     SALVA_LEZIONE: {
-      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Se serve l\'OK dell\'utente il sistema gli mostra il testo esatto e glielo chiede da sé: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge e la toglie nelle Preferenze, sotto «Memoria di Filo». Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
+      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Se serve l\'OK dell\'utente il sistema gli mostra il testo esatto e glielo chiede da sé: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge, la corregge e la toglie nel quaderno delle memorie. Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
       properties: { testo: S('La regola, breve e in terza persona ("L\'utente non beve caffè").') },
       required: ['testo'],
     },
@@ -399,9 +399,20 @@
       required: [],
     },
     DIMENTICA: {
-      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): toglie le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo`. Se serve l\'OK dell\'utente il sistema gli mostra le righe esatte e glielo chiede da sé: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
-      properties: { testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).') },
+      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo` escono dalle conversazioni e restano nascoste nel quaderno delle memorie, da dove l\'utente le rimette o le cancella. Con `per_sempre` (solo se l\'utente dice «per sempre», «definitivamente», «cancellala del tutto») il testo se ne va anche dal quaderno. Se serve l\'OK dell\'utente il sistema gli mostra le righe esatte e glielo chiede da sé: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
+      properties: {
+        testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).'),
+        per_sempre: { type: 'boolean', description: 'true solo se l\'utente chiede di cancellarla per sempre, non solo di toglierla.' },
+      },
       required: ['testo'],
+    },
+    CORREGGI_MEMORIA: {
+      description: () => 'Corregge UNA riga della memoria di Filo quando l\'utente dice che è sbagliata o cambiata ("non sono vegetariano, sono vegano", "correggi: vivo a Porto, non a Lisbona"): `testo` è la riga com\'è nella memoria (basta un pezzo che la identifichi), `nuovo` la riga giusta, breve e in terza persona come le altre. La riga tiene la conversazione da cui era nata e la correzione vale dal messaggio dopo. Se serve l\'OK il sistema mostra prima e dopo e lo chiede da sé. Al massimo ' + tettoLezione() + '. Per togliere una riga c\'è DIMENTICA.',
+      properties: {
+        testo: S('La riga da correggere, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).'),
+        nuovo: S('La riga corretta, breve e in terza persona.'),
+      },
+      required: ['testo', 'nuovo'],
     },
     IMPOSTA_PREFERENZA: {
       // L'elenco delle chiavi esce dai setter (SN_PREF.righeDescrizione): una voce nuova arriva da sola (#949).

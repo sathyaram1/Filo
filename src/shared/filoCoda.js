@@ -87,7 +87,7 @@
     function aggiungiPagina(p) {
       const t = ms(p.ts);
       if (gruppo && giornoDi(ms(gruppo.ts)) !== giornoDi(t)) chiudi();
-      const pagina = { id: p.id, ts: p.ts, url: String(p.url || ''), titolo: String(p.titolo || '') };
+      const pagina = { id: p.id, ts: p.ts, url: String(p.url || ''), titolo: String(p.titolo || ''), ...(p.archivio ? { archivio: p.archivio } : {}) };
       if (qui && p.dispositivo && p.dispositivo !== qui) pagina.altrove = true;
       if (!gruppo) gruppo = { k: 'pagine', key: `p:${p.id}`, ts: p.ts, fine: p.ts, pagine: [] };
       gruppo.pagine.push(pagina);
@@ -201,7 +201,7 @@
   }
 
   // Cerca nel filo senza passare dal modello: parole nei messaggi (anche delle altre app), nei titoli e negli indirizzi
-  // delle pagine visitate, e nel contenuto delle schede chiuse (riassunto ed estratto che la Cronologia tiene).
+  // delle pagine visitate, e nel contenuto delle schede chiuse (riassunto ed estratto che il loro archivio tiene).
   // Tutte le parole devono esserci; dal più recente.
   function cerca({ chats = [], pagine = [], schede = [] } = {}, q, { max = 40 } = {}) {
     const ts = termini(q);
@@ -223,7 +223,7 @@
     for (const p of Array.isArray(pagine) ? pagine : []) {
       if (!p || !p.url || !contiene(`${p.titolo || ''} ${p.url}`, ts)) continue;
       const prima = perUrl.get(p.url);
-      if (!prima || ms(p.ts) > ms(prima.ts)) perUrl.set(p.url, { k: 'pagina', id: p.id, url: p.url, titolo: String(p.titolo || ''), ts: p.ts });
+      if (!prima || ms(p.ts) > ms(prima.ts)) perUrl.set(p.url, { k: 'pagina', id: p.id, url: p.url, titolo: String(p.titolo || ''), ts: p.ts, ...(p.archivio ? { archivio: p.archivio } : {}) });
     }
     for (const s of Array.isArray(schede) ? schede : []) {
       if (!s || !s.url) continue;
@@ -235,9 +235,13 @@
       const voce = {
         k: 'pagina', url: s.url, titolo: String(s.title || ''), ts: prima && ms(prima.ts) > ms(ts0) ? prima.ts : ts0,
         ...(prima && prima.id ? { id: prima.id } : {}),
+        // La scheda chiusa si riapre com'era (scroll, paese): la voce d'archivio la conosce il main (#872).
+        ...(s.id ? { archivio: s.id } : {}),
         ...(nelContenuto ? { estratto: estratto(dentro, ts) } : {}),
       };
       if (!prima || nelContenuto) perUrl.set(s.url, voce);
+      // Trovata per titolo fra le visite: si riapre lo stesso dalla voce d'archivio più recente.
+      else if (s.id && (!prima.archivio || ms(ts0) > ms(prima.chiusa))) Object.assign(prima, { archivio: s.id, chiusa: ts0 });
     }
     const trovate = [...perUrl.values()].sort((a, b) => (ms(b.ts) || 0) - (ms(a.ts) || 0));
     return { messaggi: messaggi.slice(0, max), pagine: trovate.slice(0, max), termini: ts, tanti: messaggi.length + trovate.length };

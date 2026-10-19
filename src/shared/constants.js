@@ -88,7 +88,7 @@
     // Il vecchio registro grezzo (5000 voci, testi a 200 caratteri): il contesto è il filo (#868), e alla partenza
     // la chiave si toglie (ilFilo.js).
     FILO_RAW_LOG: 'filo_raw_log',
-    // Buffer lezioni in attesa di compattazione (array di stringhe).
+    // Buffer lezioni in attesa di compattazione: [{ ts, text, fonti? }], le fonti sono id di eventi del filo (#872).
     FILO_LESSONS_BUFFER: 'filo_lessons_buffer',
     // L'archivio delle chat di prima del filo (#525): alla partenza diventa segmenti del filo e la chiave sparisce
     // (src/main/services/ilFilo.js). Resta per i vecchi export, che portano le chat qui dentro.
@@ -96,6 +96,9 @@
     // Moduli memoria long-term. Oggetto { PROFILO: string, PREFERENZE: string,
     // <ESPANSIONE>: string }. Le chiavi sono uppercase-ish per coerenza col prompt.
     FILO_MEMORY: 'filo_memory',
+    // Il quaderno delle memorie (#872): da quali eventi del filo è nata ogni riga, e le righe tolte dall'utente
+    // ({ righe: { MODULO: [{ testo, fonti, nata, corretta? }] }, nascoste: [...] }). Forma in src/shared/quaderno.js.
+    FILO_MEMORY_FONTI: 'filo_memory_fonti',
     // Cache dell'ultimo output del Generatore Dashboard:
     // { ts, message: string, suggestions: [{icon,text,action,importance}] }
     FILO_DASHBOARD_CACHE: 'filo_dashboard_cache',
@@ -2271,9 +2274,11 @@
       `TENERE SEMPRE APERTO UN SITO ("tienimi sempre aperta WhatsApp", "questa scheda non chiuderla mai", "non archiviare mai Gmail") → TIENI_APERTA {dominio}: da quel momento la pulizia delle schede non archivia mai quel sito. "non tenerla più aperta" → NON_TENERE_APERTA {dominio}. È una regola, non una lezione: non usare SALVA_LEZIONE per questo. Nella risposta di' quale sito hai salvato, come lo dice l'esito.\n` +
       `CANCELLAZIONE ARCHIVIO ("cancella dall'archivio le pagine su X", "elimina definitivamente le schede a tema Y", "rimuovi dalla cronologia tutto ciò che riguarda Z") → proponi l'azione CANCELLA_ARCHIVIO con {query} = la descrizione di cosa cancellare. È DISTRUTTIVA e PERMANENTE: NON cancellare nulla da solo. L'azione cerca le schede pertinenti e mostra l'elenco con un bottone di conferma; spiega in una frase che è un'eliminazione definitiva dall'archivio.\n` +
       `PAGINE VISITATE ("cancella le pagine dell'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia", "cancella le pagine delle ultime 3 ore", "cancella le visite a YouTube", "togli le pagine di repubblica.it di oggi") → emetti CANCELLA_PAGINE con {periodo: "ultima_ora"|"oggi"|"tutto"} oppure {ore: N}, più {sito: "youtube.com"} se l'utente nomina un sito (senza periodo valgono tutte le sue pagine). Filo ricorda le pagine aperte nelle schede (non quelle in incognito); questa azione toglie solo quelle, non le chat né le schede chiuse. Il SISTEMA mostra quante sono e chiede l'OK: non chiederlo a parole e non dire di averlo fatto prima della conferma.\n` +
-      `CANCELLAZIONE MEMORIA ("cancella le mie memorie", "dimentica tutto di me", "azzera quello che sai di me", "resetta la tua memoria") → emetti l'azione CANCELLA_MEMORIA (nessun parametro). Cancellare dati in modo definitivo è fra le cose che Filo non fa da solo a nessun livello di autonomia, nemmeno se l'utente conferma: il SISTEMA risponde di no e ti dice dove l'utente può farlo da sé (le righe si tolgono in Preferenze, sotto «Memoria di Filo»). Riferiscilo in una frase e NON dichiarare mai di aver cancellato qualcosa. Per togliere UNA cosa precisa c'è DIMENTICA.\n` +
+      `CANCELLAZIONE MEMORIA ("cancella le mie memorie", "dimentica tutto di me", "azzera quello che sai di me", "resetta la tua memoria") → emetti l'azione CANCELLA_MEMORIA (nessun parametro). Cancellare dati in modo definitivo è fra le cose che Filo non fa da solo a nessun livello di autonomia, nemmeno se l'utente conferma: il SISTEMA risponde di no e ti dice dove l'utente può farlo da sé (le righe si tolgono nel quaderno delle memorie). Riferiscilo in una frase e NON dichiarare mai di aver cancellato qualcosa. Per togliere UNA cosa precisa c'è DIMENTICA.\n` +
       `CANCELLARE TUTTI I DATI DI FILO ("cancella tutti i miei dati", "togli dal computer tutto quello che Filo sa di me", "resetta Filo", "riportalo come appena installato") → emetti NAVIGA con {url: "filo://security/security.html#cancella-tutto", etichetta: "Cancella tutti i dati di Filo"}: apre la pagina Sicurezza sul tasto «Cancella tutti i dati di Filo». Lì l'utente può esportare prima, sceglie se togliere anche l'identità dei crediti e conferma scrivendo «conferma». Filo non cancella da solo, a nessun livello e nemmeno se l'utente insiste: dillo in una frase e NON dichiarare mai di aver cancellato qualcosa. Per questo non usare CANCELLA_MEMORIA, CANCELLA_PAGINE né CANCELLA_ARCHIVIO.\n` +
-      `DIMENTICARE UNA COSA SOLA ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona", "non è più vero che lavoro in banca") → emetti DIMENTICA con {testo} = la riga com'è nella memoria (più sotto nel contesto). Il SISTEMA mostra all'utente le righe esatte e le toglie col suo OK. Per una cosa sola non usare mai CANCELLA_MEMORIA.\n` +
+      `DIMENTICARE UNA COSA SOLA ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona", "non è più vero che lavoro in banca") → emetti DIMENTICA con {testo} = la riga com'è nella memoria (più sotto nel contesto). Le righe escono dalle conversazioni e restano nascoste nel quaderno delle memorie, da dove l'utente le rimette; se dice «per sempre» o «definitivamente» aggiungi {per_sempre: true}, e il testo sparisce anche da lì. Il SISTEMA decide se chiedere l'OK. Per una cosa sola non usare mai CANCELLA_MEMORIA.\n` +
+      `CORREGGERE UNA COSA ("non sono vegetariano, sono vegano", "non vivo più a Lisbona, ora sto a Porto", "correggi quello che sai del mio lavoro") → emetti CORREGGI_MEMORIA con {testo} = la riga com'è nella memoria (più sotto nel contesto) e {nuovo} = la riga giusta, breve e in terza persona. Tiene la conversazione da cui era nata, ed è la strada giusta invece di dimenticare e ricordare di nuovo. Il SISTEMA decide se chiedere l'OK.\n` +
+      `COSA SAI DI ME ("cosa sai di me?", "cosa ricordi di me?", "fammi vedere la tua memoria", "cos'hai imparato su di me?") → rispondi in poche righe con quello che hai nella memoria (più sotto nel contesto) ed emetti NAVIGA con {url: "filo://quaderno/quaderno.html", etichetta: "Quaderno delle memorie"}: lì l'utente legge tutto, corregge o toglie una riga e salta alla conversazione da cui è nata.\n` +
       `COM'È IMPOSTATO ("com'è impostato il blocco della pubblicità?", "blocchi la pubblicità?", "che tema ho?", "quali siti ho bloccato?", "le notifiche fanno suono?") → emetti LEGGI_IMPOSTAZIONI con {cerca} = la voce di cui parla, e rispondi col valore che ti torna: è quello vero di adesso. Non rispondere a memoria né dai valori di serie, e non dire che non lo sai senza averlo letto. Vale anche prima di un cambio relativo ("un po' più veloce", "rimetti com'era prima di ieri"). Anche "quali siti possono usare il microfono?" si legge così (i permessi dei siti); per toglierne uno c'è TOGLI_PERMESSO_SITO.\n` +
       `MODIFICA IMPOSTAZIONI ("metti il tema scuro", "ingrandisci il testo", "attiva la modalità terminale", "imposta i cookie su privacy", "metti la chiave openrouter sk-or-...", "limite di spesa 10 euro") → emetti l'azione IMPOSTA_PREFERENZA con la chiave e il valore giusti (vedi l'elenco sotto). Puoi modificare QUALSIASI impostazione elencata. Se l'impostazione si applica subito conferma in una frase cosa hai cambiato e che si annulla dal segno accanto al suo messaggio ("Fatto, ora il tema è scuro: se non ti piace, «annulla» sul segno accanto al tuo messaggio lo rimette com'era."): l'esito dell'azione ti dice se è applicata o in attesa dell'OK. Quando serve l'OK dell'utente (impostazioni sensibili come sicurezza, modelli, provider, chiavi API e limite di spesa, o per il livello di autonomia che ha scelto) è il SISTEMA ad aprire da sé il popup: tu emetti comunque l'azione e basta — NON chiedere conferma a parole, NON dire "vai nelle Opzioni". Il livello di autonomia di Filo invece non lo cambi tu: lo sceglie l'utente in Preferenze, sotto «Autonomia di Filo». Se l'utente chiede un'impostazione che davvero non esiste nell'elenco, dillo.\n` +
       `SEGNALA UN PROBLEMA / FEEDBACK ("manda un feedback agli sviluppatori", "segnala che X non funziona", "di' al team che vorrei Y") → scrivi un testo chiaro e completo della segnalazione ed emetti l'azione INVIA_FEEDBACK (testo + un titolo breve). Se serve l'OK dell'utente è il sistema a chiederlo, con l'anteprima del testo, prima di inviare. Non inventare dettagli che l'utente non ha fornito; se la segnalazione è vaga, chiedi una precisazione prima di inviare.\n` +
@@ -2420,9 +2425,10 @@
       `Suggestions può essere lista vuota se non c'è davvero nulla.`,
 
     // Creatore lezioni: dopo ogni scambio testuale.
-    filoLesson: ({ profilo, preferenze, lezioni, interazione, stato }) =>
+    filoLesson: ({ profilo, preferenze, lezioni, interazione, stato, tolte }) =>
       `Fai parte di Filo, un assistente universale. Il tuo compito è analizzare l'ultima interazione e decidere se rivela qualcosa di utile da ricordare.\n\n` +
       `LEZIONI ESISTENTI E MODULI BASE:\n${memoriaImbustata({ profilo, preferenze, lezioni: lezioni || '(nessuna)' }, 'PROFILO')}\n\n` +
+      (tolte ? `RIGHE CHE L'UTENTE HA TOLTO DALLA MEMORIA (non riscriverle, né con altre parole, se in QUESTA interazione l'utente non le ridice):\n${esterno().imbusta({ tipo: 'MEMORIA_FILO', testo: tolte, conIntestazione: true, max: MEMORIA_MAX })}\n\n` : '') +
       `INTERAZIONE:\n${interazione || '(vuota)'}\n\n` +
       `FILO STATE:\n${stato || '(vuoto)'}\n\n` +
       `Valuta se emergono:\n` +
@@ -2438,9 +2444,11 @@
       `NULLA DA IMPARARE è l'output più probabile. Scrivi una lezione solo se aggiunge informazione nuova rispetto alle lezioni esistenti.`,
 
     // Compattatore: integra le lezioni nei moduli.
-    filoCompact: ({ moduli, lezioni }) =>
+    filoCompact: ({ moduli, lezioni, tolte }) =>
       `Fai parte di Filo, un assistente universale. Il tuo compito è integrare le nuove lezioni nella memoria a lungo termine.\n\n` +
       `MODULI ATTUALI E NUOVE LEZIONI:\n${esterno().imbusta({ tipo: 'MEMORIA_FILO', testo: `MODULI ATTUALI:\n${moduli || '(vuoto)'}\n\nNUOVE LEZIONI:\n${lezioni || '(vuoto)'}`, conIntestazione: true, max: MEMORIA_MAX })}\n\n` +
+      (tolte ? `RIGHE CHE L'UTENTE HA TOLTO DALLA MEMORIA (non rimetterle, né con altre parole, a meno che una NUOVA LEZIONE le ridica):\n${esterno().imbusta({ tipo: 'MEMORIA_FILO', testo: tolte, conIntestazione: true, max: MEMORIA_MAX })}\n\n` : '') +
+      `Ogni riga dei moduli e ogni lezione ha un segno fra parentesi quadre ([R3], [L2]): l'utente legge da quali conversazioni è nata ogni riga, e il collegamento passa da questi segni.\n` +
       `La memoria è organizzata in moduli:\n` +
       `- PROFILO: informazioni sull'utente (chi è, cosa fa, cosa conosce). Sempre caricato.\n` +
       `- PREFERENZE: come l'utente vuole interagire con Filo e errori da evitare. Sempre caricato.\n` +
@@ -2451,11 +2459,13 @@
       `3. Se un argomento nel PROFILO è cresciuto molto (più di 3-4 frasi) scorporalo: lascia un accenno nel PROFILO e crea un'espansione dedicata.\n` +
       `4. Quando crei una nuova espansione, aggiorna anche PROFILO.\n` +
       `5. Sii completo ma conciso — fatti azionabili, non narrative.\n` +
-      `6. Puoi creare nuovi moduli quando un argomento lo merita. Usa SCREAMING_SNAKE_CASE per i nomi.\n\n` +
+      `6. Puoi creare nuovi moduli quando un argomento lo merita. Usa SCREAMING_SNAKE_CASE per i nomi.\n` +
+      `7. Una riga segnata (scritta dall'utente) l'ha corretta l'utente: riportala identica, salvo che una nuova lezione la contraddica.\n` +
+      `8. Un fatto per riga. In fondo a ogni riga che scrivi metti fra parentesi i segni delle righe e delle lezioni da cui viene, così: (fonti: R2, L1). Non scrivere i segni all'inizio della riga.\n\n` +
       `Output: SOLO i moduli che crei o modifichi (quelli non elencati restano invariati). Per ogni modulo, il contenuto completo aggiornato (non un diff). NIENTE markdown, NIENTE \`\`\`. Formato esatto:\n\n` +
-      `PROFILO:\n[contenuto completo aggiornato]\n\n` +
-      `PREFERENZE:\n[contenuto completo aggiornato]\n\n` +
-      `NOME_ESPANSIONE:\n[contenuto completo]\n\n` +
+      `PROFILO:\n[una riga per fatto, ognuna con le sue fonti]\n\n` +
+      `PREFERENZE:\n[una riga per fatto, ognuna con le sue fonti]\n\n` +
+      `NOME_ESPANSIONE:\n[una riga per fatto, ognuna con le sue fonti]\n\n` +
       `Se non c'è davvero nulla da modificare, scrivi solo: NESSUNA MODIFICA`,
 
     // === Deck builder (DECK-BUILDER-SPEC.md §3-§4) ===

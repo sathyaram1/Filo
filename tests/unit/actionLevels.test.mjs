@@ -51,13 +51,16 @@ test('SALVA_LEZIONE: costo 2 col testo esatto, come lo stile (#592)', () => {
   assert.ok(AL.describe({ type: 'SALVA_LEZIONE', lezione: 'regola Y' }).includes('regola Y'));
 });
 
-test('DIMENTICA: le righe trovate dal main vanno nel popup; oltre tre è costo 3 (#592)', () => {
+test('DIMENTICA nasconde (costo 1, si rimette dal quaderno); il «per sempre» è il costo più alto (#592, #872)', () => {
   assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'caffè', _righe: [] }), 1);
-  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] }), 2);
-  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3'] }), 2);
-  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3', 'a4'] }), 3);
+  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] }), 1);
+  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3', 'a4'] }), 1);
+  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1'], per_sempre: true }), 3);
+  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1'], per_sempre: 'true' }), 1, 'il main normalizza: una stringa non alza da sola');
   const d = AL.describe({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] });
   assert.ok(d.includes('L’utente non beve caffè.'));
+  assert.ok(d.includes('quaderno delle memorie'));
+  assert.ok(AL.describe({ type: 'DIMENTICA', _righe: ['x'], per_sempre: true }).includes('per sempre'));
   assert.ok(d.split('\n')[0].length < 70, 'la prima riga fa da bottone: resta corta');
 });
 

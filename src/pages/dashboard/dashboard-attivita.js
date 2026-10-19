@@ -579,6 +579,7 @@
     SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
     SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
     DIMENTICA: (n) => (n > 1 ? `dimenticato ${n} cose` : 'dimenticato una cosa'),
+    CORREGGI_MEMORIA: (n) => (n > 1 ? `corretto ${n} cose` : 'corretto una cosa'),
     CANCELLA_MEMORIA: () => 'cancellato la memoria',
     NAVIGA: (n) => (n > 1 ? `aperto ${n} pagine` : 'aperto una pagina'),
     ONBOARDING: () => 'proseguito con l\'accoglienza',
@@ -796,6 +797,10 @@
       const t = tolte.join(', ') || String(a.testo || '').trim();
       return { icon: '🧠', text: `Dimenticato · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
     },
+    CORREGGI_MEMORIA: (a) => {
+      const t = String((a._output && a._output.corretta) || a.nuovo || '').trim();
+      return { icon: '🧠', text: `Corretto · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
+    },
     // Le due azioni che l'utente conferma nel popup e poi non ritrova da
     // nessuna parte: proprio quelle che non si disfano più.
     CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
@@ -920,6 +925,7 @@
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
     SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
     DIMENTICA: 'Niente da dimenticare',
+    CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
@@ -963,7 +969,7 @@
   const SOLO_BOTTONE = ['APRI_FILE', 'NAVIGA', 'ESEGUI_COMANDO'];
   // Detto di un'azione che la regola ha fermato prima di cominciare: dove l'etichetta di sopra parla di un esito.
   const NO_LABELS = {
-    ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato',
+    ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato', CORREGGI_MEMORIA: 'Non corretto',
     CANCELLA_SVEGLIA: 'Non cancellata', MODIFICA_SVEGLIA: 'Non spostata',
     CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
@@ -1788,7 +1794,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';
