@@ -100,6 +100,13 @@
   const mgListLoading  = document.getElementById('mgListLoading');
   const mgList         = document.getElementById('mgList');
   const mgListEmpty    = document.getElementById('mgListEmpty');
+  // L'avviso al posto delle sezioni, con l'azione che carica la chiave (#1042): parole e azione sono le stesse
+  // della pagina dei feedback.
+  const avvisoChiave = window.SN_AVVISO_CHIAVE.monta(mgNoSections, {
+    invia: sendToMain,
+    admin: () => isAdmin,
+    onCambiata: () => ricaricaConLaChiave(),
+  });
   const mgArchiveFilter = document.getElementById('mgArchiveFilter');
   const mgStarFilter    = document.getElementById('mgStarFilter');
   const mgReevalBar     = document.getElementById('mgReevalBar');
