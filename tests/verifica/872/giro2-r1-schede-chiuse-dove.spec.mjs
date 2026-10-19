@@ -15,11 +15,7 @@ test('r1 Preferenze: la pulizia delle schede e il riassunto delle schede chiuse 
 
 test('r1 la conferma del riordino delle schede e il suo esito non rimandano a «Tab archiviate»', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const testi = await app.evaluate(() => {
-    const L = globalThis.SN_ACTION_LEVELS || globalThis.SN_LIVELLI_AZIONI;
-    const voce = L && (L.AZIONI || L.ACTIONS || L.livelli || L)['PULISCI_TAB'];
-    return [voce && typeof voce.describe === 'function' ? voce.describe({}) : ''];
-  });
+  const testi = await app.evaluate(() => [String(globalThis.SN_ACTION_LEVELS.describe({ type: 'PULISCI_TAB' }) || '')]);
   expect(testi.join('\n')).toContain('schede');
   expect(testi.join('\n')).not.toMatch(VECCHIO);
 });
