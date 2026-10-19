@@ -149,6 +149,24 @@
     return Number.isFinite(t) && ora - t <= PAUSA_MS ? ultima : null;
   }
 
+  // Due messaggi di Filo scritti di sua iniziativa si fondono solo se sono vicini nel tempo, nello stesso giorno, e nel
+  // filo non è successo niente fra l'uno e l'altro: il fuso prende il posto e l'ora del primo, sopra ciò che è venuto dopo.
+  function siFonde({ chats = [], pagine = [], cambi = [] } = {}, chat, { ora = Date.now() } = {}) {
+    const lista = Array.isArray(chats) ? chats : [];
+    const c = lista.find((x) => x && x.id === chat);
+    const m = c && Array.isArray(c.messages) ? c.messages[c.messages.length - 1] : null;
+    if (!m || !m.spontaneo || m.role !== 'filo') return false;
+    const t = ms(m.ts);
+    if (!Number.isFinite(t) || ora - t > FUSIONE_MS || giornoDi(t) !== giornoDi(ora)) return false;
+    const dopo = (iso) => ms(iso) > t;
+    for (const x of lista) {
+      if (!x || x.id === chat || !Array.isArray(x.messages)) continue;
+      if (x.messages.some((y) => haContenuto(y) && dopo(y.ts))) return false;
+    }
+    if ((Array.isArray(pagine) ? pagine : []).some((p) => p && dopo(p.ts))) return false;
+    return !(Array.isArray(cambi) ? cambi : []).some((e) => e && !VIE_COL_SEGNO.has(e.via) && dopo(e.ts));
+  }
+
   // La giornata comincia alla prima apertura dopo le cinque, se nella home non si è ancora detto niente oggi.
   function serveGiornata(chats, { ora = Date.now() } = {}) {
     if (new Date(ora).getHours() < ORA_GIORNATA) return false;
