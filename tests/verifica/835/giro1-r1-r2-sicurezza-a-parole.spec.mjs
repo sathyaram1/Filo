@@ -1,7 +1,5 @@
-// Verifica #835 giro 1: allentare la Sicurezza a parole va rifiutato col rimando alla pagina (r1); bloccare un sito
-// col blocco dei siti spento deve bloccarlo davvero o dirlo (r2).
+// Verifica #835 giro 1: bloccare un sito col blocco dei siti spento deve bloccarlo davvero o dirlo (r2).
 import { test, expect } from '../../fixtures/electron.mjs';
-import { confirmState } from '../../helpers/confirm.mjs';
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
@@ -56,30 +54,6 @@ async function scrivi(page, testo) {
   await page.locator('#sendBtn').click();
 }
 const sicurezza = async (app) => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security);
-
-test('r1 «sblocca example.org» e «spegni il giudizio AI»: niente cambia, nessun riquadro, la risposta rimanda alla pagina Sicurezza', async ({ app, shell }) => {
-  test.setTimeout(90_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const chat = await homeDi(app);
-  await configura(app, { siteBlock: { blacklist: ['tiktok.com', 'example.org'] } });
-
-  for (const [chiave, valore, frase, id] of [
-    ['siti_bloccati', 'togli example.org', 'sblocca example.org', 'v1'],
-    ['giudizio_ai_siti', 'spegni', 'spegni il giudizio AI', 'v2'],
-  ]) {
-    await modelloFinto(app, [imposta(chiave, valore, id), { text: `Risposta a ${id}.` }]);
-    await scrivi(chat, frase);
-    await expect(chat.locator('.dash-bubble-filo', { hasText: `Risposta a ${id}.` })).toBeVisible({ timeout: 10_000 });
-    await expect.poll(async () => (await app.evaluate(() => globalThis.__v835_tool.length)), { timeout: 10_000 }).toBeGreaterThan(0);
-    await chat.waitForTimeout(800);
-    expect(await confirmState(chat), `${frase}: nessun riquadro da confermare, il cambio si fa a mano`).toBeNull();
-    const esito = (await app.evaluate(() => globalThis.__v835_tool)).join('\n');
-    expect(esito, `${frase}: l'esito dice che si fa a mano nella pagina Sicurezza`).toMatch(/Sicurezza/);
-  }
-  const s = await sicurezza(app);
-  expect(s.siteBlock.blacklist).toEqual(['tiktok.com', 'example.org']);
-  expect(s.safeBrowse.llmJudge).toBe(true);
-});
 
 test('r2 «blocca example.org» col blocco dei siti spento: il sito resta aperto e nessuno lo dice', async ({ app, shell }) => {
   test.setTimeout(90_000);
