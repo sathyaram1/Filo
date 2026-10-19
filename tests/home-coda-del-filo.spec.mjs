@@ -316,8 +316,8 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   const cancellata = 'https://www.youtube.com/watch?v=delfini';
   await semina(app, { pagine: [{ url: tolta, titolo: 'YouTube: orche', ts: alle(0, 0, 30) }, { url: cancellata, titolo: 'YouTube: delfini', ts: new Date(Date.now() - 600_000).toISOString() }] });
   await app.evaluate(async (_e, urls) => {
-    for (const [url, title] of urls) await globalThis.SN_ARCHIVED_TABS.archive({ url, title, closedAt: new Date().toISOString() });
-  }, [[tolta, 'YouTube: orche'], [cancellata, 'YouTube: delfini']]);
+    for (const [url, title, closedAt, openedAt] of urls) await globalThis.SN_ARCHIVED_TABS.archive({ url, title, closedAt: closedAt || new Date().toISOString(), openedAt });
+  }, [[tolta, 'YouTube: orche'], [cancellata, 'YouTube: delfini'], ['https://esempio.it/ieri', 'ieri', alle(1, 12), alle(1, 11)]]);
   const page = await openTab('filo://newtab/');
   const riga = page.locator('.dash-pagine').first();
   await riga.locator('.dash-pagine-testa').click();
@@ -334,7 +334,7 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   await cerca.fill('delfini');
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
   // Le schede chiuse di ieri restano: la cancellazione tocca solo il suo periodo.
-  expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(0);
+  expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => t.title))).toEqual(['ieri']);
 });
 
 test('senza un modello la frase dice perché e la strada porta ai Crediti', async ({ app }) => {
