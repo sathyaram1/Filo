@@ -930,6 +930,7 @@
         win.addEventListener('paste', onIncolla, o);
         win.addEventListener('drop', onIncolla, o);
         win.addEventListener('submit', onSubmit, o);
+        win.addEventListener('formdata', onDatiModulo, o);
         win.addEventListener('blur', onUscita);
         win.document.addEventListener('load', onCaricato, o);
         for (const f of win.document.querySelectorAll('iframe, frame')) riquadro(f);
