@@ -293,6 +293,7 @@ function creaFilo({ cartella } = {}) {
       const ev = t.evento(E().TIPI.CANCELLAZIONE, { pagine }, { autore: 'utente' });
       const { tolti } = await t.scrivi([ev]);
       try { await globalThis.SN_DELICATE?.dimentica(pagine); } catch (_) {}
+      try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...pagine, url: periodo.url || null }); } catch (_) {}
       return tolti;
     }, opts);
   }
