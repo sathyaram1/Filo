@@ -25,6 +25,28 @@
   // Un comando che scarica dal web porta nel compito testo di autore ignoto, non un file del computer.
   const SCARICA = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m)\b|https?:\/\//i;
 
+  // Un comando esce dal computer se nomina un indirizzo che non è il computer stesso, o se usa un programma di rete
+  // verso un posto che non sa dire. I nomi risolti dal DNS escono sempre, anche chiesti a un resolver locale.
+  const RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m|git|ssh|scp|sftp|rsync|ftp|tftp|telnet|nc|ncat|netcat|socat|start-bitstransfer)\b/i;
+  const DNS = /\b(?:ping|nslookup|dig|whois|traceroute|tracert|resolve-dnsname|test-netconnection)\b/i;
+  const HOST_URL = /\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s\/?#@]*@)?(\[[^\]\s]*\]|[^\s\/:?#@]*)/gi;
+  const HOST_UTENTE = /[\w.+-]+@((?:[\w-]+\.)*[\w-]+)(?=[:\s\/]|$)/g;
+  const HOST_NUDO = /(?<![\w@.\/-])((?:[\w-]+\.)+[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?![\w-])/gi;
+  function questoComputer(host) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+    return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h === '0.0.0.0' || /^127(?:\.\d{1,3}){3}$/.test(h);
+  }
+  function comandoEsce(testo) {
+    if (DNS.test(testo)) return true;
+    const dagliIndirizzi = [...testo.matchAll(HOST_URL)].map((m) => m[1]).filter(Boolean);
+    if (dagliIndirizzi.some((h) => !questoComputer(h))) return true;
+    if (!RETE.test(testo)) return false;
+    const altri = [...testo.matchAll(HOST_UTENTE)].map((m) => m[1]);
+    if (!dagliIndirizzi.length) altri.push(...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]));
+    const nominati = [...dagliIndirizzi, ...altri];
+    return !nominati.length || nominati.some((h) => !questoComputer(h));
+  }
+
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati. Contano in ogni uscita: l'elenco chiesto, i candidati di un
   // nome non trovato o ambiguo, il nome vero trovato da quello detto (`_nomeTrovato`, lo scrive il main).
