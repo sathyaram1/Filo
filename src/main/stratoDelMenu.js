@@ -280,6 +280,18 @@ class StratoDelMenu {
     }
   }
 
+  _rigiocaDestro(wc, p) {
+    let davanti = null;
+    try { davanti = this.schedaAttiva(); } catch (_) { davanti = null; }
+    const area = this._area();
+    const q = davanti === wc && !wc.isDestroyed() ? puntoNellArea(p, area) : null;
+    if (!q) return;
+    try {
+      wc.sendInputEvent({ type: 'mouseDown', x: q.x, y: q.y, button: 'right', clickCount: 1 });
+      wc.sendInputEvent({ type: 'mouseUp', x: q.x, y: q.y, button: 'right', clickCount: 1 });
+    } catch (_) {}
+  }
+
   // Un'icona trascinata dal menu dello strato verso la barra laterale: i px dello strato sono quelli della scheda.
   _versoLaBarra(d) {
     const m = this.menu;
@@ -428,7 +440,11 @@ class StratoDelMenu {
     wc.on('ipc-message', (_e, canale, dati) => {
       // Un clic fuori dal menu chiude e basta: lo strato copre la scheda, e alla pagina sotto non arriva.
       if (canale === 'strato:fuori') {
-        if (this.aperto && Number(dati && dati.seq) === this.aperto.seq) this.nascondi();
+        if (!this.aperto || Number(dati && dati.seq) !== this.aperto.seq) return;
+        const sotto = this.aperto.wc;
+        this.nascondi();
+        // Un tasto destro altrove apre lì il menu nuovo, come nella pagina: lo strato lo rigioca sulla scheda.
+        if (dati.destro && Date.now() - this.clicAlle <= GESTO_MS) this._rigiocaDestro(sotto, dati.destro);
         return;
       }
       if (/^strato:(esegui|incolla|scegli|togli|svuota|tastiera)$/.test(canale)) this._dalloStrato(canale, dati).catch(() => {});
