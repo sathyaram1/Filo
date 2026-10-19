@@ -23,6 +23,23 @@ const valoreFirestore = (v) => oggetto(v) && Object.keys(v).length === 1 && VALO
 const percorsoFirestore = (s) => /\/databases\/[^/]+\/documents\//.test(s);
 // Un campo scritto in chiaro o nel formato del server è la stessa persona.
 const scritto = (v) => typeof v === 'string' || (valoreFirestore(v) && typeof v.stringValue === 'string');
+// Lo stesso campo con un altro nome (user_agent, «User Agent», useragent, client_id_hash) è la stessa persona.
+const NOMI_CAMPI = new Map(CAMPI.map((k) => [k.toLowerCase(), k]));
+const campoDi = (nome) => NOMI_CAMPI.get(String(nome).toLowerCase().replace(/[^a-z0-9]/g, '')) || '';
+
+// Senza i nomi (un CSV senza intestazione, un elenco di soli valori) la persona si riconosce dai valori: un user agent
+// di browser accanto a un testo libero o a un identificativo del server.
+const UA_BROWSER = /Mozilla\/5\.0(?: ?\([^()\n]*\)| [\w.\-]+\/[\w.\-]+)+/;
+const IDENTIFICATIVO = /^(?:[0-9a-f]{16,64}|[A-Za-z0-9]{20})$/;
+const testoLibero = (v) => v.split(/\s+/).filter((p) => /\p{L}{2}/u.test(p)).length >= 3;
+function motivoDaiValori(valori) {
+  const s = valori.map((v) => (valoreFirestore(v) ? v.stringValue : v)).filter((v) => typeof v === 'string').map((v) => v.trim());
+  const ua = (v) => UA_BROWSER.test(v) && v.startsWith('Mozilla/5.0');
+  if (!s.some(ua)) return '';
+  return s.some((v) => !ua(v) && (testoLibero(v) || IDENTIFICATIVO.test(v)))
+    ? 'valori di un feedback senza i nomi dei campi (user agent di un browser accanto a un testo o a un identificativo)' : '';
+}
+const senzaNomi = (o) => Object.keys(o).every((k) => /^#\d+$/.test(k));
 
 function motivoDiUnNodo(o, chiave) {
   if (typeof o.name === 'string' && percorsoFirestore(o.name)) return 'documento Firestore (percorso del documento)';
@@ -30,11 +47,16 @@ function motivoDiUnNodo(o, chiave) {
     if (typeof o.name === 'string' && chiave === 'documents') return 'documento Firestore (name + fields)';
     if (Object.values(o.fields).some(valoreFirestore)) return 'campi nel formato di Firestore (stringValue, integerValue…)';
   }
-  const presenti = CAMPI.filter((k) => scritto(o[k]));
+  const campi = Object.create(null);
+  for (const [k, v] of Object.entries(o)) {
+    const c = campoDi(k);
+    if (c && !(c in campi) && scritto(v)) campi[c] = v;
+  }
+  const presenti = CAMPI.filter((k) => k in campi);
   const chi = presenti.filter((k) => k !== 'text');
-  if (chi.some((k) => valoreFirestore(o[k]))) return `campi di un feedback nel formato di Firestore (${presenti.join(', ')})`;
+  if (chi.some((k) => valoreFirestore(campi[k]))) return `campi di un feedback nel formato di Firestore (${presenti.join(', ')})`;
   if (chi.length && presenti.length >= 2) return `campi di un feedback (${presenti.join(', ')})`;
-  return '';
+  return senzaNomi(o) ? motivoDaiValori(Object.values(o)) : '';
 }
 
 /** Il motivo per cui un valore è una copia di dati del server, o ''. Scende in tutto l'albero. */
@@ -43,6 +65,10 @@ export function motivoCopia(radice) {
   while (pila.length) {
     const [v, chiave] = pila.pop();
     if (Array.isArray(v)) {
+      if (v.every((x) => !x || typeof x !== 'object' || valoreFirestore(x))) {
+        const m = motivoDaiValori(v);
+        if (m) return m;
+      }
       for (const x of v) pila.push([x, chiave]);
     } else if (oggetto(v)) {
       const m = motivoDiUnNodo(v, chiave);
@@ -64,7 +90,7 @@ export function motivoCopiaTesto(testo) {
   // Un JSON dentro una stringa (una riga di log, un doppio JSON.stringify) ha le virgolette scritte \".
   const viste = t.includes('\\"') ? [t, t.replace(/\\(["\\/])/g, '$1')] : [t];
   for (const vista of viste) {
-    for (const leggi of [valoriFraParentesi, righeDiTabella, blocchiChiaveValore]) {
+    for (const leggi of [valoriFraParentesi, valoriSenzaInizio, righeDiTabella, righeSenzaIntestazione, blocchiChiaveValore]) {
       for (const v of leggi(vista)) {
         const m = motivoCopia(v);
         if (m) return m;
@@ -119,15 +145,27 @@ function metti(f, v) {
   f.attesa = false;
 }
 
-/** Il valore che comincia in t[i] ('{' o '['), e l'indice dopo la fine. */
-function leggiStruttura(t, i) {
-  const radice = nuovo(t[i]);
+/**
+ * Il valore che comincia in t[i] ('{' o '['), e l'indice dopo la fine. Con `aperto` il testo comincia dentro un
+ * oggetto già aperto (la coda di un file): ogni parentesi che chiude di troppo chiude quello e ne apre un altro.
+ * → [radice, indice dopo, tutte le radici]
+ */
+function leggiStruttura(t, i, aperto = false) {
+  const radici = [];
+  let radice = aperto ? Object.create(null) : nuovo(t[i]);
   const pila = [{ c: radice, chiave: null, attesa: false, n: 0 }];
-  i++;
+  if (!aperto) i++;
   while (i < t.length && pila.length) {
     const c = t[i];
     const f = pila[pila.length - 1];
     if (SPAZIO.test(c)) { i++; continue; }
+    if (CHIUDE.has(c) && aperto && pila.length === 1) {
+      radici.push(radice);
+      radice = Object.create(null);
+      pila[0] = { c: radice, chiave: null, attesa: false, n: 0 };
+      i++;
+      continue;
+    }
     if (CHIUDE.has(c)) { pila.pop(); i++; continue; }
     if (APRE.has(c)) {
       const figlio = nuovo(c);
@@ -178,7 +216,8 @@ function leggiStruttura(t, i) {
     else if (f.attesa) { f.c[f.chiave] = nudo ? null : testo; f.chiave = null; f.attesa = false; }
     else f.chiave = testo;
   }
-  return [radice, i];
+  radici.push(radice);
+  return [radice, i, radici];
 }
 
 function* valoriFraParentesi(t) {
@@ -190,14 +229,19 @@ function* valoriFraParentesi(t) {
   }
 }
 
+function* valoriSenzaInizio(t) {
+  yield* leggiStruttura(t, 0, true)[2];
+}
+
 // ─── Lettore delle tabelle: CSV, TSV, tabelle markdown, console.table di node, colonne allineate (pandas) ──────────
 const NOME_COLONNA = /^\(?[A-Za-z_][\w.\-/]*\)?$/;
 const SEPARATORE_RIGA = /^[\s:\-+─━═┼╋╬├┤┌┐└┘┬┴]*$/;
 const COLONNE_ALLINEATE = /[ \t]{2,}/;
 const nomeCampo = (cella) => {
   const n = cella.trim().replace(/^["'`]|["'`]$/g, '');
-  return CAMPI.includes(n) ? n : (n.split(/[./]/).find((p) => CAMPI.includes(p)) || n);
+  return campoDi(n) || n.split(/[./]/).map(campoDi).find(Boolean) || n;
 };
+const RIGA_CON_IDENTITA = /user[\s_-]?agent|client[\s_-]?id|wallet[\s_-]?pseudonym/i;
 
 // Le celle della riga che comincia in t[i]; le virgolette doppie possono andare a capo (un testo su più righe).
 function leggiRiga(t, i, d) {
@@ -240,13 +284,16 @@ function* righeDiTabella(t) {
     const fine = a < 0 ? t.length : a + 1;
     const riga = t.slice(i, fine);
     i = fine;
-    if (!IDENTITA.some((k) => riga.includes(k))) continue;
+    if (!RIGA_CON_IDENTITA.test(riga)) continue;
     for (const d of [',', ';', '\t', '|', '│', COLONNE_ALLINEATE]) {
       if (!ha(riga, d)) continue;
       const [intestazione] = leggiRiga(riga, 0, d);
       const nomi = intestazione.map(nomeCampo);
       if (!nomi.some((n) => IDENTITA.includes(n))) continue;
-      if (!intestazione.every((c) => !c.trim() || NOME_COLONNA.test(c.trim().replace(/^["'`]|["'`]$/g, '')))) continue;
+      if (!intestazione.every((c) => {
+        const n = c.trim().replace(/^["'`]|["'`]$/g, '');
+        return !n || NOME_COLONNA.test(n) || (/^[A-Za-z][\w -]*$/.test(n) && campoDi(n));
+      })) continue;
       while (i < t.length) {
         const a2 = t.indexOf('\n', i);
         if (!t.slice(i, a2 < 0 ? t.length : a2).trim()) break;
@@ -265,8 +312,23 @@ function* righeDiTabella(t) {
   }
 }
 
+// Le righe senza intestazione (jq @csv, la coda di un file): celle senza nome, riconosciute dai valori. Lo user agent
+// si toglie prima di dividere, perché i suoi «;» e «,» non diventino celle.
+function* righeSenzaIntestazione(t) {
+  for (const riga of t.split(/\r\n|\r|\n/)) {
+    const ua = UA_BROWSER.exec(riga);
+    if (!ua) continue;
+    const segno = '\u0000UA\u0000';
+    const coperta = riga.replace(ua[0], segno);
+    for (const d of [',', ';', '\t', '|', '│']) {
+      if (!coperta.includes(d)) continue;
+      yield leggiRiga(coperta, 0, d)[0].map((c) => c.replace(segno, ua[0]));
+    }
+  }
+}
+
 // ─── Lettore delle righe «chiave: valore»: YAML, testi, righe di log chiave=valore ─────────────────────────────────
-const RIGA_CHIAVE = /^(\s*)(?:[-*]\s+)?["']?([A-Za-z_]\w*)["']?\s*[:=]\s*(.*)$/;
+const RIGA_CHIAVE = /^(\s*)(?:[-*]\s+)?["']?([A-Za-z_][\w-]*(?: [A-Za-z_][\w-]*)?)["']?\s*[:=]\s*(.*)$/;
 const COPPIE_LOGFMT = /(?:^|\s)([A-Za-z_]\w*)=("(?:[^"\\]|\\.)*"?|\S+)/g;
 
 function* blocchiChiaveValore(t) {
