@@ -325,7 +325,8 @@ module.exports = function register(on, ctx) {
     const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') });
     if (l.rifiuto) return { ok: false, error: l.rifiuto, rifiuto: true };
     if (!l.testo) return { ok: false, error: 'vuota' };
-    return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo), testo: l.testo };
+    const fonti = Array.isArray(msg.fonti) ? msg.fonti.filter((x) => typeof x === 'string') : [];
+    return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo, { fonti }), testo: l.testo };
   });
 
   on(MSG.FILO_MEMORY_RESTORE, async (msg, sender, origin) => {
