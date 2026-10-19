@@ -231,3 +231,51 @@ test('le notifiche chieste dal riquadro vuoto dopo un clic passano dalla domanda
   await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['notifiche:granted/granted']);
   expect((await leggi(p)).riquadro).toContain('notifications=granted,Notification=granted');
 });
+
+// Vincoli che cambiano fra la lettura di Filo e quella di Chromium: la prima innocua, la seconda la strada vecchia.
+const CAMBIA = `(() => { let n = 0; return { get mandatory() { n++; return n < 2 ? {} : { chromeMediaSource: 'desktop' }; } }; })()`;
+const PROXY = `(() => { let n = 0; return new Proxy({ video: false }, { get(t, k) { if (k === 'audio') { n++; return n < 2 ? true : { mandatory: { chromeMediaSource: 'desktop' } }; } return t[k]; } }); })()`;
+test('vincoli che cambiano a ogni lettura non fanno morire la scheda, dalla pagina né dal riquadro vuoto: al sito arriva un no', async () => {
+  test.setTimeout(150_000);
+  const p = await apri();
+  await p.locator('#nota').fill('appunti da non perdere');
+  const casi = {
+    'riquadro, solo audio': `w.MediaDevices.prototype.getUserMedia.call(navigator.mediaDevices, { audio: ${CAMBIA}, video: false })`,
+    'riquadro, Proxy': `w.MediaDevices.prototype.getUserMedia.call(navigator.mediaDevices, ${PROXY})`,
+    'riquadro, la sua funzione': `w.navigator.mediaDevices.getUserMedia({ audio: ${CAMBIA}, video: false })`,
+    'riquadro, a callback': `new Promise((ok, no) => w.navigator.webkitGetUserMedia({ audio: ${CAMBIA}, video: false }, ok, no))`,
+    'pagina, solo audio': `navigator.mediaDevices.getUserMedia({ audio: ${CAMBIA}, video: false })`,
+    'pagina, microfono e schermo': `navigator.mediaDevices.getUserMedia({ audio: true, video: ${CAMBIA} })`,
+  };
+  for (const [nome, chiamata] of Object.entries(casi)) {
+    esiti.length = 0;
+    await alClic(p, `const w = ${VUOTO}; const s = await ${chiamata}; return s.getTracks().map((t) => t.kind).join(',');`);
+    await scegliLoSchermo(nome);
+    await expect.poll(() => esiti.slice(), { timeout: 10_000, message: nome }).toEqual(['NotAllowedError']);
+  }
+  await restaLaPagina(p);
+});
+
+// La copia dei vincoli che Filo passa a Chromium tiene anche quelli scritti come getter di una classe.
+test('vincoli normali dati da un oggetto con getter arrivano interi: il microfono passa dalla domanda e funziona', async () => {
+  test.setTimeout(60_000);
+  const p = await apri();
+  await alClic(p, `class Vincoli { get audio() { return { echoCancellation: true }; } get video() { return false; } }
+    const s = await navigator.mediaDevices.getUserMedia(new Vincoli()); return s.getTracks().map((t) => t.kind).join(',');`);
+  await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
+  await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['audio']);
+});
+
+test('la finestra vuota che la pagina apre legge «da chiedere» e il microfono chiesto da lì passa dalla domanda di Filo', async () => {
+  test.setTimeout(60_000);
+  const p = await apri();
+  await alClic(p, `const w = window.open('', '_blank', 'width=200,height=200'); const o = [];
+    for (const n of ['camera', 'microphone', 'geolocation']) o.push(n + '=' + (await w.navigator.permissions.query({ name: n })).state);
+    m(o.join(' ')); const s = await w.navigator.mediaDevices.getUserMedia({ audio: true }); return s.getTracks().map((t) => t.kind).join(',');`);
+  await expect.poll(() => esiti.slice(0, 1), { timeout: 10_000 }).toEqual(['camera=prompt microphone=prompt geolocation=prompt']);
+  await expect(barra()).toContainText('vuole usare il microfono', { timeout: 10_000 });
+  await expect(barra()).toContainText(new URL(origine).host);
+  await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['audio']);
+});

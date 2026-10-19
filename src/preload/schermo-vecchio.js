@@ -9,22 +9,26 @@ const EVENTO_SCHERMO_VECCHIO = 'filo:schermo-vecchio';
 function buildSchermoVecchioCorpo() {
   return `(function(){
   'use strict';
-  function haLaChiave(o) { return Boolean(o) && typeof o === 'object' && 'chromeMediaSource' in o; }
+  function haLaChiave(o) { return !!o && typeof o === 'object' && 'chromeMediaSource' in o; }
+  // Solo cicli e operatori: un metodo degli array cambiato dalla pagina non deve poter dire «non è vecchia».
   function vecchia(c) {
-    try {
-      if (!c || typeof c !== 'object') return false;
-      return ['audio', 'video'].some(function (k) {
-        var t = c[k];
-        if (!t || typeof t !== 'object') return false;
-        return haLaChiave(t) || haLaChiave(t.mandatory) || (Array.isArray(t.optional) && t.optional.some(haLaChiave));
-      });
-    } catch (e) { return false; }
+    if (!c || typeof c !== 'object') return false;
+    for (var k = 0; k < 2; k++) {
+      var t = c[k ? 'video' : 'audio'];
+      if (!t || typeof t !== 'object') continue;
+      if (haLaChiave(t) || haLaChiave(t.mandatory)) return true;
+      var op = t.optional;
+      if (isArr(op)) for (var i = 0; i < op.length; i++) if (haLaChiave(op[i])) return true;
+    }
+    return false;
   }
-  // Chromium rilegge i vincoli: un getter o un Proxy che alla seconda lettura dice desktop chiude la scheda (#1057). Si
-  // guarda e si passa una copia di soli dati, letta una volta, con attrezzi presi prima che la pagina li possa cambiare.
+  // Chromium rilegge i vincoli: un getter o un Proxy che alla seconda lettura dice desktop chiude la scheda (#1057). A
+  // Chromium va una copia di soli dati; è vecchia se lo è una di due letture. Attrezzi presi prima che la pagina li cambi.
   var nomiDi = Object.getOwnPropertyNames, protoDi = Object.getPrototypeOf, defP = Object.defineProperty;
   var crea = Object.create, isArr = Array.isArray, minimo = Math.min, numero = Number;
   var FINE = [Object.prototype, Function.prototype, Array.prototype];
+  // Lette sempre, anche se un Proxy le nasconde all'elenco delle chiavi: sono quelle che decidono la strada.
+  var SEMPRE = ['audio', 'video', 'mandatory', 'optional', 'advanced', 'chromeMediaSource'];
   function finale(o) { return o === FINE[0] || o === FINE[1] || o === FINE[2]; }
   function metto(o, k, v) { defP(o, k, { value: v, enumerable: true, writable: true, configurable: true }); }
   function copia(v, prof) {
@@ -46,6 +50,11 @@ function buildSchermoVecchioCorpo() {
         visti[k] = true;
         metto(out, k, copia(v[k], prof + 1));
       }
+    }
+    for (i = 0; i < SEMPRE.length; i++) {
+      if (visti[SEMPRE[i]]) continue;
+      var x = v[SEMPRE[i]];
+      if (x !== undefined) metto(out, SEMPRE[i], copia(x, prof + 1));
     }
     return out;
   }
@@ -73,9 +82,9 @@ function buildSchermoVecchioCorpo() {
       var gum = WP.getUserMedia;
       metti(WP, 'getUserMedia', { getUserMedia(c) {
         if (!arguments.length) return gum.apply(this, arguments);
-        var d;
-        try { d = copia(c, 0); } catch (e) { return Promise.reject(e); }
-        return vecchia(d) ? rifiuta() : gum.call(this, d);
+        var d, d2;
+        try { d = copia(c, 0); d2 = copia(c, 0); } catch (e) { return Promise.reject(e); }
+        return vecchia(d) || vecchia(d2) ? rifiuta() : gum.call(this, d);
       } }.getUserMedia);
     }
     var N = w.Navigator && w.Navigator.prototype;
@@ -84,8 +93,8 @@ function buildSchermoVecchioCorpo() {
       if (typeof f !== 'function') return;
       metti(N, nome, { [nome](c, ok, err) {
         if (!arguments.length) return f.apply(this, arguments);
-        var a = [copia(c, 0), ok, err];
-        if (!vecchia(a[0])) return f.apply(this, a);
+        var d = copia(c, 0);
+        if (!vecchia(d) && !vecchia(copia(c, 0))) return f.call(this, d, ok, err);
         rifiuta().catch(function (e) { if (typeof err === 'function') err(e); });
       } }[nome]);
     });

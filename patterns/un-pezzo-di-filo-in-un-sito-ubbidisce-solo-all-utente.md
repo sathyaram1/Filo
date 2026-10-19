@@ -273,7 +273,10 @@ arriva dentro l'inserimento), dai getter `contentWindow`/`contentDocument` (un r
 quelli per indice) e da `window.open`; e lì dentro si legge e si chiede come nella pagina. Resta fuori solo il codice
 della pagina che gira **dentro** un inserimento prima che finisca (uno `<script>` o un elemento personalizzato inseriti
 insieme a un riquadro con un indirizzo, ancora sul suo `about:blank`, o scritti nello stesso `document.write`): è un
-sito che chiude la propria scheda apposta, come potrebbe fare con un ciclo infinito. Prova:
+sito che chiude la propria scheda apposta, come potrebbe fare con un ciclo infinito. I vincoli si guardano su una
+copia di soli dati, ed è la copia che va a Chromium: un getter o un Proxy che alla seconda lettura dice desktop
+chiuderebbe la scheda anche dalla pagina. La finestra vuota aperta con `window.open` ha `about:blank` come indirizzo:
+il sito che chiede lo dice l'origine del suo frame, non l'indirizzo. Prova:
 `tests/permessi-riquadro-vuoto.spec.mjs`. Il clic dentro il riquadro di un altro
 sito non passa da `input-event`: lo riferisce il preload del frame, e vale per quel riquadro e i suoi antenati. A richiesta in corso, su Linux, `desktopCapturer` con schermi e finestre
 insieme torna vuoto: si chiedono a parte. Sentinelle in `tests/unit/permessiPagine.test.mjs`.
