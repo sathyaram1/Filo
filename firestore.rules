@@ -314,7 +314,7 @@ service cloud.firestore {
 
       // Creazione admin: senza vincoli di forma. La usano l'app dell'owner e
       // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
-      // (#595), la prova del mittente che il create anonimo sotto NON ammette:
+      // (#595), la prova del mittente che il create anonimo sotto NON ammette, né un update dopo:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
       // La fiducia (SPEC-DOMANDE.md §1) la scrive solo l'Admin SDK: nessun client,
       // nemmeno l'admin, che è anche ogni sessione locale. `bigliettoLocale` (impronta
