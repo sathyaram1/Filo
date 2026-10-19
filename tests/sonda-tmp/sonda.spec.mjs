@@ -1,0 +1,37 @@
+import { test, expect, _electron as electron } from '@playwright/test';
+import { createServer } from 'node:http';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { chiudiApp } from '../fixtures/electron.mjs';
+import { primaFinestra } from '../helpers/primaFinestra.mjs';
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+test('sonda', async () => {
+  test.setTimeout(120_000);
+  const server = createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><textarea id=n></textarea>'); });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  const origine = `http://127.0.0.1:${server.address().port}`;
+  const app = await electron.launch({ args: ['--use-fake-device-for-media-stream', '.'], cwd: APP_ROOT, env: { ...process.env, FILO_USER_DATA: cartellaTemporanea('sonda-'), NODE_ENV: 'test' } });
+  const shell = await primaFinestra(app);
+  await shell.waitForLoadState('domcontentloaded');
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/x');
+  await expect.poll(() => Boolean(app.windows().find((w) => w.url().startsWith(origine))), { timeout: 10000 }).toBe(true);
+  const p = app.windows().find((w) => w.url().startsWith(origine));
+  await p.waitForLoadState('load');
+  const r = await p.evaluate(async () => {
+    const out = {};
+    const nomi = ['camera', 'microphone', 'geolocation', 'notifications'];
+    out.main = (await Promise.all(nomi.map((n) => navigator.permissions.query({ name: n }).then((s) => n + '=' + s.state)))).join(',') + ' N=' + Notification.permission;
+    const f = document.createElement('iframe'); let sync = false; f.onload = () => { sync = true; };
+    let cap = false; document.addEventListener('load', (e) => { if (e.target === f) cap = true; }, true);
+    document.body.appendChild(f); out.loadSync = sync; out.capSync = cap;
+    const g = document.createElement('iframe'); g.src = '/altra'; document.body.appendChild(g);
+    const w2 = window[window.length - 1]; out.srcInitial = String(w2.location.href) + ' ' + typeof w2.MediaDevices;
+    const d = document.createElement('div'); const sr = d.attachShadow({ mode: 'closed' }); document.body.appendChild(d);
+    const h = document.createElement('iframe'); let capS = false; sr.addEventListener('load', () => { capS = true; }, true); sr.appendChild(h);
+    out.shadowLen = window.length; out.shadowCap = capS;
+    return out;
+  });
+  console.log('SONDA', JSON.stringify(r));
+  await chiudiApp(app); server.close();
+});
