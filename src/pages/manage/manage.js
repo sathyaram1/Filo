@@ -6677,6 +6677,33 @@
       } catch (_) { /* il registro resta quello di prima: la nota lo dice già */ }
     }
     renderFs();
+    if (aperto && !fsRipiego) fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
+  }
+
+  // Una segnalazione NUOVA arrivata col giro è una riga d'elenco: senza i campi
+  // di dettaglio il suo controllo di sicurezza risulterebbe «non letto» (#997).
+  // A scheda davanti la si legge intera, una volta per caricamento.
+  let fsChiesteIntere = new Set();
+  async function fsCompletaRighe() {
+    const ids = (fsFeedbacks || [])
+      .filter((f) => f && f._proiezione && f._id && !fsChiesteIntere.has(f._id))
+      .map((f) => f._id);
+    if (!ids.length) return false;
+    for (const id of ids) fsChiesteIntere.add(id);
+    let interi;
+    try {
+      interi = await liveSources.getDettagli(ids);
+    } catch (_) {
+      return false;   // resta la riga, e il riquadro dice che l'esito non è letto
+    }
+    interi = (Array.isArray(interi) ? interi : []).filter((f) => f && f._id && !f._proiezione);
+    if (!interi.length) return false;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_fields', list: interi });
+      if (r && r.ok && Array.isArray(r.list)) interi = r.list;
+    } catch (_) { /* come al caricamento: senza chiave lo dice la voce «non leggibile» */ }
+    fsFeedbacks = LIVE.applyChanges(fsFeedbacks, { fresh: interi });
+    return true;
   }
 
   function fsPannelloAperto() {
