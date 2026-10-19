@@ -98,8 +98,13 @@
         dopo = r.el;
       }
     }
-    for (const [k, r] of nodi) if (!vivi.has(k)) { r.el.remove(); nodi.delete(k); if (inModifica === k) inModifica = null; }
-    for (const [id, ge] of gruppiEl) if (!gruppiVivi.has(id)) { ge.el.remove(); gruppiEl.delete(id); }
+    // Il campo aperto resta anche se il compattatore ha appena riordinato la sua riga: al salvataggio il main ritrova la
+    // riga nuova dalle fonti, e quello che l'utente sta scrivendo non si perde.
+    const aperta = inModifica ? nodi.get(inModifica) : null;
+    for (const [k, r] of nodi) if (!vivi.has(k) && k !== inModifica) { r.el.remove(); nodi.delete(k); }
+    for (const [id, ge] of gruppiEl) {
+      if (!gruppiVivi.has(id) && !(aperta && ge.lista.contains(aperta.el))) { ge.el.remove(); gruppiEl.delete(id); }
+    }
   }
 
   function creaGruppo(g) {
