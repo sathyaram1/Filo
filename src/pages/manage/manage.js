@@ -7028,7 +7028,7 @@
             : `${fsNum(stat.prober.ritrovamenti)} ${stat.prober.ritrovamenti === 1 ? 'segnalazione' : 'segnalazioni'} dall'esploratore`),
         false,
         stat.prober.ritrovamentiIds.length ? 'proberTrovate' : ''),
-      fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', ko ? false : 'espandi'),
+      fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', esp.lanci ? 'espandi' : false),
     ].join('') + (det
       ? `<div class="mg-fs-detail"><h4>${esc(det.titolo)}</h4>${det.html}</div>`
       : '');
