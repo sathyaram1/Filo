@@ -127,7 +127,7 @@ test('una riga tolta resta fra le nascoste, non torna dallo stesso tratto, torna
   // Il compattatore che la riscrive a memoria (senza fonti, o citando solo quel tratto) non la rimette.
   await M.appendLesson('Le piace cucinare', { fonti: ['ev-u9'] });
   const letto = await compatta('PREFERENZE:\nAma il mare (fonti: R1)\nÈ vegetariano\nVegetariano convinto (fonti: R1)\nLe piace cucinare (fonti: L1)');
-  assert.deepEqual(letto.scartate, ['È vegetariano']);
+  assert.deepEqual(letto.scartate, ['È vegetariano', 'Vegetariano convinto'], 'con parole sue, dallo stesso tratto, è la stessa riga');
   assert.ok(!(await M.getMemory()).PREFERENZE.includes('È vegetariano'));
   assert.ok((await M.getMemory()).PREFERENZE.includes('Le piace cucinare'), 'una riga diversa dallo stesso giro resta');
   // Un messaggio nuovo che la ridice la riporta.

@@ -324,7 +324,7 @@ test('elenco fisso nel registro: cancellare la memoria, cambiare il livello, far
   assert.equal(risposta({ type: 'CANCELLA_MEMORIA' }, { livello: 'automatico' }), 'no');
   assert.equal(risposta({ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }), 'no');
   assert.equal(AL.ingressi({ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }).elenco, 'regole');
-  assert.match(AL.ingressi({ type: 'CANCELLA_MEMORIA' }).dove, /Memoria di Filo/);
+  assert.match(AL.ingressi({ type: 'CANCELLA_MEMORIA' }).dove, /quaderno delle memorie/);
   assert.equal(risposta({ type: 'NAVIGA', url: 'https://x.example/?password=Gatto2024!' }), 'no');
   assert.equal(risposta({ type: 'CERCA_WEB', query: 'il mio codice di verifica è 482913' }), 'no');
   assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'la mia chiave è sk-or-v1-0123456789abcdef0123456789abcdef' }), 'no');

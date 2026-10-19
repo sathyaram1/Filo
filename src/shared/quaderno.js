@@ -11,11 +11,15 @@
     return String(s == null ? '' : s).replace(/^\s*(?:\[[RL]\d+\]\s*)?[-•*]?\s*/, '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  // «L'utente» è il soggetto di quasi ogni lezione e quasi mai delle righe che il compattatore ne ricava.
+  const VUOTE = new Set(['utente', 'filo']);
   function parole(s) {
-    return new Set(norma(s).normalize('NFD').replace(/\p{M}/gu, '').split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3));
+    return new Set(norma(s).normalize('NFD').replace(/\p{M}/gu, '').split(/[^\p{L}\p{N}]+/u)
+      .filter((w) => w.length >= 3 && !VUOTE.has(w)));
   }
 
-  // Due righe dicono la stessa cosa se le loro parole piene coincidono quasi tutte: il compattatore riscrive con parole sue.
+  // Due righe dicono la stessa cosa se le parole piene della più corta stanno quasi tutte nell'altra: il compattatore
+  // riscrive le lezioni con parole sue e più brevi. Vale solo insieme alle fonti (tornaDaTolta), mai da sola.
   function simile(a, b) {
     if (norma(a) === norma(b)) return true;
     const pa = parole(a);
@@ -23,7 +27,7 @@
     if (!pa.size || !pb.size) return false;
     let comuni = 0;
     for (const w of pa) if (pb.has(w)) comuni++;
-    return comuni / (pa.size + pb.size - comuni) >= 0.6;
+    return comuni / Math.min(pa.size, pb.size) >= 0.75;
   }
 
   // Le fonti sono id di eventi del filo: stringhe, senza doppioni. Il tetto è largo e non taglia in silenzio quelle
