@@ -378,6 +378,27 @@
     else if (v.k === 'msg' && v.spontaneo && n.classList.contains('dash-bubble')) d.setBubbleText(n, v.text);
   }
 
+  // Pagine tolte da qualunque strada: le righe delle pagine già disegnate si rifanno su quelle che il filo ha adesso. Un
+  // gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga, e la vecchia se ne va.
+  function ripassaPagine() {
+    if (!d || !primo) return Promise.resolve();
+    const fai = async () => {
+      const res = await d.send({ type: MSG.FILO_CODA, fino: primo });
+      if (!res || !res.ok || !primo) return;
+      const da = ms(primo);
+      const gruppi = new Map((res.elementi || []).filter((v) => v.k === 'pagine' && ms(v.ts) >= da).map((v) => [v.key, v]));
+      for (const r of [...d.bubblesEl.querySelectorAll('.dash-pagine')]) {
+        const v = gruppi.get(r.dataset.key);
+        if (v) { disegnaGruppo(r, v); gruppi.delete(r.dataset.key); } else r.remove();
+      }
+      for (const v of gruppi.values()) metti(v, { scorri: false });
+      segnaGiorni();
+    };
+    const p = coda.then(fai, fai);
+    coda = p.then(() => {}, () => {});
+    return p;
+  }
+
   // Una riga sola al suo posto: un messaggio di Filo scritto di sua iniziativa, quello che è arrivato da altrove.
   function metti(v, { scorri = true } = {}) {
     if (!d) return;
