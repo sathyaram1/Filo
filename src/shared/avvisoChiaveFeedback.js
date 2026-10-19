@@ -137,7 +137,7 @@
 
     if (global.filo && typeof global.filo.onBroadcast === 'function') {
       global.filo.onBroadcast((m) => {
-        if (m && m.type === MSG.CAMBIATA) { scriviEsito(''); cambiata(); }
+        if (m && m.type === MSG.CAMBIATA) cambiata();
       });
     }
 
