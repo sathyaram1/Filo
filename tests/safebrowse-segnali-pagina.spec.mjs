@@ -4,6 +4,7 @@
 // senza il passaggio dei segnali nessun avviso compare e il giudizio legge «sconosciuta».
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const EXE = 'MZ finto eseguibile di prova\n' + 'z'.repeat(2048);
 
@@ -452,7 +453,7 @@ test('tasto destro su «Scarica», «Apri in nuova tab»: la pagina di ringrazia
   });
   const p = await openTab('https://menu-programmi.it/');
   await p.locator('#s').click({ button: 'right' });
-  const menu = p.locator('.sn-menu');
+  const menu = menuDi(p).pannelli;
   await expect(menu).toBeVisible();
   await menu.getByText('Apri in nuova tab', { exact: false }).click();
   await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 10000 }).toBe('pending');
