@@ -3458,13 +3458,13 @@ function releaseOnboardingResume() { onbResumeClaimedAt = 0; }
 // l'ultimo atto dell'accoglienza, al posto di un "fatto".
 // Vale per tutte e tre le strade che la chiudono: il modello che dichiara
 // `fine`, la parola di stop riconosciuta dall'app, il pulsante «Salta».
-function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true } = {}) {
+function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true, fonti = [] } = {}) {
   const done = (d) => broadcastToTabs({
     type: MSG.FILO_ONBOARDING_DONE,
     message: d?.message || '', suggestions: d?.suggestions || [], ts: d?.ts || new Date().toISOString(),
   });
   const first = lessons
-    ? maybeRunLessonAgent({ userMessage, filoReply, stateText })
+    ? maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti })
     : Promise.resolve();
   first
     .then(() => maybeRunCompactor())
@@ -4861,6 +4861,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // archiviata la domanda con cui Filo l'ha aperta: è per questo che il
   // salvataggio sta qui sotto e non in cima, dove lo stato dell'intervista
   // non si era ancora letto.
+  // Gli eventi del filo con cui questo turno ci entra: le lezioni che ne nascono li ricordano come fonti (#872).
+  const fontiTurno = [];
   if (chatId && !internal) {
     // Da adesso questa chat è di questa scheda: quando la scheda sparisce, la
     // chat è finita (vedi `affidaChat`). L'intervista di benvenuto fa
@@ -4878,6 +4880,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
     const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
     if (imageList.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, imageList);
+    const eidDomanda = domanda && domanda.role === 'user' && archiviata.eids ? archiviata.eids[archiviata.eids.length - 1] : '';
+    if (eidDomanda) fontiTurno.push(eidDomanda);
   }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
@@ -5482,6 +5486,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Gli esiti di questo turno restano davanti al modello anche dalle altre schede, finché il messaggio è recente.
     const risposta = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (risposta && risposta.role === 'filo') ContestoFilo.ricordaEsiti(chatId, risposta.ts, { azioni: renderedActions, reasoningDetails });
+    const eidRisposta = risposta && risposta.role === 'filo' && dopo.eids ? dopo.eids[dopo.eids.length - 1] : '';
+    if (eidRisposta) fontiTurno.push(eidRisposta);
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
     // ha chiesto qualcosa ed è tornato alla home (o ha chiuso la scheda) prima
     // di leggere. La risposta si salva lo stesso, ma poi la chat va RICHIUSA,
@@ -5517,10 +5523,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (filo) statoLezioni = `${stateText}\n\n${FiloState.testoConversazioni(FiloState.conversazioniRecenti(filo.tutti))}`;
   } catch (_) {}
   if (onboardingClosed) {
-    finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni });
+    finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
   } else {
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
-      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni }) : null))
+      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
       .catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.

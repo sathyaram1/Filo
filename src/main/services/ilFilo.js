@@ -10,6 +10,10 @@ const path = require('node:path');
 const E = () => globalThis.SN_FILO_EVENTI;
 const FILE_EVENTI = 'eventi.jsonl';
 const FILE_DISPOSITIVO = 'dispositivo';
+// Segno che le schede chiuse di prima del filo ci sono entrate (#872): dopo, entrano solo quelle di un backup.
+const FILE_SCHEDE_ENTRATE = 'schede-chiuse-entrate';
+// Una visita già nel filo per la stessa scheda chiusa: stesso indirizzo, aperta fra l'apertura e la chiusura (più un margine).
+const MARGINE_SCHEDA_MS = 2 * 60 * 1000;
 
 function disco() {
   try { return require('../shim/storage'); } catch (_) { return null; }
@@ -258,6 +262,12 @@ function creaFilo({ cartella } = {}) {
     };
   }
 
+  // Dov'è un evento (messaggio o pagina visitata), per saltarci: null se non c'è più (#872).
+  async function dove(id, opts) {
+    const v = await vista(opts);
+    return E().dove(v.stato, id);
+  }
+
   async function pagine(periodo, opts) {
     const v = await vista(opts);
     return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
@@ -352,6 +362,46 @@ function creaFilo({ cartella } = {}) {
     }, opts);
   }
 
+  // Le schede chiuse archiviate prima che il filo esistesse entrano alla loro data, una visita per scheda, legata alla
+  // sua voce d'archivio (riassunto e vettore restano lì). Si ripete senza doppioni: una scheda già legata, o che ha già
+  // una visita del suo indirizzo mentre era aperta, non rientra; una che una cancellazione copre non si scrive.
+  function entranoSchedeChiuse(schede, { unaVolta = false } = {}) {
+    return transazione(async (t) => {
+      if (t.incognito) return 0;
+      const segno = path.join(dir(), FILE_SCHEDE_ENTRATE);
+      if (unaVolta) { try { await fsp.access(segno); return 0; } catch (_) {} }
+      const st = normale.stato;
+      const legate = new Set();
+      const perUrl = new Map();
+      for (const p of st.pagine.values()) {
+        if (p.archivio) legate.add(p.archivio);
+        if (!perUrl.has(p.url)) perUrl.set(p.url, []);
+        perUrl.get(p.url).push(Date.parse(p.ts));
+      }
+      const eventi = [];
+      const ordinate = (Array.isArray(schede) ? schede : [])
+        .filter((s) => s && typeof s.id === 'string' && typeof s.url === 'string' && /^(https?|file):/i.test(s.url))
+        .map((s) => ({ s, t: Date.parse(s.openedAt) || Date.parse(s.closedAt) }))
+        .filter((x) => Number.isFinite(x.t))
+        .sort((a, b) => a.t - b.t);
+      for (const { s, t: inizio } of ordinate) {
+        if (legate.has(s.id)) continue;
+        const fine = Date.parse(s.closedAt) || inizio;
+        const viste = perUrl.get(s.url) || [];
+        if (viste.some((x) => x >= inizio - MARGINE_SCHEDA_MS && x <= fine + MARGINE_SCHEDA_MS)) continue;
+        eventi.push(t.evento(E().TIPI.NAVIGAZIONE, {
+          url: s.url, titolo: String(s.title && s.title !== s.url ? s.title : ''), archivio: s.id,
+        }, { autore: 'utente', ts: new Date(inizio).toISOString() }));
+      }
+      const { scritti } = eventi.length ? await t.scrivi(eventi) : { scritti: [] };
+      if (unaVolta) {
+        try { await fsp.mkdir(dir(), { recursive: true }); await fsp.writeFile(segno, new Date().toISOString() + '\n', 'utf8'); }
+        catch (e) { console.warn('[Filo] segno delle schede chiuse non scritto:', e?.message || e); }
+      }
+      return scritti.length;
+    }, { incognito: false });
+  }
+
   function resetIncognito() {
     incognito = { stato: E().nuovoStato(), eventi: [] };
   }
@@ -367,7 +417,7 @@ function creaFilo({ cartella } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, perLaCoda, pagine, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    carica, transazione, chats, chat, perLaCoda, pagine, dove, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
     esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };

@@ -60,7 +60,8 @@
         }, { autore: m.role === 'user' ? 'utente' : 'filo', ts });
       });
       if (eventi.length) await t.scrivi(eventi);
-      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId));
+      // `eids`: con quali eventi il turno è entrato nel filo, per le fonti delle memorie (#872).
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId), { ids: true });
     });
   }
 

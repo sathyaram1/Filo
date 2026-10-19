@@ -102,7 +102,8 @@
   }
 
   function nuovoStato() {
-    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [] };
+    // `messaggi`: l'id di ogni evento-messaggio porta alla sua chat (#872: le memorie ricordano da dove sono nate).
+    return { chat: new Map(), pagine: new Map(), ids: new Set(), pos: 0, tagli: [], messaggi: new Map() };
   }
 
   function nelPeriodo(ts, pagine) {
@@ -151,7 +152,7 @@
 
   function chatNuova(id, ts) {
     return {
-      id, startedAt: ts, updatedAt: ts, closedAt: null, title: '', kind: null, onboarding: false, messages: [], _pos: 0, _disp: [],
+      id, startedAt: ts, updatedAt: ts, closedAt: null, title: '', kind: null, onboarding: false, messages: [], _pos: 0, _disp: [], _ids: [],
     };
   }
 
@@ -183,10 +184,13 @@
           const { fonde: _f, ...fuso } = ev.msg;
           c.messages[c.messages.length - 1] = { ...fuso, ts: ultimo.ts };
           c._disp[c.messages.length - 1] = ev.dispositivo;
+          (c._ids[c.messages.length - 1] = c._ids[c.messages.length - 1] || []).push(ev.id);
         } else {
           c.messages.push({ ...ev.msg, ts: ev.ts });
           c._disp.push(ev.dispositivo);
+          c._ids.push([ev.id]);
         }
+        if (stato.messaggi) stato.messaggi.set(ev.id, ev.chat);
         c.updatedAt = ev.ts;
         c._pos = stato.pos;
         // Riapre solo l'utente: una risposta arrivata a chat chiusa è la coda di quella di prima.
@@ -218,6 +222,8 @@
         if (coperto(stato, ev)) return { nuovo: true, tolti: 1 };
         stato.pagine.set(ev.id, {
           id: ev.id, ts: ev.ts, url: ev.url, titolo: ev.titolo, scheda: ev.scheda ?? null, dispositivo: ev.dispositivo,
+          // Una scheda chiusa prima del filo, entrata alla sua data (#872): riassunto e vettore restano nel suo archivio.
+          ...(stringa(ev.archivio) ? { archivio: ev.archivio } : {}),
         });
         break;
       case TIPI.TITOLO_PAGINA: {
@@ -228,6 +234,8 @@
       case TIPI.CANCELLAZIONE: {
         let tolti = 0;
         if (ev.chat != null) {
+          const via = stato.chat.get(ev.chat);
+          if (via && stato.messaggi) for (const ids of via._ids || []) for (const id of ids || []) stato.messaggi.delete(id);
           if (stato.chat.delete(ev.chat)) tolti = 1;
         } else {
           const c = copertura(ev);
@@ -276,14 +284,31 @@
   }
 
   // `dispositivi`: per la home (#869), il dispositivo da cui è arrivato ogni messaggio, allineato a `messages`.
-  function copiaChat(c, { dispositivi = false } = {}) {
+  function copiaChat(c, { dispositivi = false, ids = false } = {}) {
     if (!c) return null;
     const out = { ...c, messages: c.messages.map((m) => ({ ...m })) };
     if (Array.isArray(c.fonti)) out.fonti = c.fonti.map((f) => ({ ...f }));
     delete out._pos;
     delete out._disp;
+    delete out._ids;
     if (dispositivi) out.dispositivi = c.messages.map((_, i) => (c._disp && c._disp[i]) || '');
+    // L'ultimo evento di ogni messaggio (un messaggio di Filo fuso ne ha più d'uno): è l'id con cui una memoria lo cita.
+    if (ids) out.eids = c.messages.map((_, i) => { const a = c._ids && c._ids[i]; return (a && a[a.length - 1]) || ''; });
     return out;
+  }
+
+  // Dov'è un evento nel filo: un messaggio (chat e posizione) o una pagina visitata. Null se non c'è più.
+  function dove(stato, id) {
+    if (!stato || !stringa(id)) return null;
+    const chatId = stato.messaggi && stato.messaggi.get(id);
+    const c = chatId != null ? stato.chat.get(chatId) : null;
+    if (c) {
+      const i = (c._ids || []).findIndex((a) => Array.isArray(a) && a.includes(id));
+      if (i >= 0) return { tipo: 'messaggio', chat: c.id, i, ts: c.messages[i].ts, app: c.app || null };
+    }
+    const p = stato.pagine.get(id);
+    if (p) return { tipo: 'pagina', id: p.id, ts: p.ts, url: p.url, titolo: p.titolo };
+    return null;
   }
 
   // Le chat salvate prima del filo diventano segmenti: per ogni chat i suoi eventi uno dopo l'altro, la meno
@@ -374,7 +399,7 @@
 
   global.SN_FILO_EVENTI = {
     VERSIONE, TIPI, AUTORI, PERIODI,
-    uuid, valido, crea, riga, analizza, nuovoStato, applica, compatta, elencoChat, copiaChat,
+    uuid, valido, crea, riga, analizza, nuovoStato, applica, compatta, elencoChat, copiaChat, dove,
     daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, delSito, coperto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
