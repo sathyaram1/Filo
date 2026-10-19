@@ -54,7 +54,7 @@ test('il popup apre con la spiegazione a parole, e il comando vero resta sotto',
   const righe = d.split('\n');
   assert.equal(righe[0], 'Cancello la cartella build');
   assert.ok(righe.indexOf('rm -rf build') > 0, 'il comando vero manca');
-  assert.match(d, /Cartella di lavoro: ~\/progetto/);
+  assert.match(d, /Cartella di lavoro:\s*~\/progetto/);
   // Senza spiegazione la prima riga dice comunque a parole cosa succede.
   assert.equal(AL.describe({ type: 'ESEGUI_COMANDO', comando: 'ls' }).split('\n')[0], 'Uso il terminale del computer');
 });

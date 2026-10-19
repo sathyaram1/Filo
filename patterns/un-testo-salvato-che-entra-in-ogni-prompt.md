@@ -32,7 +32,13 @@ Valgono insieme queste regole:
   un testo non di Filo, da costo 1 in su perché un livello prudente chiede anche
   lì (feedback a suo nome, righe da dimenticare, comando, link, ricerca, sveglie,
   timer, documento, la ricerca fra i documenti dell'Aiuto, titoli di chat e
-  mazzi). Il segno del riquadro non può dipendere da un colore che cambia chi
+  mazzi). Un elenco di casi non regge: al giro 4 ne mancavano dieci (cartella
+  della ricerca, titolo di una finestra, nomi di reti e file, la frase del
+  cambio da annullare). La sentinella non nomina più i campi: ogni campo che
+  `describe` legge diventa testo del modello, e un campo che è davvero parola
+  di Filo (una bandiera, un numero del main) si dichiara lì. Fuori dal registro
+  vale lo stesso per i popup che mostrano un nome scelto da altri (un file
+  scaricato, una conversazione, una categoria): `parti` anche lì. Il segno del riquadro non può dipendere da un colore che cambia chi
   scrive il testo: l'accento il modello lo cambia senza chiedere nello stesso
   turno. Per questo il filo a sinistra è per metà colore del testo: chi lo
   spegne spegne anche le parole. Su un sito la pagina riscriveva le variabili,
