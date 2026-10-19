@@ -4029,31 +4029,40 @@ installRestaConnesso(TabManager);
 // Il sito ha ricevuto il testo dell'utente quando una richiesta che lo porta ha risposta senza errore
 // (#824); lo si dice ai frame di quel sito. Un altro sito (le registrazioni delle sessioni) non conta.
 const RICHIESTE_CON_TESTO = new Set(['xhr', 'ping', 'mainFrame', 'subFrame', 'other']);
-function schedaConTestoDi(wcId) {
+// La richiesta del service worker del sito non ha scheda: vale per le schede di quel sito, e
+// ciascuna ci cerca solo il suo testo.
+function schedeConTestoDi(d) {
+  const out = [];
+  const sitoPagina = d.webContentsId ? '' : Cookies.registrableOf(d.referrer || '');
+  if (!d.webContentsId && !sitoPagina) return out;
   for (const w of BrowserWindow.getAllWindows()) {
     for (const t of (w._filoTabs && w._filoTabs.tabs) || []) {
-      try { if (t.formDirty && t.view.webContents.id === wcId) return { tab: t, w }; } catch (_) {}
+      try {
+        if (!t.formDirty) continue;
+        if (d.webContentsId ? t.view.webContents.id === d.webContentsId : Cookies.registrableOf(t.url) === sitoPagina) out.push({ tab: t, w });
+      } catch (_) {}
     }
   }
-  return null;
+  return out;
 }
 const inViaggio = new Map();
+const chiaveRichiesta = (d) => `${d.webContentsId || 'sw'}:${d.id}`;
 Cookies.osservaRichieste((d) => {
-  if (!d || !d.webContentsId || !RICHIESTE_CON_TESTO.has(d.resourceType)) return;
-  const trovata = schedaConTestoDi(d.webContentsId);
-  if (!trovata) return;
+  if (!d || !RICHIESTE_CON_TESTO.has(d.resourceType)) return;
+  const sito = Cookies.registrableOf(d.url);
+  if (!sito) return;
   let da = '';
   try { da = (d.frame && d.frame.url) || ''; } catch (_) {}
-  const sito = Cookies.registrableOf(d.url);
-  if (!sito || Cookies.registrableOf(da || d.referrer || trovata.tab.url) !== sito) return;
+  const schede = schedeConTestoDi(d).filter((s) => Cookies.registrableOf(da || d.referrer || s.tab.url) === sito);
+  if (!schede.length) return;
   if (inViaggio.size >= 200) inViaggio.delete(inViaggio.keys().next().value);
-  inViaggio.set(`${d.webContentsId}:${d.id}`, { ...trovata, sito, url: d.url, corpo: corpoDa(d.uploadData) });
+  inViaggio.set(chiaveRichiesta(d), { schede, sito, url: d.url, corpo: corpoDa(d.uploadData) });
 }, (d, riuscita) => {
-  const k = d ? `${d.webContentsId}:${d.id}` : '';
+  const k = d ? chiaveRichiesta(d) : '';
   const r = inViaggio.get(k);
   if (!r) return;
   inViaggio.delete(k);
-  if (riuscita && d.statusCode >= 200 && d.statusCode < 400) accodaRicevuta(r);
+  if (riuscita && d.statusCode >= 200 && d.statusCode < 400) for (const s of r.schede) accodaRicevuta({ ...s, sito: r.sito, url: r.url, corpo: r.corpo });
 });
 // Una richiesta alla volta, cedendo il passo fra l'una e l'altra: una pagina che ne manda tante
 // non ferma Filo. Oltre la coda si lasciano andare, e nel dubbio la scheda resta protetta.
