@@ -522,6 +522,21 @@ test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, an
       for (const richiesta of frasi) assert.equal(risposta(azione, { impostazioni: att, azioni, richiesta }), 'conferma', `${JSON.stringify(azione)} con «${richiesta}»`);
     }
   }
+  // Una parola vicina all'azione detta per altro non è una richiesta: serve il verbo dell'azione nella stessa riga.
+  const diPassaggio = [
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['fammi la lista della spesa per una carbonara', 'metti le uova nella lista della spesa']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['la batteria di questo telefono che autonomia ha?', 'cosa vuol dire automatico nel cambio di una macchina?']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }, ['confronta i modelli di auto elettriche', 'usa i modelli di Word per la lettera']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-0123456789abcdef0123456789abcdef' }, ['ricordami di chiamare Marco']],
+    [{ type: 'CANCELLA_MEMORIA' }, ['ricordami domani di chiamare Marco', 'che memoria ha questo telefono?', 'cancella la sveglia\nricorda che sono vegetariano']],
+    [{ type: 'CANCELLA_PAGINE', periodo: 'oggi' }, ['riassumi questa pagina', 'raccontami la storia di Roma', 'cancella questa pagina dai preferiti']],
+    [{ type: 'CANCELLA_ARCHIVIO', query: 'x' }, ['fai uno screenshot dello schermo', 'fammi una tabella dei prezzi', 'chiudi le schede sulle ricette']],
+    [{ type: 'DIMENTICA', testo: 'Bologna', per_sempre: true }, ['elimina la sveglia delle 7', 'dimentica che vivo a Bologna']],
+    [{ type: 'ANNULLA_CAMBIO', _livelloCambio: 2 }, ['torna indietro alla pagina prima']],
+  ];
+  for (const [azione, frasi] of diPassaggio) {
+    for (const richiesta of frasi) assert.equal(risposta(azione, { impostazioni: att, azioni: [ricercaFatta], richiesta }), 'no', `${JSON.stringify(azione)} con «${richiesta}»`);
+  }
   // Ogni azione che può arrivare al costo 4 senza un segreto dice come si riconosce chiesta: senza, non parte mai.
   for (const [tipo, voce] of Object.entries(AL.REGISTRY)) {
     const pu4 = voce.costo === 4 || typeof voce.difesa !== 'undefined' || ['DIMENTICA', 'IMPOSTA_PREFERENZA'].includes(tipo);
