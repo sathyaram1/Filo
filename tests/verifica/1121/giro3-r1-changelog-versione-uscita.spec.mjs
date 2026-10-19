@@ -1,4 +1,4 @@
-// #1121 giro 2: le novità degli host stanno sotto una versione non ancora uscita (la 0.2.242 è già fuori).
+// #1121 giro 2 e 3: le novità degli host stanno sotto una versione non ancora uscita (la 0.2.242 è già fuori).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createRequire } from 'node:module';
