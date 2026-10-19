@@ -130,7 +130,7 @@ async function azzeraStorageNelMain() {
 
 /**
  * Registra sul file chiamante il lancio unico (beforeAll), la chiusura (afterAll) e l'azzeramento prima di ogni prova
- * dopo la prima; torna `test` ed `expect` da usare al posto di quelli della fixture.
+ * dopo la prima; torna `test` ed `expect` da usare al posto di quelli della fixture, e `azzera` per chi lo vuole a metà.
  */
 export function appCondivisa(opzioni = {}) {
   const avvio = { ...OPZIONI_FIXTURE, ...opzioni };
@@ -182,7 +182,7 @@ export function appCondivisa(opzioni = {}) {
     } catch (_) {}
   });
 
-  return { test, expect };
+  return { test, expect, azzera: () => riportaComeAppenaAperta(stato) };
 }
 
 async function aspettaHome(app) {

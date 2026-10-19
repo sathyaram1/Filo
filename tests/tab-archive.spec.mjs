@@ -1,32 +1,223 @@
-// "Chiudi = archivia" (spec §3.1): chiudendo una scheda web i suoi metadati finiscono nell'archivio delle schede chiuse,
-// col colore identità, e la scheda si ritrova e si riapre dalla ricerca del filo nella home. La pagina Cronologia non
-// c'è più: il quaderno delle memorie ne ha preso il posto (#872). Senza l'archivio la tab chiusa spariva del tutto.
+// L'archivio delle schede: chiusura che archivia, pulizia automatica, riapertura. Una sola app per il file, riportata
+// com'era appena aperta prima di ogni prova (tests/helpers/appCondivisa.mjs); un describe per ogni gruppo di prove.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { appCondivisa } from './helpers/appCondivisa.mjs';
 
-const PAGE = `<!doctype html><html><head><title>Sito Archivio</title>
+const { test, expect } = appCondivisa();
+
+test.describe('tab-archive', () => {
+  // "Chiudi = archivia" (spec §3.1): chiudendo una scheda web i suoi metadati finiscono nell'archivio delle schede chiuse,
+  // col colore identità, e la scheda si ritrova e si riapre dalla ricerca del filo nella home. La pagina Cronologia non
+  // c'è più: il quaderno delle memorie ne ha preso il posto (#872). Senza l'archivio la tab chiusa spariva del tutto.
+
+  const PAGE = `<!doctype html><html><head><title>Sito Archivio</title>
   <meta name="theme-color" content="rgb(200, 40, 60)">
 </head><body style="margin:0"><div style="height:1200px;background:#fff"></div></body></html>`;
 
-test('chiudere una scheda la archivia, e dalla ricerca del filo si ritrova e si riapre', async ({ app, shell, openTab, testServer }) => {
-  await testServer.openReady(openTab, PAGE);
-  const tabId = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
-  await expect.poll(async () => shell.evaluate(async (id) => {
-    const t = (await window.filoShell.tabs.snapshot()).tabs.find((x) => x.id === id);
-    return (t && t.identityColor) || null;
-  }, tabId), { timeout: 8_000 }).toMatch(/rgb\(200, 40, 60\)/);
+  test('chiudere una scheda la archivia, e dalla ricerca del filo si ritrova e si riapre', async ({ app, shell, openTab, testServer }) => {
+    await testServer.openReady(openTab, PAGE);
+    const tabId = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+    await expect.poll(async () => shell.evaluate(async (id) => {
+      const t = (await window.filoShell.tabs.snapshot()).tabs.find((x) => x.id === id);
+      return (t && t.identityColor) || null;
+    }, tabId), { timeout: 8_000 }).toMatch(/rgb\(200, 40, 60\)/);
 
-  await shell.evaluate(async (id) => window.filoShell.tabs.close(id), tabId);
-  await expect.poll(async () => (await app.evaluate(() => globalThis.SN_ARCHIVED_TABS.list()))
-    .some((t) => t.title === 'Sito Archivio' && /rgb\(200, 40, 60\)/.test(t.identityColor || '')), { timeout: 8_000 }).toBe(true);
+    await shell.evaluate(async (id) => window.filoShell.tabs.close(id), tabId);
+    await expect.poll(async () => (await app.evaluate(() => globalThis.SN_ARCHIVED_TABS.list()))
+      .some((t) => t.title === 'Sito Archivio' && /rgb\(200, 40, 60\)/.test(t.identityColor || '')), { timeout: 8_000 }).toBe(true);
 
-  const home = await openTab('filo://newtab/');
-  // Le pagine interne filo:// non entrano nell'archivio.
-  expect((await app.evaluate(() => globalThis.SN_ARCHIVED_TABS.list())).some((t) => /^filo:/.test(t.url))).toBe(false);
-  await home.locator('#cercaInput').fill('Sito Archivio');
-  const voce = home.locator('.dash-cerca-pagina', { hasText: 'Sito Archivio' });
-  await expect(voce).toBeVisible({ timeout: 8_000 });
-  await voce.click();
-  await expect.poll(async () => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
-    .some((t) => /127\.0\.0\.1/.test(t.url || ''))), { timeout: 8_000 }).toBe(true);
+    const home = await openTab('filo://newtab/');
+    // Le pagine interne filo:// non entrano nell'archivio.
+    expect((await app.evaluate(() => globalThis.SN_ARCHIVED_TABS.list())).some((t) => /^filo:/.test(t.url))).toBe(false);
+    await home.locator('#cercaInput').fill('Sito Archivio');
+    const voce = home.locator('.dash-cerca-pagina', { hasText: 'Sito Archivio' });
+    await expect(voce).toBeVisible({ timeout: 8_000 });
+    await voce.click();
+    await expect.poll(async () => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
+      .some((t) => /127\.0\.0\.1/.test(t.url || ''))), { timeout: 8_000 }).toBe(true);
+  });
+});
+
+test.describe('tab-auto-archive', () => {
+  // Auto-archiviazione / riordino tab (spec §2.1, §2.3) — orchestrazione.
+  //
+  // La decisione LLM viene STUBBATA (niente chiave/rete nei test): verifichiamo
+  // che, date le decisioni, il TabManager archivi le tab giuste, NON tocchi la
+  // scheda attiva, le metta nell'archivio e mostri il toast. Più: il ripristino
+  // dello scroll alla riapertura dall'archivio.
+
+  const mk = (title, color, h = 1500) =>
+    `<!doctype html><html><head><title>${title}</title>${color ? `<meta name="theme-color" content="${color}">` : ''}</head>`
+    + `<body style="margin:0"><div style="height:${h}px;background:#fff"></div></body></html>`;
+
+  test('runAutoTriage archivia le tab decise, tiene la attiva e mostra il toast', async ({ app, shell, openTab, testServer }) => {
+    await testServer.openReady(openTab, mk('Alpha', 'rgb(200,40,40)'));
+    await testServer.openReady(openTab, mk('Bravo', 'rgb(40,80,200)'));
+    await testServer.openReady(openTab, mk('Charlie', '')); // ultima → attiva
+
+    // Attendi che lo stato sia assestato: tutte e tre presenti e Charlie attiva.
+    await expect.poll(async () => shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      const titles = s.tabs.map((t) => t.title);
+      const active = s.tabs.find((t) => t.id === s.activeId);
+      return ['Alpha', 'Bravo', 'Charlie'].every((x) => titles.includes(x)) && active && active.title === 'Charlie';
+    }), { timeout: 8_000 }).toBe(true);
+
+    // Stub della decisione LLM nel main: archivia SOLO "Alpha" (deterministico).
+    const res = await app.evaluate(async ({ BrowserWindow }) => {
+      globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
+        decisions: tabs.map((t, i) => ({ i, action: t.title === 'Alpha' ? 'archive' : 'keep', reason: 'test' })),
+      });
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      return win._filoTabs.runAutoTriage({ trigger: 'test' });
+    });
+    expect(res.archived).toBe(1);
+
+    // Il primo candidato web non-attivo è "Alpha": ora non è più tra le tab aperte.
+    const titles = await shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      return s.tabs.map((t) => t.title);
+    });
+    expect(titles).not.toContain('Alpha');
+    expect(titles).toContain('Bravo');
+    expect(titles).toContain('Charlie');
+
+    // È finita nell'archivio.
+    const archived = await app.evaluate(async () => await globalThis.SN_ARCHIVED_TABS.list());
+    expect(archived.some((x) => /Alpha/.test(x.title || ''))).toBe(true);
+
+    // La scheda attiva è ancora aperta (mai archiviata).
+    const activeTitle = await shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      const a = s.tabs.find((t) => t.id === s.activeId);
+      return a ? a.title : null;
+    });
+    expect(activeTitle).toBe('Charlie');
+
+    // Toast §2.3 mostrato nella shell.
+    await expect.poll(() => shell.evaluate(() => {
+      const el = document.querySelector('.shell-notif.show .shell-notif-msg');
+      return !!(el && /cronologia/i.test(el.textContent || ''));
+    }), { timeout: 6_000 }).toBe(true);
+  });
+
+  test('riaprire una scheda dall’archivio ripristina la posizione di scroll', async ({ app, shell, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, mk('Lunga', '', 4000));
+    const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+
+    // Scrolla in fondo → scrollPct alto.
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(async () => shell.evaluate(async (i) => {
+      const s = await window.filoShell.tabs.snapshot();
+      const t = s.tabs.find((x) => x.id === i);
+      return t ? t.scrollPct : 0;
+    }, id), { timeout: 8_000 }).toBeGreaterThan(50);
+
+    // Chiudi (→ archiviata con la sua scrollPosition) e ottieni l'URL salvato.
+    await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
+    const url = await app.evaluate(async ({ BrowserWindow }) => {
+      const list = await globalThis.SN_ARCHIVED_TABS.list();
+      const e = list.find((x) => /Lunga/.test(x.title || ''));
+      if (!e) return null;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      win._filoTabs.openTab(e.url, { activate: true, restoreScrollPct: e.scrollPosition });
+      return e.url;
+    });
+    expect(url).toBeTruthy();
+
+    // La pagina riaperta torna scrollata (non da capo).
+    await expect.poll(async () => {
+      const p = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+      if (!p) return 0;
+      try { return await p.evaluate(() => window.scrollY); } catch (_) { return 0; }
+    }, { timeout: 10_000 }).toBeGreaterThan(100);
+  });
+
+  test('il riordino collassa le home duplicate e chiude le impostazioni (feedback #239)', async ({ app, shell, openTab, testServer }) => {
+    // Scenario del feedback: home aperta più volte + una pagina impostazioni +
+    // un sito. Prima il riordino toccava solo i siti web (chiudeva YouTube ma mai
+    // home/impostazioni). Ora: le home duplicate si collassano da sole e
+    // l'impostazione la archivia l'LLM; il sito web resta se l'LLM dice "keep".
+    // (Al boot Filo apre già una home; qui ne aggiungiamo altre → home duplicate.)
+    await testServer.openReady(openTab, mk('Sito', 'rgb(40,80,200)'));
+    await openTab('filo://newtab/');            // home extra
+    await openTab('filo://options/options.html'); // impostazioni
+    await openTab('filo://newtab/');            // home extra (diventa attiva)
+
+    // Assestamento: più home duplicate, una pagina options, un sito, home attiva.
+    await expect.poll(async () => shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      const newtabs = s.tabs.filter((t) => /filo:\/\/newtab/.test(t.url || ''));
+      const opts = s.tabs.filter((t) => /filo:\/\/options/.test(t.url || ''));
+      const active = s.tabs.find((t) => t.id === s.activeId);
+      return newtabs.length >= 2 && opts.length === 1 && !!active
+        && /filo:\/\/newtab/.test(active.url || '');
+    }), { timeout: 8_000 }).toBe(true);
+
+    // LLM: tiene il sito, archivia la pagina impostazioni. Le home duplicate NON
+    // dipendono dall'LLM (dedup deterministico): qui l'LLM le lascia "keep" apposta
+    // per provare che vengono chiuse comunque.
+    const res = await app.evaluate(async ({ BrowserWindow }) => {
+      globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
+        decisions: tabs.map((t, i) => ({
+          i,
+          action: /filo:\/\/options/.test(t.url || '') ? 'archive' : 'keep',
+          reason: 'test',
+        })),
+      });
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+      return win._filoTabs.runAutoTriage({ trigger: 'manual' });
+    });
+    // Almeno 2 chiuse: la home duplicata (non attiva) + la pagina impostazioni.
+    expect(res.archived).toBeGreaterThanOrEqual(2);
+
+    const after = await shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      const active = s.tabs.find((t) => t.id === s.activeId);
+      return {
+        urls: s.tabs.map((t) => t.url),
+        activeUrl: active ? active.url : null,
+      };
+    });
+    // Resta UNA sola home (l'attiva); la duplicata è stata chiusa.
+    expect(after.urls.filter((u) => /filo:\/\/newtab/.test(u || '')).length).toBe(1);
+    // La pagina impostazioni non c'è più.
+    expect(after.urls.some((u) => /filo:\/\/options/.test(u || ''))).toBe(false);
+    // La home attiva è ancora aperta e il sito web (keep) è rimasto.
+    expect(/filo:\/\/newtab/.test(after.activeUrl || '')).toBe(true);
+    expect(after.urls.some((u) => /^https?:/.test(u || ''))).toBe(true);
+  });
+
+  test('l’agente può lanciare la pulizia su richiesta (RUN_TAB_TRIAGE)', async ({ app, shell, openTab, testServer }) => {
+    await testServer.openReady(openTab, mk('Uno', 'rgb(200,40,40)'));
+    await testServer.openReady(openTab, mk('Due', 'rgb(40,80,200)'));
+    // La pagina dalla quale parte la richiesta (impostazioni) diventa attiva e
+    // interna. Usiamo options (istanza unica, non la home che al boot è già aperta
+    // e verrebbe collassata come duplicata): la pagina attiva è sempre protetta,
+    // così l'handle resta vivo per tutta la chiamata.
+    const dash = await openTab('filo://options/options.html');
+
+    // Stub: archivia tutti i candidati (le due tab web + eventuali home duplicate).
+    await app.evaluate(async () => {
+      globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({
+        decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'pulizia' })),
+      });
+    });
+
+    // L'agente, dopo conferma, manda RUN_TAB_TRIAGE: lo simuliamo dalla pagina.
+    const res = await dash.evaluate(async () =>
+      await chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
+    expect(res.ok).toBe(true);
+    expect(res.archived).toBeGreaterThanOrEqual(2);
+
+    // Le due tab web non ci sono più; la pagina attiva (interna) resta aperta.
+    const state = await shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      const active = s.tabs.find((t) => t.id === s.activeId);
+      return { titles: s.tabs.map((t) => t.title), activeUrl: active ? active.url : null };
+    });
+    expect(state.titles).not.toContain('Uno');
+    expect(state.titles).not.toContain('Due');
+    expect(/filo:\/\/options/.test(state.activeUrl || '')).toBe(true);
+  });
 });
