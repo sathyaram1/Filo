@@ -77,8 +77,7 @@
     if (Math.abs(a.length - b.length) > 1) return false;
     let i = 0;
     while (i < a.length && i < b.length && a[i] === b[i]) i++;
-    const [x, y] = [a.slice(i + 1), b.slice(i + 1)];
-    return x === y || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
+    return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
   }
   function nominata(testo, { parole = [], proprie = [] } = {}) {
     const scritte = pianoTesto(testo).split(' ').filter(Boolean);
@@ -91,7 +90,7 @@
       if (/^\d+$/.test(p)) { if (scritte.includes(p)) return true; continue; }
       if (p.length < (filtra ? 4 : 3) || (filtra && PAROLE_COMUNI.has(p))) continue;
       const r = radice(p);
-      if (scritte.some((w) => w.startsWith(r) || (r.length >= 5 && [r.length - 1, r.length, r.length + 1].some((n) => unoDiDistanza(w.slice(0, n), r))))) return true;
+      if (scritte.some((w) => w.startsWith(r) || (r.length >= 6 && [r.length - 1, r.length, r.length + 1].some((n) => unoDiDistanza(w.slice(0, n), r))))) return true;
     }
     return false;
   }
@@ -696,6 +695,7 @@
     CANCELLA_ARCHIVIO: {
       costo: 4,
       campo: null,
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['archivio', 'archiviate', 'schede', 'scheda', 'tab'], parole: [String((a && (a.query || a.testo)) || '')] }),
       describe: (a) => ["Eliminare dall'archivio le schede su ", cit(a.query || a.testo || ''),
         '.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare.'],
       describeDone: (a) => {
@@ -708,6 +708,7 @@
     CANCELLA_PAGINE: {
       costo: 4,
       campo: null,
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['cronologia', 'pagine', 'visitate', 'visitato', 'storico', 'history'], parole: [String((a && (a._sito || a.sito)) || '')] }),
       describe: (a) => {
         const n = Number(a && a._n);
         const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
@@ -726,6 +727,7 @@
       // compattate e le righe nascoste del quaderno. Irreversibile: cancellare per sempre, costo 4.
       costo: 4,
       campo: null,
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['memoria', 'memorie', 'ricordi', 'ricorda', 'dimentica', 'dimenticare', 'profilo', 'azzera', 'reset', 'sai di me', 'sai su di me', 'cancella tutto'] }),
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
@@ -737,6 +739,7 @@
       // quaderno, da dove si rimettono: costo 1 (decisione dell'owner, #872). Il «per sempre» butta il testo: costo 4.
       costo: (a) => (a && a.per_sempre === true ? 4 : 1),
       campo: null,
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['per sempre', 'definitivo', 'definitivamente', 'del tutto', 'cancella', 'elimina', 'butta'] }),
       describe: (a) => {
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
@@ -781,6 +784,12 @@
         return !!(built && !built.rifiuto && built.allenta);
       },
       dove: (a) => { const built = prefBuilt(a); return (built && built.dove) || ''; },
+      chiesta: (a, ctx) => {
+        const P = global.SN_PREF;
+        if (!P || !P.paroleDellaVoce) return false;
+        const v = P.paroleDellaVoce(a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza, a.valore ?? a.value ?? a.valoreNuovo ?? a.val);
+        return nominata(richiestaDi(ctx), { parole: [...v.parole, ...v.valori] });
+      },
       // Un setter che vuole sempre l'OK (`chiede` in preferences.js) sta fuori dal perimetro: un clic, a ogni livello.
       perimetro: (a) => {
         if (a && a._invariato) return true;
@@ -1033,6 +1042,7 @@
       costo: (a) => (a && a._livelloCambio === 1 ? 1 : 2),
       campo: null,
       difesa: (a) => !(a && a._livelloCambio === 1),
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['annulla', 'annullare', 'rimetti', 'rimettere', 'ripristina', 'com era', 'come prima', 'come era', 'indietro', 'undo'] }),
       describe: (a) => {
         // La frase del cambio riporta testi salvati (uno stile, un'etichetta, una cartella): sta tutta nel riquadro.
         const f = String((a && a._fraseCambio) || '').trim();
@@ -1237,6 +1247,10 @@
     }
     let difesa = false;
     try { difesa = !!valore(entry.difesa, action, ctx); } catch (_) { difesa = true; }
+    // Un costo 4 senza segreto lo dichiara chi conosce l'azione: senza la sua regola non vale come chiesto.
+    if (!segreto && (difesa || costo === 4)) {
+      try { chiesta = typeof entry.chiesta === 'function' && !!entry.chiesta(action, ctx); } catch (_) { chiesta = false; }
+    }
     let dove = '';
     try { dove = String(valore(entry.dove, action, ctx) || ''); } catch (_) { dove = ''; }
     let dentroPerimetro = true;
