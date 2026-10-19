@@ -107,11 +107,14 @@
       noto = null;
       chiesto = false;
       if (ricarica) return ricarica;
+      // Mentre si rilegge il tasto è spento: un secondo clic riaprirebbe la finestra di scelta per niente.
+      btn.disabled = true;
       ricarica = Promise.resolve()
         .then(() => (typeof onCambiata === 'function' ? onCambiata() : null))
         .catch(() => {})
         .finally(() => {
           ricarica = null;
+          btn.disabled = false;
           if (esito.dataset.kind === 'ok') scriviEsito('');
           if (!el.hidden) aggiorna();
         });

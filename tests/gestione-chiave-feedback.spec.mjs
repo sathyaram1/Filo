@@ -158,10 +158,10 @@ test('senza chiave la Gestione lo dice; caricata dal file, le segnalazioni torna
   await expect(carica).toBeVisible();
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: join(SHOTS, 'gestione-chiave-avviso.png') });
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
-  await page.waitForTimeout(300);
+  const tema = await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'));
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
   await page.screenshot({ path: join(SHOTS, 'gestione-chiave-avviso-scuro.png') });
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'system'; });
+  await page.evaluate((t) => (t ? document.documentElement.setAttribute('data-sn-theme', t) : document.documentElement.removeAttribute('data-sn-theme')), tema);
 
   // La bacheca senza chiave sta ferma: niente pubblicato alla cieca.
   expect(await app.evaluate(() => globalThis.__banco.pubblicate.length)).toBe(0);
@@ -261,4 +261,23 @@ test('un file senza la chiave giusta viene rifiutato con il motivo, e la pagina 
   writeFileSync(file, 'solo testo, niente chiavi\n');
   await avviso.getByRole('button', { name: 'Carica la chiave…' }).click();
   await expect(avviso.locator('.sn-chiave-esito')).toContainText('non c\'è una chiave privata');
+});
+
+test('dalla pagina dei feedback la stessa azione carica la stessa chiave', async ({ app, openTab }) => {
+  const { pub, priv } = await coppiaDiProva();
+  await bancoDiProva(app, { pub });
+  const file = join(cartella, 'chiave.pem');
+  writeFileSync(file, `-----BEGIN PRIVATE KEY-----\n${priv.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----\n`);
+  await scegliIlFile(app, file);
+
+  const page = await openTab('filo://feedback/feedback.html');
+  const avviso = page.locator('#noSections');
+  await expect(avviso).toContainText('Manca la chiave dei feedback');
+  await expect(page.locator('#tabs')).toBeHidden();
+  await avviso.getByRole('button', { name: 'Carica la chiave…' }).click();
+  await expect(avviso).toBeHidden();
+  const attesi = { inbox: 'Ricevuti (1)', queue: 'In coda (2)', resolved: 'Risolti (3)', archived: 'Archiviati (1)' };
+  for (const [tab, testo] of Object.entries(attesi)) {
+    await expect(page.locator(`#tabs [data-tab="${tab}"]`)).toHaveText(testo);
+  }
 });
