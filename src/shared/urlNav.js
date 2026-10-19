@@ -273,9 +273,30 @@
     return raw;
   }
 
+  // Le parole che l'indirizzo cerca davvero, se è una ricerca di testo o d'immagine come le costruisce Filo
+  // (src/content/actions.js): null per qualunque altro indirizzo, anche con un parametro in più (#1312).
+  function ricercaDi(url) {
+    let u;
+    try { u = new URL(String(url || '')); } catch (_) { return null; }
+    if (u.protocol !== 'https:' || u.username || u.password || u.port || u.hash) return null;
+    const chiavi = [...u.searchParams.keys()];
+    if (chiavi.length !== 1) return null;
+    if (/^(?:www\.)?google\.com$/i.test(u.hostname) && u.pathname === '/search' && chiavi[0] === 'q') return u.searchParams.get('q');
+    if (/^lens\.google\.com$/i.test(u.hostname) && u.pathname === '/uploadbyurl' && chiavi[0] === 'url') return u.searchParams.get('url');
+    return null;
+  }
+  // L'indirizzo è la ricerca di quelle parole? Il costruttore taglia a 500 caratteri.
+  function eRicercaDi(url, parole) {
+    const cercato = ricercaDi(url);
+    if (cercato == null) return false;
+    const norma = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+    const detto = String(parole == null ? '' : parole);
+    return !!norma(cercato) && (norma(cercato) === norma(detto) || norma(cercato) === norma(detto.slice(0, 500)));
+  }
+
   global.SN_URL_NAV = {
     isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
+    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress, ricercaDi, eRicercaDi,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

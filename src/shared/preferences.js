@@ -646,9 +646,9 @@
   }
 
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }; `partial` si fonde nelle impostazioni.
-  // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat; `allenta(r, attuali)` dice se il
-  // valore abbassa una difesa (vuole «conferma» a ogni livello); `elencoFisso` la mette nell'elenco fisso.
-  // `risk` è obbligatorio dal costo 2 o con `allenta`: è il rischio che il popup mostra.
+  // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat. Una voce con `allenta(r, attuali)` è un
+  // freno (regola del freno, #1312): toglierlo è costo 4, stringerlo costo 1; il suo `costo` resta quello del cambio
+  // per il registro dei cambi. `risk` è obbligatorio dal costo 2 o con `allenta`: è il rischio che il popup mostra.
   const PREF_SETTERS = [
     {
       scrive: ['theme'],
@@ -1896,20 +1896,35 @@
         + 'pagine il riassunto e la pulizia automatica delle schede tornano a mandare il testo ai modelli.',
     }),
 
-    // Il livello di autonomia lo cambia solo l'utente, in Preferenze: dalla chat è nell'elenco fisso.
+    // Il livello di autonomia è il primo freno: alzarlo è costo 4, abbassarlo 1 (#1312). Il livello attuale ignoto
+    // vale il più stretto, e yolo non si sceglie finché manca il guardiano.
     // Sta in fondo perché i sinonimi corti («auto») trovino prima le voci di sopra.
     {
-      scrive: [],
-      aiuto: '"conservativo" | "default" | "automatico" (lo sceglie solo l\'utente in Preferenze: dalla chat non si cambia)',
-      keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo'],
-      costo: 3,
-      elencoFisso: 'regole',
-      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo».',
+      scrive: ['autonomia.livello'],
+      aiuto: () => {
+        const A = global.SN_AUTONOMIA;
+        const nomi = A ? A.livelliSelezionabili().map((l) => `"${l.nome.toLowerCase()}"`).join(' | ') : '"conservativo" | "normale" | "automatico"';
+        return `${nomi} (quanto Filo fa da solo; abbassarlo vale subito, alzarlo vuole che l'utente scriva «conferma»)`;
+      },
+      keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo', 'autonomia di filo'],
+      costo: 2,
+      allenta: (r, at) => {
+        const A = global.SN_AUTONOMIA;
+        const prima = at && at.autonomia ? A.livelloAttivo(at.autonomia.livello) : 'conservativo';
+        return A.indice(r.partial.autonomia.livello) > A.indice(prima);
+      },
+      dove: 'Il livello di autonomia si cambia anche in Preferenze, sotto «Autonomia di Filo».',
+      risk: 'Cambia quante cose Filo fa da solo senza chiederti prima.',
       build(v) {
         const A = global.SN_AUTONOMIA;
+        if (!A) return null;
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        const lv = A && A.LIVELLI.find((l) => l.id === s || l.nome.toLowerCase() === s);
-        return { partial: {}, label: `Autonomia di Filo → ${lv ? lv.nome : (s || '?')}` };
+        const lv = A.LIVELLI.find((l) => l.id === s || l.nome.toLowerCase() === s);
+        if (!lv) return null;
+        if (!A.selezionabile(lv.id)) {
+          return { rifiuto: `${lv.nome} non si può ancora scegliere`, perModello: `I livelli che l'utente può scegliere sono ${A.livelliSelezionabili().map((l) => l.nome).join(', ')}.` };
+        }
+        return { partial: { autonomia: { livello: lv.id } }, label: `Autonomia di Filo → ${lv.nome}` };
       },
     },
   ];
@@ -1995,7 +2010,7 @@
     return scelte.length === 1 ? { setter: scelte[0] } : { ambigui: scelte };
   }
 
-  // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, elencoFisso, dove,
+  // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, dove,
   // risk, testo?, avviso? }; `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
   // Oppure { rifiuto, perModello? } se va rifiutato spiegando perché (`rifiuto` lo legge l'utente, `perModello` dice al
   // modello come rimediare), o null se chiave/valore non validi (il perché lo dà spiegaNonValida).
@@ -2018,13 +2033,13 @@
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     let avviso = '';
     try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
+    const freno = typeof setter.allenta === 'function';
     return {
       ...b,
-      costo: setter.costo,
+      costo: freno ? (allenta ? 4 : 1) : setter.costo,
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),
-      elencoFisso: setter.elencoFisso || '',
       dove: setter.dove || '',
       risk: setter.risk || '',
     };
