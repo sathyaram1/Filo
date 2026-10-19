@@ -351,6 +351,8 @@ const safebrowseMethods = {
       try { a.prima.apri(segna); } catch (_) {}
     } else if (scelta === 'indietro') {
       via();
+      // Una scheda che è diventata subito un file fermato dall'avviso non ha una pagina da mostrare (#814).
+      if (!tab._everNavigated && tab.isInternal === false) this._dropTab(tab);
     }
   },
 
