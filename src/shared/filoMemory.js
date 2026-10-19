@@ -361,8 +361,23 @@
     return { PROFILO: '', PREFERENZE: '' };
   }
 
+  // Una riga detta due volte nello stesso modulo è una riga sola: il quaderno riconosce le righe dal testo.
+  function senzaDoppie(testo) {
+    const viste = new Set();
+    return testo.split(/\r?\n/).filter((r) => {
+      const k = Q() ? Q().norma(r) : r.trim();
+      if (!k) return true;
+      if (viste.has(k)) return false;
+      viste.add(k);
+      return true;
+    }).join('\n');
+  }
+
   async function setMemory(memory) {
-    await setRaw(KEYS.FILO_MEMORY, memory);
+    const pulita = memory && typeof memory === 'object'
+      ? Object.fromEntries(Object.entries(memory).map(([k, v]) => [k, typeof v === 'string' ? senzaDoppie(v) : v]))
+      : memory;
+    await setRaw(KEYS.FILO_MEMORY, pulita);
   }
 
   // Toglie UNA riga da un modulo, riconosciuta dal testo esatto. Torna se c'era.
