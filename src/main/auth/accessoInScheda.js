@@ -32,7 +32,7 @@ function apri(url, { hostAccesso = hostDi(url), suChiusa, suRifiuto, fino, fines
   try { if (!win || win.isDestroyed() || !win._filoTabs || win._filoIncognito) win = finestraNormale(); } catch (_) { win = finestraNormale(); }
   if (!win) return null;
   const tabs = win._filoTabs;
-  const id = tabs.openTab(url, { activate: true });
+  const id = tabs.openTab(url, { activate: true, origine: { tipo: 'filo' } });
   if (!id) return null;
   // Chi lo chiede da una finestra incognito deve vedere la scheda, che sta nella finestra normale.
   try { if (win.isMinimized()) win.restore(); win.focus(); } catch (_) {}

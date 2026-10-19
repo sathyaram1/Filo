@@ -761,7 +761,7 @@
     // Il content script manda la URL corrente e gli indizi (campo password/pagamento); il main mostra l'avviso in una
     // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
     // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
-    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
+    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment?, insecureForm? }
     // #965 — i link che la pagina mostra, ai soli controlli locali: il verdetto resta nel main, per il clic. Aperto ai
     // siti di proposito (lo manda il content script della pagina); la pagina non ne riceve i verdetti, solo il conto.
     // Oltre LOTTO_MAX link → { ok:false, error:'troppi', max }; un esame già in coda → { ok:false, error:'occupato' }.
