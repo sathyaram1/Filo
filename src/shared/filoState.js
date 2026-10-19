@@ -370,7 +370,7 @@
     if (state.autonomia) {
       lines.push('AUTONOMIA DI FILO');
       lines.push(`Livello scelto dall'utente: ${state.autonomia.nome}. ${state.autonomia.frase}`);
-      lines.push('Lo cambia solo l\'utente, in Preferenze sotto «Autonomia di Filo».');
+      lines.push('Si cambia solo se l\'utente lo chiede: in Preferenze sotto «Autonomia di Filo», o dalla chat con IMPOSTA_PREFERENZA (chiave autonomia; alzarlo vuole che l\'utente scriva «conferma»).');
       lines.push('');
     }
     // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
