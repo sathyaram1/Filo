@@ -1017,11 +1017,12 @@ async function maybeRunCompactor() {
     const settings = await getEffectiveSettings();
     if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
     const inizio = new Date().toISOString();
+    // Le fonti per prime: la loro versione dice se l'utente ha cambiato qualcosa dopo questa lettura (#872).
+    const meta = await FiloMem.getFonti();
     const memory = await FiloMem.getMemory();
     const buf = await FiloMem.getLessonsBuffer();
     if (!buf.length) return false;
     // Ogni riga e ogni lezione col suo segno: il compattatore cita i segni, e le fonti passano alle note (#872).
-    const meta = await FiloMem.getFonti();
     const Q = globalThis.SN_QUADERNO;
     const { moduli, lezioni, rif } = Q.perCompattatore(memory, meta, buf);
     const r = await handleAIRequest({
