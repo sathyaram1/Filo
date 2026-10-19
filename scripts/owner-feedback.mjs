@@ -493,7 +493,7 @@ export async function registraParte(id, parte, opts = {}) {
 
 /**
  * Il rifiuto di una pratica come lo legge la sessione. PURA. Propone solo le strade che su QUESTA pratica
- * funzionano: niente ripasso né prova su parola a un segnalato, niente rimando nei Ricevuti a chi c'è già.
+ * funzionano: niente prova su parola a un segnalato, niente rimando nei Ricevuti a chi c'è già.
  */
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
