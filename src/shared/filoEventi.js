@@ -374,6 +374,6 @@
   global.SN_FILO_EVENTI = {
     VERSIONE, TIPI, AUTORI, PERIODI,
     uuid, valido, crea, riga, analizza, nuovoStato, applica, compatta, elencoChat, copiaChat,
-    daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, coperto,
+    daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, delSito, coperto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
