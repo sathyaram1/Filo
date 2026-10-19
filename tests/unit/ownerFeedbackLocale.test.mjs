@@ -192,7 +192,7 @@ test('all’avvio una pratica dell’owner senza segno locale, dove le routine l
       const testo = mod.rifiutoPratica('s1', r);
       assert.match(testo, /owner-feedback\.mjs s1 --solo-locale/, `${status}: dice come mettere il segno`);
       assert.match(testo, /l’ha tolto lui/, `${status}: un segno tolto dall'owner non si rimette senza chiedere`);
-      assert.doesNotMatch(testo, /--serve-locale|feedback:ripasso/, `${status}: non è un utente né senza prova`);
+      assert.doesNotMatch(testo, /--serve-locale|vale come un utente/, `${status}: non è un utente né senza prova`);
     });
   }
   await conRete(documento('s2', { clientId: 'owner:me', senderProof: 'admin', status: 'aligned', statusPublic: 'open' }), async () => {
