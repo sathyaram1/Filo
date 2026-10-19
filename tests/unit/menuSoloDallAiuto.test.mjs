@@ -37,7 +37,7 @@ function classiDelMenu() {
   return [...delMenu].filter((c) => !c.startsWith('sn-menu') && !altrove.has(c)).sort();
 }
 const CLASSI_DEL_MENU = classiDelMenu();
-const TRACCIA = new RegExp(`sn-menu|data-sn-icon-id|(?<![\\w-])(?:${CLASSI_DEL_MENU.join('|')})(?![\\w-])`);
+const TRACCIA = new RegExp(['sn-menu', 'data-sn-icon-id', ...CLASSI_DEL_MENU.map((c) => `(?<![\\w-])${c}(?![\\w-])`)].join('|'));
 const MARCATORE = 'menu-dal-sito';
 // I metodi con cui una prova cerca nel documento: decide chi li riceve. Le asserzioni sulla classe di un elemento già
 // trovato non cercano niente.
