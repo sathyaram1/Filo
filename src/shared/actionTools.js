@@ -177,7 +177,7 @@
       required: ['testo', 'contesto'],
     },
     SALVA_LEZIONE: {
-      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Se serve l\'OK dell\'utente il sistema gli mostra il testo esatto e glielo chiede da sé: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge e la toglie nelle Preferenze, sotto «Memoria di Filo». Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
+      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Se serve l\'OK dell\'utente il sistema gli mostra il testo esatto e glielo chiede da sé: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge, la corregge e la toglie nel quaderno delle memorie. Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
       properties: { testo: S('La regola, breve e in terza persona ("L\'utente non beve caffè").') },
       required: ['testo'],
     },

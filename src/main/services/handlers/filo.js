@@ -282,7 +282,10 @@ module.exports = function register(on, ctx) {
     const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
     const sempreAperta = msg && typeof msg.sempreAperta === 'string';
     if (!lezione && !riga && !sempreAperta) return { ok: false, error: 'bad_request' };
-    return { ok: true, tolta: await FiloMem.forgetLine(msg) };
+    if (sempreAperta) return { ok: true, tolta: await FiloMem.forgetLine({ sempreAperta: msg.sempreAperta }) };
+    // La riga resta fra le nascoste del quaderno (#872): l'id serve al suo «Rimetti».
+    const id = await FiloMem.hideLine(lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga });
+    return { ok: true, tolta: !!id, id: id || null };
   });
 
   // ── Il quaderno delle memorie (#872) ─────────────────────────────────────

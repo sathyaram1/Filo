@@ -265,7 +265,7 @@
       chrome.tabs.create({ url: 'filo://history/history.html' });
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openSpellcheck').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://spellcheck/spellcheck.html' });

@@ -1402,7 +1402,7 @@
     'editor/editor.html': 'Editor',
     'feedback/feedback.html': 'Feedback',
     'history/history.html': 'Cronologia AI',
-    'archive/archive.html': 'Cronologia',
+    'quaderno/quaderno.html': 'Memorie',
     'home/home.html': 'Aperti per dopo',
     'spellcheck/spellcheck.html': 'Correttore',
   };

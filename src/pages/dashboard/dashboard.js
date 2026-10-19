@@ -1784,7 +1784,7 @@
       filoParla(msg);
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       Coda.togliChat(msg.cancellata);
-      // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
+      // #525 — qualcuno ha tolto dal filo (un'altra scheda, la chat) la conversazione che
       // sta ancora qui a schermo. Continuare a scriverci dentro la farebbe
       // rinascere con la stessa targa e i messaggi di prima persi: l'opposto
       // di quello che l'utente ha chiesto. Da qui in poi è una chat nuova — e
@@ -1795,7 +1795,7 @@
         if (body.dataset.state === 'thread') {
           const nota = document.createElement('div');
           nota.className = 'dash-bubble-note';
-          nota.textContent = 'Questa conversazione è stata cancellata dalla Cronologia. Quello che scrivi da adesso apre una chat nuova.';
+          nota.textContent = 'Questa conversazione è stata tolta dal filo. Quello che scrivi da adesso apre una chat nuova.';
           bubblesEl.appendChild(nota);
           bubblesEl.scrollTop = bubblesEl.scrollHeight;
         }

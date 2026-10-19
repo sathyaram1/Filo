@@ -28,7 +28,8 @@
   const APP = [
     { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html' },
     { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html' },
-    { id: 'cronologia', titolo: 'Cronologia', icona: 'history', url: 'filo://archive/archive.html' },
+    // L'id resta quello della Cronologia, che il quaderno sostituisce (#872): le disposizioni salvate lo citano.
+    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html' },
     { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html' },
   ];
 

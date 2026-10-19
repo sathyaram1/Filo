@@ -479,7 +479,24 @@
       if (v.annullatoDa) return [{ type: 'item', icon: icona('undo', 16), label: `Rifai · ${v.frase}`, onClick: () => annullaCambio(cambio) }];
       if (v.annullabile) return [{ type: 'item', icon: icona('undo', 16), label: `Annulla · ${v.frase}`, onClick: () => annullaCambio(cambio) }];
     }
+    // Una conversazione della home si toglie dal filo da una sua bolla: la Cronologia, che lo faceva, non c'è più (#872).
+    const bolla = e.closest('.dash-bubble[data-chat]');
+    if (bolla && bolla.dataset.chat) {
+      return [{ type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', onClick: () => { togliConversazione(bolla.dataset.chat).catch(() => {}); } }];
+    }
     return [];
+  }
+
+  async function togliConversazione(id) {
+    const C = global.SN_CONFIRM_UI;
+    const ok = C ? await C.confirm({
+      title: 'Togliere la conversazione dal filo?',
+      text: 'Tutti i suoi messaggi spariscono dal filo e dal computer, e Filo non la ritrova più cercando.',
+      okLabel: 'Togli',
+    }) : false;
+    if (!ok) return;
+    await d.send({ type: MSG.FILO_CHAT_DELETE, id });
+    togliChat(id);
   }
 
   let attesaCambi = null;

@@ -458,7 +458,7 @@
   }
 
   // ── Menu del tasto destro della scheda ──
-  // Stesso menu delle righe della Cronologia (src/pages/archive/archive.js): .sn-select-pop alle coordinate del
+  // Menu proprio della pagina: .sn-select-pop alle coordinate del
   // clic, frecce/Tab/Home/Fine/lettera per muoversi, Invio per scegliere, Esc per chiudere e tornare alla scheda.
 
   function apriMenuScheda(x, y, page) {
@@ -627,7 +627,7 @@
       chrome.tabs.create({ url: 'filo://history/history.html' });
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openOptions').addEventListener('click', () => chrome.runtime.openOptionsPage());
   });
