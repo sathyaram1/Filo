@@ -436,8 +436,7 @@ service cloud.firestore {
                     'localApproval',
                     // #903: i feedback che aspetta (forma: waitsForValido).
                     'waitsFor',
-                    // #595: il ripasso dei documenti vecchi con prefisso riservato.
-                    'senderProof',
+                    // `senderProof` no: la prova nasce col documento, dopo non la scrive nessun client (#1037).
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
         // Enum: stati CANONICI della macchina a stati (FEEDBACK-STATES.md) +
