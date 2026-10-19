@@ -106,3 +106,21 @@ test('il testo cercato non è un file: una ricerca di «fattura.pdf.exe» apre i
   assert.equal(per('https://example.com/get/123'), null);
   assert.equal(per('https://example.com/get/123', 'ricevuta.jpg.scr'), 'ricevuta.jpg.scr');
 });
+
+test('un file travestito su un sito noto resta travestito: il sito vero non garantisce il file', () => {
+  const { checkLink } = SB;
+  for (const u of [
+    'https://www.dropbox.com/s/abc/fattura.pdf.exe',
+    'https://cdn.discordapp.com/attachments/1/2/fattura.pdf.exe',
+    'https://onedrive.live.com/download/fattura.pdf.exe',
+  ]) {
+    const v = checkLink(u);
+    assert.equal(v && v.level, 'sospetto', u);
+    assert.equal(v.message.title, 'File travestito', u);
+    assert.match(v.message.body, /«fattura\.pdf\.exe»/, u);
+  }
+  assert.equal(checkLink('https://drive.usercontent.google.com/download?id=1', 'ricevuta.jpg.scr').level, 'sospetto');
+  // Il resto di un sito noto non cambia.
+  assert.equal(checkLink('https://www.dropbox.com/s/abc/fattura.pdf'), null);
+  assert.equal(checkLink('https://www.google.com/search?q=fattura.pdf.exe'), null);
+});
