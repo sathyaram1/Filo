@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <title>Filo — Scaricamenti</title>
+  <title>Filo — Download</title>
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
@@ -18,6 +18,8 @@
   <script src="filo://shared/nomiSito.js"></script>
   <script src="filo://shared/eseguibili.js"></script>
   <script src="filo://shared/righeVive.js"></script>
+  <script src="filo://shared/nomiFile.js"></script>
+  <script src="filo://shared/rinominaUi.js"></script>
   <style>
     /* Un file per RIGA, dal più recente. Clic sinistro = azione primaria (apri, se completato), tasto destro =
        tutte le azioni, com'è centrale in Filo. Gli scaricamenti in corso mostrano barra e percentuale live. */
@@ -33,7 +35,7 @@
       border-radius: var(--sn-radius);
       padding: 11px 13px;
       background: var(--sn-bg);
-      transition: background 0.1s ease, border-color 0.1s ease;
+      transition: background calc(0.1s * var(--sn-motion, 1)) ease, border-color calc(0.1s * var(--sn-motion, 1)) ease;
     }
     .dl-item:hover { background: var(--sn-hover); }
     .dl-item:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
@@ -101,10 +103,10 @@
     }
     .dl-fill {
       height: 100%; background: var(--sn-accent);
-      width: 0%; transition: width 0.2s ease;
+      width: 0%; transition: width calc(0.2s * var(--sn-motion, 1)) ease;
     }
     .dl-bar.indeterminate .dl-fill {
-      width: 40%; animation: dl-indet 1.1s ease-in-out infinite;
+      width: 40%; animation: dl-indet calc(1.1s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes dl-indet {
       0% { margin-left: -40%; } 100% { margin-left: 100%; }
@@ -123,7 +125,7 @@
       padding: 4px 9px;
       border-radius: var(--sn-radius);
       white-space: nowrap;
-      transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+      transition: color calc(0.12s * var(--sn-motion, 1)) ease, background calc(0.12s * var(--sn-motion, 1)) ease, border-color calc(0.12s * var(--sn-motion, 1)) ease;
     }
     .dl-btn:hover { color: var(--sn-fg); background: var(--sn-bg); border-color: var(--sn-accent); }
     .dl-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
@@ -136,10 +138,10 @@
 </head>
 <body>
   <main class="sn-page">
-    <h1>Scaricamenti</h1>
+    <h1>Download</h1>
 
     <div class="sn-toolbar">
-      <input type="search" id="search" placeholder="Cerca tra gli scaricamenti…" />
+      <input type="search" id="search" placeholder="Cerca tra i download…" />
       <button class="sn-btn sn-btn-secondary" id="clear">Svuota elenco</button>
       <span id="count" class="dl-count"></span>
     </div>

@@ -92,7 +92,8 @@ registerAi((type, fn) => handlers.set(type, fn), {
   modelGate,
 });
 
-const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
+const DA_FILO = 'filo://admin-defaults/admin-defaults.html';
+const testModel = (msg, origin = DA_FILO) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg, { url: origin }, origin);
 const testProvider = (msg) => handlers.get(MSG.TEST_PROVIDER)(msg);
 
 beforeEach(() => {
@@ -126,8 +127,23 @@ test('riga esplicita da non-admin: rifiutata senza chiamare il provider', async 
   state.defaults.apiKeys = { openrouter: 'sk-or-default' };
   const res = await testModel({ provider: 'openrouter', model: 'qualcosa/x' });
   assert.equal(res.ok, false);
+  assert.equal(res.code, 'not_admin');
   assert.match(String(res.error), /amministrator/i);
   assert.equal(state.calls.length, 0);
+});
+
+// #784.2: sulla macchina dell'owner «sei l'admin?» è sempre sì; un sito visitato non spende le chiavi predefinite.
+test('da un sito visitato nessuna prova parte, nemmeno con la sessione dell\'owner aperta', async () => {
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  state.defaults.modelRegistry = { gemma: { provider: 'openrouter', model: 'google/gemma-4-31b-it' } };
+  for (const msg of [{ provider: 'openrouter', model: 'qualsiasi/modello' }, { nickname: 'gemma' }]) {
+    const res = await testModel(msg, 'https://evil.example/pagina');
+    assert.deepEqual(res, { ok: false, code: 'forbidden', error: 'forbidden' });
+  }
+  assert.equal(state.calls.length, 0);
+  const daFilo = await testModel({ nickname: 'gemma' });
+  assert.equal(daFilo.ok, true, `da una pagina di Filo la prova deve partire: ${daFilo.error}`);
 });
 
 test('stream concluso senza contenuto → ok:false "risposto vuoto" (capita su alcuni endpoint :free)', async () => {

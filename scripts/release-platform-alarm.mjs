@@ -56,7 +56,7 @@ export const PIATTAFORME = {
  */
 export const PASSI = {
   strumento: 'il prelievo del codice di questa corsa, quello che porta lo strumento di questo avviso',
-  riparo: "la copia dello strumento di questo avviso fuori dalla copia di lavoro",
+  riparo: "la copia degli strumenti di questa corsa (questo avviso, l'installazione che ritenta, le impronte) fuori dalla copia di lavoro",
   bersaglio: 'la scelta della versione a cui attaccarsi e del codice da costruire',
   checkout: 'il prelievo del codice di questa versione',
   node: 'la preparazione di Node',
@@ -66,6 +66,7 @@ export const PASSI = {
   build: 'la costruzione del pacchetto e il suo caricamento sulla release',
   istruzioni: 'il caricamento del foglietto del primo avvio',
   controllo: 'il controllo che i file siano davvero nella release',
+  impronte: 'la scrittura delle impronte SHA-256 dei file nella sezione «Verifica» della pagina della versione',
 };
 
 /**
@@ -144,6 +145,21 @@ export function componiAllarme({ piattaforma, versione, passo, esecuzione, repo,
         ...(esecuzione ? [`Registro dell'esecuzione: ${esecuzione}`] : []),
         '',
         `Cosa fare: riavvia a mano il lavoro di pubblicazione con la casella «${casella(nome)}» e il numero della versione scritto per intero.`,
+      ].join('\n'),
+    };
+  }
+
+  // Fermo alle impronte: i file sono nella release, manca solo con cosa confrontarli.
+  if (conf && p === 'impronte' && Array.isArray(persi) && persi.length === 0) {
+    return {
+      titolo: `La pagina della release ${v} non riporta le impronte dei file per ${nome}${coda}`,
+      testo: [
+        `I file per ${nome} sono nella release ${v}, ma le loro impronte SHA-256 non sono finite nella sezione «Verifica» della pagina della versione: chi li scarica non ha con cosa confrontarli. Se il passo è arrivato a calcolarle, stanno nel riassunto dell'esecuzione.`,
+        '',
+        `Passo fallito: «${p}» — ${PASSI[p]}.`,
+        ...(esecuzione ? [`Registro dell'esecuzione: ${esecuzione}`] : []),
+        '',
+        `Cosa fare: capisci perché il passo si è fermato, poi avvia a mano il lavoro di pubblicazione con la casella «${casella(nome)}» e ${v} nel numero di versione. Ricostruisce i file per ${nome}, li riattacca alla stessa release e ne riscrive le righe nella sezione, senza toccare quelle delle altre piattaforme.`,
       ].join('\n'),
     };
   }

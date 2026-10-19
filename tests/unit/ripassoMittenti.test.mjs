@@ -1,5 +1,5 @@
-// Il ripasso della prova del mittente (#595, #908): owner e sessioni per epoca, routine e costruzione solo con un
-// segno che un falso non può avere, mai i segnalati (anche quelli fermi nei Ricevuti). Puro.
+// Il ripasso della prova del mittente (#595, #908, #912): routine e costruzione solo con un segno che un falso non può
+// avere, mai i segnalati (anche quelli fermi nei Ricevuti); owner e sessioni mai, il solo nome non è una prova. Puro.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,98 +17,34 @@ const esitoDi = (r, id) => {
   return p ? `${p.prova}|${p.via}` : null;
 };
 const saltati = (r) => Object.fromEntries(r.saltati.map((s) => [`${s.categoria}|${s.motivo}`, s.n]));
-const S = (ms) => ({ local: ms, owner: ms });
-const msDi = (soglie) => Object.fromEntries(Object.entries(soglie).map(([f, v]) => [f, v.ms]));
-// Chi crea scrive la prova da sempre: decide solo la soglia salvata (il caso «non ancora» ha i suoi test in fondo).
-const DA_SEMPRE = { local: 0, owner: 0 };
-const cand = (docs, soglie, extra = {}) => mod.candidatiAlRipasso(docs, soglie, { inizioProva: DA_SEMPRE, ...extra });
+const cand = (docs, extra = {}) => mod.candidatiAlRipasso(docs, extra);
 
-test('senza soglie salvate: per famiglia, il primo feedback nato con la prova, altrimenti adesso', () => {
-  const adesso = Date.parse(T('10-09T00:00:00'));
-  const vuote = mod.soglieDelRipasso([doc('a', 'local:claude', 'todo', T('09-01T00:00:00'))], {}, adesso);
-  assert.deepEqual(vuote, { local: { ms: adesso, origine: 'adesso', doc: '' }, owner: { ms: adesso, origine: 'adesso', doc: '' } });
-  const conProva = [
-    doc('p2', 'local:claude', 'todo', T('10-03T00:00:00'), 'admin', { seq: 902 }),
-    doc('p1', 'local:claude', 'todo', T('10-02T00:00:00'), 'admin', { seq: 901 }),
-    doc('s', 'routine:x', 'todo', T('09-20T00:00:00'), 'server'),
-  ];
-  const s = mod.soglieDelRipasso(conProva, null, adesso);
-  assert.deepEqual(s.local, { ms: Date.parse(T('10-02T00:00:00')), origine: 'documento', doc: '#901' });
-  assert.deepEqual(s.owner, { ms: adesso, origine: 'adesso', doc: '' }, 'una sessione che parla per prima non sposta la soglia dell\'owner');
-});
-
-test('la soglia di una famiglia non è quella dell\'altra: l\'app vecchia dell\'owner resta coperta', () => {
-  const adesso = Date.parse(T('10-09T00:00:00'));
+// #912, decisione dell'owner del 02/10/2026: owner e sessioni firmano con la credenziale, e il suo Filo la scrive.
+test('owner e sessioni senza prova: il ripasso non gliela dà mai, per vecchi che siano', () => {
   const docs = [
-    doc('sessione', 'local:claude', 'todo', T('10-02T00:00:00'), 'admin'),
-    doc('falso-locale', 'local:claude', 'todo', T('10-03T00:00:00')),
-    doc('owner-app-vecchia', 'owner:me', 'todo', T('10-04T00:00:00')),
-  ];
-  const r = cand(docs, msDi(mod.soglieDelRipasso(docs, {}, adesso)));
-  assert.equal(esitoDi(r, 'owner-app-vecchia'), `admin|${VIA.EPOCA}`);
-  assert.equal(esitoDi(r, 'falso-locale'), null);
-});
-
-test('la soglia salvata dal primo giro vale ai giri dopo: un escluso accettato poi riceve la prova', () => {
-  const primoGiro = Date.parse(T('10-01T12:00:00'));
-  const voto = { pipeline: { verdicts: [{ class: 'attack' }] } };
-  const docs = [
-    doc('vecchio', 'local:claude', 'todo', T('06-16T00:00:00')),
-    doc('fermo', 'local:claude', 'unlabeled', T('07-01T00:00:00'), '', voto),
-    doc('owner-vecchio', 'owner:me', 'todo', T('08-01T00:00:00')),
-  ];
-  const s1 = mod.soglieDelRipasso(docs, {}, primoGiro);
-  const r1 = cand(docs, msDi(s1));
-  assert.deepEqual(r1.promossi.map((d) => d.id).sort(), ['owner-vecchio', 'vecchio']);
-  // Il primo giro scrive le prove; l'owner accetta da Gestione quello fermo nei Ricevuti.
-  const promossi = new Set(r1.promossi.map((d) => d.id));
-  const dopo = docs.map((d) => (promossi.has(d.id) ? { ...d, senderProof: 'admin' } : d.id === 'fermo' ? { ...d, status: 'todo' } : d));
-  const salvate = msDi(s1);
-  const s2 = mod.soglieDelRipasso(dopo, salvate, Date.parse(T('10-20T00:00:00')));
-  assert.deepEqual(s2.local, { ms: primoGiro, origine: 'salvata', doc: '' });
-  assert.equal(esitoDi(cand(dopo, msDi(s2)), 'fermo'), `admin|${VIA.EPOCA}`);
-  assert.equal(mod.soglieDelRipasso(dopo, {}, primoGiro).local.ms, Date.parse(T('06-16T00:00:00')),
-    'ricalcolata dai documenti, la soglia cadrebbe sulle prove scritte dal ripasso stesso');
-});
-
-test('una soglia salvata illeggibile ferma il giro, non si ricalcola', () => {
-  for (const male of ['2026-10-01', -5, 1.5, true]) {
-    assert.throws(() => mod.soglieDelRipasso([], { local: male }, Date.now()), /soglia salvata per local/);
-  }
-  assert.equal(mod.soglieDelRipasso([], { owner: 1000 }, 5000).owner.origine, 'salvata');
-});
-
-test('senza soglia per la famiglia nessuno passa per epoca', () => {
-  const r = cand([doc('a', 'owner:me', 'todo', T('09-01T00:00:00'))], { local: Date.now() });
-  assert.equal(r.promossi.length, 0);
-});
-
-test('owner e sessioni: admin se nati prima della soglia, mai segnalati né illeggibili', () => {
-  const soglia = Date.parse(T('10-02T00:00:00'));
-  const docs = [
-    doc('vecchio-locale', 'local:claude', 'todo', T('09-29T00:00:00')),
-    doc('vecchio-owner', 'owner:abc', 'design', T('09-10T00:00:00')),
-    doc('falso-dopo', 'local:claude', 'todo', T('10-05T00:00:00')),
+    doc('vecchio-locale', 'local:claude', 'todo', T('06-16T00:00:00')),
+    doc('vecchio-owner', 'owner:abc', 'design', T('05-10T00:00:00')),
+    doc('recente', 'LOCAL:claude', 'todo', T('10-05T00:00:00')),
+    doc('senza-ora', 'owner:abc', 'todo', ''),
     doc('attacco', 'local:claude', 'attack', T('09-01T00:00:00')),
     doc('confermato', 'owner:abc', 'spam_confirmed', T('09-01T00:00:00')),
     doc('illeggibile', 'owner:abc', 'FENC1:zz', T('09-01T00:00:00')),
     doc('utente', 'c-123', 'todo', T('09-01T00:00:00')),
     doc('gia', 'local:claude', 'todo', T('09-01T00:00:00'), 'admin'),
-    doc('senza-ora', 'local:claude', 'todo', ''),
   ];
-  const r = cand(docs, S(soglia));
-  assert.deepEqual(r.promossi.map((d) => d.id), ['vecchio-locale', 'vecchio-owner']);
-  assert.ok(r.promossi.every((d) => d.prova === 'admin' && d.via === VIA.EPOCA));
+  const r = cand(docs);
+  assert.deepEqual(r.promossi, []);
   const s = saltati(r);
-  assert.equal(s[`local|${MOTIVO.DOPO}`], 2);
+  assert.equal(s[`local|${MOTIVO.SOLO_NOME}`], 2);
+  assert.equal(s[`owner|${MOTIVO.SOLO_NOME}`], 2);
   assert.equal(s[`local|${MOTIVO.SEGNALATI}`], 1);
   assert.equal(s[`owner|${MOTIVO.SEGNALATI}`], 1, 'anche i *_confirmed restano fuori');
   assert.equal(s[`owner|${MOTIVO.ILLEGGIBILE}`], 1);
   assert.ok(!Object.keys(s).some((k) => k.startsWith('c-123')), 'un utente non entra nemmeno nei conti');
+  assert.ok(!('EPOCA' in VIA), 'nessuna strada per epoca');
 });
 
 test('fermi nei Ricevuti: fuori se un giudice ha gridato attacco o spam, o se il giudizio non si legge', () => {
-  const soglia = Date.parse(T('10-02T00:00:00'));
   const nato = T('09-01T00:00:00');
   const docs = [
     doc('voto-attacco', 'local:claude', 'unlabeled', nato, '', { pipeline: { verdicts: [{ class: 'aligned' }, { class: 'attack' }] } }),
@@ -119,9 +55,10 @@ test('fermi nei Ricevuti: fuori se un giudice ha gridato attacco o spam, o se il
     doc('design', 'local:claude', 'unlabeled', nato, '', { pipeline: { verdicts: [{ class: 'design' }] } }),
     doc('approvato-dopo-un-voto', 'local:claude', 'todo', nato, '', { pipeline: { verdicts: [{ class: 'attack' }] } }),
   ];
-  const r = cand(docs, S(soglia));
-  assert.deepEqual(r.promossi.map((d) => d.id).sort(), ['approvato-dopo-un-voto', 'design', 'mai-giudicato']);
+  const r = cand(docs);
+  assert.deepEqual(r.promossi, []);
   const s = saltati(r);
+  assert.equal(s[`local|${MOTIVO.SOLO_NOME}`], 3, 'i non segnalati restano senza per il solo nome');
   assert.equal(s[`local|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
   assert.equal(s[`owner|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
   assert.equal(s[`routine:verifier|${MOTIVO.RICEVUTI_SEGNALATI}`], 1, 'i campi del server non salvano un segnalato');
@@ -129,7 +66,6 @@ test('fermi nei Ricevuti: fuori se un giudice ha gridato attacco o spam, o se il
 });
 
 test('routine: la prova server solo con un segno del server, mai sul prefisso', () => {
-  const soglia = Date.parse(T('10-02T00:00:00'));
   const nato = T('09-01T00:00:00');
   const docs = [
     doc('derivato', 'routine:residuo', 'todo', nato, '', { derived: true }),
@@ -139,7 +75,7 @@ test('routine: la prova server solo con un segno del server, mai sul prefisso', 
     doc('solo-prefisso', 'routine:verifier', 'todo', nato),
     doc('esploratore', 'agent:gemma-3', 'archived', nato),
   ];
-  const r = cand(docs, S(soglia));
+  const r = cand(docs);
   assert.equal(esitoDi(r, 'derivato'), `server|${VIA.CAMPI}`);
   assert.equal(esitoDi(r, 'generazione'), `server|${VIA.CAMPI}`);
   assert.equal(esitoDi(r, 'allarme'), `server|${VIA.CAMPI}`);
@@ -150,7 +86,6 @@ test('routine: la prova server solo con un segno del server, mai sul prefisso', 
 });
 
 test('coda di triage: per uid col mittente giusto e nei tempi, per titolo solo se unico e nei tempi', () => {
-  const soglia = Date.parse(T('10-02T00:00:00'));
   const coda = mod.vociDellaCoda([
     { op: 'create', uid: 'u-1', queuedBy: 'prober', name: 'x', queuedAt: T('07-09T23:55:00') },
     { op: 'create', uid: 'u-2', queuedBy: 'prober', name: 'y', queuedAt: T('07-09T23:55:00') },
@@ -177,7 +112,7 @@ test('coda di triage: per uid col mittente giusto e nei tempi, per titolo solo s
     doc('u-rami', 'routine:routine', 'done', T('06-12T11:00:00')),
     doc('u-senza-ora', 'routine:routine', 'done', T('06-12T11:00:00')),
   ];
-  const r = cand(docs, S(soglia), { coda });
+  const r = cand(docs, { coda });
   assert.equal(esitoDi(r, 'u-1'), `server|${VIA.CODA_ID}`);
   assert.equal(esitoDi(r, 'u-pubblica'), null, 'un id preso dalla storia pubblica, nato mesi dopo l\'accodamento');
   assert.equal(esitoDi(r, 'u-rami'), `server|${VIA.CODA_ID}`, 'la stessa voce su più rami vale col suo accodamento più vecchio');
@@ -194,7 +129,6 @@ test('coda di triage: per uid col mittente giusto e nei tempi, per titolo solo s
 });
 
 test('derivati: la nota del server sul padre prova il numero, se il numero è unico', () => {
-  const soglia = Date.parse(T('10-02T00:00:00'));
   const nato = T('09-10T00:00:00');
   const docs = [
     doc('padre', 'owner:me', 'done', T('09-01T00:00:00'), 'admin', { seq: 500 }),
@@ -204,7 +138,7 @@ test('derivati: la nota del server sul padre prova il numero, se il numero è un
     doc('d3', 'routine:residuo', 'todo', nato, '', { seq: 500, subSeq: 3, parentId: 'padre' }),
   ];
   const derivatiDelPadre = new Map([['padre', mod.numeriDerivatiNelleNote('x\nFeedback derivati aperti: #500.1 (priorità 2, esterno), #500.2 (priorità 1, rimasti).')]]);
-  const r = cand(docs, S(soglia), { derivatiDelPadre });
+  const r = cand(docs, { derivatiDelPadre });
   assert.equal(esitoDi(r, 'd1'), `server|${VIA.NOTA_PADRE}`);
   assert.equal(esitoDi(r, 'd2'), null);
   assert.equal(esitoDi(r, 'd3'), null);
@@ -252,87 +186,30 @@ test('famiglie del mittente per i conti', () => {
   assert.equal(mod.categoria('agent:gemini-3.1'), 'agent (esploratore)');
   assert.equal(mod.categoria('c-123'), '');
   const righe = mod.resoconto({
-    promossi: [{ categoria: 'owner', prova: 'admin', via: VIA.EPOCA }],
-    saltati: [{ categoria: 'local', motivo: MOTIVO.DOPO, n: 2 }],
+    promossi: [{ categoria: 'routine:residuo', prova: 'server', via: VIA.CAMPI }],
+    saltati: [{ categoria: 'local', motivo: MOTIVO.SOLO_NOME, n: 2 }],
   });
-  assert.deepEqual(righe, ['Ricevono la prova: 1', `  owner: 1 → admin (${VIA.EPOCA})`, 'Restano senza: 2', `  local: 2 (${MOTIVO.DOPO})`]);
+  assert.deepEqual(righe, ['Ricevono la prova: 1', `  routine:residuo: 1 → server (${VIA.CAMPI})`, 'Restano senza: 2', `  local: 2 (${MOTIVO.SOLO_NOME})`]);
 });
 
-test('il giro salva le soglie nuove prima di ogni prova, e se non le salva non scrive niente', async () => {
-  const adesso = Date.parse(T('10-01T12:00:00'));
-  const docs = [doc('vecchio', 'local:claude', 'todo', T('06-16T00:00:00')), doc('o', 'owner:me', 'todo', T('07-01T00:00:00'))];
-  const base = { docs, adesso, coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), inizioProva: DA_SEMPRE, log: () => {}, err: () => {} };
-  const traccia = [];
-  const scrivi = (esitoSoglie = { ok: true }) => ({
-    soglie: async (n) => { traccia.push(['soglie', n]); return esitoSoglie; },
-    prova: async (d) => { traccia.push(['prova', d.id]); return { ok: true }; },
-  });
-  assert.equal(await mod.eseguiGiro({ ...base, salvate: {}, dryRun: false, scrivi: scrivi() }), 0);
-  assert.deepEqual(traccia.map((x) => x[0]), ['soglie', 'prova', 'prova']);
-  assert.deepEqual(traccia[0][1], { local: adesso, owner: adesso });
-
-  traccia.length = 0;
-  assert.equal(await mod.eseguiGiro({ ...base, salvate: {}, dryRun: false, scrivi: scrivi({ ok: false, status: 403 }) }), 3);
-  assert.deepEqual(traccia.map((x) => x[0]), ['soglie'], 'senza le soglie salvate nessuna prova');
-
-  traccia.length = 0;
-  assert.equal(await mod.eseguiGiro({ ...base, salvate: {}, dryRun: true, scrivi: scrivi() }), 0);
-  assert.deepEqual(traccia, [], 'a vuoto non si scrivono nemmeno le soglie');
-
-  traccia.length = 0;
-  await mod.eseguiGiro({ ...base, salvate: { local: adesso }, dryRun: false, scrivi: scrivi() });
-  assert.deepEqual(traccia[0], ['soglie', { owner: adesso }], 'si scrive solo la famiglia che non l\'aveva');
-  traccia.length = 0;
-  await mod.eseguiGiro({ ...base, salvate: { local: adesso, owner: adesso }, dryRun: false, scrivi: scrivi() });
-  assert.ok(!traccia.some((x) => x[0] === 'soglie'), 'una soglia salvata non si riscrive');
-});
-
-test('le soglie stanno in un documento che solo l\'admin legge e scrive', async () => {
-  const { readFileSync } = await import('node:fs');
-  const regole = readFileSync(join(ROOT, 'firestore.rules'), 'utf8').replace(/\/\/[^\n]*/g, '');
-  const m = new RegExp(`match /${mod.DOVE_SOGLIE.doc.replace('/', '\/')} \{([^}]*)\}`).exec(regole);
-  assert.ok(m, `firestore.rules: blocco di ${mod.DOVE_SOGLIE.doc} non trovato`);
-  const allow = [...m[1].matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([^;]+);/g)].map((x) => [x[1].trim(), x[2].trim()]);
-  assert.deepEqual(allow, [['read', 'isAdmin()'], ['write', 'isAdmin()']], 'chi sposta la soglia fa passare i falsi');
-});
-
-test('la soglia salvata non vale finché chi crea non scrive la prova: l’owner dal Filo installato e le sessioni da main', () => {
-  // Il primo giro vero l'ha fissata il 01/10 alle 11:16, quando la prova la scriveva solo il ramo del lavoro.
-  const salvata = S(Date.parse(T('10-01T11:16:00')));
+test('il giro scrive solo le prove del server, e a vuoto niente', async () => {
   const docs = [
-    doc('owner-oggi', 'owner:caf', 'unlabeled', T('10-01T15:00:00')),
-    doc('sessione-oggi', 'local:claude', 'todo', T('10-01T15:05:00')),
-    doc('segnalato-oggi', 'local:claude', 'unlabeled', T('10-01T15:10:00'), '', { pipeline: { verdicts: [{ class: 'attack' }] } }),
+    doc('vecchio', 'local:claude', 'todo', T('06-16T00:00:00')),
+    doc('o', 'owner:me', 'todo', T('07-01T00:00:00')),
+    doc('derivato', 'routine:residuo', 'todo', T('07-01T00:00:00'), '', { derived: true }),
   ];
-  const nonAncora = mod.candidatiAlRipasso(docs, salvata, { inizioProva: { local: Infinity, owner: Infinity } });
-  assert.deepEqual(nonAncora.promossi.map((d) => d.id).sort(), ['owner-oggi', 'sessione-oggi']);
-  assert.equal(saltati(nonAncora)[`local|${MOTIVO.RICEVUTI_SEGNALATI}`], 1, 'i segnalati restano fuori comunque');
-  // Main la scrive dal 02/10 per le sessioni, la versione pubblicata dal 03/10 per l'owner.
-  const inizio = { local: Date.parse(T('10-02T09:00:00')), owner: Date.parse(T('10-03T09:00:00')) };
-  const dopo = [...docs,
-    doc('owner-app-nuova', 'owner:caf', 'todo', T('10-03T10:00:00')),
-    doc('sessione-ramo-vecchio', 'local:claude', 'todo', T('10-02T10:00:00')),
-    doc('owner-app-vecchia', 'owner:caf', 'todo', T('10-02T10:00:00'))];
-  const r = mod.candidatiAlRipasso(dopo, salvata, { inizioProva: inizio });
-  assert.deepEqual(r.promossi.map((d) => d.id).sort(), ['owner-app-vecchia', 'owner-oggi', 'sessione-oggi']);
-  assert.equal(saltati(r)[`owner|${MOTIVO.DOPO}`], 1);
-  assert.equal(saltati(r)[`local|${MOTIVO.DOPO}`], 1, 'dopo l’arrivo su main, senza prova si riconosce in Gestione');
-});
+  const base = { docs, coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), log: () => {}, err: () => {} };
+  const traccia = [];
+  const scrivi = (esito = { ok: true }) => ({ prova: async (d) => { traccia.push([d.id, d.prova]); return esito; } });
+  assert.equal(await mod.eseguiGiro({ ...base, dryRun: false, scrivi: scrivi() }), 0);
+  assert.deepEqual(traccia, [['derivato', 'server']]);
 
-test('da quando chi crea scrive la prova: dall’arrivo su main (sessioni) e dalla prima versione che la porta (owner)', () => {
-  const git = (risposte) => (args) => {
-    const chiave = args[0] === 'log' ? `log ${args[args.length - 1]}` : args[0];
-    if (!(chiave in risposte)) throw new Error('niente');
-    return risposte[chiave];
-  };
-  assert.deepEqual(mod.inizioDellaProva(git({})), { local: Infinity, owner: Infinity }, 'main non la scrive: non ancora');
-  const suMain = {
-    'log scripts/claude-feedback.mjs': 'aaa 2026-10-02T09:00:00+02:00\nbbb 2026-10-05T09:00:00+02:00\n',
-    'log src/shared/feedback.js': 'ccc 2026-10-02T09:00:00+02:00\n',
-  };
-  assert.deepEqual(mod.inizioDellaProva(git(suMain)), { local: Date.parse('2026-10-02T07:00:00Z'), owner: Infinity }, 'su main ma non ancora pubblicata');
-  const uscita = { ...suMain, tag: 'v0.2.229\nv0.2.230\n', 'for-each-ref': '2026-10-03T08:00:00+02:00\n' };
-  assert.deepEqual(mod.inizioDellaProva(git(uscita)), { local: Date.parse('2026-10-02T07:00:00Z'), owner: Date.parse('2026-10-03T06:00:00Z') });
+  traccia.length = 0;
+  assert.equal(await mod.eseguiGiro({ ...base, dryRun: true, scrivi: scrivi() }), 0);
+  assert.deepEqual(traccia, [], 'a vuoto non si scrive');
+
+  traccia.length = 0;
+  assert.equal(await mod.eseguiGiro({ ...base, dryRun: false, scrivi: scrivi({ ok: false, status: 403 }) }), 3);
 });
 
 test('lavori locali passati: il ramo fuso dalla strada locale e una pratica provata dell’owner o di una sessione', () => {
@@ -346,15 +223,13 @@ test('lavori locali passati: il ramo fuso dalla strada locale e una pratica prov
   const docs = [
     doc('fatto', 'local:claude', 'done', T('09-01T00:00:00'), 'admin', { branch: 'claude/dashboard-viva' }),
     doc('owner', 'owner:me', 'archived', T('09-01T00:00:00'), 'admin', { branch: 'claude/lavori-locali' }),
-    doc('appena-provato', 'local:claude', 'done', T('09-01T00:00:00'), '', { branch: 'claude/dashboard-viva' }),
     doc('gia-segnato', 'local:claude', 'done', T('09-01T00:00:00'), 'admin', { branch: 'claude/dashboard-viva', localOnly: true }),
     doc('routine', 'routine:worker', 'done', T('09-01T00:00:00'), 'server', { branch: 'claude/dashboard-viva' }),
     doc('ramo-routine', 'local:claude', 'done', T('09-01T00:00:00'), 'admin', { branch: 'worker/abc-123' }),
     doc('senza-prova', 'local:claude', 'done', T('09-01T00:00:00'), '', { branch: 'claude/dashboard-viva' }),
     doc('attacco', 'local:claude', 'attack_confirmed', T('09-01T00:00:00'), 'admin', { branch: 'claude/dashboard-viva' }),
   ];
-  const promossi = [{ id: 'appena-provato', prova: 'admin' }];
-  assert.deepEqual(mod.lavoriLocaliPassati(docs, rami, promossi).map((d) => d.id), ['fatto', 'owner', 'appena-provato']);
+  assert.deepEqual(mod.lavoriLocaliPassati(docs, rami).map((d) => d.id), ['fatto', 'owner']);
 });
 
 test('il giro segna i lavori locali passati dopo le prove, e a vuoto li elenca soltanto', async () => {
@@ -362,15 +237,15 @@ test('il giro segna i lavori locali passati dopo le prove, e a vuoto li elenca s
   const rami = new Set(['claude/x']);
   const righe = [];
   const traccia = [];
-  const scrivi = { soglie: async () => ({ ok: true }), prova: async () => ({ ok: true }), locale: async (d) => { traccia.push(d.id); return { ok: true }; } };
-  const base = { docs, adesso: Date.now(), coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), inizioProva: DA_SEMPRE, rami, scrivi, err: () => {} };
-  assert.equal(await mod.eseguiGiro({ ...base, salvate: S(1), dryRun: true, log: (r) => righe.push(r) }), 0);
+  const scrivi = { prova: async () => ({ ok: true }), locale: async (d) => { traccia.push(d.id); return { ok: true }; } };
+  const base = { docs, coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), rami, scrivi, err: () => {} };
+  assert.equal(await mod.eseguiGiro({ ...base, dryRun: true, log: (r) => righe.push(r) }), 0);
   assert.ok(righe.some((r) => /Lavori locali passati da segnare.*: 1 \(#544\)/.test(r)), righe.join('\n'));
   assert.deepEqual(traccia, []);
-  assert.equal(await mod.eseguiGiro({ ...base, salvate: S(1), dryRun: false, log: () => {} }), 0);
+  assert.equal(await mod.eseguiGiro({ ...base, dryRun: false, log: () => {} }), 0);
   assert.deepEqual(traccia, ['l']);
   const rifiuto = { ...scrivi, locale: async () => ({ ok: false, status: 403 }) };
-  assert.equal(await mod.eseguiGiro({ ...base, salvate: S(1), dryRun: false, scrivi: rifiuto, log: () => {} }), 3);
+  assert.equal(await mod.eseguiGiro({ ...base, dryRun: false, scrivi: rifiuto, log: () => {} }), 3);
 });
 
 // Giro 3 della verifica locale: la regola del lettore in ogni stato dei Ricevuti, non solo in «Non filtrato».
@@ -380,8 +255,8 @@ test('un giudice che dice attacco in un «allineato» o in un «design» tiene f
   const r = cand([
     doc('al', 'local:claude', 'aligned', nato, '', { pipeline: voto('aligned') }),
     doc('de', 'owner:me', 'design', nato, '', { pipeline: voto('design') }),
-    doc('ok', 'local:claude', 'aligned', nato, '', { pipeline: { verdicts: [{ judge: 'A', class: 'aligned' }] } }),
-  ], S(Date.parse(T('10-01T00:00:00'))));
+    doc('ok', 'routine:residuo', 'aligned', nato, '', { derived: true, pipeline: { verdicts: [{ judge: 'A', class: 'aligned' }] } }),
+  ]);
   assert.deepEqual(r.promossi.map((d) => d.id), ['ok']);
   const s = saltati(r);
   assert.equal(s[`local|${MOTIVO.RICEVUTI_SEGNALATI}`], 1);
@@ -407,14 +282,14 @@ test('lavori locali passati col ramo solo nella conversazione: chiusi, senza ram
     ['aperto', new Set(['claude/rossi-windows'])], ['routine-fix', new Set(['claude/rossi-windows'])],
     ['nominato-non-fuso', new Set(['claude/mai-fuso'])],
   ]);
-  assert.deepEqual(mod.lavoriLocaliPassati(docs, rami, [], note).map((d) => d.id), ['507', '714']);
+  assert.deepEqual(mod.lavoriLocaliPassati(docs, rami, note).map((d) => d.id), ['507', '714']);
 
   const righe = [];
   const chiesti = [];
   const base = {
-    docs, adesso: Date.now(), coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), inizioProva: DA_SEMPRE, rami,
-    salvate: S(1), dryRun: true, err: () => {}, log: (r) => righe.push(r),
-    scrivi: { soglie: async () => ({ ok: true }), prova: async () => ({ ok: true }), locale: async () => ({ ok: true }) },
+    docs, coda: mod.vociDellaCoda([]), derivatiDelPadre: new Map(), rami,
+    dryRun: true, err: () => {}, log: (r) => righe.push(r),
+    scrivi: { prova: async () => ({ ok: true }), locale: async () => ({ ok: true }) },
     leggiNote: async (ids) => { chiesti.push(...ids); return note; },
   };
   assert.equal(await mod.eseguiGiro(base), 0);

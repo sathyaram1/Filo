@@ -1,11 +1,6 @@
-// Feedback #155: la schermata home non deve più rigenerarsi (lenta, con l'LLM)
-// a ogni apertura di scheda. La nuova scheda serve la cache all'istante e il
-// ricalcolo avviene in background; quando è pronto, la home si aggiorna DA SOLA
-// via il broadcast FILO_DASHBOARD_UPDATED.
-//
-// Questo test ASSERISCE il cablaggio lato client: quando arriva quel broadcast
-// (esattamente come lo emette il ricalcolo in background nel main), il messaggio
-// centrale e i suggerimenti della home si aggiornano senza ricaricare nulla.
+// Feedback #155, poi #869: la home non chiama il modello aprendosi. I suggerimenti si rifanno quando Filo scrive per
+// primo (o con «Aggiorna»), e la home aperta li riceve DA SOLA col broadcast FILO_DASHBOARD_UPDATED, senza ricaricare.
+// Arrivato un modello, la frase che spiegava perché Filo non poteva rispondere se ne va.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -30,12 +25,10 @@ test('la home si aggiorna live al broadcast FILO_DASHBOARD_UPDATED', async ({ ap
   // Tipo messaggio dal catalogo condiviso (niente stringhe magiche nel test).
   const type = await page.evaluate(() => window.SN_MSG.MSG.FILO_DASHBOARD_UPDATED);
 
-  // Il main spinge l'aggiornamento esattamente come fa broadcastToTabs nel
-  // ricalcolo in background (#155).
+  // Il main spinge l'aggiornamento come fa generaPerFiloParla (src/main/services/handlers.js).
   await app.evaluate(({ BrowserWindow }, t) => {
     const msg = {
       type: t,
-      message: 'Messaggio ricalcolato in background',
       suggestions: [{ icon: 'link', text: 'Suggerimento ricalcolato', action: null, importance: 3 }],
     };
     for (const win of BrowserWindow.getAllWindows()) {
@@ -48,9 +41,7 @@ test('la home si aggiorna live al broadcast FILO_DASHBOARD_UPDATED', async ({ ap
     }
   }, type);
 
-  // Il messaggio centrale si è aggiornato (senza ricaricare la pagina)…
-  await expect(page.locator('#homeMessage')).toHaveText('Messaggio ricalcolato in background', { timeout: 8_000 });
-  // …e così i suggerimenti nella colonna.
-  await expect(page.locator('.dash-suggestion'))
+  await expect(page.locator('#homeMessage')).toBeHidden({ timeout: 8_000 });
+  await expect(page.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce'))
     .toContainText('Suggerimento ricalcolato', { timeout: 8_000 });
 });

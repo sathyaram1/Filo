@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -37,6 +38,17 @@ test('#418 gli elenchi diventano <ul>/<ol>', () => {
   assert.match(html, /<ul>[\s\S]*<li>uno<\/li>[\s\S]*<li>due<\/li>[\s\S]*<\/ul>/);
   const ol = render('1. primo\n2. secondo');
   assert.match(ol, /<ol>[\s\S]*<li>primo<\/li>[\s\S]*<li>secondo<\/li>[\s\S]*<\/ol>/);
+});
+
+test('#703 un elenco numerato tiene i numeri scritti: voci staccate da righe vuote, o spezzate da un paragrafo', () => {
+  const staccate = render('1. Dal sito\n\n2. Chiesto\n\n3. Misto');
+  assert.equal((staccate.match(/<ol/g) || []).length, 1);
+  assert.equal((staccate.match(/<li>/g) || []).length, 3);
+  const spezzato = render('1. primo\n2. secondo\n\nUn paragrafo.\n\n3. terzo');
+  assert.match(spezzato, /<ol start="3">\s*<li>terzo<\/li>/);
+  // Una riga vuota prima di un elenco d'altro tipo o di un paragrafo lo chiude ancora.
+  assert.match(render('1. uno\n\n- pallino'), /<\/ol>\s*<ul>/);
+  assert.match(render('- a\n\n- b\n\nfine'), /<ul>\s*<li>a<\/li>\s*<li>b<\/li>\s*<\/ul>\s*<p>fine<\/p>/);
 });
 
 // ─── link: un link scritto da Filo deve diventare cliccabile ─────────────────
@@ -130,10 +142,9 @@ test('#853 in coda a un URL nudo si stacca solo l\'elenco chiuso: ogni altro car
 test('#853 una coda lunghissima dopo un URL nudo non blocca il disegno', () => {
   for (const coda of [')', '.', '*', '.)', "'"]) {
     const testo = 'Vedi https://example.com/pagina' + coda.repeat(50_000);
-    const t0 = performance.now();
-    const html = render(testo);
-    const ms = performance.now() - t0;
-    assert.ok(ms < 1000, `coda ${JSON.stringify(coda)}: ${Math.round(ms)} ms`);
+    let html;
+    const c = costoInUnita(() => { html = render(testo); }, { tetto: 10 });
+    assert.ok(c.entro, `coda ${JSON.stringify(coda)}: ${c.come}`);
     assert.match(html, /href="https:\/\/example\.com\/pagina"/);
   }
 });
@@ -172,4 +183,38 @@ test('#418 l\'HTML nel testo del modello viene neutralizzato (no XSS)', () => {
 test('#418 un innocente " T3 " nella prosa non viene mangiato dai segnaposto', () => {
   const html = render('La vitamina T3 e il livello T5 restano interi.');
   assert.match(html, /vitamina T3 e il livello T5/);
+});
+
+// ─── #846 «Copia» nel riquadro di Spiega e Traduci: il testo che si vede, senza marcature ───
+
+const { testo } = globalThis.SN_MARKDOWN;
+
+test('#846 il testo copiato non ha asterischi, cancelletti né parentesi dei link', () => {
+  const t = testo('## Traduzione\n\nIl **gatto** è *sul* tetto, vedi [la voce](https://it.wikipedia.org/wiki/Gatto) e `codice`.');
+  assert.equal(t, 'Traduzione\n\nIl gatto è sul tetto, vedi la voce e codice.');
+  assert.doesNotMatch(t, /[*#`[\]]/);
+});
+
+test('#846 righe, paragrafi ed elenchi restano come si leggono a schermo', () => {
+  assert.equal(testo('prima riga\nseconda riga\n\naltro paragrafo'), 'prima riga\nseconda riga\n\naltro paragrafo');
+  assert.equal(testo('- uno\n* **due**'), '• uno\n• due');
+  // La numerazione è quella che disegna l'elenco: «1. 1. 1.» a schermo si legge 1, 2, 3; uno spezzato riprende.
+  assert.equal(testo('1. a\n1. b\n1. c'), '1. a\n2. b\n3. c');
+  assert.equal(testo('3. tre\n\n4. quattro'), '3. tre\n4. quattro');
+});
+
+test('#846 i segni che a schermo restano (HTML scritto, &, apostrofi, codice) si copiano com\'erano', () => {
+  assert.equal(testo('R&D <b>tag</b> l\'altro "quote" 5 * 3'), 'R&D <b>tag</b> l\'altro "quote" 5 * 3');
+  assert.equal(testo('```\n  x = **y** &amp;\n```'), '  x = **y** &amp;');
+  assert.equal(testo('Leggi https://example.com/a_(b).'), 'Leggi https://example.com/a_(b).');
+  assert.equal(testo('[non sicuro](javascript:alert(1))'), 'non sicuro');
+  assert.equal(testo(''), '');
+  assert.equal(testo(null), '');
+});
+
+test('#846 testo e render leggono gli stessi blocchi: ogni blocco disegnato ha la sua riga copiata', () => {
+  const sorgente = '# T\n\npara\n\n- a\n- b\n\n2. c\n\n```\ncod\n```\nfine';
+  const html = render(sorgente);
+  const blocchiDisegnati = (html.match(/<(p|h\d|ul|ol|pre)[ >]/g) || []).length;
+  assert.equal(testo(sorgente).split('\n\n').length, blocchiDisegnati);
 });

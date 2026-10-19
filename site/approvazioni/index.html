@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="it" data-sn-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Filo — Fusioni da approvare</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="filo/theme.css" />
+<link rel="stylesheet" href="filo/mergeApprovals.css" />
+<link rel="stylesheet" href="approvazioni.css" />
+<script src="tema.js"></script>
+</head>
+<body>
+<main class="ap">
+  <header class="ap-testa">
+    <span class="ap-marchio">filo</span>
+    <h1 class="ap-titolo">Fusioni da approvare</h1>
+    <div class="ap-account" hidden>
+      <span class="ap-email"></span>
+      <button type="button" class="ap-icona ap-aggiorna" title="Aggiorna" aria-label="Aggiorna"></button>
+      <button type="button" class="sn-mac-btn ap-esci" title="Esci da questo account">Esci</button>
+    </div>
+  </header>
+
+  <section class="ap-accesso" hidden>
+    <button type="button" class="sn-mac-btn sn-mac-btn-go ap-accedi">Accedi con Google</button>
+  </section>
+
+  <p class="sn-mac-status ap-stato" role="status" hidden></p>
+  <div class="ap-fusioni" hidden></div>
+  <p class="ap-vuoto" hidden>Niente da approvare.</p>
+  <div class="ap-recenti" hidden></div>
+
+  <noscript><p class="sn-mac-status" data-kind="err">Questa pagina ha bisogno di JavaScript.</p></noscript>
+</main>
+<script src="/__/firebase/10.12.2/firebase-app-compat.js"></script>
+<script src="/__/firebase/10.12.2/firebase-auth-compat.js"></script>
+<script src="filo/icons.js"></script>
+<script src="filo/mergeApprovals.js"></script>
+<script src="approvazioni.js"></script>
+</body>
+</html>

@@ -39,6 +39,19 @@ test('«10,5» non diventa «105»: la virgola si legge come decimale', () => {
   assert.deepEqual(C.leggi('10,5', { intero: false }), { ok: true, valore: 10.5 });
 });
 
+// #854 — il campo numerico fa della virgola un punto: senza questa regola «10,000» (e «10.000» alla italiana)
+// in una manopola di interi si salvava come 10.
+test('dove serve un intero, punto o virgola a gruppi di tre cifre separano le migliaia', () => {
+  const INTERO = { min: 0, intero: true };
+  assert.deepEqual(C.leggi('10.000', INTERO), { ok: true, valore: 10000 });
+  assert.deepEqual(C.leggi('10,000', INTERO), { ok: true, valore: 10000 });
+  assert.deepEqual(C.leggi('1.234.567', INTERO), { ok: true, valore: 1234567 });
+  assert.equal(C.leggi('2.5', INTERO).motivo, C.MOTIVI.NON_INTERO, 'non sono migliaia: è un decimale');
+  assert.equal(C.leggi('0.500', INTERO).motivo, C.MOTIVI.NON_INTERO, 'uno zero davanti è un decimale');
+  assert.equal(C.leggi('-1.000', INTERO).motivo, C.MOTIVI.SOTTO);
+  assert.deepEqual(C.leggi('1.500', { intero: false }), { ok: true, valore: 1.5 }, 'coi decimali ammessi il punto resta un decimale');
+});
+
 test('le frasi di rifiuto dicono cosa fare, col nome della manopola davanti', () => {
   assert.equal(C.frase(C.MOTIVI.VUOTO, CREDITI), 'Crediti al giorno: scrivi un numero.');
   assert.equal(C.frase(C.MOTIVI.NON_NUMERO, CREDITI), 'Crediti al giorno: ci vuole un numero.');

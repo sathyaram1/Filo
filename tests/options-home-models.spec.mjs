@@ -23,7 +23,9 @@ async function chainInput(page, labelText) {
 
 test('Opzioni: i modelli della Home (dashboard e chat) sono impostabili e persistono', async ({ openTab }) => {
   const page = await openTab(OPTIONS_URL);
-  await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
+  // La casella c'è già nell'HTML: la griglia invece la disegna il caricamento, che poi rimette la casella com'era
+  // salvata. Toccarla prima annullava il gesto della prova.
+  await page.waitForSelector('#modelsGrid .sn-chain-input', { state: 'attached', timeout: 8_000 });
 
   // Rivela la config avanzata (registry + modelli per azione).
   await page.uncheck('#useDefaultModels');
@@ -35,20 +37,21 @@ test('Opzioni: i modelli della Home (dashboard e chat) sono impostabili e persis
   await expect(dashInput).toBeVisible();
   await expect(chatInput).toBeVisible();
 
-  // Imposta un nickname per ciascuna e salva (il change bubbla fino a #page).
+  // Imposta un nickname per ciascuna e confermalo. Il `change` di ognuna si manda a mano: quello che nasce dal
+  // passaggio del fuoco non arriva se la finestra della suite non ha il fuoco (in Electron Playwright non lo finge).
   await dashInput.fill('miodash');
+  await dashInput.dispatchEvent('change');
   await chatInput.fill('miachat');
   await chatInput.dispatchEvent('change');
-  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 
-  // I valori sono persistiti nei settings sotto le chiavi azione della Home —
-  // le stesse che il main legge per scegliere il modello (modelForAction).
-  // Le celle arrivano pre-popolate con la catena predefinita ('flash, flash-or'):
-  // qui abbiamo sostituito il PRIMO segmento (il modello primario), gli altri
-  // restano come fallback.
-  const models = await page.evaluate(async () => (await window.SN_STORAGE.getSettings()).models);
-  expect(models.filo_dashboard.split(',')[0].trim()).toBe('miodash');
-  expect(models.filo_chat.split(',')[0].trim()).toBe('miachat');
+  // I valori sono persistiti sotto le chiavi azione della Home, quelle che legge modelForAction; è cambiato solo
+  // il PRIMO segmento della catena predefinita, gli altri restano fallback. Si aspetta il valore e non «Salvato»,
+  // che resta acceso 1,5 s anche dal salvataggio della casella e dava il via prima che i due arrivassero.
+  const primari = () => page.evaluate(async () => {
+    const m = (await window.SN_STORAGE.getSettings()).models || {};
+    return [m.filo_dashboard, m.filo_chat].map((v) => String(v || '').split(',')[0].trim());
+  });
+  await expect.poll(primari, { timeout: 8_000 }).toEqual(['miodash', 'miachat']);
 
   // Dopo un reload l'editor rimostra i valori salvati.
   await page.reload();

@@ -30,16 +30,17 @@ pochi angoli (meglio profondità che ampiezza):
 Non limitarti a leggere il codice. Esercita un flusso reale cercando di
 romperlo: scrivi uno spec Playwright che esercita il flusso con input limite e
 **asserisce** il comportamento atteso (non solo "non crasha");
-`ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a npm run test:shoot` per la cattura
-composita della finestra (nel contenitore, da root, senza la sandbox spenta
-Electron non parte: il comando si scrive intero).
+`node scripts/lancia-electron.mjs npm run test:shoot` per la cattura composita
+della finestra (nel contenitore mette davanti `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a -n <base del worker>`:
+da root, senza la sandbox spenta Electron non parte).
 
 ## Regole per un feedback d'audit leggibile e affidabile
 
 1. **Riproducilo da utente, non solo leggendo il codice.** Un sospetto nato
    solo dalla lettura del sorgente NON è un feedback: o lo riproduci, o non lo
-   apri. Se visibile, cattura uno screenshot che mostra l'errore e allegalo con
-   `--image` (max 5), solo se mostra davvero l'errore.
+   apri. Un feedback accodato da qui non porta immagini (il canale non ha un
+   campo per allegarle): quello che lo screenshot mostrerebbe, scrivilo nei
+   passi per riprodurlo.
 2. **Struttura del testo: parte utente, poi parte tecnica.**
    - Primo blocco (non tecnico): cosa si rompe dal punto di vista dell'utente +
      passi esatti per riprodurlo. Niente nomi di file/funzioni.

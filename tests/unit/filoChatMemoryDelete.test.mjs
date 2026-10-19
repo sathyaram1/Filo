@@ -29,8 +29,8 @@ test('PROMPTS.filoChat: espone l\'azione CANCELLA_MEMORIA all\'LLM', () => {
   // delle azioni disponibili: senza questo il modello non può emetterla.
   assert.match(p, /CANCELLA_MEMORIA/);
   assert.match(p, /dimentica tutto di me|azzera quello che sai/i);
-  // E spiega che è il SISTEMA a chiedere "conferma" (livello 3), non l'LLM.
-  assert.match(p, /CANCELLAZIONE MEMORIA[\s\S]*conferma/i);
+  // E spiega che è il SISTEMA a rispondere (#530: Filo non cancella dati in modo definitivo), e dove lo fa l'utente.
+  assert.match(p, /CANCELLAZIONE MEMORIA[^\n]*SISTEMA risponde di no[^\n]*Memoria di Filo/);
 });
 
 test('PROMPTS.filoChat: vieta di confabulare sulla memoria vuota', () => {

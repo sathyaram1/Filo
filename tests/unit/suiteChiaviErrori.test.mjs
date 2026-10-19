@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   fileDellErrore, chiaviSenzaCasi, chiaviDelVerdetto, verdetto, CHIAVE_NON_PARTITA, ultimoTestDelWorker,
 } from '../../scripts/suite-verdict.mjs';
@@ -110,6 +110,6 @@ test('dalla riga di comando: una prova che non si carica scrive la sua chiave, n
     assert.equal(codice, 2, 'una suite che non ha eseguito niente resta un non verde');
     assert.deepEqual(readFileSync(join(dir, 'chiavi.txt'), 'utf8').split(/\r?\n/).filter(Boolean), ['suite:tests/rotto.spec.mjs']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });

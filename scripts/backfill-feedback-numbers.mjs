@@ -19,6 +19,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
+import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { contaDocumenti } from './lib/firestore-conta.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
 import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
@@ -162,11 +163,17 @@ async function listAll(bearer) {
 }
 
 async function patchSeq(id, seq, bearer) {
-  const qs = 'updateMask.fieldPaths=seq&updateMask.fieldPaths=subSeq';
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qs}`, {
+  const qs = 'updateMask.fieldPaths=seq&updateMask.fieldPaths=subSeq&updateMask.fieldPaths=updatedAt';
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qs}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields: { seq: { integerValue: String(seq) }, subSeq: { integerValue: '0' } } }),
+    body: JSON.stringify({
+      fields: {
+        seq: { integerValue: String(seq) },
+        subSeq: { integerValue: '0' },
+        updatedAt: firmaOra(),
+      },
+    }),
   });
   return { ok: res.ok, status: res.status, body: res.ok ? '' : (await res.text()).slice(0, 200) };
 }

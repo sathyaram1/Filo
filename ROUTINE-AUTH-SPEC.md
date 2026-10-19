@@ -361,25 +361,24 @@ Da oggi la fusione è una consegna del canale come le altre:
      non una richiesta che verrebbe approvata e fallirebbe;
   5. fusione di **quello sha**, via API GitHub con l'identità del server.
      Conflitto → `conflict`, niente fusione.
-- **La pre-approvazione per singola pratica** (dal 2026-09-13). L'owner può
-  mettere sulla pratica un segno — «Fondi senza chiedermelo», dal dettaglio in
-  Gestione o con `scripts/owner-feedback.mjs <id> --preapprova`; si toglie con
-  «Chiedimi prima di fondere» / `--chiedi-prima`. È il campo
-  `mergePreapproved { by, at }` sul documento del feedback, scrivibile solo
-  dall'owner (regole Firestore) e valido finché la pratica è aperta. Al passo
-  4, se L5 blocca **e** la pratica porta il segno, il server **non apre la
-  richiesta**: fa gli stessi passi di una fusione approvata (la prova di
-  fusione è già passata; un conflitto esce come `conflict` prima), fonde lo
-  sha esaminato con la sua identità e registra la fusione nella collezione
-  delle approvazioni con `preapproved: true`, chi aveva messo il segno e
-  **l'elenco intero** di ciò che L5 aveva segnalato (gate, file, righe: senza
-  tetto). Il blocco resta comunque nel registro dei rifiuti. Il lavoratore
-  riceve `merged` e chiude la pratica come dopo ogni fusione. L'owner rilegge
-  a posteriori in Gestione → Automazioni, «Fuse senza chiedere»
-  (`ownerMergeApprovals {op:'list'}` → `preapproved`, stessa finestra di
-  `recent`). Vale **solo** per il lavoro delle routine: `npm run finish`
-  locale non guarda il segno e apre la richiesta come sempre. Non esiste una
-  pre-approvazione globale o per mittente.
+- **La fiducia decide L5** (dal #1148, SPEC-DOMANDE.md §1.5; al posto della
+  pre-approvazione per pratica del 2026-09-13). Ogni biglietto nasce pulito o
+  sporco e si sporca quando il server gli consegna qualcosa di non fidato
+  (`channel.fetchWork`, prima della consegna); ogni biglietto che può spingere
+  sul ramo entra nel registro `routine-branches` con la sua fiducia e lo sha
+  (emissione, consegne `fixed`/`status`, riallineamenti del server). Al passo
+  4, se L5 blocca **e** il lavoro è fidato (feedback fidato, registro tutto
+  fidato, nessun buco, la punta è l'ultimo sha registrato), il server **non
+  apre la richiesta**: fonde lo sha esaminato con la sua identità e registra
+  la fusione nella collezione delle approvazioni con `preapproved: true`,
+  `skippedL5: true`, `motivo: 'fiducia'` e **l'elenco intero** di ciò che L5
+  aveva segnalato. Il blocco resta nel registro dei rifiuti. L'owner rilegge a
+  posteriori in Gestione → Log, «Fuse senza chiedere». Lo stesso vale
+  per «Salta il controllo» e per il finish locale (registro scritto da
+  `verify-local start` e `finish` col biglietto della sessione). Lavoro non
+  fidato → richiesta all'owner come prima. `mergePreapproved` non si scrive
+  più: lo legge solo la decisione dei rami nati prima del registro
+  (`fiduciaRamo.decisioneL5Legacy`), finché l'ultimo non si chiude.
 - **`scripts/merge-gate.mjs` è diventato il citofono**: presenta il biglietto
   e riferisce l'esito (exit invariati: 0 fuso, 10 bloccato, 20 conflitto,
   1 errore). Il git locale, l'L5 locale e il verdetto passato via ambiente
@@ -404,15 +403,10 @@ Da oggi la fusione è una consegna del canale come le altre:
   riallinea: il suo ramo vive anche nella cartella dell'owner, e un commit
   messo sul remoto dal server farebbe respingere in silenzio il salvataggio
   automatico di quella cartella.
-- **Il segno di pre-approvazione**, in breve: l'owner può marcare una pratica
-  con «Fondi senza chiedermelo» (dal dettaglio in Gestione, o dallo script
-  locale dei feedback; si toglie con «Chiedimi prima di fondere»). Con il
-  segno, un blocco L5 sul lavoro di quella pratica non apre la richiesta: il
-  server fonde come dopo un'approvazione e registra la fusione fra le
-  approvazioni con `preapproved: true`, chi aveva messo il segno e l'elenco
-  intero dei blocchi (`ownerMergeApprovals {op:'list'}` → `preapproved`).
-  Vale solo per il lavoro delle routine, mai per il finish locale; non esiste
-  una pre-approvazione globale o per mittente.
+- **Il segno del clic** (#515): un'approvazione col clic vale anche per i
+  riallineamenti dello stesso ciclo, limitata ai blocchi già approvati. Dal
+  #1148 il segno vive nello stato del giro (`routine-state/{id}.approvatoIl`,
+  solo server) e si toglie quando la pratica entra o esce dalla chiusura.
 
 ### L'identità del server: una GitHub App (2026-08-20)
 
@@ -466,6 +460,31 @@ muro non era un muro.
   spedisce il ramo, chiede la fusione, traduce l'esito. Esce con zero **solo**
   se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
   senso e viene fermato subito.
+
+### Il sì si dà anche da browser (2026-10-04, #489)
+
+L'unica superficie di approvazione stava dentro l'app: se il lavoro bloccato
+fosse proprio quello che impedisce a Filo di partire, non ci sarebbe stato
+nessun modo di approvarlo. La seconda superficie è una pagina statica,
+`site/approvazioni`, pubblicata su Firebase Hosting del progetto
+(`https://filo-8b9cb.web.app`) e raggiungibile da qualunque browser.
+
+- **Stessa identità, stessi controlli**: accesso Google con l'account del
+  proprietario, poi la stessa `ownerMergeApprovals` dell'app (`list`,
+  `approve`, `discard`). Il server non distingue le due superfici e non
+  concede niente di più: niente scorciatoie da riga di comando.
+- **Le credenziali restano in memoria** (persistenza `none`): chiusa la scheda
+  non resta niente su disco che un programma sul computer possa riusare, e la
+  scelta dell'account si rivede a ogni accesso.
+- **Non si lascia incorniciare** (`frame-ancestors 'none'`, `X-Frame-Options`,
+  e la pagina stessa non si disegna dentro un riquadro): un'altra pagina non
+  può far cliccare «Approva» a chi non la vede.
+- **Le card sono quelle dell'app**: `scripts/build-approvazioni.mjs` copia
+  modulo, icone e tema; una sentinella negli unit pretende le copie allineate e
+  il predeploy rifiuta una copia vecchia.
+- **Si pubblica solo ciò che è fuso**: `npm run regole:pubblica` porta su
+  Firebase regole, indici e la pagina insieme, da `main` allineato a
+  `origin/main`. Il terminale del finish, a ogni blocco, nomina l'indirizzo.
 
 ### Si esamina e si fonde LO STESSO commit (2026-08-21, verifica avversariale)
 
@@ -560,7 +579,13 @@ La regola, uguale per tutti e due:
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
   NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
-  su questa macchina parla di un altro commit. Se la verifica ha dato l'ok su
+  su questa macchina parla di un altro commit. Dal #929 `routineMerge` e
+  `ownerMerge` portano anche `provaUnit`: gli unit girati da chi chiede sul
+  risultato della fusione con origin/main (`scripts/lib/unit-sulla-fusione.mjs`).
+  Il server fonde solo se main è ancora lo sha provato (`main_moved`
+  altrimenti, e chi chiede rifà la prova, al massimo tre volte); rossi solo
+  sulla fusione → riallineamento con l'elenco dei test (`unit_rossi`); senza il
+  campo fonde come prima e lo scrive nel log (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
   un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
   giudica il server (punto sopra). Se su questa macchina non risulta su quale
   commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in
@@ -575,9 +600,10 @@ La regola, uguale per tutti e due:
   tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
   `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
   detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
-  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
-  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
-  copia che il ramo si porta dietro;
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto, come quelli di ogni testo che
+  uno strumento del giro stampa (suo o del server), portano agli **attrezzi del
+  giro** (`absolutizeOutput`), non a `scripts/…`, che riporterebbe alla copia
+  che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
   Il rifiuto e le note del citofono si reggono sullo specchio locale («la
   verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
@@ -701,7 +727,11 @@ verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
 conservando il testo del fail, segna nello stato del giro `secauditVerdict:
 saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
-richiesta aperta, `conflitto`, `ramo assente`). Le regole Firestore ammettono
+richiesta aperta, `conflitto`, `ramo assente`). Un lavoro server non si fonde
+da lì (#1230): la pratica torna in revisione e passa dal cancello del server,
+prima l'app e poi il server (esiti in più: `attesa_server`, `server_al_pc`,
+`rimandato`, `all_owner`); allo stesso modo il sì a un suo blocco L5 la chiude
+solo col server su main. Le regole Firestore ammettono
 `livelli` nei due rami di triage con vincolo di forma (mappa con al più
 `l3`/`l4`, testo cifrato ≤ 20.000).
 

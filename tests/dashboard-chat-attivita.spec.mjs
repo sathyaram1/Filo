@@ -2,12 +2,12 @@
 // finito» + «con conversazione lunga il box dove scrivo viene tagliato».
 //
 // Sopra ogni risposta della chat della home c'è il blocco di attività della
-// domanda: UNO per messaggio dell'utente, chiuso di default. La riga in testa
-// dice cosa succede adesso (rotella e «Aspetto la risposta…», poi «Sta
-// ragionando · …ultima frase», poi l'azione in corso) e a lavoro finito il
-// riassunto («Ha avviato un timer · 3 s»). Un click apre la cronologia
-// completa: ragionamento (tutto, non le ultime tre righe), azioni come righe
-// con icona, note intermedie dei turni automatici.
+// domanda: UNO per messaggio dell'utente. Mentre lavora corre il filo con la
+// trama del ragionamento e un nodo per ogni giro di azioni (#578, vedi
+// filo-attesa.spec.mjs); a lavoro finito il filo si avvolge nel riassunto
+// («Ha avviato un timer · 3 s»). Un click srotola la cronologia completa:
+// ragionamento (tutto, non le ultime tre righe), azioni come righe con icona
+// dentro il loro nodo, note intermedie dei turni automatici.
 //
 // Ogni test asserisce il successo dal punto di vista dell'utente, e senza il
 // fix sarebbe rosso:
@@ -15,7 +15,7 @@
 //      esisteva niente da cliccare e la prima frase del ragionamento era già
 //      sparita dallo schermo (restavano le ultime 3). Qui la si ritrova dopo.
 //  (B) prima, senza ragionamento del modello scorrevano frasi a caso che
-//      cambiavano ogni 900 ms. Qui la riga d'attesa resta ferma.
+//      cambiavano ogni 900 ms. Qui nessuna scritta: solo il filo.
 //  (C) prima, il campo di scrittura usciva dalla finestra appena cresceva.
 //  (D) prima, un lavoro in due turni lasciava DUE risposte in chat (il
 //      commento a metà e quella vera) e due indicatori. Qui un blocco solo.
@@ -51,7 +51,7 @@ const THOUGHTS = [
   'Infine scelgo la formulazione più chiara e utile.',
 ];
 
-test('A — chiuso mentre ragiona con l’ultima frase in riga; a fine lavoro il riassunto; un click apre tutto', async ({ app, shell }) => {
+test('A — mentre ragiona scorre la trama e un clic la apre; a fine lavoro il riassunto; un click srotola tutto', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -88,61 +88,64 @@ test('A — chiuso mentre ragiona con l’ultima frase in riga; a fine lavoro il
   await page.locator('#input').fill('ciao filo');
   await page.locator('#sendBtn').click();
 
-  // Mentre ragiona: chiuso, e la riga mostra l'ULTIMA frase del ragionamento
-  // vero (non una frase di riempimento).
+  // Mentre ragiona: nessuna scritta di stato, la trama mostra la coda del
+  // ragionamento VERO (non una frase di riempimento).
   const activity = page.locator('.dash-activity');
   const head = activity.locator('.dash-activity-head');
   const label = activity.locator('.dash-activity-label');
   const body = activity.locator('.dash-activity-body');
   await expect(activity).toHaveAttribute('data-phase', 'reason', { timeout: 4_000 });
-  await expect(label).toContainText('Sta ragionando');
-  await expect(body).toBeHidden();
-  // In riga c'è una frase del ragionamento VERO (l'ultima arrivata), non una
-  // frase di riempimento.
-  await expect(label).toHaveText(/Sta ragionando · (Per prima cosa interpreto|Poi confronto|Quindi soppeso|Infine scelgo)/);
+  await expect(activity).not.toContainText('Sta ragionando');
+  const trama = activity.locator('.dash-activity-trama');
+  await expect(trama).toHaveText(/(interpreto la domanda|a disposizione|una per una|chiara e utile)/);
+  await expect(head).toBeHidden();
   await page.screenshot({ path: 'tests/agent/.out/attivita-ragiona.png' });
 
-  // Un click mentre lavora apre la cronologia: c'è TUTTO il ragionamento
-  // arrivato finora, prima frase compresa.
-  await head.click();
-  await expect(body).toBeVisible();
-  await expect(body).toContainText(THOUGHTS[0]);
-  await expect(body).toContainText(THOUGHTS[2]);
+  // Un click sulla trama mentre lavora apre la sezione: c'è TUTTO il
+  // ragionamento arrivato finora, prima frase compresa.
+  await trama.click();
+  const corpo = activity.locator('.dash-activity-seg-body').first();
+  await expect(corpo).toBeVisible();
+  await expect(corpo).toContainText(THOUGHTS[0]);
+  await expect(corpo).toContainText(THOUGHTS[2], { timeout: 4_000 });
   await page.screenshot({ path: 'tests/agent/.out/attivita-ragiona-aperto.png' });
-  await head.click();
-  await expect(body).toBeHidden();
+  await trama.click();
+  await expect(corpo).toBeHidden();
 
-  // Lavoro finito: la riga è il riassunto con la durata; il blocco resta.
+  // Lavoro finito: il filo è avvolto nel riassunto con la durata; il blocco resta.
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la risposta finale.' })).toBeVisible({ timeout: 8_000 });
   await expect(activity).toHaveCount(1);
   await expect(activity).toHaveAttribute('data-phase', 'done');
   await expect(label).toHaveText(/^Ha avviato un timer · \d+ s$/);
   await expect(head).toHaveAttribute('aria-expanded', 'false');
-  await expect(body).toBeHidden();
+  await expect(body).toBeHidden({ timeout: 3_000 });
   // Niente traccia della vecchia UI a 3 righe.
   await expect(page.locator('.dash-thinking')).toHaveCount(0);
   // L'azione non è un bottone spento sotto la risposta.
   await expect(page.locator('.dash-action-btn', { hasText: '⏱' })).toHaveCount(0);
   await page.screenshot({ path: 'tests/agent/.out/attivita-chiuso.png' });
 
-  // Un click riapre la cronologia PER INTERO: le quattro frasi del
-  // ragionamento (la prima, la vecchia UI l'aveva già buttata via) e la riga
-  // dell'azione con icona e due parole.
+  // Un click srotola la cronologia PER INTERO: le quattro frasi del
+  // ragionamento (la prima, la vecchia UI l'aveva già buttata via) e, nel suo
+  // nodo, la riga dell'azione con icona e due parole.
   await head.click();
   await expect(head).toHaveAttribute('aria-expanded', 'true');
   await expect(body).toBeVisible();
   for (const t of THOUGHTS) await expect(body).toContainText(t);
+  const nodo = activity.locator('.dash-activity-seg-head', { hasText: 'Avviato un timer' });
+  await expect(nodo).toBeVisible();
+  await nodo.click();
   const row = body.locator('.dash-activity-row', { hasText: 'Timer avviato' });
   await expect(row).toBeVisible();
   await expect(row).toContainText('Pasta');
   await page.screenshot({ path: 'tests/agent/.out/attivita-aperto.png' });
   await head.click();
-  await expect(body).toBeHidden();
+  await expect(body).toBeHidden({ timeout: 3_000 });
 
   await app.evaluate(() => { try { globalThis.__restoreProvider?.(); } catch (_) {} });
 });
 
-test('B — senza ragionamento del modello: una riga d’attesa ferma, poi nessun residuo', async ({ app, shell }) => {
+test('B — senza ragionamento del modello: nessuna scritta, solo il filo che penzola, poi nessun residuo', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -165,11 +168,11 @@ test('B — senza ragionamento del modello: una riga d’attesa ferma, poi nessu
 
   const activity = page.locator('.dash-activity');
   await expect(activity).toHaveAttribute('data-phase', 'wait', { timeout: 3_000 });
-  const label = activity.locator('.dash-activity-label');
-  await expect(label).toHaveText('Aspetto la risposta…');
-  // La riga NON cambia col tempo: prima le frasi ruotavano ogni 900 ms.
+  // Nessuna scritta, nemmeno col tempo: prima le frasi ruotavano ogni 900 ms.
+  await expect(activity).toHaveText('');
+  await expect(activity.locator('.dash-activity-filo-tratto')).toHaveAttribute('d', /^M/);
   await page.waitForTimeout(1_100);
-  await expect(label).toHaveText('Aspetto la risposta…');
+  await expect(activity).toHaveText('');
   await page.screenshot({ path: 'tests/agent/.out/attivita-attesa.png' });
 
   // Risposta arrivata senza ragionamento né azioni: il blocco non lascia niente.
@@ -282,15 +285,20 @@ test('D — un lavoro in due turni: un blocco solo, il commento a metà finisce 
   await expect(activity).toHaveAttribute('data-phase', 'done');
   await expect(activity.locator('.dash-activity-label')).toHaveText(/^Ha verificato cosa sa fare · \d+ s$/);
 
-  // Dentro, nell'ordine: ragionamento 1, il commento a metà (nota), l'azione,
-  // ragionamento 2.
+  // Dentro, nell'ordine: il nodo del primo giro (ragionamento 1, il commento a
+  // metà come nota, l'azione), poi la coda (ragionamento 2) senza titolo.
   await activity.locator('.dash-activity-head').click();
   const body = activity.locator('.dash-activity-body');
   await expect(body).toBeVisible();
+  const segs = await body.evaluate((el) => Array.from(el.children).map((c) => c.dataset.stato));
+  expect(segs).toEqual(['agisce', 'coda']);
+  await activity.locator('.dash-activity-seg-head', { hasText: 'Verificato cosa so fare' }).click();
   await expect(body.locator('.dash-activity-note', { hasText: 'Controllo cosa so fare.' })).toBeVisible();
   await expect(body.locator('.dash-activity-row', { hasText: 'Verifico cosa so fare' })).toBeVisible();
-  const order = await body.evaluate((el) => Array.from(el.children).map((c) => c.className.split(' ').pop()));
-  expect(order).toEqual(['dash-activity-reasoning', 'dash-activity-note', 'dash-activity-row', 'dash-activity-reasoning']);
+  const order = await body.locator('.dash-activity-seg').first().locator('.dash-activity-seg-body')
+    .evaluate((el) => Array.from(el.children).map((c) => c.className.split(' ').pop()));
+  expect(order).toEqual(['dash-activity-reasoning', 'dash-activity-note', 'dash-activity-esiti']);
+  await expect(body.locator('.dash-activity-seg[data-stato="coda"] .dash-activity-reasoning')).toHaveText(/Ora ho il dettaglio, rispondo\./);
   await page.screenshot({ path: 'tests/agent/.out/attivita-due-turni.png' });
 
   await app.evaluate(() => { try { globalThis.__restoreProvider4?.(); } catch (_) {} });
@@ -338,7 +346,9 @@ test('E — un tentativo fallito lo dice in riga; un’impostazione applicata su
   await expect(ok).toHaveCount(1);
   await expect(ok.locator('.dash-activity-label')).toHaveText(/^Ha cambiato un'impostazione · \d+ s$/);
   await ok.locator('.dash-activity-head').click();
-  await expect(ok.locator('.dash-activity-row', { hasText: 'Impostato · tema = scuro' })).toBeVisible();
+  await ok.locator('.dash-activity-seg-head', { hasText: 'Cambiata un\'impostazione' }).click();
+  // #867 — la riga dice il cambio con le parole della pagina Preferenze, non la chiave col segno di uguale.
+  await expect(ok.locator('.dash-activity-row', { hasText: 'Impostato · tema: come il sistema → scuro' })).toBeVisible();
   await page.screenshot({ path: 'tests/agent/.out/attivita-fallito-e-riprova.png' });
 
   await app.evaluate(() => { try { globalThis.__restoreProvider5?.(); } catch (_) {} });

@@ -39,7 +39,8 @@
 
   const SLASH_COMMANDS = {
     '/home': () => { goHome(); },
-    '/clear': () => { goHome(); },
+    // Il filo è uno (#869): «pulisci» chiude la conversazione in corso, e il messaggio dopo ne comincia un'altra.
+    '/clear': () => { goHome({ nuova: true }); },
     '/clear all': () => { send({ type: MSG.CLOSE_ALL_TABS }); },
     '/kill': () => { send({ type: MSG.QUIT_APP }); },
     '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
@@ -54,7 +55,9 @@
     // Filo in chat, e quella strada non cambia.
     '/feedback': (text, chat) => {
       if (!isOwner) {
-        showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        // #986 — chi cerca le sue segnalazioni ci arriva, non legge solo dove sono.
+        showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu, in Bacheca. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        send({ type: MSG.OPEN_URL, url: 'filo://board/board.html#segnalazioni' });
         return;
       }
       send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
@@ -64,12 +67,15 @@
     '/pulizia': (text, chat) => { runTabCleanup(chat); },
     '/riordina': (text, chat) => { runTabReorder(chat); },
     '/set': (text, chat) => { handleSetCommand(text, chat); },
+    // #664 — l'invito anche dalla chat: col codice (o il link, o la riga del messaggio) lo riscatta, da solo apre Crediti.
+    '/invito': (text, chat) => { handleInviteCommand(text, chat); },
     '/users': (text, chat) => { handleUsersCommand(text, chat); },
     '/gift': (text, chat) => { handleGiftCommand(text, chat); },
     '/help': (text, chat) => {
       if (document.body.dataset.state !== 'thread') goThread();
       const lines = [
-        '/home, /clear — ricarica la dashboard',
+        '/home — torna in fondo al filo',
+        '/clear — chiudi la conversazione in corso: il messaggio dopo ne apre un\'altra',
         '/clear all — chiudi tutte le schede',
         '/kill — chiudi Filo',
         '/newtab — apri una nuova scheda',
@@ -81,6 +87,7 @@
         '/pulisci, /pulizia — riordina e archivia le schede non più utili',
         '/riordina — riordina le schede per colore (nessuna viene chiusa)',
         '/set timer 5:00 — avvia un timer (anche /set timer 8 = 8 minuti)',
+        '/invito CODICE — riscatta un invito (va bene anche il link); da solo apre i Crediti',
         '/help — lista comandi',
         '/google.com — apri un sito',
       ];
@@ -304,6 +311,14 @@
   // `chat` è la targa presa quando l'utente ha dato il comando: una riga che
   // arriva quando quella conversazione qui non c'è più si archivia lì dentro e
   // basta, senza riportare a schermo una chat che l'utente aveva chiuso.
+  async function handleInviteCommand(text, chat) {
+    const resto = String(text || '').trim().replace(/^\/invito/i, '').trim();
+    if (!resto) { send({ type: MSG.OPEN_URL, url: 'filo://credits/credits.html' }); return; }
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_REDEEM, code: resto }); } catch (_) { r = null; }
+    showFiloLine((r && r.message) || 'Non ci sono riuscito: riprova.', chat);
+  }
+
   function showFiloLine(text, chat) {
     try { archiviaRiga(text, 'filo', chat); } catch (_) {}
     if (!inChatAperta(chat)) return;
@@ -313,22 +328,12 @@
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
-  // "/pulisci" (o "/pulizia"): avvia il riordino/archiviazione delle schede non
-  // più utili, con la STESSA conferma del bottone "🧹 Riordina e archivia le
-  // schede" (mai automatico, spec §2.1). Riusa il popup Filo SN_CONFIRM_UI.
+  // "/pulisci" (o "/pulizia"): il riordino delle schede con la stessa regola e lo stesso popup della chat (#530).
   async function runTabCleanup(chat) {
-    const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-      + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-    const ok = window.SN_CONFIRM_UI
-      ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-      : window.confirm(`${text} Procedo?`);
-    if (!ok) return;
     showFiloLine('🧹 Riordino in corso…', chat);
-    const r = await send({ type: MSG.RUN_TAB_TRIAGE });
-    const n = (r && r.archived) || 0;
-    showFiloLine(n > 0
-      ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}.`
-      : '✓ Nessuna scheda da archiviare.', chat);
+    const e = await global.SN_DASH_ATTIVITA.riordinaSchede();
+    if (e.annullato) { showFiloLine('Riordino annullato.', chat); return; }
+    showFiloLine(e.ok ? `✓ ${e.testo}.` : `✗ ${e.testo}: ${e.motivo}`, chat);
   }
 
   // "/riordina": riordina la striscia delle schede per colore, esattamente come
@@ -415,11 +420,17 @@
       || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
   }
 
-  // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
-  // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
+  // Cache "il comando shell esiste?" (shell + token → bool), per non rifare lo
+  // spawn di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
   // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
+  // Tiene solo risposte certe: un controllo scaduto (macchina carica) resta senza
+  // colore e si ritenta passati RIPROVA_INCERTO_MS, alla prossima battitura (#1176).
   const shellCmdCache = new Map();
+  const shellCmdIncerti = new Map(); // chiave → quando non ha saputo rispondere
+  const shellCmdInVolo = new Set();
+  const RIPROVA_INCERTO_MS = 20000;
   let whichTimer = null;
+  const chiaveShell = (cmd) => `${getShell() || ''}\u0000${cmd}`;
 
   // Cache "il dominio /sito.tld esiste?" (host → bool). Evita di rifare il
   // lookup DNS a ogni tasto; popolata sia dalla verifica live sia da quella
@@ -432,6 +443,7 @@
   //   'shell'   → comando shell esistente (modalità terminale) → azzurro
   //   'unknown' → inizia con "/" ma non è un comando riconosciuto → rosso
   //   'pending' → modalità terminale, esistenza del comando ancora da verificare
+  //   'incerto' → modalità terminale, il controllo non ha saputo rispondere → neutro
   //   'none'    → testo normale (va all'LLM)
   function classifyInput(value) {
     const t = value.trim();
@@ -447,9 +459,11 @@
     }
     if (isTerminalMode()) {
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
-      const cmd = firstToken.slice(1);
+      const cmd = programmaDi(t);
       if (!cmd) return 'none';
-      if (shellCmdCache.has(cmd)) return shellCmdCache.get(cmd) ? 'shell' : 'unknown';
+      const chiave = chiaveShell(cmd);
+      if (shellCmdCache.has(chiave)) return shellCmdCache.get(chiave) ? 'shell' : 'unknown';
+      if (Date.now() - (shellCmdIncerti.get(chiave) ?? -Infinity) < RIPROVA_INCERTO_MS) return 'incerto';
       return 'pending'; // verifica in corso (vedi scheduleShellWhich)
     }
     // Modalità normale: un "/comando" che non è interno né un sito non verrà
@@ -471,6 +485,12 @@
     );
   }
 
+  // Il programma di un "/comando": un percorso fra virgolette (#968) è uno solo, anche con gli spazi.
+  function programmaDi(t) {
+    const V = global.SN_VIRGOLETTE;
+    return V ? V.primoComando(t.slice(1)) : (t.split(/\s+/)[0] || '').slice(1);
+  }
+
   // Verifica (con debounce) se il primo token è un comando shell esistente e
   // poi ricolora. Debounce così il controllo parte solo quando l'utente si
   // ferma: digitando di getto "/git" i prefissi non vengono mai controllati e
@@ -478,15 +498,22 @@
   function scheduleShellWhich(value) {
     clearTimeout(whichTimer);
     whichTimer = setTimeout(async () => {
-      const firstToken = value.trim().split(/\s+/)[0];
-      const cmd = firstToken.slice(1);
-      if (!cmd || shellCmdCache.has(cmd)) { updateInputClass(); return; }
-      let exists = false;
+      const cmd = programmaDi(value.trim());
+      if (!cmd) { updateInputClass(); return; }
+      const chiave = chiaveShell(cmd);
+      // Lo stesso comando già in controllo non ne lancia un secondo (sotto carico ogni spawn in più allunga gli
+      // altri): ricolora quello in volo, quando risponde.
+      if (shellCmdInVolo.has(chiave)) return;
+      if (shellCmdCache.has(chiave)) { updateInputClass(); return; }
+      shellCmdInVolo.add(chiave);
+      let exists = null;
       try {
         const r = await window.filo?.shellWhich?.({ command: cmd, shell: getShell(), cwd: getCwd() });
-        exists = !!(r && r.exists);
-      } catch (_) { exists = false; }
-      shellCmdCache.set(cmd, exists);
+        if (r && typeof r.exists === 'boolean') exists = r.exists;
+      } catch (_) { exists = null; }
+      shellCmdInVolo.delete(chiave);
+      if (exists === null) shellCmdIncerti.set(chiave, Date.now());
+      else { shellCmdCache.set(chiave, exists); shellCmdIncerti.delete(chiave); }
       updateInputClass(); // ricolora sullo stato attuale dell'input
     }, 250);
   }
@@ -566,17 +593,17 @@
 
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
-    // 'pending' (terminale, esistenza del comando ancora da verificare) viene
-    // mostrato GIÀ in rosso: aggiungere caratteri a un "/comando" non deve far
-    // lampeggiare il colore tornando a neutro a ogni tasto mentre il controllo
-    // è in corso. Quando il check risolve, il comando diventa azzurro (esiste)
-    // o resta rosso (non esiste), senza flicker intermedi.
-    const showUnknown = kind === 'unknown' || kind === 'pending';
-    inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
-    inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
-    inputEl.classList.toggle('is-cmd-unknown', showUnknown);
-    // In attesa del controllo "esiste?": rosso (vedi sopra) e avvia il check.
-    if (kind === 'pending') scheduleShellWhich(inputEl.value);
+    // 'pending' (controllo "esiste?" in corso) tiene il colore che c'era: aggiungere
+    // caratteri a un "/comando" non fa lampeggiare il rosso a ogni tasto, e un comando
+    // incollato non diventa rosso prima che il controllo dica «non esiste» (#1176).
+    if (kind === 'pending') {
+      inputEl.classList.remove('is-cmd-filo');
+      scheduleShellWhich(inputEl.value);
+    } else {
+      inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
+      inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
+      inputEl.classList.toggle('is-cmd-unknown', kind === 'unknown');
+    }
     // Sito (arancione) non ancora verificato: avvia il lookup DNS (debounce)
     // così, se il dominio non esiste, l'input diventa rosso.
     const t = inputEl.value.trim();

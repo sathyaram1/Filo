@@ -58,15 +58,17 @@ export function estraiOpzioneFeedback(argv) {
 
 /**
  * Cosa manca alla pratica perché la fusione dell'app salti L5, detto prima del lavoro. PURA.
- * Guarda i soli campi in chiaro: il mittente (cifrato) e lo stato fine li rilegge il server.
+ * Guarda i soli campi in chiaro; il registro del ramo (sessioni col biglietto pulito, #1148) lo rilegge il server.
  */
 export function avvisoDaCampi(fields, ora = Date.now()) {
   const f = fields || {};
   const mancano = [];
-  // Il sì dell'owner come lavoro locale (#913) vale quanto la prova: il server lo legge allo stesso modo.
-  if (f.senderProof?.stringValue !== 'admin' && !f.localApproval?.mapValue) {
-    mancano.push('la prova del mittente (senderProof admin) o l’approvazione dell’owner come lavoro locale');
-  }
+  if (!f.fiducia || f.fiducia.nullValue !== undefined) {
+    // Campo che la migrazione non ha ancora scritto: vale la regola di prima, come per il server (decisione dell'owner, 11/10).
+    if (f.senderProof?.stringValue !== 'admin' && !f.localApproval?.mapValue) {
+      mancano.push('la prova del mittente (senderProof admin) o l’approvazione dell’owner come lavoro locale');
+    }
+  } else if (f.fiducia.stringValue !== 'fidato') mancano.push('la fiducia (la dà l’owner, in Gestione, con «Segna fidato»)');
   if (!f.localOnly?.mapValue) mancano.push('il segno «solo in locale»');
   let tardiva = '';
   if (f.statusPublic?.stringValue === 'closed') {

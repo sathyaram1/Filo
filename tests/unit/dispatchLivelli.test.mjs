@@ -13,6 +13,7 @@
 // Senza il fix tutti questi assert sono rossi: le opzioni non esistevano, e
 // `--record-secaudit` con un argomento in più usciva con «argomento non capito».
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFile } from 'node:child_process';
@@ -20,7 +21,7 @@ import { createServer } from 'node:http';
 import { rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const TMP = cartellaTemporanea('filo-livelli-');
 process.env.FILO_DISPATCH_STATE_DIR = TMP;
@@ -31,39 +32,40 @@ const {
   applySecaudit,
   defaultState,
   secauditPassato,
-  stripFileArg,
+  leggiOpzioniRegistrazione,
   leggiTestoLivello,
   fixedPayload,
   secauditPayload,
   secauditSenzaNota,
   usageText,
-  MAX_LIVELLO_CHARS,
+  MAX_LIVELLO_BYTES,
 } = await import('../../scripts/dispatch.mjs');
 
 // ─── Parsing delle opzioni ────────────────────────────────────────────────────
 
-test('stripFileArg: toglie --segnala <file> e lascia il resto com\'è', () => {
-  const r = stripFileArg(['--record-fixed', 'ID1', 'il report', '--segnala', 'seg.md', '--frase', 'ciao'], 'segnala');
+test('leggiOpzioniRegistrazione: toglie --segnala <file> e lascia il resto com\'è', () => {
+  const r = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'il report', '--segnala', 'seg.md', '--frase', 'ciao']);
   assert.equal(r.error, '');
-  assert.equal(r.file, 'seg.md');
-  assert.deepEqual(r.args, ['--record-fixed', 'ID1', 'il report', '--frase', 'ciao']);
+  assert.equal(r.valori['--segnala'], 'seg.md');
+  assert.equal(r.valori['--frase'], 'ciao');
+  assert.deepEqual(r.args, ['--record-fixed', 'ID1', 'il report']);
 });
 
-test('stripFileArg: senza l\'opzione non cambia niente', () => {
-  const r = stripFileArg(['--record-secaudit', 'ID1', 'pass'], 'nota');
+test('leggiOpzioniRegistrazione: senza l\'opzione non cambia niente', () => {
+  const r = leggiOpzioniRegistrazione(['--record-secaudit', 'ID1', 'pass']);
   assert.equal(r.error, '');
-  assert.equal(r.file, '');
+  assert.deepEqual(r.valori, {});
   assert.deepEqual(r.args, ['--record-secaudit', 'ID1', 'pass']);
 });
 
-test('stripFileArg: l\'opzione in fondo senza file, o con un flag al posto del file, è un errore', () => {
-  assert.match(stripFileArg(['--record-fixed', 'ID1', 'rep', '--segnala'], 'segnala').error, /--segnala vuole il percorso/);
-  assert.match(stripFileArg(['--record-fixed', 'ID1', 'rep', '--segnala', '--frase', 'x'], 'segnala').error, /--segnala vuole il percorso/);
-  assert.match(stripFileArg(['--record-secaudit', 'ID1', 'pass', '--nota', '-h'], 'nota').error, /--nota vuole il percorso/);
+test('leggiOpzioniRegistrazione: l\'opzione in fondo senza file, o con un flag al posto del file, è un errore', () => {
+  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala']).error, /--segnala vuole il percorso/);
+  assert.match(leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala', '--frase', 'x']).error, /--segnala vuole il percorso/);
+  assert.match(leggiOpzioniRegistrazione(['--record-secaudit', 'ID1', 'pass', '--nota', '-h']).error, /--nota vuole il percorso/);
 });
 
-test('stripFileArg: l\'opzione ripetuta è un errore, non «vince l\'ultima»', () => {
-  const r = stripFileArg(['--record-fixed', 'ID1', 'rep', '--segnala', 'a.md', '--segnala', 'b.md'], 'segnala');
+test('leggiOpzioniRegistrazione: l\'opzione ripetuta è un errore, non «vince l\'ultima»', () => {
+  const r = leggiOpzioniRegistrazione(['--record-fixed', 'ID1', 'rep', '--segnala', 'a.md', '--segnala', 'b.md']);
   assert.match(r.error, /una volta sola/);
 });
 
@@ -96,15 +98,27 @@ test('leggiTestoLivello: file vuoto (o soli spazi) = errore, non una segnalazion
 
 test('leggiTestoLivello: oltre il tetto del server si rifiuta col numero, mai un taglio', () => {
   const f = resolve(TMP, 'lungo.md');
-  writeFileSync(f, 'x'.repeat(MAX_LIVELLO_CHARS + 1), 'utf8');
+  writeFileSync(f, 'x'.repeat(MAX_LIVELLO_BYTES + 1), 'utf8');
   const r = leggiTestoLivello(f, 'segnala');
   assert.equal(r.ok, false);
-  assert.match(r.message, new RegExp(`${MAX_LIVELLO_CHARS + 1} caratteri`));
-  assert.match(r.message, new RegExp(`massimo è ${MAX_LIVELLO_CHARS}`));
+  assert.match(r.message, new RegExp(`${MAX_LIVELLO_BYTES + 1} byte`));
+  assert.match(r.message, new RegExp(`massimo è ${MAX_LIVELLO_BYTES}`));
   // Al limite esatto passa: il tetto è lo stesso del server (12.000).
-  writeFileSync(f, 'x'.repeat(MAX_LIVELLO_CHARS), 'utf8');
+  writeFileSync(f, 'x'.repeat(MAX_LIVELLO_BYTES), 'utf8');
   assert.equal(leggiTestoLivello(f, 'segnala').ok, true);
-  assert.equal(MAX_LIVELLO_CHARS, 12000);
+  assert.equal(MAX_LIVELLO_BYTES, 12000);
+});
+
+test('leggiTestoLivello: il tetto conta i byte, così una segnalazione in cirillico non sfora il campo cifrato', () => {
+  // 7.000 lettere cirilliche sono 14.000 byte: a caratteri passavano, e cifrate
+  // superavano i 20.000 che le regole ammettono per il testo di un livello.
+  const f = resolve(TMP, 'cirillico.md');
+  writeFileSync(f, 'я'.repeat(7000), 'utf8');
+  const r = leggiTestoLivello(f, 'nota');
+  assert.equal(r.ok, false);
+  assert.match(r.message, /14000 byte/);
+  writeFileSync(f, 'я'.repeat(MAX_LIVELLO_BYTES / 2), 'utf8');
+  assert.equal(leggiTestoLivello(f, 'nota').ok, true);
 });
 
 // ─── Forma del payload ────────────────────────────────────────────────────────
@@ -242,8 +256,8 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
     assert.equal(segVer.status, 1);
     assert.match(String(segVer.stderr), /seg-manca\.md non esiste/);
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(sandbox);
+    togliCartella(fuori);
   }
 });
 
@@ -317,11 +331,11 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
     assert.equal(ricevuti.length, prima, 'niente deve partire');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
 test('cleanup', () => {
-  rmSync(TMP, { recursive: true, force: true });
+  togliCartella(TMP);
   assert.ok(!existsSync(TMP));
 });

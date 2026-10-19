@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { apriCronologia, statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback: poter scorrere fra tutto ciò che è stato incollato e, in basso, una
 // barra "Cerca…" (grigia) per cercare fra le cose incollate.
@@ -53,7 +54,7 @@ test('paste history submenu is scrollable and has a working search bar', async (
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);

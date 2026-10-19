@@ -237,7 +237,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~410 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~560 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```
@@ -249,7 +249,7 @@ npm run test:shoot         # cattura visiva della finestra reale
   in `patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md`.
 - **I rossi d'ambiente noti** stanno in `tests/rossi-noti.json`: un rosso che
   non è lì dentro è una regressione.
-- **Nel contenitore delle routine** gli spec che aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a` (`finish:check` li mette da sé, `scripts/lib/schermo-virtuale.mjs`); senza, il rosso non è del codice.
+- **Nel contenitore delle routine** (Linux senza schermo) `npx playwright test` si accende da solo uno schermo virtuale con la sandbox spenta, o si ferma subito dicendo cosa manca (`scripts/lib/schermo-virtuale.mjs`, dal globalSetup); i comandi che aprono Electron fuori da Playwright (`test:shoot`, `test:smoke`) si lanciano con `node scripts/lancia-electron.mjs <comando>`.
 - Modelli per `test:explore`: open via OpenRouter, chiave in
   `tests/agent/.env`, MAI chiavi del produttore dei pesi (politica modelli).
 
@@ -266,6 +266,9 @@ src/shared/     moduli IIFE su globalThis (constants, messages, feedback, …)
 src/content/    content scripts
 ```
 
+- **Dove sta una cosa**: `node scripts/mappa-moduli.mjs <cartella>` (per esempio
+  `src/main/services`) dà percorso, KB e prima frase dell'intestazione di ogni
+  .js; passagli una cartella: senza dà una riga per cartella, `--tutto` tutto.
 - Storage: `storage.json` nella cartella dati dell'app (`app.getPath('userData')`),
   `$FILO_USER_DATA` nei test.
 - **Convenzione IIFE**: i moduli condivisi si auto-registrano su `globalThis`
@@ -277,5 +280,5 @@ src/content/    content scripts
   seconda del contesto (main / pagine filo:// / pagine web).
 
 Macchina a stati dei feedback: **`FEEDBACK-STATES.md`**; canale autenticato
-delle routine: **`ROUTINE-AUTH-SPEC.md`**; ridisegno in corso:
-**`SPEC-RIDISEGNO-MAX.md`**.
+delle routine: **`ROUTINE-AUTH-SPEC.md`**; decisioni del ridisegno per il piano
+Max, chiuso: **`SPEC-RIDISEGNO-MAX.md`**.

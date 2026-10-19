@@ -18,14 +18,18 @@
 //   e si guarda quale dei due viene eseguito. Senza la copia fissata esce il
 //   vecchio, ed è rosso.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+
+// Il preflight riuscito installa il gancio dell'orchestratore cieco nelle impostazioni utente: mai in quelle vere.
+process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 
 // Un percorso alla unix, su Windows, viene ancorato al disco corrente. L'atteso
 // si costruisce con la stessa normalizzazione dello strumento, o il controllo
@@ -33,7 +37,8 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 const comeScritto = (p) => resolve(p).split('\\').join('/');
 
 import {
-  PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe,
+  PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe, pinWorkerTools, pinnedDirWorker,
+  absolutizeOutput, absolutizePrinted,
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
@@ -64,8 +69,8 @@ test('la copia degli strumenti finisce FUORI dal progetto', () => {
       'dentro il progetto sarebbe di nuovo soggetta al cambio di ramo');
     for (const p of PINNED_PATHS) assert.ok(existsSync(resolve(r.dir, p)), `manca ${p}`);
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa);
   }
 });
 
@@ -79,8 +84,8 @@ test('la copia si ricorda da sola dove sta il progetto', () => {
     const r = pinTools(casa, { dest: dove });
     assert.equal(pinnedRepoRoot(r.dir), resolve(casa));
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa);
   }
 });
 
@@ -89,7 +94,7 @@ test('strumenti non fissati: nessun progetto da ricordare', () => {
   try {
     assert.equal(pinnedRepoRoot(casa), '');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -104,7 +109,7 @@ test('non si fissa sopra la copia che sta girando', () => {
     assert.equal(r.why, 'già fissati');
     assert.equal(r.dir, TOOLS_ROOT);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -123,8 +128,42 @@ test('una copia vecchia non sopravvive alla nuova', () => {
     assert.ok(!existsSync(resolve(r.dir, 'scripts', 'vecchio.mjs')),
       'il residuo del giro prima non deve restare in giro');
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa);
+  }
+});
+
+test('worker in parallelo (#1157): una copia a testa, presa dagli strumenti dell\'orchestratore, col clone come progetto', () => {
+  // Con una sola copia condivisa, ripinnare un worker a giro iniziato toglie gli
+  // strumenti da sotto chi lavora, e tutti scriverebbero nella stessa cartella.
+  const orchestratore = progettoFinto();
+  const cloneA = progettoFinto();
+  const cloneB = progettoFinto();
+  const base = resolve(tmpdir(), `filo-strumenti-prova-worker-${process.pid}`);
+  try {
+    writeFileSync(resolve(orchestratore, 'scripts', 'buono.mjs'), 'o\n', 'utf8');
+    writeFileSync(resolve(cloneA, 'scripts', 'del-ramo.mjs'), 'r\n', 'utf8');
+    const suo = pinTools(orchestratore, { dest: base });
+    assert.equal(suo.ok, true);
+    const a = pinWorkerTools(cloneA, 1, { da: orchestratore, base });
+    const b = pinWorkerTools(cloneB, 2, { da: orchestratore, base });
+    assert.equal(a.ok && b.ok, true, `${a.why} ${b.why}`);
+    assert.equal(a.dir, pinnedDirWorker(1, base));
+    assert.notEqual(a.dir, b.dir);
+    assert.equal(pinnedRepoRoot(a.dir), resolve(cloneA), 'il progetto del worker 1 è il suo clone');
+    assert.equal(pinnedRepoRoot(b.dir), resolve(cloneB));
+    assert.ok(existsSync(resolve(a.dir, 'scripts', 'buono.mjs')), 'gli strumenti vengono dall\'orchestratore');
+    assert.ok(!existsSync(resolve(a.dir, 'scripts', 'del-ramo.mjs')), 'non dal clone, che è già sul ramo');
+
+    // Ripinnare il worker 1 non tocca la copia dell'orchestratore né quella del worker 2.
+    writeFileSync(resolve(b.dir, 'in-uso.txt'), 'x\n', 'utf8');
+    assert.equal(pinWorkerTools(cloneA, 1, { da: orchestratore, base }).ok, true);
+    assert.ok(existsSync(resolve(b.dir, 'in-uso.txt')), 'la copia del worker 2 resta');
+    assert.equal(pinnedRepoRoot(base), resolve(orchestratore), 'e quella dell\'orchestratore pure');
+    assert.throws(() => pinnedDirWorker(0, base), /non valido/);
+    assert.equal(pinWorkerTools(cloneA, 'x', { da: orchestratore, base }).ok, false);
+  } finally {
+    for (const d of [base, `${base}-1`, `${base}-2`, orchestratore, cloneA, cloneB]) togliCartella(d);
   }
 });
 
@@ -209,8 +248,8 @@ test('dalla copia, git continua a parlare col PROGETTO', async () => {
     assert.match(out.so, /segno-del-progetto/,
       `dalla copia non ha ritrovato il progetto: ${out.so.trim()} ${out.se.slice(-200)}`);
   } finally {
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-    rmSync(finto, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(finto);
   }
 });
 
@@ -240,6 +279,96 @@ test('più comandi nella stessa ricetta vengono riscritti tutti', () => {
   const base = comeScritto('/t');
   assert.equal(fuori.split(`node "${base}/scripts/`).length - 1, 3);
   assert.ok(fuori.includes(`node "${base}/scripts/lib/b.mjs"`), fuori);
+});
+
+// ── I testi stampati (#763) ────────────────────────────────────────────────
+
+const REPO_VERO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const flussoFinto = () => {
+  const scritto = [];
+  return { scritto, write: (c) => { scritto.push(c); return true; } };
+};
+
+test('i comandi che gli strumenti stampano, quelli del server compresi, portano agli strumenti fissati', async () => {
+  // Le porte di #763: il pass senza nota, la pulizia delle prove, e le istruzioni del server che dispatch ristampa.
+  const { verifierReplyText, secauditSenzaNota } = await import('../../scripts/dispatch.mjs');
+  const f = flussoFinto();
+  assert.equal(absolutizeOutput('/progetto', { toolsRoot: '/strumenti', streams: [f] }), true);
+  f.write(verifierReplyText({
+    outcome: 'fix',
+    phase2: {
+      findings: [{ level: 2, text: 'rotto' }],
+      derived: [{ level: 0, text: 'raro' }],
+      instructions: 'Consegna con node scripts/dispatch.mjs --record-fixed X "<report>".\nPoi node scripts/routine-channel.mjs release <biglietto> --role fixer',
+    },
+  }, 'X'));
+  f.write(`${secauditSenzaNota('pass', '')}\n`);
+  const tutto = f.scritto.join('');
+  assert.ok(!/node scripts\//.test(tutto), `resta un comando relativo:\n${tutto}`);
+  const base = comeScritto('/strumenti');
+  for (const c of ['dispatch.mjs" --record-pulizia X', 'dispatch.mjs" --record-fixed X', 'routine-channel.mjs" release', 'dispatch.mjs" --record-secaudit <id> pass', 'dispatch.mjs" --record-fixed <id>']) {
+    assert.ok(tutto.includes(`node "${base}/scripts/${c}`), `manca ${c}:\n${tutto}`);
+  }
+});
+
+test('un JSON stampato resta intatto: dentro c\'è testo di altri, e le virgolette lo romperebbero', () => {
+  const busta = `${JSON.stringify({ feedback: 'danno ancora `node scripts/dispatch.mjs …`' }, null, 2)}\n`;
+  assert.equal(absolutizePrinted(busta, '/strumenti', '/progetto'), busta);
+  assert.doesNotThrow(() => JSON.parse(absolutizePrinted(busta, '/strumenti', '/progetto')));
+  // Una parentesi in testa non basta a fare un JSON.
+  assert.ok(absolutizePrinted('[dispatch] rilancia: node scripts/dispatch.mjs --help', '/strumenti', '/progetto')
+    .includes(`node "${comeScritto('/strumenti')}/scripts/dispatch.mjs"`));
+  assert.equal(absolutizePrinted(Buffer.from('node scripts/x.mjs'), '/t', '/p').toString(), 'node scripts/x.mjs');
+});
+
+test('a strumenti NON fissati le stampe restano quelle scritte, e il filtro non si somma', () => {
+  const f = flussoFinto();
+  const scrivi = f.write;
+  assert.equal(absolutizeOutput('/progetto', { toolsRoot: '/progetto', streams: [f] }), false);
+  assert.equal(f.write, scrivi);
+  const g = flussoFinto();
+  absolutizeOutput('/progetto', { toolsRoot: '/strumenti', streams: [g] });
+  const una = g.write;
+  absolutizeOutput('/progetto', { toolsRoot: '/altrove', streams: [g] });
+  assert.equal(g.write, una);
+});
+
+test('ogni strumento che le ricette nominano passa le sue stampe dal filtro', () => {
+  const ruoli = resolve(REPO_VERO, 'routines', 'roles');
+  const nomi = new Set();
+  for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
+    for (const m of readFileSync(resolve(ruoli, f), 'utf8').matchAll(/\bnode\s+scripts\/([A-Za-z0-9._-]+\.mjs)/g)) nomi.add(m[1]);
+  }
+  assert.ok(nomi.has('dispatch.mjs') && nomi.has('routine-channel.mjs') && nomi.has('merge-gate.mjs'), [...nomi].join(', '));
+  for (const n of nomi) {
+    assert.match(readFileSync(resolve(REPO_VERO, 'scripts', n), 'utf8'), /\babsolutizeOutput\(/,
+      `${n} stampa comandi che dalla cartella di lavoro portano agli strumenti del ramo`);
+  }
+});
+
+test('dalla copia, i testi che gli strumenti stampano portano alla copia', () => {
+  const dove = resolve(tmpdir(), `filo-strumenti-stampe-${process.pid}`);
+  const casa = cartellaTemporanea('filo-progetto-stampe-');
+  try {
+    const pin = pinTools(REPO_VERO, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+    const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1', FILO_ROUTINE_TICKET: '' };
+    const casi = [
+      ['dispatch.mjs', ['--record-secaudit', 'X', 'pass'], 'dispatch.mjs" --record-secaudit'],
+      ['merge-gate.mjs', [], 'merge-gate.mjs" <ramo>'],
+      ['routine-channel.mjs', ['deliver', 'b-prova-con-la-forma-vera-di-un-biglietto', 'domanda', '--notes', 'x'], 'domanda.mjs" chiedi'],
+      ['lancia-electron.mjs', [], 'lancia-electron.mjs" <comando>'],
+    ];
+    for (const [strumento, args, atteso] of casi) {
+      const r = spawnSync(process.execPath, [resolve(dove, 'scripts', strumento), ...args], { cwd: casa, env, encoding: 'utf8' });
+      const tutto = `${r.stdout}${r.stderr}`;
+      assert.ok(tutto.includes(`${basename(dove)}/scripts/${atteso}`), `${strumento}: il comando non nomina la copia:\n${tutto.slice(-600)}`);
+      assert.ok(!/node scripts\//.test(tutto), `${strumento}: resta un comando relativo:\n${tutto.slice(-600)}`);
+    }
+  } finally {
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+  }
 });
 
 // ── Il controllo che conta ─────────────────────────────────────────────────
@@ -298,7 +427,7 @@ test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', a
       'le istruzioni devono nominare la copia');
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
   }
 });
 
@@ -376,9 +505,9 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
       `il comando deve nominare gli strumenti fissati: ${out.so.slice(0, 500)}`);
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -439,7 +568,7 @@ test('la copia SA GIRARE da sola: il preflight lanciato da lì non si guasta', a
     assert.ok(!/Cannot find module/i.test(out.se), `alla copia manca un pezzo: ${out.se.slice(-300)}`);
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
   }
 });
 
@@ -463,7 +592,7 @@ test('se la copia non riesce, il giro si FERMA invece di usare gli strumenti del
   const port = srv.address().port;
   // Una destinazione che NON si può creare: un file al posto della cartella.
   const dove = resolve(tmpdir(), `filo-strumenti-bloccata-${process.pid}`);
-  rmSync(dove, { recursive: true, force: true });
+  togliCartella(dove);
   mkdirSync(dirname(dove), { recursive: true });
 
   try {
@@ -553,9 +682,9 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
       'accanto alla copia non lo troverebbe nessuno');
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -661,7 +790,7 @@ async function preflightIn(casa, extra = {}) {
     });
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
   }
 }
 
@@ -675,8 +804,8 @@ test('testa staccata sulla PUNTA della linea principale: si passa', async () => 
     const out = await preflightIn(casa);
     assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    togliCartella(altrove);
   }
 });
 
@@ -697,8 +826,8 @@ test('checkout indietro: si allinea da solo invece di morire', async () => {
     assert.equal(out.code, 0, `doveva allinearsi e proseguire: ${out.se.slice(-300)}`);
     assert.equal(g(['rev-parse', 'HEAD']), punta, 'e il checkout deve essere aggiornato davvero');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -715,8 +844,8 @@ test('ramo di lavoro: si ferma, e dice come si fa apposta', async () => {
     assert.match(out.se, /FILO_PREFLIGHT_ANY_BRANCH/,
       'e nominare la via di fuga: un rifiuto che non dice come si fa apposta è un muro');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -733,8 +862,8 @@ test('cartella sporca: ci si ferma ANCHE se il commit è quello giusto', async (
     assert.equal(out.code, 3, `doveva fermarsi: ${out.so.slice(0, 200)}`);
     assert.match(out.se, /non salvata|non salvato/, 'e dire che la cartella non è pulita');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -752,8 +881,8 @@ test('guardia che non ha potuto guardare: passa, ma lo DICE', async () => {
     assert.match(out.se, /ATTENZIONE/,
       `un controllo saltato non deve somigliare a un controllo passato: ${out.se.slice(-200)}`);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -766,8 +895,8 @@ test('senza remoto la guardia lascia passare', async () => {
     const out = await preflightIn(casa);
     assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -811,8 +940,8 @@ test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () =>
     assert.match(negliStrumenti, /nuova/,
       'gli strumenti del giro devono restare quelli aggiornati: è tutta la differenza');
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });

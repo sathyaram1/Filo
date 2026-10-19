@@ -4,7 +4,7 @@
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare } = ctx;
+  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, sitoDaConfermare } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
   on('_tabs:create', async (msg, sender) => {
@@ -46,12 +46,18 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const tabs = win && win._filoTabs;
     if (!tabs || !sender?.tab?.id) return { ok: true, inVista: true };
-    return { ok: true, inVista: tabs.inVista(sender.tab.id) };
+    // `riserva`: la home pronta per la scheda nuova (#1128), che aspetta di diventarlo.
+    return { ok: true, inVista: tabs.inVista(sender.tab.id), riserva: !!sender.riserva };
   });
+
+  on(MSG.CASELLE_IN_SOSPESO, soloFilo(async (msg, sender) => {
+    if (sender && sender.wc) require('../../tabs/chiusuraConCaselle').segna(sender.wc, Boolean(msg && msg.inSospeso));
+    return { ok: true };
+  }));
 
   on(MSG.TAB_IDENTITY_COLOR, async (msg, sender) => {
     // Colore identità del sito (§1.2) → cachato per dominio dal TabManager e
-    // applicato attenuato alle tab inattive.
+    // mescolato col fondo della barra nelle tab inattive.
     const win = winOf(sender);
     if (win && win._filoTabs && sender?.tab?.id) {
       win._filoTabs.setTabIdentityColor(sender.tab.id, msg.color || null);
@@ -64,7 +70,14 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
-      return { ok: true, archived: (res && res.archived) || 0 };
+      return {
+        ok: true,
+        archived: (res && res.archived) || 0,
+        // Chi ha chiesto il riordino deve poter distinguere «non c'era niente
+        // da archiviare» da «il riordino non è partito».
+        giudizioMancato: !!(res && res.giudizioMancato),
+        giaInCorso: !!(res && res.giaInCorso),
+      };
     }
     return { ok: false, archived: 0 };
   }));
@@ -127,14 +140,50 @@ module.exports = function register(on, ctx) {
     },
   })));
 
+  // Una scheda chiusa eliminata se ne va anche dal filo, o la home la mostrerebbe ancora e la sua ricerca la ritroverebbe (#869).
+  const ancheDalFilo = async (scelta) => {
+    const schede = (await ArchivedTabs.list()).filter(scelta);
+    return async () => { try { await require('../codaFilo').togliSchedeChiuse(schede); } catch (_) {} };
+  };
+
   on(MSG.DELETE_ARCHIVED_TABS, soloFilo(async (msg) => {
-    const r = await ArchivedTabs.removeMany(msg.ids || []);
+    const ids = new Set(Array.isArray(msg.ids) ? msg.ids : []);
+    const poi = await ancheDalFilo((t) => ids.has(t.id));
+    const r = await ArchivedTabs.removeMany([...ids]);
+    await poi();
     return { ok: true, removed: r.removed, remaining: r.remaining };
   }));
 
-  on(MSG.REMOVE_ARCHIVED_TAB, soloFilo(async (msg) => ({ ok: true, tabs: await ArchivedTabs.remove(msg.id) })));
+  // Come GET_ARCHIVED_TABS, l'elenco torna senza vettori: con migliaia di schede sarebbero megabyte a ogni cancellazione.
+  on(MSG.REMOVE_ARCHIVED_TAB, soloFilo(async (msg) => {
+    const poi = await ancheDalFilo((t) => t.id === msg.id);
+    await ArchivedTabs.remove(msg.id);
+    await poi();
+    return { ok: true, tabs: await ArchivedTabs.listMeta() };
+  }));
 
-  on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => ({ ok: true, tabs: await ArchivedTabs.clear() })));
+  on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => {
+    const poi = await ancheDalFilo(() => true);
+    const tabs = await ArchivedTabs.clear();
+    await poi();
+    return { ok: true, tabs };
+  }));
+
+  // Solo le pagine di Filo: a un sito direbbe quali siti hai aperto, salvato o archiviato, e gli farebbe chiedere al main un indirizzo qualunque.
+  on(MSG.ICONA_SITO, soloFilo(async (msg, sender) => {
+    const { BrowserWindow, session } = require('electron');
+    const incognito = !!(sender && sender.isIncognito);
+    const schede = [];
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoTabs && !!w._filoIncognito === incognito) schede.push(...w._filoTabs.tabs);
+    }
+    const voci = async () => [...await globalThis.SN_SAVED_PAGES.list(), ...await ArchivedTabs.list()];
+    const ses = (sender && sender.wc && sender.wc.session) || session.defaultSession;
+    // Un indirizzo che al clic chiede l'OK (#848): né il suggerimento né la sua icona contattano il sito prima dell'OK.
+    const soloCopie = (msg && msg.soloCopie === true) || !!(sitoDaConfermare && sitoDaConfermare(msg && msg.url));
+    const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito, soloCopie });
+    return { ok: true, dato };
+  }));
 
   on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender) => {
     // Riapre la scheda archiviata, ripristinando lo scroll registrato.

@@ -1,19 +1,6 @@
-// Fetch "SSRF-safe" per le richieste che il MAIN process fa verso URL forniti
-// dal renderer (es. anteprima Open Graph di un link). Senza queste guardie, una
-// pagina potrebbe far colpire al processo main servizi locali/interni
-// (127.0.0.1, 169.254.169.254 metadata cloud, host di rete privata) e leggerne
-// parte della risposta.
-//
-// Difese:
-//   - solo schemi http/https;
-//   - blocco di loopback / link-local / reti private / multicast, sia per IP
-//     letterali sia risolvendo il DNS dell'hostname;
-//   - redirect gestiti a mano: OGNI hop viene rivalidato (un redirect verso un
-//     IP privato non sfugge come farebbe con redirect:'follow').
-//
-// Limite residuo noto (accettato per l'alpha): tra la risoluzione DNS e la
-// connessione effettiva resta una finestra di DNS-rebinding (TOCTOU); chiuderla
-// del tutto richiederebbe di pinnare l'IP risolto sulla connessione.
+// GET "SSRF-safe" per le richieste che il main fa verso indirizzi scelti da una pagina: solo http/https, niente
+// loopback, link-local, reti private o multicast, rivalidando ogni redirect. Resta aperta la finestra di DNS-rebinding
+// fra la risoluzione e la connessione (servirebbe pinnare l'IP). Prove: tests/unit/safeFetch.test.mjs.
 
 const dns = require('node:dns').promises;
 const net = require('node:net');
@@ -50,36 +37,57 @@ function isPrivateAddr(ip) {
 }
 
 async function assertPublicHost(hostname) {
-  if (net.isIP(hostname)) {
-    if (isPrivateAddr(hostname)) throw new Error('blocked-private-address');
+  // URL.hostname tiene le quadre di un IPv6: senza toglierle finirebbe al DNS invece che alla classificazione.
+  const nudo = String(hostname || '').replace(/^\[(.*)\]$/, '$1');
+  if (net.isIP(nudo)) {
+    if (isPrivateAddr(nudo)) throw new Error('blocked-private-address');
     return;
   }
-  const h = String(hostname || '').toLowerCase();
+  const h = nudo.toLowerCase();
   if (!h) throw new Error('bad-url');
   if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) {
     throw new Error('blocked-private-address');
   }
-  const records = await dns.lookup(hostname, { all: true });
+  const records = await dns.lookup(h, { all: true });
   if (!records.length) throw new Error('dns-empty');
   for (const r of records) {
     if (isPrivateAddr(r.address)) throw new Error('blocked-private-address');
   }
 }
 
-// GET con validazione anti-SSRF. Ritorna la Response (con body leggibile) come
-// fetch. Lancia su schema non http/https, host privato o troppi redirect.
-async function safeFetch(rawUrl, { signal, maxRedirects = 5, headers } = {}) {
+// GET con validazione anti-SSRF; ritorna la Response come fetch e lancia su schema, host privato o troppi redirect.
+// `redirectAmmesso(partenza, prossimo)` (due URL) può rifiutare un redirect: 'blocked-redirect'.
+// `lanSeGiaDiPartenza`: un host di partenza GIÀ privato (l'utente è su una pagina della sua rete) si legge, ma solo in
+// https e restando sulla sua origine: il certificato lega il nome al servizio, così un nome pubblico che il DNS di un
+// sito ostile punta sul router non passa, e un redirect non porta altrove nella rete di casa.
+async function safeFetch(rawUrl, { signal, maxRedirects = 5, headers, redirectAmmesso, lanSeGiaDiPartenza = false } = {}) {
   let current = String(rawUrl || '');
+  let partenza = null;
+  let origineLan = null;
   for (let i = 0; i <= maxRedirects; i++) {
     let u;
     try { u = new URL(current); } catch (_) { throw new Error('bad-url'); }
     if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('blocked-scheme');
-    await assertPublicHost(u.hostname);
+    if (!partenza) partenza = u;
+    if (origineLan) {
+      if (u.origin !== origineLan) throw new Error('blocked-private-address');
+    } else {
+      try {
+        await assertPublicHost(u.hostname);
+      } catch (e) {
+        const lan = i === 0 && lanSeGiaDiPartenza && u.protocol === 'https:' && e && e.message === 'blocked-private-address';
+        if (!lan) throw e;
+        origineLan = u.origin;
+      }
+    }
     const res = await fetch(current, { method: 'GET', redirect: 'manual', signal, headers });
     const loc = (res.status >= 300 && res.status < 400) ? res.headers.get('location') : null;
     if (loc) {
       try { res.body?.cancel?.(); } catch (_) {}
-      current = new URL(loc, current).href; // risolve redirect relativi; rivalidato al giro dopo
+      let prossimo;
+      try { prossimo = new URL(loc, current); } catch (_) { throw new Error('bad-url'); }
+      if (typeof redirectAmmesso === 'function' && !redirectAmmesso(partenza, prossimo)) throw new Error('blocked-redirect');
+      current = prossimo.href; // rivalidato al giro dopo
       continue;
     }
     return res;
@@ -87,4 +95,33 @@ async function safeFetch(rawUrl, { signal, maxRedirects = 5, headers } = {}) {
   throw new Error('too-many-redirects');
 }
 
-module.exports = { safeFetch, isPrivateAddr, assertPublicHost };
+// Il corpo come testo, fermandosi a `maxByte`: r.text() leggerebbe tutto quello che il sito decide di mandare.
+async function leggiTesto(res, maxByte) {
+  const reader = res && res.body && typeof res.body.getReader === 'function' ? res.body.getReader() : null;
+  if (!reader) return { testo: '', tagliato: false };
+  const dec = new TextDecoder('utf-8', { fatal: false });
+  let testo = '';
+  let letti = 0;
+  let tagliato = false;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const resto = maxByte - letti;
+      if (value.byteLength > resto) {
+        testo += dec.decode(value.subarray(0, resto), { stream: true });
+        tagliato = true;
+        break;
+      }
+      letti += value.byteLength;
+      testo += dec.decode(value, { stream: true });
+    }
+    // Tagliato, un carattere a metà del taglio si lascia cadere invece di diventare un simbolo sostitutivo.
+    if (!tagliato) testo += dec.decode();
+  } finally {
+    Promise.resolve().then(() => reader.cancel()).catch(() => {});
+  }
+  return { testo, tagliato };
+}
+
+module.exports = { safeFetch, leggiTesto, isPrivateAddr, assertPublicHost };

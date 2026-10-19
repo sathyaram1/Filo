@@ -29,7 +29,9 @@
     getPasteContext: () => pasteContext,
     restorePasteContext: () => restorePasteContext(),
     isBlocked: () => isBlocked(),
+    isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
+    spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
   MenuIcons.init({
     isContentFullscreen: () => contentFullscreen,
@@ -184,6 +186,8 @@
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
     self.SN_AVVISI?.imposta(settings.notifications);
+    // I tasti di Spiega e Aiuto scelti dall'utente: il menu li scrive accanto alle voci (#842).
+    Tasti.usaScorciatoieFilo(settings.scorciatoie);
 
     // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
     // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
@@ -197,7 +201,7 @@
 
       // Colore identità del sito (§1.2): calcolato una volta (theme-color →
       // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo applica attenuato alle tab inattive.
+      // e lo mescola col fondo della barra nelle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
       // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
@@ -329,10 +333,13 @@
       if (escInoltrato) return;
       escInoltrato = true;
       try {
-        document.dispatchEvent(new KeyboardEvent('keydown', {
+        const tasto = new KeyboardEvent('keydown', {
           key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
           bubbles: true, cancelable: true, composed: true,
-        }));
+        });
+        // Segnato come nostro: il primo ascolto della pagina lo dà ai riquadri di Filo prima che al sito (#859).
+        try { self.SN_FILO_UI?.nostro?.(tasto); } catch (_) {}
+        document.dispatchEvent(tasto);
       } catch (_) {}
       escInoltrato = false;
     };
@@ -410,6 +417,8 @@
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (isEditable(target) || isEditable(document.activeElement)) return;
+      // Il campo dentro un componente chiuso lo vede solo la regola intera (src/shared/campoTesto.js).
+      if (self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.scriveQui(document) === true) return;
       // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
       // modulo dell'Editor) se lo tiene: vince la scelta esplicita (#545).
       if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
@@ -418,16 +427,10 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) {
-      self.__snFiloSpento = true;
-      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
-      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
-      });
-      return;
-    }
-
-    SpellCheck.init(settings);
+    // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
+    // isBlocked() quando scatta. Il ponte del tasto destro lo legge da qui, prima di dare l'evento al menu.
+    seguiSpento();
+    SpellCheck.init(isBlocked() ? { ...settings, featureFlags: { ...(settings.featureFlags || {}), spellcheck: false } } : settings);
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
@@ -447,16 +450,24 @@
     // click (e.preventDefault()), il menu di Filo si fa da parte.
     if (typeof self.__snSetContextMenuHandler === 'function') {
       self.__snSetContextMenuHandler(onContextMenu);
+      if (typeof self.__snSetMenuDelSitoPrima === 'function') self.__snSetMenuDelSitoPrima(menuDelSitoPrima);
     } else {
       window.addEventListener('contextmenu', (e) => {
-        if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
+        if (e.defaultPrevented || isBlocked()) return; // la pagina interna ha il SUO menu
         onContextMenu(e);
       });
     }
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
     document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
+    // Chi si ferma prima di rilasciare il mouse o il dito non cambia più la selezione: il rilascio, gesto vero, la
+    // prepara (#1070); la pressione lunga del dito seleziona prima del rilascio.
+    for (const tipo of ['mouseup', 'touchend']) {
+      document.addEventListener(tipo, (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
+    }
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      // Spento sul sito tacciono le azioni sulla pagina; lo stato (impostazioni, schermo intero) si segue lo stesso.
+      if (isBlocked() && AZIONI_DA_FUORI.has(msg?.type)) return;
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
@@ -546,6 +557,17 @@
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
   }
 
+  // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+
+  // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
+  // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
+  function seguiSpento() {
+    const spento = isBlocked();
+    if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
+    self.__snFiloSpento = spento;
+  }
+
   function isBlocked() {
     const url = location.href;
     // #405 — dentro un riquadro incorporato "about:blank" e "about:srcdoc" NON
@@ -571,11 +593,14 @@
   // frame principale). Arriva dal main insieme alle impostazioni: da dentro un
   // riquadro di un'altra origine non è leggibile.
   let pageUrl = '';
+  // Finché il main non l'ha detto non si sa: vale incognito, e la selezione non parte da sola verso un modello.
+  let inIncognito = true;
 
   async function fetchSettings() {
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
       if (res && typeof res.pageUrl === 'string') pageUrl = res.pageUrl;
+      if (res && typeof res.incognito === 'boolean') inIncognito = res.incognito;
       return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
     } catch (_) {
       return self.SN_CONST.DEFAULT_SETTINGS;
@@ -606,7 +631,10 @@
   // all'host del componente, e closest()/tagName non vedono più il link,
   // l'immagine o il campo davvero cliccati. composedPath()[0] attraversa lo
   // shadow boundary e restituisce l'elemento reale.
+  // Dentro un riquadro chiuso di Filo (spiegazione, Modifica, feedback) il nodo vero lo sa solo SN_FILO_UI.
   function realTarget(e) {
+    const UI = self.SN_FILO_UI;
+    if (e && UI?.bersaglio) return UI.bersaglio(e);
     return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
   }
 
@@ -648,7 +676,8 @@
       for (const el of hits) {
         if (!el || seen.has(el)) continue;
         seen.add(el);
-        if (el.shadowRoot) collect(el.shadowRoot);
+        const ombra = el.shadowRoot || self.SN_FILO_UI?.ombraDi?.(el);
+        if (ombra) collect(ombra);
         out.push(el);
       }
     };
@@ -659,9 +688,82 @@
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
-  async function onContextMenu(e) {
+  // ------------------------------------------------------------
+  // Il menu che il sito si disegna da sé (#975): «Menu di <sito>» in cima, e la scelta di aprirlo subito.
+  // Chi ascolta e il clic rigiocato stanno in src/preload/menu-del-sito.js; la scelta per sito in menuDelSito.siti.
+  // ------------------------------------------------------------
+  // Il sito è quello del frame cliccato: il menu di un riquadro è del suo sito, non della pagina che lo ospita.
+  function hostQui() {
+    try { return String(location.hostname || '').toLowerCase().replace(/\.+$/, ''); } catch (_) { return ''; }
+  }
+
+  function menuDelSitoPrima() {
+    const h = hostQui();
+    const siti = settings?.menuDelSito?.siti;
+    if (!h || !Array.isArray(siti)) return false;
+    return siti.some((d) => typeof d === 'string' && d && (h === d || h.endsWith(`.${d}`)));
+  }
+
+  // Il nome che il sito dà a sé stesso; senza, il suo indirizzo. Testo della pagina: niente caratteri che girano la riga.
+  const NOME_SITO_MAX = 40;
+  function nomeDelSito() {
+    const meta = (sel) => { try { return document.querySelector(sel)?.getAttribute('content') || ''; } catch (_) { return ''; } };
+    let n = meta('meta[property="og:site_name"]') || meta('meta[name="application-name"]')
+      || meta('meta[name="apple-mobile-web-app-title"]');
+    n = String(n).replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim();
+    if (n.length > NOME_SITO_MAX) n = `${n.slice(0, NOME_SITO_MAX - 1).trimEnd()}…`;
+    return n || hostQui().replace(/^www\./, '');
+  }
+
+  // La voce c'è se sul cammino del clic la pagina ascolta il tasto destro; col menu del sito già al primo posto,
+  // dal menu aperto con Shift c'è sempre: è da lì che si torna a quello di Filo.
+  function statoMenuDelSito(e, opzioni) {
+    const M = self.__snMenuDelSito;
+    if (!M || PAGINA_DI_FILO || !hostQui()) return null;
+    const nodo = realTarget(e);
+    if (!nodo || self.SN_FILO_UI?.inside?.(nodo)) return null;
+    const prima = menuDelSitoPrima();
+    if (!(prima && opzioni && opzioni.conMaiusc) && !M.ascolta(nodo)) return null;
+    return {
+      nodo, prima, nome: nomeDelSito(),
+      x: e.clientX, y: e.clientY, sx: e.screenX, sy: e.screenY,
+      ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey, clic: Date.now(),
+    };
+  }
+
+  function conMenuDelSito(items, sito) {
+    if (!sito) return;
+    items.unshift({
+      type: 'split',
+      label: I18n.t('menu_del_sito').replace('%s', () => sito.nome),
+      onClick: () => apriMenuDelSito(sito),
+      arrowTitle: I18n.t('menu_del_sito_scelta'),
+      subItems: [sito.prima
+        ? { label: I18n.t('menu_del_sito_torna_filo'), onClick: () => impostaMenuDelSito(false) }
+        : { label: I18n.t('menu_del_sito_sempre'), onClick: () => impostaMenuDelSito(true) }],
+    }, { type: 'separator' });
+  }
+
+  // Dopo il clic sulla voce, non dentro: il clic che risale al documento chiuderebbe il menu appena aperto.
+  function apriMenuDelSito(sito) {
+    setTimeout(async () => {
+      let esito = null;
+      try { esito = await self.__snMenuDelSito.apri(sito); } catch (_) { esito = null; }
+      if (esito !== 'menu' || sito.prima) return;
+      try { await chrome.runtime.sendMessage({ type: MSG.MENU_DEL_SITO_SCELTO }); } catch (_) {}
+    }, 0);
+  }
+
+  function impostaMenuDelSito(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.MENU_DEL_SITO_IMPOSTA, attivo, avvisa: true })).catch(() => {}); } catch (_) {}
+  }
+
+  // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
+  async function onContextMenu(e, opzioni) {
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
-    if (e.shiftKey) return;
+    if (e.shiftKey && !(opzioni && opzioni.conMaiusc)) return;
+    // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
+    const sito = statoMenuDelSito(e, opzioni);
 
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
@@ -687,6 +789,9 @@
 
     const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
     if (avviso) { openAvvisoMenu(avviso, e); return; }
+    // Il documento trovato dall'Aiuto (#947.3): le azioni di un file, non quelle della pagina.
+    const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
+    if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
 
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
@@ -698,12 +803,12 @@
         if (editableEl) {
           const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
           if (blueIssue) {
-            await openSpellBlueMenu(editableEl, blueIssue, e);
+            await openSpellBlueMenu(editableEl, blueIssue, e, sito);
             return;
           }
           const wordCtx = SpellCheck.getWordAt(editableEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
-            await openSpellWordMenu(editableEl, wordCtx, e);
+            await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
           }
         }
@@ -719,12 +824,12 @@
         if (inputEl && isTextLikeInput(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
-            await openSpellWordMenu(inputEl, wordCtx, e);
+            await openSpellWordMenu(inputEl, wordCtx, e, sito);
             return;
           }
           // Nessuna parola sotto il cursore (es. click su area vuota): menu
           // normale, che riserva comunque lo slot per il nativo se arriva.
-          await openNormalMenuAt(e);
+          await openNormalMenuAt(e, sito);
           return;
         }
       }
@@ -732,7 +837,7 @@
       console.error('[SN] spellcheck detection fallita, apro menu normale:', err);
     }
 
-    await openNormalMenuAt(e);
+    await openNormalMenuAt(e, sito);
   }
 
   // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
@@ -764,7 +869,7 @@
     return true;
   }
 
-  async function openNormalMenuAt(e) {
+  async function openNormalMenuAt(e, sito = null) {
     // Timestamp del click destro: serve a onNextNativeSuggestion per decidere
     // se il broadcast `_spell:native` arrivato durante l'await sotto è già
     // pertinente a questa apertura del menu (altrimenti lo perdevamo).
@@ -784,7 +889,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -835,6 +940,7 @@
       });
     };
 
+    conMenuDelSito(items, sito);
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
     if (wantCorrection) {
@@ -1422,7 +1528,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
   }
 
@@ -1507,7 +1613,7 @@
   // La logica di prefetch proattivo (al completamento di una parola durante la
   // digitazione e dopo gli scan blu) sta in spellcheck.js — qui ci limitiamo a
   // consumare la cache e a coprire i casi non prefetchati.
-  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent) {
+  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
 
     const cached = SpellCheck.getCachedSuggestion(editableEl, wordCtx.word);
@@ -1517,6 +1623,10 @@
     // il contesto è cambiato. In entrambi i casi potremmo finire per mostrare una
     // correzione che inizialmente non era visibile.
     const refireInBackground = !cached || contextChanged;
+    // La correzione preparata mentre si scriveva, mostrata adesso: è qui che la persona usa il correttore (#969).
+    if (!refireInBackground) {
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action: ACTIONS.SPELLCHECK_WORD, attesaMs: 0 })).catch(() => {}); } catch (_) {}
+    }
 
     let updateCorrection = null;
 
@@ -1572,6 +1682,7 @@
       );
     }
 
+    conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
 
     // Rivela/aggiorna la riga di correzione con `corr` (e relative alternative).
@@ -1632,14 +1743,14 @@
     };
 
     if (refireInBackground) {
-      SpellCheck.requestWordSuggestion(wordCtx).then(applyResponse).catch(() => {});
+      SpellCheck.requestWordSuggestion(wordCtx, { suRichiesta: true }).then(applyResponse).catch(() => {});
     }
   }
 
   // Click destro su un range "blu" (issue contestuale già rilevata): la correzione
   // (o l'esplicazione del problema) è già pronta, niente loading. Click sulla riga
   // = applica; freccetta = box con la spiegazione completa.
-  async function openSpellBlueMenu(editableEl, issue, mouseEvent) {
+  async function openSpellBlueMenu(editableEl, issue, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
 
     // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
@@ -1667,6 +1778,7 @@
       },
       { type: 'separator' },
     );
+    conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
   }
 
@@ -1675,6 +1787,25 @@
       type: 'item',
       label: 'Invia feedback',
       onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()),
+    };
+  }
+
+  // #843 — spegne Filo sul sito della scheda (anche dal menu di un riquadro: «questo sito» è quello che si sta visitando).
+  // Solo dove c'è un sito con un nome: una pagina di Filo, un IP o «localhost» non entrano nell'elenco.
+  function buildSpegniFiloItem() {
+    if (PAGINA_DI_FILO || !self.SN_NOMI_SITO) return null;
+    let host = '';
+    try {
+      const u = new URL(pageUrl || location.href);
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.hostname;
+    } catch (_) { host = ''; }
+    if (!self.SN_NOMI_SITO.daScritto(host)) return null;
+    return {
+      type: 'item',
+      label: I18n.t('menu_spegni_filo'),
+      onClick: () => {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
+      },
     };
   }
 
@@ -1698,7 +1829,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
   }) {
     const items = [];
 
@@ -1707,9 +1838,9 @@
     // src/content/menuIcons.js (SN_MENU_ICONS), caricato prima di questo file.
     items.push(MenuIcons.buildGlobalIconRow(navState));
 
-    // 2. Aiuto — voce sempre presente, etichettata.
-    items.push({ type: 'separator' });
-    items.push(buildHelpItem());
+    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    const sezioneAiuto = [];
+    if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
     // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
     // vocale è in riproduzione, anche senza selezione/contesto, così la
@@ -1717,7 +1848,7 @@
     // è true anche se a leggere è un'ALTRA scheda: lo stop chiede al main di
     // inoltrare l'arresto alla scheda che legge davvero.
     if (TTS.isAnyReading()) {
-      items.push(TTS.buildStopReadingItem());
+      sezioneAiuto.push(TTS.buildStopReadingItem());
     }
 
     // 2c. Mostra originale — solo quando alla traduzione di pagina manca ancora
@@ -1730,7 +1861,7 @@
       && TranslatePage.showsRestore();
     if (TranslatePage && typeof TranslatePage.canContinue === 'function'
         && TranslatePage.canContinue() && !iconIsRestore) {
-      items.push(TranslatePage.buildRestoreOriginalItem());
+      sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
     // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
@@ -1739,12 +1870,19 @@
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
-    if (zoomItem) items.push(zoomItem);
+    if (zoomItem) sezioneAiuto.push(zoomItem);
+    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
-    const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
-    });
+    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
+    const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
+    const contextItems = [
+      ...vociDellaPagina(target),
+      ...buildContextualItems({
+        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
+      }),
+      ...vociRiquadro,
+    ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
       for (const it of contextItems) items.push(it);
@@ -1753,11 +1891,28 @@
     // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
+    const spegni = buildSpegniFiloItem();
+    if (spegni) items.push(spegni);
     // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
     refreshRedteamVisibile();
     if (redteamVisibile) items.push(buildRedteamAttackItem());
 
     return items;
+  }
+
+  // Le voci che una pagina di Filo dà ai suoi elementi (il segno di un cambio sulla bolla, #867): ogni
+  // fornitore in SN_VOCI_PAGINA riceve l'elemento cliccato. Mai sui siti: lì quel nome è della pagina.
+  function vociDellaPagina(target) {
+    if (!PAGINA_DI_FILO || !target) return [];
+    const fornitori = Array.isArray(self.SN_VOCI_PAGINA) ? self.SN_VOCI_PAGINA : [];
+    const out = [];
+    for (const f of fornitori) {
+      try {
+        const voci = typeof f === 'function' ? f(target) : null;
+        if (Array.isArray(voci)) out.push(...voci.filter((v) => v && v.label && typeof v.onClick === 'function'));
+      } catch (_) {}
+    }
+    return out;
   }
 
   // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
@@ -1820,7 +1975,7 @@
     return {
       type: 'item',
       label: I18n.t('menu_help'),
-      shortcut: Tasti.etichetta('Alt+H'),
+      shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
       onClick: () => openSurface('help', () => openHelpSidebar()),
     };
   }
@@ -1848,13 +2003,22 @@
   function buildLinkActionItems(linkEl) {
     // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
-    const out = [
+    const out = [];
+    // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
+      out.push({
+        type: 'item',
+        label: I18n.t('menu_redeem_invite'),
+        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: String(linkEl.href) }).catch(() => {}); },
+      });
+    }
+    out.push(
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(linkEl.href)),
       },
-    ];
+    );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
     // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
     // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
@@ -1890,7 +2054,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
   }) {
     const items = [];
 
@@ -1899,7 +2063,7 @@
       items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem());
+      items.push(TTS.buildDictateItem(target));
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
@@ -2019,7 +2183,7 @@
     if (editable) {
       // Casella input senza selezione: incolla + detta.
       items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem());
+      items.push(TTS.buildDictateItem(target));
       return items;
     }
 
@@ -2095,14 +2259,41 @@
   // ------------------------------------------------------------
   // Sidebar Aiuto (Fase 2)
   // ------------------------------------------------------------
+  // L'interruttore dell'Aiuto (#841): spento, nessuna strada apre il pannello e il tasto dice perché.
+  function aiutoAcceso() {
+    return !(settings && settings.featureFlags && settings.featureFlags.help === false);
+  }
+
   function openHelpSidebar(context) {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
 
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
+  function rispondiEtichetteBarra(ids) {
+    if (IS_SUBFRAME) return;
+    try {
+      const voci = MenuIcons.statoPerBarra?.(ids) || [];
+      if (voci.length) chrome.runtime.sendMessage({ type: MSG.BARRA_ETICHETTE, voci }).catch?.(() => {});
+    } catch (_) {}
+  }
+
   function onRuntimeMessage(msg, sender, sendResponse) {
+    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
+    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
+      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_FUORI) {
+      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
+      rispondiEtichetteBarra(msg.ids);
+      return;
+    }
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
@@ -2145,6 +2336,8 @@
         else if (msg.surface === 'help') openHelpSidebar();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
+      // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
+      if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);
       return;
     }
     if (msg?.type === MSG.SHOW_TOAST) {
@@ -2167,9 +2360,11 @@
     }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
+      seguiSpento();
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
       self.SN_AVVISI?.imposta(settings.notifications);
+      Tasti.usaScorciatoieFilo(settings.scorciatoie);
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.
@@ -2177,10 +2372,14 @@
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
+      // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
+      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
+      // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
+      if (isBlocked()) return;
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }

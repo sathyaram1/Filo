@@ -178,7 +178,7 @@ const geoBlockMethods = {
     try {
       wc.executeJavaScript(
         '(function(){try{return document.title+"\\n"+(((document.body&&document.body.innerText)||"").slice(0,3000));}catch(e){return "";}})()',
-        true,
+        false,
       ).then((txt) => {
         if (typeof txt !== 'string') return;
         const hit = GeoBlock.matchText(txt);

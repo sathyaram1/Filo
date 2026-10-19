@@ -76,6 +76,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
+    // #950 — rimette il nome con cui il file era arrivato (l'«Annulla» dell'avviso «Nome dato»).
+    rimettiNome: (id) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id }),
     // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
@@ -93,7 +95,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   // L'agente "Aiuto" può azionare i comandi rapidi della barra (le icone in
   // alto) chiedendo al main, che inoltra qui: la shell clicca il bottone reale.
   onTriggerButton: (fn) => {
-    const wrapped = (_event, info) => { try { fn(info && info.command); } catch (_) {} };
+    const wrapped = (_event, info) => { try { fn(info && info.command, info && info.anchor); } catch (_) {} };
     ipcRenderer.on('shell:trigger-button', wrapped);
     return () => ipcRenderer.removeListener('shell:trigger-button', wrapped);
   },
@@ -124,6 +126,13 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('avvisi:sopra', wrapped);
       return () => ipcRenderer.removeListener('avvisi:sopra', wrapped);
     },
+  },
+  // #871 — la barra laterale: la shell le passa tema e profilo, e la apre dalla maniglia.
+  barra: {
+    stato: (dati) => ipcRenderer.send('barra:dalla-shell', dati),
+    commuta: () => ipcRenderer.send('barra:commuta'),
+    chiudi: () => ipcRenderer.send('barra:chiudi'),
+    menu: (x, y) => ipcRenderer.send('barra:menu-maniglia', { x, y }),
   },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.
@@ -157,7 +166,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   // Account "Accedi con Google". I token vivono nel main process: qui
   // arriva solo il profilo pubblico { email, name, picture }.
   auth: {
-    status: () => ipcRenderer.invoke('filo:message', { type: 'auth_status' }),
+    status: (opzioni) => ipcRenderer.invoke('filo:message', { type: 'auth_status', ...(opzioni && opzioni.senzaRete ? { senzaRete: true } : {}) }),
     signIn: () => ipcRenderer.invoke('filo:message', { type: 'auth_signin' }),
     signOut: () => ipcRenderer.invoke('filo:message', { type: 'auth_signout' }),
     onChanged: (fn) => {

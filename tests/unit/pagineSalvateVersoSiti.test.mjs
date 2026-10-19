@@ -79,7 +79,7 @@ test('nessun canale delle pagine salvate risponde a un sito con indirizzo, titol
 });
 
 test('un sito non toglie, non sposta e non rinomina le voci salvate', async () => {
-  for (const tipo of [MSG.REMOVE_SAVED_PAGE, MSG.CONSUME_SAVED_PAGE, MSG.DELETE_CATEGORY, MSG.RENAME_CATEGORY, MSG.MOVE_PAGE_CATEGORY, MSG.MERGE_CATEGORIES]) {
+  for (const tipo of [MSG.REMOVE_SAVED_PAGE, MSG.RESTORE_SAVED_PAGE, MSG.CONSUME_SAVED_PAGE, MSG.APRI_PAGINA_SALVATA, MSG.DELETE_CATEGORY, MSG.RENAME_CATEGORY, MSG.MOVE_PAGE_CATEGORY, MSG.MERGE_CATEGORIES]) {
     const { stato, registro } = montaHandler();
     const r = await registro.get(tipo)({ type: tipo, ...richiestaDelSito }, daSitoB, SITO_B);
     assert.deepEqual(r, { ok: false, error: 'forbidden' }, tipo);
@@ -127,7 +127,7 @@ test('lo stato di Filo, che contiene il messaggio della home e le schede aperte,
 test('la chat di Filo, che ha davanti lo stato intero, e memoria, timer e notifiche rispondono solo alle pagine di Filo', () => {
   const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
   const tipi = ['FILO_CHAT', 'FILO_GET_MEMORY', 'FILO_GET_TIMERS', 'FILO_ADD_TIMER', 'FILO_DELETE_TIMER', 'FILO_PAUSE_TIMER',
-    'FILO_RESUME_TIMER', 'FILO_STOP_TIMER_ALARM', 'FILO_GET_NOTIFICATIONS', 'FILO_DISMISS_NOTIFICATION'];
+    'FILO_RESUME_TIMER', 'FILO_STOP_TIMER_ALARM', 'FILO_GET_NOTIFICATIONS', 'FILO_DISMISS_NOTIFICATION', 'FILO_INSTALLA_AGGIORNAMENTO'];
   for (const t of tipi) assert.match(src, new RegExp(`on\\(MSG\\.${t}, soloFilo\\(`), `${t} risponde anche a un sito`);
   assert.match(src, /const soloFilo = \(fn\) => \(msg, sender, origin\) => \(\s*isFilo\(origin\) \? fn\(/);
 });

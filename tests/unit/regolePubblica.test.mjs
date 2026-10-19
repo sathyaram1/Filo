@@ -1,5 +1,5 @@
-// La guardia delle regole: si pubblica solo da main uguale a origin/main coi file delle regole intatti, ed è
-// l'unica strada (firebase.json la richiama a ogni deploy, e nessuno script la scavalca). Puro.
+// La guardia delle regole e della pagina delle approvazioni: si pubblica solo da main uguale a origin/main coi file
+// intatti, ed è l'unica strada (firebase.json la richiama a ogni deploy, e nessuno script la scavalca). Puro.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
 const SHA = 'a'.repeat(40);
 const buono = () => ({
-  ramo: 'main', testa: SHA, origine: SHA, file: ['firestore.rules', 'firestore.indexes.json', 'storage.rules'], progetto: 'filo-8b9cb', toccati: [],
+  ramo: 'main', testa: SHA, origine: SHA, file: ['firestore.rules', 'firestore.indexes.json', 'storage.rules', 'site/approvazioni'], progetto: 'filo-8b9cb', toccati: [],
 });
 
 test('main uguale a origin/main e file intatti: si pubblica', () => {
@@ -28,6 +28,8 @@ test('ogni scostamento rifiuta col suo motivo', () => {
     [{ origine: '' }, /origin\/main non si legge/],
     [{ toccati: ['firestore.rules'] }, /modificati e non fusi: firestore\.rules/],
     [{ file: ['firestore.rules', 'firestore.indexes.json'] }, /firebase\.json.*Storage/],
+    [{ file: ['firestore.rules', 'firestore.indexes.json', 'storage.rules'] }, /firebase\.json.*pagina delle approvazioni/],
+    [{ toccati: ['site/approvazioni/approvazioni.js'] }, /modificati e non fusi: site\/approvazioni\/approvazioni\.js/],
     [{ toccati: ['storage.rules'] }, /modificati e non fusi: storage\.rules/],
     [{ progetto: '' }, /\.firebaserc/],
     [{ errore: 'rete giù' }, /rete giù/],
@@ -42,7 +44,7 @@ test('ogni scostamento rifiuta col suo motivo', () => {
 test('i file e il progetto vengono dalla configurazione vera del repo', () => {
   const fb = JSON.parse(readFileSync(join(ROOT, 'firebase.json'), 'utf8'));
   const rc = JSON.parse(readFileSync(join(ROOT, '.firebaserc'), 'utf8'));
-  assert.deepEqual(mod.fileDaPubblicare(fb), ['firestore.rules', 'firestore.indexes.json', 'storage.rules']);
+  assert.deepEqual(mod.fileDaPubblicare(fb), ['firestore.rules', 'firestore.indexes.json', 'storage.rules', 'site/approvazioni']);
   assert.equal(mod.progettoDi(rc), 'filo-8b9cb');
   assert.deepEqual(mod.fileDaPubblicare({}), []);
 });
@@ -52,19 +54,21 @@ test('lo stato di git: un file in stage o modificato conta, uno pulito no', () =
   assert.deepEqual(mod.fileToccati(''), []);
 });
 
-test('il comando pubblica regole, indici e regole di Storage insieme, sul progetto nominato, col segno della guardia', () => {
+test('il comando pubblica regole, indici, regole di Storage e pagina insieme, sul progetto nominato, col segno della guardia', () => {
   const p = mod.passo({ radice: '/r', progetto: 'filo-8b9cb' });
   assert.equal(p.cmd, 'firebase');
-  assert.deepEqual(p.args, ['deploy', '--only', 'firestore:rules,firestore:indexes,storage', '--project', 'filo-8b9cb']);
+  assert.deepEqual(p.args, ['deploy', '--only', 'firestore:rules,firestore:indexes,storage,hosting', '--project', 'filo-8b9cb']);
   assert.deepEqual(p.env, { [mod.SEGNO_GUARDIA]: '1' });
 });
 
-test('firebase.json richiama la guardia prima di ogni deploy di Firestore e di Storage', () => {
+test('firebase.json richiama la guardia prima di ogni deploy di Firestore, di Storage e della pagina', () => {
   const fb = JSON.parse(readFileSync(join(ROOT, 'firebase.json'), 'utf8'));
   for (const sezione of ['firestore', 'storage']) {
     assert.deepEqual(fb[sezione].predeploy, ['node scripts/regole-pubblica.mjs --controlla'],
       `firebase deploy a mano su ${sezione} pubblicherebbe da qualunque ramo`);
   }
+  assert.equal(fb.hosting.predeploy[0], 'node scripts/regole-pubblica.mjs --controlla',
+    'firebase deploy a mano della pagina delle approvazioni pubblicherebbe da qualunque ramo');
 });
 
 const silenzio = { log: () => {}, err: () => {} };

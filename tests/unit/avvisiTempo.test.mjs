@@ -134,10 +134,10 @@ test('segui(): il puntatore su un avviso ferma la pila, l’uscita la riavvia', 
   const b = o.segui(elemento());
   let scaduti = 0;
   o.avvia(1000, () => { scaduti++; });
-  a.manda('mouseenter');
+  a.manda('mousemove');
   assert.equal(o.fermo(), true);
   // Dal primo al secondo avviso: la pila resta ferma.
-  b.manda('mouseenter');
+  b.manda('mousemove');
   a.manda('mouseleave');
   t.mock.timers.tick(5000);
   assert.equal(scaduti, 0);
@@ -150,19 +150,38 @@ test('segui(): il puntatore su un avviso ferma la pila, l’uscita la riavvia', 
 test('segui(): un gesto fabbricato dalla pagina non tiene fermo niente', () => {
   const o = A.orologio();
   const a = o.segui(elemento());
-  a.manda('mouseenter', false);
+  a.manda('mousemove', false);
   assert.equal(o.fermo(), false);
+});
+
+// #954: comparso sotto il cursore fermo sul tasto appena premuto, l'avviso riceveva mouseenter (vero) e
+// non scadeva più, prendendosi il clic seguente su quel tasto.
+test('segui(): un avviso comparso sotto un puntatore fermo scade alla sua ora; muovendosi sopra si ferma', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const o = A.orologio();
+  const a = o.segui(elemento());
+  let scaduti = 0;
+  o.avvia(1000, () => { scaduti++; });
+  a.manda('mouseover');
+  a.manda('mouseenter');
+  assert.equal(o.fermo(), false);
+  t.mock.timers.tick(1000);
+  assert.equal(scaduti, 1);
+  o.avvia(1000, () => { scaduti++; });
+  a.manda('mousemove');
+  t.mock.timers.tick(5000);
+  assert.equal(scaduti, 1);
 });
 
 test('un avviso che sparisce sotto il cursore non lascia la pila ferma', () => {
   const o = A.orologio();
   const a = o.segui(elemento());
-  a.manda('mouseenter');
+  a.manda('mousemove');
   o.lascia(a);
   assert.equal(o.fermo(), false);
   // Portato via col suo contenitore, senza che nessuno chiami lascia().
   const b = o.segui(elemento());
-  b.manda('mouseenter');
+  b.manda('mousemove');
   b.isConnected = false;
   o.ripulisci();
   assert.equal(o.fermo(), false);

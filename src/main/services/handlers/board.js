@@ -12,6 +12,7 @@
 // quanto il renderer vede di sé via AUTH_STATUS.
 
 const auth = require('../../auth/google-auth');
+const Mittente = require('../feedbackMittente');
 // #583 — queste tre porte non sono del proprietario: valgono per chiunque
 // abbia fatto l'accesso, e su una macchina con una sessione aperta «hai una
 // sessione?» è sempre sì. Senza guardare da dove arriva la richiesta, una
@@ -201,6 +202,8 @@ module.exports = function register(on, ctx) {
         // chiude la porta a duplicati anche se la creazione del feedback qui
         // sotto fallisce a metà.
         await FB.castReopenRequest(id, uid, { idToken });
+        // Dall'owner parte con la sua prova come dal riquadro (#953), mai col ripiego anonimo.
+        const firmato = Mittente.firma(`uid:${uid}`);
         created = await FB.submit({
           // Un id d'invio STABILE per questa coppia (fix, persona): se la
           // risposta si perde per strada ma il documento è nato lo stesso, un
@@ -217,14 +220,21 @@ module.exports = function register(on, ctx) {
           url: '',
           title: '',
           userAgent: '',
-          clientId: `uid:${uid}`,
+          clientId: firmato.clientId,
           parentId: id,
           name: '',
-        });
+        }, firmato.dallOwner ? { idToken, soloAdmin: true } : undefined);
         // #678 — la riapertura è una segnalazione di questa installazione:
         // entra nel registro, e la prossima apertura della home va a vedere
         // subito se c'è una ricompensa da dare (l'attesa si azzera).
         try { await globalThis.SN_FEEDBACK_MINE?.ricordaId?.(created?.id); } catch (_) {}
+        try {
+          await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({
+            id: created?.id, feedbackId: created?.id, testo: text, stato: 'inviata',
+            num: FB.formatNum ? FB.formatNum(created?.seq, 0) : '',
+            titolo: original.name ? `Ancora rotto: ${original.name}` : 'Ancora rotto',
+          });
+        } catch (_) {}
       } catch (e) {
         // Compensazione best-effort: il segnale/feedback non è andato a buon
         // fine dopo aver già scalato — restituiamo i crediti invece di
@@ -247,6 +257,14 @@ module.exports = function register(on, ctx) {
       return esitoFallito(e, id, RIAPERTURA_NON_PARTITA);
     }
   }));
+
+  // #986 — le segnalazioni mandate da qui: le legge e le toglie solo una pagina di Filo.
+  const Mie = () => globalThis.SN_SEGNALAZIONI_MIE;
+  on(MSG.SEGNALAZIONI_MIE_LIST, soloFilo(async () => {
+    const voci = await Mie().elenco();
+    return voci ? { ok: true, voci, precedenti: await Mie().haPrecedenti() } : { ok: true, voci: [], incognito: true };
+  }));
+  on(MSG.SEGNALAZIONI_MIE_TOGLI, soloFilo(async (msg) => ({ ok: true, voci: await Mie().togli(msg?.id) })));
 
   on(MSG.BOARD_CLEAR_VOTE, soloFilo(async (msg) => {
     const id = String(msg?.id || '').trim();

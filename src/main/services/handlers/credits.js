@@ -69,10 +69,17 @@ module.exports = function register(on, ctx) {
   // Avviso "crediti regalati" (#210.4): se il doc dell'utente corrente porta un
   // `giftNotice`, mostra il popup una volta sola e azzera il campo così non si
   // ripresenta. `remote` è il doc appena letto in ensureAccountSync.
+  // La spinta arriva a ogni home aperta: il regalo lo racconta la prima che lo prende (#664), come il benvenuto dell'invito.
+  let regaloDaDire = 0;
+  function annunciaRegalo(amount) {
+    regaloDaDire = amount;
+    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+  }
+  globalThis.SN_CREDITS_MAIN = { annunciaRegalo };
   async function maybeNotifyGift(uid, remote) {
     const amount = remote?.giftNotice && Math.round(Number(remote.giftNotice.amount) || 0);
     if (!amount || amount <= 0) return;
-    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+    annunciaRegalo(amount);
     const idToken = await auth.getIdToken();
     if (!idToken) return;
     const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?updateMask.fieldPaths=giftNotice&key=${FB.rest.API_KEY}`;
@@ -157,6 +164,13 @@ module.exports = function register(on, ctx) {
   });
 
   // ── IPC ─────────────────────────────────────────────────────────────────────
+  on(MSG.GIFT_NOTICE_CLAIM, async (_msg, _sender, origin) => {
+    if (!String(origin || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    const amount = regaloDaDire;
+    regaloDaDire = 0;
+    return { ok: true, amount };
+  });
+
   on(MSG.GET_CREDITS, async () => {
     await ensureAccountSync().catch(() => {});
     return { ok: true, credits: await Credits.getPublic(), signedIn: auth.isSignedIn() };
@@ -354,7 +368,7 @@ module.exports = function register(on, ctx) {
           // così alla prossima apertura non ricompare.
           await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
         }
-        rewards.push({
+        const annuncio = {
           id: fid,
           num: FB.formatNum ? FB.formatNum(f.seq, f.subSeq) : '',
           name: String(f.name || '').slice(0, 200),
@@ -362,7 +376,16 @@ module.exports = function register(on, ctx) {
           // Risolta o chiusa senza modifiche: il riquadro non le racconta uguali.
           status: f.status === 'done' || !f.status ? 'done' : 'closed',
           credits,
-        });
+        };
+        rewards.push(annuncio);
+        // #986 — l'annuncio è anche il momento in cui la copia locale passa a «risolta»: dopo, non torna.
+        try {
+          await globalThis.SN_SEGNALAZIONI_MIE?.chiusa?.(fid, {
+            stato: annuncio.status === 'closed' ? 'chiusa' : 'risolta',
+            creataIl: f.createdAt,
+            num: annuncio.num, titolo: annuncio.name, risposta: annuncio.explanation,
+          });
+        } catch (_) {}
       }
       await MINE.segnaControllo(adesso, { visti: guardati, impara: imparati, scansione });
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);

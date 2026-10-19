@@ -48,13 +48,15 @@ test('l’owner spedisce col token fresco e la coda su disco non lo contiene mai
   const suDisco = await app.evaluate(async () => {
     const fs = process.getBuiltinModule('fs');
     const path = process.getBuiltinModule('path');
-    await new Promise((r) => setTimeout(r, 400)); // il debounce dello storage
+    // Il file si legge a scritture ferme: dopo un tempo fisso, sotto carico, poteva non esserci ancora (#1212).
+    await globalThis.__filoStorage.whenSettled();
     const coda = await globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.FEEDBACK_OUTBOX, []);
     const file = path.join(process.env.FILO_USER_DATA, 'storage.json');
     return { coda: JSON.stringify(coda), file: fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '' };
   });
   expect(suDisco.coda).toContain('spec-owner-1');
   expect(suDisco.coda).not.toContain('tok-owner');
+  expect(suDisco.file).toContain('spec-owner-1');
   expect(suDisco.file).not.toContain('tok-owner');
 
   // Torna la rete: il ritentativo chiede un token nuovo e parte autenticato.
@@ -63,7 +65,8 @@ test('l’owner spedisce col token fresco e la coda su disco non lo contiene mai
   const b = await banco$(app);
   const ultimo = b.inviati[b.inviati.length - 1];
   expect(ultimo.clientId).toBe('owner:abc123');
-  expect(ultimo.opts).toEqual({ idToken: TOKEN });
+  // #912: con la prova o niente, mai il ripiego anonimo.
+  expect(ultimo.opts).toEqual({ idToken: TOKEN, soloAdmin: true });
   expect(b.tokenChiesti).toBeGreaterThanOrEqual(2);
 });
 
@@ -78,4 +81,41 @@ test('chi non è l’owner spedisce anonimo come prima, senza che si chieda un t
   expect(b.inviati[0].clientId).toBe('abc123');
   expect(b.inviati[0].opts).toBeNull();
   expect(b.tokenChiesti).toBe(0);
+});
+
+// #912: senza accesso valido la voce dell'owner non parte da anonima: aspetta, la cornice lo dice, e parte con la prova
+// quando l'owner rientra, dall'accesso vero col solo dialogo di Google finto (#1212: non al giro del backoff).
+test('l’owner senza accesso aspetta invece di partire da utente, e parte con la prova quando l’accesso torna', async ({ app, shell, avvisi }) => {
+  // Si manda da una finestra già aperta, come fa l'owner: con la cornice ancora in caricamento l'avviso aspettava il
+  // giro dopo del backoff, e con la macchina carica non arrivava in tempo (#1212).
+  await shell.waitForLoadState('load');
+  await banco(app, { admin: true });
+  await app.evaluate(() => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const ga = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'))('./auth/google-auth');
+    globalThis.__banco.rete = true;
+    globalThis.__banco.token = '';
+    ga.getIdToken = async () => { globalThis.__banco.tokenChiesti += 1; return globalThis.__banco.token; };
+  });
+  const r = await invia(app, 'spec-owner-attesa');
+  expect(r.ok, JSON.stringify(r)).toBe(true);
+  await expect.poll(async () => (await banco$(app)).tokenChiesti, { timeout: 20_000 }).toBeGreaterThanOrEqual(1);
+  const vista = await avvisi();
+  // La vista degli avvisi nasce, carica e disegna quando la macchina glielo lascia fare: la ferma il tetto del test.
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'aspetta il tuo accesso' }).first()).toBeVisible({ timeout: 0 });
+  expect((await banco$(app)).inviati).toEqual([]);
+
+  const rientro = await app.evaluate(async (_e, t) => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const ga = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'))('./auth/google-auth');
+    ga.signIn = async () => { globalThis.__banco.token = t; return { email: 'owner@example.invalid', name: 'Owner' }; };
+    return globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.AUTH_SIGNIN }, { url: 'filo://newtab/' });
+  }, TOKEN);
+  expect(rientro.ok, JSON.stringify(rientro)).toBe(true);
+  await expect.poll(async () => (await banco$(app)).inviati.length).toBe(1);
+  const b = await banco$(app);
+  expect(b.inviati[0].clientId).toBe('owner:abc123');
+  expect(b.inviati[0].opts).toEqual({ idToken: TOKEN, soloAdmin: true });
 });

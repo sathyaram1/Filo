@@ -172,14 +172,14 @@ test('nella home i controlli sono solo quelli del browser: nessuna porta agli ap
 
   // Assert POSITIVO sull'insieme completo: se tornasse una voce "Appunti"
   // (o qualsiasi altra porta separata) l'elenco non combacerebbe più.
-  // Il Red Team in pausa (#896) non c'è per chi non è owner.
-  await expect(controls).toHaveCount(5);
+  // Il Red Team in pausa (#896) non c'è per chi non è owner; le altre voci stanno nella barra laterale (#871).
+  await expect(controls).toHaveCount(2);
   const items = await controls.evaluateAll((els) => els.map((e) => ({
     command: e.dataset.command,
     label: e.getAttribute('aria-label') || '',
   })));
   expect(items.map((i) => i.command))
-    .toEqual(['home', 'history', 'settings', 'apps', 'account']);
+    .toEqual(['settings', 'account']);
   // (l'etichetta del profilo cambia con lo stato di accesso: qui basta che
   //  nessun controllo si presenti come porta agli appunti)
   expect(items.some((i) => /appunt/i.test(i.label))).toBe(false);

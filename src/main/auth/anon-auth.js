@@ -28,6 +28,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const cfg = require('./config');
+const guasti = require('./guastiAccesso');
+const walletStore = require('./wallet-store');
+const Disco = require('../services/scritturaAtomica');
 
 const IDENTITY_ENDPOINT = process.env.FILO_IDENTITY_ENDPOINT
   || 'https://identitytoolkit.googleapis.com/v1/accounts:signUp';
@@ -39,6 +42,16 @@ let inflight = null;
 // un'altra in silenzio, perché il portafoglio è legato a quella. Chi legge lo
 // stato lo dice all'utente; ricominciare è una scelta sua (resetIdentity).
 let lost = false;
+// Il file c'è ma non si è lasciato leggere né spostare: un'identità nuova scritta sopra perderebbe il portafoglio (#1087).
+let fileIntoccabile = false;
+
+function erroreIdentita(code) {
+  const err = new Error(code === 'identity_lost'
+    ? 'l\'identità di questa installazione è stata annullata sul server'
+    : 'questo computer non riesce a leggere l\'identità salvata di questa installazione');
+  err.code = code;
+  return err;
+}
 
 // Un fetch che non arriva a destinazione è «sei offline», non «fetch failed».
 function humanNetworkError(e) {
@@ -61,10 +74,10 @@ function canEncrypt() {
 }
 
 function persist() {
-  if (!session?.refreshToken || !canEncrypt()) return false;
+  if (!session?.refreshToken || !canEncrypt() || fileIntoccabile) return false;
   try {
     const { safeStorage } = require('electron');
-    fs.writeFileSync(filePath(), safeStorage.encryptString(JSON.stringify({ refreshToken: session.refreshToken, uid: session.uid })), { mode: 0o600 });
+    Disco.scriviSync(filePath(), safeStorage.encryptString(JSON.stringify({ refreshToken: session.refreshToken, uid: session.uid })), { mode: 0o600 });
     return true;
   } catch (e) {
     console.error('[identity] salvataggio fallito:', e?.message || e);
@@ -72,18 +85,42 @@ function persist() {
   }
 }
 
-function load() {
-  if (!canEncrypt()) return null;
-  let raw;
-  try { raw = fs.readFileSync(filePath()); } catch (_) { return null; }
+function decifraDati(raw) {
   try {
     const { safeStorage } = require('electron');
-    return JSON.parse(safeStorage.decryptString(raw));
-  } catch (e) {
-    console.warn('[identity] file illeggibile, lo elimino:', e?.message || e);
-    try { fs.rmSync(filePath(), { force: true }); } catch (_) {}
+    const j = JSON.parse(safeStorage.decryptString(raw));
+    return j && j.refreshToken ? j : null;
+  } catch (_) { return null; }
+}
+
+function decifra(file) {
+  try { return decifraDati(fs.readFileSync(file)); } catch (_) { return null; }
+}
+
+// Un file che non si decifra (portachiavi sbagliato su Linux, DPAPI di un altro profilo su Windows) si
+// mette da parte, non si cancella. Se il portafoglio aspetta proprio quell'identità, all'avvio dopo si
+// riprovano le copie messe da parte: tornata la chiave giusta, tutto riparte da solo.
+function load() {
+  if (!canEncrypt()) return null;
+  const file = filePath();
+  Disco.togliTemporaneiUnaVolta(file);
+  let raw;
+  try { raw = Disco.leggiSync(file); } catch (e) {
+    console.warn('[identity] file non letto, non lo sovrascrivo:', e?.message || e);
+    fileIntoccabile = true;
     return null;
   }
+  if (raw) {
+    const dati = decifraDati(raw);
+    if (dati) return dati;
+    console.warn('[identity] file illeggibile, lo metto da parte');
+    if (!guasti.metteDaParte(file, 'illeggibile-' + guasti.timbro())) fileIntoccabile = true;
+    return null;
+  }
+  if (!walletStore.suDisco()) return null;
+  const dati = guasti.riprendiDaParte(file, 'illeggibile-', decifra);
+  if (dati) console.info('[identity] identità messa da parte di nuovo leggibile: ripresa');
+  return dati;
 }
 
 function decodeJwtPayload(tok) {
@@ -141,16 +178,13 @@ async function refresh() {
     });
   } catch (e) { throw humanNetworkError(e); }
   if (!res.ok) {
-    // Token revocato (account cancellato dalla console): l'identità è persa.
-    // Non se ne crea un'altra qui: il portafoglio è legato a questa, e
-    // l'utente deve saperlo prima di ricominciare da zero.
-    if (res.status === 400) {
-      lost = true;
-      const err = new Error('l\'identità di questa installazione è stata annullata sul server');
-      err.code = 'identity_lost';
-      throw err;
-    }
-    throw new Error(`rinnovo identità fallito (${res.status})`);
+    // Persa solo se il servizio dice che il token non vale più (account cancellato o disattivato):
+    // una chiave API ruotata, un 503 o un proxy non toccano né l'identità né il file.
+    // Anche persa, non se ne crea un'altra qui: il portafoglio è legato a questa.
+    const testo = await res.text().catch(() => '');
+    if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
+    lost = true;
+    throw erroreIdentita('identity_lost');
   }
   const j = await res.json();
   session.idToken = j.id_token;
@@ -165,12 +199,12 @@ async function refresh() {
 // dieci account.
 async function getIdToken() {
   if (session?.idToken && Date.now() < session.idTokenExp) return session.idToken;
-  if (lost) {
-    const err = new Error('l\'identità di questa installazione è stata annullata sul server');
-    err.code = 'identity_lost';
-    throw err;
-  }
+  if (lost) throw erroreIdentita('identity_lost');
   if (inflight) return inflight;
+  // Il portachiavi può sbloccarsi dopo l'avvio: prima di arrendersi si rilegge il disco. Fuori dalla
+  // corsa in volo: un errore sincrono lì dentro lascerebbe `inflight` fermo su un rifiuto per sempre.
+  if (!session?.refreshToken && walletStore.suDisco()) restore();
+  if (isUnreadable()) throw erroreIdentita('identity_unreadable');
   inflight = (async () => {
     try {
       if (session?.refreshToken) return await refresh();
@@ -183,15 +217,18 @@ async function getIdToken() {
 
 function isLost() { return lost; }
 
+// Un portafoglio su disco senza l'identità che lo regge: crearne una nuova lo staccherebbe per sempre.
+function isUnreadable() { return !session?.refreshToken && walletStore.suDisco(); }
+
 // Solo per i test: butta via il token in memoria, così la prossima richiesta
 // deve rinnovarlo (è il caso «riapri Filo senza rete»).
 function _expireToken() { if (session) { session.idToken = null; session.idTokenExp = 0; } }
 
-// Ricomincia da zero: scelta esplicita dell'utente dopo che l'identità è stata
-// annullata. La prossima richiesta crea un'identità nuova.
+// Ricomincia da zero: scelta confermata dall'utente dopo che l'identità è persa o illeggibile.
+// Il file resta accanto; la prossima richiesta crea un'identità nuova.
 function resetIdentity() {
-  session = null; lost = false; inflight = null;
-  try { fs.rmSync(filePath(), { force: true }); } catch (_) {}
+  session = null; lost = false; inflight = null; fileIntoccabile = false;
+  try { guasti.metteDaParte(filePath(), 'prev'); } catch (_) {}
 }
 
 async function getUid() {
@@ -213,6 +250,6 @@ function segreti() { return [session?.refreshToken, session?.idToken].filter(Boo
 
 // Dopo un collegamento riuscito l'account non è più anonimo, ma il refresh
 // token resta valido e punta allo stesso uid: nulla da fare. Esposto per i test.
-function _reset() { session = null; inflight = null; }
+function _reset() { session = null; inflight = null; fileIntoccabile = false; }
 
-module.exports = { restore, segreti, getIdToken, getUid, currentIdTokenSync, hasIdentity, isLost, resetIdentity, _reset, _expireToken };
+module.exports = { restore, segreti, getIdToken, getUid, currentIdTokenSync, hasIdentity, isLost, isUnreadable, resetIdentity, _reset, _expireToken };

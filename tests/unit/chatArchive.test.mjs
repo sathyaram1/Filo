@@ -169,6 +169,26 @@ test('una chat lunghissima manda testa e coda, e dichiara il buco in mezzo', () 
   assert.match(t, /parte centrale della conversazione omessa/);
 });
 
+test('rilette con l\'id, la parte omessa di una chat lunghissima si legge davvero, a pezzi, coi numeri che la trascrizione stessa dà', () => {
+  const lungo = 'a'.repeat(100000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100000);
+  const messages = [{ role: 'user', text: lungo }, { role: 'filo', text: 'Letto.' }];
+  const prima = CA.transcriptForReading(messages);
+  assert.doesNotMatch(prima, /SEGNO-DEL-MEZZO-77/);
+  const da = Number(prima.match(/da = (\d+)/)[1]);
+  let letto = '';
+  let pos = da;
+  for (let giri = 0; giri < 20 && pos != null; giri++) {
+    const pezzo = CA.transcriptForReading(messages, { da: pos });
+    letto += pezzo;
+    const m = pezzo.match(/il seguito con da = (\d+)/);
+    pos = m ? Number(m[1]) : null;
+  }
+  assert.match(letto, /SEGNO-DEL-MEZZO-77/);
+  assert.match(letto, /Filo: Letto\./, 'a pezzi si arriva fino in fondo');
+  assert.match(CA.transcriptForReading(messages, { da: 999999999 }), /qui finisce la conversazione/);
+  assert.equal(CA.transcriptForReading(chat().messages), CA.transcriptForTriage(chat().messages, 8000), 'una chat corta torna intera come prima');
+});
+
 // ── Ricerca ──────────────────────────────────────────────────────────────────
 
 test('la ricerca guarda dentro la conversazione, non solo nel titolo', () => {
@@ -344,4 +364,11 @@ test('un esito enorme si accorcia, ma dicendolo, e tiene anche la fine', () => {
   assert.ok(out.length < 1400, `troppo lungo: ${out.length}`);
   assert.ok(out.includes('non conservati'), 'un taglio muto toglie proprio la riga che conta');
   assert.ok(out.endsWith('ERRORE IN FONDO'), 'la fine di un comando è la parte che si va a leggere');
+});
+
+test('searchWide cerca anche dove si dice con `testo`: le pagine del filo si allargano come le chat (#868)', () => {
+  const pagine = [{ id: 'p1', t: 'Orche - Wikipedia https://it.wikipedia.org/wiki/Orca' }, { id: 'p2', t: 'Meteo Roma' }];
+  const r = CA.searchWide(pagine, 'pagina sulle orche chiusa ieri', { testo: (p) => p.t });
+  assert.deepEqual(r.results.map((p) => p.id), ['p1']);
+  assert.equal(r.allargata, true);
 });

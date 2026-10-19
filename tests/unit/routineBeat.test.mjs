@@ -14,16 +14,18 @@
 //   difetto è esistito, perché quella funzione non si era mai rotta: mancava
 //   chi la chiamava.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { beatIsLive, readBeat, startBeat, stopBeat, beatFile } from '../../scripts/lib/routine-beat.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -31,16 +33,6 @@ function casaFinta() {
   const casa = cartellaTemporanea('filo-battito-');
   mkdirSync(resolve(casa, '.claude'), { recursive: true });
   return casa;
-}
-
-// Su Windows sotto carico la cartella resta occupata anche dopo i tentativi: una
-// cartella temporanea rimasta è innocua, un rosso nel cancello unit della release no.
-function pulisci(casa, maxRetries = 5) {
-  try {
-    rmSync(casa, { recursive: true, force: true, maxRetries, retryDelay: 200 });
-  } catch (e) {
-    if (!['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(e?.code)) throw e;
-  }
 }
 
 function scriviMarcatore(casa, marker) {
@@ -86,7 +78,7 @@ test('due invocazioni con lo stesso biglietto accendono UN battito solo', () => 
     assert.equal(secondo.why, 'already_live');
     assert.equal(avvii, 1, 'due processi che battono lo stesso biglietto sono solo rumore');
   } finally {
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -108,7 +100,7 @@ test('biglietto nuovo: il battito si riaccende, e il vecchio non resta orfano', 
     assert.deepEqual(uccisi, [4243], 'il battito del biglietto vecchio va spento prima di perderne le tracce');
   } finally {
     process.kill = killVero;
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -129,7 +121,36 @@ test('un marcatore vecchio di giorni non fa ammazzare un estraneo', () => {
     assert.deepEqual(uccisi, [], 'un numero di processo vecchio di giorni non dice più di chi è');
   } finally {
     process.kill = killVero;
-    pulisci(casa);
+    togliCartella(casa);
+  }
+});
+
+test('worker in parallelo (#1157): il battito nominato da un marcatore di un\'ALTRA cartella non si spegne', () => {
+  // Due clone, due biglietti. Il marcatore finito nel clone B nomina il battito
+  // vivo di A (un clone fatto per copia se lo porta dietro): accendere quello di
+  // B non deve spegnere quello di A.
+  const a = casaFinta();
+  const b = casaFinta();
+  const uccisi = [];
+  const killVero = process.kill.bind(process);
+  process.kill = (pid, sig) => { uccisi.push(pid); if (sig === 0) return killVero(pid, sig); };
+  try {
+    startBeat(a, 'b-a', { spawnImpl: () => ({ pid: 6001, unref() {} }), alive: () => true });
+    assert.equal(readBeat(a).root, resolve(a), 'il marcatore dice di quale cartella è');
+    scriviMarcatore(b, readBeat(a));
+    const r = startBeat(b, 'b-b', { spawnImpl: () => ({ pid: 6002, unref() {} }), alive: () => true });
+    assert.equal(r.started, true);
+    assert.deepEqual(uccisi, [], 'il battito di A resta acceso');
+    assert.equal(readBeat(a).pid, 6001);
+    assert.equal(readBeat(b).pid, 6002);
+
+    // Nella stessa cartella, invece, un biglietto nuovo spegne ancora quello vecchio.
+    startBeat(b, 'b-b2', { spawnImpl: () => ({ pid: 6003, unref() {} }), alive: () => true });
+    assert.deepEqual(uccisi, [6002]);
+  } finally {
+    process.kill = killVero;
+    togliCartella(a);
+    togliCartella(b);
   }
 });
 
@@ -152,7 +173,7 @@ test('rilasciare un biglietto NON spegne il battito di un altro lavoro', () => {
     assert.equal(readBeat(casa).ticket, 'b-vivo', 'e il marcatore resta quello di chi lavora');
   } finally {
     process.kill = killVero;
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -169,7 +190,7 @@ test('rilasciare il PROPRIO biglietto spegne il battito', () => {
     assert.equal(readBeat(casa), null);
   } finally {
     process.kill = killVero;
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -181,7 +202,7 @@ test('senza biglietto non si accende niente', () => {
     assert.equal(r.started, false);
     assert.equal(avvii, 0);
   } finally {
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -199,7 +220,7 @@ test('un marcatore rimasto da una sessione morta non blocca il battito nuovo', (
     assert.equal(r.started, true);
     assert.equal(avvii, 1);
   } finally {
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -244,7 +265,7 @@ test('un rilascio RIFIUTATO dal server lascia vivo il battito', async () => {
     assert.ok(readBeat(casa), 'il battito non va toccato quando il rilascio non è andato a buon fine');
   } finally {
     srv.close();
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -271,7 +292,7 @@ test('rilasciare il biglietto di un ALTRO giro non tocca il battito, dal comando
       'il battito di chi sta ancora lavorando deve sopravvivere al rilascio di un altro');
   } finally {
     srv.close();
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -295,7 +316,7 @@ test('un rilascio ACCETTATO spegne il battito', async () => {
     assert.equal(readBeat(casa), null, 'col biglietto muore anche il battito');
   } finally {
     srv.close();
-    pulisci(casa);
+    togliCartella(casa);
   }
 });
 
@@ -335,13 +356,10 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
       p.on('close', fine);
     });
 
-    // Il battito è staccato: vive oltre dispatch, quindi lo si aspetta.
-    const scadenza = Date.now() + 15000;
-    while (Date.now() < scadenza && !arrivati.some((u) => u.includes('routineHeartbeat'))) {
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    assert.ok(arrivati.some((u) => u.includes('routineHeartbeat')),
-      `nessun battito è arrivato al server (chiamate viste: ${arrivati.join(', ') || 'nessuna'})`);
+    // Il battito è staccato: vive oltre dispatch, quindi lo si aspetta finché arriva (#1063).
+    await aspettaChe(() => arrivati.some((u) => u.includes('routineHeartbeat')), {
+      ogniMs: 200, cosa: () => `nessun battito è arrivato al server (chiamate viste: ${arrivati.join(', ') || 'nessuna'})`,
+    });
   } finally {
     // Il processo è staccato apposta: se non lo si ferma resta a battere.
     const m = readBeat(casa);
@@ -356,6 +374,6 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
     }
     srv.close();
     await new Promise((r) => setTimeout(r, 200));
-    pulisci(casa, 10);
+    togliCartella(casa, { tentativi: 10 });
   }
 });

@@ -68,7 +68,7 @@ test('i controlli sui siti pericolosi aspettano di sapere se la pagina è arriva
     rdap: async (r) => { usciti.push(r); return null; },
     ct: null, llm: null, sandbox: null,
   });
-  const analizza = (url) => new Promise((ok) => { SB.analyze(url, { hasPassword: true }, ok); setTimeout(ok, 100); });
+  const analizza = async (url) => { SB.analyze(url, { hasPassword: true }, () => {}); await SB._settled(); };
 
   const proxy = sessioneFinta('PROXY 10.0.0.9:8080');
   HomeNet.attach(proxy);

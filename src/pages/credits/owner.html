@@ -19,6 +19,7 @@
   <script src="filo://shared/wallet.js"></script>
   <!-- La manopola numerica: campo, controllo sul numero, salvataggio e «rimetti com'era». Qui ne servono sette. -->
   <script src="filo://shared/campoNumero.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
 </head>
 <body>
   <main class="sn-page">
@@ -26,8 +27,15 @@
     <p class="sn-muted"><a href="credits.html">← Crediti</a></p>
     <p class="sn-muted" id="ownerDenied" hidden>Questa pagina è del proprietario di Filo.</p>
     <section id="ownerSection" class="sn-wallet-owner" hidden>
+      <!-- Il conto OpenRouter che non regge (#820): in cima, prima di ogni numero. -->
+      <p class="sn-wallet-allarme" id="ownerAllarme" role="alert" hidden></p>
       <!-- I numeri che il server calcola: non si toccano, si guardano. -->
       <ul class="sn-wallet-numeri" id="ownerNumeri"></ul>
+      <!-- Le copie di Filo che hanno spedito i contatori giornalieri (#969): non dal server dei crediti, da Firestore. -->
+      <ul class="sn-wallet-numeri sn-wallet-installazioni" id="ownerInstallazioni" aria-label="Installazioni attive"></ul>
+      <h3 class="sn-wallet-sub" id="ownerContoTitle" hidden>Conto OpenRouter</h3>
+      <ul class="sn-wallet-numeri" id="ownerConto" hidden></ul>
+      <p class="sn-muted sn-wallet-conto-nota" id="ownerContoNota" hidden></p>
       <p class="sn-muted" id="ownerTotals"></p>
 
       <!-- Le manopole (#652): i campi li disegna il JS dalla tabella in
@@ -52,9 +60,10 @@
       <p class="sn-wallet-msg" id="ownerMsg" role="status" hidden></p>
       <h3 class="sn-wallet-sub" id="ownerCodesTitle" hidden>I tuoi codici</h3>
       <ul id="ownerCodes" class="sn-wallet-invites"></ul>
+      <p class="sn-muted sn-wallet-filtro" id="ownerFiltro" role="status" hidden></p>
       <div class="sn-wallet-table-wrap">
         <table class="sn-wallet-table" id="ownerUsers" hidden>
-          <thead><tr><th>Pseudonimo</th><th>Saldo</th><th>Ricevuti</th><th>Speso ($)</th><th>Registro</th><th>Invitato da</th><th>Dal</th></tr></thead>
+          <thead><tr><th>Pseudonimo</th><th>Saldo</th><th>Ricevuti</th><th>Speso ($)</th><th>Registro</th><th>Invitato da</th><th>Dal</th><th>Ultimo uso</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>

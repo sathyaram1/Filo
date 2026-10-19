@@ -14,6 +14,7 @@
 // `executed: false` e nessun testo.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeFileSync, rmSync, cpSync, mkdirSync } from 'node:fs';
@@ -180,7 +181,9 @@ test('un nome senza cartella si apre dove Filo sta guardando, non dove sta il pr
 // personale, o in un file nascosto, la lettura non parte senza un OK; dopo
 // l'OK legge davvero.
 
-test('un documento nascosto non si legge senza un OK, e con l’OK si legge', async ({ openTab }) => {
+test('un documento nascosto non si legge senza un OK, e con l’OK si legge', async ({ app, openTab }) => {
+  // Fuori dal perimetro di lettura costa 2: a Normale, in un compito pulito, si leggerebbe da solo (#530).
+  await livelloAutonomia(app, 'conservativo');
   const nascosta = join(homedir(), `.filo-perimetro-${Date.now()}`);
   mkdirSync(nascosta);
   const chiave = join(nascosta, 'credenziali.txt');

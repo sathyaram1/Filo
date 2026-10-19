@@ -17,6 +17,7 @@
 //  6. risposta vuota ed errore del provider.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { nelMondoDiFilo, statoDi, conta, scrivi } from './helpers/riquadri.mjs';
 
 async function preparaProvider(app, attesaMs = 300, opts = {}) {
   await app.evaluate(async (_electron, o) => {
@@ -59,8 +60,10 @@ const attendiIngresso = async (page) => {
   });
 };
 
+// Sui siti il riquadro sta in uno shadow root chiuso (#1071): lo si cerca con SN_FILO_UI._test, nel mondo di Filo.
 const misura = () => {
-  const root = document.querySelector('.sn-popup');
+  const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+  const root = T ? T.trova('.sn-popup') : document.querySelector('.sn-popup');
   if (!root) return null;
   const input = root.querySelector('.sn-popup-input');
   const send = root.querySelector('.sn-popup-send');
@@ -98,11 +101,14 @@ const fuoriDaiBordi = (m) => {
 };
 
 const casellaCliccabile = () => {
-  const root = document.querySelector('.sn-popup');
+  const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+  const root = T ? T.trova('.sn-popup') : document.querySelector('.sn-popup');
   if (!root) return false;
   const input = root.querySelector('.sn-popup-input');
   const r = input.getBoundingClientRect();
-  const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  const x = r.left + r.width / 2;
+  const y = r.top + r.height / 2;
+  const el = T ? T.daPunto(x, y) : document.elementFromPoint(x, y);
   return !!el && (el === input || input.contains(el));
 };
 
@@ -192,15 +198,18 @@ test('freccetta del tasto destro su una parola in basso: stessa posa della scorc
   await expect(freccia).toBeVisible({ timeout: 10_000 });
   await freccia.click();
 
-  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 25_000 });
-  await attendiIngresso(page);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-meta'))?.testo || '', { timeout: 25_000 }).toContain('€');
+  await nelMondoDiFilo(app, page, async () => {
+    const root = globalThis.SN_FILO_UI._test.trova('.sn-popup');
+    if (root?.getAnimations) await Promise.all(root.getAnimations().map((a) => a.finished.catch(() => {})));
+  });
 
-  const m = await page.evaluate(misura);
+  const m = await nelMondoDiFilo(app, page, misura);
   expect(fuoriDaiBordi(m), 'dalla freccetta del tasto destro il riquadro esce dallo schermo').toEqual([]);
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
-  await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
-  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+  expect(await nelMondoDiFilo(app, page, casellaCliccabile)).toBe(true);
+  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e adesso?');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-input'))?.valore).toBe('e adesso?');
 
   try { await page.screenshot({ path: 'tests/.shots/zz502-tasto-destro.png' }); } catch (_) {}
   await ripristinaProvider(app);

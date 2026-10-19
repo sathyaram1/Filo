@@ -165,7 +165,7 @@ test('la pagina Crediti mostra il proprio pseudonimo solo con un portafoglio, e 
   await app.evaluate(({ clipboard }) => clipboard.writeText(''));
   await page.click('#pseudonym');
   await expect(page.locator('#pseudonym')).toHaveText('Copiato');
-  expect(await leggiAppunti(app)).toBe(MIO);
+  await expect.poll(() => leggiAppunti(app)).toBe(MIO);
   await expect(page.locator('#pseudonym')).toHaveText(MIO, { timeout: 5_000 });
 
   await app.evaluate(({ clipboard }) => clipboard.writeText(''));
@@ -175,7 +175,7 @@ test('la pagina Crediti mostra il proprio pseudonimo solo con un portafoglio, e 
   await expect(menu).toContainText('regalo di crediti');
   await menu.getByRole('menuitem', { name: 'Copia lo pseudonimo' }).click();
   await expect(menu).toHaveCount(0);
-  expect(await leggiAppunti(app)).toBe(MIO);
+  await expect.poll(() => leggiAppunti(app)).toBe(MIO);
 
   // Il tasto destro sull'etichetta è lo stesso «voglio fare qualcosa qui»; Esc chiude.
   await page.locator('#pseudonymRow .sn-muted').click({ button: 'right' });

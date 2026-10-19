@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { webcrypto } from 'node:crypto';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -64,11 +65,11 @@ test('col token admin: create autenticata con senderProof admin, token solo sull
   } finally { f.restore(); }
 });
 
-test('token rifiutato: si riparte anonimi, senza prova, e il risultato lo dice', async () => {
+test('token rifiutato su un nome qualunque: si riparte anonimi, senza prova, e il risultato lo dice', async () => {
   for (const rifiuto of [401, 403]) {
     const f = installFetch([rifiuto, 200]);
     try {
-      const r = await FB.submit({ text: 'ciao', clientId: 'owner:abc' }, { idToken: 'tok-scaduto' });
+      const r = await FB.submit({ text: 'ciao', clientId: 'c-utente' }, { idToken: 'tok-scaduto' });
       assert.equal(f.create.length, 2);
       assert.equal(f.create[1].headers.Authorization, undefined);
       assert.ok(!('senderProof' in f.create[1].body.fields), 'la seconda create è quella anonima');
@@ -76,5 +77,51 @@ test('token rifiutato: si riparte anonimi, senza prova, e il risultato lo dice',
       assert.equal(r.authRefused, rifiuto);
       assert.equal(r.id, 'DOC');
     } finally { f.restore(); }
+  }
+});
+
+// #912: da anonimo un nome riservato non parte; il mittente resta, nello spazio di chi non ha la prova.
+async function chiaviDiProva() {
+  const pair = await webcrypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const pub = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('raw', pair.publicKey))).toString('base64url');
+  const priv = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('pkcs8', pair.privateKey))).toString('base64');
+  return { pub, priv };
+}
+async function mittenteSpedito(create, priv) {
+  return globalThis.SN_FEEDBACK_CRYPTO.decrypt(create.body.fields.clientId.stringValue, priv);
+}
+
+test('#912 — senza token un nome riservato parte come utente; col token rifiutato non riparte', async () => {
+  const { pub, priv } = await chiaviDiProva();
+  const salvata = globalThis.SN_FEEDBACK_PUBKEY;
+  globalThis.SN_FEEDBACK_PUBKEY = pub;
+  try {
+    for (const clientId of ['owner:abc', 'Local:claude', 'routine:residuo', 'agent:gemini']) {
+      const f = installFetch();
+      try {
+        await FB.submit({ text: 'ciao', clientId });
+        assert.equal(await mittenteSpedito(f.create[0], priv), `non-provato:${clientId}`, clientId);
+      } finally { f.restore(); }
+    }
+    // Col token rifiutato un nome riservato non riparte da anonimo: l'errore lo dice, e chi chiama aspetta l'accesso.
+    for (const rifiuto of [401, 403]) {
+      const rifiutato = installFetch([rifiuto, 200]);
+      try {
+        const e = await FB.submit({ text: 'ciao', clientId: 'owner:abc' }, { idToken: 'tok-scaduto' }).then(() => null, (x) => x);
+        assert.ok(e && e.accessoOwner === true, `con ${rifiuto} deve fermarsi`);
+        assert.equal(rifiutato.create.length, 1, 'nessuna create anonima dopo il rifiuto');
+        assert.equal(await mittenteSpedito(rifiutato.create[0], priv), 'owner:abc', 'col token il nome parte com’è');
+      } finally { rifiutato.restore(); }
+    }
+    // Chi non usa un nome riservato parte com'è.
+    for (const clientId of ['c-utente', 'filo:chat', 'auto:capacita', 'uid:123']) {
+      const f = installFetch();
+      try {
+        await FB.submit({ text: 'ciao', clientId });
+        assert.equal(await mittenteSpedito(f.create[0], priv), clientId, clientId);
+      } finally { f.restore(); }
+    }
+  } finally {
+    globalThis.SN_FEEDBACK_PUBKEY = salvata;
   }
 });

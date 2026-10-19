@@ -17,11 +17,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   normalizzaSpec,
   statoFinale,
@@ -306,7 +306,7 @@ describe('lo script da riga di comando', () => {
     assert.equal(readFileSync(join(dir, 'k5.txt'), 'utf8'), 'suite:non-partita\n');
   });
 
-  test.after(() => { try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* best effort */ } });
+  test.after(() => { try { togliCartella(dir); } catch (_) { /* best effort */ } });
 });
 
 // I rossi noti VERI devono citare titoli che esistono, altrimenti il primo

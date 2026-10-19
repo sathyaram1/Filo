@@ -8,6 +8,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
@@ -37,7 +38,7 @@ async function conRete(doc, fn) {
   try { return await fn(patch); } finally { globalThis.fetch = vero; }
 }
 const OPTS = { bearer: 'tok-finto' };
-const utente = (extra = {}) => documento('u1', { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: segnoFs, localApproval: segnoFs, ...extra });
+const utente = (extra = {}) => documento('u1', { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: segnoFs, localApproval: segnoFs, fiducia: 'fidato', ...extra });
 
 test('la regola: solo l’utente approvato senza frase', () => {
   assert.equal(MR.fraseAttesa({ clientId: 'utente-7', localApproval: SEGNO }), true);
@@ -69,8 +70,10 @@ test('--frase da sola scrive solo la frase, e dice di no a vuota, troppo lunga o
   await conRete(utente(), async (patch) => {
     assert.deepEqual(await mod.scriviFrase('u1', '  Ora il terminale parte  ', OPTS), { ok: true });
     assert.equal(patch.length, 1);
-    assert.match(patch[0].url, /updateMask\.fieldPaths=userNote$/);
-    assert.deepEqual(patch[0].body.fields, { userNote: { stringValue: 'Ora il terminale parte' } });
+    assert.match(patch[0].url, /updateMask\.fieldPaths=userNote&updateMask\.fieldPaths=updatedAt$/);
+    const { updatedAt, ...resto } = patch[0].body.fields;
+    assert.ok(updatedAt && updatedAt.timestampValue, 'la scrittura firma l\'ora (#676)');
+    assert.deepEqual(resto, { userNote: { stringValue: 'Ora il terminale parte' } });
     const lunga = await mod.scriviFrase('u1', 'a'.repeat(501), OPTS);
     assert.equal(lunga.ok, false);
     assert.match(lunga.motivo, /501/);
@@ -109,7 +112,7 @@ globalThis.fetch = async (url, opts = {}) => {
   return new Response(JSON.stringify({ name: doc.name, fields }), { status: 200 });
 };`);
   const lancia = (...extra) => spawnSync(process.execPath, ['--import', pathToFileURL(finto).href, join(ROOT, 'scripts', 'owner-feedback.mjs'), 'u1', 'done', 'finito', '--come-routine', ...extra], {
-    encoding: 'utf8', timeout: 60000, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '' },
+    encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '' },
   });
   const senza = lancia();
   assert.equal(senza.status, 0, senza.stderr);
@@ -120,6 +123,6 @@ globalThis.fetch = async (url, opts = {}) => {
 });
 
 test('l’aiuto di npm run finish dice dove si scrive la frase', () => {
-  const aiuto = execFileSync(process.execPath, [join(ROOT, 'scripts', 'finish-local.mjs'), '--help'], { encoding: 'utf8', timeout: 60000 });
+  const aiuto = execFileSync(process.execPath, [join(ROOT, 'scripts', 'finish-local.mjs'), '--help'], { encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   assert.match(aiuto, /npm run feedback -- <N> --frase/);
 });

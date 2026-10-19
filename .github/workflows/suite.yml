@@ -1,5 +1,5 @@
-# La suite Playwright completa, a ogni fusione su main: il lavoro di pubblicazione (release.yml) pubblica solo un
-# commit la cui corsa qui e' verde. Avviata a mano su un ramo prova quel ramo e non apre feedback.
+# La suite Playwright completa e gli unit test su Windows, a ogni fusione su main: il lavoro di pubblicazione (release.yml)
+# pubblica solo un commit la cui corsa qui e' verde. Avviata a mano su un ramo prova quel ramo e non apre feedback.
 # Garanzie: tests/unit/releaseSuite.test.mjs.
 
 name: Suite Playwright completa
@@ -25,6 +25,9 @@ jobs:
   # d'ambiente di tests/rossi-noti.json (contenitore.specs) non contano, e nemmeno un flaky ripassato.
   suite:
     runs-on: ubuntu-latest
+    # Il segreto dell'avviso sta nell'ambiente `rilascio`, aperto al solo main: un ramo, che l'avviso non lo
+    # apre, dichiarandolo verrebbe respinto prima di partire (#1073).
+    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}
     timeout-minutes: 240
     steps:
       - name: Checkout del commit da provare (con la storia, per l'elenco dei commit dell'avviso)
@@ -39,7 +42,7 @@ jobs:
           node-version: 20
 
       - name: Install dipendenze
-        run: npm ci
+        run: node scripts/npm-ci-ritenta.mjs
 
       # Se un giorno `npm ci` non scaricasse Electron, la suite sarebbe «rossa» per un motivo non del codice.
       - name: Binario di Electron
@@ -125,7 +128,7 @@ jobs:
           VERDETTO=$(tail -c 2500 verdetto.log 2>/dev/null || echo "(nessun verdetto: la suite non e partita)")
           if [ "$SUITE_OUTCOME" != "success" ] && [ "$SUITE_OUTCOME" != "failure" ]; then
             # La suite non e' nemmeno partita: e' rosso un passo prima di lei.
-            VERDETTO="La suite NON e partita: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, il binario di Electron, lo schermo virtuale xvfb). Non e un rosso del codice di Filo: guarda il registro di questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download che non arriva) e la prossima corsa riprova.
+            VERDETTO="La suite NON e partita: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, che ritenta gia da sola per qualche minuto, il binario di Electron, lo schermo virtuale xvfb). Non e un rosso del codice di Filo: guarda il registro di questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download giu da piu di qualche minuto) e la prossima corsa riprova.
           ${VERDETTO}"
           elif [ ! -f suite-risultati.json ]; then
             VERDETTO="La suite non ha lasciato il JSON dei risultati: o non e partita, oppure ha superato il tetto del passo (200 minuti, di norma un Electron rimasto appeso) ed e stata interrotta prima della fine. Guarda il registro del passo Suite Playwright completa in questa esecuzione (Actions).
@@ -154,4 +157,98 @@ jobs:
         shell: bash
         run: |
           echo "::error::Suite Playwright con rossi nuovi (o non partita) su ${GITHUB_REF}: nessun feedback, l'elenco sta nel verdetto qui sopra e nell'artifact."
+          exit 1
+
+  # Il cancello di pubblicazione (release.yml) rifà gli unit test su Windows: un commit rosso lì non uscirà mai, quindi
+  # non è verde nemmeno qui. Senza, la pubblicazione sceglieva un verde che il cancello rifiutava a ogni giro (#1184).
+  # Niente `if:` né `continue-on-error` sul lavoro: saltato o tollerato, la corsa sarebbe verde senza averlo passato.
+  unit-windows:
+    runs-on: windows-latest
+    # Come `suite`: il segreto dell'avviso sta nell'ambiente `rilascio`, aperto al solo main (#1073).
+    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}
+    timeout-minutes: 60
+    steps:
+      - name: Checkout del commit da provare (con la storia, per l'elenco dei commit dell'avviso)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        shell: bash
+        run: node scripts/npm-ci-ritenta.mjs
+
+      # Lo stesso comando del cancello di pubblicazione, sulla stessa macchina. Senza la riprova dei rossi un flaky
+      # buttava un verde della suite Playwright, che arriva di rado.
+      - name: Unit test su Windows
+        id: unit
+        continue-on-error: true
+        shell: bash
+        run: node scripts/unit-con-riprova.mjs --registro unit.log
+
+      # Le chiavi sono quelle del cancello (`unit:<file>`): lo stesso rosso visto qui e là apre un feedback solo.
+      - name: Unit rossi su Windows in main - apri un feedback
+        if: always() && !cancelled() && github.ref == 'refs/heads/main' && (steps.unit.outcome == 'failure' || failure())
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          GH_TOKEN: ${{ github.token }}
+          ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          echo "::error::Unit test rossi su Windows (o non partiti): questo commit non verra pubblicato."
+          PREMESSA="Gli unit test, rifatti su Windows a ogni fusione sul ramo principale come li rifa il cancello di pubblicazione, sono rossi su questo commit anche rifatti una volta: il commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Su Linux (contenitore delle routine, cancello di fusione) gli stessi test possono essere verdi: il rosso e di Windows (percorsi, fine riga, piattaforma presunta invece che iniettata, tempi). Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala. Registro: ${ESECUZIONE}"
+          ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null || true)
+          ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
+          N_TUTTE=$(printf '%s\n' "$ROSSI_TUTTE" | grep -c . || true)
+          if [ "${N_TUTTE:-0}" -gt 80 ]; then
+            ROSSI="${ROSSI}
+          … elenco tagliato: altre $((N_TUTTE - 80)) righe di test rossi stanno nel registro di questa esecuzione (Actions)"
+          fi
+          VERDE=$(node scripts/ultima-suite-verde.mjs --stampa 2>/dev/null || true)
+          if [ -n "$VERDE" ]; then
+            COMMIT_TUTTI=$(git log --first-parent --format='%h %s' "${VERDE}..HEAD" 2>/dev/null || true)
+            COMMIT=$(printf '%s\n' "$COMMIT_TUTTI" | head -40)
+            N_COMMIT=$(printf '%s\n' "$COMMIT_TUTTI" | grep -c . || true)
+            if [ "${N_COMMIT:-0}" -gt 40 ]; then
+              COMMIT="${COMMIT}
+          … elenco tagliato: altri $((N_COMMIT - 40)) commit, git log --first-parent ${VERDE}..HEAD"
+            fi
+            DOPO_VERDE="Commit entrati su main dopo l ultima suite verde (${VERDE}), ${N_COMMIT:-0}:
+          ${COMMIT}"
+          else
+            DOPO_VERDE="Nessuna suite verde su main fra le ultime cento corse riuscite: da quale commit parta il guasto non si sa da qui."
+          fi
+          if [ -s unit.log ]; then
+            CODA=$(tail -c 2500 unit.log)
+            CHIAVI=(--chiavi-unit unit.log)
+          else
+            CODA="Gli unit test NON sono partiti: e rosso un passo prima di loro (di norma l installazione delle dipendenze con npm ci, che ritenta gia da sola per qualche minuto). Guarda il registro di questa esecuzione."
+            CHIAVI=(--chiave unit-windows:non-partiti)
+          fi
+          TESTO="${PREMESSA}
+
+          Test rossi (${N_TUTTE:-0} righe):
+          ${ROSSI:-(nessuna riga not ok: guarda la coda)}
+
+
+          ${DOPO_VERDE}
+
+
+          ${CODA}"
+          printf '%s\n' "${ROSSI:-(nessuna riga not ok)}"
+          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || echo "::warning::allarme non consegnato"
+          exit 1
+
+      - name: Unit rossi su Windows su un ramo - la corsa resta rossa
+        if: always() && !cancelled() && github.ref != 'refs/heads/main' && (steps.unit.outcome == 'failure' || failure())
+        shell: bash
+        run: |
+          echo "::error::Unit test rossi su Windows (o non partiti) su ${GITHUB_REF}: nessun feedback."
+          # In coda al registro: in mezzo a trentamila righe i rossi non li trova nessuno.
+          grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || echo "(nessuna riga not ok: gli unit non sono partiti, guarda i passi sopra)"
           exit 1

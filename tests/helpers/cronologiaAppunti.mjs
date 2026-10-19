@@ -5,7 +5,7 @@ import { expect } from '../fixtures/electron.mjs';
 
 const MONDO_CONTENT_SCRIPT = 999;
 
-// { voci: [{ testo, incolla, rimuovi }], vuoto, cerca, svuota, riquadro, lista, sfondo } | null se chiuso.
+// { voci: [{ testo, incolla, rimuovi, tolta, miniatura, fuocoRimuovi }], vuoto, cerca, svuota, riquadro, lista, sfondo } | null se chiuso.
 export async function statoCronologia(app, page) {
   const url = page.url();
   if (url.startsWith('filo://')) return page.evaluate(() => globalThis.SN_MENU?._test?.cronologia() ?? null);

@@ -31,6 +31,8 @@ const apertoVerso = (app, host) => app.windows().some((w) => {
 async function preparaModelli(app, apiKeys = { openrouter: 'k-test' }) {
   await app.evaluate(async (_electron, keys) => {
     const C = globalThis.SN_CONST;
+    // Col modello pronto la home aperta comincia l'intervista di benvenuto (#663), e a volte arriva prima del messaggio.
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: keys,
@@ -53,6 +55,11 @@ async function modelloFinto(app, { giri = [], aiuto = '{"text":"Ecco.","status":
     const risposta = (attempts, messages, onToolCall) => {
       globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
       const testo = JSON.stringify(messages);
+      // Le chiamate di sottofondo non sono giri della chat: la home che si rigenera quando arriva la chiave e il
+      // correttore sul campo di scrittura. Chi arriva prima dipende dai tempi, e un giro rubato toglie l'azione.
+      const sottofondo = testo.includes('preparare la dashboard') ? '{"message":"Bentornato.","suggestions":[]}'
+        : (testo.includes('scritto in un campo editabile') ? '{"issues":[]}' : '');
+      if (sottofondo) return { text: sottofondo, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (!testo.includes('toolCalls') && !messages.some((m) => m.role === 'tool') && giri.length === 0) {
         const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
         const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];
@@ -722,7 +729,7 @@ async function apriHome(app, page, openTab) {
     });
     await openTab('filo://dashboard/dashboard.html');
     const home = await newtab(app, 'filo://dashboard/dashboard.html');
-    if (await home.locator('.dash-suggestion').first().waitFor({ state: 'visible', timeout: 6_000 }).then(() => true, () => false)) return home;
+    if (await home.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce').first().waitFor({ state: 'visible', timeout: 6_000 }).then(() => true, () => false)) return home;
     await home.close();
   }
   throw new Error('la home non mostra i suggerimenti');
@@ -751,6 +758,8 @@ test('il bottone «apri file» col percorso vuoto e l’indirizzo in un altro ca
   }
   expect(apertoVerso(app, RACCOLTA), 'il clic ha aperto l’indirizzo col codice').toBe(false);
   await page.locator('.dash-activity-head').last().click();
+  // La riga sta nel nodo della sua azione, e il titolo del nodo dice già cosa è stato fermato (#578).
+  await page.locator('.dash-activity-seg-head', { hasText: 'Non ho preparato il collegamento' }).click();
   await expect(page.locator('.dash-activity-row', { hasText: 'Non ho preparato il collegamento' })).toBeVisible();
 });
 
@@ -872,7 +881,7 @@ test('un suggerimento della home col codice letto non chiede fuori l’icona, e 
   const home = await apriHome(app, page, openTab);
   await home.waitForTimeout(1000);
   expect(richieste.filter((u) => /^https?:/.test(u)).join(' '), 'senza clic, l’icona chiede fuori il nome del sito col codice').not.toContain(CODICE);
-  const sug = home.locator('.dash-suggestion', { hasText: 'Completa la verifica' });
+  const sug = home.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: 'Completa la verifica' });
   await sug.click();
   await expect(home.locator('.dash-fermata-clic')).toHaveText(/Non ho aperto l'indirizzo: conteneva un codice letto/, { timeout: 10_000 });
   expect(apertoVerso(app, RACCOLTA), 'il suggerimento ha aperto l’indirizzo col codice').toBe(false);
@@ -888,7 +897,7 @@ for (const [nome, suggerimento] of [
     const page = await newtab(app);
     await leggiIlCodice(app, page, { home: homeDi([LEGGERE, { icon: 'link', importance: 5, ...suggerimento }]) });
     const home = await apriHome(app, page, openTab);
-    const sug = home.locator('.dash-suggestion', { hasText: 'Completa la verifica' });
+    const sug = home.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: 'Completa la verifica' });
     await expect(sug).toBeVisible({ timeout: 10_000 });
     await sug.click();
     const fermata = home.locator('.dash-activity-label', { hasText: 'fermato' });
@@ -909,7 +918,7 @@ test('un suggerimento della home che comincia con la barra va al modello, non al
       { icon: 'link', text: 'Prepara il file', importance: 5, action: { type: 'CHAT', prompt: `/touch "${file}"` } },
     ]) });
     const home = await apriHome(app, page, openTab);
-    await home.locator('.dash-suggestion', { hasText: 'Prepara il file' }).click();
+    await home.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: 'Prepara il file' }).click();
     await expect(home.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 20_000 });
     await home.waitForTimeout(1000);
     expect(existsSync(file), 'il clic ha lanciato nel terminale un comando scritto dal modello').toBe(false);

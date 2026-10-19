@@ -7,14 +7,15 @@
 // il ramo alla base parcheggiando la consegna su discarded/ (#502, #495).
 // Rosso senza il fix: il punto fermo resterebbe alla base.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -73,6 +74,6 @@ test('deliver status (primo passaggio) lascia il punto fermo sulla consegna', as
       'il punto fermo deve essere la consegna, non la base: senza, il giro dopo la scarta (#507)');
   } finally {
     srv.close();
-    try { rmSync(casa, { recursive: true, force: true }); } catch (_) { /* Windows EBUSY: riprova sotto */ }
+    try { togliCartella(casa); } catch (_) { /* Windows EBUSY: riprova sotto */ }
   }
 });

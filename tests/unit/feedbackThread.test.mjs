@@ -114,8 +114,10 @@ test('la sessione locale è "lato Filo", non "lato utente"', () => {
   // E ownerize non ci mette il cappello dell'owner sopra: non è un invio suo.
   assert.equal(TH.ownerize('local:claude'), 'local:claude');
   // La segnalazione originale finisce nel turno del modello.
-  const turni = TH.parse({ text: 'trovato un problema', clientId: 'local:claude' });
+  const turni = TH.parse({ text: 'trovato un problema', clientId: 'local:claude', senderProof: 'admin' });
   assert.equal(turni[0].role, 'model');
+  // #912: senza la prova il nome non basta: la segnalazione è di un utente.
+  assert.equal(TH.parse({ text: 'x', clientId: 'local:claude' })[0].role, 'user');
 });
 
 // SPEC-RIDISEGNO-MAX.md §13: i rilievi RESIDUI di una verifica (un lavoro
@@ -133,6 +135,18 @@ test('authorKind: routine:residuo è una categoria propria, non prober né verif
 // compresi. Prima le istanze di Claude ne avevano uno solo per tutte, e per
 // fermarne una bisognava fermarle tutte. Gemello del test in filo-security
 // (functions/test/autoApprove.test.js), che è la copia che decide davvero.
+// #1002: l'allarme della pubblicazione ha il suo autore, non «Claude (ruolo non indicato)». Interruttore no (#1035):
+// nasce senza origine e il server lo mette in coda comunque; per la mappa resta nel gruppo del gemello del server.
+test('authorKind: agent:costruzione provato è l’allarme della pubblicazione, senza un interruttore suo', () => {
+  assert.equal(TH.authorKind({ clientId: 'agent:costruzione', senderProof: 'server' }), 'costruzione');
+  assert.equal(TH.authorKind('agent:costruzione'), 'costruzione', 'una firma già efficace');
+  assert.equal(TH.authorKind({ clientId: 'agent:costruzione' }), 'user', 'il solo nome è un utente');
+  assert.equal(TH.authorKind({ clientId: 'agent:costruzione', senderProof: 'owner' }), 'user');
+  assert.equal(TH.AUTO_APPROVE_GROUPS.includes('costruzione'), false);
+  assert.equal(TH.autoApproveGroup('agent:costruzione'), 'claude');
+  assert.equal(TH.autoApproveGroup({ clientId: 'agent:costruzione' }), 'user');
+});
+
 test('autoApproveGroup: il gruppo è la categoria d’autore, una per una', () => {
   assert.equal(TH.autoApproveGroup('routine:residuo'), 'residuo');
   assert.equal(TH.autoApproveGroup('routine:prober'), 'prober');
@@ -228,7 +242,7 @@ test('note che iniziano con un marcatore → nessun turno-Filo vuoto', () => {
 });
 
 test('feedback inviato da un AGENTE → segnalazione lato modello', () => {
-  const turns = TH.parse({ text: 'area vuota', clientId: 'agent:gemini-3.1-flash-lite' });
+  const turns = TH.parse({ text: 'area vuota', clientId: 'agent:gemini-3.1-flash-lite', senderProof: 'admin' });
   assert.equal(turns[0].role, 'model');
   assert.equal(turns[0].kind, 'report');
   assert.equal(TH.isFromModel('routine:notturna'), true);

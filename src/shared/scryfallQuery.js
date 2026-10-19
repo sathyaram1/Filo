@@ -36,6 +36,26 @@
     return terms.length > 0 && terms.every((t) => SYNTAX_TERM.test(t));
   }
 
+  // Titolo della lista che il modello scrive per la riga di sintesi (#788): una riga di italiano, mai la query.
+  // Con anche un solo termine di sintassi Scryfall dentro non dice niente a chi legge: vale il ripiego.
+  function listTitle(raw) {
+    const t = String(typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').trim()
+      .replace(/^["'«“]+|["'»”]+$/g, '').trim();
+    if (!t) return '';
+    const tokens = t.replace(/[()"«»“”,;.!?]/g, ' ').split(/\s+/).filter(Boolean);
+    if (tokens.some((x) => SYNTAX_TERM.test(x))) return '';
+    return t.length > 200 ? `${t.slice(0, 199)}…` : t;
+  }
+
+  // Ordine della lista chiesto a parole (#788): il campo del modello, o l'order: che ha messo nella query.
+  const SORT_OF = { cmc: 'cmc', mana: 'cmc', name: 'name', nome: 'name', price: 'price', prezzo: 'price', eur: 'price', usd: 'price', tix: 'price' };
+  function listSort(raw, query) {
+    const own = SORT_OF[String(typeof raw === 'string' ? raw : '').trim().toLowerCase()];
+    if (own) return own;
+    const m = /(?:^|[\s(])order[:=](\w+)/i.exec(String(query || ''));
+    return (m && SORT_OF[m[1].toLowerCase()]) || '';
+  }
+
   // Una carta è DENTRO l'identità di colore del commander se OGNI colore della
   // sua color identity è tra i colori del commander (regola Commander §8.4, la
   // stessa del check di legalità). Le incolori (identity vuota) sono sempre
@@ -128,33 +148,51 @@
   //   hasBudget/budget  → l'utente ha chiesto di impostare (numero ≥ 0) o
   //                       rimuovere (null) il tetto di budget (§9.2)
   //   prob              → richiesta al calcolatore di probabilità (§9.3):
-  //                       { turn: int ≥ 1, needs: [{ tag, n }] } oppure null
-  function normalizeProb(p) {
-    if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
-    const turn = Math.floor(Number(p.turn));
-    if (!Number.isFinite(turn) || turn < 1) return null;
-    const rawNeeds = p.needs;
+  //                       { turn: int ≥ 1, needs: [{ tag, n }], game, mulligans,
+  //                       keep: [{ tag, n }], extraDraws } oppure null. `game`
+  //                       resta grezzo: lo valida SN_DECK_STATS.gameOf.
+  function normalizeNeeds(raw) {
     const needs = [];
-    if (Array.isArray(rawNeeds)) {
-      for (const it of rawNeeds) {
+    if (Array.isArray(raw)) {
+      for (const it of raw) {
         const tag = String((it && it.tag) || '').trim().toLowerCase();
         const n = Math.floor(Number(it && it.n));
         if (tag && Number.isFinite(n) && n > 0) needs.push({ tag, n });
       }
-    } else if (rawNeeds && typeof rawNeeds === 'object') {
-      for (const [tag, v] of Object.entries(rawNeeds)) {
+    } else if (raw && typeof raw === 'object') {
+      for (const [tag, v] of Object.entries(raw)) {
         const t = String(tag).trim().toLowerCase();
         const n = Math.floor(Number(v));
         if (t && Number.isFinite(n) && n > 0) needs.push({ tag: t, n });
       }
     }
-    return needs.length ? { turn, needs } : null;
+    return needs;
+  }
+
+  function normalizeProb(p) {
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+    const turn = Math.floor(Number(p.turn));
+    if (!Number.isFinite(turn) || turn < 1) return null;
+    const needs = normalizeNeeds(p.needs);
+    if (!needs.length) return null;
+    const count = (v) => {
+      const n = Math.floor(Number(v));
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    return {
+      turn,
+      needs,
+      game: typeof p.game === 'string' ? p.game.trim().toLowerCase() : '',
+      mulligans: count(p.mulligans),
+      keep: normalizeNeeds(p.keep),
+      extraDraws: count(p.extraDraws),
+    };
   }
 
   function parseAgentReply(text) {
     const none = {
-      reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-      import: [], commanderName: '', clearChat: false,
+      reply: '', query: '', filter: '', title: '', sort: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
+      tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
     };
     const raw = String(text || '').trim();
     if (!raw) return none;
@@ -187,6 +225,8 @@
           // Criterio del filtro semantico (§4.1): quando presente, il sistema
           // usa un LLM economico per tenere solo le carte che lo rispettano.
           filter: typeof o.filter === 'string' ? o.filter.trim() : '',
+          title: listTitle(o.title),
+          sort: listSort(o.sort, o.query),
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
           hasBudget,
           budget,
@@ -209,13 +249,16 @@
               })).filter((it) => it.name)
             : [],
           commanderName: typeof o.commander === 'string' ? o.commander.trim() : '',
+          // Sostituire un commander già impostato vuole questo segnale esplicito del modello: una menzione non basta.
+          replaceCommander: o.replaceCommander === true && typeof o.commander === 'string' && !!o.commander.trim(),
           // Svuotare la chat chiesto a parole: la pagina chiede conferma, qui solo l'intenzione.
           clearChat: o.clearChat === true,
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }
-    // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata).
-    return { ...none, reply: raw };
+    // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata); di un involucro tagliato a metà, il suo testo.
+    const salvato = raw.includes('{') ? global.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(raw, ['reply']) : null;
+    return { ...none, reply: salvato ?? raw };
   }
 
   // Prosa con nomi carta marcati [[Nome Carta]] (§3.5) → segmenti tipizzati:
@@ -240,7 +283,7 @@
   }
 
   global.SN_SCRYFALL_Q = {
-    WUBRG, identityCode, buildSearchQuery, isPureSyntax, withinIdentity, parseManaCost, simplifyCard, isFresh,
+    WUBRG, identityCode, buildSearchQuery, isPureSyntax, listTitle, listSort, withinIdentity, parseManaCost, simplifyCard, isFresh,
     parseAgentReply, proseSegments,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

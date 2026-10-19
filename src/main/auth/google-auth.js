@@ -2,8 +2,9 @@
 //
 // Flusso (vedi Filo/SECURITY.md §1):
 //   Fase 1 — Google OAuth 2.0 Authorization Code + PKCE:
-//     apre il consenso nel browser di SISTEMA, riceve il codice su un
-//     micro-server loopback temporaneo, lo scambia per un id_token Google.
+//     apre il consenso in una SCHEDA di Filo (così l'account Google entra anche
+//     nelle schede, #1123; se Google la rifiuta, nel browser di sistema), riceve
+//     il codice su un micro-server loopback temporaneo, lo scambia per un id_token.
 //   Fase 2 — Firebase Identity Toolkit (signInWithIdp):
 //     scambia l'id_token Google per un Firebase ID token + refresh token.
 //     Solo il Firebase ID token popola request.auth nelle regole Firestore.
@@ -16,12 +17,11 @@
 const http = require('node:http');
 // Niente require('electron') a livello di modulo: questo file viene richiesto
 // (transitivamente, via defaultsStore/supportModelsStore) anche dagli unit test
-// node:test che girano fuori da Electron. `shell` e `net` servono solo dentro signIn(),
-// quindi si richiede lazy lì (vedi CLAUDE.md — pattern usato anche altrove,
-// es. adblock.js/proxyTab.js).
+// node:test che girano fuori da Electron: `shell` e `net` si chiedono dentro le funzioni.
 const cfg = require('./config');
 const pkce = require('./pkce');
 const store = require('./token-store');
+const guasti = require('./guastiAccesso');
 
 let session = null; // { refreshToken, idToken, idTokenExp, email, name, picture }
 // Se la sessione sopravviverà alla chiusura: senza cifratura del sistema resta
@@ -50,6 +50,13 @@ function erroreAccesso(code, message) {
 const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
 let flussoInCorso = null;
 
+// A tempo costante: un tentativo sbagliato non chiude più l'ascolto, quindi i tentativi sono illimitati.
+function stessoState(ricevuto, atteso) {
+  const a = Buffer.from(String(ricevuto ?? ''));
+  const b = Buffer.from(String(atteso));
+  return a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+}
+
 // Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
 function startLoopback(expectedState) {
   return new Promise((resolve, reject) => {
@@ -59,8 +66,13 @@ function startLoopback(expectedState) {
 
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://127.0.0.1');
+      // Lo state prima di tutto: una richiesta che non lo porta (un altro programma locale, il favicon) non chiude
+      // né fa fallire l'accesso, che resta in ascolto del ritorno vero.
+      if (!stessoState(url.searchParams.get('state'), expectedState)) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Richiesta non riconosciuta.');
+      }
       const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
@@ -71,7 +83,6 @@ function startLoopback(expectedState) {
       server.close();
       if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
       if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
-      if (state !== expectedState) return rejectCode(new Error('OAuth: state non corrispondente (possibile CSRF)'));
       resolveCode(code);
     });
 
@@ -115,10 +126,10 @@ async function exchangeCodeForGoogleToken(code, verifier, redirectUri) {
 async function signInWithFirebase(googleIdToken) {
   const anonToken = await installationToken();
   const attempt = async (linkTo) => {
+    // Niente returnIdpCredential: con quello un collegamento rifiutato torna 200, senza token.
     const body = {
       postBody: `id_token=${googleIdToken}&providerId=google.com`,
       requestUri: 'http://localhost',
-      returnIdpCredential: true,
       returnSecureToken: true,
     };
     if (linkTo) body.idToken = linkTo;
@@ -132,7 +143,11 @@ async function signInWithFirebase(googleIdToken) {
       err.status = res.status;
       throw err;
     }
-    return res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+    const fb = await res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+    if (!rispostaConSessione(fb)) {
+      throw new Error(`Firebase signInWithIdp senza sessione: ${String(fb?.errorMessage || (fb?.needConfirmation ? 'needConfirmation' : 'token assenti')).slice(0, 120)}`);
+    }
+    return fb;
   };
   if (anonToken) {
     try { return await attempt(anonToken); } catch (e) {
@@ -163,7 +178,15 @@ function persist() {
   });
 }
 
+// Una risposta 200 può non essere un accesso (FEDERATED_USER_ID_ALREADY_LINKED, needConfirmation): senza i due
+// token non c'è sessione, e salvarla farebbe credere a un accesso riuscito.
+function rispostaConSessione(fb) {
+  return Boolean(fb && !fb.errorMessage && fb.idToken && fb.refreshToken);
+}
+
 function setSession(fb) {
+  // Prima di toccare la sessione o il segno dell'owner caduto (#912): un accesso non avvenuto non li cambia.
+  if (!rispostaConSessione(fb)) throw new Error('accesso senza sessione: risposta di Firebase senza token');
   session = {
     refreshToken: fb.refreshToken,
     idToken: fb.idToken,
@@ -172,6 +195,30 @@ function setSession(fb) {
     name: fb.displayName || '',
     picture: fb.photoUrl || '',
   };
+  segnaOwnerCaduto(false);
+}
+
+// #912: l'owner buttato fuori da un rinnovo fallito resta l'owner per i feedback che manda dopo (aspettano che
+// rientri, non partono da anonimi). Un file e non la memoria: vale anche dopo un riavvio. Lo toglie solo un accesso o un'uscita voluta.
+let ownerCaduto = null;
+function fileOwnerCaduto() {
+  const { app } = require('electron');
+  return require('node:path').join(app.getPath('userData'), 'accesso-owner-caduto');
+}
+function accessoOwnerCaduto() {
+  if (ownerCaduto === null) {
+    try { ownerCaduto = require('node:fs').existsSync(fileOwnerCaduto()); } catch (_) { ownerCaduto = false; }
+  }
+  return ownerCaduto;
+}
+function segnaOwnerCaduto(caduto) {
+  if (accessoOwnerCaduto() === !!caduto) return;
+  ownerCaduto = !!caduto;
+  try {
+    const fs = require('node:fs');
+    if (caduto) fs.writeFileSync(fileOwnerCaduto(), String(Date.now()));
+    else fs.rmSync(fileOwnerCaduto(), { force: true });
+  } catch (_) {}
 }
 
 // ─── API pubblica ──────────────────────────────────────────────────────────
@@ -191,17 +238,17 @@ async function signIn() {
   if (!cfg.isConfigured()) {
     throw erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
   }
-  const { shell, net } = require('electron');
+  const { net } = require('electron');
   if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
     throw erroreAccesso('rete', 'nessuna connessione');
   }
-  // Un accesso alla volta: chi lo chiede mentre uno aspetta il browser riapre la
-  // STESSA pagina e ne condivide l'esito, così qualunque scheda completi arriva a Filo.
+  // Un accesso alla volta: chi lo chiede mentre uno aspetta riporta davanti la
+  // STESSA pagina e ne condivide l'esito, così qualunque strada completi arriva a Filo.
   if (flussoInCorso) {
     const f = await flussoInCorso;
     if (f.aspettaBrowser) {
       f.rinnovaAttesa();
-      await apriBrowser(shell, f.url);
+      await mostraAccesso(f);
     }
     return f.esito;
   }
@@ -217,7 +264,7 @@ async function signIn() {
   }
   f.esito.then(libera, libera);
   try {
-    await apriBrowser(shell, f.url);
+    await mostraAccesso(f);
   } catch (e) {
     f.loop.abort(e);
     throw e;
@@ -225,9 +272,50 @@ async function signIn() {
   return f.esito;
 }
 
-async function apriBrowser(shell, url) {
+const AVVISO_NEL_BROWSER = 'Google non accetta l\'accesso dentro Filo, quindi continua nel browser. Filo si collega lo stesso, ma YouTube, Gmail e Drive nelle schede restano scollegati.';
+const AVVISO_NON_CARICATA = 'La pagina d\'accesso di Google non si è caricata in Filo, quindi continua nel browser.';
+
+// Prima in una scheda della finestra normale: lì l'accesso a Google vale anche per YouTube, Gmail e Drive (#1123).
+// Il browser di sistema resta il ripiego, quando Google rifiuta la scheda o una finestra normale non c'è.
+async function mostraAccesso(f) {
+  if (f.scheda && f.scheda.riporta()) return;
+  if (!f.nelBrowser) {
+    let scheda = null;
+    try {
+      scheda = require('./accessoInScheda').apri(f.url, {
+        hostAccesso: hostDi(cfg.authEndpoint),
+        suChiusa: () => f.loop.abort(erroreAccesso('annullato', 'scheda di accesso chiusa')),
+        suRifiuto: (motivo) => passaAlBrowser(f, motivo),
+      });
+    } catch (_) {}
+    if (scheda) { f.scheda = scheda; return; }
+  }
+  f.nelBrowser = true;
+  await apriBrowser(f.url);
+}
+
+// Lo stesso indirizzo, quindi lo stesso codice e lo stesso loopback: l'accesso a Filo riesce comunque.
+function passaAlBrowser(f, motivo) {
+  f.scheda = null;
+  f.nelBrowser = true;
+  console.warn('[auth] scheda d\'accesso abbandonata (' + motivo + '): accesso nel browser di sistema');
+  // Una pagina che non si carica non è un no di Google: la riga dice il motivo vero, e l'invito a collegare resta.
+  const nonCaricata = motivo === 'rete';
+  if (!nonCaricata) { try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {} }
+  // La riga «continua nel browser» solo se il browser si è aperto: altrimenti parla l'errore dell'accesso.
+  apriBrowser(f.url).then(() => {
+    const testo = nonCaricata ? AVVISO_NON_CARICATA : AVVISO_NEL_BROWSER;
+    try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'accesso-nel-browser' }); } catch (_) {}
+  }, (e) => f.loop.abort(e));
+}
+
+function hostDi(url) {
+  try { return new URL(String(url)).hostname.toLowerCase(); } catch (_) { return ''; }
+}
+
+async function apriBrowser(url) {
   try {
-    await shell.openExternal(url);
+    await require('electron').shell.openExternal(url);
   } catch (e) {
     throw erroreAccesso('browser', 'browser non aperto: ' + (e?.message || e));
   }
@@ -247,11 +335,11 @@ async function nuovoFlusso() {
     code_challenge: challenge,
     code_challenge_method: method,
     state,
-    access_type: 'offline',
-    prompt: 'consent',
+    // Di Google serve solo l'id_token: niente accesso offline, e il consenso si chiede una volta sola.
+    prompt: 'select_account',
   }).toString();
 
-  const f = { url: authUrl.toString(), loop, aspettaBrowser: true };
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false };
   let timer = null;
   // Il tetto riparte a ogni riapertura: chi riapre il browser ricomincia da capo.
   f.rinnovaAttesa = () => {
@@ -266,6 +354,8 @@ async function nuovoFlusso() {
     } finally {
       clearTimeout(timer);
       f.aspettaBrowser = false;
+      // Arrivato il codice (o finita l'attesa) la scheda resterebbe su una pagina morta del loopback.
+      if (f.scheda) { f.scheda.chiudi(); f.scheda = null; }
     }
     const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
     if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
@@ -282,10 +372,15 @@ function segreti() {
   return [session?.refreshToken, session?.idToken].filter(Boolean);
 }
 
-function signOut() {
+function chiudiSessione() {
   session = null;
   ricordata = false;
   store.clear();
+}
+
+function signOut() {
+  chiudiSessione();
+  segnaOwnerCaduto(false);
 }
 
 async function refreshIfNeeded() {
@@ -301,8 +396,13 @@ async function refreshIfNeeded() {
     body,
   });
   if (!res.ok) {
-    // Refresh token revocato/scaduto → sessione non più valida.
-    signOut();
+    // Si esce solo se il servizio dice che il refresh token non vale più: un 503 o un proxy
+    // che risponde 403 lasciano sessione e auth.bin come sono, e il prossimo tentativo riesce.
+    const testo = await res.text().catch(() => '');
+    if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
+    const eraOwner = isAdmin();
+    chiudiSessione();
+    if (eraOwner) segnaOwnerCaduto(true);
     throw new Error(`refresh sessione fallito (${res.status})`);
   }
   const j = await res.json(); // { id_token, refresh_token, expires_in }
@@ -375,6 +475,7 @@ module.exports = {
   isSignedIn,
   isRemembered,
   isAdmin,
+  accessoOwnerCaduto,
   // esportati per i test
-  _internals: { decodeJwtPayload, startLoopback },
+  _internals: { decodeJwtPayload, startLoopback, nuovoFlusso },
 };

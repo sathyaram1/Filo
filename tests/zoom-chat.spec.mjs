@@ -131,6 +131,8 @@ test('chat e tasti sono lo stesso zoom: il tasto riparte da dove l\'ha lasciato 
 });
 
 test('lo zoom chiesto in chat resta sul sito: una scheda nuova sullo stesso sito nasce zoomata', async ({ app, openTab, testServer }) => {
+  // Passava solo perché openTab tornava la scheda vecchia (#877): né la chat né i tasti ricordano lo zoom per sito.
+  test.fail(true, 'manca la memoria dello zoom per sito: la scheda nuova nasce al 100%');
   const page = await testServer.openReady(openTab, PAGINA);
   await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 150 });
   await expect.poll(async () => percentOf(app, page)).toBe(150);
@@ -333,8 +335,8 @@ test('il riquadro dello zoom applica il numero BATTUTO, non quello che ci scrive
   // Quello che batte l'utente invece vale.
   await page.mouse.click(200, 200, { button: 'middle' });
   await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
-  await page.locator('#__filo-zoom-percent').fill('');
-  await page.locator('#__filo-zoom-percent').type('50');
+  await page.locator('#__filo-zoom-percent').click();
+  await page.keyboard.type('50');
   await page.keyboard.press('Enter');
   await expect.poll(async () => percentOf(app, page)).toBe(50);
 });

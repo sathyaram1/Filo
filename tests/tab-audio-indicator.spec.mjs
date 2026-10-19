@@ -61,8 +61,10 @@ test('la scheda che suona tiene la favicon, e l\'icona audio sta dopo il titolo 
     }));
     expect(colori.icona).toBe(colori.titolo);
   }
-  const glow = await shell.locator('.tab.audible').first().evaluate((el) => getComputedStyle(el).animationName);
-  expect(glow).toContain('tab-glow-pulse');
+  // Scheda e stile letti nello stesso istante: la barra ridisegna le schede, e una appena sostituita dà uno stile vuoto (#944).
+  await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab.audible')]
+    .map((el) => getComputedStyle(el).animationName)), { timeout: 3000 })
+    .toEqual(['tab-glow-pulse', 'tab-glow-pulse']);
 });
 
 test('clic sull\'icona audio: silenzia e al suo posto compare il tasto per riattivare, che la riporta', async ({ app, shell, openTab, testServer }) => {
@@ -74,16 +76,20 @@ test('clic sull\'icona audio: silenzia e al suo posto compare il tasto per riatt
     return !!w._filoTabs.tabs.find((x) => x.id === id).muted;
   }, id);
 
+  // Posizione letta in un colpo solo nella barra: un ridisegno (l'icona che arriva) fra trova e misura dava null.
+  const xDi = (sel) => shell.evaluate(([id, s]) => document.querySelector(`.tab[data-id="${id}"] ${s}`)?.getBoundingClientRect().x ?? null, [id, sel]);
   await expect(tab.locator('.audio-ind')).toHaveCount(1, { timeout: 10_000 });
-  const prima = await tab.locator('.audio-ind').boundingBox();
+  await expect.poll(() => xDi('.audio-ind')).not.toBeNull();
+  const prima = await xDi('.audio-ind');
   await tab.locator('.audio-ind').click();
   await expect.poll(muted, { timeout: 10_000 }).toBe(true);
 
   await expect(tab.locator('.mute-ind')).toHaveCount(1);
   await expect(tab.locator('.audio-ind')).toHaveCount(0);
   await expect(tab).not.toHaveClass(/audible/);
-  const dopo = await tab.locator('.mute-ind').boundingBox();
-  expect(Math.abs(dopo.x - prima.x)).toBeLessThanOrEqual(1);
+  await expect.poll(() => xDi('.mute-ind')).not.toBeNull();
+  const dopo = await xDi('.mute-ind');
+  expect(Math.abs(dopo - prima)).toBeLessThanOrEqual(1);
   const colori = await tab.evaluate((el) => [getComputedStyle(el.querySelector('.mute-ind')).color, getComputedStyle(el.querySelector('.title')).color]);
   expect(colori[0]).toBe(colori[1]);
 
@@ -191,6 +197,19 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
       .toEqual({ carta: titoli[id], suggerimento: null });
   };
 
+  // La carta sparisce qualche fotogramma dopo la richiesta (si svuota prima): il suggerimento che compariva intanto le
+  // stava sopra, e il confronto dei riquadri lo vedeva solo a volte (#944). Il main lo dice nell'istante in cui lo mostra.
+  await app.evaluate(({ app: electronApp, BrowserWindow }) => {
+    globalThis.__sopraLaCarta = 0;
+    const segui = (w) => w.on('show', () => {
+      if (w.isDestroyed() || !w.webContents.getURL().startsWith('data:')) return;
+      if (BrowserWindow.getAllWindows().some((x) => !x.isDestroyed() && x.isVisible()
+        && x.webContents.getURL() === 'filo://shell/anteprima.html')) globalThis.__sopraLaCarta++;
+    });
+    BrowserWindow.getAllWindows().forEach(segui);
+    electronApp.on('browser-window-created', (_e, w) => segui(w));
+  });
+
   const ctrlW = await shell.evaluate(() => (window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+W') : 'Ctrl+W'));
   const casi = [
     [suona, '.audio-ind', 'Silenzia'],
@@ -209,6 +228,7 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
     // Tornando sul titolo la carta torna e il suggerimento se ne va.
     await sulTitolo(id);
   }
+  expect(await app.evaluate(() => globalThis.__sopraLaCarta), 'suggerimenti comparsi con la carta ancora a schermo').toBe(0);
   // Oltre l'attesa del suggerimento: la carta non ha un doppione di testo sotto.
   await new Promise((r) => setTimeout(r, 600));
   expect(await scritte(app)).toEqual({ carta: titoli[casi.at(-1)[0]], suggerimento: null });

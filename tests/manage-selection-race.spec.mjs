@@ -111,8 +111,8 @@ test('rispondere a un chiarimento non chiude il dettaglio di quello aperto nel f
   };
   await preparaConCanaleLento(page, A, feedbackB({ status: 'clarify', notes: '--- Filo ---\nE questo dove lo vedi?' }), 'inbox');
 
-  await page.locator('#mgClarifyText').fill('Intendo quello in alto a destra.');
-  await page.locator('#mgClarifyBtn').click();
+  await page.locator('#mgSideRispostaText').fill('Intendo quello in alto a destra.');
+  await page.locator('#mgSideRispostaBtn').click();
   await apriBeVerifica(page);
 
   const patch = await page.evaluate(() => window.__updates[0]);

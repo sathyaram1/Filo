@@ -1,0 +1,13 @@
+Dizionari del correttore ortografico nativo (Hunspell, nel formato .bdic di Chromium).
+Filo li copia nella sua cartella dei dati all'avvio, così il motore non li scarica da Google (#1084).
+
+Provenienza: hunspell_dictionaries.zip della release v33.4.11 di Electron, gli stessi file di
+https://chromium.googlesource.com/chromium/deps/hunspell_dictionaries
+
+- it-IT-3-0.bdic: il dizionario italiano di Gianluca Turconi e Davide Prina, sotto GNU GPL versione 2
+  o successiva (sorgenti/README_it_IT.txt). Le sorgenti da cui è compilato sono in sorgenti/
+  (it_IT.dic, it_IT.aff, it_IT.dic_delta); il testo della licenza è in COPYING.
+- en-US-10-1.bdic, en-GB-10-1.bdic: SCOWL, di Kevin Atkinson e altri; licenza e crediti in
+  sorgenti/README_en_US.txt e sorgenti/README_en_GB.txt.
+
+Questi file restano sotto le loro licenze; il resto di Filo sotto la sua (LICENSE nella radice).

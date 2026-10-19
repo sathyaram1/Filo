@@ -26,21 +26,7 @@ const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o 
 
 // Il server finto che serve config/routines ai comandi del CLI (processo
 // separato: i comandi si lanciano in modo sincrono). Vale per tutto il file.
-import { spawn as _spawn } from 'node:child_process';
-async function fintoConfigRoutines(env = {}) {
-  const helper = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'helpers', 'finto-config-routines.mjs');
-  const p = _spawn(process.execPath, [helper], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
-  const port = await new Promise((ok, no) => {
-    let so = '';
-    p.stdout.on('data', (c) => { so += c; const m = so.match(/PORT=(\d+)/); if (m) ok(Number(m[1])); });
-    p.on('exit', (code) => no(new Error(`server finto uscito con ${code}`)));
-    setTimeout(() => no(new Error('server finto: nessuna porta entro 15 s')), 15000).unref();
-  });
-  // Il figlio non deve tenere in vita il processo dei test: senza unref il
-  // runner aspettava per sempre la fine del server.
-  p.unref(); p.stdout.unref(); p.stderr.unref();
-  return { url: `http://127.0.0.1:${port}/config/routines`, kill: () => { try { p.kill(); } catch (_) { /* già morto */ } } };
-}
+import { avviaConfigRoutinesFinto as fintoConfigRoutines } from '../helpers/server-finto.mjs';
 const FINTO = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify(CAPS_TEST) });
 process.env.FILO_ROUTINE_CONFIG_URL = FINTO.url;
 process.env.FILO_ADMIN_ID_TOKEN = 'finto-id-token';
@@ -263,7 +249,7 @@ test('afterRebase in conflitto senza elenco file: messaggio comunque utilizzabil
 const VERIFY = fileURLToPath(new URL('../../scripts/verify-local.mjs', import.meta.url));
 const sandbox = [];
 test.after(() => {
-  for (const d of sandbox) { try { rmSync(d, { recursive: true, force: true }); } catch (_) {} }
+  for (const d of sandbox) { try { togliCartella(d); } catch (_) {} }
 });
 
 function g(cwd, args) {
@@ -548,7 +534,7 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
 // non usciva mai: start e critica respinti, e l'unica uscita era «corretto».
 import { execFileSync as _exec } from 'node:child_process';
 import { writeFileSync as _write } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 const _ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 function depositoUsaEGetta() {
@@ -627,18 +613,36 @@ test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per
 // caratteri, e i rilievi (in coda) sparivano dal brief del verificatore dopo.
 
 test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta col numero, non tagliata', async () => {
-  const { MAX_CRITIQUE_CHARS, leggiCoda } = await import('../../scripts/verify-local.mjs');
+  const { MAX_CRITIQUE_BYTES, leggiCoda } = await import('../../scripts/verify-local.mjs');
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const riassunto = 'provato '.repeat(700); // ~5600 caratteri: sopra il vecchio taglio a 4000
   const lunga = withCritique(s, 'r', { critique: `${riassunto}\n[2i] LA PORTA ROSSA: il salvataggio non salva col titolo vuoto`, sha: SHA });
   assert.equal(lunga.outcome, 'fix');
   assert.match(lunga.state.r.critique, /LA PORTA ROSSA/, 'il rilievo in coda sopravvive: non si taglia');
-  const troppa = withCritique(s, 'r', { critique: `${'x'.repeat(MAX_CRITIQUE_CHARS + 1)}\n[2i] rotto`, sha: SHA });
+  const troppa = withCritique(s, 'r', { critique: `${'x'.repeat(MAX_CRITIQUE_BYTES + 1)}\n[2i] rotto`, sha: SHA });
   assert.equal(troppa.ok, false);
   assert.match(troppa.reason, /troppo lunga/);
-  assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_CHARS)), 'il rifiuto dice il tetto');
+  assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_BYTES)), 'il rifiuto dice il tetto');
   assert.equal(troppa.state.r.verdict, undefined, 'respinta: niente scritto');
   assert.equal(typeof leggiCoda, 'function');
+});
+
+test('il tetto della critica conta i byte: in cirillico e in giapponese la stessa cifra non vale di più (#1333)', async () => {
+  const { MAX_CRITIQUE_BYTES } = await import('../../scripts/verify-local.mjs');
+  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  const coda = '\n[2i] rotto';
+  for (const [lingua, lettera, byte] of [['cirillico', 'я', 2], ['giapponese', 'あ', 3], ['emoji', '😀', 4]]) {
+    // Sotto il tetto in caratteri, sopra quello in byte: prima passava e valeva tre volte tanto.
+    const sopra = lettera.repeat(Math.floor(MAX_CRITIQUE_BYTES / byte) + 1);
+    const r = withCritique(s, 'r', { critique: `${sopra}${coda}`, sha: SHA });
+    assert.equal(r.ok, false, `${lingua}: oltre i byte del tetto doveva essere respinta`);
+    assert.match(r.reason, /troppo lunga: \d+ byte, il massimo è 12000/);
+    assert.equal(r.state.r.verdict, undefined, `${lingua}: respinta, non tagliata a metà carattere`);
+    const dentro = lettera.repeat(Math.floor((MAX_CRITIQUE_BYTES - coda.length) / byte) - 1);
+    const ok = withCritique(s, 'r', { critique: `${dentro}${coda}`, sha: SHA });
+    assert.equal(ok.outcome, 'fix', `${lingua}: dentro il tetto passa intera`);
+    assert.ok(ok.state.r.critique.includes(dentro), `${lingua}: la critica resta intera`);
+  }
 });
 
 // ─── #256 sulla strada locale: la critica non si registra con file non registrati ───

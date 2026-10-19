@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackStatus.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'domande.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'manageReview.js'));
 
 const MR = globalThis.SN_MANAGE_REVIEW;
@@ -72,15 +73,18 @@ test('#595 — senza prova il mittente riservato ha una chiave sua, come sul ser
   assert.equal(MR.isUnprovenSender({ clientId: 'tester' }), false);
 });
 
-test('#595 — la frase di un panel completo dice «mittente fidato» solo con la prova', () => {
+test('#595/#1148 — la frase di un panel completo dice «fidato» solo con la fiducia, «provato» con la sola prova', () => {
   const pipeline = {
     expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
     verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((judge, i) => ({ judge, class: i ? 'aligned' : 'attack' })),
   };
   const conProva = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', senderProof: 'admin', pipeline });
   const senza = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', pipeline });
-  assert.match(conProva.text, /^Mittente fidato/);
-  assert.doesNotMatch(senza.text, /fidato/);
+  const fidato = MR.judgesNote({ status: 'unlabeled', clientId: 'utente-7', fiducia: 'fidato', pipeline });
+  assert.match(conProva.text, /^Mittente provato, segnalato/);
+  assert.doesNotMatch(conProva.text, /fidato/, 'la prova non è la fiducia');
+  assert.match(fidato.text, /^Fidato, ma segnalato/);
+  assert.doesNotMatch(senza.text, /fidato|provato/);
   assert.match(senza.text, /decidi tu/);
 });
 
@@ -609,7 +613,7 @@ test('listArchiveTab: filtro "Bloccati confermati" tiene solo attacchi/spam conf
   assert.equal(MR.listArchiveTab(items).length, 3);
 });
 
-test('manageTabCounts: conta le cinque schede-lista, e solo quelle', () => {
+test('manageTabCounts: conta le sei schede-lista, e solo quelle', () => {
   const items = [
     { _id: 'i1', status: 'unlabeled', createdAt: '2026-01-01' },
     { _id: 'i2', status: 'attack', createdAt: '2026-01-02' },
@@ -620,17 +624,17 @@ test('manageTabCounts: conta le cinque schede-lista, e solo quelle', () => {
     { _id: 'z1', status: 'archived', createdAt: '2026-04-01' },
   ];
   assert.deepEqual(MR.manageTabCounts(items), {
-    inbox: 3, queue: 2, local: 0, resolved: 1, archived: 1,
+    inbox: 3, queue: 2, local: 0, waiting: 0, resolved: 1, archived: 1,
   });
   // Nessuna chiave in più: le schede senza lista (statistiche, modelli,
   // automazioni, log) non hanno un numero da mostrare.
   assert.deepEqual(Object.keys(MR.manageTabCounts(items)).sort(),
-    ['archived', 'inbox', 'local', 'queue', 'resolved']);
+    ['archived', 'inbox', 'local', 'queue', 'resolved', 'waiting']);
 });
 
-test('manageTabCounts: liste vuote → cinque zeri (una scheda vuota lo dice)', () => {
-  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
-  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
+test('manageTabCounts: liste vuote → sei zeri (una scheda vuota lo dice)', () => {
+  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 });
 });
 
 test('manageTabCounts: ogni numero è la LUNGHEZZA della lista che la scheda mostra', () => {
@@ -672,16 +676,17 @@ test('manageTabCounts: gli Archiviati seguono i filtri della colonna (⭐, confe
 
 test('manageTabCounts: spostare un feedback sposta due numeri (approvazione)', () => {
   const items = [{ _id: 'a', status: 'unlabeled', createdAt: '2026-01-01' }];
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, local: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 });
   items[0].status = 'todo';   // l'owner approva: Ricevuti → In coda
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 0, waiting: 0, resolved: 0, archived: 0 });
 });
 
 // ── Lavori locali (#908) ────────────────────────────────────────────────────
 
 const SEGNO = { by: 'owner@x', at: 1790000000000 };
+// Una sessione col biglietto pulito: il server l'ha fatta nascere fidata (#1148).
 const locale = (extra) => ({
-  _id: 'l1', status: 'todo', clientId: 'local:claude', senderProof: 'admin', createdAt: '2026-09-01', ...extra,
+  _id: 'l1', status: 'todo', clientId: 'local:claude', senderProof: 'admin', fiducia: 'fidato', createdAt: '2026-09-01', ...extra,
 });
 
 test('Lavori locali: col segno la pratica esce da «In coda» e ha la sua sezione', () => {
@@ -689,7 +694,7 @@ test('Lavori locali: col segno la pratica esce da «In coda» e ha la sua sezion
   assert.equal(MR.manageTabFor(items[0]), 'local');
   assert.deepEqual(MR.listForManageTab(items, 'local').map((f) => f._id), ['l1']);
   assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1']);
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 1, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 1, waiting: 0, resolved: 0, archived: 0 });
   // Il numero è la lunghezza della lista che la sezione mostra.
   assert.equal(MR.manageTabCounts(items).local, MR.listForManageTab(items, 'local').length);
 });
@@ -701,7 +706,7 @@ test('Lavori locali: tutto l’iter di lavorazione ci sta, i Ricevuti e i chiusi
   // Aspetta ancora l'owner: resta nei Ricevuti, e l'approvazione dice dove va.
   const allineato = locale({ status: 'aligned', localOnly: SEGNO });
   assert.equal(MR.manageTabFor(allineato), 'inbox');
-  assert.equal(MR.ownerActionFor(allineato, 'accept').label, '→ Lavori locali');
+  assert.equal(MR.ownerActionFor(allineato, 'accept').label, '→ Lavori server');
   assert.equal(MR.ownerActionFor(locale({ status: 'aligned' }), 'accept').label, '→ In coda');
   assert.equal(MR.manageTabFor(locale({ status: 'archived', localOnly: SEGNO })), 'archived');
   assert.equal(MR.manageTabFor(locale({ status: 'done', localOnly: SEGNO, resolvedInVersion: '1.0.0' }), { releasedVersion: '2.0.0' }), 'resolved');
@@ -718,19 +723,25 @@ test('Lavori locali: una fusione che aspetta l’owner lo porta nei Ricevuti anc
   assert.equal(MR.manageTabFor(fb, { fusioni }), 'inbox');
 });
 
-test('localSignCheck: il segno si mette solo su owner o sessione CON la prova', () => {
+test('localSignCheck: il segno si mette su un fidato o un approvato, mai sulla sola prova (#1148)', () => {
   assert.equal(MR.localSignCheck(locale(), true).ok, true);
   assert.equal(MR.localSignCheck(locale({ clientId: 'owner:me' }), true).ok, true);
-  // Il solo prefisso non basta: senza prova vale come un utente.
-  const senzaProva = MR.localSignCheck(locale({ senderProof: undefined }), true);
-  assert.equal(senzaProva.ok, false);
-  assert.equal(senzaProva.utente, true);
+  assert.equal(MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined }), true).ok, true, 'un utente segnato fidato');
+  // Con la prova ma non fidato: è suo, e la risposta dice la strada.
+  const mio = MR.localSignCheck(locale({ fiducia: 'non_fidato' }), true);
+  assert.deepEqual([mio.ok, mio.nonFidato], [false, true]);
+  assert.match(mio.motivo, /non è fidato/);
+  // Prima della migrazione il campo non c'è: col mittente provato vale la regola di prima.
+  assert.equal(MR.localSignCheck(locale({ fiducia: undefined }), true).ok, true);
+  // Il solo prefisso: vale come un utente.
+  const senzaProva = MR.localSignCheck(locale({ senderProof: undefined, fiducia: undefined }), true);
+  assert.deepEqual([senzaProva.ok, senzaProva.utente], [false, true]);
   assert.match(senzaProva.motivo, /prova/);
   // Un utente: rifiutato, e la risposta lo dice (lo script propone i Ricevuti).
-  const utente = MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined }), true);
+  const utente = MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined, fiducia: undefined }), true);
   assert.deepEqual([utente.ok, utente.utente], [false, true]);
-  // Una routine con la prova: non è un utente, ma non è nemmeno lavoro locale.
-  const routine = MR.localSignCheck(locale({ clientId: 'routine:worker', senderProof: 'server' }), true);
+  // Una routine non fidata: non è un utente, ma non è nemmeno lavoro locale.
+  const routine = MR.localSignCheck(locale({ clientId: 'routine:worker', senderProof: 'server', fiducia: undefined }), true);
   assert.deepEqual([routine.ok, !!routine.utente], [false, false]);
 });
 
@@ -739,17 +750,14 @@ test('localSignCheck: una pratica chiusa si segna (era un lavoro locale: fuori d
     const r = MR.localSignCheck(locale({ status, statusPublic: 'closed' }), true);
     assert.deepEqual([r.ok, r.chiusa], [true, true], status);
   }
-  // Il solo prefisso resta di un utente anche a pratica chiusa.
-  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', senderProof: undefined }), true).ok, false);
+  // Non fidata non si segna nemmeno a pratica chiusa.
+  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', fiducia: 'non_fidato' }), true).ok, false);
   assert.equal(MR.localSignCheck(locale({ status: 'attack_confirmed', statusPublic: 'closed' }), true).ok, false);
 });
 
-test('mittenteDaRiconoscere: solo i prefissi dell’owner e delle sessioni senza prova', () => {
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude' }), true);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'owner:abc' }), true);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude', senderProof: 'admin' }), false);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'routine:residuo' }), false);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'c-utente' }), false);
+test('«È mio» non c’è più: al suo posto «Segna fidato» (#1148)', () => {
+  assert.equal(MR.mittenteDaRiconoscere, undefined);
+  assert.equal(typeof MR.fiduciaCheck, 'function');
 });
 
 test('localSignCheck: pratica segnalata o in mano a una routine → no', () => {
@@ -773,10 +781,17 @@ test('localSignCheck: pratica segnalata o in mano a una routine → no', () => {
 test('localSenderCheck: la pratica da legare a un lavoro locale, segno o no', () => {
   assert.equal(MR.localSenderCheck(locale({ localOnly: SEGNO })).ok, true);
   assert.equal(MR.localSenderCheck(locale({ clientId: 'owner:me' })).ok, true);
-  const utente = MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined }));
+  assert.equal(MR.localSenderCheck(locale({ fiducia: 'non_fidato' })).nonFidato, true);
+  // Prima della migrazione il campo non c'è: per una sessione col mittente provato vale la regola di prima.
+  const vecchia = MR.localSenderCheck(locale({ fiducia: undefined }));
+  assert.deepEqual([vecchia.ok, vecchia.primaDellaMigrazione], [true, true]);
+  assert.equal(MR.localSenderCheck(locale({ fiducia: null })).ok, true);
+  assert.equal(MR.localSenderCheck(locale({ fiducia: 'qualcosa' })).ok, false, 'un valore ignoto non è assente: resta un no');
+  const utente = MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined, fiducia: undefined }));
   assert.deepEqual([utente.ok, utente.utente], [false, true]);
-  assert.equal(MR.localSenderCheck(locale({ senderProof: undefined })).utente, true);
-  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server' })).ok, false);
+  assert.equal(MR.localSenderCheck(locale({ senderProof: undefined, fiducia: undefined })).utente, true);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server', fiducia: undefined })).ok, false);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server' })).ok, true, 'un lavoro fidato delle routine');
 });
 
 test('localSignCheck: togliere il segno si può sempre, se c’è', () => {
@@ -798,12 +813,44 @@ test('isLocalOnly: serve una mappa con chi l’ha messo', () => {
   assert.equal(MR.isLocalOnly({}), false);
 });
 
-test('isProvenLocalWork: segno e prova insieme, come il server che la fonde saltando L5', () => {
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO })), true);
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'owner:me' })), true);
-  assert.equal(MR.isProvenLocalWork(locale()), false);
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, senderProof: undefined })), false);
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'utente-x' })), false);
+test('la fiducia: solo il valore esatto scritto dal server vale fidato; il resto no (#1148)', () => {
+  assert.equal(MR.isProvenLocalWork, undefined, 'la prova non fa più fondere senza chiedere');
+  assert.equal(MR.isFidato(locale()), true);
+  for (const fiducia of [undefined, null, '', 'non_fidato', 'FIDATO', 'fidato ', true, 1]) {
+    assert.equal(MR.isFidato(locale({ fiducia })), false, String(fiducia));
+  }
+  assert.equal(MR.isFidato(null), false);
+});
+
+test('fiduciaCheck: si offre su un non fidato aperto, anche segnalato (col motivo), mai su un fidato o una chiusa', () => {
+  assert.deepEqual(MR.fiduciaCheck(locale({ fiducia: undefined })), { ok: true });
+  assert.equal(MR.fiduciaCheck(locale()).ok, false);
+  assert.match(MR.fiduciaCheck(locale()).motivo, /già fidato/);
+  assert.equal(MR.fiduciaCheck(locale({ fiducia: undefined, statusPublic: 'closed' })).ok, false);
+  const attacco = MR.fiduciaCheck(locale({ fiducia: undefined, status: 'attack' }));
+  assert.equal(attacco.ok, true);
+  assert.match(attacco.segnalato, /attacco/);
+  assert.equal(MR.fiduciaCheck(null).ok, false);
+});
+
+test('fiduciaTogliCheck: se si può mettere si può togliere, su un fidato aperto; mai su un non fidato o una chiusa', () => {
+  assert.deepEqual(MR.fiduciaTogliCheck(locale()), { ok: true });
+  assert.equal(MR.fiduciaTogliCheck(locale({ fiducia: undefined })).ok, false);
+  assert.equal(MR.fiduciaTogliCheck(locale({ fiducia: 'non_fidato' })).ok, false);
+  assert.equal(MR.fiduciaTogliCheck(locale({ statusPublic: 'closed' })).ok, false);
+  assert.equal(MR.fiduciaTogliCheck(null).ok, false);
+  // Le due non valgono mai insieme: il tasto è uno solo.
+  for (const fb of [locale(), locale({ fiducia: undefined }), locale({ statusPublic: 'closed' })]) {
+    assert.ok(!(MR.fiduciaCheck(fb).ok && MR.fiduciaTogliCheck(fb).ok), JSON.stringify(fb.fiducia));
+  }
+});
+
+test('fiduciaText: da dove viene la fiducia, in una riga; niente per un non fidato', () => {
+  assert.equal(MR.fiduciaText(locale({ fiducia: undefined })), '');
+  assert.equal(MR.fiduciaText(locale({ fiduciaDa: { by: 'nascita', at: 1 } })), 'Fidato: scritto da te o da una sessione pulita.');
+  assert.equal(MR.fiduciaText(locale({ fiduciaDa: { by: 'migrazione', at: 1 } })), 'Fidato: mittente provato o già approvato da te.');
+  assert.match(MR.fiduciaText(locale({ fiduciaDa: { by: 'owner', at: Date.parse('2026-10-09T10:00:00Z') } })), /^Fidato: l’hai segnato tu il 9 ottobre.$/);
+  assert.equal(MR.fiduciaText(locale({ fiduciaDa: { by: 'altro' } })), 'Fidato.');
 });
 
 test('livelli L5: la fusione locale che ha saltato L5 non dice «avevi messo il segno»', () => {
@@ -1377,6 +1424,24 @@ test('livelli L3: grigio senza segnalazione, verde con il testo di chi ha lavora
   assert.match(righe, /2026-09-12/);
 });
 
+test('livelli L3: fermo per un guasto, arenato o in loop, il rombo dice quello che dice il segno in lista', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+  for (const motivo of ['guasto', 'arenato', 'loop']) {
+    const fb = { status: 'design', statusReason: motivo, notes: 'Report.\n\n[Filo]\nGuasto, non lavoro locale: guasto: filo-security. Domanda D-9.' };
+    const l3 = MR.livelloL3(fb);
+    const segno = MR.segnoFermata(fb);
+    assert.equal(l3.titolo, segno.testo, `${motivo}: stesso testo in lista e nel dettaglio`);
+    assert.equal(l3.esito, 'fermo', motivo);
+    // Il verde è una domanda per l'owner: c'è per il guasto (aperta nelle Domande), non per arenato e loop.
+    assert.equal(l3.vuoto, motivo !== 'guasto', motivo);
+    if (motivo === 'guasto') assert.equal(l3.colore, MR.REASONS.design.color);
+    assert.match(l3.pannello.testo, /D-9/, `${motivo}: l'ultima nota di chi ci lavorava`);
+    assert.doesNotMatch(l3.pannello.testo, /Nessuna segnalazione/, motivo);
+    assert.match(MR.livelloL3({ status: 'design', statusReason: motivo }).pannello.testo, new RegExp(segno.testo.slice(0, 12)));
+  }
+  assert.equal(MR.livelloL3({ status: 'design', statusReason: 'judges' }).esito, 'nessuna');
+});
+
 test('livelli L3: chi aspetta una risposta ha il rombo verde anche senza segnalazione salvata', () => {
   require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
   const fb = { status: 'design', statusReason: 'clarify', notes: 'Due domande: A o B?' };
@@ -1439,6 +1504,24 @@ test('livelli L5: la richiesta si lega alla segnalazione per numero o per id', (
   // Una richiesta di un'altra pratica non tocca questo quadrato.
   const altrui = MR.livelloL5(FB_412, { fusioni: { pending: [{ id: 'y', num: '#999' }] } });
   assert.equal(altrui.esito, 'attesa');
+});
+
+test('livelli L5: una richiesta già mandata a fondere, o già decisa, non dice più che aspetta il via libera (#702)', () => {
+  const fusioni = { pending: [RICHIESTA] };
+  const ferma = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => null });
+  assert.match(ferma.pannello.testo, /via libera/);
+  assert.equal(ferma.fusione, null);
+  const volo = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'volo' });
+  assert.equal(volo.esito, 'bloccato');
+  assert.equal(volo.fusione, 'volo');
+  assert.doesNotMatch(volo.pannello.testo, /via libera/);
+  assert.equal(volo.richieste.length, 1);
+  assert.equal(MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'decisa' }).fusione, 'decisa');
+  // Una in volo e una che aspetta: la frase resta quella dell'attesa.
+  const due = { pending: [RICHIESTA, { id: 'z', feedbackId: 'fb-412' }] };
+  const misto = MR.livelloL5(FB_412, { fusioni: due, statoRichiesta: (r) => (r.id === 'z' ? null : 'volo') });
+  assert.equal(misto.fusione, null);
+  assert.match(misto.pannello.testo, /via libera/);
 });
 
 test('livelli L5: giallo in lavorazione, verde fuso con la versione, grigio se non ci è arrivato', () => {
@@ -1596,4 +1679,155 @@ test('segno: il motivo si traduce se è un codice, passa com’è se è un testo
   assert.equal(MR.motivoSegnoText('Il feedback #812 è stato giudicato un attacco'), 'Il feedback #812 è stato giudicato un attacco');
   assert.equal(MR.motivoSegnoText(''), '');
   assert.equal(MR.motivoSegnoText(null), '');
+});
+
+// ── Sezioni di Gestione e filtro dei Ricevuti per livello (#1150) ─────────
+
+const RICEVUTI_PER_LIVELLO = [
+  { _id: 'a1', status: 'suspicious_file', livello: 'l1' },
+  { _id: 'a2', status: 'attack', pipeline: { action: 'block_attack' }, livello: 'l1' },
+  { _id: 'b1', status: 'unlabeled', livello: 'l2' },
+  { _id: 'b2', status: 'aligned', livello: 'l2' },
+  { _id: 'b3', status: 'spam', pipeline: { verdicts: [] }, livello: 'l2' },
+  { _id: 'c1', status: 'design', statusReason: 'clarify', livello: 'l3' },
+  { _id: 'c2', status: 'design', statusReason: 'decisione', livello: 'l3' },
+  { _id: 'c3', status: 'design', statusReason: 'locale', livello: 'l3' },
+  { _id: 'd1', status: 'design', statusReason: 'secaudit', livello: 'l4' },
+  { _id: 'e1', status: 'design', statusReason: 'l5', livello: 'l5' },
+];
+const FUORI_DAI_RICEVUTI = [{ _id: 'q1', status: 'todo' }, { _id: 'z1', status: 'archived' }];
+const soloId = (l) => l.map((f) => f._id).sort();
+
+test('livelloRicevuti: ogni stato dei Ricevuti ha il livello del suo segno, fuori dai Ricevuti nessuno', () => {
+  for (const fb of RICEVUTI_PER_LIVELLO) {
+    assert.equal(MR.livelloRicevuti(fb), fb.livello, `${fb._id} (${fb.status}/${fb.statusReason || ''})`);
+  }
+  for (const fb of FUORI_DAI_RICEVUTI) assert.equal(MR.livelloRicevuti(fb), null);
+});
+
+test('filtro dei Ricevuti: spento = tutto, un livello = solo quello, più livelli = unione', () => {
+  const tutti = RICEVUTI_PER_LIVELLO.concat(FUORI_DAI_RICEVUTI);
+  const lista = (livelli) => soloId(MR.listForManageTab(tutti, 'inbox', { livelli }));
+  assert.deepEqual(lista([]), soloId(RICEVUTI_PER_LIVELLO));
+  assert.deepEqual(lista(undefined), soloId(RICEVUTI_PER_LIVELLO));
+  assert.deepEqual(lista(['l1']), ['a1', 'a2']);
+  assert.deepEqual(lista(['l4']), ['d1']);
+  assert.deepEqual(lista(['l1', 'l5']), ['a1', 'a2', 'e1']);
+  assert.deepEqual(lista(['l3', 'l2']), ['b1', 'b2', 'b3', 'c1', 'c2', 'c3']);
+  // Un livello che non esiste vale come filtro spento, non nasconde tutto.
+  assert.deepEqual(lista(['l9']), soloId(RICEVUTI_PER_LIVELLO));
+  // Le altre schede non conoscono il filtro.
+  assert.deepEqual(soloId(MR.listForManageTab(tutti, 'queue', { livelli: ['l1'] })), ['q1']);
+});
+
+test('filtro dei Ricevuti: una pratica senza livello si vede solo a filtro spento', () => {
+  // Stato cifrato: nessun segno, quindi nessun livello.
+  const senza = { _id: 'y1', status: 'FENC1:abc' };
+  assert.equal(MR.livelloRicevuti(senza), null);
+  assert.equal(MR.filtraLivelli([senza], []).length, 1);
+  for (const l of MR.LIVELLI_RICEVUTI) assert.equal(MR.filtraLivelli([senza], [l]).length, 0, l);
+});
+
+test('conteggi per livello: lunghezza della lista filtrata, e la scheda Ricevuti segue il filtro', () => {
+  const tutti = RICEVUTI_PER_LIVELLO.concat(FUORI_DAI_RICEVUTI);
+  const n = MR.contaLivelliRicevuti(tutti, {});
+  assert.deepEqual(n, { l1: 2, l2: 3, l3: 3, l4: 1, l5: 1, senza: 0 });
+  for (const l of MR.LIVELLI_RICEVUTI) {
+    assert.equal(n[l], MR.listForManageTab(tutti, 'inbox', { livelli: [l] }).length, l);
+    assert.equal(MR.manageTabCounts(tutti, { livelli: [l] }).inbox, n[l], `scheda con ${l}`);
+  }
+  assert.equal(MR.manageTabCounts(tutti, {}).inbox, RICEVUTI_PER_LIVELLO.length);
+  assert.equal(MR.manageTabCounts(tutti, { livelli: ['l1', 'l4'] }).inbox, 3);
+  // Il filtro dei Ricevuti non tocca i numeri delle altre schede.
+  assert.equal(MR.manageTabCounts(tutti, { livelli: ['l1'] }).queue, 1);
+});
+
+test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta fuori', () => {
+  const attese = {
+    domande: 'domande', 'domande-lavoro': 'domande', 'domande-archivio': 'domande',
+    inbox: 'feedback', queue: 'feedback', local: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
+    fbstats: 'feedback', stats: 'feedback',
+    automation: 'routine', crediti: 'routine', log: 'routine',
+  };
+  for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);
+  const tutte = MR.SEZIONI.flatMap((s) => s.schede);
+  assert.deepEqual(tutte.slice().sort(), Object.keys(attese).sort());
+  assert.equal(new Set(tutte).size, tutte.length);
+  assert.equal(MR.sezioneDiScheda('nessuna'), null);
+  assert.equal(MR.schedaPredefinita('feedback'), 'inbox');
+  assert.equal(MR.schedaPredefinita('routine'), 'automation');
+});
+
+test('scelta ricordata: torna intera o non torna', () => {
+  const buona = { sezione: 'routine', schede: { routine: 'log', feedback: 'queue' } };
+  assert.deepEqual(MR.leggiSceltaSezione(buona), buona);
+  assert.deepEqual(MR.leggiSceltaSezione(JSON.stringify(buona)), buona);
+  assert.equal(MR.leggiSceltaSezione('{rotto'), null);
+  assert.equal(MR.leggiSceltaSezione(null), null);
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'routine' }), null);
+  // La sezione ricordata senza la sua scheda, o una scheda nella sezione sbagliata: niente.
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'routine', schede: { feedback: 'queue' } }), null);
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'routine', schede: { routine: 'log', feedback: 'automation' } }), null);
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'statistiche', schede: { statistiche: 'x' } }), null);
+});
+
+test('apertura: bloccante aperta > Ricevuti non vuoto > ultima sezione > Feedback/Ricevuti', () => {
+  const bloccante = { id: 'D-1', stato: 'aperta', priorita: 'bloccante' };
+  const ultima = { sezione: 'routine', schede: { routine: 'log' } };
+  const ap = (o) => { const r = MR.sezioneDiApertura(o); return `${r.sezione}/${r.scheda}/${r.motivo}`; };
+  assert.equal(ap({ domande: [bloccante], ricevuti: 4, ultima }), 'domande/domande/bloccante');
+  assert.equal(ap({ domande: [], ricevuti: 4, ultima }), 'feedback/inbox/ricevuti');
+  assert.equal(ap({ domande: [], ricevuti: 0, ultima }), 'routine/log/ultima');
+  assert.equal(ap({ domande: null, ricevuti: null, ultima }), 'routine/log/ultima');
+  assert.equal(ap({ domande: null, ricevuti: 0, ultima: null }), 'feedback/inbox/predefinita');
+  assert.equal(ap({ ultima: 'rotto' }), 'feedback/inbox/predefinita');
+  assert.equal(ap(undefined), 'feedback/inbox/predefinita');
+  // Solo una bloccante APERTA: chiusa, in lavorazione o importante non aprono Domande.
+  for (const d of [
+    { stato: 'chiusa', priorita: 'bloccante' }, { stato: 'in_lavorazione', priorita: 'bloccante' },
+    { stato: 'aperta', priorita: 'importante' },
+  ]) assert.equal(ap({ domande: [d], ricevuti: 0, ultima: null }), 'feedback/inbox/predefinita', JSON.stringify(d));
+});
+
+test('domande: la scheda di ogni stato viene da SN_DOMANDE.schedaDi, e ogni sua scheda ha un posto in Gestione', () => {
+  assert.equal(MR.schedaDomanda({ stato: 'aperta' }), 'domande');
+  assert.equal(MR.schedaDomanda({ stato: 'in_lavorazione' }), 'domande-lavoro');
+  assert.equal(MR.schedaDomanda({ stato: 'chiusa' }), 'domande-archivio');
+  assert.equal(MR.schedaDomanda({ stato: 'superata' }), 'domande-archivio');
+  // Uno stato ignoto resta davanti all'owner, come dice il modulo delle domande.
+  assert.equal(MR.schedaDomanda({ stato: 'boh' }), 'domande');
+  assert.equal(MR.schedaDomanda({ stato: 'chiusa', esito: { automatica: true } }), 'domande-archivio');
+  assert.equal(MR.schedaDomanda(null), null);
+  const schedeDomande = MR.SEZIONI.find((s) => s.id === 'domande').schede;
+  for (const s of globalThis.SN_DOMANDE.SCHEDE) {
+    const d = { da_rispondere: { stato: 'aperta' }, in_lavorazione: { stato: 'in_lavorazione' },
+      risposte_automatiche: { stato: 'chiusa', esito: { automatica: true } }, archivio: { stato: 'superata' } }[s];
+    assert.ok(d, `la prova non conosce la scheda «${s}» di SN_DOMANDE`);
+    assert.ok(schedeDomande.includes(MR.schedaDomanda(d)), `«${s}» non ha una scheda in Gestione`);
+  }
+  assert.deepEqual(MR.contaDomande([
+    { stato: 'aperta' }, { stato: 'aperta' }, { stato: 'in_lavorazione' }, { stato: 'superata' }, { stato: 'boh' },
+  ]), { domande: 3, 'domande-lavoro': 1, 'domande-archivio': 1 });
+  assert.deepEqual(MR.contaDomande(null), { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 });
+});
+
+test('attesaServer: le due attese di un lavoro server passato, solo in revisione (#1222)', () => {
+  const rev = (attesa) => ({ status: 'revision_security', attesa });
+  assert.equal(MR.attesaServer(rev('fusione_server')), 'pc');
+  assert.equal(MR.attesaServer(rev('suite_server')), 'suite');
+  // L'app si fonde prima del server: nessuno aspetta più la pubblicazione.
+  assert.equal(MR.attesaServer(rev('deploy_server')), '');
+  assert.equal(MR.attesaServer(rev('')), '');
+  assert.equal(MR.attesaServer(rev('toString')), '', 'solo le chiavi sue');
+  assert.equal(MR.attesaServer({ status: 'todo', attesa: 'suite_server' }), '', 'rimessa in coda il segno vecchio non conta');
+  assert.equal(MR.attesaServer(null), '');
+  assert.equal(MR.inAttesaFusioneServer(rev('fusione_server')), true);
+  assert.equal(MR.inAttesaFusioneServer(rev('suite_server')), false);
+});
+
+test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hover (#857)', () => {
+  assert.deepEqual(MR.tastoFrase('Ora puoi farlo.'), { piena: true, titolo: 'Frase già scritta: “Ora puoi farlo.”' });
+  for (const vuota of [undefined, null, '', '   ']) {
+    assert.deepEqual(MR.tastoFrase(vuota), { piena: false, titolo: 'Scrivi la riga che leggerà chi ha segnalato' });
+  }
 });
