@@ -193,16 +193,16 @@
   // davvero il guasto si sente (un ripiego muto direbbe «utente» per tutti e
   // la ripartizione per creatore sarebbe una bugia).
   function deps() {
-    var TH = global.SN_FEEDBACK_THREAD;
     var MR = global.SN_MANAGE_REVIEW;
     var ST = global.SN_FB_STATUS;
-    if (!TH || typeof TH.authorKind !== 'function') {
-      throw new Error('feedbackStats: manca SN_FEEDBACK_THREAD (va caricato prima)');
+    var MT = global.SN_MITTENTI;
+    if (!MT || typeof MT.mittenteDi !== 'function') {
+      throw new Error('feedbackStats: manca SN_MITTENTI (va caricato prima)');
     }
     if (!MR || typeof MR.normalizeStatus !== 'function') {
       throw new Error('feedbackStats: manca SN_MANAGE_REVIEW (va caricato prima)');
     }
-    return { TH: TH, MR: MR, ST: ST };
+    return { MR: MR, ST: ST, MT: MT };
   }
 
   // Il mittente non si è potuto leggere: la chiave privata dell'owner non c'è
@@ -214,41 +214,52 @@
   var ETICHETTA_ILLEGGIBILE = 'Non leggibile con questa chiave';
 
   /**
-   * La categoria d'autore di un feedback ('user', 'prober', …). PURA.
-   *
-   * Il `clientId` viaggia cifrato come lo stato: senza chiave il main mette al
-   * suo posto il segnaposto, e `authorKind` di un segnaposto rispondeva
-   * «utente» — cioè la scheda dichiarava illeggibile la categoria e nella
-   * stessa riga attribuiva con sicurezza tutti i mittenti a una persona.
+   * La classe del mittente di un feedback (SPEC-DOMANDE.md §10): quella scritta dal server, o calcolata dal mittente
+   * in chiaro coi documenti nati prima della migrazione. → { classe, ruolo }, con la classe CREATORE_ILLEGGIBILE se
+   * né scritta né leggibile (il segnaposto della chiave assente non è un utente). PURA.
    */
-  function creatoreDi(fb) {
+  function mittenteDi(fb) {
     var d = deps();
-    var id = fb && fb.clientId;
-    if (d.MR.valueUnreadable && d.MR.valueUnreadable(id)) return CREATORE_ILLEGGIBILE;
-    return d.TH.authorKind(fb);
+    var scritta = fb && fb.mittenteClasse;
+    if (!(typeof scritta === 'string' && CREATORI.indexOf(scritta) >= 0)) {
+      var id = fb && fb.clientId;
+      if (d.MR.valueUnreadable && d.MR.valueUnreadable(id)) return { classe: CREATORE_ILLEGGIBILE, ruolo: '' };
+    }
+    return d.MT.mittenteDi(fb || {}) || { classe: CREATORE_ILLEGGIBILE, ruolo: '' };
   }
 
-  // I creatori, nell'ordine della coda (prima le persone, poi le istanze di
-  // Claude dalla più vicina all'owner, in fondo Filo). Stesso ordine di
-  // AUTHOR_RANK in manage.js: chi legge le due superfici non deve reimparare.
-  var CREATORI = ['owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'costruzione', 'claude', 'filo'];
+  function creatoreDi(fb) {
+    return mittenteDi(fb).classe;
+  }
+
+  /** Il ruolo di una routine ('prober', 'residuo', …), '' per ogni altra classe. PURA. */
+  function ruoloDi(fb) {
+    var m = mittenteDi(fb);
+    return m.classe === 'routine' ? m.ruolo : '';
+  }
+
+  // Le classi, nell'ordine del modulo dei mittenti: prima le persone, poi i processi.
+  var MT0 = global.SN_MITTENTI || (typeof require === 'function' ? (require('./mittenti.js'), global.SN_MITTENTI) : null);
+  var CREATORI = MT0 ? MT0.CLASSI.slice() : [];
+
+  // Nome e icona di ogni classe, per le pasticche e le ripartizioni.
+  var CLASSI_META = {
+    owner: { icon: '👑', label: 'Owner' },
+    utente: { icon: '👤', label: 'Utenti' },
+    filo_per_utente: { icon: '🧵', label: 'Filo (per conto di un utente)' },
+    sessione_locale: { icon: '💻', label: 'Sessioni locali' },
+    routine: { icon: '🤖', label: 'Routine' },
+    server: { icon: '🔔', label: 'Allarmi del server' },
+    test: { icon: '🧰', label: 'Prove e collaudi' },
+  };
 
   // ── Le due domande che ci si fa davanti a questa scheda ──────────────────
-  // «Quanto è arrivato dalle persone» e «quanto hanno prodotto le routine».
-  // Con una pasticca per mittente, la seconda costava sei clic e la
-  // conoscenza di quale delle voci è una routine: la segnalazione
-  // chiedeva per esempio «i feedback lanciati da prober o altre routine
-  // cloud», e quello è un gruppo, non un mittente.
-  //
-  // `filo` sta con le PERSONE, non con le routine: un feedback che nasce da
-  // Filo è la voce di un utente vero filtrata da un modello, non un processo
-  // dell'owner (stessa scelta di feedbackThread.js). La sessione locale sta
-  // invece con le routine: è un'istanza di Claude, gira solo sul computer
-  // dell'owner. Con le routine anche gli allarmi della pubblicazione: li apre
-  // il server, non una persona.
+  // «Quanto è arrivato dalle persone» e «quanto hanno prodotto le automazioni»: un gruppo ciascuna, così non serve
+  // sapere quali classi sono processi. `filo_per_utente` sta con le PERSONE: è la voce di un utente vero filtrata da
+  // un modello. La sessione locale sta con le automazioni: è un'istanza di Claude.
   var GRUPPI_CREATORI = [
-    { key: '__persone', label: 'Persone', kinds: ['owner', 'user', 'filo'] },
-    { key: '__routine', label: 'Routine', kinds: ['local', 'worker', 'verifier', 'residuo', 'prober', 'costruzione', 'claude'] },
+    { key: '__persone', label: 'Persone', kinds: ['owner', 'utente', 'filo_per_utente'] },
+    { key: '__routine', label: 'Automazioni', kinds: ['sessione_locale', 'routine', 'server', 'test'] },
   ];
 
   // ── Il registro dei worker ────────────────────────────────────────────────
@@ -494,7 +505,7 @@
    *   feedbacks  la lista dei feedback (già decifrata)
    *   workerLog  il registro dei worker (`{ role, startedAt, num }`)
    *   range      la finestra (da `rangeOf`)
-   *   creatori   array di categorie d'autore da tenere; vuoto/assente = tutte
+   *   creatori   array di classi di mittente da tenere; vuoto/assente = tutte
    *   feedbackParziali  true se la lista dei feedback ha toccato il tetto di
    *                     caricamento (allora i conti sui feedback sono minimi)
    *   registroLetto  false se la lettura del registro dei worker è FALLITA
@@ -546,7 +557,7 @@
       var n2 = numeroDi(f2);
       if (!n2) continue;
       tenuto[n2] = !filtro || filtro.indexOf(creatoreDi(f2)) >= 0;
-      if (creatoreDi(f2) === 'residuo') {
+      if (ruoloDi(f2) === 'residuo') {
         var padre = numeroPadre(n2);
         if (padre && padre !== n2) derivatiDi[padre] = (derivatiDi[padre] || 0) + 1;
       }
@@ -570,6 +581,8 @@
     var perCreatore = Object.create(null);
     var perCreatoreTutti = Object.create(null);
     var idsPerCreatoreTutti = Object.create(null);
+    // Le routine, per ruolo (`mittenteRuolo`): il dettaglio della classe che ne ha uno.
+    var perRuoloRoutine = Object.create(null);
     var vociRicevuti = [];
     var attesePresa = [];
     var attesePresaIds = [];
@@ -610,6 +623,12 @@
       conta(perCreatore, kind);
       if (!idsPerCreatore[kind]) idsPerCreatore[kind] = [];
       if (f && f._id) idsPerCreatore[kind].push(f._id);
+      if (kind === 'routine') {
+        var ruolo = ruoloDi(f);
+        if (!perRuoloRoutine[ruolo]) perRuoloRoutine[ruolo] = { key: ruolo, n: 0, ids: [] };
+        perRuoloRoutine[ruolo].n += 1;
+        if (f && f._id) perRuoloRoutine[ruolo].ids.push(f._id);
+      }
       vociRicevuti.push({ t: ms(f.createdAt), id: f && f._id });
       // Quanto è rimasto nei Ricevuti prima che l'owner lo prendesse in mano.
       var presa = ms(f && f.reviewedAt);
@@ -671,10 +690,10 @@
     // segnalazioni delle persone.
     var proberRitrovamenti = 0;
     var proberIds = [];
-    var proberNelFiltro = !filtro || filtro.indexOf('prober') >= 0;
+    var proberNelFiltro = !filtro || filtro.indexOf('routine') >= 0;
     for (i = 0; proberNelFiltro && i < feedbacks.length; i++) {
       if (!inRange(feedbacks[i] && feedbacks[i].createdAt, range)) continue;
-      if (creatoreDi(feedbacks[i]) !== 'prober') continue;
+      if (ruoloDi(feedbacks[i]) !== 'prober') continue;
       proberRitrovamenti += 1;
       if (feedbacks[i]._id) proberIds.push(feedbacks[i]._id);
     }
@@ -839,6 +858,7 @@
         ids: idsRicevuti(perCategoria),
         categorie: ordinaPerN(perCategoria),
         creatori: creatoriOrdinati(perCreatore, idsPerCreatore),
+        ruoliRoutine: ruoliOrdinati(perRuoloRoutine),
         creatoriTutti: creatoriOrdinati(perCreatoreTutti, idsPerCreatoreTutti),
         serie: serieTemporale(vociRicevuti, range),
         senzaData: senzaData,
@@ -943,6 +963,16 @@
     return out;
   }
 
+  // I ruoli nell'ordine del modulo dei mittenti, `ignoto` in fondo.
+  function ruoliOrdinati(mappa) {
+    var ordine = (MT0 ? MT0.RUOLI.concat([MT0.RUOLO_IGNOTO]) : []);
+    var out = [];
+    for (var i = 0; i < ordine.length; i++) if (mappa[ordine[i]]) out.push(mappa[ordine[i]]);
+    var chiavi = Object.keys(mappa);
+    for (var j = 0; j < chiavi.length; j++) if (ordine.indexOf(chiavi[j]) < 0) out.push(mappa[chiavi[j]]);
+    return out;
+  }
+
   /** Tutti gli id raccolti in una mappa di voci: il numero grande di un riquadro. PURA. */
   function idsRicevuti(mappa) {
     var out = [];
@@ -977,11 +1007,11 @@
   }
 
   global.SN_FEEDBACK_STATS = {
-    PRESETS, CREATORI, GRUPPI_CREATORI, RUOLI_LAVORO,
+    PRESETS, CREATORI, CLASSI_META, GRUPPI_CREATORI, RUOLI_LAVORO,
     CREATORE_ILLEGGIBILE, ETICHETTA_ILLEGGIBILE,
     presetOf, rangeOf, inRange, giornoDi, dataBreve, durata, mediana,
     normNum, numeroDi, numeroPadre, normalizeLog,
-    creatoreDi, categoriaDi, fermato, passato, statoIlleggibile, esitoAudit, fettaGiri, serieTemporale,
+    creatoreDi, ruoloDi, mittenteDi, categoriaDi, fermato, passato, statoIlleggibile, esitoAudit, fettaGiri, serieTemporale,
     ETICHETTE_FETTE, ORDINE_FETTE,
     compute,
   };

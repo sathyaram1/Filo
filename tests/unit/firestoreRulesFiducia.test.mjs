@@ -1,5 +1,5 @@
-// Sentinella #1148: la fiducia (SPEC-DOMANDE.md §1.7) la scrive solo l'Admin SDK. Nessun ramo delle regole, admin
-// compreso (l'admin è anche ogni sessione locale), ammette `fiducia`, `fiduciaDa`, `genitori` o `mergePreapproved`;
+// Sentinella #1148/#1162: la fiducia (SPEC-DOMANDE.md §1.7) e la classe del mittente (§10) le scrive solo l'Admin SDK.
+// Nessun ramo delle regole, admin compreso (l'admin è anche ogni sessione locale), ammette quei campi;
 // `bigliettoLocale` solo nella create admin. Prova col motore vero: feedbackMittente.motore-vero.mjs, accanto.
 
 import { test } from 'node:test';
@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RULES = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
-const VIETATI = ['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved'];
+const VIETATI = ['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo'];
 
 function bloccoFeedback() {
   const da = RULES.indexOf('match /feedback/{');

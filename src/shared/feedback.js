@@ -997,7 +997,8 @@
   const CAMPI_LISTA = [
     'archiveOverride', 'attesa', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
-    'clientIdHash', 'createdAt', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly', 'name', 'parentId', 'pipeline',
+    'clientIdHash', 'createdAt', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly',
+    'mittenteClasse', 'mittenteRuolo', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',

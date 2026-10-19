@@ -180,8 +180,8 @@ test('#496 — il filtro per creatore mostra i soli dati di chi si è scelto', a
   const page = await openTab(URL);
   await apri(page, {
     feedbacks: [
-      fb({ seq: 1, clientId: 'agent:prober', createdAt: g(1) }),
-      fb({ seq: 2, clientId: 'agent:prober', createdAt: g(2) }),
+      fb({ seq: 1, clientId: 'routine:prober', createdAt: g(1) }),
+      fb({ seq: 2, clientId: 'routine:prober', createdAt: g(2) }),
       fb({ seq: 3, clientId: 'routine:verifier', createdAt: g(2) }),
       fb({ seq: 4, clientId: 'utente-vero', createdAt: g(2) }),
     ],
@@ -190,19 +190,50 @@ test('#496 — il filtro per creatore mostra i soli dati di chi si è scelto', a
   await page.locator('[data-fs-range="30g"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('4');
 
-  // Solo l'esploratore.
-  await page.locator('[data-fs-creator="prober"]').click();
-  await expect(tile(page, 'ricevuti')).toHaveText('2');
-  // …più la verifica: il filtro somma, non sostituisce.
-  await page.locator('[data-fs-creator="verifier"]').click();
+  // Una pasticca per classe di mittente (§10), non per mestiere.
+  await expect(page.locator('[data-fs-creator="prober"]')).toHaveCount(0);
+  // Solo le routine.
+  await page.locator('[data-fs-creator="routine"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('3');
+  // …più gli utenti: il filtro somma, non sostituisce.
+  await page.locator('[data-fs-creator="utente"]').click();
+  await expect(tile(page, 'ricevuti')).toHaveText('4');
   // «Tutti» rimette tutto com'era: si può togliere ciò che si è messo.
   await page.locator('[data-fs-creator="__tutti"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('4');
   await expect(page.locator('[data-fs-creator="__tutti"]')).toHaveClass(/mg-chip--on/);
 
   // Ogni pasticca dice quanto contiene, come la barra delle sezioni.
-  await expect(page.locator('[data-fs-creator="prober"] .mg-chip-n')).toHaveText('2');
+  await expect(page.locator('[data-fs-creator="routine"] .mg-chip-n')).toHaveText('3');
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('1');
+});
+
+test('§10 — la classe scritta dal server conta anche quando il mittente non si legge con questa chiave', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const cifrato = '[cifrato — chiave privata non configurata]';
+  await apri(page, {
+    feedbacks: [
+      fb({ seq: 1, clientId: cifrato, mittenteClasse: 'utente' }),
+      fb({ seq: 2, clientId: cifrato, mittenteClasse: 'routine', mittenteRuolo: 'residuo' }),
+      fb({ seq: 3, clientId: cifrato, mittenteClasse: 'server' }),
+      fb({ seq: 4, clientId: cifrato }),
+    ],
+    workerLog: [],
+  });
+  await page.locator('[data-fs-range="30g"]').click();
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('1');
+  await expect(page.locator('[data-fs-creator="routine"] .mg-chip-n')).toHaveText('1');
+  await expect(page.locator('[data-fs-creator="server"] .mg-chip-n')).toHaveText('1');
+  await expect(page.locator('[data-fs-creator="server"]')).toContainText('Allarmi del server');
+  // Solo quello senza classe e senza chiave resta «non leggibile»: non diventa un utente.
+  await page.locator('[data-fs-tile="ricevuti"]').click();
+  const det = page.locator('.mg-fs-detail');
+  await expect(det.locator('[data-fs-bargroup="creatori"][data-fs-bar="__illeggibile"] .mg-bar-n')).toHaveText('1');
+  await expect(det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="residuo"]')).toContainText('Rilievi residui');
+  // Una riga per ruolo apre le segnalazioni che ha contato.
+  await det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="residuo"]').click();
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('Routine: Rilievi residui');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
 });
 
 // ── 4. I riquadri e il dettaglio per categoria ──────────────────────────────
@@ -213,7 +244,7 @@ test('#496 — «Feedback ricevuti» si apre e mostra la divisione per categoria
     feedbacks: [
       fb({ seq: 1, status: 'todo', clientId: 'utente-a', createdAt: g(1) }),
       fb({ seq: 2, status: 'todo', clientId: 'utente-b', createdAt: g(1) }),
-      fb({ seq: 3, status: 'spam', clientId: 'agent:prober', createdAt: g(1) }),
+      fb({ seq: 3, status: 'spam', clientId: 'routine:prober', createdAt: g(1) }),
     ],
     workerLog: [],
   });
@@ -226,9 +257,11 @@ test('#496 — «Feedback ricevuti» si apre e mostra la divisione per categoria
   await expect(det).toBeVisible();
   await expect(det.locator('[data-fs-bar="todo"] .mg-bar-n')).toHaveText('2');
   await expect(det.locator('[data-fs-bar="spam"] .mg-bar-n')).toHaveText('1');
-  // …e la seconda metà: chi li ha mandati.
-  await expect(det.locator('[data-fs-bar="user"] .mg-bar-n')).toHaveText('2');
-  await expect(det.locator('[data-fs-bar="prober"] .mg-bar-n')).toHaveText('1');
+  // …e la seconda metà: chi li ha mandati, per classe, e le routine per ruolo.
+  await expect(det.locator('[data-fs-bargroup="creatori"][data-fs-bar="utente"] .mg-bar-n')).toHaveText('2');
+  await expect(det.locator('[data-fs-bargroup="creatori"][data-fs-bar="routine"] .mg-bar-n')).toHaveText('1');
+  await expect(det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="prober"] .mg-bar-n')).toHaveText('1');
+  await expect(det.locator('[data-fs-bargroup="ruoliRoutine"][data-fs-bar="prober"]')).toContainText('Esplorazione');
 
   // Si può aprire, quindi si può chiudere.
   await page.locator('[data-fs-tile="ricevuti"]').click();
@@ -238,7 +271,7 @@ test('#496 — «Feedback ricevuti» si apre e mostra la divisione per categoria
 test('#496 — esplorazioni lanciate e lanci per mestiere vengono dal registro delle esecuzioni', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page, {
-    feedbacks: [fb({ seq: 5, clientId: 'agent:prober', createdAt: g(1) })],
+    feedbacks: [fb({ seq: 5, clientId: 'routine:prober', createdAt: g(1) })],
     workerLog: [
       { role: 'prober', startedAt: g(1), num: '' },
       { role: 'prober', startedAt: g(2), num: '' },
@@ -445,16 +478,16 @@ test('#496 — col filtro acceso le pasticche degli altri mittenti dicono ancora
   const page = await openTab(URL);
   await apri(page, {
     feedbacks: [
-      fb({ seq: 1, clientId: 'agent:prober' }), fb({ seq: 2, clientId: 'agent:prober' }),
+      fb({ seq: 1, clientId: 'routine:prober' }), fb({ seq: 2, clientId: 'routine:prober' }),
       fb({ seq: 3, clientId: 'utente-a' }), fb({ seq: 4, clientId: 'utente-b' }), fb({ seq: 5, clientId: 'utente-c' }),
     ],
     workerLog: [],
   });
   await page.locator('[data-fs-range="30g"]').click();
-  await expect(page.locator('[data-fs-creator="user"] .mg-chip-n')).toHaveText('3');
-  await page.locator('[data-fs-creator="prober"]').click();
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('3');
+  await page.locator('[data-fs-creator="routine"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('2');
-  await expect(page.locator('[data-fs-creator="user"] .mg-chip-n')).toHaveText('3');
+  await expect(page.locator('[data-fs-creator="utente"] .mg-chip-n')).toHaveText('3');
 });
 
 test('#496 — un lavoro ancora in mezzo al giro non è «passato subito»', async ({ openTab }) => {
@@ -755,7 +788,7 @@ test('#496 il grafico degli arrivi disegna anche i periodi vuoti, e riempie il s
 
 test('#496 anche i numeri della fila in fondo portano alle segnalazioni che hanno contato', async ({ openTab }) => {
   const page = await openTab(URL);
-  const trovato = fb({ seq: 1, clientId: 'agent:prober', createdAt: g(2) });
+  const trovato = fb({ seq: 1, clientId: 'routine:prober', createdAt: g(2) });
   const lavorato = fb({
     seq: 2, status: 'done', createdAt: g(4), reviewedAt: g(3),
     stalls: 2, livelli: { l4: { esito: 'pass' } },
@@ -797,11 +830,11 @@ test('#496 il tasto destro sulle pasticche della finestra e del mittente offre l
   await expect(page.locator('.mg-ctxmenu')).toContainText('Copia la finestra');
   await page.keyboard.press('Escape');
 
-  await page.locator('[data-fs-creator="user"]').click({ button: 'right' });
-  await expect(page.locator('.mg-ctxmenu')).toContainText('Solo Utente');
+  await page.locator('[data-fs-creator="utente"]').click({ button: 'right' });
+  await expect(page.locator('.mg-ctxmenu')).toContainText('Solo Utenti');
   // E la voce funziona: sceglie quel mittente e basta.
   await page.locator('.mg-ctxmenu .sn-select-option').first().click();
-  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['user']);
+  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['utente']);
 });
 
 // ══ La finestra scritta a mano dice quale periodo stai guardando ═══════════
@@ -882,7 +915,7 @@ test('#496 ogni lavorazione contata esce da una porta della sezione della torta'
 // quell'esempio costava sei clic e la conoscenza di quale delle nove voci è
 // una routine.
 
-test('#496 «Routine» accende in un clic tutti i mittenti automatici', async ({ openTab }) => {
+test('#496 «Automazioni» accende in un clic tutti i mittenti automatici', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page, {
     feedbacks: [
@@ -895,6 +928,7 @@ test('#496 «Routine» accende in un clic tutti i mittenti automatici', async ({
   });
   await page.locator('[data-fs-range="30g"]').click();
 
+  await expect(page.locator('[data-fs-creator="__routine"]')).toContainText('Automazioni');
   await page.locator('[data-fs-creator="__routine"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('2');
   await expect(page.locator('[data-fs-creator="__routine"]')).toHaveAttribute('aria-pressed', 'true');
@@ -933,7 +967,7 @@ test('#496 la finestra scritta a mano e il filtro tornano interi alla riapertura
   await page.locator('#mgFsFrom').dispatchEvent('change');
   await page.locator('#mgFsTo').fill(giorno(0));
   await page.locator('#mgFsTo').dispatchEvent('change');
-  await page.locator('[data-fs-creator="user"]').click();
+  await page.locator('[data-fs-creator="utente"]').click();
   await expect(tile(page, 'ricevuti')).toHaveText('1');
 
   await page.reload();
@@ -942,7 +976,7 @@ test('#496 la finestra scritta a mano e il filtro tornano interi alla riapertura
   await expect(page.locator('.mg-chip--on[data-fs-range]')).toHaveText('Scegli tu');
   await expect(page.locator('#mgFsFrom')).toHaveValue(giorno(2));
   await expect(page.locator('#mgFsTo')).toHaveValue(giorno(0));
-  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['user']);
+  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['utente']);
   await expect(tile(page, 'ricevuti'), 'i numeri dopo la riapertura non sono quelli della finestra salvata').toHaveText('1');
 });
 
@@ -1454,19 +1488,19 @@ test('#496 la pasticca di un mittente apre le segnalazioni che il suo numero con
   await apri(page, {
     feedbacks: [
       fb({ seq: 41, createdAt: g(1), name: 'di una persona' }),
-      fb({ seq: 42, createdAt: g(1), name: 'dall\'esploratore', clientId: 'agent:prober' }),
+      fb({ seq: 42, createdAt: g(1), name: 'dall\'esploratore', clientId: 'routine:prober' }),
     ],
     workerLog: [],
   });
   await page.locator('[data-fs-range="tutto"]').click();
 
-  await page.locator('[data-fs-creator="prober"]').click({ button: 'right' });
+  await page.locator('[data-fs-creator="routine"]').click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu')).toContainText('Mostra la segnalazione contata');
   await page.locator('.mg-ctxmenu .sn-select-option').filter({ hasText: 'Mostra' }).click();
   await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
   // Il clic sulla pasticca resta il filtro: le due cose non si pestano.
-  await page.locator('[data-fs-creator="prober"]').click();
-  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['prober']);
+  await page.locator('[data-fs-creator="routine"]').click();
+  expect(await page.evaluate(() => window.__mgTest.getFsState().creatori)).toEqual(['routine']);
 });
 
 // Un conto si scrive allo stesso modo ovunque compaia, anche dove si vede solo

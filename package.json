@@ -38,7 +38,8 @@
     "feedback": "node scripts/owner-feedback.mjs",
     "feedback:apri": "node scripts/claude-feedback.mjs",
     "feedback:leggi": "node scripts/leggi-feedback.mjs",
-    "fiducia:migra": "node scripts/fiducia-migra.mjs"
+    "fiducia:migra": "node scripts/fiducia-migra.mjs",
+    "mittenti:migra": "node scripts/mittenti-migra.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

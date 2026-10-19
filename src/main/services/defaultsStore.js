@@ -576,20 +576,14 @@ async function setAutomationGate(enabled, idToken) {
   return Boolean(enabled);
 }
 
-// Auto-approvazione per mittente (config/automation, campo `autoApprove`): quali
-// categorie di mittente possono entrare in coda da sole quando l'interruttore
-// master è acceso. La decisione vera la prende il backend di sicurezza; qui c'è
-// solo la lettura/scrittura per la dashboard. Campo assente ⇒ tutti ammessi, che
-// è ciò che l'automatica faceva prima che questi sottointerruttori esistessero.
+// L'automatica per fiducia (config/automation, campo `autoApprove`, SPEC-DOMANDE.md §10): quali livelli di fiducia
+// entrano in coda da soli col master acceso. Decide il backend di sicurezza; qui lettura e scrittura per la dashboard.
+// Campo assente ⇒ tutti ammessi; una mappa per mittente salvata prima la traduce resolveAutoApprove (modulo condiviso).
 function autoApproveGroups() {
   const T = globalThis.SN_FEEDBACK_THREAD;
-  return (T && T.AUTO_APPROVE_GROUPS) || ['owner', 'filo', 'claude', 'user'];
+  return (T && T.AUTO_APPROVE_GROUPS) || ['fidato', 'non_fidato'];
 }
 
-// Un documento salvato prima che gli interruttori si sdoppiassero ha il solo
-// `claude` per tutte le istanze: il ripiego che fa ereditare quel valore vive
-// nel modulo condiviso (resolveAutoApprove), così la dashboard e il backend di
-// sicurezza leggono la stessa mappa dallo stesso documento.
 function normalizeAutoApprove(raw) {
   const T = globalThis.SN_FEEDBACK_THREAD;
   if (T && T.resolveAutoApprove) {
