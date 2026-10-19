@@ -399,8 +399,11 @@
       required: [],
     },
     DIMENTICA: {
-      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): toglie le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo`. Se serve l\'OK dell\'utente il sistema gli mostra le righe esatte e glielo chiede da sé: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
-      properties: { testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).') },
+      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo` escono dalle conversazioni e restano nascoste nel quaderno delle memorie, da dove l\'utente le rimette o le cancella. Con `per_sempre` (solo se l\'utente dice «per sempre», «definitivamente», «cancellala del tutto») il testo se ne va anche dal quaderno. Se serve l\'OK dell\'utente il sistema gli mostra le righe esatte e glielo chiede da sé: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
+      properties: {
+        testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).'),
+        per_sempre: { type: 'boolean', description: 'true solo se l\'utente chiede di cancellarla per sempre, non solo di toglierla.' },
+      },
       required: ['testo'],
     },
     IMPOSTA_PREFERENZA: {

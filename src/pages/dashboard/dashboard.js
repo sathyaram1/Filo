@@ -400,6 +400,22 @@
     catch (_) { return null; }
   }
 
+  // #872 — il quaderno delle memorie porta qui, al messaggio da cui una nota è nata (?evento=<id>): il filo ci va e lo
+  // illumina, senza riprendere quella conversazione.
+  function eventoFromUrl() {
+    try { return new URLSearchParams(self.location.search).get('evento') || null; }
+    catch (_) { return null; }
+  }
+
+  async function vaiAlEvento(id) {
+    const r = await send({ type: MSG.FILO_DOVE, id });
+    const d = r && r.ok ? r.dove : null;
+    if (!d || d.tipo !== 'messaggio') return false;
+    const trovato = await Coda.vaiA({ chat: d.chat, i: d.i, app: !!d.app, ts: d.ts });
+    if (trovato) goThread();
+    return trovato;
+  }
+
   // Le bolle di una serie di messaggi del filo, com'erano: testo, immagini (quelle ancora in memoria), le righe delle
   // azioni e il segno dei cambi. `storia`, se c'è, riceve lo storico che il turno dopo manda al main.
   function rendiMessaggi(messaggi, dove, { storia = null } = {}) {
@@ -2444,6 +2460,7 @@
     // benvenuto ha comunque la precedenza: è la PRIMA conversazione e va
     // finita, e durante l'intervista in archivio non c'è ancora niente.
     const reopenId = onbState ? null : chatIdFromUrl();
+    const eventoId = onbState ? null : eventoFromUrl();
     // Suggerimenti, stato vivo e coda del filo insieme: niente di questo chiama il modello (#869).
     await Promise.all([
       onbState ? Promise.resolve() : loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e)),
@@ -2452,6 +2469,7 @@
     ]);
     // Una chat che non c'è più (cancellata da un'altra scheda) lascia il filo com'è.
     if (reopenId) await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
+    if (eventoId) await vaiAlEvento(eventoId).catch((e) => { console.warn('[Filo] salto al punto del filo', e); return false; });
     if (onbState) await Accoglienza.openOnboarding(onbState);
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.

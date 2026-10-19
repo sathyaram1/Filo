@@ -100,7 +100,7 @@
       const testo = righe.map((riga) => {
         r += 1;
         const m = metaDi(meta, nome, riga);
-        rif.set(`R${r}`, { fonti: m ? m.fonti : [], nata: m ? m.nata : null, corretta: m && m.corretta ? m.corretta : null, testo: riga });
+        rif.set(`R${r}`, { riga: true, fonti: m ? m.fonti : [], nata: m ? m.nata : null, corretta: m && m.corretta ? m.corretta : null, testo: riga });
         return `[R${r}] ${riga}${m && m.corretta ? ' (scritta dall\'utente)' : ''}`;
       }).join('\n');
       blocchi.push(`${nome}:\n${testo || '(vuoto)'}`);
@@ -141,8 +141,9 @@
       const nata = primaData(...citati.map((c) => c.nata), prima ? prima.nata : null)
         || (citati.length || prima ? null : ora);
       const daUtente = citati.find((c) => c.corretta && norma(c.testo) === norma(riga)) || (prima && prima.corretta ? prima : null);
-      const nuovaDaLezioni = !prima && !citati.some((c) => norma(c.testo) === norma(riga) && !segni.some((s) => s.startsWith('L')));
-      if (nuovaDaLezioni && tornaDaTolta(riga, fonti, tolte)) { scartate.push(riga); continue; }
+      // Una riga che c'era già resta: il controllo vale per quelle che il compattatore scrive adesso.
+      const nuova = !prima && !citati.some((c) => c.riga && norma(c.testo) === norma(riga));
+      if (nuova && tornaDaTolta(riga, fonti, tolte)) { scartate.push(riga); continue; }
       righe.push({ testo: riga, fonti, nata, ...(daUtente ? { corretta: daUtente.corretta } : {}) });
     }
     return { righe, scartate };

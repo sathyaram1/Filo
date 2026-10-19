@@ -285,6 +285,64 @@ module.exports = function register(on, ctx) {
     return { ok: true, tolta: await FiloMem.forgetLine(msg) };
   });
 
+  // ── Il quaderno delle memorie (#872) ─────────────────────────────────────
+  // Ogni riga con la data in cui è nata e i punti del filo da cui viene: quelli che il filo non ha più (una chat
+  // cancellata) restano fuori, e una riga senza nessuno si legge e si corregge lo stesso, senza collegamento.
+  const IlFilo = () => globalThis.SN_IL_FILO;
+  async function fontiNelFilo(ids) {
+    const out = [];
+    for (const id of Array.isArray(ids) ? ids : []) {
+      let d = null;
+      try { d = await IlFilo().dove(id, { incognito: false }); } catch (_) {}
+      if (d && d.tipo === 'messaggio') out.push({ id, ts: d.ts, chat: d.chat, i: d.i, app: d.app || null });
+    }
+    return out.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  }
+  const conFonti = async (r) => ({ ...r, fonti: await fontiNelFilo(r.fonti) });
+
+  on(MSG.FILO_QUADERNO, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const q = await FiloMem.quaderno();
+    const moduli = [];
+    for (const m of q.moduli) moduli.push({ nome: m.nome, righe: await Promise.all(m.righe.map(conFonti)) });
+    return {
+      ok: true, moduli, lezioni: await Promise.all(q.lezioni.map(conFonti)),
+      sempreAperte: q.sempreAperte, nascoste: await Promise.all(q.nascoste.map(conFonti)),
+    };
+  });
+
+  const viaValida = (via) => !!via && ((via.lezione && typeof via.lezione === 'object'
+    && typeof via.lezione.ts === 'string' && typeof via.lezione.text === 'string')
+    || (typeof via.modulo === 'string' && typeof via.riga === 'string'));
+
+  // La correzione passa dagli stessi controlli di una lezione (tetto, caratteri che non si vedono): entra in ogni prompt.
+  on(MSG.FILO_MEMORY_EDIT, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!viaValida(msg && msg.via) || typeof msg.testo !== 'string') return { ok: false, error: 'bad_request' };
+    const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') });
+    if (l.rifiuto) return { ok: false, error: l.rifiuto, rifiuto: true };
+    if (!l.testo) return { ok: false, error: 'vuota' };
+    return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo), testo: l.testo };
+  });
+
+  on(MSG.FILO_MEMORY_RESTORE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
+    return { ok: true, rimessa: await FiloMem.restoreHidden(msg.id) };
+  });
+
+  on(MSG.FILO_MEMORY_FOREVER, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
+    return { ok: true, cancellata: await FiloMem.forgetHiddenForever(msg.id) };
+  });
+
+  // Il salto al punto del filo: la home chiede dove sta un evento, e ci va. Dall'incognito il filo è quello in memoria.
+  on(MSG.FILO_DOVE, soloFilo(async (msg) => {
+    if (!msg || typeof msg.id !== 'string' || !msg.id) return { ok: false, error: 'bad_request' };
+    return { ok: true, dove: await IlFilo().dove(msg.id) };
+  }));
+
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
   // PROFILO/PREFERENZE senza aspettare la soglia. Prima non esisteva alcun modo
   // di chiederla — la chiusura dell'intervista di benvenuto (#524) ne aveva

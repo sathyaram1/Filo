@@ -268,6 +268,15 @@ function creaFilo({ cartella } = {}) {
     return E().dove(v.stato, id);
   }
 
+  // L'evento dell'ultimo messaggio dell'utente in una chat: la fonte di una lezione chiesta a parole.
+  async function ultimaDomanda(id, opts) {
+    const v = await vista(opts);
+    const c = id ? E().copiaChat(v.stato.chat.get(String(id)), { ids: true }) : null;
+    if (!c) return '';
+    for (let i = c.messages.length - 1; i >= 0; i--) if (c.messages[i].role === 'user') return c.eids[i] || '';
+    return '';
+  }
+
   async function pagine(periodo, opts) {
     const v = await vista(opts);
     return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
@@ -417,7 +426,7 @@ function creaFilo({ cartella } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, perLaCoda, pagine, dove, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
     esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };
