@@ -417,6 +417,7 @@ test('aprire da Filo l\'indirizzo di un fattura.pdf.exe che scende come file: la
     return n;
   });
   await avviso.locator('#avanti').click();
+  await expect.poll(() => statoDi(shell, 'fattura.pdf.exe'), { timeout: 10000 }).toBe('pending');
   await expect.poll(vuote, { timeout: 6000 }).toBe(0);
   await expect.poll(async () => (await avvisi()).length, { timeout: 6000 }).toBe(0);
 
