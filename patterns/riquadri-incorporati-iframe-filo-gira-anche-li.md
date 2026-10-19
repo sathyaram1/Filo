@@ -114,7 +114,14 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   dall'elemento (`contentWindow`, `contentDocument`) e, per indice o per nome,
   appena entra nel documento: dalle funzioni che inseriscono (nodi e testo
   HTML, anche nelle ombre) nella stessa riga, dall'osservatore per ciò che
-  scrive il parser. **Un riquadro che carica un documento della stessa origine
+  scrive il parser. **Si segna come preparato il mondo JS del documento** (il
+  prototipo di `location`), mai la finestra: l'elemento dà la stessa finestra a
+  ogni documento che vi carica (riempito dopo l'inserimento, seconda pagina,
+  tornato vuoto), e ogni documento nuovo arriva con copie native nuove. Uno che
+  torna vuoto si prepara al suo `load`, che arriva al documento che lo contiene
+  e non alla finestra; un `embed` di HTML non dà la finestra dall'elemento:
+  nasce al calcolo della disposizione, e la si cerca fra quelle della pagina
+  con `frameElement`. **Un riquadro che carica un documento della stessa origine
   non si tocca prima**: la sua finestra vuota, toccata, la riusa il documento
   vero e il preload non gira più (niente Filo lì dentro, provato anche con la
   protezione spenta); la pagina che la tocca da sé l'ha già creata, quindi lì

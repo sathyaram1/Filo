@@ -221,12 +221,14 @@ function parteFingerprint(seed) {
 
 // Ogni finestra ha le sue copie native: una pagina che crea un riquadro vuoto (o della sua origine) e ne usa le
 // funzioni le troverebbe intatte. Il preambolo si monta in ogni finestra vuota della pagina prima che la pagina la
-// raggiunga: dall'elemento sempre, per indice o per nome appena il riquadro entra nel documento (anche da uno script).
+// raggiunga: dall'elemento sempre, per indice o per nome appena il riquadro entra nel documento (anche da uno script)
+// o vi carica una pagina vuota.
 // Un riquadro che carica un documento della stessa origine non si tocca prima: il documento erediterebbe la finestra
 // senza il preload. Nessun segno sulla finestra: un sito vedrebbe chi usa Filo (regole e porte rimaste:
 // patterns/riquadri-incorporati-iframe-filo-gira-anche-li.md).
 const PROPAGAZIONE = `
   var CORNICI = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'];
+  var TAG = { __proto__: null, IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1 };
   var NP = Node.prototype, EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute;
   var qsaE = EP.querySelectorAll, qsaF = DocumentFragment.prototype.querySelectorAll, qsaD = Document.prototype.querySelectorAll;
   var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(NP, 'nodeType').get, genitore = gOPD(NP, 'parentNode').get;
@@ -238,19 +240,28 @@ const PROPAGAZIONE = `
   var addEL = EventTarget.prototype.addEventListener, bersaglio = gOPD(Event.prototype, 'target').get;
   var annulla = Event.prototype.preventDefault, proprio = Object.prototype.hasOwnProperty;
   var WSP = WeakSet.prototype, wsHas = WSP.has, wsAdd = WSP.add, preparate = new WeakSet();
+  var dW = function (n) { return gOPD(window, n) || gOPD(Window.prototype, n) || {}; };
+  var cornice = dW('frameElement').get, quanteF = dW('length').get;
+  var vista = gOPD(Document.prototype, 'defaultView').get, misura = gOPD(HTMLElement.prototype, 'offsetWidth').get;
   var GETTER = { __proto__: null };
   for (var k = 0; k < CORNICI.length; k++) {
     var CC = window[CORNICI[k]], dcw = CC && gOPD(CC.prototype, 'contentWindow');
     if (dcw && dcw.get) GETTER[k === 0 ? 'IFRAME' : k === 1 ? 'FRAME' : 'OBJECT'] = dcw.get;
   }
 
+  // Si segna il mondo JS del documento, non la finestra: l'elemento dà la stessa finestra a ogni documento che vi
+  // carica, e ognuno arriva con copie native nuove. Il prototipo di location non lo cambia la pagina.
+  function regno(w) { try { return getProto(w.location); } catch (e) { return null; } }
+  function preparata(w) { var r = regno(w); return !!r && R(wsHas, preparate, [r]); }
+
   // Una finestra con un documento suo ha già il preambolo dal suo preload: un secondo annullerebbe il rumore.
   // La forza la passa solo chi lo chiede per sé (questa finestra, un riquadro che si unisce).
   function prepara(w, forza) {
     try {
-      if (!w || R(wsHas, preparate, [w])) return;
+      var r = w && regno(w);
+      if (!r || R(wsHas, preparate, [r])) return;
       if (!forza && R(taglia, '' + w.location.href, [0, 11]) !== 'about:blank') return;
-      R(wsAdd, preparate, [w]);
+      R(wsAdd, preparate, [r]);
     } catch (e) { return; }
     try { mascheraToString(w); } catch (e) {}
     for (var i = 0; i < parti.length; i++) { try { parti[i](w); } catch (e) {} }
@@ -272,6 +283,22 @@ const PROPAGAZIONE = `
     });
   }
 
+  // Un embed non dà la sua finestra: nasce al primo calcolo della disposizione, e la si cerca fra quelle della pagina.
+  function finestraDi(el, tag) {
+    var g = GETTER[tag];
+    if (g) return R(g, el, []);
+    if (tag !== 'EMBED' || !cornice || !quanteF) return null;
+    try {
+      R(misura, el, []);
+      var v = R(vista, R(docDi, el, []), []);
+      for (var i = 0, n = R(quanteF, v, []) | 0; i < n; i++) {
+        var cw = v[i];
+        try { if (R(cornice, cw, []) === el) return cw; } catch (e) {}
+      }
+    } catch (e) {}
+    return null;
+  }
+
   // Si tocca in anticipo un riquadro che resterà la finestra vuota della pagina, o che andrà su un'altra origine e
   // avrà una finestra nuova; mai uno che carica un documento della stessa origine.
   function anticipabile(el, tag) {
@@ -288,22 +315,30 @@ const PROPAGAZIONE = `
   // dentro se il documento arriva dopo. In Privacy massima, dopo qualche secondo ancora vuoto, si copre (decisione owner).
   var ATTESA_VUOTO = 3000, attesi = new WeakSet();
   function tocca(el) {
-    var tag = R(tagName, el, []), g = GETTER[tag];
-    if (!g) return;
-    if (anticipabile(el, tag)) { prepara(R(g, el, [])); return; }
+    var tag = R(tagName, el, []);
+    if (!TAG[tag]) return;
+    if (anticipabile(el, tag)) { prepara(finestraDi(el, tag)); return; }
     if (LIVELLO < 2 || R(wsHas, attesi, [el])) return;
     R(wsAdd, attesi, [el]);
-    R(aspetta, window, [function () { try { prepara(R(g, el, [])); } catch (e) {} }, ATTESA_VUOTO]);
+    R(aspetta, window, [function () { try { prepara(finestraDi(el, tag)); } catch (e) {} }, ATTESA_VUOTO]);
   }
-  var SEL = 'iframe,frame,object';
+  var SEL = 'iframe,frame,object,embed';
   function cornici(n, fa) {
     var t = R(nodeType, n, []), l = null;
     if (t === 1) {
-      if (GETTER[R(tagName, n, [])]) fa(n);
+      if (TAG[R(tagName, n, [])]) fa(n);
       if (R(primoFiglio, n, [])) l = R(qsaE, n, [SEL]);
     } else if (t === 11) l = R(qsaF, n, [SEL]);
     else if (t === 9) l = R(qsaD, n, [SEL]);
     if (l) for (var i = 0, m = R(quanti, l, []); i < m; i++) fa(l[i]);
+  }
+
+  // Un riquadro che torna vuoto (src about:blank, location cambiata da dentro) ha un documento nuovo senza preload:
+  // si prepara al suo load, che arriva al documento che lo contiene e mai alla sua finestra.
+  function alCarico(w) {
+    R(ascoltoDi(w), w.document, ['load', function (e) {
+      try { var el = R(bersaglio, e, []), tag = R(tagName, el, []); if (TAG[tag]) prepara(finestraDi(el, tag)); } catch (x) {}
+    }, true]);
   }
 
   // Il parser segna un riquadro scritto nell'HTML prima di eseguire lo script che lo segue.
@@ -386,19 +421,23 @@ const PROPAGAZIONE = `
     for (var j = 0; j < testi.length; j++) { try { conTesto(testi[j][0], testi[j][1], testi[j][2]); } catch (e) {} }
   }
 
+  // L'aggiunta della finestra stessa: quella di questa può essere già avvolta da chi gira prima della pagina.
+  function ascoltoDi(w) {
+    var d = gOPD(w.EventTarget.prototype, 'addEventListener');
+    return d && R(proprio, d, ['value']) ? d.value : addEL;
+  }
+
   // Un riquadro della stessa origine col suo preload chiede, prima dei suoi script, questo stesso preambolo: un canvas
   // annotato da uno si legge con le funzioni dell'altro. Il tipo dell'evento è un segreto della sessione.
-  // Con l'aggiunta della finestra stessa: quella di questa può essere già avvolta da chi gira prima della pagina.
   function ascolta(w) {
     if (!CANALE) return;
-    var d = gOPD(w.EventTarget.prototype, 'addEventListener'), add = d && R(proprio, d, ['value']) ? d.value : addEL;
-    R(add, w, [CANALE, function (e) {
+    R(ascoltoDi(w), w, [CANALE, function (e) {
       try {
-        var el = R(bersaglio, e, []), g = GETTER[R(tagName, el, [])];
-        if (!g) return;
-        var cw = R(g, el, []);
+        var el = R(bersaglio, e, []), tag = R(tagName, el, []);
+        if (!TAG[tag]) return;
+        var cw = finestraDi(el, tag);
         prepara(cw, true);
-        if (R(wsHas, preparate, [cw])) R(annulla, e, []);
+        if (preparata(cw)) R(annulla, e, []);
       } catch (x) {}
     }, true]);
   }
@@ -412,6 +451,7 @@ const PROPAGAZIONE = `
     }
     try { inserimenti(w); } catch (e) {}
     try { osserva(w); } catch (e) {}
+    try { alCarico(w); } catch (e) {}
     try { ascolta(w); } catch (e) {}
   }
 
