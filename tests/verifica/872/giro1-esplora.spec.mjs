@@ -72,7 +72,6 @@ test('aspetto chiaro e scuro', async ({ app, shell, openTab }) => {
   await page.waitForTimeout(800);
   await riga(page, 'Si chiama Marta').hover();
   await page.screenshot({ path: 'tests/.shots/v872-scuro.png' });
-  await page.setViewportSize?.({ width: 420, height: 800 }).catch?.(() => {});
 });
 
 test('correzione durante il compattatore', async ({ app, shell, openTab }) => {
