@@ -251,6 +251,14 @@ if (!IS_SUBFRAME) try {
         try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
       }
     }
+    // «Resta connesso»: la scheda è passata in un altro jar e la memoria della pagina la segue.
+    for (const [chiave, st] of [['semina', 'localStorage'], ['seminaSessione', 'sessionStorage']]) {
+      if (!w || !Array.isArray(w[chiave])) continue;
+      for (const voce of w[chiave]) {
+        try { if (Array.isArray(voce)) window[st].setItem(String(voce[0]), String(voce[1])); } catch (_) {}
+      }
+    }
+    if (w && Array.isArray(w.seminaDb) && w.seminaDb.length) require('./semina-database.js').semina(window.indexedDB, w.seminaDb);
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 

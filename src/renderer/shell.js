@@ -966,16 +966,21 @@
     }
     // #754 — cosa ha fatto Filo col banner dei cookie di questo sito, e la strada per rivederlo.
     const ck = t.cookies;
-    if (ck && (ck.shown || ck.rejected || ck.hidden)) {
-      entries.push({ type: 'separator' });
-      if (ck.shown) {
-        entries.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
-      } else {
-        if (ck.rejected) entries.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
-        if (ck.hidden) entries.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
-        entries.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
-      }
+    const cookieVoci = [];
+    if (ck && ck.shown) {
+      cookieVoci.push({ label: 'Rifiuta i cookie in automatico qui', icon: 'cookie', action: 'tab-cookies-auto' });
+    } else if (ck && (ck.rejected || ck.hidden)) {
+      if (ck.rejected) cookieVoci.push({ label: 'Cookie non necessari rifiutati', icon: 'cookie', disabled: true });
+      if (ck.hidden) cookieVoci.push({ label: 'Banner dei cookie nascosto', icon: 'cookie', disabled: true });
+      cookieVoci.push({ label: 'Mostra il banner dei cookie', icon: 'eye', action: 'tab-cookies-show' });
     }
+    // #759 — con la privacy massima l'accesso al sito si perde alla chiusura, se non resta connesso.
+    if (t.connesso) {
+      cookieVoci.push(t.connesso.fidato
+        ? { label: 'Non restare connesso', icon: 'key', action: 'tab-connesso-no' }
+        : { label: 'Resta connesso qui', icon: 'key', action: 'tab-connesso-si' });
+    }
+    if (cookieVoci.length) entries.push({ type: 'separator' }, ...cookieVoci);
     // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
     if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
       entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
@@ -985,6 +990,23 @@
       { label: 'Chiudi', icon: 'close', action: 'tab-close' },
     );
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  // `sito`: la proposta dopo un accesso, che vale per il sito dove l'accesso è avvenuto anche se la scheda è andata altrove.
+  async function restaConnesso(id, on, sito) {
+    let r = null;
+    try { r = await api.tabs.restaConnesso(id, on, sito); } catch (_) { r = null; }
+    if (!r || !r.ok) return;
+    // In Automatico l'accesso al sito resta comunque: la voce decide dei suoi contenuti incorporati in altri siti.
+    const automatico = r.modo === 'default';
+    // Un sito che tiene l'accesso in un archivio che non si sposta (chiavi crittografiche, WhatsApp Web): si rientra una volta.
+    const rientra = r.rientra ? (r.fidato ? ' Rientra una volta: il sito tiene l\'accesso in un archivio che Filo non riesce a spostare.'
+      : ' Per continuare devi rientrare: il sito tiene l\'accesso in un archivio che Filo non riesce a spostare.') : '';
+    showToast((r.fidato
+      ? (automatico ? `Resti connesso a ${r.nome} anche nei suoi contenuti dentro altri siti.`
+        : `Resti connesso a ${r.nome} anche quando chiudi la scheda o riapri Filo.`)
+      : (automatico ? `Dentro altri siti i contenuti di ${r.nome} tengono i cookie solo per la visita.`
+        : `Su ${r.nome} l'accesso finisce qualche minuto dopo che ne chiudi l'ultima scheda.`)) + rientra);
   }
 
   async function azzeraPermessi(id) {
@@ -1039,6 +1061,8 @@
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
       else if (action === 'tab-cookies-show') api.tabs.cookieBanners(id, true);
       else if (action === 'tab-cookies-auto') api.tabs.cookieBanners(id, false);
+      else if (action === 'tab-connesso-si') restaConnesso(id, true);
+      else if (action === 'tab-connesso-no') restaConnesso(id, false);
       else if (action === 'tab-permessi-azzera') azzeraPermessi(id);
       else if (action.startsWith('tab-proxy-go:')) proxyTab(id, action.slice('tab-proxy-go:'.length));
     });
@@ -1702,6 +1726,11 @@
         actions: opts.actions.map((a) => {
           if (a && a.openUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl, a.apriComunque === true) };
+          }
+          // #759 — la proposta dopo un accesso: «Resta connesso» su quel sito.
+          if (a && typeof a.restaConnesso === 'string' && !a.onClick && api.tabs.restaConnesso) {
+            const sito = a.restaConnesso;
+            return { label: a.label, onClick: () => restaConnesso(null, true, sito) };
           }
           // F4 — undo auto-feedback: azione dichiarativa cancelAutoFeedback.
           if (a && a.cancelAutoFeedback && !a.onClick) {

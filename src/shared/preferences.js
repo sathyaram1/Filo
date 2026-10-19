@@ -447,6 +447,14 @@
     return N && N.leggibile ? N.leggibile(x) : x;
   }
   const sitoLeggibileDi = sitoLeggibile;
+  // In Automatico un sito dove Filo ti ha visto entrare è «connesso» come un fidato: «non restare connesso su X»
+  // in chat lo toglie da tutti e due gli elenchi, come la voce del menu della scheda (#759).
+  const TOGLIE_ANCHE = {
+    'security.cookies.trustedSites': (correnti) => {
+      const m = dentro(correnti, 'security.cookies.mode');
+      return m === 'privacy' || m === 'manual' ? null : 'security.cookies.loggedSites';
+    },
+  };
   // L'elenco nuovo a partire da quello di adesso: { partial } da salvare, o { invariato } col perché.
   function applicaElenco(e, correnti) {
     const sitoLeggibile = e.percorso === 'documenti.cartelle' ? nomeCartella : sitoLeggibileDi;
@@ -458,6 +466,16 @@
     if (e.op === 'aggiungi') nuovo = attuale.concat(e.voci.filter((x) => !attuale.some((a) => a === x || vocePer(e.percorso, a) === x)));
     else if (e.op === 'togli') nuovo = attuale.filter((x) => !presente(e.voci, x));
     else nuovo = e.voci.slice();
+    const abbinato = e.op === 'togli' && TOGLIE_ANCHE[e.percorso] ? TOGLIE_ANCHE[e.percorso](correnti) : null;
+    const primaAbbinato = abbinato && Array.isArray(dentro(correnti, abbinato)) ? dentro(correnti, abbinato) : [];
+    const dopoAbbinato = primaAbbinato.filter((x) => !presente(e.voci, x));
+    if (abbinato && dopoAbbinato.length !== primaAbbinato.length) {
+      const partial = nidifica(e.percorso, nuovo);
+      const seg = abbinato.split('.');
+      const padre = seg.slice(0, -1).reduce((o, k) => { o[k] = o[k] || {}; return o[k]; }, partial);
+      padre[seg[seg.length - 1]] = dopoAbbinato;
+      return { partial, lista: nuovo };
+    }
     if (nuovo.length === attuale.length && nuovo.every((x, i) => x === attuale[i])) {
       const ha = attuale.length ? `adesso contiene: ${attuale.map(sitoLeggibile).join(', ')}` : 'adesso è vuoto';
       const voci = e.voci.map(sitoLeggibile).join(', ');
@@ -1645,11 +1663,13 @@
         + 'e si apre senza domande.',
     }),
     elenco({
-      keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso'],
+      keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso',
+        'siti connessi', 'resta connesso su', 'resta connesso qui', 'non restare connesso'],
       percorso: 'security.cookies.trustedSites',
       allentaSe: 'aggiungi',
       nome: 'Siti fidati dove resti connesso',
-      aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie',
+      aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie, e i cui contenuti incorporati in '
+        + 'Automatico tengono i cookie: «resta connesso su X» è aggiungi X, «togli X dai siti connessi» è togli X',
       risk: 'Cambia i siti che fanno eccezione alla privacy massima dei cookie: lì i dati restano fra una visita e '
         + 'l’altra, così resti connesso, e il sito ti riconosce.',
     }),
