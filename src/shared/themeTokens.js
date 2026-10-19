@@ -236,7 +236,24 @@
       dashCss: ['--dash-filo-gomitolo'],
       default: '850ms',
     },
+    // Il terzo segno del correttore (#1115): «controlla qui», non «hai sbagliato». Ocra, puntinato, diverso dagli zigzag
+    // rosso e blu. Le gemelle letterali stanno in spellcheck.css e menu.css (tests/unit/correttoreOcra.test.mjs).
+    'correttore.ocra.color': {
+      label: 'Colore della sottolineatura ocra del correttore',
+      type: 'color',
+      css: '--sn-spell-ocra',
+      default: { light: '#b07a14', dark: '#e2ad4d' },
+    },
+    'correttore.ocra.stile': {
+      label: 'Stile della sottolineatura ocra del correttore',
+      type: 'linea',
+      css: '--sn-spell-ocra-stile',
+      default: 'dotted',
+    },
   };
+
+  // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
+  const STILI_LINEA = Object.freeze(['dotted', 'dashed', 'wavy', 'solid', 'double']);
 
   function names() { return Object.keys(TOKENS); }
   function get(name) { return TOKENS[name] || null; }
@@ -280,6 +297,7 @@
       }
       case 'size': return RE_SIZE.test(v);
       case 'font': return RE_FONT.test(v);
+      case 'linea': return STILI_LINEA.includes(v);
       case 'time': {
         const m = v.match(RE_TIME);
         if (!m) return false;
@@ -300,6 +318,7 @@
       case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
       case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
+      case 'linea': return 'Stile non valido: dotted, dashed, wavy, solid o double.';
       case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX}, es. 0 (nessuna animazione), 1 (normale) o 1,5.`;
       default: return t ? 'Valore non valido.' : 'Token sconosciuto.';
     }
@@ -514,6 +533,7 @@
 
   global.SN_THEME_TOKENS = {
     TOKENS,
+    STILI_LINEA,
     names,
     get,
     validate,
