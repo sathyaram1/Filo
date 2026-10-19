@@ -407,3 +407,24 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await expect(sec.locator('#sec-dl-trusted')).toHaveValue('github.com', { timeout: 3_000 });
   await ripristina(app);
 });
+
+// #835 — «blocca example.org» col blocco dei siti spento: il sito entra in elenco, e l'esito fa dire al modello che
+// finché il blocco non si riaccende si apre lo stesso. Il blocco non si riaccende da solo: riaprirebbe anche gli altri.
+test('J — «blocca example.org» col blocco dei siti spento: l\'esito dice che il blocco è spento e come riaccenderlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ security: { siteBlock: { enabled: false, blacklist: [] } } }));
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi example.org', 'j1'), { text: 'Il blocco dei siti è spento.' }]);
+  await scrivi(chat, 'blocca example.org');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Il blocco dei siti è spento.' })).toBeVisible({ timeout: 10_000 });
+  const sec = (await impostazioni(app)).security.siteBlock;
+  expect(sec.blacklist).toEqual(['example.org']);
+  expect(sec.enabled).toBe(false);
+  const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
+  expect(esito).toContain('Siti bloccati → aggiungi example.org');
+  expect(esito).toContain('il blocco dei siti in blacklist è spento');
+  expect(esito).toContain('blocco_siti');
+  await ripristina(app);
+});

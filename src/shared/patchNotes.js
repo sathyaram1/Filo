@@ -24,6 +24,7 @@
         'Il riordino delle schede che non riesce a partire te lo dice, invece di rispondere «nessuna scheda da archiviare» come quando è andato tutto bene e non c\'era niente da chiudere. Vale dalla chat, dal suggerimento della home e da «/pulisci».',
         'Se chiedi «portami alla home» mentre sei già nella home, Filo non ricarica più la pagina: prima si portava via quello che aveva appena fatto e la risposta, prima che tu potessi leggerle. Ora te lo dice, e sotto la risposta hai un bottone per svuotare la conversazione quando hai finito.',
         'Se chiedi in chat di spegnere i controlli di rete o il giudizio AI sui siti, il riquadro di conferma ti dice quale nome usciva dal computer e verso chi. Quello che chiede di scrivere «conferma» per abbassare una protezione spiega il motivo una volta sola.',
+        'Se chiedi a Filo di bloccare un sito mentre il blocco dei siti è spento, ti avvisa che il sito si apre ancora e ti propone di riaccenderlo. Vale anche per le liste pubbliche, i controlli di rete e il giudizio AI chiesti con il loro interruttore principale spento.',
       ],
     },
     {

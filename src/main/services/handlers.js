@@ -2618,7 +2618,8 @@ async function eseguiAzioneFilo(action, {
         // subito nella dashboard, che ascolta SETTINGS_UPDATED).
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
-        const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
+        const correnti = await Storage.getSettings();
+        const built = global.SN_PREF.buildPreferencePartial(chiave, valore, { attuali: correnti });
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
         // `perModello` (le chiavi, i valori ammessi) va solo al modello.
@@ -2629,7 +2630,7 @@ async function eseguiAzioneFilo(action, {
         let partial = built.partial;
         let dimenticate = 0;
         if (built.elenco) {
-          const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          const r = global.SN_PREF.applicaElenco(built.elenco, correnti);
           if (built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli') {
             const Indice = require('./documentiIndice');
             for (const c of await Indice.occasionaliFra(built.elenco.voci)) dimenticate += (await Indice.dimentica(c)).tolta ? 1 : 0;
@@ -2642,7 +2643,8 @@ async function eseguiAzioneFilo(action, {
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
         const costo = typeof action._costoModello === 'string' && action._costoModello ? { costoModello: action._costoModello } : {};
-        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo } };
+        const avviso = built.avviso ? { avviso: built.avviso } : {};
+        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo, ...avviso } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -4449,8 +4451,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
       const costo = res.output && typeof res.output.costoModello === 'string' && res.output.costoModello
         ? ` Nella stessa risposta riporta il costo, con le stesse cifre: «${res.output.costoModello}»` : '';
+      const avviso = res.output && typeof res.output.avviso === 'string' && res.output.avviso
+        ? ` Attenzione: ${res.output.avviso}. Dillo all'utente e proponigli di riaccenderlo; non riaccenderlo da te.` : '';
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
-        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}`;
+        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}${avviso}`;
     }
     return `Eseguita: ${done}.`;
   }

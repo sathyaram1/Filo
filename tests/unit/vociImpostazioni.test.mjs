@@ -454,3 +454,25 @@ test('le ore di inattività capiscono l\'unità detta: «2 giorni» sono 48 ore,
   assert.equal(ore(3), 3);
   assert.equal(ore('mai'), null);
 });
+
+// #835 — una voce che vale solo con l'interruttore principale acceso, chiesta con quello spento: l'esito lo dice.
+test('bloccare un sito o accendere una voce sotto un interruttore spento porta l\'avviso, acceso no', () => {
+  const spento = { security: { siteBlock: { enabled: false, blacklist: [] }, safeBrowse: { enabled: false } } };
+  const acceso = { security: { siteBlock: { enabled: true, blacklist: [] }, safeBrowse: { enabled: true } } };
+  for (const [k, v, chiave] of [
+    ['siti_bloccati', 'aggiungi example.org', 'blocco_siti'],
+    ['siti_bloccati', 'solo example.org', 'blocco_siti'],
+    ['liste_pubbliche_blocco', 'sì', 'blocco_siti'],
+    ['giudizio_ai_siti', 'sì', 'navigazione_sicura'],
+    ['controlli_rete_siti', 'sì', 'navigazione_sicura'],
+  ]) {
+    const r = P.buildPreferencePartial(k, v, { attuali: spento });
+    assert.match(r.avviso || '', /spento/, `${k} ${v}: l'avviso manca`);
+    assert.ok(r.avviso.includes(chiave), `${k}: l'avviso nomina la chiave per riaccenderlo`);
+    assert.ok(P.setterDellaChiave(chiave), `${chiave} è una chiave vera`);
+    assert.equal(P.buildPreferencePartial(k, v, { attuali: acceso }).avviso, undefined, `${k} ${v}: niente avviso a interruttore acceso`);
+    assert.equal(P.buildPreferencePartial(k, v).avviso, undefined, `${k} ${v}: senza le impostazioni non si inventa`);
+  }
+  assert.equal(P.buildPreferencePartial('siti_bloccati', 'togli example.org', { attuali: spento }).avviso, undefined);
+  assert.equal(P.buildPreferencePartial('giudizio_ai_siti', 'no', { attuali: spento }).avviso, undefined);
+});
