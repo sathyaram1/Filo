@@ -143,7 +143,7 @@
       const meta = await getFonti();
       const n = { id: uuid(), testo: l.text, lezione: true, fonti: Q() ? Q().unisci(l.fonti) : [], nata: l.ts || null, tolta: ora };
       meta.nascoste.push(n);
-      await setFonti(meta);
+      await setFonti(toccata(meta));
       await togliLezioniSimili(n.testo, n.fonti);
       return n.id;
     }
