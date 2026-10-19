@@ -208,7 +208,7 @@ ancora aperta, si perdeva.
 - **Prima di sparire c'è tempo per UN messaggio.** Chi salva all'uscita spedisce
   subito quello che ha in mano, senza rileggere prima lo storage: il Correttore
   rileggeva l'elenco e quel giro arrivava a scheda già distrutta.
-- **Un campo che si conferma lasciandolo** (rinomina in Editor e Cronologia,
+- **Un campo che si conferma lasciandolo** (rinomina nell'Editor,
   riga del Correttore) a metà non deve partire, né alla pausa né al Ctrl:
   `SN_CASELLE.alVolo()` dice al main di aspettare e ne fa partire la conferma
   solo all'uscita vera.
