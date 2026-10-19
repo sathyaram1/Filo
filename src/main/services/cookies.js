@@ -252,6 +252,14 @@ const blockState = new WeakMap(); // session → { enabled, filtri }
 let hostChiusoFn = null;
 function chiudiHost(fn) { hostChiusoFn = typeof fn === 'function' ? fn : null; }
 
+// Chi guarda le richieste senza deciderne la sorte (il testo dell'utente ricevuto dal sito, #824):
+// `fn` alla partenza, `esitoFn(details, riuscita)` alla fine.
+let osservatoreFn = null;
+let esitoFn = null;
+function osservaRichieste(fn, esito) {
+  osservatoreFn = typeof fn === 'function' ? fn : null;
+  esitoFn = typeof esito === 'function' ? esito : null;
+}
 // Richieste che l'utente ha fatto passare con «Apri comunque» (#590): senza, il sì
 // sulla lista dei siti bloccati si ferma qui e la scheda finisce su una pagina d'errore.
 let permessoFn = null;
@@ -271,6 +279,7 @@ function ensureRequestHook(ses) {
   // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
   // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
   ses.webRequest.onBeforeRequest((details, callback) => {
+    if (osservatoreFn) { try { osservatoreFn(details); } catch (_) {} }
     if (hostChiusoFn && hostChiusoFn(details.url)) {
       callback({ cancel: true });
       return;
@@ -292,6 +301,9 @@ function ensureRequestHook(ses) {
     if (ad && ad.ricordaRichiesta) ad.ricordaRichiesta(details);
     callback({ cancel: false });
   });
+  // Nessun altro ascolta la fine delle richieste: una seconda registrazione sostituirebbe questa.
+  ses.webRequest.onCompleted((details) => { if (esitoFn) { try { esitoFn(details, true); } catch (_) {} } });
+  ses.webRequest.onErrorOccurred((details) => { if (esitoFn) { try { esitoFn(details, false); } catch (_) {} } });
   return state;
 }
 
@@ -827,6 +839,7 @@ module.exports = {
   coverAdblock,
   ensureRequestHook,
   chiudiHost,
+  osservaRichieste,
   permettiRichieste,
   ensureSiteSession,
   sessioneDelleSchede,
