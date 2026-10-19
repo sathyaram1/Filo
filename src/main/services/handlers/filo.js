@@ -231,6 +231,41 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Filo non ha un calendario suo: scrive l'evento in un .ics e lo passa al
+  // programma dell'utente, che è la porta che ogni calendario sa aprire. Se il
+  // sistema non lo apre torna il percorso, così il bottone non finisce nel nulla.
+  on(MSG.CALENDAR_ADD, soloDaFilo(async (msg) => {
+    const C = globalThis.SN_CALENDAR;
+    const ev = C && C.normalize(msg && msg.evento);
+    if (!ev) return { ok: false, error: 'evento incompleto' };
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const { app, shell } = require('electron');
+    let file = '';
+    try {
+      const dir = path.join(app.getPath('temp'), 'filo-eventi');
+      await fs.promises.mkdir(dir, { recursive: true });
+      // Un evento consegnato al calendario di ieri non serve più a nessuno:
+      // senza questa ripulita la cartella cresce a ogni uso e non la svuota nessuno.
+      const limite = Date.now() - 24 * 60 * 60 * 1000;
+      for (const nome of await fs.promises.readdir(dir)) {
+        if (!nome.endsWith('.ics')) continue;
+        const vecchio = path.join(dir, nome);
+        try {
+          const st = await fs.promises.stat(vecchio);
+          if (st.mtimeMs < limite) await fs.promises.unlink(vecchio);
+        } catch (_) {}
+      }
+      file = path.join(dir, `${Date.now().toString(36)}-${C.fileName(ev)}`);
+      await fs.promises.writeFile(file, C.buildIcs(ev, { uid: `${C.uidPer(ev)}@filo` }), 'utf8');
+    } catch (e) {
+      return { ok: false, error: e?.message || 'file non scritto' };
+    }
+    let apertura = '';
+    try { apertura = await shell.openPath(file); } catch (e) { apertura = e?.message || 'apertura non riuscita'; }
+    return { ok: true, file, aperto: !apertura, error: apertura || '', quando: ev.quando, titolo: ev.titolo };
+  }));
+
   on(MSG.FILO_GET_MEMORY, soloFilo(async () => ({ ok: true, memory: await FiloMem.getMemory() })));
 
   // Rileggere e togliere una riga di memoria alla volta (#592): è il posto dove
@@ -424,6 +459,23 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_RIGHE_APP, soloFilo(async (msg) => (
     { ok: true, righe: await globalThis.SN_CONVERSAZIONI_APP.righe({ chat: msg.chat || null }) })));
+
+  // #869 — la home come coda del filo: a pezzi, la ricerca, le pagine tolte. La prima apertura della giornata è una
+  // cosa successa: Filo la saluta (una volta).
+  const Coda = require('../codaFilo');
+  const isoO = (x) => (typeof x === 'string' && !Number.isNaN(Date.parse(x)) ? x : null);
+  on(MSG.FILO_CODA, soloFilo(async (msg) => {
+    const r = await Coda.pezzo({ prima: isoO(msg.prima), fino: isoO(msg.fino), dopo: isoO(msg.dopo), quanti: Number(msg.quanti) || undefined });
+    // L'incognito non saluta: il saluto sta nel filo di disco, che da lì non si vede.
+    if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
+    return { ok: true, ...r };
+  }));
+  on(MSG.FILO_CERCA, soloFilo(async (msg) => ({ ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
+  on(MSG.FILO_CODA_TOGLI_PAGINE, soloFilo(async (msg) => {
+    const url = msg && typeof msg.url === 'string' ? msg.url : '';
+    const tolte = url ? await Coda.togliIndirizzo(url) : await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);
+    return { ok: true, tolte };
+  }));
 
   // #866 — le pagine visitate del filo: quante sono in un periodo, e cancellarle (pagina Sicurezza).
   const periodoDa = (msg) => globalThis.SN_FILO_EVENTI.periodo(msg && msg.periodo);

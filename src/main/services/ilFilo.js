@@ -246,6 +246,18 @@ function creaFilo({ cartella } = {}) {
     return E().copiaChat(v.stato.chat.get(id));
   }
 
+  // Per la home (#869): tutte le chat col dispositivo di ogni messaggio, le pagine e il dispositivo di qui. `pos` cambia a
+  // ogni evento: chi ne ricava qualcosa di costoso lo tiene finché non cambia.
+  async function perLaCoda(opts) {
+    const v = await vista(opts);
+    return {
+      pos: v.stato.pos,
+      qui: normale.dispositivo,
+      chats: E().elencoChat(v.stato).map((c) => E().copiaChat(c, { dispositivi: true })),
+      pagine: E().pagineNelPeriodo(v.stato, { da: null, a: null }).map((p) => ({ ...p })),
+    };
+  }
+
   async function pagine(periodo, opts) {
     const v = await vista(opts);
     return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
@@ -275,12 +287,36 @@ function creaFilo({ cartella } = {}) {
 
   function cancellaPagine(periodo, opts) {
     if (!periodo) return Promise.resolve(0);
+    return cancella([periodo], opts);
+  }
+
+  // Visite tolte ({ ts, sito, url }, o una fila dello stesso sito con { da, a }), in una scrittura sola. `schedeChiuse:
+  // false` quando sono proprio le schede chiuse a portarle via (la Cronologia): quelle ancora aperte restano fuori.
+  function cancellaVisite(visite, opts, { schedeChiuse = true } = {}) {
+    const periodi = (Array.isArray(visite) ? visite : []).filter((p) => p && p.ts)
+      .map((p) => ({ da: p.da || p.ts, a: p.a || p.ts, sito: p.sito || '', url: p.url || null }));
+    return periodi.length ? cancella(periodi, opts, { schedeChiuse }) : Promise.resolve(0);
+  }
+
+  // Ogni strada che toglie pagine passa di qui, e da qui lo sanno le home aperte.
+  const pagineTolte = new Set();
+  function suPagineTolte(fn) { if (typeof fn === 'function') pagineTolte.add(fn); }
+
+  function cancella(periodi, opts, { schedeChiuse = true } = {}) {
     return transazione(async (t) => {
-      const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
-      const pagine = { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) };
-      const ev = t.evento(E().TIPI.CANCELLAZIONE, { pagine }, { autore: 'utente' });
-      const { tolti } = await t.scrivi([ev]);
-      try { await globalThis.SN_DELICATE?.dimentica(pagine); } catch (_) {}
+      const voci = periodi.map((periodo) => {
+        const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
+        return { pagine: { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) }, url: periodo.url || null };
+      });
+      const { tolti } = await t.scrivi(voci.map((v) => t.evento(E().TIPI.CANCELLAZIONE, { pagine: v.pagine }, { autore: 'utente' })));
+      // Il ricordo dei campi password va via per sito, e ogni volta si riscrive: un sito una volta sola («Svuota archivio»).
+      const siti = new Set();
+      for (const v of voci) {
+        const k = v.pagine.sito || `|${v.pagine.da}|${v.pagine.a}`;
+        if (!siti.has(k)) { siti.add(k); try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {} }
+        if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
+      }
+      for (const fn of pagineTolte) { try { fn({ incognito: t.incognito }); } catch (_) {} }
       return tolti;
     }, opts);
   }
@@ -331,7 +367,8 @@ function creaFilo({ cartella } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, pagine, registraVisita, aggiornaTitolo, cancellaPagine, esporta, importa, importaChatSalvate,
+    carica, transazione, chats, chat, perLaCoda, pagine, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };
 }

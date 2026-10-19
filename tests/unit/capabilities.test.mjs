@@ -183,6 +183,10 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CONVERSAZIONE_APP_DIMENTICA: 'app-chats-in-filo',
     FILO_CONVERSAZIONE_APP_RINOMINA: 'app-chats-in-filo',
     FILO_RIGHE_APP: 'app-chats-in-filo',
+    // #869 — la home è la coda del filo: a pezzi, la ricerca nel campo, le pagine tolte dal tasto destro.
+    FILO_CODA: 'home-filo',
+    FILO_CERCA: 'home-filo',
+    FILO_CODA_TOGLI_PAGINE: 'home-filo',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',

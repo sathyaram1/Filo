@@ -54,7 +54,7 @@
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
-    showHomeMessage: { nome: 'commento nella home', valore: sino('mostrato', 'nascosto'), livello: 1 },
+    showHomeMessage: { nome: 'Filo scrive per primo nella home', valore: sino('sì', 'no'), livello: 1 },
     'homeSistema.*': { nome: (k) => `voce «${k === 'bluetooth' ? 'Bluetooth' : k}» nella home`, valore: sino('mostrata', 'nascosta'), livello: 1 },
     'tabPreview.enabled': { nome: 'anteprima delle schede', valore: ATTIVA, livello: 1 },
     'tabPreview.size': { nome: 'dimensione dell\'anteprima delle schede', livello: 1 },
@@ -67,6 +67,8 @@
     'schermo.guarda': { nome: 'guardare lo schermo', valore: sino('acceso', 'spento'), livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
+    'propostaEmail.attiva': { nome: 'email del tuo account proposta nei siti', valore: ATTIVA, livello: 1 },
+    'propostaEmail.incognito': { nome: 'email proposta anche in incognito', valore: ATTIVA, livello: 1 },
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
     },

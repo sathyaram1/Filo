@@ -832,6 +832,16 @@
     // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
     AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
 
+    // === L'email dell'account proposta nei campi di accesso (#1124, src/content/propostaEmail.js) ===
+    // Aperto ai siti di proposito: lo manda il content script del frame dove l'utente è entrato in un campo email o
+    // nome utente. Porta il campo (misure in px CSS della scheda, valore) e non riceve mai l'email: la proposta la
+    // disegna il main in una vista sopra la scheda (src/main/propostaEmail.js). `segui:false` = qui non si propone.
+    // Dentro un riquadro di un'altra origine `ancora` è il segno mandato al documento sopra, che risponde con 'riquadro'.
+    PROPOSTA_EMAIL: 'proposta_email',               // { fase:'campo', campo, motivo, x, y, w, h, valore, digitato, ancora } | { fase:'via', campo } | { fase:'riquadro', ancora, x, y, s, su } → { ok, segui }
+    // Main→il solo frame del campo, dopo la scelta dell'utente (clic o Invio sulla proposta): l'unico momento in cui
+    // l'email arriva alla pagina.
+    PROPOSTA_EMAIL_RIEMPI: 'proposta_email_riempi', // { campo, email }
+
     // === Il menu che un sito si disegna da sé (#975, src/preload/menu-del-sito.js) ===
     // Aperti ai siti di proposito: li manda il content script dal menu di Filo, e il sito lo ricava il main dal
     // frame che parla, mai dal messaggio. Da una superficie di Filo (Preferenze, l'avviso della proposta) `sito`
@@ -943,6 +953,18 @@
     FILO_RIGHE_APP: 'filo_righe_app',
     // ANNUNCIO (main → pagine di Filo, senza dati): le righe sono cambiate, chi le mostra le richiede.
     FILO_RIGHE_APP_CAMBIATE: 'filo_righe_app_cambiate',
+    // #869 — la home è la coda del filo. Solo filo://: è la cronologia dell'utente.
+    // { prima?, fino?, dopo?, quanti? } → { ok, elementi, inizio, ultimo, chatCorrente? } (src/shared/filoCoda.js).
+    FILO_CODA: 'filo_coda',
+    // Cercare nel filo senza passare dal modello: { q } → { ok, messaggi, pagine, termini, tanti }.
+    FILO_CERCA: 'filo_cerca',
+    // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }. Con { url }: ogni visita di quell'indirizzo
+    // e le sue schede chiuse (dalla ricerca, dove una pagina è un indirizzo).
+    FILO_CODA_TOGLI_PAGINE: 'filo_coda_togli_pagine',
+    // ANNUNCIO (main → pagine di Filo, senza dati): pagine tolte dal filo, da qualunque strada; chi le mostra le rilegge.
+    FILO_PAGINE_TOLTE: 'filo_pagine_tolte',
+    // ANNUNCIO (main → schede): Filo ha scritto di sua iniziativa. { chat, i, ts, testo, fuso }.
+    FILO_PARLA: 'filo_parla',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato
@@ -1026,6 +1048,15 @@
     CAMBI_LEGGI: 'cambi_leggi',
     CAMBI_ANNULLA: 'cambi_annulla',
     CAMBI_AGGIORNATI: 'cambi_aggiornati',           // main → pagine di Filo { ids }: un cambio è nato o è stato annullato
+
+    // L'utente aggiunge al calendario del suo computer l'evento che Filo gli
+    // ha proposto in chat: il main scrive un .ics e lo apre col programma di
+    // calendario. → { ok, file, aperto, error }  { evento: { data, ora, titolo, dettagli } }
+    //
+    // ORIGINE: solo filo:// (scrive un file e chiede al sistema di aprirlo, e
+    // la risposta contiene un percorso assoluto). Una pagina web che potesse
+    // chiamarlo farebbe aprire un file al sistema operativo.
+    CALENDAR_ADD: 'calendar_add',
 
     // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
     // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di

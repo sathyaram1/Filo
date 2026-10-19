@@ -78,6 +78,10 @@ test('elencoDaTesto: più siti incollati sulla stessa riga valgono uno per uno, 
   assert.deepEqual(r.invalid, ['faceb']);
   assert.equal(N.testoDaElenco(r.valid, r.scartate), 'faceb\nfigma.com');
   assert.deepEqual(N.elencoDaTesto('https://www.esempio.it/cerca?q=a,b c').valid, ['esempio.it']);
+  // Una riga dove nessun pezzo è un sito resta una riga: scartata, si dice e si rimette com'era scritta.
+  const s = N.elencoDaTesto('studio rossi\nfigma.com');
+  assert.deepEqual(s.invalid, ['studio rossi']);
+  assert.equal(N.testoDaElenco(s.valid, s.scartate), 'studio rossi\nfigma.com');
 });
 
 test('ripulisciElenco: un elenco salvato prima della riduzione torna ai nomi; quello che non è un sito resta com\'era', () => {

@@ -70,7 +70,14 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
-      return { ok: true, archived: (res && res.archived) || 0 };
+      return {
+        ok: true,
+        archived: (res && res.archived) || 0,
+        // Chi ha chiesto il riordino deve poter distinguere «non c'era niente
+        // da archiviare» da «il riordino non è partito».
+        giudizioMancato: !!(res && res.giudizioMancato),
+        giaInCorso: !!(res && res.giaInCorso),
+      };
     }
     return { ok: false, archived: 0 };
   }));
@@ -133,18 +140,34 @@ module.exports = function register(on, ctx) {
     },
   })));
 
+  // Una scheda chiusa eliminata se ne va anche dal filo, o la home la mostrerebbe ancora e la sua ricerca la ritroverebbe (#869).
+  const ancheDalFilo = async (scelta) => {
+    const schede = (await ArchivedTabs.list()).filter(scelta);
+    return async () => { try { await require('../codaFilo').togliSchedeChiuse(schede); } catch (_) {} };
+  };
+
   on(MSG.DELETE_ARCHIVED_TABS, soloFilo(async (msg) => {
-    const r = await ArchivedTabs.removeMany(msg.ids || []);
+    const ids = new Set(Array.isArray(msg.ids) ? msg.ids : []);
+    const poi = await ancheDalFilo((t) => ids.has(t.id));
+    const r = await ArchivedTabs.removeMany([...ids]);
+    await poi();
     return { ok: true, removed: r.removed, remaining: r.remaining };
   }));
 
   // Come GET_ARCHIVED_TABS, l'elenco torna senza vettori: con migliaia di schede sarebbero megabyte a ogni cancellazione.
   on(MSG.REMOVE_ARCHIVED_TAB, soloFilo(async (msg) => {
+    const poi = await ancheDalFilo((t) => t.id === msg.id);
     await ArchivedTabs.remove(msg.id);
+    await poi();
     return { ok: true, tabs: await ArchivedTabs.listMeta() };
   }));
 
-  on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => ({ ok: true, tabs: await ArchivedTabs.clear() })));
+  on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => {
+    const poi = await ancheDalFilo(() => true);
+    const tabs = await ArchivedTabs.clear();
+    await poi();
+    return { ok: true, tabs };
+  }));
 
   // Solo le pagine di Filo: a un sito direbbe quali siti hai aperto, salvato o archiviato, e gli farebbe chiedere al main un indirizzo qualunque.
   on(MSG.ICONA_SITO, soloFilo(async (msg, sender) => {

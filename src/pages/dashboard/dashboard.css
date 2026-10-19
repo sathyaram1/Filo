@@ -427,23 +427,14 @@ html, body {
 .dash-center {
   grid-column: 2;
   grid-row: 1;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: center;
   min-width: 0;
   min-height: 0;
 }
-.dash-home {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 22px;
-  height: 100%;
-  padding: 40px 0;
-}
-/* Riga sopra il messaggio della home dopo un'accoglienza chiusa a metà: il segno «già accolto» è
+/* Riga in fondo al filo dopo un'accoglienza chiusa a metà: il segno «già accolto» è
    definitivo, e questa riga è l'unico posto in cui l'utente può accorgersene e tornare indietro. */
 .dash-onb-notice {
   display: flex;
@@ -477,23 +468,132 @@ html, body {
   transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-onb-notice button:hover { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }
-.dash-home-msg {
-  font-size: 28px;
-  font-weight: 400;
-  line-height: 1.35;
-  text-align: center;
+/* Senza un modello Filo non può scrivere: la frase che dice perché sta in fondo al filo, con la sua voce. */
+.dash-senza-modello {
+  align-self: flex-start;
+  max-width: 86%;
+  margin: 6px 8px 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--dash-line);
+  border-radius: 16px;
+  background: var(--dash-card);
   color: var(--dash-ink);
-  max-width: 640px;
-  margin: 0;
-  letter-spacing: -0.01em;
+  font-size: 14.5px;
+  line-height: 1.5;
 }
-.dash-home-msg.dash-home-msg-loading { color: var(--dash-ink-mute); font-style: italic; }
+.dash-thread > .dash-onb-notice { align-self: center; margin: 6px 0; }
+
+/* ── La coda del filo (#869) ── */
+/* Cercare nel filo: un campo discreto in cima al centro, i risultati sopra il filo. */
+.dash-cerca { flex: none; display: flex; justify-content: center; padding: 10px 8px 0; position: relative; z-index: 6; }
+.dash-cerca-campo {
+  display: flex; align-items: center; gap: 8px; width: min(320px, 100%);
+  padding: 5px 12px; border: 1px solid transparent; border-radius: var(--dash-radius-pill);
+  color: var(--dash-ink-mute); cursor: text;
+  transition: border-color calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, width calc(0.2s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-campo:hover { background: var(--dash-line); }
+.dash-cerca-campo:focus-within { width: min(460px, 100%); background: var(--dash-card); border-color: var(--dash-line-strong); color: var(--dash-ink-soft); }
+.dash-cerca-lente { display: inline-flex; flex: none; }
+.dash-cerca-input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font: inherit; font-size: 13px; color: var(--dash-ink);
+}
+.dash-cerca-input::placeholder { color: var(--dash-ink-mute); }
+.dash-cerca-input::-webkit-search-cancel-button { display: none; }
+.dash-cerca-risultati {
+  position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100% - 16px)); max-height: min(60vh, 520px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px; padding: 6px;
+  background: var(--dash-card); border: 1px solid var(--dash-line-strong); border-radius: 14px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) min(100%, 16% * var(--sn-ombra, 1)), transparent);
+  scrollbar-width: thin;
+}
+.dash-cerca-voce {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
+  font: inherit; cursor: pointer;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease, padding-left calc(0.14s * var(--sn-motion, 1)) ease;
+}
+.dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-cerca-ico { display: inline-flex; flex: none; color: var(--dash-accent); }
+.dash-cerca-corpo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dash-cerca-titolo { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cerca-sotto { font-size: 11.5px; color: var(--dash-ink-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cerca-quando { flex: none; font-size: 11px; color: var(--dash-ink-mute); font-variant-numeric: tabular-nums; }
+.dash-cerca-niente { padding: 8px 10px; font-size: 12.5px; font-style: italic; color: var(--dash-ink-mute); }
+
+/* Risalire il filo: carica il pezzo prima; all'inizio lo dice e si spegne. */
+.dash-risali { display: flex; justify-content: center; padding: 0 0 4px; }
+.dash-risali-btn {
+  font: inherit; font-size: 11.5px; color: var(--dash-ink-mute); background: transparent;
+  border: 1px solid transparent; border-radius: var(--dash-radius-pill); padding: 4px 14px; cursor: pointer;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease, border-color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-risali-btn:hover { background: var(--dash-line); color: var(--dash-ink); border-color: var(--dash-line-strong); }
+.dash-risali-btn:disabled { cursor: default; opacity: 0.55; }
+.dash-risali-btn:disabled:hover { background: transparent; border-color: transparent; color: var(--dash-ink-mute); }
+
+/* Il segno del giorno, e i giorni prima di oggi sbiaditi: tornano pieni sotto il mouse. */
+.dash-giorno {
+  display: flex; align-items: center; gap: 10px; margin: 6px 0 0;
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dash-ink-mute);
+}
+.dash-giorno::before, .dash-giorno::after { content: ""; flex: 1; height: 1px; background: var(--dash-line); }
+.dash-vecchio { opacity: var(--dash-vecchio-opacita, 0.52); transition: opacity calc(0.3s * var(--sn-motion, 1)) ease; }
+.dash-vecchio:hover, .dash-vecchio:focus-within { opacity: 1; }
+.dash-giorno.dash-vecchio { opacity: 1; }
+
+/* Il dispositivo d'origine quando non è questo. */
+.dash-altrove { font-size: 11px; color: var(--dash-ink-mute); margin-top: -10px; padding: 0 12px; }
+.dash-altrove-user { align-self: flex-end; }
+.dash-altrove-filo { align-self: flex-start; }
+
+/* Le righe sottili: un cambio fatto dall'interfaccia, le pagine visitate ripiegate. */
+.dash-cambio, .dash-pagine-testa {
+  display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%;
+  font-size: 12px; color: var(--dash-ink-mute); padding: 4px 10px; border-radius: 10px;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-cambio { align-self: stretch; }
+.dash-cambio:hover, .dash-pagine-testa:hover, .dash-pagine-testa:focus-visible { background: var(--dash-line); color: var(--dash-ink-soft); outline: none; }
+.dash-cambio-ora, .dash-pagine-ora { flex: none; font-variant-numeric: tabular-nums; opacity: 0.75; }
+.dash-cambio-ico, .dash-pagine-ico { display: inline-flex; flex: none; }
+.dash-cambio-testo, .dash-pagine-testo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-cambio-stato { flex: none; font-style: italic; }
+.dash-cambio.dash-cambi-annullato .dash-cambio-testo { text-decoration: line-through; text-decoration-color: var(--dash-line-strong); }
+.dash-cambio-annulla {
+  margin-left: auto; flex: none; font: inherit; font-size: 11.5px; color: var(--dash-ink-soft);
+  background: transparent; border: 1px solid var(--dash-line-strong); border-radius: 13px; padding: 0 9px; cursor: pointer;
+  opacity: 0; transition: opacity calc(0.16s * var(--sn-motion, 1)) ease, background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-cambio:hover .dash-cambio-annulla, .dash-cambio-annulla:focus-visible { opacity: 1; }
+.dash-cambio-annulla:hover { background: var(--dash-ink); color: var(--dash-paper); border-color: var(--dash-ink); }
+.dash-pagine { align-self: stretch; display: flex; flex-direction: column; }
+.dash-pagine-testa { border: none; background: transparent; font-family: inherit; cursor: pointer; text-align: left; }
+.dash-pagine-aperte .dash-pagine-testa { color: var(--dash-ink-soft); }
+.dash-pagine-elenco { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 4px 30px; }
+.dash-pagina {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 3px 8px; border-radius: 8px;
+  font-size: 12px; color: var(--dash-ink-soft); text-decoration: none;
+  transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
+}
+.dash-pagina:hover, .dash-pagina:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
+.dash-pagina-titolo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-pagina-sito { flex: none; font-size: 11px; color: var(--dash-ink-mute); }
+
+/* Il punto del filo dove porta una ricerca o una carta: un attimo di luce, poi niente. */
+.dash-trovato { animation: dash-trovato calc(1.6s * var(--sn-motion, 1)) ease; }
+@keyframes dash-trovato {
+  0%, 30% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 45%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
 
 
 .dash-thread {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   overflow: hidden;
 }
@@ -1036,6 +1136,7 @@ html, body {
   border-radius: 8px;
 }
 /* Riga intera delle azioni e mai oltre: i titoli lunghi si accorciano coi puntini invece di allargare la bolla. */
+.dash-cmd-blocked-btn { margin-top: 8px; }
 .dash-delete-panel {
   flex: 1 1 100%;
   min-width: 0;

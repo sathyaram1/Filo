@@ -48,6 +48,8 @@ test('accendere il terminale abbassa una difesa: non esegue senza «conferma»; 
   expect(r.needsConfirm).toBe(3);
   expect(r.avviso).toBe('Abbassa una difesa di Filo.');
   expect(r.describe).toContain('erminale');
+  // Il box dice il motivo una volta: l'avviso precede «Scrivi conferma», la spiegazione non lo ripete.
+  expect(r.describe).not.toMatch(/difesa/i);
   expect((await getSettings(page)).terminal?.enabled || false).toBe(false);
 
   // Con la conferma dell'utente (MSG.FILO_CONFIRM_ACTION): esegue.

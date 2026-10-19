@@ -587,6 +587,9 @@
         const t = a.title || a.titolo;
         return t ? ["Creare l'evento ", cit(t)] : 'Creare un evento';
       },
+      // La finisce l'UTENTE con un click in chat: senza questa riga, al turno
+      // dopo il modello non sa che è successo e tira a indovinare.
+      describeDone: (a) => `Evento aggiunto al calendario: "${a.title || a.titolo || ''}"`,
     },
     // La prima riga di describe è quella che il diario mostra mentre si aspetta il clic.
     PULISCI_TAB: {
@@ -639,6 +642,8 @@
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
+      // A cosa fatta, la ricevuta: senza, il bottone confermato ripeteva la domanda («Eliminare…»).
+      describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese e lezioni',
     },
     DIMENTICA: {
       // Toglie dalla memoria le righe indicate a voce: le stesse della × nelle

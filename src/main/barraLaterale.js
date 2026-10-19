@@ -386,6 +386,9 @@ class BarraLaterale {
     if (sito) daCoprire.add(sito);
     const conferme = this.tabs.conferme;
     try { if (conferme && conferme.vista && conferme.vista.getBounds().width > 0) daCoprire.add(conferme.vista); } catch (_) {}
+    // La barra aperta copre l'email proposta sotto un campo che le sta accanto: è un gesto dell'utente, la proposta no.
+    const proposta = this.tabs.propostaEmail;
+    if (proposta && proposta.mostrata && proposta.vista) daCoprire.add(proposta.vista);
     const mia = figli().indexOf(this.vista);
     if (mia >= 0 && !figli().slice(mia + 1).some((v) => daCoprire.has(v))) return;
     if (mia >= 0) cv.removeChildView(this.vista);

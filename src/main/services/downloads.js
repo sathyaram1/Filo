@@ -99,10 +99,7 @@ function sitoDi(url, webContents) {
     if (webContents && !webContents.isDestroyed?.()) {
       pagina = leggi(webContents.getURL() || '');
       const riquadri = webContents.mainFrame ? webContents.mainFrame.framesInSubtree : [];
-      incerto = !pagina || riquadri.some((f) => {
-        const h = leggi(f.origin);
-        return !(h && (h === pagina || h.endsWith('.' + pagina)));
-      });
+      incerto = !pagina || ESE().riquadriDiAltri(pagina, riquadri.map((f) => f.origin));
     }
   } catch (_) { incerto = true; }
   return { sito: pagina, incerto };
@@ -467,6 +464,7 @@ function completa(rec) {
   if (!rec.endedAt) rec.endedAt = new Date().toISOString();
   persist();
   broadcast('done', rec);
+  if (!scopeOf(rec)) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {

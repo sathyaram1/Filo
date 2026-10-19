@@ -331,14 +331,18 @@
       risultato: true,
     },
     EVENTO_CALENDARIO: {
-      description: 'Propone un evento di calendario: in chat compare un bottone per aggiungerlo.',
+      description: 'Propone un evento: in chat compare un bottone che lo aggiunge al calendario del computer dell\'utente. Non dire che l\'evento è già in calendario: ce lo mette lui col bottone.',
       properties: {
         data: S('Data "YYYY-MM-DD".'),
-        ora: S('Ora "HH:MM".'),
+        ora: S('Ora "HH:MM". Senza, l\'evento occupa tutto il giorno (compleanni, scadenze): non inventarla.'),
         titolo: S('Titolo dell\'evento.'),
         dettagli: S('Dettagli o note.'),
+        luogo: S('Dove si tiene, se lo sai.'),
+        durata_min: I('Quanto dura, in minuti. Senza, un\'ora.'),
+        data_fine: S('Ultimo giorno "YYYY-MM-DD" di un evento che dura più giorni (ferie dal 10 al 15: "…-15"; parto il 10 alle 8 e torno il 15: "…-15").'),
+        ora_fine: S('Ora "HH:MM" in cui finisce, se la sai: vince sulla durata.'),
       },
-      required: ['data', 'ora', 'titolo'],
+      required: ['data', 'titolo'],
     },
     APRI_FILE: {
       description: 'Mostra in chat il bottone di un file del computer dell\'utente: un clic lo apre, dal tasto destro si apre la sua cartella o '

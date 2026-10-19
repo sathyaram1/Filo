@@ -649,13 +649,14 @@
     options_cookies_whitelist_desc:
       'I siti che aggiungi qui restano connessi: in "Privacy massima" vivono in uno spazio isolato ma persistente, ' +
       'e in "Automatico" tengono i loro cookie anche quando un loro contenuto compare dentro un\'altra pagina. ' +
-      'Aggiungi il sito (es. gmail.com) e premi Invio; se poi lo togli, in "Privacy massima" Filo butta via ' +
+      'Scrivi il sito o incolla l\'indirizzo di una sua pagina (es. google.com per Gmail) e premi Invio; se poi ' +
+      'lo togli, in "Privacy massima" Filo butta via ' +
       'quello che aveva salvato.',
-    options_cookies_whitelist_placeholder: 'es. gmail.com',
+    options_cookies_whitelist_placeholder: 'es. google.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
-    options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
+    options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. google.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
       'In "Automatico" i tuoi accessi restano salvati comunque. Qui serve aggiungere un sito solo se ne vedi i ' +

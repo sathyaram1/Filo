@@ -151,7 +151,7 @@
 
   function chatNuova(id, ts) {
     return {
-      id, startedAt: ts, updatedAt: ts, closedAt: null, title: '', kind: null, onboarding: false, messages: [], _pos: 0,
+      id, startedAt: ts, updatedAt: ts, closedAt: null, title: '', kind: null, onboarding: false, messages: [], _pos: 0, _disp: [],
     };
   }
 
@@ -176,7 +176,17 @@
         break;
       case TIPI.MESSAGGIO: {
         if (!c) { c = chatNuova(ev.chat, ev.ts); stato.chat.set(ev.chat, c); }
-        c.messages.push({ ...ev.msg, ts: ev.ts });
+        // Un messaggio di Filo che si fonde col suo di prima (#869; quando, lo decide chi scrive: src/shared/filoCoda.js)
+        // lo riscrive con tutto quello che è successo, e su disco restano tutti e due.
+        const ultimo = c.messages[c.messages.length - 1];
+        if (ev.msg.fonde && ev.msg.spontaneo && ultimo && ultimo.spontaneo && ultimo.role === 'filo' && ev.msg.role === 'filo') {
+          const { fonde: _f, ...fuso } = ev.msg;
+          c.messages[c.messages.length - 1] = { ...fuso, ts: ultimo.ts };
+          c._disp[c.messages.length - 1] = ev.dispositivo;
+        } else {
+          c.messages.push({ ...ev.msg, ts: ev.ts });
+          c._disp.push(ev.dispositivo);
+        }
         c.updatedAt = ev.ts;
         c._pos = stato.pos;
         // Riapre solo l'utente: una risposta arrivata a chat chiusa è la coda di quella di prima.
@@ -265,11 +275,14 @@
     });
   }
 
-  function copiaChat(c) {
+  // `dispositivi`: per la home (#869), il dispositivo da cui è arrivato ogni messaggio, allineato a `messages`.
+  function copiaChat(c, { dispositivi = false } = {}) {
     if (!c) return null;
     const out = { ...c, messages: c.messages.map((m) => ({ ...m })) };
     if (Array.isArray(c.fonti)) out.fonti = c.fonti.map((f) => ({ ...f }));
     delete out._pos;
+    delete out._disp;
+    if (dispositivi) out.dispositivi = c.messages.map((_, i) => (c._disp && c._disp[i]) || '');
     return out;
   }
 
@@ -362,6 +375,6 @@
   global.SN_FILO_EVENTI = {
     VERSIONE, TIPI, AUTORI, PERIODI,
     uuid, valido, crea, riga, analizza, nuovoStato, applica, compatta, elencoChat, copiaChat,
-    daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, coperto,
+    daChatSalvate, periodo, pagineNelPeriodo, nelPeriodo, normaSito, delSito, coperto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

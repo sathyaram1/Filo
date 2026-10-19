@@ -215,6 +215,15 @@
     return 'user';
   }
 
+  // Scritto da Filo (chat o segnalazione automatica), per conto di chi: 'owner' se porta la prova dell'admin, 'user'
+  // se lo dichiara soltanto, '' se non è di Filo. Solo per l'etichetta: categoria e fiducia restano di authorKind (#953).
+  function filoPerConto(fb) {
+    const c = senderOf(fb);
+    const resto = c.indexOf('owner:') === 0 ? c.slice('owner:'.length) : c;
+    if (resto.indexOf('filo:') !== 0 && resto.indexOf('auto:') !== 0) return '';
+    return fb && typeof fb === 'object' && fb.senderProof === 'admin' ? 'owner' : 'user';
+  }
+
   // ── Chi può entrare in coda da solo ────────────────────────────────────────
   // La modalità automatica non è più un sì/no per tutti: l'owner sceglie QUALI
   // mittenti si fida di far entrare in coda senza passare da lui.
@@ -672,6 +681,7 @@
     originOf,
     authorKind,
     senderOf,
+    filoPerConto,
     // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
     // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
     // possano divergere su una stringa copiata a mano.
