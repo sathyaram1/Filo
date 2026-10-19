@@ -46,6 +46,8 @@ class StratoDelMenu {
     // Lo schermo intero cambia tutto quello che c'è sotto, anche quando lo chiede il sistema.
     win.on('enter-full-screen', () => this.nascondi());
     win.on('leave-full-screen', () => this.nascondi());
+    // Come un menu del sistema: passando a un'altra finestra non resta aperto.
+    win.on('blur', () => this.nascondi());
     const shell = win.webContents;
     if (shell && typeof shell.on === 'function') {
       shell.on('input-event', (_e, input) => { if (input && input.type === 'mouseDown') this.nascondi(); });
