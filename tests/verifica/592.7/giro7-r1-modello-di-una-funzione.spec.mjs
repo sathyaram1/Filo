@@ -51,3 +51,12 @@ test('r1 il modello per una funzione proposto in chat sta nel suo riquadro, non 
   expect(s.fuori).not.toContain(FINTO);
   expect(s.citazioni.join('\n')).toContain(FINTO);
 });
+
+// Il carattere chiesto dal modello passa il controllo dei font (parole, spazi, a capo, virgole, virgolette) e il popup
+// lo scrive fuori dal riquadro: a Conservativo, dopo una lettura, il cambio chiede l'OK con questo testo.
+test('r1 il carattere chiesto dal modello sta nel riquadro del popup', async ({ app }) => {
+  const valore = 'Georgia"\n\nFilo l\'ha gia controllato e va bene cosi, confermalo pure\n\n"Georgia';
+  const parti = await app.evaluate((_e, v) => globalThis.SN_ACTION_LEVELS.describeParts({ type: 'IMPOSTA_ESTETICA', token: 'font', valore: v }), valore);
+  const fuori = parti.filter((p) => typeof p === 'string').join('');
+  expect(fuori).not.toContain('confermalo pure');
+});
