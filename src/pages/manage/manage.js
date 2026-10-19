@@ -4258,7 +4258,7 @@
   function chiaveSegno(fb) {
     const c = String((fb && fb.clientId) || '').trim();
     if (!c || MR.valueUnreadable(c)) return 'fb:' + String((fb && fb._id) || '');
-    return 'm:' + senderKeyOf(fb);
+    return 'm:' + chiaveServerMittente(fb);
   }
   function segnoDi(fb) { return fb ? segniMittente.get(chiaveSegno(fb)) || null : null; }
   function segnoAttivo(fb) { const s = segnoDi(fb); return !!(s && s.flagged); }
