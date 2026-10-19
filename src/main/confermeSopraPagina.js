@@ -235,11 +235,12 @@ class ConfermeSopraPagina {
     let s = {};
     try { s = (await globalThis.SN_STORAGE?.getSettings?.()) || {}; } catch (_) { s = {}; }
     if (this.mostrata !== voce.id || !this.vista || this.vista.webContents.isDestroyed()) return;
-    const tema = {
-      theme: typeof s.theme === 'string' ? s.theme : 'system',
-      tokens: s.themeTokens && typeof s.themeTokens === 'object' ? s.themeTokens : {},
-    };
-    try { this.vista.webContents.send('conferma:mostra', { ...voce.richiesta, id: voce.id, tema }); } catch (_) {}
+    try { this.vista.webContents.send('conferma:mostra', { ...voce.richiesta, id: voce.id, tema: temaDi(s) }); } catch (_) {}
+  }
+
+  _tema(s) {
+    if (!this.mostrata || !this.vista || this.vista.webContents.isDestroyed()) return;
+    try { this.vista.webContents.send('conferma:tema', temaDi(s)); } catch (_) {}
   }
 
   _vista() {
@@ -288,6 +289,18 @@ class ConfermeSopraPagina {
     try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(vista); } catch (_) {}
     try { if (!vista.webContents.isDestroyed()) vista.webContents.close(); } catch (_) {}
   }
+}
+
+function temaDi(s) {
+  return {
+    theme: s && typeof s.theme === 'string' ? s.theme : 'system',
+    tokens: s && s.themeTokens && typeof s.themeTokens === 'object' ? s.themeTokens : {},
+  };
+}
+
+// Tema e colori cambiati con una domanda a schermo: la domanda resta com'è (campo, scorrimento), cambiano i colori.
+function seguiTema(s) {
+  for (const c of aSchermo) c._tema(s);
 }
 
 const perPopup = new WeakMap();
@@ -359,4 +372,4 @@ function chiediDalMain(wc, richiesta) {
   return c ? c.chiedi(wc, null, { ...richiesta, scriveva: false, campo: false }) : Promise.resolve(false);
 }
 
-module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci };
+module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci, seguiTema };

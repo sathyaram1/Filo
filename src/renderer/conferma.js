@@ -18,6 +18,7 @@
   try {
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applicaTema({ theme: tema }));
   } catch (_) {}
+  api.onTema(applicaTema);
 
   api.onMostra((r) => {
     if (!r || !r.id) return;

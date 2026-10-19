@@ -9,7 +9,7 @@
 //   3. la selezione del testo usa la palette di Filo, non il blu di sistema.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, staccoDelFilo } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, staccoDelFilo, confermaSopraPagina, nelMondoDiFilo } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -106,14 +106,6 @@ test('nel popup la selezione del testo è nella palette Filo, non nel blu di sis
   await clickConfirm(page, 'cancel');
 });
 
-// Sui siti il popup vive nel mondo isolato della pagina: i suoi hook si raggiungono dal main.
-function nelMondoIsolato(app, url, codice) {
-  return app.evaluate(async ({ webContents }, { url, codice }) => {
-    const wc = webContents.getAllWebContents().find((w) => w.getURL() === url);
-    return wc ? wc.executeJavaScriptInIsolatedWorld(999, [{ code: codice }]) : null;
-  }, { url, codice });
-}
-
 // Il foglio della pagina riscrive le variabili di Filo: un accento trasparente, uno
 // che non è un colore, o testo, sfondo e accento scelti insieme. Il popup resta
 // quello che si vede su una pagina qualsiasi, riquadro compreso.
@@ -123,16 +115,26 @@ const FOGLI = {
   'testo, sfondo e accento scelti insieme': '.sn-confirm-host{--sn-fg:#000;--sn-overlay-bg:#808080;--sn-accent:#fff;--sn-font:monospace}',
 };
 
-// Lo stesso sito prima e dopo aver aggiunto il suo foglio: un secondo sito nello
-// stesso test non si può aprire, le schede si scelgono per nome del sito.
-async function riquadro(app, page) {
-  const url = page.url();
-  await expect.poll(() => nelMondoIsolato(app, url, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
-  await nelMondoIsolato(app, url, `window.SN_SIDEBAR.open(); window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}); 1`);
-  await expect(page.locator(CONFIRM_HOST)).toHaveCount(1, { timeout: 8000 });
-  const s = JSON.parse(await nelMondoIsolato(app, url, 'JSON.stringify(window.SN_CONFIRM_UI._test.state())'));
-  await nelMondoIsolato(app, url, "window.SN_CONFIRM_UI._test.click('cancel')");
+// Lo stesso sito prima e dopo aver aggiunto il suo foglio: il popup dei siti sta sopra la
+// scheda (#592.6), e il foglio della pagina non lo deve raggiungere.
+async function chiediDalSito(app, page) {
+  const host = new URL(page.url()).hostname;
+  await expect.poll(() => nelMondoDiFilo(app, host, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
+  await nelMondoDiFilo(app, host, `window.__esito = 'in corso'; window.SN_SIDEBAR.open();
+    window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}).then((v) => { window.__esito = v; }); 1`);
+  const vista = await confermaSopraPagina(app, { timeout: 15_000 });
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  const annulla = async () => {
+    await clickConfirm(vista, 'cancel');
+    await expect.poll(() => nelMondoDiFilo(app, host, 'window.__esito')).toBe(false);
+  };
+  return { vista, annulla };
+}
+
+async function riquadro(app, page) {
+  const { vista, annulla } = await chiediDalSito(app, page);
+  const s = await confirmState(vista);
+  await annulla();
   return s;
 }
 
@@ -158,18 +160,14 @@ test('#592.7 — sui siti il popup segue tema e accento dell’utente, anche a p
   }, settings);
   await imposta({ theme: 'dark', themeTokens: { accent: '#2e7d32' } });
   const page = await testServer.openReady(openTab, '<!doctype html><html><body><h1>Ricette</h1></body></html>');
-  const url = page.url();
-  await expect.poll(() => nelMondoIsolato(app, url, 'typeof window.__filoSidebarTest?.runFiloAction'), { timeout: 8000 }).toBe('function');
-  await nelMondoIsolato(app, url, `window.SN_SIDEBAR.open(); window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: TESTO })}); 1`);
-  await expect(page.locator(CONFIRM_HOST)).toHaveCount(1, { timeout: 8000 });
-  const stato = async () => JSON.parse(await nelMondoIsolato(app, url, 'JSON.stringify(window.SN_CONFIRM_UI._test.state())'));
+  const { vista, annulla } = await chiediDalSito(app, page);
+  const stato = () => confirmState(vista);
   const scuro = await stato();
   expect(scuro.riquadro.bgBox).toBe('rgba(30, 29, 27, 0.98)');
   expect(scuro.riquadro.bg).toContain('0.180392 0.490196 0.196078');
-  await page.screenshot({ path: 'tests/.shots/conferma-sito-scuro-verde.png' });
+  await vista.screenshot({ path: 'tests/.shots/conferma-sito-scuro-verde.png' });
   await imposta({ theme: 'light', themeTokens: {} });
   await expect.poll(async () => (await stato()).riquadro.bgBox, { timeout: 5000 }).toBe('rgba(248, 246, 240, 0.98)');
   expect((await stato()).riquadro.bg).toContain('0.768627 0.352941 0.231373');
-  await nelMondoIsolato(app, url, "window.SN_CONFIRM_UI._test.click('cancel')");
-  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  await annulla();
 });

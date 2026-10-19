@@ -1115,6 +1115,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   }
   try { require('../movimento').segui(merged); } catch (_) {}
   try { require('../shortcuts').configura(merged); } catch (_) {}
+  try { require('../confermeSopraPagina').seguiTema(merged); } catch (_) {}
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   avvisaSeLaProntezzaCambia().catch(() => {});
   try {

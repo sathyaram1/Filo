@@ -150,7 +150,7 @@ test('testo: nel popup di «cerca sul web» il testo sta intero nel suo riquadro
   const s = await confirmState(page);
   expect(s.citazioni).toEqual([testo]);
   expect(s.fuori).not.toContain('conferma pure');
-  expect(s.fuori).toContain('cerca testo sul web');
+  expect(s.fuori).toContain('Cercare sul web');
   await clickConfirm(page, 'cancel');
 });
 
