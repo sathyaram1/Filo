@@ -33,7 +33,7 @@ test('un programma partito da solo: sospetto, e pericoloso con un dominio giovan
 test('doppia estensione nell\'indirizzo aperto o nel file che la pagina fa scaricare', () => {
   const nell = giudica('https://documenti-fattura.it/allegati/fattura.pdf.exe');
   assert.equal(nell.level, 'sospetto');
-  assert.match(nell.message.body, /finisce con «fattura\.pdf\.exe», che sembra un documento ma è un programma/);
+  assert.match(nell.message.body, /«fattura\.pdf\.exe»: sembra un documento, ma è un programma/);
   // Scritta coi caratteri cifrati è lo stesso indirizzo.
   assert.equal(giudica('https://documenti-fattura.it/fattura.pdf%2Eexe').level, 'sospetto');
 

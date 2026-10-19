@@ -149,7 +149,7 @@ test('doppia estensione: aprire /fattura.pdf.exe, o scaricare fattura.pdf.exe co
   await openTab('https://documenti-fattura.it/fattura.pdf.exe');
   const aperta = await avvisoDi(app, 'documenti-fattura.it');
   expect(aperta.level).toBe('sospetto');
-  expect(aperta.body).toContain('finisce con «fattura.pdf.exe», che sembra un documento ma è un programma');
+  expect(aperta.body).toContain('«fattura.pdf.exe»: sembra un documento, ma è un programma');
 
   const archivio = await openTab('https://archivio-fatture.it/');
   await archivio.click('#fattura');
@@ -400,9 +400,9 @@ test('aprire da Filo l\'indirizzo di un fattura.pdf.exe che scende come file: la
   const a = (await avvisi()).find((x) => x.url === url);
   expect(a.level).toBe('sospetto');
   expect(a.attiva).toBe(true);
-  expect(a.body).toContain('finisce con «fattura.pdf.exe», che sembra un documento ma è un programma');
+  expect(a.body).toContain('«fattura.pdf.exe»: sembra un documento, ma è un programma');
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByText('Programma travestito da documento')).toBeVisible({ timeout: 6000 });
+  await expect(avviso.getByText('File travestito')).toBeVisible({ timeout: 6000 });
   await avviso.screenshot({ path: 'tests/.shots/814-indirizzo-travestito.png' }).catch(() => {});
   // Tenuta solo per l'avviso: andato via l'avviso, la scheda non resta vuota fra le altre.
   const vuote = () => app.evaluate(({ BrowserWindow }) => {
