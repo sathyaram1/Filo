@@ -45,6 +45,28 @@ test('la prima bolla dice lo stesso autore della testata, per ogni mittente', as
   expect(visti.fco).toBe('Filo (per conto dell\'owner)');
 });
 
+test('il pannello del mittente tiene a parte quello che Filo manda per conto dell’owner', async ({ openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate((fbs) => { window.__mgTest.setData(fbs); }, FBS);
+  const pannello = async (id) => {
+    await page.evaluate((x) => window.__mgTest.openDetail(x), id);
+    await page.locator('#senderLink').click();
+    const info = page.locator('.mg-sender-info').first();
+    await expect(info.locator('#senderFbList')).toBeVisible();
+    return {
+      chi: (await info.locator('.mg-sender-stat').first().textContent()).trim(),
+      mittente: (await info.locator('.mg-sender-stat').nth(1).textContent()).trim(),
+      voci: await info.locator('#senderFbList .mg-sender-item').evaluateAll((els) => els.map((e) => e.dataset.id).sort()),
+    };
+  };
+  expect(await pannello('fco')).toEqual({ chi: '🧵 Filo (per conto dell\'owner)', mittente: 'filo:chat', voci: ['fco'] });
+  expect(await pannello('fch')).toEqual({ chi: '🧵 Filo (per conto di un utente)', mittente: 'filo:chat', voci: ['fch'] });
+  expect(await pannello('oau')).toEqual({ chi: '🧵 Filo (per conto dell\'owner)', mittente: 'auto:complaint', voci: ['oau'] });
+  expect(await pannello('fil')).toEqual({ chi: '🧵 Filo (per conto di un utente)', mittente: 'auto:complaint', voci: ['fil'] });
+});
+
 test('in lista l’icona dice per conto di chi ha scritto Filo', async ({ openTab }) => {
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
