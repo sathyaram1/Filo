@@ -1,0 +1,72 @@
+// #600: su un sito con CSP (WhatsApp Web) il pannello "Invia attacco" usciva senza stile, in fondo alla pagina.
+// La CSP blocca il <link filo://style/>: arriva solo il CSS che tabs.js inietta con insertCSS. Qui il pannello,
+// aperto dal tasto destro, deve stare sopra la pagina come riquadro di Filo.
+
+import { test, expect } from './fixtures/electron.mjs';
+import { createServer } from 'node:http';
+import { apriRedteamATutti } from './helpers/redteam.mjs';
+
+const PAGE = `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+  <div style="height:100vh;padding:40px" id="p">Chat del sito, tasto destro qui.</div>
+  <div style="height:600px">fondo della pagina</div>
+</body></html>`;
+const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'";
+
+let server;
+let origin;
+test.beforeAll(async () => {
+  server = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': CSP });
+    res.end(PAGE);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  origin = `http://127.0.0.1:${server.address().port}/`;
+});
+test.afterAll(async () => { await new Promise((r) => server.close(r)); });
+
+test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è un riquadro di Filo sopra la pagina', async ({ app, shell }) => {
+  await apriRedteamATutti(app);
+  const port = new URL(origin).port;
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), origin);
+  let page = null;
+  await expect.poll(() => {
+    page = app.windows().find((w) => { try { return new URL(w.url()).port === port; } catch (_) { return false; } });
+    return !!page;
+  }, { timeout: 12_000 }).toBe(true);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => !!window.SN_REDTEAM_ATTACK_UI, null, { timeout: 8_000 });
+
+  // Il link filo://style/ è davvero bloccato: senza insertCSS la prova non direbbe niente.
+  const linkBloccato = await page.evaluate(() => {
+    const l = document.querySelector('link[href="filo://style/redteam-attack.css"]');
+    try { return !l || !l.sheet || l.sheet.cssRules.length === 0; } catch (_) { return true; }
+  });
+  expect(linkBloccato).toBe(true);
+
+  const voce = page.locator('.sn-menu .sn-item', { hasText: 'Invia attacco' }).first();
+  await expect.poll(async () => {
+    await page.keyboard.press('Escape');
+    await page.locator('#p').click({ button: 'right', position: { x: 200, y: 120 } });
+    return voce.isVisible();
+  }, { timeout: 10_000 }).toBe(true);
+  await voce.click();
+
+  const overlay = page.locator('.sn-rt-overlay');
+  const modal = overlay.locator('.sn-rt-modal');
+  await expect(modal).toBeVisible();
+  const stile = await overlay.evaluate((el) => {
+    const m = el.querySelector('.sn-rt-modal');
+    const r = m.getBoundingClientRect();
+    return {
+      position: getComputedStyle(el).position,
+      zIndex: Number(getComputedStyle(el).zIndex),
+      sfondo: getComputedStyle(m).backgroundColor,
+      dentroLoSchermo: r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth,
+    };
+  });
+  expect(stile.position, 'redteam-attack.css non applicato sul sito con CSP').toBe('fixed');
+  expect(stile.zIndex).toBeGreaterThan(1000);
+  expect(stile.sfondo).not.toBe('rgba(0, 0, 0, 0)');
+  expect(stile.dentroLoSchermo, 'il pannello è finito fuori dallo schermo').toBe(true);
+  await page.screenshot({ path: 'tests/.shots/600-redteam-csp.png' });
+});
