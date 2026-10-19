@@ -35,7 +35,15 @@ const STRADE = {
   'nella radice ombra chiusa': `(() => { const h = document.createElement('div'); document.body.appendChild(h); const f = document.createElement('iframe'); h.attachShadow({ mode: 'closed' }).appendChild(f); return f.contentWindow; })()`,
   'dentro un altro riquadro vuoto': `(() => { const w = ${VUOTO}; w.document.body.appendChild(w.document.createElement('iframe')); return w[0]; })()`,
   'riscritto da capo': `(() => { const w = ${VUOTO}; w.document.open(); w.document.write('<iframe></iframe>'); w.document.close(); return w[0]; })()`,
-  'rimandato a about:blank': `new Promise((ok) => { const w = ${VUOTO}; const f = document.querySelectorAll('iframe')[document.querySelectorAll('iframe').length - 1]; f.addEventListener('load', () => setTimeout(() => ok(window[window.length - 1]), 0), { once: true }); w.location.replace('about:blank#di-nuovo'); })`,
+  // Dalla seconda volta il documento nuovo ha una finestra nuova, e i prototipi di fabbrica.
+  'rimandato a about:blank': `(async () => {
+    const w = ${VUOTO};
+    const f = [...document.querySelectorAll('iframe')].pop();
+    for (const giro of [1, 2]) {
+      await new Promise((ok) => { f.addEventListener('load', () => setTimeout(ok, 0), { once: true }); w.location.replace('about:blank?' + giro); });
+    }
+    return window[window.length - 1];
+  })()`,
 };
 
 const PAGINA = `<!doctype html><meta charset="utf-8"><title>Modulo</title>
