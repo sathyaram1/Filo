@@ -23,12 +23,12 @@ test('ricerca nella cronologia da tastiera, poi Invio', async ({ app, openTab, t
   await apriCronologia(app, page, '#c');
   await pausa(300);
   const tastiera = (await statoDelloStrato(app)).tastiera;
-  await page.keyboard.type('beta');
+  await menu.superficie.keyboard.type('beta');
   await pausa(500);
   const filtrate = (await statoCronologia(app, page))?.voci?.map((v) => v.testo);
   const cercaVal = await menu.locator('.sn-menu-history-search-input').inputValue().catch(() => null);
   const campoVal = await page.locator('#c').inputValue();
-  await page.keyboard.press('Enter');
+  await menu.superficie.keyboard.press('Enter');
   await pausa(900);
   console.log('RICERCA', JSON.stringify({ tastiera, filtrate, cercaVal, campoVal, dopoInvio: await page.locator('#c').inputValue(), aperto: (await statoDelloStrato(app)).aperto }));
 });
@@ -52,7 +52,7 @@ test('Esc subito dopo il tasto destro', async ({ app, openTab, testServer }) => 
   await expect(menuDi(page).principale).toBeVisible();
 });
 
-test('finestra incognito e seconda finestra', async ({ app }) => {
+test('finestra incognito e seconda finestra', async ({ app, testServer }) => {
   test.setTimeout(90_000);
   await paginaDelloStrato(app);
   const esiti = {};
@@ -66,5 +66,28 @@ test('finestra incognito e seconda finestra', async ({ app }) => {
   }
   const finestre = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => w._filoTabs).map((w) => ({ inc: !!w._filoIncognito, strato: !!w._filoTabs.strato?.vista, pronta: !!w._filoTabs.strato?.pronta })));
   esiti.finestre = finestre;
+  const url = testServer.html('<!doctype html><title>inc1054</title><body style="margin:0;height:100vh"><input id="c" style="position:absolute;left:100px;top:100px;width:300px"></body>');
+  await app.evaluate(({ clipboard }) => clipboard.writeText('INCOGNITO-1054'));
+  await app.evaluate(async ({ BrowserWindow }, url) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs);
+    win._filoTabs.openTab(url);
+  }, url);
+  await pausa(3000);
+  const inc = app.windows().find((w) => w.url() === url);
+  esiti.trovata = !!inc;
+  await inc.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 }).catch(() => {});
+  await inc.mouse.click(150, 110, { button: 'right' });
+  await pausa(1500);
+  const stato = () => app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs); return w._filoTabs.strato.stato(); });
+  esiti.incAperto = await stato();
+  const strati = app.windows().filter((w) => w.url().startsWith('filo://menu/'));
+  esiti.strati = strati.length;
+  for (const s of strati) {
+    const n = await s.locator('.sn-menu-paste-main').count();
+    if (n) { await s.locator('.sn-menu-paste-main').click(); esiti.cliccato = true; }
+  }
+  await pausa(1000);
+  console.log('PRIMA', JSON.stringify(esiti));
+  esiti.valore = await inc.locator('#c').inputValue({ timeout: 3000 }).catch((e) => String(e).slice(0, 100));
   console.log('FINESTRE', JSON.stringify(esiti));
 });
