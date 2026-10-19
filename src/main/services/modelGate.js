@@ -126,7 +126,7 @@
       let rimedio = '';
       try { funzione = funzioneDi(action) || ''; } catch (_) {}
       try { rimedio = rimedioDi(s, action, err) || ''; } catch (_) {}
-      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoNessunHost(err), rimedio });
+      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: err.motivo || CE.motivoNessunHost(err), rimedio });
       return err;
     }
     const DAL_ROUTER = new Set(['complete', 'streamComplete', 'embed']);

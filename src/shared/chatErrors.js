@@ -186,11 +186,18 @@
     if (reason === 'zdrunknown') return 'non so quali dei suoi fornitori si impegnano a non conservare i dati, e coi crediti di Filo è una condizione';
     return motivoHostEsclusi(err && err.hosts);
   }
+  // Un modello da comprare solo dal produttore (#904) che il produttore adesso non serve (#829): nessun altro host lo può.
+  function motivoProduttoreGiu(nome) {
+    const n = breve(nome, 60);
+    return `questo modello lo serve solo ${n || 'il suo produttore'}, e adesso non risponde`;
+  }
   // Il rimedio per dove si sceglie il modello ('opzioni' | 'predefiniti' | 'gestione'); se l'ha pagata la chiave
   // propria con l'interruttore dei fornitori esclusi spento (#962), anche la strada di accenderlo.
   function rimedioNessunHost(dove, err, effettive) {
     const base = RIMEDI_NESSUN_HOST[dove] || RIMEDI_NESSUN_HOST.opzioni;
-    const spento = Boolean(err && err.keySource === 'own') && !Array.isArray(effettive && effettive.excludedProvidersOwnKey);
+    // Il vincolo del produttore vale anche con la chiave propria: accendere i fornitori esclusi non lo scioglie.
+    const spento = Boolean(err && err.keySource === 'own') && err.reason !== 'produttore'
+      && !Array.isArray(effettive && effettive.excludedProvidersOwnKey);
     return spento ? `${base} ${RIMEDI_NESSUN_HOST.chiavePropria}` : base;
   }
   function fraseNessunHost({ modello, funzione, motivo, rimedio: dove } = {}) {
@@ -431,7 +438,7 @@
 
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
-    fraseNessunHost, motivoHostEsclusi, motivoNessunHost, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
+    fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

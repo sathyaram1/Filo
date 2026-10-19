@@ -112,7 +112,8 @@
     const code = String(err.code || '');
     if (err.name === 'AbortError' || code === 'ABORT_ERR') return null;
     if (MAI_PARTITE.has(code)) return null;
-    if (SENZA_HOST.has(code)) return 'nessun_host';
+    // Il produttore che non risponde (#829) porta il codice del «nessun host», ma è un guasto del servizio: si conta per status.
+    if (SENZA_HOST.has(code) && err.reason !== 'produttore') return 'nessun_host';
     const W = global.SN_WALLET;
     const st = Number(err.status) || 0;
     if (st === 402 || (W && typeof W.isOutOfCredits === 'function' && W.isOutOfCredits(err))) return 'crediti';
