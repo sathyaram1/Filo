@@ -12,6 +12,7 @@ require('../../src/shared/chatErrors.js');
 require('../../src/main/services/providers/openrouter.js');
 require('../../src/main/services/providers/index.js');
 require('../../src/main/services/modelGate.js');
+require('../../src/shared/contatoriGiornalieri.js');
 const C = globalThis.SN_CONST;
 const CE = globalThis.SN_CHAT_ERRORS;
 const OR = globalThis.SN_PROVIDER_OPENROUTER;
