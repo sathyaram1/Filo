@@ -626,6 +626,15 @@
     // MIME dai magic byte e torna un data URL mostrabile. Owner-only.
     //   { url } → { ok, dataUrl } | { ok:false, error }
     FEEDBACK_DECRYPT_IMAGE: 'feedback_decrypt_image',
+    // La chiave privata dei feedback su questo computer (#1042). Owner-only (ownerOnly: provenienza, poi admin).
+    // Nessuna risposta porta la chiave: il file lo sceglie e lo legge il main.
+    //   STATO → { ok, configurata, fonte: 'ambiente'|'custodita'|'sviluppo'|'', custodibile, custodita, motivo? }
+    //   CARICA (apre la finestra di scelta del file) → { ok, …stato } | { ok:false, canceled } | { ok:false, error }
+    //   DIMENTICA → { ok, …stato } | { ok:false, error }
+    FEEDBACK_CHIAVE_STATO: 'feedback_chiave_stato',
+    FEEDBACK_CHIAVE_CARICA: 'feedback_chiave_carica',
+    FEEDBACK_CHIAVE_DIMENTICA: 'feedback_chiave_dimentica',
+    FEEDBACK_CHIAVE_CAMBIATA: 'feedback_chiave_cambiata',   // broadcast alle sole pagine di Filo, senza la chiave → {}
     // Config "modelli predefiniti" condivisa (admin-only, propaga a tutti via
     // Firestore). GET ritorna la config senza esporre le chiavi vere (solo se
     // presenti); UPDATE scrive provider/models/modelRegistry/apiKeys.
