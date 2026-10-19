@@ -4614,24 +4614,21 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
 
     // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
-    // confermata: il nome resta `auto:`). Senza un accesso valido non parte: da anonima sembrerebbe di un estraneo.
-    let firma;
+    // confermata: il nome resta `auto:`). Senza un accesso valido aspetta in coda il suo rientro, come quella della chat:
+    // da anonima sembrerebbe di un estraneo, e buttata si perderebbe.
     const Mittente = require('./feedbackMittente');
-    if (Mittente.dallOwner()) {
-      const idToken = await Mittente.tokenOwner().catch(() => '');
-      if (!idToken) { console.warn('[F4] segnalazione automatica dell\'owner non partita: manca il suo accesso'); return; }
-      firma = { idToken, soloAdmin: true };
-    }
-
-    const result = await FB.submit({
+    const voce = {
       text: payload.text,
       name: payload.name,
       clientId: payload.clientId,
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
-    }, firma).catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
+    };
+    const result = await (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
+      .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
 
-    if (!result || !result.id) return;
+    // In coda non c'è ancora un documento da annullare.
+    if (!result || !result.id || result.queued) return;
     const feedbackId = result.id;
     autoFeedbackAnnullabili.add(String(feedbackId));
 
