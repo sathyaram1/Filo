@@ -296,6 +296,12 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
   const csv = (s) => (/[",\n]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s));
   const unaRiga = (s) => s.replace(/\n/g, ' ');
   const documento = (f) => ({ name: `projects/filo/databases/(default)/documents/feedback/${f.id}`, fields: nelFormatoDelServer(f) });
+  const tabellaDiNode = (righe) => {
+    let fuori = '';
+    const c = new Console({ stdout: { write: (s) => { fuori += s; } }, colorMode: false });
+    c.table(righe);
+    return fuori;
+  };
 
   const FORME = {
     // #1108.2: le forme che non sono JSON.
