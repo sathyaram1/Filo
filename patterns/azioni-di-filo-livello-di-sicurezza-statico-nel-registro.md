@@ -21,10 +21,12 @@ il perimetro e l'origine. La tabella è quella decisa dall'owner il 30/09 (#1312
 non dice mai «no», e ogni «sì» da costo 2 in su passa dal guardiano di uscita,
 che finché non c'è lo trasforma in «chiede». Il **costo 4** vuole «conferma» a
 ogni livello, yolo compreso, e parte solo se l'utente l'ha chiesto con parole
-sue (`chiesta`): mai su proposta di Filo né da un'automazione. Chiesto vuol dire che una parola che
-nomina l'azione (le chiavi della preferenza, il valore detto, le parole proprie della voce) sta in quello che
-l'utente ha scritto nel compito: ogni voce che può arrivare al 4 dichiara la sua regola `chiesta`, e senza non
-parte (sentinella in `tests/unit/autonomia.test.mjs`). Sono costo 4 la
+sue (`chiesta`): mai su proposta di Filo né da un'automazione. Chiesto vuol dire che in una stessa riga di
+quello che l'utente ha scritto nel compito c'è un verbo dell'azione (con desinenza da verbo: «cambio» non è
+«cambia») e un nome intero di ciò che tocca (una chiave della preferenza, il suo nome, il valore detto): una
+parola sola detta per altro («la lista della spesa», «riassumi questa pagina») no. Ogni voce che può arrivare
+al 4 dichiara la sua regola `chiesta`, e senza non parte (sentinella in `tests/unit/autonomia.test.mjs`).
+Riconoscerne meno è il verso sicuro: il «no» dice all'utente dove farlo da sé. Sono costo 4 la
 **regola del freno** (una preferenza con `allenta` che lo toglie; stringerla è
 costo 1), le credenziali di un servizio, il cancellare per sempre (cancellare
 dentro Filo è nascondere, costo normale) e un segreto in un'uscita: se l'ha
