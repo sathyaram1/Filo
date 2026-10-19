@@ -532,7 +532,7 @@ test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, an
   }
   // Una parola vicina all'azione detta per altro non è una richiesta: serve il verbo dell'azione nella stessa riga.
   const diPassaggio = [
-    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['fammi la lista della spesa per una carbonara', 'metti le uova nella lista della spesa']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['fammi la lista della spesa per una carbonara', 'metti le uova nella lista della spesa', '500 grammi']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['la batteria di questo telefono che autonomia ha?', 'cosa vuol dire automatico nel cambio di una macchina?']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }, ['confronta i modelli di auto elettriche', 'usa i modelli di Word per la lettera']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-0123456789abcdef0123456789abcdef' }, ['ricordami di chiamare Marco']],
