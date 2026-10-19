@@ -120,7 +120,7 @@
   }
 
   function tenue(el, r) {
-    return r.width < LARGO_MIN || r.height < ALTO_MIN || opacita(el) < OPACITA_MIN || spoglio(el);
+    return r.width < LARGO_MIN || r.height < ALTO_MIN || opacita(el) < OPACITA_MIN;
   }
 
   // L'alfa di un colore calcolato (rgb(), rgba(), color(… / a), transparent); una forma ignota vale opaca.
