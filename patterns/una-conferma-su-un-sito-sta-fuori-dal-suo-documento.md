@@ -142,9 +142,14 @@ selezione).
   cursore, come la conferma.
 - **Sotto l'avviso del sito sospetto non compare**: la scheda coperta non è quella che l'utente vede.
 - **Né sotto un campo che l'utente non vede**: quasi trasparente (anche per un antenato o un riquadro), più piccolo
-  di 20×10, fuori schermo; coperto da altro conta quando il fuoco l'ha dato la pagina, non un clic vero sul campo
-  o sulla sua etichetta. Il controllo si ripete mentre è a schermo. Se no la pagina mette a fuoco un campo invisibile
-  sopra il suo «Accetta» e il clic dell'utente sceglie l'email (#1124 giro 2).
+  di 20×10, fuori schermo, senza niente di suo da disegnare (fondo, bordo, contorno, ombra, testo, segnaposto,
+  cursore), o sotto un velo opaco che lascia passare i clic (`pointer-events: none`: la ricerca per punti non lo
+  vede, si cerca fra i nodi; conta anche dopo un clic vero, che l'ha attraversato). Coperto da un nodo che prende i
+  clic conta quando il fuoco l'ha dato la pagina, non un clic vero sul campo o sulla sua etichetta. Il controllo si
+  ripete mentre è a schermo. Se no la pagina mette a fuoco un campo invisibile sopra il suo «Accetta» e il clic
+  dell'utente sceglie l'email (#1124 giri 2 e 5). Il campo alla Google (niente fondo né bordo suoi, contorno ed
+  etichetta disegnati sopra da nodi trasparenti) si vede dal cursore e la riceve. È già un elenco di modi di
+  nascondere: alla prossima porta si cambia meccanismo o decide l'owner, non si aggiunge una voce.
 - **Dopo Esc torna come in Chrome**: rientrando nel campo, cliccandoci (ha ancora il fuoco) o scrivendo l'utente.
 
 Dove vive: `src/main/propostaEmail.js` (vista, tasti, scelta), `src/content/propostaEmail.js` (il campo),
