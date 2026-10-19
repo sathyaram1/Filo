@@ -551,8 +551,6 @@ service cloud.firestore {
         && localMergesValido(request.resource.data)
         && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && (!('senderProof' in request.resource.data)
-            || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
         // per il dedup auto-feedback. Stringa breve.
         && request.resource.data.get('capabilityGapId', '') is string
