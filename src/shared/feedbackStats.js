@@ -522,6 +522,9 @@
     // come già fa per le durate che non conosce.
     var registroLetto = p.registroLetto !== false;
     function seNoto(v) { return registroLetto ? v : null; }
+    // I conti fatti sui DOCUMENTI dei lavori che il registro nomina: basta che
+    // manchi una delle due sorgenti e non si sanno.
+    function seNotiTutti(v) { return registroLetto && feedbackLetti ? v : null; }
     // Senza la lettura il registro non è «corto» o «vuoto»: non c'è. Si parte
     // da zero voci, così nessun elenco di segnalazioni sopravvive al guasto e
     // nessun riquadro finge di potersi aprire su quello che avrebbe contato.
