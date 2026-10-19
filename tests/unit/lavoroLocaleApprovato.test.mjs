@@ -151,8 +151,7 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
   }
 });
 
-// La prova del mittente la scrive solo il ripasso, che la deduce da segni che un falso non ha (regole: ripassoMittenti.test.mjs).
-const SCRIVE_LA_PROVA = new Set(['ripasso-mittenti.mjs']);
+// La prova del mittente nasce col documento: dopo non la scrive nessuno strumento (le regole: firestoreRulesSenderProof.test.mjs).
 // La migrazione chiede al server la sua regola fissa sui feedback senza fiducia: non sceglie chi diventa fidato.
 const SOLO_MIGRAZIONE = new Set(['fiducia-migra.mjs']);
 test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
