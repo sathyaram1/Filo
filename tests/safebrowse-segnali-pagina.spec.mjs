@@ -397,7 +397,7 @@ test('aprire da Filo l\'indirizzo di un fattura.pdf.exe che scende come file: la
   const home = await openTab('filo://newtab/');
   const url = 'https://fatture-online.it/fattura.pdf.exe';
   await home.evaluate((u) => new Promise((ok) => chrome.runtime.sendMessage({ type: 'open_url', url: u, parole: [u] }, ok)), url);
-  await expect.poll(() => statoDi(shell, 'fattura.pdf.exe'), { timeout: 10000 }).toBe('pending');
+  // Il file col nome di un documento aspetta l'avviso prima di scendere (#965); la domanda sui programmi viene dopo.
   await expect.poll(async () => (await avvisi()).find((a) => a.url === url) || null, { timeout: 8000 }).not.toBeNull();
   const a = (await avvisi()).find((x) => x.url === url);
   expect(a.level).toBe('sospetto');
