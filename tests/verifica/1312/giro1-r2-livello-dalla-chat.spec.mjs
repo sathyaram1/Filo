@@ -9,7 +9,7 @@ test('r2 la descrizione dello strumento, il contesto del turno e l\'intervista n
     const defs = globalThis.SN_ACTION_TOOLS.definitions({ onboarding: true });
     const imposta = defs.find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
     const S = globalThis.SN_FILO_STATE;
-    const contesto = S.renderForPrompt(await S.assemble({ sistema: false }));
+    const contesto = (await S.assemble({ sistema: false })).stateText;
     const voce = JSON.stringify(globalThis.SN_ONBOARDING.ITEMS.find((i) => i.id === 'autonomia'));
     return { imposta, contesto, voce };
   });
