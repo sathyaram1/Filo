@@ -1179,18 +1179,22 @@ test('statusUnreadable: solo il ciphertext, non gli stati storti', () => {
   assert.equal(MR.statusUnreadable(null), false);
 });
 
-test('sectionsReliable: sezioni via solo se NESSUNO stato si legge', () => {
+test('sectionsReliable: sezioni via quando una parte non trascurabile degli stati non si legge', () => {
   const cifrato = { _id: 'a', status: CIFRATO };
   const chiaro = { _id: 'b', status: 'todo' };
+  const molti = (n, fb) => Array.from({ length: n }, () => fb);
   // Coda vuota: niente dice il contrario, e "(0)" lì è la verità.
   assert.equal(MR.sectionsReliable([]), true);
   assert.equal(MR.sectionsReliable(undefined), true);
   assert.equal(MR.sectionsReliable([chiaro, chiaro]), true);
-  // Caso misto: un documento storto non toglie le sezioni a tutti (e non fa
-  // divergere le due pagine, che è il difetto che #509 esiste per togliere).
-  assert.equal(MR.sectionsReliable([cifrato, chiaro]), true);
+  // Un documento storto in mezzo a tanti leggibili non toglie le sezioni a tutti.
+  assert.equal(MR.sectionsReliable([cifrato, ...molti(19, chiaro)]), true);
   // Nessuna chiave su questo computer: nessuno stato si legge.
   assert.equal(MR.sectionsReliable([cifrato, cifrato]), false);
+  // #1042: senza chiave si leggono solo i documenti vecchi in chiaro, e quattro
+  // su più di mille disegnavano le sezioni coi chiusi dentro i Ricevuti.
+  assert.equal(MR.sectionsReliable([...molti(1453, cifrato), ...molti(4, chiaro)]), false);
+  assert.equal(MR.sectionsReliable([cifrato, chiaro]), false);
 });
 
 test('publicStateLabel: aperta/chiusa, e niente quando non si sa nemmeno quello', () => {
