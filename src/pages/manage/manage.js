@@ -6789,20 +6789,20 @@
     }
     const cop = stat.copertura;
     if (!fsLogOk) {
-      righe.push('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
+      testo('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
     } else if (cop.logVuoto) {
-      righe.push('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
+      testo('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
     } else if (cop.logCorto) {
-      righe.push(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
+      testo(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
     }
     // Una segnalazione con la data d'arrivo mancante o illeggibile non cade in
-    // nessuna finestra, «Tutto» compreso. Sparire in silenzio da un totale è la
-    // cosa che non deve succedere: qui si dice quante sono.
+    // nessuna finestra, «Tutto» compreso: qui si dice quante sono, e il numero
+    // è l'unica strada per vederle.
     const sd = stat.ricevuti.senzaData;
     if (sd > 0) {
       righe.push(sd === 1
-        ? 'Una segnalazione non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.'
-        : `${fsNum(sd)} segnalazioni non hanno una data d'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.`);
+        ? `${fsContoInFrase('senzaData', 1, 'Una segnalazione')} ${esc('non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.')}`
+        : `${fsContoInFrase('senzaData', sd, fsNum(sd))} ${esc('segnalazioni non hanno una data d\'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.')}`);
     }
     // Il mittente viaggia cifrato come lo stato. Senza la chiave privata non si
     // legge, e la ripartizione per mittente (una delle cose chieste) non può
@@ -6810,10 +6810,10 @@
     const mi = stat.ricevuti.mittentiIgnoti;
     if (mi > 0) {
       righe.push(mi === 1
-        ? 'Di una segnalazione non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.'
-        : `Di ${fsNum(mi)} segnalazioni non si è potuto leggere il mittente: serve la chiave dell'owner su questo computer. Nel filtro per creatore non ci sono.`);
+        ? `Di ${fsContoInFrase('mittentiIgnoti', 1, 'una segnalazione')} ${esc('non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.')}`
+        : `Di ${fsContoInFrase('mittentiIgnoti', mi, fsNum(mi))} ${esc('segnalazioni non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non ci sono.')}`);
     }
-    mgFsNota.textContent = righe.join(' ');
+    mgFsNota.innerHTML = righe.join(' ');
     mgFsNota.hidden = righe.length === 0;
   }
 
