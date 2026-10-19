@@ -232,7 +232,8 @@ function* righeDiTabella(t) {
       if (!nomi.some((n) => IDENTITA.includes(n))) continue;
       if (!intestazione.every((c) => !c.trim() || NOME_COLONNA.test(c.trim().replace(/^["'`]|["'`]$/g, '')))) continue;
       for (let j = i; j < t.length;) {
-        if (/^[ \t]*\r?(\n|$)/.test(t.slice(j, j + 2 + t.slice(j).search(/\n|$/)))) break;
+        const a2 = t.indexOf('\n', j);
+        if (!t.slice(j, a2 < 0 ? t.length : a2).trim()) break;
         let celle;
         [celle, j] = leggiRiga(t, j, d);
         // Una riga con più celle dell'intestazione è un testo libero, non una riga della tabella.
