@@ -839,10 +839,45 @@
           if (form.querySelector('input[type=password]')) conTesto = false;
           dest = (e.submitter && e.submitter.getAttribute('formtarget')) || form.getAttribute('target') || '';
         } catch (_) {}
-        if (conTesto && !IS_SUBFRAME && /^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true });
+        if (conTesto && !IS_SUBFRAME && /^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
         aggiorna(false);
         mandaImpronte();
       }, 0);
+    }
+    // L'accesso in testata c'è in ogni pagina del sito: nella pagina dopo non vuol dire sessione scaduta.
+    function passwordFuori(form) {
+      try {
+        return Array.prototype.some.call(document.querySelectorAll('input[type=password]'),
+          (el) => !form.contains(el) && el.getClientRects().length > 0);
+      } catch (_) { return false; }
+    }
+    // Il modulo parte anche senza il suo bottone (uno script, un controllo antispam, un editor in un
+    // riquadro che copia il testo nel modulo): conta quello che il modulo porta, non da dove si è scritto.
+    function onDatiModulo(e) {
+      const form = e.target;
+      if (IS_SUBFRAME || !form || !aree.size || !e.formData) return;
+      try {
+        if (form.querySelector('input[type=password]')) return;
+        if (!/^(|_self|_top)$/i.test(form.getAttribute('target') || '')) return;
+      } catch (_) { return; }
+      const valori = [];
+      try {
+        for (const [, v] of e.formData) {
+          if (typeof v !== 'string' || !v) continue;
+          const t = /[<&]/.test(v) ? new DOMParser().parseFromString(v, 'text/html').body.textContent || '' : v;
+          valori.push(essenziale(t));
+        }
+      } catch (_) {}
+      for (const [a, base] of aree) {
+        if (!viva(a) || sostituito(a)) continue;
+        const ora = testo(a);
+        if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
+        const ess = essenziale(ora);
+        if (ess && valori.some((v) => v.includes(ess))) {
+          invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+          return;
+        }
+      }
     }
 
     // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
