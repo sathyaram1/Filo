@@ -130,10 +130,12 @@
 
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   // Gli appunti li legge il main per Filo: la pagina non riceve nessun permesso, nemmeno per un attimo (#586).
-  async function pasteFromClipboard() {
+  // `letti`: gli appunti già letti dal main, quando «Incolla» l'ha scelto l'utente nello strato sopra la scheda (#1054).
+  async function pasteFromClipboard(letti = null) {
     deps.restorePasteContext();
     let appunti = null;
-    try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
+    if (letti && typeof letti === 'object') appunti = { ok: true, testo: letti.testo, immagine: letti.immagine };
+    else try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
     if (!appunti || !appunti.ok) { Popup.showToast(I18n.t('toast_paste_failed')); return; }
     const text = typeof appunti.testo === 'string' ? appunti.testo : '';
     let blob = null;
@@ -178,12 +180,13 @@
     pushClipboardEntry({ type: 'text', text }, 'paste');
   }
 
-  async function pasteHistoryEntry(entry) {
+  // `giaInCima`: scelta nello strato, il main l'ha già riportata in cima (#1054).
+  async function pasteHistoryEntry(entry, { giaInCima = false } = {}) {
     if (!entry) return;
     // Riporta in cima alla cronologia: il background fa dedup e promuove.
     // Non passiamo per pushClipboardEntry() per evitare di ri-richiedere
     // all'AI la descrizione di un'immagine già descritta.
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
+    if (!giaInCima) chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
     deps.restorePasteContext();
     const ctx = deps.getPasteContext();
     if (entry.type === 'image') {
@@ -400,6 +403,8 @@
   // Cronologia clipboard + stato navigazione (dati per il menu)
   // ------------------------------------------------------------
   async function getClipboardHistory() {
+    // Col menu nello strato la cronologia la legge lo strato dal main: nella scheda non arriva (#1054).
+    try { if (global.SN_STRATO_MENU_ACCESO?.() === true) return []; } catch (_) {}
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       return r?.items || [];

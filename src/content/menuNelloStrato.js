@@ -117,7 +117,7 @@
   function apri(opzioni) {
     const items = Array.isArray(opzioni && opzioni.items) ? opzioni.items : [];
     if (corrente) chiudi();
-    const m = { id: nuovoId(), funzioni: [], pulizie: [], inline: new Map(), montaggi: [] };
+    const m = { id: nuovoId(), funzioni: [], pulizie: [], inline: new Map(), montaggi: [], sezioni: 0 };
     corrente = m;
     const op = opDi(m);
     const voci = [];
@@ -125,7 +125,7 @@
       if (!it || typeof it !== 'object') return;
       const prima = items[i - 1];
       if (it.type === 'inline') {
-        const n = m.inline.size;
+        const n = m.sezioni++;
         voci.push({ type: 'inline', subject: it.subject ? String(it.subject) : '', content: it.content ? String(it.content) : '', $inline: n });
         m.montaggi.push(() => {
           const el = montaInline(m, n, it, !!prima && prima.type === 'separator');

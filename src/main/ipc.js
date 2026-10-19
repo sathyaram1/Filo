@@ -254,6 +254,18 @@ function registerIpcHandlers() {
     } catch (_) {}
   });
 
+  // #1054 — il menu del tasto destro di questa scheda si disegna nello strato sopra di lei? Le finestre aperte da un
+  // sito non hanno strato: lì resta nella pagina.
+  ipcMain.on('filo:strato-menu', (event) => {
+    let si = false;
+    try {
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      si = !!(win && win._filoTabs.strato && win._filoTabs.strato.acceso);
+    } catch (_) {}
+    event.returnValue = si;
+  });
+
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
     try { MenuDiRiserva.chiesto(event, richiesta); } catch (_) {}
