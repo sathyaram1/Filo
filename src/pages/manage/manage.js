@@ -6623,6 +6623,7 @@
     ]);
 
     fsFeedbacks = Array.isArray(lista.rows) ? lista.rows : [];
+    fsChiesteIntere = new Set();
     fsCompleto  = lista.complete;
     fsRipiego   = lista.ripiego;
     if (lista.ripiego && lista.err && lista.err.code === 'FEEDBACK_READ_DENIED') {
