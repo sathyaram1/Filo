@@ -522,6 +522,9 @@
     // come già fa per le durate che non conosce.
     var registroLetto = p.registroLetto !== false;
     function seNoto(v) { return registroLetto ? v : null; }
+    // I conti fatti sui DOCUMENTI dei lavori che il registro nomina: basta che
+    // manchi una delle due sorgenti e non si sanno.
+    function seNotiTutti(v) { return registroLetto && feedbackLetti ? v : null; }
     // Senza la lettura il registro non è «corto» o «vuoto»: non c'è. Si parte
     // da zero voci, così nessun elenco di segnalazioni sopravvive al guasto e
     // nessun riquadro finge di potersi aprire su quello che avrebbe contato.
@@ -571,7 +574,9 @@
     var attesePresa = [];
     var attesePresaIds = [];
     var senzaData = 0;
+    var senzaDataIds = [];
     var mittentiIgnoti = 0;
+    var mittentiIgnotiIds = [];
     for (i = 0; i < feedbacks.length; i++) {
       var f = feedbacks[i];
       // Una data d'arrivo che non si legge non cade in nessuna finestra, «Tutto»
@@ -581,12 +586,18 @@
       // non ha una data leggibile» anche a chi stava guardando le sole persone,
       // con quella segnalazione mandata da una routine.
       if (ms(f && f.createdAt) == null) {
-        if (!filtro || filtro.indexOf(creatoreDi(f)) >= 0) senzaData += 1;
+        if (!filtro || filtro.indexOf(creatoreDi(f)) >= 0) {
+          senzaData += 1;
+          if (f && f._id) senzaDataIds.push(f._id);
+        }
         continue;
       }
       if (!inRange(f && f.createdAt, range)) continue;
       var kind = creatoreDi(f);
-      if (kind === CREATORE_ILLEGGIBILE) mittentiIgnoti += 1;
+      if (kind === CREATORE_ILLEGGIBILE) {
+        mittentiIgnoti += 1;
+        if (f && f._id) mittentiIgnotiIds.push(f._id);
+      }
       conta(perCreatoreTutti, kind);
       if (!idsPerCreatoreTutti[kind]) idsPerCreatoreTutti[kind] = [];
       if (f && f._id) idsPerCreatoreTutti[kind].push(f._id);
@@ -762,9 +773,14 @@
         giriValori.push(giri);
         chiave = fettaGiri(giri).key;
       }
-      if (!fette[chiave]) fette[chiave] = { key: chiave, label: ETICHETTE_FETTE[chiave], n: 0, ids: [] };
+      // `critiche`: id → quante, per i soli lavori passati. La fetta «3 o più»
+      // raggruppa conti diversi, e aperta deve dire quanto è costato ognuno.
+      if (!fette[chiave]) fette[chiave] = { key: chiave, label: ETICHETTE_FETTE[chiave], n: 0, ids: [], critiche: {} };
       fette[chiave].n += 1;
-      if (doc._id) fette[chiave].ids.push(doc._id);
+      if (doc._id) {
+        fette[chiave].ids.push(doc._id);
+        if (chiave !== 'fermati') fette[chiave].critiche[doc._id] = giri;
+      }
     }
     var somma = 0;
     for (i = 0; i < giriValori.length; i++) somma += giriValori[i];
@@ -773,6 +789,8 @@
     // ── Audit di sicurezza, arenamenti, stato di oggi (sui lavori della finestra) ──
     var audit = { pass: 0, fail: 0, saltato: 0 };
     var auditIds = { pass: [], fail: [], saltato: [] };
+    var auditNonLetti = 0;
+    var auditNonLettiIds = [];
     var arenamenti = 0;
     var feedbackArenati = 0;
     var arenatiIds = [];
@@ -791,8 +809,15 @@
       if (!statiLavorati[cat2.key]) statiLavorati[cat2.key] = { key: cat2.key, label: cat2.label, n: 0, ids: [] };
       statiLavorati[cat2.key].n += 1;
       if (d2._id) statiLavorati[cat2.key].ids.push(d2._id);
-      var es = esitoAudit(d2);
-      if (es) { audit[es] += 1; if (d2._id) auditIds[es].push(d2._id); }
+      // L'esito sta fra i campi di DETTAGLIO: una riga d'elenco (la proiezione
+      // del ripiego, #677.5) non lo porta, e «non letto» non è «non fatto».
+      if (d2._proiezione) {
+        auditNonLetti += 1;
+        if (d2._id) auditNonLettiIds.push(d2._id);
+      } else {
+        var es = esitoAudit(d2);
+        if (es) { audit[es] += 1; if (d2._id) auditIds[es].push(d2._id); }
+      }
       var st = Number(d2.stalls) || Number(d2.workingResets) || 0;
       if (st > 0) {
         arenamenti += st;
@@ -817,10 +842,12 @@
         creatoriTutti: creatoriOrdinati(perCreatoreTutti, idsPerCreatoreTutti),
         serie: serieTemporale(vociRicevuti, range),
         senzaData: senzaData,
+        senzaDataIds: senzaDataIds,
         // Quante segnalazioni della finestra hanno un mittente che non si è
         // potuto leggere: chi disegna lo dichiara, invece di lasciar credere
         // che la ripartizione per mittente sia completa.
         mittentiIgnoti: mittentiIgnoti,
+        mittentiIgnotiIds: mittentiIgnotiIds,
       },
       lavorati: {
         totale: seNoto(numeriLavorati.length),
@@ -838,16 +865,16 @@
         fette: ordinaFette(fette),
         media: mediaGiri,
         conteggio: giriValori.length,
-        fermati: seNoto(fermatiN),
+        fermati: seNotiTutti(fermatiN),
         fermatiIds: idsFermati,
-        rimandati: seNoto(conRimandati),
+        rimandati: seNotiTutti(conRimandati),
         rimandatiIds: idsRimandati,
-        aperti: seNoto(apertiN),
+        aperti: seNotiTutti(apertiN),
         apertiIds: idsAperti,
-        statoIgnoto: statoIgnotoN,
+        statoIgnoto: seNotiTutti(statoIgnotoN),
         statoIgnotoIds: idsStatoIgnoto,
-        ignoti: ignotiN,
-        senzaGiri: senzaGiriN,
+        ignoti: seNotiTutti(ignotiN),
+        senzaGiri: seNotiTutti(senzaGiriN),
         senzaGiriIds: idsSenzaGiri,
         ignotiNumeri: ignotiNumeri,
       },
@@ -857,9 +884,18 @@
         presaInCarico: { mediana: seNotoFb(mediana(attesePresa)), n: seNotoFb(attesePresa.length), ids: attesePresaIds },
         lavorazione: { mediana: seNoto(mediana(durateLavoro)), n: seNoto(durateLavoro.length), ids: durateIds, mancanti: durateMancanti },
       },
-      audit: { pass: seNoto(audit.pass), fail: seNoto(audit.fail), saltato: seNoto(audit.saltato) },
-      auditIds: auditIds,
-      arenati: { lavorazioni: seNoto(arenamenti), feedback: seNoto(feedbackArenati), ids: arenatiIds },
+      // Un esito che manca anche a un solo lavoro fa del conto un minimo: si
+      // dà `null` e `nonLetti` dice su quanti, come per le due sorgenti.
+      audit: {
+        pass: auditNonLetti ? null : seNotiTutti(audit.pass),
+        fail: auditNonLetti ? null : seNotiTutti(audit.fail),
+        saltato: auditNonLetti ? null : seNotiTutti(audit.saltato),
+        nonLetti: auditNonLetti,
+      },
+      auditIds: auditNonLetti
+        ? { pass: [], fail: [], saltato: [], nonLetti: auditNonLettiIds }
+        : { pass: auditIds.pass, fail: auditIds.fail, saltato: auditIds.saltato, nonLetti: [] },
+      arenati: { lavorazioni: seNotiTutti(arenamenti), feedback: seNotiTutti(feedbackArenati), ids: arenatiIds },
       copertura: {
         logDa: logDa,
         logA: logA,
