@@ -179,7 +179,9 @@ test.describe('programmi scaricati', () => {
 
   const elenco = (shell) => shell.evaluate(() => window.filoShell.downloads.list());
   const voce = async (shell, nome) => ((await elenco(shell))?.items || []).find((it) => it.filename === nome) || null;
-  const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: `«${nome}»` });
+  // Il nome sta nel riquadro della domanda (#592.7), senza virgolette: si cerca lì, intero.
+  const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]')
+    .filter({ has: shell.locator('.dl-row-ask-nome', { hasText: new RegExp(`^${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 
   test('un riquadro di un sottodominio è lo stesso sito; quello di un altro utente della piattaforma no', async ({ shell, openTab }) => {
     test.setTimeout(120_000);
