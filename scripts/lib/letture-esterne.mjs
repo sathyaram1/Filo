@@ -36,7 +36,15 @@ export const MCP_SENZA_LETTURA = Object.freeze([
   'mcp__Claude_Code_Remote__unarchive_session',
   'mcp__Claude_Code_Remote__interrupt_session',
   'mcp__Claude_Code_Remote__unwatch_url',
+  // L'app desktop: la lista dei passi e il riassunto del turno vanno all'app, e torna solo la sua conferma (#1252).
+  'mcp__ccd_turn__update_plan',
+  'mcp__ccd_turn__wrap_up',
 ]);
+// Strumenti dell'app desktop noti per nome ma non per server: valgono sotto un server ccd_ qualsiasi. Le sue letture
+// (eventi di altre sessioni, widget, browser) non ci stanno e sporcano.
+const CCD_SENZA_LETTURA =Object.freeze(['mark_chapter']);
+const RE_CCD_SENZA_LETTURA = new RegExp(`^mcp__ccd(?:_[A-Za-z0-9-]+)+__(?:${CCD_SENZA_LETTURA.join('|')})$`);
+const mcpSenzaLettura = (nome) => MCP_SENZA_LETTURA.includes(nome) || RE_CCD_SENZA_LETTURA.test(nome);
 
 const pulisci = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, n);
 
@@ -52,12 +60,12 @@ export function matcherDelGancio() {
   return `^(?!(?:${STRUMENTI_SENZA_LETTURA.join('|')})$).*`;
 }
 
-// ToolSearch porta le descrizioni scritte da chi fa i server MCP: non sporca solo quando chiede per nome strumenti che
-// non lo sono.
+// ToolSearch porta le descrizioni scritte da chi fa i server MCP: non sporca solo quando chiede per nome strumenti di
+// Claude, o MCP fra i puliti (la descrizione la scrive chi è già fidato per la risposta).
 function cercaSoloStrumentiDiClaude(query) {
   const m = /^\s*select:([\s\S]*)$/.exec(String(query || ''));
   const nomi = m ? m[1].split(',').map((s) => s.trim()) : [];
-  return nomi.length > 0 && nomi.every((n) => /^[A-Za-z][A-Za-z0-9_]*$/.test(n) && !/^mcp/i.test(n));
+  return nomi.length > 0 && nomi.every((n) => mcpSenzaLettura(n) || (/^[A-Za-z][A-Za-z0-9_]*$/.test(n) && !/^mcp/i.test(n)));
 }
 
 function dentro(file, cartella, P, win) {
@@ -89,7 +97,7 @@ export function motivoLettura(input, ctx = {}) {
     return dove === '' || dove === 'worktree' ? '' : `${nome} (${pulisci(dove, 40)})`;
   }
   if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
-  if (nome.startsWith('mcp__')) return MCP_SENZA_LETTURA.includes(nome) ? '' : pulisci(nome, 160);
+  if (nome.startsWith('mcp__')) return mcpSenzaLettura(nome) ? '' : pulisci(nome, 160);
   if (nome !== 'Read') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
   const grezzo = String(dati.file_path || '').trim();
   if (!grezzo) return '';
