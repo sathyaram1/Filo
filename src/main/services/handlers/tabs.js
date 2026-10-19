@@ -134,6 +134,7 @@ module.exports = function register(on, ctx) {
         formDirty: msg.formDirty,
         impronte: msg.impronte,
         invioPagina: msg.invioPagina === true,
+        pwPrima: msg.pwPrima === true,
       }, sender.frame);
     }
     return { ok: true };
