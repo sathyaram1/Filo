@@ -782,14 +782,15 @@
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       campo: 'terminale',
-      // Il comando porta fuori il suo testo, come link e ricerca (#530.3): una chiave in un curl o in un git clone
-      // passa dagli stessi controlli dei segreti. Uno di sola lettura (costo 1 per il classificatore) resta sul
-      // computer. Le shell tolgono `^`, virgolette e backtick prima di eseguire.
+      // Il comando che si collega fuori dal computer porta fuori il suo testo, come link e ricerca (#530.3): una chiave
+      // in un curl o in un git clone passa dagli stessi controlli dei segreti. Uno che resta sul computer (sola lettura,
+      // un docker, un .env, un database su localhost) non porta fuori niente e chiede come gli altri (#1312).
       uscita: (a) => {
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
         const C = global.SN_CMD_CLASSIFY;
         if (C && cmd.trim() && C.classify(cmd, a && a._perimetro) === 1) return '';
-        return `${cmd}\n${cmd.replace(/[\^"'`]/g, '')}`;
+        const testo = `${cmd}\n${cmd.replace(/[\^"'`]/g, '')}`;
+        return comandoEsce(testo) ? testo : '';
       },
       fonte: (a, out) => {
         if (out.blocked) return null;
