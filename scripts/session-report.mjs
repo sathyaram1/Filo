@@ -101,11 +101,18 @@ export function scrittureCache(u) {
 }
 
 /** Il moltiplicatore della modalità veloce per le versioni che il listino conosce; le altre: `VELOCE_RIPIEGO`, con la nota. */
-const VELOCE = Object.freeze({ opus: Object.freeze({ '5-5': 2, 5: 2, '4-8': 2 }) });
-const VELOCE_RIPIEGO = 2;
+export const VELOCE = Object.freeze({ opus: Object.freeze({ '5-5': 2, 5: 2, '4-8': 2 }) });
+export const VELOCE_RIPIEGO = 2;
+
+/**
+ * La versione del listino (PREZZI, VERSIONI, VELOCE), scritta in ogni rapporto: chi confronta costi di prima e di dopo
+ * un cambio di prezzi vede dove sta il salto (#882). I rapporti senza il campo non si ricalcolano: fino al 02/10/2026
+ * contavano Opus 5.5 al listino di Opus 5. Si cambia insieme ai prezzi: sentinella in sessionReport.test.
+ */
+export const LISTINO = '2026-10-06';
 
 /** Le versioni che il listino conosce per nome, con la tariffa che devono avere. */
-const VERSIONI = Object.freeze({
+export const VERSIONI = Object.freeze({
   opus: { '5-5': 'opus-5-5', 5: 'opus', '4-8': 'opus', '4-7': 'opus', '4-6': 'opus', '4-5': 'opus' },
   sonnet: { '5-5': 'sonnet', 5: 'sonnet', '4-6': 'sonnet-4', '4-5': 'sonnet-4', 4: 'sonnet-4' },
   haiku: { '5-5': 'haiku-5-5', '4-5': 'haiku' },
@@ -194,6 +201,7 @@ function testoDi(content) {
 export function rapportoVuoto({ role = '', ticket = '' } = {}) {
   return {
     v: 3,
+    listino: LISTINO,
     role: String(role || ''),
     ticket: String(ticket || ''),
     sessionId: '',
@@ -941,7 +949,7 @@ export function riassunto(rep) {
     `rapporto sessione — ruolo: ${rep.role || '(nessuno)'}, biglietto: ${rep.ticket ? `${rep.ticket.slice(0, 8)}…` : '(nessuno)'}, sessione: ${rep.sessionId || '(sconosciuta)'}`,
     `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}, sforzo: ${Object.entries(rep.effort || {}).map(([k, n]) => `${k} ${n}`).join(', ') || '(non dichiarato)'}`,
     `token: input ${rep.tokens.input}, cache letta ${rep.tokens.cacheRead}, cache scritta ${rep.tokens.cacheWrite}, output ${rep.tokens.output}`,
-    `costo stimato: $${rep.costUsd.toFixed(4)}${rep.orchestrator ? ` + orchestratore $${rep.orchestrator.costUsd.toFixed(4)} (${rep.orchestrator.turns} turni, contesto ${rep.orchestrator.maxContextTokens}, ${rep.orchestrator.rewarmTurns} da riscaldare, fermo ${rep.orchestrator.attesaPrimaS}s${oltreOrch ? `, oltre soglia: ${oltreOrch}` : ''})` : ''} · cache riscaldata ${rep.rewarmTurns} volte${oltre ? ` · richieste oltre la soglia del prompt: ${oltre}` : ''}`,
+    `costo stimato: $${rep.costUsd.toFixed(4)} (listino ${rep.listino || 'non dichiarato'})${rep.orchestrator ? ` + orchestratore $${rep.orchestrator.costUsd.toFixed(4)} (${rep.orchestrator.turns} turni, contesto ${rep.orchestrator.maxContextTokens}, ${rep.orchestrator.rewarmTurns} da riscaldare, fermo ${rep.orchestrator.attesaPrimaS}s${oltreOrch ? `, oltre soglia: ${oltreOrch}` : ''})` : ''} · cache riscaldata ${rep.rewarmTurns} volte${oltre ? ` · richieste oltre la soglia del prompt: ${oltre}` : ''}`,
     `strumenti: ${rep.tools.total} (timeout ${rep.tools.timeouts}, errori ${rep.tools.errors}, sotto-agenti ${rep.subagents}, il più lungo ${rep.longestToolS}s) · sotto-agenti letti: ${Number(rep.subagentRuns) || 0}, il loro costo $${(Number(rep.subagentCostUsd) || 0).toFixed(4)}${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`,
   ];
 }

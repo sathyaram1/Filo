@@ -481,7 +481,8 @@ export async function release(t, fault = '', opts, report = null) {
  * Rilascio col rapporto allegato, e le due ritentate che il server prevede:
  *   - 413 `report_too_big` → una volta senza `tools.byName` e `notes`; se è
  *     ancora troppo, senza rapporto, e lo si dice;
- *   - 400 `report_malformed` → senza rapporto, e lo si dice.
+ *   - 400 `report_malformed` → senza `listino`, se c'era (la versione passa
+ *     nelle note); poi senza rapporto, e lo si dice.
  * Il rilascio è idempotente: riprovare è sicuro. `esito.rapporto` dice cosa è
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
@@ -489,27 +490,45 @@ export async function release(t, fault = '', opts, report = null) {
 export async function releaseConRapporto(t, fault, report, opts) {
   const tenta = (rep) => release(t, fault, opts, rep);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
-  let r = await tenta(report);
+  const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
+  // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
+  // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
+  const dettaglioDi = (r) => (r.body && r.body.detail ? `: ${r.body.detail}` : '');
+  const avvisi = [];
+  // Un server che non conosce ancora `listino` (#882) non deve costare il rapporto intero a ogni rilascio.
+  const tentaRapporto = async (rep) => {
+    const r = await tenta(rep);
+    if (!malformato(r) || !Object.prototype.hasOwnProperty.call(rep, 'listino')) return r;
+    const { listino, ...senza } = rep;
+    if (Array.isArray(rep.notes)) senza.notes = [...rep.notes, `listino ${listino}`];
+    const r2 = await tenta(senza);
+    if (malformato(r2)) return r;
+    if (r2.ok) avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
+    return r2;
+  };
+  const conAvvisi = (r, rapporto, avviso) => {
+    const righe = [...avvisi, ...(avviso ? [avviso] : [])];
+    return { ...r, rapporto: rapporto === 'allegato' && avvisi.length ? 'ridotto' : rapporto, ...(righe.length ? { avviso: righe.join(' ') } : {}) };
+  };
+  let r = await tentaRapporto(report);
   if (r.status === 413 && r.reason === 'report_too_big') {
     const misura = `${r.body && r.body.bytes ? r.body.bytes : '?'} byte, massimo ${r.body && r.body.max ? r.body.max : '?'}`;
     const snello = { ...report, tools: { ...(report.tools || {}) } };
     delete snello.tools.byName;
     delete snello.notes;
-    r = await tenta(snello);
+    r = await tentaRapporto(snello);
     if (r.status === 413 && r.reason === 'report_too_big') {
       r = await tenta(null);
-      return { ...r, rapporto: 'scartato', avviso: `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.` };
+      return conAvvisi(r, 'scartato', `rapporto troppo grande anche senza l'elenco degli strumenti (${misura}): rilasciato SENZA rapporto.`);
     }
-    return { ...r, rapporto: 'ridotto', avviso: `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.` };
+    if (!malformato(r)) return conAvvisi(r, 'ridotto', `rapporto troppo grande (${misura}): allegato senza l'elenco degli strumenti e le note.`);
   }
-  if (r.status === 400 && r.reason === 'report_malformed') {
-    // Il dettaglio è nella PRIMA risposta (quella che ha rifiutato il
-    // rapporto), non nella seconda: letto dopo la ritentata si perdeva.
-    const dettaglio = r.body && r.body.detail ? `: ${r.body.detail}` : '';
+  if (malformato(r)) {
+    const dettaglio = dettaglioDi(r);
     r = await tenta(null);
-    return { ...r, rapporto: 'scartato', avviso: `il server non ha capito il rapporto (report_malformed${dettaglio}): rilasciato SENZA rapporto.` };
+    return conAvvisi(r, 'scartato', `il server non ha capito il rapporto (report_malformed${dettaglio}): rilasciato SENZA rapporto.`);
   }
-  return { ...r, rapporto: 'allegato' };
+  return conAvvisi(r, 'allegato');
 }
 
 // ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
