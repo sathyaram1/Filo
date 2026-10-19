@@ -27,7 +27,8 @@ test('le regole dei nomi sono quelle della fixture, nello stesso ordine', () => 
 });
 
 test('l\'ambiente del lancio porta le stesse variabili della fixture', () => {
-  const blocco = codice.slice(codice.indexOf('electron.launch('), codice.indexOf('registraUsciteApp(app)'));
+  const inizio = codice.indexOf('electron.launch(');
+  const blocco = codice.slice(inizio, codice.indexOf('registraUsciteApp(app)', inizio));
   const nomi = [...new Set([...blocco.matchAll(/\b(FILO_[A-Z_]+|NODE_ENV)\s*:/g)].map((m) => m[1]))].sort();
   assert.ok(nomi.includes('FILO_USER_DATA'), 'la fixture non lancia più come prima: rileggila e aggiorna questa prova');
   const tutte = lancio('/dati', { ...OPZIONI_FIXTURE, riservaNuovaScheda: true }, {}).env;
