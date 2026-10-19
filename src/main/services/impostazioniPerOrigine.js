@@ -392,6 +392,8 @@ module.exports = {
   DOMANDE_WEB_UNA_PER_GESTO,
   domandaAmmessaDaUnSito,
   vuoleUnGesto,
+  RISPOSTE_WEB,
+  rispostaPerUnSito,
   CAMPI_WEB,
   CAMPI_WEB_SCRITTURA,
   SPINTE_WEB,
