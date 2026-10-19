@@ -323,7 +323,7 @@
     },
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
-      desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu. Una scheda cancellata esce dall\'archivio sul disco; la copia della pagina nella cache di navigazione resta finché il motore non la scarta.',
+      desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu. Una scheda cancellata (una alla volta, o tutte con «Svuota archivio») esce dall\'archivio sul disco, e le sue visite escono dal filo della home e dalla sua ricerca; la copia della pagina nella cache di navigazione resta finché il motore non la scarta.',
       invoke: 'Icona «Cronologia» in fondo alla barra laterale (bordo sinistro, su ogni pagina), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina». La ricerca per contenuto nasce da un riassunto che un modello scrive quando chiudi la scheda: lo spegni in Preferenze → «Riassumi le schede chiuse» o chiedendolo a Filo («spegni il riassunto delle schede chiuse»), e da spento le schede si ritrovano per parole.',
       doesNot: 'Delle pagine delicate (posta, banca, sanità, quelle con un campo password o carta, i siti delicati aggiunti da te) non fa il riassunto e non tiene il testo: restano titolo e indirizzo, e la ricerca le trova per parole. Le finestre in incognito e le pagine interne di Filo non entrano.',
     },
