@@ -100,6 +100,14 @@ html, body {
 }
 .sn-page button.sn-btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--sn-error) 10%, transparent); opacity: 1; }
 
+/* L'avviso «manca la chiave dei feedback» (shared/avvisoChiaveFeedback.js), uguale in Gestione e Feedback: la riga
+   resta piccola come quella che sostituisce, e il tasto ci sta dentro senza alzarla. */
+.sn-page .sn-chiave-avviso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.sn-page .sn-chiave-avviso[hidden] { display: none; }
+.sn-page .sn-chiave-avviso button.sn-btn { padding: 3px 10px; font-size: 12px; }
+.sn-page .sn-chiave-esito { font-size: 12px; color: var(--sn-muted); }
+.sn-page .sn-chiave-esito[data-kind="err"] { color: var(--sn-error); }
+
 .sn-page .sn-row {
   display: flex;
   gap: 12px;
