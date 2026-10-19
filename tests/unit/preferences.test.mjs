@@ -507,4 +507,14 @@ test('#876 — i siti fidati dalla chat: il sito che la voce copre, e nessuna pi
   assert.ok(P.applicaElenco(build('siti_fidati_cookie', 'aggiungi google.com').elenco, gmail).invariato);
   assert.deepEqual(P.applicaElenco(build('siti_fidati_cookie', 'togli google.com').elenco, gmail).partial,
     { security: { cookies: { trustedSites: ['libero.it'] } } });
+
+  // #759 — in Automatico «non restare connesso su X» toglie anche il sito dove Filo ti ha visto entrare, come il menu
+  // della scheda; con la privacy massima quell'elenco non c'entra e resta com'è.
+  const entrato = (mode) => ({ security: { cookies: { mode, trustedSites: ['libero.it'], loggedSites: ['esempio.it', 'libero.it'] } } });
+  assert.deepEqual(P.applicaElenco(build('non restare connesso', 'togli www.esempio.it').elenco, entrato('default')).partial,
+    { security: { cookies: { trustedSites: ['libero.it'], loggedSites: ['libero.it'] } } });
+  assert.deepEqual(P.applicaElenco(build('siti connessi', 'togli libero.it').elenco, entrato(undefined)).partial,
+    { security: { cookies: { trustedSites: [], loggedSites: ['esempio.it'] } } });
+  assert.ok(P.applicaElenco(build('non restare connesso', 'togli esempio.it').elenco, entrato('privacy')).invariato);
+  assert.ok(P.applicaElenco(build('non restare connesso', 'togli altro.it').elenco, entrato('default')).invariato);
 });
