@@ -140,6 +140,14 @@ test('«risali» carica il pezzo prima senza far saltare la posizione, e all’i
 
 test('dieci schede nuove non chiamano il modello; il saluto della giornata arriva una volta sola', async ({ app, openTab }) => {
   test.setTimeout(90_000);
+  // Il saluto della giornata aspetta le cinque: prima di quell'ora l'orologio del main va alle dieci dello stesso giorno.
+  await app.evaluate((_e, ora) => {
+    const vero = Date.now.bind(Date);
+    const d = new Date(vero());
+    if (d.getHours() >= ora) return;
+    const spostamento = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 10).getTime() - d.getTime();
+    Date.now = () => vero() + spostamento;
+  }, await app.evaluate(() => globalThis.SN_FILO_CODA.ORA_GIORNATA));
   await home(app);
   await modelli(app);
   const storiaPrima = await app.evaluate(async () => (await globalThis.SN_HISTORY.list()).length);
