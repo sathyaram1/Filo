@@ -62,16 +62,21 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
-  // Il costo 4 parte solo se l'utente l'ha chiesto con parole sue (#1312): una parola che nomina l'azione deve stare in
-  // quello che ha scritto nel compito, con un errore di battitura ammesso. `parole` di un'impostazione passano dal filtro
-  // delle parole comuni, `proprie` no; un numero vale solo uguale. Mai il testo del modello: lo decide `ctx.richiesta`.
+  // Il costo 4 parte solo se l'utente l'ha chiesto con parole sue (#1312): in una stessa riga di quello che ha scritto
+  // nel compito un verbo dell'azione e un nome di ciò che tocca, parole intere con un errore di battitura ammesso.
+  // Una parola sola detta per altro («la lista della spesa», «riassumi questa pagina») non è una richiesta. `frasi`
+  // bastano da sole: sono già l'azione («annulla», «dimentica tutto»). Mai il testo del modello: lo decide `ctx.richiesta`.
+  const VERBI_CAMBIO = ['alz', 'aument', 'abbass', 'mett', 'impost', 'cambi', 'tog', 'spegn', 'disattiv', 'attiv', 'accend',
+    'aggiung', 'rimuov', 'disabilit', 'abilit', 'sblocc', 'lev', 'port', 'pass', 'usa', 'usi', 'fid', 'consent', 'permett',
+    'scegli', 'torn', 'riport', 'inser', 'salv'];
+  const VERBI_CANCELLA = ['cancell', 'elimin', 'svuot', 'azzer', 'reset', 'pulisc', 'pulir', 'tog', 'butt', 'rimuov', 'dimentic',
+    'scord', 'distrugg', 'via'];
   const PAROLE_COMUNI = new Set(['della', 'delle', 'degli', 'dello', 'nella', 'nelle', 'sulla', 'quanto', 'solo', 'sempre',
     'tutto', 'tutti', 'tutte', 'filo', 'fare', 'cosa', 'cose', 'anche', 'come', 'questo', 'questa', 'quello', 'quella',
     'imposta', 'attiva', 'disattiva', 'accendi', 'spegni', 'aggiungi', 'togli', 'alza', 'abbassa', 'nuovo', 'nuova', 'true',
-    'false', 'mettere', 'metti', 'dove', 'quando', 'sito', 'siti', 'pagina', 'pagine', 'altri', 'altre']);
+    'false', 'mettere', 'metti', 'dove', 'quando', 'sito', 'siti', 'pagina', 'pagine', 'altri', 'altre', 'acceso', 'spento']);
   const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, ' ').trim();
-  const radice = (w) => (w.length > 5 ? w.slice(0, w.length - 2) : w);
   function unoDiDistanza(a, b) {
     if (a === b) return true;
     if (Math.abs(a.length - b.length) > 1) return false;
@@ -79,20 +84,33 @@
     while (i < a.length && i < b.length && a[i] === b[i]) i++;
     return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
   }
-  function nominata(testo, { parole = [], proprie = [] } = {}) {
-    const scritte = pianoTesto(testo).split(' ').filter(Boolean);
-    if (!scritte.length) return false;
-    const frase = ` ${scritte.join(' ')} `;
-    const cerca = [...parole.map((p) => [pianoTesto(p), true]), ...proprie.map((p) => [pianoTesto(p), false])];
-    for (const [p, filtra] of cerca) {
-      if (!p) continue;
-      if (p.includes(' ')) { if (frase.includes(` ${p} `)) return true; continue; }
-      if (/^\d+$/.test(p)) { if (scritte.includes(p)) return true; continue; }
-      if (p.length < (filtra ? 4 : 3) || (filtra && PAROLE_COMUNI.has(p))) continue;
-      const r = radice(p);
-      if (scritte.some((w) => w.startsWith(r) || (r.length >= 6 && [r.length - 1, r.length, r.length + 1].some((n) => unoDiDistanza(w.slice(0, n), r))))) return true;
+  // Una parola scritta vale quella cercata se è uguale o, da sei lettere in su, a un errore di battitura. Un numero solo uguale.
+  const simile = (w, p) => w === p || (!/^\d+$/.test(p) && p.length >= 6 && unoDiDistanza(w, p));
+  function contiene(scritte, nome) {
+    const pz = pianoTesto(nome).split(' ').filter(Boolean);
+    if (!pz.length) return false;
+    for (let i = 0; i + pz.length <= scritte.length; i++) if (pz.every((p, k) => simile(scritte[i + k], p))) return true;
+    return false;
+  }
+  function nominata(testo, { frasi = [], verbi = [], oggetti = [] } = {}) {
+    for (const riga of String(testo == null ? '' : testo).split(/\n+/)) {
+      const scritte = pianoTesto(riga).split(' ').filter(Boolean);
+      if (!scritte.length) continue;
+      if (frasi.some((f) => contiene(scritte, f))) return true;
+      if (verbi.length && scritte.some((w) => verbi.some((v) => w.startsWith(v))) && oggetti.some((o) => contiene(scritte, o))) return true;
     }
     return false;
+  }
+  // I nomi di un'impostazione che l'utente può aver detto: le sue chiavi e il suo nome intero, e i valori che non sono
+  // parole comuni. Un valore lungo e unico (una chiave di un servizio) scritto dall'utente basta da solo.
+  function chiestaPreferenza(a, ctx) {
+    const P = global.SN_PREF;
+    if (!P || !P.paroleDellaVoce) return false;
+    const valore = a.valore ?? a.value ?? a.valoreNuovo ?? a.val;
+    const v = P.paroleDellaVoce(a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza, valore);
+    const valori = v.valori.filter((w) => /^\d+$/.test(w) || (w.length >= 4 && !PAROLE_COMUNI.has(pianoTesto(w))));
+    const unico = typeof valore === 'string' && valore.trim().length >= 16 && /\d/.test(valore) && /[a-z]/i.test(valore) ? [valore.trim()] : [];
+    return nominata(richiestaDi(ctx), { frasi: unico, verbi: VERBI_CAMBIO, oggetti: [...v.frasi, ...valori] });
   }
   const richiestaDi = (ctx) => String((ctx && ctx.richiesta) || '');
 
