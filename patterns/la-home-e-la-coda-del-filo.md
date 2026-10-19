@@ -23,7 +23,8 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
 - **Le pagine visitate**: un gruppo per ogni tratto fra due eventi, mai a cavallo di due giorni; il nome è l'ultima
   pagina con un titolo vero. Titoli e indirizzi li scrivono i siti: si mostrano come testo, si riaprono solo se sono
   `http(s)`, e si tolgono **per id** (`FILO_CODA_TOGLI_PAGINE`): l'ora e il sito della cancellazione li prende il main
-  dalla pagina che il filo ha, mai dalla scheda che chiede.
+  dalla pagina che il filo ha, mai dalla scheda che chiede. Una pagina cancellata (da qui, dalla Sicurezza, dalla chat) se ne va anche
+  dalle schede chiuse, che la ricerca legge.
 - **I cambi**: quelli chiesti in chat hanno il segno sulla bolla; tutti gli altri sono una riga col loro «annulla».
 - **La conversazione che una scheda continua** (`chatCorrente`): l'ultima della home se non è passata un'ora di
   silenzio, o se l'ultima parola è di Filo che ha scritto da sé. L'accoglienza e le chat delle altre app non si
@@ -33,7 +34,8 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
 - **Filo parla per primo** (`src/main/services/filoParla.js`): timer e sveglie che suonano, download finiti, avvisi,
   la prima apertura della giornata (dopo le cinque, se oggi nella home non si è detto niente), la fine
   dell'accoglienza. Eventi vicini fanno un giro solo. Il suo turno va nella conversazione che una scheda nuova
-  continuerebbe; **due suoi messaggi di fila sono uno**: il secondo riscrive il primo con tutto quello che è successo,
+  continuerebbe; **due suoi messaggi di fila nello stesso giorno sono uno** (quello di ieri resta sotto «ieri», e il
+  saluto di oggi non riracconta gli eventi di ieri): il secondo riscrive il primo con tutto quello che è successo,
   e la piegatura del filo lo mette al posto del primo (su disco restano tutti e due, il filo cresce solo in coda).
 - **Le parti scritte da altri** (nome di un file, testo di un avviso, nome di una sveglia messa da un modello) entrano
   nel prompt imbustate come testi salvati, e il messaggio che ne nasce si salva con `esterno`: riletto, è una lettura,

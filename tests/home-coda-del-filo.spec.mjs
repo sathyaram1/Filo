@@ -291,6 +291,52 @@ test('un cambio fatto dall’interfaccia è una riga sottile nel filo, e da lì 
   await expect(riga).toHaveClass(/dash-cambi-annullato/);
 });
 
+test('il saluto di oggi non si fonde col messaggio spontaneo di ieri: quello resta sotto «ieri», il saluto sta sotto «oggi»', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async (_e, ts) => {
+    const E = globalThis.SN_FILO_EVENTI;
+    const qui = await globalThis.SN_IL_FILO.dispositivo();
+    const msg = { role: 'filo', text: 'Il timer della pasta è suonato.', spontaneo: true, motivi: [{ tipo: 'timer', testo: 'timer «pasta»' }] };
+    const ev = [E.crea(E.TIPI.CHAT_APERTA, { chat: 'ieri' }, { ts, dispositivo: qui }), E.crea(E.TIPI.MESSAGGIO, { chat: 'ieri', msg }, { ts, dispositivo: qui, autore: 'filo' })];
+    await globalThis.SN_IL_FILO.importa(ev.map(E.riga).join(''));
+  }, alle(1, 20));
+  await home(app);
+  await modelli(app);
+  await app.evaluate(() => globalThis.SN_FILO_PARLA.giro({ subito: [{ tipo: 'giornata' }] }));
+  const page = await openTab('filo://newtab/');
+  const saluto = page.locator('.dash-bubble-filo[data-spontaneo="1"]').last();
+  await expect(saluto).toHaveText('Buongiorno.');
+  await expect(saluto).not.toHaveClass(/dash-vecchio/);
+  await expect(page.locator('.dash-bubble-filo.dash-vecchio', { hasText: 'Il timer della pasta è suonato.' })).toHaveCount(1);
+});
+
+test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla ricerca attraverso le schede chiuse', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const tolta = 'https://www.youtube.com/watch?v=orche';
+  const cancellata = 'https://www.youtube.com/watch?v=delfini';
+  await semina(app, { pagine: [{ url: tolta, titolo: 'YouTube: orche', ts: alle(0, 0, 30) }, { url: cancellata, titolo: 'YouTube: delfini', ts: new Date(Date.now() - 600_000).toISOString() }] });
+  await app.evaluate(async (_e, urls) => {
+    for (const [url, title] of urls) await globalThis.SN_ARCHIVED_TABS.archive({ url, title, closedAt: new Date().toISOString() });
+  }, [[tolta, 'YouTube: orche'], [cancellata, 'YouTube: delfini']]);
+  const page = await openTab('filo://newtab/');
+  const riga = page.locator('.dash-pagine').first();
+  await riga.locator('.dash-pagine-testa').click();
+  const orche = riga.locator('.dash-pagina', { hasText: 'YouTube: orche' });
+  await orche.click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect(orche).toHaveCount(0);
+  const cerca = page.locator('#cercaInput');
+  await cerca.fill('orche');
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
+  const r = await page.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_PAGINE_CANCELLA, periodo: 'oggi' }));
+  expect(r.ok).toBe(true);
+  await cerca.fill('');
+  await cerca.fill('delfini');
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
+  // Le schede chiuse di ieri restano: la cancellazione tocca solo il suo periodo.
+  expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(0);
+});
+
 test('senza un modello la frase dice perché e la strada porta ai Crediti', async ({ app }) => {
   const casa = await home(app);
   await expect(casa.locator('#homeMessage')).toContainText('codice d\'invito');
