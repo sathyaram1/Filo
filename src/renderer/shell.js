@@ -2008,13 +2008,13 @@
       }
       row.appendChild(meta);
 
-      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : '';
-      const domanda = r.state === 'pending' ? testoScarica(r) : apri;
+      const apri = r.state === 'completed' && !r.missing ? domandeApri.get(r.id) : null;
+      const domanda = r.state === 'pending' ? partiScarica(r) : apri;
       if (domanda) {
         row.dataset.chiede = '1';
         const ask = document.createElement('div');
         ask.className = 'dl-row-ask';
-        ask.textContent = domanda;
+        riempiDomanda(ask, domanda);
         row.appendChild(ask);
       }
       if (avvisiRiga.has(r.id)) {
