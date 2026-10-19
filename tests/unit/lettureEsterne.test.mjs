@@ -250,6 +250,9 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
     assert.deepEqual(prova('Read', { file_path: join(dirname(ROOT), 'LOCAL.md') }), []);
     assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'plans', 'p.md') }, { env: { HOME: casa, USERPROFILE: casa } }), []);
     for (const n of ['Bash', 'Grep', 'Glob', 'mcp__ide__getDiagnostics']) assert.deepEqual(prova(n, { command: 'curl x', pattern: 'x', path: fuori }), [], n);
+    // L'apertura di un turno nell'app desktop: piano, capitolo, riassunto lasciano pulito; leggere gli eventi no (#1252).
+    for (const n of ['mcp__ccd_turn__update_plan', 'mcp__ccd_session__mark_chapter', 'mcp__ccd_turn__wrap_up']) assert.deepEqual(prova(n, { plan: [{ step: 'x', status: 'in_progress' }] }), [], n);
+    assert.deepEqual(prova('mcp__ccd_session__list_events', { session: 'altra' }), ['mcp__ccd_session__list_events']);
     assert.deepEqual(prova('SearchPlugins', { query: 'posta' }), ['SearchPlugins']);
     assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', isolation: 'remote' }), ['Agent (remote)']);
     assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', subagent_type: 'Explore' }), [], 'un sotto-agente locale');
