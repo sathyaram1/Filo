@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const require = createRequire(import.meta.url);
 const { buildExportZip } = require('../src/main/services/exportData.js');
@@ -379,7 +380,7 @@ test('J — il tasto destro sulla bolla col segno offre l\'annullo e il rifai, c
   await scrivi(page, 'tema scuro', 'Fatto.');
   const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
   await expect(bolla.locator('.dash-cambi-segno')).toBeVisible();
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
 
   await bolla.click({ button: 'right', position: { x: 20, y: 10 } });
   await expect(menu).toBeVisible();
@@ -444,7 +445,7 @@ test('L — tasto destro sulla riga del blocco che nomina il cambio: annulla da 
     { text: 'Fatto.' },
   ]);
   await scrivi(page, 'tema scuro', 'Fatto.');
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   // Anche l'intestazione del blocco chiuso offre l'annullo del turno.
   await page.locator('.dash-activity-head').first().click({ button: 'right' });
   await expect(menu.getByText(/^Annulla · tema: chiaro → scuro$/)).toBeVisible();

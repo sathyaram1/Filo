@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
@@ -42,10 +43,10 @@ test('barra aperta: rotella, tasto destro, doppio clic e clic nel margine dell\'
 
   // Il tasto destro nel vuoto è quello della pagina: si apre il menu di Filo sulla pagina.
   await nelVuoto(app, clic(x, 300, 'right'));
-  await expect(p.locator('.sn-menu')).toBeVisible({ timeout: 5000 });
+  await expect(menuDi(p).locator('.sn-menu')).toBeVisible({ timeout: 5000 });
   await comandaBarra(app, 'chiudi');
   await p.keyboard.press('Escape');
-  await expect(p.locator('.sn-menu')).toBeHidden();
+  await expect(menuDi(p).locator('.sn-menu')).toBeHidden();
   await comandaBarra(app, 'tasto');
   await pannelloFermo(barra);
 

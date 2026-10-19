@@ -11,6 +11,7 @@
 // il fix sarebbe figlio di <html> e l'assert sarebbe rosso).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="margin:0">
   <div id="stage" style="width:480px;height:320px;background:#000;position:relative">
@@ -39,10 +40,10 @@ test('col contenuto a tutto schermo il tasto destro apre il menu Filo nel top la
   await page.locator('#player').click({ button: 'right' });
 
   // Il menu Filo compare…
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
   // …ed è montato DENTRO l'elemento fullscreen (altrimenti sarebbe nel sottoalbero
   // sbagliato e invisibile sotto al video).
-  const insideFs = await page.evaluate(() => {
+  const insideFs = await menuDi(page).valuta(() => {
     const m = document.querySelector('.sn-menu');
     const fs = document.fullscreenElement;
     return !!(m && fs && fs.contains(m));

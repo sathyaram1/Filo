@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Da #871 queste icone stanno nella barra laterale: qui si prova la strada del tasto destro,
 // quella di chi le ha rimesse nel menu.
@@ -15,11 +16,11 @@ const HTML_B = `<!doctype html><html><body><h1 id="t">pagina B</h1></body></html
 
 async function openOverflowGrid(page) {
   await page.locator('h1').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
   return grid;
 }

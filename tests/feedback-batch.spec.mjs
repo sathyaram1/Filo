@@ -9,6 +9,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -22,11 +23,11 @@ async function newtabPage(app) {
 
 async function openOverflowGrid(page, selector = 'h1') {
   await page.locator(selector).click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   const overflow = menu.locator('.sn-menu-row-overflow').first();
   await overflow.hover();
-  const grid = page.locator('.sn-menu-icon-grid');
+  const grid = menuDi(page).locator('.sn-menu-icon-grid');
   await expect(grid).toBeVisible({ timeout: 2000 });
   return grid;
 }

@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 const DETTO = 'che tempo fa domani a Lisbona';
@@ -153,7 +154,7 @@ test('home: con «Lascia il testo da correggere» (scelto dal tasto destro sul m
 
   // Il tasto destro sul microfono offre le due scelte; quella di serie è segnata.
   await mic.click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByText('✓ Invia da solo')).toBeVisible();
   await menu.getByText('Lascia il testo da correggere').click();
@@ -317,7 +318,7 @@ test('home: «Detta» dal tasto destro nella casella della chat è lo stesso mic
   const page = await home(app);
   const mic = page.locator('.dash-input-wrap .sn-voce-btn');
   await page.locator('#input').click({ button: 'right' });
-  const detta = page.locator('.sn-menu .sn-menu-split-main', { hasText: 'Detta' });
+  const detta = menuDi(page).locator('.sn-menu .sn-menu-split-main', { hasText: 'Detta' });
   await expect(detta).toBeVisible();
   const tasto = await page.evaluate(() => window.SN_TASTI.etichetta(window.SN_VOCE_CHAT.TASTO));
   await expect(detta.locator('.sn-menu-shortcut')).toHaveText(tasto);

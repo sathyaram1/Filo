@@ -13,6 +13,7 @@
 // prima di ogni attesa, e la miniatura è best-effort).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 test('Salva per dopo resiste al redirect immediato dopo il click', async ({ openTab, testServer }) => {
   const urlA = testServer.html(
@@ -33,7 +34,7 @@ test('Salva per dopo resiste al redirect immediato dopo il click', async ({ open
 
   // Apre il menu tasto destro e clicca l'icona "Salva per dopo".
   await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const btn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
   await expect(btn).toBeVisible();
   await btn.click();
 

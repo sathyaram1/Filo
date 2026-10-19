@@ -7,6 +7,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
   <h1>Pagina con un collegamento</h1>
@@ -20,7 +21,7 @@ function shot(page, name) {
 
 // «Copia URL» dal tasto destro vero sul link: produce l'avviso «Copiato» nella pila della pagina.
 async function copiaUrl(page) {
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   for (let i = 0; i < 6; i++) {
     await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
     const voce = menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' });
@@ -237,7 +238,7 @@ test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la sce
   await puntatoreSopra(page, avviso);
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Chiudi']);
   await voci.first().click();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
@@ -255,7 +256,7 @@ test('editor: tasto destro sull’avviso con «Annulla» offre «Annulla» e «C
   await puntatoreSopra(page, avviso);
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText([/Annulla/, 'Chiudi']);
   const testo = (await avviso.locator('span').textContent()).trim();
   await voci.first().click();
@@ -277,7 +278,7 @@ test('mazzi: tasto destro sull’avviso offre «Chiudi», e la scelta lo chiude'
   await puntatoreSopra(page, avviso);
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Chiudi']);
   await voci.first().click();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
@@ -295,7 +296,7 @@ test('tasto destro sulla conferma «Salvata in»: il menu offre «Apri la lista�
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 4 });
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Apri la lista', 'Chiudi']);
   await voci.nth(1).click();
   await expect(pill).toHaveCount(0, { timeout: 1500 });

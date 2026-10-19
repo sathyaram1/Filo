@@ -4,6 +4,7 @@
 // segni si spegne da solo, dalla pagina Altro. Il modello è finto: nessuna chiamata esce dalla macchina.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
@@ -61,7 +62,7 @@ const contraddizione = (citazione) => JSON.stringify({ issues: [{
 async function tastoDestroSu(page, segno) {
   const b = await segno.boundingBox();
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).pannelli;
   await expect(menu).toBeVisible({ timeout: 5000 });
   return menu;
 }

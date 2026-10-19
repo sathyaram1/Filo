@@ -5,6 +5,7 @@
 //   3. tasto destro su selezione → menu mostra la sezione inline AI
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo test page</h1>
@@ -15,7 +16,7 @@ const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-seri
 test('tasto destro apre il menu Filo', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('#paragraph').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
 });
 
 test('Shift + tasto destro NON apre il menu (escape hatch)', async ({ openTab, testServer }) => {
@@ -24,13 +25,13 @@ test('Shift + tasto destro NON apre il menu (escape hatch)', async ({ openTab, t
   await page.locator('#paragraph').click({ button: 'right' });
   await page.keyboard.up('Shift');
   await page.waitForTimeout(300);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 });
 
 test('la voce feedback è "Invia feedback" senza emoji né "(alpha)"', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await page.locator('#paragraph').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   // La voce esiste con l'etichetta pulita…
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
@@ -51,7 +52,7 @@ test('tasto destro su selezione mostra la sezione inline AI', async ({ openTab, 
     sel.addRange(range);
   });
   await page.locator('#paragraph').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.locator('.sn-menu-inline')).toBeVisible();
 });

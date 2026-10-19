@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { cartellaDellaProva, BOLLETTA_MARZO } from './helpers/documentiFinti.mjs';
 import { confermaSopraPagina, confirmState, clickConfirm, nelMondoDiFilo } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const RICHIESTA = 'mi serve la bolletta della luce di marzo';
 const PAGINA = `<!doctype html><html><head><title>Fornitore Energia</title></head>
@@ -121,7 +122,7 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
     await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([bolletta]);
     // Il tasto destro apre il menu di Filo con le azioni del file, non quello della pagina.
     await file.click({ button: 'right' });
-    const voci = page.locator('.sn-menu .sn-menu-item');
+    const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
     await expect(voci).toHaveText(['Apri', 'Mostra nella cartella']);
     await voci.filter({ hasText: 'Mostra nella cartella' }).click();
     await expect.poll(() => app.evaluate(() => globalThis.__cartelle)).toEqual([bolletta]);

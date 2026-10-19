@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura, scriviDallaTastiera, COPERTA } from './helpers/avvisoSito.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 
@@ -200,7 +201,7 @@ test('le altre porte dello stesso link: «Apri in nuova tab» dal tasto destro e
   const forum = pagina.url();
 
   await pagina.locator('#truffa').click({ button: 'right' });
-  const menu = pagina.locator('.sn-menu');
+  const menu = menuDi(pagina).pannelli;
   await expect(menu).toBeVisible({ timeout: 20_000 });
   await menu.locator('.sn-menu-item', { hasText: 'nuova tab' }).first().click({ noWaitAfter: true });
   const avviso = await vistaAvviso(app);

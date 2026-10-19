@@ -5,11 +5,12 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { statoCronologia, testiCronologia, cronologiaPronta } from './helpers/cronologiaAppunti.mjs';
 import { CONFIRM_HOST, clickConfirm, confermaSopraPagina, confirmState } from './helpers/confirm.mjs';
+import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 
 const SEGRETO = 'pw-Segreta-589-undici';
-const MONDO_CONTENT_SCRIPT = 999;
 
 // Lo script del sito: un velo bianco sopra tutto, che il mouse attraversa, steso appena il menu entra nella pagina.
+// menu-dal-sito
 const SITO = `
   window.stendi = (z = 2147483647) => {
     const v = document.createElement('div');
@@ -29,19 +30,7 @@ const PAGINA = `<!doctype html><html><body style="padding:40px">
   <script>${SITO}</script>
 </body></html>`;
 
-// Il mondo isolato dei content script della scheda: lì vivono il menu e la guardia.
-function nelMondo(app, page, code) {
-  return app.evaluate(async ({ BrowserWindow }, { u, mondo, code }) => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      const tab = (win._filoTabs?.tabs || []).find((t) => {
-        try { return t.view?.webContents?.getURL() === u; } catch (_) { return false; }
-      });
-      if (tab) return tab.view.webContents.executeJavaScriptInIsolatedWorld(mondo, [{ code }]);
-    }
-    return null;
-  }, { u: page.url(), mondo: MONDO_CONTENT_SCRIPT, code });
-}
-const statoVoce = (app, page, sel) => nelMondo(app, page,
+const statoVoce = (app, page, sel) => nelMondoDelMenu(app, page,
   `globalThis.SN_VISTO?._test.stato(document.querySelector(${JSON.stringify(sel)})) ?? null`);
 
 async function conCronologia(shell) {
@@ -71,7 +60,7 @@ test('sotto il velo del sito la voce della cronologia scelta senza vederla non i
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   // Il primo quadrato sta sulla freccia di Incolla: la cronologia si apre da sola, sotto il velo.
-  const freccia = await centro(page.locator('.sn-menu-paste-arrow'));
+  const freccia = await centro(menuDi(page).locator('.sn-menu-paste-arrow'));
   await page.mouse.move(freccia.x, freccia.y, { steps: 4 });
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   await page.waitForTimeout(700);
@@ -83,12 +72,12 @@ test('sotto il velo del sito la voce della cronologia scelta senza vederla non i
   await page.mouse.click(voce.incolla.x, voce.incolla.y);
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue(), 'la password non arriva al campo del sito').not.toContain(SEGRETO);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 
   // Tolto il velo, la stessa strada fatta vedendo il menu incolla come sempre.
   await page.evaluate(() => window.togli());
   await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-arrow').hover();
+  await menuDi(page).locator('.sn-menu-paste-arrow').hover();
   await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
   const vista = (await cronologiaPronta(app, page)).voci.find((v) => v.testo === SEGRETO);
   await page.mouse.move(vista.incolla.x, vista.incolla.y, { steps: 4 });
@@ -104,7 +93,7 @@ test('sotto il velo non partono nemmeno Incolla e Detta', async ({ app, openTab,
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await page.locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue(), 'gli appunti non arrivano al campo del sito').not.toContain(SEGRETO);
 
@@ -112,11 +101,12 @@ test('sotto il velo non partono nemmeno Incolla e Detta', async ({ app, openTab,
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await page.locator('.sn-menu-split-main', { hasText: 'Detta' }).click();
+  await menuDi(page).locator('.sn-menu-split-main', { hasText: 'Detta' }).click();
   await page.waitForTimeout(800);
   expect(await page.evaluate(() => document.documentElement.innerText), 'il microfono non si accende').not.toMatch(/Ti ascolto|Microfono/);
 
   // Il sito porta il fuoco su Incolla e chiede di premere Spazio: anche il clic da tastiera vuole la voce scoperta.
+  // menu-dal-sito
   await page.evaluate(() => {
     window.togli();
     window.alMenu(() => { window.stendi(); document.querySelector('.sn-menu-paste-main').focus(); });
@@ -127,13 +117,13 @@ test('sotto il velo non partono nemmeno Incolla e Detta', async ({ app, openTab,
   await page.keyboard.press('Space');
   await page.waitForTimeout(800);
   expect(await page.locator('#campo').inputValue(), 'Spazio sotto il velo non incolla').not.toContain(SEGRETO);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 });
 
 test('un velo tolto mentre la mano arriva sulla voce non lascia passare il clic: prima va visto', async ({ app, openTab, testServer }) => {
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
   const page = await apri(openTab, testServer);
-  // Il sito toglie il velo quando il puntatore arriva su Incolla.
+  // Il sito toglie il velo quando il puntatore arriva su Incolla. menu-dal-sito
   await page.evaluate(() => window.alMenu(() => {
     window.stendi();
     const via = (e) => { if (e.target.closest && e.target.closest('.sn-menu-paste-main')) { window.togli(); window.removeEventListener('pointerover', via, true); } };
@@ -142,7 +132,7 @@ test('un velo tolto mentre la mano arriva sulla voce non lascia passare il clic:
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  const incolla = await centro(page.locator('.sn-menu-paste-main'));
+  const incolla = await centro(menuDi(page).locator('.sn-menu-paste-main'));
   await page.mouse.move(incolla.x, incolla.y, { steps: 4 });
   await expect(page.locator('#velo')).toHaveCount(0);
   await expect.poll(() => statoVoce(app, page, '.sn-menu-paste-main')).toBe('visibile');
@@ -159,7 +149,7 @@ test('un velo tolto mentre la mano arriva sulla voce non lascia passare il clic:
   await page.locator('#campo').click({ button: 'right' });
   await expect.poll(() => statoVoce(app, page, '.sn-menu-paste-main')).toBe('visibile');
   await page.waitForTimeout(700);
-  await page.locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
 
@@ -170,7 +160,7 @@ test('un velo che non tocca il menu non ferma niente, e il primo clic sul menu a
     <input id="campo" style="width:320px;font-size:16px">
   </body></html>`);
   await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
   await expect(avvisoCoperto(page)).toHaveCount(0);
 });
@@ -179,17 +169,18 @@ test('il menu rimpicciolito per compensare lo zoom della pagina conta i clic com
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
   const page = await apri(openTab, testServer);
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     tm.tabs.find((t) => t.id === tm.activeId).view.webContents.setZoomFactor(1.5);
   });
-  await expect.poll(() => page.locator('.sn-menu').first().evaluate((m) => m.style.transform)).toMatch(/scale\(0\.6/);
-  await page.locator('.sn-menu-paste-main').click();
+  await expect.poll(() => menuDi(page).locator('.sn-menu').first().evaluate((m) => m.style.transform)).toMatch(/scale\(0\.6/);
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
 
 test('il foglio di stile del sito non porta il menu sotto il suo velo', async ({ app, openTab, testServer }) => {
+  // menu-dal-sito: il foglio di stile del sito prende il menu per nome.
   const page = await apri(openTab, testServer, `<!doctype html><html><head>
     <style>.sn-menu { z-index: 1 !important; position: absolute !important; display: contents !important; }</style>
     </head><body style="padding:40px">
@@ -199,7 +190,7 @@ test('il foglio di stile del sito non porta il menu sotto il suo velo', async ({
   await page.evaluate(() => window.alMenu(() => window.stendi(1000)));
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   const stile = await menu.evaluate((m) => { const cs = getComputedStyle(m); return [cs.position, cs.zIndex, cs.display]; });
   expect(stile, 'il menu resta fisso e sopra il velo').toEqual(['fixed', '2147483646', 'block']);
   // Lo stesso, se a cambiarlo è lo script del sito.
@@ -223,9 +214,9 @@ test('un velo della pagina sopra un riquadro incorporato copre anche il menu ape
   await frame.waitForSelector('#campo');
 
   await frame.locator('#campo').click({ button: 'right' });
-  await expect(frame.locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(frame).locator('.sn-menu-paste-main')).toBeVisible();
   await page.waitForTimeout(700);
-  await frame.locator('.sn-menu-paste-main').click();
+  await menuDi(frame).locator('.sn-menu-paste-main').click();
   await expect(frame.locator('.sn-toast', { hasText: 'Il menu era coperto' })).toBeVisible();
   expect(await frame.locator('#campo').inputValue()).not.toContain(SEGRETO);
 });
@@ -236,11 +227,11 @@ test('i pezzi di Filo sopra il menu non contano come velo: etichetta delle icone
 
   // L'etichetta di un'icona scende sulle voci sotto la riga: per il browser restano scoperte.
   await page.locator('#campo').click({ button: 'right' });
-  const icona = page.locator('.sn-menu-row-btn[aria-label]').first();
+  const icona = menuDi(page).locator('.sn-menu-row-btn[aria-label]').first();
   await icona.hover();
-  await expect(page.locator('.sn-tooltip')).toBeVisible();
+  await expect(menuDi(page).etichetta).toBeVisible();
   await page.waitForTimeout(400);
-  const sotto = await nelMondo(app, page, `(() => {
+  const sotto = await nelMondoDelMenu(app, page, `(() => {
     const t = document.querySelector('.sn-tooltip').getBoundingClientRect();
     return [...document.querySelectorAll('.sn-menu button')].filter((b) => {
       const r = b.getBoundingClientRect();
@@ -253,7 +244,7 @@ test('i pezzi di Filo sopra il menu non contano come velo: etichetta delle icone
 
   // Svuota → Annulla: la conferma sta sopra la scheda (#592.6), e chi torna subito su una voce incolla.
   await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-arrow').click();
+  await menuDi(page).locator('.sn-menu-paste-arrow').click();
   const stato = await cronologiaPronta(app, page);
   await page.mouse.click(stato.svuota.x, stato.svuota.y);
   const sopra = await confermaSopraPagina(app);
@@ -277,10 +268,10 @@ test('su una pagina tutta in scala di grigi il menu risponde, il velo resta ferm
   const filtro = () => page.evaluate(() => getComputedStyle(document.documentElement).filter);
 
   await page.locator('#campo').click({ button: 'right' });
-  await page.locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
   await expect(avvisoCoperto(page)).toHaveCount(0);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
   await expect.poll(filtro).toBe('grayscale(1)');
 
   // Il filtro della pagina non spegne la guardia: il velo steso sopra il menu ferma ancora il clic.
@@ -289,7 +280,7 @@ test('su una pagina tutta in scala di grigi il menu risponde, il velo resta ferm
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await page.locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
   await expect.poll(filtro).toBe('grayscale(1)');
@@ -316,11 +307,11 @@ test('una pagina scura per inversione dei colori resta scura col menu aperto, e 
   await expect.poll(() => luce(app, page, 900, 600)).toBeLessThan(60);
 
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
   await page.waitForTimeout(400);
   expect(await luce(app, page, 900, 600), 'lontano dal menu la pagina resta scura').toBeLessThan(60);
   await page.screenshot({ path: 'tests/.shots/589-11-pagina-invertita-menu.png' });
-  await page.locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
   expect(await luce(app, page, 900, 600)).toBeLessThan(60);
 
@@ -329,7 +320,7 @@ test('una pagina scura per inversione dei colori resta scura col menu aperto, e 
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('#velo')).toBeVisible();
   await page.waitForTimeout(700);
-  await page.locator('.sn-menu-paste-main').click();
+  await menuDi(page).locator('.sn-menu-paste-main').click();
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
 });
@@ -346,12 +337,12 @@ test('su una pagina scura per inversione la bolla della chat al piano più alto 
   const chiusa = await luce(app, page, x, y);
 
   await page.locator('#campo').click({ button: 'right' });
-  await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
   await page.waitForTimeout(400);
   const aperta = await luce(app, page, x, y);
   expect(Math.abs(aperta - chiusa), `la bolla cambia colore col menu aperto (${chiusa} → ${aperta})`).toBeLessThan(25);
   await page.keyboard.press('Escape');
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
   await expect.poll(() => page.locator('#bolla').evaluate((el) => el.style.filter)).toBe('');
 });
 
@@ -379,11 +370,11 @@ for (const [nome, [stileHtml, stileScheda]] of Object.entries(SCHEDE)) {
     const coperto = frame.locator('.sn-toast', { hasText: 'Il menu era coperto' });
 
     await frame.locator('#campo').click({ button: 'right' });
-    const incolla = frame.locator('.sn-menu-paste-main');
+    const incolla = menuDi(frame).locator('.sn-menu-paste-main');
     await expect(incolla).toBeVisible();
     await page.waitForTimeout(150);
     await incolla.click();
-    await expect(frame.locator('.sn-menu'), 'il clic è passato e il menu si è chiuso').toHaveCount(0);
+    await expect(menuDi(frame).locator('.sn-menu'), 'il clic è passato e il menu si è chiuso').toHaveCount(0);
     await page.waitForTimeout(300);
     expect(await coperto.count(), 'il clic dell\'utente non viene rifiutato').toBe(0);
     await expect.poll(effetti, { timeout: 5000 }).toBe(prima);
@@ -402,6 +393,7 @@ for (const [nome, [stileHtml, stileScheda]] of Object.entries(SCHEDE)) {
 // cliccato, e la guardia guarda dove il menu sta davvero, anche se lo zoom cambia a menu aperto.
 test('su una pagina con lo zoom sul documento un velo steso solo sopra il menu resta fermato, anche se lo zoom cambia dopo', async ({ app, openTab, testServer }) => {
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  // menu-dal-sito: lo script della pagina misura il menu per stendergli sopra il velo.
   const page = await apri(openTab, testServer, `<!doctype html><html style="zoom:1.5"><body style="padding:20px;margin:0">
     <input id="campo" style="width:200px;font-size:16px">
     <script>
@@ -420,11 +412,11 @@ test('su una pagina con lo zoom sul documento un velo steso solo sopra il menu r
   for (const zoom of ['', '2']) {
     await page.evaluate(() => { document.getElementById('velo')?.remove(); document.getElementById('campo').value = ''; });
     await page.locator('#campo').click({ button: 'right' });
-    await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+    await expect(menuDi(page).locator('.sn-menu-paste-main')).toBeVisible();
     await page.evaluate((z) => window.veloSulMenu(z), zoom);
     await expect(page.locator('#velo')).toHaveCount(1);
     await page.waitForTimeout(700);
-    const b = await page.locator('.sn-menu-paste-main').boundingBox();
+    const b = await menuDi(page).locator('.sn-menu-paste-main').boundingBox();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
     await expect(avvisoCoperto(page).last()).toBeVisible();
@@ -439,9 +431,9 @@ test('su una pagina con lo zoom sul documento il menu si apre accanto al campo, 
     <input id="campo" style="position:absolute;right:20px;top:200px;width:150px;font-size:16px"></body></html>`);
   const campo = await page.locator('#campo').boundingBox();
   await page.locator('#campo').click({ button: 'right', position: { x: 10, y: 5 } });
-  const incolla = page.locator('.sn-menu-paste-main');
+  const incolla = menuDi(page).locator('.sn-menu-paste-main');
   await expect(incolla).toBeVisible();
-  const menu = await page.locator('.sn-menu').first().boundingBox();
+  const menu = await menuDi(page).locator('.sn-menu').first().boundingBox();
   const vw = await page.evaluate(() => innerWidth);
   expect(menu.x + menu.width, 'il menu esce dallo schermo').toBeLessThanOrEqual(vw);
   expect(Math.abs(menu.y - (campo.y + 5 * 1.5)), 'il menu si apre lontano dal punto cliccato').toBeLessThan(40);
@@ -477,14 +469,14 @@ test('nel campo di una finestra modale del sito il menu si vede sopra la finestr
     <div id="velo" popover="manual" style="position:fixed;inset:0;margin:0;width:100vw;height:100vh;border:0;background:#fff;pointer-events:none">Clicca i quadrati</div>
     <script>document.getElementById('d').showModal();</script></body></html>`);
   await page.locator('#campo').click({ button: 'right' });
-  const incolla = page.locator('.sn-menu-paste-main');
+  const incolla = menuDi(page).locator('.sn-menu-paste-main');
   await expect(incolla).toBeVisible();
   const b = await incolla.boundingBox();
   const x = b.x + b.width / 2, y = b.y + b.height / 2;
-  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.sn-menu'), [x, y]), 'il menu sta sotto la finestra').toBe(true);
+  expect(await menuDi(page).valuta(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.sn-menu'), [x, y]), 'il menu sta sotto la finestra').toBe(true);
   await page.mouse.click(x, y);
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 
   await page.locator('#campo').fill('');
   await page.locator('#campo').click({ button: 'right' });

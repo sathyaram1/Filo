@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const FILE = Buffer.from('%PDF-1.4\n% finto pdf di prova\n' + 'x'.repeat(2048));
 
@@ -233,7 +234,7 @@ test('nel vuoto attorno agli avvisi la pagina risponde: clic, doppio clic, tasto
   await gestoNellaVista(app, { type: 'mouseDown', x: a.x, y: a.y, button: 'right', clickCount: 1 });
   await gestoNellaVista(app, { type: 'mouseUp', x: a.x, y: a.y, button: 'right', clickCount: 1 });
   // Il tasto destro nel vuoto è quello della pagina: si apre il menu di Filo sulla pagina.
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5000 });
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 5000 });
   await page.keyboard.press('Escape');
 
   // Accanto alla carta più stretta: il doppio clic seleziona la parola della pagina.
@@ -337,7 +338,7 @@ test('gli avvisi di Filo nella pagina salgono sopra quelli della barra, e tornan
   await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
 
   // Un'azione di Filo sulla pagina, dal tasto destro, che risponde col suo avviso.
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   let fatto = false;
   for (let i = 0; i < 6 && !fatto; i++) {
     await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
@@ -490,7 +491,7 @@ test('una scheda aperta con un avviso a schermo: chiuso l’avviso, gli avvisi d
   await vista.locator('.shell-notif-close').click();
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
 
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   let fatto = false;
   for (let i = 0; i < 6 && !fatto; i++) {
     await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });

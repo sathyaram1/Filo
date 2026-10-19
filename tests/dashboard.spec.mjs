@@ -5,6 +5,7 @@ import { appCondivisa } from './helpers/appCondivisa.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { home } from './helpers/chatFinta.mjs';
 import { CONFIRM_HOST, confirmState } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -37,7 +38,7 @@ test.describe('dashboard', () => {
       { timeout: 8_000 },
     );
     await page.locator('#center').click({ button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
+    await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
   });
 
   test('la dashboard renderizza le tre zone + barra input', async ({ app, shell }) => {

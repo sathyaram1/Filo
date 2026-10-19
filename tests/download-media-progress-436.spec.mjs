@@ -27,6 +27,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Serve `chunk * chunks` byte a blocchi, con una pausa fra l'uno e l'altro: così
 // il trasferimento dura abbastanza da poter essere osservato MENTRE accade (è
@@ -71,7 +72,7 @@ function pageWithVideo(src) {
 
 async function saveVideo(page) {
   await page.locator('#v').click({ button: 'right', position: { x: 20, y: 20 } });
-  const item = page.locator('.sn-menu button', { hasText: 'Salva video come' });
+  const item = menuDi(page).locator('.sn-menu button', { hasText: 'Salva video come' });
   await expect(item).toBeVisible();
   await item.click();
 }

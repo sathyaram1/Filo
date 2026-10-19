@@ -9,6 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { statoDi } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -45,7 +46,7 @@ async function apriPagina(openTab, testServer) {
 // Le voci del tasto destro sulla pagina, aperto e richiuso.
 async function vociPagina(page) {
   await page.locator('#p').click({ button: 'right' });
-  const menu = page.locator('.sn-menu[role=menu]');
+  const menu = menuDi(page).locator('.sn-menu[role=menu]');
   await expect(menu).toBeVisible();
   const voci = await menu.locator('.sn-menu-item .sn-menu-label').allTextContents();
   await page.keyboard.press('Escape');

@@ -22,6 +22,7 @@
 //  (M) nell'accoglienza un turno fermato non riparte da solo in un'altra scheda o ricaricando, e «riprendi» c'è anche lì.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -399,7 +400,7 @@ test('G — il tasto destro sul blocco che lavora offre «Ferma», poi «Riprend
   const blocco = page.locator('.dash-activity');
   const trama = blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama');
   await expect(trama).toContainText('a lungo', { timeout: 5_000 });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await trama.click({ button: 'right' });
   await menu.getByText('Ferma', { exact: true }).click();
   await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
