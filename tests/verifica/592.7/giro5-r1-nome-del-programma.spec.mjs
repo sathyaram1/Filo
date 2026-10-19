@@ -32,6 +32,10 @@ test('r1 — la domanda «Scaricarlo?» nel pannello tiene il nome scelto dal si
   try {
     const page = await openTab(`http://127.0.0.1:${srv.porta}/p.html`);
     await page.locator('#l').click();
+    await expect.poll(async () => {
+      const r = await shell.evaluate(() => window.filoShell.downloads.list());
+      return ((r && r.items) || []).map((it) => `${it.state} ${it.filename}`).join(' | ');
+    }, { timeout: 20_000 }).toContain('pending');
     const ask = shell.locator('#dl-panel .dl-row[data-chiede="1"] .dl-row-ask');
     await expect(ask).toBeVisible({ timeout: 20_000 });
     await expect(ask).toContainText('Filo l’ha controllato');
