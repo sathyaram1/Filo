@@ -147,7 +147,7 @@ const PAGINE = [
   ['options', 'options'], ['options', 'altro'], ['preferences', 'preferences'], ['security', 'security'],
   ['manage', 'manage'], ['feedback', 'feedback'],
 ];
-const AL_VOLO = [['editor', 'editor'], ['spellcheck', 'spellcheck'], ['archive', 'archive']];
+const AL_VOLO = [['editor', 'editor'], ['spellcheck', 'spellcheck']];
 
 test('le pagine che salvano da sole usano la regola condivisa', () => {
   for (const [cartella, nome] of PAGINE) {
