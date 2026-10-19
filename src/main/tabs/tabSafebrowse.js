@@ -287,7 +287,9 @@ const safebrowseMethods = {
   },
 
   // Uno scaricamento partito senza passare di lì (uno script, un nome dato dal sito): si giudica l'indirizzo cliccato
-  // col nome del file, e confermato riparte. Vero se l'avviso l'ha fermato.
+  // col nome del file, e confermato riparte. Vero se l'avviso l'ha fermato. Un file che la pagina costruisce da sé
+  // (blob:, data:, come gli allegati delle chat) non ha un indirizzo suo: vale il sito della pagina col nome del file,
+  // e confermato la pagina lo riscarica con quel nome.
   _sbScaricamento(tab, item) {
     const wc = tab.view && tab.view.webContents;
     if (!wc || wc.isDestroyed()) return false;
@@ -295,9 +297,18 @@ const safebrowseMethods = {
     try { const c = item.getURLChain(); url = (Array.isArray(c) && c[0]) || item.getURL(); } catch (_) { url = ''; }
     let nome = '';
     try { nome = item.getFilename() || ''; } catch (_) {}
-    return this._sbPrimaDelClic(tab, url, (segna) => {
+    const costruito = /^(blob|data|filesystem):/i.test(url);
+    let giudicato = url;
+    if (costruito) {
+      let pagina = '';
+      try { pagina = wc.getURL(); } catch (_) {}
+      giudicato = (/^blob:/i.test(url) && sitoDellaPagina(url, [tab._urlNavigato])) || sitoDellaPagina(pagina, [tab._urlNavigato]) || '';
+    }
+    return this._sbPrimaDelClic(tab, giudicato, (segna) => {
       segna(tab);
-      try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {}
+      const scarica = () => { try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {} };
+      if (costruito) this._sbRifaiDallaPagina(tab, 'SN_RISCARICA', url, scarica, nome);
+      else scarica();
     }, { nome });
   },
 
