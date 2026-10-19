@@ -23,12 +23,41 @@ async function pronto(app) {
   return strato;
 }
 
+// Un modello finto nel main: la spiegazione di una selezione, la parola del correttore.
+async function fornitoreFinto(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__chieste = [];
+    const finto = async ({ messages }) => {
+      const t = JSON.stringify(messages);
+      globalThis.__chieste.push(t);
+      if (t.includes('ha selezionato un testo')) return { text: 'Spiegazione **di prova** dello strato', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      if (t.includes('col tasto destro su una parola')) return { text: '{"misspelled":false,"correction":""}', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      return { text: 'ok', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+  });
+}
+
 const appunti = (app, testo) => app.evaluate(({ clipboard }, t) => clipboard.writeText(t), testo);
 
 // Il menu si è aperto nello strato, e nel documento della scheda non c'è niente del menu.
 async function apertoNelloStrato(app, page) {
   await expect.poll(async () => (await statoDelloStrato(app))?.aperto).toBe(true);
   await expect(menuDi(page).principale).toBeVisible();
+  // Nel punto del tasto destro, come il menu di oggi (o ribaltato sul punto quando sotto non ci sta).
+  const { punto } = await statoDelloStrato(app);
+  const b = await menuDi(page).principale.boundingBox();
+  const vicino = (v, a, c) => Math.abs(v - a) <= 2 || Math.abs(v - c) <= 2;
+  expect(vicino(punto.x, b.x, b.x + b.width) || b.x + b.width >= punto.x, `menu a ${b.x},${b.y}, punto ${punto.x},${punto.y}`).toBe(true);
+  expect(vicino(punto.y, b.y, b.y + b.height), `menu a ${b.x},${b.y}, punto ${punto.x},${punto.y}`).toBe(true);
   // menu-dal-sito: la prova cerca il menu nel documento del sito, dove non deve esserci.
   expect(await page.evaluate(() => document.querySelectorAll('.sn-menu, [data-sn-icon-id]').length)).toBe(0);
 }
@@ -43,6 +72,20 @@ async function fuocoNelCampo(page, sel) {
 }
 
 test.describe('il menu nello strato', () => {
+  test('appena aperto Filo, il primo tasto destro trova il menu anche se lo strato sta ancora caricando', async ({ app, openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, '<!doctype html><body style="margin:0;height:100vh"><p style="margin:60px">pagina</p></body>');
+    await pronto(app);
+    // Lo strato ancora in caricamento per un attimo, come al primo avvio su una macchina lenta.
+    await app.evaluate(({ BrowserWindow }) => {
+      const s = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.strato;
+      s.pronta = false;
+      setTimeout(() => { s.pronta = true; }, 700);
+    });
+    await page.mouse.click(200, 200, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    await expect(menuDi(page).voce('Aiuto')).toBeVisible();
+  });
+
   test('Incolla mette gli appunti dove stava il cursore, in un campo e in un editor ricco, col fuoco rimesso lì', async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
     await pronto(app);
@@ -62,31 +105,29 @@ test.describe('il menu nello strato', () => {
       </script></body>`);
     await appunti(app, 'IN MEZZO ');
 
-    // Il cursore dopo «prima ».
-    await page.locator('#campo').click();
-    await page.evaluate(() => { const c = document.getElementById('campo'); c.setSelectionRange(6, 6); });
-    await page.locator('#campo').click({ button: 'right', position: { x: 60, y: 8 } });
+    // Il cursore è dove l'utente ha fatto tasto destro, a metà del testo.
+    await page.locator('#campo').click({ button: 'right', position: { x: 40, y: 8 } });
     await apertoNelloStrato(app, page);
-    await page.evaluate(() => { const c = document.getElementById('campo'); c.setSelectionRange(6, 6); });
+    const qui = await page.evaluate(() => document.getElementById('campo').selectionStart);
+    expect(qui).toBeGreaterThan(0);
+    expect(qui).toBeLessThan('prima dopo'.length);
     const menu = menuDi(page);
     await expect(menu.locator('.sn-menu-paste-main')).toContainText('Incolla');
     await menu.locator('.sn-menu-paste-main').click();
     await chiusoLoStrato(app);
-    await expect(page.locator('#campo')).toHaveValue('prima IN MEZZO dopo');
+    await expect(page.locator('#campo')).toHaveValue(`${'prima dopo'.slice(0, qui)}IN MEZZO ${'prima dopo'.slice(qui)}`);
     await fuocoNelCampo(page, '#campo');
 
-    // Nell'editor ricco, fra «uno » e «tre».
-    await page.locator('#ricco').click();
-    await page.evaluate(() => {
+    // Nell'editor ricco, tasto destro fra «uno » e «tre».
+    const p = await page.evaluate(() => {
       const t = document.getElementById('ricco').firstChild;
       const r = document.createRange();
       r.setStart(t, 4);
-      r.collapse(true);
-      getSelection().removeAllRanges();
-      getSelection().addRange(r);
+      r.setEnd(t, 5);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + 1, y: b.top + b.height / 2 };
     });
-    const box = await page.locator('#ricco').boundingBox();
-    await page.mouse.click(box.x + box.width - 20, box.y + box.height - 10, { button: 'right' });
+    await page.mouse.click(p.x, p.y, { button: 'right' });
     await apertoNelloStrato(app, page);
     await menu.locator('.sn-menu-paste-main').click();
     await chiusoLoStrato(app);
@@ -121,8 +162,9 @@ test.describe('il menu nello strato', () => {
       };
       guarda(document.documentElement);
       setInterval(() => {
-        window.__letti.push(document.documentElement.outerHTML);
-        try { if (window.find('codice-banca-1054')) window.__letti.push('trovato con find'); } catch (_) {}
+        // Il testo del documento, senza questo script che nomina il pezzo da cercare.
+        window.__letti.push(document.body.innerText);
+        try { if (window.find(['codice', 'banca', '1054'].join('-'))) window.__letti.push('trovato con find'); } catch (_) {}
       }, 50);
     </script>`);
     await page.locator('#campo').click({ button: 'right' });
@@ -202,5 +244,195 @@ test.describe('il menu nello strato', () => {
     // Con la voce vera, premuta dall'utente, gli appunti arrivano: c'era davvero qualcosa da rubare.
     await menu.locator('.sn-menu-paste-main').click();
     await expect(page.locator('#campo')).toHaveValue('password-1054');
+  });
+
+  test('una spiegazione arriva nello strato, mai nel documento, e «Approfondisci» parte da lì', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    await fornitoreFinto(app);
+    const page = await testServer.openReady(openTab, `<!doctype html><body style="font:18px sans-serif;padding:40px">
+      <p id="testo">Il fotone è la particella elementare della luce.</p></body>`, { pubblico: true });
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    const p = await page.evaluate(() => {
+      const t = document.getElementById('testo').firstChild;
+      const r = document.createRange();
+      r.setStart(t, 3);
+      r.setEnd(t, 9);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    });
+    await page.mouse.click(p.x, p.y, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    const menu = menuDi(page);
+    const sezione = menu.locator('.sn-menu-inline-explain');
+    await expect(sezione).toContainText('Spiegazione di prova dello strato', { timeout: 8000 });
+    // Il grassetto del modello resta grassetto, e nessuno script viaggia con lui.
+    await expect(sezione.locator('strong')).toHaveText('di prova');
+    expect(await page.evaluate(() => document.body.innerText)).not.toContain('Spiegazione di prova');
+
+    const prima = await app.evaluate(() => globalThis.__chieste.length);
+    await sezione.locator('.sn-menu-inline-arrow').click();
+    await chiusoLoStrato(app);
+    await expect.poll(() => app.evaluate(() => globalThis.__chieste.length), { timeout: 8000 }).toBeGreaterThan(prima);
+  });
+
+  test('la griglia «Altro…» si apre dall\'icona, le sue voci partono, e un\'icona trascinata cambia posto', async ({ app, openTab, testServer, shell }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    const page = await apriPagina(openTab, testServer, '<!doctype html><body style="margin:0;height:100vh"><p style="margin:60px">pagina</p></body>');
+    await page.mouse.click(200, 200, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    const menu = menuDi(page);
+    const strato = menu.superficie;
+    await menu.locator('.sn-menu-row-overflow').hover();
+    await expect(menu.griglia).toBeVisible();
+    await expect(menu.griglia.locator('[data-sn-icon-id="openOptions"]')).toBeVisible();
+
+    // L'etichetta dell'icona compare passandoci sopra, come nel menu di oggi.
+    await menu.icona('qrCode').hover();
+    await expect(menu.etichetta).toBeVisible();
+
+    // Trascinata dalla riga alla griglia: la riga si ridisegna senza di lei, la griglia con lei, e resta così.
+    await menu.locator('.sn-menu-row-overflow').hover();
+    await expect(menu.griglia).toBeVisible();
+    const da = await menu.icona('qrCode').first().boundingBox();
+    const a = await menu.griglia.boundingBox();
+    await strato.mouse.move(da.x + da.width / 2, da.y + da.height / 2);
+    await strato.mouse.down();
+    await strato.mouse.move(da.x + da.width / 2 + 10, da.y + da.height / 2 + 6, { steps: 3 });
+    await expect(menu.trascinamento).toBeVisible();
+    await strato.mouse.move(a.x + a.width - 6, a.y + a.height - 6, { steps: 8 });
+    await strato.mouse.up();
+    await expect(menu.principale.locator('.sn-menu-row [data-sn-icon-id="qrCode"]')).toHaveCount(0);
+    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('sn_icon_layout', null))?.secondary?.includes('qrCode') === true))
+      .toBe(true);
+    await expect(menu.griglia.locator('[data-sn-icon-id="qrCode"]')).toBeVisible();
+
+    // Una voce della griglia parte: le Impostazioni in una scheda nuova.
+    await menu.griglia.locator('[data-sn-icon-id="openOptions"]').click();
+    await chiusoLoStrato(app);
+    await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab')].length), { timeout: 8000 }).toBeGreaterThan(1);
+  });
+
+  test('il correttore riempie la riga in cima a menu aperto, e la correzione scelta va nel campo', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    await fornitoreFinto(app);
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0">
+      <textarea id="ta" style="position:absolute;left:40px;top:40px;width:420px;height:80px;font:24px monospace;padding:10px">ciiao come stai</textarea></body>`);
+    await page.locator('#ta').click();
+    const box = await page.locator('#ta').boundingBox();
+    await page.mouse.click(box.x + 10 + 30, box.y + 10 + 14, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    // Il correttore nativo arriva dopo l'apertura: la riga nascosta si riempie nello strato.
+    await app.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+      tm.tabs.find((t) => t.id === tm.activeId).view.webContents.send('filo:broadcast', { type: '_spell:native', word: 'ciiao', suggestions: ['ciao', 'chiao'] });
+    });
+    const menu = menuDi(page);
+    const riga = menu.locator('.sn-menu-correction');
+    await expect(riga).toBeVisible({ timeout: 5000 });
+    await expect(riga.locator('.sn-menu-label').first()).toHaveText('ciao');
+    await riga.locator('.sn-menu-correction-main').click();
+    await chiusoLoStrato(app);
+    await expect(page.locator('#ta')).toHaveValue('ciao come stai');
+  });
+
+  test('un tasto destro fuori dal menu lo riapre lì, e Esc o un clic fuori lo chiudono senza toccare la pagina', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;height:100vh">
+      <a id="link" href="https://example.com/x" style="position:absolute;left:500px;top:300px">un collegamento</a>
+      <script>window.clic = 0; addEventListener('click', () => { window.clic++; }, true);</script></body>`);
+    await page.mouse.click(100, 100, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    const menu = menuDi(page);
+    await expect(menu.voce('Copia URL')).toHaveCount(0);
+    const strato = menu.superficie;
+    const l = await page.locator('#link').boundingBox();
+    await strato.mouse.click(l.x + 10, l.y + l.height / 2, { button: 'right' });
+    await expect(menu.voce('Copia URL')).toBeVisible({ timeout: 5000 });
+    const s = await statoDelloStrato(app);
+    expect(Math.abs(s.punto.x - Math.round(l.x + 10))).toBeLessThanOrEqual(1);
+    await strato.keyboard.press('Escape');
+    await chiusoLoStrato(app);
+    // Anche l'Esc che arriva alla scheda (la tastiera è rimasta lì) lo chiude.
+    await page.mouse.click(100, 100, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    await page.keyboard.press('Escape');
+    await chiusoLoStrato(app);
+    await page.mouse.click(100, 100, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    await page.evaluate(() => { window.clic = 0; });
+    await strato.mouse.click(700, 500);
+    await chiusoLoStrato(app);
+    expect(await page.evaluate(() => window.clic)).toBe(0);
+  });
+
+  test('Detta, scelta nello strato, scrive nel campo della pagina quello che si dice', async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    await pronto(app);
+    await app.evaluate(async () => {
+      await globalThis.SN_STORAGE.setSettings({
+        useDefaultModels: false,
+        apiKeys: { openrouter: 'k-test' },
+        modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+        models: { ...globalThis.SN_TEST_MODELS.models },
+      });
+      globalThis.__dettate = 0;
+      globalThis.SN_PROVIDER_OPENROUTER.transcribe = async ({ audioBase64 }) => {
+        globalThis.__dettate += 1;
+        const bytes = Buffer.from(String(audioBase64 || ''), 'base64').length;
+        return { text: ` frase ${globalThis.__dettate} `, usage: { seconds: bytes / 32000, costUsd: 0.00001 }, generationId: null };
+      };
+    });
+    // Il microfono lo apre la finestra di Filo per la pagina: qui un tono, che per chi spezza le frasi è voce.
+    await shell.evaluate(() => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        const ac = new AudioContext();
+        const osc = ac.createOscillator();
+        osc.frequency.value = 220;
+        const gain = ac.createGain();
+        gain.gain.value = 0.4;
+        const dest = ac.createMediaStreamDestination();
+        osc.connect(gain); gain.connect(dest); osc.start();
+        try { await ac.resume(); } catch (_) {}
+        window.__tono = gain;
+        return dest.stream;
+      };
+    });
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0">
+      <textarea id="campo" style="position:absolute;left:40px;top:40px;width:320px;height:60px"></textarea></body>`);
+    await page.locator('#campo').click({ button: 'right' });
+    await apertoNelloStrato(app, page);
+    await menuDi(page).locator('.sn-menu-split-main', { hasText: 'Detta' }).click();
+    await chiusoLoStrato(app);
+    await expect.poll(() => shell.evaluate(() => !!window.__tono), { timeout: 10_000 }).toBe(true);
+    await pausa(1800);
+    await shell.evaluate(() => { window.__tono.gain.value = 0; });
+    await expect.poll(() => page.locator('#campo').inputValue(), { timeout: 15_000 }).toMatch(/frase \d+/);
+  });
+
+  test('aspetto: il menu dello strato in tema chiaro e scuro', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;background:#fff">
+      <input id="campo" style="position:absolute;left:40px;top:40px;width:300px"><p style="margin:120px 40px">Testo della pagina</p></body>`);
+    const menu = menuDi(page);
+    for (const tema of ['light', 'dark']) {
+      await app.evaluate(async (_e, t) => { await globalThis.SN_STORAGE.updateSettings({ theme: t }); }, tema);
+      await page.locator('#campo').click({ button: 'right' });
+      await apertoNelloStrato(app, page);
+      await expect.poll(() => menu.valuta(() => document.documentElement.dataset.snTheme)).toBe(tema);
+      await menu.locator('.sn-menu-row-overflow').hover();
+      await expect(menu.griglia).toBeVisible();
+      await pausa(300);
+      await menu.superficie.screenshot({ path: `tests/.shots/menu-nello-strato-${tema}.png` });
+      await page.screenshot({ path: `tests/.shots/menu-nello-strato-${tema}-scheda.png` });
+      await menu.superficie.keyboard.press('Escape');
+      await chiusoLoStrato(app);
+    }
   });
 });

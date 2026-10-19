@@ -25,6 +25,8 @@ const GESTO_MS = 5000;
 const MENU_MAX_BYTE = 8 * 1024 * 1024;
 const AGGIORNA_MAX_BYTE = 4 * 1024 * 1024;
 const ID_MAX = 80;
+// Quanto un menu aspetta lo strato che finisce di caricare, appena aperta la finestra.
+const PRONTA_MS = 5000;
 // Il contagocce aspetta che l'utente scelga un punto dello schermo: il clic che lo chiude non arriva allo strato.
 const CONTAGOCCE_MS = 120000;
 
@@ -140,7 +142,11 @@ class StratoDelMenu {
       return { ok: true };
     }
     this.inArrivo = richiesta;
-    setTimeout(() => { if (this.inArrivo === richiesta) this.inArrivo = null; }, PRIMA_DEL_CLIC_MS).unref?.();
+    setTimeout(() => {
+      if (this.inArrivo !== richiesta) return;
+      this.inArrivo = null;
+      this._alContent(richiesta, { type: msg().STRATO_MENU_CHIUSO, id: richiesta.id });
+    }, PRIMA_DEL_CLIC_MS).unref?.();
     return { ok: true, attesa: true };
   }
 
@@ -169,15 +175,17 @@ class StratoDelMenu {
 
   async _apri(r) {
     const c = this.clic;
-    if (!c || c.wc !== r.wc) return;
+    if (!c || c.wc !== r.wc) { this._alContent(r, { type: msg().STRATO_MENU_CHIUSO, id: r.id }); return; }
     this.clic = null;
     if (this.menu) this.nascondi();
     const m = { id: r.id, wc: r.wc, frame: r.frame, nodo: r.nodo, cronologia: null, pronto: false, coda: r.coda };
     this.menu = m;
     const conIncolla = r.menu.items.some((it) => it && it.$incolla === true);
+    // Un tasto destro appena aperto Filo trova lo strato ancora in caricamento: lo aspetta, non perde il menu.
     const [impostazioni, cronologia] = await Promise.all([
       require('./services/handlers').getEffectiveSettings().catch(() => null),
-      conIncolla ? comeFilo(this.win, this.vista && this.vista.webContents, { type: msg().GET_CLIPBOARD_HISTORY }) : null,
+      conIncolla ? comeFilo(this.win, null, { type: msg().GET_CLIPBOARD_HISTORY }) : null,
+      this._pronta(),
     ]);
     if (this.menu !== m) return;
     m.cronologia = cronologia && cronologia.ok && Array.isArray(cronologia.items) ? cronologia.items : [];
@@ -189,6 +197,18 @@ class StratoDelMenu {
     }
     m.pronto = true;
     for (const dati of m.coda.splice(0)) this._alloStrato('strato:aggiorna', dati);
+  }
+
+  _pronta(entroMs = PRONTA_MS) {
+    const fine = Date.now() + entroMs;
+    return new Promise((fatto) => {
+      const guarda = () => {
+        if (!this.vista) this._vista();
+        if (this.pronta || Date.now() >= fine || !this.win || this.win.isDestroyed()) { fatto(this.pronta); return; }
+        setTimeout(guarda, 20);
+      };
+      guarda();
+    });
   }
 
   _alloStrato(canale, dati) {
@@ -310,7 +330,7 @@ class StratoDelMenu {
     vista.setBounds(area);
     this.inCima();
     vista.setVisible(true);
-    try { vista.webContents.send('strato:mostra', { ...dati, seq: this.aperto.seq, x: p.x, y: p.y }); } catch (_) {}
+    try { vista.webContents.send('strato:mostra', { ...dati, seq: this.aperto.seq, x: p.x, y: p.y, w: area.width, h: area.height }); } catch (_) {}
     return true;
   }
 

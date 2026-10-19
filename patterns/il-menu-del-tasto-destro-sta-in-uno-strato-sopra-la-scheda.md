@@ -30,7 +30,23 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   finestra perde il fuoco, con Esc
   (dalla scheda, dallo strato o dalla barra: prima di ogni altro uso del tasto) e con un clic fuori, anche
   sulla barra. Se aveva la tastiera, la restituisce alla scheda.
-- **Test:** `tests/strato-del-menu.spec.mjs`. Il tasto destro passa da `page.mouse` (lo smistamento di
+- **Il menu ci entra come dati (#1054).** Il content script capisce il contesto come sempre e, a strato acceso,
+  `src/content/menuNelloStrato.js` manda al main una descrizione delle voci (`src/shared/menuDescritto.js`): le
+  funzioni restano lì, tenute per numero, e il clic torna come numero. Lo strato disegna con `src/content/menu.js` e
+  `src/styles/menu.css` (le guardie contro i siti lì non servono e si spengono da sole). Le sezioni che crescono dopo
+  (spiegazioni) nascono in un documento senza finestra e arrivano allo strato come HTML ripulito; le righe che cambiano
+  (correttore, icone, griglia «Altro…») come aggiornamenti dello stesso menu.
+- **Il menu si apre solo dal riquadro del tasto destro appena visto dal main**, entro pochi secondi: un sito non apre lo
+  strato. Una voce vale solo dopo un gesto sullo strato che il main ha visto (`input-event`), non per quello che la
+  pagina dichiara.
+- **Incolla e la cronologia degli appunti non passano dalla scheda.** Lo strato riceve la cronologia dal main; Incolla
+  e la voce scelta li legge il main dopo il clic nello strato, e alla scheda arriva solo il testo da scrivere nel campo
+  catturato al tasto destro, col fuoco rimesso lì. Il sito vede quello che si incolla, come in ogni browser.
+- **Alla pagina non si regala il gesto** (`patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md`): la voce
+  scelta parte col fuoco tornato alla scheda, e quello che chiede un gesto vero lo fa lo strato (il contagocce).
+- **Un tasto destro fuori dal menu** chiude e il main lo rigioca sulla scheda: il menu nuovo si apre lì, come oggi.
+- **Test:** `tests/strato-del-menu.spec.mjs` (lo strato) e `tests/menu-nello-strato.spec.mjs` (il menu, e il sito
+  ostile di #586 giro 16). Gli spec che trovano il menu da `menuDi` lo trovano nello strato da soli. Il tasto destro passa da `page.mouse` (lo smistamento di
   Chromium lo porta dentro un riquadro di un altro sito; un `sendInputEvent` andrebbe sempre al documento
   principale). La pagina dello strato e il suo stato si chiedono a `paginaDelloStrato` e
   `statoDelloStrato` in `tests/helpers/menuContestuale.mjs`. Nessuno l'ha provato su un Mac o su un Linux

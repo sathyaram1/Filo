@@ -158,7 +158,9 @@
       }
       voci.push(D.descrivi(it, op));
     });
-    invia(MSG.STRATO_MENU_APRI, { id: m.id, menu: { items: voci, keepOnScroll: !!(opzioni && opzioni.keepOnScroll) } });
+    // Rifiutato (il tasto destro non era di questo riquadro, o troppo vecchio): non resta un menu che si crede aperto.
+    invia(MSG.STRATO_MENU_APRI, { id: m.id, menu: { items: voci, keepOnScroll: !!(opzioni && opzioni.keepOnScroll) } })
+      .then((r) => { if (!(r && r.ok) && corrente === m) pulisci(m); });
     for (const fn of m.montaggi.splice(0)) { try { fn(); } catch (e) { console.error(e); } }
   }
 
@@ -206,6 +208,15 @@
       else await A.pasteFromClipboard({ testo: String(msg.testo || ''), immagine: String(msg.immagine || '') });
     } catch (e) { console.error(e); }
   }
+
+  // Esc nella scheda chiude il menu dello strato anche quando il tasto non è passato dal main (gli strumenti di prova lo
+  // consegnano dritto alla pagina). Dichiarato preso, come fa il menu nella pagina: lo schermo intero resta (#514).
+  document.addEventListener('keydown', (e) => {
+    if (!corrente || !e.isTrusted || e.key !== 'Escape') return;
+    chiudi();
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg || typeof msg !== 'object') return;

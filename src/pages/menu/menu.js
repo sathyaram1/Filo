@@ -217,8 +217,30 @@
     };
     applicaTema(d.tema, d.tokens);
     const cronologia = Array.isArray(d.cronologia) ? d.cronologia.filter((e) => e && typeof e === 'object') : [];
-    Menu.open({ x: d.x, y: d.y, items: costruisci(d.menu.items, cronologia), keepOnScroll: !!d.menu.keepOnScroll });
+    const questo = m;
+    const disegna = () => {
+      if (m !== questo) return;
+      Menu.open({ x: d.x, y: d.y, items: costruisci(d.menu.items, cronologia), keepOnScroll: !!d.menu.keepOnScroll });
+    };
+    // Lo strato era nascosto grande zero: finché la pagina non ha la misura della scheda, il menu si poserebbe nell'angolo.
+    quandoMisura(d.w, d.h, disegna);
   });
+
+  function quandoMisura(w, h, fn) {
+    const giusta = () => !(w > 0 && h > 0) || (Math.abs(window.innerWidth - w) <= 1 && Math.abs(window.innerHeight - h) <= 1);
+    if (giusta()) { fn(); return; }
+    let fatto = false;
+    const via = () => {
+      if (fatto) return;
+      fatto = true;
+      window.removeEventListener('resize', guarda);
+      clearTimeout(t);
+      fn();
+    };
+    const guarda = () => { if (giusta()) via(); };
+    const t = setTimeout(via, 500);
+    window.addEventListener('resize', guarda);
+  }
 
   api.onAggiorna((d) => {
     if (!m || !d || d.id !== m.id) return;
