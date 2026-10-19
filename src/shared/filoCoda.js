@@ -9,6 +9,8 @@
   // Una conversazione della home continua finché non passa un'ora di silenzio, come quelle delle altre app.
   const PAUSA_MS = ORA_MS;
   const PEZZO = 60;
+  // Una raffica di cose successe (un timer, poi una mail) è un messaggio solo; oltre, Filo scrive un messaggio nuovo.
+  const FUSIONE_MS = 30 * 60 * 1000;
   // Il saluto della giornata non arriva prima di quest'ora: a notte fonda l'apertura di una scheda non è un inizio.
   const ORA_GIORNATA = 5;
   // Le azioni chieste in chat hanno il loro segno sulla bolla: nel filo una riga loro la meritano le altre.
