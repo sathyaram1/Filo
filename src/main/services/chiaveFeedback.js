@@ -141,7 +141,7 @@ async function caricaDaFile(percorso) {
     if (st.size > TETTO_FILE) {
       return { ok: false, error: `Il file scelto pesa ${Math.round(st.size / 1024)} KB, quello di una chiave meno di uno. Scegli il file con la chiave.` };
     }
-    testo = fs.readFileSync(percorso, 'utf8');
+    testo = comeTesto(fs.readFileSync(percorso));
   } catch (e) {
     return { ok: false, error: `Il file scelto non si apre (${e?.code || e?.message || e}).` };
   }
