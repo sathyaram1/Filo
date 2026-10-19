@@ -1,4 +1,5 @@
-// Verifica #835 giro 1: bloccare un sito col blocco dei siti spento deve bloccarlo davvero o dirlo (r2).
+// Verifica #835 giro 1: allentare la Sicurezza a parole va rifiutato col rimando alla pagina (r1); bloccare un sito
+// col blocco dei siti spento deve bloccarlo davvero o dirlo (r2).
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function trovaPagina(app, prova, timeout = 10_000) {
