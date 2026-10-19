@@ -1,4 +1,4 @@
-// Esplorazione #798 giro 3: un riquadro vuoto che la pagina poi porta su un indirizzo della stessa origine ha ancora Filo?
+// Esplorazione #798 giro 3: altre porte per indice e costo delle funzioni che inseriscono.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function setFpMode(openTab, mode) {
@@ -8,35 +8,49 @@ async function setFpMode(openTab, mode) {
   await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
 }
 
-const INNER = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
-  <p id="inner-text">Testo dentro il riquadro incorporato, lungo abbastanza da poterlo selezionare.</p></body></html>`;
+const INNER = '<!doctype html><meta charset="utf-8"><body><p>dentro</p></body>';
+const PAGINA = `<!doctype html><meta charset="utf-8"><body><p>ok</p>
+<div id="dsd"><template shadowrootmode="open"><iframe></iframe></template></div>
+<script>window.__dsd = (function(){ try { return window[window.length-1].HTMLCanvasElement.prototype.toDataURL; } catch(e){ return null; } })();</script>
+</body>`;
 
-function esterno(modo, src) {
-  const s = JSON.stringify(src);
-  const corpi = {
-    appendPoiSrc: `<script>const f=document.createElement('iframe');f.id='embed';f.width=600;f.height=300;document.body.appendChild(f);setTimeout(()=>{f.src=${s};},50);</script>`,
-    htmlPoiSrc: `<iframe id="embed" width="600" height="300"></iframe><script>setTimeout(()=>{document.getElementById('embed').src=${s};},50);</script>`,
-    srcPrima: `<script>const f=document.createElement('iframe');f.id='embed';f.width=600;f.height=300;f.src=${s};document.body.appendChild(f);</script>`,
-  };
-  return `<!doctype html><html><body style="margin:0;padding:12px;font:16px sans-serif"><p>fuori</p>${corpi[modo]}</body></html>`;
+async function porte(innerUrl) {
+  const fnv = (s) => { let a = 2166136261; for (let i = 0; i < s.length; i++) a = Math.imul(a ^ s.charCodeAt(i), 16777619) >>> 0; return a.toString(16); };
+  const c = document.createElement('canvas'); c.width = 80; c.height = 40;
+  const x = c.getContext('2d'); x.fillStyle = '#1e90ff'; x.fillRect(0, 0, 80, 40); x.fillStyle = '#000'; x.font = '16px sans-serif'; x.fillText('filo', 4, 24);
+  const leggiF = (fn) => { try { return fnv(fn.call(c)); } catch (e) { return 'errore ' + e.message; } };
+  const leggi = (W) => { try { return W ? leggiF(W.HTMLCanvasElement.prototype.toDataURL) : 'nessuna finestra'; } catch (e) { return 'errore ' + e.message; } };
+  const ultimo = () => window[window.length - 1];
+  const attendiLoad = (f) => new Promise((r) => { f.addEventListener('load', r, { once: true }); setTimeout(r, 3000); });
+  const out = { pagina: fnv(c.toDataURL()), lunghezza0: window.length };
+  out.dsdParser = window.__dsd ? leggiF(window.__dsd) : 'nessuna';
+  { const h = document.createElement('div'); const sr = h.attachShadow({ mode: 'open' }); sr.appendChild(document.createElement('iframe')); document.body.appendChild(h); out.ombraPoiHost = leggi(ultimo()); }
+  { const h = document.createElement('div'); document.body.appendChild(h); h.setHTMLUnsafe('<div><template shadowrootmode="open"><iframe></iframe></template></div>'); out.setHTMLUnsafeDsd = leggi(ultimo()); }
+  { const f = document.createElement('iframe'); f.src = innerUrl; document.body.appendChild(f); await attendiLoad(f); const i = window.length - 1; f.src = 'about:blank'; await attendiLoad(f); out.srcPoiAboutBlank = leggi(window[i]); }
+  { const f = document.createElement('iframe'); document.body.appendChild(f); const i = window.length - 1; f.src = 'about:blank'; await attendiLoad(f); out.vuotoPoiAboutBlank = leggi(window[i]); }
+  { const e = document.createElement('embed'); e.type = 'text/html'; e.src = 'about:blank'; document.body.appendChild(e); await new Promise((r) => setTimeout(r, 800)); out.embedLen = window.length; out.embed = leggi(ultimo()); }
+  // costo
+  const t0 = performance.now(); const box = document.createElement('div'); document.body.appendChild(box);
+  for (let i = 0; i < 100000; i++) { const d = document.createElement('div'); d.textContent = 'x'; box.appendChild(d); }
+  out.ms100kAppend = Math.round(performance.now() - t0);
+  const t1 = performance.now();
+  for (let i = 0; i < 3000; i++) { const s = document.createElement('section'); s.innerHTML = '<p>a</p><p>b</p><span>object frame</span>'; box.appendChild(s); }
+  out.ms3kInnerHTML = Math.round(performance.now() - t1);
+  box.remove();
+  return out;
 }
 
-async function menuNelRiquadro(openTab, testServer, modo) {
+test('esplora porte giro 3', async ({ openTab, testServer }) => {
+  test.setTimeout(120_000);
   const inner = testServer.html(INNER);
-  const page = await testServer.openReady(openTab, esterno(modo, inner));
-  const fl = page.frameLocator('#embed');
-  await expect(fl.locator('#inner-text')).toBeVisible({ timeout: 8_000 });
-  await page.waitForTimeout(500);
-  await fl.locator('#inner-text').click({ button: 'right' });
-  try { await expect(fl.locator('.sn-menu')).toBeVisible({ timeout: 4_000 }); return true; } catch (_) { return false; }
-}
-
-for (const modo of ['srcPrima', 'appendPoiSrc', 'htmlPoiSrc']) {
-  test(`esplora menu ${modo}`, async ({ openTab, testServer }) => {
-    test.setTimeout(90_000);
-    const on = await menuNelRiquadro(openTab, testServer, modo);
-    await setFpMode(openTab, 'off');
-    const off = await menuNelRiquadro(openTab, testServer, modo);
-    console.log(`ESITO ${modo}: automatico=${on} off=${off}`);
-  });
-}
+  const url = testServer.html(PAGINA);
+  let page = await openTab(url);
+  await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+  const on = await page.evaluate(porte, inner);
+  await setFpMode(openTab, 'off');
+  page = await openTab(testServer.html(PAGINA));
+  await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+  const off = await page.evaluate(porte, inner);
+  console.log('ESITO ON ' + JSON.stringify(on));
+  console.log('ESITO OFF ' + JSON.stringify(off));
+});
