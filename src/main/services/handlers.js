@@ -1907,6 +1907,37 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
   return fonti;
 }
 
+// #953 — la segnalazione che Filo scrive e l'owner conferma è sua (fidata, senza giudici) solo se il compito non ha
+// letto testo di altri: lo stato dei livelli di autonomia, mai più largo della classe 2; dall'Aiuto di un sito mai.
+function compitoSenzaTestoDiAltri(sender, { contesto = null, fontiLette = null, assistente = false, impostazioni = null } = {}) {
+  try {
+    if (/^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))) return false;
+    const A = globalThis.SN_AUTONOMIA;
+    const aut = (impostazioni && impostazioni.autonomia) || {};
+    const attivo = A.livelloAttivo(aut.livello);
+    const livello = A.SOGLIA_PULITO[attivo] <= A.SOGLIA_PULITO.default ? attivo : 'default';
+    const fonti = fontiDelCompito(sender, contesto, fontiLette, assistente);
+    return A.stato({ fonti, livello, spostamenti: aut.fonti, manopole: aut.manopole }).stato === 'pulito';
+  } catch (_) { return false; }
+}
+// L'OK arriva senza il contesto del turno: vale il segno preso quando la proposta è stata mostrata, legato al suo
+// testo. Senza segno (scaduto, altra scheda, proposta mai vista) è contaminata.
+const segnalazioniPulite = new Map(); // pendingConfirmKey → scade
+const SEGNALAZIONE_PULITA_TTL = 24 * 60 * 60 * 1000;
+function ricordaSegnalazione(sender, action, pulita) {
+  const key = pendingConfirmKey(sender, action);
+  segnalazioniPulite.delete(key);
+  if (!pulita) return;
+  const now = Date.now();
+  for (const [k, scade] of segnalazioniPulite) if (scade <= now) segnalazioniPulite.delete(k);
+  segnalazioniPulite.set(key, now + SEGNALAZIONE_PULITA_TTL);
+}
+function segnalazioneConfermataPulita(sender, action) {
+  const key = pendingConfirmKey(sender, action);
+  const scade = segnalazioniPulite.get(key);
+  return !!scade && scade > Date.now();
+}
+
 // Ciò che una chat ha letto resta suo anche fuori dallo storico che la pagina rimanda a ogni turno (riaperta
 // dall'archivio, oltre gli ultimi venti messaggi): lo tiene il main, per la sessione e nell'archivio (#530).
 const fontiPerChat = new Map();   // chatId → fonti lette dalla chat
@@ -2361,6 +2392,7 @@ async function eseguiAzioneFilo(action, {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
+    if (type === 'INVIA_FEEDBACK') ricordaSegnalazione(sender, action, compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni }));
     return sospesa();
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -2586,7 +2618,7 @@ async function eseguiAzioneFilo(action, {
         // questo punto la conferma è già passata (il gate sopra ha lasciato
         // procedere solo con confirmed:true). Il feedback parte come quelli
         // inviati dal box: stesso schema, ma clientId 'filo:chat' così in
-        // dashboard si vede che l'ha mandato Filo.
+        // dashboard si vede che l'ha mandato Filo. Dall'owner porta la sua prova; è suo solo a compito pulito (#953).
         const testo = String(action.testo ?? action.text ?? action.messaggio ?? '').trim();
         if (!testo) return { executed: false, kept: false };
         const FB = globalThis.SN_FEEDBACK;
@@ -2596,7 +2628,18 @@ async function eseguiAzioneFilo(action, {
         let userAgent = 'Filo desktop';
         try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
         try {
-          const r = await FB.submit({ text: testo, name: titolo, clientId: 'filo:chat', userAgent });
+          const Mittente = require('./feedbackMittente');
+          const pulita = confirmed
+            ? segnalazioneConfermataPulita(sender, action)
+            : compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni });
+          const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
+          const payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
+          // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
+          if (r && r.queued) {
+            try { await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({ id: r.id, testo, titolo }); } catch (_) {}
+            return { executed: true, kept: false };
+          }
           // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
           if (r && r.id) {
             try {
@@ -4570,15 +4613,22 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     let userAgent = 'Filo desktop auto';
     try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
 
-    const result = await FB.submit({
+    // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
+    // confermata: il nome resta `auto:`). Senza un accesso valido aspetta in coda il suo rientro, come quella della chat:
+    // da anonima sembrerebbe di un estraneo, e buttata si perderebbe.
+    const Mittente = require('./feedbackMittente');
+    const voce = {
       text: payload.text,
       name: payload.name,
       clientId: payload.clientId,
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
-    }).catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
+    };
+    const result = await (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
+      .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
 
-    if (!result || !result.id) return;
+    // In coda non c'è ancora un documento da annullare.
+    if (!result || !result.id || result.queued) return;
     const feedbackId = result.id;
     autoFeedbackAnnullabili.add(String(feedbackId));
 

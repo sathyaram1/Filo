@@ -296,8 +296,15 @@
   function authorKindOf(fb) {
     return (TH && TH.authorKind) ? TH.authorKind(fb || {}) : 'user';
   }
+  // Quello che Filo manda dalla copia dell'owner porta la sua prova (#953): l'etichetta lo dice, la categoria no.
+  const PER_CONTO_OWNER = {
+    owner: { icon: AUTHOR_META.owner.icon, label: 'Owner (scritto da Filo)' },
+    filo:  { icon: AUTHOR_META.filo.icon, label: 'Filo (per conto dell\'owner)' },
+  };
   function authorMetaOf(fb) {
-    return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
+    const kind = authorKindOf(fb);
+    if (PER_CONTO_OWNER[kind] && TH && TH.filoPerConto && TH.filoPerConto(fb || {}) === 'owner') return PER_CONTO_OWNER[kind];
+    return AUTHOR_META[kind] || AUTHOR_META.user;
   }
   function authorIconHtml(fb) {
     const m = authorMetaOf(fb);
@@ -308,7 +315,7 @@
   // loro) se ne mostra un pezzo: per owner/Filo/automazioni sarebbe rumore.
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
-    const m = AUTHOR_META[kind] || AUTHOR_META.user;
+    const m = authorMetaOf(fb);
     if (kind !== 'user') return `${m.icon} ${m.label}`;
     // Senza il nome riservato che si era dato: ne mostrerebbe la firma.
     const id = String((fb && fb.clientId) || '').trim().replace(/^(non-provato:)?(owner|routine|agent|local):/i, '');
@@ -4251,7 +4258,7 @@
   function chiaveSegno(fb) {
     const c = String((fb && fb.clientId) || '').trim();
     if (!c || MR.valueUnreadable(c)) return 'fb:' + String((fb && fb._id) || '');
-    return 'm:' + senderKeyOf(fb);
+    return 'm:' + chiaveServerMittente(fb);
   }
   function segnoDi(fb) { return fb ? segniMittente.get(chiaveSegno(fb)) || null : null; }
   function segnoAttivo(fb) { const s = segnoDi(fb); return !!(s && s.flagged); }
@@ -5590,6 +5597,7 @@
   function openSidebarSender(clientId) {
     const group = allByClient[clientId] || [];
     const total = group.length;
+    const mittente = group[0] ? chiaveServerMittente(group[0]) : mittenteDaChiave(clientId);
 
     // Età account: createdAt più vecchio
     let oldest = null;
@@ -5622,8 +5630,8 @@
 
     const html = `
       <div class="mg-sender-info">
-        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId }))}</strong></div>
-        <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
+        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId: mittente }))}</strong></div>
+        <div class="mg-sender-stat">${esc(mittente === '__anon__' ? 'anonimo' : mittente)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
         <div class="mg-sender-segno" id="mgSideSegno" hidden></div>
@@ -5744,8 +5752,18 @@
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
   // caricamento e a ogni giro di aggiornamento.
   // Chiave del mittente = la stessa del server: chi copia il clientId dell'owner senza prova sta in un gruppo suo.
-  function senderKeyOf(fb) {
+  function chiaveServerMittente(fb) {
     return (MR.effectiveClientId ? MR.effectiveClientId(fb) : String((fb && fb.clientId) || '')) || '__anon__';
+  }
+  // Il pannello tiene a parte anche ciò che Filo manda con la prova dell'owner, non con gli estranei dello stesso
+  // nome (#953). Il prefisso è su ogni chiave: nessun clientId scelto apposta entra in quel gruppo.
+  function senderKeyOf(fb) {
+    const perOwner = authorKindOf(fb) === 'filo' && !!(TH && TH.filoPerConto) && TH.filoPerConto(fb || {}) === 'owner';
+    return (perOwner ? 'owner|' : 'm|') + chiaveServerMittente(fb);
+  }
+  function mittenteDaChiave(key) {
+    const s = String(key || '');
+    return s.slice(s.indexOf('|') + 1);
   }
   function reindexByClient() {
     allByClient = {};
