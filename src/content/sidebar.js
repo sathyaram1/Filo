@@ -104,6 +104,8 @@
     ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
+    passiDaSolo = 0;
+    continuaAperto = null;
     session = newSession();
     // Ogni apertura è una conversazione sua anche nel filo.
     convFilo = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
