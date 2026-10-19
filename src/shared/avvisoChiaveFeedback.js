@@ -110,7 +110,11 @@
       ricarica = Promise.resolve()
         .then(() => (typeof onCambiata === 'function' ? onCambiata() : null))
         .catch(() => {})
-        .finally(() => { ricarica = null; if (!el.hidden) aggiorna(); });
+        .finally(() => {
+          ricarica = null;
+          if (esito.dataset.kind === 'ok') scriviEsito('');
+          if (!el.hidden) aggiorna();
+        });
       return ricarica;
     }
 
