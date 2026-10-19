@@ -178,8 +178,8 @@
     const doc = global.document;
     const copre = !!(opzioni && opzioni.coprePagina);
 
-    // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il
-    // posizionamento a tutto viewport (inline, così non serve CSS nel documento).
+    // L'host è l'UNICO nodo visibile dal documento: nessun contenuto, solo il posizionamento,
+    // inline per non dover mettere CSS nel documento del sito.
     const host = doc.createElement('div');
     host.className = 'sn-confirm-host';
     // Marcato: chi cammina sulla pagina (la traduzione, l'Esc a tutto schermo) lo sa di Filo.
@@ -470,15 +470,13 @@
   // la scheda. Nessun sito li raggiunge: sulle pagine web il modulo vive nel
   // mondo isolato del preload, e il dialogo non è nel loro documento.
   const _test = {
-    // Stato del dialogo aperto, o null se non ce n'è uno.
     state() {
       if (!active) return null;
       const q = (s) => active.root.querySelector(s);
       const okBtn = q('.sn-confirm-btn-ok') || q('.sn-confirm-btn-danger');
       const textEl = q('.sn-confirm-text');
-      // Il testo lungo scorre dentro il box invece di essere tagliato, e la sua
-      // selezione usa la palette Filo: entrambe le cose vivono nello shadow root
-      // chiuso, quindi solo da qui sono ispezionabili da uno spec.
+      // Scorrimento del testo lungo e colore della selezione vivono nel root chiuso:
+      // solo da qui uno spec può ispezionarli.
       let selectionBg = '';
       try {
         if (textEl) selectionBg = global.getComputedStyle(textEl, '::selection').backgroundColor || '';
@@ -501,8 +499,7 @@
         pronto: !!(active.pronto && active.pronto()),
       };
     },
-    // Clicca un bottone: which = 'ok' | 'cancel' | 'danger'.
-    // Ritorna false se non c'è dialogo, bottone assente o disabilitato.
+    // which = 'ok'|'cancel'|'danger'. False se manca il dialogo o il bottone è disabilitato.
     click(which) {
       if (!active) return false;
       const btn = active.root.querySelector('.sn-confirm-btn-' + which);

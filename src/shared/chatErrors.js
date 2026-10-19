@@ -49,21 +49,15 @@
 (function (global) {
   'use strict';
 
-  // Guasti di rete passeggeri: nessuna risposta HTTP è mai arrivata, quindi
-  // ritentare la stessa chiamata ha senso (a differenza di un 400, che
-  // ritornerebbe identico).
-  // Nota: "failed to fetch" (con TO) è la forma che lancia il `fetch` del
-  // renderer Chromium quando non c'è rete (le pagine filo://). Il `fetch` di
-  // Node/undici nel main dice invece "fetch failed": qui matchiamo entrambe, così
-  // un guasto di rete è classificato come tale a prescindere dal processo.
+  // Nessuna risposta HTTP è arrivata, quindi ritentare ha senso: un 400 tornerebbe uguale.
+  // Due forme: «failed to fetch» nel renderer, «fetch failed» nel main. Stessa classifica.
   const TRANSIENT_NETWORK_RE =
     /fetch failed|failed to fetch|load failed|network error|networkerror|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|other side closed|timed out|timeout/i;
 
   function messageOf(e) {
     if (!e) return '';
     if (typeof e === 'string') return e;
-    // Un errore di rete di undici/Node porta spesso il vero motivo nella
-    // `cause` ("fetch failed" ← "ENOTFOUND"): guardiamo anche lì.
+    // Il vero motivo sta spesso nella `cause`: «fetch failed» ← «ENOTFOUND».
     const own = String(e.message || '');
     const causeMsg = e.cause ? String(e.cause.message || e.cause.code || e.cause) : '';
     return causeMsg ? `${own} ${causeMsg}` : own;
@@ -71,11 +65,11 @@
 
   function isTransientNetwork(e) {
     if (!e) return false;
-    // Annullato da noi (l'utente ha cambiato pagina, nuovo invio): non è un
-    // guasto, e ritentare sarebbe sbagliato.
+    // Annullato da noi (cambio pagina, reinvio): non è un guasto, e ritentare sarebbe
+    // sbagliato.
     if (e.name === 'AbortError' || e.code === 'ABORT_ERR') return false;
-    // Un errore con status HTTP è una RISPOSTA del server: non è un guasto di
-    // rete, ritentarlo alla cieca non serve.
+    // Un errore con status HTTP è una RISPOSTA del server, non un guasto di rete:
+    // ritentarlo alla cieca non serve.
     if (Number(e.status) > 0) return false;
     const code = String(e.code || (e.cause && e.cause.code) || '');
     if (code && TRANSIENT_NETWORK_RE.test(code)) return true;
@@ -236,10 +230,8 @@
       return 'problema di rete: non sono riuscito a raggiungere il servizio. Controlla la connessione e riprova.';
     }
 
-    // Errore del SERVIZIO AI (il modello): riconosciuto dal marcatore
-    // strutturato che i provider attaccano ai loro errori HTTP (err.provider)
-    // o — rete di sicurezza per errori non marcati — dalla forma del messaggio
-    // ("OpenRouter 400: …", "Gemini 503: …").
+    // Errore del SERVIZIO AI, riconosciuto dal marcatore `err.provider` o, per quelli non
+    // marcati, dalla forma del messaggio.
     const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
@@ -328,8 +320,8 @@
       return 'il servizio AI non è riuscito a rispondere: potrebbe esserci un problema con il modello scelto nelle Impostazioni. Riprova, o prova con un altro modello.';
     }
 
-    // Errore HTTP "nudo" (nessun marcatore di provider AI): se la chat
-    // interroga anche un archivio esterno, è (quasi sempre) lui.
+    // Errore HTTP nudo, senza marcatore di provider AI: se la chat interroga anche un archivio
+    // esterno, quasi sempre è lui.
     const status = Number(e && e.status);
     if (Number.isFinite(status) && status > 0) {
       const src = String(o.dataSource || '').trim();
@@ -343,13 +335,10 @@
         : 'la richiesta non è stata accettata. Riprova riformulandola con parole diverse.';
     }
 
-    // Qualsiasi altro errore è tecnico e non aiuterebbe l'utente: frase
-    // generica in chat, dettaglio nei log.
+    // Ogni altro errore è tecnico e non aiuterebbe: frase generica in chat, dettaglio nei log.
     return 'qualcosa è andato storto. Riprova.';
   }
 
-  // Frase a sé stante: la proposizione con l'iniziale maiuscola. Per chi mostra
-  // l'errore da solo nella bolla (chat della home) invece di incastonarlo.
   function sentence(e, opts) {
     const s = friendly(e, opts);
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;

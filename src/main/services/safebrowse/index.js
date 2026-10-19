@@ -31,7 +31,6 @@ const gsb = require('./gsb');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
 
-// ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
   constructor(ttlMs) { this.ttl = ttlMs; this.m = new Map(); }
   get(k) {
@@ -278,8 +277,7 @@ function checkSync(url, ctx = {}) {
   return engine.evaluate(url, ctx, asyncData);
 }
 
-// Avvia le chiamate di rete mancanti in background. Aggiorna le cache e, se il
-// verdetto cambia, richiama onUpdate. Ritorna SUBITO il verdetto sincrono.
+// Il verdetto sincrono torna SUBITO: il resto aggiorna le cache in background.
 function analyze(url, ctx = {}, onUpdate) {
   const norm = normalizeMod.normalize(url);
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});
@@ -373,7 +371,7 @@ function analyze(url, ctx = {}, onUpdate) {
   return first;
 }
 
-// Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza/identità.
+// Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza e identità.
 function buildLlmMeta(norm, ctx, verdict) {
   const imp = verdict.imp || null;
   return {
@@ -415,8 +413,7 @@ const API = {
   recordCert,
   setProviders,
   configure,
-  // Quali stadi di rilevamento sono attivi dopo l'ultima configure() (diagnostica
-  // e test): gsb=true significa che la chiave Google Safe Browsing è in uso.
+  // Quali stadi di rilevamento sono attivi dopo l'ultima configure() (diagnostica e test).
   activeProviders() {
     return {
       gsb: !!providers.gsb && (gsbKeyOf ? !!currentGsbKey() : true),

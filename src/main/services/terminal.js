@@ -1,20 +1,11 @@
-// Esecuzione di comandi shell per Filo (#146.6).
-//
-// Il main process esegue il comando EFFETTIVO deciso dall'utente, con:
-//   • la shell scelta nelle preferenze (powershell | cmd | bash);
-//   • un timeout, oltre il quale il processo viene ucciso;
-//   • cattura di stdout/stderr, troncati se enormi (la chat non deve esplodere).
-//
-// La classificazione di sicurezza NON avviene qui: la fa il gate dei livelli
-// (src/shared/cmdClassify.js + actionLevels.js) PRIMA di chiamare runCommand.
-// Qui ci limitiamo a eseguire ciò che è già stato autorizzato.
+// Esecuzione di comandi shell (#146.6): shell dalle preferenze, timeout che uccide il
+// processo, stdout/stderr troncati se enormi perché la chat non esploda.
+// La classificazione di sicurezza la fa prima il gate dei livelli, non questo file.
 
 const { spawn, execFile } = require('node:child_process');
 
-// Uccide l'INTERO albero del processo. Su Windows `child.kill()` non termina i
-// figli (es. una shell che ne lancia un'altra): le pipe restano aperte e la
-// `close` non scatta → il timeout non libererebbe mai. taskkill /T /F chiude
-// l'albero. Su POSIX SIGKILL sul processo basta nei casi comuni.
+// Su Windows `child.kill()` lascia vivi i figli: le pipe restano aperte, `close` non scatta
+// e il timeout non libererebbe mai. Su POSIX basta SIGKILL sul processo.
 function killTree(child) {
   if (!child || child.killed) return;
   if (process.platform === 'win32') {
@@ -38,13 +29,8 @@ function defaultShell() {
   return process.platform === 'win32' ? 'powershell' : 'sh';
 }
 
-// Risolve la shell RICHIESTA in quella EFFETTIVAMENTE disponibile sulla
-// piattaforma. Fuori da Windows, 'powershell'/'cmd' non esistono (pwsh è
-// raramente installato) → ricadiamo su /bin/sh, ESATTAMENTE come fa la shell
-// persistente della modalità terminale (src/main/services/shell.js, che fuori
-// da Windows usa sempre /bin/sh). Così i comandi dell'assistente girano davvero
-// anche su Linux/macOS invece di fallire con ENOENT, e le due shell restano
-// coerenti. 'bash' resta bash se esplicitamente preferito.
+// Fuori da Windows 'powershell'/'cmd' non esistono: si ricade su /bin/sh, o i comandi
+// dell'assistente fallirebbero con ENOENT. 'bash' resta bash se preferito apposta.
 function resolveShell(shell) {
   const s = String(shell || '').toLowerCase();
   if (process.platform === 'win32') {
@@ -291,9 +277,8 @@ function extractCwdMark(rawStdout, mark) {
   };
 }
 
-// Esegue `command` e risolve con { command, stdout, stderr, code, signal,
-// truncated, timedOut, durationMs }. Non rigetta mai: gli errori di spawn
-// finiscono in stderr/code così il chiamante può sempre mostrare un esito.
+// Non rigetta mai: gli errori di spawn finiscono in stderr/code, così il chiamante ha sempre un
+// esito da mostrare.
 function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, trackCwd = false } = {}) {
   const cmd = String(command || '').trim();
   const startedAt = Date.now();

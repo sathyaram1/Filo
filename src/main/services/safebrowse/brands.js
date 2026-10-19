@@ -1,18 +1,6 @@
-// Brand ad alto valore per il phishing: i bersagli che gli attaccanti imitano
-// più spesso (banche/pagamenti, email, cloud, social, shopping, crypto).
-//
-// Ogni voce:
-//   token   — la "parola del brand" minuscola, usata per:
-//               • matching combosquat (token come label/sottostringa)
-//               • matching confusable/typo (scheletro e distanza di edit sulla
-//                 sola label di brand del dominio candidato)
-//   display — nome leggibile per i messaggi d'avviso ("Questo non è PayPal")
-//   domains — gli eTLD+1 LEGITTIMI del brand. Se il dominio candidato è uno di
-//             questi, NON è impersonazione (è il sito vero).
-//
-// La lista è volutamente corta e curata: pochi brand ad altissimo valore, per
-// tenere bassi i falsi positivi. Allungarla è sicuro finché i token restano
-// parole distintive (evita token generici tipo "pay" o "mail" da soli).
+// Brand ad alto valore per il phishing: i bersagli che gli attaccanti imitano più spesso.
+// `domains` sono gli eTLD+1 LEGITTIMI, che NON sono impersonazione.
+// Lista corta per tenere bassi i falsi positivi: mai token generici come «pay» o «mail».
 
 'use strict';
 
@@ -32,7 +20,6 @@ const BRANDS = [
   { token: 'poste', display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it'] },
   { token: 'nexi', display: 'Nexi', domains: ['nexi.it'] },
 
-  // Crypto
   { token: 'coinbase', display: 'Coinbase', domains: ['coinbase.com'] },
   { token: 'binance', display: 'Binance', domains: ['binance.com'] },
   { token: 'metamask', display: 'MetaMask', domains: ['metamask.io'] },
@@ -51,7 +38,6 @@ const BRANDS = [
   { token: 'yahoo', display: 'Yahoo', domains: ['yahoo.com', 'yahoo.it'] },
   { token: 'proton', display: 'Proton', domains: ['proton.me', 'protonmail.com'] },
 
-  // Social / comunicazione
   { token: 'facebook', display: 'Facebook', domains: ['facebook.com', 'fb.com'] },
   { token: 'instagram', display: 'Instagram', domains: ['instagram.com', 'instagram-engineering.com'] },
   { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com'] },
@@ -273,7 +259,6 @@ for (const b of BRANDS) {
   for (const d of b.domains) LEGIT_DOMAINS.set(d, b);
 }
 
-// Vero se l'eTLD+1 dato è un dominio legittimo di un brand noto.
 function isLegitBrandDomain(registrable) {
   return LEGIT_DOMAINS.has(registrable);
 }

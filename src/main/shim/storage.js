@@ -8,19 +8,8 @@ const path = require('node:path');
 const { AsyncLocalStorage } = require('node:async_hooks');
 const Disco = require('../services/scritturaAtomica');
 
-// === Cifratura a riposo delle chiavi API ===========================
-// Le chiavi API dei provider AI (settings.apiKeys) sono un segreto: a riposo NON
-// devono stare in chiaro nel storage.json (qualsiasi altro processo dell'utente,
-// un backup o un altro utente del FS potrebbe leggerle). Le cifriamo con
-// `safeStorage` di Electron (DPAPI su Windows, Keychain su macOS, libsecret su
-// Linux) — la stessa difesa già usata per i token di sessione (auth/token-store).
-// In MEMORIA (STATE.data) restano in chiaro: chi legge i settings (getSettings)
-// non cambia. La cifratura tocca solo il blob serializzato su disco.
-//
-// Compatibilità: un storage.json vecchio (apiKeys in chiaro) viene letto e, alla
-// prima scrittura, riscritto cifrato — migrazione trasparente. Se la cifratura
-// OS non è disponibile (es. Linux headless senza keyring), si ricade sul
-// comportamento precedente (apiKeys in chiaro) senza perdere dati.
+// Le chiavi API sono un segreto: a riposo si cifrano con `safeStorage` dell'OS, in memoria
+// restano in chiaro. Senza keyring si ricade sul chiaro, e uno storage vecchio si migra.
 const ENC_PREFIX = 'safeStorage:v1:';
 
 function canEncrypt() {
@@ -62,8 +51,8 @@ function deserializeFromDisk(data) {
     delete ns.apiKeysEnc;
     return { ...data, settings: ns };
   } catch (_) {
-    // Blob illeggibile (cifrato con un'altra chiave OS / altro utente): lascia
-    // i settings senza apiKeys (l'utente le re-inserisce), come fa token-store.
+    // Blob illeggibile (cifrato da un altro utente o un'altra chiave OS): si resta senza
+    // apiKeys e l'utente le reinserisce, come in token-store.
     return data;
   }
 }
@@ -122,20 +111,14 @@ function staccata(k, v) {
 // vengono dirottate su un overlay in RAM.
 const als = new AsyncLocalStorage();
 
-// Overlay in memoria: ciò che l'incognito scrive vive solo qui, finché la
-// sessione incognito è aperta. resetIncognito() lo azzera alla chiusura
-// dell'ultima finestra incognito.
+// Ciò che l'incognito scrive vive solo qui, finché la sessione incognito è aperta.
 const INCOGNITO = {
   data: {},               // { key: value } scritti durante la sessione incognito
   tombstones: new Set(),  // chiavi rimosse: mascherano l'eventuale valore su disco
 };
 
-// Allowlist FAIL-CLOSED: SOLO queste chiavi sono leggibili dal disco in
-// incognito (config/impostazioni che l'utente si aspetta di ereditare: modelli,
-// tema, blocklist, dizionario, autocorrezione, layout icone). QUALSIASI altra
-// chiave — comprese quelle aggiunte in futuro — è invisibile dal disco in
-// incognito: la finestra parte "vuota" e ciò che scrive resta in RAM.
-// Vedi STORAGE_KEYS in src/shared/constants.js.
+// Allowlist FAIL-CLOSED: dal disco l'incognito legge SOLO queste chiavi di configurazione.
+// Qualunque altra, comprese quelle future, è invisibile: la finestra parte vuota.
 const INCOGNITO_READABLE = new Set([
   'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout',
   // La disposizione delle carte della home (#870): come le icone, la scelta dell'utente vale anche in incognito.
@@ -151,8 +134,7 @@ function inIncognito() {
   return !!(s && s.incognito);
 }
 
-// Esegue fn in un contesto incognito. Ritorna ciò che fn ritorna (anche una
-// Promise: AsyncLocalStorage propaga il contesto attraverso la catena async).
+// Il contesto si propaga anche attraverso la catena async, non solo fino al primo await.
 function runIncognito(fn) {
   return als.run({ incognito: true }, fn);
 }
@@ -175,11 +157,8 @@ function resetIncognito() {
   INCOGNITO.tombstones = new Set();
 }
 
-// Risolve la lettura di UNA chiave nella vista incognito:
-//   1) scritta in questa sessione  → valore dall'overlay
-//   2) rimossa in questa sessione  → undefined (maschera il disco)
-//   3) chiave di config in allowlist → valore dal disco (ereditato)
-//   4) altrimenti (memoria/navigazione) → undefined (invisibile)
+// In incognito una chiave si legge dall'overlay, o è mascherata da un tombstone; dal disco
+// arrivano solo le chiavi di configurazione in allowlist, il resto è invisibile.
 function incognitoReadKey(k) {
   if (INCOGNITO_SHARED.has(k)) return STATE.data[k];
   if (k in INCOGNITO.data) return INCOGNITO.data[k];
@@ -190,8 +169,7 @@ function incognitoReadKey(k) {
 
 function filePath() {
   if (!STATE.filePath) {
-    // FILO_USER_DATA override per i test: ogni run mette un tempdir isolato
-    // così non si tocca lo storage reale dell'utente.
+    // FILO_USER_DATA isola i test: mai lo storage reale dell'utente.
     const root = process.env.FILO_USER_DATA || app.getPath('userData');
     STATE.filePath = path.join(root, 'storage.json');
   }
@@ -381,10 +359,8 @@ async function flush() {
   return STATE.flushChain;
 }
 
-// Forza subito una scrittura su disco, senza aspettare il debounce. Ritorna la
-// catena, quindi due chiamate ravvicinate si accodano invece di accavallarsi:
-// è proprio l'invariante che protegge dal guasto descritto sopra, ed è ciò che
-// il test verifica chiamandola due volte di fila senza attendere la prima.
+// Scrive subito, senza aspettare il debounce. Ritorna la catena: due chiamate ravvicinate
+// si accodano invece di accavallarsi.
 function flushNow() {
   if (STATE.flushTimer) { clearTimeout(STATE.flushTimer); STATE.flushTimer = null; }
   return flush();
@@ -644,8 +620,8 @@ async function remove(keys) {
   await loadIfNeeded();
   let list = Array.isArray(keys) ? keys : [keys];
   if (inIncognito()) {
-    // Rimuove dall'overlay e mette un tombstone: una lettura successiva torna
-    // undefined anche se la chiave esiste su disco (finestre normali intatte).
+    // Tombstone: la lettura successiva torna undefined anche se la chiave esiste su disco,
+    // e il disco delle finestre normali resta intatto.
     for (const k of list) {
       if (INCOGNITO_SHARED.has(k)) continue;
       delete INCOGNITO.data[k];
@@ -740,10 +716,8 @@ function flushSync() {
   } catch (e) { console.warn('[Filo storage] copia di riserva non scritta alla chiusura:', e?.message || e); }
 }
 
-// Scrittura sincrona best-effort: aggiorna lo stato in memoria e scrive subito
-// su disco. Usata sul path di chiusura (before-quit), dove non possiamo
-// aspettare il debounce né i microtask del set() async. Assume STATE già
-// caricato (vero a runtime, dopo il boot).
+// Scrittura sincrona per il cammino di chiusura (before-quit), dove non si può aspettare il
+// debounce né i microtask di set(). Assume STATE già caricato, vero dopo il boot.
 function setSync(obj) {
   try {
     if (!STATE.loaded) return;
@@ -773,11 +747,8 @@ module.exports = {
   inIncognito,
 };
 
-// Hook per i test (Playwright): app.evaluate gira nel main process ma in un
-// contesto dove `require` non è disponibile, quindi i test non possono caricare
-// questo modulo per pilotare runIncognito/resetIncognito. Sotto NODE_ENV=test
-// (impostato dal fixture) esponiamo l'API su globalThis. In produzione il ramo
-// non viene mai preso, quindi nessuna superficie extra.
+// app.evaluate gira nel main ma senza `require`, quindi i test non potrebbero pilotare
+// l'incognito: sotto NODE_ENV=test l'API si espone su globalThis, in produzione mai.
 if (process.env.NODE_ENV === 'test') {
   globalThis.__filoStorage = module.exports;
 }

@@ -14,8 +14,7 @@
   // Una voce scritta prima del #1082 può essere un servizio della rete di casa raggiunto con un redirect: si rilegge.
   const VERSIONE = 2;
   const FETCH_TIMEOUT_MS = 4000;
-  // Bound difensivo sul totale della cache (#domini): evita che cresca
-  // indefinitamente. Quando lo superiamo, scartiamo gli entry più vecchi.
+  // Bound difensivo sui domini in cache: oltre il tetto si scartano i più vecchi.
   const MAX_DOMAINS_CACHED = 500;
 
   async function readCache() {
@@ -61,16 +60,13 @@
   async function pruneIfNeeded(cache) {
     const keys = Object.keys(cache);
     if (keys.length <= MAX_DOMAINS_CACHED) return cache;
-    // Ordina per cachedAt asc e tieni solo i più recenti.
     const sorted = keys.sort((a, b) => (cache[a].cachedAt || 0) - (cache[b].cachedAt || 0));
     const toRemove = sorted.slice(0, sorted.length - MAX_DOMAINS_CACHED);
     for (const k of toRemove) delete cache[k];
     return cache;
   }
 
-  // Ritorna { text, present, cachedAt } per il dominio. Se in cache fresca,
-  // ritorna senza network. Se stale o assente, fetcha e aggiorna la cache.
-  // Non lancia mai: errori → { text:'', present:false }.
+  // Cache fresca: nessuna rete. Non lancia mai: gli errori tornano { text:'', present:false }.
   async function get(domain) {
     if (!domain || typeof domain !== 'string') return { text: '', present: false, cachedAt: 0 };
     const cache = await readCache();

@@ -1,5 +1,4 @@
-// Logica pagina Sicurezza: due toggle (proteggi IP via WebRTC + blocca popup)
-// + box informativo sui servizi P2P. Le impostazioni sono in settings.security.
+// Pagina Sicurezza: proteggi IP via WebRTC e blocca popup; impostazioni in settings.security.
 
 (function () {
   'use strict';
@@ -300,10 +299,8 @@
     }
   }
 
-  // Metà mancante dell'esportazione: ricarica un .zip esportato da Filo.
-  // Due passi voluti — prima leggiamo il file e diciamo COSA contiene, poi
-  // chiediamo conferma: l'utente sa cosa sta per rimettere dentro prima di
-  // dire sì. Il popup è quello di Filo (SN_CONFIRM_UI), mai il confirm nativo.
+  // Due passi voluti: prima si legge il file e si dice COSA contiene, poi si chiede conferma,
+  // così l'utente sa cosa sta per rimettere dentro. Popup di Filo, mai il confirm nativo.
   function showImportHint(text, isError) {
     const hint = $('sec-import-hint');
     hint.textContent = text;
@@ -380,8 +377,7 @@
       });
       if (res && res.ok) {
         showImportHint(I18n.t('security_import_done'), false);
-        // I dati appena rimessi dentro devono comparire: la pagina si ricarica
-        // per mostrare le impostazioni importate invece di quelle vecchie.
+        // La pagina si ricarica: i dati appena rimessi dentro devono comparire al posto dei vecchi.
         setTimeout(() => location.reload(), 1200);
       } else {
         showImportHint(I18n.t('security_import_fail'), true);
@@ -914,8 +910,6 @@
     mostrata = leggiSicurezza();
   }
 
-  // ─── protezione fingerprinting ─────────────────────────────────────────────
-
   function currentFpMode() {
     const checked = document.querySelector('input[name="fp-mode"]:checked');
     return checked ? checked.value : 'default';
@@ -929,8 +923,6 @@
     clearTimeout(saveFingerprint._t);
     saveFingerprint._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
-
-  // ─── gestione cookie ──────────────────────────────────────────────────────
 
   let cookieWhitelist = [];
   // #754 — siti dove l'utente ha chiesto di rivedere i banner (dal menu della scheda): qui si vedono e si tolgono.
@@ -1138,8 +1130,7 @@
     }
   }
 
-  // Mostra (o nasconde, con msg vuoto) un avviso inline sotto il campo "siti
-  // fidati". Senza questo, un input rifiutato spariva senza spiegazione.
+  // Un input rifiutato senza avviso sparirebbe senza spiegazione.
   function setWhitelistError(msg) {
     const el = $('cookie-wl-error');
     if (!el) return;
@@ -1198,8 +1189,7 @@
     saveCookies._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
-  // I sotto-controlli del rilevamento siti pericolosi sono attivi solo quando il
-  // controllo principale è acceso.
+  // I sotto-controlli valgono solo quando il controllo principale è acceso.
   function syncSafebrowseEnabled() {
     const on = $('sec-safebrowse').checked;
     const sub = $('sec-safebrowse-sub');
@@ -1209,7 +1199,6 @@
     }
   }
 
-  // Disabilita i sotto-controlli del blocco siti quando il blocco è spento.
   function syncSiteBlockEnabled() {
     const on = !!$('sec-siteblock').checked;
     const sub = $('sec-siteblock-sub');

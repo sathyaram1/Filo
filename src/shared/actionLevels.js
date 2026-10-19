@@ -45,7 +45,7 @@
     return built && !built.rifiuto && built.testo && built.partial && 'agentStyle' in built.partial ? built.testo : '';
   }
 
-  // Token + valore di un'azione estetica (più sinonimi che un LLM può produrre).
+  // Token e valore di un'azione estetica, con i sinonimi che un LLM può produrre.
   function estTok(action) {
     return action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
   }
@@ -53,10 +53,8 @@
     return action.valore ?? action.value ?? action.val ?? action.colore;
   }
 
-  // Etichetta leggibile di un paese per le azioni proxy (#152). Le location
-  // curate combaciano con ProxyTab.LOCATIONS; per qualsiasi altro alpha-2 valido
-  // ripieghiamo sul codice maiuscolo (il linguaggio naturale può chiedere paesi
-  // fuori dalla lista curata).
+  // Le location curate combaciano con ProxyTab.LOCATIONS; ogni altro alpha-2 valido ripiega
+  // sul codice maiuscolo: a voce si può chiedere un paese fuori dalla lista.
   const COUNTRY_LABELS = {
     us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania',
     es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone',
@@ -318,10 +316,8 @@
       // di segnalare, l'uscita è fuori dal perimetro del compito e chiede, anche a compito pulito.
       perimetro: (a, ctx) => CHIESTA_SEGNALAZIONE.test(String((ctx && ctx.richiesta) || '')),
       describe: (a) => {
-        // Il popup mostra il testo INTERO, mai una versione tagliata: è quello
-        // che parte a nome dell'utente, e un consenso su un testo che non si
-        // può leggere per intero non è un consenso. Se è lungo, è il popup a
-        // scorrere (src/shared/confirmUi.js), non il testo ad accorciarsi.
+        // Il popup mostra il testo INTERO, mai tagliato: un consenso su un testo che non si può
+        // leggere per intero non è un consenso. Se è lungo scorre il popup.
         const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
         return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${testo || '(vuoto)'}”`;
       },
@@ -1105,8 +1101,7 @@
     try { return entry.describe(action) || ''; } catch (_) { return ''; }
   }
 
-  // La stessa cosa a fatto compiuto, per l'esito che torna al modello: dove
-  // il registro non distingue («Avviare il timer “pasta”») vale `describe`.
+  // A fatto compiuto, per l'esito che torna al modello; senza voce propria vale `describe`.
   function describeDone(action) {
     if (!action || typeof action !== 'object') return '';
     const entry = REGISTRY[String(action.type || '').toUpperCase()];

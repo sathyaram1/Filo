@@ -1,15 +1,6 @@
-// Motore di decisione: dai segnali (locali sincroni + dati asincroni di rete,
-// quando disponibili) calcola UN verdetto con livello e messaggio specifico.
-//
-// Livelli (esattamente due avvisi, vedi spec):
-//   'safe'       — nessun avviso.
-//   'sospetto'   — banner chiudibile con "ok".
-//   'pericoloso' — interstitial bloccante (scrivere "confermo").
-//
-// Principio: "pericoloso" poggia SOLO su segnali che l'attaccante non può
-// nascondere (blacklist, dominio, certificato, età). Il contenuto rinforza,
-// mai da solo. L'LLM è monotòno: può alzare a "sospetto", mai a "pericoloso",
-// mai dichiarare sicuro (applicato da chi orchestra, non qui).
+// Motore di decisione: dai segnali calcola UN verdetto con livello e messaggio.
+// Livelli: safe nessun avviso, sospetto banner chiudibile, pericoloso blocca la pagina.
+// «Pericoloso» poggia solo su segnali non nascondibili; l'LLM alza a sospetto, mai oltre.
 
 'use strict';
 
@@ -94,7 +85,6 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
       body: `${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}${tail}`,
     };
   }
-  // 4) Solo segnali non legati all'identità.
   if (cert && CERT_BAD.has(cert.status)) {
     return { title: 'Connessione non sicura', body: `La connessione a ${dom} non è protetta: ${certText(cert.status)}.` };
   }
@@ -112,9 +102,8 @@ function joinIt(arr) {
   return arr.slice(0, -1).join(', ') + ' e ' + arr[arr.length - 1];
 }
 
-// Valutazione completa. `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays,
-// sandbox, llm }. `ctx` opzionale (indizi pagina): { hasPassword, hasPayment,
-// mixedContent, autoDownload, urlPath }.
+// `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays, sandbox, llm }.
+// `ctx`: indizi di pagina { hasPassword, hasPayment, mixedContent, autoDownload, urlPath }.
 function evaluate(url, ctx = {}, asyncData = {}) {
   const norm = normalize(url);
   if (!norm || !norm.ok) {
@@ -154,8 +143,8 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const doubleExt = sigs.some((s) => s.kind === 'double_extension');
   const sensitive = hasPassword || hasPayment;
 
-  // La whitelist certifica l'IDENTITÀ: niente impersonazione/LLM. Restano i
-  // controlli indipendenti dal contenuto (certificato, trasporto).
+  // La whitelist certifica l'IDENTITÀ: niente impersonazione né LLM, restano i controlli
+  // indipendenti dal contenuto.
   if (whitelisted) {
     if (certBad) {
       const message = buildMessage({ level: 'sospetto', norm, cert });
@@ -164,8 +153,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     return { level: 'safe', reasons: ['whitelisted'], norm, message: null, needsLlm: false, whitelisted };
   }
 
-  // ── PERICOLOSO ────────────────────────────────────────────────────────
-  // strict impersonation da sola basta; oppure rinforzi forti combinati.
+  // Pericoloso: la strict impersonation basta da sola, altrimenti servono rinforzi combinati.
   const strongCombo =
     (broad && (young || certBad)) ||
     // #728 — il typo su un brand corto blocca solo col secondo segnale.
@@ -182,7 +170,6 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     };
   }
 
-  // ── SOSPETTO ──────────────────────────────────────────────────────────
   const llmSus = llm && llm.suspicious;
   const impSus = weakTypo || broad;
   const suspectTriggers = !!(impSus || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);

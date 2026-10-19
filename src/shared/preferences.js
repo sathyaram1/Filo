@@ -17,9 +17,8 @@
     return null;
   }
 
-  // Maschera una chiave API per l'etichetta di conferma: mostra i primi/ultimi
-  // caratteri (così l'utente riconosce QUALE chiave sta impostando) senza
-  // stampare l'intero segreto nel popup. Vedi i setter `chiave_*`.
+  // Maschera la chiave API nell'etichetta di conferma: i primi e gli ultimi caratteri bastano
+  // a riconoscere QUALE chiave si sta impostando, senza stampare il segreto nel popup.
   function maskKey(k) {
     const s = String(k == null ? '' : k).trim();
     if (s.length <= 8) return '••••';
@@ -51,10 +50,8 @@
     let s = String(raw == null ? '' : raw).trim().replace(/[^0-9.,-]/g, '');
     if (!s) return NaN;
     if (s.includes(',')) {
-      // virgola = decimale, punto = migliaia (formato italiano completo)
       s = s.replace(/\./g, '').replace(',', '.');
     } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
-      // solo punti come raggruppamento delle migliaia (gruppi esatti da 3)
       s = s.replace(/\./g, '');
     }
     const n = parseFloat(s);
@@ -930,9 +927,8 @@
         + 'vengono interpretati i comandi che Filo lancia.',
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        // 'sh' e 'zsh' sono i nomi che ha senso pronunciare su Mac e Linux: là
-        // powershell/cmd non esistono e il main ricade comunque su /bin/sh —
-        // ma se l'utente li chiede per nome, la richiesta deve arrivare.
+        // 'sh' e 'zsh' sono i nomi che ha senso pronunciare su Mac e Linux, dove powershell e cmd
+        // non esistono: il main ricade comunque su /bin/sh, ma la richiesta per nome deve arrivare.
         const map = {
           powershell: 'powershell', ps: 'powershell',
           cmd: 'cmd', 'prompt dei comandi': 'cmd', prompt: 'cmd',
@@ -1000,9 +996,8 @@
         }
         const Voices = global.SN_TTS_VOICES;
         if (Voices) {
-          // Si cerca fra TUTTI i cataloghi: quale modello legge non lo sa
-          // questa pagina, e una voce di un altro modello viene comunque
-          // ignorata al momento della lettura (resolveVoice).
+          // Si cerca fra TUTTI i cataloghi: quale modello legge non lo sa questa pagina, e una voce
+          // di un altro modello viene comunque ignorata al momento della lettura.
           const hit = Voices.allVoices().find((x) => x.id === low || x.id.toLowerCase() === low
             || x.label.toLowerCase() === low || x.label.toLowerCase().split(' ')[0] === low);
           if (hit) return { partial: { tts: { modelVoice: hit.id } }, label: `Voce naturale → ${hit.label} (${Voices.LANG_LABELS[hit.lang] || hit.lang})` };

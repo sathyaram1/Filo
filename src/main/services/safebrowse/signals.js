@@ -17,9 +17,8 @@
 const { BRANDS, nominaMarchio } = require('./brands');
 const { skeleton } = require('./confusables');
 
-// Distanza di Damerau-Levenshtein (OSA): conta sostituzione/inserzione/
-// cancellazione = 1 e la trasposizione di due adiacenti = 1 (così "amzaon" dista
-// 1 da "amazon", non 2 come nella Levenshtein semplice).
+// Damerau-Levenshtein: la trasposizione di due adiacenti conta 1, così «amzaon» dista 1 da
+// «amazon».
 function osaDistance(a, b) {
   const al = a.length, bl = b.length;
   if (al === 0) return bl;
@@ -39,9 +38,8 @@ function osaDistance(a, b) {
   return d[al][bl];
 }
 
-// Soglia di typo accettata per la lunghezza del brand. Brand corti → solo
-// distanza 1 e solo se lunghi almeno 5 (evita "wise"↔"wine"). Brand lunghi →
-// fino a 2.
+// Brand corti: distanza 1 e solo da 5 lettere in su (evita «wise»↔«wine»); brand lunghi fino
+// a 2.
 function typoThreshold(tokenLen) {
   if (tokenLen < 5) return 0;     // troppo corto: il typo è indistinguibile dal caso
   if (tokenLen >= 8) return 2;
@@ -62,8 +60,8 @@ function typoBloccante(sld, token, dist) {
 // Cerca la migliore corrispondenza di impersonazione fra i brand noti.
 // Ritorna { strict, weak, broad } dove ciascuno è null o { brand, reason, ... }.
 function matchBrands(norm) {
-  // Confronti SEMPRE sulla forma Unicode decodificata (un dominio camuffato in
-  // punycode, es. xn--80ak6aa92e, va confrontato per ciò che mostra: "аррӏе").
+  // Confronti SEMPRE sulla forma Unicode decodificata: un dominio in punycode va confrontato
+  // per quello che mostra.
   const sld = (norm.sldUnicode || norm.sld || '').toLowerCase();
   const sldSkel = skeleton(sld);
   const uLabels = (norm.hostUnicode || norm.host || '').split('.');
@@ -80,7 +78,6 @@ function matchBrands(norm) {
     const token = brand.token;
     const tokenSkel = skeleton(token);
 
-    // ── STRICT: confusable (stesso scheletro, stringa diversa) ──────────
     if (!strict && sld !== token && sldSkel && sldSkel === tokenSkel) {
       strict = { brand, reason: 'confusable', sld };
       continue;
@@ -100,13 +97,11 @@ function matchBrands(norm) {
       }
     }
 
-    // ── BROAD: nome esatto su suffisso non ufficiale ────────────────────
     if (!broad && sld === token) { broad = { brand, reason: 'exact_other_tld', sld }; continue; }
     // ── BROAD: combosquat (il marchio insieme ad altro; regola in brands.js) ────
     if (!broad && sld.length > token.length && nominaMarchio(sld, token, skeleton)) {
       broad = { brand, reason: 'combosquat', sld }; continue;
     }
-    // ── BROAD: brand come sottodominio mentre l'eTLD+1 è altro ───────────
     if (!broad && subLabels.length) {
       for (const lbl of subLabels) {
         if (lbl === token || skeleton(lbl) === tokenSkel) { broad = { brand, reason: 'subdomain', sld: lbl }; break; }
@@ -117,13 +112,11 @@ function matchBrands(norm) {
   return { strict, weak: strict ? null : weak, broad: (strict || weak) ? null : broad };
 }
 
-// Doppia estensione eseguibile nell'URL (es. fattura.pdf.exe): forte indizio
-// di download ingannevole.
+// Doppia estensione eseguibile (fattura.pdf.exe): indizio forte di download ingannevole.
 const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|$)/i;
 
-// Calcola i segnali deterministici locali. `norm` = output di normalize().
-// `ctx` = indizi opzionali (mai unica base): { hasPassword, hasPayment,
-// mixedContent, autoDownload, linkOrigin, urlPath }.
+// `ctx`: indizi opzionali, mai unica base — { hasPassword, hasPayment, mixedContent,
+// autoDownload, linkOrigin, urlPath }.
 function localSignals(norm, ctx = {}) {
   const out = [];
   if (!norm || !norm.ok) return out;
@@ -140,11 +133,10 @@ function localSignals(norm, ctx = {}) {
     out.push({ kind: 'insecure_transport' });
   }
 
-  // Doppia estensione nell'URL.
   const path = ctx.urlPath || '';
   if (path && DOUBLE_EXT.test(path)) out.push({ kind: 'double_extension' });
 
-  // Indizi di pagina (solo rinforzo).
+  // Indizi di pagina: solo rinforzo.
   if (ctx.hasPassword) out.push({ kind: 'sensitive_input', field: 'password' });
   else if (ctx.hasPayment) out.push({ kind: 'sensitive_input', field: 'payment' });
   if (ctx.mixedContent) out.push({ kind: 'mixed_content' });

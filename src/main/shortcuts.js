@@ -76,10 +76,7 @@ function tastoSchermoIntero(wc, event, input, finestra) {
   return true;
 }
 
-// Una tab è "interna" (pagina filo://) se il flag isInternal è settato oppure
-// se l'URL usa lo schema filo://. Controlliamo entrambi perché isInternal è il
-// campo canonico ma l'URL è la difesa definitiva contro tab in stati di
-// transizione.
+// L'URL serve alle schede in transizione, dove `isInternal` non è ancora aggiornato.
 function isInternalTab(tab) {
   if (!tab) return false;
   return !!tab.isInternal || String(tab.url || '').startsWith('filo://');
@@ -105,12 +102,9 @@ function dispatch(command, window) {
   if (!active) return;
 
   if (command === 'save-for-later') {
-    // "Salva per dopo" ha senso solo per pagine web da rileggere: le pagine
-    // interne di Filo (filo://) non vanno salvate né chiuse. Early-return
-    // simmetrico agli altri 3 comandi, che su una pagina interna sono già
-    // no-op (nessun content script in ascolto).
+    // Una pagina filo:// non va salvata né chiusa: l'uscita è esplicita perché questo comando,
+    // a differenza degli altri, agisce comunque.
     if (isInternalTab(active)) return;
-    // Comportamento speciale: salva via servizio + chiude il tab.
     saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
     return;
   }
@@ -121,12 +115,8 @@ function dispatch(command, window) {
     return;
   }
   const wc = active.view.webContents;
-  // #405 — Spiegazione e Traduci lavorano sul testo SELEZIONATO, che può stare
-  // dentro un riquadro incorporato (un video, una mappa, un blocco commenti).
-  // `webContents.send` parla solo col frame principale: lì la selezione non
-  // esiste e la scorciatoia sembrava rotta. Consegniamo al frame con cui
-  // l'utente ha interagito per ultimo. Le altre scorciatoie riguardano la
-  // scheda intera (la sidebar Aiuto) e restano al frame principale.
+  // #405 — la selezione può stare in un riquadro incorporato, e `webContents.send` parla solo
+  // col frame principale: questi comandi vanno all'ultimo frame toccato dall'utente.
   const SELECTION_COMMANDS = new Set(['explain-selection', 'translate-selection']);
   let target = wc;
   if (SELECTION_COMMANDS.has(command)) {

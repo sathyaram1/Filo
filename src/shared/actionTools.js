@@ -25,9 +25,8 @@
   const B = (description) => ({ type: 'boolean', description });
   const I = (description) => ({ type: 'integer', description });
 
-  // Descrizione del sistema (shell, percorsi) per i testi che ne dipendono: la
-  // dà constants.js, che sa distinguere Windows da Mac e Linux. Senza (unit
-  // test che non lo caricano) restano frasi neutre.
+  // Shell e percorsi cambiano fra Windows, Mac e Linux: la descrizione la dà constants.js.
+  // Senza, i testi restano neutri.
   function sistemaInfo(sistema) {
     try {
       const C = global.SN_CONST;
@@ -620,7 +619,7 @@
 
   const NAMES = Object.keys(TOOLS);
 
-  // Le definizioni nel formato che OpenRouter (stile OpenAI) capisce.
+  // Formato che OpenRouter (stile OpenAI) capisce.
   function definitions({ sistema, onboarding = false } = {}) {
     const ctx = { sistema };
     const out = [];
@@ -648,17 +647,13 @@
     return out;
   }
 
-  // Gli strumenti che riportano un esito completo al modello (non solo «fatto»).
   function haRisultato(type) {
     const t = TOOLS[String(type || '').toUpperCase()];
     return !!(t && t.risultato);
   }
 
-  // Le chiamate del modello → azioni per executeFiloAction. Ogni voce porta
-  // `_callId` (per rispondere al fornitore con `tool_call_id`) e, se gli
-  // argomenti non erano JSON, `_argsError`: l'azione non si esegue e il
-  // modello riceve l'errore come esito, così può riprovare con argomenti buoni
-  // invece di restare senza risposta.
+  // Ogni voce porta `_callId` e, se gli argomenti non erano JSON, `_argsError`: l'azione non
+  // si esegue e l'errore torna al modello come esito, così riprova invece di tacere.
   function toolCallsToActions(toolCalls) {
     const out = [];
     for (const c of Array.isArray(toolCalls) ? toolCalls : []) {
@@ -686,10 +681,8 @@
     return out;
   }
 
-  // Tolleranza per il vecchio formato: un modello che ignora gli strumenti e
-  // scrive il JSON `{"text": …, "actions": […]}` nel testo. Non è più
-  // descritto nel prompt e non si ritenta: si accetta se c'è, così le azioni
-  // passano comunque dal registro invece di finire in chat come JSON grezzo.
+  // Tolleranza per un modello che ignora gli strumenti e scrive il JSON con testo e azioni:
+  // se c'è si accetta, così passa dal registro invece di finire in chat come JSON grezzo.
   function legacyEnvelope(text) {
     if (!text) return null;
     let t = String(text).trim();
@@ -708,10 +701,8 @@
     };
   }
 
-  // Il messaggio dell'assistente da rimandare al fornitore per un giro con
-  // chiamate: testo (anche vuoto), le chiamate così come le ha fatte, e il
-  // ragionamento così come è arrivato (`reasoning_details`), che il fornitore
-  // reinserisce al posto giusto: il modello riprende da dove aveva lasciato.
+  // Per un giro con chiamate il fornitore rivuole testo, chiamate e ragionamento com'erano
+  // (`reasoning_details`): al posto giusto il modello riprende da dove aveva lasciato.
   function assistantMessage({ text, toolCalls, reasoningDetails }) {
     const msg = { role: 'assistant', content: text ? String(text) : '' };
     const calls = (Array.isArray(toolCalls) ? toolCalls : []).map((c, i) => ({
