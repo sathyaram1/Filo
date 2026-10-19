@@ -396,6 +396,8 @@
           .filter((m) => m && typeof m.tipo === 'string')
           .map((m) => ({ tipo: m.tipo.slice(0, 20), testo: String(m.testo == null ? '' : m.testo).slice(0, 300) }));
         if (motivi.length) out.motivi = motivi.slice(-50);
+        // Riscrive il messaggio spontaneo che lo precede invece di aggiungersi (src/shared/filoCoda.js, siFonde).
+        if (turn.fonde) out.fonde = true;
       }
       // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
       const guardate = [

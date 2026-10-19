@@ -1,6 +1,6 @@
 // Filo parla per primo (#869): quando succede qualcosa (un timer scaduto, un download finito, un avviso, l'inizio della
 // giornata, la fine dell'accoglienza) scrive un turno suo in coda al filo. Mai all'apertura di una scheda. Due suoi
-// messaggi di fila si fondono (src/shared/filoEventi.js). Regole: patterns/la-home-e-la-coda-del-filo.md.
+// messaggi vicini, senza niente in mezzo, si fondono. Regole: patterns/la-home-e-la-coda-del-filo.md.
 
 const Coda = require('./codaFilo');
 
@@ -51,13 +51,13 @@ async function giroOra(subito) {
   const Chats = globalThis.SN_FILO_CHATS;
   const corrente = await Coda.chatCorrente();
   const ultimo = corrente && corrente.messages[corrente.messages.length - 1];
-  const fondi = !!(ultimo && ultimo.spontaneo && ultimo.role === 'filo');
+  const fondi = !!(ultimo && ultimo.spontaneo && ultimo.role === 'filo') && await Coda.siFonde(corrente.id);
   const motivi = [...(fondi && Array.isArray(ultimo.motivi) ? ultimo.motivi : []), ...nuovi];
   const r = await app.genera({ eventi: motivi, fondi, precedente: fondi ? String(ultimo.text || '') : '' });
   const testo = String((r && r.message) || '').trim();
   if (!testo) return r || null;
   const chat = corrente ? corrente.id : require('node:crypto').randomUUID();
-  const scritta = await Chats.append(chat, { role: 'filo', text: testo, spontaneo: true, motivi, esterno: ESTERNO });
+  const scritta = await Chats.append(chat, { role: 'filo', text: testo, spontaneo: true, motivi, esterno: ESTERNO, ...(fondi ? { fonde: true } : {}) });
   const i = scritta ? scritta.messages.length - 1 : 0;
   const m = scritta && scritta.messages[i];
   app.annuncia({ chat, i, ts: (m && m.ts) || new Date().toISOString(), testo, fuso: fondi });

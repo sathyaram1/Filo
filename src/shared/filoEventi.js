@@ -176,11 +176,12 @@
         break;
       case TIPI.MESSAGGIO: {
         if (!c) { c = chatNuova(ev.chat, ev.ts); stato.chat.set(ev.chat, c); }
-        // Due messaggi di Filo scritti di sua iniziativa, uno dietro l'altro, sono un messaggio solo (#869): il secondo
-        // riscrive il primo con tutto quello che è successo, e su disco restano tutti e due.
+        // Un messaggio di Filo che si fonde col suo di prima (#869; quando, lo decide chi scrive: src/shared/filoCoda.js)
+        // lo riscrive con tutto quello che è successo, e su disco restano tutti e due.
         const ultimo = c.messages[c.messages.length - 1];
-        if (ev.msg.spontaneo && ultimo && ultimo.spontaneo && ultimo.role === 'filo' && ev.msg.role === 'filo') {
-          c.messages[c.messages.length - 1] = { ...ev.msg, ts: ultimo.ts };
+        if (ev.msg.fonde && ev.msg.spontaneo && ultimo && ultimo.spontaneo && ultimo.role === 'filo' && ev.msg.role === 'filo') {
+          const { fonde: _f, ...fuso } = ev.msg;
+          c.messages[c.messages.length - 1] = { ...fuso, ts: ultimo.ts };
           c._disp[c.messages.length - 1] = ev.dispositivo;
         } else {
           c.messages.push({ ...ev.msg, ts: ev.ts });

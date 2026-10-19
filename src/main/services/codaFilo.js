@@ -15,7 +15,7 @@ async function tutte(opts) {
   try { if (!opts || opts.incognito == null) incog = require('../shim/storage').inIncognito(); } catch (_) {}
   const firma = `${incog ? 'i' : 'n'}|${dati.pos}|${cambi.length}|${cambi.map((c) => `${c.id}${c.annullatoDa ? '~' : ''}`).join(',').slice(-4000)}`;
   if (memo && memo.firma === firma) return memo;
-  memo = { firma, dati, elementi: C().elementi({ chats: dati.chats, pagine: dati.pagine, cambi, qui: dati.qui }) };
+  memo = { firma, dati, cambi, elementi: C().elementi({ chats: dati.chats, pagine: dati.pagine, cambi, qui: dati.qui }) };
   return memo;
 }
 
@@ -58,6 +58,11 @@ async function chatCorrente(opts) {
   return C().chatCorrente(dati.chats);
 }
 
+async function siFonde(chat, opts) {
+  const { dati, cambi } = await tutte(opts);
+  return C().siFonde({ chats: dati.chats, pagine: dati.pagine, cambi }, chat);
+}
+
 async function serveGiornata(opts) {
   const { dati } = await tutte(opts);
   return C().serveGiornata(dati.chats);
@@ -84,5 +89,5 @@ async function togliPagine(ids, opts) {
   return tolte;
 }
 
-module.exports = { pezzo, chatCorrente, serveGiornata, cerca, togliPagine };
+module.exports = { pezzo, chatCorrente, siFonde, serveGiornata, cerca, togliPagine };
 globalThis.SN_CODA_FILO = module.exports;
