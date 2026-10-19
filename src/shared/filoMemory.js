@@ -161,7 +161,7 @@
       if (m) meta.righe[via.modulo] = meta.righe[via.modulo].filter((x) => x !== m);
       const n = { id: uuid(), testo: tolta.trim(), modulo: via.modulo, fonti: m ? m.fonti : [], nata: m ? m.nata : null, tolta: ora };
       meta.nascoste.push(n);
-      await setFonti(meta);
+      await setFonti(toccata(meta));
       await togliLezioniSimili(n.testo, n.fonti);
       return n.id;
     }
