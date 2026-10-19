@@ -8016,6 +8016,7 @@
   window.__mgTest.setFsData = (dati) => {
     const d = dati || {};
     fsFeedbacks = Array.isArray(d.feedbacks) ? d.feedbacks : [];
+    fsChiesteIntere = new Set();
     fsLog       = Array.isArray(d.workerLog) ? d.workerLog : [];
     fsCompleto  = d.complete !== false;
     fsRipiego   = d.ripiego === true;
