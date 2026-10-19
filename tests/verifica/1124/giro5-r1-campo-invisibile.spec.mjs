@@ -1,6 +1,6 @@
 // Giro 5 di #1124, rilievo 1: un campo che l'utente non vede, a fuoco per mano della pagina, non riceve la proposta.
 // Due vie che il controllo di visibilità non riconosce: campo senza colori, campo coperto da un riquadro che lascia passare i clic.
-import { test, expect, aspettaFinestra } from '../../fixtures/electron.mjs';
+import { test, expect } from '../../fixtures/electron.mjs';
 
 const EMAIL = 'chi-usa-filo@example.com';
 
