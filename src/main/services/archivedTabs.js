@@ -191,7 +191,7 @@
   }
 
   global.SN_ARCHIVED_TABS = {
-    list, listMeta, archive, update, remove, removeMany, clear, importa,
+    list, listMeta, archive, update, remove, removeMany, dimenticaPagine, clear, importa,
     suEntrate, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
