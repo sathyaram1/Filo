@@ -384,7 +384,7 @@ test('un clic su «Scarica» dentro un riquadro di un altro sito, o seguito da u
 });
 
 // Un indirizzo che è davvero il file: non c'è una pagina, la scheda resta e porta l'avviso.
-test('aprire da Filo l\'indirizzo di un fattura.pdf.exe che scende come file: la scheda resta con l\'avviso, pericoloso su un dominio giovane', async ({ app, shell, openTab }) => {
+test('aprire da Filo l\'indirizzo di un fattura.pdf.exe che scende come file: la scheda resta con l\'avviso, anche su un dominio giovane', async ({ app, shell, openTab }) => {
   await servi(app, { 'fatture-online.it/': '<p>Fatture</p>', 'fatture-nuove.it/': '<p>Fatture</p>' }, { eta: { 'fatture-nuove.it': 2 } });
   const avvisi = () => app.evaluate(({ BrowserWindow }) => {
     const out = [];
