@@ -468,7 +468,7 @@ test('in Automatico niente proposta; la voce del menu protegge il sito incorpora
 
 // ── la chat ─────────────────────────────────────────────────────────────────
 
-const execAction = (app, action) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), action);
+const execAction = (app, action, opts) => app.evaluate((_e, [a, o]) => globalThis.SN_EXECUTE_FILO_ACTION(a, o), [action, opts]);
 
 // Togliere un sito dai fidati rialza una difesa: la chat lo fa senza chiedere, o con l'OK se la soglia lo vuole.
 async function eseguiDaChat(app, home, action) {
@@ -491,12 +491,12 @@ test('in chat «resta connesso su» aggiunge il sito con la conferma, e «togli 
     const home = await openTab('filo://newtab/');
 
     const aggiungi = { type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: `aggiungi ${nome}` };
-    const r = await execAction(app, aggiungi);
+    const r = await execAction(app, aggiungi, { richiesta: `resta connesso su ${nome}` });
     // Aggiungere abbassa la privacy massima: chiede l'OK come le altre impostazioni che allentano una difesa.
     expect(r.executed).toBe(false);
     expect(r.needsConfirm).toBeGreaterThanOrEqual(2);
     expect(await fidati(app)).toEqual([]);
-    const c = await home.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), aggiungi);
+    const c = await home.evaluate(([a, n]) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a, parole: [`resta connesso su ${n}`] }), [aggiungi, nome]);
     expect(c.executed).toBe(true);
     await expect.poll(() => fidati(app)).toEqual([nome]);
     await expect.poll(() => partizioneDi(app, `${base}/`)).toBe(`persist:filo-priv-${nome}`);

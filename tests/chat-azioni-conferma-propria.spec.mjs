@@ -284,7 +284,8 @@ test('assistente sulla pagina: il riordino confermato parte, la cancellazione da
     }
   });
   await seedArchive(app, [{ title: 'Gatti persiani', gatto: true }]);
-  const invia = (type, action) => page.evaluate(([t, a]) => chrome.runtime.sendMessage({ type: t, action: a, assistente: true }), [type, action]);
+  // Le parole dell'utente viaggiano col messaggio: senza, la cancellazione per sempre è un no prima del pannello (#1312).
+  const invia = (type, action) => page.evaluate(([t, a]) => chrome.runtime.sendMessage({ type: t, action: a, assistente: true, parole: ['elimina dall\'archivio le schede sui gatti'] }), [type, action]);
 
   const riordino = { type: 'PULISCI_TAB' };
   expect((await invia('filo_run_action', riordino)).needsConfirm).toBeTruthy();

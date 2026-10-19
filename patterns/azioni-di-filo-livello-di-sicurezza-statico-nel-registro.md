@@ -21,7 +21,10 @@ il perimetro e l'origine. La tabella è quella decisa dall'owner il 30/09 (#1312
 non dice mai «no», e ogni «sì» da costo 2 in su passa dal guardiano di uscita,
 che finché non c'è lo trasforma in «chiede». Il **costo 4** vuole «conferma» a
 ogni livello, yolo compreso, e parte solo se l'utente l'ha chiesto con parole
-sue (`chiesta`): mai su proposta di Filo né da un'automazione. Sono costo 4 la
+sue (`chiesta`): mai su proposta di Filo né da un'automazione. Chiesto vuol dire che una parola che
+nomina l'azione (le chiavi della preferenza, il valore detto, le parole proprie della voce) sta in quello che
+l'utente ha scritto nel compito: ogni voce che può arrivare al 4 dichiara la sua regola `chiesta`, e senza non
+parte (sentinella in `tests/unit/autonomia.test.mjs`). Sono costo 4 la
 **regola del freno** (una preferenza con `allenta` che lo toglie; stringerla è
 costo 1), le credenziali di un servizio, il cancellare per sempre (cancellare
 dentro Filo è nascondere, costo normale) e un segreto in un'uscita: se l'ha
@@ -106,7 +109,9 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   risposta di un link con la stessa chiave. Un comando di sola lettura (costo 1),
   o uno che non nomina altro che il computer stesso (un docker con la password del
   database, un `.env`, un database su localhost), resta sul computer e non dichiara
-  niente: altrimenti ogni password scritta dal modello in locale era un «no» (#1312). Quando a Normale il costo 2 partirà
+  niente: altrimenti ogni password scritta dal modello in locale era un «no» (#1312). Un client di database esce
+  quando nomina un server che non è il computer (`-h`, `--host`, `PGHOST=`, `utente@server`), un login a un registro
+  sempre, salvo verso localhost. Quando a Normale il costo 2 partirà
   da solo (col guardiano), «2» non vorrà più dire «popup»: un file caricato con
   `curl -F`, un `-X DELETE` sul server, un `git push` verso un indirizzo scritto
   nel comando o un remoto riscritto (`remote add`/`set-url`, `remote.*.url`) non
