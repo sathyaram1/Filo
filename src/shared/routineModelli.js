@@ -12,7 +12,6 @@
     Object.freeze({ id: 'verifier', nome: 'Verifica' }),
     Object.freeze({ id: 'fixer', nome: 'Correzione' }),
     Object.freeze({ id: 'secaudit', nome: 'Controllo cieco' }),
-    Object.freeze({ id: 'prober', nome: 'Esplorazione' }),
   ]);
   const SCELTE = Object.freeze({
     model: Object.freeze([

@@ -39,8 +39,6 @@
   const mgRoutinesToggle = document.getElementById('mgRoutinesToggle');
   const mgRoutinesState  = document.getElementById('mgRoutinesState');
   const mgRoutinesMsg    = document.getElementById('mgRoutinesMsg');
-  const mgProberIdle      = document.getElementById('mgProberIdle');
-  const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
   const mgLavoriServer       = document.getElementById('mgLavoriServer');
   const mgLavoriServerSwitch = document.getElementById('mgLavoriServerSwitch');
   const mgLavoriServerMsg    = document.getElementById('mgLavoriServerMsg');
@@ -462,8 +460,8 @@
 
   // Interruttori dell'automazione: una lettura vale per un interruttore solo se
   // nessun suo salvataggio era per strada né è partito o arrivato nel frattempo.
-  const mosseAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0, lavoriServer: 0 };
-  const inVoloAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0, lavoriServer: 0 };
+  const mosseAuto = { enabled: 0, routinesEnabled: 0, autoApprove: 0, lavoriServer: 0 };
+  const inVoloAuto = { enabled: 0, routinesEnabled: 0, autoApprove: 0, lavoriServer: 0 };
   function salvaAuto(chiave, fn) {
     mosseAuto[chiave] += 1;
     inVoloAuto[chiave] += 1;
@@ -563,7 +561,6 @@
         }
         if (ancoraVera(foto, 'autoApprove')) reflectAutoApprove(r.autoApprove);
         if (ancoraVera(foto, 'routinesEnabled')) reflectRoutines(r.routinesEnabled !== false);
-        if (mgProberIdle && ancoraVera(foto, 'proberWhenIdle')) mgProberIdle.checked = r.proberWhenIdle !== false;
         if (mgLavoriServer && ancoraVera(foto, 'lavoriServer') && mgLavoriServer.checked !== (r.lavoriServer === true)) {
           mgLavoriServer.checked = r.lavoriServer === true;
           renderList();
@@ -652,34 +649,6 @@
     });
   }
 
-  // ── Esplorazione automatica a coda vuota (#448) ───────────────────────────
-  // Indipendente dall'automatica: riguarda cosa fanno le routine quando NON c'è
-  // più niente in coda, non chi entra in coda.
-  let proberScelte = 0;
-  if (mgProberIdle) {
-    mgProberIdle.addEventListener('change', () => {
-      const want = mgProberIdle.checked;
-      const mia = ++proberScelte;
-      if (mgProberIdleMsg) mgProberIdleMsg.textContent = '';
-      return salvaAuto('proberWhenIdle', async () => {
-        try {
-          const r = await sendToMain({ type: AUTOMATION_SET, proberWhenIdle: want });
-          if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
-          if (mia !== proberScelte) return;
-          mgProberIdle.checked = r.proberWhenIdle !== false;
-        } catch (err) {
-          console.error('[manage] salvataggio esplorazione automatica fallito:', err);
-          if (mia !== proberScelte) return;
-          mgProberIdle.checked = !want;
-          if (mgProberIdleMsg) {
-            mgProberIdleMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
-            mgProberIdleMsg.classList.add('mg-err');
-          }
-        }
-      });
-    });
-  }
-
   // ── Lavori server alle routine (#1159) ─────────────────────────────────────
   // Spento (o mai scritto): i lavori server restano alle sessioni locali, come prima.
   let lavoriServerScelte = 0;
@@ -719,7 +688,7 @@
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
-      mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
+      mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
       if (el) el.disabled = !isAdmin;
     }
@@ -6083,7 +6052,7 @@
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
-    // mittenti auto-approvati, esplorazione a coda vuota — usato dai test.
+    // mittenti auto-approvati, lavori server — usato dai test.
     loadAutoMode,
     setTab(tab) { selectTab(tab); },
     setSezione(sezione) { if (schedaPerSezione[sezione]) selectTab(schedaPerSezione[sezione]); },
