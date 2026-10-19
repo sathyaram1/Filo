@@ -526,7 +526,8 @@ function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
     });
   } catch (_) {}
   try {
-    // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena chiedere.
+    // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena
+    // chiedere. Nella pagina quel sì senza risposta si legge «da chiedere» (`siDato`).
     ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
       const chi = origineDi(wc, (details && details.requestingUrl) || requestingOrigin);
       if (chi.filo) return true;
