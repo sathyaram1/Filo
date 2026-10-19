@@ -46,7 +46,10 @@ dell'apertura gli ha passato anche i suoi falsi allarmi (#725.8, giro 1):
 `imposte.it` è una parola vera con un marchio dentro. Ogni marchio porta tutti i
 suoi indirizzi ufficiali; un marchio che è anche una parola, o ci sta dentro,
 conta solo da solo fra punti e trattini o accanto a parole da truffa (#732, la
-regola è in `brands.js`). Una sigla di tre lettere non basta da sola a nominare
+regola è in `brands.js`). Un nome di quattro lettere o meno segue la stessa
+regola anche se non è una parola: sta dentro troppi nomi (`bperfectcosmetics.com`,
+`thebay.com`), e una voce per caso sarebbe una pezza per porta (#725.8, giro 5).
+Una sigla di tre lettere non basta da sola a nominare
 un marchio (`bnl.gov`). Il nome di un sistema pubblico lo usano per mestiere
 anche altri: le pagine d'accesso SPID stanno sui domini dei gestori accreditati
 (`spid.register.it`), che il marchio elenca a parte, senza farli entrare nella

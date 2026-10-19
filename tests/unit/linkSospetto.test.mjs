@@ -266,6 +266,8 @@ const SITI_VERI = [
   // Giro 4: La Poste francese, le sedi nazionali di GLS e DHL.
   'https://www.laposte.fr/', 'https://www.laposte.net/', 'https://www.lapostemobile.fr/', 'https://gls-poland.com/',
   'https://www.gls-info.nl/', 'https://www.dhlecommerce.co.uk/',
+  // Giro 5: il sito di Postepay; un nome corto (BPER, eBay) che sta dentro il nome di un altro sito.
+  'https://www.postepay.it/', 'https://bperfectcosmetics.com/', 'https://www.thebay.com/',
   'https://urldefense.com/v3/__https://www.poste.it/__;!!AbC!x$', 'https://www.poste.it@www.poste.it/', 'https://mario.rossi@example.com/',
 ];
 
@@ -289,7 +291,10 @@ test('un nome a una lettera da un marchio avvisa nel menu e all’apertura, senz
 test('una parola vera non copre il marchio attaccato accanto', () => {
   // Il contrappeso: la parola vale solo dove sta, non scavalca un trattino e non copre un secondo nome.
   for (const u of ['https://accesso-poste.net/', 'https://risposte-poste.com/', 'https://poste-rimborso.wordpress.com/',
-    'https://ebay-login.com/', 'https://wise-transfer.com/', 'https://p-a-y-p-a-l.com/']) {
+    'https://ebay-login.com/', 'https://wise-transfer.com/', 'https://p-a-y-p-a-l.com/',
+    // Un nome corto conta attaccato alle parole da truffa, prima o dopo.
+    'https://myebay-login.com/', 'https://secureebay.com/', 'https://inpsrimborso.com/', 'https://accessoinps.com/',
+    'https://bperonline.com/']) {
     assert.ok(LS.analizza(u).some((c) => /^(typosquatting|omografo|nome_altrui):/.test(c)), `nessun avviso su ${u}`);
   }
 });

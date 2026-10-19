@@ -218,9 +218,10 @@ function soloTruffa(s, soloItaliane = false, visti = new Map()) {
 // Un marchio-parola di quattro lettere sta dentro troppe parole, e wise è anche un suffisso (shopwise, likewise):
 // conta solo davanti a parole da truffa, senza plurale inglese (wiselogin e nexirimborso sì, shopwise e wisecards no).
 // Un numero da solo non è una parola da truffa: steam2024 è una festa della scienza, steamlogin2024 un sosia.
-function attaccatoATruffa(pezzo, tok) {
+// Un nome corto che non è una parola né un suffisso (ebay, inps) conta anche dopo parole da truffa (myebay).
+function attaccatoATruffa(pezzo, tok, ancheDopo = false) {
   const parola = (x) => !/^\d*$/.test(x);
-  if (tok.length < 5) {
+  if (tok.length < 5 && !ancheDopo) {
     const dopo = pezzo.slice(tok.length);
     return pezzo.startsWith(tok) && parola(dopo) && soloTruffa(dopo, true);
   }
@@ -293,7 +294,7 @@ function nominaMarchio(nome, token, scheletro = (x) => x) {
   if (forme) {
     // Ogni pezzo com'è scritto (i numeri restano numeri) e come si legge (app1e è apple); marchi e forme sono già così.
     const letture = nome.split(/[.-]/).filter(Boolean).flatMap((p) => [p, scheletro(p)]);
-    return letture.some((p) => p === token || attaccatoATruffa(p, token))
+    return letture.some((p) => p === token || attaccatoATruffa(p, token, !MARCHI_PAROLA.has(token)))
       || forme.some((f) => letture.some((p) => formaIntera(p, f) || formaConErrore(p, f, token)));
   }
   // Il trattino non spezza un marchio distintivo: pay-pal resta paypal.
