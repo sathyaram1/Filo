@@ -113,5 +113,5 @@ async function togliIndirizzo(url, opts) {
   return tolte;
 }
 
-module.exports = { pezzo, chatCorrente, siFonde, serveGiornata, cerca, togliPagine, togliIndirizzo };
+module.exports = { pezzo, chatCorrente, siFonde, serveGiornata, cerca, togliPagine, togliIndirizzo, togliSchedeChiuse };
 globalThis.SN_CODA_FILO = module.exports;
