@@ -185,11 +185,12 @@ export function appCondivisa(opzioni = {}) {
   return { test, expect, azzera: () => riportaComeAppenaAperta(stato) };
 }
 
-async function aspettaHome(app) {
+// Dopo l'azzeramento basta che la home ci sia, come dopo un lancio: chi la usa ne aspetta il caricamento da sé.
+async function aspettaHome(app, { caricata = true } = {}) {
   let home = null;
   await expect.poll(() => Boolean(home = app.windows().find((w) => { try { return !w.isClosed() && w.url().startsWith('filo://newtab'); } catch (_) { return false; } })),
     { message: 'appCondivisa: la home non è arrivata', timeout: 0, intervals: [50] }).toBe(true);
-  await home.waitForLoadState('domcontentloaded').catch(() => {});
+  if (caricata) await home.waitForLoadState('domcontentloaded').catch(() => {});
   return home;
 }
 
@@ -208,15 +209,13 @@ async function riportaComeAppenaAperta(stato) {
   await app.evaluate(azzeraStorageNelMain);
   // La home aperta dalla prima chiusura è nata con lo storage della prova: se ne apre una nata dopo l'azzeramento.
   await chiudiSchede(app);
-  await aspettaHome(app);
+  await aspettaHome(app, { caricata: false });
   const shell = await primaFinestra(app);
-  await shell.evaluate(async () => {
+  // La X ferma i tempi dell'avviso; la card si toglie subito, senza aspettare la transizione.
+  await shell.evaluate(() => {
     for (const c of document.querySelectorAll('#shell-notifs > .shell-notif')) {
-      const x = c.querySelector('.shell-notif-close');
-      if (x) x.click(); else c.remove();
+      c.querySelector('.shell-notif-close')?.click();
+      c.remove();
     }
-    const fine = Date.now() + 2000;
-    while (document.querySelector('#shell-notifs > .shell-notif') && Date.now() < fine) await new Promise((r) => setTimeout(r, 25));
-    document.querySelectorAll('#shell-notifs > .shell-notif').forEach((c) => c.remove());
   });
 }
