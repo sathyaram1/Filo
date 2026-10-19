@@ -85,6 +85,11 @@ tasto destro di Filo restava sotto la modale, inerte.
   non si ripete a pagina aperta. Il verdetto della pagina che risulta pulita non
   lo toglie, un documento nuovo sì; l'avviso della pagina stessa ha la
   precedenza. Prima del clic nessuna rete.
+- **Un file travestito si giudica dal nome, non da dove viene** (#965): uno
+  scaricamento passa da `_sbPrimaDelClic` col nome del file anche quando la
+  pagina lo costruisce da sé (blob:, data:: vale il sito della pagina, e
+  confermato la pagina lo riscarica col suo nome) e anche su un sito
+  dell'elenco dei fidati, che certifica chi è il sito, non i suoi file.
 - **Il «Continua» del sospetto si arma dopo un secondo**: l'avviso compare
   mentre l'utente scrive o clicca nella pagina, e quell'Invio non è per lui
   ([Una conferma non è un avviso sopra un fatto già compiuto](una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md)).
