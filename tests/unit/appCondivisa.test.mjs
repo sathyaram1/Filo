@@ -22,12 +22,13 @@ test('le regole dei nomi sono quelle della fixture, nello stesso ordine', () => 
   assert.deepEqual([...REGOLE_HOST], m[1].split(',').map((r) => r.trim()).filter(Boolean));
   const { args } = lancio('/dati', { ...OPZIONI_FIXTURE, hostInPiu: ['example.org'], argomentiInPiu: ['--x'] }, {});
   assert.ok(args.includes(`--host-resolver-rules=${[...REGOLE_HOST, 'MAP example.org 127.0.0.1'].join(', ')}`));
+  assert.deepEqual(args.slice(0, argomentiScala.length), argomentiScala, 'la manopola della scala apre il lancio, come nella fixture');
   assert.ok(args.indexOf('--x') < args.findIndex((a) => a.startsWith('--host-resolver-rules=')));
   assert.equal(args.at(-1), '.');
 });
 
 test('l\'ambiente del lancio porta le stesse variabili della fixture', () => {
-  const inizio = codice.indexOf('electron.launch(');
+  const inizio = codice.indexOf('electron.launch');
   const blocco = codice.slice(inizio, codice.indexOf('registraUsciteApp(app)', inizio));
   const nomi = [...new Set([...blocco.matchAll(/\b(FILO_[A-Z_]+|NODE_ENV)\s*:/g)].map((m) => m[1]))].sort();
   assert.ok(nomi.includes('FILO_USER_DATA'), 'la fixture non lancia più come prima: rileggila e aggiorna questa prova');

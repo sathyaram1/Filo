@@ -3,11 +3,11 @@
 // Cosa si azzera e cosa no: patterns/una-suite-accorpata-riparte-pulita-a-ogni-prova.md; sentinella: appCondivisa.test.mjs.
 
 import { _electron as electron } from '@playwright/test';
-import { rmSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test as base, expect, chiudiApp, argomentiScala } from '../fixtures/electron.mjs';
-import { cartellaTemporanea } from './percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from './percorsi.mjs';
 import { primaFinestra } from './primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -163,7 +163,7 @@ export function appCondivisa(opzioni = {}) {
 
   test.afterAll(async () => {
     if (stato.app) await chiudiApp(stato.app);
-    try { rmSync(stato.userData, { recursive: true, force: true }); } catch (_) {}
+    if (stato.userData) togliCartella(stato.userData);
     stato.app = null;
   });
 
