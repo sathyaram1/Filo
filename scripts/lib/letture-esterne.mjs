@@ -60,12 +60,12 @@ export function matcherDelGancio() {
   return `^(?!(?:${STRUMENTI_SENZA_LETTURA.join('|')})$).*`;
 }
 
-// ToolSearch porta le descrizioni scritte da chi fa i server MCP: non sporca solo quando chiede per nome strumenti che
-// non lo sono.
+// ToolSearch porta le descrizioni scritte da chi fa i server MCP: non sporca solo quando chiede per nome strumenti di
+// Claude o MCP fra i puliti, che descrive chi è già fidato per le loro risposte.
 function cercaSoloStrumentiDiClaude(query) {
   const m = /^\s*select:([\s\S]*)$/.exec(String(query || ''));
   const nomi = m ? m[1].split(',').map((s) => s.trim()) : [];
-  return nomi.length > 0 && nomi.every((n) => /^[A-Za-z][A-Za-z0-9_]*$/.test(n) && !/^mcp/i.test(n));
+  return nomi.length > 0 && nomi.every((n) => mcpSenzaLettura(n) || (/^[A-Za-z][A-Za-z0-9_]*$/.test(n) && !/^mcp/i.test(n)));
 }
 
 function dentro(file, cartella, P, win) {
