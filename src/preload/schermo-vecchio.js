@@ -4,9 +4,8 @@
 
 const EVENTO_SCHERMO_VECCHIO = 'filo:schermo-vecchio';
 
-// Un'espressione che vale la funzione da applicare a ogni finestra: la pagina e i riquadri vuoti che si crea (#1057).
-// Anche la funzione presa da un riquadro chiede dalla pagina: per Chromium una combinazione come solo l'audio del computer
-// è un messaggio guasto, e chiude la scheda prima di chiedere a Filo.
+// La funzione da applicare alla pagina e ai riquadri vuoti che si crea (#1057): anche da lì si chiede dalla pagina, perché
+// per Chromium «solo l'audio del computer» è un messaggio guasto e chiude la scheda prima di chiedere a Filo.
 function buildSchermoVecchioCorpo() {
   return `(function(){
   'use strict';
