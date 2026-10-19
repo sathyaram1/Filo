@@ -12,7 +12,32 @@ import ts from 'typescript';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TESTS = join(ROOT, 'tests');
 const AIUTO = 'menuContestuale.mjs';
-const TRACCIA = /sn-menu|data-sn-icon-id/;
+// Oltre a `sn-menu…`, ogni classe che solo il menu assegna (etichetta delle icone, immagine del trascinamento…): un
+// pezzo nuovo del menu entra da sé. Una classe assegnata anche altrove (sn-disabled) è uno stato condiviso, non il menu.
+const SORGENTI_MENU = ['src/content/menu.js', 'src/content/menuIcons.js'];
+const ASSEGNATE = /(?:className\s*=\s*|classList\.(?:add|toggle)\(\s*|class=\\?)(['"`])([^'"`\\]*)/g;
+function classiAssegnate(testo) {
+  const out = new Set();
+  for (const m of testo.matchAll(ASSEGNATE)) for (const c of m[2].split(/\s+/)) if (/^sn-[\w-]+$/.test(c)) out.add(c);
+  return out;
+}
+function classiDelMenu() {
+  const delMenu = new Set();
+  for (const f of SORGENTI_MENU) for (const c of classiAssegnate(readFileSync(join(ROOT, f), 'utf8'))) delMenu.add(c);
+  const altrove = new Set();
+  (function giro(dir) {
+    for (const nome of readdirSync(dir)) {
+      const p = join(dir, nome);
+      if (statSync(p).isDirectory()) giro(p);
+      else if (/\.(m?js|html)$/.test(nome) && !SORGENTI_MENU.includes(relative(ROOT, p).split(sep).join('/'))) {
+        for (const c of classiAssegnate(readFileSync(p, 'utf8'))) altrove.add(c);
+      }
+    }
+  })(join(ROOT, 'src'));
+  return [...delMenu].filter((c) => !c.startsWith('sn-menu') && !altrove.has(c)).sort();
+}
+const CLASSI_DEL_MENU = classiDelMenu();
+const TRACCIA = new RegExp(`sn-menu|data-sn-icon-id|(?<![\\w-])(?:${CLASSI_DEL_MENU.join('|')})(?![\\w-])`);
 const MARCATORE = 'menu-dal-sito';
 // I metodi con cui una prova cerca nel documento: decide chi li riceve. Le asserzioni sulla classe di un elemento già
 // trovato non cercano niente.
