@@ -35,11 +35,9 @@ async function gesto(app, chi, eventi) {
   }, { chi, eventi });
 }
 
-const clicDestro = (app, x, y) => gesto(app, 'scheda', [
-  { type: 'mouseMove', x, y },
-  { type: 'mouseDown', x, y, button: 'right', clickCount: 1 },
-  { type: 'mouseUp', x, y, button: 'right', clickCount: 1 },
-]);
+// Il tasto destro dell'utente su un punto della pagina (px CSS del documento): passa dallo smistamento di Chromium, che
+// lo porta anche dentro il riquadro di un altro sito. Un sendInputEvent andrebbe sempre al documento principale.
+const clicDestro = (page, p) => page.mouse.click(p.css.x, p.css.y, { button: 'right' });
 
 const zoom = (app, f) => app.evaluate(({ BrowserWindow }, f) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
@@ -51,10 +49,11 @@ const areaScheda = (app) => app.evaluate(({ BrowserWindow }) => {
   return tm.tabs.find((t) => t.id === tm.activeId).view.getBounds();
 });
 
-// Centro di un elemento in px della scheda (DIP): quello che vede l'utente, zoom compreso.
+// Centro di un elemento: in px CSS del documento della scheda, e in px della scheda (quello che vede l'utente, zoom compreso).
 async function centro(frame, sel, f, scarto = { x: 0, y: 0 }) {
   const r = await frame.locator(sel).evaluate((el) => { const b = el.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; });
-  return { x: Math.round((scarto.x + r.x) * f), y: Math.round((scarto.y + r.y) * f) };
+  const css = { x: Math.round(scarto.x + r.x), y: Math.round(scarto.y + r.y) };
+  return { css, x: Math.round(css.x * f), y: Math.round(css.y * f) };
 }
 
 async function apertoIn(app, strato, punto) {
@@ -91,7 +90,7 @@ test.describe('strato acceso', () => {
       // Nel documento della scheda.
       const p = await centro(page, '#bersaglio', f);
       await page.evaluate(() => { window.visti = []; });
-      await clicDestro(app, p.x, p.y);
+      await clicDestro(page, p);
       const s = await apertoIn(app, strato, p);
       // Il punto dello strato indica davvero quello che l'utente ha cliccato.
       const visto = (await page.evaluate(() => window.visti)).find((v) => v.tasto === 2);
@@ -105,10 +104,11 @@ test.describe('strato acceso', () => {
       const ofs = await page.locator('#riquadro').evaluate((el) => { const b = el.getBoundingClientRect(); return { x: b.x, y: b.y }; });
       const q = await centro(riquadro, '#interno', f, ofs);
       await riquadro.evaluate(() => { window.visti = []; });
-      await clicDestro(app, q.x, q.y);
+      await clicDestro(page, q);
       const t = await apertoIn(app, strato, q);
+      // Il clic è arrivato al riquadro, e il suo punto (px CSS del riquadro) è quello dello strato.
       const dentro = (await riquadro.evaluate(() => window.visti)).find((v) => v.tasto === 2);
-      expect(dentro.id).toBe('interno');
+      expect(dentro, 'il riquadro ha ricevuto il tasto destro').toBeTruthy();
       expect(Math.abs((ofs.x + dentro.x) * f - t.punto.x)).toBeLessThanOrEqual(1);
       expect(Math.abs((ofs.y + dentro.y) * f - t.punto.y)).toBeLessThanOrEqual(1);
       await gesto(app, 'scheda', [{ type: 'keyDown', keyCode: 'Escape' }, { type: 'keyUp', keyCode: 'Escape' }]);
@@ -124,7 +124,7 @@ test.describe('strato acceso', () => {
     await paginaDelloStrato(app);
     await expect.poll(async () => (await statoDelloStrato(app))?.pronta).toBe(true);
     const p = await centro(page, '#bersaglio', 1);
-    await clicDestro(app, p.x, p.y);
+    await clicDestro(page, p);
     await expect.poll(async () => (await statoDelloStrato(app))?.aperto).toBe(true);
 
     // Lo script della pagina cerca lo strato: nel suo documento non c'è, e sotto il punto trova il suo elemento.
@@ -136,11 +136,12 @@ test.describe('strato acceso', () => {
       return {
         traccia: nodi.some((el) => el.id === 'ancora' || /filo:\/\/menu/.test(el.outerHTML.slice(0, 2000))),
         riquadri: window.frames.length,
-        sotto: document.elementFromPoint(x, y)?.id,
+        // Il menu di oggi, ancora nella pagina, può stare sopra il punto: sotto c'è comunque l'elemento del sito.
+        sotto: document.elementsFromPoint(x, y).some((el) => el.id === 'bersaglio'),
         inCima: window.top === window,
       };
-    }, p);
-    expect(visto).toEqual({ traccia: false, riquadri: 1, sotto: 'bersaglio', inCima: true });
+    }, p.css);
+    expect(visto).toEqual({ traccia: false, riquadri: 1, sotto: true, inCima: true });
 
     // Un clic fuori dal punto: lo strato si chiude, la pagina non riceve niente.
     await page.evaluate(() => { window.visti = []; });
@@ -163,7 +164,7 @@ test.describe('strato acceso', () => {
     await expect.poll(async () => (await statoDelloStrato(app))?.pronta).toBe(true);
     const p = await centro(page, '#bersaglio', 1);
     const apri = async () => {
-      await clicDestro(app, p.x, p.y);
+      await clicDestro(page, p);
       await expect.poll(async () => (await statoDelloStrato(app))?.aperto).toBe(true);
     };
 
@@ -205,7 +206,7 @@ test.describe('strato acceso', () => {
 test('spento di serie: nessuno strato, e il tasto destro non lo apre', async ({ app, openTab, testServer }) => {
   const { page } = await apriSito(openTab, testServer);
   const p = await centro(page, '#bersaglio', 1);
-  await clicDestro(app, p.x, p.y);
+  await clicDestro(page, p);
   await page.waitForTimeout(500);
   const s = await statoDelloStrato(app);
   expect(s.acceso).toBe(false);
