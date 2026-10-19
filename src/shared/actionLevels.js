@@ -62,6 +62,41 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
+  // Il costo 4 parte solo se l'utente l'ha chiesto con parole sue (#1312): una parola che nomina l'azione deve stare in
+  // quello che ha scritto nel compito, con un errore di battitura ammesso. `parole` di un'impostazione passano dal filtro
+  // delle parole comuni, `proprie` no; un numero vale solo uguale. Mai il testo del modello: lo decide `ctx.richiesta`.
+  const PAROLE_COMUNI = new Set(['della', 'delle', 'degli', 'dello', 'nella', 'nelle', 'sulla', 'quanto', 'solo', 'sempre',
+    'tutto', 'tutti', 'tutte', 'filo', 'fare', 'cosa', 'cose', 'anche', 'come', 'questo', 'questa', 'quello', 'quella',
+    'imposta', 'attiva', 'disattiva', 'accendi', 'spegni', 'aggiungi', 'togli', 'alza', 'abbassa', 'nuovo', 'nuova', 'true',
+    'false', 'mettere', 'metti', 'dove', 'quando', 'sito', 'siti', 'pagina', 'pagine', 'altri', 'altre']);
+  const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+  const radice = (w) => (w.length > 5 ? w.slice(0, w.length - 2) : w);
+  function unoDiDistanza(a, b) {
+    if (a === b) return true;
+    if (Math.abs(a.length - b.length) > 1) return false;
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i++;
+    const [x, y] = [a.slice(i + 1), b.slice(i + 1)];
+    return x === y || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
+  }
+  function nominata(testo, { parole = [], proprie = [] } = {}) {
+    const scritte = pianoTesto(testo).split(' ').filter(Boolean);
+    if (!scritte.length) return false;
+    const frase = ` ${scritte.join(' ')} `;
+    const cerca = [...parole.map((p) => [pianoTesto(p), true]), ...proprie.map((p) => [pianoTesto(p), false])];
+    for (const [p, filtra] of cerca) {
+      if (!p) continue;
+      if (p.includes(' ')) { if (frase.includes(` ${p} `)) return true; continue; }
+      if (/^\d+$/.test(p)) { if (scritte.includes(p)) return true; continue; }
+      if (p.length < (filtra ? 4 : 3) || (filtra && PAROLE_COMUNI.has(p))) continue;
+      const r = radice(p);
+      if (scritte.some((w) => w.startsWith(r) || (r.length >= 5 && [r.length - 1, r.length, r.length + 1].some((n) => unoDiDistanza(w.slice(0, n), r))))) return true;
+    }
+    return false;
+  }
+  const richiestaDi = (ctx) => String((ctx && ctx.richiesta) || '');
+
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati. Contano in ogni uscita: l'elenco chiesto, i candidati di un
   // nome non trovato o ambiguo, il nome vero trovato da quello detto (`_nomeTrovato`, lo scrive il main).

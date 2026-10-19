@@ -1374,7 +1374,7 @@
     {
       scrive: ['monthlyLimitEur'],
       aiuto: 'numero in euro (limite di spesa mensile)',
-      keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
+      keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget', 'tetto di spesa', 'tetto spesa'],
       costo: 2,
       allenta: (r, at) => {
         const tetto = (v) => (Number(v) > 0 ? Number(v) : Infinity);
