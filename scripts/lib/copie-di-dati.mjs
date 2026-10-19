@@ -192,7 +192,7 @@ function* valoriFraParentesi(t) {
 
 // ─── Lettore delle tabelle: CSV, TSV, tabelle markdown, console.table di node, colonne allineate (pandas) ──────────
 const NOME_COLONNA = /^\(?[A-Za-z_][\w.\-/]*\)?$/;
-const SEPARATORE_RIGA = /^[\s:\-─━═┼╋╬+]*$/;
+const SEPARATORE_RIGA = /^[\s:\-+─━═┼╋╬├┤┌┐└┘┬┴]*$/;
 const COLONNE_ALLINEATE = /[ \t]{2,}/;
 const nomeCampo = (cella) => {
   const n = cella.trim().replace(/^["'`]|["'`]$/g, '');
@@ -279,7 +279,7 @@ function* blocchiChiaveValore(t) {
     margine = -1;
     pieno = false;
   };
-  for (const riga of t.split(/\r?\n/)) {
+  for (const riga of t.split(/\r\n|\r|\n/)) {
     if (!riga.trim()) { yield* chiudi(); continue; }
     if (riga.includes('=')) {
       const r = Object.create(null);

@@ -11,6 +11,7 @@ import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspect } from 'node:util';
 import { Console } from 'node:console';
+import { Writable } from 'node:stream';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { scene, togliScene, runHookRaw, stdinEdit, git as gitScena } from '../helpers/scenaHook.mjs';
 import {
@@ -297,10 +298,16 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
   const csv = (s) => (/[",\n]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s));
   const unaRiga = (s) => s.replace(/\n/g, ' ');
   const documento = (f) => ({ name: `projects/filo/databases/(default)/documents/feedback/${f.id}`, fields: nelFormatoDelServer(f) });
+  // Come la stampa di un DataFrame: colonne allineate a destra, due spazi fra l'una e l'altra, l'indice senza nome.
+  const tabellaDiPandas = (righe, nomi) => {
+    const tutte = [['', ...nomi], ...righe.map((r, i) => [String(i), ...r])];
+    const larghe = tutte[0].map((_, k) => Math.max(...tutte.map((r) => r[k].length)));
+    return tutte.map((r) => r.map((c, k) => c.padStart(larghe[k])).join('  ')).join('\n');
+  };
   const tabellaDiNode = (righe) => {
     let fuori = '';
-    const c = new Console({ stdout: { write: (s) => { fuori += s; } }, colorMode: false });
-    c.table(righe);
+    const stdout = new Writable({ write(pezzo, _, fatto) { fuori += pezzo; fatto(); } });
+    new Console({ stdout, colorMode: false }).table(righe);
     return fuori;
   };
 
@@ -311,7 +318,7 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
     'la stampa di node di una risposta di Firestore': inspect({ documents: FB.map(documento) }),
     'la stampa di node a colori': inspect(FB, { colors: true }),
     'console.table di node': tabellaDiNode(FB.map(({ id, text, clientId, userAgent }) => ({ id, text, clientId, userAgent }))),
-    'una tabella di pandas': ['       id             text clientId    userAgent', ...FB.map((f, i) => `${i}  ${f.id}  ${unaRiga(f.text)}  ${f.clientId}  ${f.userAgent}`)].join('\n'),
+    'una tabella di pandas': tabellaDiPandas(FB.map((f) => [f.id, unaRiga(f.text), f.clientId, f.userAgent]), ['id', 'text', 'clientId', 'userAgent']),
     'una risposta salvata con le intestazioni HTTP': `HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=UTF-8\r\nVary: Origin\r\n\r\n${JSON.stringify({ documents: FB.map(documento) }, null, 2)}`,
     'una risposta HTTP in chiaro': `HTTP/2 200\ncontent-type: application/json\n\n${JSON.stringify(FB)}`,
     'un CSV con testo, identificativo e user agent': ['id,text,clientId,userAgent', ...FB.map((f) => [f.id, f.text, f.clientId, f.userAgent].map(csv).join(','))].join('\n'),
@@ -377,6 +384,8 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
       'un elenco di Python di numeri': '[1, 2, 3, (4, 5)]',
       'testo italiano con apostrofi e parentesi': "L'utente [vedi nota] ha scritto {qualcosa}: l'ho letto (due volte) e clientId non c'era.\n",
       'un documento qualunque col nome': inspect({ name: 'modulo', fields: ['a', 'b'] }),
+      'console.table senza chi scrive': tabellaDiNode([{ text: 'il tasto', titolo: 'tasto' }, { text: 'grazie', titolo: 'ok' }]),
+      'colonne allineate senza righe': '       id   text   clientId\n',
     };
     for (const [caso, testo] of Object.entries(non)) assert.equal(motivoCopiaTesto(testo), '', `${caso}: non è una copia\n${testo}`);
     // Mille parentesi aperte in fila non fanno saltare il controllo (che senza esito lascerebbe passare tutto).
