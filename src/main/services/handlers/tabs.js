@@ -132,7 +132,9 @@ module.exports = function register(on, ctx) {
         lastInteractionAt: msg.lastInteractionAt,
         scrollPct: msg.scrollPct,
         formDirty: msg.formDirty,
-      });
+        impronte: msg.impronte,
+        invioPagina: msg.invioPagina === true,
+      }, sender.frame);
     }
     return { ok: true };
   });

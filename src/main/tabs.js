@@ -9,6 +9,7 @@ const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
 const Sito = require('../shared/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
+const { testoDellaRichiesta, corpoDa } = require('./services/testoInviato');
 const ProxyTab = require('./services/proxyTab');
 const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
@@ -303,6 +304,9 @@ const LISTA_FERMA_MS = 3000;
 // tutto: i siti a pagina unica riempiono il testo dopo la fine del caricamento.
 const TRIAGE_RIAPERTURA_MS = 4000;
 const TRIAGE_DOPO_CODA_MS = 1500;
+// Oltre, la pagina che arriva non è più la risposta all'invio di un modulo (#824).
+const INVIO_PAGINA_MS = 120_000;
+const PAGINA_DI_ACCESSO = /(?:^|[^a-z])(?:log-?in|sign-?in|accedi|accesso|auth|anmelden|connexion|iniciar-sesion)(?:[^a-z]|$)/i;
 
 // webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
 const permessiApriComunque = new Map();
@@ -1448,6 +1452,8 @@ class TabManager {
     const ses = session.fromPartition(partition);
     // Senza filo:// qui la pagina d'errore non si carica e un proxy muto lascia la scheda vuota.
     if (!ses.protocol.isProtocolHandled('filo')) registerFiloProtocolForSession(ses);
+    // Anche qui il testo scritto risulta partito quando esce verso il sito (#824).
+    Cookies.ensureRequestHook(ses);
     try { Cookies.coverAdblock(ses); } catch (_) {}
     try {
       await ses.setProxy({
@@ -1590,15 +1596,78 @@ class TabManager {
     this._lastAppInteractionAt = Date.now();
   }
 
+  // Mai chiuse dalla pulizia, qualunque cosa decida il modello: l'attiva, quella con audio,
+  // quella di un sito tenuto sempre aperto, quella con testo scritto e non inviato (#824, spec §2.1).
+  _intoccabileDalTriage(tab) {
+    return tab.id === this.activeId || !!tab.audible || this._sempreAperta(tab) || !!tab.formDirty || this._invioNonTenuto(tab);
+  }
+
+  // Un modulo col testo dell'utente mandato cambiando pagina: se il sito risponde con un errore, non
+  // risponde o chiede di accedere, il testo vive solo nella pagina di prima (Indietro lo rimette).
+  _dopoInvio(tab, url, httpResponseCode) {
+    const NE = globalThis.SN_NET_ERROR;
+    const paginaErrore = !!(NE && NE.isErrorPageUrl && NE.isErrorPageUrl(url));
+    if (tab._invioPagina && Date.now() - tab._invioPagina < INVIO_PAGINA_MS) {
+      tab._invioRespinto = { codice: Number(httpResponseCode) || 0, fallito: !!tab._invioFallito, accesso: null, caricata: false };
+    } else if (paginaErrore && tab._invioRespinto && tab._invioFallito) {
+      // La pagina d'errore di Filo arriva con una navigazione sua, dopo quella fallita.
+      tab._invioRespinto.fallito = true;
+    } else {
+      tab._invioRespinto = null;
+    }
+    tab._invioPagina = 0;
+    tab._invioFallito = false;
+  }
+
+  _invioNonTenuto(tab) {
+    const r = tab._invioRespinto;
+    return !!r && (r.fallito || !(r.codice >= 200 && r.codice < 400) || r.accesso === true);
+  }
+
+  // La pulizia decide da cosa c'è nei campi adesso, non da cosa c'era: ogni scheda
+  // lo riconferma frame per frame (un campo svuotato dopo l'invio, un riquadro
+  // sparito, un editor che ha messo il testo dopo l'ultimo segnale).
+  async _ricontrollaModuli() {
+    let chiesto = false;
+    for (const tab of this.tabs) {
+      let frames = [];
+      try { frames = tab.view.webContents.mainFrame.framesInSubtree || []; } catch (_) {}
+      // Senza l'elenco dei frame non si toglie niente: nel dubbio la scheda resta protetta.
+      if (!frames.length) continue;
+      const vivi = new Set(frames.map(chiaveFrame));
+      for (const k of [...(tab._moduli || [])]) if (!vivi.has(k)) tab._moduli.delete(k);
+      for (const k of [...(tab._impronte ? tab._impronte.keys() : [])]) if (!vivi.has(k)) tab._impronte.delete(k);
+      tab.formDirty = !!(tab._moduli && tab._moduli.size);
+      const inv = tab._invioRespinto;
+      if (inv && inv.accesso === null && !this._invioNonTenuto(tab)) {
+        // Il sito che a sessione scaduta rimanda all'accesso risponde come a un invio riuscito.
+        try {
+          const p = await Promise.race([
+            tab.view.webContents.executeJavaScript(
+              '(function(){try{return {pw:Array.prototype.some.call(document.querySelectorAll("input[type=password]"),function(e){return e.getClientRects().length>0;}),dove:location.pathname,titolo:document.title};}catch(e){return {};}})()',
+              false,
+            ),
+            new Promise((r) => setTimeout(() => r(null), 1000)),
+          ]);
+          if (p) inv.accesso = !!p.pw || PAGINA_DI_ACCESSO.test(String(p.dove || '')) || PAGINA_DI_ACCESSO.test(String(p.titolo || ''));
+        } catch (_) {}
+      }
+      // Le impronte del documento di prima: la pagina nuova può mostrare il testo mandato al server.
+      const impronte = tab._improntePrima || [];
+      spingiAllaScheda(tab.view.webContents, { type: globalThis.SN_MSG?.MSG?.FORM_RECHECK || 'form_recheck', impronte }, { inVista: tab.id === this.activeId });
+      chiesto = true;
+    }
+    if (chiesto) await new Promise((r) => setTimeout(r, 400));
+  }
+
   // Candidati archiviabili: schede web + pagine interne EFFIMERE (home/nuova
-  // scheda, impostazioni), non attiva, non in riproduzione audio. Prima erano
-  // esclusi TUTTI i filo:// interni, quindi il riordino poteva chiudere un sito
-  // (es. YouTube) ma mai le impostazioni aperte o le home duplicate. (Incognito
-  // è escluso a monte: niente timer in incognito.)
+  // scheda, impostazioni). Prima erano esclusi TUTTI i filo:// interni, quindi
+  // il riordino poteva chiudere un sito (es. YouTube) ma mai le impostazioni
+  // aperte o le home duplicate. (Incognito è escluso a monte.)
   _triageCandidates() {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
-      if (t.id === this.activeId || t.audible || this._sempreAperta(t)) return false;
+      if (this._intoccabileDalTriage(t)) return false;
       if (T) return T.isTriageableUrl(t.url);
       return !t.isInternal && /^https?:\/\//i.test(t.url || '');
     });
@@ -1667,6 +1736,7 @@ class TabManager {
     if (this._triageRunning) return { archived: 0, giaInCorso: true };
     this._triageRunning = true;
     try {
+      await this._ricontrollaModuli();
       await this._caricaSempreAperte();
       const cands = this._triageCandidates();
       if (!cands.length) return { archived: 0 };
@@ -1716,9 +1786,9 @@ class TabManager {
     }
   }
 
-  // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive' (mai la
-  // attiva o con audio — salvaguardia), poi riordina cromaticamente i superstiti
-  // (§1.3) e mostra il toast (§2.3). `cands` è l'elenco indicizzato passato all'LLM.
+  // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
+  // riordina cromaticamente i superstiti (§1.3) e mostra il toast (§2.3).
+  // `cands` è l'elenco indicizzato passato all'LLM.
   applyTriageDecisions(cands, decisions) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
@@ -1728,8 +1798,8 @@ class TabManager {
     cands.forEach((tab, i) => {
       const d = byIndex.get(i);
       if (!d || d.action !== 'archive') return;
-      // Salvaguardia dura. Durante la decisione la scheda può essere andata su un sito da tenere aperto.
-      if (tab.id === this.activeId || tab.audible || this._sempreAperta(tab)) return;
+      // Ricontrollata qui: mentre il modello rispondeva l'utente può aver scritto.
+      if (this._intoccabileDalTriage(tab)) return;
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
@@ -1951,7 +2021,7 @@ class TabManager {
 
   // §2.1 — segnali di attività del content script (input, scroll, form sporco), arrivano a ogni clic e
   // scorrimento. Servono solo al main (triage, archivio): niente broadcast né salvataggio di sessione (#1089).
-  setTabActivity(id, activity) {
+  setTabActivity(id, activity, frame = null) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
     // Qualsiasi attività in una tab conta come "Filo è in uso": resetta il
@@ -1959,7 +2029,19 @@ class TabManager {
     this._lastAppInteractionAt = Date.now();
     if (typeof activity.lastInteractionAt === 'number') tab.lastInteractionAt = activity.lastInteractionAt;
     if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
-    if (typeof activity.formDirty === 'boolean') tab.formDirty = activity.formDirty;
+    if (typeof activity.formDirty === 'boolean') {
+      // Una voce per frame: il «niente» della pagina non cancella il testo di un riquadro.
+      if (!tab._moduli) tab._moduli = new Set();
+      const k = frame ? chiaveFrame(frame) : '';
+      if (activity.formDirty) tab._moduli.add(k); else tab._moduli.delete(k);
+      tab.formDirty = tab._moduli.size > 0;
+    }
+    if (activity.invioPagina === true) { tab._invioPagina = Date.now(); tab._invioFallito = false; }
+    if (Array.isArray(activity.impronte)) {
+      if (!tab._impronte) tab._impronte = new Map();
+      const imp = activity.impronte.filter((x) => typeof x === 'string' && x.length <= 32).slice(0, 50);
+      tab._impronte.set(frame ? chiaveFrame(frame) : '', imp);
+    }
   }
 
   navigate(id, url) {
@@ -2650,6 +2732,8 @@ class TabManager {
       if (process.env.NODE_ENV !== 'production') {
         console.error(`[tab:${tab.id.slice(0, 6)}] did-fail-load`, code, desc, failedUrl);
       }
+      // Fallito l'invio di un modulo, non un collegamento seguito dopo dalla pagina che gli ha risposto.
+      if (isMainFrame && code !== -3 && (tab._invioPagina || (tab._invioRespinto && !tab._invioRespinto.caricata))) tab._invioFallito = true;
       const NE = globalThis.SN_NET_ERROR;
       if (!NE) return;
       const failed = failedUrl || tab.url || '';
@@ -2661,6 +2745,7 @@ class TabManager {
         if (!wc.isDestroyed()) wc.loadURL(NE.buildUrl(failed, code, desc, { altroPaese: !!tab.proxy }));
       } catch (_) {}
     });
+    wc.on('did-finish-load', () => { if (tab._invioRespinto) tab._invioRespinto.caricata = true; });
     // #327 — renderer morto (crash/oom): stessa scheda bianca, stessa cura.
     // loadURL su un webContents col renderer morto ne rilancia uno nuovo.
     wc.on('render-process-gone', (_e, details) => {
@@ -2862,10 +2947,17 @@ class TabManager {
       // host già in cache lo applichiamo subito, altrimenti azzeriamo e aspettiamo
       // che il content script lo ricalcoli per il nuovo sito.
       const cachedIdentity = this._identityColorCache.get(hostOf(url)) || null;
+      tab._moduli = null;
+      this._dopoInvio(tab, url, httpResponseCode);
+      tab._improntePrima = [...(tab._impronte ? tab._impronte.values() : [])].flat().slice(-50);
+      tab._impronte = null;
       update({
         url: userUrl(url),
         color: null,
         identityColor: cachedIdentity,
+        // Il testo scritto nel documento vecchio è stato inviato o è già perso:
+        // senza, una ricerca fatta una volta proteggerebbe la scheda per sempre (#824).
+        formDirty: false,
         canBack: this.puoTornare(tab, 'indietro', wc),
         canFwd: this.puoTornare(tab, 'avanti', wc),
       });
@@ -2891,6 +2983,15 @@ class TabManager {
           this._geoBlockDetected(tab, url, GeoBlock.SOURCES.REDIRECT, redirectHit.detail);
         }
       }
+    });
+    // Un riquadro che cambia documento si porta via il testo che c'era (#824).
+    wc.on('did-frame-navigate', (_e, _url, _code, _text, isMainFrame, pid, rid) => {
+      if (isMainFrame) return;
+      const k = `${pid}:${rid}`;
+      const imp = tab._impronte && tab._impronte.get(k);
+      if (imp) { tab._improntePrima = [...(tab._improntePrima || []), ...imp].slice(-50); tab._impronte.delete(k); }
+      if (!tab._moduli || !tab._moduli.delete(k)) return;
+      if (!tab._moduli.size && tab.formDirty) update({ formDirty: false });
     });
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this._misuraStoria(tab, wc);
@@ -3924,6 +4025,60 @@ installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
 installRestaConnesso(TabManager);
+
+// Il sito ha ricevuto il testo dell'utente quando una richiesta che lo porta ha risposta senza errore
+// (#824); lo si dice ai frame di quel sito. Un altro sito (le registrazioni delle sessioni) non conta.
+const RICHIESTE_CON_TESTO = new Set(['xhr', 'ping', 'mainFrame', 'subFrame', 'other']);
+function schedaConTestoDi(wcId) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    for (const t of (w._filoTabs && w._filoTabs.tabs) || []) {
+      try { if (t.formDirty && t.view.webContents.id === wcId) return { tab: t, w }; } catch (_) {}
+    }
+  }
+  return null;
+}
+const inViaggio = new Map();
+Cookies.osservaRichieste((d) => {
+  if (!d || !d.webContentsId || !RICHIESTE_CON_TESTO.has(d.resourceType)) return;
+  const trovata = schedaConTestoDi(d.webContentsId);
+  if (!trovata) return;
+  let da = '';
+  try { da = (d.frame && d.frame.url) || ''; } catch (_) {}
+  const sito = Cookies.registrableOf(d.url);
+  if (!sito || Cookies.registrableOf(da || d.referrer || trovata.tab.url) !== sito) return;
+  if (inViaggio.size >= 200) inViaggio.delete(inViaggio.keys().next().value);
+  inViaggio.set(`${d.webContentsId}:${d.id}`, { ...trovata, sito, url: d.url, corpo: corpoDa(d.uploadData) });
+}, (d, riuscita) => {
+  const k = d ? `${d.webContentsId}:${d.id}` : '';
+  const r = inViaggio.get(k);
+  if (!r) return;
+  inViaggio.delete(k);
+  if (riuscita && d.statusCode >= 200 && d.statusCode < 400) accodaRicevuta(r);
+});
+// Una richiesta alla volta, cedendo il passo fra l'una e l'altra: una pagina che ne manda tante
+// non ferma Filo. Oltre la coda si lasciano andare, e nel dubbio la scheda resta protetta.
+const ricevute = [];
+let leggendo = false;
+function accodaRicevuta(r) {
+  if (ricevute.length >= 8) return;
+  ricevute.push(r);
+  if (!leggendo) { leggendo = true; setImmediate(leggiRicevuta); }
+}
+function leggiRicevuta() {
+  const r = ricevute.shift();
+  if (!r) { leggendo = false; return; }
+  try {
+    const testo = testoDellaRichiesta(r);
+    const type = globalThis.SN_MSG?.MSG?.FORM_SENT || 'form_sent';
+    const inVista = !!(r.w._filoTabs && r.w._filoTabs.activeId === r.tab.id);
+    if (testo) spingiAllaScheda(r.tab.view.webContents, { type, testo }, { inVista, soloFrame: (url) => Cookies.registrableOf(url) === r.sito });
+  } catch (_) {}
+  setImmediate(leggiRicevuta);
+}
+
+function chiaveFrame(f) {
+  try { return `${f.processId}:${f.routingId}`; } catch (_) { return ''; }
+}
 
 function origineDi(url) {
   try { return new URL(url).origin; } catch (_) { return ''; }
