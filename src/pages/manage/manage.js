@@ -420,7 +420,7 @@
   // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
   let impostazioniAvviate = false;
   function caricaImpostazioni() {
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals(), loadChiave()])
       .finally(fineLetturaAutomazioni);
   }
 
@@ -8011,6 +8011,8 @@
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
       if (m && m.type === MERGE_APPROVALS_CHANGED) loadMergeApprovals(m);
+      // La chiave cambiata da un'altra scheda: le segnalazioni le rilegge l'avviso, qui si ridice da dove arriva.
+      if (m && m.type === window.SN_AVVISO_CHIAVE.MSG.CAMBIATA) loadChiave();
     });
   }
 
