@@ -4,10 +4,20 @@
 
 const MONDO_CONTENT_SCRIPT = 999;
 
-// Il solo punto da cambiare quando il menu starà in una vista filo://menu/ sopra la scheda (passo 3 di #1052): oggi è
-// disegnato nel documento della scheda stessa (o del riquadro, se si passa un Frame).
+function paginaDi(scheda) {
+  if (typeof scheda.context === 'function') return scheda;
+  if (typeof scheda.page === 'function') return scheda.page();
+  if (typeof scheda.owner === 'function') return scheda.owner().page();
+  return null;
+}
+
+// Con lo strato acceso (#1054) il menu di una pagina web sta nella vista filo://menu/ sopra la scheda, qualunque
+// riquadro l'abbia aperto; spento, e sulle pagine di Filo, nel documento della scheda (o del riquadro, se è un Frame).
 export function superficieDelMenu(scheda) {
-  return scheda;
+  const url = typeof scheda.url === 'function' ? scheda.url() : '';
+  const pagina = url.startsWith('filo://') ? null : paginaDi(scheda);
+  const strato = pagina && pagina.context().pages().find((p) => p.url().startsWith('filo://menu/'));
+  return strato || scheda;
 }
 
 /**

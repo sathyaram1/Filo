@@ -25,8 +25,8 @@ const GESTO_MS = 5000;
 const MENU_MAX_BYTE = 8 * 1024 * 1024;
 const AGGIORNA_MAX_BYTE = 4 * 1024 * 1024;
 const ID_MAX = 80;
-// Un sito occupato non trattiene a lungo l'azione scelta: senza risposta, si va avanti lo stesso.
-const CONCEDI_MS = 300;
+// Il contagocce aspetta che l'utente scelga un punto dello schermo: il clic che lo chiude non arriva allo strato.
+const CONTAGOCCE_MS = 120000;
 
 const msg = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {};
 
@@ -203,13 +203,6 @@ class StratoDelMenu {
     } catch (_) {}
   }
 
-  // L'azione scelta parte nel riquadro come dopo un clic dell'utente lì: copia, schermo intero e finestre lo chiedono.
-  async _concedi(m) {
-    try {
-      await Promise.race([m.frame.executeJavaScript('void 0', true), new Promise((r) => { setTimeout(r, CONCEDI_MS); })]);
-    } catch (_) {}
-  }
-
   _voce(m, chiave) {
     const C = globalThis.SN_CLIPBOARD;
     if (!C || typeof chiave !== 'string' || !chiave) return null;
@@ -222,7 +215,8 @@ class StratoDelMenu {
     const a = this.aperto;
     if (!m || !m.pronto || !a || !d || Number(d.seq) !== a.seq || d.id !== m.id) return;
     const ora = Date.now();
-    if (ora - this.gestoAlle > GESTO_MS) return;
+    const contagocce = canale === 'strato:esegui' && d.contagocce === true && ora - this.clicAlle <= CONTAGOCCE_MS;
+    if (ora - this.gestoAlle > GESTO_MS && !contagocce) return;
     const unClic = ora - this.clicAlle <= GESTO_MS;
     const M = msg();
     if (canale === 'strato:tastiera') {
@@ -241,17 +235,16 @@ class StratoDelMenu {
       const chiude = d.chiude === true;
       const esegui = { type: M.STRATO_MENU_ESEGUI, id: m.id, n: d.n, args, chiude };
       if (!chiude) { this._alContent(m, esegui); return; }
-      if (!unClic) return;
-      await this._concedi(m);
-      if (this.menu === m) this.nascondi({ dopo: () => this._alContent(m, esegui) });
+      // Alla pagina non si regala il gesto (patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md): la voce
+      // parte col fuoco rimesso alla scheda, e quello che chiede un gesto vero lo fa lo strato (il contagocce).
+      if (!unClic && !contagocce) return;
+      this.nascondi({ dopo: () => this._alContent(m, esegui) });
       return;
     }
     if (!unClic) return;
     if (canale === 'strato:incolla') {
       const s = this.scheda(m.wc);
       const letti = s ? await comeFilo(this.win, null, { type: M.APPUNTI_DI_FILO }, { id: s.id, url: s.url, wc: m.wc }) : null;
-      if (this.menu !== m) return;
-      await this._concedi(m);
       if (this.menu !== m) return;
       const incolla = letti && letti.ok
         ? { type: M.STRATO_MENU_INCOLLA, id: m.id, testo: String(letti.testo || ''), immagine: String(letti.immagine || '') }
@@ -263,8 +256,6 @@ class StratoDelMenu {
     const vista = this.vista && this.vista.webContents;
     if (canale === 'strato:scegli' && voce) {
       await comeFilo(this.win, vista, { type: M.PUSH_CLIPBOARD_ENTRY, entry: voce });
-      if (this.menu !== m) return;
-      await this._concedi(m);
       if (this.menu === m) this.nascondi({ dopo: () => this._alContent(m, { type: M.STRATO_MENU_INCOLLA, id: m.id, voce }) });
       return;
     }

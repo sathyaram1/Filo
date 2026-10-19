@@ -1793,14 +1793,15 @@
   // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
   // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
   // colore in formato hex nella clipboard. Esc annulla.
-  async function pickColor() {
-    if (typeof window.EyeDropper !== 'function') {
+  // `scelto`: il colore l'ha già preso lo strato del menu sopra la scheda, che ha il gesto dell'utente (#1054).
+  async function pickColor(scelto) {
+    const giaScelto = typeof scelto === 'string' && /^#[0-9a-f]{6}$/i.test(scelto);
+    if (!giaScelto && typeof window.EyeDropper !== 'function') {
       Popup.showToast(I18n.t('err_color_picker_unsupported'), { duration: 3000 });
       return;
     }
     try {
-      const ep = new window.EyeDropper();
-      const result = await ep.open();
+      const result = giaScelto ? { sRGBHex: scelto } : await new window.EyeDropper().open();
       const hex = (result?.sRGBHex || '').toUpperCase();
       if (!hex) return;
       try {

@@ -41,7 +41,7 @@
 
   // Una voce del content script: la si chiama per numero. Chi apre un pannello passa il bottone, che qui diventa il suo
   // segno; mentre la risposta viaggia la stessa voce non riparte (hover e clic sullo stesso «Altro…»).
-  const chiamata = (n) => (...args) => {
+  const chiamata = (n) => Object.assign((...args) => {
     if (!m) return;
     const conAncora = args.some((a) => a instanceof Element);
     if (conAncora) {
@@ -51,6 +51,20 @@
     }
     const op = { speciale: (v) => (v instanceof Element ? { $ancora: segno(v) } : undefined) };
     chiedi('esegui', { n, args: D.descrivi(args, op) });
+  }, { n });
+
+  // Il contagocce chiede un gesto vero, e la pagina sotto non ce l'ha: lo apre lo strato, e alla voce va il colore.
+  // Lo strato resta a schermo, vuoto, finché l'utente non sceglie un punto o rinuncia.
+  const contagocce = (fn) => () => {
+    if (!m || typeof window.EyeDropper !== 'function') { fn(); return; }
+    chiusoOra = false;
+    const s = seq;
+    new window.EyeDropper().open().then((r) => r && r.sRGBHex, () => null).then((hex) => {
+      if (!m || seq !== s) return;
+      if (!hex) { api.fuori(s); return; }
+      chiusoOra = true;
+      chiedi('esegui', { n: fn.n, args: [String(hex)], contagocce: true });
+    });
   };
 
   // ── quello che arriva dalla scheda non diventa codice qui ───────────────
@@ -123,6 +137,7 @@
       if (k === 'icon') v[k] = pulisciIcona(v[k]);
       else if (v[k] && typeof v[k] === 'object') v[k] = voce(v[k]);
     }
+    if (v.nelloStrato === 'contagocce' && typeof v.onClick === 'function' && Number.isInteger(v.onClick.n)) v.onClick = contagocce(v.onClick);
     return v;
   }
 
