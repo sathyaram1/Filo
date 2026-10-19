@@ -197,10 +197,12 @@ const nomeCampo = (cella) => {
 function leggiRiga(t, i, d) {
   const celle = [];
   let cella = '';
+  let vuota = true;
   while (i < t.length) {
     const c = t[i];
-    if (c === '"' && !cella.trim()) {
+    if (c === '"' && vuota) {
       cella = '';
+      vuota = false;
       i++;
       while (i < t.length) {
         if (t[i] === '"' && t[i + 1] === '"') { cella += '"'; i += 2; }
