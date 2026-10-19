@@ -176,6 +176,35 @@ test('fotocamera, microfono, posizione e notifiche mai decisi si leggono «da ch
   expect(await leggi(p)).toEqual({ pagina: `${attesi},Notification=default`, riquadro: `${attesi},Notification=default`, misto: attesi });
 });
 
+// Un sito che controlla se le funzioni della pagina sono state toccate le vede di fabbrica, anche nel riquadro (#799).
+test('le funzioni sistemate nella pagina e nel riquadro vuoto si presentano come quelle di fabbrica', async () => {
+  test.setTimeout(60_000);
+  const p = await apri();
+  const strane = await p.evaluate((vuoto) => {
+    const w = eval(vuoto);
+    const D = Object.getOwnPropertyDescriptor;
+    const out = [];
+    for (const win of [window, w]) {
+      const fs = {
+        appendChild: win.Node.prototype.appendChild,
+        getUserMedia: win.MediaDevices.prototype.getUserMedia,
+        query: win.Permissions.prototype.query,
+        requestPermission: win.Notification.requestPermission,
+        'get contentWindow': D(win.HTMLIFrameElement.prototype, 'contentWindow').get,
+        'set innerHTML': D(win.Element.prototype, 'innerHTML').set,
+        'get permission': D(win.Notification, 'permission').get,
+        toString: win.Function.prototype.toString,
+      };
+      for (const [nome, f] of Object.entries(fs)) {
+        const testo = Function.prototype.toString.call(f) + ' | ' + win.Function.prototype.toString.call(f);
+        if (testo !== `function ${nome}() { [native code] } | function ${nome}() { [native code] }` || 'prototype' in f) out.push(nome + ': ' + testo);
+      }
+    }
+    return out;
+  }, VUOTO);
+  expect(strane).toEqual([]);
+});
+
 test('dopo Consenti al microfono e Non consentire alla fotocamera, pagina e riquadro vuoto leggono le risposte date', async () => {
   test.setTimeout(60_000);
   const p = await apri();

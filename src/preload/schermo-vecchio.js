@@ -34,26 +34,24 @@ function buildSchermoVecchioCorpo() {
       throw no();
     }, function () { throw no(); });
   }
+  var nativo = typeof comeNativo === 'function' ? comeNativo : function (f) { return f; };
   function metti(o, nome, f) {
-    try { Object.defineProperty(f, 'length', { value: o[nome].length }); } catch (e) {}
-    try { Object.defineProperty(o, nome, { value: f, writable: true, configurable: true, enumerable: true }); } catch (e) {}
+    try { Object.defineProperty(o, nome, { value: nativo(f, o[nome], nome), writable: true, configurable: true, enumerable: true }); } catch (e) {}
   }
   return function (w) {
     var WP = w.MediaDevices && w.MediaDevices.prototype;
     if (WP && typeof WP.getUserMedia === 'function') {
       var gum = WP.getUserMedia;
-      metti(WP, 'getUserMedia', { getUserMedia: function (c) { return vecchia(c) ? rifiuta() : gum.apply(this, arguments); } }.getUserMedia);
+      metti(WP, 'getUserMedia', { getUserMedia(c) { return vecchia(c) ? rifiuta() : gum.apply(this, arguments); } }.getUserMedia);
     }
     var N = w.Navigator && w.Navigator.prototype;
     ['webkitGetUserMedia', 'getUserMedia'].forEach(function (nome) {
       var f = N && N[nome];
       if (typeof f !== 'function') return;
-      var v = {};
-      v[nome] = function (c, ok, err) {
+      metti(N, nome, { [nome](c, ok, err) {
         if (!vecchia(c)) return f.apply(this, arguments);
         rifiuta().catch(function (e) { if (typeof err === 'function') err(e); });
-      };
-      metti(N, nome, v[nome]);
+      } }[nome]);
     });
   };
 })()`;

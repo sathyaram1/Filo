@@ -7,8 +7,16 @@
 function buildRiquadriVuotiSource(corpi) {
   return `(function(){
   'use strict';
-  var corpi = [${corpi.join(',\n')}];
   var D = Object.getOwnPropertyDescriptor, def = Object.defineProperty;
+  // I sostituti somigliano ai nativi a chi li ispeziona (#799): niente prototype né new, stessa lunghezza, testo nativo;
+  // i corpi lo usano per i loro.
+  var finti = new WeakMap();
+  function comeNativo(f, v, nome) {
+    try { def(f, 'length', { value: v.length, configurable: true }); } catch (e) {}
+    finti.set(f, 'function ' + nome + '() { [native code] }');
+    return f;
+  }
+  var corpi = [${corpi.join(',\n')}];
   var lungo = (D(window, 'length') || D(Window.prototype, 'length') || {}).get;
   var urlDi = (D(Document.prototype, 'URL') || {}).get;
   var vistaDi = (D(Document.prototype, 'defaultView') || {}).get;
@@ -105,13 +113,6 @@ function buildRiquadriVuotiSource(corpi) {
     spazza();
   }
   function ascolta(t) { try { t.addEventListener('load', alLoad, true); } catch (e) {} }
-  // I sostituti somigliano ai nativi a chi li ispeziona (#799): niente prototype né new, stessa lunghezza, testo nativo.
-  var finti = new WeakMap();
-  function comeNativo(f, v, nome) {
-    try { def(f, 'length', { value: v.length, configurable: true }); } catch (e) {}
-    finti.set(f, 'function ' + nome + '() { [native code] }');
-    return f;
-  }
   function mascheraIn(w) {
     try {
       var FP = w.Function.prototype, t = FP.toString;

@@ -43,7 +43,8 @@ function buildStatoPermessiCorpo(stato) {
   function gesto(e) { if (e.isTrusted && e.key !== 'Escape') ultimoGesto = Date.now(); }
   var chiedi = typeof N === 'function' ? N.requestPermission : null;
   // La domanda parte sempre dalla pagina: da un riquadro vuoto Chromium non riconosce il sito che lo ha creato.
-  var r = { requestPermission: function (cb) {
+  var nativo = typeof comeNativo === 'function' ? comeNativo : function (f) { return f; };
+  var r = { requestPermission(cb) {
     var g = Date.now() - ultimoGesto < ${gestoMs};
     return chiedi.call(N).then(function (x) {
       if (x === 'denied' && g) deciso = 'denied';
@@ -60,33 +61,34 @@ function buildStatoPermessiCorpo(stato) {
     var WN = w.Notification;
     var wd = typeof WN === 'function' ? Object.getOwnPropertyDescriptor(WN, 'permission') : null;
     if (vero && wd && typeof wd.get === 'function') {
-      var g = { get permission() { return leggi(); } };
-      try { Object.defineProperty(WN, 'permission', { get: Object.getOwnPropertyDescriptor(g, 'permission').get, enumerable: wd.enumerable, configurable: true }); } catch (e) {}
+      var g = Object.getOwnPropertyDescriptor({ get permission() { return leggi(); } }, 'permission').get;
+      try { Object.defineProperty(WN, 'permission', { get: nativo(g, wd.get, 'get permission'), enumerable: wd.enumerable, configurable: true }); } catch (e) {}
       if (typeof chiedi === 'function' && typeof WN.requestPermission === 'function') {
-        try { Object.defineProperty(WN, 'requestPermission', { value: r.requestPermission, writable: true, configurable: true, enumerable: true }); } catch (e) {}
+        try { Object.defineProperty(WN, 'requestPermission', { value: nativo(r.requestPermission, chiedi, 'requestPermission'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
       }
     }
     var P = w.Permissions && w.Permissions.prototype;
     var S = w.PermissionStatus && Object.getOwnPropertyDescriptor(w.PermissionStatus.prototype, 'state');
     if (P && typeof P.query === 'function' && S && typeof S.get === 'function') {
       var q = P.query, stato = S.get;
-      var o = { query: function (richiesta) {
+      var o = { query(richiesta) {
         var p = q.apply(this, arguments);
         var nome;
         try { nome = richiesta && richiesta.name; } catch (e) {}
         if (nome !== 'notifications' && !(typeof nome === 'string' && Object.hasOwn(PARTI, nome))) return p;
         return p.then(function (st) {
           try {
-            Object.defineProperty(st, 'state', { get: function () {
+            var leggiStato = Object.getOwnPropertyDescriptor({ get state() {
               var v = 'denied';
               try { v = stato.call(st); } catch (e) {}
               return letto(nome, v);
-            }, configurable: true });
+            } }, 'state').get;
+            Object.defineProperty(st, 'state', { get: nativo(leggiStato, stato, 'get state'), configurable: true });
           } catch (e) {}
           return st;
         });
       } };
-      try { Object.defineProperty(P, 'query', { value: o.query, writable: true, configurable: true, enumerable: true }); } catch (e) {}
+      try { Object.defineProperty(P, 'query', { value: nativo(o.query, q, 'query'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
     }
   };
 })()`;
