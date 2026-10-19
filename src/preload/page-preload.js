@@ -620,6 +620,35 @@ try {
     if (!a || !/^file:/i.test(String(a.href))) return;
     try { ipcRenderer.send('filo:indirizzo-rifiutato', String(a.href)); } catch (_) {}
   };
+  // #965 — un link «scarica» verso un file da avviso non parte: l'avviso compare sulla pagina, come per un link che apre.
+  // Dopo la pagina, che può gestire il clic da sé; confermato, il main lo riclicca da qui (SN_RISCARICA).
+  let scaricaDaRifare = null;
+  const scaricaScelto = (e) => {
+    if (!e.isTrusted || e.defaultPrevented || e.button !== 0) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href && n.hasAttribute('download'));
+    if (!a || !/^https?:/i.test(String(a.href))) return;
+    let fermo = false;
+    try { fermo = ipcRenderer.sendSync('filo:scaricamento-scelto', String(a.href), String(a.getAttribute('download') || '')) === true; } catch (_) {}
+    if (!fermo) return;
+    e.preventDefault();
+    scaricaDaRifare = a;
+  };
+  // `nome`: un file che la pagina ha costruito da sé (blob:, data:) e scaricato senza un link cliccato, rifatto col suo nome.
+  globalThis.SN_RISCARICA = (url, nome) => {
+    const a = scaricaDaRifare;
+    scaricaDaRifare = null;
+    if (a && a.isConnected && String(a.href) === String(url)) { a.click(); return true; }
+    if (!nome || !/^(blob|data|filesystem):/i.test(String(url))) return false;
+    const b = document.createElement('a');
+    b.href = String(url);
+    b.download = String(nome);
+    b.style.display = 'none';
+    (document.body || document.documentElement).appendChild(b);
+    b.click();
+    b.remove();
+    return true;
+  };
   const ascolta = (win) => {
     // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
     for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
@@ -631,6 +660,7 @@ try {
       win.addEventListener(ev, scelto, { passive: true });
       win.addEventListener(ev, rifiutato, { passive: true });
     }
+    win.addEventListener('click', scaricaScelto);
     win.addEventListener('pointerover', confine, { capture: true, passive: true });
   };
   // I documenti che la pagina si scrive da sé non hanno un preload loro (il riquadro vuoto riempito dallo script), o
@@ -834,6 +864,7 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
+  try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
@@ -947,6 +978,7 @@ function vediCampiDelicati() {
 function startSafebrowse() {
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+  try { require(path.join(CONTENT_DIR, 'safebrowseLinks.js')); } catch (e) { console.error('[Filo CS] safebrowseLinks', e); } // #965
 }
 
 if (!IS_SUBFRAME) {

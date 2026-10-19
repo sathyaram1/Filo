@@ -12,6 +12,7 @@
 //   preverifica(url, ctx)          puntatore fermo su un link accorciato o di rimando
 //                                  (#966): lista nera e destinazione prima del clic.
 //   preverdetto(url)               il risultato di preverifica per quel link, se c'è.
+//   checkLink(url) / checkLinks()  i link di una pagina, coi soli controlli locali (links.js).
 //   recordCert(host, st)           registra l'esito del certificato visto da
 //                                  Electron (certificate-error / did-navigate).
 //   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
@@ -34,6 +35,7 @@ const gsb = require('./gsb');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
 const rimandi = require('./rimandi');
+const links = require('./links');
 
 // ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
@@ -512,6 +514,9 @@ function scopeOf(url) {
 
 const API = {
   checkSync,
+  // #965 — il verdetto locale di un link non ancora aperto ({ url, level, message, scope } o null), e i link a fette.
+  checkLink: (url, nome) => links.esaminaLink(url, checkSync, nome),
+  checkLinks: (urls, opts = {}) => links.esaminaAFette(urls, { ...opts, checkSync }),
   scopeOf,
   ownerOf,
   createOwnerBudget,
@@ -555,6 +560,7 @@ const API = {
   llm,
   sandbox,
   rimandi,
+  links,
 };
 
 globalThis.SN_SAFEBROWSE = API;

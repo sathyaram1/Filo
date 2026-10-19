@@ -19,6 +19,20 @@
   box-sizing: border-box;
 }
 
+/* Il testo dello specchio e dei riquadri dei segni serve solo a misurare: un foglio di stile della pagina che colori
+   div o span non deve renderlo visibile. */
+.sn-spell-overlay *,
+.sn-spell-overlay *::before,
+.sn-spell-overlay *::after,
+.sn-spell-overlay *::marker {
+  color: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
 /* Lo zigzag sta un filo più in basso del rosso nativo del browser: se una parola è marcata sia rossa
    sia blu i due tratti convivono affiancati invece di sovrapporsi. */
 .sn-spell-overlay .sn-semantic-error {
@@ -32,6 +46,24 @@
 /* Dark mode: blu più vivido per restare leggibile */
 .sn-spell-overlay[data-sn-theme="dark"] .sn-semantic-error {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpolyline points='0,3 2,0 4,3 6,0 8,3' fill='none' stroke='%2360a5fa' stroke-width='1.2'/%3E%3C/svg%3E");
+}
+
+/* Il terzo segno (#1115): «controlla qui», non «hai sbagliato». È una sottolineatura, lo zigzag blu uno sfondo: sulla
+   stessa parola convivono. I letterali sono i predefiniti dei token correttore.ocra.*, che la scelta dell'utente scavalca. */
+.sn-spell-overlay .sn-coerenza {
+  text-decoration-line: underline;
+  text-decoration-style: var(--sn-spell-ocra-stile, dotted);
+  text-decoration-color: var(--sn-spell-ocra, #b07a14);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+  text-decoration-skip-ink: none;
+}
+.sn-spell-overlay[data-sn-theme="dark"] .sn-coerenza {
+  text-decoration-color: var(--sn-spell-ocra, #e2ad4d);
+}
+/* Sulla stessa parola i puntini scendono sotto lo zigzag, che altrimenti coprirebbero. */
+.sn-spell-overlay .sn-semantic-error.sn-coerenza {
+  text-underline-offset: 9px;
 }
 
 /* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */

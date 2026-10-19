@@ -26,6 +26,9 @@
   // Il giro dal vivo, lo stesso della Gestione (feedbackLive.js + feedbackLivePagina.js).
   const LIVE = window.SN_FEEDBACK_LIVE;
   const PAG = window.SN_FEEDBACK_LIVE_PAGINA;
+  // Note e frase partono dopo una pausa e a ogni uscita (Ctrl, cambio o chiusura della scheda): la regola delle caselle.
+  const caselleTesti = window.SN_CASELLE.crea();
+  const PAUSA_TESTI_MS = 1500;
   let live = null;
 
   const listEl = document.getElementById('list');
@@ -1550,8 +1553,9 @@
     // Salvataggio note: debounce su input + blur. Salva capo (testo + allegati)
     // ricomposto con la coda (notesValueOf).
     root.querySelectorAll('.fb-notes').forEach((ta) => {
-      let timer;
+      const nome = `note:${ta.dataset.id}`;
       const flush = () => {
+        caselleTesti.spedita(nome);
         const id = ta.dataset.id;
         const item = all.find((f) => f._id === id);
         if (!item) return;
@@ -1559,11 +1563,9 @@
         if (item.notes === v) return;
         patch(id, { notes: v }, { notes: v }, { silenzioso: true });
       };
+      caselleTesti.registra(nome, flush);
       ta.addEventListener('blur', flush);
-      ta.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(flush, 1500);
-      });
+      ta.addEventListener('input', (e) => caselleTesti.cambiato(nome, e, { pausa: PAUSA_TESTI_MS }));
     });
 
     // La frase per chi ha segnalato: stesso salvataggio delle note (debounce +
@@ -1571,8 +1573,9 @@
     // era l'unica strada da cui quella metà si perdeva: chiudendo un feedback
     // col pulsante, a chi l'aveva mandato restava solo la riga generica.
     root.querySelectorAll('.fb-usernote').forEach((input) => {
-      let timer;
+      const nome = `frase:${input.dataset.id}`;
       const flush = () => {
+        caselleTesti.spedita(nome);
         const id = input.dataset.id;
         const item = all.find((f) => f._id === id);
         if (!item) return;
@@ -1584,11 +1587,9 @@
           mostraFrase(listEl.querySelector(`.fb-card[data-id="${cssEsc(id)}"]`), id, true);
         });
       };
+      caselleTesti.registra(nome, flush);
       input.addEventListener('blur', flush);
-      input.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(flush, 1500);
-      });
+      input.addEventListener('input', (e) => caselleTesti.cambiato(nome, e, { pausa: PAUSA_TESTI_MS }));
       input.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape' || e.isComposing) return;
         e.preventDefault();

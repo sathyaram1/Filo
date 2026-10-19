@@ -238,8 +238,6 @@ service cloud.firestore {
     //   - `enabled` (bool; assente = true = comportamento storico): interruttore
     //     MASTER delle routine. Spento, l'orchestratore parte ma il dispatcher
     //     non consegna nulla a nessuno.
-    //   - `proberWhenIdle` (bool; assente = true): a coda vuota le routine
-    //     esplorano l'app in cerca di problemi (#448).
     //   - `cap3`, `cap2`, `cap1`, `cap0` (int 0-10): giri di correzione per
     //     livello di rilievo, e `fixInstructions` (string): il testo della fase
     //     2. Senza default nel codice — assenti, la verifica si ferma (#561).
@@ -254,7 +252,7 @@ service cloud.firestore {
     //   - `accountAOff` / `accountBOff` (bool; assente = false): account
     //     escluso — da lì non parte nessuna sessione nuova.
     //   - `roleModels` ({ ruolo: { model?, effort? } }; ruoli new-work,
-    //     verifier, fixer, secaudit, prober; model opus|sonnet|haiku|fable,
+    //     verifier, fixer, secaudit; model opus|sonnet|haiku|fable,
     //     effort low|medium|high|xhigh|max; assente = definizione
     //     dell'agente): modello e sforzo del worker per fase (#1193).
     //
@@ -892,7 +890,7 @@ service cloud.firestore {
       function funzioniContate() {
         return [
           'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
-          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic',
+          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
           'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
           'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
           'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',

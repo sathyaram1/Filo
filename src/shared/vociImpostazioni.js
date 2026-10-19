@@ -152,6 +152,7 @@
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
         ownKeyAllProviders: 'ownKeyAllProviders',
+        ordineHost: 'ordineHost',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',
@@ -169,7 +170,11 @@
     },
     altro: {
       titolo: 'Altro',
-      campi: { blocklist: 'blocklist' },
+      campi: {
+        blocklist: 'blocklist',
+        spellcheckBlu: 'featureFlags.spellcheck',
+        spellcheckOcra: 'featureFlags.spellcheckContext',
+      },
       gruppi: {},
       fuori: {},
       messaggi: {

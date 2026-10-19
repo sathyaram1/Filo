@@ -70,6 +70,8 @@
   flex-direction: column;
   gap: 10px;
 }
+/* Pieno il diario, le righe con overflow nascosto si schiacciavano a zero e sparivano: scorre lui, loro restano intere. */
+.sn-sidebar-conv > * { flex-shrink: 0; }
 
 .sn-sidebar-msg {
   max-width: 92%;

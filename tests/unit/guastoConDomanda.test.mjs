@@ -33,7 +33,7 @@ const piatto = (s) => s.replace(/\s+/g, ' ');
 // I testi come li consegna dispatch: ruolo, pezzi condivisi e contratto dei worker.
 const CHI_RISOLVE = [['new-work', {}], ['fixer', {}], ['fixer', { caso: 'ripresa' }], ['fixer', { caso: 'riallineamento' }]];
 const GLI_ALTRI = [['verifier', { scope: 'pieno' }], ['verifier', { scope: 'chiusura' }], ['verifier', { scope: 'riallineamento' }],
-  ['secaudit', {}], ['prober', {}]];
+  ['secaudit', {}]];
 
 test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge anche l’attesa col motivo guasto', () => {
   for (const [ruolo, opts] of [...CHI_RISOLVE, ...GLI_ALTRI]) {

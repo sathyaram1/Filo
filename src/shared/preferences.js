@@ -1020,13 +1020,24 @@
     // ── Funzionalità (interruttori) — reversibili, nessun rischio → costo 1 ──
     {
       scrive: ['featureFlags.spellcheck'],
-      aiuto: 'true | false (correttore ortografico AI)',
+      aiuto: 'true | false (correttore AI della lingua: lo zigzag blu)',
       costo: 1,
-      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione'],
+      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione', 'zigzag blu'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { featureFlags: { spellcheck: b } }, label: `Correttore ortografico → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    {
+      scrive: ['featureFlags.spellcheckContext'],
+      aiuto: 'true | false (coerenza col contesto della pagina: i puntini ocra sotto giorni, date e nomi che non tornano)',
+      costo: 1,
+      keys: ['coerenza', 'controllo coerenza', 'controllo di coerenza', 'coerenza col contesto', 'puntini ocra', 'sottolineatura ocra', 'incoerenze', 'contraddizioni'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { featureFlags: { spellcheckContext: b } }, label: `Controllo di coerenza → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
     {
@@ -1270,6 +1281,26 @@
           partial: { ownKeyAllProviders: b },
           label: `Fornitori esclusi con la tua chiave → ${b ? 'usati' : 'esclusi'}`,
         };
+      },
+    },
+    {
+      scrive: ['ordineHost'],
+      aiuto: '"velocità" | "latenza" | "prezzo" | "filo" (come OpenRouter sceglie chi serve ogni modello: "velocità"=più token al secondo, "latenza"=prima parola più rapida, "prezzo"=il più economico, "filo"=torna alla scelta di Filo; vale anche per i modelli predefiniti, e i fornitori esclusi restano esclusi)',
+      keys: ['ordine_host', 'ordine host', 'host dei modelli', 'host', 'ordinamento host', 'host più veloci',
+        'velocità dei modelli', 'modelli più veloci', 'chat più veloce', 'host più economici', 'provider sort'],
+      costo: 2,
+      risk: 'Cambia quali host servono i modelli: più veloci di solito costano di più, più economici rispondono più lentamente.',
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        if (!s) return null;
+        let sort = null;
+        if (/(filo|auto|predefinit|default|standard|ripristin|reset|nessun)/.test(s)) sort = '';
+        else if (/(latenz|latency|pront|prima parola|reattiv)/.test(s)) sort = 'latency';
+        else if (/(prezz|price|econom|costo|cost|risparm|meno car)/.test(s)) sort = 'price';
+        else if (/(veloc|throughput|rapid|svelt|token)/.test(s)) sort = 'throughput';
+        if (sort === null) return null;
+        const nomi = { '': 'scelti da Filo', throughput: 'più veloci', latency: 'risposta più pronta', price: 'più economici' };
+        return { partial: { ordineHost: sort }, label: `Host dei modelli → ${nomi[sort]}` };
       },
     },
     {

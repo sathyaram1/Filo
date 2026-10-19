@@ -15,7 +15,7 @@ async function apri(openTab) {
   await page.evaluate(() => {
     const attesa = (ms) => new Promise((r) => setTimeout(r, ms || 0));
     window.__auto = {
-      enabled: false, routinesEnabled: true, proberWhenIdle: false,
+      enabled: false, routinesEnabled: true,
       autoApprove: { owner: true, filo: true, claude: true, user: true },
     };
     window.__doc = { maxSessions: 4, priorityAccount: '', accountAOff: false, accountBOff: false };
@@ -40,7 +40,6 @@ async function apri(openTab) {
           istantanea = foto();
         }
         if (typeof msg.routinesEnabled === 'boolean') { a.routinesEnabled = msg.routinesEnabled; istantanea = foto(); }
-        if (typeof msg.proberWhenIdle === 'boolean') { a.proberWhenIdle = msg.proberWhenIdle; istantanea = foto(); }
         await attesa(p.dopo);
         window.__arrivate += 1;
         return Object.assign({ ok: true }, istantanea);

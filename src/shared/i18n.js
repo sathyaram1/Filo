@@ -471,6 +471,21 @@
     reasoning_low: 'Basso',
     reasoning_medium: 'Medio',
     reasoning_high: 'Alto',
+    admin_defaults_sort: 'host',
+    admin_defaults_sort_desc:
+      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi.',
+    admin_defaults_sort_general: 'Scelta generale degli host',
+    admin_defaults_sort_general_desc:
+      'Vale per i modelli lasciati su «Automatico». Di serie Filo non chiede nessun ordine e l\'host lo sceglie OpenRouter.',
+    provider_sort_general_auto: 'Lo sceglie OpenRouter',
+    options_host_order: 'Host dei modelli',
+    options_host_order_desc:
+      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti. I fornitori esclusi restano esclusi.',
+    options_host_order_filo: 'Li sceglie Filo',
+    provider_sort_auto: 'Automatico',
+    provider_sort_throughput: 'Più veloce',
+    provider_sort_latency: 'Risposta più pronta',
+    provider_sort_price: 'Più economico',
     // Fornitori esclusi (politica sui modelli, #421 / #518)
     admin_defaults_excluded: 'Fornitori esclusi',
     admin_defaults_excluded_desc:
@@ -516,6 +531,9 @@
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
+    admin_defaults_saved_partial:
+      'Salvato — una riga evidenziata sotto non è stata propagata.',
+    admin_defaults_unsaved: 'Modifiche non ancora propagate.',
     admin_defaults_save_fail: 'Salvataggio fallito: %s',
 
     // Sicurezza (pagina dedicata in filo://security/)
@@ -918,6 +936,17 @@
     spell_action_semantic_label: 'Correttore contestuale (zigzag blu)',
     spell_action_word_label: 'Suggerimento ortografico (zigzag rosso, on demand)',
     spell_feature_label: 'Correttore AI (zigzag blu per errori contestuali)',
+    spell_action_coerenza_label: 'Coerenza col contesto (puntini ocra)',
+    spell_switch_blu: 'Errori di lingua (zigzag blu)',
+    spell_switch_blu_desc: 'Parole giuste nel posto sbagliato, grammatica, ripetizioni.',
+    spell_switch_ocra: 'Coerenza col contesto (puntini ocra)',
+    spell_switch_ocra_desc: 'Giorni, date, nomi e numeri che non tornano con la pagina, frasi che si leggono in due modi.',
+    spell_ocra_ignora: 'Ignora',
+    spell_ocra_prima: 'prima: «%s»',
+    spell_ocra_controlla: 'Controlla qui',
+    spell_ocra_data: '%s è %s.',
+    spell_ocra_relativa: '%s è %s.',
+    spell_ocra_inesistente: '%s non esiste: %s ha %s giorni.',
 
     // Pagina Gestisci correttore
     spell_page_title: 'Filo — Correttore',

@@ -59,9 +59,23 @@ function typoBloccante(sld, token, dist) {
   return dist === 1 || osaDistance(sld.replace(/rn/g, 'm').replace(/vv/g, 'w'), token) <= 1;
 }
 
+// Il confronto coi marchi è la parte cara del verdetto, e dipende solo dal nome: una pagina con migliaia di link ne ha
+// pochi siti (#965). Tetto largo, il più vecchio esce per primo.
+const MEMO_MAX = 20000;
+const memo = new Map();
+function matchBrands(norm) {
+  const k = [norm.hostUnicode || norm.host, norm.registrable, norm.sldUnicode || norm.sld, norm.ospitato ? 1 : 0].join('|');
+  const noto = memo.get(k);
+  if (noto) return noto;
+  const r = cercaMarchi(norm);
+  memo.set(k, r);
+  if (memo.size > MEMO_MAX) memo.delete(memo.keys().next().value);
+  return r;
+}
+
 // Cerca la migliore corrispondenza di impersonazione fra i brand noti.
 // Ritorna { strict, weak, broad } dove ciascuno è null o { brand, reason, ... }.
-function matchBrands(norm) {
+function cercaMarchi(norm) {
   // Confronti SEMPRE sulla forma Unicode decodificata (un dominio camuffato in
   // punycode, es. xn--80ak6aa92e, va confrontato per ciò che mostra: "аррӏе").
   const sld = (norm.sldUnicode || norm.sld || '').toLowerCase();
@@ -119,7 +133,13 @@ function matchBrands(norm) {
 
 // Doppia estensione eseguibile nell'URL (es. fattura.pdf.exe): forte indizio
 // di download ingannevole.
-const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|$)/i;
+const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|&|$)/i;
+
+// Il nome del file travestito, come lo dirà l'avviso: l'ultimo pezzo del percorso o del parametro che lo porta.
+function nomeFile(path, fine) {
+  const nome = path.slice(0, fine).split(/[/?&=#]/).pop() || '';
+  return nome.length > 80 ? '…' + nome.slice(-79) : nome;
+}
 
 // Calcola i segnali deterministici locali. `norm` = output di normalize().
 // `ctx` = indizi opzionali (mai unica base): { hasPassword, hasPayment,
@@ -142,7 +162,8 @@ function localSignals(norm, ctx = {}) {
 
   // Doppia estensione nell'URL.
   const path = ctx.urlPath || '';
-  if (path && DOUBLE_EXT.test(path)) out.push({ kind: 'double_extension' });
+  const doppia = path ? DOUBLE_EXT.exec(path) : null;
+  if (doppia) out.push({ kind: 'double_extension', file: nomeFile(path, doppia.index + doppia[0].length - doppia[3].length) });
 
   // Indizi di pagina (solo rinforzo).
   if (ctx.hasPassword) out.push({ kind: 'sensitive_input', field: 'password' });

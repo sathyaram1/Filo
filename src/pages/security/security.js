@@ -1364,6 +1364,7 @@
       setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
       if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
     },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
   caselle.registra('liste', (avvisi) => save({ avvisi }));
   caselle.registra('fidato', (avvisi) => spedisciFidato(avvisi));
@@ -1434,7 +1435,7 @@
 
   // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora: «faceb» è una riga a metà.
   async function save(opts) {
-    caselle.spedita('liste');
+    const biglietto = caselle.spedita('liste');
     if (!(opts && opts.avvisi === false)) {
       setTrustedError(parseFidati($('sec-dl-trusted').value).invalid);
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
@@ -1446,6 +1447,7 @@
     if (Object.keys(cambi).length) {
       await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: cambi }, mentreScrive: !!(opts && opts.avvisi === false) });
     }
+    if (!caselle.aggiornata('liste', biglietto)) return;
     const hint = $('savedHint');
     hint.classList.add('sn-show');
     clearTimeout(save._t);

@@ -299,7 +299,7 @@
         apiKey: a.apiKey,
         model: a.model,
         ...(a.reasoning !== undefined ? { reasoning: a.reasoning } : {}),
-        providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s),
+        providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s, a),
       };
       // Il testo passa dal router, che per complete e streamComplete ha già il suo smistamento per nome.
       const router = providers();
@@ -376,7 +376,7 @@
           try {
             r = (await P.decisions({
               apiKey: a.apiKey, model: a.model, state: req.state, questions: req.questions,
-              providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s), signal,
+              providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s, a), signal,
             })) || {};
           } finally { inVolo--; }
           risposte++;

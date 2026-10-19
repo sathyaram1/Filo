@@ -676,8 +676,10 @@ module.exports = function register(on, ctx) {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
       const FC = globalThis.SN_FILO_CONTESTO;
+      // Anche la scelta generale degli host: senza, una pagina non sa a cosa rimanda «Automatico».
       return {
         ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
+        providerSort: d.providerSort || '',
         contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
         lunghezzaRisposte: d.lunghezzaRisposte || {},
         lunghezzaRisposteDiSerie: globalThis.SN_LUNGHEZZA_RISPOSTE ? { ...globalThis.SN_LUNGHEZZA_RISPOSTE.DI_SERIE } : {},
@@ -708,10 +710,9 @@ module.exports = function register(on, ctx) {
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
       const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
       const lavoriServer = await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -733,9 +734,6 @@ module.exports = function register(on, ctx) {
       const autoApprove = (msg.autoApprove && typeof msg.autoApprove === 'object')
         ? await Defaults.setAutomationAutoApprove(msg.autoApprove, idToken)
         : await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = (typeof msg.proberWhenIdle === 'boolean')
-        ? await Defaults.setAutomationProberIdle(msg.proberWhenIdle, idToken)
-        : await Defaults.getAutomationProberIdle(idToken);
       // Interruttore master delle routine (config/routines): è ciò che ferma il
       // lavoro autonomo, mentre `enabled` qui sopra riguarda solo chi entra in
       // coda da solo. Due decisioni diverse, due interruttori.
@@ -746,7 +744,7 @@ module.exports = function register(on, ctx) {
       const lavoriServer = (typeof msg.lavoriServer === 'boolean')
         ? await Defaults.setLavoriServer(msg.lavoriServer, idToken)
         : await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }

@@ -797,13 +797,21 @@
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
     // parola sotto il cursore (zigzag rosso del browser).
     try {
-      if (settings?.featureFlags?.spellcheck !== false && SpellCheck) {
+      const bluAttivo = settings?.featureFlags?.spellcheck !== false;
+      // Il segno ocra (#1115) ha il suo interruttore: col blu spento il suo menu resta.
+      const ocra = SpellCheck && SpellCheck.ocraAttiva?.() ? SpellCheck.findSupportedEditable(realTarget(e)) : null;
+      const ocraIssue = ocra ? SpellCheck.getContextIssueAt(ocra, e.clientX, e.clientY) : null;
+      if (ocraIssue && !bluAttivo) {
+        await openSpellBlueMenu(ocra, null, e, sito, ocraIssue);
+        return;
+      }
+      if (bluAttivo && SpellCheck) {
         const rt = realTarget(e);
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
           const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
-          if (blueIssue) {
-            await openSpellBlueMenu(editableEl, blueIssue, e, sito);
+          if (blueIssue || ocraIssue) {
+            await openSpellBlueMenu(editableEl, blueIssue, e, sito, ocraIssue);
             return;
           }
           const wordCtx = SpellCheck.getWordAt(editableEl, e.clientX, e.clientY);
@@ -1750,36 +1758,73 @@
   // Click destro su un range "blu" (issue contestuale già rilevata): la correzione
   // (o l'esplicazione del problema) è già pronta, niente loading. Click sulla riga
   // = applica; freccetta = box con la spiegazione completa.
-  async function openSpellBlueMenu(editableEl, issue, mouseEvent, sito = null) {
+  async function openSpellBlueMenu(editableEl, issue, mouseEvent, sito = null, ocra = null) {
     const items = await buildBaseItemsAt(mouseEvent);
 
-    // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
-    // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
-    let label;
-    if (issue.correction) {
-      label = issue.correction;
-    } else if (issue.type === 'repetition') {
-      label = I18n.t('spell_resolve');
-    } else {
-      label = (issue.explanation || I18n.t('spell_semantic_issue')).slice(0, 60);
-    }
+    if (issue) {
+      // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
+      // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
+      let label;
+      if (issue.correction) {
+        label = issue.correction;
+      } else if (issue.type === 'repetition') {
+        label = I18n.t('spell_resolve');
+      } else {
+        label = (issue.explanation || I18n.t('spell_semantic_issue')).slice(0, 60);
+      }
 
-    items.unshift(
-      {
-        type: 'correction',
-        label,
-        loading: false,
-        onClick: () => {
-          SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, issue.correction || '', {
-            expectedSegment: issue.segment,
-          });
+      items.unshift(
+        {
+          type: 'correction',
+          label,
+          loading: false,
+          onClick: () => {
+            SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, issue.correction || '', {
+              expectedSegment: issue.segment,
+            });
+          },
+          subItems: buildBlueSubItems(issue),
         },
-        subItems: buildBlueSubItems(issue),
-      },
-      { type: 'separator' },
-    );
+        { type: 'separator' },
+      );
+    }
+    if (ocra) items.unshift(...buildOcraItems(editableEl, ocra));
     conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+  }
+
+  // Il segno ocra (#1115): perché c'è (con la citazione che lo motiva), la correzione se c'è, «Ignora». Mai applicato
+  // da solo: lo applica solo il clic sulla sua riga.
+  function buildOcraItems(editableEl, issue) {
+    const righe = [{
+      type: 'inline',
+      onMount(el) {
+        el.classList.add('sn-menu-coerenza');
+        const perche = document.createElement('div');
+        perche.textContent = issue.spiegazione || I18n.t('spell_ocra_controlla');
+        el.appendChild(perche);
+        if (issue.citazione) {
+          const prova = document.createElement('div');
+          prova.className = 'sn-menu-coerenza-citazione';
+          prova.textContent = I18n.t('spell_ocra_prima', issue.citazione);
+          el.appendChild(prova);
+        }
+      },
+    }];
+    for (const c of issue.correzioni || []) {
+      righe.push({
+        type: 'correction',
+        label: c,
+        loading: false,
+        onClick: () => SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, c, { expectedSegment: issue.segment }),
+        senzaFreccia: true,
+      });
+    }
+    righe.push(
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignoraCoerenza(editableEl, issue) },
+      { type: 'separator' },
+    );
+    return righe;
   }
 
   function buildFeedbackItem() {
@@ -2371,7 +2416,7 @@
       if (!IS_SUBFRAME) { try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {} }
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
-      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
+      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false } } : settings);
       // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
       if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
       return;

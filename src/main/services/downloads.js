@@ -862,7 +862,14 @@ function attachSession(ses, { scope = '' } = {}) {
   if (!ses || attached.has(ses)) return;
   attached.add(ses);
   try {
-    ses.on('will-download', (_e, item, webContents) => { onWillDownload(item, webContents, scope); });
+    ses.on('will-download', (e, item, webContents) => {
+      // #965 — un file da avviso chiesto da una pagina (link con «download», nome dato dal sito) si ferma all'avviso
+      // della sua scheda prima di scendere, come il clic sul link: confermato, riparte da capo.
+      let fermo = false;
+      try { fermo = typeof globalThis.SN_SB_SCARICAMENTO === 'function' && globalThis.SN_SB_SCARICAMENTO(item, webContents) === true; } catch (_) {}
+      if (fermo) { e.preventDefault(); return; }
+      onWillDownload(item, webContents, scope);
+    });
   } catch (_) {}
 }
 

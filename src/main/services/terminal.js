@@ -199,9 +199,10 @@ function nuovoMarcatore() {
     + Date.now().toString(36).slice(-5);
 }
 
-// L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
-// i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
-const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
+// L'esito di un comando PowerShell (#718, scelta dell'owner): un programma esterno uscito con errore in un punto
+// qualunque lo fa fallito col suo codice ($__filo_x), anche se dopo c'è un comando riuscito. Altrimenti decide il
+// $? dell'ultimo ($__filo_ok): $LASTEXITCODE lo scrivono solo i programmi, un cmdlet fallito lo lascia a 0 (#714).
+const ESITO_POWERSHELL = 'if ($__filo_x) { $__filo_x } elseif ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
   // $__filo_ok ancora $null = il comando è uscito prima della riga che lo scrive. A dire come basta il $? della riga
   // che lo ha eseguito ($__filo_riga): falso dopo un errore che ferma, vero dopo un return o un break, anche se prima
   // un errore era stato zittito o gestito (in $Error ci finiscono pure quelli, quindi da lì non si può dedurre).
@@ -233,17 +234,44 @@ function testoPowerShell(testo) {
   return `(-join @(${pezzi.join(',')}))`;
 }
 
+// Dopo ogni istruzione di primo livello: il primo codice d'errore di un programma resta in $__filo_x, perché quello
+// riuscito dopo lo azzera. Poi $? torna com'era (Write-Error ignorato lo spegne senza lasciare traccia).
+const SONDA_ISTRUZIONE_POWERSHELL = '$__filo_p=$?;if($global:LASTEXITCODE -and -not $__filo_x)'
+  + '{$__filo_x=$global:LASTEXITCODE};if(-not $__filo_p){Write-Error -Message x -ErrorAction Ignore}';
+
+// Le sonde entrano nell'albero del comando, non nel testo: così un errore mostra la riga e il testo che l'utente ha
+// scritto. Il costruttore a quattro argomenti è l'unico senza ambiguità con $null, anche nella 5.1. Con param, begin,
+// process o using la sonda va in fondo al testo e basta.
+const AST_POWERSHELL = 'Management.Automation.Language';
+function bloccoConSonde(conCoda, coda) {
+  const istruzioni = (testo) => `[${AST_POWERSHELL}.Parser]::ParseInput('${testo}', [ref]$null, [ref]$null).EndBlock.Statements`;
+  const copia = (da, verso) => `foreach ($__filo_z in @(${da})) { if ($__filo_z) { ${verso}.Add($__filo_z.Copy()) } }; `;
+  return '$__filo_b=$null; if ($__filo_a -and $__filo_a.EndBlock -and -not ($__filo_a.ParamBlock -or $__filo_a.BeginBlock '
+    + '-or $__filo_a.ProcessBlock -or $__filo_a.DynamicParamBlock -or @($__filo_a.UsingStatements).Count)) { try { '
+    + `$__filo_q=@(${istruzioni(SONDA_ISTRUZIONE_POWERSHELL)}); `
+    + `$__filo_l=[Collections.Generic.List[${AST_POWERSHELL}.StatementAst]]::new(); `
+    + 'foreach ($__filo_s in $__filo_a.EndBlock.Statements) { $__filo_l.Add($__filo_s.Copy()); '
+    + 'foreach ($__filo_z in $__filo_q) { $__filo_l.Add($__filo_z.Copy()) } }; '
+    + (coda ? copia(istruzioni(coda), '$__filo_l') : '')
+    + `$__filo_r=[Collections.Generic.List[${AST_POWERSHELL}.TrapStatementAst]]::new(); `
+    + copia('$__filo_a.EndBlock.Traps', '$__filo_r')
+    + `$__filo_b=[${AST_POWERSHELL}.ScriptBlockAst]::new($__filo_a.Extent, $null, `
+    + `[${AST_POWERSHELL}.StatementBlockAst]::new($__filo_a.EndBlock.Extent, $__filo_l, $__filo_r), $false).GetScriptBlock() `
+    + '} catch { $__filo_b=$null } }; '
+    + `if (-not $__filo_b) { $__filo_b=[ScriptBlock]::Create($__filo_t + [char]10 + '${SONDA_ISTRUZIONE_POWERSHELL}'${conCoda}) }; `;
+}
+
 // Si esegue con `. scriptblock`, nello scope di chi chiama: con Invoke-Expression gli errori che fermano (e quelli
 // di sintassi) mostravano questa riga invece del comando. La sintassi si controlla prima, sul solo testo; `coda`
 // gira dopo ma resta fuori. In modalità ristretta (PC aziendali bloccati) quei metodi sono vietati: resta
-// Invoke-Expression, l'unica strada che lì il comando lo esegue.
+// Invoke-Expression, l'unica strada che lì il comando lo esegue, senza le sonde (#718): lì decide l'ultimo comando.
 function invocaCodificato(testo, coda = '') {
   const conCoda = coda ? ` + [char]10 + '${coda}'` : '';
   return `$__filo_t=${testoPowerShell(testo)}; $__filo_pe=$null; `
     + `if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Invoke-Expression ($__filo_t${conCoda}) } else { `
-    + 'try { $null=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch {}; '
+    + 'try { $__filo_a=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch { $__filo_a=$null }; '
     + 'if ($__filo_pe) { [Console]::Error.WriteLine((New-Object Management.Automation.ParseException (,$__filo_pe)).Message); $__filo_ok=$false } '
-    + `else { . ([ScriptBlock]::Create($__filo_t${conCoda})) } }`;
+    + `else { ${bloccoConSonde(conCoda, coda)}. $__filo_b } }`;
 }
 
 const SEGNA_ESITO = '$__filo_ok=$?';
@@ -252,7 +280,7 @@ const SEGNA_ESITO = '$__filo_ok=$?';
 // usano dashboard e assistente. Niente try attorno al comando: dentro un try un comando sconosciuto ferma tutto il
 // resto (#722). La riga del segno è una pipeline a parte: gira anche dopo un throw, non dopo un `exit`.
 function righePowerShell(command, segno, codifica = invocaCodificato) {
-  return `$global:LASTEXITCODE=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+  return `$global:LASTEXITCODE=0\n$__filo_x=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
     + `${codifica(command, SEGNA_ESITO)}\n$__filo_riga=$?\n`
     + `"${segno}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`;
 }
@@ -516,5 +544,5 @@ module.exports = {
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).
-  CWD_MARK_PREFIX, nuovoMarcatore,
+  CWD_MARK_PREFIX, nuovoMarcatore, extractCwdMark,
 };

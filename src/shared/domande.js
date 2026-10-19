@@ -34,7 +34,6 @@
   // Le chiavi che un'azione `automazione` può scrivere: solo booleani già in Automazioni. `spegne`: il vero spegne.
   const CHIAVI_AUTOMAZIONE = Object.freeze({
     'routine.enabled': Object.freeze({ nome: 'Routine', spegne: false }),
-    'routine.proberWhenIdle': Object.freeze({ nome: 'Esplorazione a coda vuota', spegne: false }),
     'routine.accountAOff': Object.freeze({ nome: 'Routine dell’account A', spegne: true }),
     'routine.accountBOff': Object.freeze({ nome: 'Routine dell’account B', spegne: true }),
   });

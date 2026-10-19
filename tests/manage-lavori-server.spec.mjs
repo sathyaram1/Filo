@@ -25,7 +25,7 @@ function fb(over = {}) {
 
 async function stubAutomazioni(page, { lavoriServer, rompi = false } = {}) {
   await page.evaluate((cfg) => {
-    window.__auto = { enabled: false, autoApprove: {}, proberWhenIdle: true, routinesEnabled: true };
+    window.__auto = { enabled: false, autoApprove: {}, routinesEnabled: true };
     if (cfg.lavoriServer !== undefined) window.__auto.lavoriServer = cfg.lavoriServer;
     window.__autoSets = [];
     const orig = window.filo.message.bind(window.filo);

@@ -81,7 +81,26 @@
   // ----------------------------------------------------------------------
   // Autocorrect
   // ----------------------------------------------------------------------
+  // Le correzioni che la pagina sta mostrando, cioè quelle su cui si scrive.
+  let mappaMostrata = {};
+
+  // Un campo si conferma quando il cursore ne esce: registrato qui, si conferma
+  // anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_CASELLE.alVolo();
+
+  // Una correzione si aggiunge anche dal tasto destro su una parola: se l'elenco
+  // cambia da fuori ci si riallinea, ma non mentre il cursore è in una riga,
+  // dove ridisegnare butterebbe via quello che si sta scrivendo.
+  chrome.storage.onChanged.addListener((changes) => {
+    const c = changes && changes[STORAGE_KEYS.AUTOCORRECT];
+    if (!c) return;
+    const a = document.activeElement;
+    if (a && a.closest && a.closest('.sn-spell-row')) return;
+    renderAutocorrect(c.newValue || {});
+  });
+
   function renderAutocorrect(map) {
+    mappaMostrata = { ...(map || {}) };
     const list = $('autocorrectList');
     list.innerHTML = '';
     const keys = Object.keys(map || {}).sort((a, b) => a.localeCompare(b));
@@ -161,15 +180,18 @@
         wIn.dataset.original = newKey;
       }
     };
-    wIn.addEventListener('change', commit);
-    cIn.addEventListener('change', commit);
+    for (const el of [wIn, cIn]) {
+      el.addEventListener('input', () => campoAlVolo.scrivendo(commit));
+      el.addEventListener('change', () => { campoAlVolo.confermato(); commit(); });
+    }
 
     return row;
   }
 
+  // Si parte da quello che la pagina ha in mano, non da una rilettura: chiudendo
+  // la scheda c'è tempo per UN messaggio solo, e un giro in più lo mangia.
   async function updateAutocorrect(oldKey, newKey, newVal, opts = {}) {
-    const data = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
-    const map = { ...(data[STORAGE_KEYS.AUTOCORRECT] || {}) };
+    const map = { ...mappaMostrata };
     // Controllo conflitto: se stiamo rinominando (oldKey diverso da newKey) e
     // newKey esiste già in un'altra riga, blocca la modifica e avvisa l'utente.
     if (newKey && oldKey !== newKey && Object.prototype.hasOwnProperty.call(map, newKey)) {
@@ -185,8 +207,7 @@
 
   async function removeAutocorrect(word) {
     const key = String(word || '').toLowerCase();
-    const data = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
-    const map = { ...(data[STORAGE_KEYS.AUTOCORRECT] || {}) };
+    const map = { ...mappaMostrata };
     delete map[key];
     await chrome.storage.local.set({ [STORAGE_KEYS.AUTOCORRECT]: map });
     renderAutocorrect(map);

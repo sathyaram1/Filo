@@ -179,6 +179,7 @@ const FUORI_DALLA_CHAT = {
   'autonomia.': 'elenco fisso «regole» (#530): livello di autonomia, manopole e fiducia nelle fonti li sceglie solo l\'utente in Preferenze',
   'models.': 'il modello di ogni funzione si sceglie nella pagina Modelli: cambiarlo dalla chat aspetta una decisione dell\'owner',
   modelRegistry: 'il registro dei modelli si cura nella pagina Modelli: cambiarlo dalla chat aspetta una decisione dell\'owner',
+  defaultModelTests: 'sono le misure del pulsante «Prova» (latenza, velocità), non una scelta: le scrive la prova',
   modelliScelti: 'il modello scelto per una funzione sola (#818) si cambia nella pagina Modelli: dalla chat aspetta una decisione dell\'owner',
   'pricing.': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
   usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
