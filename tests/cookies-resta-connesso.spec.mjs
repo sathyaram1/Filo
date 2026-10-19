@@ -530,8 +530,8 @@ test('«resta connesso su» un sottodominio vale per il sito intero, da chat, da
 
     // Chat: come web.whatsapp.com per whatsapp.com.
     const aggiungi = { type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: `aggiungi app.${nome}` };
-    await execAction(app, aggiungi);
-    expect((await home.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), aggiungi)).executed).toBe(true);
+    await execAction(app, aggiungi, { richiesta: `resta connesso su app.${nome}` });
+    expect((await home.evaluate(([a, n]) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a, parole: [`resta connesso su app.${n}`] }), [aggiungi, nome])).executed).toBe(true);
     await expect.poll(() => fidati(app)).toEqual([nome]);
     await expect.poll(() => partizioneDi(app, `${base}/`)).toBe(`persist:filo-priv-${nome}`);
     await chiudiScheda(app, shell, base);

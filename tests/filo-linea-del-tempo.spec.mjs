@@ -240,10 +240,10 @@ test('togliere una chat dal filo (tasto destro su una sua bolla) la toglie dal f
   await expect.poll(() => leggiFilo(userData).includes('Barocco ZXQ'), { timeout: 10_000 }).toBe(false);
   expect(leggiFilo(userData)).toContain('Parliamo di Epicuro');
 
-  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ultima_ora' }));
+  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ultima_ora' }, { richiesta: 'cancella le pagine dell\'ultima ora' }));
   expect(chiesta.needsConfirm).toBe(3); // cancellare per sempre: la parola (#1312)
   expect(chiesta.describe).toContain('la pagina visitata dell’ultima ora');
-  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ultima_ora' }, { confirmed: true }));
+  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ultima_ora' }, { confirmed: true, richiesta: 'cancella le pagine dell\'ultima ora' }));
   expect(fatta.output.cancellate).toBe(1);
   const testo = leggiFilo(userData);
   expect(testo).not.toContain('Pagina di adesso');
@@ -436,12 +436,12 @@ test('«cancella le pagine di YouTube» chiede la parola col conto di quel sito 
       await globalThis.SN_IL_FILO.registraVisita({ url, titolo });
     }
   });
-  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }));
+  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }, { richiesta: 'cancella le pagine di YouTube' }));
   expect(chiesta.needsConfirm).toBe(3); // cancellare per sempre: la parola (#1312)
   // Il sito sta nel suo riquadro (#592.7): la frase lo annuncia, il riquadro lo porta da solo.
   expect(chiesta.describe).toContain('le 2 pagine visitate di sempre di questo sito:');
   expect(chiesta.parti).toContainEqual({ citazione: 'youtube.com', nuda: true });
-  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }, { confirmed: true }));
+  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }, { confirmed: true, richiesta: 'cancella le pagine di YouTube' }));
   expect(fatta.output.cancellate).toBe(2);
   const testo = leggiFilo(userData);
   expect(testo).not.toContain('Video uno');
@@ -478,17 +478,17 @@ test('«cancella le pagine di ieri sera» e «di ieri» chiedono la parola per q
   // Un intervallo qualsiasi passa da `da`/`a`, con l'ora locale, e il popup dice le ore.
   const da = await app.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T20:00:00`; });
   const sera = { type: 'CANCELLA_PAGINE', da, a: da.replace('T20:00:00', 'T23:59:59') };
-  const chiestaSera = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), sera);
+  const chiestaSera = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { richiesta: 'cancella le pagine di ieri sera' }), sera);
   expect(chiestaSera.needsConfirm).toBe(3);
   expect(chiestaSera.describe).toMatch(/la pagina visitata dal .*20:00 al .*23:59/);
-  await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { confirmed: true }), sera);
+  await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { confirmed: true, richiesta: 'cancella le pagine di ieri sera' }), sera);
   expect(leggiFilo(userData)).not.toContain('Ieri sera');
   expect(leggiFilo(userData)).toContain('Ieri mattina');
 
-  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }));
+  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }, { richiesta: 'cancella le pagine di ieri' }));
   expect(chiesta.needsConfirm).toBe(3); // cancellare per sempre: la parola (#1312)
   expect(chiesta.describe).toContain('la pagina visitata di ieri');
-  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }, { confirmed: true }));
+  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }, { confirmed: true, richiesta: 'cancella le pagine di ieri' }));
   expect(fatta.output.cancellate).toBe(1);
   expect(leggiFilo(userData)).not.toContain('Ieri mattina');
   expect(leggiFilo(userData)).toContain('Pagina di oggi');

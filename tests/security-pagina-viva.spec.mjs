@@ -13,6 +13,8 @@ const confermata = (page, chiave, valore) => page.evaluate(
   ({ c, v }) => chrome.runtime.sendMessage({
     type: window.SN_MSG.MSG.FILO_CONFIRM_ACTION,
     action: { type: 'IMPOSTA_PREFERENZA', chiave: c, valore: v },
+    // Le parole dell'utente: spegnere una protezione è costo 4, e parte solo se l'ha chiesto lui (#1312).
+    parole: [`${c.replace(/_/g, ' ')}: ${v}`],
   }),
   { c: chiave, v: valore },
 );

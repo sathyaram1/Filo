@@ -255,7 +255,7 @@ test('dalla chat: «cerca anche in quella cartella» si aggiunge, una cartella c
   const altrove = cartellaTemporanea('filo-chat-cartella-');
   try {
     const imposta = (valore) => app.evaluate(async (_e, v) => globalThis.SN_HANDLE_MESSAGE(
-      { type: globalThis.SN_MSG.MSG.FILO_CONFIRM_ACTION, action: { type: 'IMPOSTA_PREFERENZA', chiave: 'cartelle_documenti', valore: v } },
+      { type: globalThis.SN_MSG.MSG.FILO_CONFIRM_ACTION, action: { type: 'IMPOSTA_PREFERENZA', chiave: 'cartelle_documenti', valore: v }, parole: [`cerca anche in quella cartella: ${v}`] },
       { tab: { id: 1, url: 'filo://newtab/' }, url: 'filo://newtab/' },
     ), valore);
     const ok = await imposta(`aggiungi ${altrove}`);

@@ -80,15 +80,15 @@ test('costo 2: chiede anche a compito pulito finché manca il guardiano; dopo un
 test('togliere un freno vuole «conferma» anche a compito pulito: provider, cookie meno stretti', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   const action = setPref('provider', 'openrouter');
-  const r = await execAction(app, action);
+  const r = await execAction(app, action, { richiesta: 'usa openrouter come provider' });
   expect(r.needsConfirm).toBe(3);
   expect(r.avviso).toBe('Abbassa una difesa di Filo.');
   const c = await page.evaluate(async (a) =>
-    chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), action);
+    chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a, parole: ['usa openrouter come provider'] }), action);
   expect(c.executed).toBe(true);
   expect((await getSettings(page)).provider).toBe('openrouter');
 
-  const cookie = await execAction(app, setPref('gestione_cookie', 'manuale'));
+  const cookie = await execAction(app, setPref('gestione_cookie', 'manuale'), { richiesta: 'i cookie li gestisco io, manuale' });
   expect(cookie.executed).toBe(false);
   expect(cookie.needsConfirm).toBe(3);
   expect((await getSettings(page)).security?.cookies?.mode).toBe('default');
@@ -108,7 +108,7 @@ test('le impostazioni che abbassano una difesa NON sono auto-applicate da un gir
   // Simula ciò che fa handleFiloChat: esegue l'azione senza `confirmed`. Alzare il
   // limite di spesa deve tornare `kept` con la «conferma» da digitare, MAI eseguita.
   const page = await openTab(NEWTAB);
-  const r = await execAction(app, setPref('limite_spesa', '99'));
+  const r = await execAction(app, setPref('limite_spesa', '99'), { richiesta: 'alza il limite di spesa a 99' });
   expect(r.executed).toBe(false);
   expect(r.kept).toBe(true);
   expect(r.needsConfirm).toBe(3);
@@ -122,13 +122,13 @@ test('CANCELLA_MEMORIA: cancellare per sempre vuole «conferma», e confermata s
   await app.evaluate(() =>
     globalThis.SN_FILO_MEMORY.patchMemory({ PROFILO: 'utente di prova', PREFERENZE: 'preferisce il dark' }));
 
-  const r = await execAction(app, action);
+  const r = await execAction(app, action, { richiesta: 'cancella la tua memoria' });
   expect(r.executed).toBe(false);
   expect(r.needsConfirm).toBe(3);
   expect(r.no).toBeFalsy();
   expect((await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory())).PROFILO).toBe('utente di prova');
 
-  const c = await page.evaluate(async (a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), action);
+  const c = await page.evaluate(async (a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a, parole: ['cancella la tua memoria'] }), action);
   expect(c.executed).toBe(true);
   const mem = await app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
   expect(mem.PROFILO).toBe('');
