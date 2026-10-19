@@ -726,7 +726,7 @@
     CANCELLA_PAGINE: {
       costo: 4,
       campo: null,
-      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['cronologia', 'pagine', 'visitate', 'visitato', 'storico', 'history'] }),
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { verbi: VERBI_CANCELLA, oggetti: ['cronologia', 'storico', 'history', 'pagine visitate', 'pagina visitata', 'siti visitati', 'ho visitato', 'ho visto'] }),
       describe: (a) => {
         const n = Number(a && a._n);
         const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
