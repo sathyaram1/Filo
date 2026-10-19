@@ -33,7 +33,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   getSettings: () => getEffectiveSettings(),
   buildChain: (s, ref, action) => buildAttemptChain(s, ref, action),
   modelFor: (s, action) => modelForAction(s, action),
-  routing: (s) => providerRouting(s),
+  routing: (s, a) => providerRouting(s, a && a.sort),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
   segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
@@ -357,7 +357,9 @@ function withDefaults(settings) {
   // sourced dai default condivisi (costante ⊕ override Firestore config/models),
   // MAI dallo storage utente — così l'owner la aggiorna senza rilasciare codice.
   const baseExcluded = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
-  const providerSort = typeof d.providerSort === 'string' ? d.providerSort : '';
+  // L'ordinamento degli host invece lo può scegliere chi usa Filo: la sua scelta vale sopra quella condivisa.
+  const sortPersonale = SN_CONST.normalizeProviderSort(settings.ordineHost);
+  const providerSort = sortPersonale || (typeof d.providerSort === 'string' ? d.providerSort : '');
 
   // "Solo modelli a pesi aperti" (#461) è invece una scelta di CHI USA Filo, e
   // sta sopra alla config condivisa: vale anche quando si usano i crediti di
@@ -388,7 +390,7 @@ function withDefaults(settings) {
     ...settings,
     provider: d.provider,
     models: SN_CONST.effectiveModels(d.models, settings.modelliScelti, d.modelRegistry),
-    modelRegistry: d.modelRegistry,
+    modelRegistry: sortPersonale ? SN_CONST.registroSenzaOrdinamento(d.modelRegistry) : d.modelRegistry,
     openWeightsOnly,
     excludedProviders,
     excludedProvidersOwnKey,
@@ -539,11 +541,10 @@ function buildAttemptChain(settings, modelRef, action) {
   // campo. Se dopo l'esclusione OpenRouter non trova un host ammesso, risponde
   // con un errore: la richiesta fallisce in modo evidente invece di essere
   // servita da un fornitore escluso.
-  const routing = providerRouting(settings);
-  if (routing) {
-    for (const a of out) {
-      if (a.provider === 'openrouter') a.providerRouting = routing;
-    }
+  for (const a of out) {
+    if (a.provider !== 'openrouter') continue;
+    const routing = providerRouting(settings, a.sort);
+    if (routing) a.providerRouting = routing;
   }
   // Il tetto della risposta per la famiglia della funzione (#1097.3): Preferenze, poi Modelli predefiniti, poi il codice.
   const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
@@ -560,8 +561,9 @@ function buildAttemptChain(settings, modelRef, action) {
 // una richiesta vera che finisce su un host, e senza queste istruzioni sarebbe
 // l'unica richiesta di Filo libera di essere servita da un fornitore escluso.
 // Ritorna null se non c'è niente da dire.
-function providerRouting(settings) {
-  return SN_CONST.providerRoutingFor(settings);
+// La regola (la voce vince sul globale, `ignore` resta com'è) sta in SN_CONST.
+function providerRouting(settings, entrySort) {
+  return SN_CONST.providerRoutingFor(settings, entrySort);
 }
 
 // Cancello della politica per le chiamate che NON passano da buildAttemptChain:

@@ -974,10 +974,11 @@
   // Le istruzioni di routing per OpenRouter dalle impostazioni effettive: chi NON deve servire, l'ordinamento e, con
   // l'interruttore della chiave propria, la lista per quella chiave (`ownKeyIgnore`, la sceglie il provider dalla
   // chiave con cui parte davvero). null se non c'è niente da dire. PURA.
-  function providerRoutingFor(effettive) {
+  // L'ordinamento della voce (`entrySort`) vince su quello globale; `ignore` non dipende mai dall'ordinamento.
+  function providerRoutingFor(effettive, entrySort) {
     const e = effettive || {};
     const ignore = providerIgnoreList(e.excludedProviders || []);
-    const sort = typeof e.providerSort === 'string' ? e.providerSort : '';
+    const sort = ordinamentoEffettivo(entrySort, e.providerSort);
     if (!ignore.length && !sort) return null;
     const routing = {};
     if (ignore.length) routing.ignore = ignore;
@@ -1266,6 +1267,55 @@
     return REASONING_LEVELS.includes(s) ? s : null;
   }
 
+  // Ordinamento degli host scelto per una voce del registry. 'auto' (o assente, o
+  // un valore ignoto) = nessuna scelta propria: vale quello globale della config.
+  const PROVIDER_SORTS = ['auto', 'throughput', 'latency', 'price'];
+
+  function normalizeProviderSort(v) {
+    const s = String(v == null ? '' : v).toLowerCase().trim();
+    if (!s || s === 'auto') return null;
+    return PROVIDER_SORTS.includes(s) ? s : null;
+  }
+
+  // Una misura del pulsante «Prova» (latenza, token al secondo) vale per la
+  // configurazione con cui è stata presa: cambiato il modello, il livello di
+  // ragionamento o l'ordinamento degli host, quei numeri parlano di altro. PURA.
+  function misuraValePer(misura, voce) {
+    if (!misura || typeof misura !== 'object') return false;
+    if (misura.ttftMs == null && misura.tokensPerSec == null) return false;
+    const v = voce || {};
+    const uguale = (a, b) => String(a == null ? '' : a) === String(b == null ? '' : b);
+    return uguale(misura.model, v.model)
+      && uguale(normalizeReasoning(misura.reasoning), normalizeReasoning(v.reasoning))
+      && uguale(normalizeProviderSort(misura.sort), normalizeProviderSort(v.sort));
+  }
+
+  // L'ordinamento con cui una voce chiama DAVVERO: il suo, o quello generale
+  // finché resta su «Automatico». Lo chiedono qui anche le pagine. PURA.
+  function ordinamentoEffettivo(entrySort, sceltaGenerale) {
+    // Anche la scelta generale si normalizza: scritta a mano nella config
+    // condivisa, una maiuscola la faceva sparire in silenzio.
+    return normalizeProviderSort(entrySort) || normalizeProviderSort(sceltaGenerale);
+  }
+
+  // Per una voce dei modelli PREDEFINITI: la scelta personale di chi usa Filo vince anche sull'ordinamento che
+  // l'owner ha dato a quel modello, come «solo pesi aperti» sta sopra la config condivisa. PURA.
+  function ordinamentoPerUtente(personale, entrySort, sceltaGenerale) {
+    return normalizeProviderSort(personale) || ordinamentoEffettivo(entrySort, sceltaGenerale);
+  }
+
+  // Il registro predefinito visto da chi ha una scelta personale: senza l'ordinamento delle voci. PURA.
+  function registroSenzaOrdinamento(registry) {
+    const out = {};
+    for (const [nick, e] of Object.entries(registry || {})) {
+      if (e && typeof e === 'object' && 'sort' in e) {
+        const { sort, ...resto } = e;
+        out[nick] = resto;
+      } else out[nick] = e;
+    }
+    return out;
+  }
+
   function buildModelAttempts(refs, registry, providerOrder, apiKeys) {
     const out = [];
     const seen = new Set();
@@ -1274,6 +1324,7 @@
       // non del provider: lo stesso nickname lo porta su tutti i suoi tentativi.
       const entry = registry && registry[ref];
       const reasoning = normalizeReasoning(entry && entry.reasoning);
+      const sort = normalizeProviderSort(entry && entry.sort);
       for (const provider of providerOrder || []) {
         const apiKey = apiKeys && apiKeys[provider];
         if (!apiKey) continue;
@@ -1284,6 +1335,7 @@
         seen.add(key);
         const attempt = { provider, apiKey, model: concrete };
         if (reasoning) attempt.reasoning = reasoning;
+        if (sort) attempt.sort = sort;
         out.push(attempt);
       }
     }
@@ -2659,6 +2711,9 @@
     // #962 — con una chiave OpenRouter propria, le richieste pagate con lei partono senza la lista dei fornitori
     // esclusi. Spento di serie: chi ha messo la chiave solo per non consumare i crediti resta coperto.
     ownKeyAllProviders: false,
+    // Come OpenRouter ordina gli host per chi usa Filo: '' lascia la scelta della config condivisa,
+    // altrimenti una di PROVIDER_SORTS. Sta sopra anche all'ordinamento dei singoli modelli predefiniti.
+    ordineHost: '',
     apiKeys: {
       openrouter: '',
       // Tavily: provider di web search "LLM-friendly" usato dalla sidebar
@@ -2672,6 +2727,10 @@
     // Firestore config/models), applicata in withDefaults. Metterla in
     // DEFAULT_SETTINGS la congelerebbe nello storage utente, impedendo
     // l'aggiornamento senza codice. Vedi DEFAULT_EXCLUDED_PROVIDERS.
+    // Esiti del pulsante «Prova» sui modelli predefiniti, per nickname: la
+    // misura è di chi l'ha fatta (la config condivisa è in sola lettura), e
+    // senza un posto dove tenerla spariva al ricaricamento della pagina.
+    defaultModelTests: {},
     // Costi stimati per 1M token (input/output) in USD. Valori indicativi.
     pricing: {
       'anthropic/claude-haiku-4.5': { input: 1.00, output: 5.00 },
@@ -3211,6 +3270,12 @@
     buildModelAttempts,
     REASONING_LEVELS,
     normalizeReasoning,
+    PROVIDER_SORTS,
+    normalizeProviderSort,
+    misuraValePer,
+    ordinamentoEffettivo,
+    ordinamentoPerUtente,
+    registroSenzaOrdinamento,
     DEFAULT_EXCLUDED_PROVIDERS,
     EXCLUDED_PROVIDER_KINDS,
     DEFAULT_EXCLUDED_PROVIDER_REASONS,

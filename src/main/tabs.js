@@ -1732,7 +1732,7 @@ class TabManager {
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
         try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-        try { tab.view.webContents.close(); } catch (_) {}
+        ChiusuraConCaselle.chiudi(tab.view.webContents);
         this.tabs.splice(idx, 1);
       }
     }
@@ -3399,7 +3399,7 @@ class TabManager {
     this._avvisaSorvegliante(tab, 'chiusa');
     this._esitoApertura(tab, null);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-    try { tab.view.webContents.close(); } catch (_) {}
+    ChiusuraConCaselle.chiudi(tab.view.webContents);
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     this.tabs.splice(idx, 1);
     if (this.activeId === tab.id) {

@@ -116,7 +116,6 @@
   let dirty = false;
   let settingsMode = false;
   let commenting = false;
-  let saveTimer = null;
   // Snapshot manuali: `manualBaseline` è lo stato di riferimento (contenuto
   // serializzato) da cui misurare quanto l'utente ha scritto/cancellato a mano
   // prima di decidere se salvare un punto di ripristino. `manualSnapTimer` è la
@@ -393,7 +392,12 @@
     collection.activeId = doc.id;
   }
 
+  // Il documento parte dopo la pausa e prima che la scheda, la finestra o Filo si chiudano: la regola delle caselle.
+  const documentoAlSicuro = window.SN_CASELLE.crea();
+  documentoAlSicuro.registra('doc', () => save(false));
+
   function save(flash) {
+    documentoAlSicuro.spedita('doc');
     try {
       syncActiveIntoCollection();
       writeCollection();
@@ -406,12 +410,15 @@
       console.error('[Filo editor] save', e);
     }
   }
+  // Il nome del documento si conferma quando il cursore lascia il campo:
+  // registrato qui, si conferma anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_CASELLE.alVolo();
+
   function markDirty() {
     dirty = true;
     saveStateEl.textContent = 'Non salvato';
     saveStateEl.classList.add('dirty');
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => save(false), 1200);
+    documentoAlSicuro.cambiato('doc', null, { pausa: 1200 });
     // Snapshot manuale "a pausa": dopo che l'utente smette di scrivere, valuta
     // se la deriva è abbastanza grande da meritare un punto di ripristino.
     clearTimeout(manualSnapTimer);
@@ -1464,12 +1471,14 @@
     const finish = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       const val = input.value;
       if (docSwitchBtn) docSwitchBtn.style.display = '';
       input.remove();
       if (save) renameFileAction(doc.id, val, { manual: true });
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => finish(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); finish(true); }
@@ -1590,9 +1599,11 @@
     const commit = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       if (save) renameFileAction(f.id, input.value);
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => commit(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); commit(true); }

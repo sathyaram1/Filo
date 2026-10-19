@@ -152,6 +152,7 @@
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
         ownKeyAllProviders: 'ownKeyAllProviders',
+        ordineHost: 'ordineHost',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',

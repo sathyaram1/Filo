@@ -1284,6 +1284,26 @@
       },
     },
     {
+      scrive: ['ordineHost'],
+      aiuto: '"velocità" | "latenza" | "prezzo" | "filo" (come OpenRouter sceglie chi serve ogni modello: "velocità"=più token al secondo, "latenza"=prima parola più rapida, "prezzo"=il più economico, "filo"=torna alla scelta di Filo; vale anche per i modelli predefiniti, e i fornitori esclusi restano esclusi)',
+      keys: ['ordine_host', 'ordine host', 'host dei modelli', 'host', 'ordinamento host', 'host più veloci',
+        'velocità dei modelli', 'modelli più veloci', 'chat più veloce', 'host più economici', 'provider sort'],
+      costo: 2,
+      risk: 'Cambia quali host servono i modelli: più veloci di solito costano di più, più economici rispondono più lentamente.',
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        if (!s) return null;
+        let sort = null;
+        if (/(filo|auto|predefinit|default|standard|ripristin|reset|nessun)/.test(s)) sort = '';
+        else if (/(latenz|latency|pront|prima parola|reattiv)/.test(s)) sort = 'latency';
+        else if (/(prezz|price|econom|costo|cost|risparm|meno car)/.test(s)) sort = 'price';
+        else if (/(veloc|throughput|rapid|svelt|token)/.test(s)) sort = 'throughput';
+        if (sort === null) return null;
+        const nomi = { '': 'scelti da Filo', throughput: 'più veloci', latency: 'risposta più pronta', price: 'più economici' };
+        return { partial: { ordineHost: sort }, label: `Host dei modelli → ${nomi[sort]}` };
+      },
+    },
+    {
       scrive: ['provider'],
       aiuto: '"openrouter"',
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],

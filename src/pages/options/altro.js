@@ -216,7 +216,7 @@
   // `riscrivi`: a gesto finito (uscita, incolla) la casella mostra i siti ridotti e dice le righe scartate; mentre
   // si scrive no, perché «faceb» è una riga a metà e il cursore non deve saltare.
   async function save({ riscrivi = false } = {}) {
-    caselle.spedita('blocklist');
+    const biglietto = caselle.spedita('blocklist');
     const el = $('blocklist');
     const letto = Siti.elencoDaTesto(el.value);
     scartate = letto.scartate;
@@ -233,7 +233,7 @@
     }
     mostrato = el.value;
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist: letto.valid }, mentreScrive: !riscrivi });
-    mostraSalvato();
+    if (caselle.aggiornata('blocklist', biglietto)) mostraSalvato();
   }
 
   // Domini esclusi e nomi delle categorie non hanno un «Salva», e chiudere la scheda non avvisa la pagina (#590.5).
@@ -243,6 +243,7 @@
     uscita() {
       for (const [input, cat] of caselleCategorie) if (!input.value.trim()) input.value = cat.name;
     },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
   caselle.registra('blocklist', (avvisi) => save({ riscrivi: avvisi === true }));
 

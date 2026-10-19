@@ -105,6 +105,83 @@ test.describe('options-default-models', () => {
     await expect(page.locator('#sec-provider')).toBeVisible();
   });
 
+  // La misura del pulsante «Prova» è di chi l'ha fatta: la lista dei modelli
+  // predefiniti è in sola lettura, e senza un posto dove tenerla spariva a ogni
+  // ricaricamento proprio dove sta quasi tutta la gente (switch acceso).
+  test('Opzioni: la misura del «Prova» di un modello predefinito resta dopo il ricaricamento', async ({ app, openTab }) => {
+    await app.evaluate(async () => {
+      const vero = global.fetch;
+      global.fetch = async (url, init) => {
+        const u = String(url && url.url ? url.url : url);
+        if (!u.includes('openrouter.ai/')) return vero(url, init);
+        if (u.includes('/chat/completions')) {
+          const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
+            + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
+            + 'data: [DONE]\n\n';
+          return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+        }
+        return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      };
+      await globalThis.SN_STORAGE.updateSettings({
+        useDefaultModels: true,
+        openWeightsOnly: false,
+        apiKeys: { openrouter: 'sk-or-finta' },
+      });
+    });
+
+    const riga = (page) => page.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)').first();
+    const page = await openTab(OPTIONS_URL);
+    await riga(page).waitFor({ timeout: 15_000 });
+    await riga(page).locator('.sn-model-test').click();
+    await expect(riga(page).locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
+
+    await page.reload();
+    await riga(page).waitFor({ timeout: 15_000 });
+    await expect(riga(page).locator('.sn-model-row-status'), 'la misura è sparita col ricaricamento')
+      .toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
+  });
+
+  // Una riga dei modelli propri con ordinamento e ragionamento suoi: la misura è presa con quelli, e con quelli deve
+  // ancora valere dopo il ricaricamento.
+  test('Opzioni: la misura del «Prova» di un modello proprio con ordinamento e ragionamento resta dopo il ricaricamento', async ({ app, openTab }) => {
+    await app.evaluate(async () => {
+      const vero = global.fetch;
+      global.fetch = async (url, init) => {
+        const u = String(url && url.url ? url.url : url);
+        if (!u.includes('openrouter.ai/')) return vero(url, init);
+        if (u.includes('/chat/completions')) {
+          const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
+            + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
+            + 'data: [DONE]\n\n';
+          return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+        }
+        return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      };
+      await globalThis.SN_STORAGE.updateSettings({
+        useDefaultModels: false,
+        openWeightsOnly: false,
+        apiKeys: { openrouter: 'sk-or-finta' },
+        modelRegistry: { mio: { provider: 'openrouter', model: 'finto/mio', sort: 'throughput', reasoning: 'high' } },
+      });
+    });
+
+    const riga = async (page) => {
+      const sel = '#modelRegistryList .sn-model-row:not(.sn-model-row-head)';
+      await page.waitForSelector(sel, { timeout: 15_000 });
+      const i = await page.evaluate((q) => Array.from(document.querySelectorAll(q))
+        .findIndex((r) => (r.querySelector('.sn-model-nick') || {}).value === 'mio'), sel);
+      expect(i, 'la riga «mio» non c\'è').toBeGreaterThanOrEqual(0);
+      return page.locator(sel).nth(i);
+    };
+    const page = await openTab(OPTIONS_URL);
+    await (await riga(page)).locator('.sn-model-test').click();
+    await expect((await riga(page)).locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
+
+    await page.reload();
+    await expect((await riga(page)).locator('.sn-model-row-status'), 'la misura è sparita col ricaricamento')
+      .toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
+  });
+
   test('Opzioni: riattivare lo switch ri-nasconde la config', async ({ openTab }) => {
     const page = await openTab(OPTIONS_URL);
     await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
@@ -115,6 +192,51 @@ test.describe('options-default-models', () => {
     await page.check('#useDefaultModels');
     await expect(page.locator('#sec-provider')).toBeHidden();
     await expect(page.locator('#sec-models')).toBeHidden();
+  });
+
+  // Una riga su «Automatico» segue la scelta generale degli host: cambiata
+  // quella, i numeri di prima parlano di un altro modo di scegliere l'host, e
+  // restare sullo schermo come se valessero ancora è peggio che sparire.
+  test('Opzioni: cambiata la scelta generale degli host, la misura di prima non resta', async ({ app, openTab }) => {
+    const generaleA = (valore) => app.evaluate(async (_e, v) => {
+      const D = globalThis.__filoDefaults;
+      if (!globalThis.__getVeroGenerale) globalThis.__getVeroGenerale = D.get;
+      D.get = (...a) => ({ ...globalThis.__getVeroGenerale(...a), providerSort: v });
+    }, valore);
+
+    await app.evaluate(async () => {
+      const vero = global.fetch;
+      global.fetch = async (url, init) => {
+        const u = String(url && url.url ? url.url : url);
+        if (!u.includes('openrouter.ai/')) return vero(url, init);
+        if (u.includes('/chat/completions')) {
+          const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
+            + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
+            + 'data: [DONE]\n\n';
+          return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+        }
+        return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      };
+      await globalThis.SN_STORAGE.updateSettings({
+        useDefaultModels: true,
+        openWeightsOnly: false,
+        apiKeys: { openrouter: 'sk-or-finta' },
+      });
+    });
+    await generaleA('price');
+
+    const riga = (page) => page.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)').first();
+    const page = await openTab(OPTIONS_URL);
+    await riga(page).waitFor({ timeout: 15_000 });
+    await riga(page).locator('.sn-model-test').click();
+    await expect(riga(page).locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
+
+    await generaleA('throughput');
+    await page.reload();
+    await riga(page).waitFor({ timeout: 15_000 });
+    await expect(riga(page).locator('.sn-model-row-status'),
+      'la misura parla di un ordinamento che non è più quello in vigore')
+      .toHaveText(/Non ancora testato/, { timeout: 10_000 });
   });
 });
 
@@ -505,6 +627,10 @@ test.describe('options-model-registry-invalid-row', () => {
   //   3. Una riga valida (nickname compilato, non duplicato) continua a
   //      salvare normalmente: la conferma resta "Salvato" senza avviso e la
   //      riga non viene marcata come non valida.
+  //   4. La conferma parla dell'ULTIMA modifica: appena ne arriva un'altra
+  //      sparisce, e torna solo quando anche quella è nello storage. Senza il
+  //      fix restava in vista mentre una modifica era ancora in attesa, e chi
+  //      chiudeva la pagina in quel momento la perdeva credendola salvata.
 
   const OPTIONS_URL = 'filo://options/options.html';
 
@@ -612,6 +738,39 @@ test.describe('options-model-registry-invalid-row', () => {
     });
     expect(rowInvalid).toBe(false);
   });
+
+  test('la conferma parla dell\'ultima modifica, non di quella di prima', async ({ openTab }) => {
+    const page = await openTab(OPTIONS_URL);
+    await revealRegistry(page);
+
+    await page.evaluate(() => {
+      const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+      row.querySelector('.sn-model-nick').value = 'prima';
+      row.querySelector('.sn-model-provider').value = 'openrouter';
+      row.querySelector('.sn-model-id').value = 'openai/gpt-4o-mini';
+      row.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+
+    // Seconda modifica mentre la conferma di prima è ancora sullo schermo: da
+    // quell'istante c'è qualcosa che salvato non è, e la conferma deve sparire.
+    const confermaRimasta = await page.evaluate(() => {
+      const hint = document.getElementById('savedHint');
+      const row = document.querySelector('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+      row.querySelector('.sn-model-id').value = 'openai/gpt-4o';
+      row.dispatchEvent(new Event('change', { bubbles: true }));
+      return hint.classList.contains('sn-show');
+    });
+    expect(confermaRimasta).toBe(false);
+
+    // Quando torna, quello che l'utente vede scritto è davvero quello salvato.
+    await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+    const salvato = await page.evaluate(async () => {
+      const s = await window.SN_STORAGE.getSettings();
+      return (s.modelRegistry && s.modelRegistry.prima && s.modelRegistry.prima.model) || '';
+    });
+    expect(salvato).toBe('openai/gpt-4o');
+  });
 });
 
 test.describe('options-multi-model', () => {
@@ -686,7 +845,10 @@ test.describe('options-multi-model', () => {
       row.querySelector('.sn-model-nick').value = 'provatm';
       row.querySelector('.sn-model-provider').value = 'openrouter';
       row.querySelector('.sn-model-id').value = 'anthropic/claude-3.5-haiku';
-      row._test = { ttftMs: 321, tokensPerSec: 48.5, at: new Date().toISOString() };
+      // La misura porta con sé il modello su cui è stata presa: senza, vale per
+      // un'altra riga e non va mostrata.
+      row._test = { ttftMs: 321, tokensPerSec: 48.5, at: new Date().toISOString(),
+        model: 'anthropic/claude-3.5-haiku' };
       // Forza il render immediato + il salvataggio (change bubbla fino a #page).
       row.dispatchEvent(new Event('change', { bubbles: true }));
     });

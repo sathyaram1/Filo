@@ -587,6 +587,12 @@
       doesNot: 'Senza una tua chiave non compare e non ha effetto, e Filo dalla chat non lo accende. Se OpenRouter rifiuta la tua chiave e Filo passa ai suoi crediti, l’esclusione torna a valere per intero. Non tocca «Solo modelli a pesi aperti», che vale comunque.',
     },
     {
+      id: 'host-order', title: 'Host più veloci o più economici', category: 'settings',
+      desc: 'Lo stesso modello lo servono più host: scegli se Filo chiede i più veloci, quelli che cominciano a rispondere prima o i più economici. Vale per tutti i modelli, anche per quelli predefiniti. Il pulsante «Prova» misura ogni modello con la scelta in uso, e la misura resta finché modello e host non cambiano.',
+      invoke: 'Opzioni → «Host dei modelli», oppure chiedendolo a Filo ("voglio la chat più veloce", "usa gli host più economici").',
+      doesNot: 'Non fa servire un modello da un fornitore escluso dalla politica di Filo, e non cambia il modello: cambia solo chi lo serve.',
+    },
+    {
       id: 'model-usage-census', title: 'Dove Filo usa un modello', category: 'settings',
       desc: 'L’elenco completo dei punti in cui Filo usa un modello, anche quelli che non si vedono: riordino delle schede, riassunti, memoria, etichette dei mazzi, giudizi sui feedback, indicizzazione dell’archivio. Per ognuno c’è scritto se il modello lo scegli tu, se lo sceglie chi gestisce Filo, o se quel punto un modello non lo usa affatto.',
       invoke: 'Opzioni → sezione dei modelli (l’elenco sta sotto le funzioni impostabili).',

@@ -4787,7 +4787,6 @@
   // e appena il cursore lascia la casella. È lo stesso comportamento della
   // gemella, che così faceva già.
   const FRASE_PAUSA_MS = 1500;
-  let userNoteTimer = null;
   // L'ultimo salvataggio partito, e COSA portava: chi deve sapere se la frase è
   // a destinazione (un'azione di stato, il tasto premuto un istante dopo che la
   // casella ha perso il fuoco) aspetta questo invece di spedirlo una seconda
@@ -4810,12 +4809,11 @@
       : String((fb && fb.userNote) || '');
     return gia !== fraseInCasella();
   }
+  // Pausa, Ctrl da solo, cambio e chiusura della scheda: le uscite le ascolta la regola condivisa delle caselle.
+  const caselleFrase = window.SN_CASELLE.crea();
+  caselleFrase.registra('frase', () => { salvaFraseAutomatico(); });
   function annullaSalvataggioProgrammato() {
-    if (userNoteTimer) { clearTimeout(userNoteTimer); userNoteTimer = null; }
-  }
-  function programmaSalvataggioFrase() {
-    annullaSalvataggioProgrammato();
-    userNoteTimer = setTimeout(() => { userNoteTimer = null; salvaFraseAutomatico(); }, FRASE_PAUSA_MS);
+    caselleFrase.spedita('frase');
   }
   // Salva ORA quello che c'è nella casella, se non è già a destinazione.
   // Ritorna la promessa dell'esito (true = a destinazione c'è quello che
@@ -4876,7 +4874,10 @@
   }
   if (mgUserNoteBtn) mgUserNoteBtn.addEventListener('click', salvaFraseAMano);
   if (mgUserNoteText) {
-    mgUserNoteText.addEventListener('input', () => { userNoteToccata = true; programmaSalvataggioFrase(); });
+    mgUserNoteText.addEventListener('input', (e) => {
+      userNoteToccata = true;
+      caselleFrase.cambiato('frase', e, { pausa: FRASE_PAUSA_MS });
+    });
     mgUserNoteText.addEventListener('blur', () => { salvaFraseAutomatico(); });
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
