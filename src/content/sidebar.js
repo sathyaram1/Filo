@@ -1895,6 +1895,7 @@
       userAction: aiNote,
       esterno: { elementoPagina: { etichetta: label, selettore: highlight.selector } },
       preActionUrl,
+      daGesto: true,
     });
   }
 
