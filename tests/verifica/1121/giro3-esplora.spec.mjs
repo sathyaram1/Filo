@@ -95,10 +95,10 @@ test('la scelta delle Opzioni arriva alla chat e vince su quella del modello pre
 test('la scelta cambiata da fuori (a parole) si vede nella pagina Opzioni già aperta', async ({ app, openTab }) => {
   const opz = await openTab('filo://options/options.html');
   await expect(opz.locator('#ordineHost')).toHaveValue('');
-  await app.evaluate(async () => {
-    const b = globalThis.SN_PREF.buildPreferencePartial('host dei modelli', 'voglio la chat più veloce');
-    await globalThis.SN_STORAGE.updateSettings(b.partial);
-  });
+  const partial = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('host dei modelli', 'voglio la chat più veloce').partial);
+  const dash = await openTab('filo://dashboard/dashboard.html');
+  await dash.evaluate(async (p) => window.filo.message({ type: 'update_settings', settings: p }), partial);
+  await opz.bringToFront();
   await expect(opz.locator('#ordineHost')).toHaveValue('throughput', { timeout: 10_000 });
   await opz.screenshot({ path: 'tests/.shots/1121-giro3-opzioni.png', fullPage: false });
 });
