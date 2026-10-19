@@ -233,8 +233,6 @@
   // Come si chiama la lista quando le sezioni non ci sono: nessun nome di
   // sezione, perché nessuna sezione è stata scelta.
   const SENZA_SEZIONI_LABEL = 'Segnalazioni';
-  const SENZA_SEZIONI_AVVISO = 'Questo computer non può leggere lo stato delle segnalazioni. '
-    + 'Le trovi tutte qui sotto, in un elenco solo.';
 
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
