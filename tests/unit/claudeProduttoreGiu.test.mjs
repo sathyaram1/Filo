@@ -114,6 +114,17 @@ test('con un altro modello nella catena risponde quello, senza frase', async () 
   }
 });
 
+test('nei contatori giornalieri Anthropic giù è un guasto del servizio, non un «nessun host»', async () => {
+  const K = globalThis.SN_CONTATORI;
+  const tipo = async (model, giu) => K.tipoErrore(await conRouter((body) => (body.model === model ? giu() : risposta(body)),
+    () => fallita(cancello().complete({ action: 'explain', attempts: [tentativo(model)], messages: MESSAGGI }))));
+  assert.equal(await tipo(CLAUDE, () => rifiuto(503, 'Provider returned error')), 'fornitore');
+  assert.equal(await tipo(CLAUDE, GUASTI['nessun host fra gli ammessi (404)']), 'fornitore');
+  assert.equal(await tipo(CLAUDE, () => rifiuto(504, 'Gateway Timeout')), 'tempo');
+  assert.equal(await tipo(LLAMA, () => rifiuto(503, 'Provider returned error')), 'fornitore');
+  assert.equal(K.tipoErrore(Object.assign(new Error('x'), { code: 'NO_ALLOWED_HOST', reason: 'excluded', status: 404 })), 'nessun_host');
+});
+
 test('Anthropic che si ferma a metà flusso prima di scrivere è lo stesso guasto', async () => {
   const fermo = () => new Response(`data: ${JSON.stringify({ provider: 'Anthropic', choices: [{ delta: {}, finish_reason: 'error' }] })}\n\ndata: [DONE]\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
   const err = await conRouter(anthropicGiu(fermo), () => fallita(cancello().stream({ action: 'explain', attempts: [tentativo(CLAUDE)], messages: MESSAGGI, onDelta: () => {} })));
