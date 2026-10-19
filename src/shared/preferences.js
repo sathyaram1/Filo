@@ -851,6 +851,32 @@
         };
       },
     },
+    // #1124 — il sito riceve l'email solo quando l'utente la sceglie: accendere e spegnere non cede niente.
+    {
+      scrive: ['propostaEmail.attiva'],
+      aiuto: 'true | false (nei campi email o nome utente dei siti propone l\'email dell\'account Filo; il sito la riceve solo se la scegli)',
+      keys: ['proposta_email', 'proposta email', 'proponi email', 'proponi la mia email', 'suggerisci email',
+        'suggerimento email', 'email nei siti', 'email nei campi', 'autocompila email', 'autocompilazione email',
+        'compila email', 'email dell\'account nei siti'],
+      costo: 1,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { propostaEmail: { attiva: b } }, label: `La tua email proposta nei siti → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
+      scrive: ['propostaEmail.incognito'],
+      aiuto: 'true | false (la stessa proposta dell\'email anche nelle finestre in incognito; di serie spenta)',
+      keys: ['proposta_email_incognito', 'proposta email incognito', 'proposta email in incognito',
+        'email in incognito', 'suggerisci email in incognito', 'proponi email in incognito'],
+      costo: 1,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { propostaEmail: { incognito: b } }, label: `La tua email proposta anche in incognito → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
     {
       scrive: ['terminal.shell'],
       aiuto: (ctx) => ctx.shellPref,

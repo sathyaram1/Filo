@@ -832,6 +832,16 @@
     // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
     AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
 
+    // === L'email dell'account proposta nei campi di accesso (#1124, src/content/propostaEmail.js) ===
+    // Aperto ai siti di proposito: lo manda il content script del frame dove l'utente è entrato in un campo email o
+    // nome utente. Porta il campo (misure in px CSS della scheda, valore) e non riceve mai l'email: la proposta la
+    // disegna il main in una vista sopra la scheda (src/main/propostaEmail.js). `segui:false` = qui non si propone.
+    // Dentro un riquadro di un'altra origine `ancora` è il segno mandato al documento sopra, che risponde con 'riquadro'.
+    PROPOSTA_EMAIL: 'proposta_email',               // { fase:'campo', campo, motivo, x, y, w, h, valore, digitato, ancora } | { fase:'via', campo } | { fase:'riquadro', ancora, x, y, s, su } → { ok, segui }
+    // Main→il solo frame del campo, dopo la scelta dell'utente (clic o Invio sulla proposta): l'unico momento in cui
+    // l'email arriva alla pagina.
+    PROPOSTA_EMAIL_RIEMPI: 'proposta_email_riempi', // { campo, email }
+
     // === Il menu che un sito si disegna da sé (#975, src/preload/menu-del-sito.js) ===
     // Aperti ai siti di proposito: li manda il content script dal menu di Filo, e il sito lo ricava il main dal
     // frame che parla, mai dal messaggio. Da una superficie di Filo (Preferenze, l'avviso della proposta) `sito`

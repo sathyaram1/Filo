@@ -188,6 +188,12 @@
       doesNot: 'Il correttore contestuale (blu) lavora su testi né troppo corti né enormi; si spegne in Preferenze → Impostazioni avanzate → «Funzioni» o chiedendolo a Filo. Parte solo da quello che scrivi tu: il testo che un sito inserisce da solo si controlla al tuo prossimo tasto in quella casella, e a scheda nascosta il controllo aspetta che torni. Da una scheda partono al massimo 300 controlli al minuto: oltre, Filo li ferma e te lo dice.',
     },
     {
+      id: 'email-nei-siti', title: 'La tua email nei campi di accesso', category: 'writing',
+      desc: 'Quando entri in un campo di un sito che chiede l’email o il nome utente, compreso quello di accesso di Google, sotto il campo compare l’email del tuo account Filo; compare anche se hai scritto solo l’inizio dell’indirizzo. Un clic, oppure freccia giù e Invio, la scrive nel campo come se l’avessi battuta tu. Esc o un clic altrove la chiudono. Il sito non la vede finché non la scegli.',
+      invoke: 'Automatica, con l’account Filo collegato. Col tasto destro sulla proposta: «Inserisci l’email» o «Non propormela più». Si spegne e si riaccende in Preferenze → Impostazioni avanzate → La tua email nei siti, dove c’è anche «Anche nelle finestre in incognito», oppure chiedendolo a Filo («non propormi più la mia email»).',
+      doesNot: 'Non salva e non propone password né altre email: solo quella dell’account Filo. Senza account collegato non compare niente. Non compare nelle pagine di Filo, né in incognito se non l’hai chiesto. Compare anche nei moduli di accesso incorporati da un altro sito.',
+    },
+    {
       id: 'spellcheck-manage', title: 'Gestisci correttore e dizionario', category: 'writing',
       desc: 'Gestisci le correzioni automatiche (da → a, anche su più parole come "x es" → "per esempio", che si espandono mentre scrivi) e il dizionario personale di parole da non segnalare.',
       invoke: 'Pagina filo://spellcheck/spellcheck.html.',

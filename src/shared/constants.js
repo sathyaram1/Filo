@@ -2654,6 +2654,8 @@
     // #1039 — `installa`: su Windows una versione scaricata si installa all'apertura, con la barra visibile ('avvio'), o
     // in silenzio alla chiusura ('chiusura'). Le regole per sistema: src/main/aggiornamentoRegole.js.
     aggiornamenti: { automatici: true, installa: 'avvio' },
+    // #1124 — l'email dell'account Filo proposta nei campi di accesso dei siti; in incognito solo se l'utente lo chiede.
+    propostaEmail: { attiva: true, incognito: false },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è

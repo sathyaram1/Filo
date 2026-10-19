@@ -44,6 +44,7 @@ const { VisiteSchede } = require('./tabs/visite');
 const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
+const { PropostaEmail } = require('./propostaEmail');
 const Storia = require('./tabs/storia');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
@@ -421,7 +422,7 @@ class TabManager {
       window.once('closed', () => { this.anteprime.chiudi(); this.riserva.spegni(); this.codaRiapertura.chiudi(); });
     }
     this.avvisi = new AvvisiSopraPagina(window, {
-      dopoInCima: () => this.conferme.inCima(),
+      dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); },
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       schedaAttiva: () => {
@@ -431,6 +432,19 @@ class TabManager {
       sottoIlVuoto: () => this.vistaSottoIlVuoto(),
     });
     this.barra = new BarraLaterale(window, this, { alto: () => this._altezzaCornice() });
+    // L'email dell'account sotto il campo di accesso della scheda davanti (#1124): sopra gli avvisi, sotto la conferma.
+    this.propostaEmail = new PropostaEmail(window, {
+      area: (wc) => {
+        const t = schedaDavanti();
+        if (!t || !t.view || t.view.webContents !== wc || this._attivaNascosta) return null;
+        if (this.avvisoSito.coperta() === t || (this.conferme && this.conferme.mostrata)) return null;
+        const b = t.view.getBounds();
+        return b.width > 0 && b.height > 0 ? b : null;
+      },
+      restituisci: () => this._tastieraAllaSchedaAttiva(),
+      sotto: () => [...this.tabs.map((t) => t.view), this.avvisoSito.vista, this.avvisi.vista].filter(Boolean),
+      dopoInCima: () => { this.conferme.inCima(); this.barra._inCima(); },
+    });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
       scegli: (tab, scelta, dati) => this._sbScelta(tab, scelta, dati),
@@ -2291,6 +2305,7 @@ class TabManager {
     this._attivaNascosta = !visible;
     if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
     this.avvisoSito.nascondi(!visible);
+    this.propostaEmail.posa();
   }
 
   // Solo la scheda davanti si vede; una aperta dietro resta «visibile» a 0×0 finché non ha l'anteprima (#430).
@@ -2329,6 +2344,7 @@ class TabManager {
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
     this.avvisi.posa();
+    this.propostaEmail.posa();
     this.conferme.posa();
     this.barra.posa();
   }
@@ -2497,6 +2513,11 @@ class TabManager {
       if (staRegistrandoTasti(wc)) return;
       // La barra laterale prima di tutto: il suo tasto, e l'Esc che la chiude prima della modalità.
       if (this.barra.tasto(input)) {
+        event.preventDefault();
+        return;
+      }
+      // Con l'email proposta sotto un campo, frecce, Invio ed Esc scelgono o la chiudono prima della pagina e della modalità.
+      if (this.propostaEmail.tasto(wc, input)) {
         event.preventDefault();
         return;
       }
