@@ -34,6 +34,8 @@ export function menuDi(scheda) {
     griglia: locator('.sn-menu-icon-grid'),
     /** L'etichetta che compare sopra un'icona del menu. */
     etichetta: locator('.sn-tooltip'),
+    /** L'icona che segue il puntatore mentre la si trascina nel menu, o dal menu. */
+    trascinamento: locator('.sn-drag-preview'),
   };
 }
 
