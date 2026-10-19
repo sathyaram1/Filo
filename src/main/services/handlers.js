@@ -5960,10 +5960,12 @@ function ammessaDaUnSito(msg, sender) {
 
 async function handleMessage(msg, sender = {}) {
   const origin = sender?.tab?.url || sender?.url || '';
-  if (daUnSito(origin, sender) && !ammessaDaUnSito(msg, sender)) {
+  const sito = daUnSito(origin, sender);
+  if (sito && !ammessaDaUnSito(msg, sender)) {
     return { ok: false, code: 'forbidden', error: 'forbidden' };
   }
   const fn = registry.get(msg.type);
+  if (fn && sito) return rispostaPerUnSito(msg.type, await fn(msg, sender, origin), indirizziDelMittente(sender));
   if (fn) return fn(msg, sender, origin);
   return { ok: false, error: `Tipo messaggio sconosciuto: ${msg.type}` };
 }
