@@ -770,9 +770,14 @@
         giriValori.push(giri);
         chiave = fettaGiri(giri).key;
       }
-      if (!fette[chiave]) fette[chiave] = { key: chiave, label: ETICHETTE_FETTE[chiave], n: 0, ids: [] };
+      // `critiche`: id → quante, per i soli lavori passati. La fetta «3 o più»
+      // raggruppa conti diversi, e aperta deve dire quanto è costato ognuno.
+      if (!fette[chiave]) fette[chiave] = { key: chiave, label: ETICHETTE_FETTE[chiave], n: 0, ids: [], critiche: {} };
       fette[chiave].n += 1;
-      if (doc._id) fette[chiave].ids.push(doc._id);
+      if (doc._id) {
+        fette[chiave].ids.push(doc._id);
+        if (chiave !== 'fermati') fette[chiave].critiche[doc._id] = giri;
+      }
     }
     var somma = 0;
     for (i = 0; i < giriValori.length; i++) somma += giriValori[i];
