@@ -364,7 +364,8 @@ function creaFilo({ cartella } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, perLaCoda, pagine, registraVisita, aggiornaTitolo, cancellaPagine, esporta, importa, importaChatSalvate,
+    carica, transazione, chats, chat, perLaCoda, pagine, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };
 }
