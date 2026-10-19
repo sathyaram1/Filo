@@ -145,8 +145,8 @@
     const t = ms(ultima.updatedAt);
     // Una parola spontanea di Filo si continua (e si fonde) solo nello stesso giorno: quella di ieri resta sotto «ieri»
     // e il saluto di oggi non riracconta il timer di ieri sera.
-    const spontaneaDiOggi = !!(m && m.spontaneo) && Number.isFinite(ms(m.ts)) && giornoDi(ms(m.ts)) === giornoDi(ora);
-    return spontaneaDiOggi || (Number.isFinite(t) && ora - t <= PAUSA_MS) ? ultima : null;
+    if (m && m.spontaneo) return Number.isFinite(ms(m.ts)) && giornoDi(ms(m.ts)) === giornoDi(ora) ? ultima : null;
+    return Number.isFinite(t) && ora - t <= PAUSA_MS ? ultima : null;
   }
 
   // La giornata comincia alla prima apertura dopo le cinque, se nella home non si è ancora detto niente oggi.
