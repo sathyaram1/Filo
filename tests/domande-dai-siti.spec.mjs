@@ -360,3 +360,39 @@ test('Salva per dopo dal menu aperto in un riquadro di un altro sito salva ancor
   await expect.poll(async () => shell.evaluate(async (u) => (await window.filoShell.message({ type: 'get_saved_pages' })).pages
     .some((p) => p.url === u), url), { timeout: 8000 }).toBe(true);
 });
+
+// #589.1 giro 4 — le risposte non portano i siti degli altri, e dallo sfondo non passa davanti una scheda nuova.
+test('a un sito di sfondo non arrivano i siti degli altri, e non porta davanti una scheda nuova', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate(async () => {
+    await window.filoShell.message({ type: 'update_settings', settings: { blocklist: ['banca-privata.example', 'clinica.example'], menuDelSito: { siti: ['figma.example'] } } });
+  });
+  await testServer.openReady(openTab, '<h1>sito</h1>', { pubblico: true });
+  await openTab(testServer.html('<h1>quella che guardo</h1>'));
+  const sito = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+  const prima = await schede(app);
+
+  for (const [tipo, extra] of [['filo_spento_imposta', { spento: false }], ['menu_del_sito_imposta', { attivo: false }]]) {
+    const r = await sito(chiedi(tipo, extra));
+    expect(r.nonTrovata || r.errore, `${tipo}: il preload del sito non è stato raggiunto`).toBeFalsy();
+    expect(r.risposta, `${tipo}: la domanda del sito deve ancora rispondere`).toMatchObject({ ok: true, sito: 'sito-pubblico.test' });
+    for (const altro of ['banca-privata.example', 'clinica.example', 'figma.example']) {
+      expect(JSON.stringify(r.risposta), `${tipo}: la risposta porta un sito dell'utente`).not.toContain(altro);
+    }
+  }
+
+  for (const [tipo, extra] of [['apri_collegamento_filo', { url: 'https://example.org/promo' }], ['wallet_invite_open', { link: 'filo://invito/ABCD1234' }]]) {
+    const r = await sito(chiedi(tipo, extra));
+    expect(r.risposta, `${tipo} da una scheda di sfondo`).toMatchObject({ ok: false, code: 'forbidden' });
+  }
+  await new Promise((r) => setTimeout(r, 500));
+  const dopo = await schede(app);
+  expect(dopo.attiva, 'una scheda nuova è passata davanti a quella dell\'utente').toBe(prima.attiva);
+  expect(dopo.tutte.length).toBe(prima.tutte.length);
+
+  // Dalla scheda in vista il collegamento si apre ancora.
+  await testServer.openReady(openTab, '<h1>in vista</h1>');
+  const davanti = dalPreload(app, (u) => u.startsWith('http://127.0.0.1') && u.endsWith('/3'));
+  const r = await davanti(chiedi('apri_collegamento_filo', { url: 'https://example.org/scelto' }));
+  expect(r.nonTrovata || r.errore, JSON.stringify(r)).toBeFalsy();
+  expect(r.risposta).toMatchObject({ ok: true, aperto: true });
+});

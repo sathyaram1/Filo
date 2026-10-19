@@ -138,7 +138,13 @@ suo riquadro: da una scheda di sfondo il tasto Home portava via la pagina che
 l'utente stava scrivendo. E una risposta porta solo ciò che serve a chi chiede:
 il premio del feedback dice la cifra, non il saldo; la foto della barra in alto,
 che mostra i titoli delle altre schede, un sito la riceve solo mentre l'utente
-ci ha disegnato sopra per un feedback.
+ci ha disegnato sopra per un feedback. Al giro 4 la stessa porta è rientrata da
+domande nuove: aprire il collegamento scritto dal modello, l'invito ai crediti
+e «apri comunque» portavano davanti una scheda dallo sfondo, e spegnere Filo o
+scegliere il menu del sito rispondevano con l'elenco di tutti i siti
+dell'utente. Una domanda che apre una scheda entra in
+`DOMANDE_WEB_SCHEDA_IN_VISTA`; una risposta con un elenco di siti si ritaglia
+in `RISPOSTE_WEB`, sulla voce di chi chiede, come la lettura delle impostazioni.
 
 Una domanda che il codice di Filo fa solo **dopo un gesto dell'utente** vuole il
 gesto anche nel main (#589.1, giro 2). Incolla e Detta si danno il permesso

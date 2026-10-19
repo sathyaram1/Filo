@@ -262,3 +262,25 @@ test('sentinella: nessun canale si registra fuori dalla regola del confine', () 
   const ipc = leggi('src/main/ipc.js');
   assert.ok((ipc.match(/^\s+handle\('/gm) || []).length > 20, 'la sentinella non vede più i canali di ipc.js');
 });
+
+// #589.1 giro 4 — una domanda ammessa non risponde con i siti degli altri, e non porta una scheda davanti dallo sfondo.
+test('a un sito le risposte con l\'elenco dei siti tornano ritagliate sulla sua voce', () => {
+  const indirizzi = ['https://www.sito.example/pagina', 'https://sito.example/'];
+  for (const t of [MSG.FILO_SPENTO_IMPOSTA, MSG.MENU_DEL_SITO_IMPOSTA]) {
+    assert.ok(W.RISPOSTE_WEB.has(t), t);
+    const r = W.rispostaPerUnSito(t, { ok: true, sito: 'sito.example', siti: ['banca.example', 'sito.example', 'clinica.example'] }, indirizzi);
+    assert.deepEqual(r, { ok: true, sito: 'sito.example', siti: ['sito.example'] }, t);
+  }
+  const altra = { ok: true, siti: ['banca.example'] };
+  assert.equal(W.rispostaPerUnSito(MSG.GET_SETTINGS, altra, indirizzi), altra, 'le altre risposte restano com\'erano');
+  assert.equal(W.rispostaPerUnSito(MSG.FILO_SPENTO_IMPOSTA, null, indirizzi), null);
+});
+
+test('aprire un collegamento, un invito o un sito bloccato lo chiede solo la scheda in primo piano', () => {
+  for (const t of [MSG.APRI_COLLEGAMENTO_FILO, MSG.APRI_COMUNQUE, MSG.WALLET_INVITE_OPEN]) {
+    assert.ok(t, 'un tipo della prova non esiste più');
+    assert.ok(W.DOMANDE_WEB_SCHEDA_IN_VISTA.has(t), t);
+    assert.equal(W.domandaAmmessaDaUnSito(t, { schedaInVista: false }, { type: t }), false, `${t} da una scheda di sfondo`);
+    assert.equal(W.domandaAmmessaDaUnSito(t, { schedaInVista: true }, { type: t }), true, `${t} dalla scheda in vista`);
+  }
+});
