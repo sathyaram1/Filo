@@ -493,7 +493,7 @@ e controllo cieco. La funzione gira in due momenti:
 
 Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
 Invariante, con sentinella: al massimo un compito di fase aperto per feedback.
-I figli non contano.
+I compiti figli, qui sotto, non contano.
 
 **Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
 (§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), e i compiti creati a
