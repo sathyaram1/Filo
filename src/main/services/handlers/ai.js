@@ -137,7 +137,10 @@ module.exports = function register(on, ctx) {
       ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
       : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
     const K = globalThis.SN_WALLET_MAIN;
-    const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
+    const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
+    // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
+    const Cont = globalThis.SN_CONTATORI_MAIN;
+    const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
     if (lettura) await lettura;
     return { ok: true, ...r };
   });
@@ -320,7 +323,14 @@ module.exports = function register(on, ctx) {
     return { ok: false, error, errorCode: errorCode || '', firstFallback };
   };
 
-  on(MSG.TTS_SYNTH, async (msg) => {
+  // Una lettura coi suoi ripieghi di voce e di fornitore è un uso solo, per i contatori giornalieri (#969); i pezzi
+  // dopo il primo di una lettura lunga (`parteDiUnUso`) contano solo se si guastano.
+  on(MSG.TTS_SYNTH, (msg) => {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    const misura = msg && msg.parteDiUnUso === true ? C && C.parteDiUnUso : C && C.unUso;
+    return typeof misura === 'function' ? misura(SN_CONST.ACTIONS.TTS, () => sintesiVocale(msg)) : sintesiVocale(msg);
+  });
+  async function sintesiVocale(msg) {
     // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
     // prova i fornitori che la implementano (il router, verso un host
     // indipendente). Se nessuno è disponibile o tutti falliscono, torna
@@ -385,6 +395,7 @@ module.exports = function register(on, ctx) {
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
+            try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(SN_CONST.ACTIONS.TTS); } catch (_) {}
             ttsFallbackAnnounced = ''; // sintesi disponibile: riarma l'avviso
             return {
               ok: true,
@@ -420,7 +431,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return ttsFallback(e?.message || String(e));
     }
-  });
+  }
 
   // Le voci del modello di lettura IN USO, per la tendina delle Preferenze:
   // quale modello legge (il primo della catena), il suo catalogo raggruppato

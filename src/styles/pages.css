@@ -822,6 +822,7 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 6px;
   font-size: 13px;
 }
+.sn-page #cookie-wl-list .sn-cookie-wl-nota { display: block; margin-top: 2px; color: var(--sn-error); font-size: 12px; line-height: 1.4; }
 .sn-page #cookie-wl-list li button,
 .sn-page #cookie-banners-list li button,
 .sn-page #cookie-done-list li button,

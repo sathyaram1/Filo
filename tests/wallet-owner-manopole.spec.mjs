@@ -79,6 +79,17 @@ function configDiPartenza() {
   };
 }
 
+// Le persone che la vista elenca: una prova le cambia per vedere cosa fa la pagina quando la vista si rilegge.
+let persone = [];
+function personeDiPartenza() {
+  return [{
+    pseudonym: PSEUDONIMO,
+    balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+    invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
+    reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
+  }];
+}
+
 test.beforeAll(async () => {
   server = createServer((req, res) => {
     let raw = '';
@@ -133,23 +144,19 @@ test.beforeAll(async () => {
               { code: 'AAAA2222', max: 3, used: 1, uses: [{ pseudonym: 'fedebb00', at: '2026-09-17T10:00:00.000Z' }], createdAt: '2026-09-11T09:00:00.000Z' },
               { code: 'CCCC4444', max: 3, used: 3, uses: [], createdAt: '2026-09-11T09:00:00.000Z' },
             ],
-            users: [{
-              pseudonym: PSEUDONIMO,
-              balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
-              invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
-              reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
-            }],
+            users: persone,
           },
         });
       }
       if (url === '/walletUserDetail') {
         detailChiesti.push(body.data);
-        if (!body.data || body.data.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
+        const lei = persone.find((p) => body.data && p.pseudonym === body.data.pseudonym);
+        if (!lei || lei.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
         return json(res, 200, {
           result: {
             found: true,
             pseudonym: PSEUDONIMO,
-            balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+            balance: lei.balance,
             createdAt: '2026-09-10T08:00:00.000Z',
             invitedBy: 'owner',
             reconcile: { flagged: false },
@@ -188,6 +195,7 @@ test.afterAll(async () => {
 
 test.beforeEach(() => {
   configDoc = configDiPartenza();
+  persone = personeDiPartenza();
   patch.length = 0;
   rifiutaPatch = false;
   detailChiesti.length = 0;
@@ -642,6 +650,67 @@ test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regal
   await expect(page.locator('.sn-wallet-ctxmenu')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('.sn-wallet-ctxmenu')).toHaveCount(0);
+});
+
+// #1087.4 — la vista si rilegge a ogni movimento di crediti, anche di un'altra scheda, e rifaceva da capo la tabella:
+// sotto le mani dell'owner sparivano il menu del tasto destro e la scheda aperta, e il fuoco cadeva dalla riga.
+test('una rilettura della vista lascia aperti il menu e la scheda di una persona, col fuoco sulla sua riga', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  const righe = page.locator('#ownerUsers tr.sn-wallet-user');
+  const lei = righe.filter({ hasText: PSEUDONIMO });
+  const scheda = page.locator('#ownerUsers .sn-wallet-scheda');
+  const menu = page.locator('.sn-wallet-ctxmenu');
+  const fuocoSu = () => page.evaluate(() => {
+    const a = document.activeElement;
+    return a && a.classList.contains('sn-wallet-user') ? a.cells[0].textContent : null;
+  });
+  const rileggi = () => app.evaluate(() => globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED }));
+
+  await expect(righe).toHaveCount(1, { timeout: 15_000 });
+  await lei.click();
+  await expect(scheda).toContainText('4.890,5', { timeout: 15_000 });
+  await lei.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Le arrivano crediti: la riga e la scheda aperta prendono il numero nuovo, e niente si chiude.
+  persone[0] = { ...persone[0], balance: { ...persone[0].balance, credits: 5890.5, creditsGranted: 6128 } };
+  await rileggi();
+  await expect(lei.locator('td').nth(1)).toHaveText('5.890,5', { timeout: 15_000 });
+  await expect(scheda).toContainText('5.890,5', { timeout: 15_000 });
+  expect(detailChiesti.length).toBe(2);
+  await expect(menu).toHaveCount(1);
+  await expect(menu).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Entra una persona nuova, in cima: la riga col fuoco non si sposta e non lo perde.
+  persone.unshift({
+    pseudonym: 'f00dfeed00000001', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0, limitUsd: 3.5 },
+    invitedBy: 'owner', createdAt: '2026-10-01T08:00:00.000Z', reconcile: null, usage: { rows: 0, byAction: {}, byDay: {} },
+  });
+  await rileggi();
+  await expect(righe).toHaveCount(2, { timeout: 15_000 });
+  await expect(righe.first()).toContainText('f00dfeed00000001');
+  await expect(menu).toBeVisible();
+  await expect(scheda).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Esc chiude il menu, e il fuoco è ancora sulla riga: Invio richiude la scheda.
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(scheda).toBeHidden();
+
+  // Una persona che il server non elenca più porta via la sua riga e il menu aperto su di lei.
+  await lei.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  persone = persone.filter((p) => p.pseudonym !== PSEUDONIMO);
+  await rileggi();
+  await expect(righe).toHaveCount(1, { timeout: 15_000 });
+  await expect(lei).toHaveCount(0);
+  await expect(menu).toHaveCount(0);
 });
 
 // Tema chiaro e tema scuro: le manopole e i riquadri dei numeri sono roba

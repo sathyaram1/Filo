@@ -5,7 +5,7 @@
 'use strict';
 
 const cfg = require('./config');
-const G = require('../services/dominiGoogle');
+const G = require('../../shared/dominiGoogle');
 
 const DOPO = 'https://www.youtube.com/';
 const INVITO = 'YouTube, Gmail e Drive nelle schede non sono ancora collegati al tuo account Google.';

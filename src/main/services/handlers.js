@@ -40,7 +40,15 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.
   funzioneDi: (action) => (action === ACTIONS.PROVIDER_TEST ? '' : actionLabelForSettings(action)),
   rimedioDi: (s, action, err) => globalThis.SN_CHAT_ERRORS.rimedioNessunHost(doveSiSceglieIlModello(s, action), err, s),
+  // Lo crea handlers/contatori.js, registrato più sotto: lo si chiede a ogni chiamata.
+  contatore: () => globalThis.SN_CONTATORI_MAIN,
 });
+// Più chiamate che per chi usa Filo sono una richiesta sola (un messaggio coi suoi giri di strumenti, una dettatura
+// coi suoi ripieghi) contano un uso, con l'attesa da quando è partita la richiesta (#969).
+function unUsoContato(action, fn) {
+  const C = globalThis.SN_CONTATORI_MAIN;
+  return C && typeof C.unUso === 'function' ? C.unUso(action, fn) : fn();
+}
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -620,7 +628,11 @@ function noteServedProvider(settings, action, result) {
 // testo. Stessa catena di modelli, stesso limite di spesa, stesso riscontro su
 // chi ha servito. `payload`: { audioBase64, format, lang, interim } — oppure,
 // nella forma vecchia, { dataUrl, lang }.
-async function handleTranscription({ settings, payload, origin, signal }) {
+function handleTranscription(args) {
+  return unUsoContato(ACTIONS.TRANSCRIBE_AUDIO, () => trascrivi(args));
+}
+
+async function trascrivi({ settings, payload, origin, signal }) {
   const p = payload || {};
   const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
   const attempts = buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO);
@@ -778,6 +790,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
   const skipCache = hasTools || AICache.esclusa(action);
   const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
+    try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(action); } catch (_) {}
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
@@ -892,6 +905,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
 
   const cached = await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
+    try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(action); } catch (_) {}
     if (onDelta) onDelta(cached.text);
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
@@ -1118,6 +1132,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
   try { require('../updater').seguiImpostazioni(merged); } catch (_) {}
+  try { globalThis.SN_CONTATORI_MAIN?.seguiImpostazioni(merged); } catch (_) {}
   wireSafebrowse(merged).catch(() => {});
   try {
     const Cookies = require('./cookies');
@@ -1137,6 +1152,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     if (require('./adSkip').configureFromSettings(merged)) broadcastToTabs({ type: MSG.AD_SKIP_CONFIG_UPDATE });
   } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
+  try { require('../propostaEmail').impostazioni(merged); } catch (_) {}
   // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
   try {
     for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.({ mentreScrive });
@@ -1891,6 +1907,37 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
   return fonti;
 }
 
+// #953 — la segnalazione che Filo scrive e l'owner conferma è sua (fidata, senza giudici) solo se il compito non ha
+// letto testo di altri: lo stato dei livelli di autonomia, mai più largo della classe 2; dall'Aiuto di un sito mai.
+function compitoSenzaTestoDiAltri(sender, { contesto = null, fontiLette = null, assistente = false, impostazioni = null } = {}) {
+  try {
+    if (/^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))) return false;
+    const A = globalThis.SN_AUTONOMIA;
+    const aut = (impostazioni && impostazioni.autonomia) || {};
+    const attivo = A.livelloAttivo(aut.livello);
+    const livello = A.SOGLIA_PULITO[attivo] <= A.SOGLIA_PULITO.default ? attivo : 'default';
+    const fonti = fontiDelCompito(sender, contesto, fontiLette, assistente);
+    return A.stato({ fonti, livello, spostamenti: aut.fonti, manopole: aut.manopole }).stato === 'pulito';
+  } catch (_) { return false; }
+}
+// L'OK arriva senza il contesto del turno: vale il segno preso quando la proposta è stata mostrata, legato al suo
+// testo. Senza segno (scaduto, altra scheda, proposta mai vista) è contaminata.
+const segnalazioniPulite = new Map(); // pendingConfirmKey → scade
+const SEGNALAZIONE_PULITA_TTL = 24 * 60 * 60 * 1000;
+function ricordaSegnalazione(sender, action, pulita) {
+  const key = pendingConfirmKey(sender, action);
+  segnalazioniPulite.delete(key);
+  if (!pulita) return;
+  const now = Date.now();
+  for (const [k, scade] of segnalazioniPulite) if (scade <= now) segnalazioniPulite.delete(k);
+  segnalazioniPulite.set(key, now + SEGNALAZIONE_PULITA_TTL);
+}
+function segnalazioneConfermataPulita(sender, action) {
+  const key = pendingConfirmKey(sender, action);
+  const scade = segnalazioniPulite.get(key);
+  return !!scade && scade > Date.now();
+}
+
 // Ciò che una chat ha letto resta suo anche fuori dallo storico che la pagina rimanda a ogni turno (riaperta
 // dall'archivio, oltre gli ultimi venti messaggi): lo tiene il main, per la sessione e nell'archivio (#530).
 const fontiPerChat = new Map();   // chatId → fonti lette dalla chat
@@ -1968,7 +2015,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   if (d.risposta !== 'si' && d.risposta !== 'no') {
     const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
     if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
-    else if (d.regola === 'difesa') perche = 'Te lo chiedo perché abbassa una difesa di Filo.';
+    // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
     else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
   return { ...d, livello, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
@@ -2345,6 +2392,7 @@ async function eseguiAzioneFilo(action, {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
+    if (type === 'INVIA_FEEDBACK') ricordaSegnalazione(sender, action, compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni }));
     return sospesa();
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -2570,7 +2618,7 @@ async function eseguiAzioneFilo(action, {
         // questo punto la conferma è già passata (il gate sopra ha lasciato
         // procedere solo con confirmed:true). Il feedback parte come quelli
         // inviati dal box: stesso schema, ma clientId 'filo:chat' così in
-        // dashboard si vede che l'ha mandato Filo.
+        // dashboard si vede che l'ha mandato Filo. Dall'owner porta la sua prova; è suo solo a compito pulito (#953).
         const testo = String(action.testo ?? action.text ?? action.messaggio ?? '').trim();
         if (!testo) return { executed: false, kept: false };
         const FB = globalThis.SN_FEEDBACK;
@@ -2580,7 +2628,18 @@ async function eseguiAzioneFilo(action, {
         let userAgent = 'Filo desktop';
         try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
         try {
-          const r = await FB.submit({ text: testo, name: titolo, clientId: 'filo:chat', userAgent });
+          const Mittente = require('./feedbackMittente');
+          const pulita = confirmed
+            ? segnalazioneConfermataPulita(sender, action)
+            : compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni });
+          const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
+          const payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
+          // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
+          if (r && r.queued) {
+            try { await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({ id: r.id, testo, titolo }); } catch (_) {}
+            return { executed: true, kept: false };
+          }
           // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
           if (r && r.id) {
             try {
@@ -2603,7 +2662,8 @@ async function eseguiAzioneFilo(action, {
         // subito nella dashboard, che ascolta SETTINGS_UPDATED).
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
-        const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
+        const correnti = await Storage.getSettings();
+        const built = global.SN_PREF.buildPreferencePartial(chiave, valore, { attuali: correnti });
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
         // `perModello` (le chiavi, i valori ammessi) va solo al modello.
@@ -2614,7 +2674,7 @@ async function eseguiAzioneFilo(action, {
         let partial = built.partial;
         let dimenticate = 0;
         if (built.elenco) {
-          const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          const r = global.SN_PREF.applicaElenco(built.elenco, correnti);
           if (built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli') {
             const Indice = require('./documentiIndice');
             for (const c of await Indice.occasionaliFra(built.elenco.voci)) dimenticate += (await Indice.dimentica(c)).tolta ? 1 : 0;
@@ -2627,7 +2687,8 @@ async function eseguiAzioneFilo(action, {
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
         const costo = typeof action._costoModello === 'string' && action._costoModello ? { costoModello: action._costoModello } : {};
-        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo } };
+        const avviso = built.avviso ? { avviso: built.avviso } : {};
+        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo, ...avviso } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -2731,8 +2792,15 @@ async function eseguiAzioneFilo(action, {
         broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
         return { executed: true, kept: false, output: { tolte: r.tolte } };
       }
-      case 'EVENTO_CALENDARIO':
-        return { executed: false, kept: true };
+      case 'EVENTO_CALENDARIO': {
+        // Filo PROPONE: nel calendario l'evento entra col bottone. `proposta`
+        // lo dice alla chat, che senza lo racconterebbe come non riuscito; data
+        // e ora si controllano qui, non nel calendario dell'utente.
+        const C = globalThis.SN_CALENDAR;
+        const v = C ? C.verifica(action) : { errore: 'calendario non disponibile' };
+        if (!v.evento) return { executed: false, kept: false, output: { event: 'invalid', error: v.errore } };
+        return { executed: false, kept: true, output: { proposta: true, evento: v.evento } };
+      }
       case 'CAPACITA_DETTAGLIO': {
         // Lookup del manifesto delle capacità (F2): l'agente chiede il dettaglio
         // di una o più voci per id; glielo restituiamo come output, che il client
@@ -2989,7 +3057,13 @@ async function eseguiAzioneFilo(action, {
           if (!tm) return { executed: false, kept: confirmed, output: { error: 'nessuna finestra con schede' } };
           try {
             const r = await tm.runAutoTriage({ trigger: 'manual' });
-            return { executed: true, kept: confirmed, output: { archived: (r && r.archived) || 0 } };
+            const archived = (r && r.archived) || 0;
+            // Un riordino mai partito (già in corso, o senza giudizio e niente archiviato) non si racconta come riuscito.
+            if (!archived && r && (r.giaInCorso || r.giudizioMancato)) {
+              const error = r.giaInCorso ? 'un riordino è già in corso' : 'Filo non è riuscito a valutare le schede';
+              return { executed: false, kept: false, output: { archived: 0, giaInCorso: !!r.giaInCorso, giudizioMancato: !!r.giudizioMancato, error } };
+            }
+            return { executed: true, kept: confirmed, output: { archived } };
           } catch (e) {
             return { executed: false, kept: false, output: { error: String(e?.message || e) } };
           }
@@ -3303,6 +3377,12 @@ async function eseguiAzioneFilo(action, {
         }
         const win = winOf(sender);
         if (!win) return { executed: false, kept: false };
+        // Chi è già nella home non ci si porta: ricaricarla butterebbe via il
+        // lavoro e la risposta prima che l'utente li legga (il bottone per
+        // svuotare la conversazione lo mette la chat).
+        if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
+          return { executed: true, kept: true, output: { window: 'home', already: true } };
+        }
         if (cmd === 'fullscreen') {
           // Schermo intero "immersivo": la view attiva copre l'intera finestra e
           // le barre (schede + indirizzo) spariscono — è ciò che l'utente intende
@@ -4387,6 +4467,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
+  // La home chiesta da chi è già nella home: non è stato ricaricato niente, e
+  // il modello non deve dire di averlo portato da qualche parte.
+  if (type === 'COMANDO_FINESTRA' && res.output && res.output.already) {
+    return 'La home È la pagina da cui l\'utente ti sta scrivendo: non ho ricaricato niente, perché ricaricarla '
+      + 'cancellerebbe questa conversazione. Diglielo in una riga; sotto la tua risposta trova un bottone per svuotarla lui.';
+  }
   if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
     const A = globalThis.SN_AUTONOMIA;
     const ora = A ? A.infoLivello(res.output.livello).nome : '';
@@ -4409,8 +4495,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
       const costo = res.output && typeof res.output.costoModello === 'string' && res.output.costoModello
         ? ` Nella stessa risposta riporta il costo, con le stesse cifre: «${res.output.costoModello}»` : '';
+      const avviso = res.output && typeof res.output.avviso === 'string' && res.output.avviso
+        ? ` Attenzione: ${res.output.avviso}. Dillo all'utente e proponigli di riaccenderlo; non riaccenderlo da te.` : '';
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
-        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}`;
+        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}${avviso}`;
     }
     return `Eseguita: ${done}.`;
   }
@@ -4525,15 +4613,22 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     let userAgent = 'Filo desktop auto';
     try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
 
-    const result = await FB.submit({
+    // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
+    // confermata: il nome resta `auto:`). Senza un accesso valido aspetta in coda il suo rientro, come quella della chat:
+    // da anonima sembrerebbe di un estraneo, e buttata si perderebbe.
+    const Mittente = require('./feedbackMittente');
+    const voce = {
       text: payload.text,
       name: payload.name,
       clientId: payload.clientId,
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
-    }).catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
+    };
+    const result = await (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
+      .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
 
-    if (!result || !result.id) return;
+    // In coda non c'è ancora un documento da annullare.
+    if (!result || !result.id || result.queued) return;
     const feedbackId = result.id;
     autoFeedbackAnnullabili.add(String(feedbackId));
 
@@ -4738,7 +4833,7 @@ async function handleFiloChat(richiesta) {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
     const turno = () => turnoFiloChat(richiesta, volo);
-    return await (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno());
+    return await unUsoContato(ACTIONS.FILO_CHAT, () => (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno()));
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
   }
@@ -5930,12 +6025,14 @@ require('./handlers/filo')(on, handlerCtx);
 require('./handlers/auth')(on, handlerCtx);
 require('./handlers/credits')(on, handlerCtx);
 require('./handlers/wallet')(on, handlerCtx);   // #598 — chiave personale, inviti, registro d'uso
+require('./handlers/contatori')(on, handlerCtx); // #969 — i contatori giornalieri anonimi
 require('./handlers/avvisoCrediti')(on, handlerCtx); // #818 — l'avviso prima che i crediti finiscano, coi rimedi
 require('./handlers/board')(on, handlerCtx);
 require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
+require('./handlers/propostaEmail')(on, handlerCtx); // #1124 — l'email dell'account nei campi di accesso dei siti
 require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/filoSpento')(on, handlerCtx); // #843 — Filo spento o riacceso su un sito dal tasto destro
 require('./handlers/redteam')(on, handlerCtx);

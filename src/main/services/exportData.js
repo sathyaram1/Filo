@@ -544,6 +544,8 @@ const REGOLE_ALTRE_CHIAVI = {
   walletNotice: 'stato',
   walletPendingInvite: 'stato',
   walletUsageQueue: 'stato',
+  // I contatori di questa copia di Filo (#969): portati su un'altra, la stessa copia conterebbe due volte.
+  contatoriGiornalieri: 'stato',
   avvisoChiaviInChiaro: 'stato',
   'filo.editor.notesMigrated': 'stato',
   sn_qr_in_primary_migrated: 'stato',

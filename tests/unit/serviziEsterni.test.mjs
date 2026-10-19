@@ -21,6 +21,7 @@ const FILE_ESCLUSI = {
   'src/shared/serviziEsterni.js': 'l’elenco stesso: i suoi indirizzi non provano che il codice li usi',
   'src/shared/transparency.js': 'testi e fonti dei documenti di trasparenza',
   'src/shared/patchNotes.js': 'testo del changelog',
+  'src/vendor/public-suffix-list/privata.js': 'dati della Public Suffix List: l’indirizzo è la fonte che scripts/aggiorna-psl.mjs clona',
 };
 const DATI_DI_TERZI = { cartella: 'src/vendor/', perche: 'regole e licenze impacchettate: i loro indirizzi sono selettori di pagina' };
 
@@ -53,7 +54,7 @@ const COMPOSTI = [
   { file: 'src/main/services/siteBlock.js', testo: 'new URL(`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },
   { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
-  { file: 'src/shared/eseguibili.js', testo: 's : `https://${s}`', perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/stessoSito.js', testo: '`http://${s}`', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/nomiSito.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/tabTriage.js', testo: 's = `https://${s}`', perche: 'ne estrae il nome del sito da tenere sempre aperto' },
   { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },

@@ -29,6 +29,7 @@
     if (!owner || overviewLoaded) return;
     overviewLoaded = true;
     loadOverview().catch(() => {});
+    loadInstallazioni().catch(() => {});
   }
 
   async function load() {
@@ -68,87 +69,134 @@
     renderOwnerCodes(o.ownerInvites || []);
 
     const table = $('ownerUsers');
-    const tbody = table.querySelector('tbody');
-    // Le righe si rifanno: un menu aperto su una riga che non esiste più
-    // resterebbe appeso sopra la pagina.
-    chiudiMenuPersona();
-    tbody.innerHTML = '';
-    // Le righe si rifanno da zero: le schede già chieste vanno richieste.
-    schedeChieste.clear();
     const users = (o.users || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     table.hidden = users.length === 0;
     ricevuti.clear();
     for (const u of users) ricevuti.set(u.pseudonym, ricevutiIn(u));
-    for (const u of users) {
-      const tr = document.createElement('tr');
-      const b = u.balance || {};
-      const rec = u.reconcile;
-      const regTxt = !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok');
-      const fine = uso.ultimo[u.pseudonym];
-      const cells = [
-        u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd), regTxt,
-        u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
-        fine ? giornoBreve(fine) : (u.usage && !u.usage.rows ? 'mai' : '—'),
-      ];
-      cells.forEach((c, i) => {
-        const td = document.createElement('td');
-        td.textContent = c;
-        if (i === 0) { td.className = 'sn-wallet-pseudonym'; td.title = 'Copia'; td.addEventListener('click', (ev) => { ev.stopPropagation(); try { navigator.clipboard.writeText(u.pseudonym); } catch (_) {} $('ownerGrantPseudonym').value = u.pseudonym; }); }
-        if (i === 4 && rec && rec.flagged) td.className = 'is-flagged';
-        tr.appendChild(td);
-      });
-      if (u.disabled) tr.className = 'is-used';
-      tr.classList.add('sn-wallet-user');
-      tr.dataset.pseudonym = u.pseudonym;
-      tr.title = 'Apri la scheda di questa persona';
-      tr.tabIndex = 0;
-      tr.setAttribute('role', 'button');
-      tr.setAttribute('aria-expanded', 'false');
-      tbody.appendChild(tr);
-
-      // La scheda della persona sta in una riga sotto, che si apre al clic
-      // sulla riga. Il contenuto è una chiamata a parte (movimenti, inviti,
-      // ultime chiamate): si chiede alla prima apertura, non prima.
-      const detail = document.createElement('tr');
-      detail.className = 'sn-wallet-user-detail';
-      detail.dataset.pseudonym = u.pseudonym;
-      detail.hidden = true;
-      const td = document.createElement('td');
-      td.colSpan = cells.length;
-      // Finché la scheda non arriva si mostra quello che la vista generale sa
-      // già (per azione, per giorno): qualcosa da leggere c'è subito.
-      td.appendChild(usageDetail(u.usage));
-      detail.appendChild(td);
-      tbody.appendChild(detail);
-
-      const apriChiudi = () => {
-        detail.hidden = !detail.hidden;
-        tr.classList.toggle('is-open', !detail.hidden);
-        tr.setAttribute('aria-expanded', detail.hidden ? 'false' : 'true');
-        if (!detail.hidden) caricaScheda(u, td).catch(() => {});
-      };
-      tr.addEventListener('click', apriChiudi);
-      // Il tasto destro su una persona: quello che si vorrebbe fare proprio a
-      // lei. Senza, si apriva il menu generale della pagina, che di questa
-      // riga non sa niente. Vale anche dal tasto menu della tastiera, che
-      // manda lo stesso evento sulla riga col fuoco.
-      tr.addEventListener('contextmenu', (ev) => {
-        ev.preventDefault();
-        apriMenuPersona(u, detail, apriChiudi, ev.clientX, ev.clientY);
-      });
-      // Stessa strada da tastiera: una riga che si apre solo col mouse è una
-      // riga che per metà delle persone non si apre.
-      tr.addEventListener('keydown', (ev) => {
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault();
-        apriChiudi();
-      });
-    }
+    aggiornaRighe(table.querySelector('tbody'), users);
     applicaFiltro();
     const runs = [];
     if (o.daily && o.daily.lastRunAt) runs.push(`giornaliera ${formatDateTime(o.daily.lastRunAt)}${summ(o.daily.summary)}`);
     if (o.reconcile && o.reconcile.lastRunAt) runs.push(`riconciliazione ${formatDateTime(o.reconcile.lastRunAt)}${summ(o.reconcile.summary)}`);
     $('ownerRuns').textContent = runs.length ? `Ultime: ${runs.join(' · ')}` : 'Giornaliera e riconciliazione non hanno ancora girato.';
+  }
+
+  // ── Le righe delle persone ─────────────────────────────────────────────────
+  // La vista si rilegge a ogni movimento di crediti, anche di un'altra scheda: le righe si ritrovano per pseudonimo invece
+  // di rifarsi (patterns/una-lista-che-si-rilegge-da-sola-aggiorna-le-righe-al-loro-posto.md, #1087.4).
+  const righe = new Map();
+
+  function celleDi(u) {
+    const b = u.balance || {};
+    const rec = u.reconcile;
+    const fine = (usoLetto.ultimo || {})[u.pseudonym];
+    return [
+      u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd),
+      !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok'),
+      u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
+      fine ? giornoBreve(fine) : (u.usage && !u.usage.rows ? 'mai' : '—'),
+    ];
+  }
+
+  function scriviRiga(r, u) {
+    r.u = u;
+    r.impronta = JSON.stringify(u);
+    celleDi(u).forEach((c, i) => { r.celle[i].textContent = c; });
+    r.celle[4].classList.toggle('is-flagged', Boolean(u.reconcile && u.reconcile.flagged));
+    r.tr.classList.toggle('is-used', Boolean(u.disabled));
+  }
+
+  function nuovaRiga(u) {
+    const tr = document.createElement('tr');
+    tr.className = 'sn-wallet-user';
+    tr.dataset.pseudonym = u.pseudonym;
+    tr.title = 'Apri la scheda di questa persona';
+    tr.tabIndex = 0;
+    tr.setAttribute('role', 'button');
+    tr.setAttribute('aria-expanded', 'false');
+    const celle = celleDi(u).map(() => tr.appendChild(document.createElement('td')));
+    celle[0].className = 'sn-wallet-pseudonym';
+    celle[0].title = 'Copia';
+
+    // La scheda della persona sta in una riga sotto, che si apre al clic sulla riga. Il contenuto è una chiamata a parte
+    // (movimenti, inviti, ultime chiamate), chiesta alla prima apertura: fino ad allora c'è quello che la vista sa già.
+    const detail = document.createElement('tr');
+    detail.className = 'sn-wallet-user-detail';
+    detail.dataset.pseudonym = u.pseudonym;
+    detail.hidden = true;
+    const td = document.createElement('td');
+    td.colSpan = celle.length;
+    td.appendChild(usageDetail(u.usage));
+    detail.appendChild(td);
+
+    const r = { u, impronta: '', tr, celle, detail, td, scheda: null, rileggi: false };
+    r.apriChiudi = () => {
+      detail.hidden = !detail.hidden;
+      tr.classList.toggle('is-open', !detail.hidden);
+      tr.setAttribute('aria-expanded', detail.hidden ? 'false' : 'true');
+      if (!detail.hidden) caricaScheda(r).catch(() => {});
+    };
+    celle[0].addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      try { navigator.clipboard.writeText(r.u.pseudonym); } catch (_) {}
+      $('ownerGrantPseudonym').value = r.u.pseudonym;
+    });
+    tr.addEventListener('click', r.apriChiudi);
+    // Il tasto destro su una persona: quello che si vorrebbe fare proprio a lei (il menu generale della pagina di questa
+    // riga non sa niente). Vale anche dal tasto menu della tastiera, che manda lo stesso evento sulla riga col fuoco.
+    tr.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      apriMenuPersona(r, ev.clientX, ev.clientY);
+    });
+    tr.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      r.apriChiudi();
+    });
+    scriviRiga(r, u);
+    return r;
+  }
+
+  // I numeri di una persona sono cambiati: la sua scheda si richiede (aperta subito, chiusa alla prossima apertura), e
+  // quella vecchia resta sotto gli occhi finché la nuova non arriva.
+  function cambiaRiga(r, u) {
+    scriviRiga(r, u);
+    if (r.scheda === 'chiesta') { r.rileggi = true; return; }
+    r.scheda = null;
+    if (!r.td.querySelector('.sn-wallet-scheda')) r.td.replaceChildren(usageDetail(u.usage));
+    if (!r.detail.hidden) caricaScheda(r).catch(() => {});
+  }
+
+  function aggiornaRighe(tbody, users) {
+    const elenco = [];
+    const viste = new Map();
+    for (const u of users) {
+      const n = viste.get(u.pseudonym) || 0;
+      viste.set(u.pseudonym, n + 1);
+      elenco.push({ chiave: n ? `${u.pseudonym}#${n}` : String(u.pseudonym), u });
+    }
+    const chiavi = new Set(elenco.map((e) => e.chiave));
+    // Prima via chi non c'è più, così le righe che restano non si spostano: una riga spostata perde il fuoco.
+    for (const [chiave, r] of righe) {
+      if (chiavi.has(chiave)) continue;
+      if (menuDi === r) chiudiMenuPersona();
+      r.tr.remove();
+      r.detail.remove();
+      righe.delete(chiave);
+    }
+    let posto = tbody.firstChild;
+    for (const { chiave, u } of elenco) {
+      let r = righe.get(chiave);
+      if (!r) {
+        r = nuovaRiga(u);
+        righe.set(chiave, r);
+      } else if (JSON.stringify(u) !== r.impronta) {
+        cambiaRiga(r, u);
+      }
+      if (posto !== r.tr) tbody.insertBefore(r.tr, posto);
+      if (r.tr.nextSibling !== r.detail) tbody.insertBefore(r.detail, r.tr.nextSibling);
+      posto = r.detail.nextSibling;
+    }
   }
 
   // ── Quando il server non risponde ──────────────────────────────────────────
@@ -279,6 +327,62 @@
     const posti = buoni.reduce((a, v) => a + Math.max(0, (Number(v.max) || 0) - (Number(v.used) || 0)), 0);
     lista.appendChild(riquadro(formatInt(buoni.length), buoni.length === 1 ? 'tuo invito da dare' : 'tuoi inviti da dare',
       `Codici usciti da qui con ancora un posto libero: ${formatInt(posti)} ${posti === 1 ? 'persona può entrare' : 'persone possono entrare'}.`));
+  }
+
+  // ── Le installazioni attive, dai contatori giornalieri (#969) ──────────────
+  // Copie di Filo che hanno spedito i numeri di ieri e del mese in corso: pseudonimi distinti, e uno pseudonimo vale un
+  // mese. Chi ha spento i contatori non c'è. Non letti: un trattino, mai uno zero; dietro il tasto destro si rilegge.
+  const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre',
+    'novembre', 'dicembre'];
+  let letturaInstallazioni = 0;
+
+  async function loadInstallazioni() {
+    const mia = ++letturaInstallazioni;
+    const r = await chrome.runtime.sendMessage({ type: MSG.CONTATORI_INSTALLAZIONI })
+      .catch((e) => ({ ok: false, error: String((e && e.message) || e) }));
+    if (mia !== letturaInstallazioni) return;
+    const i = r && r.ok ? r.installazioni : null;
+    if (!i) console.warn('[credits/owner] contatori non letti:', r && r.error);
+    const lista = $('ownerInstallazioni');
+    lista.innerHTML = '';
+    const ieri = i && i.ieri;
+    const mese = i && i.mese;
+    // Senza risposta il mese è quello di oggi, qui: è lo stesso che il main avrebbe chiesto.
+    const nomeMese = (m) => MESI[m ? Number(String(m).slice(5, 7)) - 1 : new Date().getMonth()] || MESI[new Date().getMonth()];
+    const quando = ieri ? giornoBreve(ieri.giorno) : 'ieri';
+    lista.append(
+      riquadroInstallazioni(ieri, (n) => `${n === 1 ? 'installazione attiva' : 'installazioni attive'} ieri`,
+        `Le copie di Filo che hanno mandato i contatori di ieri (${quando}). Chi li ha spenti non c'è.`, r),
+      riquadroInstallazioni(mese, (n) => `${n === 1 ? 'installazione attiva' : 'installazioni attive'} a ${nomeMese(mese && mese.mese)}`,
+        `Le copie di Filo che hanno mandato i contatori di almeno un giorno di ${nomeMese(mese && mese.mese)}, fino a ieri: `
+        + 'ognuna conta una volta. Chi li ha spenti non c\'è.', r),
+    );
+  }
+
+  // Prima che le regole coi contatori siano pubblicate il server nega la lettura: lo si dice, non «rientra».
+  function fraseContatori(raw) {
+    const t = String(raw || '');
+    if (/not_admin|sessione scaduta|not_signed_in/i.test(t)) return fraseGuasto(t);
+    if (/PERMISSION_DENIED|contatori 40[13]/i.test(t)) {
+      return 'il server li ha negati; se le regole coi contatori non sono ancora pubblicate, si pubblicano con npm run regole:pubblica';
+    }
+    return 'il server non risponde';
+  }
+
+  function riquadroInstallazioni(v, nome, spiega, r) {
+    const noto = Boolean(v && Number.isFinite(Number(v.n)));
+    const n = noto ? Number(v.n) : null;
+    const valore = !noto ? '—' : `${v.completo === false ? 'almeno ' : ''}${formatInt(n)}`;
+    const title = noto ? spiega : `I contatori non si sono letti: ${fraseContatori(r && r.error)}.`;
+    const li = riquadro(valore, nome(n), title, { nota: noto ? '' : 'non letti' });
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      apriMenu([
+        ...(noto ? [['Copia il numero', () => copia(String(n))]] : []),
+        ['Rileggi', () => { loadInstallazioni().catch(() => {}); }],
+      ], ev.clientX, ev.clientY);
+    });
+    return li;
   }
 
   // ── Chi ha usato Filo: il numero apre le persone che ha contato ────────────
@@ -585,11 +689,13 @@
   // a QUELLA persona: aprire la sua scheda, prendere il suo pseudonimo,
   // regalarle crediti.
   let menuAperto = null;
+  let menuDi = null;
 
   function chiudiMenuPersona() {
     if (!menuAperto) return;
     menuAperto.remove();
     menuAperto = null;
+    menuDi = null;
     document.removeEventListener('mousedown', fuoriDalMenu, true);
     document.removeEventListener('keydown', tastoSulMenu, true);
     window.removeEventListener('wheel', fuoriDalMenu, true);
@@ -605,20 +711,21 @@
 
   function copia(testo) { try { navigator.clipboard.writeText(testo); } catch (_) {} }
 
-  function apriMenuPersona(u, detail, apriChiudi, x, y) {
+  function apriMenuPersona(r, x, y) {
     apriMenu([
-      [detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => apriChiudi()],
-      ['Copia lo pseudonimo', () => copia(u.pseudonym)],
+      [r.detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => r.apriChiudi()],
+      ['Copia lo pseudonimo', () => copia(r.u.pseudonym)],
       ['Regala crediti a questa persona', () => {
-        $('ownerGrantPseudonym').value = u.pseudonym;
+        $('ownerGrantPseudonym').value = r.u.pseudonym;
         const quanti = $('ownerGrantCredits');
         quanti.focus();
         quanti.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
       }],
-    ], x, y);
+    ], x, y, r);
   }
 
-  function apriMenu(voci, x, y) {
+  // `di` è la riga a cui il menu appartiene: se la riga sparisce in una rilettura, il menu se ne va con lei.
+  function apriMenu(voci, x, y, di = null) {
     chiudiMenuPersona();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
@@ -644,6 +751,7 @@
     menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
     menuAperto = menu;
+    menuDi = di;
     document.addEventListener('keydown', tastoSulMenu, true);
     setTimeout(() => {
       if (menuAperto !== menu) return;
@@ -657,35 +765,45 @@
   // Tutto quello che si può sapere di chi usa Filo con un portafoglio, senza
   // mai un nome: saldo, quanto ha ricevuto e quanto ha speso, dove sono andati
   // i crediti, i movimenti, chi l'ha invitata, i suoi inviti e le ultime
-  // chiamate che ha fatto. Si chiede alla prima apertura della riga.
-  const schedeChieste = new Set();
-
-  async function caricaScheda(u, td) {
-    if (schedeChieste.has(u.pseudonym)) return;
-    schedeChieste.add(u.pseudonym);
-    const attesa = document.createElement('p');
-    attesa.className = 'sn-muted sn-wallet-scheda-attesa';
-    attesa.textContent = 'Apro la scheda…';
-    td.appendChild(attesa);
-    const r = await chrome.runtime
-      .sendMessage({ type: MSG.WALLET_OWNER_USER_DETAIL, pseudonym: u.pseudonym })
+  // chiamate che ha fatto. Si chiede alla prima apertura della riga, e di nuovo
+  // quando la vista dice che i suoi numeri sono cambiati (`cambiaRiga`).
+  async function caricaScheda(r) {
+    if (r.scheda) return;
+    r.scheda = 'chiesta';
+    const td = r.td;
+    for (const n of td.querySelectorAll('.sn-wallet-scheda-esito')) n.remove();
+    let attesa = null;
+    if (!td.querySelector('.sn-wallet-scheda')) {
+      attesa = document.createElement('p');
+      attesa.className = 'sn-muted sn-wallet-scheda-attesa';
+      attesa.textContent = 'Apro la scheda…';
+      td.appendChild(attesa);
+    }
+    const res = await chrome.runtime
+      .sendMessage({ type: MSG.WALLET_OWNER_USER_DETAIL, pseudonym: r.u.pseudonym })
       .catch(() => null);
-    attesa.remove();
-    const d = r && r.ok && r.detail;
+    if (attesa) attesa.remove();
+    const d = res && res.ok && res.detail;
     if (!d || d.found === false) {
       // Riprovabile: la prossima apertura la richiede.
-      schedeChieste.delete(u.pseudonym);
+      r.scheda = null;
       const err = document.createElement('p');
-      err.className = 'sn-wallet-msg is-error';
-      if (r && r.error) console.warn('[credits/owner] scheda non arrivata:', r.error);
+      err.className = 'sn-wallet-msg is-error sn-wallet-scheda-esito';
+      if (res && res.error) console.warn('[credits/owner] scheda non arrivata:', res.error);
       err.textContent = d && d.found === false
         ? 'Questa persona non risulta più al server.'
-        : `Scheda non arrivata: ${fraseGuasto(r && r.error)}. Richiudi e riapri per riprovare.`;
+        : `Scheda non arrivata: ${fraseGuasto(res && res.error)}. Richiudi e riapri per riprovare.`;
       td.appendChild(err);
-      return;
+    } else {
+      r.scheda = 'arrivata';
+      td.replaceChildren(schedaPersona(r.u, d));
     }
-    td.innerHTML = '';
-    td.appendChild(schedaPersona(u, d));
+    // La vista è cambiata mentre questa era in viaggio: quella appena scritta è già vecchia.
+    if (r.rileggi) {
+      r.rileggi = false;
+      r.scheda = null;
+      if (!r.detail.hidden) await caricaScheda(r);
+    }
   }
 
   function bloccoScheda(titolo, corpo) {
@@ -819,7 +937,13 @@
   // questa pagina che escono i codici per i primi invitati, e un invito da tre
   // posti con uno occupato è ancora da dare. Un invito «usato» e basta faceva
   // sparire gli altri due posti: barrato, pulsante spento, nessun link.
+  // Riletti uguali, i codici restano quelli: un pulsante col fuoco o appena
+  // copiato non si rifà sotto le dita (#1087.4, come le righe delle persone).
+  let codiciScritti = null;
   function renderOwnerCodes(invites) {
+    const impronta = JSON.stringify(invites);
+    if (impronta === codiciScritti) return;
+    codiciScritti = impronta;
     const list = $('ownerCodes');
     list.innerHTML = '';
     $('ownerCodesTitle').hidden = invites.length === 0;

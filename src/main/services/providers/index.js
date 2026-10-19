@@ -115,7 +115,14 @@
   // usato) al risultato. Ogni attempt può portare il proprio `model` (id
   // provider-specifico risolto dal nickname): se assente si usa il `model`
   // globale per retro-compatibilità.
-  async function completeWithFallback({ attempts, model, messages, tools, toolChoice, signal, onFallback }) {
+  // `onTentativoFallito(err, { modello, host })` arriva per OGNI tentativo fallito, anche l'ultimo: lo leggono i
+  // contatori giornalieri (#969), che contano i guasti per modello e host.
+  function tentativoFallito(fn, err, aModel) {
+    if (typeof fn !== 'function') return;
+    try { fn(err, { modello: aModel, host: (err && err.hostFallito) || '' }); } catch (_) {}
+  }
+
+  async function completeWithFallback({ attempts, model, messages, tools, toolChoice, signal, onFallback, onTentativoFallito }) {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
       const a = attempts[i];
@@ -130,6 +137,7 @@
         return { ...r, provider: a.provider, model: aModel };
       } catch (err) {
         lastErr = err;
+        tentativoFallito(onTentativoFallito, err, aModel);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} fallito (${i + 1}/${attempts.length}):`, err.message || err);
         if (onFallback && i + 1 < attempts.length) {
@@ -146,7 +154,7 @@
   // provider successivo emettiamo `onReset` così il chiamante butta il buffer
   // parziale e riparte pulito (#273). onReset viene chiamato SOLO se l'attempt
   // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
-  async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset }) {
+  async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onTentativoFallito }) {
     let lastErr = null;
     // I tentativi rotti dopo che il modello aveva già scritto: il fornitore li fa pagare, chi tiene il conto li deve vedere.
     const broken = [];
@@ -186,6 +194,7 @@
         lastErr = err;
         // Porta le chiavi usate: non enumerabile, un errore si stampa e si serializza.
         if (broken.length && err && typeof err === 'object') Object.defineProperty(err, 'brokenAttempts', { value: broken, enumerable: false, configurable: true });
+        tentativoFallito(onTentativoFallito, err, aModel);
         if (stopOnOutOfCredits(err)) throw err;
         console.warn(`[SN] provider ${a.provider} streaming fallito (${i + 1}/${attempts.length}):`, err.message || err);
         const hasNext = i + 1 < attempts.length;

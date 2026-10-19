@@ -2654,6 +2654,8 @@
     // #1039 — `installa`: su Windows una versione scaricata si installa all'apertura, con la barra visibile ('avvio'), o
     // in silenzio alla chiusura ('chiusura'). Le regole per sistema: src/main/aggiornamentoRegole.js.
     aggiornamenti: { automatici: true, installa: 'avvio' },
+    // #1124 — l'email dell'account Filo proposta nei campi di accesso dei siti; in incognito solo se l'utente lo chiede.
+    propostaEmail: { attiva: true, incognito: false },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è
@@ -2839,6 +2841,8 @@
       riquadriRotti: {
         modello: true,
       },
+      // Segnalazione automatica e anonima dei problemi a chi sviluppa Filo (F4, src/shared/autoFeedback.js): attiva di serie.
+      autoFeedback: true,
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
     // disco?», e nella home un `/comando` va alla shell. Accesa di serie (#892):
@@ -2889,6 +2893,9 @@
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
+    // #969 — i contatori giornalieri anonimi (decisione dell'owner D52: accesi di serie). Spenti, non si conta niente
+    // e non parte niente: src/main/services/contatori.js.
+    contatori: { attivi: true },
     // #842 — i tasti di Spiega, Traduci, Salva per dopo e Aiuto scelti dall'utente, per id dell'azione; '' o assente
     // vale il tasto di serie (SN_TASTI.AZIONI_FILO).
     scorciatoie: {},

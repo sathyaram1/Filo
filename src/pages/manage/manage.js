@@ -22,7 +22,8 @@
   // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
   // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
   // Un interruttore per ogni categoria d'autore che la lista mostra come icona
-  // (AUTHOR_META più sotto): chi si vede separato si regola separato.
+  // (AUTHOR_META più sotto): chi si vede separato si regola separato. Esplorazione
+  // e allarmi della pubblicazione no: entrano in coda comunque (#1035).
   const mgAutoApprove = {
     owner:    document.getElementById('mgAutoApproveOwner'),
     user:     document.getElementById('mgAutoApproveUser'),
@@ -30,7 +31,6 @@
     worker:   document.getElementById('mgAutoApproveWorker'),
     verifier: document.getElementById('mgAutoApproveVerifier'),
     residuo:  document.getElementById('mgAutoApproveResiduo'),
-    prober:   document.getElementById('mgAutoApproveProber'),
     claude:   document.getElementById('mgAutoApproveClaude'),
     filo:     document.getElementById('mgAutoApproveFilo'),
   };
@@ -288,14 +288,23 @@
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
+    // Lo apre il server quando una versione non si costruisce (#1002): non è Claude, ed è lavoro che ferma le uscite.
+    costruzione: { icon: '🏗️', label: 'Allarme della pubblicazione' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
   };
   // Dal feedback, non dal clientId: un nome riservato senza prova è un utente come gli altri (#912).
   function authorKindOf(fb) {
     return (TH && TH.authorKind) ? TH.authorKind(fb || {}) : 'user';
   }
+  // Quello che Filo manda dalla copia dell'owner porta la sua prova (#953): l'etichetta lo dice, la categoria no.
+  const PER_CONTO_OWNER = {
+    owner: { icon: AUTHOR_META.owner.icon, label: 'Owner (scritto da Filo)' },
+    filo:  { icon: AUTHOR_META.filo.icon, label: 'Filo (per conto dell\'owner)' },
+  };
   function authorMetaOf(fb) {
-    return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
+    const kind = authorKindOf(fb);
+    if (PER_CONTO_OWNER[kind] && TH && TH.filoPerConto && TH.filoPerConto(fb || {}) === 'owner') return PER_CONTO_OWNER[kind];
+    return AUTHOR_META[kind] || AUTHOR_META.user;
   }
   function authorIconHtml(fb) {
     const m = authorMetaOf(fb);
@@ -306,7 +315,7 @@
   // loro) se ne mostra un pezzo: per owner/Filo/automazioni sarebbe rumore.
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
-    const m = AUTHOR_META[kind] || AUTHOR_META.user;
+    const m = authorMetaOf(fb);
     if (kind !== 'user') return `${m.icon} ${m.label}`;
     // Senza il nome riservato che si era dato: ne mostrerebbe la firma.
     const id = String((fb && fb.clientId) || '').trim().replace(/^(non-provato:)?(owner|routine|agent|local):/i, '');
@@ -340,7 +349,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
+  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, costruzione: 7, claude: 8, filo: 9 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
@@ -4249,7 +4258,7 @@
   function chiaveSegno(fb) {
     const c = String((fb && fb.clientId) || '').trim();
     if (!c || MR.valueUnreadable(c)) return 'fb:' + String((fb && fb._id) || '');
-    return 'm:' + senderKeyOf(fb);
+    return 'm:' + chiaveServerMittente(fb);
   }
   function segnoDi(fb) { return fb ? segniMittente.get(chiaveSegno(fb)) || null : null; }
   function segnoAttivo(fb) { const s = segnoDi(fb); return !!(s && s.flagged); }
@@ -5071,6 +5080,42 @@
     }).join('\n\n');
   }
 
+  // Le note lunghe della lavorazione si mostrano ripiegate, l'inizio visibile e un tocco per aprirle (#559):
+  // una critica di duecento righe non deve nascondere il turno dopo. Aperte e chiuse sopravvivono ai ridisegni.
+  const NOTA_RIGHE_MAX = 24;
+  let noteAperte = { id: null, chiavi: new Set() };
+
+  function righeStimate(testo) {
+    return String(testo || '').split('\n').reduce((n, riga) => n + Math.max(1, Math.ceil(riga.length / 100)), 0);
+  }
+
+  function ripiegaNota(bolla, chiave) {
+    const corpo = bolla.querySelector('.mg-bubble-body');
+    const tasto = document.createElement('button');
+    tasto.type = 'button';
+    tasto.className = 'mg-bubble-apri';
+    corpo.after(tasto);
+    const mostra = (aperta) => {
+      bolla.classList.toggle('mg-bubble--ripiegata', !aperta);
+      tasto.setAttribute('aria-expanded', String(aperta));
+      tasto.textContent = aperta ? 'Riduci' : 'Mostra tutto';
+      if (aperta) noteAperte.chiavi.add(chiave);
+      else noteAperte.chiavi.delete(chiave);
+    };
+    tasto.addEventListener('click', () => {
+      const apri = bolla.classList.contains('mg-bubble--ripiegata');
+      mostra(apri);
+      // Richiusa dal fondo di una nota lunga, la bolla tornerebbe fuori vista: la si riporta sotto gli occhi.
+      if (!apri) bolla.scrollIntoView({ block: 'nearest' });
+    });
+    corpo.addEventListener('click', (e) => {
+      if (!bolla.classList.contains('mg-bubble--ripiegata')) return;
+      if (e.target.closest('a') || String(window.getSelection() || '')) return;
+      mostra(true);
+    });
+    mostra(noteAperte.chiavi.has(chiave));
+  }
+
   // La conversazione COMPLETA del feedback, un turno per bolla: segnalazione
   // originale → parere di Filo (giudici) → commento dell'owner alla revisione →
   // tutti i turni della lavorazione (report delle istanze, esiti del verifier,
@@ -5192,12 +5237,19 @@
       if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
-    for (const seg of TH.splitNotes(notes)) {
+    if (noteAperte.id !== fb._id) noteAperte = { id: fb._id, chiavi: new Set() };
+    const turni = TH.splitNotes(notes);
+    turni.forEach((seg, i) => {
       const when = seg.ts ? ` — ${seg.ts}` : '';
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       const corpo = seg.role === 'user' ? esc(seg.body) : markdownHtml(seg.body);
-      appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
-    }
+      const b = appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
+      const chiave = `${i}:${seg.body.length}`;
+      // L'ultima nota è quella che si legge: resta aperta, e resta aperta anche quando un turno nuovo
+      // arriva mentre la si legge (niente che si richiude da solo).
+      if (i === turni.length - 1) noteAperte.chiavi.add(chiave);
+      else if (righeStimate(seg.body) > NOTA_RIGHE_MAX) ripiegaNota(b, chiave);
+    });
     appendFraseBubble(fb);
     // La copia che si sta leggendo è rimasta indietro e il tentativo di
     // rileggerla non è tornato: si dice in coda alla conversazione, dove
@@ -5408,6 +5460,11 @@
     non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
     non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
     guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
+    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
+    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
+    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
+    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
   };
 
   function pannelloSaltaAudit(fb) {
@@ -5540,6 +5597,7 @@
   function openSidebarSender(clientId) {
     const group = allByClient[clientId] || [];
     const total = group.length;
+    const mittente = group[0] ? chiaveServerMittente(group[0]) : mittenteDaChiave(clientId);
 
     // Età account: createdAt più vecchio
     let oldest = null;
@@ -5572,8 +5630,8 @@
 
     const html = `
       <div class="mg-sender-info">
-        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId }))}</strong></div>
-        <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
+        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId: mittente }))}</strong></div>
+        <div class="mg-sender-stat">${esc(mittente === '__anon__' ? 'anonimo' : mittente)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
         <div class="mg-sender-segno" id="mgSideSegno" hidden></div>
@@ -5694,8 +5752,18 @@
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
   // caricamento e a ogni giro di aggiornamento.
   // Chiave del mittente = la stessa del server: chi copia il clientId dell'owner senza prova sta in un gruppo suo.
-  function senderKeyOf(fb) {
+  function chiaveServerMittente(fb) {
     return (MR.effectiveClientId ? MR.effectiveClientId(fb) : String((fb && fb.clientId) || '')) || '__anon__';
+  }
+  // Il pannello tiene a parte anche ciò che Filo manda con la prova dell'owner, non con gli estranei dello stesso
+  // nome (#953). Il prefisso è su ogni chiave: nessun clientId scelto apposta entra in quel gruppo.
+  function senderKeyOf(fb) {
+    const perOwner = authorKindOf(fb) === 'filo' && !!(TH && TH.filoPerConto) && TH.filoPerConto(fb || {}) === 'owner';
+    return (perOwner ? 'owner|' : 'm|') + chiaveServerMittente(fb);
+  }
+  function mittenteDaChiave(key) {
+    const s = String(key || '');
+    return s.slice(s.indexOf('|') + 1);
   }
   function reindexByClient() {
     allByClient = {};

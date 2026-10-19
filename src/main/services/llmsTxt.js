@@ -6,7 +6,7 @@
   'use strict';
 
   const { safeFetch, leggiTesto } = require('./safe-fetch');
-  const Sito = require('./stessoSito');
+  const Sito = require('../../shared/stessoSito');
 
   const STORAGE_KEY = 'sn_llmstxt_cache';
   const TTL_MS = 24 * 60 * 60 * 1000;       // 24h
