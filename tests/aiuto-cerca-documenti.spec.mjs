@@ -91,8 +91,9 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
     const sopra = await confermaSopraPagina(app, { timeout: 20_000 });
     const domanda = await confirmState(sopra);
     expect(domanda.title).toBe('Cerco fra i tuoi documenti?');
-    expect(domanda.text).toContain('127.0.0.1');
-    expect(domanda.text).toContain('«bolletta luce energia elettrica marzo»');
+    expect(domanda.fuori).toContain('127.0.0.1');
+    // La richiesta la scrive il modello: sta intera nel suo riquadro (#592.7).
+    expect(domanda.citazioni).toEqual(['bolletta luce energia elettrica marzo']);
     await clickConfirm(sopra, 'ok');
 
     const file = page.locator('.sn-sidebar .sn-sidebar-file');

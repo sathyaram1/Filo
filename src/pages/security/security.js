@@ -356,19 +356,25 @@
         prev.chiavi === false ? I18n.t('security_import_senza_chiavi') : '',
         prev.proxySenzaCredenziali ? I18n.t('security_import_proxy_senza_credenziali') : '',
       ].filter(Boolean);
-      const text = I18n.t('security_import_confirm_text')
-        .replace('%6', I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
-        .replace('%1', prev.fileName || '')
-        .replace('%2', when)
-        .replace('%3', sezioni)
-        .replace('%4', immagini)
-        .replace('%5', delFilo ? `, più ${delFilo}` : '')
+      // Sostituzioni a funzione: un `$&` o un `%2` nel nome del file non pescano nella frase di Filo.
+      const testo = I18n.t('security_import_confirm_text')
+        .replace('%6', () => I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
+        .replace('%2', () => when)
+        .replace('%3', () => sezioni)
+        .replace('%4', () => immagini)
+        .replace('%5', () => (delFilo ? `, più ${delFilo}` : ''))
         + (manca.length ? `\n\n${manca.join('\n')}` : '');
+      // Il nome lo sceglie chi ha dato il file: nel suo riquadro, fuori dalle parole di Filo (#592.7).
+      const nome = String(prev.fileName || '');
+      const [prima, dopo = ''] = testo.split('"%1"');
+      const text = `${prima}"${nome}"${dopo}`;
+      const parti = nome ? [prima, { citazione: nome }, dopo] : null;
 
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({
           title: I18n.t('security_import_confirm_title'),
           text,
+          parti,
           okLabel: I18n.t('security_import_confirm_ok'),
         })
         : true;

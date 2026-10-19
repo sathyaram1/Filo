@@ -275,7 +275,7 @@ test('i nomi delle reti Wi-Fi e dei dispositivi Bluetooth elencati sono di altri
 test('la ricerca dell\'Aiuto passa da NAVIGA col testo cercato: costo 2 lì, una domanda sola', () => {
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), 2);
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://esempio.it/' }), 1);
-  assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n“gatti”/);
+  assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n«gatti»/);
   const side = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
   for (const op of ['search_text', 'search_image']) {
     assert.match(side, new RegExp(`${op}:\\s*\\{[^}]*viaFilo: true`), `${op} non chiede anche lui prima del dispatch`);

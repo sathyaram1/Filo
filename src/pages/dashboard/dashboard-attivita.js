@@ -1619,7 +1619,7 @@
     // Un indirizzo che la porta delle uscite vuole confermato si conferma qui, come i collegamenti della chat.
     if (r && r.conferma) {
       const Ui = window.SN_CONFIRM_UI;
-      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : window.confirm(String(r.conferma));
       r = null;
       if (ok) { try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; } }
       if (!ok) { delete btn.dataset.inCorso; return; }
@@ -1807,7 +1807,7 @@
       async function runConfirm() {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
-        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', avviso: a._confirm.avviso || '' };
+        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', parti: a._confirm.parti, avviso: a._confirm.avviso || '' };
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
@@ -2205,6 +2205,14 @@
     const query = String(a.query || a.testo || '').trim();
     const panel = document.createElement('div');
     panel.className = 'dash-delete-panel';
+    // La richiesta la scrive il modello: sta nel suo riquadro, sopra le parole di Filo, dove non
+    // può chiudere le virgolette e continuare con la voce di Filo (#592.7).
+    if (query) {
+      const chiesta = document.createElement('div');
+      chiesta.className = 'dash-delete-query';
+      chiesta.textContent = query;
+      panel.appendChild(chiesta);
+    }
     const note = document.createElement('div');
     note.className = 'dash-delete-note';
     panel.appendChild(note);
@@ -2216,7 +2224,7 @@
         return;
       }
       note.dataset.cerco = '1';
-      const cercoTesto = `Cerco nell’archivio: “${query}”…`;
+      const cercoTesto = 'Cerco nell’archivio le schede su questa richiesta…';
       note.textContent = cercoTesto;
       // Con un archivio grande il giudizio dura: il main dice quante schede ha già guardato.
       const richiesta = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -2237,7 +2245,7 @@
       if (!results) {
         // Senza un giudizio completo non si propone niente: un elenco a metà
         // farebbe credere di aver tolto tutto.
-        note.textContent = `Non sono riuscito a capire quali schede riguardano “${query}”.`;
+        note.textContent = 'Non sono riuscito a capire quali schede riguardano questa richiesta.';
         const again = document.createElement('button');
         again.className = 'dash-action-btn';
         again.type = 'button';
@@ -2247,13 +2255,13 @@
         return;
       }
       if (!results.length) {
-        note.textContent = `Nessuna scheda archiviata riguarda “${query}”.`;
+        note.textContent = 'Nessuna scheda archiviata riguarda questa richiesta.';
         return;
       }
       const quante = (n) => `${n} ${n === 1 ? 'scheda' : 'schede'}`;
       note.textContent = results.length === 1
-        ? `Trovata 1 scheda pertinente a “${query}”. Verrà eliminata DEFINITIVAMENTE:`
-        : `Trovate ${results.length} schede pertinenti a “${query}”. Verranno eliminate DEFINITIVAMENTE:`;
+        ? 'Trovata 1 scheda pertinente a questa richiesta. Verrà eliminata DEFINITIVAMENTE:'
+        : `Trovate ${results.length} schede pertinenti a questa richiesta. Verranno eliminate DEFINITIVAMENTE:`;
       // Le sceglie un modello: chi conferma deve poter togliere quella presa per sbaglio.
       const ul = document.createElement('ul');
       ul.className = 'dash-delete-list';

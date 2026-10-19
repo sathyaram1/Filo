@@ -438,7 +438,9 @@ test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e t
   });
   const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }));
   expect(chiesta.needsConfirm).toBe(2);
-  expect(chiesta.describe).toContain('le 2 pagine visitate su youtube.com di sempre');
+  // Il sito sta nel suo riquadro (#592.7): la frase lo annuncia, il riquadro lo porta da solo.
+  expect(chiesta.describe).toContain('le 2 pagine visitate di sempre di questo sito:');
+  expect(chiesta.parti).toContainEqual({ citazione: 'youtube.com', nuda: true });
   const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }, { confirmed: true }));
   expect(fatta.output.cancellate).toBe(2);
   const testo = leggiFilo(userData);

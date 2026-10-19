@@ -1,8 +1,10 @@
 // Componenti di conferma riusabili per i livelli di sicurezza delle azioni
 // di Filo (#146.2). Stile minimale, costruito sui token del tema (--sn-*).
 //
-//   SN_CONFIRM_UI.confirm({ title, text, okLabel, cancelLabel }) → Promise<bool>
+//   SN_CONFIRM_UI.confirm({ title, text, parti, okLabel, cancelLabel }) → Promise<bool>
 //     Livello 2: popup che SPIEGA in chiaro la modifica, con OK e Annulla.
+//     `parti` (facoltativo, vince su `text`): stringhe di Filo e riquadri
+//     { citazione } / { elenco } col testo che non è suo (#592.7).
 //
 //   SN_CONFIRM_UI.confirmTyped({ title, text, word, avviso }) → Promise<bool>
 //     Livello 3: box con attrito maggiore — il bottone resta disabilitato
@@ -62,6 +64,24 @@
      sotto gli occhi (tuttoVisto). Il tetto lascia posto a titolo e bottoni. */
   max-height: min(640px, calc(100vh - 160px));
   overflow-y: auto;
+}
+.sn-confirm-filo { margin: 0; }
+/* Il testo che non è di Filo sta su un foglietto tinto d'accento, con un filo a
+   sinistra che le parole di Filo non hanno. Il filo è per metà colore del testo:
+   l'accento lo cambiano il modello e le pagine, e chi spegne il filo spegne le parole. */
+.sn-confirm-quote {
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--sn-accent, #c45a3b) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 30%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 50%, currentColor);
+  border-radius: var(--sn-radius, 6px);
+}
+.sn-confirm-quote:last-child { margin-bottom: 0; }
+.sn-confirm-quote-voce + .sn-confirm-quote-voce {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 22%, transparent);
 }
 .sn-confirm-input {
   display: block;
@@ -265,7 +285,7 @@
     return { overlay, box, done, troppoPresto, fuoco };
   }
 
-  function header(box, { title, text }) {
+  function header(box, { title, parti }) {
     const doc = global.document;
     if (title) {
       const h = doc.createElement('div');
@@ -275,8 +295,61 @@
     }
     const p = doc.createElement('div');
     p.className = 'sn-confirm-text';
-    p.textContent = text || '';
+    if (parti.some(riquadro)) riempi(p, parti);
+    else p.textContent = parti.join('');
     box.appendChild(p);
+  }
+
+  const riquadro = (x) => !!x && typeof x === 'object' && (Array.isArray(x.elenco) || x.citazione != null);
+  function partiDi(text, parti) {
+    const buone = Array.isArray(parti) ? parti.filter((x) => typeof x === 'string' || riquadro(x)) : [];
+    return buone.length ? buone : [String(text ?? '')];
+  }
+  // Le parti nella forma che attraversa il canale verso la vista sopra la scheda:
+  // solo stringhe e riquadri, coi testi interi. La stessa regola la rifà il main.
+  function partiPerFuori(parti) {
+    if (!Array.isArray(parti)) return null;
+    const out = [];
+    for (const x of parti) {
+      if (typeof x === 'string') out.push(x);
+      else if (riquadro(x) && Array.isArray(x.elenco)) out.push({ elenco: x.elenco.map((v) => String(v ?? '')) });
+      else if (riquadro(x)) out.push(x.nuda === true ? { citazione: String(x.citazione), nuda: true } : { citazione: String(x.citazione) });
+    }
+    return out.length ? out : null;
+  }
+
+  // Il testo che non è di Filo va in un elemento suo, riempito con textContent:
+  // il bordo lo chiude il DOM, non un carattere (#592.7). Gli a capo accanto a un
+  // riquadro li fa il riquadro stesso.
+  function riempi(el, parti) {
+    const doc = global.document;
+    const fuse = [];
+    for (const x of parti) {
+      if (typeof x === 'string' && typeof fuse[fuse.length - 1] === 'string') fuse[fuse.length - 1] += x;
+      else fuse.push(x);
+    }
+    fuse.forEach((x, i) => {
+      if (typeof x === 'string') {
+        let s = x;
+        if (riquadro(fuse[i - 1])) s = s.replace(/^\s+/, '');
+        if (riquadro(fuse[i + 1])) s = s.replace(/\s+$/, '');
+        if (!s) return;
+        const t = doc.createElement('div');
+        t.className = 'sn-confirm-filo';
+        t.textContent = s;
+        el.appendChild(t);
+        return;
+      }
+      const q = doc.createElement('div');
+      q.className = 'sn-confirm-quote';
+      for (const v of Array.isArray(x.elenco) ? x.elenco : [x.citazione]) {
+        const r = doc.createElement('div');
+        r.className = 'sn-confirm-quote-voce';
+        r.textContent = String(v ?? '');
+        q.appendChild(r);
+      }
+      el.appendChild(q);
+    });
   }
 
   function campoAttivo(doc) {
@@ -315,6 +388,8 @@
       if (opts && opts[k] != null) richiesta[k] = String(opts[k]);
     }
     for (const k of BANDIERE) if (opts && opts[k] === true) richiesta[k] = true;
+    const parti = partiPerFuori(opts && opts.parti);
+    if (parti) richiesta.parti = parti;
     const suTasto = (t) => { if (campo && prima.isConnected && typeof t === 'string') applicaTasto(prima, t); };
     aperteFuori++;
     let attesa;
@@ -381,10 +456,10 @@
   // Livello 2 — popup di conferma con spiegazione + OK/Annulla.
   function confirm(opts = {}, ospite = null) {
     if (daFuori(ospite)) return fuori('confirm', opts);
-    const { title = 'Conferma', text = '', okLabel = 'OK', cancelLabel = 'Annulla' } = opts || {};
+    const { title = 'Conferma', text = '', parti = null, okLabel = 'OK', cancelLabel = 'Annulla' } = opts || {};
     return new Promise((resolve) => {
       const { box, done, troppoPresto } = buildOverlay(resolve, ospite, opts);
-      header(box, { title, text });
+      header(box, { title, parti: partiDi(text, parti) });
       const row = buttonRow(box);
       const cancel = makeBtn(row, cancelLabel, 'sn-confirm-btn-cancel');
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
@@ -408,12 +483,12 @@
   // `avviso` sostituisce la frase sull'irreversibilità quando a chiedere la parola è altro (una difesa abbassata).
   function confirmTyped(opts = {}, ospite = null) {
     if (daFuori(ospite)) return fuori('typed', opts);
-    const { title = 'Conferma richiesta', text = '', word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla', avviso = '' } = opts || {};
+    const { title = 'Conferma richiesta', text = '', parti = null, word = 'conferma', okLabel = 'Esegui', cancelLabel = 'Annulla', avviso = '' } = opts || {};
     return new Promise((resolve) => {
       const doc = global.document;
       const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
       const perche = String(avviso || '').trim() || (opts && opts.reversibile ? '' : 'Questa azione non è reversibile.');
-      header(box, { title, text: `${text}\n\n${perche ? `${perche} ` : ''}Scrivi “${word}” per procedere.` });
+      header(box, { title, parti: [...partiDi(text, parti), `\n\n${perche ? `${perche} ` : ''}Scrivi “${word}” per procedere.`] });
 
       const input = doc.createElement('input');
       input.type = 'text';
@@ -453,10 +528,10 @@
   // (es. "Hai ricevuto N crediti in regalo 🎁"). Risolve quando l'utente chiude.
   function notify(opts = {}, ospite = null) {
     if (daFuori(ospite)) return fuori('notify', opts);
-    const { title = '', text = '', okLabel = 'OK' } = opts || {};
+    const { title = '', text = '', parti = null, okLabel = 'OK' } = opts || {};
     return new Promise((resolve) => {
       const { box, done, troppoPresto, fuoco } = buildOverlay(resolve, ospite, opts);
-      header(box, { title, text });
+      header(box, { title, parti: partiDi(text, parti) });
       const row = buttonRow(box);
       const ok = makeBtn(row, okLabel, 'sn-confirm-btn-ok');
       ok.addEventListener('click', (e) => { if (!troppoPresto(e)) done(true); });
@@ -483,9 +558,25 @@
       try {
         if (textEl) selectionBg = global.getComputedStyle(textEl, '::selection').backgroundColor || '';
       } catch (_) {}
+      // Cosa sta nei riquadri e cosa fuori: le parole di Filo non devono
+      // contenere il testo del modello, e il riquadro deve vedersi (#592.7).
+      const quote = Array.from(active.root.querySelectorAll('.sn-confirm-quote'));
+      const voci = (el) => Array.from(el.children).map((c) => c.textContent).join('\n');
+      const pezzi = textEl ? Array.from(textEl.childNodes) : [];
+      const primo = quote[0] ? global.getComputedStyle(quote[0]) : null;
+      const box = q('.sn-confirm-box');
       return {
         title: (q('.sn-confirm-title') && q('.sn-confirm-title').textContent) || '',
-        text: (textEl && textEl.textContent) || '',
+        text: pezzi.map((n) => (n.nodeType === 1 && n.classList.contains('sn-confirm-quote') ? voci(n) : n.textContent)).join('\n'),
+        citazioni: quote.map(voci),
+        fuori: pezzi.filter((n) => !(n.nodeType === 1 && n.classList.contains('sn-confirm-quote'))).map((n) => n.textContent).join('\n'),
+        riquadro: primo ? {
+          bg: primo.backgroundColor,
+          bordo: primo.borderLeftColor,
+          bordoSinistro: primo.borderLeftWidth,
+          bgBox: box ? global.getComputedStyle(box).backgroundColor : '',
+          font: box ? global.getComputedStyle(box).fontFamily : '',
+        } : null,
         okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
         textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),

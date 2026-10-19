@@ -1129,6 +1129,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   }
   try { require('../movimento').segui(merged); } catch (_) {}
   try { require('../shortcuts').configura(merged); } catch (_) {}
+  try { require('../confermeSopraPagina').seguiTema(merged); } catch (_) {}
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   avvisaSeLaProntezzaCambia().catch(() => {});
   try {
@@ -1697,7 +1698,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
       if (chiesti && !confermato) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
       const Levels = globalThis.SN_ACTION_LEVELS;
       const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
-      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
+      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo, ...(Levels ? { parti: Levels.describeParts(azione) } : {}) };
     }
   }
   if (typeof apri === 'function') apri();
@@ -2414,12 +2415,14 @@ async function eseguiAzioneFilo(action, {
   // L'attesa della risposta dell'utente, la stessa per il popup generico e per i pannelli di riordino e archivio.
   const sospesa = () => {
     const describe = Levels.describe(action);
+    const parti = Levels.describeParts(action);
     return {
       executed: false,
       kept: true,
       needsConfirm: decisione.digita ? 3 : 2,
       ...(decisione.risposta === 'propone' ? { proposta: true } : {}),
       describe: decisione.perche ? `${describe}\n\n${decisione.perche}` : describe,
+      parti: decisione.perche ? [...parti, `\n\n${decisione.perche}`] : parti,
       // Il box da digitare dice «non è reversibile»: per una difesa abbassata non è vero.
       ...(decisione.digita && decisione.regola === 'difesa' ? { avviso: 'Abbassa una difesa di Filo.' } : {}),
     };
@@ -3826,7 +3829,7 @@ async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = tru
   let tabId = null;
   if (porta) {
     const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
-    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma, parti: r.parti } : {}), ...(r.frase ? { frase: r.frase } : {}) };
   } else {
     tabId = tm.openTab(voce.url, { activate: true });
   }
@@ -5358,7 +5361,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
+        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', parti: res.parti, ...(res.avviso ? { avviso: res.avviso } : {}) };
         if (res.domanda) rendered._domanda = res.domanda;
         if (res.domanda && res.perche) rendered._perche = res.perche;
         // Output di un comando eseguito subito (livello 1) o esito bloccato
@@ -5509,7 +5512,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     if (res.kept) {
       const rendered = res.needsConfirm
-        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) } }
+        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', parti: res.parti, ...(res.avviso ? { avviso: res.avviso } : {}) } }
         : { ...proposal };
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);

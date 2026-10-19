@@ -539,7 +539,9 @@
         const lista = voci.map(nomeCartella).join(', ');
         const label = op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
           : op === 'togli' ? `${nome} → togli ${lista}` : `${nome} → solo ${lista}`;
-        return { partial: nidifica(percorso, voci), label, elenco: { percorso, op, voci, nome } };
+        // Un percorso lo scrive il modello e può contenere quasi ogni carattere: nel popup sta nel riquadro (#592.7).
+        const campo = `${nome}, ${op === 'aggiungi' ? 'aggiungi' : op === 'togli' ? 'togli' : 'solo'}`;
+        return { partial: nidifica(percorso, voci), label, campo, valore: lista, elenco: { percorso, op, voci, nome } };
       },
     };
   }
@@ -980,7 +982,7 @@
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
         if (voceAutomatica(v)) return { partial: { tts: { voice: '' } }, label: 'Voce di lettura → automatica' };
-        return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"` };
+        return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"`, campo: 'Voce di lettura', valore: s };
       },
     },
     {
@@ -1011,7 +1013,7 @@
         const nome = testoVisibile(s);
         if (!nome) return null;
         if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${cifre(nome.length)} caratteri e il massimo è ${VOCE_MAX}` };
-        return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)` };
+        return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)`, campo: 'Voce naturale scritta a mano', valore: nome };
       },
     },
 

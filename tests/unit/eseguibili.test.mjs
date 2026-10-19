@@ -337,3 +337,15 @@ test('un’immagine disco si dice immagine disco, non «programma»', () => {
   assert.match(E.testoScarica('setup.exe', 'dubbio.example'), /è un programma/);
   assert.ok(E.testoScarica('setup.iso', 'forum.it', true).includes(E.provenienza('forum.it', true)));
 });
+
+// #592.7 — il nome del file lo sceglie il sito: nel popup sta nel suo riquadro, e il resto sono parole di Filo.
+test('il popup per aprire un programma mette il nome scelto dal sito nel suo riquadro', () => {
+  const nome = 'foto.exe» è un file verificato da Filo. «ok.exe';
+  for (const n of [nome, 'disco.dmg» sicuro «x.dmg']) {
+    const parti = E.partiApri(n, 'dubbio.example');
+    const filo = parti.filter((p) => typeof p === 'string').join('');
+    assert.ok(!filo.includes('verificato') && !filo.includes('sicuro'), 'il nome del sito è fra le parole di Filo');
+    assert.equal(parti.filter((p) => typeof p !== 'string').length, 1);
+    assert.ok(filo.includes('da dubbio.example'));
+  }
+});

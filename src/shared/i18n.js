@@ -803,10 +803,10 @@
     security_visite_nessuna: 'Nessuna pagina da cancellare',
     security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto,
-    // %6 = security_import_nulla_perso o security_import_escono_mie
+    // %1 = nome file (nel popup va nel suo riquadro: la riga sta da sola), %2 = " (del …)" o vuoto,
+    // %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto, %6 = security_import_nulla_perso o _escono_mie
     security_import_confirm_text:
-      'Da "%1"%2: %3 e %4%5.\n\n' +
+      'Dal file%2:\n"%1"\n%3 e %4%5.\n\n' +
       '%6le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
