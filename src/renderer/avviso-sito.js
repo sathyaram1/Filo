@@ -38,6 +38,7 @@
       ? 'Questo sito potrebbe essere una truffa o tentare di rubare i tuoi dati.'
       : 'Questo sito ha alcune caratteristiche sospette. Fai attenzione ai dati che inserisci.');
     conferma.hidden = !pericoloso;
+    indietro.textContent = s.prima ? 'Non aprire' : 'Torna indietro';
     parola.value = '';
     avanti.textContent = pericoloso ? 'Procedi comunque' : 'Continua';
     clearTimeout(timerArma);
@@ -59,6 +60,7 @@
       level: s.level === 'pericoloso' ? 'pericoloso' : 'sospetto',
       title: String(s.title || ''),
       body: String(s.body || ''),
+      prima: Number(s.prima) > 0,
     });
   });
 

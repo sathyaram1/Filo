@@ -55,7 +55,7 @@ function gsbText(category) {
 
 // Costruisce il messaggio specifico dai segnali fidati. `lead` è il segnale
 // guida; gli altri diventano frasi di rinforzo.
-function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox, hosted }) {
+function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox, hosted, doppia }) {
   const dom = hosted ? (norm.hostUnicode || norm.host) : (norm.registrableUnicode || norm.registrable || norm.host);
   // 1) Blacklist: prevale su tutto.
   if (gsb && gsb.listed) {
@@ -92,6 +92,15 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
     return {
       title: `${imp.brand.display}? Controlla l'indirizzo`,
       body: `${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}${tail}`,
+    };
+  }
+  // 3bis) Il pericolo è il file, non il sito: si nomina il file com'è scritto nel link.
+  if (doppia) {
+    const file = doppia.file ? `«${doppia.file}»` : 'un file';
+    return {
+      title: 'File travestito',
+      body: `Il link porta a ${file}: sembra un documento, ma è un programma che si avvia sul computer.`
+        + (facts.length ? ` ${dom}: ${joinIt(facts)}.` : ''),
     };
   }
   // 4) Solo segnali non legati all'identità.
@@ -151,7 +160,8 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const veryYoung = ageDays != null && ageDays < VERY_YOUNG_DOMAIN_DAYS;
   const sandboxBad = sandbox && sandbox.verdict === 'dangerous';
   const sandboxSus = sandbox && sandbox.verdict === 'suspicious';
-  const doubleExt = sigs.some((s) => s.kind === 'double_extension');
+  const doppia = sigs.find((s) => s.kind === 'double_extension') || null;
+  const doubleExt = !!doppia;
   const sensitive = hasPassword || hasPayment;
 
   // La whitelist certifica l'IDENTITÀ: niente impersonazione/LLM. Restano i
@@ -160,6 +170,11 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     if (certBad) {
       const message = buildMessage({ level: 'sospetto', norm, cert });
       return { level: 'sospetto', reasons: ['cert_' + cert.status], norm, message, cert, needsLlm: false, whitelisted };
+    }
+    // Chi è il sito non dice niente del file: Dropbox o il CDN di Discord ospitano anche file travestiti (#965).
+    if (doubleExt) {
+      const message = buildMessage({ level: 'sospetto', norm, doppia });
+      return { level: 'sospetto', reasons: ['double_extension'], norm, message, needsLlm: false, whitelisted, scope };
     }
     return { level: 'safe', reasons: ['whitelisted'], norm, message: null, needsLlm: false, whitelisted };
   }
@@ -174,7 +189,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     (imp && sensitive && certBad) ||
     (doubleExt && (young || certBad));
   if (strict || strongCombo) {
-    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, hosted });
+    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, hosted, doppia });
     return {
       level: 'pericoloso',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], sandboxBad ? ['sandbox_dangerous'] : []),
@@ -187,9 +202,9 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const impSus = weakTypo || broad;
   const suspectTriggers = !!(impSus || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);
   if (suspectTriggers) {
-    let message = buildMessage({ level: 'sospetto', norm, imp: impSus, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    let message = buildMessage({ level: 'sospetto', norm, imp: impSus, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, doppia });
     // Su una pagina ospitata il dominio è della piattaforma: nominarlo farebbe credere che la pagina sia sua.
-    if (hosted && !impSus && !certBad) {
+    if (hosted && !impSus && !certBad && !doubleExt) {
       message = {
         title: 'Pagina pubblicata da un utente',
         body: `Questa pagina è su ${hosted}, dove chiunque può pubblicare: non l'ha scritta chi gestisce ${norm.hostUnicode || norm.host}.`,

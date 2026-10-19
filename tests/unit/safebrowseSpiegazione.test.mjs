@@ -38,9 +38,11 @@ test('la chat che riceve «Filo mi protegge dal phishing?» ha la voce nell\'ind
     ['cosa esce verso Google', /verso Google solo un pezzo dell'impronta dell'indirizzo, mai l'indirizzo/],
     ['cosa esce verso il modello', /verso il modello AI[^.]*mai la pagina/],
     ['dove si spegne', /filo:\/\/security\/security\.html/],
+    ['che un link da avviso si ferma prima di aprirsi (#965)', /il sito non si apre finché non confermi/],
   ]) assert.match(d, re, `il dettaglio dice ${cosa}`);
   for (const [cosa, re] of [
-    ['che la pagina carica', /Non impedisce il caricamento/],
+    ['che una pagina aperta senza un clic su un link carica sotto l\'avviso', /carica sotto l'avviso/],
+    ['che prima del clic su un link qualunque non esce niente', /Prima del clic su un link qualunque non chiede niente alla rete/],
     ['che la conferma vale per la scheda', /La conferma vale solo per quella scheda/],
     ['che il testo della pagina non si legge', /non legge il testo della pagina: guarda solo se ci sono campi password o carta/],
   ]) assert.match(v.doesNot, re, `i limiti dicono ${cosa}`);
@@ -55,6 +57,8 @@ test('le parole e i pulsanti promessi sono quelli dell\'avviso e della pagina Si
   const [, avanti, continua] = /avanti\.textContent = pericoloso \? '([^']+)' : '([^']+)'/.exec(avviso);
   assert.ok(testo.includes(`«${avanti}»`) && testo.includes(`«${continua}»`), `i pulsanti sono «${avanti}» e «${continua}»`);
   assert.match(leggi('src/renderer/avviso-sito.html'), /Torna indietro/);
+  const [, nonAprire] = /indietro\.textContent = s\.prima \? '([^']+)'/.exec(avviso);
+  assert.ok(testo.includes(`«${nonAprire}»`), `sull'avviso di un link il pulsante è «${nonAprire}»`);
   for (const k of ['options_security_safebrowse', 'options_security_safebrowse_network', 'options_security_safebrowse_llm',
     'options_security_safebrowse_sandbox', 'options_action_safebrowse_judge']) {
     assert.ok(testo.includes(`«${T(k)}»`), `la voce nomina l'interruttore com'è scritto: «${T(k)}»`);
