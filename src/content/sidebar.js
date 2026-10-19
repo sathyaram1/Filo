@@ -1445,8 +1445,16 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false } = {}) {
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
     if (!root) return;
+    // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
+    if (userMessage || daGesto) {
+      passiDaSolo = 0;
+      if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
+    } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
+      fermaPassiDaSolo(userAction, esterno);
+      return;
+    }
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
     // (dopo un click sul target) mantieni lo stato attuale: evita che il box
