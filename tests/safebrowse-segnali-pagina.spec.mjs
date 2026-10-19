@@ -426,7 +426,8 @@ test('aprire da Filo l\'indirizzo di un fattura.pdf.exe che scende come file: la
   const r = await home.evaluate((u) => new Promise((ok) => chrome.runtime.sendMessage(
     { type: 'filo_run_action', action: { type: 'NAVIGA', url: u }, parole: ['aprimi la fattura'] }, ok)), giovane);
   expect(r && r.opened).toBe(true);
-  await expect.poll(async () => ((await avvisi()).find((x) => x.url === giovane) || {}).level || null, { timeout: 8000 }).toBe('pericoloso');
+  // L'avviso che ferma il file prima che scenda usa i soli controlli locali (#965): l'età del dominio arriva dopo.
+  await expect.poll(async () => ((await avvisi()).find((x) => x.url === giovane) || {}).level || null, { timeout: 8000 }).toBe('sospetto');
   const pericolo = await vistaAvviso(app);
   await pericolo.locator('#indietro').click();
   await expect.poll(vuote, { timeout: 6000 }).toBe(0);
