@@ -38,7 +38,9 @@ Valgono insieme queste regole:
   `describe` legge diventa testo del modello, e un campo che è davvero parola
   di Filo (una bandiera, un numero del main) si dichiara lì. Fuori dal registro
   vale lo stesso per i popup che mostrano un nome scelto da altri (un file
-  scaricato, una conversazione, una categoria): `parti` anche lì. Il segno del riquadro non può dipendere da un colore che cambia chi
+  scaricato, un backup da importare, una conversazione, una categoria): `parti`
+  anche lì; e per i pannelli dove si decide senza popup (la richiesta del
+  modello sopra «Elimina definitivamente» dell'archivio), un elemento suo. Il segno del riquadro non può dipendere da un colore che cambia chi
   scrive il testo: l'accento il modello lo cambia senza chiedere nello stesso
   turno. Per questo il filo a sinistra è per metà colore del testo: chi lo
   spegne spegne anche le parole. Su un sito la pagina riscriveva le variabili,
