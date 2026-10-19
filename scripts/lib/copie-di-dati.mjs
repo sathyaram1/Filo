@@ -169,7 +169,8 @@ function leggiStruttura(t, i, aperto = false) {
     if (CHIUDE.has(c)) { pila.pop(); i++; continue; }
     if (APRE.has(c)) {
       const figlio = nuovo(c);
-      metti(f, figlio);
+      // Nell'oggetto supposto aperto un valore senza chiave davanti è un valore a sé: tenerli tutti lì costerebbe.
+      if (aperto && pila.length === 1 && !f.attesa) { radici.push(figlio); f.chiave = null; } else metti(f, figlio);
       pila.push({ c: figlio, chiave: null, attesa: false, n: 0 });
       i++;
       continue;
