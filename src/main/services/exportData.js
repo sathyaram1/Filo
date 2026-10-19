@@ -513,6 +513,7 @@ const REGOLE_IMPORT = {
   FILO_LESSONS_BUFFER: 'contenuto',
   FILO_CHATS: 'contenuto',
   FILO_MEMORY: 'contenuto',
+  FILO_MEMORY_FONTI: 'contenuto',
   FILO_DASHBOARD_CACHE: 'stato',
   FILO_NOTES: 'contenuto',
   FILO_TIMERS: 'sveglie',

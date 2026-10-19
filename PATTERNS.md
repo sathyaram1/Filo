@@ -1,20 +1,19 @@
 # Pattern e convenzioni di Filo
 
 Indice del **sapere condiviso** su come si costruiscono le cose in Filo: pattern UI,
-convenzioni di design, decisioni ricorrenti. Vale per le sessioni locali **e** per le
-routine cloud.
+convenzioni di design, decisioni ricorrenti, per ogni agente.
 
 Qui sotto c'è una riga per pattern: il titolo e la regola. Il **racconto** di ogni
 pattern sta nel file linkato, dentro `patterns/`: il caso che l'ha fatto nascere,
-i tentativi sbagliati, i riferimenti al codice.
+i tentativi sbagliati, dove sta nel codice.
 
 **Quando leggerlo:** l'indice, per intero, prima di toccare la UI o di prendere una
 decisione di design. Il racconto di una sezione si apre quando stai per toccare
 proprio quella cosa: la regola dice cosa fare, il racconto dice perché e cosa era
 già stato provato.
 
-**Quando aggiornarlo:** ogni volta che stabilisci (o ti viene indicato) un pattern
-nuovo, o che ne scopri uno implicito nel codice che vale la pena rendere esplicito.
+**Quando aggiornarlo:** quando stabilisci (o ti viene indicato) un pattern nuovo, o
+ne scopri uno implicito nel codice che vale la pena rendere esplicito.
 Una voce qui dovrebbe **guadagnarsi il suo posto**: è una regola riusabile, non un
 appunto monouso.
 
@@ -35,8 +34,7 @@ riporta all'indice, se un nome di file resta appeso, o se un rimando — di qui,
 codice o da un racconto vicino — punta a un file che non c'è.
 
 I principi a monte di questi pattern stanno in **`filo_filosofia.txt`** (filosofia
-generale) e **`filo_design.txt`** (principi di design concreti). Sono già nel tuo
-prompt, importati da CLAUDE.md: non rileggerli con uno strumento.
+generale) e **`filo_design.txt`** (principi di design concreti), importati da CLAUDE.md.
 
 ---
 
@@ -58,6 +56,7 @@ prompt, importati da CLAUDE.md: non rileggerli con uno strumento.
 - **[Il contesto è la coda del filo, e il prefisso non si muove](patterns/il-contesto-e-la-coda-del-filo-e-il-prefisso-non-si-muove.md)** — La chat ha davanti gli ultimi giorni del filo di tutte le schede, entro due tetti (giorni e token, vince il minore): istruzioni, poi il tratto del filo identico fra un turno e l'altro, poi tutto ciò che cambia (stato, ricordi ripescati) subito prima della domanda; le letture vivono venti messaggi e le loro azioni contano per le uscite in ogni scheda.
 - **[Il filo cresce solo in coda, e cancellare è un evento](patterns/il-filo-cresce-solo-in-coda-e-cancellare-e-un-evento.md)** — La linea del tempo (chat, pagine visitate) si scrive solo aggiungendo righe a un file suo, da un modulo solo: una cancellazione è un evento in coda che toglie dal disco le righe che copre e lascia le altre identiche, l'incognito resta in memoria, e nessun tetto taglia niente.
 - **[La home è la coda del filo](patterns/la-home-e-la-coda-del-filo.md)** — Il centro della home è il filo a pezzi; Filo scrive per primo solo quando succede qualcosa.
+- **[Il quaderno delle memorie è l'indice del filo](patterns/il-quaderno-delle-memorie-e-l-indice-del-filo.md)** — Ogni riga della memoria sa da quale tratto del filo è nata; tolta, resta nascosta e non ne torna.
 - **[Una pagina dei più recenti non è «tutto»](patterns/una-pagina-dei-piu-recenti-non-e-tutto.md)** — Una lista «i primi N per data» risponde solo a «cosa è arrivato per ultimo»: chi vuole tutte le righe le legge tutte, con un cursore, e se un freno scatta lo dichiara invece di troncare in silenzio. Su un cammino caldo una memoria breve non basta — il costo resta una lettura per riga per utente: si cambia domanda (le poche righe che si sanno per nome, una pagina per volta, solo quello che è cambiato).
 - **[Una scansione chiede i campi che usa, e si paga una volta](patterns/una-scansione-chiede-i-campi-che-usa-e-si-paga-una-volta.md)** — Chi legge una collezione intera dichiara i campi che gli servono (`select` / `mask.fieldPaths` / `fields:`, dall'elenco che vive accanto alla decisione, non da una copia), chiede al server di CONTARE invece di scaricare per contare, stampa quanti documenti ha letto, e non rilegge quello che ha già in mano: la prova a secco mette da parte la sua lettura e l'applicazione la riusa. Un filtro che il database non sa scrivere (campo assente, campo non su tutti i documenti) non si sostituisce con un taglio silenzioso. Il freno sta sulla richiesta che parte, non sul testo del comando: ogni grafia nuova produce la stessa richiesta.
 - **[Un numero che non si conosce non è uno zero](patterns/un-numero-che-non-si-conosce-non-e-uno-zero.md)** — Se la sorgente di un conteggio non ha risposto, il conto esce `null` e in pagina si scrive un trattino: la distinzione sta nel modulo che conta, non in chi disegna, e una riga di spiegazione piccola non disdice uno zero grande.

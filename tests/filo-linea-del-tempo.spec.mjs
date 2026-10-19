@@ -86,16 +86,18 @@ const CHAT_VECCHIE = [
   },
 ];
 
-test('dopo l’aggiornamento le chat di prima si riaprono dalla Cronologia e Filo le ritrova, coi messaggi interi', async () => {
+test('dopo l’aggiornamento le chat di prima sono nel filo della home e Filo le ritrova, coi messaggi interi', async () => {
   test.setTimeout(90_000);
   const userData = cartellaTemporanea('filo-866-mig-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ filo_chats: CHAT_VECCHIE }), 'utf8');
   const { app, shell } = await avvia(userData);
   try {
-    const page = await paginaInterna(app, shell, 'filo://archive/archive.html');
+    const page = await paginaInterna(app, shell, 'filo://quaderno/quaderno.html');
     const elenco = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chats_list' }));
     expect(elenco.chats.map((c) => [c.id, c.messageCount])).toEqual([['chat-coscienza', 3], ['chat-sveglia', 2]]);
-    await expect(page.locator('.arc-chat', { hasText: 'La coscienza è emergente?' })).toBeVisible({ timeout: 10_000 });
+    const casa = await paginaInterna(app, shell, 'filo://newtab/');
+    await casa.locator('#cercaInput').fill('coscienza emergente');
+    await expect(casa.locator('.dash-cerca-msg', { hasText: 'Secondo te la coscienza è emergente?' })).toBeVisible({ timeout: 10_000 });
 
     const riaperta = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_chat_get', id: 'chat-coscienza' }));
     expect(riaperta.chat.messages[2].text).toBe(LUNGO);
@@ -211,7 +213,7 @@ test('con 50.000 eventi nel filo un messaggio di 20.000 caratteri si salva inter
   }
 });
 
-test('cancellare una chat dalla Cronologia la toglie dal file; «cancella le pagine dell’ultima ora» toglie quelle e nessun’altra', async ({ app, openTab, testServer }) => {
+test('togliere una chat dal filo (tasto destro su una sua bolla) la toglie dal file; «cancella le pagine dell’ultima ora» toglie quelle e nessun’altra', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   await configura(app);
@@ -225,13 +227,16 @@ test('cancellare una chat dalla Cronologia la toglie dal file; «cancella le pag
   await openTab(recente);
   await expect.poll(() => leggiFilo(userData).includes('Pagina di adesso'), { timeout: 20_000 }).toBe(true);
 
-  const page = await openTab('filo://archive/archive.html');
-  const riga = page.locator('.arc-chat', { hasText: 'Barocco ZXQ' });
-  await expect(riga).toBeVisible({ timeout: 10_000 });
-  await riga.click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina la chat' }).click();
-  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null)).toBe('Elimina la chat');
+  const page = await openTab('filo://newtab/');
+  const bolla = page.locator('.dash-bubble[data-chat="chat-da-cancellare"]', { hasText: 'Barocco ZXQ' });
+  await expect(bolla).toBeVisible({ timeout: 10_000 });
+  await bolla.evaluate((el) => {
+    const v = (window.SN_VOCI_PAGINA || []).flatMap((f) => f(el) || []).find((x) => x.label === 'Togli la conversazione dal filo');
+    v.onClick();
+  });
+  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI._test.state()?.title || null)).toBe('Togliere la conversazione dal filo?');
   await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
+  await expect(page.locator('.dash-bubble', { hasText: 'Barocco ZXQ' })).toHaveCount(0);
   await expect.poll(() => leggiFilo(userData).includes('Barocco ZXQ'), { timeout: 10_000 }).toBe(false);
   expect(leggiFilo(userData)).toContain('Parliamo di Epicuro');
 
@@ -516,7 +521,7 @@ test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle ri
   await app.evaluate(async () => { await globalThis.SN_CLOSE_FILO_CHAT('chat-privata'); await globalThis.SN_CLOSE_FILO_CHAT('chat-da-tenere'); });
   const voci = () => app.evaluate(async () => (await globalThis.SN_HISTORY.list()).length);
   const prima = await voci();
-  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_CHAT_DELETE, id: 'chat-privata' }, { url: 'filo://archive/archive.html' }));
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_CHAT_DELETE, id: 'chat-privata' }, { url: 'filo://quaderno/quaderno.html' }));
   const dove = await app.evaluate(async () => {
     const tutto = await globalThis.chrome.storage.local.get(null);
     const cronologia = await globalThis.SN_HISTORY.list();

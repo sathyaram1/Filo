@@ -82,8 +82,9 @@ test('scrivo a Filo e apro una scheda nuova: il mio scambio è in fondo al centr
 
   await chiedi(nuova, 'e le balene?');
   await expect(nuova.locator('.dash-bubble-filo', { hasText: 'Sì, anche le balene.' })).toBeVisible();
-  const chats = await app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).filter((c) => !c.app).map((c) => c.messages.map((m) => m.text)));
-  expect(chats).toEqual([['come cacciano le orche?', 'Le orche cacciano in branco.', 'e le balene?', 'Sì, anche le balene.']]);
+  // La bolla compare mentre la risposta arriva; nel filo entra appena finita.
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).filter((c) => !c.app).map((c) => c.messages.map((m) => m.text))))
+    .toEqual([['come cacciano le orche?', 'Le orche cacciano in branco.', 'e le balene?', 'Sì, anche le balene.']]);
 });
 
 test('il giorno dopo c’è il segno «ieri», lo scambio è sbiadito, e da un altro dispositivo lo dice', async ({ app, openTab }) => {
@@ -480,7 +481,7 @@ test('pagine cancellate dalla Sicurezza escono subito dalla home già aperta', a
   await expect(page.locator('.dash-pagine')).toHaveCount(0);
 });
 
-test('una scheda chiusa eliminata dalla Cronologia esce dal filo: niente riga nella home, niente ricerca', async ({ app, shell, openTab, testServer }) => {
+test('una scheda chiusa eliminata dall’archivio esce dal filo: niente riga nella home, niente ricerca', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await home(app);
   const delfini = await visita(openTab, testServer, 'delfini');
@@ -494,7 +495,7 @@ test('una scheda chiusa eliminata dalla Cronologia esce dal filo: niente riga ne
   await expect.poll(() => app.evaluate(async (_e, u) => (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => t.url === u).length, url)).toBe(1);
   const page = await openTab('filo://newtab/');
   await expect(righePagine(page)).toHaveText(['2 pagine, fra cui orche marine']);
-  const cron = await openTab('filo://archive/archive.html');
+  const cron = await openTab('filo://quaderno/quaderno.html');
   const r = await cron.evaluate(async (u) => {
     const { MSG } = self.SN_MSG;
     const { tabs } = await self.chrome.runtime.sendMessage({ type: MSG.GET_ARCHIVED_TABS });

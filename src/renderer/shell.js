@@ -263,6 +263,7 @@
       { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
       { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { label: 'Memorie', icon: 'memory', url: 'filo://quaderno/quaderno.html' },
       { type: 'separator' },
       { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
     ];
@@ -1402,7 +1403,7 @@
     'editor/editor.html': 'Editor',
     'feedback/feedback.html': 'Feedback',
     'history/history.html': 'Cronologia AI',
-    'archive/archive.html': 'Cronologia',
+    'quaderno/quaderno.html': 'Memorie',
     'home/home.html': 'Aperti per dopo',
     'spellcheck/spellcheck.html': 'Correttore',
   };

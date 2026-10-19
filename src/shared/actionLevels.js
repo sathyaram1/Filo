@@ -10,8 +10,8 @@
     if (P && P.lezioneDaAzione) return P.lezioneDaAzione(a);
     return { testo: String((a && (a.testo ?? a.text ?? a.lezione)) ?? '').trim() };
   }
-  const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dalle Preferenze, '
-    + 'sotto «Memoria di Filo». Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
+  const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dal quaderno delle '
+    + 'memorie. Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
     + 'documento potrebbe provare a fargliela ricordare.';
 
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
@@ -606,7 +606,7 @@
       costo: 3,
       campo: null,
       elenco: () => 'cancella-definitivo',
-      dove: 'Le righe della memoria le può togliere l\'utente, una per una, in Preferenze sotto «Memoria di Filo».',
+      dove: 'Le righe della memoria le può togliere l\'utente, una per una, nel quaderno delle memorie (filo://quaderno/quaderno.html).',
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
@@ -614,23 +614,38 @@
       describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese e lezioni',
     },
     DIMENTICA: {
-      // Toglie dalla memoria le righe indicate a voce: le stesse della × nelle
-      // Preferenze. Il main risolve la frase in `_righe` prima del gate, mai
-      // l'LLM; nessuna riga → 1, il dispatch lo dice. Oltre tre è quasi un
-      // «dimentica tutto» → costo 3.
-      costo: (a) => {
-        const n = Array.isArray(a && a._righe) ? a._righe.length : 0;
-        return n === 0 ? 1 : n > 3 ? 3 : 2;
-      },
+      // Le righe indicate a voce le risolve il main in `_righe` prima del gate, mai l'LLM. Toglierle le nasconde nel
+      // quaderno, da dove si rimettono: costo 1 (decisione dell'owner, #872). Il «per sempre» butta il testo: il costo
+      // più alto del registro.
+      costo: (a) => (a && a.per_sempre === true ? 3 : 1),
       campo: null,
       describe: (a) => {
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
-        return `Filo sta per dimenticare ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`
+        const per = a && a.per_sempre === true;
+        return `Filo sta per ${per ? 'cancellare per sempre' : 'dimenticare'} ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`
           + righe.map((r) => `• ${r}`).join('\n')
-          + '\n\nNon entreranno più nelle conversazioni.';
+          + (per ? '\n\nNon entreranno più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.'
+            : '\n\nNon entreranno più nelle conversazioni. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.');
       },
-      describeDone: (a) => `Dimenticato: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
+      describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
+    },
+    CORREGGI_MEMORIA: {
+      // Cambia una riga che entra in ogni prompt, come una lezione (#872): il popup mostra prima e dopo. La riga la
+      // trova il main (`_righe`); nessuna, più d'una o una correzione che il tetto rifiuta → 1, il dispatch lo dice.
+      costo: (a) => {
+        const r = Array.isArray(a && a._righe) ? a._righe : [];
+        const l = lezione({ testo: a && a.nuovo });
+        return r.length === 1 && l.testo && !l.rifiuto ? 2 : 1;
+      },
+      campo: null,
+      describe: (a) => {
+        const r = Array.isArray(a && a._righe) ? a._righe : [];
+        const l = lezione({ testo: a && a.nuovo });
+        if (r.length !== 1 || !l.testo || l.rifiuto) return 'Correggere una cosa che Filo ricorda';
+        return `Filo vuole correggere una riga della sua memoria.\n\nPrima:\n«${r[0]}»\n\nDopo:\n«${l.testo}»\n\n${RISCHIO_LEZIONE}`;
+      },
+      describeDone: (a) => `Corretto: «${lezione({ testo: a && a.nuovo }).testo}»`,
     },
     IMPOSTA_PREFERENZA: {
       // Costo, difesa abbassata ed elenco fisso li dichiara il setter in preferences.js. Preferenza sconosciuta,
