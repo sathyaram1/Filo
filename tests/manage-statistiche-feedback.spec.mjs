@@ -1693,6 +1693,7 @@ test('#997 ripiego sulla lista in pagina: il controllo di sicurezza scrive un tr
   const sotto = page.locator('[data-fs-id="audit"] .mg-tile-sub');
   await expect(sotto).toContainText('esito non letto su 1 lavoro');
   await expect(sotto).not.toContainText('0 bocciati');
+  await page.locator('#mgFsAltro').screenshot({ path: 'tests/.shots/997-ripiego-audit.png' });
   // La riga piccola conta un lavoro e si apre su quello.
   await sotto.click();
   await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
