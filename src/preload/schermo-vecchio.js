@@ -20,6 +20,32 @@ function buildSchermoVecchioCorpo() {
       });
     } catch (e) { return false; }
   }
+  // Chromium rilegge i vincoli dopo di noi: un getter o un Proxy che alla seconda lettura dice desktop chiuderebbe la
+  // scheda (#1057). Si guarda e si passa una copia di soli dati, letta una volta; quello che la copia non ha, Chromium non lo vede.
+  var nomiDi = Object.getOwnPropertyNames, protoDi = Object.getPrototypeOf, defP = Object.defineProperty, isArr = Array.isArray;
+  var FINE = [Object.prototype, Function.prototype, Array.prototype];
+  function copia(v, prof) {
+    if (v === null || (typeof v !== 'object' && typeof v !== 'function')) return v;
+    if (prof > 8) return {};
+    var out;
+    if (isArr(v)) {
+      out = [];
+      for (var i = 0, n = Math.min(Number(v.length) || 0, 1024); i < n; i++) out.push(copia(v[i], prof + 1));
+      return out;
+    }
+    out = Object.create(null);
+    var visti = Object.create(null);
+    for (var o = v, giri = 0; o && FINE.indexOf(o) < 0 && giri < 16; o = protoDi(o), giri++) {
+      var nomi = nomiDi(o);
+      for (var j = 0; j < nomi.length; j++) {
+        var k = nomi[j];
+        if (k === 'constructor' || k === '__proto__' || visti[k]) continue;
+        visti[k] = true;
+        defP(out, k, { value: copia(v[k], prof + 1), enumerable: true, writable: true, configurable: true });
+      }
+    }
+    return out;
+  }
   var DE = window.DOMException, Ev = window.Event, manda = window.EventTarget.prototype.dispatchEvent;
   function no() { return new DE('Permission denied', 'NotAllowedError'); }
   var P = window.MediaDevices && window.MediaDevices.prototype;
