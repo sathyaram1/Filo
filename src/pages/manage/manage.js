@@ -7282,14 +7282,15 @@
         t.lavorazione.ids.length ? 'apri' : false),
       // Il controllo di sicurezza e gli arenamenti si leggono sulle lavorazioni
       // della finestra, e quali siano lo dice il registro: senza, non sono zero.
-      fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati',
-        ko ? noto : `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`,
-        auditN ? 'espandi' : false),
+      // La riga piccola dei lavori senza esito letto si apre su quelli.
+      fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati', auditSotto,
+        fsEspandibili(stat).audit ? 'espandi' : false,
+        !ko && !fbKo && nonLetti ? 'auditNonLetti' : ''),
       // Il numero grande conta ARENAMENTI: una segnalazione arenata due volte
       // ne vale due, quindi non è un conto di segnalazioni e non si apre.
       // Ad aprirle è la riga piccola, come nel riquadro delle esplorazioni.
       fsTile('arenati', stat.arenati.lavorazioni, 'Lavorazioni arenate e rimesse in coda',
-        ko ? noto : (stat.arenati.feedback
+        ko ? noto : fbKo ? 'segnalazioni non lette' : (stat.arenati.feedback
           ? `su ${fsNum(stat.arenati.feedback)} ${stat.arenati.feedback === 1 ? 'segnalazione' : 'segnalazioni'}`
           : 'nessuna'),
         false,
