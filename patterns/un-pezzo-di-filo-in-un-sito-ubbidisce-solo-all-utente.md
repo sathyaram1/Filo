@@ -251,3 +251,19 @@ contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi
 ([Un avviso su una pagina non sta dentro la pagina](un-avviso-su-una-pagina-non-sta-dentro-la-pagina.md)).
+
+## Il permesso del sito non è di Filo (#586)
+
+Lo stesso vale per i permessi di Chromium: sono della pagina, non del mondo che chiede. Un «lasciapassare» di cinque
+secondi sulla scheda per Detta e Incolla valeva anche per gli script del sito, e passava sopra il no che l'utente gli
+aveva dato. Quindi Filo non prende in prestito il permesso del sito: il microfono di Detta lo apre la cornice e alla
+pagina arrivano solo i campioni, nel mondo del preload (`services/microfonoDiFilo.js`); gli appunti di Incolla li
+legge il main. Così funzionano proprio dove il sito ha avuto un no.
+
+Lo schermo segue la stessa idea dall'altro lato: si sceglie nella cornice prima del sì, perché Chromium chiama il
+gestore dello schermo dentro il sì a `getDisplayMedia` e lì si consegna la fonte scelta. La strada vecchia
+(`chromeMediaSource: 'desktop'`) arriva con gli stessi dati ma senza gestore e prenderebbe schermo e audio senza
+scelta: nella pagina la gira su `getDisplayMedia` e avvisa il main, che dopo la scelta dice no
+(`preload/schermo-vecchio.js`); chi la aggira si ferma prima di riceverli. Il clic dentro il riquadro di un altro
+sito non passa da `input-event`: lo riferisce il preload del frame, e vale per quel riquadro e i suoi antenati. A richiesta in corso, su Linux, `desktopCapturer` con schermi e finestre
+insieme torna vuoto: si chiedono a parte. Sentinelle in `tests/unit/permessiPagine.test.mjs`.

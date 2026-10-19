@@ -262,6 +262,19 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
+// Lo schermo alla maniera vecchia, in ogni frame web: la domanda di sempre e poi un no, senza far morire la pagina
+// (#586). Regole in preload/schermo-vecchio.js; un avviso finto della pagina fa negare solo la sua prossima domanda.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (!/^(filo|devtools):/i.test(loc)) {
+    const { buildSchermoVecchioSource, EVENTO_SCHERMO_VECCHIO } = require('./schermo-vecchio.js');
+    window.addEventListener(EVENTO_SCHERMO_VECCHIO, () => {
+      try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {}
+    }, true);
+    webFrame.executeJavaScript(buildSchermoVecchioSource(), false).catch(() => {});
+  }
+} catch (e) { /* come sopra: mai bloccare il caricamento */ }
+
 // Le notifiche si leggono «da chiedere» finché l'utente non ha deciso (#591): regole in preload/stato-permessi.js.
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
@@ -769,6 +782,31 @@ try {
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
+// Il microfono di Filo su una pagina web lo apre la cornice (#586): qui arrivano i campioni a 16 kHz per SN_ASCOLTO,
+// solo nel mondo di Filo. La pagina non riceve il permesso, nemmeno durante una dettatura. Main: services/microfonoDiFilo.js.
+const microfoniAperti = new Map();
+ipcRenderer.on('microfono:dati', (_event, d) => {
+  const m = d && microfoniAperti.get(d.id);
+  if (!m) return;
+  if (d.fine) { microfoniAperti.delete(d.id); try { m.suFine(); } catch (_) {} return; }
+  if (d.dati) { try { m.suDati(d.dati instanceof Float32Array ? d.dati : Float32Array.from(d.dati)); } catch (_) {} }
+});
+globalThis.SN_MICROFONO_CORNICE = {
+  async apri({ suDati, suFine } = {}) {
+    let r = null;
+    try { r = await ipcRenderer.invoke('microfono:apri'); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.id) throw Object.assign(new Error('microfono'), { name: (r && r.errore) || 'NotAllowedError' });
+    microfoniAperti.set(r.id, { suDati: suDati || (() => {}), suFine: suFine || (() => {}) });
+    return {
+      rate: r.rate,
+      chiudi: () => {
+        if (!microfoniAperti.delete(r.id)) return;
+        ipcRenderer.invoke('microfono:chiudi', { id: r.id }).catch(() => {});
+      },
+    };
+  },
+};
+
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
 // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
 // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
