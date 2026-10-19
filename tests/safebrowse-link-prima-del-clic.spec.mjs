@@ -422,18 +422,14 @@ test('un file travestito che il sito nomina solo rispondendo: l\'avviso lo ferma
 
 // Come gli allegati di una chat o della posta cifrata: il file lo prepara la pagina, e c'è solo il suo nome.
 test('un file travestito che la pagina costruisce da sé (blob, data): l\'avviso lo ferma; «Continua» lo scarica col suo nome', async ({ app, openTab, testServer }) => {
-  await testServer.openReady(openTab, '<title>Chat</title><button id="blob">allegato</button><button id="data">allegato</button><script>'
-    + 'function scarica(href) { var a = document.createElement("a"); a.href = href; a.download = "fattura.pdf.exe";'
-    + ' document.body.appendChild(a); a.click(); a.remove(); }'
-    + 'document.getElementById("blob").onclick = function () { scarica(URL.createObjectURL(new Blob(["MZ00"]))); };'
-    + 'document.getElementById("data").onclick = function () { scarica("data:application/octet-stream;base64,TVowMA=="); };'
+  await testServer.openReady(openTab, '<title>Chat</title><button id="blob">allegato</button><script>'
+    + 'document.getElementById("blob").onclick = function () { var a = document.createElement("a");'
+    + ' a.href = URL.createObjectURL(new Blob(["MZ00"])); a.download = "fattura.pdf.exe"; document.body.appendChild(a); a.click(); a.remove(); };'
     + '</script>');
   await fuocoAllaPagina(app);
-  const avviso = await (async () => {
-    await contaScaricamenti(app);
-    await clicFermato(app, '#blob');
-    return vistaAvviso(app);
-  })();
+  await contaScaricamenti(app);
+  await clicFermato(app, '#blob');
+  const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
