@@ -98,17 +98,20 @@
     for (let i = 0; i + pz.length <= scritte.length; i++) if (pz.every((p, k) => simile(scritte[i + k], p))) return true;
     return false;
   }
-  function nominata(testo, { frasi = [], verbi = [], oggetti = [] } = {}) {
+  // `risposte`: nomi che bastano in una riga di tre parole al massimo, la risposta secca a una domanda di Filo («Automatico»).
+  function nominata(testo, { frasi = [], verbi = [], oggetti = [], risposte = [] } = {}) {
     for (const riga of String(testo == null ? '' : testo).split(/\n+/)) {
       const scritte = pianoTesto(riga).split(' ').filter(Boolean);
       if (!scritte.length) continue;
       if (frasi.some((f) => contiene(scritte, f))) return true;
+      if (scritte.length <= 3 && risposte.some((r) => contiene(scritte, r))) return true;
       if (verbi.length && scritte.some((w) => verbi.some((v) => verbo(w, v))) && oggetti.some((o) => contiene(scritte, o))) return true;
     }
     return false;
   }
   // I nomi di un'impostazione che l'utente può aver detto: le sue chiavi e il suo nome intero, e i valori che non sono
-  // parole comuni. Un valore lungo e unico (una chiave di un servizio) scritto dall'utente basta da solo.
+  // parole comuni. Un valore lungo e unico (una chiave di un servizio) scritto dall'utente basta da solo; un valore che
+  // non è un numero basta come risposta secca.
   function chiestaPreferenza(a, ctx) {
     const P = global.SN_PREF;
     if (!P || !P.paroleDellaVoce) return false;
