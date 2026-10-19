@@ -34,9 +34,9 @@ la cartella.
   rossa la respinge (#679, una prova rossa cancellata insieme alla correzione; togliere il
   solo caso rosso e tenere il file è la stessa porta). Dopo un riallineamento contano solo
   le prove che ha toccato il ramo: quelle che main ha cambiato nel frattempo sono di altri
-  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono PRIMA di ogni
-  correzione, in un commit che toglie solo quelle registrato da chi ha scritto la critica
-  (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
+  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono appena la risposta
+  alla critica li elenca, in un commit che toglie solo quelle registrato da chi ha scritto la
+  critica (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
   e una prova tolta ancora rossa ferma la consegna sempre (`scripts/lib/prove-tolte.mjs`).
   Dopo un «pass» la pulizia non si registra: la sigilla il rilascio di chi ha verificato (il punto fermo
   porta il ruolo), e un riallineamento confronta da quel punto fermo se dalla critica ha solo tolto prove
@@ -48,8 +48,8 @@ la cartella.
   prova rossa di uno da correggere.
 - **Una prova che la pulizia ha dimenticato** (#747) e chi corregge toglie ancora rossa ferma
   la consegna lo stesso, ma il rifiuto la riconosce dallo stesso numero (nel nome, o nel titolo
-  del caso rosso) e manda a pulirla, non a correggere un rilievo che sta in un feedback suo. La
-  pulizia si registra anche dopo le correzioni: è l'ultimo commit da solo, toglie solo prove o
+  del caso rosso) e manda a pulirla, non a correggere un rilievo che sta in un feedback suo. Una
+  pulizia dimenticata si registra più tardi: è l'ultimo commit da solo, toglie solo prove o
   loro casi di rilievi messi da parte (niente righe di supporto), com'erano alla base, e un caso
   di un rilievo da correggere non esce nemmeno verde. Non sposta la base: la consegna non rilancia
   le prove che ha tolto per intero, e quelle a cui ha tolto un caso le rilancia com'erano dopo di lei.

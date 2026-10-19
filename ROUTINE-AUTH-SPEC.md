@@ -172,8 +172,8 @@ Punti non negoziabili del flusso:
    il BIGLIETTO (la sua impronta), non il semaforo del feedback, che è lo
    stesso per tutti i biglietti emessi su quel feedback: un biglietto nuovo
    giudica sempre. Non chiude feedback e non ne apre (dal 2026-09-05,
-   feedback #561: i rilievi che non corregge li raccoglie il server in UN
-   feedback derivato per lavoro). Sono respinti, prima di scrivere qualsiasi
+   feedback #561): i feedback derivati li apre il server, come dice
+   `FEEDBACK-STATES.md` §3. Sono respinti, prima di scrivere qualsiasi
    cosa: una critica vuota (nessun rilievo e nessun riassunto), un verdetto
    senza lo sha del commit provato (in ogni forma), una critica coi livelli
    scritti fuori posto (`Rilievo [2]: …` non è un rilievo), una consegna il
@@ -207,7 +207,7 @@ diventa un **muro**.
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
 | `new-work` | il testo del suo feedback | — |
-| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni conflitto di fusione (dispatch a chi lavora consegna solo il feedback) | i rilievi di una verifica: li corregge chi li ha scritti |
+| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni conflitto di fusione (dispatch a chi lavora consegna solo il feedback) | i rilievi di una verifica |
 | `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 

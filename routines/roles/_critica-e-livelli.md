@@ -153,9 +153,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
   giro e il numero di adesso: il numero che porta è di una critica vecchia.
   Serve alla pulizia: quelle dei rilievi che la risposta del server mette da
-  parte le togli tu, appena la leggi e prima di ogni correzione, in un commit che
-  toglie solo quelle, e lo registri con `--record-pulizia` (la risposta ti dà il
-  comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
+  parte le togli tu appena la leggi, in un commit che toglie solo quelle, e lo
+  registri con `--record-pulizia` (la risposta ti dà il comando e ripete il
+  numero davanti a ogni rilievo). Esce solo una prova che nel
   nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
   questa verifica; a una che copre anche un rilievo da correggere togli solo il
   caso dei messi da parte. Un file di supporto (un aiuto, una pagina) non è una
@@ -165,8 +165,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   una prova senza più un rosso, la respinge (può durare qualche minuto: lanciala
   in sottofondo). Da quel commit una prova rossa tolta ferma la consegna, e una
   a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
-  Una che la pulizia ha dimenticato esce con un'altra, anche dopo le correzioni:
-  un commit a parte che toglie solo lei, registrato finché è l'ultimo.
+  Una che la pulizia ha dimenticato esce con un'altra: un commit a parte che
+  toglie solo lei, registrato finché è l'ultimo.
   Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
@@ -191,8 +191,7 @@ di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
 `--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
 restano davanti a chi riprende dopo la sua risposta. Un 1 col `?`, o un
 esterno di qualunque livello, va avanti in un feedback derivato che l'owner
-decide a parte. Se poi il server ti manda a correggere, una segnalazione a
-QUELLA consegna ferma il lavoro come per chi risolve.
+decide a parte.
 
 La critica registrata non si modifica più.
 

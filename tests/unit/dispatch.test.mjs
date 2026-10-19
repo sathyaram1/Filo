@@ -1105,7 +1105,8 @@ test('nei file di prova non si anticipa il seguito del giro', async () => {
       if (e.isDirectory()) { if (!e.name.startsWith('.') && e.name !== 'node_modules') cammina(p); continue; }
       if (!/\.(test|spec)\.mjs$/.test(e.name)) continue;
       read(p, 'utf8').split('\n').forEach((riga, i) => {
-        const elenco = /^\s*(test|it)\(/.test(riga) ? TITOLI : OVUNQUE;
+        // Un titolo è anche una riga: oltre al suo elenco vale quello di ovunque.
+        const elenco = /^\s*(test|it)\(/.test(riga) ? [...TITOLI, ...OVUNQUE] : OVUNQUE;
         if (elenco.some((r) => r.test(riga))) colpevoli.push(`${e.name}:${i + 1}: ${riga.trim().slice(0, 90)}`);
       });
     }
