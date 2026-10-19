@@ -7262,7 +7262,14 @@
     // quelle: erano gli ultimi quattro rimasti muti.
     const ko = stat.copertura.registroLetto === false;
     const noto = 'registro delle routine non letto';
-    const auditN = ko ? 0 : stat.audit.pass + stat.audit.fail + stat.audit.saltato;
+    // Senza segnalazioni lette, l'esito del controllo e gli arenamenti (che
+    // stanno sui documenti dei lavori) non si sanno: trattino e motivo.
+    const fbKo = stat.copertura.feedbackLetti === false;
+    const nonLetti = stat.audit.nonLetti || 0;
+    let auditSotto = `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`;
+    if (ko) auditSotto = noto;
+    else if (fbKo) auditSotto = 'segnalazioni non lette';
+    else if (nonLetti) auditSotto = `esito non letto su ${fsNum(nonLetti)} ${nonLetti === 1 ? 'lavoro' : 'lavori'}`;
     const det = fsAperto === 'audit' ? fsDettaglio(stat) : null;
     mgFsAltro.innerHTML = [
       fsTile('attesa', FS.durata(t.presaInCarico.mediana), 'Attesa prima che tu lo prendessi in mano',
