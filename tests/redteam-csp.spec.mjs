@@ -34,7 +34,6 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
     return !!page;
   }, { timeout: 12_000 }).toBe(true);
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => !!window.SN_REDTEAM_ATTACK_UI, null, { timeout: 8_000 });
 
   // Il link filo://style/ è davvero bloccato: senza insertCSS la prova non direbbe niente.
   const linkBloccato = await page.evaluate(() => {
@@ -43,7 +42,7 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
   });
   expect(linkBloccato).toBe(true);
 
-  const voce = page.locator('.sn-menu .sn-item', { hasText: 'Invia attacco' }).first();
+  const voce = page.locator('.sn-menu .sn-menu-item', { hasText: 'Invia attacco' }).first();
   await expect.poll(async () => {
     await page.keyboard.press('Escape');
     await page.locator('#p').click({ button: 'right', position: { x: 200, y: 120 } });
@@ -65,8 +64,10 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
     };
   });
   expect(stile.position, 'redteam-attack.css non applicato sul sito con CSP').toBe('fixed');
-  expect(stile.zIndex).toBeGreaterThan(1000);
+  expect(stile.zIndex, 'il pannello deve stare sopra la pagina').toBeGreaterThan(1000);
   expect(stile.sfondo).not.toBe('rgba(0, 0, 0, 0)');
   expect(stile.dentroLoSchermo, 'il pannello è finito fuori dallo schermo').toBe(true);
+  // La finestra nascosta dei test non fa avanzare le animazioni: la dissolvenza d'entrata si chiude a mano per la foto.
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
   await page.screenshot({ path: 'tests/.shots/600-redteam-csp.png' });
 });
