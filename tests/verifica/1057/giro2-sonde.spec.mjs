@@ -74,7 +74,7 @@ const STRADE = {
     const s = document.createElement('script'); s.textContent = 'window.__w = window[window.length - 1];';
     fr.append(f, s); document.body.append(fr); const w = window.__w;
     return await ${CHIEDI};`],
-  'riquadro scritto nella pagina fin dall\\'inizio': ['/statico', `const w = window[0]; return await ${CHIEDI};`],
+  'riquadro scritto nella pagina fin dall inizio': ['/statico', `const w = window[0]; return await ${CHIEDI};`],
   'riquadro srcdoc': ['/modulo', `const f = document.createElement('iframe'); f.srcdoc = '<p>x</p>'; document.body.append(f);
     await new Promise((ok) => f.addEventListener('load', ok, { once: true })); const w = window[window.length - 1]; return await ${CHIEDI};`],
   'riquadro blob': ['/modulo', `const f = document.createElement('iframe'); f.src = URL.createObjectURL(new Blob(['<p>x</p>'], { type: 'text/html' })); document.body.append(f);
