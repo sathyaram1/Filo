@@ -21,8 +21,8 @@ function stessaArea(a, b) {
 // Il punto arriva dal `context-menu` della scheda: px della vista (DIP), già fuori da zoom e riquadri. Mai dalla
 // posizione del cursore sullo schermo, che su Wayland non si sa.
 function puntoNellArea(punto, area) {
-  const x = Number(punto && punto.x);
-  const y = Number(punto && punto.y);
+  const x = punto ? punto.x : undefined;
+  const y = punto ? punto.y : undefined;
   if (!Number.isFinite(x) || !Number.isFinite(y) || !area) return null;
   return {
     x: Math.min(Math.max(0, Math.round(x)), Math.max(0, area.width - 1)),
