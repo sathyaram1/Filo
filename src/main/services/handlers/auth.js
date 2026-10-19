@@ -858,6 +858,7 @@ module.exports = function register(on, ctx) {
     } catch (_) { /* scritto sì: lo stato si rilegge alla prossima apertura */ }
     return out;
   }));
+
   // Le pause in corso degli account e della routine server, col motivo (#996). Lo stato del pacemaker non lo legge
   // nessun client: passa dalla callable, con le credenziali dell'owner.
   on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
