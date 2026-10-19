@@ -1667,7 +1667,7 @@
       // senza eseguirlo) resta a un clic.
       // La domanda sta nella riga del pannello: un avviso in basso finirebbe
       // sotto la pagina, e il clic sembrerebbe non fare niente.
-      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.text); return; }
+      if (res.needsConfirm && chiediApertura) { chiediApertura(id, res.parti); return; }
       const opts = res.missing
         ? { actions: [{ label: 'Apri cartella', onClick: () => openDownloadFolder(id) }] }
         : undefined;
