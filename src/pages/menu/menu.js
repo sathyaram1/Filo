@@ -228,8 +228,11 @@
   });
 
   // La cronologia degli appunti si cerca scrivendo: aperta, lo strato prende la tastiera.
+  let cerca = null;
   new MutationObserver(() => {
-    if (m && document.querySelector('.sn-menu-history-search-input')) chiedi('tastiera');
+    const c = m ? document.querySelector('.sn-menu-history-search-input') : null;
+    if (c && c !== cerca) chiedi('tastiera');
+    cerca = c;
   }).observe(document.documentElement, { childList: true });
 
   // Le icone trascinate dal menu verso la barra laterale: i px dello strato sono quelli della scheda (#871).
