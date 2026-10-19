@@ -202,7 +202,7 @@ test('il compattatore non scrive sopra un cambio dell’utente fatto mentre il m
   assert.equal((await M.getMemory()).PREFERENZE, 'È vegano\nAma le spezie');
 });
 
-test('una lezione già riordinata si corregge nella riga che ne è nata, mai in una che ne ha assorbite altre', async () => {
+test('la correzione di una lezione già riordinata va alla riga che ne è nata, mai a una che ne ha assorbite altre', async () => {
   disco();
   await M.setMemory({ PROFILO: '', PREFERENZE: '' });
   await M.appendLesson('L’utente è vegetariano.', { fonti: ['ev-u1', 'ev-f1'] });
