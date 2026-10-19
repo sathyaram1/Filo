@@ -1,4 +1,5 @@
-// #824 giro 12: esplorazione delle strade aperte dal testo seguito fino all'uscita della pagina.
+// #824 giro 12, rilievo 1: un modulo di soli campi di una riga mandato senza che la pagina se ne vada
+// (in una scheda nuova, da un dialogo) tiene la scheda protetta anche se il testo è già partito.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
@@ -54,22 +55,7 @@ async function apriSito() {
   };
 }
 
-test('bozza in una casella lunga non mandata: resta, le altre si chiudono', async ({ app, shell }) => {
-  const sito = await apriSito();
-  try {
-    const p = await apriEsatta(app, shell, sito.pagina('<!doctype html><title>Bozza</title><textarea id="c" style="width:400px;height:100px"></textarea>'));
-    await p.locator('#c').click();
-    await p.keyboard.type('Gentile direttore, le scrivo per');
-    await apriEsatta(app, shell, sito.pagina('<!doctype html><title>Feed</title><p>niente'));
-    await expect.poll(() => sporca(shell, 'Bozza')).toBe(true);
-    await pulisciTutto(app, shell, sito);
-    const t = await titoliAperti(shell);
-    expect(t).toContain('Bozza');
-    expect(t).not.toContain('Feed');
-  } finally { await sito.chiudi(); }
-});
-
-test('campo di una riga mandato in una scheda nuova dello stesso sito', async ({ app, shell }) => {
+test('r1 il codice mandato in una scheda nuova dello stesso sito non protegge più la scheda di partenza', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
     const p = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Traccia</title>
@@ -85,7 +71,7 @@ test('campo di una riga mandato in una scheda nuova dello stesso sito', async ({
   } finally { await sito.chiudi(); }
 });
 
-test('campo di una riga in un dialogo chiuso dal suo modulo', async ({ app, shell }) => {
+test('r1 il nome scritto in un dialogo chiuso dal suo modulo non protegge più la scheda', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
     const p = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Lista</title>
@@ -101,23 +87,5 @@ test('campo di una riga in un dialogo chiuso dal suo modulo', async ({ app, shel
     await p.waitForTimeout(800);
     await pulisciTutto(app, shell, sito);
     expect(await titoliAperti(shell)).not.toContain('Lista');
-  } finally { await sito.chiudi(); }
-});
-
-test('questionario a sole scelte compilato a metà', async ({ app, shell }) => {
-  const sito = await apriSito();
-  try {
-    const p = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Questionario</title>
-      <form action="/api/q" method="post">
-        <p>1</p><label><input type="radio" name="a" value="1" id="r1">Sì</label><label><input type="radio" name="a" value="2">No</label>
-        <p>2</p><select name="b" id="s"><option>-</option><option>Spesso</option><option>Mai</option></select>
-        <p>3</p><label><input type="checkbox" name="c" id="k">Mi interessa</label>
-        <button>Invia</button></form>`));
-    await p.locator('#r1').click();
-    await p.locator('#s').selectOption('Spesso');
-    await p.locator('#k').click();
-    await p.waitForTimeout(800);
-    await pulisciTutto(app, shell, sito);
-    expect(await titoliAperti(shell)).toContain('Questionario');
   } finally { await sito.chiudi(); }
 });
