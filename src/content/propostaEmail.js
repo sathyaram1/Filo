@@ -200,7 +200,7 @@
     let n = walker.currentNode; let contati = 0; let liberi = punti.length;
     for (; n; n = walker.nextNode()) {
       if (++contati > NODI_MAX) return dubbio;
-      if (n === cima || n.contains(cima)) continue;
+      if (n === cima || n.contains(cima) || cima.contains(n)) continue;
       let b;
       try { b = n.getBoundingClientRect(); } catch (_) { continue; }
       if (b.width <= 0 || b.height <= 0) continue;
