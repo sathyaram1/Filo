@@ -261,6 +261,12 @@ async function perIndice() {
   { const fr = document.createDocumentFragment(); fr.appendChild(document.createElement('iframe')); document.body.append(fr); out.frammento = leggi(ultimo()); }
   { const h = document.createElement('div'); document.body.appendChild(h); const sr = h.attachShadow({ mode: 'closed' }); sr.appendChild(document.createElement('iframe')); out.ombra = leggi(ultimo()); }
   { const f = document.createElement('iframe'); f.src = location.protocol + '//sito-pubblico.test:' + location.port + '/lento'; document.body.appendChild(f); await new Promise((r) => setTimeout(r, 200)); out.altroSitoInCarico = leggi(ultimo()); }
+  // Un embed di HTML non dà la finestra dall'elemento: nasce al calcolo della disposizione, raggiungibile per indice.
+  {
+    const e = document.createElement('embed'); e.type = 'text/html'; e.src = 'about:blank'; document.body.appendChild(e);
+    await new Promise((r) => setTimeout(r, 500));
+    const w = ultimo(); out.embedNato = !!w && w.frameElement === e; out.embed = leggi(w);
+  }
   return out;
 }
 
@@ -282,13 +288,83 @@ test('un riquadro raggiunto per indice o per nome subito dopo l\'inserimento ha 
     await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 8_000 });
     const off = await page.evaluate(perIndice);
     expect(on.pagina).not.toBe(off.pagina);
-    for (const k of ['appendChild', 'insertAdjacentHTML', 'innerHTMLPerNome', 'frammento', 'ombra', 'altroSitoInCarico']) {
+    expect(on.embedNato && off.embedNato, 'l\'embed apre una finestra raggiungibile per indice').toBe(true);
+    for (const k of ['appendChild', 'insertAdjacentHTML', 'innerHTMLPerNome', 'frammento', 'ombra', 'altroSitoInCarico', 'embed']) {
       expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
       expect.soft(off[k], `${k}: in Off come la pagina`).toBe(off.pagina);
     }
   } finally {
     srv.closeAllConnections?.();
     await new Promise((r) => srv.close(r));
+  }
+});
+
+// Un riquadro che cambia documento: riempito dopo l'inserimento, passato a una seconda pagina, tornato vuoto. Ogni
+// documento nuovo porta copie native nuove nella stessa finestra, e ognuno deve avere il rumore della pagina.
+async function cambiDiDocumento(interno) {
+  /* global fnv, scena */
+  const dalDocumento = {};
+  addEventListener('message', (e) => { if (e.data && e.data.lettura) dalDocumento[e.data.lettura] = e.data.valore; });
+  const carico = (f) => new Promise((r) => { f.addEventListener('load', r, { once: true }); setTimeout(r, 4000); });
+  const attendi = (k) => new Promise((r) => { const t0 = Date.now(); const t = () => (k in dalDocumento || Date.now() - t0 > 4000 ? r() : setTimeout(t, 25)); t(); });
+  const daFuori = (W) => { try { return fnv(scena(W.document).c.toDataURL()); } catch (e) { return 'errore ' + e.message; } };
+  const out = { pagina: fnv(scena(document).c.toDataURL()) };
+  const riempiti = {
+    srcDopo: (f) => { f.src = interno('srcDopo'); },
+    srcdocDopo: (f) => { f.srcdoc = window.__srcdoc; },
+  };
+  for (const [nome, riempi] of Object.entries(riempiti)) {
+    const f = document.createElement('iframe');
+    document.body.appendChild(f);
+    const i = window.length - 1;
+    riempi(f);
+    await carico(f);
+    await attendi(nome);
+    out[nome + 'Documento'] = dalDocumento[nome];
+    out[nome + 'Elemento'] = daFuori(f.contentWindow);
+    out[nome + 'Indice'] = daFuori(window[i]);
+  }
+  const pigro = document.getElementById('pigro');
+  pigro.src = interno('pigro');
+  await carico(pigro);
+  await attendi('pigro');
+  out.pigroDocumento = dalDocumento.pigro;
+  const n = document.createElement('iframe');
+  n.src = interno('prima');
+  document.body.appendChild(n);
+  const j = window.length - 1;
+  await carico(n);
+  n.src = interno('seconda');
+  await carico(n);
+  await attendi('seconda');
+  out.primaDocumento = dalDocumento.prima;
+  out.secondaDocumento = dalDocumento.seconda;
+  out.secondaElemento = daFuori(n.contentWindow);
+  n.src = 'about:blank';
+  await carico(n);
+  out.tornatoVuotoIndice = daFuori(window[j]);
+  out.tornatoVuotoElemento = daFuori(n.contentWindow);
+  return out;
+}
+
+test('un riquadro che cambia documento ha il rumore della pagina in ogni documento', async ({ openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const pagine = {};
+  for (const k of ['srcDopo', 'pigro', 'prima', 'seconda']) pagine[k] = testServer.html(documento(k));
+  const apri = async () => {
+    const page = await openTab(testServer.html(`<!doctype html><meta charset="utf-8"><script>${IMPRONTA}</script><body><iframe id="pigro"></iframe></body>`));
+    await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+    await page.evaluate((s) => { window.__srcdoc = s; }, documento('srcdocDopo'));
+    return page.evaluate(`(${cambiDiDocumento})((k) => (${JSON.stringify(pagine)})[k])`);
+  };
+  const on = await apri();
+  await setFpMode(openTab, 'off');
+  const off = await apri();
+  expect(on.pagina).not.toBe(off.pagina);
+  for (const k of Object.keys(on)) {
+    if (k === 'pagina') continue;
+    expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
+    expect.soft(off[k], `${k}: in Off come la pagina`).toBe(off.pagina);
   }
 });
 
