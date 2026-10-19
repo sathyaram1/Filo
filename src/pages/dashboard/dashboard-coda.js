@@ -183,22 +183,23 @@
     const res = await d.send({ type: MSG.FILO_CODA_TOGLI_PAGINE, ids });
     if (!res || !res.ok) return;
     const via = new Set(ids);
-    const resto = { ...g, pagine: g.pagine.filter((p) => !via.has(p.id)) };
-    if (!resto.pagine.length) r.remove();
-    else disegnaGruppo(r, resto);
+    senza(r, (p) => !via.has(p.id));
     segnaGiorni();
+  }
+
+  // Subito, senza aspettare che il filo lo ridica: la riga perde le pagine tolte (l'annuncio poi la rifà dal filo).
+  function senza(r, tieni) {
+    const g = r._gruppo;
+    if (!g || !r.isConnected) return;
+    const pagine = g.pagine.filter(tieni);
+    if (!pagine.length) r.remove();
+    else if (pagine.length !== g.pagine.length) disegnaGruppo(r, { ...g, pagine, ts: pagine[0].ts });
   }
 
   // Una pagina tolta altrove (dalla ricerca): via da ogni gruppo che la mostra.
   function togliIndirizzo(url) {
     if (!d) return;
-    for (const r of [...d.bubblesEl.querySelectorAll('.dash-pagine')]) {
-      const g = r._gruppo;
-      if (!g || !g.pagine.some((p) => p.url === url)) continue;
-      const resto = { ...g, pagine: g.pagine.filter((p) => p.url !== url) };
-      if (!resto.pagine.length) r.remove();
-      else disegnaGruppo(r, resto);
-    }
+    for (const r of [...d.bubblesEl.querySelectorAll('.dash-pagine')]) senza(r, (p) => p.url !== url);
     segnaGiorni();
   }
 

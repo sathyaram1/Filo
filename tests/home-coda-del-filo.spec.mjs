@@ -423,6 +423,96 @@ test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue
   await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
 });
 
+// Le pagine aperte in schede vere, una dopo l'altra; tornare alla home la fa rileggere come quando torna in vista.
+async function visita(openTab, testServer, nome) {
+  const p = await openTab(testServer.html(`<title>${nome}</title><p>${nome}</p>`));
+  await p.waitForFunction((n) => document.title === n, nome);
+}
+async function tornaAllaHome(shell, page) {
+  await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const t = s.tabs.filter((x) => String(x.url).startsWith('filo://newtab')).pop();
+    await window.filoShell.tabs.activate(t.id);
+  });
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+}
+const righePagine = (page) => page.locator('.dash-pagine .dash-pagine-testo');
+
+test('tolta la prima pagina del gruppo in corso, la riga resta una sola, aperta, e prende le pagine che vengono dopo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await home(app);
+  for (const n of ['alfa orche', 'beta', 'gamma']) await visita(openTab, testServer, n);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(3);
+  const page = await openTab('filo://newtab/');
+  const riga = page.locator('.dash-pagine').last();
+  await riga.locator('.dash-pagine-testa').click();
+  const alfa = riga.locator('.dash-pagina', { hasText: 'alfa orche' });
+  await alfa.click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect(righePagine(page)).toHaveText(['2 pagine, fra cui gamma']);
+  await expect(page.locator('.dash-pagine')).toHaveClass(/dash-pagine-aperte/);
+  await visita(openTab, testServer, 'delta');
+  await tornaAllaHome(shell, page);
+  await expect(righePagine(page)).toHaveText(['3 pagine, fra cui delta']);
+  // Dalla ricerca, la prima del gruppo: stessa cosa.
+  await page.locator('#cercaInput').fill('beta');
+  await page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'beta' }).click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect(righePagine(page)).toHaveText(['2 pagine, fra cui delta']);
+  await visita(openTab, testServer, 'epsilon');
+  await tornaAllaHome(shell, page);
+  await expect(righePagine(page)).toHaveText(['3 pagine, fra cui epsilon']);
+});
+
+test('pagine cancellate dalla Sicurezza escono subito dalla home già aperta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await home(app);
+  for (const n of ['alfa', 'beta']) await visita(openTab, testServer, n);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(2);
+  const page = await openTab('filo://newtab/');
+  await expect(righePagine(page)).toHaveText(['2 pagine, fra cui beta']);
+  const sic = await openTab('filo://security/security.html');
+  const r = await sic.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_PAGINE_CANCELLA, periodo: 'oggi' }));
+  expect(r.ok).toBe(true);
+  await expect(page.locator('.dash-pagine')).toHaveCount(0);
+});
+
+test('una scheda chiusa eliminata dalla Cronologia esce dal filo: niente riga nella home, niente ricerca', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await home(app);
+  await visita(openTab, testServer, 'delfini');
+  const url = testServer.html('<title>orche marine</title><p>le orche</p>');
+  const p = await openTab(url);
+  await p.waitForFunction(() => document.title === 'orche marine');
+  await shell.evaluate(async (u) => {
+    const s = await window.filoShell.tabs.snapshot();
+    await window.filoShell.tabs.close(s.tabs.find((x) => x.url === u).id);
+  }, url);
+  await expect.poll(() => app.evaluate(async (_e, u) => (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => t.url === u).length, url)).toBe(1);
+  const page = await openTab('filo://newtab/');
+  await expect(righePagine(page)).toHaveText(['2 pagine, fra cui orche marine']);
+  const cron = await openTab('filo://archive/archive.html');
+  const r = await cron.evaluate(async (u) => {
+    const { MSG } = self.SN_MSG;
+    const { tabs } = await self.chrome.runtime.sendMessage({ type: MSG.GET_ARCHIVED_TABS });
+    return self.chrome.runtime.sendMessage({ type: MSG.REMOVE_ARCHIVED_TAB, id: tabs.find((x) => x.url === u).id });
+  }, url);
+  expect(r.ok).toBe(true);
+  // La home già aperta lo vede subito; la pagina visitata in un'altra scheda resta.
+  await expect(righePagine(page)).toHaveText(['1 pagina: delfini']);
+  await page.locator('#cercaInput').fill('orche');
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
+  // «Svuota archivio»: anche le visite delle altre schede chiuse.
+  await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    const t = s.tabs.find((x) => /delfini/.test(x.title || ''));
+    if (t) await window.filoShell.tabs.close(t.id);
+  });
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(1);
+  await cron.evaluate(async () => self.chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.CLEAR_ARCHIVED_TABS }));
+  await expect(page.locator('.dash-pagine')).toHaveCount(0);
+});
+
 test('senza un modello la frase dice perché e la strada porta ai Crediti', async ({ app }) => {
   const casa = await home(app);
   await expect(casa.locator('#homeMessage')).toContainText('codice d\'invito');
