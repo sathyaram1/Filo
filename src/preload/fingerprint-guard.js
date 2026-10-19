@@ -288,15 +288,15 @@ const PROPAGAZIONE = `
     var g = GETTER[tag];
     if (g) return R(g, el, []);
     if (tag !== 'EMBED' || !cornice || !quanteF) return null;
-    try {
-      R(misura, el, []);
+    var cerca = function () {
       var v = R(vista, R(docDi, el, []), []);
       for (var i = 0, n = R(quanteF, v, []) | 0; i < n; i++) {
         var cw = v[i];
         try { if (R(cornice, cw, []) === el) return cw; } catch (e) {}
       }
-    } catch (e) {}
-    return null;
+      return null;
+    };
+    try { return cerca() || (R(misura, el, []), cerca()); } catch (e) { return null; }
   }
 
   // Si tocca in anticipo un riquadro che resterà la finestra vuota della pagina, o che andrà su un'altra origine e
