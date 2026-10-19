@@ -11,6 +11,7 @@ const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const { consiglioPortachiavi } = require('../../portachiavi');
+require('../../../shared/routineCrediti.js');
 
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
 // riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
@@ -84,6 +85,33 @@ function erroreDomande(e) {
   if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
   if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
   return e?.message || 'Non riuscito.';
+}
+
+// Un errore di ownerCrediti detto all'owner. Su un numero fuori misura la spiegazione è del server.
+function erroreCrediti(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'I crediti delle routine non sono ancora pubblicati sul server.';
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può toccare i crediti: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Dallo stato dei crediti la scheda usa questi campi per account; le sessioni restano sul server.
+const CREDITI_CAMPI_ACCOUNT = Object.freeze(['pct', 'lettura', 'stima', 'fonte', 'limite', 'taratura', 'taraturaDa',
+  'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte']);
+function accountsCrediti(r) {
+  const out = {};
+  for (const a of ['A', 'B']) {
+    const v = r && r.accounts && r.accounts[a];
+    if (!v || typeof v !== 'object') continue;
+    out[a] = {};
+    for (const k of CREDITI_CAMPI_ACCOUNT) if (v[k] !== undefined) out[a][k] = v[k];
+  }
+  return out;
 }
 
 // Un istante del server (ISO, millisecondi, secondi o Timestamp serializzato) come ISO; '' se non c'è.
@@ -794,6 +822,41 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
+  }));
+
+  // I numeri dell'owner sui crediti delle routine (#1356): il main fa da tramite verso ownerCrediti e rifà i
+  // controlli della pagina (SN_ROUTINE_CREDITI). Si scrive solo il campo toccato; `numeri` torna sempre intero
+  // dalla scrittura, lo stato per account solo se la rilettura riesce.
+  async function statoCreditiRoutine() {
+    const r = await callSecurityFunction('ownerCrediti', { op: 'stato' });
+    const freni = r && (r.riserva === 'attivi' || r.riserva === 'numeri_assenti') ? r.riserva : '';
+    return { numeri: globalThis.SN_ROUTINE_CREDITI.leggiNumeri(r && r.numeri), accounts: accountsCrediti(r), freni };
+  }
+  on(MSG.ROUTINE_CREDITI_GET, ownerOnly(async () => {
+    try {
+      return Object.assign({ ok: true }, await statoCreditiRoutine());
+    } catch (e) {
+      return { ok: false, error: erroreCrediti(e) };
+    }
+  }));
+  on(MSG.ROUTINE_CREDITI_SET, ownerOnly(async (msg) => {
+    const RC = globalThis.SN_ROUTINE_CREDITI;
+    const patch = {};
+    for (const k of RC.CHIAVI) if (msg && Object.prototype.hasOwnProperty.call(msg, k)) patch[k] = msg[k];
+    const v = RC.valida(patch);
+    if (!v.ok) return { ok: false, error: v.testo };
+    let scritto;
+    try {
+      scritto = await callSecurityFunction('ownerCrediti', Object.assign({ op: 'imposta' }, v.valori));
+    } catch (e) {
+      return { ok: false, error: erroreCrediti(e) };
+    }
+    const out = { ok: true, numeri: RC.leggiNumeri(scritto && scritto.numeri) };
+    try {
+      const st = await statoCreditiRoutine();
+      Object.assign(out, { accounts: st.accounts, freni: st.freni });
+    } catch (_) { /* scritto sì: lo stato si rilegge alla prossima apertura */ }
+    return out;
   }));
 
   // Modello e sforzo del worker per fase (config/routines.roleModels). Owner-only. Le legge il server
@@ -1511,13 +1574,14 @@ module.exports = function register(on, ctx) {
   // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
   // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
   // torna è l'esito VERO di quel cancello, non un "fatto" generico.
-  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente'];
+  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner'];
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
     const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
     if (!r || r.ok === false) {
-      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha saltato il controllo.' };
+      // `error` è la frase del server per l'owner; `reason` il codice, solo se la frase manca.
+      return { ok: false, error: (r && (r.error || r.detail || r.reason)) || 'Il server non ha saltato il controllo.' };
     }
     // Un esito che questo client non conosce non si traduce in «fatto»: passa
     // com'è, e la pagina lo scrive invece di inventarsi un successo.

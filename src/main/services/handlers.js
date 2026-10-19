@@ -41,7 +41,15 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.
   funzioneDi: (action) => (action === ACTIONS.PROVIDER_TEST ? '' : actionLabelForSettings(action)),
   rimedioDi: (s, action, err) => globalThis.SN_CHAT_ERRORS.rimedioNessunHost(doveSiSceglieIlModello(s, action), err, s),
+  // Lo crea handlers/contatori.js, registrato più sotto: lo si chiede a ogni chiamata.
+  contatore: () => globalThis.SN_CONTATORI_MAIN,
 });
+// Più chiamate che per chi usa Filo sono una richiesta sola (un messaggio coi suoi giri di strumenti, una dettatura
+// coi suoi ripieghi) contano un uso, con l'attesa da quando è partita la richiesta (#969).
+function unUsoContato(action, fn) {
+  const C = globalThis.SN_CONTATORI_MAIN;
+  return C && typeof C.unUso === 'function' ? C.unUso(action, fn) : fn();
+}
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
 const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -617,7 +625,11 @@ function noteServedProvider(settings, action, result) {
 // testo. Stessa catena di modelli, stesso limite di spesa, stesso riscontro su
 // chi ha servito. `payload`: { audioBase64, format, lang, interim } — oppure,
 // nella forma vecchia, { dataUrl, lang }.
-async function handleTranscription({ settings, payload, origin, signal }) {
+function handleTranscription(args) {
+  return unUsoContato(ACTIONS.TRANSCRIBE_AUDIO, () => trascrivi(args));
+}
+
+async function trascrivi({ settings, payload, origin, signal }) {
   const p = payload || {};
   const model = modelForAction(settings, ACTIONS.TRANSCRIBE_AUDIO);
   const attempts = buildAttemptChain(settings, model, ACTIONS.TRANSCRIBE_AUDIO);
@@ -775,6 +787,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
   const skipCache = hasTools || AICache.esclusa(action);
   const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
+    try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(action); } catch (_) {}
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
@@ -889,6 +902,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
 
   const cached = await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
+    try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(action); } catch (_) {}
     if (onDelta) onDelta(cached.text);
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
@@ -1115,6 +1129,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
   try { require('../updater').seguiImpostazioni(merged); } catch (_) {}
+  try { globalThis.SN_CONTATORI_MAIN?.seguiImpostazioni(merged); } catch (_) {}
   wireSafebrowse(merged).catch(() => {});
   try {
     const Cookies = require('./cookies');
@@ -4736,7 +4751,7 @@ async function handleFiloChat(richiesta) {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
     const turno = () => turnoFiloChat(richiesta, volo);
-    return await (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno());
+    return await unUsoContato(ACTIONS.FILO_CHAT, () => (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno()));
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
   }
@@ -5914,6 +5929,7 @@ require('./handlers/filo')(on, handlerCtx);
 require('./handlers/auth')(on, handlerCtx);
 require('./handlers/credits')(on, handlerCtx);
 require('./handlers/wallet')(on, handlerCtx);   // #598 — chiave personale, inviti, registro d'uso
+require('./handlers/contatori')(on, handlerCtx); // #969 — i contatori giornalieri anonimi
 require('./handlers/avvisoCrediti')(on, handlerCtx); // #818 — l'avviso prima che i crediti finiscano, coi rimedi
 require('./handlers/board')(on, handlerCtx);
 require('./handlers/decks')(on, handlerCtx);

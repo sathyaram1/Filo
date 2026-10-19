@@ -1489,6 +1489,19 @@
       risk: 'Decide se Filo manda da solo una segnalazione anonima e generica a chi lo sviluppa quando non riesce a fare '
         + 'una cosa: mai indirizzi né testi delle conversazioni. Spegnerla toglie anche i 10 crediti extra al giorno.',
     }),
+    interruttore({
+      keys: ['contatori', 'contatori anonimi', 'contatori d\'uso', 'contatori giornalieri', 'statistiche d\'uso',
+        'statistiche anonime', 'telemetria', 'dati d\'uso anonimi', 'contatori.attivi'],
+      percorso: 'contatori.attivi',
+      spentoAllenta: false,
+      nome: 'Contatori anonimi d\'uso',
+      stati: ['accesi', 'spenti'],
+      aiuto: 'true | false (una volta al giorno manda a chi sviluppa Filo solo numeri: quante volte si usa ogni funzione, '
+        + 'quanto si aspetta la risposta, quante chiamate falliscono; spenti, non si conta niente e non parte niente)',
+      risk: 'Decide se Filo manda una volta al giorno a chi lo sviluppa dei numeri senza contenuto (usi e attese per '
+        + 'funzione, chiamate fallite, versione e sistema), con uno pseudonimo che cambia ogni mese: mai testi, '
+        + 'indirizzi o nomi di file.',
+    }),
     elenco({
       keys: ['siti_bloccati', 'siti bloccati', 'blacklist', 'domini in blacklist', 'elenco dei siti bloccati', 'lista dei siti bloccati'],
       percorso: 'security.siteBlock.blacklist',

@@ -22,7 +22,8 @@
   // Un interruttore per categoria di mittente (#446): la chiave è il gruppo
   // definito in SN_FEEDBACK_THREAD.AUTO_APPROVE_GROUPS.
   // Un interruttore per ogni categoria d'autore che la lista mostra come icona
-  // (AUTHOR_META più sotto): chi si vede separato si regola separato.
+  // (AUTHOR_META più sotto): chi si vede separato si regola separato. Esplorazione
+  // e allarmi della pubblicazione no: entrano in coda comunque (#1035).
   const mgAutoApprove = {
     owner:    document.getElementById('mgAutoApproveOwner'),
     user:     document.getElementById('mgAutoApproveUser'),
@@ -30,7 +31,6 @@
     worker:   document.getElementById('mgAutoApproveWorker'),
     verifier: document.getElementById('mgAutoApproveVerifier'),
     residuo:  document.getElementById('mgAutoApproveResiduo'),
-    prober:   document.getElementById('mgAutoApproveProber'),
     claude:   document.getElementById('mgAutoApproveClaude'),
     filo:     document.getElementById('mgAutoApproveFilo'),
   };
@@ -288,6 +288,8 @@
     // "computer" perché è l'unica delle istanze che lavora DAVANTI a lui: le
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
+    // Lo apre il server quando una versione non si costruisce (#1002): non è Claude, ed è lavoro che ferma le uscite.
+    costruzione: { icon: '🏗️', label: 'Allarme della pubblicazione' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
   };
   // Dal feedback, non dal clientId: un nome riservato senza prova è un utente come gli altri (#912).
@@ -340,7 +342,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
+  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, costruzione: 7, claude: 8, filo: 9 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
@@ -5071,6 +5073,42 @@
     }).join('\n\n');
   }
 
+  // Le note lunghe della lavorazione si mostrano ripiegate, l'inizio visibile e un tocco per aprirle (#559):
+  // una critica di duecento righe non deve nascondere il turno dopo. Aperte e chiuse sopravvivono ai ridisegni.
+  const NOTA_RIGHE_MAX = 24;
+  let noteAperte = { id: null, chiavi: new Set() };
+
+  function righeStimate(testo) {
+    return String(testo || '').split('\n').reduce((n, riga) => n + Math.max(1, Math.ceil(riga.length / 100)), 0);
+  }
+
+  function ripiegaNota(bolla, chiave) {
+    const corpo = bolla.querySelector('.mg-bubble-body');
+    const tasto = document.createElement('button');
+    tasto.type = 'button';
+    tasto.className = 'mg-bubble-apri';
+    corpo.after(tasto);
+    const mostra = (aperta) => {
+      bolla.classList.toggle('mg-bubble--ripiegata', !aperta);
+      tasto.setAttribute('aria-expanded', String(aperta));
+      tasto.textContent = aperta ? 'Riduci' : 'Mostra tutto';
+      if (aperta) noteAperte.chiavi.add(chiave);
+      else noteAperte.chiavi.delete(chiave);
+    };
+    tasto.addEventListener('click', () => {
+      const apri = bolla.classList.contains('mg-bubble--ripiegata');
+      mostra(apri);
+      // Richiusa dal fondo di una nota lunga, la bolla tornerebbe fuori vista: la si riporta sotto gli occhi.
+      if (!apri) bolla.scrollIntoView({ block: 'nearest' });
+    });
+    corpo.addEventListener('click', (e) => {
+      if (!bolla.classList.contains('mg-bubble--ripiegata')) return;
+      if (e.target.closest('a') || String(window.getSelection() || '')) return;
+      mostra(true);
+    });
+    mostra(noteAperte.chiavi.has(chiave));
+  }
+
   // La conversazione COMPLETA del feedback, un turno per bolla: segnalazione
   // originale → parere di Filo (giudici) → commento dell'owner alla revisione →
   // tutti i turni della lavorazione (report delle istanze, esiti del verifier,
@@ -5192,12 +5230,19 @@
       if (fb._dettaglioMancato) appendRiprovaDettaglio();
       return;
     }
-    for (const seg of TH.splitNotes(notes)) {
+    if (noteAperte.id !== fb._id) noteAperte = { id: fb._id, chiavi: new Set() };
+    const turni = TH.splitNotes(notes);
+    turni.forEach((seg, i) => {
       const when = seg.ts ? ` — ${seg.ts}` : '';
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       const corpo = seg.role === 'user' ? esc(seg.body) : markdownHtml(seg.body);
-      appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
-    }
+      const b = appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
+      const chiave = `${i}:${seg.body.length}`;
+      // L'ultima nota è quella che si legge: resta aperta, e resta aperta anche quando un turno nuovo
+      // arriva mentre la si legge (niente che si richiude da solo).
+      if (i === turni.length - 1) noteAperte.chiavi.add(chiave);
+      else if (righeStimate(seg.body) > NOTA_RIGHE_MAX) ripiegaNota(b, chiave);
+    });
     appendFraseBubble(fb);
     // La copia che si sta leggendo è rimasta indietro e il tentativo di
     // rileggerla non è tornato: si dice in coda alla conversazione, dove
@@ -5408,6 +5453,11 @@
     non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
     non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
     guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
+    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
+    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
+    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
+    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
   };
 
   function pannelloSaltaAudit(fb) {

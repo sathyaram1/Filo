@@ -94,6 +94,10 @@ lo vede:
   limite accettato: in locale c'è l'owner.
 
 Le sessioni locali prendono il biglietto all'avvio (hook), come le routine.
+Alla fine (hook) chiudono il biglietto se è sporco; uno pulito resta, perché la
+sessione si può riprendere senza nascere sporca. Quelli fermi da più di 30
+giorni, o di sessioni morte senza l'hook di fine, li chiude l'avvio di una
+sessione successiva.
 
 ### 1.3 Unire senza sporcare: la delega
 

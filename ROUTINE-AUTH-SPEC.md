@@ -727,7 +727,11 @@ verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
 conservando il testo del fail, segna nello stato del giro `secauditVerdict:
 saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
-richiesta aperta, `conflitto`, `ramo assente`). Le regole Firestore ammettono
+richiesta aperta, `conflitto`, `ramo assente`). Un lavoro server non si fonde
+da lì (#1230): la pratica torna in revisione e passa dal cancello del server,
+prima l'app e poi il server (esiti in più: `attesa_server`, `server_al_pc`,
+`rimandato`, `all_owner`); allo stesso modo il sì a un suo blocco L5 la chiude
+solo col server su main. Le regole Firestore ammettono
 `livelli` nei due rami di triage con vincolo di forma (mappa con al più
 `l3`/`l4`, testo cifrato ≤ 20.000).
 

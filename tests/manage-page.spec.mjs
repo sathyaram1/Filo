@@ -45,8 +45,8 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await page.waitForLoadState('domcontentloaded');
 
   // 9 schede: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni
-  // (#1110); più le tre della sezione Domande (#1150) e «Aspettano» (#903).
-  await expect(page.locator('.mg-tab')).toHaveCount(13);
+  // (#1110); più le tre della sezione Domande (#1150), «Aspettano» (#903) e «Crediti» fra le Routine (#1356).
+  await expect(page.locator('.mg-tab')).toHaveCount(14);
   // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -63,6 +63,7 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   // I Modelli di supporto stanno dentro Automazioni (#1110).
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveCount(0);
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
+  await expect(page.locator('.mg-tab[data-tab="crediti"]')).toHaveText('Crediti');
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
 
   // La vecchia tab "Revisione" non esiste più (assorbita in "In coda").
@@ -315,23 +316,23 @@ test('ogni istanza di Claude si spegne da sola, senza trascinare le altre', asyn
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
 
-  // L'esploratore non entra più in coda da solo…
+  // Lo sviluppo non entra più in coda da solo…
   await page.evaluate(() => {
-    const el = document.getElementById('mgAutoApproveProber');
+    const el = document.getElementById('mgAutoApproveWorker');
     el.checked = false;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await expect
-    .poll(() => page.evaluate(() => window.__automation.autoApprove.prober))
+    .poll(() => page.evaluate(() => window.__automation.autoApprove.worker))
     .toBe(false);
 
   // …e la sessione locale, che è l'istanza che lavora insieme all'owner, resta
   // ammessa: è il motivo per cui gli interruttori si sono sdoppiati.
   expect(await page.evaluate(() => window.__automation.autoApprove.local)).not.toBe(false);
   await expect(page.locator('#mgAutoApproveLocal')).toBeChecked();
-  await expect(page.locator('#mgAutoApproveWorker')).toBeChecked();
   await expect(page.locator('#mgAutoApproveVerifier')).toBeChecked();
   await expect(page.locator('#mgAutoApproveResiduo')).toBeChecked();
+  await expect(page.locator('#mgAutoApproveClaude')).toBeChecked();
 });
 
 test('una config salvata prima dello sdoppiamento non riaccende le istanze spente', async ({ openTab }) => {
@@ -349,7 +350,7 @@ test('una config salvata prima dello sdoppiamento non riaccende le istanze spent
   await page.evaluate(() => window.__mgTest.loadAutoMode());
 
   for (const id of ['mgAutoApproveLocal', 'mgAutoApproveWorker', 'mgAutoApproveVerifier',
-    'mgAutoApproveResiduo', 'mgAutoApproveProber', 'mgAutoApproveClaude']) {
+    'mgAutoApproveResiduo', 'mgAutoApproveClaude']) {
     await expect(page.locator('#' + id)).not.toBeChecked();
   }
   await expect(page.locator('#mgAutoApproveOwner')).toBeChecked();
@@ -370,7 +371,7 @@ test('#446 — con l\'automatica spenta gli interruttori per mittente restano mo
 
   for (const id of ['mgAutoApproveOwner', 'mgAutoApproveUser', 'mgAutoApproveLocal',
     'mgAutoApproveWorker', 'mgAutoApproveVerifier', 'mgAutoApproveResiduo',
-    'mgAutoApproveProber', 'mgAutoApproveClaude', 'mgAutoApproveFilo']) {
+    'mgAutoApproveClaude', 'mgAutoApproveFilo']) {
     await expect(page.locator('#' + id)).toBeEnabled();
   }
 

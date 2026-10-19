@@ -129,11 +129,17 @@
     const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
     return num ? `il feedback da cui nasce (${num})` : 'il feedback da cui nasce';
   }
+  // L'allarme della pubblicazione (#1002) non nasce da un lavoro: lo apre il server.
+  const ALLARME_COSTRUZIONE = 'agent:costruzione';
   function judgesSkippedText(fb) {
     const p = fb && fb.pipeline;
     const k = p && typeof p === 'object' ? String(p.skipped || '') : '';
     if (!Object.prototype.hasOwnProperty.call(GIUDICI_SALTATI, k)) return '';
-    return isFidato(fb) ? GIUDICI_SALTATI[k] : '';
+    if (!isFidato(fb)) return '';
+    if (k === 'routine_proven' && effectiveClientId(fb).toLowerCase() === ALLARME_COSTRUZIONE) {
+      return 'Allarme aperto dal server: i giudici non servono.';
+    }
+    return GIUDICI_SALTATI[k];
   }
   // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
   // il server non lo ri-giudica; entra in coda da solo. Il motivo lo scrive solo il server, fidato o già giudicato.
@@ -1867,7 +1873,7 @@
   const SEZIONI = Object.freeze([
     { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
     { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
-    { id: 'routine', nome: 'Routine', schede: ['automation', 'log'] },
+    { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
   ]);
 
   function sezioneDiScheda(tab) {

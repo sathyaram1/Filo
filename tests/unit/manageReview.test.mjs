@@ -1747,7 +1747,7 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
     domande: 'domande', 'domande-lavoro': 'domande', 'domande-archivio': 'domande',
     inbox: 'feedback', queue: 'feedback', local: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
     fbstats: 'feedback', stats: 'feedback',
-    automation: 'routine', log: 'routine',
+    automation: 'routine', crediti: 'routine', log: 'routine',
   };
   for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);
   const tutte = MR.SEZIONI.flatMap((s) => s.schede);

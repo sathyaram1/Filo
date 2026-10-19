@@ -76,7 +76,8 @@ functions. Qui sotto il perché dei passaggi, per attore.
 **Pipeline** (filo-security):
 - ingresso → gate file (prima dei giudici): flag → `suspicious_file`; pulito → `unlabeled`.
 - `unlabeled` —panel completo→ `attack` | `spam` | `design` | (sicuro: automatica ON **e
-  mittente ammesso** → `todo`, altrimenti → `aligned`).
+  mittente ammesso** → `todo`, altrimenti → `aligned`; un ritrovamento del server senza
+  origine → `todo` comunque, §4c).
 - `attack`/`spam` → `unlabeled`: un mittente fidato segnalato per errore torna al ri-giudizio
   (sotto, «Mittenti fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
   `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
@@ -279,8 +280,13 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     `onFeedbackOrigineCambiata` (functions/src/origine.js), e alla nascita si rilegge l'origine
     dopo la scrittura perché un passo appena avvenuto non vada perso;
   - origine sparita → `aligned` (`statusReason: origine_mancante`);
-  - senza origine (allarmi della costruzione, esplorazioni) → come un allineato dei giudici: `todo`
-    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`.
+  - senza origine (allarmi della costruzione, esplorazioni) → `todo`, a interruttori spenti o accesi
+    (decisione dell'owner del 05/10, #1035): le routine lo prendono quando l'automatica è accesa,
+    come ogni altro lavoro in coda. Vale anche per il NON fidato (l'esploratore lo è sempre): passa
+    dai giudici, e se lo dicono allineato entra in coda senza guardare gli interruttori; se lo
+    fermano resta nei Ricevuti. La prova è `senderProof: 'server'` col prefisso, mai il solo nome:
+    un anonimo che si firma `agent:costruzione` è un utente. L'allarme porta la sua priorità
+    (`priorityManual`, 3): il giudice di priorità non la riscrive.
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
@@ -341,6 +347,13 @@ C'È UN GRUPPO PER OGNI CATEGORIA D'AUTORE, quelle che la coda mostra con un'ico
 istanze di Claude stavano dietro un interruttore solo: la coda le distingueva ma la
 fiducia era una sola, quindi per fermare l'esploratore si fermava anche la sessione
 locale. Adesso i due assi coincidono — chi si vede separato si regola separato.
+
+Due categorie non hanno interruttore in Gestione, perché nascono senza origine e vanno in
+coda comunque (§4c): l'esplorazione (`prober`, il gruppo resta nella mappa ma non decide
+più niente) e l'allarme della pubblicazione (`costruzione`, 🏗️, `agent:costruzione` con la
+prova del server; per la mappa sta in `claude`, come sul server). Gli interruttori di
+`worker`, `verifier` e `residuo` contano solo per i ritrovamenti NON fidati, quelli che
+passano dai giudici: un fidato va dove dice la sua origine.
 
 **Compatibilità:** un documento salvato prima, che ha il solo `claude`, fa ereditare quel
 valore a tutte le sue istanze (`resolveAutoApprove`, in entrambe le copie). Senza,
