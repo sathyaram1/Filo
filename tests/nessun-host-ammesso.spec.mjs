@@ -1,11 +1,12 @@
 // #828: un modello che su OpenRouter servono solo host esclusi dalla politica. Chat, funzioni e «Prova» delle Opzioni
 // dicono quale modello, quale funzione, perché e dove sceglierne un altro, senza invitare a riprovare.
-// Regole pure: tests/unit/nessunHostAmmesso.test.mjs.
+// Regole pure: tests/unit/nessunHostAmmesso.test.mjs e, per la coda della chiave propria, chiavePropriaFornitori.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const GEMINI = 'google/gemini-2.5-flash';
-const SPIEGAZIONE = 'non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione.';
+// Qui paga la chiave propria con l'interruttore dei fornitori esclusi spento: la frase indica anche quella strada (#962).
+const SPIEGAZIONE = 'non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione. Visto che paghi con la tua chiave, puoi anche accendere «Con la mia chiave, usa anche i fornitori esclusi» in Opzioni.';
 
 // Il router finto nel main: il catalogo dice che Gemini lo servono solo host di Google, e la richiesta, che li esclude,
 // riceve il 404 del router; ogni altro modello risponde.
