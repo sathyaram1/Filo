@@ -401,17 +401,18 @@
   }
 
   /**
-   * Si possono disegnare le sezioni per QUESTA lista? No solo quando la pagina
-   * non legge NESSUNO stato: è il caso vero (o hai la chiave e li leggi tutti,
-   * o non ce l'hai e non ne leggi uno). Un documento storto in mezzo a mille
-   * leggibili lascia la barra al suo posto: toglierla a tutti sarebbe
-   * sproporzionato, e farebbe divergere le due superfici.
-   * Lista vuota → non c'è niente che dica il contrario: sezioni sì (e "(0)"
-   * lì è la verità).
+   * Si possono disegnare le sezioni per QUESTA lista? No quando una parte non
+   * trascurabile degli stati non si legge (#1042): senza chiave restano in
+   * chiaro solo i documenti più vecchi, e quattro di quelli su mille e passa
+   * bastavano a disegnare le sezioni coi chiusi ammucchiati nei Ricevuti. Un
+   * documento storto in mezzo a tanti leggibili lascia la barra al suo posto.
+   * Lista vuota → sezioni sì (e "(0)" lì è la verità).
    */
+  const QUOTA_ILLEGGIBILI = 0.1;
   function sectionsReliable(feedbacks) {
     const list = feedbacks || [];
-    return !list.length || !list.every(statusUnreadable);
+    if (!list.length) return true;
+    return list.filter(statusUnreadable).length / list.length < QUOTA_ILLEGGIBILI;
   }
 
   /**
