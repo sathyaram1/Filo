@@ -66,6 +66,11 @@
   // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
   // Ignoriamo silenziosamente le ricerche oltre questo limite.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
+  // Ogni passo che l'Aiuto fa da solo è una chiamata pagata, e una pagina può chiederne all'infinito (#1049): oltre il
+  // tetto di fila si ferma e chiede. Largo, perché aprire una a una trenta sezioni è un uso vero e costa solo un clic.
+  const MAX_PASSI_DA_SOLO = 20;
+  let passiDaSolo = 0;
+  let continuaAperto = null;
 
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
   function isOpen() { return !!(root && root.isConnected); }
