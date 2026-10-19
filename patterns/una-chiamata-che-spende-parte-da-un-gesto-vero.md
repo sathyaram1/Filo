@@ -109,4 +109,5 @@ autocompletamento) senza un tasto premuto, l'anticipo. Il calcolo al tasto
 destro resta.
 
 Prove: `tests/chiamate-automatiche-solo-da-gesto.spec.mjs` (la pagina vera),
+`tests/aiuto-passi-da-solo.spec.mjs` (il giro dell'Aiuto),
 `tests/unit/chiamateAutomatiche.test.mjs` (cosa conta come gesto, il tetto).
