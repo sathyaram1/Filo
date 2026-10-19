@@ -41,17 +41,20 @@ test('dispatch rifiuta un clone dentro il checkout di Filo', () => {
   assert.equal(cartellaCloneServer({ FILO_SERVER_CLONE: '/altrove/fs' }), resolve('/altrove/fs'));
 });
 
-test('le istruzioni del lavoro server: percorsi veri, aiutante nel clone, registro dopo il push', () => {
+test('le istruzioni del lavoro server: git verso GitHub solo da git-server, percorsi veri, registro dopo il push', () => {
   const t = testoLavoroServer({ clone: '/home/user/filo-security', canale: 'C:\\x\\scripts\\routine-channel.mjs' });
   assert.ok(t.length > 400);
   assert.ok(!t.includes('<CLONE>') && !t.includes('<CANALE>'), 'segnaposti sostituiti');
   assert.ok(!/<!--\s*includi:/.test(t));
-  assert.match(t, /git-credenziali/);
-  assert.match(t, /credential\.useHttpPath/);
-  assert.match(t, /config --local credential\.helper ""/, 'l’elenco si azzera nel clone, mai globale');
-  assert.match(t, /node "C:\/x\/scripts\/routine-channel\.mjs" ramo-server/, 'barre in avanti, percorso assoluto');
-  assert.match(t, /"\/home\/user\/filo-security"/);
-  assert.ok(!/--global/.test(t), 'niente configurazione globale');
+  const canale = 'node "C:/x/scripts/routine-channel.mjs"';
+  for (const azione of ['clone', 'ls-remote', 'fetch', 'push']) {
+    assert.ok(t.includes(`${canale} git-server ${azione} "/home/user/filo-security"`), `git-server ${azione}, barre in avanti e percorso assoluto`);
+  }
+  assert.ok(t.includes(`${canale} ramo-server`));
+  // #1233: l'aiutante di credenziali lo blocca il controllo dei permessi della sessione, e git fuori da git-server non ha il token.
+  assert.ok(!/credential\.|git-credenziali|--global/.test(t), 'niente aiutanti né configurazione di credenziali');
+  assert.ok(!/git (-C "[^"]+" )?(clone|fetch|push|pull|ls-remote)\b/.test(t), 'nessun git di rete fuori da git-server');
+  assert.match(t, /messaggio esatto/, 'un blocco del controllo dei permessi si riporta parola per parola');
 });
 
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {

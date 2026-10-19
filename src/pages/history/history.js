@@ -186,8 +186,12 @@
       const first = tm.firstTextMs != null ? tm.firstTextMs : tm.firstToolMs;
       const chip = document.createElement('span');
       chip.className = 'sn-history-timing';
-      chip.textContent = I18n.t('history_timing', fmt(tm.firstReasoningMs), fmt(first), fmt(tm.totalMs));
-      chip.title = I18n.t('history_timing_title');
+      // L'attesa prima della richiesta (stato del computer, saldo) la vive chi aspetta: compare per prima (#1097.1).
+      const prima = tm.preparazioneMs != null;
+      chip.textContent = (prima ? I18n.t('history_timing_prep', fmt(tm.preparazioneMs)) : '')
+        + I18n.t('history_timing', fmt(tm.firstReasoningMs), fmt(first), fmt(tm.totalMs));
+      chip.title = I18n.t('history_timing_title')
+        + (prima ? `\n${I18n.t('history_timing_prep_title', fmt(tm.preparazioneMs), fmt(tm.sistemaMs), fmt(tm.saldoMs))}` : '');
       right.appendChild(chip);
     }
 
@@ -297,7 +301,7 @@
       render();
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openHome').addEventListener('click', () => {
       // #252 — indirizzo canonico: una sola scheda per "Aperti per dopo".

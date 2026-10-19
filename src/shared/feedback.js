@@ -634,30 +634,33 @@
     return null;
   }
 
-  // Rimette il contatore in pari: lo crea se manca, lo alza se un `seq` più
-  // alto è già in giro (backfill, migrazioni, numeri assegnati a mano). Solo
-  // owner: serve il token admin. Torna il valore in vigore alla fine.
-  //
-  // `allowLower` lo RIPORTA GIÙ quando è più alto di qualunque `seq` esistente.
-  // Serve perché farlo avanzare di uno lo può fare chiunque (è ciò che fa chi
-  // invia, e non c'è modo di distinguerlo da chi lo alza a vuoto): senza questo,
-  // un estraneo che lo spinge a diecimila lascerebbe i feedback nuovi con numeri
-  // assurdi per sempre, e l'unica cura sarebbe la console. Si passa `true` SOLO
-  // con il numero più alto VERO in mano (SN_FEEDBACK.maxSeq, che lo chiede al
-  // server): con il massimo dei soli feedback caricati si riassegnerebbero
-  // numeri già usati.
-  //
-  // Anche col massimo vero resta una corsa: un invio fra la nostra lettura e la
-  // nostra scrittura assegna un numero che noi non abbiamo visto, e abbassare
-  // lo farebbe riusare. Per questo si scende solo quando lo scarto è più largo
-  // di qualunque corsa realistica (SEQ_LOWER_MARGIN): uno scarto di uno o due è
-  // gente che sta inviando adesso, uno scarto di cento è un contatore gonfiato.
-  // Uno scarto piccolo resta com'è: sono numeri saltati, cioè un'etichetta con
-  // un buco, e vale meno del rischio di stamparne due uguali.
+  // La prova del mittente (#595) la scrivono solo l'owner e il server: gemello di SENDER_PROOFS in feedbackThread.js.
+  const PROVE_MITTENTE = ['admin', 'server'];
+
+  // Il `seq` più alto fra le righe con la prova del mittente: l'unico che può ALZARE il contatore (#923).
+  // Un `seq` anonimo lo sceglie chi manda, fino al tetto delle regole.
+  function maxSeqProvato(rows) {
+    let max = 0;
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!r || !PROVE_MITTENTE.includes(r.senderProof)) continue;
+      const n = Number(r.seq);
+      if (Number.isInteger(n) && n > max) max = n;
+    }
+    return max;
+  }
+
+  // Rimette il contatore in pari; solo owner (token admin). Torna il valore in vigore.
+  // `provato` lo ALZA (o lo crea): un seq con la prova del mittente o assegnato da chi chiama, mai il
+  // massimo di tutti, che un anonimo porta a un milione, oltre il tetto delle regole (#923).
+  // `opts.pavimento` lo ABBASSA, contro chi lo gonfia di uno in uno: il seq più alto di TUTTI, esatto
+  // (maxSeq; mai i soli caricati), perché sotto si riuserebbero numeri già dati. Si scende solo oltre
+  // SEQ_LOWER_MARGIN: un invio fra lettura e scrittura è una corsa, e un numero saltato vale meno di due uguali.
   const SEQ_LOWER_MARGIN = 10;
 
-  async function ensureSeqCounter(maxSeq, opts = {}) {
-    const value = Math.max(0, Math.trunc(Number(maxSeq) || 0));
+  async function ensureSeqCounter(provato, opts = {}) {
+    const alza = Math.max(0, Math.trunc(Number(provato) || 0));
+    const p = Math.trunc(Number(opts.pavimento));
+    const pavimento = Number.isInteger(p) && p > 0 ? Math.max(p, alza) : null;
     const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
@@ -671,9 +674,16 @@
     } else if (res.status !== 404) {
       throw new Error(`firestore contatore non leggibile (${res.status})`);
     }
-    if (current === value) return current;
-    if (current > value && !opts.allowLower) return current;
-    if (current > value && current - value < SEQ_LOWER_MARGIN) return current;
+    let value = null;
+    if (current < 0) {
+      // Un contatore che manca rinasce oltre ogni numero in uso: dal solo provato i prossimi invii riprenderebbero
+      // numeri già dati a chi non ha la prova (#923). Senza il massimo vero non lo si crea.
+      const tetto = pavimento !== null ? pavimento : await maxSeq({ idToken: opts.idToken || '' });
+      value = Math.max(alza, Number.isInteger(tetto) ? tetto : 0);
+      if (!(value > 0)) return current;
+    } else if (alza > 0 && current < alza) value = alza;
+    else if (pavimento !== null && current - pavimento >= SEQ_LOWER_MARGIN) value = pavimento;
+    if (value === null) return current;
     const w = await fetch(`${docUrl}?updateMask.fieldPaths=value&key=${API_KEY}`, {
       method: 'PATCH',
       headers,
@@ -705,7 +715,9 @@
     // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
     const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
-    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
+    // #903: le attese le scrive solo l'admin; da anonimo il feedback partirebbe senza, e senza dirlo.
+    const attese = (opts && Array.isArray(opts.waitsFor) && opts.waitsFor.length) ? attesePerScrittura(opts.waitsFor) : [];
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length);
     // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
     if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
@@ -876,6 +888,7 @@
           at: Math.round(Number(localOnly.at) || Date.now()),
         });
       }
+      if (attese.length) doc.fields.waitsFor = toFsValue(attese);
       // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
       // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
       const prioritaScelta = opts && opts.priority;
@@ -989,7 +1002,7 @@
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
-    'updatedAt', 'walletPseudonym', 'workingResets', 'workingSince',
+    'updatedAt', 'waitsFor', 'walletPseudonym', 'workingResets', 'workingSince',
   ];
 
   // Un documento letto con la proiezione della lista porta questo marchio: chi
@@ -1294,6 +1307,8 @@
   // dovuto o solo più alto di quello che aveva visto, e per prudenza non lo
   // toccava: la cura scritta per un contatore gonfiato non è mai partita.
   // Questa domanda costa UNA lettura e la risposta è esatta.
+  // Conta anche i numeri scelti da chi manda: è il pavimento del contatore,
+  // mai il numero a cui alzarlo (vedi ensureSeqCounter, #923).
   async function maxSeq({ idToken = '', timeoutMs = 0 } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
@@ -1959,11 +1974,31 @@
     return fields;
   }
 
+  // Le attese (#903) nella forma che le regole ammettono: [{ id, num }], al più 20. Oltre si rifiuta, mai un taglio.
+  function attesePerScrittura(lista) {
+    const A = global.SN_FB_ATTESE;
+    const grezze = Array.isArray(lista) ? lista : [];
+    if (!A) {
+      if (grezze.length) throw new Error('attese non scritte: SN_FB_ATTESE non è caricato');
+      return [];
+    }
+    const pulite = A.atteseDi({ waitsFor: grezze });
+    if (pulite.length !== grezze.length) throw new Error('attese non scritte: c’è un id non valido o doppio');
+    if (pulite.length > A.MAX) throw new Error(`un feedback aspetta al più ${A.MAX} feedback: qui sono ${pulite.length}`);
+    return pulite.map((w) => ({ id: w.id, num: w.num }));
+  }
+
+  // Una pratica chiusa che torna aperta riparte col registro delle parti vuoto (#938): le parti già su main erano del
+  // giro chiuso, e lette nel giro nuovo lo chiuderebbero prima del tempo o ne rifiuterebbero le parti.
+  function riapre(statusPublicPrima, statusDopo) {
+    return statusPublicPrima === 'closed' && statusToPublic(statusDopo) === 'open';
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -2080,6 +2115,14 @@
       }
       mask.push('localApproval');
     }
+    // Le attese (#903): [{ id, num }] già controllate da SN_FB_ATTESE.valida; vuota o null le toglie (campo cancellato).
+    if (waitsFor !== undefined) {
+      const lista = attesePerScrittura(waitsFor);
+      if (lista.length) fields.waitsFor = toFsValue(lista);
+      mask.push('waitsFor');
+    }
+    // Il registro delle parti dall'app si toglie e basta, alla riapertura: lo scrivono il server e server:fondi.
+    if (localMerges === null) mask.push('localMerges');
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
@@ -2340,6 +2383,7 @@
     ensureSeqCounter,
     nextSeq,
     maxSeq,
+    maxSeqProvato,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     // La proiezione degli elenchi e il suo complemento: chi elenca chiede
@@ -2355,6 +2399,8 @@
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
     // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.
     statusToPublic,
+    // La riapertura svuota il registro delle parti (#938).
+    riapre,
     // Voti di verifica (DB4): substrato letto da board (DC*) e archiviazione (DC3).
     castVote,
     clearVote,

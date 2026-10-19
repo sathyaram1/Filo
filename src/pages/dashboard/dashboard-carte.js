@@ -157,7 +157,7 @@
     // Un programma si apre solo col sì dell'utente (#588): le parole le scrive il main.
     if (res.needsConfirm) {
       const ok = global.SN_CONFIRM_UI
-        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : global.confirm(res.text);
       if (ok) await apriDownload(r, true);
       return;
@@ -234,14 +234,17 @@
     const scarica = AVVISI_AGGIORNAMENTO.includes(tipo);
     // Una versione pronta (#1039): il fallimento lo dice la barra, la carta resta per riprovare.
     const pronto = tipo === 'aggiornamento-pronto';
+    const pagina = C.paginaDiAvviso(n);
     let principale = { etichetta: 'Chiudi', fai: chiudi };
+    if (pagina) principale = { etichetta: pagina.etichetta, forte: true, fai: () => apri(pagina.url) };
     if (scarica) principale = { etichetta: 'Scarica Filo', forte: true, fai: () => apri(URL_SCARICA_FILO) };
     if (pronto) principale = { etichetta: 'Riavvia e aggiorna', forte: true, fai: () => d.send({ type: MSG.AGGIORNAMENTO_INSTALLA, avvisa: true }) };
+    const titolo = n.action && typeof n.action.titolo === 'string' && n.action.titolo.trim();
     const carta = {
       chiave: `avviso:${n.id}`, tipo: 'avviso', icona: pronto ? 'download' : allarme ? 'warning' : 'bell',
-      titolo: allarme ? 'Avviso' : 'Filo', stato: n.text, lungo: true,
+      titolo: titolo || (allarme ? 'Avviso' : 'Filo'), stato: n.text, lungo: true,
       principale,
-      secondaria: scarica || pronto ? { etichetta: 'Chiudi', fai: chiudi } : null,
+      secondaria: scarica || pronto || pagina ? { etichetta: 'Chiudi', fai: chiudi } : null,
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: n.text,
     };
@@ -432,7 +435,6 @@
   const ICONA_SUGGERIMENTO = { gmail: 'mailOpen', calendar: 'calendar', editor: 'editor', file: 'folder', note: 'note', link: 'globe', web: 'globe' };
   function faviconDi(s) {
     const tipo = String((s.action && s.action.type) || '').toUpperCase();
-    const url = tipo === 'NAVIGA' ? d.faviconUrl(s.action.url) : '';
     const ico = el('span', 'dash-carta-voce-ico');
     ico.setAttribute('aria-hidden', 'true');
     const generica = () => {
@@ -442,14 +444,12 @@
       const nome = ICONA_SUGGERIMENTO[s.icon] || propria || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
       ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
     };
-    if (url) {
-      const img = el('img');
-      img.src = url;
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      img.onerror = () => { img.remove(); generica(); };
-      ico.appendChild(img);
-    } else generica();
+    if (tipo !== 'NAVIGA') { generica(); return ico; }
+    const img = el('img');
+    img.alt = '';
+    img.onerror = () => { img.remove(); generica(); };
+    ico.appendChild(img);
+    d.iconaDelSito(s.action.url, { soloCopie: !!s.chiedeOk }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 

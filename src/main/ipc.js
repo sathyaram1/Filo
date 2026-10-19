@@ -60,8 +60,18 @@ function senderInfo(event) {
       if (t) { tab = t; win = w; break; }
     }
   }
+  // La home pronta per la scheda nuova (#1128) parla già come la scheda che diventerà, nella sua finestra: senza,
+  // in incognito leggerebbe e scriverebbe il disco, e nessuno saprebbe che non è davanti agli occhi.
+  let riserva = false;
+  if (!tab) {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const r = w._filoTabs?.riserva;
+      if (r && r.possiede(wc)) { tab = { id: r.id, url: wc.getURL(), title: '' }; win = w; riserva = true; break; }
+    }
+  }
   return {
-    tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
+    riserva,
+    tab: tab ? { id: tab.id, url: tab.url, title: tab.title, openedAt: tab.openedAt || null, paginaDal: tab.paginaDal || null } : null,
     url: wc.getURL(),
     isShell: Boolean(finestraDellaBarra(wc)),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
@@ -200,6 +210,13 @@ function registerIpcHandlers() {
     require('./services/permessiPagine').aperturaScelta(event.sender, url);
     event.returnValue = true;
   });
+  ipcMain.on('filo:indirizzo-rifiutato', (event, url) => {
+    try {
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
+    } catch (_) {}
+  });
 
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
@@ -237,6 +254,13 @@ function registerIpcHandlers() {
     try { return Boolean(globalThis.SN_WALLET?.keyRefusalOf?.(err)); } catch (_) { return false; }
   };
 
+  // Tetto, finestra e taglio viaggiano con l'errore: la frase e il tasto per le Preferenze si ricompongono da qui (#1097.3).
+  const dettagliDelTetto = (err) => (err ? {
+    ...(err.maxTokens ? { maxTokens: err.maxTokens } : {}),
+    ...(err.finestra ? { finestra: err.finestra } : {}),
+    ...(err.code === 'RISPOSTA_TAGLIATA' ? { finishReason: err.finishReason || null, vuota: !!err.vuota } : {}),
+  } : {});
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
@@ -249,7 +273,7 @@ function registerIpcHandlers() {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
       console.error('[Filo IPC] handler error', msg?.type, err);
-      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err) };
+      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err), ...dettagliDelTetto(err) };
     }
   });
 
@@ -300,6 +324,7 @@ function registerIpcHandlers() {
           provider: (err && err.provider) || '',
           userMessage: (err && typeof err.userMessage === 'string') ? err.userMessage : '',
           keyRefused: rifiutoDellaChiave(err),
+          ...dettagliDelTetto(err),
         });
       } finally {
         inFlightStreams.delete(requestId);
@@ -381,7 +406,8 @@ function registerIpcHandlers() {
       const exists = await commandExists({ shell, cwd, command });
       return { ok: true, exists };
     } catch (_) {
-      return { ok: false, exists: false };
+      // Un controllo andato storto non sa niente: `null` lascia il comando senza colore, mai rosso (#1176).
+      return { ok: false, exists: null };
     }
   });
 

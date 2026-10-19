@@ -19,10 +19,7 @@ l'ha rotto e cosa hai cambiato.
 
 <!-- includi: _immagini.md -->
 
-1. `git config core.commentChar ';' && git fetch origin main && git rebase origin/main`.
-   Il primo comando serve: i titoli dei commit cominciano con `#<numero>`, e
-   col carattere di commento di default `git rebase --continue` dopo un
-   conflitto li cancella. In ogni conflitto tieni
+1. `git fetch origin main && git rebase origin/main`. In ogni conflitto tieni
    **tutte e due le intenzioni**: quella del lavoro e quella arrivata su
    `main`. Per capire la seconda leggi il commit di `main` che ha toccato quel
    punto, non indovinarla.
@@ -40,6 +37,8 @@ l'ha rotto e cosa hai cambiato.
 <!-- includi: _segnala.md -->
 
 <!-- includi: _solo-in-locale.md -->
+
+<!-- includi: _guasto-in-attesa.md -->
 
 ## Consegna
 

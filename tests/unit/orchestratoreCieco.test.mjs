@@ -254,8 +254,10 @@ test('variabili: niente FORCE, opus solo come default di chi lancia senza dirlo,
 
 test('cablaggio: il preflight installa prima di consegnare le istruzioni; nel progetto niente gancio, le stesse variabili', () => {
   const s = JSON.parse(readFileSync(join(RADICE, '.claude', 'settings.local.json'), 'utf8'));
+  // Si riconosce dal comando, non dal matcher: il gancio delle letture esterne nomina Task* fra gli strumenti puliti.
+  const cieco = (g) => g.matcher === 'Agent|Task' || (g.hooks || []).some((h) => /orchestratore-cieco/.test(String(h.command || '')) || String(h.command || '').includes(ETICHETTA));
   for (const ev of Object.keys(s.hooks)) {
-    assert.ok(!s.hooks[ev].some((g) => /Agent|Task/.test(g.matcher || '')), `${ev}: la cecità non sta nella cartella del progetto, che il ramo del worker cambia`);
+    assert.ok(!s.hooks[ev].some(cieco), `${ev}: la cecità non sta nella cartella del progetto, che il ramo del worker cambia`);
   }
   for (const [k, v] of Object.entries(AMBIENTE)) assert.equal(s.env[k], v, k);
   for (const k of AMBIENTE_TOLTO) assert.equal(k in s.env, false, `${k} nel progetto farebbe ignorare il modello deciso dal server`);

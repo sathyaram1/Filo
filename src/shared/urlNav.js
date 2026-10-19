@@ -146,10 +146,30 @@
   //   - altrimenti → ricerca Google.
   // La parte ":porta" è il motivo del fix #233: prima ogni "host:porta"
   // (localhost:3000, 127.0.0.1:8080, example.com:8443/admin) cadeva in ricerca.
+  // Indirizzi completi anche senza «//» (#482): diventati ricerca, la posta finiva su Google invece che al programma di
+  // posta, e un data:/javascript: sfuggiva all'avviso di chi lo ferma. Un altro «parola:» resta testo («ricetta: pasta»).
+  const SCHEMI_SENZA_BARRE = /^(?:mailto|tel|sms|data|javascript|file):/i;
+
+  // Un percorso del computer scritto com'è (\\nas\cartella, C:\…, /home/…, ~/…) è un file, non una ricerca (#482 giro 2):
+  // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file.
+  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|Volumes|root|srv|usr|Library|Applications|System)(?:\/|$)/;
+  const pezzi = (s) => s.replace(/\\/g, '/').split('/').map((p) => encodeURIComponent(p)).join('/');
+  function percorsoDelComputer(raw) {
+    let m = /^\\\\([^\\/\s?#]+)(?:[\\/](.*))?$/.exec(raw);
+    if (m) return `file://${m[1]}/${pezzi(m[2] || '')}`;
+    m = /^([a-z]):[\\/](.*)$/i.exec(raw);
+    if (m) return `file:///${m[1]}:/${pezzi(m[2])}`;
+    if (RADICI_DEL_COMPUTER.test(raw)) return `file://${pezzi(raw)}`;
+    if (/^~(?:[\\/]|$)/.test(raw)) return `file:///${pezzi(raw)}`;
+    return null;
+  }
+
   function normalizeUrl(input) {
     const raw = String(input || '').trim();
     if (!raw) return 'filo://newtab/';
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://')) return raw;
+    const file = percorsoDelComputer(raw);
+    if (file) return file;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://') || SCHEMI_SENZA_BARRE.test(raw)) return raw;
 
     // Isola la parte host[:porta] = tutto prima del primo separatore di path/query
     // (/, ?, #). Uno spazio interno significa "non è un indirizzo" → ricerca.

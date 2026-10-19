@@ -24,13 +24,69 @@
   // destro sul video non compariva nulla (e non si poteva mandare feedback).
   // Se c'è un fullscreenElement montiamo lì dentro, così il menu è visibile.
   function menuHost() {
-    return document.fullscreenElement || document.documentElement;
+    if (document.fullscreenElement) return document.fullscreenElement;
+    const d = dialogoModale();
+    return (d && strato(d)) || document.documentElement;
   }
 
-  // Ogni pezzo entra nel documento del sito già chiuso ai gesti finti, nodo per nodo (#589.8).
+  // Una finestra modale del sito (<dialog> aperta con showModal) sta nello strato più alto e rende inerte tutto il
+  // resto: il menu va dentro di lei, in un nostro strato più alto ancora (popover), o resta sotto e non risponde.
+  function dialogoModale() {
+    let modali = [];
+    try { modali = [...document.querySelectorAll('dialog[open]')].filter((d) => d.matches(':modal')); } catch (_) {}
+    if (!modali.length) return null;
+    const attivo = document.activeElement;
+    return modali.find((d) => d.contains(attivo)) || modali[modali.length - 1];
+  }
+  let stratoEl = null;
+  function strato(dialogo) {
+    try {
+      if (!stratoEl) {
+        stratoEl = document.createElement('div');
+        global.SN_FILO_UI?.mark(stratoEl);
+        stratoEl.setAttribute('popover', 'manual');
+        stratoEl.style.cssText = 'all:initial!important;display:block!important;position:fixed!important;inset:0 auto auto 0!important;'
+          + 'width:0!important;height:0!important;overflow:visible!important;margin:0!important;padding:0!important;'
+          + 'border:0!important;background:transparent!important;';
+      }
+      const nuovo = stratoEl.parentNode !== dialogo;
+      if (nuovo) dialogo.appendChild(stratoEl);
+      // Sopra a ciò che il sito ha portato nello strato più alto prima di questo menu.
+      if (!activeMenu && stratoEl.matches(':popover-open')) stratoEl.hidePopover();
+      if (!stratoEl.matches(':popover-open')) stratoEl.showPopover();
+      return stratoEl;
+    } catch (_) {
+      return null;
+    }
+  }
+  function chiudiStrato() {
+    try { if (stratoEl && !activeMenu && stratoEl.matches(':popover-open')) stratoEl.hidePopover(); } catch (_) {}
+  }
+
+  // Uno zoom del foglio di stile sul contenitore (html { zoom: 1.5 }) moltiplicherebbe le misure del menu, che sono
+  // quelle dello schermo: il pezzo lo annulla.
+  function annullaZoom(el, host) {
+    const z = Number(host.currentCSSZoom) || 1;
+    if (z === 1) el.style.removeProperty('zoom');
+    else el.style.setProperty('zoom', String(1 / z), 'important');
+  }
+
+  // Ogni pezzo entra nel documento del sito già chiuso ai gesti finti, nodo per nodo (#589.8), e sotto le sonde
+  // che dicono se l'utente lo vede (#589.11).
   function monta(el) {
     global.SN_FILO_UI?.soloGestiVeri(el);
-    return menuHost().appendChild(el);
+    const host = menuHost();
+    annullaZoom(el, host);
+    return host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
+  }
+
+  // Un clic su una voce che il sito copriva non parte: il menu si chiude e l'utente sa perché.
+  function bloccaMenu() {
+    close();
+    try { global.SN_POPUP?.showToast?.(I18n.t('menu_click_covered'), { duration: 4000 }); } catch (_) {}
+  }
+  function sorveglia(pannello, radice) {
+    global.SN_VISTO?.sorveglia(pannello, { radice, bloccato: bloccaMenu });
   }
 
   let activeMenu = null;
@@ -48,6 +104,7 @@
       try { activeMenu.cleanupZoom?.(); } catch (_) {}
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
       activeMenu = null;
+      chiudiStrato();
     }
     // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
     dropZones.length = 0;
@@ -487,6 +544,7 @@
 
     // Posizionamento: misura, flip se necessario.
     place(root, x, y);
+    sorveglia(root);
 
     // #500 — il menu non ha un'altezza definitiva quando lo si posa: le sezioni
     // dinamiche (la spiegazione AI di una selezione, di un collegamento, di
@@ -684,6 +742,7 @@
     activeMenu.subMode = 'anchor';
 
     placeSub(sub, anchorEl, 'anchor');
+    sorveglia(sub);
     attachSubmenuHover(sub);
   }
 
@@ -1060,6 +1119,7 @@
     activeMenu.subAnchor = anchorEl;
     activeMenu.subMode = 'edge';
     placeSub(sub, anchorEl, 'edge');
+    sorveglia(sub, host);
     attachSubmenuHover(sub);
   }
 
@@ -1094,6 +1154,7 @@
     activeMenu.subMode = 'anchor';
 
     placeSub(sub, anchorEl, 'anchor');
+    sorveglia(sub);
     // Senza questo, il timer di mouseleave sull'ancora (overflow) chiude il
     // sub-menu appena il cursore entra nella griglia (feedback alpha).
     attachSubmenuHover(sub);
@@ -1116,6 +1177,10 @@
   function showTooltip(target, text) {
     if (!text) return;
     const el = ensureTooltipEl();
+    // Sopra i pannelli aperti dopo di lei (stesso piano: vale l'ordine), sotto le sonde (#589.11).
+    const host = menuHost();
+    annullaZoom(el, host);
+    host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
     el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     el.textContent = text;
     el.style.display = '';
@@ -1163,6 +1228,9 @@
   // fabbricato da codice non passerebbe da `soloGestiVeri`.
   const apritori = new WeakMap();
 
+  // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
+  function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
+
   function makeRowButton(sub, opts = {}) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1176,7 +1244,7 @@
     if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
     // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
     // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
-    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, sub.label);
+    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
     setIconContent(b, sub.icon || sub.label);
     // Il bottone contiene solo un disegno: senza nome accessibile è un bottone
     // muto per chi legge lo schermo (e invisibile a chi lo cerca per etichetta).
@@ -1248,7 +1316,7 @@
     setIconContent(b, it.icon || it.label || '');
     if (it.id) b.dataset.snIconId = it.id;
     // Vedi makeRowButton: nome accessibile su un bottone di sola icona.
-    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, it.label); }
+    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (it.disabled) return;
@@ -1443,7 +1511,7 @@
         preview.style.width = '36px';
         preview.style.height = '36px';
         preview.innerHTML = icon || '';
-        menuHost().appendChild(preview);
+        monta(preview);
         esterno = { id, preview, zona: null };
       }
       esterno.preview.style.left = (x - 18) + 'px';
@@ -1512,20 +1580,36 @@
     const r = sub.getBoundingClientRect();
     const lista = sub.querySelector('.sn-menu-history-list');
     const cerca = sub.querySelector('.sn-menu-history-search-input');
+    // Un clic conta solo su una voce che il browser ha già visto scoperta (#589.11): gli spec aspettano questo.
+    const pronta = (el) => !el || !global.SN_VISTO || global.SN_VISTO._test.pronta(el);
+    // Una voce scorsa fuori dalla lista non ha niente da dire: null. Con la guardia accesa decide lei cosa è a
+    // schermo, così una riga tagliata dal bordo sotto il pixel non resta «da aspettare» per sempre.
+    const nellaLista = (el) => {
+      if (global.SN_VISTO?.ATTIVO) return global.SN_VISTO._test.aSchermo(el);
+      if (!lista) return true;
+      const a = el.getBoundingClientRect(), b = lista.getBoundingClientRect();
+      return a.bottom > b.top && a.top < b.bottom;
+    };
+    const svuota = sub.querySelector('.sn-menu-history-clear-btn');
     return {
       voci: [...sub.querySelectorAll('.sn-menu-history-item')].filter(visibile).map((riga) => ({
         testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
+        pronta: ((bottoni) => (bottoni.length ? bottoni.every(pronta) : null))(
+          [riga.querySelector('.sn-menu-history-paste'), riga.querySelector('.sn-menu-history-remove')]
+            .filter((b) => b && nellaLista(b))),
+        libera: !global.SN_VISTO || !!global.SN_VISTO._test.libera(riga.querySelector('.sn-menu-history-paste')),
         tolta: riga.classList.contains('sn-menu-history-gone'),
         miniatura: riga.querySelector('.sn-menu-history-thumb')?.getAttribute('src') || null,
         fuocoRimuovi: sub.getRootNode().activeElement === riga.querySelector('.sn-menu-history-remove'),
       })),
+      svuotaPronta: pronta(svuota),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
       cerca: cerca ? {
         centro: centro(cerca), valore: cerca.value, segnaposto: cerca.placeholder, fuoco: sub.getRootNode().activeElement === cerca,
       } : null,
-      svuota: centro(sub.querySelector('.sn-menu-history-clear-btn')),
+      svuota: centro(svuota),
       riquadro: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
       lista: lista ? {
         centro: centro(lista), scrollTop: lista.scrollTop, scrollHeight: lista.scrollHeight, clientHeight: lista.clientHeight,

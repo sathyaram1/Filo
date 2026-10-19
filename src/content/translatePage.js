@@ -106,6 +106,7 @@
   // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
   // appena riportato indietro (#407).
   let runSeq = 0;
+  let usoContato = false;
   // La riga del ripiego sui crediti di Filo (#662): la pagina tradotta non ha un riquadro sotto cui
   // scriverla, la dice un avviso al primo pezzo pagato così (a fine giro si perde chi lascia la pagina prima).
   let ripiegoDelGiro = '';
@@ -159,6 +160,9 @@
     }
     pageTranslating = true;
     ripiegoDelGiro = '';
+    // Una traduzione è un uso, non un uso per blocco: la conta la prima richiesta del giro, le altre (e quelle dei
+    // riquadri incorporati) contano solo se si guastano (#969).
+    usoContato = quiet;
     const myRun = ++runSeq;
     const aborted = () => myRun !== runSeq;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
@@ -823,12 +827,15 @@
     for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt) await new Promise((r) => setTimeout(r, 1200));
       let res = null;
+      const parteDiUnUso = usoContato;
+      usoContato = true;
       try {
         res = await chrome.runtime.sendMessage({
           type: MSG.AI_REQUEST,
           action: ACTIONS.TRANSLATE_PAGE,
           payload: { chunk },
           diceRipiego: true,
+          ...(parteDiUnUso ? { parteDiUnUso: true } : {}),
         });
       } catch (e) {
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };

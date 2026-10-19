@@ -242,6 +242,36 @@ sta ancora uscendo. Le prove stanno in `tests/verifica/514/verify-514-g10.spec.m
 controprove della stessa pagina senza niente aperto sopra e della modalità di
 Filo.
 
+**Aspettare di vedere chi ha usato il tasto vale solo se i nostri lo vedono
+per primi.** La regola guarda il tasto a giro finito, e
+presuppone che i riquadri di Filo l'abbiano ricevuto. Un sito che ascolta l'Esc
+in cattura sulla FINESTRA (molti lo fanno per chiudere le proprie finestre) e lo
+ferma arriva prima di ogni riquadro, che ascolta sul documento: il menu restava
+aperto, non spariva niente, e la modalità se ne andava (#859). È lo stesso danno
+di #514 da una porta che nessuna attesa può chiudere, perché il tasto ai nostri
+non arriva proprio. Il primo ascolto della pagina è nostro (il ponte di
+`src/preload/page-preload.js`, a document_start, prima di qualunque script del
+sito), e da lì l'Esc va subito a TUTTI gli ascolti in cattura che Filo tiene su
+finestra e documento, nell'ordine in cui li vedrebbe (`anticipa` in
+`src/preload/riscrittura.js`, che quegli ascolti se li segna già): vedono una
+copia con le regole della propagazione, e il giro vero li salta. Se uno lo
+ferma — il menu, la risposta, il QR, la conferma, e per costruzione ogni altro —
+il sito il tasto non lo vede; se nessuno lo ferma, il tasto prosegue verso il
+sito com'era. Nessuno si iscrive e nessuno deve sapere niente: la decisione
+resta quella di sempre, a giro finito, e i tetti non cambiano. Vale anche fuori
+dallo schermo intero (lì il menu non si chiudeva affatto) e per l'Esc che il
+main consegna sopra lo schermo pieno del sito, che `consegnaEsc` marca come
+nostro con `SN_FILO_UI.nostro()`; uno fabbricato dal sito fa il giro di sempre.
+Un Esc chiude UN piano: con un riquadro di Filo aperto sopra una finestra del
+sito, il primo chiude il nostro e il secondo arriva al sito. La regola generale:
+**prima di aspettare di vedere chi ha usato un tasto, assicurati che i tuoi lo
+ricevano.** Prove in `tests/esc-sito-che-si-tiene-il-tasto.spec.mjs`, col
+sito che ferma l'Esc con `stopPropagation` e con `stopImmediatePropagation`; le
+regole della copia in `tests/unit/escAnticipato.test.mjs`. Resta fuori l'ascolto di un riquadro su un suo elemento (non su finestra o
+documento): non viene anticipato. Oggi chiude l'Esc solo così il pannello del
+canale red-team, che ascolta sulla sua radice; chi scrive un riquadro nuovo
+ascolti l'Esc in cattura sul documento, come tutti gli altri.
+
 **L'attesa non è una scadenza per chi risponde.** Una pagina che ha i pezzi di
 Filo dentro risponde sempre, in tutti e due i versi: se il tasto era suo lo
 rivendica, se non lo era chiede lei l'uscita. Per lei l'attesa del main non è un

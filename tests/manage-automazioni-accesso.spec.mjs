@@ -1,12 +1,13 @@
 // Gestione aperta prima di essere riconosciuti, poi «Accedi» dal banner: la scheda Automazioni si sblocca
 // e deve mostrare i valori del server, non quelli di partenza della pagina.
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 test('accesso dal banner: le impostazioni sbloccate sono quelle lette dal server', async ({ openTab }) => {
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgBanner')).toBeVisible();
   // I Modelli di supporto stanno nella stessa pagina (#1110): da non owner il main li rifiuta.
   await expect(page.locator('#mgSmDenied')).toBeVisible();

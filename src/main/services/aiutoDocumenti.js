@@ -75,7 +75,11 @@ function domanda({ cosa, cartella, host, perche }) {
   const righe = [`${chi} vuole cercare fra i tuoi documenti «${unaRiga(cosa, COSA_NEL_POPUP).replace(/[«»]/g, '"')}»${dove}.`];
   if (host) righe.push('Il sito potrà leggere la risposta dell\'Aiuto, con i nomi dei documenti trovati. Il documento arriva al sito solo se lo trascini tu nella pagina.');
   if (perche) righe.push(`Perché te lo chiedo: ${perche}.`);
-  return { tipo: 'confirm', title: 'Cerco fra i tuoi documenti?', text: righe.join('\n\n'), okLabel: 'Cerca', cancelLabel: 'Annulla' };
+  // Nel popup la richiesta e la cartella, intere, stanno nel loro riquadro: le scrive il modello, guidato dalla pagina (#592.7).
+  const parti = [`${chi} vuole cercare fra i tuoi documenti:\n`, { citazione: unaRiga(cosa, COSA_MAX) },
+    ...(cartella ? ['\nNella cartella:\n', { citazione: unaRiga(cartella, CARTELLA_MAX), nuda: true }] : []),
+    ...righe.slice(1).map((r) => `\n\n${r}`)];
+  return { tipo: 'confirm', title: 'Cerco fra i tuoi documenti?', text: righe.join('\n\n'), parti, okLabel: 'Cerca', cancelLabel: 'Annulla' };
 }
 
 // Della risposta dell'indice alla pagina va solo quello che serve a dirlo: i nomi delle cartelle, mai i percorsi.

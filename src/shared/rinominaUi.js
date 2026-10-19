@@ -97,10 +97,10 @@
         doc.removeEventListener('scroll', chiudiMenu, true);
       },
     };
+    doc.addEventListener('keydown', tasto, true);
     setTimeout(() => {
       if (!menuAperto || menuAperto.el !== el) return;
       doc.addEventListener('mousedown', fuori, true);
-      doc.addEventListener('keydown', tasto, true);
       global.addEventListener('blur', chiudiMenu);
       global.addEventListener('resize', chiudiMenu);
       doc.addEventListener('scroll', chiudiMenu, true);
@@ -208,10 +208,10 @@
         if (ancora && doc.contains(ancora)) try { ancora.focus({ preventScroll: true }); } catch (_) {}
       },
     };
+    doc.addEventListener('keydown', tasti, true);
     setTimeout(() => {
       if (!attivo) return;
       doc.addEventListener('mousedown', fuori, true);
-      doc.addEventListener('keydown', tasti, true);
       global.addEventListener('resize', chiudi);
     }, 0);
 
@@ -360,10 +360,10 @@
         doc.removeEventListener('keydown', tasti, true);
       },
     };
+    doc.addEventListener('keydown', tasti, true);
     setTimeout(() => {
       if (!aperto || aperto.el !== el) return;
       doc.addEventListener('mousedown', fuori, true);
-      doc.addEventListener('keydown', tasti, true);
     }, 0);
     return el;
   }

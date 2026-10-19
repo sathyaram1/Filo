@@ -146,7 +146,12 @@ rimette com'era. Regge solo perché il codice la chiede al momento, da un punto 
 prova non arriverebbe più, e il caso Windows girerebbe da Linux. Uno spec in Electron
 fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per ognuna
 (`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
-dà un ramo che la suite in GitHub non corre mai (#1171).
+dà un ramo che la suite in GitHub non corre mai (#1171). Un caso nuovo che non si
+sceglie la piattaforma è rosso anche su Linux: le prove dell'aggiornatore si rifanno
+con Node che si crede Windows e Mac (`tests/unit/aggiornamentiDaOgniSistema.test.mjs`,
+#1146). Da Windows non si finge: un Node di Windows che si crede Linux sceglie
+un'altra shell e il rosso sarebbe della finzione; un caso che presume Windows è già
+rosso su Linux da sé.
 
 **Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
 la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
@@ -212,18 +217,34 @@ Le forme che cadevano, e cosa le ha sostituite:
   6.000 in archivio): prima si contano le operazioni sul disco (nessuna rilettura, nessuna
   riscrittura, una riga in coda; `tests/helpers/spiaDisco.mjs`), poi il lavoro in memoria si
   misura a turno contro lo stesso lavoro su dati quasi vuoti, campione per campione, col
-  minimo di ciascuno (`rapportoFraCosti`). Una finestra di tempo fra due figli che devono
-  sovrapporsi si toglie facendoli girare in fila.
+  minimo di ciascuno (`rapportoFraCosti`). Quando i dati quasi vuoti non sono il paragone giusto
+  (un flush di 4 MB copia comunque 4 MB), si paragona lo stesso lavoro fatto per intero; e se il
+  campione ha un pezzo da non contare (la scrittura su disco), `ora` è un orologio che corre solo
+  nella finestra misurata (#1228, `tests/unit/storageScritturePerChiave.test.mjs`). Un `await` fra
+  partenza e arrivo nasconde la soglia fissa alla sentinella: lì la regola la tiene chi scrive.
+  Una finestra di tempo fra due figli che devono sovrapporsi si toglie facendoli girare in fila.
 - **La pulizia**: una cartella si toglie con `togliCartella`, che ritenta e non fa rosso il
   test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
   sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
   ritentano anche loro (`maxRetries`).
-- **Il tetto del lanciatore** (20 minuti in cui niente va avanti, non la durata del file: un
-  file sano sotto carico è lento ma avanza): una prova sola che ci si avvicina si divide, e una
+- **Il tetto del lanciatore** (20 minuti in cui un file non va avanti, non la sua durata: un
+  file sano sotto carico è lento ma avanza): il file fermo si chiude da solo, rosso col suo
+  nome, e gli altri girano (#1231). Node mostra in diretta solo i passi del primo file in
+  corso: se in un tetto non finisce nessun file, con lui si chiudono i file partiti da più
+  di un tetto (in fila costerebbero un tetto ciascuno), e se dopo non finisce più niente si
+  chiude la corsa (il disco pieno). Una prova sola che ci si avvicina si divide, e una
   scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
   (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
   risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
-  lanciatore, e la riprova dei rossi pure (`--solo`).
+  lanciatore, e la riprova dei rossi pure (`--solo`). Una prova che fa girare altri file di
+  prova con un ambiente suo (le prove da sole in sessione, #1214) usa la stessa guardia,
+  `lanciaSorvegliato`, col tetto delle attese: cinque minuti sulla durata della corsa
+  cadevano con due corse insieme su un portatile lento.
+- **Un file non si appende sul primo errore.** Un intervallo vero che tiene vivo il processo
+  per tutto il file tiene vivo anche una promessa rimasta a metà: si accende solo finché
+  l'attesa vera è in viaggio (`tests/helpers/letturaIsolata.mjs`). Un pacchetto che il
+  codice provato usa si cerca al caricamento del modulo, così se manca il file cade subito
+  col nome del pacchetto.
 
 ## Il verso opposto (#937)
 

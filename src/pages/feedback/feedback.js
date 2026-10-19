@@ -83,16 +83,17 @@
   // Le sezioni della macchina a stati, le stesse della dashboard di
   // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
   // In coda (l'iter di lavorazione), 'local' Lavori locali (la stessa coda, che
-  // le routine non prendono: #908), 'resolved' Risolti (fix usciti davvero in
+  // le routine non prendono: #908), 'waiting' Aspettano (in coda dopo altri feedback: #903), 'resolved' Risolti (fix usciti davvero in
   // una versione rilasciata), 'archived' Archiviati.
-  const TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
+  const TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
     local: 'Nessun lavoro server.',
+    waiting: 'Nessun feedback aspetta un altro.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
   };
@@ -125,7 +126,7 @@
   // Il più vecchio caricato, quando il caricamento si è fermato al tetto: il giro non porta dentro i più vecchi.
   let sogliaFinestra = null;
   function opzSezioni() {
-    return { releasedVersion, fusioni };
+    return { releasedVersion, fusioni, trovaAtteso: (id) => all.find((f) => f._id === id) };
   }
 
   // Stato CANONICO di un feedback (spec FEEDBACK-STATES.md §2). Unica porta
@@ -188,6 +189,10 @@
   // (il titolo breve sta in `name`), quindi lo trattiamo a parte.
   function agentMeta(f) {
     const c = String(f.clientId || '');
+    // L'allarme della pubblicazione (#1002) non è un modello: il suo titolo sta in `name`.
+    if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.authorKind(f) === 'costruzione') {
+      return { source: 'costruzione', model: '', severity: '', area: '', title: String(f.name || '').trim() };
+    }
     if (c.startsWith('routine:')) {
       const slug = c.slice('routine:'.length) || 'routine';
       return { source: 'routine', model: slug, severity: '', area: '', title: String(f.name || '').trim() };
@@ -270,6 +275,15 @@
     const testo = l5.esito === 'conflitto' ? 'fusione non avvenuta' : 'fusione ferma';
     const titolo = `${(l5.pannello && l5.pannello.testo) || ''} Si decide in Gestione.`.trim();
     return `<span class="fb-fusione" title="${escapeHtml(titolo)}">${escapeHtml(testo)}</span>`;
+  }
+
+  // «Aspetta #N» (#903): cosa aspetta e lo stato di ciascuno, come in Gestione (dove si mette e si toglie).
+  function attesaChipHtml(f) {
+    const ATT = window.SN_FB_ATTESE;
+    const stati = ATT ? ATT.statiDelleAttese(f, opzSezioni().trovaAtteso) : [];
+    if (!stati.length) return '';
+    const testo = stati.map((w) => `${ATT.etichetta(w)} ${ATT.ETICHETTA[w.stato] || w.stato}`).join(', ');
+    return `<span class="fb-attesa" title="Nessuna routine lo prende finché non sono tutti fusi. Si cambia in Gestione.">⏳ aspetta ${escapeHtml(testo)}</span>`;
   }
 
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
@@ -840,6 +854,42 @@
     }).join('\n');
   }
 
+  // ── La frase per chi ha segnalato parte chiusa, come in Gestione (#497, #857) ──
+  // Si scrive una volta sola, e aperta su tutte le schede occupava la lista. Il tasto sta fuori da
+  // `.fb-actions`: quella scatola sono le azioni di stato, che esito e riapertura riscrivono.
+  const fraseAperte = new Set(); // id delle schede con la frase aperta: un ridisegno non la richiude
+
+  function tastoFraseHtml(f) {
+    const id = escapeHtml(f._id);
+    const t = MR.tastoFrase(f.userNote);
+    return `<button type="button" class="sn-btn sn-btn-secondary fb-usernote-toggle${t.piena ? ' fb-usernote-piena' : ''}"`
+      + ` data-id="${id}" aria-controls="fb-frase-${id}" aria-expanded="${fraseAperte.has(f._id)}"`
+      + ` title="${escapeHtml(t.titolo)}">Frase</button>`;
+  }
+
+  // Aperta riceve il cursore (chi preme vuole scrivere); chiusa rende il fuoco al tasto. Il blur salva.
+  function mostraFrase(card, id, aperta) {
+    const box = card && card.querySelector('.fb-usernote-box');
+    if (!box) return;
+    const tasto = card.querySelector('.fb-usernote-toggle');
+    box.hidden = !aperta;
+    if (aperta) fraseAperte.add(id); else fraseAperte.delete(id);
+    if (tasto) tasto.setAttribute('aria-expanded', aperta ? 'true' : 'false');
+    const input = box.querySelector('.fb-usernote');
+    if (aperta && input) input.focus();
+    else if (!aperta && tasto) tasto.focus();
+  }
+
+  // Da chiusa, solo il tasto dice che una frase c'è: porta il segno di quello che è stato salvato.
+  function riflettiFrase(id) {
+    const item = all.find((f) => f._id === id);
+    const tasto = listEl.querySelector(`.fb-usernote-toggle[data-id="${cssEsc(id)}"]`);
+    if (!item || !tasto) return;
+    const t = MR.tastoFrase(item.userNote);
+    tasto.classList.toggle('fb-usernote-piena', t.piena);
+    tasto.title = t.titolo;
+  }
+
   // ── UN CLIC, UNA SCHEDA ───────────────────────────────────────────────────
   // Qui i pulsanti vivono DENTRO la scheda, in una lista che si riordina da sé.
   // Finché ogni azione ridisegnava la lista, appena la scheda usciva dalla
@@ -978,8 +1028,8 @@
     const id = el.dataset && el.dataset.id;
     if (!id) return null;
     // Distingue le textarea con stesso data-id (es. note) dalla classe.
-    const cls = el.classList && el.classList.contains('fb-notes') ? 'fb-notes'
-      : (el.classList && el.classList.contains('fb-usernote') ? 'fb-usernote' : null);
+    // Anche il tasto della frase: Esc gli rende il fuoco, e un ridisegno dal vivo non deve toglierglielo.
+    const cls = ['fb-notes', 'fb-usernote', 'fb-usernote-toggle'].find((c) => el.classList && el.classList.contains(c)) || null;
     if (!cls) return null;
     return {
       cls,
@@ -1076,9 +1126,11 @@
       const agent = isAgent(f);
       const am = agent ? agentMeta(f) : null;
       const isRoutineFind = am && am.source === 'routine';
-      const agentIcon = isRoutineFind ? '🔧' : '🤖';
-      const agentLabel = am ? (isRoutineFind ? `audit · ${am.model}` : am.model) : '';
-      const agentBadgeTitle = isRoutineFind ? 'Audit automatico di una routine cloud' : "Modello che ha trovato l'errore";
+      const isAllarme = am && am.source === 'costruzione';
+      const agentIcon = isAllarme ? '🏗️' : isRoutineFind ? '🔧' : '🤖';
+      const agentLabel = !am ? '' : isAllarme ? 'Allarme della pubblicazione' : isRoutineFind ? `audit · ${am.model}` : am.model;
+      const agentBadgeTitle = isAllarme ? 'Aperto dal server quando una versione non si costruisce'
+        : isRoutineFind ? 'Audit automatico di una routine cloud' : "Modello che ha trovato l'errore";
       const agentTitleHtml = am && (am.title || num)
         ? `<div class="fb-title">${numHtml}${numHtml ? ' ' : ''}${segnoFermataHtml(f)}${escapeHtml(am.title)}</div>` : '';
       const agentHtml = agent ? `
@@ -1111,7 +1163,7 @@
       // ci si scrive dentro non si può salvare (sostituirebbe il report), e
       // offrirla vorrebbe dire far scrivere l'owner per niente.
       const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
-        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local');
+        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
@@ -1193,12 +1245,17 @@
         ? `<label class="fb-notes-label">${notesLabelText}
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" data-tail="${escapeHtml(tailStr)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(headText || '')}</textarea>
            </label>
-           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>
-           <label class="fb-usernote-label">Frase per chi ha segnalato:
-             <input type="text" class="fb-usernote" data-id="${escapeHtml(f._id)}" maxlength="500"
-                    placeholder="Una riga in chiaro: cosa può fare adesso. La casella qui sopra la legge solo tu."
-                    value="${escapeHtml(String(f.userNote || ''))}">
-           </label>`
+           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>`
+        : '';
+      // Sotto la riga dei tasti: aprendosi non sposta il tasto, e il secondo clic lo ritrova.
+      const fraseBlock = notesEditable
+        ? `<div class="fb-usernote-box" id="fb-frase-${escapeHtml(f._id)}"${fraseAperte.has(f._id) ? '' : ' hidden'}>
+             <label class="fb-usernote-label">Frase per chi ha segnalato: è quello che legge quando il feedback si chiude
+               <input type="text" class="fb-usernote" data-id="${escapeHtml(f._id)}" maxlength="500"
+                      placeholder="Una riga in chiaro: cosa può fare adesso."
+                      value="${escapeHtml(String(f.userNote || ''))}">
+             </label>
+           </div>`
         : '';
       // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
       // risposta si APPENDE allo storico (conserva la domanda) e il feedback
@@ -1220,6 +1277,7 @@
             <span>${escapeHtml(when)}</span>
             ${stateBadgeHtml(f)}
             ${fusioneChipHtml(f)}
+            ${attesaChipHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
@@ -1232,7 +1290,8 @@
           ${notesBlock}
           ${tailThreadHtml}
           ${replyBlock}
-          <div class="fb-actions">${actionsFor(f)}</div>
+          <div class="fb-tasti">${notesEditable ? tastoFraseHtml(f) : ''}<div class="fb-actions">${actionsFor(f)}</div></div>
+          ${fraseBlock}
         </article>
       `;
     }).join('');
@@ -1519,12 +1578,30 @@
         if (!item) return;
         const v = input.value.slice(0, 500);
         if (String(item.userNote || '') === v) return;
-        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true });
+        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true }).then((ok) => {
+          if (ok) { riflettiFrase(id); return; }
+          // Come in Gestione: se il salvataggio fallisce a casella chiusa, si riapre su quello che c'è davvero.
+          mostraFrase(listEl.querySelector(`.fb-card[data-id="${cssEsc(id)}"]`), id, true);
+        });
       };
       input.addEventListener('blur', flush);
       input.addEventListener('input', () => {
         clearTimeout(timer);
         timer = setTimeout(flush, 1500);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || e.isComposing) return;
+        e.preventDefault();
+        e.stopPropagation();
+        mostraFrase(input.closest('.fb-card'), input.dataset.id, false);
+      });
+    });
+
+    root.querySelectorAll('.fb-usernote-toggle').forEach((b) => {
+      b.addEventListener('click', () => {
+        const card = b.closest('.fb-card');
+        const box = card && card.querySelector('.fb-usernote-box');
+        if (box) mostraFrase(card, b.dataset.id, box.hidden);
       });
     });
   }
@@ -1908,6 +1985,8 @@
 
   function selectTab(tab) {
     if (!TABS.includes(tab)) return;
+    // Cambiare sezione è lasciare le schede: tornando, la frase riparte chiusa, come in Gestione cambiando feedback.
+    if (tab !== currentTab) fraseAperte.clear();
     currentTab = tab;
     tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
       b.classList.toggle('fb-tab--active', b.dataset.tab === tab);

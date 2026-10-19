@@ -73,6 +73,23 @@ export async function fillConfirmInput(page, value) {
   expect(filled, 'campo di testo del dialogo presente').toBe(true);
 }
 
+function rgba(s) {
+  const t = String(s || '');
+  let m = /color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/.exec(t);
+  if (m) return [m[1], m[2], m[3]].map((x) => Number(x) * 255).concat(m[4] == null ? 1 : Number(m[4]));
+  m = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/.exec(t);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3]), m[4] == null ? 1 : Number(m[4])] : null;
+}
+
+// Quanto il filo a sinistra del riquadro (stato di confirmState) si stacca dallo
+// sfondo del popup, da 0 a 255 sul canale peggiore: sotto una sessantina non si vede.
+export function staccoDelFilo(s) {
+  const c = rgba(s && s.riquadro && s.riquadro.bordo);
+  const b = rgba(s && s.riquadro && s.riquadro.bgBox);
+  if (!c || !b || !(parseFloat(s.riquadro.bordoSinistro) >= 2)) return 0;
+  return Math.max(...[0, 1, 2].map((i) => Math.abs(c[i] * c[3] + b[i] * (1 - c[3]) - b[i])));
+}
+
 // Su una pagina web il popup non sta nel documento del sito ma in una vista di Filo sopra la
 // scheda (#592.6): la sua pagina è filo://shell/conferma.html, e lì valgono gli helper qui sopra.
 // Ritorna quella pagina quando il popup ci è a schermo.

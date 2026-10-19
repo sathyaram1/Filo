@@ -245,6 +245,7 @@
       root.style.bottom = bassoPer(startBottom, rect.left, rect.width);
       root.style.right = 'auto';
       root.style.top = 'auto';
+      root.dataset.spostata = '1';
       e.preventDefault();
     });
     window.addEventListener('mousemove', (e) => {
@@ -288,6 +289,7 @@
     root.style.right = 'auto';
     root.style.top = 'auto';
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
+    root.dataset.spostata = '1';
   }
 
   // ---------- Rendering conv ----------
@@ -338,6 +340,7 @@
     btn.type = 'button';
     btn.className = 'sn-sidebar-choice';
     btn.textContent = pagina.label;
+    if (pagina.title) btn.title = pagina.title;
     btn.addEventListener('click', (e) => {
       if (!gestoVero(e)) return;
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
@@ -567,7 +570,7 @@
   border: 1px solid var(--sn-border);
   border-radius: 999px;
   font-size: 12px;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-sidebar-feedback-btn:hover {
   background: var(--sn-accent);
@@ -660,7 +663,9 @@
   // ---------- Parsing risposta AI ----------
 
   function parseAssistantOutput(text) {
-    const fallback = { display: (text || '').trim(), highlight: null, choices: [], status: 'done', collapse: false };
+    // Un involucro tagliato a metà (tetto, guasto) si mostra per quello che il modello aveva scritto, non come codice.
+    const salvato = String(text || '').includes('{') ? globalThis.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(text, ['text']) : null;
+    const fallback = { display: (salvato ?? (text || '')).trim(), highlight: null, choices: [], status: 'done', collapse: false };
     if (!text) return fallback;
     const trimmed = text.trim();
     const start = trimmed.indexOf('{');
@@ -923,7 +928,7 @@
     // l'azione (riclassificata di nuovo nel main) via FILO_CONFIRM_ACTION.
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
-      const opts = { title: 'Filo chiede conferma', text: res.describe || '', avviso: res.avviso || '' };
+      const opts = { title: 'Filo chiede conferma', text: res.describe || '', parti: res.parti, avviso: res.avviso || '' };
       let ok = false;
       try {
         ok = Ui
@@ -1103,9 +1108,10 @@
   // suo perché, come nel diario della chat: «non riuscita» e basta non dice cosa
   // cambiare (#592).
   function esitoAzione(label, done, r) {
-    if (done) return `${label}: fatto`;
     const o = r && r.output;
-    const perche = o && o.rifiuto && typeof o.error === 'string' ? o.error.trim() : '';
+    // Una preferenza cambiata si dice col suo nome e il valore («Filo spento su docs.google.com», #843).
+    if (done) return o && typeof o.etichetta === 'string' && o.etichetta.trim() ? o.etichetta.trim() : `${label}: fatto`;
+    const perche = o && (o.rifiuto || o.invariato) && typeof o.error === 'string' ? o.error.trim() : '';
     return perche ? `${label}: non applicata, ${perche}` : `${label}: non riuscita`;
   }
 
@@ -1140,7 +1146,14 @@
     copy_link:  { target: 'link', costo: 1, label: 'copia link' },
     save_link:  { target: 'link', costo: 1, label: 'salva link per dopo' },
     share_link: { target: 'link', costo: 2, label: 'condividi link' },
+    // la pagina intera: la stessa strada di «Salva per dopo» del menu, che poi chiude la scheda (niente passo dopo).
+    save_page: { target: 'none', costo: 1, label: 'salva la pagina per dopo', chiude: true },
   };
+
+  // Come Alt+S: le pagine di Filo non si mettono da parte, tranne quella d'errore, che salva il sito non caricato.
+  function paginaDaSalvare() {
+    try { return location.protocol !== 'filo:' || location.href.startsWith('filo://error/'); } catch (_) { return false; }
+  }
 
   // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
   function resolveActionText(page) {
@@ -1221,6 +1234,9 @@
         appendActionLog(`${label}: link non trovato`);
         return false;
       }
+    } else if (page.op === 'save_page' && !paginaDaSalvare()) {
+      appendActionLog(`${label}: le pagine di Filo non si salvano per dopo`);
+      return false;
     }
 
     // Senza risposta dal main si chiede: il caso prudente.
@@ -1231,12 +1247,15 @@
       if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
       if (risposta !== 'si') {
         const Ui = global.SN_CONFIRM_UI;
+        // Il testo intero e nel suo riquadro: si conferma quello che si legge, e il
+        // testo non può chiudere le virgolette e parlare come Filo (#592.7).
         let detail = '';
-        if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+        if (spec.target === 'text') detail = text;
         else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
         else if (linkEl) detail = linkEl.href || '';
         const perche = d && d.perche ? `\n\n${d.perche}` : '';
-        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}` };
+        const parti = [...(detail ? [`${label}:`, { citazione: detail, nuda: spec.target !== 'text' }] : [label]), ...(perche ? [perche] : [])];
+        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}`, parti };
         let ok = false;
         try {
           ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
@@ -1267,6 +1286,11 @@
         }
         case 'copy_link': Actions?.copyUrlToClipboard(linkEl.href); break;
         case 'save_link': await Actions?.saveLink(linkEl); break;
+        case 'save_page': {
+          if (!(await Actions?.savePage())) { appendActionLog(`${label}: non riuscita`); return false; }
+          appendActionLog('pagina salvata in «Aperti per dopo»: chiudo la scheda');
+          return true;
+        }
         case 'share_link': await Actions?.shareLink(linkEl); break;
         default: appendActionLog(`${label}: non riuscita`); return false;
       }
@@ -1362,7 +1386,7 @@
 
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, leggera: true });
       if (r?.ok && r.dataUrl) return r.dataUrl;
     } catch (_) {}
     return null;
@@ -1455,6 +1479,8 @@
         action: ACTIONS.HELP,
         payload,
         diceRipiego: true,
+        // Un passo che l'Aiuto fa da solo è un giro della stessa richiesta, come i giri di strumenti della chat (#969).
+        ...(userMessage ? {} : { parteDiUnUso: true }),
       });
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).
@@ -1645,7 +1671,7 @@
         const ok = await runPageAction(parsed.page);
         // Se l'agente vuole concatenare passi (status:"continue") e l'azione è
         // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
-        if (parsed.status === 'continue' && ok) {
+        if (parsed.status === 'continue' && ok && !PAGE_ACTIONS[parsed.page.op].chiude) {
           const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
           setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
         } else {
@@ -1662,6 +1688,12 @@
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
       const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
+      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      if (interrotta) appendActionLog(interrotta);
+      if (interrotta && !(parsed.choices && parsed.choices.length)) {
+        parsed.choices = [{ label: 'Continua', prompt: globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO }];
+      }
 
       // Aggiorna la storia AI
       if (userAction && !userMessage) {

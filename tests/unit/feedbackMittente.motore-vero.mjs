@@ -47,10 +47,13 @@ await prova('create di un loggato qualunque con senderProof: rifiutata', () =>
   assertFails(setDoc(doc(loggato, 'feedback/a3'), { ...FEEDBACK, senderProof: 'admin' })));
 await prova('create admin con senderProof admin: accettata', () =>
   assertSucceeds(setDoc(doc(admin, 'feedback/a4'), { ...FEEDBACK, senderProof: 'admin' })));
-await prova('ripasso admin di un documento vecchio: senderProof admin accettato', () =>
-  assertSucceeds(updateDoc(doc(admin, 'feedback/vecchio'), { senderProof: 'admin' })));
-await prova('ripasso admin con un valore inventato: rifiutato', () =>
-  assertFails(updateDoc(doc(admin, 'feedback/vecchio'), { senderProof: 'utente' })));
+// #1037: la prova nasce col documento; dopo, nemmeno l'admin la aggiunge o la cambia.
+await prova('update admin che aggiunge senderProof a un documento vecchio: rifiutato', () =>
+  assertFails(updateDoc(doc(admin, 'feedback/vecchio'), { senderProof: 'admin' })));
+await prova('update admin che cambia senderProof: rifiutato', () =>
+  assertFails(updateDoc(doc(admin, 'feedback/a4'), { senderProof: 'server' })));
+await prova('update admin di un altro campo su un documento con la prova: accettato', () =>
+  assertSucceeds(updateDoc(doc(admin, 'feedback/a4'), { status: 'todo' })));
 await prova('un loggato qualunque non aggiunge senderProof a un documento', () =>
   assertFails(updateDoc(doc(loggato, 'feedback/a1'), { senderProof: 'admin' })));
 

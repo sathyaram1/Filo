@@ -31,6 +31,8 @@ async function withFetch(impl, run) {
     const u = String(url);
     const body = init && init.body ? JSON.parse(init.body) : null;
     calls.push({ url: u, body, headers: (init && init.headers) || {} });
+    // Coi crediti di Filo il classificatore parte solo se i suoi host dichiarano la ritenzione zero (#831).
+    if (u === OR.ZDR_ENDPOINT) return jsonRes({ data: [{ model_id: 'typesafe/jev-1.13', provider_name: 'TypeSafe', tag: 'typesafe' }] });
     if (u.includes('/endpoints')) return jsonRes({ data: { endpoints: [{ provider_name: 'TypeSafe', tag: 'typesafe' }] } });
     return impl({ url: u, body });
   };

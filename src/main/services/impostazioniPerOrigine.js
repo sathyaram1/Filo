@@ -17,7 +17,12 @@ const CAMPI_WEB = Object.freeze({
   blocklist: true,
   // I siti dove il tasto destro apre il loro menu (#975): come i siti esclusi, arriva solo la voce del frame che chiede.
   menuDelSito: Object.freeze({ siti: true }),
-  featureFlags: Object.freeze({ spellcheck: true }),
+  // L'Aiuto spento (#841) toglie la sua voce dal tasto destro anche sui siti.
+  featureFlags: Object.freeze({ spellcheck: true, help: true }),
+  // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
+  spiegaAnticipata: true,
+  // I tasti di Spiega e Aiuto scelti dall'utente (#842): il menu del tasto destro li scrive accanto alle voci.
+  scorciatoie: true,
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
   // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
   notifications: Object.freeze({ durationSec: true }),
@@ -151,10 +156,34 @@ function indirizziDelMittente(sender) {
   return [riquadro, String(sender?.tab?.url || sender?.url || '')];
 }
 
+// #843 — dall'Aiuto di un sito si spegne o si riaccende Filo solo lì: si aggiunge il nome del sito, si tolgono le voci
+// che lo coprono. Mai un altro sito, che il testo della pagina potrebbe far nominare.
+function filoSulSitoStesso(action, origine) {
+  const N = globalThis.SN_NOMI_SITO || require('../../shared/nomiSito.js');
+  const D = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
+  if (!globalThis.SN_PREF) require('../../shared/preferences.js');
+  const P = globalThis.SN_PREF;
+  const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
+  const setter = P.setterDellaChiave(chiave);
+  if (!setter || setter.scrive.length !== 1 || setter.scrive[0] !== 'blocklist') return false;
+  const host = hostDi(origine);
+  const sito = N.daScritto(host);
+  if (!sito) return false;
+  const r = D.risolviSchede(action.valore ?? action.value ?? action.valoreNuovo ?? action.val, { schede: [], attiva: origine });
+  const b = r.rifiuto ? null : P.buildPreferencePartial(chiave, r.valore);
+  const e = b && !b.rifiuto && b.elenco;
+  if (!e || !e.voci.length) return false;
+  if (e.op === 'aggiungi') return e.voci.every((v) => v === sito);
+  return e.op === 'togli' && e.voci.every((v) => N.copre(v, host));
+}
+
 function azioneAmmessaDa(action, origine) {
   if (isFilo(origine)) return true;
   if (!action || typeof action !== 'object') return false;
   const type = String(action.type || '').toUpperCase();
+  if (type === 'IMPOSTA_PREFERENZA') {
+    try { return filoSulSitoStesso(action, origine); } catch (_) { return false; }
+  }
   if (!AZIONI_WEB.has(type)) return false;
   return type !== 'NAVIGA' || indirizzoWeb(action.url ?? action.href ?? action.link);
 }

@@ -35,6 +35,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { spingiAllaScheda } = require('./impostazioniPerOrigine');
+const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 
 // Tetto della cronologia persistita: teniamo le voci più recenti. 200 è ampio
 // per l'uso reale e non gonfia storage.json (poche centinaia di byte a voce).
@@ -98,10 +99,7 @@ function sitoDi(url, webContents) {
     if (webContents && !webContents.isDestroyed?.()) {
       pagina = leggi(webContents.getURL() || '');
       const riquadri = webContents.mainFrame ? webContents.mainFrame.framesInSubtree : [];
-      incerto = !pagina || riquadri.some((f) => {
-        const h = leggi(f.origin);
-        return !(h && (h === pagina || h.endsWith('.' + pagina)));
-      });
+      incerto = !pagina || ESE().riquadriDiAltri(pagina, riquadri.map((f) => f.origin));
     }
   } catch (_) { incerto = true; }
   return { sito: pagina, incerto };
@@ -391,10 +389,7 @@ function notifyTabs(scope = '') {
     const type = (globalThis.SN_MSG && globalThis.SN_MSG.MSG.DOWNLOADS_UPDATED) || 'downloads_updated';
     const msg = { type };
     for (const win of windowsOf(scope)) {
-      const tm = win._filoTabs;
-      if (tm && Array.isArray(tm.tabs)) {
-        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg, { inVista: t.id === tm.activeId });
-      }
+      for (const { wc, inVista } of vistePerAnnunci(win._filoTabs)) spingiAllaScheda(wc, msg, { inVista });
     }
   } catch (_) {}
 }
@@ -469,6 +464,7 @@ function completa(rec) {
   if (!rec.endedAt) rec.endedAt = new Date().toISOString();
   persist();
   broadcast('done', rec);
+  if (!scopeOf(rec)) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
@@ -997,8 +993,13 @@ function openFile(id, opts, scope = '') {
   if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain, servitoDi(rec))) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy); title = ESE().titoloApri(rec.filename); } catch (_) {}
-    return { ok: false, needsConfirm: true, exe: true, title, text };
+    let parti = null;
+    try {
+      text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy);
+      parti = ESE().partiApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy);
+      title = ESE().titoloApri(rec.filename);
+    } catch (_) {}
+    return { ok: false, needsConfirm: true, exe: true, title, text, parti };
   }
   try {
     const r = electron().shell.openPath(rec.savePath);

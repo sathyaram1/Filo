@@ -39,12 +39,58 @@
       $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
     }
 
-    // Le due letture non dipendono l'una dall'altra: partono insieme.
+    // Le due letture non dipendono l'una dall'altra: partono insieme. L'avviso viene dopo, dal saldo appena letto.
     const [r, w] = await Promise.all([
       chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }),
       chrome.runtime.sendMessage({ type: MSG.WALLET_STATE }).catch(() => null),
     ]);
     render(r || {}, w || null);
+    renderAvviso(await chrome.runtime.sendMessage({ type: MSG.CREDITS_WARNING_STATE }).catch(() => null));
+    seguiAncora();
+  }
+
+  // ── L'avviso prima che i crediti finiscano (#818) ──────────────────────────
+  // C'è finché le soglie lo dicono, o finché c'è un rimedio applicato da poter rimettere com'era. La frase
+  // dell'ultimo clic resta sotto il suo rimedio anche quando la pagina si ridisegna da sola.
+  let esitoAvviso = null;
+  function renderAvviso(a) {
+    const sez = $('avviso');
+    const avviso = a && a.ok && a.mostra ? a.avviso : null;
+    sez.hidden = !avviso;
+    if (!avviso) return;
+    $('avvisoTesto').textContent = avviso.testo || '';
+    $('avvisoTesto').hidden = !avviso.testo;
+    const host = $('avvisoRimedi');
+    const opz = {
+      avviso,
+      invia: (m) => chrome.runtime.sendMessage(m),
+      classeBottone: 'sn-btn sn-btn-secondary',
+      apriChiave: apriCampoChiave,
+      esito: esitoAvviso,
+      onEsito: (id, frase) => { esitoAvviso = frase ? { id, frase } : null; },
+    };
+    // La pagina si ridisegna a ogni saldo cambiato: l'elenco si aggiorna sul posto, così un clic non va a vuoto.
+    const ul = host.querySelector(':scope > .sn-crediti-rimedi');
+    if (ul) window.SN_CREDITI_AVVISO_UI.aggiorna(ul, opz);
+    else host.appendChild(window.SN_CREDITI_AVVISO_UI.elenco(opz));
+  }
+
+  // «Metti la chiave»: il campo della chiave propria, qui sotto.
+  function apriCampoChiave() {
+    const sez = $('ownKeySection');
+    if (sez.hidden || $('ownKeyForm').hidden) return;
+    sez.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
+    $('ownKeyInput').focus();
+  }
+
+  // Arrivati dalla notifica (#avviso) o da «Metti la chiave» in chat (#chiave): una volta, al primo disegno.
+  let ancora = String(location.hash || '').slice(1);
+  function seguiAncora() {
+    if (!ancora) return;
+    const a = ancora;
+    ancora = '';
+    if (a === 'chiave') apriCampoChiave();
+    else if (a === 'avviso' && !$('avviso').hidden) $('avviso').scrollIntoView({ block: 'start' });
   }
 
   function render(r, w) {
@@ -374,9 +420,10 @@
     menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
     menuAperto = menu;
     voce.focus();
+    document.addEventListener('keydown', tastoSulMenu, true);
     setTimeout(() => {
+      if (menuAperto !== menu) return;
       document.addEventListener('mousedown', fuoriDalMenu, true);
-      document.addEventListener('keydown', tastoSulMenu, true);
       window.addEventListener('wheel', fuoriDalMenu, true);
       window.addEventListener('resize', chiudiMenu);
     }, 0);

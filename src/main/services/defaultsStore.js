@@ -313,6 +313,10 @@ function get() {
     if (remoteModels.contestoFilo && typeof remoteModels.contestoFilo === 'object') {
       out.contestoFilo = tettiContesto(remoteModels.contestoFilo);
     }
+    // #1097.3 — il tetto delle risposte per famiglia di funzioni: vale per chi non l'ha cambiato in Preferenze.
+    if (remoteModels.lunghezzaRisposte && typeof remoteModels.lunghezzaRisposte === 'object') {
+      out.lunghezzaRisposte = tettiRisposte(remoteModels.lunghezzaRisposte);
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;
@@ -369,6 +373,8 @@ function getPublicForAdmin() {
     sitiDelicatiDiSerie: PD() ? PD().elenco(null) : {},
     contestoFilo: eff.contestoFilo || {},
     contestoFiloDiSerie: contestoDiSerie(),
+    lunghezzaRisposte: eff.lunghezzaRisposte || {},
+    lunghezzaRisposteDiSerie: risposteDiSerie(),
   };
 }
 const PD = () => globalThis.SN_PAGINE_DELICATE || null;
@@ -386,6 +392,18 @@ function tettiContesto(o) {
 function contestoDiSerie() {
   const FC = globalThis.SN_FILO_CONTESTO;
   return FC ? { ...FC.TETTI_DI_SERIE } : {};
+}
+
+// Solo le famiglie note, coi numeri nei limiti: un valore assente vuol dire «quello del codice».
+function tettiRisposte(o) {
+  const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+  if (!LR) return {};
+  const pulito = LR.pulisci(o);
+  return Object.fromEntries(Object.entries(pulito).filter(([, v]) => v != null));
+}
+function risposteDiSerie() {
+  const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+  return LR ? { ...LR.DI_SERIE } : {};
 }
 
 async function patchDoc(docPath, fields, mask, idToken) {
@@ -480,6 +498,10 @@ async function update(partial, idToken) {
   if (partial.contestoFilo && typeof partial.contestoFilo === 'object' && !Array.isArray(partial.contestoFilo)) {
     modelFields.contestoFilo = toFsValue(tettiContesto(partial.contestoFilo));
     modelMask.push('contestoFilo');
+  }
+  if (partial.lunghezzaRisposte && typeof partial.lunghezzaRisposte === 'object' && !Array.isArray(partial.lunghezzaRisposte)) {
+    modelFields.lunghezzaRisposte = toFsValue(tettiRisposte(partial.lunghezzaRisposte));
+    modelMask.push('lunghezzaRisposte');
   }
   // Nella maschera ma non nel corpo: Firestore li cancella.
   if (modelMask.length) modelMask.push(...CAMPI_RITIRATI);
@@ -838,7 +860,7 @@ async function setRedteamOpen(on, idToken) {
 }
 
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
-// Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
+// Le impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
 // src/shared/wallet.js: qui si applica, non si ridichiara.
 //
@@ -913,6 +935,7 @@ async function getWorkerLog(idToken, { severo = false } = {}) {
 
 module.exports = {
   tettiContesto,
+  tettiRisposte,
   get,
   fornitoreUsabile,
   getPublicForAdmin,

@@ -63,7 +63,10 @@ module.exports = function register(on, ctx) {
       // per la pagina Crediti solo quando è lì che si sistema.
       const W = globalThis.SN_WALLET;
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
+      // Il tetto e il taglio decidono se accanto alla frase ci va il tasto per le Preferenze (#1097.3).
+      const tetto = Number(e && e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {};
+      const taglio = e && e.code === 'RISPOSTA_TAGLIATA' ? { finishReason: e.finishReason || null } : {};
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio };
     } finally {
       fineLavoro();
     }
@@ -183,8 +186,9 @@ module.exports = function register(on, ctx) {
     const davanti = !(schede && sender.tab) || schede.inVista(sender.tab.id);
     const segue = !(msg && msg.segue === false);
     // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
+    // Una volta anche dopo una pausa lunga: il turno lo chiederebbe comunque, e lo aspetterebbe (#1097.1).
     if (msg && msg.perChat === true) {
-      if (davanti) Sistema.richiedi();
+      if (davanti) Sistema.richiedi({ unaVolta: true });
       return { ok: true, stato: Sistema.stato() };
     }
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
@@ -227,6 +231,41 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Filo non ha un calendario suo: scrive l'evento in un .ics e lo passa al
+  // programma dell'utente, che è la porta che ogni calendario sa aprire. Se il
+  // sistema non lo apre torna il percorso, così il bottone non finisce nel nulla.
+  on(MSG.CALENDAR_ADD, soloDaFilo(async (msg) => {
+    const C = globalThis.SN_CALENDAR;
+    const ev = C && C.normalize(msg && msg.evento);
+    if (!ev) return { ok: false, error: 'evento incompleto' };
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const { app, shell } = require('electron');
+    let file = '';
+    try {
+      const dir = path.join(app.getPath('temp'), 'filo-eventi');
+      await fs.promises.mkdir(dir, { recursive: true });
+      // Un evento consegnato al calendario di ieri non serve più a nessuno:
+      // senza questa ripulita la cartella cresce a ogni uso e non la svuota nessuno.
+      const limite = Date.now() - 24 * 60 * 60 * 1000;
+      for (const nome of await fs.promises.readdir(dir)) {
+        if (!nome.endsWith('.ics')) continue;
+        const vecchio = path.join(dir, nome);
+        try {
+          const st = await fs.promises.stat(vecchio);
+          if (st.mtimeMs < limite) await fs.promises.unlink(vecchio);
+        } catch (_) {}
+      }
+      file = path.join(dir, `${Date.now().toString(36)}-${C.fileName(ev)}`);
+      await fs.promises.writeFile(file, C.buildIcs(ev, { uid: `${C.uidPer(ev)}@filo` }), 'utf8');
+    } catch (e) {
+      return { ok: false, error: e?.message || 'file non scritto' };
+    }
+    let apertura = '';
+    try { apertura = await shell.openPath(file); } catch (e) { apertura = e?.message || 'apertura non riuscita'; }
+    return { ok: true, file, aperto: !apertura, error: apertura || '', quando: ev.quando, titolo: ev.titolo };
+  }));
+
   on(MSG.FILO_GET_MEMORY, soloFilo(async () => ({ ok: true, memory: await FiloMem.getMemory() })));
 
   // Rileggere e togliere una riga di memoria alla volta (#592): è il posto dove
@@ -241,9 +280,72 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const lezione = msg && msg.lezione && typeof msg.lezione === 'object';
     const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
-    if (!lezione && !riga) return { ok: false, error: 'bad_request' };
-    return { ok: true, tolta: await FiloMem.forgetLine(msg) };
+    const sempreAperta = msg && typeof msg.sempreAperta === 'string';
+    if (!lezione && !riga && !sempreAperta) return { ok: false, error: 'bad_request' };
+    if (sempreAperta) return { ok: true, tolta: await FiloMem.forgetLine({ sempreAperta: msg.sempreAperta }) };
+    // La riga resta fra le nascoste del quaderno (#872): l'id serve al suo «Rimetti».
+    const id = await FiloMem.hideLine(lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga });
+    return { ok: true, tolta: !!id, id: id || null };
   });
+
+  // ── Il quaderno delle memorie (#872) ─────────────────────────────────────
+  // Ogni riga con la data in cui è nata e i punti del filo da cui viene: quelli che il filo non ha più (una chat
+  // cancellata) restano fuori, e una riga senza nessuno si legge e si corregge lo stesso, senza collegamento.
+  const IlFilo = () => globalThis.SN_IL_FILO;
+  async function fontiNelFilo(ids) {
+    const out = [];
+    for (const id of Array.isArray(ids) ? ids : []) {
+      let d = null;
+      try { d = await IlFilo().dove(id, { incognito: false }); } catch (_) {}
+      if (d && d.tipo === 'messaggio') out.push({ id, ts: d.ts, chat: d.chat, i: d.i, role: d.role, app: d.app || null });
+    }
+    return out.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  }
+  const conFonti = async (r) => ({ ...r, fonti: await fontiNelFilo(r.fonti) });
+
+  on(MSG.FILO_QUADERNO, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const q = await FiloMem.quaderno();
+    const moduli = [];
+    for (const m of q.moduli) moduli.push({ nome: m.nome, righe: await Promise.all(m.righe.map(conFonti)) });
+    return {
+      ok: true, moduli, lezioni: await Promise.all(q.lezioni.map(conFonti)),
+      sempreAperte: q.sempreAperte, nascoste: await Promise.all(q.nascoste.map(conFonti)),
+    };
+  });
+
+  const viaValida = (via) => !!via && ((via.lezione && typeof via.lezione === 'object'
+    && typeof via.lezione.ts === 'string' && typeof via.lezione.text === 'string')
+    || (typeof via.modulo === 'string' && typeof via.riga === 'string'));
+
+  // La correzione passa dagli stessi controlli di una lezione (tetto, caratteri che non si vedono): entra in ogni prompt.
+  on(MSG.FILO_MEMORY_EDIT, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!viaValida(msg && msg.via) || typeof msg.testo !== 'string') return { ok: false, error: 'bad_request' };
+    const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') });
+    if (l.rifiuto) return { ok: false, error: l.rifiuto, rifiuto: true };
+    if (!l.testo) return { ok: false, error: 'vuota' };
+    const fonti = Array.isArray(msg.fonti) ? msg.fonti.filter((x) => typeof x === 'string') : [];
+    return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo, { fonti }), testo: l.testo };
+  });
+
+  on(MSG.FILO_MEMORY_RESTORE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
+    return { ok: true, rimessa: await FiloMem.restoreHidden(msg.id) };
+  });
+
+  on(MSG.FILO_MEMORY_FOREVER, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
+    return { ok: true, cancellata: await FiloMem.forgetHiddenForever(msg.id) };
+  });
+
+  // Il salto al punto del filo: la home chiede dove sta un evento, e ci va. Dall'incognito il filo è quello in memoria.
+  on(MSG.FILO_DOVE, soloFilo(async (msg) => {
+    if (!msg || typeof msg.id !== 'string' || !msg.id) return { ok: false, error: 'bad_request' };
+    return { ok: true, dove: await IlFilo().dove(msg.id) };
+  }));
 
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
   // PROFILO/PREFERENZE senza aspettare la soglia. Prima non esisteva alcun modo
@@ -329,8 +431,12 @@ module.exports = function register(on, ctx) {
     const esterno = role === 'filo' && Object.hasOwn(ESTERNI, msg.esterno) ? ESTERNI[msg.esterno] : '';
     // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
     const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
+    // Una finestra guardata dopo l'OK (#778): ne resta il nome, che toStoredMessage accorcia.
+    const guardate = role === 'filo' && actions.some((a) => a.type === 'VEDI_SCHERMO')
+      ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     await FiloChats.append(id, {
       role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
+      ...(guardate.length ? { guardate } : {}),
     });
     return { ok: true };
   });
@@ -416,6 +522,23 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_RIGHE_APP, soloFilo(async (msg) => (
     { ok: true, righe: await globalThis.SN_CONVERSAZIONI_APP.righe({ chat: msg.chat || null }) })));
 
+  // #869 — la home come coda del filo: a pezzi, la ricerca, le pagine tolte. La prima apertura della giornata è una
+  // cosa successa: Filo la saluta (una volta).
+  const Coda = require('../codaFilo');
+  const isoO = (x) => (typeof x === 'string' && !Number.isNaN(Date.parse(x)) ? x : null);
+  on(MSG.FILO_CODA, soloFilo(async (msg) => {
+    const r = await Coda.pezzo({ prima: isoO(msg.prima), fino: isoO(msg.fino), dopo: isoO(msg.dopo), quanti: Number(msg.quanti) || undefined });
+    // L'incognito non saluta: il saluto sta nel filo di disco, che da lì non si vede.
+    if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
+    return { ok: true, ...r };
+  }));
+  on(MSG.FILO_CERCA, soloFilo(async (msg) => ({ ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
+  on(MSG.FILO_CODA_TOGLI_PAGINE, soloFilo(async (msg) => {
+    const url = msg && typeof msg.url === 'string' ? msg.url : '';
+    const tolte = url ? await Coda.togliIndirizzo(url) : await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);
+    return { ok: true, tolte };
+  }));
+
   // #866 — le pagine visitate del filo: quante sono in un periodo, e cancellarle (pagina Sicurezza).
   const periodoDa = (msg) => globalThis.SN_FILO_EVENTI.periodo(msg && msg.periodo);
   on(MSG.FILO_PAGINE_CONTA, soloFilo(async (msg) => {
@@ -460,7 +583,8 @@ module.exports = function register(on, ctx) {
     // Chi apre una seconda scheda nuova mentre la prima aspetta la risposta
     // riceve `resume: false`: vede la conversazione e si aggiorna con
     // FILO_ONBOARDING_UPDATED, invece di rilanciare lo stesso messaggio.
-    const resume = Onboarding.hasPendingTurn(state) && claimOnboardingResume();
+    // La home pronta per la scheda nuova (#1128) non la prende: nessuno la guarda, e la chiede quando arriva davanti.
+    const resume = Onboarding.hasPendingTurn(state) && !sender?.riserva && claimOnboardingResume();
     return {
       ok: true,
       ready: true,

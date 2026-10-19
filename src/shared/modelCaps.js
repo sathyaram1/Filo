@@ -125,6 +125,9 @@
       // validazione impedisce entrambi gli scambi.
       case A.ARCHIVE_EMBED:
         return { output: M.EMBED, inputs: [] };
+      // La chat chiama le azioni come strumenti: un modello che non li regge risponde senza fare niente.
+      case A.FILO_CHAT:
+        return { output: M.TEXT, inputs: [], tools: true };
       default:
         return { output: M.TEXT, inputs: [] };
     }

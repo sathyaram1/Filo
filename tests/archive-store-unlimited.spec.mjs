@@ -61,7 +61,7 @@ function fileCheContengono(dir, ago) {
 }
 const cartellaDati = (app) => app.evaluate(() => process.env.FILO_USER_DATA);
 
-test('6000 schede: la pagina le riceve tutte e la ricerca per contenuto trova una delle prime', async ({ app, openTab }) => {
+test('6000 schede: le pagine di Filo le ricevono tutte e la ricerca per contenuto trova una delle prime', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await preparaModelli(app);
   await app.evaluate(async () => {
@@ -88,11 +88,6 @@ test('6000 schede: la pagina le riceve tutte e la ricerca per contenuto trova un
   expect(r.results[0].title).toBe('Recensione del Gattopardo');
   // Tutte le schede hanno già il loro vettore: l'unica chiamata è quella della domanda.
   expect(await app.evaluate(() => globalThis.__embedCalls)).toEqual([['gattopardo']]);
-
-  // La Cronologia, senza modifiche ai suoi file, le mostra tutte: anche la più vecchia.
-  const cronologia = await openTab('filo://archive/archive.html');
-  await expect(cronologia.locator('.arc-tab')).toHaveCount(6000, { timeout: 30_000 });
-  await expect(cronologia.locator('.arc-tab', { hasText: 'Pagina qualunque 0' })).toHaveCount(1);
 });
 
 test('due ricerche di fila: la prima indicizza le schede senza vettore, la seconda non ripaga niente', async ({ app, openTab }) => {
@@ -119,8 +114,9 @@ test('due ricerche di fila: la prima indicizza le schede senza vettore, la secon
   expect(await app.evaluate(() => globalThis.__embedCalls)).toEqual([['gattopardo'], ['gattopardo']]);
 });
 
-// #825 giro 1: dopo la migrazione le schede vecchie non avevano vettore, e la prima ricerca in Cronologia non le trovava.
-test('la prima ricerca in Cronologia trova già una scheda vecchia rimasta senza vettore', async ({ app, openTab }) => {
+// #825 giro 1: dopo la migrazione le schede vecchie non avevano vettore, e la prima ricerca per significato non le trovava.
+// Dal #872 quella ricerca parte dal campo «Cerca nel filo» della home.
+test('la prima ricerca per significato trova già una scheda vecchia rimasta senza vettore', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await preparaModelli(app);
   await app.evaluate(async () => {
@@ -141,13 +137,16 @@ test('la prima ricerca in Cronologia trova già una scheda vecchia rimasta senza
       return veloce(a);
     };
   });
-  const page = await openTab('filo://archive/archive.html');
-  await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('.arc-tab').first()).toBeVisible({ timeout: 20_000 });
-  await page.locator('#search').fill('gattopardo');
-  await page.locator('#search').press('Enter');
-  await expect(page.locator('#searchNote')).toContainText('per pertinenza', { timeout: 30_000 });
-  await expect(page.locator('.arc-results .arc-tab').first()).toContainText('Il Gattopardo, riassunto');
+  // La domanda non contiene il titolo: la trova solo il vettore, non le parole.
+  await app.evaluate(() => {
+    const f = globalThis.SN_PROVIDER_OPENROUTER.embed;
+    globalThis.SN_PROVIDER_OPENROUTER.embed = (a) => f({ ...a, texts: a.texts.map((t) => t.replace(/romanzo siciliano/i, 'gattopardo')) });
+  });
+  const page = await openTab('filo://newtab/');
+  await page.locator('#cercaInput').fill('romanzo siciliano');
+  await expect(page.locator('.dash-cerca-niente').first()).toBeVisible({ timeout: 8_000 });
+  await page.locator('.dash-cerca-significato').click();
+  await expect(page.locator('.dash-cerca-pagina').first()).toContainText('Il Gattopardo, riassunto', { timeout: 30_000 });
 });
 
 test('una scheda che il modello non indicizza si trova lo stesso per testo', async ({ app, openTab }) => {
@@ -217,7 +216,7 @@ test('chiudere una scheda con 6000 già in archivio resta rapido, e storage.json
   expect(JSON.parse(storage).archivedTabs).toBeUndefined();
 });
 
-test('cancellata dalla Cronologia, una scheda non si trova più in nessun file della cartella dati', async ({ app, openTab }) => {
+test('tolta dalla ricerca del filo, una scheda chiusa non si trova più in nessun file della cartella dati', async ({ app, openTab }) => {
   const url = 'https://da-cancellare-825.test/pagina-privata';
   await app.evaluate(async (_e, u) => {
     const A = globalThis.SN_ARCHIVED_TABS;
@@ -229,13 +228,17 @@ test('cancellata dalla Cronologia, una scheda non si trova più in nessun file d
   const dati = await cartellaDati(app);
   expect(fileCheContengono(dati, url).length).toBeGreaterThan(0);
 
-  const archivio = await openTab('filo://archive/archive.html');
-  const chip = archivio.locator('.arc-tab', { hasText: 'Da cancellare' });
-  await expect(chip).toBeVisible({ timeout: 8_000 });
-  await chip.click({ button: 'right' });
-  await archivio.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Elimina' }).click();
-  await expect(chip).toHaveCount(0);
-  await expect(archivio.locator('.arc-tab', { hasText: 'Rimane' })).toBeVisible();
+  const home = await openTab('filo://newtab/');
+  await home.locator('#cercaInput').fill('825');
+  const voce = home.locator('.dash-cerca-pagina', { hasText: 'Da cancellare' });
+  await expect(voce).toBeVisible({ timeout: 8_000 });
+  // Il tasto destro sul risultato: «Togli dal filo».
+  await voce.evaluate((el) => {
+    const v = (window.SN_VOCI_PAGINA || []).flatMap((f) => f(el) || []).find((x) => x.label === 'Togli dal filo');
+    v.onClick();
+  });
+  await expect(voce).toHaveCount(0, { timeout: 8_000 });
+  await expect(home.locator('.dash-cerca-pagina', { hasText: 'Rimane' })).toBeVisible();
 
   await expect.poll(async () => {
     await app.evaluate(() => globalThis.__filoStorage.whenSettled());
@@ -400,14 +403,13 @@ testSenzaFixture('dopo la migrazione le schede senza vettore si indicizzano da s
       (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => !t.embedding).length), { timeout: 60_000 }).toBe(0);
 
     await app.evaluate(() => { globalThis.__embedCalls = []; });
-    await shell.evaluate(() => window.filoShell.tabs.open('filo://archive/archive.html'));
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
     let page = null;
-    await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith('filo://archive')); return !!page; }).toBe(true);
-    await expect(page.locator('.arc-tab').first()).toBeVisible({ timeout: 30_000 });
-    await page.locator('#search').fill('libro sulla nobiltà in Sicilia');
-    await page.locator('#search').press('Enter');
-    await expect(page.locator('#searchNote')).toContainText('per pertinenza', { timeout: 10_000 });
-    await expect(page.locator('.arc-results .arc-tab').first()).toContainText('Il Gattopardo');
+    await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith('filo://newtab')); return !!page; }).toBe(true);
+    await page.waitForLoadState('domcontentloaded');
+    await page.locator('#cercaInput').fill('libro sulla nobiltà in Sicilia');
+    await page.locator('.dash-cerca-significato').click();
+    await expect(page.locator('.dash-cerca-pagina').first()).toContainText('Il Gattopardo', { timeout: 10_000 });
     expect(await app.evaluate(() => globalThis.__embedCalls.map((t) => t.length))).toEqual([1]);
   } finally {
     await chiudiApp(app);

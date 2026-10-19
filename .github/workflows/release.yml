@@ -10,6 +10,8 @@
 #   Niente di verde e nuovo: non fa nulla; se dura da piu' di 48 ore apre un
 #   feedback e la corsa e' rossa. Anche un verde che non esce (la meta'
 #   Windows si ferma dopo la scelta) apre un feedback, passate le 48 ore.
+#   Ogni meta' scrive nella pagina della versione la sezione «Verifica» (commit,
+#   corsa, SHA-256 dei suoi file): scripts/release-impronte.mjs.
 #
 # QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
 #   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
@@ -369,6 +371,28 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
         run: npm run release
 
+      # Le pagine web girano in sandbox col preload impacchettato (src/main/preloadPacchetto.js, scritto da
+      # build.beforePack): senza quel file nell'asar, o con uno vecchio, ogni sito resterebbe senza Filo. La bozza
+      # allora non si pubblica. Un commit di prima della sandbox non ha il file da confrontare, e passa.
+      - name: Il pacchetto per Windows porta il preload delle pagine web?
+        if: steps.check.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          set -e
+          if [ ! -f src/main/preloadPacchetto.js ]; then echo "versione senza preload impacchettato: niente da controllare"; exit 0; fi
+          ARCHIVIO=$(find dist -path '*win-unpacked/resources/app.asar' -print -quit)
+          test -n "$ARCHIVIO" || { echo "::error::nel pacchetto per Windows non trovo app.asar: non pubblico la bozza"; exit 1; }
+          node -e "
+            const asar = require('@electron/asar');
+            const { componi } = require('./src/main/preloadPacchetto.js');
+            let dentro = '';
+            try { dentro = asar.extractFile(process.argv[1], 'generato/page-preload.js').toString('utf8'); } catch (_) {
+              console.log('::error::nel pacchetto manca generato/page-preload.js: le pagine web resterebbero senza Filo'); process.exit(1);
+            }
+            if (dentro !== componi().codice) { console.log('::error::il preload nel pacchetto non è quello dei sorgenti'); process.exit(1); }
+            console.log('preload delle pagine web nel pacchetto:', dentro.length, 'byte');
+          " "$ARCHIVIO"
+
       # Il passo sopra puo' finire verde senza aver caricato niente (lo
       # strumento, quando decide di non pubblicare, si limita a un avviso).
       # Si guarda la bozza VERA prima di renderla pubblica: senza l'installer
@@ -397,6 +421,22 @@ jobs:
               exit 1
             }
           done
+
+      # Le impronte entrano nella bozza prima che diventi pubblica: nessuna versione esce senza «Verifica».
+      # Lo strumento e' quello di questa corsa: il commit provato puo' essere piu' vecchio di lui.
+      - name: Impronte dei file nella sezione Verifica
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
+          VERSIONE: ${{ steps.bump.outputs.version }}
+          COMMIT: ${{ steps.applica.outputs.sha }}
+          CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -e
+          git show "${GITHUB_SHA}:scripts/release-impronte.mjs" > "${RUNNER_TEMP}/release-impronte.mjs"
+          node "${RUNNER_TEMP}/release-impronte.mjs" --piattaforma Windows --cartella dist \
+            --versione "$VERSIONE" --repo "$GITHUB_REPOSITORY" --commit "$COMMIT" --corsa "$CORSA"
 
       - name: Pubblica la release (da bozza a pubblicata)
         # electron-builder crea la release come DRAFT. La rendiamo pubblica solo
@@ -476,6 +516,7 @@ jobs:
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -618,6 +659,21 @@ jobs:
             exit 1
           fi
 
+      # Mac e Linux scrivono la stessa pagina in parallelo: --verifica-dopo la rilegge e rimette le righe se l'altro le ha coperte.
+      - name: Impronte dei file nella sezione Verifica
+        id: impronte
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Dall'ambiente e non scritta nel comando: sulla strada a mano la versione la scrive una persona.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+          CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -e
+          node "${{ runner.temp }}/strumenti/release-impronte.mjs" --piattaforma Mac --cartella dist \
+            --versione "$VERSIONE" --repo "$GITHUB_REPOSITORY" --commit "$(git rev-parse HEAD)" \
+            --corsa "$CORSA" --verifica-dopo 45
+
       # `continue-on-error` sul lavoro tiene in piedi la release Windows, e fin
       # qui e' giusto; il prezzo era il silenzio: dal 20/09 al 26/09 nessuno si
       # e' accorto che Filo per Linux non usciva (#733). Da qui il guasto
@@ -708,6 +764,7 @@ jobs:
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -868,6 +925,21 @@ jobs:
             echo "::error::mancano nella release ${{ steps.bersaglio.outputs.versione }}: ${MANCANTI% }"
             exit 1
           fi
+
+      # Stesso passo della meta' Mac, che puo' scrivere la pagina nello stesso momento.
+      - name: Impronte dei file nella sezione Verifica
+        id: impronte
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Dall'ambiente e non scritta nel comando: sulla strada a mano la versione la scrive una persona.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+          CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -e
+          node "${{ runner.temp }}/strumenti/release-impronte.mjs" --piattaforma Linux --cartella dist \
+            --versione "$VERSIONE" --repo "$GITHUB_REPOSITORY" --commit "$(git rev-parse HEAD)" \
+            --corsa "$CORSA" --verifica-dopo 45
 
       # `continue-on-error` sul lavoro tiene in piedi la release Windows, e fin
       # qui e' giusto; il prezzo era il silenzio: dal 20/09 al 26/09 nessuno si

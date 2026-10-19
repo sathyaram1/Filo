@@ -37,3 +37,65 @@ test('sitoDi: il sito di un indirizzo, porta compresa', () => {
   assert.equal(N.sitoDi('https://сайт.рф/'), 'сайт.рф');
   assert.equal(N.sitoDi('non è un indirizzo'), '');
 });
+
+// #843 — la riduzione di tutti gli elenchi di siti: quello che l'utente incolla diventa il nome con cui il sito si confronta.
+test('daScritto: un indirizzo incollato, con www., maiuscole, spazi e virgolette, diventa il nome del sito', () => {
+  const casi = {
+    'https://www.Docs.Google.com/document/d/x': 'docs.google.com',
+    '  docs.google.com  ': 'docs.google.com',
+    'WWW.ESEMPIO.IT': 'esempio.it',
+    'http://esempio.it:8080/percorso?q=1#a': 'esempio.it',
+    '*.esempio.it': 'esempio.it',
+    '.esempio.it.': 'esempio.it',
+    '«esempio.it»,': 'esempio.it',
+    '"https://esempio.it/x";': 'esempio.it',
+    'münchen.de': 'xn--mnchen-3ya.de',
+    'esempio.it/una/pagina': 'esempio.it',
+  };
+  for (const [scritto, atteso] of Object.entries(casi)) assert.equal(N.daScritto(scritto), atteso, scritto);
+  for (const no of ['', '   ', 'facebook', '127.0.0.1', 'http://localhost:3000/', 'non è un sito', '<b>x</b>', '😀', 'ftp://', 'https://']) {
+    assert.equal(N.daScritto(no), '', no);
+  }
+  assert.equal(N.daScritto(null), '');
+  assert.equal(N.daScritto('a'.repeat(5000) + '.com').length > 0, true, 'un nome lunghissimo non rompe niente');
+});
+
+test('elencoDaTesto e testoDaElenco: i siti ridotti senza doppioni, le righe scartate dette e rimesse al loro posto', () => {
+  const r = N.elencoDaTesto('https://www.Docs.Google.com/document/d/x\n\nfaceb\ndocs.google.com\n  esempio.it  \n127.0.0.1');
+  assert.deepEqual(r.valid, ['docs.google.com', 'esempio.it']);
+  assert.deepEqual(r.invalid, ['faceb', '127.0.0.1']);
+  assert.equal(N.testoDaElenco(r.valid, r.scartate), 'docs.google.com\nfaceb\nesempio.it\n127.0.0.1');
+  assert.equal(N.testoDaElenco(['xn--mnchen-3ya.de']), 'münchen.de');
+  assert.equal(N.testoDaElenco(null), '');
+  assert.deepEqual(N.elencoDaTesto('').valid, []);
+});
+
+test('elencoDaTesto: più siti incollati sulla stessa riga valgono uno per uno, un indirizzo con virgole resta uno', () => {
+  assert.deepEqual(N.elencoDaTesto('docs.google.com, figma.com').valid, ['docs.google.com', 'figma.com']);
+  assert.deepEqual(N.elencoDaTesto('docs.google.com figma.com;notion.so').valid, ['docs.google.com', 'figma.com', 'notion.so']);
+  const r = N.elencoDaTesto('faceb, figma.com');
+  assert.deepEqual(r.valid, ['figma.com']);
+  assert.deepEqual(r.invalid, ['faceb']);
+  assert.equal(N.testoDaElenco(r.valid, r.scartate), 'faceb\nfigma.com');
+  assert.deepEqual(N.elencoDaTesto('https://www.esempio.it/cerca?q=a,b c').valid, ['esempio.it']);
+  // Una riga dove nessun pezzo è un sito resta una riga: scartata, si dice e si rimette com'era scritta.
+  const s = N.elencoDaTesto('studio rossi\nfigma.com');
+  assert.deepEqual(s.invalid, ['studio rossi']);
+  assert.equal(N.testoDaElenco(s.valid, s.scartate), 'studio rossi\nfigma.com');
+});
+
+test('ripulisciElenco: un elenco salvato prima della riduzione torna ai nomi; quello che non è un sito resta com\'era', () => {
+  assert.deepEqual(N.ripulisciElenco(['https://docs.google.com/document', 'DOCS.google.com', 'www.esempio.it', '127.0.0.1', '', 3, '  ']),
+    ['docs.google.com', 'esempio.it', '127.0.0.1']);
+  assert.equal(N.ripulisciElenco('rotto'), 'rotto');
+});
+
+test('copre: la voce vale per il sito e i suoi sottodomini, non per un nome che finisce allo stesso modo', () => {
+  assert.equal(N.copre('google.com', 'docs.google.com'), true);
+  assert.equal(N.copre('google.com', 'google.com'), true);
+  assert.equal(N.copre('google.com', 'Docs.Google.Com.'), true);
+  assert.equal(N.copre('google.com', 'notgoogle.com'), false);
+  assert.equal(N.copre('docs.google.com', 'google.com'), false);
+  assert.equal(N.copre('', 'google.com'), false);
+  assert.equal(N.copre('google.com', ''), false);
+});

@@ -19,6 +19,10 @@ che la regola sia installata prima di lui: lo controlla una sentinella in
 `tests/unit/zoomPagina.test.mjs`. Chi tiene nel documento un elemento suo creato
 una volta e riusato deve ricrearlo se lo trova staccato.
 
+Lo stesso elenco serve anche a dare l'Esc agli ascolti di Filo prima che agli
+script del sito (`anticipa`, #859): vedi
+[Esc chiude prima il riquadro aperto, poi la modalità](esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md).
+
 **Il caso.** #686.1 giro 7: dopo una riscrittura il tasto destro non apriva più
 il menu di Filo, e con lui spariva «Dimensione reale». I gesti dello zoom si
 erano già curati con la stessa idea ristretta ai loro ascoltatori (vedi

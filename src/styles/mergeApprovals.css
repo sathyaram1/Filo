@@ -1,5 +1,5 @@
 /* Avviso delle fusioni in attesa di approvazione (src/shared/mergeApprovals.js).
-   Un foglio solo per le due rese — l'avviso in cima ai Ricevuti e la traccia in Automazioni — così non divergono.
+   Un foglio solo per le rese (quadrato, Automazioni, Log), così non divergono.
    Solo token `--sn-*`: gli override estetici valgono anche qui e il blocco regge il tema chiaro e quello scuro. */
 
 .sn-mac {
@@ -90,7 +90,7 @@
 button.sn-mac-origin-link {
   font-family: var(--sn-font);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 button.sn-mac-origin-link:hover {
   background: color-mix(in srgb, var(--sn-accent) 22%, transparent);
@@ -200,7 +200,7 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
   background: transparent;
   color: var(--sn-fg);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-mac-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sn-fg) 7%, transparent);

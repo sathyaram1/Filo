@@ -6,7 +6,7 @@
 //   - TAB APERTE (URL/titolo/focus, ultima attività via chrome.tabs)
 //   - PROCESSI ATTIVI (timer, notifiche pending)
 //   - NOTIFICHE NON GESTITE
-//   - DASHBOARD ATTUALE (cache dell'ultimo output del Generatore Dashboard)
+//   - SUGGERIMENTI DELLA HOME (cache dell'ultimo output del Generatore Dashboard)
 //
 // Esposto come funzione che ritorna sia l'oggetto strutturato sia un testo
 // pronto per essere inserito nei prompt LLM.
@@ -109,6 +109,15 @@
     } catch (_) { return null; }
   }
 
+  // «Tieni sempre aperto X» (#823): a «quali siti tieni aperti?» il modello risponde col dato. Solo host: una voce
+  // arrivata da un backup con altro dentro non entra nel prompt.
+  async function readSempreAperte(Mem) {
+    try {
+      const voci = Mem && typeof Mem.listKeepOpen === 'function' ? Object.keys(await Mem.listKeepOpen()) : [];
+      return voci.filter((h) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h)).sort();
+    } catch (_) { return []; }
+  }
+
   // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
   // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
   // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
@@ -148,16 +157,20 @@
   async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia] = await Promise.all([
+    // Le due letture che possono far aspettare un turno (computer e saldo): i loro tempi vanno nella cronologia (#1097.1).
+    const attese = {};
+    const cronometra = (nome, p) => { const t = Date.now(); return p.finally(() => { attese[nome] = Date.now() - t; }); };
+    const [tabs, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia, sempreAperte] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
       Mem.listNotifications(),
       Mem.getDashboardCache(),
-      readCredits({ fresco: creditiFreschi }),
+      cronometra('saldoMs', readCredits({ fresco: creditiFreschi })),
       readCambi(),
-      conSistema ? readSistema() : Promise.resolve(undefined),
+      conSistema ? cronometra('sistemaMs', readSistema()) : Promise.resolve(undefined),
       readAutonomia(),
+      readSempreAperte(Mem),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -179,6 +192,7 @@
         session: sessionInfo,
       },
       tabs,
+      sempreAperte,
       // Filtra i timer scaduti (non in pausa): se Filo era chiuso alla scadenza
       // non c'è stata notifica, quindi mostrarli come "processi attivi" al boot
       // confonde l'LLM ("Il timer sta per suonare" in modo permanente).
@@ -214,7 +228,7 @@
     };
 
     const stateText = renderForPrompt(state);
-    return { state, stateText };
+    return { state, stateText, attese };
   }
 
   // #593 (terzo giro di verifica) — la busta del contenuto esterno, e la
@@ -339,6 +353,11 @@
       lines.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n') }));
     }
     lines.push('');
+    if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
+      lines.push('SITI SEMPRE APERTI (la pulizia delle schede non li archivia; si tolgono con NON_TENERE_APERTA)');
+      lines.push(state.sempreAperte.join(', '));
+      lines.push('');
+    }
     // ZOOM — #686: il livello della scheda davanti, come Filo vede il titolo.
     // Sempre, anche al 100%: senza la riga, a «a quanto è lo zoom?» il modello
     // rispondeva a naso. È un dato di Filo, non del sito: fuori dalla busta.
@@ -395,18 +414,13 @@
       lines.push('');
     }
     if (state.conversazioni) lines.push(testoConversazioni(state.conversazioni, salvati), '');
-    lines.push('DASHBOARD ATTUALE');
-    if (state.dashboard) {
-      const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
-      if (state.dashboard.suggestions?.length) {
-        righe.push('Suggerimenti:');
-        state.dashboard.suggestions.slice(0, 8).forEach((s, i) => {
-          righe.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
-        });
-      }
+    // Il messaggio della home è un turno di Filo nel filo (#869): qui restano i suggerimenti.
+    lines.push('SUGGERIMENTI DELLA HOME');
+    if (state.dashboard && state.dashboard.suggestions?.length) {
+      const righe = state.dashboard.suggestions.slice(0, 8).map((s, i) => `${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
       lines.push(salvati(righe));
     } else {
-      lines.push('(non ancora generata)');
+      lines.push('(nessuno)');
     }
     return lines.join('\n');
   }

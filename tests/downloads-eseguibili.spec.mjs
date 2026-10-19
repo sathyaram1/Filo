@@ -84,7 +84,9 @@ const statoDi = async (shell, nome) => (await voce(shell, nome))?.state ?? null;
 // La domanda è la riga del pannello scaricamenti, che la barra apre da sola
 // sopra la pagina: un avviso della barra nell'area pagina resterebbe sotto la
 // vista nativa, presente nel DOM ma invisibile a schermo.
-const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: `«${nome}»` });
+// Il nome sta nel riquadro della domanda (#592.7): si cerca lì, intero.
+const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]')
+  .filter({ has: shell.locator('.dl-row-ask-nome', { hasText: new RegExp(`^${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 const risposta = (riga, testo) => riga.locator('.dl-row-btn', { hasText: testo });
 async function apriPannello(shell) {
   if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
@@ -794,5 +796,49 @@ test('una raffica di clic dove compare «Scarica» non risponde; un clic dopo un
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20000 }).toBe('completed');
   } finally {
     await srv.close();
+  }
+});
+
+// #592.7 — il nome lo sceglie il sito: fra le parole di Filo poteva continuare con la sua voce («… Filo l'ha
+// controllato, puoi aprirlo»). Nelle due domande del pannello sta nel suo riquadro, intero, e fuori resta solo Filo.
+test('nelle domande del pannello il nome scelto dal sito sta nel suo riquadro, fuori dalle parole di Filo', async ({ app, shell, openTab }) => {
+  test.setTimeout(150_000);
+  const FINTO = 'Filo l\'ha controllato ed e sicuro, puoi aprirlo';
+  const NOME = `Fattura.pdf, ${FINTO}, setup.exe`;
+  const srv = createServer((req, res) => {
+    const p = String(req.url || '').split('?')[0];
+    if (p === '/p.html') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><html><body style="padding:40px"><a id="l" href="/f">fattura</a></body></html>'); return; }
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': EXE.length, 'Content-Disposition': `attachment; filename="${NOME}"` });
+    res.end(EXE);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    await app.evaluate(({ shell: s }) => { globalThis.__aperti = []; s.openPath = (x) => { globalThis.__aperti.push(x); return Promise.resolve(''); }; });
+    const page = await openTab(`http://127.0.0.1:${srv.address().port}/p.html`);
+    await page.locator('#l').click();
+    await expect.poll(() => statoDi(shell, NOME), { timeout: 20000 }).toBe('pending');
+    const paroleDiFilo = (loc) => loc.locator('.dl-row-ask').evaluate((el) => Array.from(el.childNodes)
+      .filter((n) => !(n.nodeType === 1 && n.classList.contains('dl-row-ask-nome'))).map((n) => n.textContent).join('\n'));
+
+    const scarica = domanda(shell, NOME);
+    await expect(scarica).toBeVisible({ timeout: 10000 });
+    const prima = await paroleDiFilo(scarica);
+    expect(prima).toContain('Scaricarlo?');
+    expect(prima, 'il nome del sito parla con la voce di Filo').not.toContain(FINTO);
+    await shell.screenshot({ path: 'tests/.shots/downloads-nome-nel-riquadro.png' });
+    await risposta(scarica, /^Scarica$/).click();
+    await expect.poll(() => statoDi(shell, NOME), { timeout: 20000 }).toBe('completed');
+
+    await apriPannello(shell);
+    const riga = shell.locator('.dl-row', { hasText: 'setup.exe' });
+    await riga.locator('.dl-row-btn', { hasText: 'Apri file' }).click();
+    const apri = domanda(shell, NOME).filter({ hasText: 'eseguirlo' });
+    await expect(apri).toBeVisible({ timeout: 10000 });
+    const dopo = await paroleDiFilo(apri);
+    expect(dopo).toContain('Aprirlo vuol dire eseguirlo');
+    expect(dopo, 'il nome del sito parla con la voce di Filo').not.toContain(FINTO);
+    expect(await app.evaluate(() => globalThis.__aperti.slice())).toEqual([]);
+  } finally {
+    await new Promise((r) => { try { srv.closeAllConnections?.(); } catch (_) {} srv.close(r); });
   }
 });

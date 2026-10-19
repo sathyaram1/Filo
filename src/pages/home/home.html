@@ -13,6 +13,51 @@
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/storage.js"></script>
+  <style>
+    /* Il menu della scheda: le classi .sn-select-pop del resto di Filo, fisso alle coordinate del clic come
+       quello della Cronologia; i nomi lunghi delle categorie si accorciano invece di allargarlo a tutta la finestra. */
+    .home-ctxmenu { position: fixed; right: auto; top: auto; min-width: 180px; max-width: min(320px, calc(100vw - 8px)); }
+    .home-ctxmenu:focus { outline: none; }
+    .home-ctxmenu .sn-select-option:hover,
+    .home-ctxmenu .sn-select-option:focus {
+      background-color: rgba(var(--sn-accent-rgb), 0.18);
+      outline: none;
+    }
+    .home-ctxmenu[role="dialog"] { padding: 6px; }
+    .home-campo {
+      box-sizing: border-box;
+      width: 240px;
+      max-width: 100%;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 13px;
+      color: var(--sn-fg);
+      background: var(--sn-bg);
+      border: 1px solid var(--sn-border);
+      border-radius: var(--sn-radius);
+      outline: none;
+      transition: border-color calc(120ms * var(--sn-motion, 1)) ease;
+    }
+    .home-campo:focus { border-color: var(--sn-accent); }
+
+    /* L'avviso con «Annulla»: un toast di Filo con il comando in colore d'accento, come «Apri la lista» dopo
+       «Salva per dopo». */
+    .sn-toast.home-annulla { display: flex; align-items: center; gap: 12px; }
+    .home-annulla-testo { min-width: 0; }
+    .home-annulla-btn {
+      all: unset;
+      flex: none;
+      cursor: pointer;
+      color: var(--sn-accent);
+      font-weight: 600;
+      padding: 2px 6px;
+      margin: -2px -6px -2px 0;
+      border-radius: 4px;
+      transition: background-color calc(120ms * var(--sn-motion, 1)) ease;
+    }
+    .home-annulla-btn:hover,
+    .home-annulla-btn:focus-visible { background-color: rgba(var(--sn-accent-rgb), 0.18); }
+  </style>
 </head>
 <body>
   <main class="sn-page">
@@ -23,7 +68,7 @@
     <div class="sn-toolbar">
       <input type="search" id="search" />
       <button class="sn-btn sn-btn-secondary" id="openHistory">Cronologia AI</button>
-      <button class="sn-btn sn-btn-secondary" id="openArchive">Cronologia</button>
+      <button class="sn-btn sn-btn-secondary" id="openArchive">Memorie</button>
       <button class="sn-btn sn-btn-secondary" id="openOptions">Opzioni</button>
     </div>
 

@@ -119,15 +119,28 @@ module.exports = function register(on, ctx) {
       const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
       if (d) esterno.documenti = d; else delete esterno.documenti;
     }
+    // Quando è stata aperta la scheda lo sa il main (#826): il valore che manda la pagina non conta.
+    if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
+      msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
+      msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
+    }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
     // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
-    const chiedi = () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
+    const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+    const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    const chiedi = daSola
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
+      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
     const K = globalThis.SN_WALLET_MAIN;
-    const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
+    const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
+    // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
+    const Cont = globalThis.SN_CONTATORI_MAIN;
+    const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
     if (lettura) await lettura;
     return { ok: true, ...r };
   });
@@ -310,7 +323,14 @@ module.exports = function register(on, ctx) {
     return { ok: false, error, errorCode: errorCode || '', firstFallback };
   };
 
-  on(MSG.TTS_SYNTH, async (msg) => {
+  // Una lettura coi suoi ripieghi di voce e di fornitore è un uso solo, per i contatori giornalieri (#969); i pezzi
+  // dopo il primo di una lettura lunga (`parteDiUnUso`) contano solo se si guastano.
+  on(MSG.TTS_SYNTH, (msg) => {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    const misura = msg && msg.parteDiUnUso === true ? C && C.parteDiUnUso : C && C.unUso;
+    return typeof misura === 'function' ? misura(SN_CONST.ACTIONS.TTS, () => sintesiVocale(msg)) : sintesiVocale(msg);
+  });
+  async function sintesiVocale(msg) {
     // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
     // prova i fornitori che la implementano (il router, verso un host
     // indipendente). Se nessuno è disponibile o tutti falliscono, torna
@@ -375,6 +395,7 @@ module.exports = function register(on, ctx) {
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
+            try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(SN_CONST.ACTIONS.TTS); } catch (_) {}
             ttsFallbackAnnounced = ''; // sintesi disponibile: riarma l'avviso
             return {
               ok: true,
@@ -410,7 +431,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return ttsFallback(e?.message || String(e));
     }
-  });
+  }
 
   // Le voci del modello di lettura IN USO, per la tendina delle Preferenze:
   // quale modello legge (il primo della catena), il suo catalogo raggruppato
@@ -561,9 +582,12 @@ module.exports = function register(on, ctx) {
     const s = await getEffectiveSettings();
     const interna = daFilo(origin, sender);
     let routing = providerRouting(s);
-    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando.
+    let filoPays;
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando,
+    // senza la lista della chiave propria di chi la modifica (#962), e coi vincoli dei crediti di Filo (#831).
     if (interna && Array.isArray(msg.excluded)) {
-      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string') });
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string'), excludedProvidersOwnKey: null });
+      filoPays = true;
     }
     let entry = null;
     if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
@@ -574,7 +598,7 @@ module.exports = function register(on, ctx) {
     }
     if (!entry || !entry.model) return { ok: true, verdict: 'na' };
     const v = await modelGate.hostVerdict({
-      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing,
+      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing, filoPays,
     });
     if (v.ok) return { ok: true, verdict: 'ok' };
     const many = v.excluded.length > 1 ? '_many' : '';
@@ -798,6 +822,16 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Le stime di costo accanto ai modelli (#819): la pagina le calcola col contesto che solo il main ha.
+  on(MSG.STIMA_COSTO_MODELLI, soloFilo(async (msg) => {
+    try {
+      const contesto = await require('../costoModelli').contesto({ Defaults, forzaListino: Boolean(msg && msg.forzaListino) });
+      return { ok: true, contesto };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
   on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
@@ -867,7 +901,7 @@ module.exports = function register(on, ctx) {
         // giro), e un token preso adesso a quel punto è scaduto. Chi manda se
         // lo fa dare al momento dell'invio, da `ottieniIdToken` (vedi l'init
         // della coda in handlers/misc.js).
-        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin, intera: true });
         const r = await PathsCollector.collectAndSave({ session: msg.payload?.session, invokeAI });
         if (r?.saved) console.info('[Filo] percorso in coda:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }

@@ -67,12 +67,14 @@ test('pagina Sicurezza: controlli personali default ON e persistenti; nessun cam
   await expect(page.locator('#sec-safebrowse-llm')).toBeChecked();
   await expect(page.locator('#sec-safebrowse-sandbox')).toBeChecked();
 
-  // La chiave NON è più un campo per-utente: il vecchio input è sparito e al suo
-  // posto c'è la nota che dice che è gestita centralmente in "Modelli predefiniti".
+  // La chiave NON è un campo per-utente: arriva col programma e vale anche senza accesso (#815).
   await expect(page.locator('#sec-safebrowse-key')).toHaveCount(0);
   const note = page.locator('#sec-safebrowse-key-managed');
   await expect(note).toBeVisible();
-  await expect(note).toContainText('Modelli predefiniti');
+  await expect(note).toContainText('anche senza aver fatto l\'accesso');
+  await expect(note).not.toContainText('amministratore');
+  await expect(page.locator('#sec-safebrowse-desc')).toContainText('«confermo»');
+  await expect(page.locator('#sec-safebrowse-desc')).not.toContainText('ignorare');
 
   // I toggle personali restano e si persistono: spegni il giudizio AI, ricarica.
   await page.locator('#sec-safebrowse-llm').uncheck();

@@ -300,3 +300,32 @@ test('due schede nuove mostrano la STESSA intervista, non una ferma a com’era'
   const s = await onbState(app);
   expect(s.thread.filter((m) => m.role === 'user').length).toBe(1);
 });
+
+test('una scheda nuova aperta mentre Filo sta rispondendo non rimanda lo stesso messaggio al modello', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const prima = await apriIntervista(app, shell);
+  // La risposta arriva tardi: la seconda scheda nasce mentre la prima aspetta, con l'ultimo messaggio dell'utente.
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDERS;
+    const orig = P.streamCompleteWithFallback;
+    P.streamCompleteWithFallback = async (o) => { await new Promise((r) => setTimeout(r, 4_000)); return orig(o); };
+  });
+  await queueChat(app, { text: 'Piacere Anna, ti scrivo breve.', actions: [] });
+  await prima.locator('#input').fill('sono Anna, insegnante');
+  await prima.locator('#sendBtn').click();
+  await expect.poll(async () => (await onbState(app)).thread.filter((m) => m.role === 'user').length).toBe(1);
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  const seconda = await newtabPage(app, 1);
+  await expect(seconda.locator('.dash-bubble-user', { hasText: 'sono Anna' })).toBeVisible({ timeout: 15_000 });
+  await expect(prima.locator('.dash-bubble-filo', { hasText: 'Piacere Anna' })).toBeVisible({ timeout: 30_000 });
+  await expect(seconda.locator('.dash-bubble-filo', { hasText: 'Piacere Anna' })).toBeVisible({ timeout: 20_000 });
+
+  // Un secondo turno partito dalla seconda scheda arriverebbe entro il ritardo del modello finto.
+  await prima.waitForTimeout(6_000);
+  expect(await chatCalls(app)).toBe(1);
+  const s = await onbState(app);
+  expect(s.thread.filter((m) => m.role === 'filo').length).toBe(2);
+  const chats = await app.evaluate(() => globalThis.SN_FILO_CHATS.list());
+  expect(chats.filter((c) => c.onboarding).length).toBe(1);
+});

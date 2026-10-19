@@ -551,6 +551,19 @@
     renderOverlayContent(state);
   }
 
+  // I segni di una risposta dello scan su `inviato`, portati sul testo di `adesso`.
+  function segniDellaRisposta(risposta, inviato, adesso) {
+    return riallineaIssues(buildIssues(parseIssues(risposta), inviato), inviato, adesso);
+  }
+
+  // Le stesse parole a meno di spazi e punteggiatura: lo scan rifarebbe la stessa domanda (#1097.5). Due parole fuse
+  // o separate invece cambiano le parole, e così apostrofo e trattino («un amico» / «un'amico», «e-mail»).
+  const ossatura = (t) => String(t ?? '').replace(/\u2019/g, "'").replace(/\u2010/g, '-')
+    .replace(/(?:(?!['-])[\s\p{P}])+/gu, ' ').trim();
+  function soloSpaziOPunteggiatura(prima, dopo) {
+    return typeof prima === 'string' && !!prima && prima !== dopo && ossatura(prima) === ossatura(dopo);
+  }
+
   // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
   // (un bordo che passa da separatore a lettera), si perde.
   function riallineaIssues(issues, vecchio, nuovo) {
@@ -591,6 +604,33 @@
     return G.prendi('correttore', undefined, oppure ? (l) => qui(l) || oppure(l) : qui);
   }
 
+  // Gli esiti già pagati, per testo e contesto (#1097.5): fuori dalla cache del main, un campo lasciato e ripreso, o un
+  // annulla che torna a un testo controllato, non ripagano la stessa domanda. Pochi e per pagina.
+  const ESITI_MAX = 30;
+  const esitiRecenti = new Map();
+  const chiaveEsito = (text, context) => `${JSON.stringify(context ?? null)}\u0000${text}`;
+  function ricordaEsito(chiave, risposta) {
+    esitiRecenti.delete(chiave);
+    esitiRecenti.set(chiave, risposta);
+    while (esitiRecenti.size > ESITI_MAX) esitiRecenti.delete(esitiRecenti.keys().next().value);
+  }
+  // Le domande ancora in viaggio, per la stessa chiave: rientrare nel campo mentre il controllo corre non lo ripaga.
+  const inViaggio = new Map();
+  function chiediScan(chiave, text, context) {
+    let p = inViaggio.get(chiave);
+    if (!p) {
+      p = Promise.resolve(chrome.runtime.sendMessage({
+        type: MSG.AI_REQUEST,
+        action: ACTIONS.SPELLCHECK_SEMANTIC,
+        payload: { text, context },
+      }));
+      inViaggio.set(chiave, p);
+      const via = () => { if (inViaggio.get(chiave) === p) inViaggio.delete(chiave); };
+      p.then(via, via);
+    }
+    return p;
+  }
+
   function scheduleScan(state) {
     if (!isEnabled()) return;
     if (state.timer) clearTimeout(state.timer);
@@ -616,33 +656,39 @@
     if (!text || text.length < MIN_TEXT_LENGTH) {
       state.issues = [];
       state.testoIssues = text;
-      state.lastScannedText = text;
+      // Mai controllato: un segno che lo porta alla lunghezza minima deve far partire lo scan, non saltarlo.
+      state.lastScannedText = '';
+      // Una risposta ancora in viaggio parlava del testo di prima: non riporta i segni.
+      state.scanMostrato = state.scanInviati || 0;
       renderOverlayContent(state);
       return;
     }
     if (text === state.lastScannedText) return;
+    if (soloSpaziOPunteggiatura(state.lastScannedText, text)) return;
+    // Lo stesso testo, o solo un segno in più, è già in viaggio: la sua risposta arriva su quello di adesso.
+    if (state.testoInViaggio && (text === state.testoInViaggio || soloSpaziOPunteggiatura(state.testoInViaggio, text))) return;
     if (text.length > MAX_TEXT_LENGTH) {
       // Niente scan continuo su testi enormi: lasciamo invariati gli issue precedenti.
       return;
     }
 
     const context = extractContext(state.el);
+    const numero = (state.scanInviati || 0) + 1;
+    state.scanInviati = numero;
+    const chiave = chiaveEsito(text, context);
     let res;
-    try {
-      res = await chrome.runtime.sendMessage({
-        type: MSG.AI_REQUEST,
-        action: ACTIONS.SPELLCHECK_SEMANTIC,
-        payload: { text, context },
-      });
-    } catch (err) {
-      console.error('[SN] scan blu — sendMessage fallito:', err);
-      return;
+    if (esitiRecenti.has(chiave)) res = { ok: true, text: esitiRecenti.get(chiave) };
+    else {
+      state.testoInViaggio = text;
+      try {
+        res = await chiediScan(chiave, text, context);
+      } catch (err) {
+        console.error('[SN] scan blu — sendMessage fallito:', err);
+        return;
+      } finally {
+        if (state.testoInViaggio === text) state.testoInViaggio = '';
+      }
     }
-
-    // Se nel frattempo l'utente ha modificato il testo, scarta la risposta:
-    // sarebbe disallineata. Il prossimo input rilancerà lo scan.
-    const currentText = getEditableText(state.el);
-    if (currentText !== text) return;
 
     if (!res?.ok) {
       console.error('[SN] scan blu — provider error:', res?.code, res?.error);
@@ -652,10 +698,21 @@
       console.warn('[SN] scan blu — risposta senza text:', res);
       return;
     }
-    const allIssues = buildIssues(parseIssues(res.text), text);
-    state.issues = allIssues;
-    state.testoIssues = text;
-    state.lastScannedText = text;
+    // Ricordata prima di guardare la casella: arrivata a campo lasciato, serve a chi ci rientra.
+    ricordaEsito(chiave, res.text);
+    // Una risposta più vecchia di quella già in vista non la sovrascrive.
+    if (numero < (state.scanMostrato || 0)) return;
+    const currentText = getEditableText(state.el);
+    if (!currentText || currentText.length < MIN_TEXT_LENGTH) return;
+    // Il testo è tornato a uno già controllato (un annulla): i suoi segni sono quelli giusti, non quelli dell'abbandonato.
+    if (currentText !== text && currentText === state.lastScannedText) return;
+    state.scanMostrato = numero;
+    // Arrivata mentre l'utente scriveva, la risposta pagata non si butta (#1097.5): i segni passano sul testo di adesso
+    // come quelli già in vista; quelli che il cambio tocca li rifà lo scan che segue.
+    const { issues, perse } = segniDellaRisposta(res.text, text, currentText);
+    state.issues = issues;
+    state.testoIssues = currentText;
+    state.lastScannedText = perse ? '' : text;
     renderOverlayContent(state);
     // Prefetch delle correzioni a singola parola: per ogni issue blu su 1 parola
     // chiediamo subito allo stesso modello la verifica ortografica e mettiamo in
@@ -666,7 +723,7 @@
     // italiane reali ma usate male). Il blu resta stabile; per evitare la
     // sovrapposizione con il rosso nativo lo zigzag blu è leggermente offsettato
     // verticalmente in CSS.
-    prefetchSingleWordSuggestions(state, text).catch((e) => {
+    prefetchSingleWordSuggestions(state, currentText).catch((e) => {
       console.warn('[SN] prefetch single-word failed:', e);
     });
   }
@@ -1349,7 +1406,8 @@
         type: MSG.AI_REQUEST,
         action: ACTIONS.SPELLCHECK_WORD,
         payload: { word, sentence, prev, next },
-        ...(suRichiesta ? { suRichiesta: true } : {}),
+        // Senza il tasto destro è un anticipo: l'uso lo conta il menu che mostra la correzione già pronta (#969).
+        ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
       });
       if (!res?.ok) {
         console.error('[SN] word check — provider error:', res?.code, res?.error);
@@ -1466,6 +1524,8 @@
     applyFix,
     sostituisciComeBattuta,
     riallineaIssues,
+    soloSpaziOPunteggiatura,
+    segniDellaRisposta,
     addToDictionary,
     isInDictionary,
     setAutocorrect,

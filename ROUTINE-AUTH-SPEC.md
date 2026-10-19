@@ -600,9 +600,10 @@ La regola, uguale per tutti e due:
   tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
   `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
   detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
-  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
-  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
-  copia che il ramo si porta dietro;
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto, come quelli di ogni testo che
+  uno strumento del giro stampa (suo o del server), portano agli **attrezzi del
+  giro** (`absolutizeOutput`), non a `scripts/…`, che riporterebbe alla copia
+  che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
   Il rifiuto e le note del citofono si reggono sullo specchio locale («la
   verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
@@ -726,7 +727,11 @@ verifica l'identità, scrive `livelli.l4 = { esito: saltato, by: owner, at }`
 conservando il testo del fail, segna nello stato del giro `secauditVerdict:
 saltato` (che il cancello tratta come `pass`) e lancia subito L5 sul ramo come
 per un'approvazione; l'esito torna al chiamante (`fuso`, `bloccato` con
-richiesta aperta, `conflitto`, `ramo assente`). Le regole Firestore ammettono
+richiesta aperta, `conflitto`, `ramo assente`). Un lavoro server non si fonde
+da lì (#1230): la pratica torna in revisione e passa dal cancello del server,
+prima l'app e poi il server (esiti in più: `attesa_server`, `server_al_pc`,
+`rimandato`, `all_owner`); allo stesso modo il sì a un suo blocco L5 la chiude
+solo col server su main. Le regole Firestore ammettono
 `livelli` nei due rami di triage con vincolo di forma (mappa con al più
 `l3`/`l4`, testo cifrato ≤ 20.000).
 

@@ -220,4 +220,4 @@ function checkSync(url, ctx = {}) {
   return evaluate(url, ctx, {});
 }
 
-module.exports = { evaluate, checkSync, buildMessage, agePhrase, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };
+module.exports = { evaluate, checkSync, buildMessage, agePhrase, gsbText, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };

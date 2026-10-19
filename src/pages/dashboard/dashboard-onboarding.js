@@ -21,7 +21,6 @@
   let bubblesEl = null;
   let threadView = null;
   let inputEl = null;
-  let homeMessageEl = null;
   let makeBubble = null;
   let stepTrace = null;
   let goHome = null;
@@ -33,7 +32,8 @@
   let giaAschermo = null;
   let beginSending = null;
   let runTurnAndContinue = null;
-  let isHomeMessageVisible = null;
+  let nienteInCorso = null;
+  let allApertura = null;
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
@@ -97,6 +97,7 @@
   async function openOnboarding(state) {
     onboardingActive = true;
     hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
+    if (allApertura) allApertura();
     goThread();
     renderOnboardingThread(state);
     showSkipOnboarding();
@@ -300,6 +301,17 @@
   // adesso c'è: la apriamo, ma solo se l'utente è ancora sulla home e non sta
   // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
   // che aspettare la prossima scheda.
+  // Una home preparata nascosta (#1128) non prende la ripresa del turno rimasto a metà: la chiede arrivando davanti.
+  async function riprendiAllaComparsa() {
+    if (!onboardingActive || isSending()) return;
+    const state = await fetchOnboarding();
+    const thread = (state && state.thread) || [];
+    const last = thread[thread.length - 1];
+    if (!state || !state.resume || !onboardingActive || isSending() || !last || last.role !== 'user') return;
+    beginSending();
+    await runTurnAndContinue({ userMessage: last.text });
+  }
+
   async function maybeOpenOnboardingLater() {
     if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
@@ -310,7 +322,7 @@
   // Una chat in cui Filo ha solo risposto «servono i crediti» non è una conversazione in corso: chi ha scritto
   // prima di averli deve vedere Filo presentarsi, non la stessa risposta ferma.
   function nienteDaInterrompere() {
-    if (document.body.dataset.state === 'home') return true;
+    if (nienteInCorso && nienteInCorso()) return true;
     return Boolean(soloRisposteSenzaCrediti && soloRisposteSenzaCrediti());
   }
 
@@ -362,15 +374,11 @@
     closingShownAt = 0;
     clearTimeout(onboardingHomeFallback);
     hideSkipOnboarding();
-    goHome(); // svuota bolle e storico: l'intervista è finita
-    if (isHomeMessageVisible()) {
-      homeMessageEl.classList.remove('dash-home-msg-loading');
-      homeMessageEl.textContent = msg?.message || 'Filo è in ascolto.';
-    }
+    // Il filo si rilegge da capo: l'intervista ne è il primo tratto, e il primo messaggio di Filo sta in coda (#869).
+    goHome();
     setSuggestions(Array.isArray(msg?.suggestions) ? msg.suggestions : []);
-    // La home appena generata È la risposta finale. Se non è arrivata (chiave
-    // assente, provider giù) la si carica per la strada normale.
-    if (!msg?.message) loadDashboard().catch(() => {});
+    // I suggerimenti nati con quel messaggio; se non sono arrivati (chiave assente, provider giù) quelli di sempre.
+    if (!msg?.suggestions?.length) loadDashboard().catch(() => {});
     // Chiusa prima della fine? Il congedo era in chat, e la chat è appena
     // sparita: la riga qui sotto è quello che ne resta.
     refreshOnboardingNotice().catch(() => {});
@@ -446,7 +454,6 @@
     bubblesEl = deps.bubblesEl;
     threadView = deps.threadView;
     inputEl = deps.inputEl;
-    homeMessageEl = deps.homeMessageEl;
     makeBubble = deps.makeBubble;
     stepTrace = deps.stepTrace;
     goHome = deps.goHome;
@@ -458,7 +465,8 @@
     giaAschermo = deps.giaAschermo || null;
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
-    isHomeMessageVisible = deps.isHomeMessageVisible;
+    nienteInCorso = deps.nienteInCorso;
+    allApertura = deps.allApertura;
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
@@ -474,6 +482,7 @@
     onboardingClosing,
     onboardingDone,
     maybeOpenOnboardingLater,
+    riprendiAllaComparsa,
     refreshOnboardingNotice,
     hideOnboardingNotice,
     makeSkipOnboardingBtn,
