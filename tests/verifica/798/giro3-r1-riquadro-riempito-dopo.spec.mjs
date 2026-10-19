@@ -1,6 +1,6 @@
-// Verifica #798 giro 3, r1: un riquadro inserito vuoto e riempito subito dopo (srcdoc o un indirizzo della stessa
-// origine assegnati dopo l'inserimento, o un riquadro scritto senza indirizzo che lo riceve più tardi) perde il rumore:
-// le letture dal suo documento, dall'elemento e per indice coincidono con Off invece che con la pagina.
+// Verifica #798 giro 3, r1: un riquadro che cambia documento (riempito dopo l'inserimento con srcdoc o un indirizzo
+// della stessa origine, passato a una seconda pagina, tornato vuoto) perde il rumore: le letture dal suo documento,
+// dall'elemento e per indice coincidono con Off invece che con la pagina.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function setFpMode(openTab, mode) {
@@ -49,6 +49,22 @@ async function letture(interno) {
   await carico(p);
   await new Promise((r) => setTimeout(r, 300));
   out['pigro:elemento'] = daFuori(p.contentWindow);
+  // Un riquadro della stessa origine che passa a una seconda pagina, o torna vuoto.
+  const n = document.createElement('iframe');
+  n.src = interno + '#primaPagina';
+  document.body.appendChild(n);
+  const j = window.length - 1;
+  await carico(n);
+  n.src = interno + '?seconda#secondaPagina';
+  await carico(n);
+  await new Promise((r) => setTimeout(r, 300));
+  out['primaPagina:documento'] = dalDocumento.primaPagina;
+  out['secondaPagina:documento'] = dalDocumento.secondaPagina;
+  out['secondaPagina:elemento'] = daFuori(n.contentWindow);
+  n.src = 'about:blank';
+  await carico(n);
+  out['tornatoVuoto:indice'] = daFuori(window[j]);
+  out['tornatoVuoto:elemento'] = daFuori(n.contentWindow);
   out['srcDopoAppend:documento'] = dalDocumento.srcDopoAppend;
   out['srcdocDopoAppend:documento'] = dalDocumento.srcdoc;
   out['pigro:documento'] = dalDocumento.pigro;
