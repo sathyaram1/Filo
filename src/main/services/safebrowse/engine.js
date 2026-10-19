@@ -171,6 +171,11 @@ function evaluate(url, ctx = {}, asyncData = {}) {
       const message = buildMessage({ level: 'sospetto', norm, cert });
       return { level: 'sospetto', reasons: ['cert_' + cert.status], norm, message, cert, needsLlm: false, whitelisted };
     }
+    // Chi è il sito non dice niente del file: Dropbox o il CDN di Discord ospitano anche file travestiti (#965).
+    if (doubleExt) {
+      const message = buildMessage({ level: 'sospetto', norm, doppia });
+      return { level: 'sospetto', reasons: ['double_extension'], norm, message, needsLlm: false, whitelisted, scope };
+    }
     return { level: 'safe', reasons: ['whitelisted'], norm, message: null, needsLlm: false, whitelisted };
   }
 
