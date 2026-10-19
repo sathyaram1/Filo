@@ -201,19 +201,42 @@
     return true;
   }
 
+  // La riga che il compattatore ha appena fatto da una lezione o da una riga sotto un campo ancora aperto: stesse fonti
+  // e stesso senso, e una sola. Senza fonti non si indovina.
+  async function erede(vecchio, fonti) {
+    const f = Q() ? Q().unisci(fonti) : [];
+    if (!f.length || !vecchio) return null;
+    const mem = await getMemory();
+    const meta = await getFonti();
+    const trovate = [];
+    for (const [nome, v] of Object.entries(mem || {})) {
+      if (typeof v !== 'string') continue;
+      for (const riga of Q().righeDi(v)) {
+        const m = Q().metaDi(meta, nome, riga);
+        if (m && Q().contenute(f, m.fonti) && Q().stessoSenso(riga, vecchio)) trovate.push({ modulo: nome, riga });
+      }
+    }
+    return trovate.length === 1 ? trovate[0] : null;
+  }
+
   // La correzione dell'utente prende il posto della riga e tiene le sue fonti: vale dal messaggio dopo, e il
   // compattatore la riporta com'è. `testo` arriva già controllato (tetto e caratteri, SN_PREF.lezioneDaAzione).
-  async function editLine(via, testo) {
+  // `fonti`: gli eventi che il quaderno mostrava per la riga, per ritrovarla se nel frattempo è stata riordinata.
+  async function editLine(via, testo, { fonti = [] } = {}) {
     const nuovo = String(testo || '').trim();
     if (!nuovo || /[\r\n]/.test(nuovo)) return false;
     const ora = new Date().toISOString();
     if (via && via.lezione && typeof via.lezione === 'object') {
       const buf = await getLessonsBuffer();
       const i = buf.findIndex((l) => l && l.ts === via.lezione.ts && l.text === via.lezione.text);
-      if (i < 0) return false;
+      if (i < 0) {
+        const e = await erede(via.lezione.text, fonti);
+        return e ? editLine(e, nuovo) : false;
+      }
       const vecchia = buf[i];
       buf[i] = { ...vecchia, text: nuovo, corretta: ora };
       await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+      await setFonti(toccata(await getFonti()));
       return true;
     }
     if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') {
@@ -222,14 +245,30 @@
       if (testoMod == null) return false;
       const righe = testoMod.split(/\r?\n/);
       const i = righe.findIndex((r) => r.trim() === via.riga.trim());
-      if (i < 0) return false;
-      righe[i] = nuovo;
-      await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
+      if (i < 0) {
+        const e = await erede(via.riga, fonti);
+        return e ? editLine(e, nuovo) : false;
+      }
       const meta = await getFonti();
       const m = Q() ? Q().metaDi(meta, via.modulo, via.riga) : null;
-      const riga = { testo: nuovo, fonti: m ? m.fonti : [], nata: m ? m.nata : null, corretta: ora };
-      meta.righe[via.modulo] = [...(meta.righe[via.modulo] || []).filter((x) => x !== m), riga];
-      await setFonti(meta);
+      const lista = (meta.righe[via.modulo] || []).filter((x) => x !== m);
+      // Corretta in una riga che c'è già: ne resta una, con le fonti di tutte e due (due righe uguali il quaderno non
+      // le sa distinguere).
+      const doppia = righe.findIndex((r, j) => j !== i && Q().norma(r) && Q().norma(r) === Q().norma(nuovo));
+      let riga;
+      if (doppia >= 0) {
+        const altra = Q().metaDi(meta, via.modulo, righe[doppia]);
+        const nate = [altra && altra.nata, m && m.nata].filter(Boolean).sort();
+        riga = { testo: righe[doppia].trim(), fonti: Q().unisci(altra ? altra.fonti : [], m ? m.fonti : []), nata: nate[0] || null, corretta: ora };
+        righe.splice(i, 1);
+        meta.righe[via.modulo] = [...lista.filter((x) => x !== altra), riga];
+      } else {
+        righe[i] = nuovo;
+        riga = { testo: nuovo, fonti: m ? m.fonti : [], nata: m ? m.nata : null, corretta: ora };
+        meta.righe[via.modulo] = [...lista, riga];
+      }
+      await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
+      await setFonti(toccata(meta));
       await togliLezioniSimili(via.riga, riga.fonti);
       return true;
     }
