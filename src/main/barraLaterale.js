@@ -753,13 +753,14 @@ class BarraLaterale {
 
   // Da una scheda: il menu del tasto destro trascina un'icona verso la barra. La scheda ha il
   // puntatore per tutto il trascinamento, quindi le coordinate arrivano da lei (px della pagina).
-  dallaScheda(msg, tabId) {
+  // `zoom`: dallo strato del menu sopra la scheda (#1054) i px sono già della vista, non della pagina.
+  dallaScheda(msg, tabId, { zoom: zoomDato = null } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const fase = testo(msg.fase);
     const attiva = this._attiva();
     if (!attiva || attiva.id !== tabId) return { ok: false };
     let zoom = 1;
-    try { zoom = attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+    try { zoom = zoomDato || attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
     const yLocale = (y) => {
       const tb = attiva.view.getBounds();
       const vb = this.vista ? this.vista.getBounds() : { y: tb.y };

@@ -1,5 +1,5 @@
 // Lo strato del menu del tasto destro (#1053): una vista trasparente per finestra, posata sopra la scheda attiva, dove
-// il menu si disegnerà fuori dal documento del sito. Nasce una volta e resta pronta e nascosta; spenta di serie.
+// il menu si disegna fuori dal documento del sito (#1054). Nasce una volta e resta pronta e nascosta; spenta di serie.
 // Regole: patterns/il-menu-del-tasto-destro-sta-in-uno-strato-sopra-la-scheda.md
 
 const path = require('node:path');
@@ -13,6 +13,51 @@ function acceso() {
 }
 
 const INDIRIZZO = 'filo://menu/';
+
+// Il content script descrive il menu dopo il `context-menu` (aspetta la cronologia e la navigazione, o rigioca il clic
+// in un riquadro appena montato): oltre questo tempo dal tasto destro un menu non si apre più.
+const DOPO_IL_CLIC_MS = 5000;
+// Un menu descritto prima che il `context-menu` arrivi lo aspetta così.
+const PRIMA_DEL_CLIC_MS = 1000;
+// Una voce dello strato vale solo dopo un gesto dell'utente sullo strato stesso, visto qui.
+const GESTO_MS = 5000;
+// Abbondanti: le icone sono SVG, una spiegazione lunga è qualche decina di KB.
+const MENU_MAX_BYTE = 8 * 1024 * 1024;
+const AGGIORNA_MAX_BYTE = 4 * 1024 * 1024;
+const ID_MAX = 80;
+// Un sito occupato non trattiene a lungo l'azione scelta: senza risposta, si va avanti lo stesso.
+const CONCEDI_MS = 300;
+
+const msg = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {};
+
+function pesa(v) {
+  try { return JSON.stringify(v).length; } catch (_) { return Infinity; }
+}
+
+function nodoDi(frame) {
+  try { return frame && !frame.detached ? frame.frameTreeNodeId : null; } catch (_) { return null; }
+}
+
+function idValido(id) {
+  return typeof id === 'string' && id.length > 0 && id.length <= ID_MAX;
+}
+
+function interi(a) {
+  return Array.isArray(a) && a.length <= 64 && a.every((i) => Number.isInteger(i) && i >= 0) ? a : null;
+}
+
+// Le richieste dello strato per la cronologia e gli appunti passano dalle stesse porte di Filo, come una sua pagina.
+async function comeFilo(win, wc, richiesta, scheda = null) {
+  const { handleMessage } = require('./services/handlers');
+  const info = {
+    tab: scheda, url: scheda ? scheda.url : INDIRIZZO, isShell: false, win,
+    isIncognito: !!(win && win._filoIncognito), wc: scheda ? scheda.wc : wc, frame: null,
+  };
+  const run = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'menu' }, () => handleMessage(richiesta, info));
+  try {
+    return info.isIncognito ? await require('./shim/storage').runIncognito(run) : await run();
+  } catch (_) { return null; }
+}
 
 function stessaArea(a, b) {
   return !!a && !!b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
@@ -32,15 +77,23 @@ function puntoNellArea(punto, area) {
 
 class StratoDelMenu {
   // schedaAttiva(): il webContents della scheda davanti; area(): dove sta nella finestra, null se non si vede.
-  constructor(win, { schedaAttiva = () => null, area = () => null } = {}) {
+  // scheda(wc): { id, url } della scheda di quel webContents; barra(): la barra laterale della finestra.
+  constructor(win, { schedaAttiva = () => null, area = () => null, scheda = () => null, barra = () => null } = {}) {
     this.win = win;
     this.schedaAttiva = schedaAttiva;
     this.area = area;
+    this.scheda = scheda;
+    this.barra = barra;
     this.vista = null;
     this.pronta = false;
     this.aperto = null; // { wc, punto, area, seq }
     this.seq = 0;
     this.seguite = new WeakSet();
+    this.clic = null; // l'ultimo tasto destro: { wc, punto, nodo, alle }
+    this.inArrivo = null; // un menu descritto prima del suo tasto destro
+    this.menu = null; // il menu disegnato: { id, wc, frame, nodo, cronologia, pronto, coda }
+    this.gestoAlle = 0;
+    this.clicAlle = 0;
     if (!acceso() || !win || typeof win.once !== 'function') return;
     win.once('closed', () => this._butta());
     // Lo schermo intero cambia tutto quello che c'è sotto, anche quando lo chiede il sistema.
@@ -60,7 +113,187 @@ class StratoDelMenu {
 
   get acceso() { return acceso(); }
 
-  mostra(wc, punto) {
+  // Il `context-menu` della scheda: il punto e il riquadro del tasto destro. Il menu si apre quando arriva la sua
+  // descrizione dal content script di quel riquadro.
+  segnaClic(wc, params) {
+    if (!acceso() || !wc || !params) return;
+    this.clic = { wc, punto: { x: params.x, y: params.y }, nodo: nodoDi(params.frame), alle: Date.now() };
+    const a = this.inArrivo;
+    if (a && a.wc === wc && a.nodo === this.clic.nodo && Date.now() - a.alle < PRIMA_DEL_CLIC_MS) {
+      this.inArrivo = null;
+      this._apri(a);
+    }
+  }
+
+  // STRATO_MENU_APRI: solo dal riquadro dell'ultimo tasto destro, e da poco. Un sito non apre il menu da sé.
+  apriDa(sender, d) {
+    const wc = sender && sender.wc;
+    const frame = sender && sender.frame;
+    const nodo = nodoDi(frame);
+    if (!acceso() || !wc || nodo == null || !d || !idValido(d.id)) return { ok: false };
+    const menu = d.menu;
+    if (!menu || !Array.isArray(menu.items) || pesa(menu) > MENU_MAX_BYTE) return { ok: false, error: 'menu' };
+    const richiesta = { wc, frame, nodo, id: d.id, menu: { items: menu.items, keepOnScroll: !!menu.keepOnScroll }, coda: [], alle: Date.now() };
+    const c = this.clic;
+    if (c && c.wc === wc && c.nodo === nodo && Date.now() - c.alle < DOPO_IL_CLIC_MS) {
+      this._apri(richiesta);
+      return { ok: true };
+    }
+    this.inArrivo = richiesta;
+    setTimeout(() => { if (this.inArrivo === richiesta) this.inArrivo = null; }, PRIMA_DEL_CLIC_MS).unref?.();
+    return { ok: true, attesa: true };
+  }
+
+  // Le voci che cambiano a menu aperto: solo per il menu che quel riquadro ha aperto.
+  aggiornaDa(sender, d) {
+    if (!d || !idValido(d.id) || pesa(d) > AGGIORNA_MAX_BYTE) return { ok: false };
+    const cosa = String(d.cosa || '');
+    if (!['riga', 'griglia', 'griglia-apri', 'correzione', 'inline'].includes(cosa)) return { ok: false };
+    const { type: _t, ...dati } = d;
+    const di = (r) => r && r.id === d.id && r.wc === (sender && sender.wc) && r.nodo === nodoDi(sender && sender.frame);
+    if (di(this.inArrivo)) { this.inArrivo.coda.push(dati); return { ok: true }; }
+    const m = this.menu;
+    if (!di(m)) return { ok: false };
+    if (!m.pronto) m.coda.push(dati);
+    else this._alloStrato('strato:aggiorna', dati);
+    return { ok: true };
+  }
+
+  chiudiDa(sender, d) {
+    if (this.inArrivo && d && this.inArrivo.id === d.id && this.inArrivo.wc === (sender && sender.wc)) this.inArrivo = null;
+    const m = this.menu;
+    if (!m || !d || m.id !== d.id || m.wc !== (sender && sender.wc) || m.nodo !== nodoDi(sender && sender.frame)) return { ok: false };
+    this.nascondi();
+    return { ok: true };
+  }
+
+  async _apri(r) {
+    const c = this.clic;
+    if (!c || c.wc !== r.wc) return;
+    this.clic = null;
+    if (this.menu) this.nascondi();
+    const m = { id: r.id, wc: r.wc, frame: r.frame, nodo: r.nodo, cronologia: null, pronto: false, coda: r.coda };
+    this.menu = m;
+    const conIncolla = r.menu.items.some((it) => it && it.$incolla === true);
+    const [impostazioni, cronologia] = await Promise.all([
+      require('./services/handlers').getEffectiveSettings().catch(() => null),
+      conIncolla ? comeFilo(this.win, this.vista && this.vista.webContents, { type: msg().GET_CLIPBOARD_HISTORY }) : null,
+    ]);
+    if (this.menu !== m) return;
+    m.cronologia = cronologia && cronologia.ok && Array.isArray(cronologia.items) ? cronologia.items : [];
+    const tema = { tema: (impostazioni && impostazioni.theme) || 'system', tokens: (impostazioni && impostazioni.themeTokens) || {} };
+    if (!this.mostra(r.wc, c.punto, { menu: { id: m.id, ...r.menu }, cronologia: conIncolla ? m.cronologia : null, ...tema })) {
+      this.menu = null;
+      this._alContent(m, { type: msg().STRATO_MENU_CHIUSO, id: m.id });
+      return;
+    }
+    m.pronto = true;
+    for (const dati of m.coda.splice(0)) this._alloStrato('strato:aggiorna', dati);
+  }
+
+  _alloStrato(canale, dati) {
+    const v = this.vista;
+    if (!v || v.webContents.isDestroyed()) return;
+    try { v.webContents.send(canale, dati); } catch (_) {}
+  }
+
+  _alContent(m, dati) {
+    try {
+      if (m && m.frame && !m.frame.detached) m.frame.send('filo:broadcast', dati);
+    } catch (_) {}
+  }
+
+  // L'azione scelta parte nel riquadro come dopo un clic dell'utente lì: copia, schermo intero e finestre lo chiedono.
+  async _concedi(m) {
+    try {
+      await Promise.race([m.frame.executeJavaScript('void 0', true), new Promise((r) => { setTimeout(r, CONCEDI_MS); })]);
+    } catch (_) {}
+  }
+
+  _voce(m, chiave) {
+    const C = globalThis.SN_CLIPBOARD;
+    if (!C || typeof chiave !== 'string' || !chiave) return null;
+    return (m.cronologia || []).find((v) => C.chiave(v) === chiave) || null;
+  }
+
+  // Quello che lo strato chiede al main: vale per il menu a schermo, e dopo un gesto vero sullo strato.
+  async _dalloStrato(canale, d) {
+    const m = this.menu;
+    const a = this.aperto;
+    if (!m || !m.pronto || !a || !d || Number(d.seq) !== a.seq || d.id !== m.id) return;
+    const ora = Date.now();
+    if (ora - this.gestoAlle > GESTO_MS) return;
+    const unClic = ora - this.clicAlle <= GESTO_MS;
+    const M = msg();
+    if (canale === 'strato:tastiera') {
+      try { this.vista.webContents.focus(); } catch (_) {}
+      return;
+    }
+    if (canale === 'strato:esegui') {
+      if (d.inline != null) {
+        const cammino = interi(d.cammino);
+        if (!unClic || !Number.isInteger(d.inline) || !cammino) return;
+        this._alContent(m, { type: M.STRATO_MENU_ESEGUI, id: m.id, inline: d.inline, cammino });
+        return;
+      }
+      if (!Number.isInteger(d.n) || d.n < 0) return;
+      const args = Array.isArray(d.args) && pesa(d.args) <= AGGIORNA_MAX_BYTE ? d.args : [];
+      const chiude = d.chiude === true;
+      const esegui = { type: M.STRATO_MENU_ESEGUI, id: m.id, n: d.n, args, chiude };
+      if (!chiude) { this._alContent(m, esegui); return; }
+      if (!unClic) return;
+      await this._concedi(m);
+      if (this.menu === m) this.nascondi({ dopo: () => this._alContent(m, esegui) });
+      return;
+    }
+    if (!unClic) return;
+    if (canale === 'strato:incolla') {
+      const s = this.scheda(m.wc);
+      const letti = s ? await comeFilo(this.win, null, { type: M.APPUNTI_DI_FILO }, { id: s.id, url: s.url, wc: m.wc }) : null;
+      if (this.menu !== m) return;
+      await this._concedi(m);
+      if (this.menu !== m) return;
+      const incolla = letti && letti.ok
+        ? { type: M.STRATO_MENU_INCOLLA, id: m.id, testo: String(letti.testo || ''), immagine: String(letti.immagine || '') }
+        : { type: M.STRATO_MENU_INCOLLA, id: m.id, testo: '', immagine: '' };
+      this.nascondi({ dopo: () => this._alContent(m, incolla) });
+      return;
+    }
+    const voce = this._voce(m, d.chiave);
+    const vista = this.vista && this.vista.webContents;
+    if (canale === 'strato:scegli' && voce) {
+      await comeFilo(this.win, vista, { type: M.PUSH_CLIPBOARD_ENTRY, entry: voce });
+      if (this.menu !== m) return;
+      await this._concedi(m);
+      if (this.menu === m) this.nascondi({ dopo: () => this._alContent(m, { type: M.STRATO_MENU_INCOLLA, id: m.id, voce }) });
+      return;
+    }
+    if (canale === 'strato:togli' && voce) {
+      const C = globalThis.SN_CLIPBOARD;
+      m.cronologia = m.cronologia.filter((v) => C.chiave(v) !== d.chiave);
+      await comeFilo(this.win, vista, { type: M.REMOVE_CLIPBOARD_ENTRY, entry: voce });
+      return;
+    }
+    if (canale === 'strato:svuota') {
+      m.cronologia = [];
+      await comeFilo(this.win, vista, { type: M.CLEAR_CLIPBOARD_HISTORY });
+    }
+  }
+
+  // Un'icona trascinata dal menu dello strato verso la barra laterale: i px dello strato sono quelli della scheda.
+  _versoLaBarra(d) {
+    const m = this.menu;
+    const barra = this.barra();
+    const s = m && this.scheda(m.wc);
+    if (!m || !m.pronto || !barra || !s || !d || Date.now() - this.gestoAlle > GESTO_MS) return { ok: false };
+    const fase = String(d.fase || '');
+    if (!['inizio', 'sopra', 'posa', 'fine'].includes(fase)) return { ok: false };
+    const num = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+    const dati = { fase, id: String(d.id || ''), menuSinistra: num(d.menuSinistra), x: num(d.x), y: num(d.y) };
+    try { return barra.dallaScheda(dati, s.id, { zoom: 1 }); } catch (_) { return { ok: false }; }
+  }
+
+  mostra(wc, punto, dati = {}) {
     if (!acceso() || !wc || wc.isDestroyed() || !this.win || this.win.isDestroyed()) return false;
     let davanti = null;
     try { davanti = this.schedaAttiva(); } catch (_) { davanti = null; }
@@ -74,20 +307,27 @@ class StratoDelMenu {
     vista.setBounds(area);
     this.inCima();
     vista.setVisible(true);
-    try { vista.webContents.send('strato:mostra', { seq: this.aperto.seq, x: p.x, y: p.y }); } catch (_) {}
+    try { vista.webContents.send('strato:mostra', { ...dati, seq: this.aperto.seq, x: p.x, y: p.y }); } catch (_) {}
     return true;
   }
 
-  nascondi() {
-    if (!this.aperto) return;
-    this.aperto = null;
-    const vista = this.vista;
-    if (!vista || vista.webContents.isDestroyed()) return;
-    const aveva = this._haTastiera();
-    vista.setVisible(false);
-    vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-    try { vista.webContents.send('strato:via'); } catch (_) {}
-    if (aveva) this._restituisci();
+  // `dopo`: l'azione scelta, consegnata quando la tastiera è già tornata alla scheda e prima che il menu si dica chiuso.
+  nascondi({ dopo = null } = {}) {
+    const m = this.menu;
+    this.menu = null;
+    if (this.aperto) {
+      this.aperto = null;
+      const vista = this.vista;
+      if (vista && !vista.webContents.isDestroyed()) {
+        const aveva = this._haTastiera();
+        vista.setVisible(false);
+        vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+        try { vista.webContents.send('strato:via'); } catch (_) {}
+        if (aveva) this._restituisci();
+      }
+    }
+    if (typeof dopo === 'function') { try { dopo(); } catch (_) {} }
+    if (m) this._alContent(m, { type: msg().STRATO_MENU_CHIUSO, id: m.id });
   }
 
   // Dal layout delle schede: un'altra scheda davanti, o la sua area cambiata (schermo intero, barra compatta,
@@ -179,10 +419,21 @@ class StratoDelMenu {
     wc.on('will-navigate', (e) => e.preventDefault());
     collegaScorciatoie(wc, this.win);
     wc.on('before-input-event', (e, input) => { if (this.tasto(input)) e.preventDefault(); });
+    // Il gesto vero sullo strato lo vede il main: è quello che fa valere una voce, non quello che la pagina dichiara.
+    wc.on('input-event', (_e, input) => {
+      const t = input && input.type;
+      this.gestoAlle = Date.now();
+      if (t === 'mouseDown' || t === 'mouseUp' || t === 'keyDown' || t === 'rawKeyDown') this.clicAlle = this.gestoAlle;
+    });
     wc.on('ipc-message', (_e, canale, dati) => {
       // Un clic fuori dal menu chiude e basta: lo strato copre la scheda, e alla pagina sotto non arriva.
-      if (canale === 'strato:fuori' && this.aperto && Number(dati && dati.seq) === this.aperto.seq) this.nascondi();
+      if (canale === 'strato:fuori') {
+        if (this.aperto && Number(dati && dati.seq) === this.aperto.seq) this.nascondi();
+        return;
+      }
+      if (/^strato:(esegui|incolla|scegli|togli|svuota|tastiera)$/.test(canale)) this._dalloStrato(canale, dati).catch(() => {});
     });
+    try { wc.ipc.handle('strato:barra', (_e, dati) => this._versoLaBarra(dati)); } catch (_) {}
     wc.once('did-finish-load', () => {
       // I px dello strato devono essere quelli del punto: uno zoom rimasto sull'host «menu» li sposterebbe.
       try { wc.setZoomFactor(1); } catch (_) {}

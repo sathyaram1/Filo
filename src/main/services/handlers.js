@@ -6500,6 +6500,7 @@ const handlerCtx = {
 
 require('./handlers/nav')(on, handlerCtx);
 require('./handlers/barra')(on, handlerCtx);
+require('./handlers/stratoMenu')(on, handlerCtx); // #1054 — il menu del tasto destro nello strato sopra la scheda
 require('./handlers/tabs')(on, handlerCtx);
 require('./handlers/storage')(on, handlerCtx);
 require('./handlers/pages')(on, handlerCtx);

@@ -464,6 +464,8 @@ class TabManager {
         const t = schedaDavanti();
         return t && t.view && !this._attivaNascosta ? t.view.getBounds() : null;
       },
+      scheda: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return t ? { id: t.id, url: t.url } : null; },
+      barra: () => this.barra || null,
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
@@ -3114,7 +3116,7 @@ class TabManager {
     // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
     // content script perché li mostri nel menu di correzione custom.
     wc.on('context-menu', (_e, params) => {
-      if (this.strato.acceso) this.strato.mostra(wc, { x: params.x, y: params.y });
+      if (this.strato.acceso) this.strato.segnaClic(wc, params);
       if (params.misspelledWord) {
         // #405 — il click destro può essere avvenuto dentro un riquadro
         // incorporato (iframe): il menu di correzione lo costruisce il content
