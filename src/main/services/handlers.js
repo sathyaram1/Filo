@@ -1032,16 +1032,19 @@ async function maybeRunCompactor() {
       intera: true,
     });
     const text = (r?.text || '').trim();
+    const versione = meta.versione || 0;
+    let applicata;
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
-      await FiloMem.applicaCompattazione({ patch: {}, usate: buf, inizio });
-      return true;
+      applicata = await FiloMem.applicaCompattazione({ patch: {}, usate: buf, versione });
+    } else {
+      const letto = Q.leggiCompattatore(FiloMem.parseCompactorOutput(text), {
+        rif, meta, tolte: meta.nascoste, ora: inizio,
+      });
+      if (letto.scartate.length) console.warn(`[Filo] compattatore: ${letto.scartate.length} righe tolte dall'utente non rimesse`);
+      applicata = await FiloMem.applicaCompattazione({ patch: letto.patch, righe: letto.righe, usate: buf, versione });
     }
-    const letto = Q.leggiCompattatore(FiloMem.parseCompactorOutput(text), {
-      rif, meta, tolte: meta.nascoste, ora: inizio,
-    });
-    if (letto.scartate.length) console.warn(`[Filo] compattatore: ${letto.scartate.length} righe tolte dall'utente non rimesse`);
-    await FiloMem.applicaCompattazione({ patch: letto.patch, righe: letto.righe, usate: buf, inizio });
-    return true;
+    if (!applicata) console.warn('[Filo] compattatore: l\'utente ha cambiato la memoria mentre lavorava, riparte al giro dopo');
+    return applicata;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
     return false;
