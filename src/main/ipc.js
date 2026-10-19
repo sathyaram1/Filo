@@ -210,6 +210,17 @@ function registerIpcHandlers() {
     require('./services/permessiPagine').aperturaScelta(event.sender, url);
     event.returnValue = true;
   });
+  // #965 — il clic su un link «scarica» verso un file da avviso: vero se l'avviso lo ferma prima che parta.
+  ipcMain.on('filo:scaricamento-scelto', (event, url, nome) => {
+    let fermo = false;
+    try {
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      const tab = win && win._filoTabs.tabs.find((t) => t.view.webContents === wc);
+      if (tab) fermo = win._filoTabs._sbScaricamentoScelto(tab, String(url || ''), String(nome || '')) === true;
+    } catch (_) {}
+    event.returnValue = fermo;
+  });
   ipcMain.on('filo:indirizzo-rifiutato', (event, url) => {
     try {
       const wc = event.sender;

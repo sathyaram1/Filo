@@ -945,7 +945,7 @@ class TabManager {
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
   // `adotta`: { webContents, partition, sito } della finestra che una pagina ha aperto e tiene; si carica da sé.
   // `rinvia`: la scheda dietro nasce senza caricarsi; la carica la coda della riapertura, o chi la apre (_caricaRinviata).
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false, invio = null } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -1091,7 +1091,11 @@ class TabManager {
     if (daGesto) view.webContents._filoGestoAlle = Date.now();
     if (rinviata) tab._rinviata = true;
     else if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
-    else if (!adotta && !pronta) view.webContents.loadURL(url);
+    // `invio`: i dati di un modulo da mandare con l'apertura (un invio fermato dall'avviso e confermato, #965).
+    else if (!adotta && !pronta) view.webContents.loadURL(url, invio && Array.isArray(invio.data) ? {
+      postData: invio.data,
+      extraHeaders: `Content-Type: ${invio.contentType || 'application/x-www-form-urlencoded'}${invio.boundary ? `; boundary=${invio.boundary}` : ''}`,
+    } : undefined);
     // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei.
     if (adotta) {
       const wc = view.webContents;
@@ -2569,6 +2573,11 @@ class TabManager {
         event.preventDefault();
         return;
       }
+      // #965 — un link da avviso non si apre prima dell'avviso, che compare qui, sulla pagina da cui parte.
+      if (this._sbPrimaDelClic(tab, url, (segna) => { segna(tab); this._sbRifaiDallaPagina(tab, 'SN_RIFAI_INVIO', url, () => this.navigate(tab.id, url)); })) {
+        event.preventDefault();
+        return;
+      }
       if (this._needsRecreate(tab, url)) {
         event.preventDefault();
         this._recreateView(tab, url, { nuova: true });
@@ -2993,7 +3002,7 @@ class TabManager {
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab' });
+          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null });
         }).catch(() => {});
         return { action: 'deny' };
       }
@@ -3036,12 +3045,6 @@ class TabManager {
         this._notifyPopupBlocked(tab.id, url, wc);
         return { action: 'deny' };
       }
-      if (accesso && gesto) {
-        if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
-        // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
-        // finestrella diventa una scheda, dove l'avviso c'è.
-        if (!tab.sbAvviso) return this._allowAuthPopup(url, details.features);
-      }
       // #170.3 — la lista dei siti bloccati la applica openTab; un «Apri comunque»
       // dato qui vale anche per le schede che apre sullo stesso sito.
       // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
@@ -3062,6 +3065,18 @@ class TabManager {
         const nuova = this.tabs.find((t) => t.id === aperta);
         if (nuova) nuova._sbApertaDa = tab._urlNavigato;
       };
+      // #965 — un link da avviso non si apre prima dell'avviso, sulla pagina da cui parte; confermato, in una scheda.
+      if (this._sbPrimaDelClic(tab, url, (segna) => {
+        const id = this.openTab(url, { ...opzioni, invio: details.postBody || null });
+        daLei(id);
+        segna(this.tabs.find((t) => t.id === id));
+      })) return { action: 'deny' };
+      if (accesso && gesto) {
+        if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
+        // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
+        // finestrella diventa una scheda, dove l'avviso c'è.
+        if (!tab.sbAvviso) return this._allowAuthPopup(url, details.features);
+      }
       // La finestra resta in mano alla pagina che l'ha chiesta (la riempie, la porta altrove, la chiude), come in un
       // browser; si può solo se la scheda nuova starebbe nella sua stessa partizione, altrove nasce staccata.
       if (this._finestraDellaPagina(tab, url, opzioni.apriComunque)) {
@@ -3417,10 +3432,17 @@ class TabManager {
 
   // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
   // siti in blacklist fermati come un clic, il resto in una scheda nuova.
-  apriDaCollegamento(url, { sfondo = false } = {}) {
+  // `daScheda`: la pagina dove l'utente ha scelto il link (menu di riserva, una pagina di Filo, l'assistente sopra una
+  // pagina), dove compare l'avviso che lo precede (#965).
+  apriDaCollegamento(url, { sfondo = false, daScheda = null } = {}) {
     if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
-    this.openTab(url, { activate: !sfondo, openedByLink: true });
+    const apri = (segna) => {
+      const id = this.openTab(url, { activate: !sfondo, openedByLink: true });
+      if (segna) segna(this.tabs.find((t) => t.id === id));
+    };
+    if (daScheda && this._sbPrimaDelClic(daScheda, url, apri, { daFilo: true })) return true;
+    apri();
     return true;
   }
 

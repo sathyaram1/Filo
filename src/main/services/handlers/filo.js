@@ -118,6 +118,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // #965 — la scheda da cui parte un collegamento che Filo apre per lei: l'avviso di un sito da avviso compare lì, prima.
+  const schedaDi = (tm, sender) => (tm && tm.tabs.find((t) => t.id === sender?.tab?.id && t.view && t.view.webContents === sender.wc)) || null;
+
   // Un indirizzo che un modello ha proposto in una pagina di Filo (un collegamento in una risposta, anche di posta, un
   // bottone, un suggerimento della home) si apre solo dopo la porta delle uscite (#810). La frase torna a chi ha cliccato.
   on(MSG.FILO_APRI_PROPOSTA, async (msg, sender, origin) => {
@@ -127,7 +130,14 @@ module.exports = function register(on, ctx) {
     if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const win = winOf(sender);
     const r = await apriDaFilo(url, {
-      wc: sender?.wc, parole: paroleDa(msg), avvisa: false, apri: () => { if (win?._filoTabs) win._filoTabs.openTab(url); },
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: false,
+      apri: () => {
+        const tm = win?._filoTabs;
+        if (!tm) return;
+        const apri = (segna) => { const id = tm.openTab(url); if (segna) segna(tm.tabs.find((t) => t.id === id)); };
+        const da = schedaDi(tm, sender);
+        if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
+      },
       chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true,
     });
     return { ok: true, ...r };
@@ -144,7 +154,7 @@ module.exports = function register(on, ctx) {
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
-      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo) }); },
+      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender) }); },
     });
     return { ok: true, ...r, avvisato };
   });

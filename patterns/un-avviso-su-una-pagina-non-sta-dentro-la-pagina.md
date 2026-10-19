@@ -74,6 +74,17 @@ tasto destro di Filo restava sotto la modale, inerte.
   falso allarme — si fa in una scheda di Filo che se lo prende all'apertura
   (`CASA_RICHIESTA`, una volta sola): un pannello nella pagina starebbe sotto
   l'avviso, e se fosse sopra la pagina sentirebbe quello che ci si scrive.
+- **Un link da avviso si ferma prima di aprirsi** (#965). I link della pagina
+  passano dai soli controlli locali appena compaiono (`SAFEBROWSE_LINKS`, a
+  lotti e a fette; il verdetto resta nel main, per scheda), e al clic lo stesso
+  avviso copre la pagina da cui il link parte, con `prima` nello stato. Tutte le
+  porte di un clic passano da `_sbPrimaDelClic`: stessa scheda (`will-navigate`),
+  scheda nuova o Ctrl+clic (`setWindowOpenHandler`), menu di riserva; un link
+  mai esaminato si giudica lì. «Non aprire» lo toglie e basta; la conferma fa
+  l'apertura chiesta e segna la scelta sulla scheda dove il sito si apre, così
+  non si ripete a pagina aperta. Il verdetto della pagina che risulta pulita non
+  lo toglie, un documento nuovo sì; l'avviso della pagina stessa ha la
+  precedenza. Prima del clic nessuna rete.
 - **Il «Continua» del sospetto si arma dopo un secondo**: l'avviso compare
   mentre l'utente scrive o clicca nella pagina, e quell'Invio non è per lui
   ([Una conferma non è un avviso sopra un fatto già compiuto](una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md)).
