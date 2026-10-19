@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const mk = (title, color, h = 1500) =>
   `<!doctype html><html><head><title>${title}</title>${color ? `<meta name="theme-color" content="${color}">` : ''}</head>`
@@ -295,8 +296,8 @@ test('una bozza incollata in un editor ricco, con Ctrl+V o con «Incolla» di Fi
   const menu = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Menu</title></head><body>${EDITOR_RICCO}</body></html>`));
   await menu.locator('#ed').click();
   await menu.locator('#ed').click({ button: 'right' });
-  await expect(menu.locator('.sn-menu')).toBeVisible();
-  await menu.locator('.sn-menu').getByText('Incolla', { exact: true }).first().click();
+  await expect(menuDi(menu).locator('.sn-menu')).toBeVisible();
+  await menuDi(menu).locator('.sn-menu').getByText('Incolla', { exact: true }).first().click();
   await expect(menu.locator('#ed')).toHaveText(TESTO);
   await expect.poll(() => moduloDi(shell, 'Menu'), { timeout: 8_000 }).toBe(true);
 
@@ -512,8 +513,8 @@ test('un numero o una data messi dai pulsanti della pagina non proteggono la sch
   const nota = await apriEsatta(app, shell, testServer.html('<!doctype html><html><head><title>Nota</title></head><body><textarea id="t" style="width:300px;height:80px"></textarea></body></html>'));
   await nota.locator('#t').click();
   await nota.locator('#t').click({ button: 'right' });
-  await expect(nota.locator('.sn-menu')).toBeVisible();
-  await nota.locator('.sn-menu').getByText('Incolla', { exact: true }).first().click();
+  await expect(menuDi(nota).locator('.sn-menu')).toBeVisible();
+  await menuDi(nota).locator('.sn-menu').getByText('Incolla', { exact: true }).first().click();
   await expect(nota.locator('#t')).toHaveValue(TESTO);
   await expect.poll(() => moduloDi(shell, 'Nota'), { timeout: 8_000 }).toBe(true);
 
