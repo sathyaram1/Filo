@@ -66,11 +66,17 @@
   // nel compito un verbo dell'azione e un nome di ciò che tocca, parole intere con un errore di battitura ammesso.
   // Una parola sola detta per altro («la lista della spesa», «riassumi questa pagina») non è una richiesta. `frasi`
   // bastano da sole: sono già l'azione («annulla», «dimentica tutto»). Mai il testo del modello: lo decide `ctx.richiesta`.
-  const VERBI_CAMBIO = ['alz', 'aument', 'abbass', 'mett', 'impost', 'cambi', 'tog', 'spegn', 'disattiv', 'attiv', 'accend',
-    'aggiung', 'rimuov', 'disabilit', 'abilit', 'sblocc', 'lev', 'port', 'pass', 'usa', 'usi', 'fid', 'consent', 'permett',
-    'scegli', 'torn', 'riport', 'inser', 'salv'];
-  const VERBI_CANCELLA = ['cancell', 'elimin', 'svuot', 'azzer', 'reset', 'pulisc', 'pulir', 'tog', 'butt', 'rimuov', 'dimentic',
-    'scord', 'distrugg'];
+  // Radici di verbi: valgono solo con una desinenza da verbo («cambia», «mettiti», «cancellare»), così «cambio» o
+  // «impostazioni» non sono una richiesta.
+  const VERBI_CAMBIO = ['alz', 'aument', 'abbass', 'mett', 'impost', 'cambi', 'togl', 'togli', 'spegn', 'disattiv', 'attiv',
+    'accend', 'aggiung', 'rimuov', 'disabilit', 'abilit', 'sblocc', 'lev', 'port', 'pass', 'us', 'fid', 'consent', 'permett',
+    'scegl', 'torn', 'riport', 'inser', 'salv'];
+  const VERBI_CANCELLA = ['cancell', 'elimin', 'svuot', 'azzer', 'reset', 'resett', 'pulisc', 'pul', 'togl', 'togli', 'butt',
+    'rimuov', 'dimentic', 'scord', 'distrugg'];
+  const DESINENZE = new Set(['', 'a', 'i', 'e', 'are', 'ere', 'ire', 'iamo', 'ate', 'ete', 'ite', 'isci', 'isca', 'ando', 'endo']);
+  const ENCLITICHE = ['', 'mi', 'ti', 'lo', 'la', 'li', 'le', 'ci', 'vi', 'ne', 'gli', 'glielo', 'gliela', 'melo', 'mela', 'telo'];
+  const verbo = (w, radice) => w.startsWith(radice)
+    && ENCLITICHE.some((e) => { const r = w.slice(radice.length); return r.endsWith(e) && DESINENZE.has(r.slice(0, r.length - e.length)); });
   const PAROLE_COMUNI = new Set(['della', 'delle', 'degli', 'dello', 'nella', 'nelle', 'sulla', 'quanto', 'solo', 'sempre',
     'tutto', 'tutti', 'tutte', 'filo', 'fare', 'cosa', 'cose', 'anche', 'come', 'questo', 'questa', 'quello', 'quella',
     'imposta', 'attiva', 'disattiva', 'accendi', 'spegni', 'aggiungi', 'togli', 'alza', 'abbassa', 'nuovo', 'nuova', 'true',
