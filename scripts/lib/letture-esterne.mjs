@@ -61,7 +61,7 @@ export function matcherDelGancio() {
 }
 
 // ToolSearch porta le descrizioni scritte da chi fa i server MCP: non sporca solo quando chiede per nome strumenti di
-// Claude o MCP fra i puliti, che descrive chi è già fidato per le loro risposte.
+// Claude, o MCP fra i puliti (la descrizione la scrive chi è già fidato per la risposta).
 function cercaSoloStrumentiDiClaude(query) {
   const m = /^\s*select:([\s\S]*)$/.exec(String(query || ''));
   const nomi = m ? m[1].split(',').map((s) => s.trim()) : [];
