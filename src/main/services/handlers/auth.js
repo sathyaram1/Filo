@@ -629,6 +629,48 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // La chiave privata dei feedback (#1042): stato, caricamento da un file e oblio. Il file lo sceglie la finestra
+  // del main e lo legge il main: alla pagina tornano solo stato ed esiti, mai la chiave.
+  on(MSG.FEEDBACK_CHIAVE_STATO, ownerOnly(async () => ({ ok: true, ...ChiaveFeedback.stato() })));
+
+  on(MSG.FEEDBACK_CHIAVE_CARICA, ownerOnly(async (_msg, sender) => {
+    const prima = ChiaveFeedback.stato();
+    if (!prima.custodibile) return { ok: false, error: prima.motivo, ...prima };
+    const { dialog, BrowserWindow } = require('electron');
+    const win = (sender && sender.win) || BrowserWindow.getFocusedWindow() || undefined;
+    let scelta;
+    try {
+      // `showHiddenFiles`: su Mac e Linux il .env che la contiene è un file nascosto.
+      scelta = await dialog.showOpenDialog(win, {
+        title: 'Il file con la chiave privata dei feedback',
+        properties: ['openFile', 'showHiddenFiles'],
+      });
+    } catch (e) {
+      console.warn('[chiave feedback] finestra di scelta non aperta:', e?.message || e);
+      return { ok: false, error: 'La finestra per scegliere il file non si è aperta: riprova.' };
+    }
+    if (!scelta || scelta.canceled || !Array.isArray(scelta.filePaths) || !scelta.filePaths[0]) {
+      return { ok: false, canceled: true };
+    }
+    const r = await ChiaveFeedback.caricaDaFile(scelta.filePaths[0]);
+    if (!r.ok) return { ok: false, error: r.error };
+    chiaveCambiata();
+    return { ok: true, ...ChiaveFeedback.stato() };
+  }));
+
+  on(MSG.FEEDBACK_CHIAVE_DIMENTICA, ownerOnly(async () => {
+    const r = ChiaveFeedback.dimentica();
+    if (!r.ok) return { ok: false, error: r.error };
+    chiaveCambiata();
+    return { ok: true, ...ChiaveFeedback.stato() };
+  }));
+
+  // Ogni pagina che elenca feedback rilegge da sé; la bacheca, ferma senza chiave, si rimette in pari.
+  function chiaveCambiata() {
+    avvisaLeSuperficiDiFilo({ type: MSG.FEEDBACK_CHIAVE_CAMBIATA });
+    if (auth.isAdmin()) scheduleViewSync({ delayMs: 1500, force: true });
+  }
+
   // Config "modelli predefiniti" condivisa. La lettura (per l'editor admin)
   // NON espone le chiavi vere, solo se sono configurate. La scrittura è
   // riservata agli admin (Firebase ID token come Bearer): le regole Firestore
