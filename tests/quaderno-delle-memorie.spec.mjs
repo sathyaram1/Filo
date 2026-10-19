@@ -158,6 +158,11 @@ test('a parole «non sono vegetariano, sono vegano»: la riga cambia e tiene le 
     ];
   });
   await turno(app, 'chat-correzione', 'non sono vegetariano, sono vegano');
+  // Correggere una riga che entra in ogni prompt costa 2: senza guardiano chiede l'OK (#1312), poi cambia.
+  expect((await memoria(app)).PREFERENZE).toBe('È vegetariano');
+  const ok = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'CORREGGI_MEMORIA', testo: 'vegetariano', nuovo: 'È vegano' }, { confirmed: true }));
+  expect(ok.executed).toBe(true);
   await expect.poll(async () => (await memoria(app)).PREFERENZE, { timeout: 10_000 }).toBe('È vegano');
   const dopo = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.quaderno()).moduli.find((m) => m.nome === 'PREFERENZE').righe[0]);
   expect(dopo.fonti).toEqual(prima);

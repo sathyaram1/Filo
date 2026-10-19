@@ -394,7 +394,7 @@
       required: [],
     },
     CANCELLA_MEMORIA: {
-      description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Filo non lo fa da solo a nessun livello di autonomia: il sistema risponde di no e ti dice dove l\'utente può farlo lui. NON dichiarare mai di averlo fatto.',
+      description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Solo se l\'utente lo chiede con parole sue: il sistema gli fa scrivere «conferma» a ogni livello di autonomia, e se non l\'ha chiesto risponde di no. Non dichiarare di averlo fatto finché l\'esito non lo dice.',
       properties: {},
       required: [],
     },

@@ -11,6 +11,8 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Il livello di autonomia lo cambi anche chiedendolo a Filo, per esempio «mettiti a Conservativo». Abbassarlo vale subito. Alzarlo vuole che tu scriva «conferma», come alzare il limite di spesa, aggiungere un sito fidato o spegnere una protezione, e Filo lo fa solo se gliel\'hai chiesto tu.',
+        'Puoi chiedere a Filo di cancellare tutta la sua memoria in un colpo: ti fa scrivere «conferma» e la svuota.',
         'Nelle Opzioni, sotto «Host dei modelli», scegli se i modelli rispondono dagli host più veloci, da quelli che cominciano a rispondere prima o dai più economici. Lo puoi chiedere anche a Filo, per esempio «voglio la chat più veloce». I fornitori esclusi restano esclusi.',
         'Il pulsante «Prova» dei modelli predefiniti misura il modello come lo useresti davvero e la misura resta: riapri la pagina e ritrovi latenza e velocità. Se cambi modello o host la misura sparisce, e se non è di oggi porta la sua data.',
         'C\'è il quaderno delle memorie, dove leggi quello che Filo ha capito di te, riga per riga, col giorno in cui l\'ha imparato. Un clic sulla data ti porta al messaggio da cui è nato. Se una riga è sbagliata la correggi, e Filo usa la tua versione dal messaggio dopo. Se la togli non torna più da quella conversazione, e la ritrovi fra le nascoste se cambi idea. Lo apri da «Memorie» nella barra laterale, oppure chiedi a Filo «cosa sai di me?». Prende il posto della Cronologia: chat e schede chiuse, anche quelle di mesi fa, le trovi nel filo della home cercandole dal campo in cima.',
@@ -26,6 +28,10 @@
         'Quando chiedi a Filo di segnarti un appuntamento, il bottone «Aggiungi al calendario» ora funziona davvero: apre l’evento nel calendario del tuo computer, con giorno, ora, durata e note già scritti. Un compleanno o una scadenza, che un’ora non ce l’hanno, entrano come evento di tutto il giorno, le ferie occupano tutti i loro giorni e un viaggio arriva fino al giorno del ritorno. Se le date non tornano, Filo ti dice cosa non va. Prima il bottone era spento e la proposta non portava da nessuna parte.',
       ],
       fixes: [
+        'A Normale Filo ti chiede un OK prima di ricordare una cosa per sempre, installare un pacchetto dal terminale, leggere un file di configurazione fuori dalla tua cartella o aprire un link che porta tuoi dati. Prima, in una conversazione nuova, partiva da solo.',
+        'Un comando con dentro una password o una chiave, come un curl o un git clone con un token, si ferma come un link con la stessa chiave.',
+        'Quando Filo vuole aprire una pagina presentandola come una ricerca, il riquadro mostra le parole cercate solo se la pagina è davvero quella ricerca. Altrimenti mostra l\'indirizzo che si aprirà.',
+        'Un\'immagine incollata in chat, i nomi di reti Wi-Fi e dispositivi Bluetooth, i nomi nuovi proposti per i tuoi file e le pagine visitate ritrovate in una chat passata contano come testo scritto da altri: dopo averli letti Filo fa meno da solo. Delle schede aperte vede solo il nome del sito.',
         'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il testo e il nome di un documento dell\'Editor e le correzioni del Correttore.',
         'In Preferenze, Opzioni, Altro e Sicurezza la scritta «Salvato» compare per l\'ultima cosa che hai toccato, non per una modifica di prima.',
         'Quando l\'Aiuto fa dei passi da solo, come aprire una sezione dopo l\'altra, dopo 20 di fila si ferma e ti chiede se continuare. Così una pagina non può fargli spendere i tuoi crediti mentre non tocchi niente.',

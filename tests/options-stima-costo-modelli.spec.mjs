@@ -247,7 +247,7 @@ test('Chat coi modelli predefiniti: il cambio non parte e Filo sa perché, senza
   expect((await impostazioni(app)).models.filo_chat).toBe(prima);
 });
 
-test('Chat col listino lento: il cambio parte e la risposta dice che il costo non è arrivato, non tace', async ({ app, shell }) => {
+test('Chat col listino lento: confermato, il cambio parte e la risposta dice che il costo non è arrivato, non tace', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
@@ -255,11 +255,16 @@ test('Chat col listino lento: il cambio parte e la risposta dice che il costo no
   await configura(app, { chiave: 'k-test', models: { filo_chat: 'deepseek-flash' } });
   await app.evaluate(() => { globalThis.SN_WALLET_MAIN.keySource = async () => 'factory'; });
 
-  await modelloFinto(app, [cambia('Chat con Filo: opus'), { text: 'Fatto.' }]);
+  await modelloFinto(app, [cambia('Chat con Filo: opus'), { text: 'Ti chiedo conferma.' }, { text: 'Fatto.' }]);
   await scrivi(chat, 'usa opus per la chat');
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
-  await expect.poll(async () => (await impostazioni(app)).models.filo_chat, { timeout: 5_000 }).toBe('opus');
+  // Il modello di una funzione costa 2: senza guardiano chiede l'OK anche a Normale (#1312).
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 15_000 });
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
   const ritardo = /listino di OpenRouter non è arrivato in tempo/;
+  // Il riquadro e l'esito al modello lo dicono, invece di tacere il costo.
+  expect(await confirmText(chat)).toMatch(ritardo);
   expect((await app.evaluate(() => globalThis.__costo_tool)).join('\n')).toMatch(ritardo);
-  await expect(chat.locator('.dash-activity', { hasText: ritardo }).first()).toBeAttached({ timeout: 5_000 });
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'ok');
+  await expect.poll(async () => (await impostazioni(app)).models.filo_chat, { timeout: 15_000 }).toBe('opus');
 });

@@ -355,7 +355,7 @@ test('nel benvenuto il livello di autonomia si sceglie con un clic, e il clic è
   const livelli = scelta.locator('.dash-autonomia-livello');
   await expect(livelli).toHaveText(['Conservativo', 'Normale', 'Automatico']);
   await expect(scelta.locator('.dash-autonomia-livello.scelto')).toHaveText('Normale');
-  await expect(scelta.locator('.dash-autonomia-frase')).toHaveText(/ti chiede prima di ciò che non si disfa/);
+  await expect(scelta.locator('.dash-autonomia-frase')).toHaveText(/ti chiede prima di ciò che dura o non si disfa/);
   expect((await onbState(app)).done).toBe(false);
   expect((await onbState(app)).ticked).not.toContain('autonomia');
 
@@ -489,7 +489,7 @@ test('nel benvenuto lungo, il cursore fermo su un livello non fa saltare la scel
   const bottone = scelta.locator('.dash-autonomia-livello', { hasText: 'Conservativo' });
   for (const nome of ['Conservativo', 'Automatico']) {
     await scelta.locator('.dash-autonomia-livello', { hasText: nome }).hover();
-    await expect(scelta.locator('.dash-autonomia-frase')).not.toHaveText(/ti chiede prima di ciò che non si disfa/);
+    await expect(scelta.locator('.dash-autonomia-frase')).not.toHaveText(/ti chiede prima di ciò che dura o non si disfa/);
     expect(await altezza(), `il passaggio su ${nome} non cambia l'altezza della scelta`).toBe(ferma);
   }
 

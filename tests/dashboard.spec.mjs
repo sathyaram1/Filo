@@ -4,7 +4,7 @@
 import { appCondivisa } from './helpers/appCondivisa.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { home } from './helpers/chatFinta.mjs';
-import { CONFIRM_HOST, confirmState } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, clickConfirm, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -240,12 +240,15 @@ test.describe('dashboard-pulisci-command', () => {
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
   });
 
-  // #530: a Normale, in una conversazione pulita, il riordino costa 2 e parte da solo, come chiesto in chat.
+  // #1312: a Normale il riordino costa 2 e, finché manca il guardiano, chiede un OK anche in una conversazione pulita.
   // Nella home che c'è già: una seconda home aperta apposta sarebbe un doppione, e il riordino la archivierebbe.
-  test('"/pulisci" a livello Normale riordina subito, senza popup, e dice com\'è andata', async ({ app }) => {
+  test('"/pulisci" a livello Normale chiede un OK, e confermato riordina e dice com\'è andata', async ({ app }) => {
     const page = await home(app);
     await submit(page, '/pulisci');
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
+    await expect.poll(async () => (await confirmState(page)).title).toBe('Riordino delle schede');
+    await scrollConfirmToEnd(page);
+    await clickConfirm(page, 'ok');
     await expect(page.locator('body')).toContainText(/✓ (Archiviate \d+|Nessuna scheda da archiviare)/, { timeout: 15_000 });
-    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   });
 });

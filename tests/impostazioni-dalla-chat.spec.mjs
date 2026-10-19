@@ -149,10 +149,11 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   // La casella resta col fuoco mentre l'utente va in chat: da dietro nessuno ci sta scrivendo.
   await sec.locator('#sec-siteblock-blacklist').focus();
 
-  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi facebook.com'), { text: 'Ti chiedo conferma.' }]);
+  // Bloccare un sito stringe un freno: costo 1, si fa subito (#1312).
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi facebook.com'), { text: 'Bloccato.' }]);
   await scrivi(chat, 'blocca facebook.com');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
-  await expect.poll(async () => (await impostazioni(app)).security.siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'facebook.com']);
+  await expect.poll(async () => (await impostazioni(app)).security.siteBlock.blacklist, { timeout: 10_000 }).toEqual(['tiktok.com', 'facebook.com']);
+  await expect(chat.locator('.sn-confirm-host')).toHaveCount(0);
   await sec.bringToFront();
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com', { timeout: 3_000 });
 
@@ -164,10 +165,10 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   await expect.poll(async () => (await app.evaluate(() => globalThis.__imp_tool)).join('\n'), { timeout: 10_000 }).toMatch(/Niente da cambiare: .*facebook\.com c'è già/);
   expect((await impostazioni(app)).security.siteBlock.blacklist).toEqual(['tiktok.com', 'facebook.com']);
 
-  await modelloFinto(app, [imposta('segnalazione_automatica', 'no', 'i3'), { text: 'Ti chiedo conferma.' }]);
+  // Spegnere la segnalazione automatica manda fuori meno: stringe, costo 1, si fa subito (#1312).
+  await modelloFinto(app, [imposta('segnalazione_automatica', 'no', 'i3'), { text: 'Spenta.' }]);
   await scrivi(chat, 'spegni la segnalazione automatica');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
-  await expect.poll(async () => (await impostazioni(app)).security.autoFeedback, { timeout: 5_000 }).toBe(false);
+  await expect.poll(async () => (await impostazioni(app)).security.autoFeedback, { timeout: 10_000 }).toBe(false);
   await sec.bringToFront();
   await expect(sec.locator('#sec-auto-feedback')).not.toBeChecked({ timeout: 3_000 });
 
@@ -287,14 +288,12 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
 
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
   await scrivi(chat, 'blocca a.it');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
-  await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
+  await expect.poll(blacklist, { timeout: 10_000 }).toEqual(['a.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
 
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
   await scrivi(chat, 'blocca b.it');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
-  await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);
+  await expect.poll(blacklist, { timeout: 10_000 }).toEqual(['a.it', 'b.it']);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato b.it.' })).toBeVisible({ timeout: 10_000 });
 
   const bolla = chat.locator('.dash-bubble-user', { hasText: 'blocca a.it' });
@@ -336,7 +335,7 @@ test('H — un valore che non si applica non chiede un OK a vuoto, e il perché 
 // #835 — la Sicurezza si stringe a parole. A Conservativo accendere una protezione chiede un OK e Annulla non cambia
 // niente; bloccare un sito lo aggiunge agli altri; allentare (sbloccare, spegnere il giudizio AI) senza «conferma» non
 // cambia niente; togliere un sito fidato lascia gli altri.
-test('I — «accendi il blocco della pubblicità», «blocca example.org», «sblocca» e «spegni il giudizio AI» annullati, «non fidarti più dei download da»', async ({ app, shell, openTab }) => {
+test('I — «accendi il blocco della pubblicità», «blocca example.org» e «non fidarti più dei download da» stringono e si fanno subito; «sblocca» e «spegni il giudizio AI» vogliono la parola', async ({ app, shell, openTab }) => {
   await livelloAutonomia(app, 'conservativo');
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -356,27 +355,18 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
     return confirmState(chat);
   };
 
-  await modelloFinto(app, [imposta('blocco_pubblicita', 'accendi', 'a1'), { text: 'Ti chiedo un OK.' }]);
+  // Accendere una protezione stringe un freno: costo 1, si fa subito anche a Conservativo (#1312).
+  await modelloFinto(app, [imposta('blocco_pubblicita', 'accendi', 'a1'), { text: 'Acceso.' }]);
   await scrivi(chat, 'accendi il blocco della pubblicità');
-  expect((await domanda('Blocco di pubblicità e tracker → attivo')).hasInput, 'accendere una protezione non chiede la parola').toBeFalsy();
-  await clickConfirm(chat, 'cancel');
-  await chiuso();
-  expect((await sicurezza()).adblock.enabled).toBe(false);
-  await expect(sec.locator('#sec-adblock')).not.toBeChecked();
-
-  await modelloFinto(app, [imposta('blocco_pubblicita', 'accendi', 'a2'), { text: 'Ti chiedo un OK.' }]);
-  await scrivi(chat, 'accendi il blocco della pubblicità');
-  await domanda('Blocco di pubblicità e tracker → attivo');
-  await clickConfirm(chat, 'ok');
-  await expect.poll(async () => (await sicurezza()).adblock.enabled, { timeout: 5_000 }).toBe(true);
+  await expect.poll(async () => (await sicurezza()).adblock.enabled, { timeout: 10_000 }).toBe(true);
+  expect(await confirmState(chat)).toBeNull();
   await sec.bringToFront();
   await expect(sec.locator('#sec-adblock')).toBeChecked({ timeout: 3_000 });
 
-  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi example.org', 'a3'), { text: 'Ti chiedo un OK.' }]);
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi example.org', 'a3'), { text: 'Bloccato.' }]);
   await scrivi(chat, 'blocca example.org');
-  await domanda('Siti bloccati → aggiungi example.org');
-  await clickConfirm(chat, 'ok');
-  await expect.poll(async () => (await sicurezza()).siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'facebook.com', 'example.org']);
+  await expect.poll(async () => (await sicurezza()).siteBlock.blacklist, { timeout: 10_000 }).toEqual(['tiktok.com', 'facebook.com', 'example.org']);
+  expect(await confirmState(chat)).toBeNull();
   await sec.bringToFront();
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com\nexample.org', { timeout: 3_000 });
 
@@ -398,11 +388,10 @@ test('I — «accendi il blocco della pubblicità», «blocca example.org», «s
   await chiuso();
   expect((await sicurezza()).safeBrowse.llmJudge).toBe(true);
 
-  await modelloFinto(app, [imposta('siti_fidati_programmi', 'togli example.org', 'a6'), { text: 'Ti chiedo un OK.' }]);
+  await modelloFinto(app, [imposta('siti_fidati_programmi', 'togli example.org', 'a6'), { text: 'Tolto.' }]);
   await scrivi(chat, 'non fidarti più dei download da example.org');
-  expect((await domanda('Siti fidati per i programmi → togli example.org')).hasInput).toBeFalsy();
-  await clickConfirm(chat, 'ok');
-  await expect.poll(async () => (await sicurezza()).downloads.trustedSites, { timeout: 5_000 }).toEqual(['github.com']);
+  await expect.poll(async () => (await sicurezza()).downloads.trustedSites, { timeout: 10_000 }).toEqual(['github.com']);
+  expect(await confirmState(chat)).toBeNull();
   await sec.bringToFront();
   await expect(sec.locator('#sec-dl-trusted')).toHaveValue('github.com', { timeout: 3_000 });
   await ripristina(app);

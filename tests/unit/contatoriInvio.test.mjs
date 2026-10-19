@@ -356,9 +356,10 @@ test('a Filo si chiede a parole: «contatori» e i suoi sinonimi accendono e spe
   for (const chiave of ['contatori', 'contatori anonimi', 'telemetria', 'statistiche d\'uso']) {
     const r = P.buildPreferencePartial(chiave, 'no');
     assert.deepEqual(r && r.partial, { contatori: { attivi: false } }, chiave);
-    assert.equal(r.costo, 2);
+    assert.equal(r.costo, 1, 'spegnerli manda fuori meno: stringe (#1312)');
     assert.ok(r.risk);
   }
   assert.deepEqual(P.buildPreferencePartial('contatori', 'sì').partial, { contatori: { attivi: true } });
+  assert.equal(P.buildPreferencePartial('contatori', 'sì').costo, 2, 'riaccenderli chiede un OK');
   assert.deepEqual(globalThis.SN_CONST.DEFAULT_SETTINGS.contatori, { attivi: true }, 'accesi di serie (D52)');
 });

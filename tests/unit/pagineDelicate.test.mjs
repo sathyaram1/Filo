@@ -95,8 +95,8 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   assert.equal(r.costo, 1);
   const p = P.buildPreferencePartial('pagine_delicate', 'spento');
   assert.deepEqual(p.partial, { security: { pagineDelicate: { enabled: false } } });
-  assert.equal(p.costo, 2);
-  assert.equal(p.allenta, true, 'spegnere la protezione abbassa una difesa (#530)');
+  assert.equal(p.costo, 4, 'spegnere la protezione toglie un freno: costo 4 (#1312)');
+  assert.equal(p.allenta, true);
   assert.match(p.risk, /saldi, movimenti, mail e referti/);
   const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
   assert.deepEqual(s.elenco.voci, ['studiorossi.it']);

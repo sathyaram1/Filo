@@ -113,9 +113,13 @@ test('A — appunto e lezione hanno la loro riga nel diario, e il riassunto le c
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 10_000 });
 
-  // A Normale, in un compito che ha letto solo l'utente, la lezione (costo 2) si
-  // salva da sola, senza popup (#530).
-  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  // La lezione entra in ogni conversazione: costo 2, che finché manca il guardiano
+  // passa dal popup col testo anche a Normale (#592, #1312).
+  const host = page.locator(CONFIRM_HOST);
+  await expect(host).toBeVisible({ timeout: 5_000 });
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect(host).toHaveCount(0, { timeout: 5_000 });
 
   // Il blocco c'è (prima: nessun blocco, nessuna traccia) e il riassunto dice
   // l'appunto.
@@ -773,7 +777,7 @@ test('N — il riordino delle schede che non è potuto partire non si legge come
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
-  // Da Conservativo il riordino passa dal bottone; a Normale parte da solo, ed è la seconda metà.
+  // Il riordino passa dal bottone a ogni livello finché manca il guardiano.
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }); });
 
   await fakeProvider(app, [
@@ -803,26 +807,7 @@ test('N — il riordino delle schede che non è potuto partire non si legge come
   await expect(activity.locator('.dash-activity-label')).not.toContainText('riordinato le schede');
   await restore(app, '__fakeN');
 
-  // A Normale il riordino parte dalla chat senza bottone: il diario dice che non è riuscito, e perché.
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' } }); });
-  const page2 = await newtabPage(app);
-  await fakeProvider(app, [
-    { toolCalls: [{ id: 'n2', name: 'PULISCI_TAB', arguments: '{}' }] },
-    { text: 'Ho provato a riordinare.' },
-  ], '__fakeN2');
-  await page2.locator('#input').fill('riordina le schede e archivia quelle che non servono');
-  await page2.locator('#sendBtn').click();
-  await expect(page2.locator('.dash-bubble-filo', { hasText: 'Ho provato a riordinare.' })).toBeVisible({ timeout: 15_000 });
-  const diario = page2.locator('.dash-activity').last();
-  await diario.locator('.dash-activity-head').click();
-  await expect(diario.locator('.dash-activity-body .dash-activity-row', { hasText: 'Riordino non riuscito' }))
-    .toContainText('non è riuscito a valutare le schede');
-  await expect(diario.locator('.dash-activity-label')).not.toContainText('riordinato le schede');
-  // E il modello lo sa: non risponde «nessuna scheda da archiviare».
-  const detto = await app.evaluate(() => JSON.stringify(globalThis.__fakeN2_calls.at(-1)));
-  expect(detto).not.toContain('nessuna da archiviare');
-  expect(detto).toContain('non è riuscito a valutare le schede');
-
+  // Senza guardiano nessun livello fa partire il riordino da solo (#1312): la strada senza bottone torna col guardiano.
   await app.evaluate(() => { globalThis.SN_TAB_TRIAGE_DECIDE = globalThis.__nOrig; });
-  await restore(app, '__fakeN2');
+
 });

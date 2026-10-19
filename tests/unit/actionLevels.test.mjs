@@ -55,7 +55,7 @@ test('DIMENTICA nasconde (costo 1, si rimette dal quaderno); il «per sempre» �
   assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'caffè', _righe: [] }), 1);
   assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] }), 1);
   assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3', 'a4'] }), 1);
-  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1'], per_sempre: true }), 3);
+  assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1'], per_sempre: true }), 4);
   assert.equal(AL.costoFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1'], per_sempre: 'true' }), 1, 'il main normalizza: una stringa non alza da sola');
   const d = AL.describe({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] });
   assert.ok(d.includes('L’utente non beve caffè.'));
@@ -74,9 +74,9 @@ test('NAVIGA con flag anti-esfiltrazione sale a costo 2', () => {
   assert.ok(d.includes('contiene un tuo dato'));
 });
 
-test('PULISCI_TAB è costo 2, CANCELLA_ARCHIVIO è costo 3', () => {
+test('PULISCI_TAB è costo 2, CANCELLA_ARCHIVIO (per sempre) è costo 4', () => {
   assert.equal(AL.costoFor({ type: 'PULISCI_TAB' }), 2);
-  assert.equal(AL.costoFor({ type: 'CANCELLA_ARCHIVIO', query: 'ricette' }), 3);
+  assert.equal(AL.costoFor({ type: 'CANCELLA_ARCHIVIO', query: 'ricette' }), 4);
 });
 
 test('le azioni NON registrate non hanno costo (→ il dispatch le rifiuta)', () => {
@@ -96,24 +96,29 @@ test('IMPOSTA_PREFERENZA: costo per-preferenza, non unico', () => {
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }), 1);
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'correttore', valore: 'off' }), 1);
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'categorizzazione', valore: 'on' }), 1);
-  // Modalità terminale → dà a Filo accesso alla shell: costo 2.
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' }), 2);
+  // Modalità terminale → dà a Filo accesso alla shell: toglie un freno, costo 4; spegnerla lo stringe, costo 1.
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' }), 4);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'off' }), 1);
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'shell', valore: 'bash' }), 2);
   // Preferenza sconosciuta o valore non valido → 1: il dispatch la respinge col perché, niente OK a vuoto.
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'boh', valore: 'x' }), 1);
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'fingerprint', valore: false }), 1);
 });
 
-test('IMPOSTA_PREFERENZA: impostazioni sensibili (#146.5) → costo 2', () => {
+test('IMPOSTA_PREFERENZA: impostazioni sensibili (#146.5), regola del freno (#1312): toglierlo 4, stringerlo 1', () => {
   // Sicurezza / privacy.
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'gestione_cookie', valore: 'privacy' }), 2);
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'fingerprint', valore: 'off' }), 2);
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'navigazione_sicura', valore: 'off' }), 2);
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'protezione_ip', valore: 'off' }), 2);
-  // Modelli / provider / chiavi / costi.
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'provider', valore: 'openrouter' }), 2);
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-XXXX1234' }), 2);
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '10' }), 2);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'gestione_cookie', valore: 'privacy' }), 1);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'fingerprint', valore: 'off' }), 4);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'navigazione_sicura', valore: 'off' }), 4);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'protezione_ip', valore: 'off' }), 4);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'protezione_ip', valore: 'on' }), 1);
+  // Modelli / provider / chiavi / costi: credenziali 4 sempre, il tetto di spesa secondo il valore di adesso.
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'provider', valore: 'openrouter' }), 4);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-XXXX1234' }), 4);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '10' }), 4, 'tetto attuale ignoto: alzarlo');
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '10' }, { impostazioni: { monthlyLimitEur: 20 } }), 1);
+  // Una voce che non è un freno tiene il suo costo.
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'ordine_host', valore: 'prezzo' }), 2);
 });
 
 test('INVIA_FEEDBACK è costo 2 e descrive il testo nel popup', () => {
@@ -256,7 +261,7 @@ test('proxy per-tab (#152): describe nomina il paese (etichetta) e il dominio', 
 test('ogni azione registrata ha un costo valido e una describe', () => {
   for (const [type, entry] of Object.entries(AL.REGISTRY)) {
     const costo = AL.costoFor({ type, chiave: 'tema', valore: 'scuro' });
-    assert.ok([0, 1, 2, 3].includes(costo), `${type} → costo non valido ${costo}`);
+    assert.ok([0, 1, 2, 3, 4].includes(costo), `${type} → costo non valido ${costo}`);
     assert.equal(typeof entry.describe, 'function', `${type} senza describe`);
   }
 });
@@ -389,5 +394,5 @@ test('lo stile del benvenuto si imposta senza riquadro solo col segno del main (
   // Il segno vale solo per uno stile da impostare: non per toglierlo, non per un'altra preferenza, non se è un vero sì scritto dal modello.
   assert.equal(AL.costoFor({ ...stile, valore: 'nessuno', _accoglienza: true }), 2);
   assert.equal(AL.costoFor({ ...stile, _accoglienza: 'true' }), 2);
-  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-abcdefghijkl', _accoglienza: true }), 2);
+  assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-abcdefghijkl', _accoglienza: true }), 4);
 });

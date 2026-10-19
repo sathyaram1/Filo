@@ -221,7 +221,7 @@ test('il titolo di una pagina delicata non resta sulla scheda quando la pagina d
 });
 
 test('dalla chat della home una scheda aperta diventa delicata col suo titolo, senza scriverne l\'indirizzo', async ({ app, openTab, testServer }) => {
-  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
+  await livelloAutonomia(app, 'conservativo');
   await testServer.openReady(openTab,
     '<!doctype html><html><head><title>Studio Rossi - Area clienti</title></head><body><p>Dichiarazione dei redditi</p></body></html>',
     { pubblico: true });
@@ -229,12 +229,11 @@ test('dalla chat della home una scheda aperta diventa delicata col suo titolo, s
   await home.evaluate(() => window.SN_SIDEBAR.open());
   const corsa = home.evaluate(() => window.__filoSidebarTest.runFiloAction(
     { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_delicati', valore: 'aggiungi scheda: Studio Rossi - Area clienti' }));
-  await expect(home.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-  expect(await confirmText(home)).toContain('sito-pubblico.test');
-  await clickConfirm(home, 'ok');
+  // Un sito delicato in più stringe un freno: costo 1, si fa subito (#1312), col sito trovato dal titolo.
   await corsa;
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.pagineDelicate.siti), { timeout: 5_000 })
     .toEqual(['sito-pubblico.test']);
+  await expect(home.locator(CONFIRM_HOST)).toHaveCount(0);
 });
 
 test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità, e salva solo quello che ha toccato', async ({ app, openTab }) => {

@@ -241,7 +241,7 @@ test('togliere una chat dal filo (tasto destro su una sua bolla) la toglie dal f
   expect(leggiFilo(userData)).toContain('Parliamo di Epicuro');
 
   const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ultima_ora' }));
-  expect(chiesta.needsConfirm).toBe(2);
+  expect(chiesta.needsConfirm).toBe(3); // cancellare per sempre: la parola (#1312)
   expect(chiesta.describe).toContain('la pagina visitata dell’ultima ora');
   const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ultima_ora' }, { confirmed: true }));
   expect(fatta.output.cancellate).toBe(1);
@@ -429,7 +429,7 @@ test('la chat della home in una finestra incognito resta fuori dal file, anche a
   expect(await app.evaluate(async () => (await globalThis.SN_IL_FILO.chats({ incognito: true })).length)).toBe(0);
 });
 
-test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e toglie solo quelle dal file', async ({ app }) => {
+test('«cancella le pagine di YouTube» chiede la parola col conto di quel sito e toglie solo quelle dal file', async ({ app }) => {
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   await app.evaluate(async () => {
     for (const [url, titolo] of [['https://www.youtube.com/watch?v=1', 'Video uno'], ['https://m.youtube.com/watch?v=2', 'Video due'], ['https://it.wikipedia.org/', 'Wikipedia']]) {
@@ -437,7 +437,7 @@ test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e t
     }
   });
   const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', sito: 'youtube.com' }));
-  expect(chiesta.needsConfirm).toBe(2);
+  expect(chiesta.needsConfirm).toBe(3); // cancellare per sempre: la parola (#1312)
   // Il sito sta nel suo riquadro (#592.7): la frase lo annuncia, il riquadro lo porta da solo.
   expect(chiesta.describe).toContain('le 2 pagine visitate di sempre di questo sito:');
   expect(chiesta.parti).toContainEqual({ citazione: 'youtube.com', nuda: true });
@@ -467,7 +467,7 @@ test('una pagina che riscrive il proprio indirizzo (una mappa spostata) resta un
   expect(visite().map((e) => e.titolo)).toEqual(['Mappa', 'Altro video']);
 });
 
-test('«cancella le pagine di ieri sera» e «di ieri» chiedono l’OK per quel periodo e lasciano il resto', async ({ app }) => {
+test('«cancella le pagine di ieri sera» e «di ieri» chiedono la parola per quel periodo e lasciano il resto', async ({ app }) => {
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
   await app.evaluate(async () => {
     const ieri = (h) => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(h, 0, 0, 0); return d.toISOString(); };
@@ -479,14 +479,14 @@ test('«cancella le pagine di ieri sera» e «di ieri» chiedono l’OK per quel
   const da = await app.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T20:00:00`; });
   const sera = { type: 'CANCELLA_PAGINE', da, a: da.replace('T20:00:00', 'T23:59:59') };
   const chiestaSera = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), sera);
-  expect(chiestaSera.needsConfirm).toBe(2);
+  expect(chiestaSera.needsConfirm).toBe(3);
   expect(chiestaSera.describe).toMatch(/la pagina visitata dal .*20:00 al .*23:59/);
   await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { confirmed: true }), sera);
   expect(leggiFilo(userData)).not.toContain('Ieri sera');
   expect(leggiFilo(userData)).toContain('Ieri mattina');
 
   const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }));
-  expect(chiesta.needsConfirm).toBe(2);
+  expect(chiesta.needsConfirm).toBe(3); // cancellare per sempre: la parola (#1312)
   expect(chiesta.describe).toContain('la pagina visitata di ieri');
   const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }, { confirmed: true }));
   expect(fatta.output.cancellate).toBe(1);

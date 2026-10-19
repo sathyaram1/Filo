@@ -442,9 +442,13 @@
       // riprendere un discorso di ieri. Sola lettura di dati che sono già
       // dell'utente e che sono già passati da questo contesto (le ha scritte
       // lui, con Filo): niente scritture, niente cancellazioni, niente che
-      // esca dal computer → costo 0, come LEGGI_FILE. Sono di classe 1: non sporcano il compito.
+      // esca dal computer → costo 0, come LEGGI_FILE. Sono di classe 1: non sporcano il compito. Le pagine visitate
+      // che la ricerca riporta no: titoli e riassunti li scrivono i siti (#1312).
       costo: 0,
       campo: null,
+      fonte: (a, out) => (Array.isArray(out.pagine) && out.pagine.some((p) => p && !p.delicata)
+        ? { classe: 5, campo: 'web', chiave: 'filo:pagine', motivo: 'ho letto titoli e riassunti di pagine che hai visitato, scritti dai siti' }
+        : null),
       describe: (a) => {
         const q = String((a && (a.query ?? a.testo)) || '').trim();
         if (a && a.id && !q) return 'Rileggere una conversazione passata';
@@ -779,9 +783,12 @@
       },
       campo: 'terminale',
       // Il comando porta fuori il suo testo, come link e ricerca (#530.3): una chiave in un curl o in un git clone
-      // passa dagli stessi controlli dei segreti. Le shell tolgono `^`, virgolette e backtick prima di eseguire.
+      // passa dagli stessi controlli dei segreti. Uno di sola lettura (costo 1 per il classificatore) resta sul
+      // computer. Le shell tolgono `^`, virgolette e backtick prima di eseguire.
       uscita: (a) => {
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
+        const C = global.SN_CMD_CLASSIFY;
+        if (C && cmd.trim() && C.classify(cmd, a && a._perimetro) === 1) return '';
         return `${cmd}\n${cmd.replace(/[\^"'`]/g, '')}`;
       },
       fonte: (a, out) => {

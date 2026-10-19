@@ -2039,7 +2039,8 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   const d = A.decideDettaglio(ingressi);
   let perche = '';
   if (d.risposta !== 'si' && d.risposta !== 'no') {
-    const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
+    // La lettura è il perché quando, a compito pulito e col guardiano, la risposta sarebbe più larga.
+    const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito', guardiano: true }) : d.risposta;
     if (ing.segreto) perche = A.fraseSegreto(ing.segreto);
     else if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
     // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
@@ -2401,7 +2402,8 @@ async function eseguiAzioneFilo(action, {
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
-  const ing = Levels ? Levels.ingressi(action, { richiesta, impostazioni }) : null;
+  // Alla conferma la richiesta non viaggia: valgono le parole dell'utente che la pagina rimanda, come per la porta delle uscite.
+  const ing = Levels ? Levels.ingressi(action, { richiesta: richiesta || parole, impostazioni }) : null;
   if (!ing) {
     console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };

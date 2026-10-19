@@ -99,9 +99,19 @@ test('l\'Aiuto chiede al server i percorsi del sito, e il documento sulla privac
   legame(chiede, privacy, 'Per chi usa l\'app fa cinque cose', 'i percorsi fra i compiti del server');
 });
 
-test('cancellare le pagine visitate chiede solo un OK, e il documento sulla sicurezza lo dice', () => {
-  const soloOk = /CANCELLA_PAGINE:\s*\{\s*costo:\s*3\b/.test(leggi('src', 'shared', 'actionLevels.js'));
-  legame(soloOk, sicurezza, 'Le pagine visitate si cancellano con un OK', 'cronologia cancellata con un OK');
+test('cancellare le pagine visitate è cancellare per sempre, e il documento sulla sicurezza lo dice', () => {
+  const perSempre = /CANCELLA_PAGINE:\s*\{\s*costo:\s*4\b/.test(leggi('src', 'shared', 'actionLevels.js'));
+  legame(perSempre, sicurezza, 'Le pagine visitate si cancellano con la parola «conferma»', 'cronologia cancellata con «conferma»');
+  legame(false, sicurezza, 'Le pagine visitate si cancellano con un OK', 'cronologia cancellata con un OK');
+});
+
+test('i costi vanno da 0 a 4 e il guardiano non c\'è ancora, e il documento sulla sicurezza lo dice', () => {
+  const aut = leggi('src', 'shared', 'autonomia.js');
+  const cinque = /const COSTO_MAX = 4;/.test(aut);
+  const senzaGuardiano = /const GUARDIANO_REGISTRI = false;/.test(aut);
+  legame(cinque, sicurezza, '4. **Toglie un freno che hai messo, o non torna più.**', 'il costo 4');
+  legame(senzaGuardiano, sicurezza, 'Finché non c\'è, quello che dal costo 2 in su potrebbe partire da solo chiede un OK.', 'il guardiano che manca');
+  legame(false, sicurezza, 'I livelli sono tre', 'i tre livelli di prima');
 });
 
 test('i pacchetti Mac e Linux ricostruiti dopo hanno la loro esecuzione, e il documento sulla sicurezza lo dice', () => {

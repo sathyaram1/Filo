@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
 for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito', 'tasti',
-  'ttsVoices', 'filoMemory', 'preferences', 'cambi', 'actionLevels', 'actionTools', 'capabilities', 'vociImpostazioni']) {
+  'ttsVoices', 'filoMemory', 'autonomia', 'preferences', 'cambi', 'actionLevels', 'actionTools', 'capabilities', 'vociImpostazioni']) {
   require(`../../src/shared/${m}.js`);
 }
 const V = globalThis.SN_VOCI_IMPOSTAZIONI;
@@ -176,7 +176,8 @@ test('sentinella: ogni voce delle pagine si cambia dalla chat, e la chiave la sc
 // #835 — Filo cambia QUALSIASI impostazione: una foglia di DEFAULT_SETTINGS senza una chiave di IMPOSTA_PREFERENZA che
 // la scriva sta qui col suo perché. Un oggetto vuoto (themeTokens, modelRegistry) è una foglia; «x.» vale per tutto x.
 const FUORI_DALLA_CHAT = {
-  'autonomia.': 'elenco fisso «regole» (#530): livello di autonomia, manopole e fiducia nelle fonti li sceglie solo l\'utente in Preferenze',
+  'autonomia.manopole': 'le manopole dei campi arrivano con la posta (#530): finché non c\'è, nessuna pagina le mostra e nessun lavoro le legge',
+  'autonomia.fonti': 'la fiducia nelle singole fonti arriva con la posta (#530): finché non c\'è, nessuna pagina la mostra e nessun lavoro la sposta',
   'models.': 'il modello di ogni funzione si sceglie nella pagina Modelli: cambiarlo dalla chat aspetta una decisione dell\'owner',
   modelRegistry: 'il registro dei modelli si cura nella pagina Modelli: cambiarlo dalla chat aspetta una decisione dell\'owner',
   defaultModelTests: 'sono le misure del pulsante «Prova» (latenza, velocità), non una scelta: le scrive la prova',
@@ -236,8 +237,9 @@ test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e
       const jolly = p.endsWith('.*') ? p.slice(0, -1) : '';
       assert.ok(scritti.has(p) || (jolly && [...scritti].some((x) => x.startsWith(jolly))), `${s.keys[0]} dichiara ${p} ma non lo scrive`);
       const voce = K.voce(p);
-      assert.ok(voce, `${p}: nessuna frase per il suo evento in src/shared/cambi.js`);
-      if (!voce.segreto) assert.equal(voce.livello, s.costo, `${p}: l'annullo chiede un livello diverso dal costo del cambio (${voce.livello} contro ${s.costo})`);
+      // Fuori dal registro dei cambi solo col perché: il livello di autonomia, che un «annulla» rialzerebbe con un clic.
+      assert.ok(voce || K.esclusa(p), `${p}: nessuna frase per il suo evento in src/shared/cambi.js`);
+      if (voce && !voce.segreto) assert.equal(voce.livello, s.costo, `${p}: l'annullo chiede un livello diverso dal costo del cambio (${voce.livello} contro ${s.costo})`);
     }
   }
   assert.ok(descr.includes('LEGGI_IMPOSTAZIONI'), 'la descrizione dice come leggere il valore di adesso');
@@ -291,7 +293,8 @@ test('elenchi di siti: aggiungi, togli, solo, svuota; un nome senza estensione �
   const b = (v) => P.buildPreferencePartial('siti_bloccati', v);
   const a = b('aggiungi facebook.com e https://www.YouTube.com/watch?v=1');
   assert.deepEqual(a.elenco.voci, ['facebook.com', 'youtube.com']);
-  assert.equal(a.costo, 2);
+  assert.equal(a.costo, 1, 'bloccare un sito stringe un freno (#1312)');
+  assert.equal(b('togli tiktok.com').costo, 4, 'sbloccarlo lo toglie');
   assert.match(a.risk, /Apri comunque/);
   assert.equal(b('togli tiktok.com').elenco.op, 'togli');
   assert.equal(b('solo a.it, b.it').elenco.op, 'sostituisci');

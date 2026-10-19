@@ -225,6 +225,9 @@
     /\btvly-[A-Za-z0-9_-]{16,}/,
     /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
   ];
+  // Un token nell'intestazione di autorizzazione, di qualunque forma, e la password dentro un indirizzo (utente:password@).
+  const INTESTAZIONE = /\bAuthorization[ \t]*:[ \t]*(?:Bearer|Basic|Token|Digest)[ \t]+([A-Za-z0-9._~+\/=-]{8,})/gi;
+  const NELL_INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s\/:@"'`]+:([^\s\/@"'`]{4,})@/gi;
   const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s+d['’]ordine|chiave\s+segreta|secret)\s*(?:[:=]|\bè\b|\bis\b|\bera\b)\s*["'«“]?([^\s"'»”,;&]{4,})/gi;
   const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s+(?:di\s+)?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s+codes?\b)[\s:=]*(?:(?:è|e'|is|era|was)\s+)?["'«“]?(\d[A-Za-z0-9]{3,}|[A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){1,9})/gi;
 
@@ -264,7 +267,9 @@
       const m = t.match(re);
       if (m) yield { tipo: 'chiave', valore: m[0] };
     }
+    for (const m of t.matchAll(INTESTAZIONE)) yield { tipo: 'chiave', valore: m[1] };
     for (const m of t.matchAll(PAROLA_PASSWORD)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
+    for (const m of t.matchAll(NELL_INDIRIZZO)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
     for (const m of t.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) yield { tipo: 'codice', valore: m[1] };
     for (const m of t.matchAll(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}/g)) {
       const s = soloAlnum(m[0]);

@@ -112,7 +112,8 @@
       scrive: [percorso],
       aiuto: aiuto || 'true | false',
       costo: 2,
-      allenta: (r) => spentoAllenta && dentro(r.partial, percorso) === false,
+      // Senza un verso che abbassa una difesa non è un freno: spegnerlo manda fuori meno, quindi stringe (costo 1).
+      ...(spentoAllenta ? { allenta: (r) => dentro(r.partial, percorso) === false } : { stringe: (r) => dentro(r.partial, percorso) === false }),
       avviso: (r, at) => (dentro(r.partial, percorso) === true ? principaleSpento(sotto, at) : ''),
       risk,
       build(v) {
@@ -387,14 +388,16 @@
       aiuto: `"aggiungi <siti>" | "togli <siti>" | "solo <siti>" | "svuota" (${aiuto}; più siti separati da virgole)`,
       costo: 2,
       avviso: (r, at) => (r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length ? principaleSpento(sotto, at) : ''),
-      allenta: (r, at) => {
-        const e = r.elenco;
-        if (!allentaSe || !e) return false;
-        if (e.op !== 'sostituisci') return e.op === allentaSe;
-        const prima = at ? dentro(at, percorso) : null;
-        if (!Array.isArray(prima)) return true;
-        return allentaSe === 'togli' ? prima.some((x) => !e.voci.includes(x)) : e.voci.some((x) => !prima.includes(x));
-      },
+      ...(allentaSe ? {
+        allenta: (r, at) => {
+          const e = r.elenco;
+          if (!e) return false;
+          if (e.op !== 'sostituisci') return e.op === allentaSe;
+          const prima = at ? dentro(at, percorso) : null;
+          if (!Array.isArray(prima)) return true;
+          return allentaSe === 'togli' ? prima.some((x) => !e.voci.includes(x)) : e.voci.some((x) => !prima.includes(x));
+        },
+      } : {}),
       risk,
       build(v) {
         const o = opElenco(v, RIDUZIONI[percorso]);
@@ -648,7 +651,8 @@
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }; `partial` si fonde nelle impostazioni.
   // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat. Una voce con `allenta(r, attuali)` è un
   // freno (regola del freno, #1312): toglierlo è costo 4, stringerlo costo 1; il suo `costo` resta quello del cambio
-  // per il registro dei cambi. `risk` è obbligatorio dal costo 2 o con `allenta`: è il rischio che il popup mostra.
+  // per il registro dei cambi; `stringe(r)` dà costo 1 al verso che toglie portata a Filo in una voce che non è un freno.
+  // `risk` è obbligatorio dal costo 2 o con `allenta`: è il rischio che il popup mostra.
   const PREF_SETTERS = [
     {
       scrive: ['theme'],
@@ -843,6 +847,7 @@
       // Accenderla vuole sempre un OK, a ogni livello di autonomia: un clic, non la parola (#778). Non abbassa una
       // difesa: anche accesa, la prima occhiata a ogni finestra di un'altra app chiede.
       chiede: (r) => r.partial.schermo.guarda === true,
+      stringe: (r) => r.partial.schermo.guarda === false,
       risk: 'Da accesa, quando glielo chiedi in chat Filo cattura l\'immagine di una finestra o dello schermo e la fa leggere '
         + 'a un modello che vede le immagini, insieme alla tua domanda. Quello che si vede in quella finestra arriva quindi al modello. '
         + 'La prima volta che guarda una finestra di un\'altra app, a ogni tua richiesta, ti chiede l\'OK dicendoti quale. '
@@ -1709,8 +1714,7 @@
         percorso: 'menuDelSito.siti',
         nome: 'Siti dove il tasto destro apre il menu del sito',
         aiuto: 'siti col loro menu del tasto destro (Google Docs, Figma…) dove il tasto destro apre il menu del sito e quello di Filo '
-          + 'resta a Shift + tasto destro; per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) '
-          + 'o «scheda: <titolo come in TAB APERTE>»',
+          + 'resta a Shift + tasto destro; per un sito aperto: il suo nome come in TAB APERTE, o «questo sito» (la scheda web davanti)',
         risk: 'Cambia su quali siti il tasto destro apre il menu del sito invece di quello di Filo; '
           + 'il menu di Filo resta a Shift + tasto destro.',
       }),
@@ -1880,7 +1884,7 @@
       allentaSe: 'togli',
       nome: 'Siti delicati aggiunti da te',
       aiuto: 'siti che Filo tratta come delicati oltre a posta, banche e sanità: il loro testo non va ai modelli nei lavori automatici. '
-        + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
+        + 'Per un sito aperto: il suo nome come in TAB APERTE, o «questo sito» (la scheda web davanti)',
       risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine il riassunto e la '
         + 'pulizia automatica delle schede non mandano il testo ai modelli. Un sito tolto torna a mandarlo.',
     }),
@@ -2034,9 +2038,11 @@
     let avviso = '';
     try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
     const freno = typeof setter.allenta === 'function';
+    let stringe = false;
+    try { stringe = !freno && typeof setter.stringe === 'function' && !!setter.stringe(b, attuali); } catch (_) { stringe = false; }
     return {
       ...b,
-      costo: freno ? (allenta ? 4 : 1) : setter.costo,
+      costo: freno ? (allenta ? 4 : 1) : (stringe ? 1 : setter.costo),
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),
