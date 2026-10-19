@@ -475,8 +475,9 @@ Due oggetti, decisi dall'owner il 12/10:
   ciclo: ramo, verifica, controllo cieco, fusione. Non porta un modello.
 - **Compito**: una chiamata di un agente. Ha **urgenza**, **modello**,
   **sforzo**, **ambito**, fiducia e, se c'è, il feedback a cui è legato con la
-  sua **fase**, o il compito padre se è un figlio (§ 12.2). Il biglietto è un tentativo di eseguire un compito: un compito
-  ne può avere più di uno, per esempio dopo un arenamento.
+  sua **fase**, o il compito padre se è un figlio (§ 12.2). Il biglietto è un
+  tentativo di eseguire un compito: un compito ne può avere più di uno, per
+  esempio dopo un arenamento.
 
 ### 6.1 Da dove nascono i compiti
 
