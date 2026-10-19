@@ -277,6 +277,8 @@
     // A filo vuoto quello che arriva dopo è tutto: si parte dall'inizio dei tempi.
     ultimo = res.ultimo || new Date(0).toISOString();
     const lista = Array.isArray(res.elementi) ? res.elementi : [];
+    // Un messaggio di Filo annunciato mentre la coda si leggeva è già posato, e la coda lo porta di nuovo: vale la coda.
+    for (const v of lista) { const c = conChiave(v.key); if (c) c.remove(); }
     d.bubblesEl.insertBefore(frammento(lista), d.bubblesEl.firstChild);
     if (lista.length) primo = lista[0].ts;
     finito = !!res.inizio;
