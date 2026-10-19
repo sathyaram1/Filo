@@ -97,7 +97,7 @@ export function motivoLettura(input, ctx = {}) {
     return dove === '' || dove === 'worktree' ? '' : `${nome} (${pulisci(dove, 40)})`;
   }
   if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
-  if (nome.startsWith('mcp__')) return MCP_SENZA_LETTURA.includes(nome) ? '' : pulisci(nome, 160);
+  if (nome.startsWith('mcp__')) return mcpSenzaLettura(nome) ? '' : pulisci(nome, 160);
   if (nome !== 'Read') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
   const grezzo = String(dati.file_path || '').trim();
   if (!grezzo) return '';
