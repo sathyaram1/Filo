@@ -7428,6 +7428,7 @@
         attesa:   ['Segnalazioni che hai preso in mano', fsStat.tempi.presaInCarico.ids],
         durata:   ['Lavorazioni misurate in questa finestra', fsStat.tempi.lavorazione.ids, fsStat.tempi.lavorazione.mancanti],
         audit:    ['Controllo di sicurezza passato', (fsStat.auditIds || {}).pass],
+        auditNonLetti: ['Lavori con l\'esito del controllo di sicurezza non letto', (fsStat.auditIds || {}).nonLetti],
         arenatiFeedback: ['Segnalazioni la cui lavorazione si è arenata', fsStat.arenati.ids],
       }[chiave];
       if (!dietro) return null;
