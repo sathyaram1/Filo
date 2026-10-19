@@ -211,6 +211,10 @@ test('la sentinella riconosce chi cerca il menu senza l\'aiuto', () => {
     [`${imp}const voce = (p, sel) => p.locator(sel);\nawait voce(page, '.sn-menu-item').click();`, 1],
     ["// menu-dal-sito: lo script della pagina prova a premere Incolla\nawait page.evaluate(() => document.querySelector('.sn-menu-paste-main')?.click());", 0],
     ["await expect(riga).toHaveClass('sn-menu-row');", 0],
+    ["await expect(page.locator('.sn-drag-preview')).toHaveCount(1);", 1],
+    ["await expect(page.locator('.sn-tooltip')).toBeVisible();", 1],
+    [`${imp}await expect(menuDi(page).locator('.sn-drag-preview')).toHaveCount(0);`, 0],
+    ["await expect(pop.locator('.sn-select-option')).toHaveClass(/sn-disabled/);", 0],
   ];
   for (const [codice, attese] of casi) assert.equal(cercheFuoriDallAiuto(codice).length, attese, codice);
 });
