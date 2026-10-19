@@ -76,7 +76,10 @@ test('classificatore: un sotto-agente sporca solo se gira fuori dal computer; To
   assert.equal(agente({ prompt: 'x' }, 'Task'), '');
   const cerca = (query) => L.motivoLettura({ tool_name: 'ToolSearch', tool_input: { query, max_results: 5 } });
   for (const q of ['select:Monitor', 'select:TaskCreate, TaskUpdate,EnterWorktree', ' select:WebFetch']) assert.equal(cerca(q), '', q);
-  for (const q of ['select:mcp__github__get_me', 'select:Monitor,mcp__x__y', 'select:MCP__x', 'select:*', 'select:', 'select:Monitor,', 'notebook jupyter', '+slack send', '', undefined]) {
+  // Caricare uno strumento MCP pulito non sporca più che chiamarlo (#1252).
+  for (const q of ['select:mcp__ccd_turn__update_plan,mcp__ccd_turn__wrap_up', 'select:Monitor, mcp__ccd_session__mark_chapter', 'select:mcp__ide__getDiagnostics']) assert.equal(cerca(q), '', q);
+  for (const q of ['select:mcp__github__get_me', 'select:Monitor,mcp__x__y', 'select:MCP__x', 'select:*', 'select:', 'select:Monitor,', 'notebook jupyter', '+slack send', '', undefined,
+    'select:mcp__ccd_turn__update_plan,mcp__ccd_session__list_events', 'select:mcp__ccd_widget__read_widget_context', 'ccd_turn update_plan']) {
     assert.equal(cerca(q), 'ToolSearch', String(q));
   }
 });
