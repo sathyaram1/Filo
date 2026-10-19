@@ -309,8 +309,11 @@ function creaFilo({ cartella } = {}) {
         return { pagine: { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) }, url: periodo.url || null };
       });
       const { tolti } = await t.scrivi(voci.map((v) => t.evento(E().TIPI.CANCELLAZIONE, { pagine: v.pagine }, { autore: 'utente' })));
+      // Il ricordo dei campi password va via per sito, e ogni volta si riscrive: un sito una volta sola («Svuota archivio»).
+      const siti = new Set();
       for (const v of voci) {
-        try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {}
+        const k = v.pagine.sito || `|${v.pagine.da}|${v.pagine.a}`;
+        if (!siti.has(k)) { siti.add(k); try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {} }
         if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
       }
       for (const fn of pagineTolte) { try { fn({ incognito: t.incognito }); } catch (_) {} }
