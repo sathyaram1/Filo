@@ -1,6 +1,6 @@
 // #1334 (#1002, #1035): l'allarme della pubblicazione (agent:costruzione con la prova del server) in Gestione ha il
-// suo mittente, il suo posto «per creatore» e il suo filtro; il solo nome resta un utente. In Automazioni non ha
-// interruttore, e nemmeno l'esplorazione: entrano in coda comunque.
+// suo mittente, il suo posto «per creatore» e il suo filtro (nelle statistiche è la classe `server`, §10); il solo
+// nome non è un allarme. In Automazioni gli interruttori sono per fiducia: allarmi ed esplorazione entrano comunque.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
@@ -88,7 +88,7 @@ test('il filtro per creatore ha la pasticca dell’allarme, e il gruppo delle ro
       { ...ALLARME, _id: 'a2', seq: 2, createdAt: g(2) },
       fb({ seq: 3, clientId: 'routine:prober', senderProof: 'server', createdAt: g(2) }),
       fb({ seq: 4, clientId: 'utente-vero', createdAt: g(2) }),
-      // Il finto conta fra gli utenti, non fra gli allarmi.
+      // Il finto non conta fra gli allarmi: un `agent:` senza prova è un collaudo (§10).
       fb({ seq: 5, clientId: 'agent:costruzione', createdAt: g(2) }),
     ],
     workerLog: [],
@@ -98,8 +98,8 @@ test('il filtro per creatore ha la pasticca dell’allarme, e il gruppo delle ro
   const ricevuti = page.locator('[data-fs-id="ricevuti"] .mg-tile-n');
   await expect(ricevuti).toHaveText('5');
 
-  const chip = page.locator('[data-fs-creator="costruzione"]');
-  await expect(chip).toContainText('🏗️ Allarme della pubblicazione');
+  const chip = page.locator('[data-fs-creator="server"]');
+  await expect(chip).toContainText('Allarmi del server');
   await expect(chip.locator('.mg-chip-n')).toHaveText('2');
   await chip.click();
   await expect(ricevuti).toHaveText('2');
@@ -107,10 +107,10 @@ test('il filtro per creatore ha la pasticca dell’allarme, e il gruppo delle ro
   await expect(ricevuti).toHaveText('5');
 
   const routine = page.locator('[data-fs-creator="__routine"]');
-  await expect(routine).toHaveAttribute('title', /Allarme della pubblicazione/);
-  await expect(routine.locator('.mg-chip-n')).toHaveText('3');
+  await expect(routine).toHaveAttribute('title', /Allarmi del server/);
+  await expect(routine.locator('.mg-chip-n')).toHaveText('4');
   await routine.click();
-  await expect(ricevuti).toHaveText('3');
+  await expect(ricevuti).toHaveText('4');
 });
 
 test('anche la pagina dei feedback dice «Allarme della pubblicazione», non un modello di nome costruzione', async ({ openTab }) => {
@@ -138,15 +138,11 @@ test('in Automazioni niente interruttore per l’esplorazione e gli allarmi: la 
 
   const blocco = page.locator('#mgAutoApproveBlock');
   await expect(blocco).toBeVisible();
-  await expect(blocco.locator('.mg-switch')).toHaveCount(8);
+  await expect(blocco.locator('.mg-switch')).toHaveCount(2);
   await expect(blocco).not.toContainText('esplorazione');
   await expect(blocco).not.toContainText('Allarme');
   await expect(page.locator('#mgAutoApproveProber')).toHaveCount(0);
   await expect(page.locator('#mgAutoSwitch + .mg-auto-block-desc'))
     .toContainText('Gli allarmi della pubblicazione e i ritrovamenti dell\'esplorazione entrano in coda comunque.');
-  // Gli interruttori delle routine che restano dicono quando contano.
-  for (const id of ['Worker', 'Verifier', 'Residuo']) {
-    await expect(page.locator(`label:has(#mgAutoApprove${id})`)).toHaveAttribute('title', /Conta per quelli di un lavoro non fidato/);
-  }
   await page.screenshot({ path: 'tests/.shots/manage-automazioni-1334.png' });
 });
