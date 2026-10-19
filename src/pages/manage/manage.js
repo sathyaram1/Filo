@@ -6981,8 +6981,23 @@
   // ripartizione compariva in mezzo ai riquadri sbagliati.
   const FS_DETTAGLI_TILES = ['ricevuti', 'lavorati', 'lanci'];
 
+  // Quali riquadri si aprono qui sotto, sul conto di ADESSO. La leggono chi
+  // disegna e chi tiene aperto il pannello: un riquadro che non si apre più
+  // perde anche «chiudi», e il suo pannello restava lì senza uscita (#997).
+  function fsEspandibili(stat) {
+    const ko = stat.copertura.registroLetto === false;
+    const a = stat.audit;
+    return {
+      ricevuti: stat.copertura.feedbackLetti !== false,
+      lavorati: !ko,
+      lanci: !ko,
+      audit: ((a.pass || 0) + (a.fail || 0) + (a.saltato || 0)) > 0,
+    };
+  }
+
   function renderFsTiles(stat) {
     const det = FS_DETTAGLI_TILES.includes(fsAperto) ? fsDettaglio(stat) : null;
+    const esp = fsEspandibili(stat);
     // Col registro non letto i tre riquadri che ne vivono non hanno un numero.
     // Il trattino da solo non basta: lo dicono anche sul riquadro, perché la
     // riga sopra sta in dodici pixel e il numero grande ne ha trenta.
@@ -6991,7 +7006,7 @@
     const fbKo = stat.copertura.feedbackLetti === false;
     mgFsTiles.innerHTML = [
       fsTile('ricevuti', stat.ricevuti.totale, 'Feedback ricevuti',
-        fbKo ? 'segnalazioni non lette' : '', fbKo ? false : 'espandi'),
+        fbKo ? 'segnalazioni non lette' : '', esp.ricevuti ? 'espandi' : false),
       // «in tutto» prometteva un totale che questo numero non ha: conta le
       // verifiche partite DENTRO la finestra, mentre la torta qui sotto conta
       // le critiche di un lavoro su tutto il registro. Con una finestra
