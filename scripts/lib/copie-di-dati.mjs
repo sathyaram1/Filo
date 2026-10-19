@@ -1,4 +1,4 @@
-// Riconosce fra i file del repo, che è pubblico, una copia di dati del server: documenti Firestore o feedback già in chiaro.
+// Riconosce fra i file del repo, che è pubblico, una copia di dati del server (documenti Firestore, campi di feedback) dal contenuto.
 // Non legge il server e non sposta niente: dice quali file e commit sono copie e perché. Le copie di lavoro stanno in os.tmpdir().
 // Sentinella: tests/unit/copieDiDatiFuoriDalRepo.test.mjs.
 
@@ -60,24 +60,28 @@ export function motivoCopia(radice) {
  */
 export function motivoCopiaTesto(testo) {
   const t = String(testo || '');
-  for (const leggi of [valoriFraParentesi, righeDiTabella, blocchiChiaveValore]) {
-    for (const v of leggi(t)) {
-      const m = motivoCopia(v);
-      if (m) return m;
+  // Un JSON dentro una stringa (una riga di log, un doppio JSON.stringify) ha le virgolette scritte \".
+  const viste = t.includes('\\"') ? [t, t.replace(/\\(["\\/])/g, '$1')] : [t];
+  for (const vista of viste) {
+    for (const leggi of [valoriFraParentesi, righeDiTabella, blocchiChiaveValore]) {
+      for (const v of leggi(vista)) {
+        const m = motivoCopia(v);
+        if (m) return m;
+      }
     }
   }
   return '';
 }
 
 // ─── Lettore delle forme a parentesi: JSON, JS, la stampa di node, Python ────────────────────────────────────────
-// Non fallisce mai: una chiave non chiusa a fine testo vale come chiusa. A pila e non ricorsivo: mille parentesi
+// Non fallisce mai: una parentesi aperta a fine testo vale come chiusa. A pila e non ricorsivo: mille parentesi
 // aperte in fila non devono far saltare il controllo.
 const CHIUDE = new Set(['}', ']', ')']);
 const APRE = new Set(['{', '[', '(']);
 const SPAZIO = /\s/;
 const FINE_NUDO = /[\s,;:=(){}[\]'"`]/;
 const PREFISSO_STRINGA = /^[bBrRuUfF]{1,2}$/;
-const ESCAPE = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', 0: '\0' };
+const ESCAPE = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', 0: '\u0000' };
 
 // Una stringa fra virgolette; un a capo la chiude (nessuna di queste forme lo scrive crudo): un apostrofo in un testo
 // libero non si porta via il resto del file. → [testo, indice dopo]
@@ -211,9 +215,10 @@ function leggiRiga(t, i, d) {
       }
       continue;
     }
-    if (c === d) { celle.push(cella); cella = ''; i++; continue; }
+    if (c === d) { celle.push(cella); cella = ''; vuota = true; i++; continue; }
     if (c === '\n') { i++; break; }
     if (c !== '\r') cella += c;
+    if (vuota && !SPAZIO.test(c)) vuota = false;
     i++;
   }
   celle.push(cella);
@@ -233,15 +238,15 @@ function* righeDiTabella(t) {
       const nomi = intestazione.map(nomeCampo);
       if (!nomi.some((n) => IDENTITA.includes(n))) continue;
       if (!intestazione.every((c) => !c.trim() || NOME_COLONNA.test(c.trim().replace(/^["'`]|["'`]$/g, '')))) continue;
-      for (let j = i; j < t.length;) {
-        const a2 = t.indexOf('\n', j);
-        if (!t.slice(j, a2 < 0 ? t.length : a2).trim()) break;
+      while (i < t.length) {
+        const a2 = t.indexOf('\n', i);
+        if (!t.slice(i, a2 < 0 ? t.length : a2).trim()) break;
         let celle;
-        [celle, j] = leggiRiga(t, j, d);
-        // Una riga con più celle dell'intestazione è un testo libero, non una riga della tabella.
-        if (celle.length > nomi.length || celle.every((c) => !c.trim() || SEPARATORE_MD.test(c))) continue;
+        [celle, i] = leggiRiga(t, i, d);
+        if (celle.every((c) => !c.trim() || SEPARATORE_MD.test(c))) continue;
+        // Una cella in più (un separatore non citato dentro un valore) sposta solo le colonne dopo di lei.
         const r = Object.create(null);
-        celle.forEach((c, k) => { if (c.trim()) r[nomi[k]] = c.trim(); });
+        celle.forEach((c, k) => { if (c.trim() && k < nomi.length) r[nomi[k]] = c.trim(); });
         yield r;
       }
       break;
@@ -473,7 +478,7 @@ righe=$(cat)
 dati=$(printf '%s\\n' "$righe" | while read -r _ locale _ _; do
   case "$locale" in *[!0]*) ;; *) continue ;; esac
   git log --format= --name-only --diff-filter=ACMR "$locale" --not --remotes 2>/dev/null
-done | grep -vE '\\.(js|mjs|cjs|ts|css|html|md|sh|ps1|png|jpe?g|gif|webp|svg|ico)$' | grep -m1 .)
+done | grep -vE '\\.(js|mjs|cjs|ts|css|html|sh|ps1|png|jpe?g|gif|webp|svg|ico)$' | grep -m1 .)
 [ -n "$dati" ] || exit 0
 printf '%s\\n' "$righe" | node "$controllo" --pre-push "$radice"
 `;

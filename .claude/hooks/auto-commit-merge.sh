@@ -264,11 +264,12 @@ controllo_copie() {
   [ -f "$controllo" ] && command -v node >/dev/null 2>&1 && printf '%s' "$controllo"
 }
 # Vero se fra i nomi letti (separati da NUL) c'e' qualcosa che non e' codice o immagine: solo allora si paga node.
+# Un .md si legge: una copia incollata in una nota e' una copia (#1360).
 forse_dati() {
   local f
   while IFS= read -r -d '' f; do
     case "$f" in
-      ''|*.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.md|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
+      ''|*.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
       *) return 0 ;;
     esac
   done
