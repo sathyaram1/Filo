@@ -13,6 +13,7 @@ import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CODICE = '482913';
 const PAGINA_OTP = `<!doctype html><html><head><title>Banca Esempio</title></head>
@@ -808,7 +809,7 @@ test('il tasto destro su un collegamento della risposta non porta fuori il codic
   const link = page.locator('.dash-bubble-filo a', { hasText: 'la verifica' });
   await expect(link).toBeVisible({ timeout: 10_000 });
   await link.click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible({ timeout: 5_000 });
   // La sezione che descrive il collegamento parte da sola: senza il titolo del sito, ma parte.
   await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 5_000 });
@@ -1107,12 +1108,12 @@ test('i collegamenti nella risposta dell’assistente di pagina col codice letto
   await link('la verifica').click({ button: 'middle' });
   await expect(righe).toHaveCount(2, { timeout: 10_000 });
   await link('la verifica').click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Apri in nuova tab', { exact: false }).first().click();
+  await menuDi(page).locator('.sn-menu').getByText('Apri in nuova tab', { exact: false }).first().click();
   await expect(righe).toHaveCount(3, { timeout: 10_000 });
   await link('scrivi al supporto').click();
   await expect(righe).toHaveCount(4, { timeout: 10_000 });
   await link('la ricevuta').click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
+  await menuDi(page).locator('.sn-menu').getByText('Salva file', { exact: false }).first().click();
   await expect(page.locator('.sn-sidebar-log', { hasText: 'non ho scaricato il file: conteneva un codice letto dalla pagina 127.0.0.1' }))
     .toHaveCount(1, { timeout: 10_000 });
   await page.waitForTimeout(500);

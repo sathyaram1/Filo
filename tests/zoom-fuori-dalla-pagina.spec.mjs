@@ -10,6 +10,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>sito</title></head>
 <body style="height:4000px"><h1>un sito qualunque</h1><p>testo</p></body></html>`;
@@ -221,7 +222,7 @@ test('col fuoco nel riquadro, il tasto destro sul contenuto offre la dimensione 
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
   await frame.locator('#c').click({ button: 'right' });
-  const voce = frame.locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
+  const voce = menuDi(frame).locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
   await expect(voce).toBeVisible({ timeout: 8000 });
   await voce.click();
   await expect.poll(async () => percentOf(app, page)).toBe(100);

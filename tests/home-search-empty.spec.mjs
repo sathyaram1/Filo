@@ -13,6 +13,7 @@
 // diventerebbe rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HOME = 'filo://home/home.html';
 
@@ -26,7 +27,7 @@ test('ricerca senza risultati mostra "Nessun risultato", non l\'archivio vuoto',
   const page = await openTab(url);
   await page.waitForLoadState('domcontentloaded');
   await page.click('body', { button: 'right' });
-  const saveBtn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+  const saveBtn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
   await expect(saveBtn).toBeVisible();
   await saveBtn.click();
   await page.waitForTimeout(1500).catch(() => {});

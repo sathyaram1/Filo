@@ -2,6 +2,7 @@
 // il menu restava aperto e a schermo intero la modalità se ne andava. Regola: patterns/esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi, menuAperto } from './helpers/menuContestuale.mjs';
 
 // Il gestore sta nella testa del documento, il primo script della pagina: prima di così un sito non può arrivare.
 const sito = (ferma, extra = '') => `<!doctype html><html><head><script>
@@ -42,8 +43,6 @@ async function esc(app, attesa = 900) {
   });
   await new Promise((r) => setTimeout(r, attesa));
 }
-
-const menuAperto = (page) => page.evaluate(() => !!document.querySelector('.sn-menu'));
 
 async function apriMenu(page) {
   await page.locator('#t').click({ button: 'right' });
@@ -90,8 +89,8 @@ test('sito che ferma l\'Esc: il QR della pagina si chiude col primo Esc, lo sche
   const page = await testServer.openReady(openTab, sito('tutto'));
   await entra(app);
   await apriMenu(page);
-  const qr = page.locator('[data-sn-icon-id="qrCode"]');
-  if (await qr.count() === 0) await page.locator('.sn-menu-row-overflow').first().click();
+  const qr = menuDi(page).locator('[data-sn-icon-id="qrCode"]');
+  if (await qr.count() === 0) await menuDi(page).locator('.sn-menu-row-overflow').first().click();
   await qr.first().click();
   await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 8000 });
   await new Promise((r) => setTimeout(r, 300));

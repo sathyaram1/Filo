@@ -4,6 +4,7 @@
 // DENTRO il mondo isolato dei content script, dove arriva davvero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const CHIAVE = 'sk-or-v1-SPINTA-589-' + Date.now();
 const PROXY = 'socks5://utente-{country}:parolasegreta589@gate.provider.example:7000';
@@ -251,7 +252,7 @@ test('sul sito escluso Filo resta spento', async ({ shell, openTab, testServer }
   await web.waitForTimeout(1500);
   await web.locator('h1').click({ button: 'right' });
   await web.waitForTimeout(800);
-  await expect(web.locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toBeHidden();
+  await expect(menuDi(web).locator('.sn-menu'), 'sul sito escluso il menu di Filo si è aperto').toBeHidden();
 });
 
 // Anche le spinte senza dati passano dalla lista: l'avviso dei dati dal vivo

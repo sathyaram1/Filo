@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiamateAlModello, chiedi } from './helpers/chatFinta.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -228,7 +229,7 @@ test('la riga si toglie dal filo col tasto destro, e la ricerca del filo la trov
   const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
   await riga.locator('.dash-riga-app-testa').click({ button: 'right' });
-  const menu = casa.locator('.sn-menu');
+  const menu = menuDi(casa).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Mostra lo scambio', { exact: true })).toBeVisible();
   await expect(menu.getByText("Apri nell'Editor", { exact: true })).toBeVisible();

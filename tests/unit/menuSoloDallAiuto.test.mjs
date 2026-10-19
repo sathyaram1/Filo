@@ -19,7 +19,7 @@ const MARCATORE = 'menu-dal-sito';
 const CERCATORI = new Set(['locator', '$', '$$', '$eval', '$$eval', 'waitForSelector', 'evaluate', 'evaluateHandle',
   'evaluateAll', 'frameLocator', 'addInitScript', 'addScriptTag', 'setContent', 'executeJavaScript',
   'executeJavaScriptInIsolatedWorld', 'isVisible', 'click', 'hover', 'fill', 'textContent', 'innerText', 'count']);
-const NEUTRE = new Set(['toHaveClass', 'toContainClass', 'not']);
+const NEUTRE = new Set(['toHaveClass', 'toContainClass']);
 
 function sorgenti(dir, out = []) {
   for (const nome of readdirSync(dir)) {
@@ -75,9 +75,30 @@ export function cercheFuoriDallAiuto(testo, nomeFile = 'x.spec.mjs') {
     while (e && (ts.isParenthesizedExpression(e) || ts.isAwaitExpression(e) || ts.isNonNullExpression(e))) e = e.expression;
     if (!e) return false;
     if (ts.isIdentifier(e)) return derivati.has(e.text) || aiuto.has(e.text);
-    if (ts.isCallExpression(e)) return (ts.isIdentifier(e.expression) && aiuto.has(e.expression.text)) || daMenu(e.expression);
+    if (ts.isCallExpression(e)) {
+      const c = e.expression;
+      if (ts.isIdentifier(c) && aiuto.has(c.text)) return true;
+      if (ts.isIdentifier(c) && locali.has(c.text)) return restituisceIlMenu(locali.get(c.text));
+      return daMenu(c);
+    }
     if (ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e)) return daMenu(e.expression);
     return false;
+  }
+  // Una funzione dello spec che apre il menu e ne restituisce un pezzo vale quanto l'aiuto.
+  const inEsame = new Set();
+  function restituisceIlMenu(fn) {
+    if (inEsame.has(fn) || !fn.body) return false;
+    inEsame.add(fn);
+    try {
+      if (!ts.isBlock(fn.body)) return daMenu(fn.body);
+      const ritorni = [];
+      (function cerca(n) {
+        if (n !== fn.body && funzione(n)) return;
+        if (ts.isReturnStatement(n)) ritorni.push(n.expression);
+        ts.forEachChild(n, cerca);
+      })(fn.body);
+      return ritorni.length > 0 && ritorni.every((r) => r && daMenu(r));
+    } finally { inEsame.delete(fn); }
   }
   for (let cambiato = true; cambiato;) {
     cambiato = false;
@@ -114,12 +135,14 @@ export function cercheFuoriDallAiuto(testo, nomeFile = 'x.spec.mjs') {
       if (marcato(p)) return true;
       if (ts.isCallExpression(p) && p.arguments.includes(figlio)) {
         const c = p.expression;
-        if (ts.isPropertyAccessExpression(c) && NEUTRE.has(c.name.text)) return true;
+        if (ts.isPropertyAccessExpression(c) && (NEUTRE.has(c.name.text) || daMenu(c.expression))) return true;
         if (ts.isPropertyAccessExpression(c) && CERCATORI.has(c.name.text)) return daMenu(c.expression);
         if (ts.isIdentifier(c) && aiuto.has(c.text)) return true;
         if (ts.isIdentifier(c) && locali.has(c.text)) return parametroAmmesso(locali.get(c.text), p.arguments.indexOf(figlio), visti);
       }
       if (ts.isVariableDeclaration(p) && p.initializer === figlio && ts.isIdentifier(p.name)) {
+        if (visti.has(p)) return true;
+        visti.add(p);
         const ambito = p.parent?.parent?.parent || sf;
         const usi = riferimenti(p.name.text, ambito, p.name);
         return usi.length > 0 && usi.every((r) => usoAmmesso(r, visti));
@@ -153,7 +176,7 @@ test('la sentinella riconosce chi cerca il menu senza l\'aiuto', () => {
     ["await expect(page.locator('[data-sn-icon-id=\"copy\"]')).toBeVisible();", 1],
     ["const n = await page.evaluate(() => document.querySelectorAll('.sn-menu').length);", 1],
     ["const SEL = '.sn-menu-paste-main';\nawait page.locator(SEL).click();", 1],
-    ["const menu = page.locator('.sn-menu');\nawait menu.locator('.sn-menu-item').first().click();", 1],
+    ["const menu = page.locator('.sn-menu');\nawait menu.locator('.sn-menu-item').first().click();", 2],
     [`${imp}await menuDi(page).locator('.sn-menu-item').click();`, 0],
     [`${imp}const menu = menuDi(page);\nconst g = menu.locator('.sn-menu-icon-grid');\nawait g.locator('.sn-menu-icon-btn').click();`, 0],
     [`${imp}await menuDi(page).valuta(() => document.querySelector('.sn-menu').scrollTop);`, 0],

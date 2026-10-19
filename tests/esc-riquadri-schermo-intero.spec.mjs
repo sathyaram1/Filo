@@ -13,6 +13,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mettiNelMenu } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = '<html><body style="margin:0;height:1200px"><p id="t">parola dentro una frase</p></body></html>';
 
@@ -78,10 +79,10 @@ test('menu del tasto destro aperto: il primo Esc chiude il menu, il secondo esce
   await entra(app);
 
   await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
 
   await esc(app);
-  expect(await page.locator('.sn-menu').count(), 'il menu doveva chiudersi col primo Esc').toBe(0);
+  expect(await menuDi(page).locator('.sn-menu').count(), 'il menu doveva chiudersi col primo Esc').toBe(0);
   expect((await stato(app)).cf, 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
 
   await esc(app);
@@ -146,10 +147,10 @@ test('il menu aperto mentre lo schermo intero si spegne da un\'altra strada camb
   const page = await testServer.openReady(openTab, PAGINA);
   await entra(app);
   await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
-  const voce = page.locator('[data-sn-icon-id="fullscreen"]');
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  const voce = menuDi(page).locator('[data-sn-icon-id="fullscreen"]');
   if (await voce.count() === 0) {
-    await page.locator('.sn-menu-row-overflow').first().click();
+    await menuDi(page).locator('.sn-menu-row-overflow').first().click();
     await expect(voce.first()).toBeVisible({ timeout: 8000 });
   }
   await expect.poll(async () => voce.first().getAttribute('aria-label'), { timeout: 8000 })
@@ -236,9 +237,9 @@ test('pagina dei feedback: l\'immagine ingrandita si chiude col primo Esc', asyn
 // Le due voci del menu del tasto destro che aprono un riquadro loro: nessuna
 // delle due sa niente dello schermo intero, e funzionano lo stesso.
 async function voceDelMenu(page, id) {
-  const voce = page.locator(`[data-sn-icon-id="${id}"]`);
+  const voce = menuDi(page).locator(`[data-sn-icon-id="${id}"]`);
   if (await voce.count() === 0) {
-    const overflow = page.locator('.sn-menu-row-overflow').first();
+    const overflow = menuDi(page).locator('.sn-menu-row-overflow').first();
     if (await overflow.count() > 0) await overflow.click();
   }
   return voce.first();
@@ -248,7 +249,7 @@ test('QR code della pagina: il primo Esc chiude il QR, il secondo esce', async (
   const page = await testServer.openReady(openTab, PAGINA);
   await entra(app);
   await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
   await (await voceDelMenu(page, 'qrCode')).click();
   await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 8000 });
   await new Promise((r) => setTimeout(r, 400));
@@ -265,7 +266,7 @@ test('cattura di una parte: il primo Esc annulla la selezione, il secondo esce',
   const page = await testServer.openReady(openTab, PAGINA);
   await entra(app);
   await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
   await (await voceDelMenu(page, 'screenshotCrop')).click();
   await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 8000 });
   await new Promise((r) => setTimeout(r, 400));

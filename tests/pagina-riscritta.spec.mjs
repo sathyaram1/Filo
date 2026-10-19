@@ -3,6 +3,7 @@
 // Regola: patterns/un-documento-riscritto-non-spegne-filo.md (#686.1 giro 7).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function percentOf(app, page) {
   const url = await page.evaluate(() => location.href);
@@ -68,7 +69,7 @@ for (const [nome, riscrivi] of Object.entries(RISCRITTURE)) {
     await expect.poll(async () => percentOf(app, page)).toBe(120);
 
     await page.locator('h1').click({ button: 'right' });
-    const menu = page.locator('.sn-menu');
+    const menu = menuDi(page).locator('.sn-menu');
     await expect(menu, 'il tasto destro non apre il menu di Filo').toBeVisible();
     expect(await menu.evaluate((m) => getComputedStyle(m).position), 'il menu è senza il suo stile').toBe('fixed');
     await menu.getByText(/Dimensione reale \(ora 120%\)/).click();

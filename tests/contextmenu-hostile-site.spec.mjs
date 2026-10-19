@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Feedback alpha: «il tasto destro non funziona su YouTube». Causa: alcuni siti
 // (YouTube, Reddit…) registrano il PROPRIO listener `contextmenu` in cattura al
@@ -29,7 +30,7 @@ test('right-click su sito ostile (handler su document) apre il menu Filo, non qu
   await page.locator('#player').click({ button: 'right' });
   await page.waitForTimeout(300);
   // Il menu Filo compare…
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   // …e quello del sito NO: l'abbiamo pre-emptato registrandoci per primi.
   await expect(page.locator('#site-menu')).toHaveCount(0);
 });
@@ -38,7 +39,7 @@ test('right-click su sito ostile (handler su body) apre il menu Filo, non quello
   const page = await testServer.openReady(openTab, mkHTML('document.body'));
   await page.locator('#player').click({ button: 'right' });
   await page.waitForTimeout(300);
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await expect(page.locator('#site-menu')).toHaveCount(0);
 });
 
@@ -48,5 +49,5 @@ test('Shift + right-click su sito ostile resta escape hatch (nessun menu Filo)',
   await page.locator('#player').click({ button: 'right' });
   await page.keyboard.up('Shift');
   await page.waitForTimeout(300);
-  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
 });

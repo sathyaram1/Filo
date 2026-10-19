@@ -4,6 +4,7 @@
 // Regole: patterns/il-preload-delle-pagine-web-gira-in-sandbox.md.
 
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Il mondo isolato in cui girano page-preload.js e i content script (lo stesso numero di src/preload/mondo-esente.js).
 const MONDO_DEL_PRELOAD = 999;
@@ -34,7 +35,7 @@ test('una scheda web gira in sandbox, senza Node nel mondo del preload, e il tas
   expect(await preferenze(app, { url })).toEqual(SANDBOX);
   expect(await mondoDelPreload(app, url)).toEqual(SENZA_NODE);
   await page.locator('#t').click({ button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
 });
@@ -44,7 +45,7 @@ test('in un riquadro di un altro sito i content script si montano e il menu comp
   const page = await testServer.openReady(openTab, `<p>Fuori</p><iframe id="r" src="${dentro}" width="500" height="300"></iframe>`);
   const riquadro = page.frameLocator('#r');
   await riquadro.locator('#dentro').click({ button: 'right' });
-  await expect(riquadro.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(riquadro).locator('.sn-menu')).toBeVisible();
   const frame = page.frames().find((f) => f.url().includes('blocked.test'));
   await expect.poll(() => frame.evaluate(() => document.documentElement.dataset.filoReady)).toBe('1');
 });
@@ -63,7 +64,7 @@ test('la finestrella di accesso aperta da un sito gira in sandbox, con Filo dent
   expect(await preferenze(app, { url: accesso })).toEqual(SANDBOX);
   expect(await mondoDelPreload(app, accesso)).toEqual(SENZA_NODE);
   await popup.locator('#a').click({ button: 'right' });
-  await expect(popup.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(popup).locator('.sn-menu')).toBeVisible();
 });
 
 test('la shell, normale e in incognito, gira in sandbox e risponde', async ({ app, shell, testServer }) => {

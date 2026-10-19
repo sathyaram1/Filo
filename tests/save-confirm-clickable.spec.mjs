@@ -13,6 +13,7 @@
 //   3. nella lista la scheda salvata è quella evidenziata (data-highlighted).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 test('la conferma di "Salva per dopo" è cliccabile e apre la lista con la scheda evidenziata', async ({ app, openTab, testServer }) => {
   const pageUrl = testServer.html(
@@ -29,7 +30,7 @@ test('la conferma di "Salva per dopo" è cliccabile e apre la lista con la sched
 
   // Apri il menu tasto destro e clicca "Salva per dopo".
   await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const btn = page.locator('.sn-menu [data-sn-icon-id="saveForLater"]');
+  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
   await expect(btn).toBeVisible();
   await btn.click();
 

@@ -3,6 +3,7 @@
 // il correttore non lavora a scheda nascosta, e il main ha un tetto per scheda sulle chiamate automatiche.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="font:20px sans-serif;padding:30px;margin:0">
@@ -138,7 +139,7 @@ test('selezione lunga: niente anticipo, al tasto destro intera; la frase intorno
 
   // Al tasto destro la spiegazione si chiede davvero, con tutta la selezione.
   await page.mouse.click(p.x, p.y, { button: 'right' });
-  const sezione = page.locator('.sn-menu .sn-menu-inline-explain');
+  const sezione = menuDi(page).locator('.sn-menu .sn-menu-inline-explain');
   await expect(sezione).toContainText('Spiegazione di prova', { timeout: 10_000 });
   expect((await conti(app)).spiega).toBe(2);
   expect(await ultima()).toContain('parolafine');
@@ -556,6 +557,6 @@ test('spenta la spiegazione preparata (#818), il doppio clic non la paga; il tas
   await pausa(1500);
   expect((await conti(app)).spiega).toBe(0);
   await page.mouse.click(p.x, p.y, { button: 'right' });
-  await expect(page.locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
+  await expect(menuDi(page).locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
   expect((await conti(app)).spiega).toBe(1);
 });

@@ -4,7 +4,7 @@
 
 const MONDO_CONTENT_SCRIPT = 999;
 
-// IL punto da cambiare quando il menu starà in una vista filo://menu/ sopra la scheda (passo 3 di #1052): oggi è
+// Il solo punto da cambiare quando il menu starà in una vista filo://menu/ sopra la scheda (passo 3 di #1052): oggi è
 // disegnato nel documento della scheda stessa (o del riquadro, se si passa un Frame).
 export function superficieDelMenu(scheda) {
   return scheda;
@@ -32,6 +32,8 @@ export function menuDi(scheda) {
     sottomenu: locator('.sn-menu-sub'),
     /** La griglia di «Altro…». */
     griglia: locator('.sn-menu-icon-grid'),
+    /** L'etichetta che compare sopra un'icona del menu. */
+    etichetta: locator('.sn-tooltip'),
   };
 }
 
@@ -40,24 +42,26 @@ export async function menuAperto(scheda) {
   return (await menuDi(scheda).pannelli.count()) > 0;
 }
 
-// Lo stato del pannello della cronologia degli appunti, dall'hook SN_MENU._test del mondo dei content script: quello
-// isolato sui siti, la pagina stessa su filo://. { voci: [{ testo, incolla, rimuovi, tolta, miniatura, fuocoRimuovi }],
-// vuoto, cerca, svuota, riquadro, lista, sfondo } | null a pannello chiuso.
-export async function statoCronologia(app, scheda) {
+// Esegue `codice` (un'espressione come testo, o una funzione senza argomenti) nel mondo dei content script dove vive il
+// menu: quello isolato sui siti, la pagina stessa su filo://. Lì stanno SN_MENU, SN_VISTO e la cronologia degli appunti.
+export async function nelMondoDelMenu(app, scheda, codice) {
+  if (typeof codice === 'function') codice = `(${codice})()`;
   const superficie = superficieDelMenu(scheda);
   const url = superficie.url();
-  if (url.startsWith('filo://')) return superficie.evaluate(() => globalThis.SN_MENU?._test?.cronologia() ?? null);
-  return app.evaluate(async ({ BrowserWindow }, { u, mondo }) => {
+  if (url.startsWith('filo://')) return superficie.evaluate(codice);
+  return app.evaluate(async ({ BrowserWindow }, { u, mondo, codice }) => {
     for (const win of BrowserWindow.getAllWindows()) {
       const tab = (win._filoTabs?.tabs || []).find((t) => {
         try { return t.view?.webContents?.getURL() === u; } catch (_) { return false; }
       });
-      if (tab) {
-        return tab.view.webContents.executeJavaScriptInIsolatedWorld(mondo, [
-          { code: 'globalThis.SN_MENU?._test?.cronologia() ?? null' },
-        ]);
-      }
+      if (tab) return tab.view.webContents.executeJavaScriptInIsolatedWorld(mondo, [{ code: codice }]);
     }
     return null;
-  }, { u: url, mondo: MONDO_CONTENT_SCRIPT });
+  }, { u: url, mondo: MONDO_CONTENT_SCRIPT, codice });
+}
+
+// Lo stato del pannello della cronologia degli appunti: { voci: [{ testo, incolla, rimuovi, tolta, miniatura,
+// fuocoRimuovi }], vuoto, cerca, svuota, riquadro, lista, sfondo } | null a pannello chiuso.
+export function statoCronologia(app, scheda) {
+  return nelMondoDelMenu(app, scheda, 'globalThis.SN_MENU?._test?.cronologia() ?? null');
 }

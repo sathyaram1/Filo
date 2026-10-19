@@ -5,6 +5,7 @@
 // (url + titolo), così sa da dove parte.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><head><title>Pagina Aiuto Test</title></head>
 <body style="padding:40px;font:16px sans-serif"><h1>Contenuto</h1></body></html>`;
@@ -35,8 +36,8 @@ test('Aiuto dal menu Filo della pagina apre la sidebar SENZA marcatura tab', asy
   const page = await testServer.openReady(openTab, HTML);
   // Percorso base: tasto destro sulla pagina → menu Filo → voce "Aiuto".
   await page.locator('h1').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
-  await page.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 8_000 });
+  await menuDi(page).locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
   await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
   // Nessun contesto tab in questo cammino.
   expect(await page.locator('.sn-sidebar').getAttribute('data-invoked-from')).toBeNull();

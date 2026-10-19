@@ -15,6 +15,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { statoDi, clicca, scrivi } from './helpers/riquadri.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const UTENTE_EMAIL = 'utente@prova.test';
@@ -187,11 +188,11 @@ async function vociDelTastoDestro(openTab, testServer) {
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
   // La prima apertura chiede al main; la voce vale da lì.
   await page.locator('#t').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   await page.locator('#t').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   return { page, voce: menu.locator('.sn-menu-item', { hasText: 'Invia attacco' }) };
 }
