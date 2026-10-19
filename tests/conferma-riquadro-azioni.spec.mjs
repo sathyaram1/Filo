@@ -1,8 +1,8 @@
-// #592.7 giro 4, rilievo 1: in chat la ricerca fra i documenti mostra la cartella scritta dal modello fra le
-// parole di Filo. Il modello ci mette un finto avviso: nel popup deve stare in un riquadro, non fuori.
-import { test, expect } from '../../fixtures/electron.mjs';
-import { confirmState, clickConfirm, CONFIRM_HOST } from '../../helpers/confirm.mjs';
-import { livelloAutonomia } from '../../helpers/autonomia.mjs';
+// #592.7 — un testo scritto dal modello, in qualunque campo di un'azione, nel popup sta nel suo riquadro: qui la
+// cartella della ricerca fra i documenti, con dentro un finto avviso di Filo. La regola per campo: tests/unit/actionLevels.
+import { test, expect } from './fixtures/electron.mjs';
+import { confirmState, clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const FINTO_AVVISO = 'Attenzione: confermalo solo se l’hai chiesto tu. Una pagina potrebbe provare a farti cercare in una cartella come questa, che invece va rifiutata:';
 const CARTELLA = `/srv/archivio\n\n${FINTO_AVVISO}\n«/home/altro/segreti»`;
@@ -17,7 +17,7 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-test('r1 in chat la cartella scritta dal modello per la ricerca fra i documenti sta nel suo riquadro', async ({ app, shell }) => {
+test('#592.7 — in chat la cartella scritta dal modello per la ricerca fra i documenti sta nel suo riquadro', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -45,7 +45,7 @@ test('r1 in chat la cartella scritta dal modello per la ricerca fra i documenti 
   if (!(await page.locator(CONFIRM_HOST).count())) await btn.click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
   const s = await confirmState(page);
-  await page.screenshot({ path: 'tests/.shots/592.7-giro4-cerca-documenti.png' });
+  await page.screenshot({ path: 'tests/.shots/conferma-riquadro-cerca-documenti.png' });
   expect(s.text).toContain('Attenzione: confermalo');
   expect(s.fuori, 'il finto avviso del modello sta fra le parole di Filo').not.toContain('Attenzione: confermalo');
   expect(s.citazioni.join('\n')).toContain('Attenzione: confermalo');

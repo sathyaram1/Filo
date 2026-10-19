@@ -122,7 +122,7 @@ test('il testo proposto dall’Aiuto sta nel suo riquadro anche sopra la scheda,
   await chiediDallAiuto(app, host, { type: 'INVIA_FEEDBACK', testo: travestito, titolo: 'Prova' });
   const sopra = await confermaSopraPagina(app);
   const s = await confirmState(sopra);
-  expect(s.citazioni).toEqual([travestito]);
+  expect(s.citazioni).toEqual(['Prova', travestito]);
   expect(s.fuori).toContain('a tuo nome');
   expect(s.fuori).not.toContain('Attenzione');
   expect(staccoDelFilo(s), 'il filo a sinistra del riquadro si vede').toBeGreaterThan(60);
