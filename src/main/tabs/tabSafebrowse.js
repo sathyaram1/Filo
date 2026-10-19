@@ -315,9 +315,9 @@ const safebrowseMethods = {
   // Un gesto della pagina fermato dall'avviso e confermato si rifà dalla pagina, uguale: l'invio di un modulo coi suoi
   // dati (SN_RIFAI_INVIO), il link «scarica» col nome del suo file (SN_RISCARICA), che l'indirizzo da solo perderebbe.
   // Se la pagina non ha più il gesto da rifare, `altrimenti`. Chi li tiene: il preload e src/content/safebrowseLinks.js.
-  _sbRifaiDallaPagina(tab, funzione, url, altrimenti) {
+  _sbRifaiDallaPagina(tab, funzione, url, altrimenti, nome = '') {
     const wc = tab.view && tab.view.webContents;
-    const code = `(() => { const f = globalThis.${funzione}; return typeof f === 'function' ? f(${JSON.stringify(String(url))}) : false; })()`;
+    const code = `(() => { const f = globalThis.${funzione}; return typeof f === 'function' ? f(${JSON.stringify(String(url))}, ${JSON.stringify(String(nome))}) : false; })()`;
     let p = null;
     try { p = wc && !wc.isDestroyed() ? wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]) : null; } catch (_) { p = null; }
     Promise.resolve(p).then((fatto) => { if (fatto !== true) altrimenti(); }, () => altrimenti());
