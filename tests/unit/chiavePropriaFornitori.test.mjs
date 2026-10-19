@@ -44,6 +44,11 @@ beforeEach(() => {
   };
   globalThis.fetch = async (url, init = {}) => {
     const key = String((init.headers && init.headers.Authorization) || '').replace('Bearer ', '');
+    // Il catalogo a ritenzione zero (#831): qui ogni host elencato la dichiara, la prova è sulla lista di esclusione.
+    if (String(url) === P.ZDR_ENDPOINT) {
+      const data = Object.entries(hostsOf).flatMap(([id, names]) => names.map((n) => ({ model_id: id, provider_name: n, tag: n.toLowerCase() })));
+      return new Response(JSON.stringify({ data }), { status: 200 });
+    }
     if (String(url).endsWith('/endpoints')) {
       const id = String(url).replace(`${P.MODELS_ENDPOINT}/`, '').replace('/endpoints', '');
       const endpoints = (hostsOf[id] || []).map((n) => ({ provider_name: n, tag: n.toLowerCase() }));
