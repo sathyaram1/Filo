@@ -105,41 +105,57 @@ function buildRiquadriVuotiSource(corpi) {
     spazza();
   }
   function ascolta(t) { try { t.addEventListener('load', alLoad, true); } catch (e) {} }
-  function stessaForma(f, v) { try { def(f, 'length', { value: v.length }); } catch (e) {} return f; }
+  // I sostituti somigliano ai nativi a chi li ispeziona (#799): niente prototype né new, stessa lunghezza, testo nativo.
+  var finti = new WeakMap();
+  function comeNativo(f, v, nome) {
+    try { def(f, 'length', { value: v.length, configurable: true }); } catch (e) {}
+    finti.set(f, 'function ' + nome + '() { [native code] }');
+    return f;
+  }
+  function mascheraIn(w) {
+    try {
+      var FP = w.Function.prototype, t = FP.toString;
+      var m = { toString() { return (typeof this === 'function' && finti.get(this)) || t.apply(this, arguments); } }.toString;
+      def(FP, 'toString', { value: comeNativo(m, t, 'toString'), writable: true, enumerable: false, configurable: true });
+    } catch (e) {}
+  }
   function dopo(o, nome, se, poi) {
     var x = o && D(o, nome);
     if (!x || typeof x.value !== 'function') return;
     var v = x.value;
-    var m = {}; m[nome] = function () {
+    var m = { [nome]() {
       var giro = se(this, arguments), r;
       try { r = v.apply(this, arguments); } finally { if (giro) spazza(); }
       if (poi) { try { poi(this, r); } catch (e) {} }
       return r;
-    };
-    try { def(o, nome, { value: stessaForma(m[nome], v), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    } }[nome];
+    try { def(o, nome, { value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function prima(o, nome) {
     var x = o && D(o, nome);
     if (!x) return;
     if (typeof x.value === 'function') {
       var v = x.value;
-      var m = {}; m[nome] = function () { spazza(); var r = v.apply(this, arguments); applicaA(r); return r; };
-      try { def(o, nome, { value: stessaForma(m[nome], v), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+      var m = { [nome]() { spazza(); var r = v.apply(this, arguments); applicaA(r); return r; } }[nome];
+      try { def(o, nome, { value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
       return;
     }
     if (typeof x.get !== 'function') return;
     var g = x.get;
-    try { def(o, nome, { get: function () { spazza(); var r = g.call(this); applicaA(r); return r; }, set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var nuovo = D({ get [nome]() { spazza(); var r = g.call(this); applicaA(r); return r; } }, nome).get;
+    try { def(o, nome, { get: comeNativo(nuovo, g, 'get ' + nome), set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function dopoLaScrittura(o, nome) {
     var x = o && D(o, nome);
     if (!x || typeof x.set !== 'function') return;
     var s = x.set, se = SE.testo(0);
-    try { def(o, nome, { get: x.get, set: function (v) { var giro = se(this, [v]); try { s.call(this, v); } finally { if (giro) spazza(); } }, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var nuovo = D({ set [nome](v) { var giro = se(this, [v]); try { s.call(this, v); } finally { if (giro) spazza(); } } }, nome).set;
+    try { def(o, nome, { get: x.get, set: comeNativo(nuovo, s, 'set ' + nome), enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function proto(w, nome) { var c = w[nome]; return c && c.prototype; }
   function finestra(r) { return r && typeof r === 'object' && r === r.window; }
   function aggancia(w, d) {
+    mascheraIn(w);
     ascolta(d);
     try { new w.MutationObserver(spazza).observe(d, { childList: true, subtree: true }); } catch (e) {}
     var N = proto(w, 'Node');
