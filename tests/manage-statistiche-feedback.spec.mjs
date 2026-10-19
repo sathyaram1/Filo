@@ -1754,6 +1754,46 @@ test('#997 il giro di aggiornamento non porta via l\'esito del controllo già le
   await expect(tile(page, 'audit')).toHaveText('1');
 });
 
+// Una segnalazione NUOVA arriva col giro come riga d'elenco, senza esito: a
+// scheda aperta la si legge intera, o il riquadro dice che l'esito non è letto.
+for (const [come, dettagli, atteso, sotto] of [
+  ['letta intera', 'ok', '1', '0 bocciati'],
+  ['lettura intera fallita', 'ko', '—', 'esito non letto su 1 lavoro'],
+]) {
+  test(`#997 una segnalazione arrivata col giro, ${come}: il controllo di sicurezza non diventa zero`, async ({ openTab }) => {
+    const page = await openTab(URL);
+    const nuova = fb({ _id: 'lv-n', seq: 8, status: 'done', createdAt: g(1), livelli: { l4: { esito: 'pass' } }, _updateTime: 't1' });
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.filo);
+    await page.evaluate(() => window.__mgTest.whenReady());
+    await page.evaluate(() => window.__mgTest.setAdmin(true));
+    await page.evaluate(() => window.__mgTest.setData([]));
+    await apriScheda(page, 'fbstats');
+    // Il registro la nomina già: la lista la porterà il giro.
+    await page.evaluate(() => window.__mgTest.setFsData({
+      feedbacks: [],
+      workerLog: [{ role: 'secaudit', startedAt: new Date(Date.now() - 864e5).toISOString(), num: '8' }],
+    }));
+    await page.locator('[data-fs-range="tutto"]').click();
+
+    const riga = { ...nuova, _proiezione: true };
+    delete riga.livelli;
+    await page.evaluate(({ riga, intera, dettagli }) => {
+      window.__mgTest.setLiveSources({
+        listVersions: async () => [{ _id: riga._id, _updateTime: 't1' }],
+        getMany: async () => [riga],
+        getDettagli: async () => {
+          if (dettagli === 'ko') throw new Error('rete giù');
+          return [intera];
+        },
+      });
+    }, { riga, intera: nuova, dettagli });
+    await page.evaluate(() => window.__mgTest.pollNow());
+    await expect(page.locator('[data-fs-id="audit"] .mg-tile-sub')).toContainText(sotto);
+    await expect(tile(page, 'audit')).toHaveText(atteso);
+  });
+}
+
 // ── 5. La fetta «3 o più» dice quante critiche ha avuto ogni lavoro ─────────
 
 test('#997 aperta la fetta «3 o più», ogni lavoro dice quante critiche ha avuto', async ({ openTab }) => {
