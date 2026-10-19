@@ -884,9 +884,18 @@
         presaInCarico: { mediana: seNotoFb(mediana(attesePresa)), n: seNotoFb(attesePresa.length), ids: attesePresaIds },
         lavorazione: { mediana: seNoto(mediana(durateLavoro)), n: seNoto(durateLavoro.length), ids: durateIds, mancanti: durateMancanti },
       },
-      audit: { pass: seNoto(audit.pass), fail: seNoto(audit.fail), saltato: seNoto(audit.saltato) },
-      auditIds: auditIds,
-      arenati: { lavorazioni: seNoto(arenamenti), feedback: seNoto(feedbackArenati), ids: arenatiIds },
+      // Un esito che manca anche a un solo lavoro fa del conto un minimo: si
+      // dà `null` e `nonLetti` dice su quanti, come per le due sorgenti.
+      audit: {
+        pass: auditNonLetti ? null : seNotiTutti(audit.pass),
+        fail: auditNonLetti ? null : seNotiTutti(audit.fail),
+        saltato: auditNonLetti ? null : seNotiTutti(audit.saltato),
+        nonLetti: auditNonLetti,
+      },
+      auditIds: auditNonLetti
+        ? { pass: [], fail: [], saltato: [], nonLetti: auditNonLettiIds }
+        : { pass: auditIds.pass, fail: auditIds.fail, saltato: auditIds.saltato, nonLetti: [] },
+      arenati: { lavorazioni: seNotiTutti(arenamenti), feedback: seNotiTutti(feedbackArenati), ids: arenatiIds },
       copertura: {
         logDa: logDa,
         logA: logA,
