@@ -104,7 +104,8 @@ function stato() {
   const custodibile = !!portachiavi();
   return {
     configurata: !!fonte, fonte, custodibile,
-    custodita: fonte === 'custodita' || (fonte === 'ambiente' && !!custodita()),
+    // Una copia custodita c'è anche quando la variabile d'ambiente la scavalca: si deve poter togliere.
+    custodita: !!custodita(),
     ...(custodibile ? {} : { motivo: motivoSenzaPortachiavi() }),
   };
 }
