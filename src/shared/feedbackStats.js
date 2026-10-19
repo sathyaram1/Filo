@@ -583,12 +583,18 @@
       // non ha una data leggibile» anche a chi stava guardando le sole persone,
       // con quella segnalazione mandata da una routine.
       if (ms(f && f.createdAt) == null) {
-        if (!filtro || filtro.indexOf(creatoreDi(f)) >= 0) senzaData += 1;
+        if (!filtro || filtro.indexOf(creatoreDi(f)) >= 0) {
+          senzaData += 1;
+          if (f && f._id) senzaDataIds.push(f._id);
+        }
         continue;
       }
       if (!inRange(f && f.createdAt, range)) continue;
       var kind = creatoreDi(f);
-      if (kind === CREATORE_ILLEGGIBILE) mittentiIgnoti += 1;
+      if (kind === CREATORE_ILLEGGIBILE) {
+        mittentiIgnoti += 1;
+        if (f && f._id) mittentiIgnotiIds.push(f._id);
+      }
       conta(perCreatoreTutti, kind);
       if (!idsPerCreatoreTutti[kind]) idsPerCreatoreTutti[kind] = [];
       if (f && f._id) idsPerCreatoreTutti[kind].push(f._id);
