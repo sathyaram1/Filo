@@ -7015,7 +7015,7 @@
       fsTile('lavorati', stat.lavorati.totale, 'Feedback lavorati',
         ko ? noto : (stat.lavorati.verifiche
           ? `${fsNum(stat.lavorati.verifiche)} ${stat.lavorati.verifiche === 1 ? 'verifica partita' : 'verifiche partite'} in questa finestra`
-          : ''), ko ? false : 'espandi'),
+          : ''), esp.lavorati ? 'espandi' : false),
       // Il numero grande conta PARTENZE dell'esplorazione: non sono
       // segnalazioni e non si aprono su niente, quindi il riquadro non promette
       // di aprirsi. A portare alle segnalazioni è la riga piccola, che è
