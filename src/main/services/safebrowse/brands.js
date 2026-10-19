@@ -160,6 +160,7 @@ for (const b of BRANDS) b.domains.push(...(ALTRI_INDIRIZZI[b.token] || []));
 // Marchi che sono anche parole, o stanno dentro parole comuni (pineapple, otherwise, purchase, steampunk): contano
 // solo da soli fra punti e trattini, o in una delle loro forme tipiche; gli altri anche attaccati (paypallogin) (#732).
 // Elenco unico per il controllo all'apertura e per l'avviso sui link: un marchio nuovo che è una parola va aggiunto qui.
+// Un nome di quattro lettere o meno segue la stessa regola anche senza voce: sta dentro troppi nomi (bperfect, thebay).
 const MARCHI_PAROLA = new Map([
   ['apple', ['appleid', 'applepay', 'applesupport', 'applecare', 'appleaccount']],
   ['wise', ['transferwise', 'wisetransfer']],
