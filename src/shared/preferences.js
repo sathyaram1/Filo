@@ -2051,6 +2051,17 @@
     };
   }
 
+  // Le parole con cui l'utente nomina una voce, per sapere se un freno tolto l'ha chiesto lui (#1312): quelle delle
+  // sue chiavi e del nome in pagina, e il valore detto. [] se la chiave non indica una voce sola.
+  function paroleDellaVoce(rawKey, rawVal) {
+    const r = risolviChiave(rawKey);
+    if (!r || !r.setter) return { parole: [], valori: [] };
+    const parole = new Set();
+    for (const t of [...r.setter.keys, nomeVoce(r.setter)]) for (const w of pianoChiave(t).split(' ')) if (w) parole.add(w);
+    const valori = typeof rawVal === 'string' || typeof rawVal === 'number' ? pianoChiave(String(rawVal)).split(' ').filter(Boolean) : [];
+    return { parole: [...parole], valori };
+  }
+
   // Perché una chiave o un valore non si applicano (buildPreferencePartial ha reso null): { rifiuto, perModello }.
   function spiegaNonValida(rawKey, rawVal) {
     const r = risolviChiave(rawKey);
