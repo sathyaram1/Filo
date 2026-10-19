@@ -84,9 +84,10 @@ test.describe('strato acceso', () => {
     const prima = await statoDelloStrato(app);
     expect(prima.aperto || prima.visibile).toBe(false);
 
+    const base = await page.evaluate(() => window.devicePixelRatio);
     for (const f of [1, 1.5, 0.8]) {
       await zoom(app, f);
-      await expect.poll(() => page.evaluate(() => window.devicePixelRatio)).toBeCloseTo(f * (prima.scala || 1) * (1 / (prima.scala || 1)) * (globalThis.__scala || 1) || f, 1);
+      await expect.poll(() => page.evaluate(() => window.devicePixelRatio)).toBeCloseTo(base * f, 2);
       // Nel documento della scheda.
       const p = await centro(page, '#bersaglio', f);
       await page.evaluate(() => { window.visti = []; });
@@ -168,7 +169,7 @@ test.describe('strato acceso', () => {
 
     // Un'altra scheda davanti.
     await apri();
-    const primo = await shell.evaluate(() => window.filoShell.tabs.list().then((l) => l.find((t) => t.active)?.id));
+    const primo = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
     await openTab(testServer.html('<p>altra</p>'));
     await chiuso(app);
     await shell.evaluate((id) => window.filoShell.tabs.activate(id), primo);

@@ -51,7 +51,9 @@ class StratoDelMenu {
       shell.on('input-event', (_e, input) => { if (input && input.type === 'mouseDown') this.nascondi(); });
       shell.on('before-input-event', (e, input) => { if (this.tasto(input)) e.preventDefault(); });
     }
-    this._vista();
+    // Dopo la shell: all'avvio non le contende il caricamento.
+    if (shell && typeof shell.once === 'function' && shell.isLoading()) shell.once('did-finish-load', () => this._vista());
+    else setImmediate(() => this._vista());
   }
 
   get acceso() { return acceso(); }
