@@ -7823,6 +7823,7 @@
       return;
     }
     fsStat = stat;
+    if (fsAperto && !fsEspandibili(stat)[fsAperto]) fsAperto = '';
     // L'elenco aperto su un conto vecchio non vale più: cambiata la finestra o
     // il filtro, quei numeri non sono più quelli. Si richiude da solo invece di
     // restare lì a dire una cosa che la scheda sopra non dice più.
