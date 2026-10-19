@@ -35,7 +35,7 @@ const BRANDS = [
   { token: 'intesa', display: 'Intesa Sanpaolo', domains: ['intesasanpaolo.com', 'intesasanpaolovita.it', 'intesasanpaoloassicura.com', 'intesasanpaoloprivatebanking.it'] },
   { token: 'intesasanpaolo', display: 'Intesa Sanpaolo', domains: ['intesasanpaolo.com', 'intesasanpaolovita.it', 'intesasanpaoloassicura.com', 'intesasanpaoloprivatebanking.it'] },
   { token: 'isybank', unaLetteraAvvisa: true, display: 'Isybank', domains: ['isybank.com', 'isybank.it'] },
-  { token: 'poste', display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it', 'postemobile.it', 'postevita.it', 'postel.it'] },
+  { token: 'poste', display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it', 'postemobile.it', 'postevita.it', 'postel.it', 'postepay.it'] },
   { token: 'bancoposta', unaLetteraAvvisa: true, display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it'] },
   { token: 'nexi', display: 'Nexi', domains: ['nexi.it', 'nexigroup.com'] },
   { token: 'bper', unaLetteraAvvisa: true, display: 'BPER Banca', domains: ['bper.it'] },
