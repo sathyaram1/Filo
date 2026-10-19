@@ -493,8 +493,8 @@ Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
 Invariante, con sentinella: al massimo un compito aperto per feedback.
 
 **Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
-(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), l'esplorazione a coda
-vuota, e i compiti creati a mano dall'owner o da una sessione locale.
+(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), e i compiti creati a
+mano dall'owner o da una sessione locale.
 
 **Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
 server), il blocco di sicurezza (diventa una domanda), la segnalazione (diventa
@@ -540,7 +540,6 @@ fidato e figlio. I nipoti contano come figli.
 | Revisione delle domande, posta | 30 |
 | Unione di feedback | 20 |
 | Potatura dei rami | 5 |
-| Esplorazione | sotto tutto, solo a coda vuota |
 
 Cosa garantisce la scala:
 
@@ -633,13 +632,13 @@ scrive: con i compiti quella lettura si toglie.
   Quindi i lavori server li fa una routine dedicata, con Filo e filo-security
   collegati e la rete limitata:
   - la sua parola d'ordine ha `lavori: server` (`routine-keys.mjs lavori`) e
-    riceve solo lavori server fidati, mai l'esplorazione; le altre chiavi non
+    riceve solo lavori server fidati; le altre chiavi non
     ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
     diff dal server senza clonare;
   - il pacemaker la accende con una voce sua (`routineIdServer` in config,
     segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
     se c'è un lavoro server che nascerebbe pulito. Decide prima di A/B, che
-    altrimenti riempirebbero ogni posto anche con l'esplorazione, e prende i
+    altrimenti riempirebbero ogni posto, e prende i
     posti che le spettano nell'ordine di priorità della coda: a pari priorità
     il server, e un lavoro normale più urgente non lo ferma se A/B non
     possono accendere. Conta nel

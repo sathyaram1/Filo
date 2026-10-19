@@ -117,10 +117,6 @@ test('busta assente o incartata male → pacchetto vuoto, mai un feedback invent
   assert.equal(serverCtx({ role: 'new-work' }, { server: BUSTA }).feedback, null);
 });
 
-test('chi esplora non riceve niente', () => {
-  assert.deepEqual(serverCtx({ role: 'prober' }, BUSTA), {});
-});
-
 test('lo storico delle critiche passa dalla busta al pacchetto (e manca senza rompere)', () => {
   const history = [{ verdict: 'fail', critique: 'esce con lo zoom' }];
   const conStorico = Object.assign({}, BUSTA, {
@@ -169,8 +165,8 @@ test('una busta senza niente dentro NON si consegna, per chi il feedback lo deve
 
 test('un lavoro senza il feedback a cui si riferisce NON si consegna', () => {
   assert.match(checkEnvelope({ role: 'new-work', id: '' }), /senza il feedback/);
-  // L'esplorazione è l'unica che non ha un feedback: quella passa.
-  assert.equal(checkEnvelope({ role: 'prober', id: '' }), null);
+  // Nessun ruolo ne è esente, nemmeno chi lavora sul solo diff.
+  assert.match(checkEnvelope({ role: 'secaudit', id: '', branch: 'worker/x' }), /senza il feedback/);
 });
 
 test('un rifiuto NON è un guasto: sono due esiti diversi', () => {

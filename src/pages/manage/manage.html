@@ -2030,8 +2030,8 @@
                 </label>
                 <p class="mg-auto-block-desc">
                   Spente, le sessioni automatiche partono ma non fanno niente: nessun
-                  lavoro sul codice, nessuna verifica, nessuna esplorazione. I feedback
-                  restano in coda e ti aspettano.
+                  lavoro sul codice, nessuna verifica. I feedback restano in coda e ti
+                  aspettano.
                   <span class="mg-action-msg" id="mgRoutinesMsg" role="status"></span>
                 </p>
               </section>
@@ -2094,20 +2094,6 @@
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                 </div>
-              </section>
-
-              <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
-              <section class="mg-auto-block" id="mgProberIdleBlock">
-                <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
-                  <span class="mg-switch-text">Esplora quando la coda è vuota</span>
-                  <input type="checkbox" id="mgProberIdle" checked />
-                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                </label>
-                <p class="mg-auto-block-desc">
-                  Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
-                  nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
-                  <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
-                </p>
               </section>
 
               <!-- I lavori server alle routine (#1159): spento, restano alle sessioni locali. -->
