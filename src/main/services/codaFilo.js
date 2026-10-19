@@ -79,7 +79,7 @@ async function togliPagine(ids, opts) {
   let tolte = 0;
   for (const p of tutte0) {
     if (!voluti.has(String(p.id))) continue;
-    tolte += await F().cancellaPagine({ da: p.ts, a: p.ts, sito: C().sito(p.url) }, opts);
+    tolte += await F().cancellaPagine({ da: p.ts, a: p.ts, sito: C().sito(p.url), url: p.url }, opts);
   }
   return tolte;
 }
