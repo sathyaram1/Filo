@@ -34,7 +34,10 @@ async function configura(app, { compattatore = 'PREFERENZE:\nÈ vegetariano (fon
       if (joined.includes('integrare le nuove lezioni')) return { ...base, text: globalThis.__q_compattatore };
       if (joined.includes('Classifichi le conversazioni')) return { ...base, text: JSON.stringify({ tipo: 'conversazione', titolo: 'Cibo' }) };
       globalThis.__q_prompt.push(joined);
-      return { ...base, text: 'Ne terrò conto.' };
+      // Un giro con le azioni che il modello emette, se la prova le ha messe in fila.
+      const giro = (globalThis.__q_giri || []).shift();
+      if (giro && giro.toolCalls) return { ...base, text: '', toolCalls: giro.toolCalls, finishReason: 'tool_calls' };
+      return { ...base, text: (giro && giro.text) || 'Ne terrò conto.' };
     };
     globalThis.SN_PROVIDERS.completeWithFallback = rispondi;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = rispondi;
@@ -132,6 +135,29 @@ test('correggo in «vegano»: al turno dopo Filo usa la correzione, e la riga ti
   await expect(page.locator('.qd-errore:not([hidden])')).toContainText('800');
   await expect(page.locator('.qd-campo')).toBeFocused();
   expect((await memoria(app)).PREFERENZE).toBe('È vegano');
+});
+
+test('a parole «non sono vegetariano, sono vegano»: la riga cambia e tiene le sue fonti, come dal quaderno', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await configura(app);
+  await turno(app, 'chat-cibo', 'sono vegetariano');
+  await expect.poll(async () => (await lezioni(app)).length, { timeout: 10_000 }).toBe(1);
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_COMPACT_MEMORY }, { url: 'filo://quaderno/quaderno.html' }));
+  expect((await memoria(app)).PREFERENZE).toBe('È vegetariano');
+  const prima = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.quaderno()).moduli.find((m) => m.nome === 'PREFERENZE').righe[0].fonti);
+
+  await app.evaluate(() => {
+    globalThis.__q_giri = [
+      { toolCalls: [{ id: 'c1', name: 'CORREGGI_MEMORIA', arguments: JSON.stringify({ testo: 'vegetariano', nuovo: 'È vegano' }) }] },
+      { text: 'Corretto.' },
+    ];
+  });
+  await turno(app, 'chat-correzione', 'non sono vegetariano, sono vegano');
+  await expect.poll(async () => (await memoria(app)).PREFERENZE, { timeout: 10_000 }).toBe('È vegano');
+  const dopo = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.quaderno()).moduli.find((m) => m.nome === 'PREFERENZE').righe[0]);
+  expect(dopo.fonti).toEqual(prima);
+  expect(dopo.corretta).toBeTruthy();
 });
 
 test('tolgo una riga: sparisce, il prompt non la vede, non ricompare dallo stesso tratto, e dalle nascoste si rimette', async ({ app, shell, openTab }) => {
