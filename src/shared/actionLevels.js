@@ -29,7 +29,7 @@
   // verso un posto che non sa dire. I nomi risolti dal DNS escono sempre, anche chiesti a un resolver locale.
   const RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m|git|ssh|scp|sftp|rsync|ftp|tftp|telnet|nc|ncat|netcat|socat|start-bitstransfer)\b/i;
   const DNS = /\b(?:ping|nslookup|dig|whois|traceroute|tracert|resolve-dnsname|test-netconnection)\b/i;
-  const HOST_URL = /\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s\/?#@]*@)?(\[[^\]\s]*\]|[^\s\/:?#@]*)/gi;
+  const HOST_URL = /\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s\/?#@"'`^]*@)?(\[[^\]\s]*\]|[^\s\/:?#@"'`^]*)/gi;
   const HOST_UTENTE = /[\w.+-]+@((?:[\w-]+\.)*[\w-]+)(?=[:\s\/]|$)/g;
   const HOST_NUDO = /(?<![\w@.\/-])((?:[\w-]+\.)+[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?![\w-])/gi;
   function questoComputer(host) {
