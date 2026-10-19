@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lancio, OPZIONI_FIXTURE, REGOLE_HOST } from '../helpers/appCondivisa.mjs';
+import { argomentiScala } from '../helpers/scala.mjs';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'electron.mjs');
 const codice = readFileSync(FIXTURE, 'utf8').split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
