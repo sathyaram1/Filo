@@ -1,4 +1,5 @@
-// #824 giro 9: porte del giro 8 ri-provate e porte nuove (esplorazione).
+// #824 giro 9: r1 invio di un modulo vero che non passa dal suo bottone, r2 accesso in testata scambiato per
+// sessione scaduta, r3 testo mandato attraverso il service worker del sito.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
@@ -72,7 +73,7 @@ async function scriviEManda(app, shell, page, titolo) {
   return id;
 }
 
-test('giro 8 r1: un modulo vero mandato dalla pagina con uno script e respinto dal sito tiene aperta la scheda', async ({ app, shell }) => {
+test('r1 un modulo vero mandato dalla pagina con uno script e respinto dal sito tiene aperta la scheda', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
     const link = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Forum</title>
@@ -102,7 +103,7 @@ test('giro 8 r1: un modulo vero mandato dalla pagina con uno script e respinto d
   } finally { await sito.chiudi(); }
 });
 
-test('giro 8 r3: un modulo mandato bene a un sito con l’accesso in testata non protegge la scheda', async ({ app, shell }) => {
+test('r2 un modulo mandato bene a un sito con l’accesso in testata non protegge la scheda', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
     const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Scrivici</title>${TESTATA}
@@ -113,7 +114,7 @@ test('giro 8 r3: un modulo mandato bene a un sito con l’accesso in testata non
   } finally { await sito.chiudi(); }
 });
 
-test('nuova: un post mandato da una finestrella attraverso il service worker del sito non protegge la scheda', async ({ app, shell }) => {
+test('r3 un post mandato da una finestrella attraverso il service worker del sito non protegge la scheda', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
     const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Social</title>
