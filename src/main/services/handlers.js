@@ -2746,8 +2746,15 @@ async function eseguiAzioneFilo(action, {
         broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
         return { executed: true, kept: false, output: { tolte: r.tolte } };
       }
-      case 'EVENTO_CALENDARIO':
-        return { executed: false, kept: true };
+      case 'EVENTO_CALENDARIO': {
+        // Filo PROPONE: nel calendario l'evento entra col bottone. `proposta`
+        // lo dice alla chat, che senza lo racconterebbe come non riuscito; data
+        // e ora si controllano qui, non nel calendario dell'utente.
+        const C = globalThis.SN_CALENDAR;
+        const v = C ? C.verifica(action) : { errore: 'calendario non disponibile' };
+        if (!v.evento) return { executed: false, kept: false, output: { event: 'invalid', error: v.errore } };
+        return { executed: false, kept: true, output: { proposta: true, evento: v.evento } };
+      }
       case 'CAPACITA_DETTAGLIO': {
         // Lookup del manifesto delle capacità (F2): l'agente chiede il dettaglio
         // di una o più voci per id; glielo restituiamo come output, che il client
@@ -3004,7 +3011,13 @@ async function eseguiAzioneFilo(action, {
           if (!tm) return { executed: false, kept: confirmed, output: { error: 'nessuna finestra con schede' } };
           try {
             const r = await tm.runAutoTriage({ trigger: 'manual' });
-            return { executed: true, kept: confirmed, output: { archived: (r && r.archived) || 0 } };
+            const archived = (r && r.archived) || 0;
+            // Un riordino mai partito (già in corso, o senza giudizio e niente archiviato) non si racconta come riuscito.
+            if (!archived && r && (r.giaInCorso || r.giudizioMancato)) {
+              const error = r.giaInCorso ? 'un riordino è già in corso' : 'Filo non è riuscito a valutare le schede';
+              return { executed: false, kept: false, output: { archived: 0, giaInCorso: !!r.giaInCorso, giudizioMancato: !!r.giudizioMancato, error } };
+            }
+            return { executed: true, kept: confirmed, output: { archived } };
           } catch (e) {
             return { executed: false, kept: false, output: { error: String(e?.message || e) } };
           }
@@ -3318,6 +3331,12 @@ async function eseguiAzioneFilo(action, {
         }
         const win = winOf(sender);
         if (!win) return { executed: false, kept: false };
+        // Chi è già nella home non ci si porta: ricaricarla butterebbe via il
+        // lavoro e la risposta prima che l'utente li legga (il bottone per
+        // svuotare la conversazione lo mette la chat).
+        if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
+          return { executed: true, kept: true, output: { window: 'home', already: true } };
+        }
         if (cmd === 'fullscreen') {
           // Schermo intero "immersivo": la view attiva copre l'intera finestra e
           // le barre (schede + indirizzo) spariscono — è ciò che l'utente intende
@@ -4401,6 +4420,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const saltati = Array.isArray(o.saltati) && o.saltati.length
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
+  }
+  // La home chiesta da chi è già nella home: non è stato ricaricato niente, e
+  // il modello non deve dire di averlo portato da qualche parte.
+  if (type === 'COMANDO_FINESTRA' && res.output && res.output.already) {
+    return 'La home È la pagina da cui l\'utente ti sta scrivendo: non ho ricaricato niente, perché ricaricarla '
+      + 'cancellerebbe questa conversazione. Diglielo in una riga; sotto la tua risposta trova un bottone per svuotarla lui.';
   }
   if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
     const A = globalThis.SN_AUTONOMIA;

@@ -611,8 +611,20 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530).
-      Att.riordinaSchede();
+      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530). L'esito si legge
+      // sul suggerimento stesso: un riordino mai partito non deve somigliare a uno in cui non c'era niente da chiudere.
+      const testo = vicino && vicino.querySelector('.dash-carta-voce-testo');
+      const prima = testo ? testo.textContent : '';
+      if (vicino) vicino.disabled = true;
+      if (testo) testo.textContent = 'Riordino in corso…';
+      const e = await Att.riordinaSchede();
+      if (e.annullato) {
+        if (testo) testo.textContent = prima;
+        if (vicino) vicino.disabled = false;
+        return;
+      }
+      if (testo) testo.textContent = `${e.ok ? '✓' : '✗'} ${e.testo}`;
+      if (!e.ok && vicino) { vicino.disabled = false; vicino.title = `${e.motivo} Puoi riprovare.`; }
       return;
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va

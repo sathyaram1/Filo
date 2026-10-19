@@ -329,13 +329,9 @@
   // "/pulisci" (o "/pulizia"): il riordino delle schede con la stessa regola e lo stesso popup della chat (#530).
   async function runTabCleanup(chat) {
     showFiloLine('🧹 Riordino in corso…', chat);
-    const r = await global.SN_DASH_ATTIVITA.riordinaSchede();
-    if (r.annullato) { showFiloLine('Riordino annullato.', chat); return; }
-    if (r.errore) { showFiloLine(`Riordino non riuscito: ${r.errore}.`, chat); return; }
-    const n = r.archived;
-    showFiloLine(n > 0
-      ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}.`
-      : '✓ Nessuna scheda da archiviare.', chat);
+    const e = await global.SN_DASH_ATTIVITA.riordinaSchede();
+    if (e.annullato) { showFiloLine('Riordino annullato.', chat); return; }
+    showFiloLine(e.ok ? `✓ ${e.testo}.` : `✗ ${e.testo}: ${e.motivo}`, chat);
   }
 
   // "/riordina": riordina la striscia delle schede per colore, esattamente come

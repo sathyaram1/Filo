@@ -13,10 +13,16 @@
       features: [
         'Se paghi con una tua chiave OpenRouter, nelle Opzioni trovi «Con la mia chiave, usa anche i fornitori esclusi». Acceso, le richieste pagate con la tua chiave possono andare anche ai fornitori che Filo esclude, quindi funzionano anche modelli come Gemini o Grok. È spento di serie e lo accendi anche chiedendolo a Filo. Coi crediti di Filo l\'esclusione resta.',
         'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
+        'Quando chiedi a Filo di segnarti un appuntamento, il bottone «Aggiungi al calendario» ora funziona davvero: apre l’evento nel calendario del tuo computer, con giorno, ora, durata e note già scritti. Un compleanno o una scadenza, che un’ora non ce l’hanno, entrano come evento di tutto il giorno, le ferie occupano tutti i loro giorni e un viaggio arriva fino al giorno del ritorno. Se le date non tornano, Filo ti dice cosa non va. Prima il bottone era spento e la proposta non portava da nessuna parte.',
       ],
       fixes: [
         'L\'archivio che esporti da Sicurezza non porta più le tue chiavi API, nemmeno quelle copiate o scritte in chat, a meno che tu non spunti «Includi le chiavi». Importarlo non tocca le chiavi che hai già. Gli archivi fatti prima le contengono, quindi trattali come una password. Su un computer senza portachiavi di sistema, Filo ti dice una volta che salva le chiavi in chiaro.',
         'Filo non chiede più a Google le icone dei siti che ti suggerisce nella home o che apre per te in chat, e Google non vede più quali siti frequenti. Usa quelle già viste nelle tue schede, nell\'archivio e nelle pagine salvate, o le chiede al sito stesso.',
+        'Se chiedi un comando mentre la modalità terminale è spenta, Filo torna a spiegarti perché non è partito, e il riquadro ti porta dove si accende. Prima restava un «Azione non riuscita» che non diceva niente a chi non sapeva dell’esistenza di quell’interruttore.',
+        'Quando confermi un’impostazione dopo che Filo ha già risposto, la riga in cima al blocco del lavoro la conta, invece di restare su «Come ha lavorato».',
+        'Quando confermi un’azione nel popup, il diario del lavoro la registra e il bottone diventa la ricevuta di quello che è successo. Se invece non riesce, il bottone ti dice perché, al posto di un semplice «Non eseguita».',
+        'Il riordino delle schede che non riesce a partire te lo dice, invece di rispondere «nessuna scheda da archiviare» come quando è andato tutto bene e non c\'era niente da chiudere. Vale dalla chat, dal suggerimento della home e da «/pulisci».',
+        'Se chiedi «portami alla home» mentre sei già nella home, Filo non ricarica più la pagina: prima si portava via quello che aveva appena fatto e la risposta, prima che tu potessi leggerle. Ora te lo dice, e sotto la risposta hai un bottone per svuotare la conversazione quando hai finito.',
       ],
     },
     {
