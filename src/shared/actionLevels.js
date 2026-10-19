@@ -70,7 +70,7 @@
     'aggiung', 'rimuov', 'disabilit', 'abilit', 'sblocc', 'lev', 'port', 'pass', 'usa', 'usi', 'fid', 'consent', 'permett',
     'scegli', 'torn', 'riport', 'inser', 'salv'];
   const VERBI_CANCELLA = ['cancell', 'elimin', 'svuot', 'azzer', 'reset', 'pulisc', 'pulir', 'tog', 'butt', 'rimuov', 'dimentic',
-    'scord', 'distrugg', 'via'];
+    'scord', 'distrugg'];
   const PAROLE_COMUNI = new Set(['della', 'delle', 'degli', 'dello', 'nella', 'nelle', 'sulla', 'quanto', 'solo', 'sempre',
     'tutto', 'tutti', 'tutte', 'filo', 'fare', 'cosa', 'cose', 'anche', 'come', 'questo', 'questa', 'quello', 'quella',
     'imposta', 'attiva', 'disattiva', 'accendi', 'spegni', 'aggiungi', 'togli', 'alza', 'abbassa', 'nuovo', 'nuova', 'true',
