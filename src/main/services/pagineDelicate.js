@@ -3,7 +3,7 @@
 // La regola sta in src/shared/pagineDelicate.js; dall'incognito non si scrive niente su disco.
 
 const { getDomainInfo } = require('./safebrowse/psl');
-const { ElencoSiti } = require('./stessoSito');
+const { ElencoSiti } = require('../../shared/stessoSito');
 
 const PD = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
 
