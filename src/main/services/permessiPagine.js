@@ -550,7 +550,8 @@ function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
 // Prima si sceglie, poi si dice sì: Chromium chiama il gestore dello schermo DENTRO il sì a getDisplayMedia, e lì
 // consegna la scelta. La strada vecchia (getUserMedia con chromeMediaSource) arriva con gli stessi dati ma non passa
 // dal gestore e prenderebbe schermo intero e audio senza scelta. Di solito la pagina la gira su getDisplayMedia e avvisa
-// (preload/schermo-vecchio.js, `schermoVecchio`): dopo la scelta riceve no. Chi lo aggira si ferma prima di riceverli.
+// (preload/schermo-vecchio.js, anche nei riquadri vuoti: riquadri-vuoti.js): dopo la scelta riceve no. Chi lo aggira si
+// ferma prima di riceverli.
 const ANTEPRIMA_SCHERMO = { width: 240, height: 135 };
 
 // Il frame avvisa che la sua prossima domanda dello schermo viene dalla strada vecchia: dopo la scelta la risposta è no.
