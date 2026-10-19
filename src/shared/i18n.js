@@ -607,10 +607,15 @@
       'a cui somiglia, l\'età, il certificato, se la pagina chiede una password), mai il contenuto della ' +
       'pagina. Può solo renderlo sospetto, mai dichiararlo sicuro o pericoloso, e in incognito non parte. ' +
       'Usa il modello scelto in Modelli alla voce «Rilevamento siti pericolosi — giudizio».',
-    options_security_safebrowse_sandbox: 'Prova i link sospetti in una finestra isolata',
+    options_security_safebrowse_sandbox: 'Scopri in una finestra isolata dove portano i link accorciati',
     options_security_safebrowse_sandbox_desc:
-      'La finestra nascosta e senza i tuoi dati in cui Filo proverebbe un link sospetto prima che tu lo ' +
-      'apra. Oggi nessuna funzione la usa, e una pagina che hai già aperto non ci torna mai.',
+      'Quando tieni fermo il puntatore per mezzo secondo su un link accorciato (bit.ly e simili) o su un ' +
+      'rimando noto, o ci arrivi col tasto Tab, Filo controlla dove porta prima che tu clicchi. Cerca il ' +
+      'link e la sua destinazione nella lista nera di Google e, se la destinazione non è scritta nel link, ' +
+      'lo apre in una finestra nascosta e senza i tuoi dati. La finestra si chiude appena il rimando rivela ' +
+      'la destinazione, così il sito d\'arrivo non riceve visite prima del tuo clic. Una finestra alla ' +
+      'volta, mai in incognito, mai su una pagina che hai già aperto. Spento, resta solo la lista nera. ' +
+      'Sugli altri link, e col dito su uno schermo touch, prima del clic non parte niente.',
     options_security_safebrowse_key_managed:
       'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma. ' +
       'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
