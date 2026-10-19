@@ -1,4 +1,5 @@
-// Esplorazione del giro 11 di #824: invii di moduli che lasciano il testo solo nella pagina di prima.
+// #824 giro 11, rilievo 1: un modulo mandato in un'altra scheda o in un riquadro lascia il testo nella sua casella,
+// e la pulizia deve tenere aperta la scheda come per ogni casella col testo ancora lì.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
@@ -26,9 +27,8 @@ async function apriSito() {
     req.on('end', () => {
       const p = req.url.split('?')[0];
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      if (p === '/modulo') return res.end(MODULO('/invia'));
       if (p === '/modulo-nuova') return res.end(MODULO('/anteprima', 'target="_blank"'));
-      if (p === '/invia') return res.end(`<!doctype html><title>Contatti</title><p style="color:red">Codice di controllo sbagliato, riprova.</p>${MODULO('/invia').replace(/^[\s\S]*<form/, '<form')}`);
+      if (p === '/modulo-riquadro') return res.end(MODULO('/anteprima', 'target="dietro"') + '<iframe name="dietro" style="width:10px;height:10px"></iframe>');
       if (p === '/anteprima') return res.end('<!doctype html><title>Anteprima</title><p>Anteprima del messaggio');
       return res.end('<!doctype html><title>Altra</title><p>altra');
     });
@@ -50,35 +50,20 @@ async function archiviaTutto(app, shell, sito) {
 
 const LETTERA = 'Buongiorno, vi scrivo per il rimborso del biglietto del treno di sabato scorso';
 
-test('esplora: modulo respinto con una pagina 200 che lo ripropone vuoto', async ({ app, shell }) => {
-  const sito = await apriSito();
-  try {
-    const page = await apriEsatta(app, shell, `${sito.o}/modulo`);
-    await page.locator('#n').click(); await page.keyboard.type('Anna');
-    await page.locator('#c').click(); await page.keyboard.type(LETTERA);
-    await expect.poll(async () => (await schede(shell)).find((t) => t.title === 'Contatti')?.formDirty, { timeout: 8000 }).toBe(true);
-    const id = (await schede(shell)).find((t) => t.title === 'Contatti').id;
-    await page.locator('#pub').click();
-    await expect(page.locator('text=Codice di controllo sbagliato')).toBeVisible();
-    await page.waitForTimeout(800);
-    const aperte = await archiviaTutto(app, shell, sito);
-    console.log('RESPINTO-200 aperta:', aperte.includes(id));
-  } finally { await sito.chiudi(); }
-});
-
-test('esplora: modulo mandato in una scheda nuova lascia il testo nella casella', async ({ app, shell }) => {
-  const sito = await apriSito();
-  try {
-    const page = await apriEsatta(app, shell, `${sito.o}/modulo-nuova`);
-    await page.locator('#c').click(); await page.keyboard.type(LETTERA);
-    await expect.poll(async () => (await schede(shell)).find((t) => t.title === 'Contatti')?.formDirty, { timeout: 8000 }).toBe(true);
-    const id = (await schede(shell)).find((t) => t.title === 'Contatti').id;
-    await page.locator('#pub').click();
-    await expect.poll(async () => (await schede(shell)).some((t) => t.title === 'Anteprima'), { timeout: 8000 }).toBe(true);
-    await page.waitForTimeout(800);
-    console.log('NUOVA-SCHEDA testo nel campo:', JSON.stringify(await page.locator('#c').inputValue()));
-    console.log('NUOVA-SCHEDA formDirty:', (await schede(shell)).find((t) => t.id === id)?.formDirty);
-    const aperte = await archiviaTutto(app, shell, sito);
-    console.log('NUOVA-SCHEDA aperta:', aperte.includes(id));
-  } finally { await sito.chiudi(); }
-});
+for (const [nome, percorso] of [['in una scheda nuova', '/modulo-nuova'], ['in un riquadro della pagina', '/modulo-riquadro']]) {
+  test(`r1 il testo rimasto nella casella dopo un modulo mandato ${nome} tiene aperta la scheda`, async ({ app, shell }) => {
+    const sito = await apriSito();
+    try {
+      const page = await apriEsatta(app, shell, `${sito.o}${percorso}`);
+      await page.locator('#c').click();
+      await page.keyboard.type(LETTERA);
+      await expect.poll(async () => (await schede(shell)).find((t) => t.title === 'Contatti')?.formDirty, { timeout: 8000 }).toBe(true);
+      const id = (await schede(shell)).find((t) => t.title === 'Contatti').id;
+      await page.locator('#pub').click();
+      await page.waitForTimeout(1500);
+      expect(await page.locator('#c').inputValue()).toBe(LETTERA);
+      const aperte = await archiviaTutto(app, shell, sito);
+      expect(aperte).toContain(id);
+    } finally { await sito.chiudi(); }
+  });
+}
