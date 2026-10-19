@@ -576,7 +576,7 @@ trigger ricalcola l'urgenza del suo compito aperto.
   Routine → Automazioni. Oggi: primo lavoro Opus `xhigh`, le altre Opus `high`.
 - **Compiti senza feedback:** dal ricorrente (§ 4.1) o da chi crea il compito.
   «Gestisci la risposta» resta Opus (§ 3.5), sforzo `high`.
-- **Figli** (§ 12.2): modello e sforzo del padre.
+- **Compiti figli** (§ 12.2): modello e sforzo del padre.
 - Ogni agente può lanciare sotto-agenti, fino a tre livelli sotto la sessione
   principale, e sceglierne il modello.
 
