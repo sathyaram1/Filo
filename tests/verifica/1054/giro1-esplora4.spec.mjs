@@ -21,6 +21,8 @@ for (const acceso of [false, true]) {
       const page = await apri(openTab, testServer, HTML);
       const menu = menuDi(page);
       const esiti = {};
+      await page.locator('#c').click();
+      await page.keyboard.press('Control+a');
       await page.locator('#c').click({ button: 'right' });
       await expect(menu.principale).toBeVisible();
       esiti.html = await menu.principale.evaluate((e) => [...e.querySelectorAll('*')].filter((x) => /Modifica|Aiuto/.test(x.textContent) && x.children.length === 0).map((x) => `${x.tagName}.${x.className}|${x.parentElement.className}`));
