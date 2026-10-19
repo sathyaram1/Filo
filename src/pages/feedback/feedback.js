@@ -776,7 +776,7 @@
     // rimasto sullo schermo. Gli altri campi (stato, priorità) restano liberi.
     if (item.reportIllegibile && payload && typeof payload.notes === 'string') {
       alert('Il report di questo feedback non è leggibile su questo computer: manca la chiave privata. '
-        + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Carica la chiave (Gestione → Routine → Automazioni) e riprova.');
+        + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Carica la chiave (Gestione → Automazioni) e riprova.');
       return false;
     }
     // Stessa regola, altro motivo: la conversazione non è mai arrivata, quindi

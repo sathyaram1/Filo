@@ -605,7 +605,7 @@ module.exports = function register(on, ctx) {
       if (C && C.isEncryptedBytes && C.isEncryptedBytes(raw)) {
         const priv = await getPrivateKey();
         if (!priv) {
-          return { ok: false, error: 'Immagine cifrata, e su questo computer manca la chiave dei feedback. Caricala da Gestione → Routine → Automazioni.' };
+          return { ok: false, error: 'Immagine cifrata, e su questo computer manca la chiave dei feedback. Caricala da Gestione → Automazioni.' };
         }
         try {
           bytes = await C.decryptBytes(raw, priv);
