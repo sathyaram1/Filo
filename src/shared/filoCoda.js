@@ -201,7 +201,7 @@
   }
 
   // Cerca nel filo senza passare dal modello: parole nei messaggi (anche delle altre app), nei titoli e negli indirizzi
-  // delle pagine visitate, e nel contenuto delle schede chiuse (riassunto ed estratto che la Cronologia tiene).
+  // delle pagine visitate, e nel contenuto delle schede chiuse (riassunto ed estratto che il loro archivio tiene).
   // Tutte le parole devono esserci; dal più recente.
   function cerca({ chats = [], pagine = [], schede = [] } = {}, q, { max = 40 } = {}) {
     const ts = termini(q);
