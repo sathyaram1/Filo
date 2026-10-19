@@ -100,5 +100,11 @@ test('la scelta cambiata da fuori (a parole) si vede nella pagina Opzioni già a
   await dash.evaluate(async (p) => window.filo.message({ type: 'update_settings', settings: p }), partial);
   await opz.bringToFront();
   await expect(opz.locator('#ordineHost')).toHaveValue('throughput', { timeout: 10_000 });
-  await opz.screenshot({ path: 'tests/.shots/1121-giro3-opzioni.png', fullPage: false });
+  for (const tema of ['light', 'dark']) {
+    await app.evaluate(async (_e, t) => { await globalThis.SN_STORAGE.updateSettings({ theme: t }); }, tema);
+    await opz.reload();
+    await opz.locator('#sec-host-order').scrollIntoViewIfNeeded();
+    await opz.locator('#ordineHost').focus();
+    await opz.screenshot({ path: `tests/.shots/1121-giro3-opzioni-${tema}.png`, fullPage: false });
+  }
 });
