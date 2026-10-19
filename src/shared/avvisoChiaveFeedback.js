@@ -126,7 +126,7 @@
       btn.disabled = true;
       scriviEsito('');
       const r = await carica(invia);
-      btn.disabled = false;
+      btn.disabled = !!ricarica;
       if (r && r.ok) {
         noto = r;
         scriviEsito(TESTI.caricata, 'ok');
