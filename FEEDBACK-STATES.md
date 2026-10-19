@@ -533,6 +533,10 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   bilanci `cap3/cap2/cap1/cap0`, uno per livello, li scrive SOLO l'owner in `config/routines`
   (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
   verifica locale li legge dal server e senza si ferma.)*
+  *(Dal 2026-10-15, #795: alla chiusura di un lavoro, per qualunque strada, i suoi giri
+  — data, livelli trovati, esterni, corretti, bilancio pagato, esito; mai il testo dei
+  rilievi — passano nella collezione `routine-giri`, chiusa alle app; lo stato del giro
+  si azzera come prima. Li stampa `node scripts/storico-giri.mjs --da … --a …`.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`npm run regole:pubblica`).
