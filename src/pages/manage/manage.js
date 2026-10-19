@@ -4286,7 +4286,7 @@
   }
 
   const RIAPERTURA_ILLEGGIBILE = 'La conversazione di questo feedback non è leggibile su questo computer '
-    + '(manca la chiave privata): riaprirlo adesso sostituirebbe il report. Configura la chiave e riprova.';
+    + '(manca la chiave privata): riaprirlo adesso sostituirebbe il report. Carica la chiave (Gestione → Routine → Automazioni) e riprova.';
 
   // Il resto della segnalazione non è arrivato: scrivere adesso metterebbe
   // questo testo al posto del report. Vale per tutti i tasti che appendono
@@ -4684,7 +4684,7 @@
     const T = window.SN_FEEDBACK_THREAD;
     if (T && T.reportUnreadable && T.reportUnreadable(oldNotes)) {
       setClarifyMsg('La conversazione di questo feedback non è leggibile su questo computer (manca la chiave privata): '
-        + 'rispondere adesso la sostituirebbe. Configura la chiave e riprova.', 'err');
+        + 'rispondere adesso la sostituirebbe. Carica la chiave (Gestione → Routine → Automazioni) e riprova.', 'err');
       return;
     }
     // Lo stesso guardiano delle azioni di stato: rispondere rimette in coda, e

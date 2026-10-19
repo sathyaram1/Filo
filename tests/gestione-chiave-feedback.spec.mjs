@@ -129,7 +129,7 @@ function fileDentro(dir) {
     let st;
     try { st = statSync(p); } catch (_) { continue; }
     if (st.isDirectory()) out.push(...fileDentro(p));
-    else if (st.size < 5 * 1024 * 1024) out.push(p);
+    else if (st.isFile() && st.size < 5 * 1024 * 1024) out.push(p);
   }
   return out;
 }
@@ -158,6 +158,10 @@ test('senza chiave la Gestione lo dice; caricata dal file, le segnalazioni torna
   await expect(carica).toBeVisible();
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: join(SHOTS, 'gestione-chiave-avviso.png') });
+  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: join(SHOTS, 'gestione-chiave-avviso-scuro.png') });
+  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'system'; });
 
   // La bacheca senza chiave sta ferma: niente pubblicato alla cieca.
   expect(await app.evaluate(() => globalThis.__banco.pubblicate.length)).toBe(0);
@@ -187,8 +191,10 @@ test('senza chiave la Gestione lo dice; caricata dal file, le segnalazioni torna
   // 4. La chiave non è in chiaro su disco, e nessun messaggio verso le pagine la porta.
   const userData = await app.evaluate(({ app: a }) => a.getPath('userData'));
   expect(existsSync(join(userData, 'chiave-feedback.bin')), 'la chiave non è stata custodita').toBe(true);
-  for (const f of fileDentro(userData)) {
-    expect(readFileSync(f).includes(Buffer.from(priv)), `la chiave in chiaro in ${f}`).toBe(false);
+  const letti = fileDentro(userData).map((f) => { try { return [f, readFileSync(f)]; } catch (_) { return [f, null]; } });
+  expect(letti.some(([f, b]) => b && /storage\.json$/.test(f)), 'storage.json non letto').toBe(true);
+  for (const [f, b] of letti) {
+    if (b) expect(b.includes(Buffer.from(priv)), `la chiave in chiaro in ${f}`).toBe(false);
   }
   const uscite = await app.evaluate(() => globalThis.__banco.uscite);
   expect(uscite.some((u) => u.startsWith('risposta:feedback_chiave_carica')), 'la spia non ha visto il caricamento').toBe(true);
