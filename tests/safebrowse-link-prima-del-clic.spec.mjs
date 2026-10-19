@@ -420,6 +420,55 @@ test('un file travestito che il sito nomina solo rispondendo: l\'avviso lo ferma
   } finally { await s.chiudi(); }
 });
 
+// Come gli allegati di una chat o della posta cifrata: il file lo prepara la pagina, e c'è solo il suo nome.
+test('un file travestito che la pagina costruisce da sé (blob, data): l\'avviso lo ferma; «Continua» lo scarica col suo nome', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, '<title>Chat</title><button id="blob">allegato</button><button id="data">allegato</button><script>'
+    + 'function scarica(href) { var a = document.createElement("a"); a.href = href; a.download = "fattura.pdf.exe";'
+    + ' document.body.appendChild(a); a.click(); a.remove(); }'
+    + 'document.getElementById("blob").onclick = function () { scarica(URL.createObjectURL(new Blob(["MZ00"]))); };'
+    + 'document.getElementById("data").onclick = function () { scarica("data:application/octet-stream;base64,TVowMA=="); };'
+    + '</script>');
+  await fuocoAllaPagina(app);
+  const avviso = await (async () => {
+    await contaScaricamenti(app);
+    await clicFermato(app, '#blob');
+    return vistaAvviso(app);
+  })();
+  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
+  await expect(avviso.getByRole('button', { name: 'Continua' })).toBeEnabled({ timeout: 5_000 });
+  await avviso.getByRole('button', { name: 'Continua' }).click();
+  await expect.poll(() => scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }, { nome: 'fattura.pdf.exe', fermato: false }]);
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+
+  // Scritto dentro il link: lo stesso, in una scheda nuova (la conferma vale per la sua scheda).
+  await testServer.openReady(openTab, '<title>Chat</title><button id="data">allegato</button><script>'
+    + 'document.getElementById("data").onclick = function () { var a = document.createElement("a");'
+    + ' a.href = "data:application/octet-stream;base64,TVowMA=="; a.download = "fattura.pdf.exe"; document.body.appendChild(a); a.click(); };'
+    + '</script>');
+  await fuocoAllaPagina(app);
+  await contaScaricamenti(app);
+  await clicFermato(app, '#data');
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  await expect(avviso.getByText(/«fattura\.pdf\.exe»/)).toBeVisible();
+  expect(await scaricamenti(app)).toEqual([{ nome: 'fattura.pdf.exe', fermato: true }]);
+});
+
+test('un file travestito su un sito noto (Dropbox, il CDN di Discord): al clic l\'avviso nomina il file', async ({ app, openTab, testServer }) => {
+  await contaLaRete(app, {});
+  await testServer.openReady(openTab, '<title>Chat</title>'
+    + '<a id="dropbox" href="https://www.dropbox.com/s/abc/fattura.pdf.exe">fattura</a>'
+    + '<a id="discord" href="https://cdn.discordapp.com/attachments/1/2/foto.jpg.scr">foto</a>');
+  await fuocoAllaPagina(app);
+  await expect.poll(() => verdettoPronto(app, 'https://cdn.discordapp.com/attachments/1/2/foto.jpg.scr')).toBe('sospetto');
+  await clicFermato(app, '#dropbox');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento/)).toBeVisible();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  expect(await richiesteVerso(app, 'dropbox.com')).toEqual([]);
+});
+
 test('un modulo verso un indirizzo da avviso: confermato, il sito riceve i dati, nella scheda e in una scheda nuova', async ({ app, openTab }) => {
   const modulo = (id, extra) => `<form id="${id}" method="post" action="/invio/${id}.pdf.exe?x=1" ${extra}>`
     + '<input name="nome" value="Mario"><input name="action" value="campo"><button name="scelta" value="si">Invia</button></form>';
