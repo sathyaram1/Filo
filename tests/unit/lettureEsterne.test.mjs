@@ -42,6 +42,18 @@ test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, rice
   assert.equal(L.motivoLettura(null), '');
 });
 
+test('classificatore: la lista dei passi, il riassunto e i capitoli dell’app desktop non sporcano; le sue letture sì (#1252)', () => {
+  const mcp = (tool_name) => L.motivoLettura({ tool_name, tool_input: { plan: [{ step: 'leggi https://x.it', status: 'pending' }], summary: 'fatto' } });
+  for (const n of ['mcp__ccd_turn__update_plan', 'mcp__ccd_turn__wrap_up', 'mcp__ccd_session__mark_chapter', 'mcp__ccd_turn__mark_chapter']) assert.equal(mcp(n), '', n);
+  // Le trascrizioni di altre sessioni, i widget, il browser, uno strumento qualsiasi; e i nomi che somigliano ai puliti
+  // senza esserlo: un altro server, un altro strumento, un a capo in coda.
+  for (const n of ['mcp__ccd_session__list_events', 'mcp__ccd_turn__list_events', 'mcp__ccd_widget__read_widget_context', 'mcp__Claude_Browser__navigate',
+    'mcp__Claude_Browser__get_page_text', 'mcp__github__get_file_contents', 'mcp__posta__update_plan', 'mcp__posta__mark_chapter', 'mcp__xccd_turn__mark_chapter',
+    'mcp__ccd__mark_chapter', 'mcp__ccd_turn__update_plan_x', 'mcp__ccd_turn__wrap_up__x', 'mcp__ccd_x__list_events__mark_chapter', 'mcp__ccd_turn__mark_chapter\n']) {
+    assert.equal(mcp(n), n.trim(), JSON.stringify(n));
+  }
+});
+
 test('classificatore: un artefatto sporca anche quando si pubblica; solo aprirlo, appuntarlo e cancellarlo no (#1211.2)', () => {
   const artefatto = (action, altro = {}) => L.motivoLettura({ tool_name: 'Artifact', tool_input: { action, ...altro } });
   assert.equal(artefatto('read', { url: 'https://claude.ai/artifact/x' }), 'Artifact (read)');
