@@ -444,7 +444,8 @@ test('un file travestito che la pagina costruisce da sé (blob, data): l\'avviso
     + ' a.href = "data:application/octet-stream;base64,TVowMA=="; a.download = "fattura.pdf.exe"; document.body.appendChild(a); a.click(); };'
     + '</script>');
   await fuocoAllaPagina(app);
-  await contaScaricamenti(app);
+  // La sessione è la stessa: si azzera l'elenco, l'ascoltatore resta quello di prima.
+  await app.evaluate(() => { globalThis.__scaricamenti = []; });
   await clicFermato(app, '#data');
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   await expect(avviso.getByText(/«fattura\.pdf\.exe»/)).toBeVisible();
