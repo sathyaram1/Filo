@@ -77,8 +77,6 @@ async function fotografaNelMain() {
   }
   await globalThis.__filoStorage.whenSettled();
   const storage = JSON.stringify(await globalThis.chrome.storage.local.get(null));
-  const w = globalThis.require ? null : null;
-  void w;
   globalThis.__filoAppCondivisa = { globali, oggetti, storage };
 }
 
