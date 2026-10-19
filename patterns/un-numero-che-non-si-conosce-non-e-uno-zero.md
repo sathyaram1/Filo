@@ -50,7 +50,9 @@ come «non letta» e lo dice col suo numero (`audit.nonLetti`); un conto che ha
 bisogno di tutte e due le sorgenti (i documenti dei lavori che il registro
 nomina) esce `null` se ne manca una qualunque. E chi aggiorna un documento
 intero con una riga riletta la FONDE (`SN_FEEDBACK_LIVE.applyChanges`), non la
-sostituisce: sostituirla cancellava il campo che si era letto.
+sostituisce: sostituirla cancellava il campo che si era letto. Una segnalazione
+NUOVA arrivata come riga si legge intera, una volta, se il conto che la vuole
+è davanti agli occhi; se quella lettura non torna, resta il «non letto».
 
 Due cose da non confondere:
 
