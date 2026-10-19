@@ -161,8 +161,9 @@ non fidato. Dopo, solo «🤝 Segna fidato» in Gestione (callable `ownerFiducia
 comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nascono non fidati, e L5 torna a valere. Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
 (fidati prima) e L5 (§4b, e ROUTINE-AUTH-SPEC.md).
 
-**La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
-scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
+**La prova del mittente** (#595, #912, #1037): un nome riservato vale solo con `senderProof`, che
+scrivono alla nascita l'admin (owner, sessioni, esploratore) e il server (routine). Dopo, nessun
+client la aggiunge né la cambia, nemmeno l'admin: le regole non la ammettono in un update. Senza, è un utente
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
 Dalla copia dell'owner (#953) firmano tutte le strade: riquadro, chat, riapertura dalla bacheca
 (`owner:uid:<uid>`). La segnalazione che Filo scrive in chat e l'owner conferma è sua (`owner:filo:chat`, fidata) solo

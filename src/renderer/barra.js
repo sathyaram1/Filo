@@ -200,7 +200,7 @@
 
   // ── il sistema: ora e voci fisse ─────────────────────────────────────────
   const FISSE = [
-    { comando: 'history', icona: 'history', etichetta: 'Cronologia' },
+    { comando: 'history', icona: 'memory', etichetta: 'Memorie' },
     { comando: 'apps', icona: 'apps', etichetta: 'App' },
     { comando: 'redteam', icona: 'redteam', etichetta: 'Red-team' },
     { comando: 'account', icona: 'user', etichetta: 'Profilo' },

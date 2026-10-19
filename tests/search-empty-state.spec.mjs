@@ -1,7 +1,7 @@
 // Feedback #217: una ricerca senza risultati NON deve mostrare il testo di
-// "archivio realmente vuoto" ("Nessuna tab archiviata, per ora." /
-// "Nessuna interazione AI registrata." / "Nessuna scheda salvata…"), che fa
-// credere all'utente di aver perso i propri dati.
+// "archivio realmente vuoto" ("Nessuna interazione AI registrata." / "Nessuna
+// scheda salvata…"), che fa credere all'utente di aver perso i propri dati.
+// La ricerca del filo nella home dice «Niente nel filo per …» (dashboard-cerca.js).
 //
 // ASSERISCE il successo: con contenuti presenti e una query che non matcha
 // nulla, lo stato vuoto dice "Nessun risultato…" (e svuotando la query i
@@ -9,48 +9,6 @@
 // archivio/cronologia vuoti — questi assert diventano rossi.
 
 import { test, expect } from './fixtures/electron.mjs';
-
-const PAGE = `<!doctype html><html><head><title>Sito Ricerca</title></head>
-<body style="margin:0"><div style="height:600px">contenuto</div></body></html>`;
-
-test('archivio: ricerca senza risultati dice "Nessun risultato", non "archivio vuoto"', async ({ shell, openTab, testServer }) => {
-  // Archivia una scheda chiudendola.
-  await testServer.openReady(openTab, PAGE);
-  const tabId = await shell.evaluate(async () => {
-    const snap = await window.filoShell.tabs.snapshot();
-    return snap.activeId;
-  });
-  await shell.evaluate(async (id) => window.filoShell.tabs.close(id), tabId);
-
-  const archive = await openTab('filo://archive/archive.html');
-  await archive.waitForLoadState('domcontentloaded');
-  const chip = archive.locator('.arc-tab', { hasText: 'Sito Ricerca' });
-  await expect(chip).toBeVisible({ timeout: 8_000 });
-
-  // Query che non matcha nulla → messaggio "nessun risultato", con la query.
-  await archive.fill('#search', 'zzzznomatch');
-  const empty = archive.locator('#empty');
-  await expect(empty).toBeVisible();
-  await expect(empty).toHaveText(/Nessun risultato per "zzzznomatch"/);
-  await expect(empty).not.toContainText('Nessuna tab archiviata');
-
-  // Svuotando la ricerca l'archivio ricompare: nulla è stato cancellato.
-  await archive.fill('#search', '');
-  await expect(chip).toBeVisible();
-  await expect(empty).toBeHidden();
-});
-
-test('archivio davvero vuoto: resta il testo di default anche con una query', async ({ openTab }) => {
-  const archive = await openTab('filo://archive/archive.html');
-  await archive.waitForLoadState('domcontentloaded');
-  const empty = archive.locator('#empty');
-  await expect(empty).toBeVisible({ timeout: 8_000 });
-  await expect(empty).toHaveText('Nessuna tab archiviata, per ora.');
-  // Con l'archivio vuoto la query non deve trasformare il messaggio in un
-  // fuorviante "nessun risultato": il problema è che non c'è nulla, punto.
-  await archive.fill('#search', 'qualcosa');
-  await expect(empty).toHaveText('Nessuna tab archiviata, per ora.');
-});
 
 test('cronologia AI: ricerca/filtro senza risultati non dicono "nessuna interazione registrata"', async ({ openTab }) => {
   const history = await openTab('filo://history/history.html');

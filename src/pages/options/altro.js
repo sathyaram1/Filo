@@ -127,7 +127,8 @@
     deleteBtn.addEventListener('click', async () => {
       const text = I18n.t('options_category_delete_confirm', cat.name);
       const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: I18n.t('options_category_delete'), text, okLabel: I18n.t('options_category_delete') })
+        // Il nome della categoria può averlo scritto il modello che le crea: nel suo riquadro (#592.7).
+        ? await window.SN_CONFIRM_UI.confirm({ title: I18n.t('options_category_delete'), text, parti: ['Eliminare la categoria', { citazione: String(cat.name || '') }, 'Le schede diventeranno non categorizzate.'], okLabel: I18n.t('options_category_delete') })
         : window.confirm(text); // fallback se il modulo non è caricato
       if (!ok) return;
       await chrome.runtime.sendMessage({ type: MSG.DELETE_CATEGORY, id: cat.id });
@@ -266,7 +267,7 @@
       chrome.tabs.create({ url: 'filo://history/history.html' });
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openSpellcheck').addEventListener('click', () => {
       chrome.tabs.create({ url: 'filo://spellcheck/spellcheck.html' });

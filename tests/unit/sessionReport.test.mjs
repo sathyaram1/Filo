@@ -958,3 +958,19 @@ test('il marcatore di un altro biglietto non dà il momento del rilascio', async
     assert.equal(readTicketSince(base), since);
   } finally { togliCartella(base); }
 });
+
+// #882: chi confronta costi di prima e di dopo un cambio di prezzi deve vedere dove sta il salto.
+test('ogni rapporto porta la versione del listino, e un prezzo cambiato senza nuova versione è rosso', async () => {
+  const { LISTINO, VERSIONI, VELOCE, VELOCE_RIPIEGO } = await import('../../scripts/session-report.mjs');
+  const { createHash } = await import('node:crypto');
+  // Cambiando PREZZI, VERSIONI o i moltiplicatori della modalità veloce: LISTINO va alla data del nuovo listino, e qui si aggiunge la sua impronta.
+  const IMPRONTE = { '2026-10-06': '13fddb51dfc48202' };
+  const impronta = createHash('sha256').update(JSON.stringify({ p: PREZZI, v: VERSIONI, f: VELOCE, fr: VELOCE_RIPIEGO })).digest('hex').slice(0, 16);
+  assert.equal(IMPRONTE[LISTINO], impronta, `listino cambiato (impronta ${impronta}) senza una versione nuova in LISTINO`);
+  assert.equal(rapportoVuoto().listino, LISTINO);
+  const rep = await analizzaRighe([assistant('a', 'claude-opus-5-5', { input_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 1 }, [], T('00:00'))], { role: 'resolver' });
+  assert.equal(rep.listino, LISTINO, 'anche il rapporto di una sessione vera');
+  assert.match(riassunto(rep)[3], new RegExp(`listino ${LISTINO}`));
+  const senza = await generaRapporto({ transcript: join(cartellaTemporanea(), 'non-esiste.jsonl'), role: 'resolver' });
+  assert.equal(senza.listino, LISTINO, 'anche il rapporto minimo, senza transcript');
+});

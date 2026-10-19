@@ -414,6 +414,7 @@
     const ok = await window.SN_CONFIRM_UI.confirm({
       title: 'Eliminare il mazzo?',
       text: `"${deck ? deck.nome : ''}" verrà eliminato definitivamente.`,
+      parti: deck && deck.nome ? ['Il mazzo', { citazione: deck.nome }, 'verrà eliminato definitivamente.'] : null,
       okLabel: 'Elimina',
     });
     if (!ok) return;
@@ -1131,6 +1132,7 @@
     const ok = await window.SN_CONFIRM_UI.confirm({
       title: 'Svuotare la chat?',
       text: `La conversazione su "${deck.nome}" sparisce per sempre. Il mazzo resta com'è.`,
+      parti: deck.nome ? ['La conversazione sul mazzo', { citazione: deck.nome }, "sparisce per sempre. Il mazzo resta com'è."] : null,
       okLabel: 'Svuota',
     });
     if (!ok) return;
@@ -2418,6 +2420,7 @@
       const ok = await window.SN_CONFIRM_UI.confirm({
         title: 'Eliminare il mazzo?',
         text: `"${current.nome}" verrà eliminato definitivamente.`,
+      parti: current.nome ? ['Il mazzo', { citazione: current.nome }, 'verrà eliminato definitivamente.'] : null,
         okLabel: 'Elimina',
       });
       if (!ok) return;

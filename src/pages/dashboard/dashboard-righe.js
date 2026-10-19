@@ -164,7 +164,9 @@
     // L'Aiuto non tiene la sua conversazione: il filo è l'unica copia. Editor e Mazzi la tengono.
     const resta = a && r.vista.app !== 'aiuto' ? ` ${a.nel[0].toUpperCase()}${a.nel.slice(1)} la conversazione resta.` : '';
     const testo = `«${r.vista.testo}» sparisce dal filo, e Filo non la ritrova più cercando.${resta}`;
-    const ok = C ? await C.confirm({ title: 'Togliere la conversazione dal filo?', text: testo, okLabel: 'Togli' }) : false;
+    // Il soggetto lo scrive chi ha dato il nome alla conversazione (per l'Aiuto, il sito): nel suo riquadro (#592.7).
+    const parti = ['La conversazione', { citazione: String(r.vista.testo || '') }, `sparisce dal filo, e Filo non la ritrova più cercando.${resta}`];
+    const ok = C ? await C.confirm({ title: 'Togliere la conversazione dal filo?', text: testo, parti, okLabel: 'Togli' }) : false;
     if (!ok) return;
     await d.send({ type: MSG.FILO_CHAT_DELETE, id: r.vista.id });
     r.el.remove();

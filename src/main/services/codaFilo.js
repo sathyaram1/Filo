@@ -68,11 +68,35 @@ async function serveGiornata(opts) {
   return C().serveGiornata(dati.chats);
 }
 
+// Una frase intera («la discussione di ieri sulla coscienza») non trova niente se pretende ogni parola: allora si cerca
+// con le parole che distinguono, come faceva la Cronologia, e la risposta lo dice (`allargata`).
 async function cerca(q, opts) {
   const { dati } = await tutte(opts);
   let schede = [];
   try { schede = await globalThis.SN_ARCHIVED_TABS.list(); } catch (_) { schede = []; }
-  return C().cerca({ chats: dati.chats, pagine: dati.pagine, schede }, q);
+  const fonti = { chats: dati.chats, pagine: dati.pagine, schede };
+  const r = C().cerca(fonti, q);
+  if (r.messaggi.length || r.pagine.length) return r;
+  const CA = globalThis.SN_CHAT_ARCHIVE;
+  const forti = CA && CA.terminiCheDistinguono ? CA.terminiCheDistinguono(r.termini) : [];
+  if (!forti.length || forti.length >= r.termini.length) return r;
+  const largo = C().cerca(fonti, forti.join(' '));
+  if (largo.messaggi.length || largo.pagine.length) return { ...largo, allargata: true };
+  // Ultimo passo: almeno una parola che distingue, prima chi ne ha di più.
+  const conti = new Map();
+  for (const w of forti) {
+    const uno = C().cerca(fonti, w);
+    for (const v of [...uno.messaggi, ...uno.pagine]) {
+      const k = v.k === 'msg' ? `m|${v.chat}|${v.i}` : `p|${v.url}`;
+      const c = conti.get(k);
+      if (c) c.n += 1; else conti.set(k, { v, n: 1 });
+    }
+  }
+  if (!conti.size) return r;
+  const ordine = [...conti.values()].sort((a, b) => b.n - a.n || (Date.parse(b.v.ts) || 0) - (Date.parse(a.v.ts) || 0)).map((x) => x.v);
+  const messaggi = ordine.filter((v) => v.k === 'msg');
+  const pagine = ordine.filter((v) => v.k !== 'msg');
+  return { messaggi: messaggi.slice(0, 40), pagine: pagine.slice(0, 40), termini: forti, tanti: ordine.length, allargata: true };
 }
 
 // Una pagina tolta dal filo: si cerca per id fra quelle che il filo ha, mai con ora e indirizzo mandati dalla pagina.

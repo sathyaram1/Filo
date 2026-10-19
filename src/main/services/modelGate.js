@@ -62,10 +62,10 @@
   }
 
   // Chi servirebbe il modello è tutto ammesso? Non spende: legge solo l'elenco degli host (#1141).
-  async function hostVerdict({ provider = 'openrouter', apiKey, model, providerRouting } = {}) {
+  async function hostVerdict({ provider = 'openrouter', apiKey, model, providerRouting, filoPays } = {}) {
     const P = providerOf(provider);
     if (!P || typeof P.hostVerdict !== 'function') return { ok: true };
-    return P.hostVerdict({ apiKey, model, providerRouting });
+    return P.hostVerdict({ apiKey, model, providerRouting, filoPays });
   }
 
   function limitError() {
@@ -126,10 +126,13 @@
       let rimedio = '';
       try { funzione = funzioneDi(action) || ''; } catch (_) {}
       try { rimedio = rimedioDi(s, action, err) || ''; } catch (_) {}
-      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoHostEsclusi(err.hosts), rimedio });
+      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoNessunHost(err), rimedio });
       return err;
     }
     const DAL_ROUTER = new Set(['complete', 'streamComplete', 'embed']);
+    // La ritenzione zero (#831) ha la frase condivisa su ogni strada; le altre frasi di voce e dettatura restano loro.
+    const zdrDi = (err) => Boolean(err && /^zdr/.test(String(err.reason || '')));
+    const conLaFrase = (err, s, action, method) => (DAL_ROUTER.has(method) || zdrDi(err) ? conLaFunzione(err, s, action) : err);
 
     // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
@@ -306,7 +309,7 @@
         r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
       } catch (e) {
         m.errore(e, { modello: a.model, host: e && e.hostFallito });
-        throw DAL_ROUTER.has(method) ? conLaFunzione(e, s, action) : e;
+        throw conLaFrase(e, s, action, method);
       }
       const usage = r.usage;
       const { servedBy, violation } = noteServed(s, action, { ...r, model: r.model || a.model });
@@ -401,6 +404,7 @@
           seen = noteServed(s, action, { servedBy, model: a.model, keySource: somma.keySource });
           costEur = await recordCost(s, action, a.provider, a.model, somma);
         }
+        if (esito.fermo) conLaFrase(esito.fermo, s, action, 'decisions');
         if (esito.fermo && fineCrediti(esito.fermo) && !risposte) throw esito.fermo;
         if (esito.fermo && !risposte && !esito.interrotto) {
           ultimo = esito.fermo;

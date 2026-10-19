@@ -21,7 +21,7 @@ export const CAMPIONE_MS = 5000;
 // Sul ramo della misura finish:check non trova aree toccate e non corre spec: senza questi la misura vedrebbe solo gli
 // unit. Quattro spec di aree diverse, quanti ne sceglie la mediana di un ramo vero, lanciati dopo il comando come li
 // lancia finish:check, perché pesino Electron e i display come in un lavoro.
-export const SPEC_MISURA = Object.freeze(['tab-archive', 'options-default-models', 'feedback-attach-files', 'context-menu']);
+export const SPEC_MISURA = Object.freeze(['tab-archive', 'options', 'feedback-attach-files', 'context-menu']);
 
 /** L'ambiente di un worker della corsa: il suo numero e quanti insieme. PURA. */
 export function ambienteWorker(env, indice, paralleli) {

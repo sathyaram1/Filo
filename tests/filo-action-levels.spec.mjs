@@ -246,7 +246,7 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
   expect(cd.needsConfirm).toBeFalsy();
   const dopo = await execAction(app, scarica, DOPO_UNA_RICERCA);
   expect(dopo.needsConfirm).toBe(3);
-  const cartella = (r) => (String(r.describe).match(/Cartella di lavoro: *(\S+)/) || [])[1];
+  const cartella = (r) => (String(r.describe).match(/Cartella di lavoro:\s*(\S+)/) || [])[1];
   expect(cartella(prima)).toBeTruthy();
   expect(cartella(dopo)).toBeTruthy();
   expect(cartella(dopo)).not.toBe(cartella(prima));

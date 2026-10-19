@@ -472,7 +472,7 @@ test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dall
       for (const [nome, msg] of Object.entries(porte())) res[prov][nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
     }
     const rimaste = (await A.list()).map((x) => x.title);
-    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://archive/archive.html' });
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://quaderno/quaderno.html' });
     return { res, rimaste, daFilo };
   }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA });
 

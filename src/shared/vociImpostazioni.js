@@ -80,8 +80,6 @@
         DOCUMENTI_STATO: 'CERCA_DOCUMENTI',
         DOCUMENTI_DIMENTICA: 'IMPOSTA_PREFERENZA',
         DOCUMENTI_SCEGLI_CARTELLA: 'apre la finestra del sistema per scegliere una cartella: dalla chat la cartella si dice col suo percorso (cartelle_documenti)',
-        FILO_MEMORY_VIEW: 'DIMENTICA',
-        FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
         DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei tetti della chat e delle risposte per mostrarli accanto ai campi: non salva niente',
         FILO_RESTART_ONBOARDING: 'pulsante che fa un’azione (rifà l’intervista di benvenuto): resta nella pagina',

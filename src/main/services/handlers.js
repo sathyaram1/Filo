@@ -967,7 +967,14 @@ async function lezioniAutomaticheConsentite({ sender = null, contesto = null, fo
   } catch (_) { return false; }
 }
 
-async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
+// Le righe che l'utente ha tolto dal quaderno: lezioni e compattatore le vedono per non riscriverle (#872).
+async function testoRigheTolte() {
+  const tolte = (await FiloMem.righeTolte()).filter((t) => t.testo);
+  return tolte.map((t) => `- ${t.testo}`).join('\n');
+}
+
+// `fonti`: gli eventi del filo di questo scambio (la domanda e la risposta), che le lezioni ricordano (#872).
+async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = [] }) {
   try {
     const settings = await getEffectiveSettings();
     if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_LESSON)) return;
@@ -975,9 +982,10 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
     const { profilo, preferenze } = FiloMem.renderMemoryForPrompt(memory);
     const lezioniText = await lessonsBufferText();
     const interazione = `UTENTE: ${userMessage || ''}\nFILO: ${filoReply || ''}`;
+    const tolte = await testoRigheTolte();
     const r = await handleAIRequest({
       action: ACTIONS.FILO_LESSON,
-      payload: { profilo, preferenze, lezioni: lezioniText, interazione, stato: stateText },
+      payload: { profilo, preferenze, lezioni: lezioniText, interazione, stato: stateText, tolte },
       origin: 'filo:lesson',
       intera: true,
     });
@@ -990,7 +998,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
       // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
       const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
       if (l.rifiuto) { console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
-      if (l.testo) await FiloMem.appendLesson(l.testo);
+      if (l.testo) await FiloMem.appendLesson(l.testo, { fonti });
     }
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -1010,26 +1018,35 @@ async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
     if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
+    const inizio = new Date().toISOString();
+    // Le fonti per prime: la loro versione dice se l'utente ha cambiato qualcosa dopo questa lettura (#872).
+    const meta = await FiloMem.getFonti();
     const memory = await FiloMem.getMemory();
-    const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
     if (!buf.length) return false;
-    const lezioniText = buf.map((l) => `- ${l.text}`).join('\n');
+    // Ogni riga e ogni lezione col suo segno: il compattatore cita i segni, e le fonti passano alle note (#872).
+    const Q = globalThis.SN_QUADERNO;
+    const { moduli, lezioni, rif } = Q.perCompattatore(memory, meta, buf);
     const r = await handleAIRequest({
       action: ACTIONS.FILO_COMPACT,
-      payload: { moduli: moduliText, lezioni: lezioniText },
+      payload: { moduli, lezioni, tolte: await testoRigheTolte() },
       origin: 'filo:compact',
       intera: true,
     });
     const text = (r?.text || '').trim();
+    const versione = meta.versione || 0;
+    let applicata;
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
-      await FiloMem.clearLessonsBuffer();
-      return true;
+      applicata = await FiloMem.applicaCompattazione({ patch: {}, usate: buf, versione });
+    } else {
+      const letto = Q.leggiCompattatore(FiloMem.parseCompactorOutput(text), {
+        rif, meta, tolte: meta.nascoste, ora: inizio,
+      });
+      if (letto.scartate.length) console.warn(`[Filo] compattatore: ${letto.scartate.length} righe tolte dall'utente non rimesse`);
+      applicata = await FiloMem.applicaCompattazione({ patch: letto.patch, righe: letto.righe, usate: buf, versione });
     }
-    const patch = FiloMem.parseCompactorOutput(text);
-    if (Object.keys(patch).length) await FiloMem.patchMemory(patch);
-    await FiloMem.clearLessonsBuffer();
-    return true;
+    if (!applicata) console.warn('[Filo] compattatore: l\'utente ha cambiato la memoria mentre lavorava, riparte al giro dopo');
+    return applicata;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
     return false;
@@ -1114,6 +1131,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   }
   try { require('../movimento').segui(merged); } catch (_) {}
   try { require('../shortcuts').configura(merged); } catch (_) {}
+  try { require('../confermeSopraPagina').seguiTema(merged); } catch (_) {}
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   avvisaSeLaProntezzaCambia().catch(() => {});
   try {
@@ -1682,7 +1700,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
       if (chiesti && !confermato) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
       const Levels = globalThis.SN_ACTION_LEVELS;
       const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
-      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
+      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo, ...(Levels ? { parti: Levels.describeParts(azione) } : {}) };
     }
   }
   if (typeof apri === 'function') apri();
@@ -2207,6 +2225,28 @@ async function eseguiAzioneFilo(action, {
       }
     } catch (_) {}
     action._righe = righeDaDimenticare.map((r) => r.testo);
+    // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
+    action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+  }
+
+  // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
+  let rigaDaCorreggere = null;
+  if (type === 'CORREGGI_MEMORIA') {
+    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+    }
+    let trovate = [];
+    try {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        trovate = await FiloMem.linesWithText(visti && Array.isArray(visti.righe) ? visti.righe : []);
+      } else {
+        trovate = (await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? ''))
+          .filter((r) => r.via && typeof r.via.sempreAperta !== 'string');
+      }
+    } catch (_) {}
+    action._righe = trovate.map((r) => r.testo);
+    rigaDaCorreggere = trovate.length === 1 ? trovate[0] : null;
   }
 
   // «Tieni sempre aperto X» (#823): il sito lo risolve il main (detto, o la scheda web davanti), così il popup e
@@ -2377,12 +2417,14 @@ async function eseguiAzioneFilo(action, {
   // L'attesa della risposta dell'utente, la stessa per il popup generico e per i pannelli di riordino e archivio.
   const sospesa = () => {
     const describe = Levels.describe(action);
+    const parti = Levels.describeParts(action);
     return {
       executed: false,
       kept: true,
       needsConfirm: decisione.digita ? 3 : 2,
       ...(decisione.risposta === 'propone' ? { proposta: true } : {}),
       describe: decisione.perche ? `${describe}\n\n${decisione.perche}` : describe,
+      parti: decisione.perche ? [...parti, `\n\n${decisione.perche}`] : parti,
       // Il box da digitare dice «non è reversibile»: per una difesa abbassata non è vero.
       ...(decisione.digita && decisione.regola === 'difesa' ? { avviso: 'Abbassa una difesa di Filo.' } : {}),
     };
@@ -2601,7 +2643,9 @@ async function eseguiAzioneFilo(action, {
         let fissata = false;
         if (l.testo) {
           try {
-            await FiloMem.appendLesson(l.testo);
+            let fonte = '';
+            try { fonte = chatId ? await globalThis.SN_IL_FILO.ultimaDomanda(chatId) : ''; } catch (_) {}
+            await FiloMem.appendLesson(l.testo, { fonti: fonte ? [fonte] : [] });
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -3089,6 +3133,8 @@ async function eseguiAzioneFilo(action, {
         try {
           await FiloMem.setMemory({ PROFILO: '', PREFERENZE: '' });
           await FiloMem.clearLessonsBuffer();
+          // Anche le righe nascoste del quaderno: «tutto» comprende quello che l'utente aveva solo tolto (#872).
+          await FiloMem.svuotaQuaderno();
           broadcastLiveUpdate();
           return { executed: true, kept: false };
         } catch (e) {
@@ -3096,15 +3142,31 @@ async function eseguiAzioneFilo(action, {
           return { executed: false, kept: false };
         }
       }
+      case 'CORREGGI_MEMORIA': {
+        const l = global.SN_PREF.lezioneDaAzione({ testo: String(action.nuovo ?? '').replace(/\s*[\r\n]+\s*/g, ' ') });
+        if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
+        if (!rigaDaCorreggere || !l.testo) {
+          return { executed: false, kept: false, output: { corrette: 0, trovate: (action._righe || []).length } };
+        }
+        const ok = await FiloMem.editLine(rigaDaCorreggere.via, l.testo);
+        return { executed: ok, kept: false, output: ok ? { corretta: l.testo, prima: rigaDaCorreggere.testo } : { corrette: 0, trovate: 0 } };
+      }
       case 'DIMENTICA': {
         if (!righeDaDimenticare.length) {
           return { executed: false, kept: false, output: { dimenticate: [] } };
         }
         const tolte = [];
         for (const r of righeDaDimenticare) {
-          if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
+          if (r.via && typeof r.via.sempreAperta === 'string') {
+            if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
+            continue;
+          }
+          const id = await FiloMem.hideLine(r.via);
+          if (!id) continue;
+          if (action.per_sempre === true) await FiloMem.forgetHiddenForever(id);
+          tolte.push(r.testo);
         }
-        return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
+        return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte, perSempre: action.per_sempre === true } };
       }
       case 'APRI_FILE': {
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
@@ -3460,13 +3522,13 @@ function releaseOnboardingResume() { onbResumeClaimedAt = 0; }
 // l'ultimo atto dell'accoglienza, al posto di un "fatto".
 // Vale per tutte e tre le strade che la chiudono: il modello che dichiara
 // `fine`, la parola di stop riconosciuta dall'app, il pulsante «Salta».
-function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true } = {}) {
+function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true, fonti = [] } = {}) {
   const done = (d) => broadcastToTabs({
     type: MSG.FILO_ONBOARDING_DONE,
     message: d?.message || '', suggestions: d?.suggestions || [], ts: d?.ts || new Date().toISOString(),
   });
   const first = lessons
-    ? maybeRunLessonAgent({ userMessage, filoReply, stateText })
+    ? maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti })
     : Promise.resolve();
   first
     .then(() => maybeRunCompactor())
@@ -3769,7 +3831,7 @@ async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = tru
   let tabId = null;
   if (porta) {
     const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
-    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma, parti: r.parti } : {}), ...(r.frase ? { frase: r.frase } : {}) };
   } else {
     tabId = tm.openTab(voce.url, { activate: true });
   }
@@ -4215,6 +4277,7 @@ const CAMPI_SALVATI = {
   SVEGLIA: ['label', 'etichetta'],
   SALVA_LEZIONE: ['testo', 'text', 'lezione'],
   DIMENTICA: ['_righe'],
+  CORREGGI_MEMORIA: ['_righe', 'nuovo'],
   ANNULLA_CAMBIO: ['_fraseCambio'],
   BLUETOOTH: ['_nomeSistema'],
   WIFI: ['_nomeSistema'],
@@ -4415,9 +4478,17 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
     return res.output.removed.length ? `Tolte:\n${nomiSalvati(res.output.removed)}` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
+  if (type === 'CORREGGI_MEMORIA' && res.output) {
+    if (res.output.corretta) return `Corretta (vale dal prossimo messaggio; l'utente la rilegge nel quaderno delle memorie):\n${nomiSalvati([res.output.corretta])}`;
+    if (res.output.rifiuto) return `Non corretta: ${res.output.error}`;
+    return res.output.trovate > 1
+      ? 'Più righe della memoria corrispondono: non ne ho corretta nessuna. Copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.'
+      : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa SALVA_LEZIONE.';
+  }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
     return res.output.dimenticate.length
-      ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
+      ? (res.output.perSempre ? `Cancellate per sempre:\n${nomiSalvati(res.output.dimenticate)}`
+        : `Dimenticate (escono dalle conversazioni; l'utente le ritrova nascoste nel quaderno delle memorie, da dove può rimetterle):\n${nomiSalvati(res.output.dimenticate)}`)
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
   if (type === 'TOGLI_PERMESSO_SITO' && res.executed && res.output && Array.isArray(res.output.tolte)) {
@@ -4863,6 +4934,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // archiviata la domanda con cui Filo l'ha aperta: è per questo che il
   // salvataggio sta qui sotto e non in cima, dove lo stato dell'intervista
   // non si era ancora letto.
+  // Gli eventi del filo con cui questo turno ci entra: le lezioni che ne nascono li ricordano come fonti (#872).
+  const fontiTurno = [];
   if (chatId && !internal) {
     // Da adesso questa chat è di questa scheda: quando la scheda sparisce, la
     // chat è finita (vedi `affidaChat`). L'intervista di benvenuto fa
@@ -4880,6 +4953,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
     const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
     if (imageList.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, imageList);
+    const eidDomanda = domanda && domanda.role === 'user' && archiviata.eids ? archiviata.eids[archiviata.eids.length - 1] : '';
+    if (eidDomanda) fontiTurno.push(eidDomanda);
   }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
@@ -5288,7 +5363,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
+        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', parti: res.parti, ...(res.avviso ? { avviso: res.avviso } : {}) };
         if (res.domanda) rendered._domanda = res.domanda;
         if (res.domanda && res.perche) rendered._perche = res.perche;
         // Output di un comando eseguito subito (livello 1) o esito bloccato
@@ -5439,7 +5514,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     if (res.kept) {
       const rendered = res.needsConfirm
-        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) } }
+        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', parti: res.parti, ...(res.avviso ? { avviso: res.avviso } : {}) } }
         : { ...proposal };
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);
@@ -5484,6 +5559,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Gli esiti di questo turno restano davanti al modello anche dalle altre schede, finché il messaggio è recente.
     const risposta = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (risposta && risposta.role === 'filo') ContestoFilo.ricordaEsiti(chatId, risposta.ts, { azioni: renderedActions, reasoningDetails });
+    const eidRisposta = risposta && risposta.role === 'filo' && dopo.eids ? dopo.eids[dopo.eids.length - 1] : '';
+    if (eidRisposta) fontiTurno.push(eidRisposta);
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
     // ha chiesto qualcosa ed è tornato alla home (o ha chiuso la scheda) prima
     // di leggere. La risposta si salva lo stesso, ma poi la chat va RICHIUSA,
@@ -5519,10 +5596,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (filo) statoLezioni = `${stateText}\n\n${FiloState.testoConversazioni(FiloState.conversazioniRecenti(filo.tutti))}`;
   } catch (_) {}
   if (onboardingClosed) {
-    finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni });
+    finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
   } else {
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
-      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni }) : null))
+      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
       .catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
@@ -6562,6 +6639,20 @@ try {
   programmaIndiceArchivio(10_000);
   ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
 } catch (_) {}
+
+// #872 — le schede chiuse archiviate prima che il filo esistesse ci entrano alla loro data, una volta sola: la
+// Cronologia non c'è più, e si ritrovano dalla ricerca del filo. Dopo la partenza, per non rallentarla.
+async function schedeChiuseNelFilo({ unaVolta = true } = {}) {
+  if (Disco.inIncognito()) return 0;
+  const IlFilo = globalThis.SN_IL_FILO;
+  if (!IlFilo || !IlFilo.entranoSchedeChiuse) return 0;
+  return IlFilo.entranoSchedeChiuse(await ArchivedTabs.list(), { unaVolta });
+}
+globalThis.SN_SCHEDE_NEL_FILO = schedeChiuseNelFilo;
+if (process.env.NODE_ENV !== 'test' || process.env.FILO_SCHEDE_NEL_FILO === '1') {
+  const t = setTimeout(() => { schedeChiuseNelFilo().catch((e) => console.warn('[Filo] schede chiuse nel filo:', e?.message || e)); }, 4000);
+  t.unref?.();
+}
 
 // Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
 function testoPiano(testo) {

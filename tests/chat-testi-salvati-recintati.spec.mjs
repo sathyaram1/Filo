@@ -298,7 +298,7 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
   const riepilogo = calls[2].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
   expect(riepilogo).toMatch(/ERANO GIÀ STATE FATTE/);
   for (const testo of [esito, riepilogo]) {
-    expect(testo).toMatch(/timer "voce 1"/);
+    expect(testo).toMatch(/timer «voce 1»/);
     const { volte, fuori } = await conta(app, testo, AGO);
     expect(volte).toBe(1);
     expect(fuori).toBe(0);

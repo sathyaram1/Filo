@@ -41,6 +41,16 @@ delle chat. Regole che ne seguono:
   dettatura e classificatori, dove il router non la applica, parte solo se gli
   host passano il controllo dei crediti (`hostCheckedFetch`); altrimenti risale
   il rifiuto della chiave. Prove: `tests/unit/chiavePropriaFornitori.test.mjs`.
+- **Coi crediti di Filo vale anche la ritenzione zero** (#831): `providerBlock`
+  aggiunge `zdr: true` a ogni corpo pagato da una chiave che non è la propria
+  (ripiego compreso), tranne i modelli da comprare solo dal produttore. Per
+  voce, dettatura e classificatori `hostVerdict` chiede in più che TUTTI gli
+  host compaiano nel catalogo `/endpoints/zdr` (motivi `zdr`, `zdrmixed`,
+  `zdrunknown`); un 404 delle chat senza host ammessi a ritenzione zero diventa
+  `NO_ALLOWED_HOST` con `reason: 'zdr'`, la frase di #828. Anche i tre motivi
+  dell'audio passano dal cancello alla frase condivisa (funzione, modello,
+  motivo, dove cambiarlo); quelli degli host esclusi tengono la loro. Prove:
+  `tests/unit/ritenzioneZero.test.mjs`, `tests/voce-ritenzione-zero.spec.mjs`.
 - **Gli embedding non hanno il controllo preventivo**: la documentazione del
   router dice che lì il blocco `provider` vale, e la risposta porta chi ha
   servito. Non è provato con una chiamata vera: se un riscontro a posteriori

@@ -113,7 +113,7 @@ test('nella home una domanda su un programma apre il pannello con l’indicatore
     // La scheda in secondo piano fa partire un programma mentre si guarda la home.
     await page.evaluate(() => document.getElementById('exe').click());
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20_000 }).toBe('pending');
-    const domanda = shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: '«setup.exe»' });
+    const domanda = shell.locator('#dl-panel .dl-row[data-chiede="1"]').filter({ has: shell.locator('.dl-row-ask-nome', { hasText: /^setup\.exe$/ }) });
     await expect(domanda).toBeVisible({ timeout: 10_000 });
     const indicatore = shell.locator('#dl-indicator');
     await expect(indicatore).toBeVisible();

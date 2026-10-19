@@ -522,6 +522,9 @@ html, body {
 .dash-cerca-sotto { font-size: 11.5px; color: var(--dash-ink-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-cerca-quando { flex: none; font-size: 11px; color: var(--dash-ink-mute); font-variant-numeric: tabular-nums; }
 .dash-cerca-niente { padding: 8px 10px; font-size: 12.5px; font-style: italic; color: var(--dash-ink-mute); }
+/* La ricerca per significato fra le schede chiuse parte a richiesta: la sua riga resta più quieta dei risultati. */
+.dash-cerca-significato .dash-cerca-titolo { color: var(--dash-ink-soft); }
+.dash-cerca-significato:disabled { cursor: progress; opacity: 0.7; }
 
 /* Risalire il filo: carica il pezzo prima; all'inizio lo dice e si spegne. */
 .dash-risali { display: flex; justify-content: center; padding: 0 0 4px; }
@@ -1148,6 +1151,19 @@ html, body {
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
 .dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
+/* La richiesta scritta dal modello, su un foglietto suo come il testo altrui nei popup di conferma (#592.7):
+   il filo a sinistra è per metà colore del testo, così un accento spento non lo spegne. */
+.dash-delete-query {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 50%, currentColor);
+  border-radius: 6px;
+}
 /* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
 .dash-delete-note[data-cerco="1"]::before {
   content: '';

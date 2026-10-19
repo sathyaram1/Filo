@@ -297,8 +297,8 @@ export function provaFusione(base, root = ROOT) {
  * Gli spec Playwright che toccano le aree modificate dal branch. Puro.
  *
  * Gli spec della suite portano il nome di una FUNZIONALITÀ, non di un modulo:
- * `tab-archive`, `options-default-models`, `feedback-attach-files`. Uno spec
- * col nome intero dell'area (`tests/tabs`, `tests/options`) quasi mai esiste:
+ * `tab-archive`, `options-stima-costo-modelli`, `feedback-attach-files`. Uno spec
+ * col nome intero dell'area (`tests/tabs`) quasi mai esiste:
  * col solo nome intero, 12 file sorgente su 254 trovavano uno spec (giro 3 di
  * suite-locale), e toccare la pagina delle opzioni non lanciava nessuno dei
  * nove `options-*`. Quindi, se si passa l'elenco degli spec tracciati, si

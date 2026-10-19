@@ -996,9 +996,21 @@
     // in righe e lezioni ancora da riordinare. Solo pagine filo://.
     // Risposta: { ok, moduli: [{ nome, righe }], lezioni: [{ ts, text }] }
     FILO_MEMORY_VIEW: 'filo_memory_view',
-    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }.
+    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }. La riga resta nascosta nel quaderno (#872).
     // Solo pagine filo://. Risposta: { ok, tolta } (false: non c'era più).
     FILO_MEMORY_FORGET: 'filo_memory_forget',
+    // Il quaderno delle memorie (#872): righe con data e fonti risolte nel filo, lezioni, siti tenuti aperti e
+    // righe nascoste. Solo pagine filo://.
+    // Risposta: { ok, moduli: [{ nome, righe: [{ testo, via, nata, corretta, fonti: [{ id, ts, chat?, i? }] }] }], lezioni, sempreAperte, nascoste }
+    FILO_QUADERNO: 'filo_quaderno',
+    // La correzione di una riga: { via: { modulo, riga } | { lezione }, testo }. Risposta: { ok, corretta } o { ok:false, error }.
+    FILO_MEMORY_EDIT: 'filo_memory_edit',
+    // Una riga nascosta torna in memoria: { id }. Risposta: { ok, rimessa }.
+    FILO_MEMORY_RESTORE: 'filo_memory_restore',
+    // Una riga nascosta si cancella per sempre: { id }. Risposta: { ok, cancellata }.
+    FILO_MEMORY_FOREVER: 'filo_memory_forever',
+    // Dov'è un evento del filo, per saltarci dalla home (#872): { id }. Risposta: { ok, dove: { tipo, chat, i, ts, app } | null }.
+    FILO_DOVE: 'filo_dove',
     // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
     // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
     FILO_MEMORY_CHANGED: 'filo_memory_changed',
@@ -1135,6 +1147,11 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // #589.11 — un riquadro con un menu di Filo aperto chiede alla pagina che lo contiene di sospendere gli effetti
+    // grafici sopra di lui. Va dal riquadro al main { n, si }, e il main lo gira alla SOLA pagina madre come
+    // VISTO_PERMESSO { n, si }: la pagina crede a una richiesta solo se la chiave le arriva anche da qui.
+    VISTO_SOSPENDI: 'visto_sospendi',
+    VISTO_PERMESSO: 'visto_permesso',
     // Contropartita di TRANSLATE_FRAMES: arriva a ogni riquadro della scheda e
     // gli fa tradurre (o riportare all'originale) se stesso. { mode, runId }
     FRAME_TRANSLATE: 'frame_translate',

@@ -590,10 +590,12 @@ module.exports = function register(on, ctx) {
     const s = await getEffectiveSettings();
     const interna = daFilo(origin, sender);
     let routing = providerRouting(s);
+    let filoPays;
     // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando,
-    // senza la lista della chiave propria di chi la modifica (#962).
+    // senza la lista della chiave propria di chi la modifica (#962), e coi vincoli dei crediti di Filo (#831).
     if (interna && Array.isArray(msg.excluded)) {
       routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string'), excludedProvidersOwnKey: null });
+      filoPays = true;
     }
     let entry = null;
     if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
@@ -604,7 +606,7 @@ module.exports = function register(on, ctx) {
     }
     if (!entry || !entry.model) return { ok: true, verdict: 'na' };
     const v = await modelGate.hostVerdict({
-      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing,
+      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing, filoPays,
     });
     if (v.ok) return { ok: true, verdict: 'ok' };
     const many = v.excluded.length > 1 ? '_many' : '';
