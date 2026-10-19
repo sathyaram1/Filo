@@ -824,8 +824,16 @@ function statoNotifiche(ses, url) {
   return scelta === true ? 'granted' : scelta === false ? 'denied' : 'default';
 }
 
+// Il controllo di Chromium dice concessi fotocamera, microfono e posizione anche a chi nessuno ha risposto: la pagina li
+// legge «da chiedere» finché qui non c'è un sì (preload/stato-permessi.js, #1057).
+const PARTI_CON_SI = new Set(['audio', 'video', 'posizione']);
+function siDato(ses, url, parte) {
+  const origine = origineWeb(url);
+  return Boolean(origine && ses && PARTI_CON_SI.has(parte) && sceltePer(ses).get(`${origine}|${parte}`) === true);
+}
+
 module.exports = {
-  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, aperturaScelta, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
