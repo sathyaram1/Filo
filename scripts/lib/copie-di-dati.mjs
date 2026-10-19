@@ -59,7 +59,8 @@ export function motivoCopia(radice) {
  * quello che resta aperto, così una lettura a metà segue la regola di quella intera.
  */
 export function motivoCopiaTesto(testo) {
-  const t = String(testo || '');
+  // I colori del terminale (una stampa con FORCE_COLOR) spezzerebbero le parentesi.
+  const t = String(testo || '').replace(/\u001b\[[0-9;]*[A-Za-z]/g, '');
   // Un JSON dentro una stringa (una riga di log, un doppio JSON.stringify) ha le virgolette scritte \".
   const viste = t.includes('\\"') ? [t, t.replace(/\\(["\\/])/g, '$1')] : [t];
   for (const vista of viste) {
@@ -189,9 +190,10 @@ function* valoriFraParentesi(t) {
   }
 }
 
-// ─── Lettore delle tabelle: CSV, TSV, tabelle markdown ──────────────────────────────────────────────────────────────
-const NOME_COLONNA = /^[A-Za-z_][\w.\-/]*$/;
-const SEPARATORE_MD = /^\s*:?-+:?\s*$/;
+// ─── Lettore delle tabelle: CSV, TSV, tabelle markdown, console.table di node, colonne allineate (pandas) ──────────
+const NOME_COLONNA = /^\(?[A-Za-z_][\w.\-/]*\)?$/;
+const SEPARATORE_RIGA = /^[\s:\-─━═┼╋╬+]*$/;
+const COLONNE_ALLINEATE = /[ \t]{2,}/;
 const nomeCampo = (cella) => {
   const n = cella.trim().replace(/^["'`]|["'`]$/g, '');
   return CAMPI.includes(n) ? n : (n.split(/[./]/).find((p) => CAMPI.includes(p)) || n);
@@ -199,6 +201,11 @@ const nomeCampo = (cella) => {
 
 // Le celle della riga che comincia in t[i]; le virgolette doppie possono andare a capo (un testo su più righe).
 function leggiRiga(t, i, d) {
+  if (d === COLONNE_ALLINEATE) {
+    const a = t.indexOf('\n', i);
+    const fine = a < 0 ? t.length : a;
+    return [t.slice(i, fine).trim().split(d), fine + 1];
+  }
   const celle = [];
   let cella = '';
   let vuota = true;
@@ -225,15 +232,17 @@ function leggiRiga(t, i, d) {
   return [celle, i];
 }
 
+const ha = (riga, d) => (d === COLONNE_ALLINEATE ? d.test(riga.trim()) : riga.includes(d));
+
 function* righeDiTabella(t) {
   for (let i = 0; i < t.length;) {
     const a = t.indexOf('\n', i);
     const fine = a < 0 ? t.length : a + 1;
     const riga = t.slice(i, fine);
     i = fine;
-    if (!CAMPI.some((k) => riga.includes(k))) continue;
-    for (const d of [',', ';', '\t', '|']) {
-      if (!riga.includes(d)) continue;
+    if (!IDENTITA.some((k) => riga.includes(k))) continue;
+    for (const d of [',', ';', '\t', '|', '│', COLONNE_ALLINEATE]) {
+      if (!ha(riga, d)) continue;
       const [intestazione] = leggiRiga(riga, 0, d);
       const nomi = intestazione.map(nomeCampo);
       if (!nomi.some((n) => IDENTITA.includes(n))) continue;
@@ -243,8 +252,10 @@ function* righeDiTabella(t) {
         if (!t.slice(i, a2 < 0 ? t.length : a2).trim()) break;
         let celle;
         [celle, i] = leggiRiga(t, i, d);
-        if (celle.every((c) => !c.trim() || SEPARATORE_MD.test(c))) continue;
-        // Una cella in più (un separatore non citato dentro un valore) sposta solo le colonne dopo di lei.
+        if (celle.every((c) => SEPARATORE_RIGA.test(c))) continue;
+        // La colonna dell'indice di pandas non ha nome; una cella in più altrove (un separatore non citato dentro un
+        // valore) sposta solo le colonne dopo di lei.
+        if (d === COLONNE_ALLINEATE && celle.length === nomi.length + 1) celle.shift();
         const r = Object.create(null);
         celle.forEach((c, k) => { if (c.trim() && k < nomi.length) r[nomi[k]] = c.trim(); });
         yield r;
@@ -254,9 +265,9 @@ function* righeDiTabella(t) {
   }
 }
 
-// ─── Lettore delle righe «chiave: valore»: YAML, testi, logfmt ─────────────────────────────────────────────────────
+// ─── Lettore delle righe «chiave: valore»: YAML, testi, righe di log chiave=valore ─────────────────────────────────
 const RIGA_CHIAVE = /^(\s*)(?:[-*]\s+)?["']?([A-Za-z_]\w*)["']?\s*[:=]\s*(.*)$/;
-const COPPIE_LOGFMT = /(?:^|\s)([A-Za-z_]\w*)=("(?:[^"\\\n]|\\.)*"?|\S+)/g;
+const COPPIE_LOGFMT = /(?:^|\s)([A-Za-z_]\w*)=("(?:[^"\\]|\\.)*"?|\S+)/g;
 
 function* blocchiChiaveValore(t) {
   let blocco = Object.create(null);
@@ -268,8 +279,13 @@ function* blocchiChiaveValore(t) {
     margine = -1;
     pieno = false;
   };
-  for (const riga of t.split('\n')) {
+  for (const riga of t.split(/\r?\n/)) {
     if (!riga.trim()) { yield* chiudi(); continue; }
+    if (riga.includes('=')) {
+      const r = Object.create(null);
+      for (const [, k, v] of riga.matchAll(COPPIE_LOGFMT)) r[k] = v.replace(/^"|"$/g, '');
+      yield r;
+    }
     const m = RIGA_CHIAVE.exec(riga);
     if (!m) {
       if (margine < 0 || riga.search(/\S/) <= margine) yield* chiudi();
@@ -280,12 +296,6 @@ function* blocchiChiaveValore(t) {
     if (margine < 0) margine = rientro.length;
     const valore = resto.trim().replace(/^(["'])(.*)\1$/, '$2');
     if (valore && !/^[{[]/.test(valore)) { blocco[chiave] = valore; pieno = true; }
-    const coppie = [...riga.matchAll(COPPIE_LOGFMT)];
-    if (coppie.length > 1) {
-      const r = Object.create(null);
-      for (const [, k, v] of coppie) r[k] = v.replace(/^"|"$/g, '');
-      yield r;
-    }
   }
   yield* chiudi();
 }

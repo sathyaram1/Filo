@@ -302,6 +302,9 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
     'la stampa normale di node': inspect(FB),
     'la stampa di node con un titolo davanti': `Trovati ${FB.length} feedback:\n${inspect(FB)}\n`,
     'la stampa di node di una risposta di Firestore': inspect({ documents: FB.map(documento) }),
+    'la stampa di node a colori': inspect(FB, { colors: true }),
+    'console.table di node': tabellaDiNode(FB.map(({ id, text, clientId, userAgent }) => ({ id, text, clientId, userAgent }))),
+    'una tabella di pandas': ['       id             text clientId    userAgent', ...FB.map((f, i) => `${i}  ${f.id}  ${unaRiga(f.text)}  ${f.clientId}  ${f.userAgent}`)].join('\n'),
     'una risposta salvata con le intestazioni HTTP': `HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=UTF-8\r\nVary: Origin\r\n\r\n${JSON.stringify({ documents: FB.map(documento) }, null, 2)}`,
     'una risposta HTTP in chiaro': `HTTP/2 200\ncontent-type: application/json\n\n${JSON.stringify(FB)}`,
     'un CSV con testo, identificativo e user agent': ['id,text,clientId,userAgent', ...FB.map((f) => [f.id, f.text, f.clientId, f.userAgent].map(csv).join(','))].join('\n'),
@@ -312,7 +315,7 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
     'oggetti di Python': `[${FB.map((f) => `Feedback(text=${pyStr(f.text)}, clientId='${f.clientId}', userAgent='${f.userAgent}')`).join(', ')}]`,
     'YAML': FB.map((f) => `- id: ${f.id}\n  text: "${unaRiga(f.text)}"\n  clientId: ${f.clientId}\n  userAgent: ${f.userAgent}`).join('\n'),
     'righe «chiave: valore»': FB.map((f) => `text: ${unaRiga(f.text)}\nclientId: ${f.clientId}\nuserAgent: ${f.userAgent}\n`).join('\n'),
-    'righe di log chiave=valore': FB.map((f) => `level=info clientId=${f.clientId} userAgent="${f.userAgent}" text="${unaRiga(f.text).replace(/"/g, '\\"')}"`).join('\n'),
+    'righe di log chiave=valore': FB.map((f) => `level=info text="${unaRiga(f.text).replace(/"/g, '\\"')}" clientId=${f.clientId} userAgent="${f.userAgent}"`).join('\n'),
     'un JSON dentro una stringa': JSON.stringify(JSON.stringify(FB)),
     // #1108.3: i soli campi dei documenti, nel formato del server, senza il percorso.
     'i campi dei documenti nel formato del server': JSON.stringify(FB.map(nelFormatoDelServer), null, 2),
