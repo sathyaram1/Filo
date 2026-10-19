@@ -289,7 +289,7 @@ function formaConErrore(pezzo, forma, token) {
 function nominaMarchio(nome, token, scheletro = (x) => x) {
   if (!nome || !token || token.length < 3) return false; // un nome di una o due lettere sta in ogni parola (x-plane)
   const tok = scheletro(token);
-  const forme = MARCHI_PAROLA.get(token);
+  const forme = MARCHI_PAROLA.get(token) || (token.length <= CORTO ? [] : null);
   if (forme) {
     // Ogni pezzo com'è scritto (i numeri restano numeri) e come si legge (app1e è apple); marchi e forme sono già così.
     const letture = nome.split(/[.-]/).filter(Boolean).flatMap((p) => [p, scheletro(p)]);
