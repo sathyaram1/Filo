@@ -774,7 +774,11 @@ test('un collegamento nella risposta di Filo che porta fuori il codice letto non
   await link.click();
   await expect(page.locator('.dash-fermata-clic')).toContainText("Non ho aperto l'indirizzo: conteneva un codice letto dall'output di un comando", { timeout: 10_000 });
   expect(apertoVerso(app, RACCOLTA)).toBe(false);
-  // Un collegamento che non porta niente di letto si apre come prima.
+  // Un collegamento che non porta niente di letto si apre; scritto da Filo dopo l'uscita di un comando, con un OK (#553, D-20).
+  await page.evaluate(() => {
+    window.__chiesto = [];
+    window.SN_CONFIRM_UI = { confirm: async (o) => { window.__chiesto.push(String((o && o.text) || '')); return true; }, confirmTyped: async () => false };
+  });
   await modelloARegole(app, { risposta: 'Le istruzioni sono su [la guida](https://guida.example/verifica).' });
   await page.locator('#input').fill('leggi la notifica della banca di nuovo');
   await page.locator('#sendBtn').click();
@@ -782,6 +786,7 @@ test('un collegamento nella risposta di Filo che porta fuori il codice letto non
   await expect(guida).toBeVisible({ timeout: 20_000 });
   await guida.click();
   await expect.poll(() => apertoVerso(app, 'guida.example'), { timeout: 10_000 }).toBe(true);
+  expect(await page.evaluate(() => window.__chiesto.length)).toBe(1);
 });
 
 // Il sito risponde davvero: il nome si risolve, e ogni richiesta del main verso di lui resta in __chiesti.

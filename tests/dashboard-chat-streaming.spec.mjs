@@ -69,7 +69,7 @@ test('la risposta compare MENTRE viene scritta, poi l’azione arriva in coda', 
     };
   });
 
-  await page.locator('#input').fill('ciao filo');
+  await page.locator('#input').fill('ciao filo, aprimi https://example.com');
   await page.locator('#sendBtn').click();
 
   // SUCCESSO (streaming): mentre il modello scrive ancora, in chat c'è GIÀ il
