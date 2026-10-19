@@ -1620,6 +1620,7 @@ test('#997 il conto delle segnalazioni senza data si apre su quelle, col clic e 
   const page = await schedaConNota(openTab);
   const numero = page.locator('#mgFsNota [data-fs-esito="senzaData"]');
   await expect(numero).toHaveText('2');
+  await page.locator('#mgFsRoot').screenshot({ path: 'tests/.shots/997-riga-sotto-i-filtri.png' });
   await numero.click();
   await expect(page.locator('#mgFsDrill')).toBeVisible();
   await expect(page.locator('#mgFsDrillTitle')).toContainText('data d\'arrivo');
