@@ -12,7 +12,7 @@ async function fintoRouter(app) {
       if (!u.includes('openrouter.ai/')) return vero(url, init);
       let corpo = null;
       try { corpo = JSON.parse((init && init.body) || 'null'); } catch (_) { corpo = null; }
-      globalThis.__corpi.push({ u, corpo });
+      globalThis.__corpi.push({ u, corpo, dopo: !!globalThis.__dopo, m: corpo && corpo.model, primo: JSON.stringify((corpo && corpo.messages) || []).slice(0, 120) });
       if (u.includes('/chat/completions')) {
         const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
           + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
@@ -32,6 +32,7 @@ test('chat cambia gli host: la tendina delle Opzioni aperta si riallinea e la pr
   const page = await openTab(OPZ);
   const riga = page.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)').first();
   await riga.waitFor({ timeout: 15_000 });
+  await app.evaluate(() => { globalThis.__dopo = true; });
   const r = await app.evaluate(async () => globalThis.__filoHandlers.executeFiloAction(
     { type: 'IMPOSTA_PREFERENZA', chiave: 'ordine_host', valore: 'velocità' }, { confirmed: true }));
   console.log('ESEGUI', JSON.stringify(r));
@@ -40,7 +41,7 @@ test('chat cambia gli host: la tendina delle Opzioni aperta si riallinea e la pr
   expect(salvato).toBe('throughput');
   await riga.locator('.sn-model-test').click();
   await expect(riga.locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
-  const sorts = await app.evaluate(() => globalThis.__corpi.filter((c) => c.u.includes('/chat/')).map((c) => c.corpo && c.corpo.provider));
+  const sorts = await app.evaluate(() => globalThis.__corpi.filter((c) => c.u.includes('/chat/')).map((c) => ({ dopo: c.dopo, m: c.m, p: c.corpo && c.corpo.provider && c.corpo.provider.sort, primo: c.primo })));
   console.log('PROVIDER', JSON.stringify(sorts));
   // Ora una richiesta vera della chat
   const eff = await app.evaluate(async () => {
@@ -69,4 +70,45 @@ for (const tema of ['light', 'dark']) {
       await page.screenshot({ path: `tests/.shots/1121g2-opzioni-${tema}-${def}.png` });
     });
   }
+}
+
+async function rallenta(page) {
+  await page.evaluate(() => {
+    window.__log = [];
+    const vero = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = async (msg, ...r) => {
+      if (msg && msg.settings) {
+        const t0 = performance.now();
+        window.__log.push(['parte', JSON.stringify(msg.settings).slice(0, 80), Math.round(t0)]);
+        await new Promise((ok) => setTimeout(ok, 2500));
+        const res = await vero(msg, ...r);
+        window.__log.push(['arriva', JSON.stringify(msg.settings).slice(0, 80), Math.round(performance.now())]);
+        return res;
+      }
+      return vero(msg, ...r);
+    };
+    window.__hint = [];
+    const h = document.getElementById('savedHint');
+    new MutationObserver(() => window.__hint.push([h.classList.contains('sn-show'), Math.round(performance.now()), h.textContent])).observe(h, { attributes: true, attributeFilter: ['class'] });
+  });
+}
+
+for (const [nome, url, id, a, b] of [
+  ['preferenze', 'filo://preferences/preferences.html', 'agentStyleText', 'primo', 'secondo testo'],
+  ['opzioni', 'filo://options/options.html', 'monthlyLimit', '7', '9'],
+]) {
+  test(`in viaggio: ${nome}`, async ({ openTab }) => {
+    const page = await openTab(url);
+    await page.waitForSelector('#' + id, { timeout: 15_000 });
+    await page.waitForTimeout(1500);
+    await rallenta(page);
+    const scrivi = (t) => page.evaluate(([i, v]) => { const el = document.getElementById(i); el.focus(); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }, [id, t]);
+    await scrivi(a);
+    await expect.poll(() => page.evaluate(() => window.__log.length), { timeout: 10_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(300);
+    await scrivi(b);
+    await page.waitForTimeout(9000);
+    console.log(nome, 'LOG', JSON.stringify(await page.evaluate(() => window.__log)));
+    console.log(nome, 'HINT', JSON.stringify(await page.evaluate(() => window.__hint)));
+  });
 }
