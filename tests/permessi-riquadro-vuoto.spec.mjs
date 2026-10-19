@@ -13,46 +13,40 @@ import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Ogni variante crea il suo riquadro vuoto e ne prende la funzione per indice, come la prova del giro 16 di #586.
-const VARIANTI = {
+// Le combinazioni che Chromium tratta come un messaggio guasto (le prime due) e quella che prenderebbe tutto senza scelta.
+const VINCOLI = {
   'solo-audio': `{ audio: { mandatory: { chromeMediaSource: 'desktop' } }, video: false }`,
   'microfono-e-schermo': `{ audio: true, video: { mandatory: { chromeMediaSource: 'desktop' } } }`,
   'schermo-e-audio': `{ audio: { mandatory: { chromeMediaSource: 'desktop' } }, video: { mandatory: { chromeMediaSource: 'desktop' } } }`,
 };
-const MODO = {
-  // La funzione del riquadro sui dispositivi della pagina.
+// Come la funzione del riquadro arriva a chiedere.
+const CHIAMATE = {
+  // La sua funzione sui dispositivi della pagina, come la prova del giro 16 di #586.
   prototipo: `w.MediaDevices.prototype.getUserMedia.call(navigator.mediaDevices, c)`,
-  // I dispositivi del riquadro stesso.
   proprio: `w.navigator.mediaDevices.getUserMedia(c)`,
-  // La strada a callback, quella più vecchia ancora.
   callback: `new Promise((ok, no) => w.navigator.webkitGetUserMedia(c, ok, no))`,
 };
+const VUOTO = `(() => { document.body.appendChild(document.createElement('iframe')); return window[window.length - 1]; })()`;
+// Le altre strade per avere in mano un riquadro vuoto appena nato, ognuna presa nello stesso istante.
+const STRADE = {
+  innerHTML: `(() => { const d = document.createElement('div'); document.body.appendChild(d); d.innerHTML = '<iframe></iframe>'; return window[window.length - 1]; })()`,
+  insertAdjacentHTML: `(() => { document.body.insertAdjacentHTML('beforeend', '<iframe></iframe>'); return window[window.length - 1]; })()`,
+  'con un indirizzo, prima che arrivi': `(() => { const f = document.createElement('iframe'); f.src = '/lento'; document.body.append(f); return window[window.length - 1]; })()`,
+  'nella radice ombra chiusa': `(() => { const h = document.createElement('div'); document.body.appendChild(h); const f = document.createElement('iframe'); h.attachShadow({ mode: 'closed' }).appendChild(f); return f.contentWindow; })()`,
+  'dentro un altro riquadro vuoto': `(() => { const w = ${VUOTO}; w.document.body.appendChild(w.document.createElement('iframe')); return w[0]; })()`,
+  'riscritto da capo': `(() => { const w = ${VUOTO}; w.document.open(); w.document.write('<iframe></iframe>'); w.document.close(); return w[0]; })()`,
+  'rimandato a about:blank': `new Promise((ok) => { const w = ${VUOTO}; const f = document.querySelectorAll('iframe')[document.querySelectorAll('iframe').length - 1]; f.addEventListener('load', () => setTimeout(() => ok(window[window.length - 1]), 0), { once: true }); w.location.replace('about:blank#di-nuovo'); })`,
+};
 
-const pagina = (modo) => `<!doctype html><meta charset="utf-8"><title>Modulo</title>
+const PAGINA = `<!doctype html><meta charset="utf-8"><title>Modulo</title>
 <textarea id="nota" style="position:fixed;top:20px;left:20px;width:300px;height:60px"></textarea>
-${Object.keys(VARIANTI).map((v, i) => `<button id="${v}" style="position:fixed;top:${120 + i * 50}px;left:20px">${v}</button>`).join('\n')}
+<button id="vai" style="position:fixed;top:120px;left:20px">Vai</button>
 <script>
   const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
-  const vuoto = () => { document.body.appendChild(document.createElement('iframe')); return window[window.length - 1]; };
-  const VARIANTI = { ${Object.entries(VARIANTI).map(([k, v]) => `'${k}': () => (${v})`).join(', ')} };
-  for (const nome of Object.keys(VARIANTI)) {
-    document.getElementById(nome).addEventListener('click', () => {
-      const w = vuoto();
-      const c = VARIANTI[nome]();
-      let p;
-      try { p = ${MODO[modo]}; } catch (e) { p = Promise.reject(e); }
-      p.then((s) => m(nome + ':' + s.getTracks().map((t) => t.kind).sort().join(',')), (e) => m(nome + ':' + e.name));
-    });
-  }
-  // Stato dei permessi letto dal riquadro vuoto, sia dal suo navigator sia con la sua funzione su quello della pagina.
-  addEventListener('load', async () => {
-    const w = vuoto();
-    const nomi = ['camera', 'microphone', 'geolocation', 'notifications'];
-    const leggi = (f) => Promise.all(nomi.map((n) => f(n).then((s) => n + '=' + s.state, (e) => n + '=!' + e.name)));
-    const dentro = await leggi((n) => w.navigator.permissions.query({ name: n }));
-    const misto = await leggi((n) => w.Permissions.prototype.query.call(navigator.permissions, { name: n }));
-    m('stato:' + dentro.join(',') + ',Notification=' + w.Notification.permission);
-    m('misto:' + misto.join(','));
+  document.getElementById('vai').addEventListener('click', () => {
+    let p;
+    try { p = Promise.resolve(window.__azione()); } catch (e) { p = Promise.reject(e); }
+    p.then((x) => m(String(x)), (e) => m(e && e.name));
   });
 </script>`;
 
@@ -63,9 +57,9 @@ test.beforeAll(async () => {
   server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/esito') { esiti.push(u.searchParams.get('m')); res.end('ok'); return; }
+    if (u.pathname === '/lento') { const t = setTimeout(() => { try { res.end('x'); } catch (_) {} }, 20_000); t.unref?.(); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    const modo = u.pathname.slice(1);
-    res.end(MODO[modo] ? pagina(modo) : '<p>vuota</p>');
+    res.end(PAGINA);
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
   origine = `http://127.0.0.1:${server.address().port}`;
@@ -97,40 +91,106 @@ test.afterEach(async () => {
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
 const barra = () => shell.locator('#permesso-bar');
 
-async function apri(modo) {
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), `${origine}/${modo}`);
+async function apri() {
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), `${origine}/modulo`);
   await expect.poll(() => Boolean(paginaDi(origine)), { timeout: 10_000 }).toBe(true);
   const p = paginaDi(origine);
   await p.waitForLoadState('load');
   return p;
 }
 
-for (const modo of Object.keys(MODO)) {
-  test(`schermo alla vecchia da un riquadro vuoto preso per indice (${modo}): la scheda resta, il testo pure, e la domanda è quella di Filo`, async () => {
+// Il clic vero sul pulsante della pagina fa partire `azione` (il corpo di una funzione asincrona, nel mondo della pagina).
+async function alClic(p, azione) {
+  await p.evaluate((codice) => { window.__azione = new Function(`return (async () => { ${codice} })()`); }, azione);
+  await p.locator('#vai').click();
+}
+
+// Chi la usa vede la stessa domanda dello schermo; anche scegliendo, al sito non arriva niente.
+async function scegliLoSchermo(cosa) {
+  await expect(barra(), cosa).toBeVisible({ timeout: 10_000 });
+  const fonte = barra().locator('.permesso-fonte[data-tipo="schermo"]');
+  await expect(fonte).toBeEnabled({ timeout: 5_000 });
+  await fonte.click();
+  await expect(barra()).toBeHidden({ timeout: 10_000 });
+}
+
+async function restaLaPagina(p) {
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(paginaDi(origine), 'la scheda è ancora il sito, non la pagina d\'errore').toBeTruthy();
+  expect(await p.evaluate(() => document.querySelector('#nota').value)).toBe('appunti da non perdere');
+  await expect(shell.locator('.tab .tab-permessi .segno[data-parte="schermo"]')).toHaveCount(0);
+}
+
+for (const [chiamata, codice] of Object.entries(CHIAMATE)) {
+  test(`schermo alla vecchia da un riquadro vuoto preso per indice (${chiamata}): la scheda resta, il testo pure, e la domanda è quella di Filo`, async () => {
     test.setTimeout(90_000);
-    const p = await apri(modo);
+    const p = await apri();
     await p.locator('#nota').fill('appunti da non perdere');
-    for (const nome of Object.keys(VARIANTI)) {
-      await p.locator('#' + nome).click();
-      // Chi la usa vede la stessa domanda dello schermo; anche scegliendo, al sito non arriva niente.
-      await expect(barra(), nome).toBeVisible({ timeout: 10_000 });
-      const fonte = barra().locator('.permesso-fonte[data-tipo="schermo"]');
-      await expect(fonte).toBeEnabled({ timeout: 5_000 });
-      await fonte.click();
-      await expect(barra()).toBeHidden({ timeout: 10_000 });
-      await expect.poll(() => esiti.filter((x) => x.startsWith(nome + ':')), { timeout: 10_000 }).toEqual([nome + ':NotAllowedError']);
+    for (const [nome, vincoli] of Object.entries(VINCOLI)) {
+      esiti.length = 0;
+      await alClic(p, `const w = ${VUOTO}; const c = ${vincoli}; const s = await ${codice}; return s.getTracks().map((t) => t.kind).join(',');`);
+      await scegliLoSchermo(nome);
+      await expect.poll(() => esiti.slice(), { timeout: 10_000, message: nome }).toEqual(['NotAllowedError']);
     }
-    await new Promise((r) => setTimeout(r, 1500));
-    expect(paginaDi(origine), 'la scheda è ancora il sito, non la pagina d\'errore').toBeTruthy();
-    expect(await paginaDi(origine).evaluate(() => document.querySelector('#nota').value)).toBe('appunti da non perdere');
-    await expect(shell.locator('.tab .tab-permessi .segno[data-parte="schermo"]')).toHaveCount(0);
+    await restaLaPagina(p);
   });
 }
 
-test('nel riquadro vuoto preso per indice fotocamera, microfono, posizione e notifiche mai decisi si leggono «da chiedere»', async () => {
+test('le altre strade per avere un riquadro vuoto appena nato portano alla stessa domanda, e la scheda resta', async () => {
+  test.setTimeout(150_000);
+  const p = await apri();
+  await p.locator('#nota').fill('appunti da non perdere');
+  for (const [strada, prendi] of Object.entries(STRADE)) {
+    esiti.length = 0;
+    await alClic(p, `const w = await ${prendi}; const s = await w.MediaDevices.prototype.getUserMedia.call(navigator.mediaDevices, ${VINCOLI['solo-audio']}); return s.getTracks().length;`);
+    await scegliLoSchermo(strada);
+    await expect.poll(() => esiti.slice(), { timeout: 10_000, message: strada }).toEqual(['NotAllowedError']);
+  }
+  await restaLaPagina(p);
+});
+
+const NOMI = ['camera', 'microphone', 'geolocation', 'notifications'];
+// Lo stato letto dalla pagina, dal riquadro vuoto e con la funzione del riquadro sui permessi della pagina.
+const leggi = (p) => p.evaluate(async (nomi) => {
+  const w = (() => { document.body.appendChild(document.createElement('iframe')); return window[window.length - 1]; })();
+  const giro = (f) => Promise.all(nomi.map((n) => f(n).then((s) => n + '=' + s.state, (e) => n + '=!' + e.name))).then((r) => r.join(','));
+  return {
+    pagina: await giro((n) => navigator.permissions.query({ name: n })) + ',Notification=' + Notification.permission,
+    riquadro: await giro((n) => w.navigator.permissions.query({ name: n })) + ',Notification=' + w.Notification.permission,
+    misto: await giro((n) => w.Permissions.prototype.query.call(navigator.permissions, { name: n })),
+  };
+}, NOMI);
+
+test('fotocamera, microfono, posizione e notifiche mai decisi si leggono «da chiedere», nella pagina e nel riquadro vuoto preso per indice', async () => {
   test.setTimeout(60_000);
-  await apri('prototipo');
+  const p = await apri();
   const attesi = 'camera=prompt,microphone=prompt,geolocation=prompt,notifications=prompt';
-  await expect.poll(() => esiti.find((x) => x.startsWith('stato:')), { timeout: 10_000 }).toBe(`stato:${attesi},Notification=default`);
-  await expect.poll(() => esiti.find((x) => x.startsWith('misto:')), { timeout: 10_000 }).toBe(`misto:${attesi}`);
+  expect(await leggi(p)).toEqual({ pagina: `${attesi},Notification=default`, riquadro: `${attesi},Notification=default`, misto: attesi });
+});
+
+test('dopo Consenti al microfono e Non consentire alla fotocamera, pagina e riquadro vuoto leggono le risposte date', async () => {
+  test.setTimeout(60_000);
+  const p = await apri();
+  await alClic(p, `const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach((t) => t.stop()); return 'microfono';`);
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['microfono']);
+  // La fotocamera chiesta dal riquadro vuoto passa dalla stessa domanda della pagina.
+  await alClic(p, `const w = ${VUOTO}; await w.navigator.mediaDevices.getUserMedia({ video: true }); return 'fotocamera';`);
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['microfono', 'NotAllowedError']);
+  const attesi = 'camera=denied,microphone=granted,geolocation=prompt,notifications=prompt';
+  expect(await leggi(p)).toEqual({ pagina: `${attesi},Notification=default`, riquadro: `${attesi},Notification=default`, misto: attesi });
+});
+
+test('le notifiche chieste dal riquadro vuoto dopo un clic passano dalla domanda di Filo col nome del sito', async () => {
+  test.setTimeout(60_000);
+  const p = await apri();
+  await alClic(p, `const w = ${VUOTO}; return 'notifiche:' + (await w.Notification.requestPermission()) + '/' + w.Notification.permission;`);
+  await expect(barra()).toContainText('vuole mandarti notifiche', { timeout: 10_000 });
+  await expect(barra()).toContainText(new URL(origine).host);
+  await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
+  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual(['notifiche:granted/granted']);
+  expect((await leggi(p)).riquadro).toContain('notifications=granted,Notification=granted');
 });

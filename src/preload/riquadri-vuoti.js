@@ -12,10 +12,17 @@ function buildRiquadriVuotiSource(corpi) {
   var D = Object.getOwnPropertyDescriptor, def = Object.defineProperty;
   var lungo = (D(window, 'length') || D(Window.prototype, 'length') || {}).get;
   var urlDi = (D(Document.prototype, 'URL') || {}).get;
+  var vistaDi = (D(Document.prototype, 'defaultView') || {}).get;
+  var chiusa = (D(window, 'closed') || D(Window.prototype, 'closed') || {}).get;
+  // Un riquadro dentro una radice ombra non sta fra quelli per indice: si raggiunge dal suo elemento.
+  var finestreDi = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'].map(function (c) {
+    return ((window[c] && D(window[c].prototype, 'contentWindow')) || {}).get;
+  }).filter(Boolean);
   // Un documento a about:blank non ha un preload suo: il riquadro appena nato, o rimandato lì dalla pagina.
   var VUOTO = /^about:blank([?#]|$)/i;
   var visti = new WeakSet();
   var fuori = new WeakSet();
+  var sistemate = [];
   function documento(w) {
     if (fuori.has(w)) return null;
     try { return w.document || null; } catch (e) { fuori.add(w); return null; }
@@ -29,14 +36,28 @@ function buildRiquadriVuotiSource(corpi) {
     if (!VUOTO.test(u)) return d;
     for (var i = 0; i < corpi.length; i++) { try { corpi[i](w); } catch (e) {} }
     aggancia(w, d);
+    try { sistemate.push(new WeakRef(w)); } catch (e) {}
     return d;
   }
+  function applicaA(r) {
+    if (!r || typeof r !== 'object') return;
+    if (finestra(r)) { applica(r); return; }
+    var v = null;
+    try { v = vistaDi.call(r); } catch (e) {}
+    if (v) applica(v);
+  }
+  function delRiquadro(t) {
+    for (var i = 0; i < finestreDi.length; i++) { try { var w = finestreDi[i].call(t); if (w) return w; } catch (e) {} }
+    return null;
+  }
+  function aperta(w) { try { return !chiusa.call(w); } catch (e) { return false; } }
   var inGiro = false;
   function spazza() {
     if (inGiro) return;
     inGiro = true;
     try {
       var coda = [window];
+      sistemate = sistemate.filter(function (r) { var w = r.deref(); if (w && aperta(w)) { coda.push(w); return true; } return false; });
       for (var n = 0; n < coda.length && n < 4096; n++) {
         var w = coda[n], k = 0;
         try { k = lungo ? lungo.call(w) : w.length; } catch (e) {}
@@ -49,7 +70,12 @@ function buildRiquadriVuotiSource(corpi) {
     } catch (e) {} finally { inGiro = false; }
   }
   // Un frame che cambia documento può passare da un altro sito a un riquadro vuoto: al load si riguarda tutto.
-  function alLoad() { fuori = new WeakSet(); spazza(); }
+  function alLoad(e) {
+    fuori = new WeakSet();
+    var w = e && delRiquadro(e.target);
+    if (w) applica(w);
+    spazza();
+  }
   function ascolta(t) { try { t.addEventListener('load', alLoad, true); } catch (e) {} }
   function stessaForma(f, v) { try { def(f, 'length', { value: v.length }); } catch (e) {} return f; }
   function dopo(o, nome, poi) {
@@ -69,13 +95,13 @@ function buildRiquadriVuotiSource(corpi) {
     if (!x) return;
     if (typeof x.value === 'function') {
       var v = x.value;
-      var m = {}; m[nome] = function () { spazza(); return v.apply(this, arguments); };
+      var m = {}; m[nome] = function () { spazza(); var r = v.apply(this, arguments); applicaA(r); return r; };
       try { def(o, nome, { value: stessaForma(m[nome], v), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
       return;
     }
     if (typeof x.get !== 'function') return;
     var g = x.get;
-    try { def(o, nome, { get: function () { spazza(); return g.call(this); }, set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    try { def(o, nome, { get: function () { spazza(); var r = g.call(this); applicaA(r); return r; }, set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function dopoLaScrittura(o, nome) {
     var x = o && D(o, nome);
