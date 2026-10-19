@@ -180,6 +180,26 @@ for (const [chi, opzioni, atteso] of [
   });
 }
 
+test('segnalazione automatica dell’owner senza accesso: aspetta il rientro e parte firmata', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await accesso(app, { admin: true, token: '' });
+  const page = await openTab('filo://newtab/');
+  await expect(page.locator('#input')).toBeVisible();
+  await turnoConUnBuco(app, page);
+  await expect.poll(() => app.evaluate(() => globalThis.SN_FEEDBACK_OUTBOX.size()), { timeout: 15_000 }).toBe(1);
+  expect(await inviati(app)).toEqual([]);
+  const rientro = await app.evaluate(async (_e, t) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    M._cache[k].exports.signIn = async () => { globalThis.__accesso.token = t; return { email: 'owner@example.invalid', name: 'Owner' }; };
+    return globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.AUTH_SIGNIN }, { url: 'filo://newtab/' });
+  }, TOKEN);
+  expect(rientro.ok, JSON.stringify(rientro)).toBe(true);
+  await expect.poll(() => inviati(app), { timeout: 15_000 }).toEqual([
+    { clientId: 'auto:complaint', name: 'Problema segnalato automaticamente', opts: { idToken: TOKEN, soloAdmin: true } },
+  ]);
+});
+
 test('la riapertura dalla bacheca dell’owner parte col suo nome e la sua prova', async ({ app, openTab }) => {
   await accesso(app, { admin: true });
   await app.evaluate(() => {
