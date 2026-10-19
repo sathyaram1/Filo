@@ -341,7 +341,11 @@ test('assistente sulla pagina: il collegamento col numero detto prima chiede l\'
   expect(dopoOk.aperto).toBe(true);
   await expect.poll(() => app.windows().some((w) => { try { return w.url() === LINK; } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);
 
-  // Un collegamento senza dati dell'utente si apre subito.
+  // Un collegamento senza dati dell'utente si apre subito. Lo chiede la scheda in vista: quella aperta è passata davanti.
+  await app.evaluate(({ BrowserWindow }, h) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    win._filoTabs.activate(win._filoTabs.tabs.find((t) => String(t.url || '').includes(h)).id);
+  }, host);
   const pulito = testServer.html('<!doctype html><title>Pulito</title>');
   const diretto = await manda({ type: 'apri_collegamento_filo', url: pulito, parole });
   expect(diretto.aperto).toBe(true);

@@ -406,12 +406,11 @@ test('chiedere l\'accesso da un sito non consegna al sito chi è entrato (#810.9
     };
   }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
 
+  // Un sito che non è la scheda in primo piano non apre l'accesso (#589.1): qui nessuno dei due mittenti lo è.
   for (const provenienza of ['sito', 'sitoConScheda']) {
     const r = out[provenienza];
-    expect(r.ok, `${provenienza}: l'esito dell'accesso arriva anche al sito`).toBe(true);
-    expect(r.signedIn).toBe(true);
+    expect(r, `${provenienza}: un sito fuori dalla scheda in vista ha aperto l'accesso`).toMatchObject({ ok: false, code: 'forbidden' });
     expect(JSON.stringify(r), `${provenienza}: l'email di chi usa Filo è arrivata al sito`).not.toContain('chi-usa-filo@example.com');
-    expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
   }
   expect(out.filo.ok).toBe(true);
   expect(out.filo.profile && out.filo.profile.email).toBe('chi-usa-filo@example.com');
