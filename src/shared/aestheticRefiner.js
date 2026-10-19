@@ -4,8 +4,8 @@
 // verdi"), applica SUBITO un valore ragionevole; poi la bolla mostra un bottone
 // che apre QUESTO box in sovrimpressione per scegliere il valore esatto, con
 // anteprima LIVE. Il tipo di controllo deriva dal tipo del token nel registro
-// (themeTokens.js): colore → color picker, opacità → slider, raggio → slider,
-// font → menu di famiglie.
+// (themeTokens.js): colore → color picker, opacità, raggio, durata e
+// moltiplicatore → slider, font → menu di famiglie.
 //
 // È un modulo condiviso (IIFE su globalThis) ma puramente DOM: lo usa la
 // dashboard, e si testa in isolamento passando callback-spia (applyLive /
@@ -34,7 +34,7 @@
   function controlTypeFor(name, Tokens) {
     const t = Tokens && Tokens.get && Tokens.get(name);
     const type = t && t.type;
-    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time') return type;
+    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time' || type === 'factor' || type === 'linea') return type;
     return 'color';
   }
 
@@ -45,8 +45,11 @@
     size: 'Regola la dimensione',
     font: 'Cambia il font',
     time: 'Regola la durata',
+    factor: 'Regola col cursore',
+    linea: 'Cambia lo stile della linea',
     color: 'Scegli il colore esatto',
   };
+  const NOMI_LINEA = { dotted: 'Puntini', dashed: 'Trattini', wavy: 'Onda', solid: 'Linea', double: 'Doppia' };
   function triggerHint(name, Tokens) {
     return HINTS[controlTypeFor(name, Tokens)] || HINTS.color;
   }
@@ -78,6 +81,15 @@
     { label: 'Monospazio', value: "'Courier New', ui-monospace, monospace" },
     { label: 'Tondo (Trebuchet)', value: "'Trebuchet MS', Tahoma, sans-serif" },
   ];
+
+  // Come si legge un moltiplicatore delle animazioni: il numero da solo non dice se è lento o veloce.
+  function factorLabel(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n === 1) return 'Normali';
+    if (n === 0) return 'Nessuna animazione';
+    const x = `×${String(n).replace('.', ',')}`;
+    return n < 1 ? `Più veloci (${x})` : `Più lente (${x})`;
+  }
 
   let openEl = null; // un solo box alla volta
 
@@ -168,6 +180,15 @@
         if (name === 'link.color' || name === 'accent' || name === 'selection.color') txt.style.color = eff;
         txt.textContent = 'Testo di esempio';
         sample.appendChild(txt);
+      } else if (type === 'opacity' && name === 'shadow') {
+        const box = doc.createElement('span');
+        box.className = 'sn-refine-sample-box sn-refine-sample-ombra';
+        box.style.boxShadow = `0 4px 16px rgba(0, 0, 0, ${eff})`;
+        sample.appendChild(box);
+        const lbl = doc.createElement('span');
+        lbl.className = 'sn-refine-sample-text';
+        lbl.textContent = `${Math.round(Number(eff) * 100)}%`;
+        sample.appendChild(lbl);
       } else if (type === 'opacity') {
         const mark = doc.createElement('span');
         mark.className = 'sn-refine-sample-text';
@@ -191,11 +212,36 @@
         txt.className = 'sn-refine-sample-text';
         txt.textContent = eff;
         sample.appendChild(txt);
+      } else if (type === 'factor') {
+        // Il pallino si muove con la variabile vera, che applyLive ha appena aggiornato.
+        const track = doc.createElement('span');
+        track.className = 'sn-refine-sample-track';
+        const dot = doc.createElement('span');
+        dot.className = 'sn-refine-sample-dot';
+        track.appendChild(dot);
+        sample.appendChild(track);
+        const lbl = doc.createElement('span');
+        lbl.className = 'sn-refine-sample-text';
+        lbl.textContent = factorLabel(eff);
+        sample.appendChild(lbl);
+      } else if (type === 'linea') {
+        const txt = doc.createElement('span');
+        txt.className = 'sn-refine-sample-text';
+        txt.style.textDecoration = `underline ${eff}`;
+        txt.style.textUnderlineOffset = '4px';
+        txt.textContent = 'Testo di esempio';
+        sample.appendChild(txt);
       } else if (type === 'font') {
         const txt = doc.createElement('span');
         txt.className = 'sn-refine-sample-text';
         txt.style.fontFamily = eff;
-        txt.textContent = 'Aa — Testo di esempio 123';
+        if (name === 'link.font') {
+          txt.style.color = Tokens.effectiveValue('link.color', working, theme);
+          txt.style.textDecoration = 'underline';
+          txt.textContent = 'Un link di esempio';
+        } else {
+          txt.textContent = 'Aa — Testo di esempio 123';
+        }
         sample.appendChild(txt);
       }
     }
@@ -242,6 +288,29 @@
       control.value = String(m ? Math.round(Number(m[1]) * (m[2] === 's' ? 1000 : 1)) : 0);
       control.setAttribute('aria-label', t.label || name);
       control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}ms`));
+    } else if (type === 'factor') {
+      const max = Tokens.FACTOR_MAX || 3;
+      control = doc.createElement('input');
+      control.type = 'range';
+      control.className = 'sn-refine-input sn-refine-range';
+      control.min = '0'; control.max = String(max); control.step = '0.25';
+      control.value = String(Number(startEff) || 0);
+      control.setAttribute('aria-label', t.label || name);
+      control.addEventListener('input', () => {
+        const n = Math.min(max, Math.max(0, Math.round((parseFloat(control.value) || 0) * 4) / 4));
+        setValue(String(n));
+      });
+    } else if (type === 'linea') {
+      control = doc.createElement('select');
+      control.className = 'sn-refine-input sn-refine-select';
+      control.setAttribute('aria-label', t.label || name);
+      for (const v of Tokens.STILI_LINEA || []) {
+        const o = doc.createElement('option');
+        o.value = v; o.textContent = NOMI_LINEA[v] || v;
+        if (v === startEff) o.selected = true;
+        control.appendChild(o);
+      }
+      control.addEventListener('change', () => setValue(control.value));
     } else { // font
       control = doc.createElement('select');
       control.className = 'sn-refine-input sn-refine-select';
@@ -361,5 +430,6 @@
     openOverlay,
     close,
     FONT_CHOICES,
+    factorLabel,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

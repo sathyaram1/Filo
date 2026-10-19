@@ -127,7 +127,7 @@ html, body {
   justify-content: center;
 }
 .ed-doc :is(h1,h2,h3) { position: relative; }
-.ed-collapse-toggle svg { transition: transform 0.12s; }
+.ed-collapse-toggle svg { transition: transform calc(0.12s * var(--sn-motion, 1)); }
 .ed-collapse-toggle.is-collapsed svg { transform: rotate(-90deg); }
 
 .ed-root.commenting .ed-doc { cursor: crosshair; }
@@ -229,7 +229,7 @@ html, body {
      del mouse e durante un drop. */
   opacity: 0.14;
   cursor: pointer;
-  transition: opacity 0.12s ease;
+  transition: opacity calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .ed-cell-empty:hover { opacity: 1; border-color: var(--sn-accent); color: var(--sn-accent); }
 .ed-cell-empty.drop-target { opacity: 1; border-color: var(--sn-accent); background: rgba(var(--sn-accent-rgb), 0.08); }
@@ -367,7 +367,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-note { align-self: flex-start; font-size: 11px; font-style: italic; color: var(--sn-muted); padding: 0 9px; }
 .ed-chat-continua {
   align-self: flex-start; margin-left: 9px; padding: 3px 10px; border-radius: 999px; font: inherit; font-size: 12px;
-  border: 1px solid var(--sn-border); background: transparent; color: inherit; cursor: pointer; transition: background 120ms ease;
+  border: 1px solid var(--sn-border); background: transparent; color: inherit; cursor: pointer; transition: background calc(120ms * var(--sn-motion, 1)) ease;
 }
 .ed-chat-continua:hover { background: var(--sn-hover); }
 .ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
@@ -486,6 +486,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-field input:focus, .ed-field textarea:focus { border-color: var(--sn-accent); }
 .ed-field input.ed-field-invalid { border-color: var(--sn-error); }
 .ed-field-hint { margin-top: 6px; font-size: 12px; line-height: 1.35; color: var(--sn-error); }
+/* Un'informazione sul campo, non un errore: grigia come l'etichetta. */
+.ed-field-hint.ed-field-nota { color: var(--sn-muted); }
 .ed-overlay-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .ed-btn {
   padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
@@ -503,7 +505,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease, border-color calc(0.14s * var(--sn-motion, 1)) ease;
 }
 .ed-vh-item:hover { background: var(--sn-hover); border-color: var(--sn-accent); }
 .ed-vh-item:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
@@ -572,11 +574,11 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   padding: 12px 14px;
   font-size: 13px; line-height: 1.4; color: var(--sn-fg);
   opacity: 0; transform: translateY(8px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.18s * var(--sn-motion, 1)) ease;
   pointer-events: none; z-index: 200;
 }
 /* Visibile prende il puntatore: sopra, i tempi aspettano; un clic lo chiude. Mentre sfuma torna trasparente. */
-.ed-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease; }
+.ed-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; transition: opacity calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.18s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease; }
 .ed-toast.show:hover { background: var(--sn-hover, var(--sn-bg)); }
 /* Toast con azione (es. "Annulla"): testo + bottone in riga. */
 .ed-toast:has(.ed-toast-action) { display: flex; align-items: center; gap: 12px; }
@@ -589,7 +591,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   padding: 5px 12px;
   font-size: 13px; font-weight: 600; color: var(--sn-accent, var(--sn-fg));
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, border-color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .ed-toast-action:hover { background: var(--sn-hover, rgba(127,127,127,0.12)); border-color: var(--sn-accent, var(--sn-border)); }
 .ed-check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
@@ -646,7 +648,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   background: var(--sn-bg);
   border: 1px solid var(--sn-border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
 }
 .ed-doc-pop[hidden] { display: none; }
 
@@ -737,7 +739,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 }
 
 /* Il titolo pulsa mentre si (ri)genera: è il riscontro che il lavoro è in corso. */
-.ed-doc-generating { opacity: 0.6; animation: ed-title-pulse 1s ease-in-out infinite; }
+.ed-doc-generating { opacity: 0.6; animation: ed-title-pulse calc(1s * var(--sn-motion, 1)) ease-in-out infinite; }
 @keyframes ed-title-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.75; } }
 @media (prefers-reduced-motion: reduce) {
   .ed-doc-generating { animation: none; }

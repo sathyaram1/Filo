@@ -1,0 +1,919 @@
+// Sezione Domande di Gestione (SPEC-DOMANDE §3): elenco, domanda aperta e risposte; scheda, ordine ed etichette da
+// SN_DOMANDE, mai dal testo di chi chiede. Non decide l'apertura né i contatori (manage.js). Il testo degli agenti
+// passa sempre dal formattatore che toglie l'HTML o da textContent. Prove: tests/manage-domande.spec.mjs.
+
+(function () {
+  'use strict';
+
+  const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
+  const T = {
+    elenco: MSG.DOMANDE_ELENCO || 'domande_elenco',
+    mostra: MSG.DOMANDA_MOSTRA || 'domanda_mostra',
+    rispondi: MSG.DOMANDA_RISPONDI || 'domanda_rispondi',
+    consiglio: MSG.DOMANDE_CONSIGLIO || 'domande_consiglio',
+    archivia: MSG.DOMANDA_ARCHIVIA || 'domanda_archivia',
+    riapri: MSG.DOMANDA_RIAPRI || 'domanda_riapri',
+  };
+  const MR = window.SN_MANAGE_REVIEW;
+  const D = window.SN_DOMANDE;
+  const $ = (id) => document.getElementById(id);
+
+  const NOMI_SCHEDA = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
+  const VUOTO = {
+    domande: 'Nessuna domanda da rispondere.',
+    'domande-lavoro': 'Nessuna domanda in lavorazione.',
+    'domande-archivio': 'Nessuna domanda in archivio.',
+  };
+  const PRIORITA = { bloccante: 'Bloccante', importante: 'Importante', quando_puoi: 'Quando puoi' };
+  const PRIORITA_PLURALE = { bloccante: 'Bloccanti', importante: 'Importanti', quando_puoi: 'Quando puoi' };
+  const TITOLO_NON_FIDATA = 'Chi l’ha scritta ha letto testo che non viene da te: le parole possono essere manipolate. '
+    + 'Ogni pulsante fa solo quello che c’è scritto sopra.';
+  const TASTO_MANDA = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : '';
+  const TITOLO_FIDATA = 'Scritta da una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
+
+  // `lette` falso finché nessuna lettura è riuscita: un numero senza dati direbbe più di quanto si sa. Dopo, una
+  // rilettura che salta tiene le domande a schermo e lo dice in `aggiornamento`: l'owner può star rispondendo.
+  const stato = { lette: false, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '', domande: [], riferimenti: {}, adesso: 0, altre: false };
+  let finte = false;
+  let inVolo = null;
+  let scheda = 'domande';
+  // Quello che il dettaglio mostra: una domanda o un gruppo, per id fissati al clic, così una domanda appena risposta
+  // resta a schermo col suo esito anche se lascia la scheda.
+  let aperta = null;
+  // La domanda appena risposta: resta nel dettaglio finché non si cambia scheda o se ne apre un'altra.
+  let tieni = null;
+  const scelte = new Set();
+  const bozze = new Map();
+  const avvisi = new Map();
+  const inCorso = new Set();
+  let conferma = null;
+  const ascoltatori = [];
+  const dip = { apriFeedback: null, apriScheda: null };
+  let firmaLista = '';
+  let firmaDettaglio = '';
+
+  // Chiamato a ogni invio: le prove sostituiscono window.filo.message dopo il caricamento.
+  function send(m) {
+    if (window.filo && window.filo.message) return window.filo.message(m);
+    if (window.chrome && chrome.runtime && chrome.runtime.sendMessage) return chrome.runtime.sendMessage(m);
+    return Promise.reject(new Error('canale main non disponibile'));
+  }
+  async function chiedi(m) {
+    try { return (await send(m)) || { ok: false, error: 'nessuna risposta' }; } catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
+  }
+
+  // Messaggio che il main non conosce ancora, o funzione del server non pubblicata: non è un guasto da riprovare.
+  function nonPubblicata(err) {
+    return /sconosciut|ancora pubblicat|not[ _-]?found/i.test(String(err || ''));
+  }
+
+  function cambia() {
+    disegna();
+    for (const fn of ascoltatori) {
+      try { fn(); } catch (e) { console.error('[manage] domande:', e); }
+    }
+  }
+
+  function fondi(vecchie, nuove) {
+    const per = new Map(vecchie.map((d) => [d.id, d]));
+    for (const d of nuove || []) if (d && d.id) per.set(d.id, d);
+    return Array.from(per.values());
+  }
+  function trova(id) { return stato.domande.find((d) => d.id === id) || null; }
+  function aggiorna(d) {
+    if (!d || !d.id) return;
+    stato.domande = fondi(stato.domande, [d]);
+  }
+
+  // La prima lettura le chiede tutte (l'archivio compreso), poi solo le cambiate: il delta del server.
+  function carica() {
+    if (finte) return Promise.resolve(stato);
+    if (inVolo) return inVolo;
+    inVolo = (async () => {
+      let delta = stato.lette && stato.adesso > 0;
+      let r = await chiedi(Object.assign({ type: T.elenco }, delta ? { dopo: stato.adesso } : { tutte: true }));
+      // Un delta che sfora il tetto non è «tutto quello che è cambiato»: si rilegge da capo.
+      if (delta && r.ok && r.altre) { delta = false; r = await chiedi({ type: T.elenco, tutte: true }); }
+      // Oltre il tetto «tutte» sono le più recenti: quelle che aspettano l'owner si chiedono a parte, intere.
+      const aperte = !delta && r.ok && r.altre ? await chiedi({ type: T.elenco }) : null;
+      if (finte) return stato;
+      const guasto = !r.ok || !Array.isArray(r.domande) ? r : (aperte && !aperte.ok ? aperte : null);
+      if (!guasto) {
+        let domande = delta ? fondi(stato.domande, r.domande) : r.domande.slice();
+        if (aperte) domande = fondi(domande, aperte.domande);
+        Object.assign(stato, {
+          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '',
+          domande,
+          riferimenti: Object.assign({}, delta ? stato.riferimenti : {}, aperte ? aperte.riferimenti : {}, r.riferimenti || {}),
+          adesso: Number(r.adesso) || stato.adesso,
+          altre: delta ? stato.altre : r.altre === true,
+        });
+      } else {
+        const errore = String(guasto.error || 'nessuna risposta');
+        const soloOwner = guasto.code === 'not_admin';
+        const nonDisponibile = nonPubblicata(errore);
+        // Chi non è più owner, o un server che non le pubblica più, le toglie; un guasto qualunque no, e la lettura
+        // dopo riparte dallo stesso `adesso`.
+        if (stato.lette && !soloOwner && !nonDisponibile) stato.aggiornamento = errore;
+        else {
+          Object.assign(stato, {
+            lette: false, fallita: true, nonDisponibile, soloOwner,
+            errore, aggiornamento: '', domande: [], riferimenti: {}, adesso: 0, altre: false,
+          });
+        }
+      }
+      cambia();
+      return stato;
+    })().finally(() => { inVolo = null; });
+    return inVolo;
+  }
+
+  // ── Elenco ────────────────────────────────────────────────────────────────
+  function quando(ms, conOra) {
+    const n = Number(ms);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const o = conOra ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' };
+    try { return new Date(n).toLocaleString('it-IT', o); } catch (_) { return ''; }
+  }
+  // «l’11 ott», «il 12 ott»: l'articolo segue il numero.
+  function ilGiorno(ms) {
+    const t = quando(ms, true);
+    return /^(1|8|11)\D/.test(t) ? `l’${t}` : `il ${t}`;
+  }
+  function idDi(d) { return d.id || (Number.isInteger(d.numero) ? D.idDi(d.numero) : ''); }
+  function chiaveDi(b) { return `${b.priorita}|${String(b.gruppo || '').toLocaleLowerCase('it')}`; }
+
+  function diScheda(tab) { return stato.domande.filter((d) => MR.schedaDomanda(d) === tab); }
+
+  // Le schede che aspettano seguono §3.7 (priorità, gruppo, età); l'archivio va dal più recente.
+  function blocchi(tab) {
+    const mie = diScheda(tab);
+    if (tab === 'domande-archivio') {
+      const t = (d) => Number(d.modificataIl) || Number(d.creataIl) || 0;
+      return mie.slice().sort((a, b) => (t(b) - t(a)) || ((b.numero || 0) - (a.numero || 0)))
+        .map((d) => ({ priorita: '', gruppo: '', domande: [d] }));
+    }
+    return D.raggruppa(mie);
+  }
+  function inOrdine(tab) { return blocchi(tab).flatMap((b) => b.domande); }
+
+  function el(tag, cls, testo) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (testo !== undefined && testo !== null) e.textContent = String(testo);
+    return e;
+  }
+
+  function casella(ids, titolo) {
+    const c = el('input', 'mg-dom-sel');
+    c.type = 'checkbox';
+    c.checked = ids.length > 0 && ids.every((id) => scelte.has(id));
+    c.indeterminate = !c.checked && ids.some((id) => scelte.has(id));
+    c.dataset.ids = ids.join(' ');
+    c.setAttribute('aria-label', titolo);
+    c.title = titolo;
+    return c;
+  }
+
+  function riga(d, tab, nelGruppo) {
+    const li = el('li', 'mg-domanda');
+    li.dataset.id = idDi(d);
+    li.dataset.priorita = String(d.priorita || '');
+    li.tabIndex = 0;
+    if (nelGruppo) li.classList.add('mg-domanda--gruppo');
+    if (aperta && aperta.ids.includes(li.dataset.id)) li.classList.add('mg-domanda--aperta');
+    if (tab === 'domande') li.appendChild(casella([li.dataset.id], `Scegli ${li.dataset.id} per «Applica il consiglio»`));
+    li.appendChild(el('span', 'mg-domanda-num', li.dataset.id));
+    li.appendChild(el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)')));
+    if (tab === 'domande-archivio') li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
+    const data = quando(tab === 'domande-archivio' ? (d.modificataIl || d.creataIl) : d.creataIl);
+    if (data) li.appendChild(el('span', 'mg-domanda-data', data));
+    return li;
+  }
+
+  function disegnaLista() {
+    const lista = $('mgDomandeLista');
+    if (!lista) return;
+    const bl = blocchi(scheda);
+    const firma = JSON.stringify([scheda, aperta && aperta.ids, [...scelte],
+      bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile])])]);
+    if (firma === firmaLista && !lista.hidden) return;
+    firmaLista = firma;
+    lista.replaceChildren();
+    let prio = null;
+    for (const b of bl) {
+      if (scheda !== 'domande-archivio' && b.priorita !== prio) {
+        prio = b.priorita;
+        lista.appendChild(el('li', 'mg-domande-prio', PRIORITA_PLURALE[prio] || 'Senza priorità'));
+      }
+      const gruppo = b.gruppo && b.domande.length > 1;
+      if (gruppo) {
+        const ids = b.domande.map(idDi);
+        const g = el('li', 'mg-domande-gruppo');
+        g.dataset.gruppo = chiaveDi(b);
+        g.dataset.ids = ids.join(' ');
+        g.tabIndex = 0;
+        g.title = 'Apri tutto il gruppo';
+        if (aperta && aperta.gruppo === g.dataset.gruppo) g.classList.add('mg-domande-gruppo--aperto');
+        if (scheda === 'domande') g.appendChild(casella(ids, `Scegli tutto il gruppo «${b.gruppo}»`));
+        g.appendChild(el('span', 'mg-domande-gruppo-nome', b.gruppo));
+        g.appendChild(el('span', 'mg-domande-gruppo-n', b.domande.length));
+        lista.appendChild(g);
+      }
+      for (const d of b.domande) lista.appendChild(riga(d, scheda, gruppo));
+    }
+  }
+
+  function disegnaTesta() {
+    const titolo = $('mgDomandeTitolo');
+    if (titolo) titolo.textContent = NOMI_SCHEDA[scheda] || '';
+    const tutte = $('mgDomandeTutte');
+    const btn = $('mgDomandeConsiglioSel');
+    const ids = stato.lette && scheda === 'domande' ? inOrdine('domande').map(idDi) : [];
+    for (const id of [...scelte]) if (!ids.includes(id)) scelte.delete(id);
+    if (tutte) {
+      tutte.hidden = !ids.length;
+      tutte.checked = ids.length > 0 && ids.every((id) => scelte.has(id));
+      tutte.indeterminate = !tutte.checked && scelte.size > 0;
+    }
+    if (btn) {
+      btn.hidden = !scelte.size;
+      btn.textContent = `Applica il consiglio (${scelte.size})`;
+      btn.disabled = !!(conferma && conferma.inviando);
+    }
+  }
+
+  // ── Domanda aperta ────────────────────────────────────────────────────────
+  function md(testo) {
+    const box = el('div', 'mg-dq-md');
+    if (window.SN_MARKDOWN) {
+      box.classList.add('filo-md');
+      box.innerHTML = window.SN_MARKDOWN.render(String(testo || ''));
+    } else {
+      box.textContent = String(testo || '');
+    }
+    return box;
+  }
+
+  function sezione(cls, titolo, ...figli) {
+    const s = el('section', `mg-dq-sez ${cls || ''}`.trim());
+    if (titolo) s.appendChild(el('h3', 'mg-dq-h', titolo));
+    for (const f of figli) if (f) s.appendChild(f);
+    return s;
+  }
+
+  function rif(id) {
+    const r = stato.riferimenti && Object.prototype.hasOwnProperty.call(stato.riferimenti, id) ? stato.riferimenti[id] : null;
+    return r && typeof r.num === 'string' ? r : null;
+  }
+
+  // Origine e collegamenti: un feedback noto al server si apre in Gestione, una domanda nel dettaglio.
+  function legame(tipo, id) {
+    if (tipo === 'feedback') {
+      const r = rif(id);
+      if (!r) return el('span', 'mg-dq-legame mg-dq-legame--muto', 'un feedback');
+      const a = el('button', 'mg-dq-legame', r.num);
+      a.type = 'button';
+      a.dataset.feedback = r.num;
+      a.title = `Apri ${r.num} nei Feedback`;
+      return a;
+    }
+    if (tipo === 'domanda' && D.numeroDi(id) !== null) {
+      const a = el('button', 'mg-dq-legame', id);
+      a.type = 'button';
+      a.dataset.domanda = id;
+      a.title = `Apri ${id}`;
+      return a;
+    }
+    return el('span', 'mg-dq-legame mg-dq-legame--muto', tipo === 'ramo' ? `ramo ${id}` : String(id || tipo));
+  }
+
+  function testata(d) {
+    const meta = el('div', 'mg-dq-meta');
+    meta.appendChild(el('span', 'mg-dq-num', idDi(d)));
+    if (PRIORITA[d.priorita]) {
+      const p = el('span', 'mg-dq-prio', PRIORITA[d.priorita]);
+      p.dataset.priorita = d.priorita;
+      meta.appendChild(p);
+    }
+    const fidata = d.fiducia === 'fidato';
+    const f = el('span', `mg-dq-fiducia${fidata ? '' : ' mg-dq-fiducia--no'}`, fidata ? 'Fidata' : 'Non fidata');
+    f.title = fidata ? TITOLO_FIDATA : TITOLO_NON_FIDATA;
+    meta.appendChild(f);
+    const nata = quando(d.creataIl, true);
+    if (nata) meta.appendChild(el('span', 'mg-dq-data', `chiesta ${nata}`));
+    if (Number(d.modificataIl) > Number(d.creataIl || 0) + 60000) meta.appendChild(el('span', 'mg-dq-data', `aggiornata ${quando(d.modificataIl, true)}`));
+    const legami = [];
+    if (d.origine && d.origine.tipo) legami.push(['da', d.origine.tipo, d.origine.id]);
+    for (const c of Array.isArray(d.collegamenti) ? d.collegamenti : []) {
+      if (!(d.origine && c.tipo === d.origine.tipo && c.id === d.origine.id)) legami.push(['', c.tipo, c.id]);
+    }
+    // L'origine e gli altri legami stanno in due gruppi: «da #902 #813» farebbe sembrare origine anche il secondo.
+    for (const gruppo of [legami.filter((x) => x[0]), legami.filter((x) => !x[0])]) {
+      if (!gruppo.length) continue;
+      const l = el('span', 'mg-dq-legami');
+      for (const [pre, tipo, id] of gruppo) {
+        if (pre) l.appendChild(el('span', 'mg-dq-legami-pre', pre));
+        l.appendChild(legame(tipo, id));
+      }
+      meta.appendChild(l);
+    }
+    const h = el('h2', 'mg-dq-titolo', d.illeggibile ? 'Questa domanda non si legge' : String(d.titolo || '(senza titolo)'));
+    const head = el('header', 'mg-dq-testa');
+    head.append(meta, h);
+    return head;
+  }
+
+  // L'ultima scelta fatta su questa domanda, per segnarla nell'archivio.
+  function sceltaFatta(d) {
+    const turni = Array.isArray(d.conversazione) ? d.conversazione : [];
+    for (let i = turni.length - 1; i >= 0; i--) if (Number.isInteger(turni[i].scelta)) return turni[i].scelta;
+    return null;
+  }
+
+  function etichettaDi(o) { return o ? D.etichettaAzione(o.azione, stato.riferimenti) : null; }
+  function consigliata(d) {
+    return d.consiglio && Number.isInteger(d.consiglio.opzione) ? (d.opzioni || [])[d.consiglio.opzione] || null : null;
+  }
+
+  function opzioni(d) {
+    const ops = Array.isArray(d.opzioni) ? d.opzioni : [];
+    if (!ops.length) return null;
+    const rispondibile = d.stato === 'aperta';
+    const occupata = inCorso.has(d.id);
+    const fatta = d.stato === 'aperta' ? null : sceltaFatta(d);
+    const lista = el('ol', 'mg-dq-opzioni');
+    ops.forEach((o, i) => {
+      const li = el('li', 'mg-dq-opzione');
+      li.dataset.indice = String(i);
+      const consigli = d.consiglio && d.consiglio.opzione === i;
+      if (consigli) li.classList.add('mg-dq-opzione--consigliata');
+      const testa = el('div', 'mg-dq-opzione-testa');
+      testa.appendChild(el('span', 'mg-dq-opzione-n', `${i + 1}.`));
+      testa.appendChild(el('span', 'mg-dq-opzione-testo', o.testo));
+      if (consigli) testa.appendChild(el('span', 'mg-dq-badge', 'Consigliata'));
+      if (fatta === i) testa.appendChild(el('span', 'mg-dq-badge mg-dq-badge--scelta', 'Scelta'));
+      li.appendChild(testa);
+      if (o.pro || o.contro) {
+        const pc = el('div', 'mg-dq-procontro');
+        if (o.pro) { const p = el('div', 'mg-dq-pro'); p.append(el('span', 'mg-dq-pc', 'Pro'), md(o.pro)); pc.appendChild(p); }
+        if (o.contro) { const c = el('div', 'mg-dq-contro'); c.append(el('span', 'mg-dq-pc', 'Contro'), md(o.contro)); pc.appendChild(c); }
+        li.appendChild(pc);
+      }
+      if (rispondibile) {
+        const etichetta = etichettaDi(o);
+        if (etichetta) {
+          const b = el('button', 'sn-btn mg-dq-azione', etichetta);
+          b.type = 'button';
+          b.dataset.scelta = String(i);
+          b.disabled = occupata;
+          if ((bozze.get(d.id) || '').trim()) b.title = 'Con la scelta parte anche il testo che hai scritto';
+          li.appendChild(b);
+        } else {
+          const n = el('span', 'mg-dq-senza-azione', 'Da qui non si applica');
+          n.title = 'Il tipo d’azione o il feedback a cui punta non tornano coi dati del server: puoi rispondere a parole.';
+          li.appendChild(n);
+        }
+      }
+      lista.appendChild(li);
+    });
+    return sezione('mg-dq-opz', 'Opzioni', lista);
+  }
+
+  function consiglio(d) {
+    const o = consigliata(d);
+    if (!o) return null;
+    const corpo = el('div', 'mg-dq-consiglio-corpo');
+    corpo.appendChild(el('span', 'mg-dq-consiglio-n', `Opzione ${d.consiglio.opzione + 1}`));
+    if (d.consiglio.perche) corpo.appendChild(md(d.consiglio.perche));
+    const s = sezione('mg-dq-consiglio', 'Consiglio', corpo);
+    const etichetta = d.stato === 'aperta' ? etichettaDi(o) : null;
+    if (etichetta) {
+      const b = el('button', 'sn-btn mg-dq-applica', `Applica il consiglio: ${etichetta}`);
+      b.type = 'button';
+      b.dataset.fai = 'consiglio';
+      b.disabled = inCorso.has(d.id);
+      s.appendChild(b);
+    }
+    return s;
+  }
+
+  function esito(d) {
+    const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
+    let testo = '';
+    let tipo = '';
+    if (d.stato === 'superata') testo = 'Superata da un’altra domanda.';
+    else if (e && e.archiviata) testo = `Archiviata senza azioni${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
+    else if (e && e.automatica) testo = 'Risposta automatica.';
+    else if (e && e.ok === false && e.errore === 'in_corso') testo = 'Risposta in corso sul server…';
+    else if (e && e.ok === false) { testo = 'L’ultima risposta non è stata applicata: il motivo è nella conversazione.'; tipo = 'err'; }
+    else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente ${ilGiorno(e.compito.da)}.` : 'Affidata a un agente.';
+    // Una domanda riaperta da un chiarimento può portarsi dietro l'esito di prima: «fatto» solo se è chiusa.
+    else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
+    if (!testo) return null;
+    return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
+  }
+
+  function autoreDi(a) {
+    const t = a && a.tipo;
+    if (t === 'owner') return 'Tu';
+    if (t === 'server') return 'Server';
+    return a && a.ruolo ? `Agente (${a.ruolo})` : 'Agente';
+  }
+
+  function conversazione(d) {
+    const turni = Array.isArray(d.conversazione) ? d.conversazione : [];
+    if (!turni.length) return null;
+    const ol = el('ol', 'mg-dq-turni');
+    for (const t of turni) {
+      const li = el('li', 'mg-dq-turno');
+      const tipoAutore = (t.autore && t.autore.tipo) || '';
+      li.dataset.autore = tipoAutore;
+      const head = el('div', 'mg-dq-turno-testa');
+      head.appendChild(el('span', 'mg-dq-turno-chi', autoreDi(t.autore)));
+      if (tipoAutore !== 'owner' && tipoAutore !== 'server' && !(t.autore && t.autore.fiducia === 'fidato')) {
+        const f = el('span', 'mg-dq-fiducia mg-dq-fiducia--no', 'non fidato');
+        f.title = TITOLO_NON_FIDATA;
+        head.appendChild(f);
+      }
+      if (Number.isInteger(t.scelta)) head.appendChild(el('span', 'mg-dq-turno-scelta', `opzione ${t.scelta + 1}${t.consiglio ? ', il consiglio' : ''}`));
+      const ora = quando(t.ora, true);
+      if (ora) head.appendChild(el('span', 'mg-dq-data', ora));
+      li.appendChild(head);
+      if (t.testo) li.appendChild(tipoAutore === 'owner' ? el('div', 'mg-dq-turno-tuo', t.testo) : md(t.testo));
+      ol.appendChild(li);
+    }
+    return sezione('mg-dq-conv', 'Conversazione', ol);
+  }
+
+  function risposta(d) {
+    const box = el('div', 'mg-dq-risposta');
+    const occupata = inCorso.has(d.id);
+    const rispondibile = d.stato === 'aperta' || d.stato === 'in_lavorazione';
+    if (rispondibile && !d.illeggibile) {
+      const ta = el('textarea', 'mg-dq-testo');
+      ta.rows = 3;
+      ta.placeholder = d.stato === 'aperta' ? 'Rispondi a parole…' : 'Aggiungi qualcosa…';
+      ta.value = bozze.get(d.id) || '';
+      ta.dataset.id = d.id;
+      ta.disabled = occupata;
+      box.appendChild(ta);
+    }
+    const tasti = el('div', 'mg-dq-tasti');
+    const tasto = (testo, fai, cls, titolo) => {
+      const b = el('button', `sn-btn ${cls || ''}`.trim(), testo);
+      b.type = 'button';
+      b.dataset.fai = fai;
+      b.disabled = occupata;
+      if (titolo) b.title = titolo;
+      tasti.appendChild(b);
+    };
+    if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
+    tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
+    if (rispondibile) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
+    else if (d.esito && d.esito.archiviata) tasto('Riapri', 'riapri', 'sn-btn-secondary', 'Rimettila fra quelle da rispondere');
+    box.appendChild(tasti);
+    const a = avvisi.get(d.id);
+    const msg = el('p', `mg-dq-msg${a && a.tipo ? ` mg-dq-msg--${a.tipo}` : ''}`, a ? a.testo : '');
+    msg.setAttribute('role', 'status');
+    box.appendChild(msg);
+    return box;
+  }
+
+  function blocco(d) {
+    const art = el('article', 'mg-dq');
+    art.dataset.id = idDi(d);
+    art.appendChild(testata(d));
+    if (d.illeggibile) {
+      art.appendChild(el('p', 'mg-dq-esito mg-dq-esito--err', 'Il server non riesce ad aprire il testo di questa domanda.'));
+      art.appendChild(risposta(d));
+      return art;
+    }
+    if (d.contesto) art.appendChild(sezione('', 'Contesto', md(d.contesto)));
+    if (d.problema) art.appendChild(sezione('', 'Problema', md(d.problema)));
+    for (const parte of [opzioni(d), consiglio(d), esito(d), conversazione(d), risposta(d)]) if (parte) art.appendChild(parte);
+    if (d.notePerAgenti) {
+      const det = el('details', 'mg-dq-note');
+      det.appendChild(el('summary', '', 'Note per gli agenti'));
+      det.appendChild(md(d.notePerAgenti));
+      art.appendChild(det);
+    }
+    return art;
+  }
+
+  function disegnaDettaglio() {
+    const box = $('mgDomandaDettaglio');
+    if (!box) return;
+    const ds = aperta ? aperta.ids.map(trova).filter(Boolean) : [];
+    const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.esito, d.titolo, d.illeggibile,
+      ...(d.opzioni || []).map((o) => etichettaDi(o))]), [...inCorso], [...avvisi], stato.lette]);
+    if (firma === firmaDettaglio) return;
+    firmaDettaglio = firma;
+    // Chi stava scrivendo ritrova il cursore dov'era: il dettaglio si ridisegna anche per un esito altrui.
+    const att = document.activeElement;
+    const fuoco = att && att.classList && att.classList.contains('mg-dq-testo') && box.contains(att)
+      ? { id: att.dataset.id, a: att.selectionStart, b: att.selectionEnd } : null;
+    const aperte = new Set([...box.querySelectorAll('details.mg-dq-note[open]')].map((x) => x.closest('.mg-dq').dataset.id));
+    const scorre = box.scrollTop;
+    box.replaceChildren();
+    if (!stato.lette || !ds.length) {
+      box.appendChild(el('p', 'mg-dq-vuoto', stato.lette && inOrdine(scheda).length ? 'Scegli una domanda.' : ''));
+      return;
+    }
+    if (aperta.gruppo && ds.length > 1) box.appendChild(el('p', 'mg-dq-gruppo', `${String(ds[0].gruppo || '')} · ${ds.length} domande`));
+    for (const d of ds) {
+      const b = blocco(d);
+      if (aperte.has(b.dataset.id)) { const n = b.querySelector('details.mg-dq-note'); if (n) n.open = true; }
+      box.appendChild(b);
+    }
+    box.scrollTop = scorre;
+    if (fuoco) {
+      const ta = box.querySelector(`.mg-dq[data-id="${fuoco.id}"] .mg-dq-testo`);
+      if (ta) { ta.focus(); try { ta.setSelectionRange(fuoco.a, fuoco.b); } catch (_) {} }
+    }
+  }
+
+  // ── Conferma di «applica il consiglio» su più domande ───────────────────
+  function piano(ids) {
+    const voci = [];
+    const fuori = [];
+    const tante = ids.length > 1;
+    for (const id of ids) {
+      const d = trova(id);
+      if (!d || d.stato !== 'aperta') { fuori.push({ id, perche: 'non aspetta più una risposta' }); continue; }
+      const o = consigliata(d);
+      const etichetta = etichettaDi(o);
+      if (!etichetta) { fuori.push({ id, perche: o ? 'il consiglio da qui non si applica' : 'nessun consiglio' }); continue; }
+      const v = D.validaAzione(o.azione);
+      if (tante && v.ok && !D.TIPI[v.azione.tipo].bulk) { fuori.push({ id, perche: `una per una: ${etichetta}` }); continue; }
+      voci.push({ id, etichetta });
+    }
+    return { voci, fuori };
+  }
+
+  function disegnaConferma() {
+    const box = $('mgDomandeConferma');
+    if (!box) return;
+    box.hidden = !conferma;
+    box.replaceChildren();
+    if (!conferma) return;
+    const elenco = (righe) => {
+      const ul = el('ul', 'mg-dom-conferma-lista');
+      for (const r of righe) {
+        const li = el('li');
+        li.append(el('span', 'mg-domanda-num', r.id), el('span', '', r.testo));
+        ul.appendChild(li);
+      }
+      return ul;
+    };
+    const { voci, fuori, esiti, inviando } = conferma;
+    if (esiti) {
+      const ok = esiti.filter((e) => e.ok);
+      const ko = esiti.filter((e) => !e.ok);
+      if (ok.length) box.appendChild(el('p', 'mg-dom-conferma-ok', `Applicato a ${ok.length === 1 ? 'una domanda' : `${ok.length} domande`}:`));
+      if (ok.length) box.appendChild(elenco(ok.map((e) => ({ id: e.id, testo: e.etichetta || '' }))));
+      if (ko.length) box.appendChild(el('p', 'mg-dom-conferma-err', `Non applicato a ${ko.length === 1 ? 'una domanda' : `${ko.length} domande`}:`));
+      if (ko.length) box.appendChild(elenco(ko.map((e) => ({ id: e.id, testo: e.dettaglio || e.errore || 'errore' }))));
+    } else if (voci.length) {
+      box.appendChild(el('p', '', `Applico il consiglio a ${voci.length === 1 ? 'una domanda' : `${voci.length} domande`}:`));
+      box.appendChild(elenco(voci.map((v) => ({ id: v.id, testo: v.etichetta }))));
+    } else {
+      box.appendChild(el('p', '', 'Nessuna delle domande scelte ha un consiglio da applicare così.'));
+    }
+    if (!esiti && fuori.length) {
+      box.appendChild(el('p', 'mg-dom-conferma-fuori', 'Restano fuori:'));
+      box.appendChild(elenco(fuori.map((f) => ({ id: f.id, testo: f.perche }))));
+    }
+    if (conferma.errore) box.appendChild(el('p', 'mg-dom-conferma-err', conferma.errore));
+    const tasti = el('div', 'mg-dq-tasti');
+    const tasto = (testo, cosa, cls) => {
+      const b = el('button', `sn-btn ${cls || ''}`.trim(), testo);
+      b.type = 'button';
+      b.dataset.conferma = cosa;
+      b.disabled = !!inviando;
+      tasti.appendChild(b);
+    };
+    if (!esiti && voci.length) tasto(inviando ? 'Applico…' : 'Applica', 'si');
+    tasto(esiti || !voci.length ? 'Chiudi' : 'Annulla', 'no', 'sn-btn-secondary');
+    box.appendChild(tasti);
+  }
+
+  async function applicaConferma() {
+    if (!conferma || conferma.inviando || !conferma.voci.length) return;
+    conferma.inviando = true;
+    disegnaConferma();
+    disegnaTesta();
+    const ids = conferma.voci.map((v) => v.id);
+    const r = await chiedi({ type: T.consiglio, ids });
+    conferma.inviando = false;
+    if (r.ok && Array.isArray(r.esiti)) {
+      const etichette = new Map(conferma.voci.map((v) => [v.id, v.etichetta]));
+      conferma.esiti = r.esiti.map((e) => Object.assign({}, e, { etichetta: e.etichetta || etichette.get(e.id) || '' }));
+      for (const e of r.esiti) if (e.ok) scelte.delete(e.id);
+    } else {
+      conferma.errore = `Non riuscito: ${r.error || 'nessuna risposta'}`;
+    }
+    disegnaConferma();
+    carica();
+    cambia();
+  }
+
+  // ── Risposte su una domanda ───────────────────────────────────────────────
+  async function manda(id, richiesta, attesa) {
+    if (inCorso.has(id)) return null;
+    inCorso.add(id);
+    avvisi.set(id, { testo: attesa, tipo: '' });
+    disegnaDettaglio();
+    const r = await chiedi(richiesta);
+    inCorso.delete(id);
+    return r;
+  }
+
+  function dopo(id, r, fatto) {
+    if (r.ok) {
+      if (r.domanda) aggiorna(r.domanda);
+      avvisi.set(id, { testo: fatto, tipo: 'ok' });
+      tieni = id;
+      carica();
+    } else {
+      avvisi.set(id, { testo: `Non riuscito: ${r.error || 'nessuna risposta'}`, tipo: 'err' });
+    }
+    cambia();
+  }
+
+  async function rispondi(id, scelta) {
+    const testo = (bozze.get(id) || '').trim();
+    const req = { type: T.rispondi, id };
+    if (Number.isInteger(scelta)) req.scelta = scelta;
+    if (testo) req.testo = testo;
+    if (req.scelta === undefined && !req.testo) {
+      avvisi.set(id, { testo: 'Scrivi qualcosa o scegli un’opzione.', tipo: 'err' });
+      disegnaDettaglio();
+      return;
+    }
+    const r = await manda(id, req, 'Invio…');
+    if (!r) return;
+    if (r.ok) bozze.delete(id);
+    const d = r.domanda || trova(id);
+    dopo(id, r, d && d.stato === 'in_lavorazione' ? 'Mandata: la prende un agente.' : 'Fatto.');
+  }
+
+  async function consiglioUna(id) {
+    // Col testo scritto il consiglio è una scelta come le altre: le parole partono con lei.
+    const d = trova(id);
+    if ((bozze.get(id) || '').trim() && d && d.consiglio) return rispondi(id, d.consiglio.opzione);
+    if (inCorso.has(id)) return;
+    inCorso.add(id);
+    avvisi.set(id, { testo: 'Applico il consiglio…', tipo: '' });
+    disegnaDettaglio();
+    const r = await chiedi({ type: T.consiglio, ids: [id] });
+    const e = r.ok && Array.isArray(r.esiti) ? r.esiti.find((x) => x.id === id) : null;
+    let fine;
+    if (!r.ok) fine = r;
+    else if (!e) fine = { ok: false, error: 'il server non ha detto com’è andata' };
+    else if (!e.ok) fine = { ok: false, error: e.dettaglio || e.errore };
+    else {
+      // L'esito del consiglio non porta la domanda: la si rilegge prima di riaccendere i pulsanti.
+      const m = await chiedi({ type: T.mostra, id });
+      if (m.ok && m.riferimenti) Object.assign(stato.riferimenti, m.riferimenti);
+      fine = { ok: true, domanda: m.ok ? m.domanda : null };
+    }
+    inCorso.delete(id);
+    dopo(id, fine, 'Fatto.');
+  }
+
+  async function discuti(id) {
+    const testo = `Discutiamo la domanda ${id}`;
+    try {
+      await navigator.clipboard.writeText(testo);
+      avvisi.set(id, { testo: `Copiato: «${testo}»`, tipo: 'ok' });
+    } catch (_) {
+      avvisi.set(id, { testo: `Non riesco a copiare. La riga è: ${testo}`, tipo: 'err' });
+    }
+    disegnaDettaglio();
+  }
+
+  async function archivia(id, riapri) {
+    const r = await manda(id, { type: riapri ? T.riapri : T.archivia, id }, riapri ? 'Riapro…' : 'Archivio…');
+    if (r) dopo(id, r, riapri ? 'Riaperta.' : 'Archiviata.');
+  }
+
+  // ── Disegno e scelta di cosa mostrare ─────────────────────────────────────
+  function apri(ids, gruppo) {
+    const nuove = ids && ids.length ? ids.slice() : [];
+    // Un esito vale per la domanda su cui si è agito: aprendone un'altra se ne va.
+    for (const id of [...avvisi.keys()]) if (!nuove.includes(id) && !inCorso.has(id)) avvisi.delete(id);
+    if (tieni && !nuove.includes(tieni)) tieni = null;
+    aperta = nuove.length ? { ids: nuove, gruppo: gruppo || null } : null;
+  }
+
+  // Si apre da sé la prima della scheda: la più urgente. Quella appena risposta resta finché non se ne sceglie un'altra.
+  function scegliSeServe() {
+    const visibili = inOrdine(scheda).map(idDi);
+    if (aperta && aperta.ids.some((id) => trova(id))) {
+      if (aperta.ids.some((id) => visibili.includes(id) || id === tieni)) return;
+    }
+    apri(visibili.length ? [visibili[0]] : null);
+  }
+
+  function disegna() {
+    const el0 = $('mgDomandeStato');
+    const lista = $('mgDomandeLista');
+    const riprova = $('mgDomandeRiprova');
+    const altre = $('mgDomandeAltre');
+    if (!el0 || !lista || !MR) return;
+    if (riprova) riprova.hidden = true;
+    if (altre) altre.hidden = true;
+    el0.hidden = false;
+    if (!stato.lette || !D) {
+      lista.hidden = true;
+      lista.replaceChildren();
+      firmaLista = '';
+      if (!D) el0.textContent = 'Le domande non si possono mostrare: manca il modulo delle domande.';
+      else if (stato.nonDisponibile) el0.textContent = 'Le domande non sono ancora disponibili: il server non le pubblica ancora.';
+      else if (stato.soloOwner) el0.textContent = 'Le domande le vede solo l’owner: accedi col suo account.';
+      else if (stato.fallita) {
+        el0.textContent = `Non riesco a leggere le domande: ${stato.errore}`;
+        if (riprova) riprova.hidden = false;
+      } else el0.textContent = 'Caricamento…';
+      conferma = null;
+      disegnaConferma();
+      disegnaTesta();
+      aperta = null;
+      disegnaDettaglio();
+      return;
+    }
+    scegliSeServe();
+    const n = inOrdine(scheda).length;
+    const vuoto = n ? '' : (VUOTO[scheda] || '');
+    if (stato.aggiornamento) {
+      el0.textContent = `Non riesco ad aggiornare le domande: ${stato.aggiornamento}. Restano quelle dell’ultima lettura.${vuoto ? ` ${vuoto}` : ''}`;
+      if (riprova) riprova.hidden = false;
+    } else el0.textContent = vuoto;
+    el0.hidden = !el0.textContent;
+    lista.hidden = !n;
+    disegnaLista();
+    if (altre && stato.altre && scheda === 'domande-archivio') {
+      altre.hidden = false;
+      altre.textContent = 'In archivio ci sono altre domande, più vecchie: qui si vedono le più recenti.';
+    }
+    disegnaTesta();
+    disegnaConferma();
+    disegnaDettaglio();
+  }
+
+  // ── Eventi ────────────────────────────────────────────────────────────────
+  const riprova = $('mgDomandeRiprova');
+  if (riprova) riprova.addEventListener('click', () => { carica(); });
+
+  const lista = $('mgDomandeLista');
+  if (lista) {
+    lista.addEventListener('change', (e) => {
+      const c = e.target.closest('.mg-dom-sel');
+      if (!c) return;
+      for (const id of c.dataset.ids.split(' ').filter(Boolean)) { if (c.checked) scelte.add(id); else scelte.delete(id); }
+      disegnaLista();
+      disegnaTesta();
+    });
+    const apriDaRiga = (t) => {
+      const g = t.closest('.mg-domande-gruppo');
+      if (g) { apri(g.dataset.ids.split(' '), g.dataset.gruppo); return true; }
+      const r = t.closest('.mg-domanda[data-id]');
+      if (r) { apri([r.dataset.id]); return true; }
+      return false;
+    };
+    lista.addEventListener('click', (e) => {
+      if (e.target.closest('.mg-dom-sel')) return;
+      if (!apriDaRiga(e.target)) return;
+      disegnaLista();
+      disegnaDettaglio();
+      const box = $('mgDomandaDettaglio');
+      if (box) box.scrollTop = 0;
+    });
+    lista.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.target.closest('.mg-dom-sel')) return;
+      if (!apriDaRiga(e.target)) return;
+      e.preventDefault();
+      disegnaLista();
+      disegnaDettaglio();
+    });
+    lista.addEventListener('contextmenu', (e) => {
+      const r = e.target.closest('.mg-domanda[data-id]');
+      const d = r && trova(r.dataset.id);
+      const menu = window.SN_MANAGE_MENU;
+      if (!d || !menu) return;
+      e.preventDefault();
+      const voci = [{ testo: 'Apri', azione: () => { apri([d.id]); disegna(); } }];
+      const et = d.stato === 'aperta' ? etichettaDi(consigliata(d)) : null;
+      if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
+      voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
+      if (d.stato === 'aperta' || d.stato === 'in_lavorazione') voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
+      else if (d.esito && d.esito.archiviata) voci.push({ testo: 'Riapri', azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
+      menu.apri(e.clientX, e.clientY, voci);
+    });
+  }
+
+  const tutte = $('mgDomandeTutte');
+  if (tutte) {
+    tutte.addEventListener('change', () => {
+      const ids = inOrdine('domande').map(idDi);
+      if (tutte.checked) ids.forEach((id) => scelte.add(id)); else scelte.clear();
+      disegnaLista();
+      disegnaTesta();
+    });
+  }
+  const selBtn = $('mgDomandeConsiglioSel');
+  if (selBtn) {
+    selBtn.addEventListener('click', () => {
+      const ids = inOrdine('domande').map(idDi).filter((id) => scelte.has(id));
+      if (!ids.length) return;
+      conferma = Object.assign({ esiti: null, errore: '', inviando: false }, piano(ids));
+      disegnaConferma();
+    });
+  }
+  const confBox = $('mgDomandeConferma');
+  if (confBox) {
+    confBox.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-conferma]');
+      if (!b || b.disabled) return;
+      if (b.dataset.conferma === 'si') { applicaConferma(); return; }
+      conferma = null;
+      disegnaConferma();
+      disegnaTesta();
+    });
+  }
+
+  const det = $('mgDomandaDettaglio');
+  if (det) {
+    det.addEventListener('input', (e) => {
+      const ta = e.target.closest('.mg-dq-testo');
+      if (!ta) return;
+      const pieno = !!ta.value.trim();
+      const prima = !!(bozze.get(ta.dataset.id) || '').trim();
+      bozze.set(ta.dataset.id, ta.value);
+      if (avvisi.has(ta.dataset.id) && avvisi.get(ta.dataset.id).tipo === 'err') avvisi.delete(ta.dataset.id);
+      // Il titolo dei pulsanti delle opzioni dice se il testo parte con la scelta.
+      if (pieno !== prima) {
+        const art = ta.closest('.mg-dq');
+        art.querySelectorAll('.mg-dq-azione').forEach((b) => {
+          if (pieno) b.title = 'Con la scelta parte anche il testo che hai scritto'; else b.removeAttribute('title');
+        });
+      }
+    });
+    det.addEventListener('keydown', (e) => {
+      const ta = e.target.closest('.mg-dq-testo');
+      if (!ta || e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      rispondi(ta.dataset.id);
+    });
+    det.addEventListener('click', (e) => {
+      const fb = e.target.closest('[data-feedback]');
+      if (fb) { if (dip.apriFeedback) dip.apriFeedback(fb.dataset.feedback); return; }
+      const dom = e.target.closest('[data-domanda]');
+      if (dom) {
+        const d = trova(dom.dataset.domanda);
+        if (!d) return;
+        apri([d.id]);
+        const tab = MR.schedaDomanda(d);
+        if (tab && tab !== scheda && dip.apriScheda) dip.apriScheda(tab); else disegna();
+        return;
+      }
+      const b = e.target.closest('button[data-scelta], button[data-fai]');
+      if (!b || b.disabled) return;
+      const id = b.closest('.mg-dq').dataset.id;
+      if (b.dataset.scelta !== undefined) { rispondi(id, Number(b.dataset.scelta)); return; }
+      const fai = b.dataset.fai;
+      if (fai === 'testo') rispondi(id);
+      else if (fai === 'consiglio') consiglioUna(id);
+      else if (fai === 'discuti') discuti(id);
+      else if (fai === 'chiudi') archivia(id, false);
+      else if (fai === 'riapri') archivia(id, true);
+    });
+  }
+
+  window.SN_MG_DOMANDE = {
+    carica,
+    stato: () => stato,
+    mostra(tab) {
+      if (VUOTO[tab] === undefined) return;
+      if (tab !== scheda) { scheda = tab; conferma = null; tieni = null; }
+      disegna();
+    },
+    alCambio(fn) { if (typeof fn === 'function') ascoltatori.push(fn); },
+    // Quello che la pagina possiede: aprire un feedback nella sua scheda, accendere una scheda di Domande.
+    collega(d) { Object.assign(dip, d || {}); },
+    // Solo per le prove: domande finte (o un guasto finto) al posto del main, che da lì non le rimpiazza più.
+    imposta(lista, opts) {
+      finte = true;
+      const errore = opts && opts.errore ? String(opts.errore) : '';
+      Object.assign(stato, errore
+        ? { lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), soloOwner: !!(opts && opts.soloOwner), errore, aggiornamento: '', domande: [], riferimenti: {}, altre: false }
+        : {
+          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '',
+          domande: Array.isArray(lista) ? lista : [], riferimenti: (opts && opts.riferimenti) || {}, altre: !!(opts && opts.altre),
+        });
+      cambia();
+    },
+  };
+})();

@@ -908,3 +908,84 @@ test('anche col passo al giorno un anno sotto il cento resta quello scritto', ()
     `le colonne non sono dell'anno 42: ${serie.punti.map((p) => p.label).join(', ')}`,
   );
 });
+
+// ── #997: ogni conto porta i suoi id, e un esito non letto non è zero ───────
+
+test('i due conti della riga sotto i filtri portano gli id di ciò che hanno contato', () => {
+  const cifrato = '[cifrato — chiave privata non configurata]';
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [
+      fb({ _id: 'sd1', seq: 1, createdAt: 'non-una-data' }),
+      fb({ _id: 'sd2', seq: 2, createdAt: null }),
+      fb({ _id: 'mi1', seq: 3, clientId: cifrato }),
+      fb({ _id: 'ok1', seq: 4 }),
+    ],
+    workerLog: [],
+  });
+  assert.deepEqual(r.ricevuti.senzaDataIds.sort(), ['sd1', 'sd2']);
+  assert.equal(r.ricevuti.senzaData, r.ricevuti.senzaDataIds.length);
+  assert.deepEqual(r.ricevuti.mittentiIgnotiIds, ['mi1']);
+  assert.equal(r.ricevuti.mittentiIgnoti, r.ricevuti.mittentiIgnotiIds.length);
+});
+
+test('la fetta «3 o più» sa quante critiche ha avuto ogni lavoro', () => {
+  const verifiche = (num, n) => Array.from({ length: n }, () => ({ role: 'verifier', startedAt: g(2), num }));
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [
+      fb({ _id: 'w4', seq: 4, status: 'done' }),
+      fb({ _id: 'w7', seq: 7, status: 'done' }),
+    ],
+    // 4 lanci del verificatore = 3 critiche; 7 lanci = 6 critiche.
+    workerLog: [...verifiche('4', 4), ...verifiche('7', 7)],
+  });
+  const g3 = r.giri.fette.find((f) => f.key === 'g3');
+  assert.ok(g3, 'la fetta «3 o più» c\'è');
+  assert.deepEqual(g3.critiche, { w4: 3, w7: 6 });
+});
+
+test('una riga d\'elenco non porta l\'esito del controllo: il conto non è zero ma ignoto', () => {
+  const registro = [
+    { role: 'new-work', startedAt: g(3), num: '2' },
+    { role: 'secaudit', startedAt: g(2), num: '2' },
+  ];
+  const intero = S.compute({
+    range: S.rangeOf('7g', ORA),
+    feedbacks: [fb({ _id: 'p2', seq: 2, status: 'done', livelli: { l4: { esito: 'pass' } } })],
+    workerLog: registro,
+  });
+  assert.equal(intero.audit.pass, 1);
+  assert.equal(intero.audit.nonLetti, 0);
+
+  const proiettato = S.compute({
+    range: S.rangeOf('7g', ORA),
+    feedbacks: [fb({ _id: 'p2', seq: 2, status: 'done', _proiezione: true })],
+    workerLog: registro,
+  });
+  assert.equal(proiettato.audit.pass, null);
+  assert.equal(proiettato.audit.fail, null);
+  assert.equal(proiettato.audit.saltato, null);
+  assert.equal(proiettato.audit.nonLetti, 1);
+  assert.deepEqual(proiettato.auditIds.nonLetti, ['p2']);
+  assert.deepEqual(proiettato.auditIds.pass, []);
+});
+
+test('senza segnalazioni lette, anche i conti fatti sui documenti dei lavori sono null', () => {
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [],
+    feedbackLetti: false,
+    workerLog: [
+      { role: 'new-work', startedAt: g(3), num: '5' },
+      { role: 'verifier', startedAt: g(2), num: '5' },
+    ],
+  });
+  assert.equal(r.lavorati.totale, 1, 'il registro ha risposto: quanti lavori si sa');
+  for (const [nome, v] of Object.entries({
+    'audit.pass': r.audit.pass, 'audit.fail': r.audit.fail, 'audit.saltato': r.audit.saltato,
+    'arenati.lavorazioni': r.arenati.lavorazioni, 'arenati.feedback': r.arenati.feedback,
+    'giri.fermati': r.giri.fermati, 'giri.rimandati': r.giri.rimandati, 'giri.aperti': r.giri.aperti,
+    'giri.ignoti': r.giri.ignoti, 'giri.senzaGiri': r.giri.senzaGiri, 'giri.statoIgnoto': r.giri.statoIgnoto,
+  })) assert.equal(v, null, `${nome} vale ${v}: senza segnalazioni non si sa`);
+});

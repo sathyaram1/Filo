@@ -69,10 +69,12 @@
     user('translate-page', 'Traduci la pagina', 'Pagine web', A.TRANSLATE_PAGE),
     user('edit-text', 'Riscrivi il testo selezionato', 'Pagine web', A.EDIT_TEXT),
     user('categorize', 'Categorizza una pagina', 'Pagine web', A.CATEGORIZE),
-    user('describe-image', 'Descrivi un\'immagine', 'Pagine web', A.DESCRIBE_IMAGE),
+    user('describe-image', 'Descrivi un\'immagine', 'Pagine web', A.DESCRIBE_IMAGE,
+      'Lo stesso modello legge le finestre che Filo guarda quando glielo chiedi in chat.'),
     user('transcribe-image', 'Leggi il testo di un\'immagine', 'Pagine web', A.TRANSCRIBE_IMAGE),
     user('spellcheck-word', 'Correttore ortografico — parola', 'Scrittura', A.SPELLCHECK_WORD),
     user('spellcheck-semantic', 'Correttore ortografico — frase', 'Scrittura', A.SPELLCHECK_SEMANTIC),
+    user('spellcheck-context', 'Correttore — coerenza col contesto della pagina', 'Scrittura', A.SPELLCHECK_CONTEXT),
     user('transcribe-audio', 'Dettatura dal microfono', 'Scrittura', A.TRANSCRIBE_AUDIO),
     user('tts', 'Lettura ad alta voce', 'Scrittura', A.TTS),
 

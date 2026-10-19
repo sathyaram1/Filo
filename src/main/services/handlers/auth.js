@@ -11,6 +11,7 @@ const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const { consiglioPortachiavi } = require('../../portachiavi');
+require('../../../shared/routineCrediti.js');
 
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
 // riapertura di essere di nuovo fuori, e pensava a un guasto (#708.1).
@@ -84,6 +85,33 @@ function erroreDomande(e) {
   if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
   if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
   return e?.message || 'Non riuscito.';
+}
+
+// Un errore di ownerCrediti detto all'owner. Su un numero fuori misura la spiegazione è del server.
+function erroreCrediti(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'I crediti delle routine non sono ancora pubblicati sul server.';
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può toccare i crediti: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Dallo stato dei crediti la scheda usa questi campi per account; le sessioni restano sul server.
+const CREDITI_CAMPI_ACCOUNT = Object.freeze(['pct', 'lettura', 'stima', 'fonte', 'limite', 'taratura', 'taraturaDa',
+  'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte']);
+function accountsCrediti(r) {
+  const out = {};
+  for (const a of ['A', 'B']) {
+    const v = r && r.accounts && r.accounts[a];
+    if (!v || typeof v !== 'object') continue;
+    out[a] = {};
+    for (const k of CREDITI_CAMPI_ACCOUNT) if (v[k] !== undefined) out[a][k] = v[k];
+  }
+  return out;
 }
 
 // Un istante del server (ISO, millisecondi, secondi o Timestamp serializzato) come ISO; '' se non c'è.
@@ -366,6 +394,35 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // «Aspetta #N» (#903): la pagina manda i numeri come li ha scritti l'owner; li risolve e li controlla il main, che
+  // legge i documenti col token (la pagina ne vede una finestra). Vuoto = togliere. Regole: SN_FB_ATTESE.valida.
+  // `tieni`: id delle attese già scritte che la pagina non sa rinumerare (aspettato cancellato o non letto): restano come sono.
+  async function prepareAttese(id, valore, idToken, tieni) {
+    const A = globalThis.SN_FB_ATTESE;
+    const FB = globalThis.SN_FEEDBACK;
+    const letti = A.leggiNumeri(valore === null || valore === false ? '' : valore);
+    if (!letti.ok) return letti;
+    if (tieni !== undefined && (!Array.isArray(tieni) || tieni.length > A.MAX || tieni.some((x) => typeof x !== 'string'))) {
+      return { ok: false, motivo: 'elenco delle attese da tenere non valido' };
+    }
+    if (!letti.numeri.length && !(tieni || []).length) return { ok: true, attese: [] };
+    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
+    if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
+    return A.valida({
+      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri, gia: A.atteseDi(proprio), tieni: tieni || [],
+      risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
+      leggiAttese: async (ids) => {
+        const out = new Map();
+        for (let i = 0; i < ids.length; i += 100) {
+          // eslint-disable-next-line no-await-in-loop
+          const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
+          for (const r of righe) out.set(r._id, A.atteseDi(r));
+        }
+        return out;
+      },
+    });
+  }
+
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
   // Firestore rules; questo è il gate applicativo + il trasporto autenticato.
@@ -402,9 +459,23 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
+      let waitsFor;
+      if (msg.waitsFor !== undefined) {
+        const r = await prepareAttese(id, msg.waitsFor, idToken, msg.waitsTieni);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      }
+      // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
+      // partenza si chiede al documento, non alla copia della pagina.
+      const FB = globalThis.SN_FEEDBACK;
+      let localMerges;
+      if (status !== undefined && FB.statusToPublic(status) === 'open') {
+        const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
+        if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
+      }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -421,6 +492,7 @@ module.exports = function register(on, ctx) {
       // dritti su quello, e l'età non conta più.
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
+      if (waitsFor) return { ok: true, waitsFor };
       // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
       return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
     } catch (e) {
@@ -636,10 +708,9 @@ module.exports = function register(on, ctx) {
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
       const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
       const lavoriServer = await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -661,9 +732,6 @@ module.exports = function register(on, ctx) {
       const autoApprove = (msg.autoApprove && typeof msg.autoApprove === 'object')
         ? await Defaults.setAutomationAutoApprove(msg.autoApprove, idToken)
         : await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = (typeof msg.proberWhenIdle === 'boolean')
-        ? await Defaults.setAutomationProberIdle(msg.proberWhenIdle, idToken)
-        : await Defaults.getAutomationProberIdle(idToken);
       // Interruttore master delle routine (config/routines): è ciò che ferma il
       // lavoro autonomo, mentre `enabled` qui sopra riguarda solo chi entra in
       // coda da solo. Due decisioni diverse, due interruttori.
@@ -674,7 +742,7 @@ module.exports = function register(on, ctx) {
       const lavoriServer = (typeof msg.lavoriServer === 'boolean')
         ? await Defaults.setLavoriServer(msg.lavoriServer, idToken)
         : await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -750,6 +818,41 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
+  }));
+
+  // I numeri dell'owner sui crediti delle routine (#1356): il main fa da tramite verso ownerCrediti e rifà i
+  // controlli della pagina (SN_ROUTINE_CREDITI). Si scrive solo il campo toccato; `numeri` torna sempre intero
+  // dalla scrittura, lo stato per account solo se la rilettura riesce.
+  async function statoCreditiRoutine() {
+    const r = await callSecurityFunction('ownerCrediti', { op: 'stato' });
+    const freni = r && (r.riserva === 'attivi' || r.riserva === 'numeri_assenti') ? r.riserva : '';
+    return { numeri: globalThis.SN_ROUTINE_CREDITI.leggiNumeri(r && r.numeri), accounts: accountsCrediti(r), freni };
+  }
+  on(MSG.ROUTINE_CREDITI_GET, ownerOnly(async () => {
+    try {
+      return Object.assign({ ok: true }, await statoCreditiRoutine());
+    } catch (e) {
+      return { ok: false, error: erroreCrediti(e) };
+    }
+  }));
+  on(MSG.ROUTINE_CREDITI_SET, ownerOnly(async (msg) => {
+    const RC = globalThis.SN_ROUTINE_CREDITI;
+    const patch = {};
+    for (const k of RC.CHIAVI) if (msg && Object.prototype.hasOwnProperty.call(msg, k)) patch[k] = msg[k];
+    const v = RC.valida(patch);
+    if (!v.ok) return { ok: false, error: v.testo };
+    let scritto;
+    try {
+      scritto = await callSecurityFunction('ownerCrediti', Object.assign({ op: 'imposta' }, v.valori));
+    } catch (e) {
+      return { ok: false, error: erroreCrediti(e) };
+    }
+    const out = { ok: true, numeri: RC.leggiNumeri(scritto && scritto.numeri) };
+    try {
+      const st = await statoCreditiRoutine();
+      Object.assign(out, { accounts: st.accounts, freni: st.freni });
+    } catch (_) { /* scritto sì: lo stato si rilegge alla prossima apertura */ }
+    return out;
   }));
 
   // Modello e sforzo del worker per fase (config/routines.roleModels). Owner-only. Le legge il server
@@ -1368,29 +1471,14 @@ module.exports = function register(on, ctx) {
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
 
-      // Il contatore dei numeri: lo crea e lo rimette in pari l'app
-      // dell'owner, che è l'unica a poterlo scrivere a piacere. Senza, un
-      // feedback nuovo arriverebbe senza numero.
-      //
-      // Il massimo si CHIEDE al server con una query sua (una lettura), non si
-      // ricava dai feedback caricati: quelli sono i 500 più recenti per data, e
-      // il numero più alto potrebbe stare fuori. Con il massimo vero,
-      // `allowLower` è sempre lecito, ed è l'unico modo perché la cura funzioni:
-      // chiunque può far avanzare il contatore di uno, e prima si abbassava solo
-      // quando il caricamento non toccava il tetto, cioè mai più.
+      // Il contatore dei numeri si alza solo fino a un numero provato (#923); il massimo di tutti si
+      // chiede al server (i caricati sono solo i più recenti) e fa da pavimento per riportarlo giù.
+      const provato = FB.maxSeqProvato(raw);
       let piuAlto = null;
       try { piuAlto = await FB.maxSeq({ idToken, timeoutMs: 15000 }); }
       catch (e) { console.warn('[feedback] numero più alto non letto:', e?.message || e); }
-      if (piuAlto === null) {
-        // Non lo sappiamo: al massimo alziamo il contatore fino a quello che
-        // abbiamo visto, mai abbassarlo alla cieca.
-        const visto = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
-        if (visto > 0) {
-          try { await FB.ensureSeqCounter(visto, { idToken }); }
-          catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
-        }
-      } else if (piuAlto > 0) {
-        try { await FB.ensureSeqCounter(piuAlto, { idToken, allowLower: true }); }
+      if (provato > 0 || piuAlto > 0) {
+        try { await FB.ensureSeqCounter(provato, { idToken, pavimento: piuAlto }); }
         catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
       }
 
@@ -1467,13 +1555,14 @@ module.exports = function register(on, ctx) {
   // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
   // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
   // torna è l'esito VERO di quel cancello, non un "fatto" generico.
-  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente'];
+  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner'];
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
     const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
     if (!r || r.ok === false) {
-      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha saltato il controllo.' };
+      // `error` è la frase del server per l'owner; `reason` il codice, solo se la frase manca.
+      return { ok: false, error: (r && (r.error || r.detail || r.reason)) || 'Il server non ha saltato il controllo.' };
     }
     // Un esito che questo client non conosce non si traduce in «fatto»: passa
     // com'è, e la pagina lo scrive invece di inventarsi un successo.

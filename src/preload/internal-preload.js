@@ -315,6 +315,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»
   safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro
   safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
   safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
@@ -329,9 +330,11 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
+  safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
   safe(path.join(CONTENT, 'sidebar.js'));
+  safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
   safe(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2

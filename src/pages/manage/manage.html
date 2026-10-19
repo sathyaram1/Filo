@@ -27,6 +27,9 @@
   <script src="filo://shared/feedbackTransitions.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
+  <script src="filo://shared/feedbackAttese.js"></script>
+  <script src="filo://shared/tasti.js"></script>
+  <script src="filo://shared/domande.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
@@ -36,6 +39,7 @@
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
   <script src="filo://shared/routineSessioni.js"></script>
+  <script src="filo://shared/routineCrediti.js"></script>
   <script src="filo://shared/routineModelli.js"></script>
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
@@ -61,9 +65,9 @@
 
     /* Sulle schede-lista la colonna è alta ESATTAMENTE la finestra, non "almeno": senza quella pressione il tetto
        del riquadro delle fusioni non morde. Perché: patterns/unarea-che-si-prende-quello-che-avanza-pretende-un-tetto.md */
-    .sn-page:has(> #panel-list.mg-panel--active) { height: 100vh; }
+    .sn-page:has(> #panel-list.mg-panel--active), .sn-page:has(> #panel-domande.mg-panel--active) { height: 100vh; }
     /* Testata: altezza sua, non si lascia stringere dalla pressione qui sopra. */
-    .mg-banner, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
+    .mg-banner, .mg-sezioni, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
 
     /* `.sn-page label` (pages.css) impone `display: block` a OGNI label di una pagina filo:// e con specificità 0-1-1
        batteva `.mg-switch`: della levetta restava la sola pallina. Vincere senza toccare pages.css costa questo selettore. */
@@ -80,12 +84,12 @@
       position: relative; width: 40px; height: 22px; border-radius: 999px;
       /* A riposo un grigio theme-aware: `--sn-border` sul tema chiaro è quasi bianco e non si leggeva come switch.
          `--sn-muted` si vede su entrambi i temi; da acceso passa a `--sn-accent`. */
-      background: var(--sn-muted); transition: background 0.15s; flex: 0 0 auto;
+      background: var(--sn-muted); transition: background calc(0.15s * var(--sn-motion, 1)); flex: 0 0 auto;
     }
     .mg-switch-thumb {
       position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
-      border-radius: 50%; background: #fff; transition: transform 0.15s;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      border-radius: 50%; background: #fff; transition: transform calc(0.15s * var(--sn-motion, 1));
+      box-shadow: 0 1px 2px rgba(0, 0, 0, calc(0.3 * var(--sn-ombra, 1)));
     }
     .mg-switch input:checked + .mg-switch-track { background: var(--sn-accent); }
     .mg-switch input:checked + .mg-switch-track .mg-switch-thumb { transform: translateX(18px); }
@@ -101,8 +105,8 @@
     #mgRtRoot label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--sn-accent) 22%, transparent);
     }
-    #mgRtRoot .mg-switch-track { transition: background 0.15s, box-shadow 0.15s; }
-    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa 0.9s ease-in-out infinite; }
+    #mgRtRoot .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
+    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
     @keyframes mg-rt-pulsa { 50% { opacity: 0.55; } }
     .mg-rt-stato:empty { display: none; }
     .mg-rt-stato.mg-err { color: #c0392b; }
@@ -140,7 +144,7 @@
       padding: 7px 14px; border-radius: 999px;
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
       font-size: 13px; font-weight: 600; color: var(--sn-muted);
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      transition: background calc(0.15s * var(--sn-motion, 1)), color calc(0.15s * var(--sn-motion, 1)), border-color calc(0.15s * var(--sn-motion, 1));
     }
     .mg-auto-choice-item:hover .mg-auto-choice-text { background: var(--sn-hover); color: var(--sn-fg); }
     .mg-auto-choice-item input:checked + .mg-auto-choice-text {
@@ -162,6 +166,179 @@
     .mg-auto-warn {
       margin: 12px 0 0; font-size: 12px; font-weight: 600; color: #c0392b;
     }
+
+    /* Prima fila: le sezioni. Più grandi delle schede sotto, perché sono il primo livello della scelta. */
+    .mg-sezioni {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+      margin: 0 0 var(--mg-sezioni-gap, 6px);
+    }
+    .mg-sezione {
+      all: unset; cursor: pointer;
+      padding: 6px 12px; border-radius: var(--mg-sezione-radius, 8px);
+      font-size: var(--mg-sezione-size, 14px); font-weight: 600; color: var(--sn-muted);
+      white-space: nowrap;
+      transition: background calc(0.1s * var(--sn-motion, 1)), color calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-sezione:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-sezione:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-sezione--active { color: var(--sn-fg); background: var(--mg-sezione-bg, var(--sn-hover)); }
+    .mg-sezione-count { margin-left: 5px; font-weight: 400; font-variant-numeric: tabular-nums; opacity: 0.8; }
+    .mg-sezione-count:empty { display: none; }
+    /* Una domanda bloccante: il numero si fa notare anche da un'altra sezione. */
+    .mg-sezione--urgente .mg-sezione-count { color: var(--mg-urgente-color, #c0392b); font-weight: 600; opacity: 1; }
+    .mg-sezione--arrivi::after {
+      content: ''; display: inline-block; vertical-align: super;
+      width: 5px; height: 5px; margin-left: 3px; border-radius: 50%;
+      background: var(--mg-arrivo-color, var(--sn-accent));
+    }
+
+    /* I cinque livelli dei Ricevuti: pasticche piccole, la forma è quella del segno in lista. */
+    .mg-livelli-filtro {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      padding: 6px 12px; border-bottom: 1px solid var(--sn-border);
+      flex: 0 0 auto;
+    }
+    .mg-livelli-filtro[hidden] { display: none; }
+    .mg-livello-btn {
+      all: unset; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border: 1px solid var(--sn-border); border-radius: 999px;
+      font-size: 12px; color: var(--sn-muted); white-space: nowrap; font-variant-numeric: tabular-nums;
+      transition: background calc(0.1s * var(--sn-motion, 1)), color calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-livello-btn:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-livello-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-livello-btn[aria-pressed="true"] {
+      color: var(--sn-fg); border-color: var(--sn-accent);
+      background: color-mix(in srgb, var(--sn-accent) 14%, transparent);
+    }
+    .mg-livello-btn svg { width: 10px; height: 10px; display: block; overflow: visible; }
+    .mg-livello-btn svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+    .mg-livello-count { opacity: 0.8; }
+    .mg-livello-count:empty { display: none; }
+
+    /* Domande: elenco a sinistra, la domanda (o il gruppo intero) a destra; tutta l'altezza come la lista dei feedback. */
+    #panel-domande.mg-panel--active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+    .mg-dom {
+      display: grid; grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); gap: 12px;
+      flex: 1 1 auto; min-height: var(--mg-aree-min);
+    }
+    .mg-dom-head { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+    .mg-dom-head-nome { flex: 1 1 auto; min-width: 0; }
+    .mg-dom-head [hidden] { display: none; }
+    .mg-dom-sel { margin: 0; flex: 0 0 auto; cursor: pointer; accent-color: var(--sn-accent); }
+    .mg-dom-consiglio {
+      all: unset; cursor: pointer; flex: 0 0 auto;
+      padding: 2px 8px; border-radius: 999px; border: 1px solid var(--sn-accent);
+      font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--sn-accent);
+      transition: background calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-dom-consiglio:hover { background: color-mix(in srgb, var(--sn-accent) 14%, transparent); }
+    .mg-dom-consiglio:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-domande-stato { margin: 6px 4px 12px; font-size: 13px; color: var(--sn-muted); }
+    .mg-domande-stato[hidden], #mgDomandeRiprova[hidden], .mg-domande-lista[hidden], .mg-dom-conferma[hidden] { display: none; }
+    .mg-domande-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+    .mg-domande-prio {
+      margin: 10px 4px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--sn-muted);
+    }
+    .mg-domande-prio:first-child { margin-top: 2px; }
+    .mg-domanda, .mg-domande-gruppo {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 7px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-domanda:hover, .mg-domande-gruppo:hover { background: var(--sn-hover); }
+    .mg-domanda:focus-visible, .mg-domande-gruppo:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-domanda--aperta, .mg-domande-gruppo--aperto { background: var(--sn-hover); border-left-color: var(--sn-accent); }
+    .mg-domanda[data-priorita="bloccante"] { border-left-color: var(--mg-urgente-color, #c0392b); }
+    .mg-domanda--gruppo { margin-left: 14px; }
+    .mg-domande-gruppo { font-weight: 600; }
+    .mg-domande-gruppo-nome { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+    .mg-domande-gruppo-n { color: var(--sn-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+    .mg-domanda-num, .mg-domanda-data { color: var(--sn-muted); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+    .mg-domanda-titolo { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+    .mg-domanda-prio { flex: 0 0 auto; font-size: 11.5px; color: var(--sn-muted); }
+    .mg-domanda-data { font-size: 11.5px; }
+
+    /* «Applica il consiglio» sulla scelta: prima di partire l'elenco delle etichette, poi l'esito al suo posto. */
+    .mg-dom-conferma {
+      margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; font-size: 13px;
+      border: 1px solid color-mix(in srgb, var(--sn-accent) 45%, var(--sn-border));
+      background: color-mix(in srgb, var(--sn-accent) 6%, transparent);
+    }
+    .mg-dom-conferma p { margin: 0 0 6px; }
+    .mg-dom-conferma-lista { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+    .mg-dom-conferma-lista li { display: flex; gap: 8px; align-items: baseline; }
+    .mg-dom-conferma-fuori { color: var(--sn-muted); }
+    .mg-dom-conferma-err { color: #c0392b; }
+
+    /* Una domanda nel dettaglio: la fiducia sta a vista, le note per gli agenti chiuse in fondo. */
+    .mg-dq-corpo { padding: 14px 18px 24px; }
+    .mg-dq + .mg-dq { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--sn-border); }
+    .mg-dq-vuoto, .mg-dq-gruppo { margin: 4px 0 14px; font-size: 13px; color: var(--sn-muted); }
+    .mg-dq-gruppo { font-weight: 600; }
+    .mg-dq-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 12px; color: var(--sn-muted); }
+    .mg-dq-num { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--sn-fg); }
+    .mg-dq-prio[data-priorita="bloccante"] { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
+    .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; border: 1px solid var(--sn-border); cursor: help; }
+    .mg-dq-fiducia--no { color: #b9770e; border-color: color-mix(in srgb, #e08e0b 55%, transparent); }
+    .mg-dq-legami { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+    .mg-dq-legami-pre { margin-right: 2px; }
+    .mg-dq-legame { all: unset; cursor: pointer; color: var(--sn-accent); font-variant-numeric: tabular-nums; }
+    .mg-dq-legame:hover { text-decoration: underline; }
+    .mg-dq-legame:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; border-radius: 3px; }
+    .mg-dq-legame--muto { cursor: default; color: var(--sn-muted); }
+    .mg-dq-legame--muto:hover { text-decoration: none; }
+    /* Più specifico di `.sn-page h2` (pages.css): il titolo della domanda sta sotto la sua riga, senza filetto. */
+    .sn-page .mg-dq-titolo { margin: 6px 0 12px; padding: 0; border: 0; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+    .mg-dq-sez { margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; }
+    .mg-dq-h { margin: 0 0 4px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sn-muted); }
+    .mg-dq-md { overflow-wrap: anywhere; }
+    .mg-dq-opzioni { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .mg-dq-opzione { padding: 10px 12px; border: 1px solid var(--sn-border); border-radius: 8px; }
+    .mg-dq-opzione--consigliata { border-color: color-mix(in srgb, var(--sn-accent) 60%, var(--sn-border)); }
+    .mg-dq-opzione-testa { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-weight: 600; }
+    .mg-dq-opzione-n { color: var(--sn-muted); font-variant-numeric: tabular-nums; }
+    .mg-dq-opzione-testo { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+    .mg-dq-badge {
+      font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 999px;
+      color: var(--sn-accent); border: 1px solid var(--sn-accent);
+    }
+    .mg-dq-badge--scelta { color: #2e9e5b; border-color: #2e9e5b; }
+    .mg-dq-procontro { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 16px; margin: 6px 0 0; }
+    .mg-dq-pc { display: block; font-size: 11.5px; font-weight: 600; color: var(--sn-muted); }
+    .mg-dq-pro .mg-dq-pc { color: #2e9e5b; }
+    .mg-dq-contro .mg-dq-pc { color: #b9770e; }
+    .sn-page button.sn-btn.mg-dq-azione, .sn-page button.sn-btn.mg-dq-applica { margin-top: 8px; }
+    .mg-dq-senza-azione { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--sn-muted); cursor: help; }
+    .mg-dq-consiglio-corpo { display: flex; flex-direction: column; gap: 2px; }
+    .mg-dq-consiglio-n { font-weight: 600; }
+    .mg-dq-esito { margin: 0 0 14px; font-size: 13px; color: var(--sn-muted); }
+    .mg-dq-esito--err { color: #c0392b; }
+    .mg-dq-turni { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .mg-dq-turno { padding-left: 10px; border-left: 2px solid var(--sn-border); }
+    .mg-dq-turno[data-autore="owner"] { border-left-color: var(--sn-accent); }
+    .mg-dq-turno-testa { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 12px; color: var(--sn-muted); }
+    .mg-dq-turno-chi { font-weight: 600; color: var(--sn-fg); }
+    .mg-dq-turno-tuo { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .mg-dq-data { font-variant-numeric: tabular-nums; }
+    .mg-dq-risposta { margin: 4px 0 14px; display: flex; flex-direction: column; gap: 8px; }
+    .mg-dq-testo {
+      box-sizing: border-box; width: 100%; resize: vertical; min-height: 64px;
+      padding: 8px 10px; border-radius: 6px; border: 1px solid var(--sn-border);
+      background: var(--sn-input-bg, transparent); color: var(--sn-fg); font: inherit; font-size: 13.5px;
+    }
+    .mg-dq-testo:focus { outline: none; border-color: var(--sn-accent); }
+    .mg-dq-tasti { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mg-dq-msg { margin: 0; min-height: 1.4em; font-size: 12.5px; color: var(--sn-muted); }
+    .mg-dq-msg--ok { color: #2e9e5b; }
+    .mg-dq-msg--err { color: #c0392b; }
+    .mg-dq-note { margin: 4px 0 0; font-size: 13px; color: var(--sn-muted); }
+    .mg-dq-note summary { cursor: pointer; user-select: none; width: max-content; }
+    .mg-dq-note summary:hover { color: var(--sn-fg); }
+    .mg-dq-note[open] .mg-dq-md { margin-top: 6px; color: var(--sn-fg); }
 
     .mg-tabs {
       display: flex;
@@ -226,7 +403,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       width: 30px; height: 30px; border-radius: 6px;
       color: var(--sn-muted);
-      transition: background 0.1s, color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-search-toggle:hover { background: var(--sn-hover); color: var(--sn-fg); }
     .mg-search-toggle:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
@@ -253,7 +430,7 @@
     .mg-search-progress[hidden] { display: none; }
     .mg-search-progress-fill {
       display: block; height: 100%; width: 0;
-      background: var(--sn-accent); transition: width 0.2s ease-out;
+      background: var(--sn-accent); transition: width calc(0.2s * var(--sn-motion, 1)) ease-out;
     }
     .mg-search-ico { display: inline-flex; color: var(--sn-muted); flex: 0 0 auto; }
     .mg-search-ico svg { display: block; }
@@ -350,7 +527,7 @@
       padding: 7px 12px; border-radius: 999px;
       border: 1px solid var(--sn-border);
       background: transparent; color: var(--sn-muted);
-      cursor: pointer; transition: background 0.14s, color 0.14s, border-color 0.14s;
+      cursor: pointer; transition: background calc(0.14s * var(--sn-motion, 1)), color calc(0.14s * var(--sn-motion, 1)), border-color calc(0.14s * var(--sn-motion, 1));
       display: inline-flex; align-items: center; gap: 6px;
     }
     .mg-chip:hover { background: var(--sn-hover); color: var(--sn-fg); }
@@ -401,7 +578,7 @@
       padding: 14px 16px; text-align: left;
       font: inherit; color: var(--sn-fg);
       display: flex; flex-direction: column; gap: 2px;
-      transition: border-color 0.14s, background 0.14s;
+      transition: border-color calc(0.14s * var(--sn-motion, 1)), background calc(0.14s * var(--sn-motion, 1));
     }
     .mg-tile--click { cursor: pointer; appearance: none; -webkit-appearance: none; }
     .mg-tile--click:hover { border-color: var(--sn-accent); background: var(--sn-hover); }
@@ -430,7 +607,7 @@
       font-size: 11px; color: var(--sn-muted); margin-top: 6px;
       display: inline-flex; align-items: center; gap: 4px;
     }
-    .mg-tile-caret { transition: transform 0.16s; display: inline-block; }
+    .mg-tile-caret { transition: transform calc(0.16s * var(--sn-motion, 1)); display: inline-block; }
     .mg-tile--open .mg-tile-caret { transform: rotate(90deg); }
     .mg-tile--open { border-color: var(--sn-accent); }
 
@@ -491,6 +668,7 @@
     .mg-fs-drill-num { font-variant-numeric: tabular-nums; color: var(--sn-muted); flex: 0 0 auto; min-width: 56px; }
     .mg-fs-drill-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mg-fs-drill-cat { margin-left: auto; color: var(--sn-muted); font-size: 11.5px; flex: 0 0 auto; padding-left: 10px; }
+    .mg-fs-drill-giri { font-size: 11.5px; flex: 0 0 auto; font-variant-numeric: tabular-nums; min-width: 68px; text-align: right; }
 
     /* Le superfici che si aprono su cosa hanno contato lo dicono col puntatore. */
     .mg-fs-legend li[data-group] { cursor: pointer; padding: 3px 6px; margin: 0 -6px; border-radius: 6px; }
@@ -505,6 +683,7 @@
       cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
     }
     .mg-fs-quanti:hover { color: var(--sn-accent); }
+    .mg-fs-quanti:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 3px; }
 
     /* Le sezioni sotto i riquadri. */
     .mg-fs-sec { margin-bottom: 30px; }
@@ -592,7 +771,7 @@
       cursor: col-resize;
       background: transparent;
       border-radius: 2px;
-      transition: background 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1));
     }
     .mg-divider:hover, .mg-divider.mg-divider--dragging {
       background: var(--sn-accent);
@@ -618,7 +797,7 @@
       border: none; background: transparent; cursor: pointer;
       color: var(--sn-muted); font-size: 14px; line-height: 1;
       padding: 2px 4px; border-radius: 4px;
-      transition: background 0.1s, color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-sort-btn:hover { background: var(--sn-hover); color: var(--sn-fg); }
     /* Ordinamento non predefinito: il glifo si tinge d'accento, così è chiaro che la lista è riordinata. */
@@ -637,7 +816,7 @@
       border: 1px solid var(--sn-border);
       border-left-width: 3px;
       background: transparent;
-      transition: background 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1));
     }
     /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «locale»
        insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
@@ -675,7 +854,7 @@
        votando». Solo sulla card di turno, non sulle altre. */
     .mg-item--evaluating {
       border-left-color: var(--sn-accent);
-      animation: mg-eval-pulse 1.2s ease-in-out infinite;
+      animation: mg-eval-pulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes mg-eval-pulse {
       0%, 100% { box-shadow: inset 4px 0 0 -1px var(--sn-accent); }
@@ -686,10 +865,10 @@
     .mg-eval-dots i {
       width: 5px; height: 5px; border-radius: 50%;
       background: var(--sn-accent);
-      animation: mg-eval-bounce 1s ease-in-out infinite;
+      animation: mg-eval-bounce calc(1s * var(--sn-motion, 1)) ease-in-out infinite;
     }
-    .mg-eval-dots i:nth-child(2) { animation-delay: 0.15s; }
-    .mg-eval-dots i:nth-child(3) { animation-delay: 0.3s; }
+    .mg-eval-dots i:nth-child(2) { animation-delay: calc(0.15s * var(--sn-motion, 1)); }
+    .mg-eval-dots i:nth-child(3) { animation-delay: calc(0.3s * var(--sn-motion, 1)); }
     @keyframes mg-eval-bounce {
       0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
       40%           { opacity: 1;   transform: scale(1); }
@@ -707,7 +886,7 @@
     .mg-segno-fermata {
       flex: 0 0 auto; align-self: center; display: inline-flex;
       width: var(--mg-segno-size, 11px); height: var(--mg-segno-size, 11px); color: var(--sn-muted);
-      cursor: help; transition: transform 0.1s;
+      cursor: help; transition: transform calc(0.1s * var(--sn-motion, 1));
     }
     .mg-segno-fermata:hover { transform: scale(1.25); }
     .mg-segno-fermata svg { width: 100%; height: 100%; display: block; overflow: visible; }
@@ -740,7 +919,7 @@
       width: 12px; height: 12px; padding: 0; border-radius: 50%;
       border: 1px solid var(--sn-muted); background: transparent;
       cursor: pointer; box-sizing: border-box;
-      transition: background 0.1s, border-color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-priority .mg-dot:hover { border-color: var(--sn-accent); }
     .mg-priority .mg-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }
@@ -768,7 +947,7 @@
     }
     .mg-work-live i {
       width: 7px; height: 7px; border-radius: 50%; background: var(--sn-accent);
-      animation: mg-eval-bounce 1s ease-in-out infinite;
+      animation: mg-eval-bounce calc(1s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     .mg-work-idle { flex-basis: 100%; font-style: italic; }
     @media (prefers-reduced-motion: reduce) {
@@ -834,7 +1013,7 @@
       width: 14px; height: 14px; flex: 0 0 auto;
       display: inline-flex; align-items: center; justify-content: center;
       cursor: pointer; color: var(--sn-muted);
-      transition: transform 0.1s;
+      transition: transform calc(0.1s * var(--sn-motion, 1));
     }
     .mg-forma:hover, .mg-forma:focus-visible { transform: scale(1.2); }
     .mg-forma svg { width: 14px; height: 14px; display: block; overflow: visible; }
@@ -860,7 +1039,7 @@
       border: 2px solid var(--sn-border);
       background: transparent; display: inline-block;
       flex: 0 0 auto;
-      transition: transform 0.1s;
+      transition: transform calc(0.1s * var(--sn-motion, 1));
     }
     .mg-dot--clickable {
       cursor: pointer;
@@ -900,6 +1079,28 @@
       font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
     }
     .mg-bubble-body > em { color: var(--sn-muted); font-style: italic; }
+    /* Nota lunga ripiegata (#559): otto righe e una sfumatura che dice «continua»; un tocco la apre. */
+    .mg-bubble--ripiegata .mg-bubble-body {
+      max-height: calc(8 * 1.55em); overflow: hidden; cursor: pointer;
+      -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+      mask-image: linear-gradient(to bottom, #000 55%, transparent);
+    }
+    .mg-bubble--ripiegata .mg-bubble-body:hover {
+      -webkit-mask-image: linear-gradient(to bottom, #000 75%, transparent);
+      mask-image: linear-gradient(to bottom, #000 75%, transparent);
+    }
+    .mg-bubble-apri {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin: 6px 0 0 -8px; padding: 2px 8px; border: 0; border-radius: 6px;
+      background: transparent; color: var(--sn-muted); font: inherit; font-size: 12px; cursor: pointer;
+      transition: background calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-bubble-apri:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-bubble-apri::after {
+      content: '▾'; font-size: 11px;
+      transition: transform calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-bubble-apri[aria-expanded="true"]::after { transform: rotate(180deg); }
     .mg-bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .mg-bubble-imgs img {
       max-width: 200px; max-height: 200px; border-radius: 6px;
@@ -912,7 +1113,7 @@
       background: var(--sn-surface-2, rgba(127,127,127,.08));
       cursor: default;
     }
-    .mg-bubble-imgs img.mg-img-loading { animation: mgImgPulse 1.2s ease-in-out infinite; }
+    .mg-bubble-imgs img.mg-img-loading { animation: mgImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite; }
     .mg-bubble-imgs img.mg-img-failed {
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 11px; color: var(--sn-text-dim, #999);
@@ -1020,7 +1221,7 @@
       line-height: 1.45; color: var(--sn-fg); opacity: 0; transform: translateY(8px);
       /* Più esiti in un avviso solo: ognuno sulla sua riga. */
       white-space: pre-line;
-      transition: opacity 0.18s ease, transform 0.18s ease;
+      transition: opacity calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.18s * var(--sn-motion, 1)) ease;
       pointer-events: none; z-index: 2147483001;
     }
     /* Visibile prende il puntatore (sopra, il tempo aspetta; un clic lo chiude); nascosto torna trasparente. */
@@ -1080,7 +1281,7 @@
     .mg-usernote-toggle::after {
       content: '▾'; display: inline-block; margin-left: 6px;
       font-size: 11px; color: var(--sn-muted);
-      transition: transform 0.12s;
+      transition: transform calc(0.12s * var(--sn-motion, 1));
     }
     .mg-usernote-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
     .mg-usernote-toggle.mg-usernote-piena {
@@ -1107,7 +1308,7 @@
       padding: 7px 12px; border-radius: 8px;
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
       color: var(--sn-fg); font-size: 13px; font-weight: 600;
-      transition: background 0.1s, border-color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-star-btn:hover { background: var(--sn-hover); }
     .mg-star-btn[aria-pressed="true"] {
@@ -1142,6 +1343,46 @@
     /* Pronto e fermo per il PC (#1159): la tinta d'accento lo stacca dalle righe di chi sta lavorando. */
     .mg-attesa-server { color: var(--sn-accent, var(--sn-fg)); }
 
+    /* «Aspetta #N» (#903): la forma del segno locale, tinta d'accento solo sui numeri non ancora fusi. */
+    /* Con tante attese va a capo fra un numero e l'altro invece di uscire dalla scheda: i numeri si leggono tutti. */
+    .mg-attesa-badge {
+      flex: 0 1 auto; min-width: 0;
+      font-size: 10.5px; line-height: 1.25;
+      padding: 2px 6px; border-radius: 9px;
+      border: 1px solid color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent);
+      color: var(--sn-accent, #c8763c);
+      white-space: normal; overflow-wrap: anywhere;
+    }
+    .mg-attese-toggle[hidden] { display: none; }
+    .mg-attese-toggle.mg-attese-piena { border-color: var(--sn-accent, #c8763c); color: var(--sn-accent, #c8763c); }
+    /* Coi numeri il tasto non allunga la fila: il resto finisce nei puntini, e tutti col loro stato stanno nell'elenco sotto. */
+    .mg-attese-toggle { max-width: 9.5em; overflow: hidden; text-overflow: ellipsis; }
+    .mg-attese { display: flex; flex-direction: column; gap: 8px; }
+    .mg-attese[hidden], .mg-attese .mg-actions-row[hidden], .mg-attese .mg-actions-row button[hidden] { display: none; }
+    .mg-attese-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .mg-attese-lista:empty { display: none; }
+    .mg-attesa {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 4px 3px 8px; border-radius: 999px;
+      border: 1px solid var(--sn-border); font-size: 12.5px;
+      transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-attesa:hover { background: var(--sn-hover); }
+    .mg-attesa--fuso { border-color: color-mix(in srgb, #2e9e5b 55%, transparent); }
+    .mg-attesa--chiuso, .mg-attesa--cancellato { border-color: color-mix(in srgb, #c0392b 55%, transparent); }
+    .mg-attesa-num { all: unset; font-weight: 600; cursor: pointer; }
+    .mg-attesa-num:hover { text-decoration: underline; }
+    .mg-attesa-num:disabled { cursor: default; text-decoration: none; }
+    .mg-attesa-stato { color: var(--sn-muted); }
+    .mg-attesa--fuso .mg-attesa-stato { color: #2e9e5b; }
+    .mg-attesa--chiuso .mg-attesa-stato, .mg-attesa--cancellato .mg-attesa-stato { color: #c0392b; }
+    .mg-attesa-togli {
+      all: unset; cursor: pointer; width: 18px; height: 18px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center; color: var(--sn-muted);
+    }
+    .mg-attesa-togli:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-attese-input { flex: 1 1 160px; min-width: 120px; margin: 0; }
+
     /* Una fusione ferma sulla scheda: stessa forma del segno qui sopra, tinta del blocco di sicurezza. Senza, una
        decisione che aspetta l'owner non si distinguerebbe scorrendo la lista. */
     .mg-fusione-badge {
@@ -1165,7 +1406,7 @@
     .mg-segno--tolto, .mg-segno--errore { color: var(--sn-muted); }
     .mg-segno-riprova {
       all: unset; cursor: pointer; margin-left: 8px; color: var(--sn-accent);
-      font-size: 12px; transition: opacity 0.1s;
+      font-size: 12px; transition: opacity calc(0.1s * var(--sn-motion, 1));
     }
     .mg-segno-riprova:hover, .mg-segno-riprova:focus-visible { text-decoration: underline; }
     .mg-segno-riprova:disabled { opacity: 0.5; cursor: default; }
@@ -1214,6 +1455,27 @@
     }
     /* Il Red Team ha un riquadro solo: la griglia di Automazioni lo stirerebbe a due terzi della finestra. */
     #mgRtRoot { display: block; max-width: 640px; }
+    /* Crediti: un riquadro per account più la taratura, affiancati finché c'è posto. */
+    .mg-crediti {
+      padding: 24px 0 32px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 20px; align-items: start;
+    }
+    .mg-crediti > .mg-cr-avviso { grid-column: 1 / -1; margin: 0; }
+    .mg-cr-riga { font-size: 12px; color: var(--sn-muted); margin: 0 0 14px; min-height: 1.4em; }
+    .mg-cr-campo + .mg-cr-campo { margin-top: 16px; }
+    .mg-cr-account .mg-auto-field-label { font-size: 13px; }
+    .mg-crediti .mg-auto-field-row { flex-wrap: wrap; }
+    .mg-cr-account .mg-cr-campo .mg-auto-field-row { margin-top: 6px; }
+    .mg-cr-unita { font-size: 13px; color: var(--sn-muted); margin-left: -4px; }
+    .sn-page .mg-crediti input.mg-auto-number { width: 96px; }
+    .sn-page input.mg-cr-data {
+      font: inherit; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--sn-border); background: var(--sn-bg, transparent); color: var(--sn-fg);
+    }
+    :root[data-sn-theme="dark"] .mg-cr-data { color-scheme: dark; }
+    :root[data-sn-theme="light"] .mg-cr-data { color-scheme: light; }
+    .mg-crediti h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; color: var(--sn-fg); }
+    .mg-cr-data:disabled, .mg-crediti .mg-auto-number:disabled { opacity: 0.5; cursor: not-allowed; }
     .mg-automation h2 {
       font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--sn-fg);
     }
@@ -1340,19 +1602,31 @@
       <button type="button" class="sn-btn" id="mgSignIn">Accedi</button>
     </div>
 
+    <!-- Sezioni (SPEC-DOMANDE §2.1): la tabella sezione → schede sta in manageReview.js (SEZIONI). -->
+    <nav class="mg-sezioni" id="mgSezioni" role="tablist" aria-label="Sezioni di Gestione">
+      <button type="button" class="mg-sezione" data-sezione="domande" role="tab">Domande<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione mg-sezione--active" data-sezione="feedback" role="tab">Feedback<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione" data-sezione="routine" role="tab">Routine<span class="mg-sezione-count"></span></button>
+      <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
+      <button type="button" class="mg-search-toggle" id="mgSearchToggle"
+        title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
+    </nav>
+
     <nav class="mg-tabs" id="mgTabs" role="tablist">
+      <button type="button" class="mg-tab" data-tab="domande" role="tab" hidden>Da rispondere</button>
+      <button type="button" class="mg-tab" data-tab="domande-lavoro" role="tab" hidden>In lavorazione</button>
+      <button type="button" class="mg-tab" data-tab="domande-archivio" role="tab" hidden>Archivio</button>
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
       <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori server</button>
+      <button type="button" class="mg-tab" data-tab="waiting" role="tab">Aspettano</button>
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
-      <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
-      <button type="button" class="mg-tab" data-tab="log" role="tab">Log</button>
-      <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
-      <button type="button" class="mg-search-toggle" id="mgSearchToggle"
-        title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
+      <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
+      <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
+      <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
     </nav>
 
     <!-- Lo stato viaggia cifrato: senza la chiave dell'owner non si legge, e allora le quattro sezioni non si
@@ -1384,6 +1658,14 @@
             <div id="mgListHead">Ricevuti</div>
             <button type="button" class="mg-sort-btn" id="mgSortBtn"
               title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+          </div>
+          <!-- Ricevuti per livello (SPEC-DOMANDE §2.2): nessuno acceso = tutto, più accesi = unione. Non si ricorda. -->
+          <div class="mg-livelli-filtro" id="mgLivelliFiltro" role="group" aria-label="Filtra i Ricevuti per livello" hidden>
+            <button type="button" class="mg-livello-btn" data-livello="l1" aria-pressed="false" title="Fermi al filtro d’ingresso">L1<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l2" aria-pressed="false" title="Fermi ai giudici">L2<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l3" aria-pressed="false" title="Aspettano una tua decisione">L3<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l4" aria-pressed="false" title="Bloccati dalla verifica di sicurezza">L4<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l5" aria-pressed="false" title="Fermi al cancello di fusione">L5<span class="mg-livello-count"></span></button>
           </div>
           <!-- Filtro ⭐ della tab Archiviati (DB2): OFF = solo gli archiviati,
                ON = tutti i preferiti di qualunque stato. Nascosto sulle altre tab. -->
@@ -1462,6 +1744,9 @@
                     <button type="button" class="mg-star-btn mg-usernote-toggle" id="mgUserNoteToggle"
                       aria-expanded="false" aria-controls="mgUserNote"
                       title="Scrivi la riga che leggerà chi ha segnalato">Frase</button>
+                    <!-- «Aspetta #N» (#903): testo, hover e casella dal JS; acceso quando ci sono attese. -->
+                    <button type="button" class="mg-star-btn mg-attese-toggle" id="mgAtteseToggle"
+                      aria-expanded="false" aria-controls="mgAttese" hidden>⏳ Aspetta</button>
                     <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
                     <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
                     <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
@@ -1490,6 +1775,18 @@
                 <div class="mg-actions-row">
                   <button type="button" class="sn-btn sn-btn-secondary" id="mgReopenCancelBtn">Annulla</button>
                   <button type="button" class="sn-btn" id="mgReopenConfirmBtn">Conferma riapertura</button>
+                </div>
+              </div>
+
+              <!-- Le attese (#903): ogni numero col suo stato e la × per toglierlo; la casella ne aggiunge altri. Sta aperta
+                 finché ce n'è una, perché lo stato di ciascuna è quello che l'owner viene a guardare. -->
+              <div class="mg-attese" id="mgAttese" hidden>
+                <ul class="mg-attese-lista" id="mgAtteseLista"></ul>
+                <div class="mg-actions-row" id="mgAtteseScrivi">
+                  <input type="text" id="mgAtteseInput" class="mg-accept-comment mg-attese-input"
+                    placeholder="#676, #663.2" aria-label="Numeri dei feedback da aspettare">
+                  <button type="button" class="sn-btn" id="mgAtteseAggiungi">Aspetta</button>
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgAtteseTogliTutte" hidden>Non aspettare più</button>
                 </div>
               </div>
 
@@ -1528,6 +1825,29 @@
           </div>
         </div>
 
+      </div>
+    </section>
+
+    <!-- Le tre schede di Domande condividono questo pannello; lo disegna manageDomande.js. -->
+    <section class="mg-panel" id="panel-domande" data-panel="domande">
+      <div class="mg-dom">
+        <div class="mg-col" id="mgDomandeCol">
+          <div class="mg-col-head mg-dom-head">
+            <input type="checkbox" class="mg-dom-sel" id="mgDomandeTutte" aria-label="Scegli tutte" title="Scegli tutte" hidden>
+            <span class="mg-dom-head-nome" id="mgDomandeTitolo">Da rispondere</span>
+            <button type="button" class="mg-dom-consiglio" id="mgDomandeConsiglioSel" hidden>Applica il consiglio</button>
+          </div>
+          <div class="mg-col-body">
+            <p class="mg-domande-stato" id="mgDomandeStato" role="status">Caricamento…</p>
+            <button type="button" class="sn-btn sn-btn-secondary" id="mgDomandeRiprova" hidden>Riprova</button>
+            <div class="mg-dom-conferma" id="mgDomandeConferma" role="status" hidden></div>
+            <ol class="mg-domande-lista" id="mgDomandeLista" hidden></ol>
+            <p class="mg-domande-stato" id="mgDomandeAltre" hidden></p>
+          </div>
+        </div>
+        <div class="mg-col" id="mgDomandaCol">
+          <div class="mg-col-body mg-dq-corpo" id="mgDomandaDettaglio"></div>
+        </div>
       </div>
     </section>
 
@@ -1621,6 +1941,73 @@
       </div>
     </section>
 
+    <!-- I crediti delle routine (#1356, SPEC-DOMANDE.md §8.2): i numeri dell'owner li legge e li scrive manageCrediti.js. -->
+    <section class="mg-panel" id="panel-crediti" data-panel="crediti">
+      <div class="mg-crediti" id="mgCrRoot">
+        <section class="mg-auto-block mg-cr-account" data-account="A">
+          <h2>Account A</h2>
+          <p class="mg-cr-riga" id="mgCrRigaA" role="status"></p>
+          <div class="mg-cr-campo" data-campo="riservaA">
+            <label class="mg-auto-field-label" for="mgCrRiservaA"
+              title="La parte della settimana di A che resta alle tue sessioni: le routine si fermano prima. Vuoto: nessuna riserva.">Riserva</label>
+            <div class="mg-auto-field-row">
+              <input type="text" id="mgCrRiservaA" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+                placeholder="nessuna" aria-describedby="mgCrRiservaAMsg" />
+              <span class="mg-cr-unita">%</span>
+              <button type="button" class="sn-btn" id="mgCrRiservaASave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRiservaAMsg" role="status"></span>
+            </div>
+          </div>
+          <div class="mg-cr-campo" data-campo="rinnovoA">
+            <label class="mg-auto-field-label" for="mgCrRinnovoA"
+              title="Un rinnovo qualsiasi della settimana di A, se è cambiato: vale ogni sette giorni da lì. Vuoto: martedì alle 19 (ora di Roma).">Rinnovo</label>
+            <div class="mg-auto-field-row">
+              <input type="datetime-local" id="mgCrRinnovoA" class="mg-cr-data" aria-describedby="mgCrRinnovoAMsg" />
+              <button type="button" class="sn-btn" id="mgCrRinnovoASave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRinnovoAMsg" role="status"></span>
+            </div>
+          </div>
+        </section>
+        <section class="mg-auto-block mg-cr-account" data-account="B">
+          <h2>Account B</h2>
+          <p class="mg-cr-riga" id="mgCrRigaB" role="status"></p>
+          <div class="mg-cr-campo" data-campo="tettoB">
+            <label class="mg-auto-field-label" for="mgCrTettoB"
+              title="Fin dove le routine possono usare la settimana di B. Vuoto: nessun tetto.">Tetto</label>
+            <div class="mg-auto-field-row">
+              <input type="text" id="mgCrTettoB" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+                placeholder="nessuno" aria-describedby="mgCrTettoBMsg" />
+              <span class="mg-cr-unita">%</span>
+              <button type="button" class="sn-btn" id="mgCrTettoBSave">Salva</button>
+              <span class="mg-action-msg" id="mgCrTettoBMsg" role="status"></span>
+            </div>
+          </div>
+          <div class="mg-cr-campo" data-campo="rinnovoB">
+            <label class="mg-auto-field-label" for="mgCrRinnovoB"
+              title="Un rinnovo qualsiasi della settimana di B, se è cambiato: vale ogni sette giorni da lì. Vuoto: mercoledì alle 9 (ora di Roma).">Rinnovo</label>
+            <div class="mg-auto-field-row">
+              <input type="datetime-local" id="mgCrRinnovoB" class="mg-cr-data" aria-describedby="mgCrRinnovoBMsg" />
+              <button type="button" class="sn-btn" id="mgCrRinnovoBSave">Salva</button>
+              <span class="mg-action-msg" id="mgCrRinnovoBMsg" role="status"></span>
+            </div>
+          </div>
+        </section>
+        <section class="mg-auto-block mg-cr-campo" data-campo="usdPer100">
+          <h2 id="mgCrTaraturaTitolo"
+            title="Quanti dollari di listino valgono una settimana intera di un account: senza una lettura della barra di stato la percentuale si stima così. Vuoto: 2.150 $.">Taratura</h2>
+          <p class="mg-cr-riga">Dollari per una settimana intera, su A e su B.</p>
+          <div class="mg-auto-field-row">
+            <input type="text" id="mgCrTaratura" class="mg-auto-number" inputmode="decimal" autocomplete="off"
+              placeholder="2150" aria-labelledby="mgCrTaraturaTitolo" aria-describedby="mgCrTaraturaMsg" />
+            <span class="mg-cr-unita">$</span>
+            <button type="button" class="sn-btn" id="mgCrTaraturaSave">Salva</button>
+            <span class="mg-action-msg" id="mgCrTaraturaMsg" role="status"></span>
+          </div>
+        </section>
+        <p class="mg-action-msg mg-cr-avviso" id="mgCrAvviso" role="status" hidden></p>
+      </div>
+    </section>
+
     <!-- Automazioni e Modelli di supporto stanno in una pagina sola e su tutta la larghezza (#1110); la traccia
        delle fusioni già decise sta nel Log, perché qui non si scorra per arrivare alle impostazioni. -->
     <section class="mg-panel mg-in-lettura" id="panel-automation" data-panel="automation" aria-busy="true">
@@ -1643,8 +2030,8 @@
                 </label>
                 <p class="mg-auto-block-desc">
                   Spente, le sessioni automatiche partono ma non fanno niente: nessun
-                  lavoro sul codice, nessuna verifica, nessuna esplorazione. I feedback
-                  restano in coda e ti aspettano.
+                  lavoro sul codice, nessuna verifica. I feedback restano in coda e ti
+                  aspettano.
                   <span class="mg-action-msg" id="mgRoutinesMsg" role="status"></span>
                 </p>
               </section>
@@ -1659,6 +2046,7 @@
                 <p class="mg-auto-block-desc">
                   Quando è attiva, i feedback giudicati sicuri entrano in coda da soli.
                   Spenta, li approvi tu uno per uno.
+                  Gli allarmi della pubblicazione e i ritrovamenti dell'esplorazione entrano in coda comunque.
                   <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
                 </p>
 
@@ -1680,24 +2068,19 @@
                     <input type="checkbox" id="mgAutoApproveLocal" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice">
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
                     <span class="mg-switch-text">🔧 Claude (sviluppo)</span>
                     <input type="checkbox" id="mgAutoApproveWorker" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza">
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
                     <span class="mg-switch-text">🧪 Claude (verifica)</span>
                     <input type="checkbox" id="mgAutoApproveVerifier" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro">
+                  <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
                     <span class="mg-switch-text">🧹 Claude (rilievi residui)</span>
                     <input type="checkbox" id="mgAutoApproveResiduo" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi esplora l'app in cerca di problemi che nessuno ha segnalato">
-                    <span class="mg-switch-text">🔍 Claude (esplorazione)</span>
-                    <input type="checkbox" id="mgAutoApproveProber" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                   <label class="mg-switch mg-switch--sm" title="Automazioni che non dichiarano il proprio ruolo (feedback storici)">
@@ -1711,20 +2094,6 @@
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                 </div>
-              </section>
-
-              <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
-              <section class="mg-auto-block" id="mgProberIdleBlock">
-                <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
-                  <span class="mg-switch-text">Esplora quando la coda è vuota</span>
-                  <input type="checkbox" id="mgProberIdle" checked />
-                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                </label>
-                <p class="mg-auto-block-desc">
-                  Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
-                  nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
-                  <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
-                </p>
               </section>
 
               <!-- I lavori server alle routine (#1159): spento, restano alle sessioni locali. -->
@@ -2112,7 +2481,9 @@
 
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
 
+  <script src="manageDomande.js"></script>
   <script src="manage.js"></script>
   <script src="manageRedteam.js"></script>
+  <script src="manageCrediti.js"></script>
 </body>
 </html>

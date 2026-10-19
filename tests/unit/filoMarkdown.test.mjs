@@ -184,3 +184,37 @@ test('#418 un innocente " T3 " nella prosa non viene mangiato dai segnaposto', (
   const html = render('La vitamina T3 e il livello T5 restano interi.');
   assert.match(html, /vitamina T3 e il livello T5/);
 });
+
+// ─── #846 «Copia» nel riquadro di Spiega e Traduci: il testo che si vede, senza marcature ───
+
+const { testo } = globalThis.SN_MARKDOWN;
+
+test('#846 il testo copiato non ha asterischi, cancelletti né parentesi dei link', () => {
+  const t = testo('## Traduzione\n\nIl **gatto** è *sul* tetto, vedi [la voce](https://it.wikipedia.org/wiki/Gatto) e `codice`.');
+  assert.equal(t, 'Traduzione\n\nIl gatto è sul tetto, vedi la voce e codice.');
+  assert.doesNotMatch(t, /[*#`[\]]/);
+});
+
+test('#846 righe, paragrafi ed elenchi restano come si leggono a schermo', () => {
+  assert.equal(testo('prima riga\nseconda riga\n\naltro paragrafo'), 'prima riga\nseconda riga\n\naltro paragrafo');
+  assert.equal(testo('- uno\n* **due**'), '• uno\n• due');
+  // La numerazione è quella che disegna l'elenco: «1. 1. 1.» a schermo si legge 1, 2, 3; uno spezzato riprende.
+  assert.equal(testo('1. a\n1. b\n1. c'), '1. a\n2. b\n3. c');
+  assert.equal(testo('3. tre\n\n4. quattro'), '3. tre\n4. quattro');
+});
+
+test('#846 i segni che a schermo restano (HTML scritto, &, apostrofi, codice) si copiano com\'erano', () => {
+  assert.equal(testo('R&D <b>tag</b> l\'altro "quote" 5 * 3'), 'R&D <b>tag</b> l\'altro "quote" 5 * 3');
+  assert.equal(testo('```\n  x = **y** &amp;\n```'), '  x = **y** &amp;');
+  assert.equal(testo('Leggi https://example.com/a_(b).'), 'Leggi https://example.com/a_(b).');
+  assert.equal(testo('[non sicuro](javascript:alert(1))'), 'non sicuro');
+  assert.equal(testo(''), '');
+  assert.equal(testo(null), '');
+});
+
+test('#846 testo e render leggono gli stessi blocchi: ogni blocco disegnato ha la sua riga copiata', () => {
+  const sorgente = '# T\n\npara\n\n- a\n- b\n\n2. c\n\n```\ncod\n```\nfine';
+  const html = render(sorgente);
+  const blocchiDisegnati = (html.match(/<(p|h\d|ul|ol|pre)[ >]/g) || []).length;
+  assert.equal(testo(sorgente).split('\n\n').length, blocchiDisegnati);
+});

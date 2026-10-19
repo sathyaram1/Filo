@@ -10,8 +10,13 @@
     if (P && P.lezioneDaAzione) return P.lezioneDaAzione(a);
     return { testo: String((a && (a.testo ?? a.text ?? a.lezione)) ?? '').trim() };
   }
-  const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dalle Preferenze, '
-    + 'sotto «Memoria di Filo». Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
+  // Un testo che non è di Filo (scritto dal modello, o salvato e ripetuto) va in
+  // un pezzo suo: il popup lo chiude in un riquadro, e nessun carattere del testo
+  // può chiuderlo prima (#592.7). Sentinella in tests/unit/actionLevels.test.mjs.
+  const cit = (testo, nuda) => (nuda ? { citazione: String(testo), nuda: true } : { citazione: String(testo) });
+  const elenco = (voci) => ({ elenco: voci.map(String) });
+  const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dal quaderno delle '
+    + 'memorie. Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
     + 'documento potrebbe provare a fargliela ricordare.';
 
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
@@ -115,7 +120,7 @@
     const cosa = /timer/.test(kind) ? 'i timer' : (/svegli|alarm/.test(kind) ? 'le sveglie' : 'sveglie e timer');
     const etichetta = String((action && (action.etichetta ?? action.label ?? action.nome)) || '').trim();
     if (wantsAll(action) && !etichetta) return `TUTTI ${cosa}`;
-    if (etichetta) return `“${etichetta}”`;
+    if (etichetta) return cit(etichetta);
     return cosa;
   }
   function repeatLabel(action) {
@@ -131,14 +136,15 @@
     // Un nome di destra si riconosce solo esatto: «lo scaricamento del file» è una carta di sinistra, non l'Editor.
     const id = C ? C.risolvi(a && a.carta, { esatto: true }) : null;
     const detto = String((a && a.carta) || '').trim();
-    // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza.
-    const nome = id ? ` «${C.carta(id).titolo}»` : (detto && !/^[a-z]+:/.test(detto) ? ` «${detto.length > 60 ? `${detto.slice(0, 59)}…` : detto}»` : '');
+    // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza. Un nome non riconosciuto è del modello.
+    const nome = id ? [` «${C.carta(id).titolo}»`] : (detto && !/^[a-z]+:/.test(detto) ? [' ', cit(detto.length > 60 ? `${detto.slice(0, 59)}…` : detto)] : []);
     const op = String((a && (a.operazione ?? a.op)) || '').toLowerCase();
+    const frase = (prima, dopo) => (fatto ? piatto([prima, ...nome, dopo]) : [prima, ...nome, dopo]);
     if (op === 'ripristina') return fatto ? 'Carte della home rimesse com\'erano all\'inizio' : 'Rimettere le carte della home com\'erano all\'inizio';
-    if (op === 'togli' && !id) return fatto ? `Carta${nome} tolta dalla home` : `Togliere la carta${nome} dalla home`;
-    if (op === 'togli') return fatto ? `Carta${nome} tolta dalla home: ora è un'icona in «altro»` : `Togliere la carta${nome} dalla home`;
-    if (op === 'rimetti' || op === 'aggiungi') return fatto ? `Carta${nome} rimessa nella home` : `Rimettere la carta${nome} nella home`;
-    return fatto ? `Carta${nome} spostata nella home` : `Spostare la carta${nome} nella home`;
+    if (op === 'togli' && !id) return fatto ? frase('Carta', ' tolta dalla home') : frase('Togliere la carta', ' dalla home');
+    if (op === 'togli') return fatto ? frase('Carta', ' tolta dalla home: ora è un\'icona in «altro»') : frase('Togliere la carta', ' dalla home');
+    if (op === 'rimetti' || op === 'aggiungi') return fatto ? frase('Carta', ' rimessa nella home') : frase('Rimettere la carta', ' nella home');
+    return fatto ? frase('Carta', ' spostata nella home') : frase('Spostare la carta', ' nella home');
   }
 
   // Perché la cartella di CERCA_DOCUMENTI esce dal perimetro ('' se ci sta, o se si cerca nelle cartelle di sempre).
@@ -170,8 +176,9 @@
       .replace(/\s+/g, ' ').trim();
     const segni = Array.from(t);
     if (segni.length > SPIEGAZIONE_MAX) t = `${segni.slice(0, SPIEGAZIONE_MAX - 1).join('').trimEnd()}…`;
-    return t || 'Uso il terminale del computer';
+    return t || SPIEGAZIONE_DI_FILO;
   }
+  const SPIEGAZIONE_DI_FILO = 'Uso il terminale del computer';
 
   function nomeLeggibile(n) {
     const N = global.SN_NOMI_FILE;
@@ -182,13 +189,15 @@
     const proposte = Array.isArray(a && a._proposte) ? a._proposte : [];
     const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
     const n = proposte.length;
-    const righe = proposte.map((p) => `«${nomeLeggibile(p && p.prima)}» → «${nomeLeggibile(p && p.nome)}»`);
-    let t = `${n === 1 ? 'Rinominare questo file' : `Rinominare questi ${n} file`}:\n${righe.join('\n')}`;
+    // I nomi li scelgono chi ha salvato il file e il modello: stanno nell'elenco, una voce per file.
+    const t = [`${n === 1 ? 'Rinominare questo file' : `Rinominare questi ${n} file`}:\n`,
+      elenco(proposte.map((p) => `«${nomeLeggibile(p && p.prima)}» → «${nomeLeggibile(p && p.nome)}»`))];
     if (saltati.length) {
-      t += `\n\nRestano come sono:\n${saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`).join('\n')}`;
+      t.push('\n\nRestano come sono:\n', elenco(saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`)));
     }
-    if (a && a._oltre > 0) t += `\n\nNe restano altri ${a._oltre}: chiedimelo di nuovo dopo questi.`;
-    return `${t}\n\nL'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».`;
+    if (a && a._oltre > 0) t.push(`\n\nNe restano altri ${Number(a._oltre)}: chiedimelo di nuovo dopo questi.`);
+    t.push('\n\nL\'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».');
+    return t;
   }
 
   const REGISTRY = {
@@ -208,26 +217,29 @@
         const url = a.url || a.href || a.link || 'una pagina';
         if (a && a._exfil) {
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
-          return `Aprire un link${why}:\n${url}\n\n`
-            + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
+          return [`Aprire un link${why}:\n`, cit(url, true),
+            '\n\nPotrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.'];
         }
-        if (a && typeof a.cerca === 'string' && a.cerca.trim()) {
-          const t = a.cerca.trim();
-          return `Cercare sul web:\n“${t.length > 80 ? `${t.slice(0, 80)}…` : t}”`;
-        }
-        return `Aprire ${url}`;
+        if (a && typeof a.cerca === 'string' && a.cerca.trim()) return ['Cercare sul web:\n', cit(a.cerca.trim())];
+        return a.url || a.href || a.link ? ['Aprire ', cit(url, true)] : 'Aprire una pagina';
       },
     },
     // Mette in chat il bottone del file e basta: ad aprirlo è il clic dell'utente (#947) → resta in chat, costo 0.
     APRI_FILE: {
       costo: 0,
       campo: 'file',
-      describe: (a) => `Mostrare in chat il file ${a.percorso || a.path || ''}`.trim(),
+      describe: (a) => {
+        const f = String(a.percorso || a.path || '').trim();
+        return f ? ['Mostrare in chat il file ', cit(f, true)] : 'Mostrare in chat un file';
+      },
     },
     TIMER: {
       costo: 1,
       campo: null,
-      describe: (a) => `Avviare il timer "${a.label || a.etichetta || 'Timer'}"`,
+      describe: (a) => {
+        const nome = a.label || a.etichetta;
+        return nome ? ['Avviare il timer ', cit(nome)] : 'Avviare un timer';
+      },
     },
     // Rinominare file dell'utente (#950): si torna indietro con «Annulla», ma un programma che cercava il file
     // per nome non lo trova più → costo 2. L'elenco vecchio → nuovo lo prepara il main (`_proposte`), mai il modello.
@@ -244,7 +256,12 @@
     SVEGLIA: {
       costo: 1,
       campo: null,
-      describe: (a) => `Impostare una sveglia ${a.time || a.orario || ''}`.trim(),
+      describe: (a) => {
+        const ora = String(a.time || a.orario || '').trim();
+        // Un orario di sole cifre resta nella frase: il resto è testo del modello e va nel riquadro.
+        if (!ora || /^\d{1,2}(?:[:.]\d{2})?$/.test(ora)) return `Impostare una sveglia ${ora}`.trim();
+        return ['Impostare una sveglia ', cit(ora, true)];
+      },
     },
     // Cancellare e spostare sveglie e timer dalla chat. Il criterio del costo
     // è QUANTE cose sparirebbero, non come la richiesta è formulata: togliere la
@@ -261,12 +278,10 @@
       describe: (a) => {
         const list = targetList(a);
         if (list.length) {
-          return `Filo sta per togliere ${list.length === 1 ? 'questa voce' : `queste ${list.length} voci`}:\n`
-            + list.map((t) => `• ${t}`).join('\n')
-            + '\n\nUna volta tolte non suoneranno più.';
+          return [`Filo sta per togliere ${list.length === 1 ? 'questa voce' : `queste ${list.length} voci`}:\n`,
+            elenco(list), list.length === 1 ? '\n\nUna volta tolta non suonerà più.' : '\n\nUna volta tolte non suoneranno più.'];
         }
-        const what = timerRefLabel(a);
-        return `Togliere ${what}`;
+        return ['Togliere ', timerRefLabel(a)];
       },
     },
     MODIFICA_SVEGLIA: {
@@ -283,10 +298,13 @@
         const dove = when ? ` alle ${when}` : '';
         const quando = rip ? ` (${rip})` : '';
         if (list.length > 1) {
-          return `Filo sta per spostare${dove}${quando} queste ${list.length} voci:\n`
-            + list.map((t) => `• ${t}`).join('\n');
+          // Un orario che non è solo cifre è testo del modello: nel popup va nel riquadro.
+          const cifre = !when || /^\d{1,2}(?:[:.]\d{2})?$/.test(when);
+          return [`Filo sta per spostare${cifre ? dove : ''}${quando} queste ${list.length} voci:\n`, elenco(list),
+            ...(cifre ? [] : ['\n\nNuovo orario:\n', cit(when, true)])];
         }
-        return `Spostare ${timerRefLabel(a)}${dove}${quando}`;
+        const cifre = !when || /^\d{1,2}(?:[:.]\d{2})?$/.test(when);
+        return ['Spostare ', timerRefLabel(a), `${cifre ? dove : ''}${quando}`, ...(cifre ? [] : ['\n\nNuovo orario:\n', cit(when, true)])];
       },
     },
     SALVA_APPUNTO: {
@@ -303,7 +321,7 @@
       describe: (a) => {
         const l = lezione(a);
         if (!l.testo || l.rifiuto) return 'Ricordare una cosa';
-        return `Filo vuole ricordare una cosa.\n\nTesto esatto:\n«${l.testo}»\n\n${RISCHIO_LEZIONE}`;
+        return ['Filo vuole ricordare una cosa.\n\nTesto esatto:\n', cit(l.testo), `\n\n${RISCHIO_LEZIONE}`];
       },
       describeDone: (a) => `Ricordato: «${lezione(a).testo}»`,
     },
@@ -322,8 +340,11 @@
         // che parte a nome dell'utente, e un consenso su un testo che non si
         // può leggere per intero non è un consenso. Se è lungo, è il popup a
         // scorrere (src/shared/confirmUi.js), non il testo ad accorciarsi.
+        // Il titolo parte con il testo: si vede anche lui, intero.
         const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
-        return `Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n“${testo || '(vuoto)'}”`;
+        const titolo = String(a.titolo ?? a.title ?? a.name ?? '').trim();
+        return ['Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n', ...(titolo ? ['Titolo:\n', cit(titolo), '\nTesto:\n'] : []),
+          testo ? cit(testo) : '(vuoto)'];
       },
     },
     CERCA_WEB: {
@@ -340,10 +361,10 @@
         const q = a.query || a.q || a.testo || a.text || '';
         if (a && a._exfil) {
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
-          return `Cercare sul web un testo${why}:\n"${q}"\n\n`
-            + 'Potrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.';
+          return [`Cercare sul web un testo${why}:\n`, cit(q),
+            '\n\nPotrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.'];
         }
-        return `Cercare sul web "${q}"`;
+        return ['Cercare sul web ', cit(q)];
       },
     },
     ONBOARDING: {
@@ -360,7 +381,7 @@
         if (a && /^(true|1|si|sì|yes)$/i.test(String(a.autonomia ?? ''))) return 'Mostrarti i livelli di autonomia, da scegliere tu';
         if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
         const ids = Array.isArray(a?.spunta) ? a.spunta : [];
-        return `Segnare come fatto nell’intervista di benvenuto${ids.length ? `: ${ids.join(', ')}` : ''}`;
+        return ids.length ? ['Segnare come fatto nell’intervista di benvenuto:\n', elenco(ids)] : 'Segnare come fatto nell’intervista di benvenuto';
       },
     },
     CAPACITA_DETTAGLIO: {
@@ -371,7 +392,7 @@
       campo: null,
       describe: (a) => {
         const ids = Array.isArray(a.ids) ? a.ids : (a.id ? [a.id] : []);
-        return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
+        return ids.length ? ['Verificare cosa sa fare Filo:\n', elenco(ids)] : 'Verificare cosa sa fare Filo';
       },
     },
     // #949 — togliere una risposta ricordata non concede niente: il sito torna a chiedere.
@@ -379,9 +400,10 @@
       costo: 1,
       campo: null,
       describe: (a) => {
-        const sito = String((a && (a.sito ?? a.dominio)) || '').trim().slice(0, 80) || 'un sito';
-        const p = String((a && a.permesso) || '').trim().slice(0, 40);
-        return `Togliere ${p ? `il permesso «${p}»` : 'i permessi ricordati'} di ${sito}`;
+        const sito = String((a && (a.sito ?? a.dominio)) || '').trim();
+        const p = String((a && a.permesso) || '').trim();
+        return [p ? 'Togliere il permesso ' : 'Togliere i permessi ricordati', ...(p ? [cit(p), ' di '] : [' di ']),
+          sito ? cit(sito, true) : 'un sito'];
       },
       describeDone: (a) => {
         const tolte = (a && a._output && Array.isArray(a._output.tolte)) ? a._output.tolte : [];
@@ -394,7 +416,7 @@
       campo: null,
       describe: (a) => {
         const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
-        return cerca ? `Leggere com'è impostato «${cerca.slice(0, 60)}»` : 'Leggere le impostazioni';
+        return cerca ? ['Leggere com\'è impostato ', cit(cerca.slice(0, 60))] : 'Leggere le impostazioni';
       },
       describeDone: (a) => {
         const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
@@ -412,7 +434,37 @@
       describe: (a) => {
         const q = String((a && (a.query ?? a.testo)) || '').trim();
         if (a && a.id && !q) return 'Rileggere una conversazione passata';
-        return `Cercare nel filo${q ? ` ("${q}")` : ''}`;
+        return q ? ['Cercare nel filo ', cit(q)] : 'Cercare nel filo';
+      },
+    },
+    // #845 — la lista «Aperti per dopo»: l'ha fatta l'utente, ma titoli e indirizzi li hanno scritti i siti che ha
+    // scelto di tenere (classe 3, come i siti segnati da lui). Sola lettura, niente esce → costo 0.
+    CERCA_SALVATE: {
+      costo: 0,
+      campo: null,
+      fonte: (a, out) => (Array.isArray(out.pagine) && out.pagine.length
+        ? { classe: 3, campo: 'web', chiave: 'salvate:titoli', motivo: 'ho letto i titoli delle pagine che hai salvato per dopo, scritti dai siti' }
+        : null),
+      describe: (a) => {
+        const q = String((a && (a.cerca ?? a.query ?? a.testo)) || '').replace(/\s+/g, ' ').trim();
+        return q ? ['Cercare fra le pagine salvate per dopo ', cit(q.slice(0, 60))] : 'Guardare le pagine salvate per dopo';
+      },
+    },
+    // Come il clic sulla lista: apre la pagina e la toglie, che si rimette salvandola di nuovo → costo 1.
+    // L'indirizzo è quello in elenco, mai uno scritto dal modello.
+    APRI_SALVATA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        const quale = t ? cit(t) : 'una pagina salvata per dopo';
+        return ['Aprire ', quale, a && a.tieni === true ? ', lasciandola in «Aperti per dopo»' : ' e toglierla da «Aperti per dopo»'];
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const titolo = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (!o.aperta) return 'Pagina salvata non aperta';
+        return `Aperta «${titolo || 'la pagina salvata'}»${o.tolta ? ' e tolta da «Aperti per dopo»' : ', ancora in «Aperti per dopo»'}`;
       },
     },
     LEGGI_FILE: {
@@ -426,7 +478,7 @@
       fonte: (a, out) => (out.text ? { classe: 2, campo: 'file', chiave: `editor:${a.fileId ?? a.id ?? ''}`, motivo: 'ho letto un file dell\'editor' } : null),
       describe: (a) => {
         const id = a && (a.fileId ?? a.id ?? a.file);
-        return `Leggere per intero un documento dell'editor${id ? ` (${id})` : ''}`;
+        return id ? ['Leggere per intero un documento dell\'editor ', cit(String(id), true)] : 'Leggere per intero un documento dell\'editor';
       },
     },
     LEGGI_DOCUMENTO: {
@@ -450,7 +502,52 @@
       describe: (a) => {
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
         const perche = documentoFuori(a);
-        return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+        const motivo = perche ? [`\nPerché te lo chiedo: ${perche}`] : [];
+        return p ? ['Leggere il documento ', cit(p, true), ...motivo] : ['Leggere il documento', ...motivo];
+      },
+    },
+    VEDI_SCHERMO: {
+      // #778 — guardare una finestra non cambia niente: costo 0. Leggere fuori da Filo è un fatto di privacy, quindi
+      // la prima lettura di ogni finestra esterna (o di una pagina delicata in Filo) in una richiesta sta fuori dal
+      // perimetro e chiede a ogni livello; le letture dopo della stessa finestra partono da sole. `_finestra` e
+      // `_approvata` li scrive il main (src/main/services/schermo.js), mai il modello.
+      costo: 0,
+      campo: null,
+      perimetro: (a) => {
+        const f = a && a._finestra;
+        if (!f) return false;
+        return (f.filo === true && !f.delicata) || a._approvata === true;
+      },
+      perchePerimetro: (a) => (a && a._finestra && a._finestra.delicata
+        ? 'Te lo chiedo perché in quella scheda c\'è una pagina delicata.'
+        : 'Te lo chiedo la prima volta che guardo una finestra fuori da Filo, a ogni tua richiesta.'),
+      fonte: (a, out) => {
+        if (out.testo) {
+          if (out.filo && !out.web) return null;
+          return { classe: 5, campo: null, chiave: 'schermo:finestra', motivo: out.filo ? 'ho guardato una pagina web' : 'ho guardato una finestra fuori da Filo' };
+        }
+        return Array.isArray(out.elenco) && out.elenco.some((v) => v && !v.filo)
+          ? { classe: 5, campo: null, chiave: 'schermo:titoli', motivo: 'ho letto i titoli delle finestre aperte' }
+          : null;
+      },
+      describe: (a) => {
+        const f = (a && a._finestra) || {};
+        // Il nome è il titolo che sceglie chi ha aperto la finestra (per una scheda, il sito): sta nel riquadro.
+        const nome = String(f.nome || (a && a.finestra) || '').trim();
+        let quale = nome ? ['la finestra ', cit(nome)] : ['una finestra'];
+        if (f.tipo === 'schermo') quale = nome ? [cit(nome)] : ['lo schermo'];
+        else if (f.tipo === 'selettore') quale = ['una finestra o lo schermo, che scegli tu nel selettore del sistema'];
+        else if (f.filo) quale = nome ? ['la finestra di Filo ', cit(nome)] : ['una finestra di Filo'];
+        return ['Filo vuole guardare ', ...quale, typeof quale[quale.length - 1] === 'string' ? '.' : '',
+          '\n\nNe cattura l\'immagine e la fa leggere al modello che descrive le immagini, '
+          + 'insieme alla tua domanda. Non clicca, non scrive e non salva l\'immagine.'];
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const nome = String(o.finestra || (a && a._finestra && a._finestra.nome) || '').trim();
+        if (Array.isArray(o.elenco) && !o.testo) return 'Ho guardato quali finestre sono aperte';
+        if (!nome) return 'Ho guardato lo schermo';
+        return o.tipo === 'schermo' ? `Ho guardato «${nome}»` : `Ho guardato la finestra «${nome}»`;
       },
     },
     CERCA_DOCUMENTI: {
@@ -470,8 +567,9 @@
         const q = String((a && (a.cosa ?? a.query ?? a.testo)) || '').trim();
         const c = String((a && a.cartella) || '').trim();
         const perche = cartellaDocumentiFuori(a);
-        return `Cercare fra i tuoi documenti${q ? ` «${q.length > 80 ? `${q.slice(0, 79)}…` : q}»` : ''}${c ? ` nella cartella ${c}` : ''}`
-          + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+        // Richiesta e cartella le scrive il modello: intere, nel loro riquadro, come nell'Aiuto.
+        return ['Cercare fra i tuoi documenti', ...(q ? [' ', cit(q)] : []), ...(c ? [' nella cartella ', cit(c, true)] : []),
+          ...(perche ? [`\nPerché te lo chiedo: ${perche}`] : [])];
       },
     },
     LEGGI_TRASPARENZA: {
@@ -480,12 +578,18 @@
       // testo statico incluso nell'app, nessuna uscita verso l'esterno → 1.
       costo: 0,
       campo: null,
-      describe: (a) => `Rileggere la pagina di trasparenza${a && a.doc ? ` (${a.doc})` : ''}`,
+      describe: (a) => (a && a.doc ? ['Rileggere la pagina di trasparenza ', cit(String(a.doc), true)] : 'Rileggere la pagina di trasparenza'),
     },
     EVENTO_CALENDARIO: {
       costo: 1,
       campo: null,
-      describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
+      describe: (a) => {
+        const t = a.title || a.titolo;
+        return t ? ["Creare l'evento ", cit(t)] : 'Creare un evento';
+      },
+      // La finisce l'UTENTE con un click in chat: senza questa riga, al turno
+      // dopo il modello non sa che è successo e tira a indovinare.
+      describeDone: (a) => `Evento aggiunto al calendario: "${a.title || a.titolo || ''}"`,
     },
     // La prima riga di describe è quella che il diario mostra mentre si aspetta il clic.
     PULISCI_TAB: {
@@ -501,8 +605,8 @@
     CANCELLA_ARCHIVIO: {
       costo: 3,
       campo: null,
-      describe: (a) => `Eliminare dall'archivio le schede su “${a.query || a.testo || ''}”.\n`
-        + 'Vengono eliminate DEFINITIVAMENTE: non si possono recuperare.',
+      describe: (a) => ["Eliminare dall'archivio le schede su ", cit(a.query || a.testo || ''),
+        '.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare.'],
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.eliminate) || 0;
         return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
@@ -516,7 +620,10 @@
       describe: (a) => {
         const n = Number(a && a._n);
         const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
-        return `Cancellare ${quali}${sitoDetto(a)} ${periodoDetto(a)}.\nFilo non le ricorderà più. Chat e schede chiuse restano.`;
+        const sito = String((a && (a._sito || a.sito)) || '').trim();
+        const coda = 'Filo non le ricorderà più. Chat e schede chiuse restano.';
+        return sito ? [`Cancellare ${quali} ${periodoDetto(a)} di questo sito:\n`, cit(sito, true), `\n${coda}`]
+          : [`Cancellare ${quali} ${periodoDetto(a)}.\n${coda}`];
       },
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.cancellate) || 0;
@@ -531,29 +638,45 @@
       costo: 3,
       campo: null,
       elenco: () => 'cancella-definitivo',
-      dove: 'Le righe della memoria le può togliere l\'utente, una per una, in Preferenze sotto «Memoria di Filo».',
+      dove: 'Le righe della memoria le può togliere l\'utente, una per una, nel quaderno delle memorie (filo://quaderno/quaderno.html).',
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
+      // A cosa fatta, la ricevuta: senza, il bottone confermato ripeteva la domanda («Eliminare…»).
+      describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese e lezioni',
     },
     DIMENTICA: {
-      // Toglie dalla memoria le righe indicate a voce: le stesse della × nelle
-      // Preferenze. Il main risolve la frase in `_righe` prima del gate, mai
-      // l'LLM; nessuna riga → 1, il dispatch lo dice. Oltre tre è quasi un
-      // «dimentica tutto» → costo 3.
-      costo: (a) => {
-        const n = Array.isArray(a && a._righe) ? a._righe.length : 0;
-        return n === 0 ? 1 : n > 3 ? 3 : 2;
-      },
+      // Le righe indicate a voce le risolve il main in `_righe` prima del gate, mai l'LLM. Toglierle le nasconde nel
+      // quaderno, da dove si rimettono: costo 1 (decisione dell'owner, #872). Il «per sempre» butta il testo: il costo
+      // più alto del registro.
+      costo: (a) => (a && a.per_sempre === true ? 3 : 1),
       campo: null,
       describe: (a) => {
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
-        return `Filo sta per dimenticare ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`
-          + righe.map((r) => `• ${r}`).join('\n')
-          + '\n\nNon entreranno più nelle conversazioni.';
+        const per = a && a.per_sempre === true;
+        return [`Filo sta per ${per ? 'cancellare per sempre' : 'dimenticare'} ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
+          elenco(righe), per ? '\n\nNon entreranno più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.'
+            : '\n\nNon entreranno più nelle conversazioni. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.'];
       },
-      describeDone: (a) => `Dimenticato: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
+      describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
+    },
+    CORREGGI_MEMORIA: {
+      // Cambia una riga che entra in ogni prompt, come una lezione (#872): il popup mostra prima e dopo. La riga la
+      // trova il main (`_righe`); nessuna, più d'una o una correzione che il tetto rifiuta → 1, il dispatch lo dice.
+      costo: (a) => {
+        const r = Array.isArray(a && a._righe) ? a._righe : [];
+        const l = lezione({ testo: a && a.nuovo });
+        return r.length === 1 && l.testo && !l.rifiuto ? 2 : 1;
+      },
+      campo: null,
+      describe: (a) => {
+        const r = Array.isArray(a && a._righe) ? a._righe : [];
+        const l = lezione({ testo: a && a.nuovo });
+        if (r.length !== 1 || !l.testo || l.rifiuto) return 'Correggere una cosa che Filo ricorda';
+        return ['Filo vuole correggere una riga della sua memoria.\n\nPrima:\n', cit(r[0]), '\n\nDopo:\n', cit(l.testo), `\n\n${RISCHIO_LEZIONE}`];
+      },
+      describeDone: (a) => `Corretto: «${lezione({ testo: a && a.nuovo }).testo}»`,
     },
     IMPOSTA_PREFERENZA: {
       // Costo, difesa abbassata ed elenco fisso li dichiara il setter in preferences.js. Preferenza sconosciuta,
@@ -573,6 +696,13 @@
         return !!(built && !built.rifiuto && built.allenta);
       },
       dove: (a) => { const built = prefBuilt(a); return (built && built.dove) || ''; },
+      // Un setter che vuole sempre l'OK (`chiede` in preferences.js) sta fuori dal perimetro: un clic, a ogni livello.
+      perimetro: (a) => {
+        if (a && a._invariato) return true;
+        const built = prefBuilt(a);
+        return !(built && !built.rifiuto && built.chiede);
+      },
+      perchePerimetro: 'Te lo chiedo sempre prima di accenderla.',
       describe: (a) => {
         const built = prefBuilt(a);
         if (!built || built.rifiuto) return 'Modificare una preferenza';
@@ -581,9 +711,12 @@
         // arriva dal setter in preferences.js, che deve dichiararlo.
         // Un testo libero si mostra per intero: si conferma quello (#592). La
         // prima riga resta corta perché fa anche da bottone.
-        const base = `Filo vuole impostare: ${built.label}.`;
-        const testo = built.testo ? `\n\nTesto esatto:\n«${built.testo}»` : '';
-        return built.risk ? `${base}${testo}\n\n${built.risk}` : `${base}${testo}`;
+        // Un valore scritto dal modello (`campo` + `valore` del setter) va nel riquadro, non nell'etichetta.
+        const base = built.valore ? [`Filo vuole impostare: ${built.campo} → `, cit(built.valore, true)] : [`Filo vuole impostare: ${built.label}.`];
+        const testo = built.testo ? ['\n\nTesto esatto:\n', cit(built.testo)] : [];
+        // Il costo del modello scelto per una funzione (#819): lo calcola il main prima della conferma.
+        const costo = a && typeof a._costoModello === 'string' && a._costoModello ? [`\n\n${a._costoModello}`] : [];
+        return [...base, ...testo, ...costo, ...(built.risk ? [`\n\n${built.risk}`] : [])];
       },
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {
@@ -608,10 +741,16 @@
         const label = (t && t.label) || estTok(a) || 'un elemento';
         const val = estVal(a);
         if (a && a._illegible) {
-          return `Cambiare “${label}” a ${val || 'questo valore'} renderebbe il testo `
+          // Nel popup solo parole di Filo: un token del registro e un valore valido.
+          const nome = (t && t.label) || 'un elemento';
+          const valido = T && T.validate && T.validate(estTok(a), val) ? val : 'questo valore';
+          return `Cambiare “${nome}” a ${valido} renderebbe il testo `
             + `quasi illeggibile (colore troppo vicino allo sfondo). Applico comunque?`;
         }
-        return `Cambiare “${label}”${val ? ` a ${val}` : ''}`;
+        // Fuori dal registro nome e valore sono del modello: stanno nel riquadro.
+        const valOk = !!(t && val && T.validate && T.validate(estTok(a), val));
+        return [t ? `Cambiare “${label}”` : 'Cambiare ', ...(t ? [] : [cit(label, true)]),
+          ...(val ? (valOk ? [` a ${val}`] : [' a ', cit(val, true)]) : [])];
       },
     },
     ESEGUI_COMANDO: {
@@ -652,9 +791,10 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
-        return `${spiegazioneComando(a)}\n\nIl comando, nel terminale:\n${cmd || '(comando vuoto)'}`
-          + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
-          + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+        // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
+        const sp = spiegazioneComando(a);
+        return [sp === SPIEGAZIONE_DI_FILO ? sp : cit(sp, true), '\n\nIl comando, nel terminale:\n', cmd ? cit(cmd, true) : '(comando vuoto)',
+          ...(cwd ? ['\nCartella di lavoro:\n', cit(cwd, true)] : []), perche ? `\nPerché te lo chiedo: ${perche}` : ''];
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────
@@ -681,12 +821,40 @@
     REGOLA_PROXY_DOMINIO: {
       costo: 1,
       campo: 'web',
-      describe: (a) => `Aprire sempre ${proxyDomain(a) || 'questo sito'} da ${countryLabel(proxyCountry(a)) || 'un altro paese'}`,
+      describe: (a) => {
+        const d = proxyDomain(a);
+        const da = ` da ${countryLabel(proxyCountry(a)) || 'un altro paese'}`;
+        return d ? ['Aprire sempre ', cit(d, true), da] : `Aprire sempre questo sito${da}`;
+      },
     },
     RIMUOVI_REGOLA_PROXY: {
       costo: 1,
       campo: 'web',
-      describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
+      describe: (a) => {
+        const d = proxyDomain(a);
+        return ['Togliere la regola "apri sempre da un altro paese" per ', d ? cit(d, true) : 'questo sito'];
+      },
+    },
+    // «Tieni sempre aperto X» (#823): la pulizia delle schede non lo archivia più. Si vede e si toglie in
+    // Preferenze → Memoria. `_voce`/`_voci` le risolve il main prima del gate, mai l'LLM.
+    TIENI_APERTA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => {
+        const v = (a && (a._voce || a._detto)) || proxyDomain(a || {});
+        return ['Tenere sempre aperto ', v ? cit(v, true) : 'questo sito'];
+      },
+      describeDone: (a) => `Da ora la pulizia delle schede non archivia ${(a && a._voce) || 'questo sito'}`,
+    },
+    NON_TENERE_APERTA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => {
+        const voci = Array.isArray(a && a._voci) ? a._voci : [];
+        const v = voci.length ? null : ((a && a._detto) || proxyDomain(a || {}));
+        return ['Non tenere più sempre aperto ', voci.length > 1 ? elenco(voci) : voci.length ? cit(voci[0], true) : v ? cit(v, true) : 'questo sito'];
+      },
+      describeDone: (a) => `La pulizia delle schede può di nuovo archiviare ${(Array.isArray(a && a._voci) && a._voci.join(', ')) || 'questo sito'}`,
     },
     // ── comandi della finestra / barra di Filo via chat (#419) ────────────────
     // L'agente della home aziona i controlli del browser stesso (schermo intero,
@@ -731,7 +899,7 @@
       campo: 'web',
       describe: (a) => {
         const d = a && (a.descrizione ?? a.description);
-        if (d) return `Cambiare l'aspetto della pagina: ${String(d).trim()}`;
+        if (d && String(d).trim()) return ["Cambiare l'aspetto della pagina:\n", cit(String(d).trim())];
         return 'Cambiare l\'aspetto del testo della pagina';
       },
     },
@@ -748,10 +916,11 @@
       describe: (a) => {
         const D = global.SN_DISPOSIZIONE_ICONE;
         const id = String((a && (a.icona ?? a.id)) || '').trim();
-        const nome = D && D.noto(id) ? D.nome(id) : (id || 'un\'icona');
+        // Un nome che Filo non conosce l'ha scritto il modello: nel riquadro.
+        const nome = D && D.noto(id) ? `«${D.nome(id)}»` : (id ? cit(id) : 'un\'icona');
         const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
         const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
-        return d ? `Spostare «${nome}» ${d}` : `Spostare «${nome}»`;
+        return ['Spostare ', nome, d ? ` ${d}` : ''];
       },
       describeDone: (a) => {
         const D = global.SN_DISPOSIZIONE_ICONE;
@@ -770,10 +939,11 @@
       campo: null,
       difesa: (a) => !(a && a._livelloCambio === 1),
       describe: (a) => {
+        // La frase del cambio riporta testi salvati (uno stile, un'etichetta, una cartella): sta tutta nel riquadro.
         const f = String((a && a._fraseCambio) || '').trim();
-        const base = f ? `Filo vuole rimettere com'era prima di: ${f}.` : 'Filo vuole rimettere com\'era l\'ultimo cambio.';
+        const base = f ? ['Filo vuole rimettere com\'era prima di:\n', cit(f, true)] : ['Filo vuole rimettere com\'era l\'ultimo cambio.'];
         if (a && a._livelloCambio === 1) return base;
-        return `${base}\n\nTocca un'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l'hai chiesto tu.`;
+        return [...base, '\n\nTocca un\'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
       },
       describeDone: (a) => {
         const f = String((a && a._fraseCambio) || '').trim();
@@ -810,9 +980,10 @@
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
         if (r.nome && r.collega === false) {
-          return `Scollegare «${nome}» dal Bluetooth.\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.`;
+          return ['Scollegare dal Bluetooth ', cit(nome), '\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.'];
         }
-        if (r.nome) return `Collegare «${nome}» col Bluetooth`;
+        // Il nome del dispositivo lo sceglie chi l'ha fatto, o il modello: nel riquadro.
+        if (r.nome) return ['Collegare col Bluetooth ', cit(nome)];
         if (r.acceso === true) return 'Accendere il Bluetooth';
         if (r.acceso === false) {
           return 'Spegnere il Bluetooth.\n\nCuffie, casse, tastiere e mouse Bluetooth si scollegano finché non lo riaccendi, dal tasto nella home o chiedendolo a Filo.';
@@ -841,7 +1012,7 @@
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
         if (r.nome) {
-          return `Collegare il computer alla rete Wi-Fi «${nome}».\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.`;
+          return ['Collegare il computer alla rete Wi-Fi ', cit(nome), '\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.'];
         }
         if (r.acceso === true) return 'Accendere il Wi-Fi';
         if (r.acceso === false) {
@@ -870,6 +1041,20 @@
           + (a._conBarra === true ? 'Ci vuole una decina di secondi, con la barra di avanzamento; poi ' : 'Ci vuole qualche secondo; poi ')
           + 'Filo si riapre da solo con le schede di adesso. Le finestre in incognito si chiudono.'
         : 'Cercare la versione nuova di Filo e scaricarla'),
+    },
+    // #818 — un rimedio dell'avviso dei crediti: lo stesso clic dei pulsanti, che si rimette com'era con un altro.
+    RIMEDIO_CREDITI: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const op = String((a && a.operazione) || '').trim().toLowerCase();
+        const r = String((a && a.rimedio) || '').trim().toLowerCase();
+        if (op === 'applica' && r === 'modello') return 'Usare modelli più economici per le funzioni che consumano di più';
+        if (op === 'applica' && r === 'automatiche') return 'Spegnere le funzioni automatiche che consumano crediti';
+        if (op === 'annulla' && r === 'modello') return 'Rimettere i modelli di prima';
+        if (op === 'annulla' && r === 'automatiche') return 'Riaccendere le funzioni automatiche';
+        return 'Guardare come far durare i crediti';
+      },
     },
     ZOOM_PAGINA: {
       costo: 1,
@@ -925,6 +1110,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+    'VEDI_SCHERMO', 'CERCA_SALVATE',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -958,15 +1144,38 @@
     try { dove = String(valore(entry.dove, action, ctx) || ''); } catch (_) { dove = ''; }
     let dentroPerimetro = true;
     try { dentroPerimetro = typeof entry.perimetro === 'function' ? !!entry.perimetro(action, ctx) : true; } catch (_) { dentroPerimetro = false; }
-    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro };
+    // La frase del popup quando chiede perché l'azione sta fuori dal perimetro: la dice chi conosce l'azione.
+    let perchePerimetro = '';
+    try { perchePerimetro = dentroPerimetro ? '' : String(valore(entry.perchePerimetro, action, ctx) || ''); } catch (_) { perchePerimetro = ''; }
+    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro, perchePerimetro };
   }
 
-  // Spiegazione in chiaro di cosa Filo sta tentando, per il popup di conferma.
-  function describe(action) {
-    if (!action || typeof action !== 'object') return '';
+  const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || p.citazione != null);
+
+  // La spiegazione per il popup di conferma a pezzi: stringhe (parole di Filo) e
+  // riquadri ({ citazione } o { elenco }) col testo che non è suo.
+  function describeParts(action) {
+    if (!action || typeof action !== 'object') return [];
     const entry = REGISTRY[String(action.type || '').toUpperCase()];
-    if (!entry) return '';
-    try { return entry.describe(action) || ''; } catch (_) { return ''; }
+    if (!entry) return [];
+    let d;
+    try { d = entry.describe(action); } catch (_) { return []; }
+    if (!Array.isArray(d)) return d ? [String(d)] : [];
+    return d.filter((p) => (typeof p === 'string' ? p : riquadro(p)));
+  }
+
+  // La stessa spiegazione in una riga di testo: il bottone, il diario, il
+  // modello. I riquadri tornano fra virgolette, gli elenchi a punti.
+  function piatto(parti) {
+    return parti.map((p) => {
+      if (typeof p === 'string') return p;
+      if (Array.isArray(p.elenco)) return p.elenco.map((v) => `• ${v}`).join('\n');
+      return p.nuda ? p.citazione : `«${p.citazione}»`;
+    }).join('');
+  }
+
+  function describe(action) {
+    return piatto(describeParts(action));
   }
 
   // La stessa cosa a fatto compiuto, per l'esito che torna al modello: dove
@@ -975,8 +1184,9 @@
     if (!action || typeof action !== 'object') return '';
     const entry = REGISTRY[String(action.type || '').toUpperCase()];
     if (!entry) return '';
-    try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
+    if (!entry.describeDone) return describe(action);
+    try { return entry.describeDone(action) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeDone, spiegazioneComando, stileDellAccoglienza };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

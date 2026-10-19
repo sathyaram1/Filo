@@ -1,6 +1,7 @@
 // Gestione → Automazioni è UNA pagina per tutte le impostazioni dell'owner, Modelli di supporto compresi, e
 // usa tutta la larghezza; la traccia delle fusioni decise sta nel Log, non sopra le impostazioni (#1110).
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 const SHA = 'a1b2c3d4'.repeat(5);
@@ -38,7 +39,7 @@ async function apri(app, openTab, { admin = true, recent = STORIA.slice(0, 6), p
       if (!cfg.admin && /^(support_models_get|merge_approvals_get|automation_)/.test(t || '')) return { ok: false, error: 'riservato' };
       if (t === 'support_models_get') return { ok: true, models: cfg.modelli };
       if (t === 'merge_approvals_get') return { ok: true, pending: [], failed: [], recent: cfg.recent, preapproved: cfg.preapproved, ttlMs: 7 * 864e5 };
-      if (t === 'automation_get') return { ok: true, enabled: true, routinesEnabled: true, autoApprove: {}, proberWhenIdle: true };
+      if (t === 'automation_get') return { ok: true, enabled: true, routinesEnabled: true, autoApprove: {} };
       if (t === 'automation_caps_get') return { ok: true, cap3: 3, cap2: 2, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true };
       if (t === 'automation_sessions_get') return { ok: true, letto: true, maxSessions: 4, priorityAccount: '', accountAOff: false, accountBOff: false };
       return orig(msg);
@@ -56,7 +57,7 @@ test('Automazioni: impostazioni e modelli di supporto in una pagina sola, subito
 
   // La scheda a parte non c'è più: si modifica tutto da qui.
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveCount(0);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const pannello = page.locator('#panel-automation');
   await expect(pannello.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
   await expect(pannello.locator('#mgSmChain-judge1 .sn-chain-input')).toHaveCount(2);
@@ -95,7 +96,7 @@ test('Automazioni: impostazioni e modelli di supporto in una pagina sola, subito
 
 test('finestra stretta: la stessa pagina va in colonna, senza sbordare', async ({ app, openTab }) => {
   const page = await apri(app, openTab, { size: [820, 800] });
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
   const r = await page.evaluate(() => ({
     sbordo: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
@@ -108,7 +109,7 @@ test('finestra stretta: la stessa pagina va in colonna, senza sbordare', async (
 
 test('la storia delle fusioni decise si rilegge nel Log, con tutto quello che era stato segnalato', async ({ app, openTab }) => {
   const page = await apri(app, openTab);
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
   const sezione = page.locator('#panel-log #mgFusioniSection');
   await expect(sezione).toBeVisible();
   await expect(sezione.locator('#mgMergeApprovalsRecent')).toContainText('Decise di recente');
@@ -128,13 +129,13 @@ test('la storia delle fusioni decise si rilegge nel Log, con tutto quello che er
 
 test('Log senza fusioni decise lo dice; da non owner la colonna non c’è', async ({ app, openTab }) => {
   const page = await apri(app, openTab, { recent: [], preapproved: [] });
-  await page.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(page, 'log');
   await expect(page.locator('#mgFusioniSection')).toBeVisible();
   await expect(page.locator('#mgFusioniEmpty')).toBeVisible();
   await expect(page.locator('#mgFusioniEmpty')).toHaveText('Nessuna fusione decisa finora.');
 
   const ospite = await apri(app, openTab, { admin: false });
-  await ospite.locator('.mg-tab[data-tab="log"]').click();
+  await apriScheda(ospite, 'log');
   await expect(ospite.locator('#mgLogDenied')).toBeVisible();
   // Un «nessuna fusione» detto senza aver letto niente sarebbe falso.
   await expect(ospite.locator('#mgFusioniSection')).toBeHidden();
@@ -142,7 +143,7 @@ test('Log senza fusioni decise lo dice; da non owner la colonna non c’è', asy
 
 test('i campi di Automazioni tengono il loro stile, e il Red Team non si stira sulla griglia', async ({ app, openTab }) => {
   const page = await apri(app, openTab);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const m = await page.evaluate(() => {
     const titolo = getComputedStyle(document.querySelector('#mgCap3Block .mg-auto-field-label'));
     const interruttore = getComputedStyle(document.querySelector('#mgRoutinesSwitch .mg-switch-text'));
@@ -157,7 +158,7 @@ test('i campi di Automazioni tengono il loro stile, e il Red Team non si stira s
   expect(m.sopra).toBe(0);
   await page.screenshot({ path: 'tests/.shots/1110-campi.png' });
 
-  await page.locator('.mg-tab[data-tab="stats"]').click();
+  await apriScheda(page, 'stats');
   const rt = await page.evaluate(() => document.querySelector('#mgRtRoot .mg-auto-block').getBoundingClientRect().width);
   expect(rt).toBeLessThanOrEqual(660);
 });

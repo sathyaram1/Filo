@@ -88,10 +88,15 @@
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
-  // Un lavoro server passato dal verificatore aspetta il PC dell'owner (server:fondi, #1159): gemello di
-  // select.inAttesaFusioneServer nel server; fuori dalla revisione il segno vecchio non conta.
+  // Le attese di un lavoro server passato (#1159): il PC dell'owner, la suite di filo-security. Gemello di select.ATTESA
+  // nel server; fuori dalla revisione il segno vecchio non conta.
+  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite' });
+  function attesaServer(fb) {
+    if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
+    return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
+  }
   function inAttesaFusioneServer(fb) {
-    return !!fb && fb.attesa === 'fusione_server' && normalizeStatus(fb).status === 'revision_security';
+    return attesaServer(fb) === 'pc';
   }
   function isProvenLocalSender(fb) {
     return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
@@ -124,11 +129,17 @@
     const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
     return num ? `il feedback da cui nasce (${num})` : 'il feedback da cui nasce';
   }
+  // L'allarme della pubblicazione (#1002) non nasce da un lavoro: lo apre il server.
+  const ALLARME_COSTRUZIONE = 'agent:costruzione';
   function judgesSkippedText(fb) {
     const p = fb && fb.pipeline;
     const k = p && typeof p === 'object' ? String(p.skipped || '') : '';
     if (!Object.prototype.hasOwnProperty.call(GIUDICI_SALTATI, k)) return '';
-    return isFidato(fb) ? GIUDICI_SALTATI[k] : '';
+    if (!isFidato(fb)) return '';
+    if (k === 'routine_proven' && effectiveClientId(fb).toLowerCase() === ALLARME_COSTRUZIONE) {
+      return 'Allarme aperto dal server: i giudici non servono.';
+    }
+    return GIUDICI_SALTATI[k];
   }
   // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
   // il server non lo ri-giudica; entra in coda da solo. Il motivo lo scrive solo il server, fidato o già giudicato.
@@ -547,6 +558,10 @@
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
       }
+      // Un guasto dell'ambiente non è lavoro locale né un verdetto (#1241): cosa fare sta nella domanda della nota.
+      if (statusReason === 'guasto') {
+        return { text: 'Fermo per un guasto, non per una scelta: cosa è successo e cosa puoi fare stanno nella domanda.', color: S.design.color };
+      }
       // Lo rimandano qui una sessione o una routine, su un feedback di chiunque (#914): la frase segue il mittente.
       if (statusReason === 'locale') {
         // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
@@ -612,7 +627,9 @@
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
+    attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',
+    guasto: 'fermo per un guasto',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
   };
@@ -654,7 +671,17 @@
     // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
     // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
     if (tab === 'queue' && isLocalOnly(fb)) return 'local';
+    // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
+    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
+  }
+
+  // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
+  const STATI_CHE_ASPETTANO = ['todo', 'revision_capability', 'revision_security'];
+  // `opts.trovaAtteso(id)` → il documento dell'aspettato, se la pagina lo conosce. Senza il modulo nessuna attesa.
+  function aspettaAncora(fb, opts) {
+    const A = global.SN_FB_ATTESE;
+    return !!A && A.aspettaAncora(fb, opts && opts.trovaAtteso);
   }
 
   // Gli stati in cui una pratica aspetta l'owner: le sessioni locali non la spostano da lì (#908).
@@ -663,7 +690,7 @@
     return !!info && info.tab === 'inbox';
   }
 
-  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica per lettore e ripasso. */
+  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica: chi guarda i giudizi la chiede qui. */
   function segnaliDeiGiudici(pipeline) {
     const p = pipeline && typeof pipeline === 'object' ? pipeline : null;
     if (!p) return { attacco: false, spam: false };
@@ -879,7 +906,7 @@
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
       return acts;
     }
-    if (tab === 'queue' || tab === 'local') {
+    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
@@ -1021,13 +1048,13 @@
   // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
   function listForManageTab(feedbacks, tab, opts) {
     const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
-    if (tab === 'inbox') return sortReview(items);
+    if (tab === 'inbox') return sortReview(filtraLivelli(items, opts && opts.livelli, opts));
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
     // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
-    // stessa coda, lavorata da un'altra parte.
-    if (tab === 'queue' || tab === 'local') {
+    // stessa coda, lavorata da un'altra parte; chi aspetta (#903) la stessa coda, più tardi.
+    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in
       // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
@@ -1085,14 +1112,17 @@
   // In coda / Risolti l'ordinamento non cambia la lunghezza, quindi basta
   // l'appartenenza (manageTabFor, lo stesso filtro di listForManageTab);
   // Archiviati passa da listArchiveTab perché ha regole e filtri suoi.
-  // `opts`: { releasedVersion, starredOnly, confirmedOnly }. PURA.
+  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 };
+    const inbox = [];
     for (const f of list) {
       const tab = manageTabFor(f, opts);
-      if (tab === 'inbox' || tab === 'queue' || tab === 'local' || tab === 'resolved') counts[tab]++;
+      if (tab === 'inbox') inbox.push(f);
+      else if (tab === 'queue' || tab === 'local' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
+    counts.inbox = filtraLivelli(inbox, opts && opts.livelli, opts).length;
     counts.archived = listArchiveTab(list, opts).length;
     return counts;
   }
@@ -1503,9 +1533,23 @@
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
     if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
+    // Fermo al livello 3 senza una scelta da fare qui (guasto, arenato, loop): il rombo dice quello che dice il segno in
+    // lista, con l'ultima nota; verde solo se una domanda aperta aspetta l'owner (il guasto), grigio per gli altri.
+    const fermo = !attesa && !segnalato ? fermoAlLivello3(fb) : null;
     // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
     if (!letto) {
-      return nonLetto('l3', 'rombo', attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
+      return nonLetto('l3', 'rombo', fermo ? fermo.testo : attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
+    }
+    if (fermo) {
+      const nota = ultimaDomanda(fb);
+      const cifrata = valueUnreadable(fb && fb.notes);
+      return forma('l3', 'rombo', fermo.testo, fermo.domanda ? fermo.classe : null, 'fermo', {
+        titolo: fermo.testo,
+        righe: (nota && nota.ts) ? [riga('Quando', istanteDelTurno(nota.ts))] : [],
+        testo: cifrata ? TESTO_CIFRATO : ((nota && nota.body) || fermo.testo),
+        illeggibile: cifrata,
+        azioni: [],
+      });
     }
     const titolo = !attesa ? 'Segnalazione di Claude'
       : segnalato ? 'Domande e segnalazione di Claude' : 'Domande di Claude';
@@ -1751,8 +1795,18 @@
     decisione:{ forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo su una scelta che spetta a te: aspetta una tua risposta' },
     loop:     { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La verifica ha trovato un difetto che non si corregge più da soli' },
     arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
+    guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
   };
+
+  /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
+  function fermoAlLivello3(fb) {
+    if (!fb || statusUnreadable(fb)) return null;
+    const { status, statusReason } = normalizeStatus(fb);
+    const motivo = String(statusReason || '');
+    const s = status === 'design' && Object.hasOwn(SEGNO_DESIGN, motivo) ? SEGNO_DESIGN[motivo] : null;
+    return s && s.livello === 'l3' && s.classe === 'design' && !MOTIVI_RISPOSTA.includes(motivo) ? s : null;
+  }
 
   /**
    * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio
@@ -1812,8 +1866,120 @@
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
   }
 
+  // ── Sezioni di Gestione (SPEC-DOMANDE §2.1) ───────────────────────────────
+  // Le sezioni raggruppano SCHEDE, non stati: lo stato → scheda resta in feedbackStatus.js.
+  // Una scheda o sezione nuova (Risposte automatiche, Crediti, Impostazioni predefinite…) entra qui quando esiste la
+  // cosa che mostra: un pulsante che non apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110).
+  const SEZIONI = Object.freeze([
+    { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
+    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
+    { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
+  ]);
+
+  function sezioneDiScheda(tab) {
+    const s = SEZIONI.find((x) => x.schede.includes(String(tab || '')));
+    return s ? s.id : null;
+  }
+
+  function schedaPredefinita(sezione) {
+    const s = SEZIONI.find((x) => x.id === sezione);
+    return s ? s.schede[0] : null;
+  }
+
+  /**
+   * L'ultima sezione ricordata, con la scheda di ogni sezione, validata: una parte storta butta tutto,
+   * perché una scelta ricordata a metà torna come un'altra (patterns/una-scelta-ricordata-si-ricorda-intera.md). PURA.
+   */
+  function leggiSceltaSezione(raw) {
+    let v = raw;
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch (_) { return null; } }
+    if (!v || typeof v !== 'object' || !v.schede || typeof v.schede !== 'object') return null;
+    const schede = {};
+    for (const [sez, tab] of Object.entries(v.schede)) {
+      if (sezioneDiScheda(tab) !== sez) return null;
+      schede[sez] = tab;
+    }
+    if (!schede[v.sezione]) return null;
+    return { sezione: v.sezione, schede };
+  }
+
+  // La regola stato → scheda è SN_DOMANDE.schedaDi (src/shared/domande.js); qui solo il nome della scheda di Gestione.
+  // Le risposte automatiche stanno in Archivio finché la loro scheda non ha una fonte (#1154): mai fuori da ogni scheda.
+  const SCHEDA_DOMANDA = Object.freeze({
+    da_rispondere: 'domande', in_lavorazione: 'domande-lavoro', risposte_automatiche: 'domande-archivio', archivio: 'domande-archivio',
+  });
+  function schedaDomanda(d) {
+    const D = global.SN_DOMANDE;
+    if (!d || typeof d !== 'object' || !D || typeof D.schedaDi !== 'function') return null;
+    return SCHEDA_DOMANDA[D.schedaDi(d)] || null;
+  }
+  function contaDomande(domande) {
+    const n = { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 };
+    for (const d of (Array.isArray(domande) ? domande : [])) {
+      const t = schedaDomanda(d);
+      if (t) n[t]++;
+    }
+    return n;
+  }
+  function bloccanteAperta(domande) {
+    return (Array.isArray(domande) ? domande : []).some((d) => d && d.stato === 'aperta' && d.priorita === 'bloccante');
+  }
+
+  /**
+   * Dove si apre Gestione: Domande con una bloccante aperta, Ricevuti se non è vuoto, poi l'ultima sezione,
+   * poi Feedback → Ricevuti. `domande` null = non lette; `ricevuti` null = non si sa. PURA.
+   */
+  function sezioneDiApertura(o) {
+    const opts = o || {};
+    if (bloccanteAperta(opts.domande)) return { sezione: 'domande', scheda: 'domande', motivo: 'bloccante' };
+    if (typeof opts.ricevuti === 'number' && opts.ricevuti > 0) return { sezione: 'feedback', scheda: 'inbox', motivo: 'ricevuti' };
+    const u = leggiSceltaSezione(opts.ultima);
+    if (u) return { sezione: u.sezione, scheda: u.schede[u.sezione], motivo: 'ultima' };
+    return { sezione: 'feedback', scheda: 'inbox', motivo: 'predefinita' };
+  }
+
+  // ── Filtro dei Ricevuti per livello (SPEC-DOMANDE §2.2) ───────────────────
+  const LIVELLI_RICEVUTI = Object.freeze(['l1', 'l2', 'l3', 'l4', 'l5']);
+  const FORMA_DI_LIVELLO = Object.freeze({ l1: 'triangolo', l2: 'cerchio', l3: 'rombo', l4: 'pentagono', l5: 'quadrato' });
+
+  /** Il livello a cui è ferma una pratica dei Ricevuti ('l1'…'l5'), o null: lo stesso del segno in lista. PURA. */
+  function livelloRicevuti(fb, opts) {
+    const s = segnoFermata(fb, opts);
+    return s && LIVELLI_RICEVUTI.includes(s.livello) ? s.livello : null;
+  }
+
+  /** Nessun livello scelto = tutto (anche le pratiche senza livello); più livelli = l'unione. PURA. */
+  function filtraLivelli(lista, livelli, opts) {
+    const items = Array.isArray(lista) ? lista : [];
+    const scelti = (Array.isArray(livelli) ? livelli : []).filter((l) => LIVELLI_RICEVUTI.includes(l));
+    if (!scelti.length) return items.slice();
+    return items.filter((fb) => scelti.includes(livelloRicevuti(fb, opts)));
+  }
+
+  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, a filtro spento; `senza` = nessun livello. PURA. */
+  function contaLivelliRicevuti(feedbacks, opts) {
+    const n = { l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, senza: 0 };
+    for (const fb of (feedbacks || [])) {
+      if (manageTabFor(fb, opts) !== 'inbox') continue;
+      const l = livelloRicevuti(fb, opts);
+      n[l || 'senza']++;
+    }
+    return n;
+  }
+
+  /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
+   *  frase c'è già, che si legge intera nell'hover. Soli spazi = nessuna frase. PURA. */
+  function tastoFrase(frase) {
+    const testo = String(frase == null ? '' : frase).trim();
+    return {
+      piena: !!testo,
+      titolo: testo ? `Frase già scritta: “${testo}”` : 'Scrivi la riga che leggerà chi ha segnalato',
+    };
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
+    tastoFrase,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
     // grezzi. Lo usa listBoardTab qui dentro, e lo usa feedbackPublicView.js
     // (#583) per decidere se un feedback può avere una scheda pubblica: la
@@ -1825,7 +1991,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,
@@ -1837,6 +2003,9 @@
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
+    SEZIONI, sezioneDiScheda, schedaPredefinita, leggiSceltaSezione, sezioneDiApertura,
+    schedaDomanda, contaDomande, bloccanteAperta,
+    LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

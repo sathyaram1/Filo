@@ -29,6 +29,7 @@
     GET_SETTINGS: 'get_settings',
     UPDATE_SETTINGS: 'update_settings',           // { settings }
     RESET_SETTINGS: 'reset_settings',             // → riporta TUTTE le impostazioni ai predefiniti
+    REGISTRA_TASTI: 'registra_tasti',             // { attivo } → i tasti premuti arrivano alla pagina (Preferenze, #842)
     EXPORT_DATA: 'export_data',                   // → salva tutti i dati come .zip
     // Reimportazione del .zip di EXPORT_DATA, in due passi: prima si sceglie e
     // si LEGGE il file (anteprima con quante sezioni/immagini contiene), poi si
@@ -37,13 +38,18 @@
     // né riscrivere lo storage (comprese le chiavi API).
     IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
     IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
+    // Solo dalla pagina Sicurezza (#850): Filo si chiude e al riavvio svuota la cartella dei dati.
+    CANCELLA_TUTTI_I_DATI: 'cancella_tutti_i_dati',             // { parola: 'conferma', ancheIdentita } → { ok } | { ok:false, error }
+    CANCELLA_TUTTI_I_DATI_STATO: 'cancella_tutti_i_dati_stato', // → { ok, identita, inCorso }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
     REMOVE_HISTORY_ENTRY: 'remove_history_entry', // { id }
     CLEAR_HISTORY: 'clear_history',
     GET_SAVED_PAGES: 'get_saved_pages',
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }
+    RESTORE_SAVED_PAGE: 'restore_saved_page',     // { id } — l'«Annulla» di una rimozione: la voce la tiene il main
     CONSUME_SAVED_PAGE: 'consume_saved_page',     // { id }
+    APRI_PAGINA_SALVATA: 'apri_pagina_salvata',   // { id, tieni } — dalla chat: apre con l'indirizzo in elenco e la toglie (#845)
     SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id } — il main fotografa la scheda di chi chiede e ne fa la miniatura
 
     // §3.1/§3.3 — archivio tab chiuse (metadati). La scrittura avviene nel main
@@ -64,6 +70,8 @@
     ARCHIVIO_DA_CANCELLARE_AVANZAMENTO: 'archivio_da_cancellare_avanzamento',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
+    // #848 — l'icona di un sito per la home e la chat, senza servizi di terzi. { url } → { ok, dato } (data:image/… o '')
+    ICONA_SITO: 'icona_sito',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
     // locale nel main (deckStore). Usati dalla pagina filo://decks.
     DECKS_LIST: 'decks_list',
@@ -110,6 +118,8 @@
     SCRYFALL_SYMBOLS: 'scryfall_symbols', // {} → mappa '{U}' → svg_uri
     SCRYFALL_PRINTS: 'scryfall_prints',   // { name } → { ok, prints } (n. stampe, cache permanente)
     GET_COSTS: 'get_costs',
+    // Le stime di costo dei modelli (#819): {} → { ok, contesto } (listino, saldo, tariffa, token medi, predefiniti).
+    STIMA_COSTO_MODELLI: 'stima_costo_modelli',
     // Crediti (gamification): saldo + consumo aggregato per tipo d'uso, per la
     // pagina Crediti del profilo. NON espone mai il costo in €. Vedi creditStore.
     GET_CREDITS: 'get_credits',
@@ -211,6 +221,23 @@
     //   la chiave resta nel main). { } → { ok, limit|null, usage,
     //   limit_remaining|null, line } oppure { ok:false, status, message }
     WALLET_OWN_KEY_INFO: 'wallet_own_key_info',
+    // === L'avviso prima che i crediti finiscano (#818) =======================
+    // ORIGINE: solo pagine filo:// e la shell (come i WALLET_*).
+    // CREDITS_WARNING: spinta del main alle pagine filo:// quando scatta l'avviso. { id }
+    //   La home con una conversazione aperta lo prende con CREDITS_WARNING_CLAIM; se nessuna lo prende, diventa una
+    //   notifica nella cornice che apre la pagina Crediti.
+    CREDITS_WARNING: 'credits_warning',
+    // CREDITS_WARNING_CLAIM: { id } → { ok, avviso:{ id, testo, rimedi:[…] } } solo alla prima che lo chiede.
+    CREDITS_WARNING_CLAIM: 'credits_warning_claim',
+    // CREDITS_WARNING_STATE: l'avviso com'è adesso, per la pagina Crediti. { } → { ok, mostra, avviso|null }
+    CREDITS_WARNING_STATE: 'credits_warning_state',
+    // CREDITS_REMEDY_APPLY / _UNDO: un rimedio con un clic, e com'era con un altro. Il main ricalcola il rimedio da
+    //   sé: dalla pagina arriva solo l'id. { id: 'modello'|'automatiche' } → { ok, frase, avviso }
+    CREDITS_REMEDY_APPLY: 'credits_remedy_apply',
+    CREDITS_REMEDY_UNDO: 'credits_remedy_undo',
+    // SPIEGAZIONE_ANTICIPATA_USATA: la spiegazione preparata alla selezione è stata aperta col tasto destro. Anche dai
+    //   siti (content script): serve solo a non contarla fra quelle che spegnere farebbe risparmiare. { } → { ok }
+    SPIEGAZIONE_ANTICIPATA_USATA: 'spiegazione_anticipata_usata',
     // WALLET_NOTICE_SEEN (#651): l'avviso di benvenuto («Sei entrato con un
     //   invito: hai N crediti») è stato mostrato da una superficie. Lo dicono
     //   la home e la pagina Crediti, ognuna per sé: chi l'ha già visto in
@@ -235,9 +262,25 @@
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).
+    //   `overview.account` (#820) è il conto OpenRouter di Filo, che il server legge con la sua chiave di gestione
+    //   (GET /api/v1/credits): { totalCreditsUsd, totalUsageUsd, readAt } (caricato e speso), o { error } se
+    //   OpenRouter non ha risposto. Senza il campo la pagina dice che il conto non è letto.
     WALLET_OWNER_OVERVIEW: 'wallet_owner_overview',
+    // WALLET_OWNER_ALARM_PENDING (#820): gli allarmi del conto OpenRouter da dire all'owner all'avvio, una volta
+    //   finché la situazione resta quella. Chi non è owner non fa partire nessuna lettura. La risposta arriva quando
+    //   gli avvisi della home nati dalla stessa lettura (#855) sono già fra le notifiche.
+    //   { } → { ok, alarm: { title, text } | null }
+    WALLET_OWNER_ALARM_PENDING: 'wallet_owner_alarm_pending',
     // WALLET_OWNER_GRANT: alza il tetto di un utente. { pseudonym, credits, why } → { ok, result }
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
+    // CONTATORI_INSTALLAZIONI (#969): quante copie di Filo hanno spedito i contatori giornalieri di ieri e del mese in
+    //   corso, cioè gli pseudonimi distinti. Solo pagine di Filo e solo owner, col token dell'account Google.
+    //   { } → { ok, installazioni: { ieri: { giorno, n, completo }, mese: { mese, n, completo } } }
+    CONTATORI_INSTALLAZIONI: 'contatori_installazioni',
+    // CONTATORI_USO (#969): la persona ha visto la risposta di una chiamata partita prima che la chiedesse (una
+    //   spiegazione preparata alla selezione, la correzione di una parola già pronta): l'uso lo conta chi la mostra.
+    //   { action, attesaMs } → { ok }
+    CONTATORI_USO: 'contatori_uso',
     // WALLET_OWNER_INVITES: genera codici d'invito dell'owner. { count } → { ok, codes }
     WALLET_OWNER_INVITES: 'wallet_owner_invites',
     // WALLET_OWNER_KNOBS_SET (#652): cambia le manopole dei crediti in
@@ -541,7 +584,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, localOnly?: bool, localApproval?: true }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, localOnly?: bool, localApproval?: true, waitsFor?: '#12, #13' ('' le toglie), waitsTieni?: [id] (già scritte, tenute come sono) }
     // #583 — LETTURA dei feedback per le superfici dell'owner. La collezione
     // non è più pubblica: leggono solo l'admin e il server. L'ID token vive nel
     // main e non deve arrivare in una pagina, quindi la pagina CHIEDE la
@@ -618,9 +661,9 @@
     //   `enabled` (doc config/automation) → chi entra in coda da solo (filo-security
     //     DESIGN §2);
     //   `routinesEnabled` (doc config/routines) → se le routine autonome lavorano.
-    // Insieme viaggiano `autoApprove` e `proberWhenIdle`.
-    AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer } | { ok:false, error }
-    AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled?, lavoriServer? } → { ok, … } | { ok:false, error }
+    // Insieme viaggiano `autoApprove` e `lavoriServer`.
+    AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, routinesEnabled, lavoriServer } | { ok:false, error }
+    AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, routinesEnabled?, lavoriServer? } → { ok, … } | { ok:false, error }
     // I bilanci dei giri di correzione, uno per livello (doc config/routines,
     // campi `cap3`, `cap2`, `cap1`, `cap0` — feedback #561) e il testo della
     // fase 2 (`fixInstructions`, vuoto = quello del server):
@@ -644,6 +687,12 @@
     // Le legge il SERVER quando accende le sessioni. Owner-only.
     AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff } | { ok:false, error }
     AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff? } → come sopra | { ok:false, error }
+    // I numeri dell'owner sui crediti delle routine (ownerCrediti sul server, regole in src/shared/routineCrediti.js):
+    // riserva di A, tetto di B, taratura, rinnovi; `null` toglie un numero. Lo stato dice per account percentuale,
+    // limite, passo del giorno e rinnovo. Owner-only.
+    // `freni`: 'attivi', o 'numeri_assenti' (senza riserva di A né tetto di B i crediti non frenano niente).
+    ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
+    ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
     // Modello e sforzo del worker per fase (doc config/routines, campo
     // `roleModels` = { ruolo: { model?, effort? } }; regole in
     // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore
@@ -680,7 +729,7 @@
     // entrato in main o se si è aperta una richiesta da approvare.
     // Stessa origine e stesso cancello delle approvazioni di fusione: solo
     // pagine `filo://`, solo il proprietario.
-    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente', requestId? } | { ok:false, error }
+    LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente'|'attesa_server'|'server_al_pc'|'rimandato'|'all_owner', requestId? } | { ok:false, error }
     // Il segno di mittente pericoloso di chi ha mandato quel feedback (#922), dalla callable ownerSenderFlag.
     // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
     // Solo pagine `filo://`, solo il proprietario.
@@ -713,6 +762,10 @@
     // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
     // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
     SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
+    // #965 — i link che la pagina mostra, ai soli controlli locali: il verdetto resta nel main, per il clic. Aperto ai
+    // siti di proposito (lo manda il content script della pagina); la pagina non ne riceve i verdetti, solo il conto.
+    // Oltre LOTTO_MAX link → { ok:false, error:'troppi', max }; un esame già in coda → { ok:false, error:'occupato' }.
+    SAFEBROWSE_LINKS: 'safebrowse_links',          // { urls: string[] } → { ok, esaminati }
     // #1004 — la pagina, o un suo riquadro (il modulo di pagamento di un altro sito), mostra un campo password o carta:
     // il sito della scheda diventa delicato. Il sito lo dà il main, dalla scheda.
     CAMPI_DELICATI: 'campi_delicati', // { hasPassword, hasPayment } (campi a schermo) → { ok }
@@ -783,12 +836,24 @@
     // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
     AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
 
+    // === L'email dell'account proposta nei campi di accesso (#1124, src/content/propostaEmail.js) ===
+    // Aperto ai siti di proposito: lo manda il content script del frame dove l'utente è entrato in un campo email o
+    // nome utente. Porta il campo (misure in px CSS della scheda, valore) e non riceve mai l'email: la proposta la
+    // disegna il main in una vista sopra la scheda (src/main/propostaEmail.js). `segui:false` = qui non si propone.
+    // Dentro un riquadro di un'altra origine `ancora` è il segno mandato al documento sopra, che risponde con 'riquadro'.
+    PROPOSTA_EMAIL: 'proposta_email',               // { fase:'campo', campo, motivo, x, y, w, h, valore, digitato, ancora } | { fase:'via', campo } | { fase:'riquadro', ancora, x, y, s, su } → { ok, segui }
+    // Main→il solo frame del campo, dopo la scelta dell'utente (clic o Invio sulla proposta): l'unico momento in cui
+    // l'email arriva alla pagina.
+    PROPOSTA_EMAIL_RIEMPI: 'proposta_email_riempi', // { campo, email }
+
     // === Il menu che un sito si disegna da sé (#975, src/preload/menu-del-sito.js) ===
     // Aperti ai siti di proposito: li manda il content script dal menu di Filo, e il sito lo ricava il main dal
     // frame che parla, mai dal messaggio. Da una superficie di Filo (Preferenze, l'avviso della proposta) `sito`
     // dice quale.
     MENU_DEL_SITO_SCELTO: 'menu_del_sito_scelto',   // (sito) {} → { ok, proposto }: «Menu di <sito>» ha aperto il suo menu
     MENU_DEL_SITO_IMPOSTA: 'menu_del_sito_imposta', // { attivo, sito? (solo da Filo), avvisa? } → { ok, sito, siti }
+    // Filo spento o riacceso su un sito dal tasto destro (#843): da un sito vale per la sua scheda, che ricava il main.
+    FILO_SPENTO_IMPOSTA: 'filo_spento_imposta', // { spento, siti? (solo da Filo), avvisa? } → { ok, sito, siti, cambiati }
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
@@ -803,6 +868,7 @@
     // lo dà solo GET; le scritture rispondono { ok } e basta.
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
+    COPY_TEXT_TO_CLIPBOARD: 'copy_text_to_clipboard', // { text } → { ok }: appunti di sistema e cronologia, dal «Copia» delle risposte (#846); cancello di PUSH
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
@@ -819,7 +885,7 @@
     RENAME_CATEGORY: 'rename_category',         // { id, name, unisci? } — unisci:false non fonde con un'omonima
     DELETE_CATEGORY: 'delete_category',         // { id }
     MERGE_CATEGORIES: 'merge_categories',       // { fromId, toId }
-    MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId }
+    MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId } o { pageId, nome } per una categoria nuova
 
     // === Filo dashboard ===
     // Filo Chat: invio messaggio utente all'agente conversazionale
@@ -891,6 +957,18 @@
     FILO_RIGHE_APP: 'filo_righe_app',
     // ANNUNCIO (main → pagine di Filo, senza dati): le righe sono cambiate, chi le mostra le richiede.
     FILO_RIGHE_APP_CAMBIATE: 'filo_righe_app_cambiate',
+    // #869 — la home è la coda del filo. Solo filo://: è la cronologia dell'utente.
+    // { prima?, fino?, dopo?, quanti? } → { ok, elementi, inizio, ultimo, chatCorrente? } (src/shared/filoCoda.js).
+    FILO_CODA: 'filo_coda',
+    // Cercare nel filo senza passare dal modello: { q } → { ok, messaggi, pagine, termini, tanti }.
+    FILO_CERCA: 'filo_cerca',
+    // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }. Con { url }: ogni visita di quell'indirizzo
+    // e le sue schede chiuse (dalla ricerca, dove una pagina è un indirizzo).
+    FILO_CODA_TOGLI_PAGINE: 'filo_coda_togli_pagine',
+    // ANNUNCIO (main → pagine di Filo, senza dati): pagine tolte dal filo, da qualunque strada; chi le mostra le rilegge.
+    FILO_PAGINE_TOLTE: 'filo_pagine_tolte',
+    // ANNUNCIO (main → schede): Filo ha scritto di sua iniziativa. { chat, i, ts, testo, fuso }.
+    FILO_PARLA: 'filo_parla',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato
@@ -922,9 +1000,21 @@
     // in righe e lezioni ancora da riordinare. Solo pagine filo://.
     // Risposta: { ok, moduli: [{ nome, righe }], lezioni: [{ ts, text }] }
     FILO_MEMORY_VIEW: 'filo_memory_view',
-    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }.
+    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }. La riga resta nascosta nel quaderno (#872).
     // Solo pagine filo://. Risposta: { ok, tolta } (false: non c'era più).
     FILO_MEMORY_FORGET: 'filo_memory_forget',
+    // Il quaderno delle memorie (#872): righe con data e fonti risolte nel filo, lezioni, siti tenuti aperti e
+    // righe nascoste. Solo pagine filo://.
+    // Risposta: { ok, moduli: [{ nome, righe: [{ testo, via, nata, corretta, fonti: [{ id, ts, chat?, i? }] }] }], lezioni, sempreAperte, nascoste }
+    FILO_QUADERNO: 'filo_quaderno',
+    // La correzione di una riga: { via: { modulo, riga } | { lezione }, testo }. Risposta: { ok, corretta } o { ok:false, error }.
+    FILO_MEMORY_EDIT: 'filo_memory_edit',
+    // Una riga nascosta torna in memoria: { id }. Risposta: { ok, rimessa }.
+    FILO_MEMORY_RESTORE: 'filo_memory_restore',
+    // Una riga nascosta si cancella per sempre: { id }. Risposta: { ok, cancellata }.
+    FILO_MEMORY_FOREVER: 'filo_memory_forever',
+    // Dov'è un evento del filo, per saltarci dalla home (#872): { id }. Risposta: { ok, dove: { tipo, chat, i, ts, app } | null }.
+    FILO_DOVE: 'filo_dove',
     // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
     // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
     FILO_MEMORY_CHANGED: 'filo_memory_changed',
@@ -974,6 +1064,15 @@
     CAMBI_LEGGI: 'cambi_leggi',
     CAMBI_ANNULLA: 'cambi_annulla',
     CAMBI_AGGIORNATI: 'cambi_aggiornati',           // main → pagine di Filo { ids }: un cambio è nato o è stato annullato
+
+    // L'utente aggiunge al calendario del suo computer l'evento che Filo gli
+    // ha proposto in chat: il main scrive un .ics e lo apre col programma di
+    // calendario. → { ok, file, aperto, error }  { evento: { data, ora, titolo, dettagli } }
+    //
+    // ORIGINE: solo filo:// (scrive un file e chiede al sistema di aprirlo, e
+    // la risposta contiene un percorso assoluto). Una pagina web che potesse
+    // chiamarlo farebbe aprire un file al sistema operativo.
+    CALENDAR_ADD: 'calendar_add',
 
     // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
     // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di
@@ -1052,6 +1151,11 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // #589.11 — un riquadro con un menu di Filo aperto chiede alla pagina che lo contiene di sospendere gli effetti
+    // grafici sopra di lui. Va dal riquadro al main { n, si }, e il main lo gira alla SOLA pagina madre come
+    // VISTO_PERMESSO { n, si }: la pagina crede a una richiesta solo se la chiave le arriva anche da qui.
+    VISTO_SOSPENDI: 'visto_sospendi',
+    VISTO_PERMESSO: 'visto_permesso',
     // Contropartita di TRANSLATE_FRAMES: arriva a ogni riquadro della scheda e
     // gli fa tradurre (o riportare all'originale) se stesso. { mode, runId }
     FRAME_TRANSLATE: 'frame_translate',

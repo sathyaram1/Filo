@@ -15,6 +15,9 @@ const SHA = /^[0-9a-f]{7,40}$/i;
 // Gitignorata: il salvataggio automatico non deve mai committarla.
 export const PREFISSO_RIPRISTINO = '_tolte-';
 
+// Nelle risposte alla critica, in cloud e in locale: chi corregge legge «Expected to fail, but passed» proprio quando ha chiuso la porta.
+export const ROSSO_ATTESO_CHIUSO = 'Una prova segnata come rosso atteso (`test.fail`) conta per quello che fa il suo corpo: quando passa («Expected to fail, but passed») la porta è chiusa e la consegna la prende per verde, quindi le togli il segno, o la togli insieme alla prova durevole; quando fallisce come previsto (e Playwright la dà verde) la porta è ancora aperta, e vale come ogni prova rossa.';
+
 const PROVA = /\.spec\.m?js$/;
 const CONFIG_PLAYWRIGHT = /^playwright\.config\.[cm]?[jt]s$/;
 const nelGiro = (f) => f.startsWith(PROVE_GIRO) && f.split('/').length >= 4
@@ -100,12 +103,19 @@ export function soloDiMessiDaParte(prova, messi, rossi = null, vecchie = []) {
  * rilievi messi da parte: la pulizia l'ha lasciata indietro, e con lei esce. `via`: le prove rilanciate perché è
  * cambiato un file di supporto che usano, con quei file; `numeri`: i posti dei rilievi messi da parte nella critica
  * (assente se non si sanno); `casi`: per prova rossa i titoli dei casi rossi (null senza rapporto); `comando`: come
- * si registra la pulizia.
+ * si registra la pulizia; `segnate`: le rosse con un caso segnato come rosso atteso che fallisce come previsto.
  */
 export function esitoProveTolte({
   rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0, via = {}, numeri, casi = {}, vecchie = [], comando = '',
+  segnate = [],
 } = {}) {
   if (!rosse.length && !dallaPulizia.length) return { ferma: false, testo: '' };
+  // Senza questa riga chi vede «passed» su una prova segnata come rosso atteso crede che il rifiuto sbagli.
+  const attese = (Array.isArray(segnate) ? segnate : []).filter((f) => rosse.includes(f) || dallaPulizia.includes(f));
+  const segno = attese.length ? [
+    `${attese.length === 1 ? 'Una è segnata' : `${attese.length} sono segnate`} come rosso atteso (test.fail), e Playwright ${attese.length === 1 ? 'la dà verde perché fallisce' : 'le dà verdi perché falliscono'}`,
+    `come previsto: qui conta il corpo, ed è ancora rosso (${attese.map((f) => f.split('/').pop()).join(', ')}).`,
+  ] : [];
   const dove = via && typeof via === 'object' ? via : {};
   const usa = (f) => (Array.isArray(dove[f]) && dove[f].length ? `usa ${dove[f].map(nomeAiuto).join(', ')}` : '');
   const riga = (f) => `  · ${f}${usa(f) ? ` (${usa(f)})` : ''}`;
@@ -139,7 +149,7 @@ export function esitoProveTolte({
     accorciate.map(riga).join('\n'),
     'Correggi finché è verde, e consegna di nuovo.',
   ] : [];
-  if (!proprie.length) return { ferma: true, testo: [...casiRestati, ...lasciate].join('\n') };
+  if (!proprie.length) return { ferma: true, testo: [...casiRestati, ...lasciate, ...segno].join('\n') };
   const supporto = proprie.some((f) => usa(f));
   // Senza pulizia registrata, e senza i numeri, una rossa può essere di un rilievo messo da parte: quello aspetta l'owner.
   const perche = conPulizia ? [
@@ -167,6 +177,7 @@ export function esitoProveTolte({
       'Una prova, o un suo caso, si toglie solo verde, insieme alla prova durevole che la sostituisce.',
       ...casiRestati,
       ...lasciate,
+      ...segno,
     ].join('\n'),
   };
 }
@@ -494,17 +505,21 @@ export function toccateDalRamo(prove, shaPrima, root, principale = riferimentoPr
 
 /**
  * Rilancia le prove tolte, ciascuna nella sua cartella com'era a `shaPrima` e col codice di adesso.
- * `{ rosse, motivo, casi }`: `motivo` non vuoto = non si è potuto rilanciare, e non è un via libera; `casi`, per
- * prova rossa, i titoli dei casi rossi (null senza rapporto): dicono di quale rilievo è il rosso.
+ * `{ rosse, motivo, casi, segnate }`: `motivo` non vuoto = non si è potuto rilanciare, e non è un via libera; `casi`, per
+ * prova rossa, i titoli dei casi rossi (null senza rapporto): dicono di quale rilievo è il rosso; `segnate`, le rosse
+ * che hanno un caso segnato come rosso atteso col corpo ancora rosso (Playwright quel caso lo dà verde).
  */
 export function rilanciaProveTolte(prove, shaPrima, root, opzioni = {}) {
   const r = corriCome(prove, shaPrima, root, { perCaso: true, ...opzioni });
   const rosse = prove.filter((p) => r.esiti.get(p)?.rossa);
   const rossiDi = (c) => (c ? Object.keys(c).filter((t) => c[t] === false) : null);
-  return { rosse, motivo: r.motivo, casi: Object.fromEntries(rosse.map((p) => [p, rossiDi(r.esiti.get(p)?.casi)])) };
+  return {
+    rosse, motivo: r.motivo, casi: Object.fromEntries(rosse.map((p) => [p, rossiDi(r.esiti.get(p)?.casi)])),
+    segnate: rosse.filter((p) => r.esiti.get(p)?.attesi?.length),
+  };
 }
 
-// Ogni prova nella sua cartella com'era a `sha`, col codice di adesso: `{ esiti: Map<prova, { rossa, casi }>, motivo }`.
+// Ogni prova nella sua cartella com'era a `sha`, col codice di adesso: `{ esiti: Map<prova, { rossa, casi, attesi }>, motivo }`.
 // Con `perCaso` anche l'esito di ogni caso (casiDalReport), null se Playwright non l'ha scritto. `versioni`: le prove
 // da prendere a un altro commit (quelle a cui una pulizia dopo le correzioni ha tolto un caso).
 function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, prepara = preparaLancioElectron, titolo = '', perCaso = false, etichetta = `${process.pid}`, fuori = [], versioni = {} } = {}) {
@@ -538,7 +553,8 @@ function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, pr
       const rapporto = perCaso ? join(rapporti, `${i}.json`) : '';
       const env = perCaso ? { ...(l.env || process.env), PLAYWRIGHT_JSON_OUTPUT_FILE: rapporto } : l.env;
       const r = lancia(l.cmd, l.args, { cwd: base, stdio: 'inherit', shell: process.platform === 'win32', ...(env ? { env } : {}) });
-      esiti.set(p, { rossa: !r || r.status !== 0, casi: perCaso ? casiDalReport(leggiJson(rapporto)) : null });
+      const e = esitoDelRilancio(r ? r.status : null, perCaso ? leggiJson(rapporto) : null);
+      esiti.set(p, { rossa: e.rossa, casi: perCaso ? e.casi : null, attesi: e.attesi });
     });
     return { esiti, motivo: '' };
   } catch (e) {
@@ -582,19 +598,56 @@ function leggiJson(file) {
   try { return JSON.parse(readFileSync(file, 'utf8')); } catch (_) { return null; }
 }
 
-/** Dal rapporto JSON di Playwright, `{ titolo: ok }` per ogni caso (describe compresi, il file no); null senza. PURA. */
-export function casiDalReport(rapporto) {
-  if (!rapporto || typeof rapporto !== 'object' || !Array.isArray(rapporto.suites)) return null;
-  const casi = {};
+const valido = (rapporto) => !!rapporto && typeof rapporto === 'object' && Array.isArray(rapporto.suites);
+
+function visitaCasi(rapporto, fai) {
   const visita = (suite, sopra) => {
-    for (const s of Array.isArray(suite?.specs) ? suite.specs : []) {
-      const t = [...sopra, String(s?.title ?? '')].join(' › ');
-      casi[t] = casi[t] !== false && s?.ok !== false;
-    }
+    for (const s of Array.isArray(suite?.specs) ? suite.specs : []) fai([...sopra, String(s?.title ?? '')].join(' › '), s);
     for (const figlia of Array.isArray(suite?.suites) ? suite.suites : []) visita(figlia, [...sopra, String(figlia?.title ?? '')]);
   };
   for (const file of rapporto.suites) visita(file, []);
+}
+
+const corse = (s) => (Array.isArray(s?.tests) ? s.tests.filter((t) => t && typeof t === 'object') : []);
+const segnata = (t) => t.expectedStatus === 'failed';
+const corpoPassato = (t) => t.status === 'skipped' || (Array.isArray(t.results) ? t.results : []).some((r) => r?.status === 'passed');
+
+// Playwright rovescia l'esito di un caso segnato come rosso atteso (test.fail): per il giro conta quello che fa il corpo (#932).
+function casoVerde(s) {
+  const l = corse(s);
+  if (!l.length) return s?.ok !== false;
+  return l.every((t) => (segnata(t) ? corpoPassato(t) : (t.status ? t.status !== 'unexpected' : s?.ok !== false)));
+}
+
+/** Dal rapporto JSON di Playwright, `{ titolo: verde }` per ogni caso (describe compresi, il file no); null senza. PURA. */
+export function casiDalReport(rapporto) {
+  if (!valido(rapporto)) return null;
+  const casi = {};
+  visitaCasi(rapporto, (t, s) => { casi[t] = casi[t] !== false && casoVerde(s); });
   return casi;
+}
+
+/**
+ * L'esito di un rilancio: `rossa`, `casi` (casiDalReport) e `attesi`, i casi segnati come rosso atteso col corpo ancora
+ * rosso. Un'uscita diversa da 0 che spiegano solo rossi attesi col corpo verde non è un rosso: è una porta chiusa. PURA.
+ */
+export function esitoDelRilancio(status, rapporto) {
+  const casi = casiDalReport(rapporto);
+  const attesi = new Set();
+  let inattese = 0;
+  let chiuse = 0;
+  if (casi) {
+    visitaCasi(rapporto, (titolo, s) => {
+      for (const t of corse(s)) {
+        if (segnata(t) && !corpoPassato(t)) attesi.add(titolo);
+        if (t.status === 'unexpected') { inattese += 1; if (segnata(t) && corpoPassato(t)) chiuse += 1; }
+      }
+    });
+  }
+  const errori = valido(rapporto) && Array.isArray(rapporto.errors) && rapporto.errors.length > 0;
+  const spiegata = inattese > 0 && inattese === chiuse && !errori;
+  const rossa = typeof status !== 'number' || errori || (!!casi && Object.values(casi).includes(false)) || (status !== 0 && !spiegata);
+  return { rossa, casi, attesi: [...attesi] };
 }
 
 const ultimo = (t) => String(t).split(' › ').pop();
@@ -763,6 +816,6 @@ export function controllaProveTolte({
   return esitoProveTolte({
     rosse: r.rosse.filter((f) => prove.includes(f)), dallaPulizia: r.rosse.filter((f) => accorciate.includes(f)),
     shaPrima, conPulizia, messi, via: { ...(pulite ? pulite.via : {}), ...dal.via },
-    numeri, casi: r.casi, vecchie: vecchie || [], comando,
+    numeri, casi: r.casi, vecchie: vecchie || [], comando, segnate: r.segnate,
   });
 }

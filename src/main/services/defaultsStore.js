@@ -626,10 +626,10 @@ async function setAutomationAutoApprove(partial, idToken) {
 }
 
 // ── Ciò che le routine devono sapere (config/routines) ──────────────────────
-// Interruttore master, esplorazione a coda vuota e tentativi del loop vivono in
-// un documento SEPARATO da config/automation, e leggibile senza credenziali.
+// Interruttore master e tentativi del loop vivono in un documento SEPARATO da
+// config/automation, e leggibile senza credenziali.
 //
-// Perché separato: chi legge queste tre cose sono le macchine delle routine, che
+// Perché separato: chi legge queste cose sono le macchine delle routine, che
 // non hanno nessuna credenziale. Finché stavano nel documento admin-only la
 // lettura falliva sempre, in silenzio, e si ricadeva sui default: in dashboard
 // sembravano attive, ma nessuna routine le ha mai viste (stessa radice del
@@ -652,28 +652,6 @@ async function getRoutinesEnabled(idToken) {
 async function setRoutinesEnabled(on, idToken) {
   if (!idToken) throw new Error('Serve un ID token admin per accendere o spegnere le routine.');
   await patchDoc(ROUTINES_DOC, { enabled: toFsValue(Boolean(on)) }, ['enabled'], idToken);
-  return Boolean(on);
-}
-
-// Esplorazione automatica a coda vuota (campo `proberWhenIdle`): quando non c'è
-// più niente da lavorare, le routine vanno a cercare problemi che nessuno ha
-// segnalato. Campo assente ⇒ true (il comportamento che c'è sempre stato): solo
-// un `false` scritto apposta ferma l'esplorazione.
-async function getAutomationProberIdle(idToken) {
-  // SOLO config/routines: è il documento che il server legge davvero. Il
-  // ripiego sul documento vecchio (config/automation) mostrava all'owner un
-  // valore che il server ignorava — la manopola girava, le ruote no. È già
-  // successo: la migrazione ha seminato i default nel documento nuovo e le
-  // scelte fatte prima (esplorazione spenta, tetto a 5) sono rimaste in
-  // ombra nel vecchio, mai più lette da nessuno.
-  const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  if (doc && typeof doc.proberWhenIdle === 'boolean') return doc.proberWhenIdle;
-  return true;
-}
-
-async function setAutomationProberIdle(on, idToken) {
-  if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'esplorazione automatica.');
-  await patchDoc(ROUTINES_DOC, { proberWhenIdle: toFsValue(Boolean(on)) }, ['proberWhenIdle'], idToken);
   return Boolean(on);
 }
 
@@ -724,9 +702,9 @@ function clampCap(n) {
 }
 
 async function getRoutineCaps(idToken) {
-  // SOLO config/routines: è il documento che il server legge davvero, e
-  // mostrare un valore pescato altrove significa mostrare una regola che
-  // nessuno applica (vedi il commento in getAutomationProberIdle).
+  // SOLO config/routines: è il documento che il server legge davvero. Un
+  // ripiego sul vecchio config/automation mostrava valori che il server
+  // ignorava: la manopola girava, le ruote no.
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   // `null` = non ho potuto leggere: dirlo, o «spento» e «non impostato» sembrano parole del server.
   if (doc === null) throw new Error('Impostazioni del giro di verifica non raggiungibili.');
@@ -860,7 +838,7 @@ async function setRedteamOpen(on, idToken) {
 }
 
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
-// Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
+// Le impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
 // src/shared/wallet.js: qui si applica, non si ridichiara.
 //
@@ -951,8 +929,6 @@ module.exports = {
   setAutomationGate,
   getAutomationAutoApprove,
   setAutomationAutoApprove,
-  getAutomationProberIdle,
-  setAutomationProberIdle,
   getLavoriServer,
   setLavoriServer,
   getRoutinesEnabled,

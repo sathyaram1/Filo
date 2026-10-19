@@ -341,7 +341,20 @@ export function exitCodeFor(reply) {
   if (r.ok === true && r.result === 'blocked') return 10;
   // Unit rossi sul risultato della fusione (#929): come un conflitto, il server ha già instradato il riallineamento.
   if (r.ok === true && (r.result === 'conflict' || r.result === 'unit_rossi')) return 20;
+  // Lavoro server (#1159 fase 2): la parte del server la segue il server, chi chiede non fa niente.
+  if (r.ok === true && r.result === 'server') return 30;
   return 1;
+}
+
+/** Cosa sta facendo il server con la parte del server di un lavoro server. PURA. */
+export function testoEsitoServer(esito) {
+  const testi = {
+    attesa_suite: 'il cancello aspetta la suite di filo-security verde sul commit da fondere, e riprova da sé (prima l’app, poi il server)',
+    attesa_pc: 'il lavoro lo porta su main il PC dell’owner, prima la parte dell’app e poi il ramo del server',
+    rimandato: 'il ramo del server torna alle routine (suite rossa o conflitto con main del server)',
+    all_owner: 'il lavoro sul server non è fidato: decide l’owner',
+  };
+  return `${testi[esito] || `esito «${String(esito || '?')}»`}. Niente da fare qui: rilascia il biglietto.`;
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
@@ -494,6 +507,7 @@ async function main() {
     console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
   }
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
+  else if (code === 30) console.error(`[merge-gate] SERVER: ${testoEsitoServer(reply.esito)}`);
   else console.error(testoRifiutoServer(reply.reason) || `[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
   process.exit(code);
 }

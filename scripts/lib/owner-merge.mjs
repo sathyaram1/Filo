@@ -395,3 +395,80 @@ export function erroreDiConnessione(e) {
   return /^(ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|UND_ERR_SOCKET|UND_ERR_CLOSED)$/.test(codice)
     || (e instanceof TypeError && /fetch failed/i.test(String(e.message || '')));
 }
+
+// ── Il ramo del server, dopo il passo 10 (#1159 fase 2) ─────────────────────
+// Su main di filo-security scrive solo il cancello: server:fondi prova la spinta e, rifiutata, chiede a lui.
+
+const ESITI_SERVER = new Set(['merged', 'aspetta_suite', 'suite_rossa', 'non_rapido', 'rifiutata', 'main_moved']);
+
+/** La risposta di ownerMerge con `repo: 'server'` in un esito. PURA. */
+export function classifyServerMerge(status, body) {
+  const b = body || {};
+  const r = b.result || {};
+  const errMsg = String((b.error && b.error.message) || '');
+  if (status === 200 && r.ok === true && ESITI_SERVER.has(String(r.result))) {
+    const out = { outcome: String(r.result) };
+    for (const k of ['sha', 'url', 'detail', 'mainSha']) if (r[k]) out[k] = String(r[k]);
+    return out;
+  }
+  if (status === 200 && r.ok === true) return { outcome: 'fault', reason: `risposta inattesa: ${String(r.result || '')}` };
+  if (status === 200) {
+    const reason = String(r.reason || '');
+    if (reason === 'github_unreachable' || /^github_5/.test(reason)) return { outcome: 'unreachable', reason };
+    return { outcome: 'fault', reason: `${reason || 'guasto senza motivo'}${r.detail ? `: ${String(r.detail).slice(0, 200)}` : ''}` };
+  }
+  if (status === 404) return { outcome: 'not_deployed', reason: errMsg };
+  if (status === 401 || status === 403) return { outcome: 'denied', reason: errMsg };
+  if (status === 400) return { outcome: 'rejected', reason: errMsg };
+  if (status === 0 || status >= 500) return { outcome: 'unreachable', reason: errMsg || `http_${status}` };
+  return { outcome: 'fault', reason: errMsg || `http_${status}` };
+}
+
+/** La riga per l'owner. PURA. */
+export function messageForServerMerge(reply, ramo = 'il ramo') {
+  const r = reply || {};
+  const sha = String(r.sha || '').slice(0, 9);
+  switch (r.outcome) {
+    case 'merged': return `Il cancello ha portato ${ramo} su main di filo-security${sha ? ` (${sha})` : ''}. La pubblicazione la fa GitHub (deploy.yml).`;
+    case 'aspetta_suite': return `La suite di filo-security su ${sha || 'quel commit'} non è ancora verde${r.url ? ` (${r.url})` : ''}: rilancia lo stesso comando quando lo è.`;
+    case 'suite_rossa': return `La suite di filo-security è rossa su ${sha || 'quel commit'}${r.url ? ` (${r.url})` : ''}: correggi il ramo, spingi e rilancia.`;
+    case 'non_rapido': return `${ramo} non contiene main di filo-security: nel ramo git merge origin/main, prove, spinta, poi rilancia.`;
+    case 'rifiutata': return `Anche il cancello è stato rifiutato da GitHub (${String(r.detail || '').slice(0, 160)}): controlla il bypass della regola di main di filo-security.`;
+    case 'main_moved': return 'main di filo-security si è mosso mentre il cancello fondeva: rilancia lo stesso comando.';
+    case 'no_owner_credential': return 'Su questa macchina non c’è la credenziale admin per chiedere la fusione al server.';
+    case 'not_deployed': return 'Il server non conosce ancora la fusione del ramo del server (ownerMerge senza repo «server»): va pubblicato il server della fase 2.';
+    case 'denied': return `Il server non riconosce l’owner: ${String(r.reason || '').slice(0, 160)}`;
+    case 'rejected': return `Il server rifiuta la richiesta: ${String(r.reason || '').slice(0, 200)}`;
+    case 'unreachable': return `Server non raggiungibile: ${String(r.reason || '').slice(0, 200)}`;
+    default: return `Fusione del server non riuscita: ${String(r.reason || 'motivo non detto').slice(0, 200)}`;
+  }
+}
+
+/**
+ * «Porta questo sha del ramo del server su main di filo-security»: ownerMerge con `repo: 'server'`. Ritorna sempre un
+ * esito classificato, mai un'eccezione.
+ */
+export async function askServerMergeServer({ branch, sha, feedbackId, fetchImpl = fetch, mintImpl = fetch, attese = null, url = OWNER_MERGE_URL } = {}) {
+  const refresh = findAdminRefreshToken();
+  if (!refresh) return { outcome: 'no_owner_credential' };
+  let idToken;
+  try {
+    idToken = await mintIdToken(refresh, { fetchImpl: mintImpl, ...(attese ? { attese } : {}) });
+  } catch (e) {
+    if (e && e.credenziale) return { outcome: 'denied', reason: `il servizio dei token ha rifiutato la credenziale (${e.status})` };
+    return { outcome: 'unreachable', reason: String((e && (e.motivo || e.message)) || e).slice(0, 300) };
+  }
+  try {
+    const res = await fetchRitentato(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ data: { repo: 'server', branch: String(branch || ''), sha: String(sha || ''), feedbackId: String(feedbackId || '') } }),
+    }, { fetchImpl, ...(attese ? { attese } : {}) });
+    const text = await res.text();
+    let body = {};
+    try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
+    return classifyServerMerge(res.status, body);
+  } catch (e) {
+    return { outcome: 'unreachable', reason: `rete verso il server: ${descriviErroreDiRete(e)}`.slice(0, 300) };
+  }
+}

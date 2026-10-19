@@ -389,6 +389,24 @@
         .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
       if (letti.length) out.letti = letti;
       if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+      // Un messaggio che Filo ha scritto di sua iniziativa (#869), e le cose successe che l'hanno fatto nascere.
+      if (turn.spontaneo) {
+        out.spontaneo = true;
+        const motivi = (Array.isArray(turn.motivi) ? turn.motivi : [])
+          .filter((m) => m && typeof m.tipo === 'string')
+          .map((m) => ({ tipo: m.tipo.slice(0, 20), testo: String(m.testo == null ? '' : m.testo).slice(0, 300) }));
+        if (motivi.length) out.motivi = motivi.slice(-50);
+        // Riscrive il messaggio spontaneo che lo precede invece di aggiungersi (src/shared/filoCoda.js, siFonde).
+        if (turn.fonde) out.fonde = true;
+      }
+      // Di una finestra guardata resta il nome (#778): l'immagine e quello che c'era non entrano nell'archivio.
+      const guardate = [
+        ...(Array.isArray(turn.guardate) ? turn.guardate : []),
+        ...(Array.isArray(turn.actions) ? turn.actions : [])
+          .filter((a) => a && String(a.type || '').toUpperCase() === 'VEDI_SCHERMO' && a._executed !== false && a._output && a._output.testo)
+          .map((a) => a._output.finestra),
+      ].filter((n) => typeof n === 'string' && n.trim()).map((n) => n.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120));
+      if (guardate.length) out.guardate = [...new Set(guardate)].slice(0, 20);
       // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
       const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
       if (cambi.length) out.cambi = cambi;

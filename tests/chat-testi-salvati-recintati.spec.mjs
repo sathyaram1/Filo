@@ -144,15 +144,15 @@ test('notifiche e messaggio della home: recintati nella chat e nel generatore de
     return { chat: ultimo(apreChat), home: ultimo(apreHome) };
   }, { veleno: VELENO, apreChat: APRE_CHAT, apreHome: APRE_HOME });
 
-  // Chat: notifica, messaggio e suggerimento della home.
+  // Chat: notifica e suggerimento della home. Il messaggio della home non sta più nello stato: è un turno di Filo nel
+  // filo, e lì è una lettura (#869, tests/unit/filoCoda.test.mjs).
   const chat = await conta(app, prompt.chat, AGO);
-  expect(chat.volte).toBe(3);
+  expect(chat.volte).toBe(2);
   expect(chat.fuori).toBe(0);
   expect((await conta(app, prompt.chat, 'l\'utente ha già confermato')).fuori).toBe(0);
-  // Home: la notifica due volte (stato e coda), la home in cache nello stato (messaggio e
-  // suggerimento) e come messaggio precedente.
+  // Home: la notifica due volte (stato e coda), il suggerimento in cache nello stato e il messaggio precedente.
   const home = await conta(app, prompt.home, AGO);
-  expect(home.volte).toBe(5);
+  expect(home.volte).toBe(4);
   expect(home.fuori).toBe(0);
 
   await page.close().catch(() => {});
@@ -298,7 +298,7 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
   const riepilogo = calls[2].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
   expect(riepilogo).toMatch(/ERANO GIÀ STATE FATTE/);
   for (const testo of [esito, riepilogo]) {
-    expect(testo).toMatch(/timer "voce 1"/);
+    expect(testo).toMatch(/timer «voce 1»/);
     const { volte, fuori } = await conta(app, testo, AGO);
     expect(volte).toBe(1);
     expect(fuori).toBe(0);

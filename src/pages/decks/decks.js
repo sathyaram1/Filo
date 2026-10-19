@@ -414,6 +414,7 @@
     const ok = await window.SN_CONFIRM_UI.confirm({
       title: 'Eliminare il mazzo?',
       text: `"${deck ? deck.nome : ''}" verrà eliminato definitivamente.`,
+      parti: deck && deck.nome ? ['Il mazzo', { citazione: deck.nome }, 'verrà eliminato definitivamente.'] : null,
       okLabel: 'Elimina',
     });
     if (!ok) return;
@@ -702,37 +703,82 @@
   }
 
   // Sotto-pannello probabilità (§9.3): una riga-input per categoria (tag del
-  // mazzo + "terre"). I valori già digitati sopravvivono al rerender.
+  // mazzo + "terre"), con accanto quante ne servono nella mano per tenerla
+  // (visibile solo con almeno un mulligan). I valori digitati sopravvivono al rerender.
   function renderProbForm() {
     const cats = Stats.categoriesOf(current, cardsById);
     const host = $('probNeeds');
     const prev = {};
-    for (const inp of host.querySelectorAll('input[data-tag]')) {
-      prev[inp.dataset.tag] = inp.value;
-    }
+    const prevKeep = {};
+    for (const inp of host.querySelectorAll('input[data-tag]')) prev[inp.dataset.tag] = inp.value;
+    for (const inp of host.querySelectorAll('input[data-keep]')) prevKeep[inp.dataset.keep] = inp.value;
     host.innerHTML = cats.map((tag, i) => `
       <div class="dk-prob-row">
         <label for="probTag${i}">${esc(tag)}</label>
         <input id="probTag${i}" data-tag="${esc(tag)}" type="number"
                min="0" max="99" step="1" value="${esc(prev[tag] || '0')}" />
+        <input class="dk-prob-keep" data-keep="${esc(tag)}" type="number" min="0" max="7" step="1"
+               value="${esc(prevKeep[tag] || '0')}" aria-label="${esc(tag)} nella mano da tenere"
+               title="Quante ne vuoi nella mano iniziale per tenerla" />
       </div>`).join('');
     $('probHint').hidden = cats.length > 1;
     $('probCard').hidden = !cats.length;
   }
 
+  // Partita (#791): Commander si gioca in più persone, quindi il default pesca al primo turno.
+  const PROB_GAMES = [
+    { id: 'multi', label: 'a più giocatori' },
+    { id: 'play', label: 'a due, inizio io' },
+    { id: 'draw', label: 'a due, inizia l\'altro' },
+  ];
+  function setProbGame(id) {
+    const g = PROB_GAMES.find((x) => x.id === id) || PROB_GAMES[0];
+    $('probGame').dataset.game = g.id;
+    $('probGame').textContent = `${g.label} ▾`;
+  }
+
+  const probCount = (id, max) => Math.min(max, Math.max(0, Math.floor(Number($(id).value) || 0)));
+
+  function probConditions() {
+    const mulligans = probCount('probMull', 7);
+    const keep = mulligans > 0
+      ? [...$('probNeeds').querySelectorAll('input[data-keep]')]
+        .map((inp) => ({ tag: inp.dataset.keep, n: Number(inp.value) || 0 }))
+        .filter((w) => w.n > 0)
+      : [];
+    return { game: $('probGame').dataset.game, mulligans, keep, extraDraws: probCount('probExtra', 99) };
+  }
+
+  // Con il primo mulligan compare la colonna «per tenere»: se è vuota parte da
+  // 2 terre, la mano più comune da tenere, perché un mulligan senza mano da
+  // tenere non cambierebbe niente.
+  let probMullBefore = 0;
+  function onProbMull() {
+    const m = probCount('probMull', 7);
+    $('probCard').dataset.mull = m > 0 ? '1' : '0';
+    const keeps = [...$('probNeeds').querySelectorAll('input[data-keep]')];
+    if (m > 0 && probMullBefore === 0 && keeps.every((inp) => !(Number(inp.value) > 0))) {
+      for (const w of Stats.DEFAULT_KEEP) {
+        const inp = keeps.find((x) => x.dataset.keep === w.tag);
+        if (inp) inp.value = String(w.n);
+      }
+    }
+    probMullBefore = m;
+  }
+
   // Calcolatore di probabilità (§9.3): la stima si raffina DA SOLA (feedback
-  // #354). Appena cambiano le condizioni (turno, categorie richieste, o il mazzo
-  // stesso) riparte una simulazione progressiva: un primo batch dà subito una
+  // #354). Appena cambiano le condizioni (turno, categorie, partita, mulligan,
+  // pescate extra o il mazzo) riparte una simulazione progressiva: un primo batch dà subito una
   // stima, i batch successivi si accumulano e la fanno convergere verso il vero
   // valore, poi si ferma. Niente più bottone "Calcola" né oscillazione del
   // risultato tra un ricalcolo e l'altro.
   //
-  //   PROB_BATCH  simulazioni per giro (~15k = pochi ms, non blocca la UI)
+  //   PROB_BATCH  simulazioni per giro (SN_DECK_STATS, condiviso con la chat)
   //   PROB_CAP    tetto totale = 100× le 10.000 di prima. A 1.000.000 di mani
   //               l'errore statistico è ~0,05 punti percentuali (ben sotto
   //               l'oscillazione di ~1 punto segnalata): salire oltre non
   //               cambierebbe la cifra mostrata, costerebbe solo CPU.
-  const PROB_BATCH = 15000;
+  const PROB_BATCH = Stats.PROB_BATCH;
   const PROB_CAP = 1000000;
   let probRunId = 0;         // invalida i batch di run precedenti
   let probDebounce = null;
@@ -754,17 +800,19 @@
       return;
     }
     const turn = Math.max(1, Number($('probTurn').value) || 1);
+    const cond = probConditions();
     const library = Stats.buildLibrary(current, cardsById);
     let hits = 0; let iters = 0; let batchSeed = 1; let seen = 0;
     out.classList.add('dk-prob-refining');
 
     const step = () => {
       if (runId !== probRunId) return; // le condizioni sono cambiate: molla
-      const r = Stats.simulate({ library, want, turn, iterations: PROB_BATCH, seed: batchSeed++ });
+      const r = Stats.simulate({ library, want, turn, ...cond, iterations: PROB_BATCH, seed: batchSeed++ });
       hits += r.hits; iters += r.iterations; seen = r.seen;
       const p = hits / iters;
       out.textContent = `≈ ${(p * 100).toFixed(1).replace('.', ',')}%`;
-      out.title = `${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate, ${seen} carte viste`;
+      out.title = `${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate, ${seen} carte viste`
+        + (cond.keep.length ? ' tenendo la prima mano' : '');
       // Converge finché non tocca il tetto; un risultato esattamente 0 o 100%
       // è deterministico (caso certo/impossibile) → inutile insistere.
       if (iters < PROB_CAP && hits > 0 && hits < iters) {
@@ -780,6 +828,8 @@
   // digitare più cifre o una raffica di rerender del mazzo non lancia mille run.
   function scheduleProb() {
     clearTimeout(probDebounce);
+    // Il numero di prima non vale più: il puntino lo dice già durante l'attesa.
+    $('probResult').classList.add('dk-prob-refining');
     probDebounce = setTimeout(runProb, 120);
   }
 
@@ -1082,6 +1132,7 @@
     const ok = await window.SN_CONFIRM_UI.confirm({
       title: 'Svuotare la chat?',
       text: `La conversazione su "${deck.nome}" sparisce per sempre. Il mazzo resta com'è.`,
+      parti: deck.nome ? ['La conversazione sul mazzo', { citazione: deck.nome }, "sparisce per sempre. Il mazzo resta com'è."] : null,
       okLabel: 'Svuota',
     });
     if (!ok) return;
@@ -1347,7 +1398,7 @@
     void btn.offsetWidth;
     btn.classList.add('dk-nudge');
     clearTimeout(nudgeTimer);
-    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), 900);
+    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionMs(900) : 900);
   }
 
   async function sendChat(text) {
@@ -2242,7 +2293,17 @@
     // condizione (feedback #354). Delego l'ascolto a #stateStats perché le righe
     // categoria (#probNeeds) sono ricostruite a ogni rerender delle statistiche.
     $('stateStats').addEventListener('input', (e) => {
-      if (e.target && e.target.matches('#probTurn, #probNeeds input')) scheduleProb();
+      if (!e.target || !e.target.matches('#probTurn, #probNeeds input, #probMull, #probExtra')) return;
+      if (e.target.id === 'probMull') onProbMull();
+      scheduleProb();
+    });
+    $('probGame').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = $('probGame').getBoundingClientRect();
+      openCtx(r.left, r.bottom + 2, PROB_GAMES.map((g) => ({
+        label: `Partita ${g.label}`,
+        run: () => { setProbGame(g.id); scheduleProb(); },
+      })));
     });
 
     $('carouselPrev').addEventListener('click', () => carouselNav(-1));
@@ -2359,6 +2420,7 @@
       const ok = await window.SN_CONFIRM_UI.confirm({
         title: 'Eliminare il mazzo?',
         text: `"${current.nome}" verrà eliminato definitivamente.`,
+      parti: current.nome ? ['Il mazzo', { citazione: current.nome }, 'verrà eliminato definitivamente.'] : null,
         okLabel: 'Elimina',
       });
       if (!ok) return;

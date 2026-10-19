@@ -4,6 +4,23 @@
 
 const { pageHints } = require('../../content/safebrowseHints.js');
 
+// Il puntatore che resta fermo su un link accorciato (#966), e quanto prima deve averlo portato lì un input vero.
+const SOSTA_MS = 500;
+const GESTO_MS = 1000;
+// Solo il dito: scorrere e pizzicare arrivano anche dal touchpad.
+const TOCCO = /^(touch|gesture(TapDown|ShowPress|Tap|TapCancel|ShortPress|LongPress|LongTap|TwoFingerTap|TapUnconfirmed|DoubleTap)$)/;
+// Anche la pagina che l'utente fa scorrere (rotella, touchpad, tasti) porta un link sotto il puntatore fermo.
+const SCORRE = /^(mouseWheel|gesture(Scroll|Fling|Pinch))/;
+const TASTI_GESTO = new Set(['Tab', 'PageDown', 'PageUp', 'End', 'Home', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', ' ']);
+const GRADI = { safe: 0, sospetto: 1, pericoloso: 2 };
+const grado = (level) => GRADI[level] || 0;
+// #965 — lotti di link in attesa per scheda (la pagina ne manda uno alla volta), e link da avviso tenuti pronti.
+const LINK_IN_CODA = 4;
+const LINK_SEGNALATI_MAX = 10000;
+let avvisiDiLink = 0;
+// Il mondo dei content script della pagina (src/content/safebrowseLinks.js).
+const MONDO_SCRIPT = 999;
+
 // In un riquadro di un altro sito la pagina sopra non si legge: se è lei a nasconderlo (trasparente, ritagliato,
 // coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.
 const CODICE_RIQUADRO = `(async () => {
@@ -49,7 +66,8 @@ const safebrowseMethods = {
     return verdict;
   },
 
-  // Un verdetto arrivato in ritardo per un sito da cui la scheda è già andata via non vale più.
+  // Un verdetto arrivato in ritardo per un sito da cui la scheda è già andata via non vale più. Quello della pagina che
+  // risulta pulita non toglie l'avviso di un link cliccato da lei (`prima`, #965), che aspetta la scelta dell'utente.
   _sbMostra(tab, url, verdict) {
     const wc = tab && tab.view && tab.view.webContents;
     if (!wc || wc.isDestroyed()) return;
@@ -58,8 +76,9 @@ const safebrowseMethods = {
     // È anche l'input «sito flaggato» delle regole geo-block (#151), che non devono aggirare i controlli di sicurezza.
     tab.sbLevel = level;
     const prima = JSON.stringify(tab.sbAvviso || null);
+    const delLink = tab.sbAvviso && tab.sbAvviso.prima ? tab.sbAvviso : null;
     tab.sbAvviso = (level === 'pericoloso' || level === 'sospetto')
-      ? { level, message: verdict.message || null, url: url || wc.getURL() } : null;
+      ? { level, message: verdict.message || null, url: url || wc.getURL() } : delLink;
     if (tab.id === this.activeId && JSON.stringify(tab.sbAvviso) !== prima) this.layout();
     if (tab.sbAvviso && tab._sbFinestrelle) for (const segui of [...tab._sbFinestrelle]) { try { segui(); } catch (_) {} }
   },
@@ -85,6 +104,92 @@ const safebrowseMethods = {
     return globalThis.SN_SAFEBROWSE.analyze(url, { ...ctx, incognito: !!this.incognito }, onUpdate);
   },
 
+  // Lo stesso per un link non ancora aperto: in incognito niente finestra nascosta.
+  _sbPreverifica(url, pagina) {
+    return globalThis.SN_SAFEBROWSE.preverifica(url, { pagina, incognito: !!this.incognito });
+  },
+
+  // Il puntatore fermo mezzo secondo su un link accorciato o di rimando ne prepara il verdetto prima del clic (#966).
+  // Il link sotto il puntatore e un input vero (mouse, scorrimento, Tab) vicini nel tempo, in qualunque ordine: una
+  // pagina che cambia il link sotto un mouse fermo non fa partire niente, e col dito resta il controllo all'apertura.
+  _sbSeguiPuntatore(tab, wc) {
+    let timer = null;
+    let gestoAlle = 0;
+    let dito = false;
+    // `sotto`: l'accorciato sotto il puntatore, anche se arrivato senza gesto; `armato`: quello per cui la sosta è partita.
+    let sotto = '';
+    let armato = '';
+    const ferma = () => { clearTimeout(timer); timer = null; };
+    const arma = () => {
+      if (!sotto || sotto === armato || dito || Date.now() - gestoAlle > GESTO_MS) return;
+      ferma();
+      const url = armato = sotto;
+      timer = setTimeout(() => {
+        timer = null;
+        if (wc.isDestroyed()) return;
+        try { this._sbPreverifica(url, wc.getURL()); } catch (_) {}
+      }, SOSTA_MS);
+    };
+    wc.on('input-event', (_e, input) => {
+      const t = (input && input.type) || '';
+      if (TOCCO.test(t)) { dito = true; ferma(); return; }
+      if (t === 'mouseDown') { dito = false; ferma(); return; }
+      if (t === 'mouseMove') dito = false;
+      else if (!SCORRE.test(t) && !(t === 'rawKeyDown' && TASTI_GESTO.has(input.key))) return;
+      gestoAlle = Date.now();
+      arma();
+    });
+    wc.on('update-target-url', (_e, url) => {
+      ferma();
+      const SB = globalThis.SN_SAFEBROWSE;
+      sotto = url && SB && SB.tipoLink(url) ? url : '';
+      armato = '';
+      arma();
+    });
+    // Il link da cui parte una navigazione: il suo verdetto vale per la pagina dove arriva (vedi _sbConLink).
+    const segna = (url, principale, redirect) => {
+      if (principale === false) return;
+      const SB = globalThis.SN_SAFEBROWSE;
+      const voce = SB && url ? SB.preverdetto(url) : null;
+      if (!redirect) tab._sbLinkInArrivo = null;
+      if (!voce || tab._sbLinkInArrivo) return;
+      tab._sbLinkInArrivo = url;
+      // Il controllo ancora in corso al clic: il suo verdetto raggiunge la pagina appena arriva.
+      if (!voce.finito) voce.pronto.then(() => this._sbLinkPronto(tab, url)).catch(() => {});
+    };
+    wc.on('did-start-navigation', (_e, url, inPagina, principale) => {
+      if (principale === false || inPagina) return;
+      ferma();
+      sotto = '';
+      segna(url, principale, false);
+    });
+    wc.on('did-redirect-navigation', (_e, url, _inPagina, principale) => segna(url, principale, true));
+    wc.once('destroyed', ferma);
+  },
+
+  // Il verdetto della pagina, o quello del link accorciato che l'ha portata qui se è più grave: la destinazione può
+  // sembrare pulita mentre il link, o un suo passaggio, è in lista. La conferma vale per il sito della pagina.
+  _sbConLink(tab, url, verdict) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const voce = tab._sbLink && SB ? SB.preverdetto(tab._sbLink) : null;
+    const v = voce && voce.verdetto;
+    if (!v || grado(v.level) <= grado(verdict && verdict.level)) return verdict;
+    return { ...v, norm: verdict ? verdict.norm : null, scope: SB.scopeOf(url) };
+  },
+
+  _sbDellaScheda(tab, url, verdict) {
+    return this._sbApplyState(tab, this._sbConLink(tab, url, verdict));
+  },
+
+  // Arriva solo ad alzare l'avviso: quello a schermo può venire da indizi della pagina che qui non si rivedono.
+  _sbLinkPronto(tab, link) {
+    const wc = tab.view && tab.view.webContents;
+    if (tab._sbLink !== link || !wc || wc.isDestroyed()) return;
+    const url = tab._urlNavigato;
+    const v = url && this._sbConLink(tab, url, { level: 'safe' });
+    if (v && grado(v.level) > grado(tab.sbLevel)) this._sbMostra(tab, url, this._sbApplyState(tab, v));
+  },
+
   // Chiesto dal content script (SAFEBROWSE_GET) all'apertura del documento e quando compaiono campi sensibili: il
   // verdetto sincrono si mostra subito, quello dei segnali di rete quando arriva.
   safebrowseGet(tabId, url, ctx = {}) {
@@ -96,12 +201,12 @@ const safebrowseMethods = {
     let verdict;
     try {
       verdict = this._sbAnalizza(url, { ...ctx, budgetUrl: tab._urlNavigato }, (next) => {
-        this._sbMostra(tab, url, this._sbApplyState(tab, next));
+        this._sbMostra(tab, url, this._sbDellaScheda(tab, url, next));
       });
     } catch (_) {
       return { ok: true, level: 'safe', message: null };
     }
-    const applied = this._sbApplyState(tab, verdict);
+    const applied = this._sbDellaScheda(tab, url, verdict);
     this._sbMostra(tab, url, applied);
     return {
       ok: true,
@@ -111,11 +216,151 @@ const safebrowseMethods = {
     };
   },
 
+  // #965 — I link che la pagina mostra, ai soli controlli locali appena arrivano: un lotto alla volta per scheda, a
+  // fette, così migliaia di link non fermano Filo. Restano quelli da avviso, pronti per il clic, del documento che li ha
+  // mandati. Una pagina che riempisse la coda o la memoria non toglie niente: al clic il link si giudica comunque.
+  safebrowseLinks(tabId, urls) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const tab = this.tabs.find((t) => t.id === tabId);
+    if (!SB || !tab || !Array.isArray(urls)) return Promise.resolve({ ok: false });
+    if ((tab._sbLinkInCoda || 0) >= LINK_IN_CODA) return Promise.resolve({ ok: false, error: 'occupato' });
+    tab._sbLinkInCoda = (tab._sbLinkInCoda || 0) + 1;
+    const giro = tab._sbLinkGiro || 0;
+    const wc = tab.view && tab.view.webContents;
+    const vivo = () => giro === (tab._sbLinkGiro || 0) && this.tabs.includes(tab) && !!wc && !wc.isDestroyed()
+      && tab.view.webContents === wc;
+    const esame = (tab._sbLinkCoda || Promise.resolve()).then(async () => {
+      const r = await SB.checkLinks(urls, { vivo });
+      if (!vivo()) return { ok: true, esaminati: 0 };
+      if (!tab._sbLinkSegnalati) tab._sbLinkSegnalati = new Map();
+      for (const s of r.segnalati) {
+        tab._sbLinkSegnalati.delete(s.url);
+        tab._sbLinkSegnalati.set(s.url, s);
+        if (tab._sbLinkSegnalati.size > LINK_SEGNALATI_MAX) tab._sbLinkSegnalati.delete(tab._sbLinkSegnalati.keys().next().value);
+      }
+      return { ok: true, esaminati: r.esaminati };
+    }).catch(() => ({ ok: false })).finally(() => { tab._sbLinkInCoda -= 1; });
+    tab._sbLinkCoda = esame;
+    return esame;
+  },
+
+  // Il verdetto di un link al clic: quello pronto dall'esame, o lo stesso esame adesso per un link nato dopo (o un
+  // indirizzo scritto da uno script). Vale quello che l'utente ha già confermato o chiuso in questa scheda.
+  // `nome`: il nome con cui arriva un file scaricato, che conta come il suo indirizzo.
+  _sbVerdettoLink(tab, url, nome = '') {
+    const SB = globalThis.SN_SAFEBROWSE;
+    if (!SB || typeof SB.checkLink !== 'function') return null;
+    let v = (tab._sbLinkSegnalati && tab._sbLinkSegnalati.get(url)) || null;
+    if (!v) { try { v = SB.checkLink(url, nome); } catch (_) { v = null; } }
+    if (!v) return null;
+    const a = this._sbApplyState(tab, v);
+    return a && (a.level === 'pericoloso' || a.level === 'sospetto') ? a : null;
+  },
+
+  // #965 — Un link da avviso non si apre prima dell'avviso: compare sulla pagina da cui parte, e «Procedi» o «Continua»
+  // fanno l'apertura che era stata chiesta (`apri(segna)`, che segna la conferma sulla scheda dove il sito si apre).
+  // Dalle pagine web; da una pagina di Filo solo un collegamento che Filo apre per lei (`daFilo`), mai il suo indirizzo. L'avviso
+  // della pagina stessa, se c'è, resta il suo. `nome`: vedi _sbVerdettoLink.
+  _sbPrimaDelClic(tab, url, apri, { nome = '', daFilo = false } = {}) {
+    if (!tab || (tab.isInternal !== false && !daFilo) || !/^https?:\/\//i.test(String(url || ''))) return false;
+    if (tab.sbAvviso && !tab.sbAvviso.prima) return false;
+    const v = this._sbVerdettoLink(tab, url, nome);
+    if (!v) return false;
+    // Ogni clic è un avviso nuovo, da ridisegnare da capo (conferma vuota, «Continua» da riarmare); lo stesso link
+    // chiesto di nuovo mentre è a schermo no.
+    const a = tab.sbAvviso;
+    const n = a && a.prima && a.url === String(url) && a.level === v.level ? a.prima.n : ++avvisiDiLink;
+    tab.sbAvviso = { level: v.level, message: v.message || null, url: String(url), prima: { apri, n } };
+    if (tab.id === this.activeId) this.layout();
+    return true;
+  },
+
+  // Il clic su un link «scarica» (attributo download), chiesto dal preload prima che lo scaricamento parta: vero se
+  // l'avviso lo ferma. Confermato, il link si riclicca nella pagina, che dà al file il suo nome.
+  _sbScaricamentoScelto(tab, url, nome) {
+    const wc = tab.view && tab.view.webContents;
+    if (!wc || wc.isDestroyed()) return false;
+    return this._sbPrimaDelClic(tab, url, (segna) => {
+      segna(tab);
+      this._sbRifaiDallaPagina(tab, 'SN_RISCARICA', url, () => { try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {} });
+    }, { nome });
+  },
+
+  // Uno scaricamento partito senza passare di lì (uno script, un nome dato dal sito): si giudica l'indirizzo cliccato
+  // col nome del file, e confermato riparte. Vero se l'avviso l'ha fermato. Un file che la pagina costruisce da sé
+  // (blob:, data:, come gli allegati delle chat) non ha un indirizzo suo: vale il sito della pagina col nome del file,
+  // e confermato la pagina lo riscarica con quel nome.
+  _sbScaricamento(tab, item) {
+    const wc = tab.view && tab.view.webContents;
+    if (!wc || wc.isDestroyed()) return false;
+    let url = '';
+    try { const c = item.getURLChain(); url = (Array.isArray(c) && c[0]) || item.getURL(); } catch (_) { url = ''; }
+    let nome = '';
+    try { nome = item.getFilename() || ''; } catch (_) {}
+    const costruito = /^(blob|data|filesystem):/i.test(url);
+    let giudicato = url;
+    if (costruito) {
+      let pagina = '';
+      try { pagina = wc.getURL(); } catch (_) {}
+      giudicato = (/^blob:/i.test(url) && sitoDellaPagina(url, [tab._urlNavigato])) || sitoDellaPagina(pagina, [tab._urlNavigato]) || '';
+    }
+    return this._sbPrimaDelClic(tab, giudicato, (segna) => {
+      segna(tab);
+      const scarica = () => { try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {} };
+      if (costruito) this._sbRifaiDallaPagina(tab, 'SN_RISCARICA', url, scarica, nome);
+      else scarica();
+    }, { nome });
+  },
+
+  // Un gesto della pagina fermato dall'avviso e confermato si rifà dalla pagina, uguale: l'invio di un modulo coi suoi
+  // dati (SN_RIFAI_INVIO), il link «scarica» col nome del suo file (SN_RISCARICA), che l'indirizzo da solo perderebbe.
+  // Se la pagina non ha più il gesto da rifare, `altrimenti`. Chi li tiene: il preload e src/content/safebrowseLinks.js.
+  _sbRifaiDallaPagina(tab, funzione, url, altrimenti, nome = '') {
+    const wc = tab.view && tab.view.webContents;
+    const code = `(() => { const f = globalThis.${funzione}; return typeof f === 'function' ? f(${JSON.stringify(String(url))}, ${JSON.stringify(String(nome))}) : false; })()`;
+    let p = null;
+    try { p = wc && !wc.isDestroyed() ? wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]) : null; } catch (_) { p = null; }
+    Promise.resolve(p).then((fatto) => { if (fatto !== true) altrimenti(); }, () => altrimenti());
+  },
+
+  // Le scelte sull'avviso di un link non ancora aperto: «Non aprire» lo toglie e basta, la conferma apre.
+  _sbSceltaPrima(tab, a, scelta, dati) {
+    const via = () => {
+      if (tab.sbAvviso !== a) return;
+      tab.sbAvviso = null;
+      if (tab.id === this.activeId) this.layout();
+    };
+    const procedi = scelta === 'procedi' && a.level === 'pericoloso' && String(dati.testo || '').trim().toLowerCase() === 'confermo';
+    const continua = scelta === 'continua' && a.level === 'sospetto';
+    if (procedi || continua) {
+      via();
+      let chiave = null;
+      try { chiave = globalThis.SN_SAFEBROWSE.scopeOf(a.url); } catch (_) {}
+      const segna = (t) => {
+        if (!t || !chiave) return;
+        this._sbState(t);
+        (procedi ? t.sbBypass : t.sbDismissed).add(chiave);
+      };
+      try { a.prima.apri(segna); } catch (_) {}
+    } else if (scelta === 'indietro') {
+      via();
+    }
+  },
+
   // did-navigate: ricontrolla l'URL FINALE (dopo i redirect). Una pagina che non è un sito (filo://, about:blank)
   // toglie l'avviso del documento di prima.
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!tab || !url) return;
+    tab._sbLink = tab._sbLinkInArrivo || null;
+    tab._sbLinkInArrivo = null;
+    // I link esaminati e l'avviso di un link cliccato erano del documento di prima.
+    tab._sbLinkGiro = (tab._sbLinkGiro || 0) + 1;
+    tab._sbLinkSegnalati = null;
+    if (tab.sbAvviso && tab.sbAvviso.prima) {
+      tab.sbAvviso = null;
+      if (tab.id === this.activeId) this.layout();
+    }
     const sito = sitoDellaPagina(url, [tab._urlNavigato, tab._sbApertaDa]);
     if (!sito) { this._sbMostra(tab, null, null); return; }
     if (!SB) return;
@@ -124,9 +369,9 @@ const safebrowseMethods = {
     tab._urlNavigato = sito;
     try {
       const verdict = this._sbAnalizza(sito, {}, (next) => {
-        this._sbMostra(tab, sito, this._sbApplyState(tab, next));
+        this._sbMostra(tab, sito, this._sbDellaScheda(tab, sito, next));
       });
-      this._sbMostra(tab, sito, this._sbApplyState(tab, verdict));
+      this._sbMostra(tab, sito, this._sbDellaScheda(tab, sito, verdict));
     } catch (_) {}
   },
 
@@ -236,8 +481,8 @@ const safebrowseMethods = {
     if ((hints.hasPassword || hints.hasPayment) && wc.getURL() === url) {
       tab._sbCampiUrl = url;
       try {
-        const v = this._sbAnalizza(url, hints, (next) => this._sbMostra(tab, url, this._sbApplyState(tab, next)));
-        if (v && v.level !== 'safe') this._sbMostra(tab, url, this._sbApplyState(tab, v));
+        const v = this._sbAnalizza(url, hints, (next) => this._sbMostra(tab, url, this._sbDellaScheda(tab, url, next)));
+        if (v && v.level !== 'safe') this._sbMostra(tab, url, this._sbDellaScheda(tab, url, v));
       } catch (_) {}
       return;
     }
@@ -330,7 +575,9 @@ const safebrowseMethods = {
   _sbScelta(tab, scelta, dati = {}) {
     const a = tab && tab.sbAvviso;
     if (!a) return;
-    if (scelta === 'procedi') {
+    if (a.prima && ['procedi', 'continua', 'indietro'].includes(scelta)) {
+      this._sbSceltaPrima(tab, a, scelta, dati);
+    } else if (scelta === 'procedi') {
       if (a.level === 'pericoloso' && String(dati.testo || '').trim().toLowerCase() === 'confermo') {
         this.safebrowseProceed(tab.id, a.url);
       }
@@ -345,13 +592,14 @@ const safebrowseMethods = {
     }
   },
 
-  _sbVociMenu() {
+  _sbVociMenu(tab) {
+    const prima = !!(tab && tab.sbAvviso && tab.sbAvviso.prima);
     return [
       { label: 'Chiedi a Filo di questo sito', icon: 'help', action: 'avviso-sito:chiedi' },
       { label: 'Segnala un falso allarme', icon: 'feedback', action: 'avviso-sito:segnala' },
       { type: 'separator' },
       { label: 'Copia l\'indirizzo', icon: 'duplicate', action: 'avviso-sito:copia' },
-      { label: 'Torna indietro', icon: 'back', action: 'avviso-sito:indietro' },
+      { label: prima ? 'Non aprire' : 'Torna indietro', icon: 'back', action: 'avviso-sito:indietro' },
     ];
   },
 
@@ -413,6 +661,17 @@ function stessoSito(a, b) {
 // Installa i metodi sul prototype di TabManager (mixin). `this` resta l'istanza.
 function installSafebrowse(TabManager) {
   Object.assign(TabManager.prototype, safebrowseMethods);
+  // Lo chiama il servizio degli scaricamenti (will-download), che non conosce le schede.
+  globalThis.SN_SB_SCARICAMENTO = (item, wc) => {
+    if (!wc) return false;
+    const { BrowserWindow } = require('electron');
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      const tab = tm && tm.tabs.find((t) => t.view && t.view.webContents === wc);
+      if (tab) return tm._sbScaricamento(tab, item);
+    }
+    return false;
+  };
 }
 
 module.exports = { installSafebrowse };

@@ -26,7 +26,8 @@ function correttore() {
     setTimeout: (fn, ms) => { const t = { id: ++tid, fn, ms, done: false }; timers.push(t); return t.id; },
     clearTimeout: (id) => { const t = timers.find((x) => x.id === id); if (t) t.done = true; },
     setInterval: () => 0, clearInterval: () => {},
-    requestAnimationFrame: (f) => f(),
+    // Un fotogramma vero non arriva mai dentro quello che lo chiede: eseguito subito, il giro che segue il campo non finirebbe.
+    requestAnimationFrame: () => 0,
     ResizeObserver: class { observe() {} disconnect() {} },
     MutationObserver: class { observe() {} disconnect() {} },
     document: {

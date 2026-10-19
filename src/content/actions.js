@@ -481,7 +481,8 @@
       return null;
     }
     if (!res?.ok) {
-      if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
+      // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
+      if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
         warnModelConfigOnce(res.error);
         // La voce in cronologia incolla resterebbe su «Descrizione…» per
@@ -599,6 +600,8 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // Spenta dalle Preferenze, o per far durare i crediti (#818): la spiegazione parte al tasto destro.
+    if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) return;
     // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
     if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
@@ -615,6 +618,7 @@
     // seleziona altrove (#1070).
     if (!Gesto.prendi('spiega', Gesto.SELEZIONA, Gesto.sullaSelezione)) return;
     prefetchedExplain = startExplainRequest(sel);
+    prefetchedExplain.anticipata = true;
   }
 
   // `suRichiesta`: l'ha chiesta l'utente col tasto destro, e il tetto del main sulle automatiche non la ferma.
@@ -626,7 +630,8 @@
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
-      ...(suRichiesta ? { suRichiesta: true } : {}),
+      // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
+      ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
     }).then(
       (res) => {
         if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
@@ -637,6 +642,10 @@
       (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
     );
     return entry;
+  }
+
+  function contaUso(action, attesaMs) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs })).catch(() => {}); } catch (_) {}
   }
 
   // Restituisce la Promise per la spiegazione di questa selezione.
@@ -651,7 +660,12 @@
     };
     const pre = prefetchedExplain;
     if (pre && pre.key === key && !pre.fermata) {
-      return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
+      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
+      if (pre.anticipata && !pre.usata) {
+        pre.usata = true;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+      }
+      return pre.promise.then((res) => (pre.fermata ? chiedi() : { ...res, giaChiesta: true }));
     }
     return chiedi();
   }
@@ -674,7 +688,7 @@
           const arrow = document.createElement('button');
           arrow.type = 'button';
           arrow.className = 'sn-menu-inline-arrow';
-          arrow.title = Tasti.frase(I18n.t('menu_explain_deep'), 'Alt+E');
+          arrow.title = `${I18n.t('menu_explain_deep')} (${Tasti.etichettaFilo(Tasti.scorciatoiaFilo('explain-selection'))})`;
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -685,7 +699,11 @@
         }
 
         let cancelled = false;
+        const apertaIl = Date.now();
         getExplainPromise(selInfo).then((res) => {
+          // Una risposta già chiesta prima (l'anticipo alla selezione) non passa dal conto delle chiamate: l'uso lo
+          // conta chi la mostra, con l'attesa da quando la persona ha aperto Spiega (#969).
+          if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
           if (!res || res.error || !res.text) {
@@ -942,13 +960,32 @@
     };
   }
 
-  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per chiudersi.
-  let salvataggioInCorso = false;
+  // Un secondo Alt+S (o clic) mentre il salvataggio è in corso non apre una seconda conferma: la scheda sta già per
+  // chiudersi, e chi chiede riceve lo stesso esito (la voce salvata, o null).
+  let salvataggioInCorso = null;
   const confermeMostrate = new Set();
 
-  async function savePage() {
-    if (salvataggioInCorso) return;
-    salvataggioInCorso = true;
+  function savePage() {
+    if (!salvataggioInCorso) {
+      salvataggioInCorso = salva().then((entry) => {
+        if (!entry) salvataggioInCorso = null;
+        return entry;
+      }, () => {
+        salvataggioInCorso = null;
+        return null;
+      });
+    }
+    return salvataggioInCorso;
+  }
+
+  // La miniatura è della pagina: l'Aiuto aperto sopra non ci finisce dentro.
+  function nascondiPannelli() {
+    const aperti = [...document.querySelectorAll('.sn-sidebar')].filter((el) => el.style.visibility !== 'hidden');
+    for (const el of aperti) el.style.visibility = 'hidden';
+    return () => { for (const el of aperti) el.style.visibility = ''; };
+  }
+
+  async function salva() {
     // Committa il salvataggio SUBITO, prima di qualsiasi attesa. La cattura
     // della miniatura attende ~120ms che il menu sparisca
     // dal compositor: se in quella finestra la pagina fa un redirect o si
@@ -962,18 +999,16 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        salvataggioInCorso = false;
         Popup.showToast(I18n.t('toast_save_failed'));
-        return;
+        return null;
       }
       entry = res.entry;
     } catch (e) {
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
-      salvataggioInCorso = false;
       console.error('[SN] savePage', e);
       Popup.showToast(I18n.t('toast_save_failed'));
-      return;
+      return null;
     }
 
     // Miniatura best-effort: la scatta il main (piccola, #839) dopo che il menu
@@ -981,14 +1016,17 @@
     // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
     // risposta. Se la pagina è già cambiata la cattura può fallire: il
     // salvataggio resta comunque valido, solo senza anteprima.
+    const rimetti = nascondiPannelli();
     try {
       await attendiCompositor();
       if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
     } catch (_) { /* miniatura opzionale */ }
+    rimetti();
 
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
     showSaveConfirm(entry);
+    return entry;
   }
 
   // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
@@ -1032,11 +1070,11 @@
     const finish = (openList) => {
       if (done) return;
       done = true;
-      if (chiudiScheda) salvataggioInCorso = false;
+      if (chiudiScheda) salvataggioInCorso = null;
       if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
-      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
+      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, self.SN_THEME_TOKENS?.motionMs(220) ?? 220);
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
@@ -1886,7 +1924,7 @@
       b.textContent = label;
       const base = [
         'flex:1', 'padding:9px 12px', 'border-radius:8px', 'font-size:13px',
-        'font-family:inherit', 'cursor:pointer', 'transition:background .12s,border-color .12s',
+        'font-family:inherit', 'cursor:pointer', 'transition:background calc(.12s * var(--sn-motion, 1)),border-color calc(.12s * var(--sn-motion, 1))',
       ];
       if (primary) {
         base.push('border:1px solid var(--sn-accent,#c45a3b)', 'background:var(--sn-accent,#c45a3b)', 'color:#fff');

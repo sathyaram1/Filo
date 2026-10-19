@@ -99,10 +99,7 @@ function sitoDi(url, webContents) {
     if (webContents && !webContents.isDestroyed?.()) {
       pagina = leggi(webContents.getURL() || '');
       const riquadri = webContents.mainFrame ? webContents.mainFrame.framesInSubtree : [];
-      incerto = !pagina || riquadri.some((f) => {
-        const h = leggi(f.origin);
-        return !(h && (h === pagina || h.endsWith('.' + pagina)));
-      });
+      incerto = !pagina || ESE().riquadriDiAltri(pagina, riquadri.map((f) => f.origin));
     }
   } catch (_) { incerto = true; }
   return { sito: pagina, incerto };
@@ -467,6 +464,7 @@ function completa(rec) {
   if (!rec.endedAt) rec.endedAt = new Date().toISOString();
   persist();
   broadcast('done', rec);
+  if (!scopeOf(rec)) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
@@ -864,7 +862,14 @@ function attachSession(ses, { scope = '' } = {}) {
   if (!ses || attached.has(ses)) return;
   attached.add(ses);
   try {
-    ses.on('will-download', (_e, item, webContents) => { onWillDownload(item, webContents, scope); });
+    ses.on('will-download', (e, item, webContents) => {
+      // #965 — un file da avviso chiesto da una pagina (link con «download», nome dato dal sito) si ferma all'avviso
+      // della sua scheda prima di scendere, come il clic sul link: confermato, riparte da capo.
+      let fermo = false;
+      try { fermo = typeof globalThis.SN_SB_SCARICAMENTO === 'function' && globalThis.SN_SB_SCARICAMENTO(item, webContents) === true; } catch (_) {}
+      if (fermo) { e.preventDefault(); return; }
+      onWillDownload(item, webContents, scope);
+    });
   } catch (_) {}
 }
 
@@ -995,8 +1000,13 @@ function openFile(id, opts, scope = '') {
   if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain, servitoDi(rec))) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy); title = ESE().titoloApri(rec.filename); } catch (_) {}
-    return { ok: false, needsConfirm: true, exe: true, title, text };
+    let parti = null;
+    try {
+      text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy);
+      parti = ESE().partiApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy);
+      title = ESE().titoloApri(rec.filename);
+    } catch (_) {}
+    return { ok: false, needsConfirm: true, exe: true, title, text, parti };
   }
   try {
     const r = electron().shell.openPath(rec.savePath);

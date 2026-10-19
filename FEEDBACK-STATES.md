@@ -76,7 +76,8 @@ functions. Qui sotto il perché dei passaggi, per attore.
 **Pipeline** (filo-security):
 - ingresso → gate file (prima dei giudici): flag → `suspicious_file`; pulito → `unlabeled`.
 - `unlabeled` —panel completo→ `attack` | `spam` | `design` | (sicuro: automatica ON **e
-  mittente ammesso** → `todo`, altrimenti → `aligned`).
+  mittente ammesso** → `todo`, altrimenti → `aligned`; un ritrovamento del server senza
+  origine → `todo` comunque, §4c).
 - `attack`/`spam` → `unlabeled`: un mittente fidato segnalato per errore torna al ri-giudizio
   (sotto, «Mittenti fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
   `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
@@ -160,9 +161,15 @@ non fidato. Dopo, solo «🤝 Segna fidato» in Gestione (callable `ownerFiducia
 comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nascono non fidati, e L5 torna a valere. Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
 (fidati prima) e L5 (§4b, e ROUTINE-AUTH-SPEC.md).
 
-**La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
-scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
+**La prova del mittente** (#595, #912, #1037): un nome riservato vale solo con `senderProof`, che
+scrivono alla nascita l'admin (owner, sessioni, esploratore) e il server (routine). Dopo, nessun
+client la aggiunge né la cambia, nemmeno l'admin: le regole non la ammettono in un update. Senza, è un utente
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
+Dalla copia dell'owner (#953) firmano tutte le strade: riquadro, chat, riapertura dalla bacheca
+(`owner:uid:<uid>`). La segnalazione che Filo scrive in chat e l'owner conferma è sua (`owner:filo:chat`, fidata) solo
+se il compito non ha letto testo di altri (lo stato dei livelli di autonomia, mai oltre la classe 2); altrimenti, e
+sempre dall'Aiuto di un sito, resta `filo:chat` con la sua prova: «Filo per conto dell'owner», non fidata, giudicata.
+La segnalazione automatica resta `auto:` (non l'ha letta né confermata) con la sua prova, come quella. Chi decide il mittente: `src/main/services/feedbackMittente.js`.
 Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
 
 **Mittenti provati** (`owner:`/`routine:`/`agent:`/`local:` con la prova; per mittente fino al §10, non per fiducia): mai `attack`/`spam`; se un
@@ -201,6 +208,7 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
 - Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
+- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta 676,663.2` / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito, e da riga di comando la risposta dice quelle che sostituisce): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
 
@@ -278,8 +286,13 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     `onFeedbackOrigineCambiata` (functions/src/origine.js), e alla nascita si rilegge l'origine
     dopo la scrittura perché un passo appena avvenuto non vada perso;
   - origine sparita → `aligned` (`statusReason: origine_mancante`);
-  - senza origine (allarmi della costruzione, esplorazioni) → come un allineato dei giudici: `todo`
-    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`.
+  - senza origine (gli allarmi della costruzione) → `todo`, a interruttori spenti o accesi
+    (decisione dell'owner del 05/10, #1035): le routine lo prendono quando l'automatica è accesa,
+    come ogni altro lavoro in coda. Vale anche per il NON fidato: passa
+    dai giudici, e se lo dicono allineato entra in coda senza guardare gli interruttori; se lo
+    fermano resta nei Ricevuti. La prova è `senderProof: 'server'` col prefisso, mai il solo nome:
+    un anonimo che si firma `agent:costruzione` è un utente. L'allarme porta la sua priorità
+    (`priorityManual`, 3): il giudice di priorità non la riscrive.
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
@@ -335,11 +348,19 @@ La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackT
 (dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
 
 C'È UN GRUPPO PER OGNI CATEGORIA D'AUTORE, quelle che la coda mostra con un'icona:
-`owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`,
+`owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`
+(l'esplorazione a coda vuota, tolta col #1206: resta per i feedback che ha aperto),
 `claude` (automazioni che non dichiarano il ruolo) e `filo`. Fino al 2026-08-22 le cinque
 istanze di Claude stavano dietro un interruttore solo: la coda le distingueva ma la
 fiducia era una sola, quindi per fermare l'esploratore si fermava anche la sessione
 locale. Adesso i due assi coincidono — chi si vede separato si regola separato.
+
+Due categorie non hanno interruttore in Gestione, perché nascono senza origine e vanno in
+coda comunque (§4c): l'esplorazione (`prober`, il gruppo resta nella mappa ma non decide
+più niente) e l'allarme della pubblicazione (`costruzione`, 🏗️, `agent:costruzione` con la
+prova del server; per la mappa sta in `claude`, come sul server). Gli interruttori di
+`worker`, `verifier` e `residuo` contano solo per i ritrovamenti NON fidati, quelli che
+passano dai giudici: un fidato va dove dice la sua origine.
 
 **Compatibilità:** un documento salvato prima, che ha il solo `claude`, fa ereditare quel
 valore a tutte le sue istanze (`resolveAutoApprove`, in entrambe le copie). Senza,
@@ -370,7 +391,11 @@ dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
-arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
+arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
+aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
+lavoro locale: quello resta `locale`, e la sua nota dice quale regola lo tiene
+fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul

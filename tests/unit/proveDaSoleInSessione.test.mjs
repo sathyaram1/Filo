@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { IDENTITA_SESSIONE, fileArgs, flagsConAvanzamento, lanciaSorvegliato, testoFermo } from '../../scripts/run-unit-tests.mjs';
+import { IDENTITA_SESSIONE, fileArgs, flagsConAvanzamento, lanciaSorvegliato, testoFermo, testoFileChiusi } from '../../scripts/run-unit-tests.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
@@ -32,7 +32,8 @@ async function daSoli(file, sessione, { casa, tetto = TETTO_ATTESA_MS }) {
   const r = await lanciaSorvegliato(['--test', ...flagsConAvanzamento(['--test-reporter=tap'], avanzamento), ...fileArgs(file, ROOT)], {
     env: { ...ambiente, ...sessione }, avanzamento, tetto, raccogli: true,
   });
-  return { ...r, fermo: r.fermo ? testoFermo(r.fermo, tetto) : null };
+  // Un file fermo lo chiude da solo il tetto per file (#1231): è lo stesso rosso col suo nome.
+  return { ...r, fermo: r.fermo ? testoFermo(r.fermo, tetto) : r.chiusi?.length ? testoFileChiusi(r.chiusi, tetto) : null };
 }
 
 test('lanciati da soli in una sessione con tutta la sua identità accesa, i file che la leggono sono verdi (#1109.1)', async () => {
@@ -46,7 +47,7 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
     const uso = { input_tokens: 12, output_tokens: 34, cache_read_input_tokens: 5600, cache_creation_input_tokens: 78 };
     writeFileSync(transcript, `${JSON.stringify({ type: 'assistant', message: { id: 'msg_1', model: 'claude-opus-4-8', usage: uso } })}\n`, 'utf8');
     const sessione = {
-      FILO_ROUTINE: '1', FILO_ROUTINE_ROLE: 'prober', FILO_ROUTINE_TICKET: 'biglietto-della-sessione-vera',
+      FILO_ROUTINE: '1', FILO_ROUTINE_ROLE: 'verifier', FILO_ROUTINE_TICKET: 'biglietto-della-sessione-vera',
       FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: sid,
     };
     assert.deepEqual(Object.keys(sessione).sort(), [...IDENTITA_SESSIONE].sort(), 'ogni voce dell\'identità della sessione è accesa');

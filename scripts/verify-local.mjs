@@ -77,12 +77,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
+import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifier-scope.mjs';
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
-import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { numeraRilievi, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
 import { installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
@@ -209,10 +210,7 @@ export function stateFile(root = ROOT) {
   return resolve(root, '.claude', 'verify-local.json');
 }
 
-// Tetto di una critica: lo stesso del server (12000 caratteri). Oltre, la
-// registrazione è respinta con la spiegazione, mai tagliata in silenzio
-// (CLAUDE.md § Limiti).
-export const MAX_CRITIQUE_CHARS = 12000;
+export { MAX_CRITIQUE_BYTES };
 // E un pavimento: una verifica di due parole non è una verifica. Vale anche
 // per il pass, che è la promozione (feedback #565).
 export const MIN_CRITIQUE_CHARS = 80;
@@ -435,9 +433,8 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   // Tetto abbondante e niente taglio silenzioso: tagliata, una critica perdeva
   // proprio i rilievi, che stanno in coda (giro 8 su #561).
   const testo = ROUND.normalizeCritique(critique);
-  if (testo.length > MAX_CRITIQUE_CHARS) {
-    return { ok: false, state: s, reason: `critica troppo lunga: ${testo.length} caratteri, il massimo è ${MAX_CRITIQUE_CHARS}. Accorcia il riassunto, non i rilievi.` };
-  }
+  const troppo = criticaTroppoLunga(testo);
+  if (troppo) return { ok: false, state: s, reason: troppo };
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
   for (const k of ['fix', 'derived', 'external']) decision[k] = numeraRilievi(parsed.findings, decision[k]);
@@ -564,7 +561,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   const base = {
     ...prev,
     pending: null,
-    fixedReport: String(report || '').slice(0, MAX_CRITIQUE_CHARS),
+    fixedReport: String(report || '').slice(0, MAX_CRITIQUE_BYTES),
     fixedSha: sha || '',
     fixedServer: coppiaServer(server),
     fixedAt: when,
@@ -779,6 +776,7 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     'li tiene chiusi (se non ne scrive una, la prova del giro resta). Una prova del giro ancora rossa non si toglie e non si',
     'cambia mai: la consegna la rilancia com\'era e si ferma. Restano anche le prove dei rilievi che fermano il lavoro: le',
     'tratta chi riprende.',
+    ROSSO_ATTESO_CHIUSO,
     '',
     testo,
   );
@@ -1133,7 +1131,9 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
     `del giro è \`${cartellaProveGiro(branch)}\` — dove la recipe qui sotto dice`,
     '`tests/verifica/<numero>/`, in locale si legge quella. Come si chiamano lo dice la',
-    'recipe (il numero del rilievo nel nome), e si committano prima della critica. Sei tu',
+    'recipe (il numero del rilievo nel nome), e si committano prima della critica, rosse',
+    'come le trovi: il segno di rosso atteso (`test.fail`) non va mai sulla prova di un',
+    'rilievo che stai per registrare, e quando va lo dice la recipe. Sei tu',
     'l\'unico a rilanciare quelle dei giri passati, e il momento è ADESSO, in partenza:',
     'sono il controllo delle porte riaperte, e dopo di te nessuno le rilancia. Se la',
     'cartella non c\'è, non c\'era niente da rilanciare — ma guarda la cartella, non il',

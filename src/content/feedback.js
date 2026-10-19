@@ -128,6 +128,8 @@
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const reduce = !!(global.matchMedia &&
         global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      // Token `motion`: moltiplica le durate; a 0 l'etichetta resta ferma il tempo di leggerla.
+      const k = global.SN_THEME_TOKENS ? global.SN_THEME_TOKENS.motionFactor(document) : 1;
 
       const layer = document.createElement('div');
       layer.className = 'sn-fb-credit-fly';
@@ -162,7 +164,7 @@
 
       const coinSvg = icon('credits', 22) || '●';
       const coins = [];
-      const count = reduce ? 0 : Math.min(7, Math.max(4, n));
+      const count = reduce || !k ? 0 : Math.min(7, Math.max(4, n));
       for (let i = 0; i < count; i++) {
         const c = document.createElement('div');
         c.className = 'sn-fb-coin';
@@ -176,15 +178,15 @@
         coins.push(c);
       }
 
-      let maxEnd = 900;
+      let maxEnd = 900 * k;
       coins.forEach((c, i) => {
         const sx = ox + (Math.random() - 0.5) * 80;
         const sy = oy + (Math.random() - 0.5) * 30;
         // Punto intermedio: si alza in un arco prima di puntare in alto a destra.
         const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 60;
         const my = Math.min(sy, ty) - 40 - Math.random() * 40;
-        const delay = i * 40;
-        const dur = 650 + i * 50 + Math.random() * 120;
+        const delay = i * 40 * k;
+        const dur = (650 + i * 50 + Math.random() * 120) * k;
         maxEnd = Math.max(maxEnd, delay + dur);
         c.animate([
           { transform: `translate(${sx}px,${sy}px) scale(.6)`, opacity: 0 },
@@ -194,13 +196,17 @@
         ], { duration: dur, delay, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' });
       });
 
-      label.animate([
-        { transform: 'translate(-50%,-50%) scale(.7)', opacity: 0 },
-        { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.25 },
-        { transform: 'translate(-50%,-200%) scale(1)', opacity: 0 },
-      ], { duration: reduce ? 900 : Math.max(900, maxEnd), easing: 'ease-out', fill: 'forwards' });
+      if (k) {
+        label.animate([
+          { transform: 'translate(-50%,-50%) scale(.7)', opacity: 0 },
+          { transform: 'translate(-50%,-110%) scale(1)', opacity: 1, offset: 0.25 },
+          { transform: 'translate(-50%,-200%) scale(1)', opacity: 0 },
+        ], { duration: reduce ? 900 * k : Math.max(900 * k, maxEnd), easing: 'ease-out', fill: 'forwards' });
+      } else {
+        label.style.transform = 'translate(-50%,-110%)';
+      }
 
-      const total = (reduce ? 900 : maxEnd) + 120;
+      const total = k ? (reduce ? 900 * k : maxEnd) + 120 : 1200;
       setTimeout(() => { try { layer.remove(); } catch (_) {} }, total);
     } catch (_) {}
   }

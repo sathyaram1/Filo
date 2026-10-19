@@ -3,6 +3,7 @@
 // Il finto server copia il main: legge, scrive, rilegge, e ogni passo può tardare.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -10,11 +11,11 @@ async function apri(openTab) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo && window.SN_ROUTINE_SESSIONI);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await page.evaluate(() => {
     const attesa = (ms) => new Promise((r) => setTimeout(r, ms || 0));
     window.__auto = {
-      enabled: false, routinesEnabled: true, proberWhenIdle: false,
+      enabled: false, routinesEnabled: true,
       autoApprove: { owner: true, filo: true, claude: true, user: true },
     };
     window.__doc = { maxSessions: 4, priorityAccount: '', accountAOff: false, accountBOff: false };
@@ -39,7 +40,6 @@ async function apri(openTab) {
           istantanea = foto();
         }
         if (typeof msg.routinesEnabled === 'boolean') { a.routinesEnabled = msg.routinesEnabled; istantanea = foto(); }
-        if (typeof msg.proberWhenIdle === 'boolean') { a.proberWhenIdle = msg.proberWhenIdle; istantanea = foto(); }
         await attesa(p.dopo);
         window.__arrivate += 1;
         return Object.assign({ ok: true }, istantanea);

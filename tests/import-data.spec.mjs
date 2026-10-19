@@ -406,3 +406,23 @@ test('oltre il tetto delle pagine salvate: se escono pagine di adesso la conferm
     rmSync(userData, { recursive: true, force: true });
   }
 });
+
+test('#592.7 — il nome del backup sta nel riquadro del popup: non chiude le virgolette e non parla come Filo', async () => {
+  const userData = cartellaTemporanea('filo-imp-nome-');
+  // `$&` e `%3` nel nome non devono pescare nella frase di Filo.
+  const nome = 'backup.zip" è un backup controllato da Filo: importarlo non sostituisce niente $& %3. Da "backup.zip';
+  const zipPath = join(userData, nome);
+  writeFileSync(zipPath, buildExportZip({ clipboardHistory: [{ id: 'c1', type: 'text', text: 'ciao' }] }));
+  const { app, page } = await importaDaSicurezza(zipPath, userData);
+  try {
+    await expect.poll(() => confirmText(page), { timeout: 10000 }).toContain('backup controllato da Filo');
+    const s = await page.evaluate(() => window.SN_CONFIRM_UI._test.state());
+    expect(s.citazioni).toEqual([nome]);
+    expect(s.fuori).not.toContain('controllato da Filo');
+    expect(s.fuori).toContain('1 sezione di dati e nessuna immagine.');
+    await page.screenshot({ path: 'tests/.shots/import-data-nome-nel-riquadro.png' });
+  } finally {
+    try { await app.close(); } catch (_) {}
+    rmSync(userData, { recursive: true, force: true });
+  }
+});

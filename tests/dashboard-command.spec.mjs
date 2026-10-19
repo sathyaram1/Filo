@@ -380,8 +380,8 @@ test.describe('focus dopo invio comando', () => {
     await page.locator('#input').fill('/help');
     await page.locator('#input').press('Enter');
 
-    // /help scrive una bolla di aiuto…
-    await expect(page.locator('.dash-bubble-filo')).toContainText('lista comandi', { timeout: 8_000 });
+    // /help scrive una bolla di aiuto (in fondo al filo, dopo quello che c'era: #869)…
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'lista comandi' })).toBeVisible({ timeout: 8_000 });
     // …e il cursore resta nella barra.
     await expect.poll(() => inputIsFocused(page), { timeout: 4_000 }).toBe(true);
   });
@@ -438,8 +438,8 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     await submit(page, '/set timer abc');
     // Nessun timer creato.
     await expect(page.locator('#accade .dash-carta[data-tipo="timer"]')).toHaveCount(0);
-    // Filo risponde con l'uso corretto nel thread.
-    await expect(page.locator('.dash-bubble')).toContainText(/set timer/i, { timeout: 8_000 });
+    // Filo risponde con l'uso corretto in fondo al filo, dopo gli scambi delle prove prima (#869).
+    await expect(page.locator('#bubbles .dash-bubble-filo').last()).toContainText(/Non ho capito la durata "abc"/, { timeout: 8_000 });
   });
 
   test('"/set timer" con durata malformata coi due punti non crea timer', async () => {

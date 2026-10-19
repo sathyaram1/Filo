@@ -1,6 +1,6 @@
 ---
 name: routine-worker
-description: Worker delle routine di Filo per verifica, correzione, riallineamento ed esplorazione: diventa il ruolo che dispatch gli stampa. Opus a sforzo high (decisione owner 2026-10-02: a xhigh trovava quasi gli stessi rilievi a costo doppio).
+description: Worker delle routine di Filo per verifica, correzione e riallineamento: diventa il ruolo che dispatch gli stampa. Opus a sforzo high (decisione owner 2026-10-02: a xhigh trovava quasi gli stessi rilievi a costo doppio).
 model: opus
 effort: high
 hooks:

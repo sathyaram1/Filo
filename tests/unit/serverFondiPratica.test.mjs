@@ -6,8 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
 import {
-  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV, USCITA_SOLO_APP,
+  cartellaDelServer, leggiArgomenti, esegui, notaFine, ramiApertiDellaPratica, PRATICA_ENV, USCITA_SOLO_APP, USCITA_SPINTA_RIFIUTATA,
 } from '../../scripts/server-fondi-pratica.mjs';
+import { classifyServerMerge, messageForServerMerge } from '../../scripts/lib/owner-merge.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
 
 test('cartellaDelServer: il checkout del server accanto al repo, dal checkout principale e da una sua worktree', () => {
@@ -69,19 +70,22 @@ const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${s
 // Il registro dei rami (#1159): per difetto il ramo non ne ha uno, come i lavori locali di prima.
 const SENZA_REGISTRO = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: 'il ramo non ha un registro' });
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40) }) {
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
     const chiesti = [];
+    const alCancello = [];
     const k = await esegui(argv, {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
       punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto, fissa,
       lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
+      chiediAlCancello: async (x) => { alCancello.push(x); return cancello ? cancello(x) : { outcome: 'fault', reason: 'nessun cancello nella prova' }; },
+      allinea: () => {}, deployDaGitHub: () => daGitHub,
     });
-    return { k, lanci, scritture, chiesti, testo: righe.join('\n') };
+    return { k, lanci, scritture, chiesti, alCancello, testo: righe.join('\n') };
   });
 }
 
@@ -151,6 +155,17 @@ test('davvero, con --solo-server: presa in carico, server con la pratica, a fusi
   assert.match(r.testo, /Pratica #910 chiusa/);
 });
 
+test('con deploy.yml su main del server il consiglio non è un secondo deploy insieme a quello di GitHub', async () => {
+  const gh = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], daGitHub: true });
+  assert.equal(gh.k, 0, gh.testo);
+  assert.match(gh.testo, /Il deploy lo fa GitHub \(deploy\.yml\) per questa spinta: niente server:pubblica adesso/);
+  assert.doesNotMatch(gh.testo, /Per il deploy: npm run server:pubblica/);
+  assert.match(notaFine('claude/x', 'a'.repeat(40), true), /In produzione lo porta GitHub/);
+  const pc = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
+  assert.match(pc.testo, /Per il deploy: npm run server:pubblica/);
+  assert.match(notaFine('claude/x', ''), /npm run server:pubblica/);
+});
+
 test('senza --solo-server e senza un ramo dell’app in vista la pratica resta aperta, e si dice come chiuderla', async () => {
   const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
@@ -218,7 +233,8 @@ test('la parte dell’app già fusa una volta ma con un ramo legato ancora fuori
   }
 });
 
-test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il server la usa, non la riapre, la annota', async () => {
+// Con un ramo dell'app ancora in arrivo la pratica si riapre invece (#938): tests/unit/praticaRiaperta.test.mjs.
+test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro, e nessun suo ramo in arrivo: il server la usa, non la riapre, la annota', async () => {
   const d = doc('p', { status: 'done', parti: { app: ORA - 3 * ORE, ramo: 'claude/x' } });
   const prova = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p', '--dry-run'] });
   assert.equal(prova.k, 0, prova.testo);
@@ -226,7 +242,7 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il se
   assert.match(prova.testo, /non si riapre e, a fusione riuscita, resterebbe chiusa/);
   assert.doesNotMatch(prova.testo, /andrebbe in lavorazione/);
 
-  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
   assert.equal(r.scritture.length, 2, 'nessuna presa in carico: la parte e la nota');
@@ -408,4 +424,49 @@ test('ramo assente su origin del server: uscita «solo app», senza toccare nien
 test('leggiArgomenti: i rami delle routine (worker/…) valgono come i claude/…', () => {
   assert.equal(leggiArgomenti(['worker/f1-20261012T090000Z', '--feedback', '9']).ramo, 'worker/f1-20261012T090000Z');
   for (const no of ['worker/', 'worker/../main', 'lavoro/x']) assert.match(leggiArgomenti([no]).errore, /solo rami claude/, no);
+});
+
+// ── Dopo il passo 10 (#1159 fase 2): su main di filo-security scrive solo il cancello ──
+
+test('GitHub rifiuta la spinta su main: la stessa fusione la chiede il cancello, e la pratica si chiude come sempre', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const r = await giro({
+    docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato,
+    codiceServer: USCITA_SPINTA_RIFIUTATA, cancello: () => ({ outcome: 'merged', sha: 'c'.repeat(40) }),
+  });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.alCancello, [{ branch: 'claude/x', sha: 'c'.repeat(40), feedbackId: 'p' }], 'lo sha registrato, non la punta del momento');
+  assert.match(r.testo, /lo scrive solo il cancello: gli chiedo di portarci cccccccc/);
+  assert.match(r.testo, /Il cancello ha portato claude\/x su main di filo-security/);
+  assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+test('il cancello non fonde (suite non verde): la pratica resta in lavorazione, col motivo', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const r = await giro({
+    docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato,
+    codiceServer: USCITA_SPINTA_RIFIUTATA, cancello: () => ({ outcome: 'aspetta_suite', sha: 'c'.repeat(40), url: 'https://x/r/1' }),
+  });
+  assert.equal(r.k, 1, r.testo);
+  assert.match(r.testo, /suite di filo-security su ccccccccc non è ancora verde \(https:\/\/x\/r\/1\): rilancia/);
+  assert.match(r.testo, /resta in lavorazione/);
+  assert.ok(!r.scritture.some((u) => u.includes('resolvedInVersion')), 'non si chiude');
+  // Senza uno sha da chiedere non si chiede niente.
+  const senza = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], codiceServer: USCITA_SPINTA_RIFIUTATA, puntaRamo: () => 'c'.repeat(40), lavoroDelRamo: async () => ({ ok: true, registro: false }) });
+  assert.equal(senza.alCancello.length, 1, 'senza registro vale la punta letta su origin');
+});
+
+test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il ramo del server', () => {
+  const ok = (result, extra = {}) => classifyServerMerge(200, { result: { ok: true, result, ...extra } });
+  assert.deepEqual(ok('merged', { sha: 'a'.repeat(40) }), { outcome: 'merged', sha: 'a'.repeat(40) });
+  assert.deepEqual(ok('suite_rossa', { sha: 'b', url: 'u' }), { outcome: 'suite_rossa', sha: 'b', url: 'u' });
+  assert.equal(ok('strano').outcome, 'fault');
+  assert.equal(classifyServerMerge(200, { result: { ok: false, reason: 'github_503' } }).outcome, 'unreachable');
+  assert.equal(classifyServerMerge(404, {}).outcome, 'not_deployed');
+  assert.equal(classifyServerMerge(400, { error: { message: 'ramo_non_fidato' } }).reason, 'ramo_non_fidato');
+  assert.equal(classifyServerMerge(403, {}).outcome, 'denied');
+  assert.equal(classifyServerMerge(0, {}).outcome, 'unreachable');
+  assert.match(messageForServerMerge({ outcome: 'non_rapido' }, 'claude/x'), /claude\/x non contiene main di filo-security/);
+  assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
+  assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
 });

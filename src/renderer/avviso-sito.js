@@ -27,6 +27,10 @@
 
   function disegna(s) {
     stato = s;
+    // Durata delle animazioni e intensità delle ombre scelte dall'utente: solo numeri, solo variabili --sn-*.
+    for (const [k, v] of Object.entries((s && s.vars) || {})) {
+      if (/^--sn-[a-z-]+$/.test(k) && /^[0-9.]+$/.test(String(v))) root.style.setProperty(k, String(v));
+    }
     const pericoloso = s.level === 'pericoloso';
     root.dataset.livello = pericoloso ? 'pericoloso' : 'sospetto';
     titolo.textContent = s.title || (pericoloso ? 'Sito pericoloso' : 'Sito potenzialmente sospetto');
@@ -34,6 +38,7 @@
       ? 'Questo sito potrebbe essere una truffa o tentare di rubare i tuoi dati.'
       : 'Questo sito ha alcune caratteristiche sospette. Fai attenzione ai dati che inserisci.');
     conferma.hidden = !pericoloso;
+    indietro.textContent = s.prima ? 'Non aprire' : 'Torna indietro';
     parola.value = '';
     avanti.textContent = pericoloso ? 'Procedi comunque' : 'Continua';
     clearTimeout(timerArma);
@@ -55,6 +60,7 @@
       level: s.level === 'pericoloso' ? 'pericoloso' : 'sospetto',
       title: String(s.title || ''),
       body: String(s.body || ''),
+      prima: Number(s.prima) > 0,
     });
   });
 

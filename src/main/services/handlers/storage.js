@@ -30,6 +30,7 @@ module.exports = function register(on, ctx) {
     chiaviStoragePerOrigine, scritturaStorageAmmessa, scritturaImpostazioniAmmessa,
   } = require('../impostazioniPerOrigine');
   const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
+  const { soloFilo } = require('./origine');
   const AppuntiDaiSiti = require('../appuntiDaiSiti');
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
@@ -90,6 +91,15 @@ module.exports = function register(on, ctx) {
     return { ok: true, settings: impostazioniPerOrigine(merged, origin, indirizziDelMittente(sender)) };
   });
 
+  // Le Preferenze registrano una scorciatoia (#842): finché dura, i tasti che Filo prende prima della pagina arrivano
+  // a lei. Da un sito no (gli toglierebbe le scorciatoie di Filo), e solo dal frame principale della scheda che chiede.
+  on(MSG.REGISTRA_TASTI, soloFilo(async (msg, sender) => {
+    const wc = sender && sender.wc;
+    if (!wc || (sender.frame && wc.mainFrame && sender.frame !== wc.mainFrame)) return { ok: false, error: 'forbidden' };
+    require('../../shortcuts').registraTasti(wc, msg.attivo === true);
+    return { ok: true };
+  }));
+
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     // Ripristino completo (#184): riscrive TUTTE le impostazioni ai valori
@@ -114,10 +124,9 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.EXPORT_DATA, async (msg, sender, origin) => {
-    // Esporta TUTTI i dati di Filo in un unico .zip (data.json + immagini
-    // copiate estratte come file). L'utente sceglie dove salvarlo. Solo dalle
-    // pagine interne (Opzioni): una pagina web non deve poter innescare un dump
-    // completo dei dati utente (incluse le chiavi API) né aprire un file dialog.
+    // Esporta i dati di Filo in un unico .zip (data.json + immagini copiate estratte come file); le chiavi solo con
+    // `chiavi: true` (#905). Solo dalle pagine interne: una pagina web non deve poter innescare un dump dei dati utente
+    // né aprire un file dialog.
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     try {
       const { dialog } = require('electron');
@@ -135,7 +144,7 @@ module.exports = function register(on, ctx) {
       const mie = Mie ? await Mie.elenco() : null;
       if (mie && mie.length) allData[Mie.CHIAVE_BACKUP] = mie;
       const filo = await require('../ilFilo').esporta();
-      const zip = buildExportZip(allData, { filo });
+      const zip = buildExportZip(allData, { filo, chiavi: !!msg && msg.chiavi === true });
 
       const win = winOf(sender);
       const stamp = new Date().toISOString().slice(0, 10);
@@ -222,9 +231,9 @@ module.exports = function register(on, ctx) {
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
       const filo = contaFilo(parsed);
-      const { mergeImportedData, regolaImport } = require('../exportData');
+      const { mergeImportedData, regolaImport, haSegreti, proxyDaCompletare } = require('../exportData');
       const dati = datiDaFondere(parsed.data);
-      const { stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
+      const { merged, stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
       return {
         ok: true,
         token,
@@ -239,6 +248,8 @@ module.exports = function register(on, ctx) {
         tettoPagine: SN_CONST.SAVED_PAGES_LIMIT,
         chats: filo.chats,
         pagine: filo.pagine,
+        chiavi: haSegreti(parsed.data),
+        proxySenzaCredenziali: proxyDaCompletare(merged, parsed.proxySenzaCredenziali).length > 0,
       };
     } catch (e) {
       // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"
@@ -307,6 +318,8 @@ module.exports = function register(on, ctx) {
       await require('../registroCambi').con({ via: 'importazione' }, async () => {
         if (Object.keys(rest).length) await DiskStorage.set(rest);
         await ArchivedTabs.importa(merged[ARCHIVE_KEY]);
+        // Le schede chiuse di un backup entrano anche nel filo, alla loro data (#872): la Cronologia non c'è più.
+        try { await globalThis.SN_SCHEDE_NEL_FILO?.({ unaVolta: false }); } catch (e) { console.warn('[Filo] schede del backup nel filo:', e?.message || e); }
         await History.importa(merged[HISTORY_KEY]);
         if (Mie) await Mie.importa(merged[MIE_KEY]);
         if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
@@ -320,6 +333,15 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: String(e?.message || e) };
     }
   });
+
+  // ── Cancella tutti i dati di Filo (#850) ────────────────────────────────
+  // Solo dalla pagina Sicurezza, dove l'utente ha scritto la parola: la chat ci porta, non cancella (cancellaTutto.js).
+  const dallaSicurezza = (origin) => /^filo:\/\/security\//.test(String(origin || ''));
+  on(MSG.CANCELLA_TUTTI_I_DATI, soloFilo(async (msg, sender, origin) => {
+    if (!dallaSicurezza(origin)) return vietato;
+    return require('../../cancellaTutto').chiedi({ parola: msg && msg.parola, ancheIdentita: !!msg && msg.ancheIdentita === true });
+  }));
+  on(MSG.CANCELLA_TUTTI_I_DATI_STATO, soloFilo(async () => ({ ok: true, ...require('../../cancellaTutto').stato() })));
 
   // ── Cronologia appunti ────────────────────────────────────────────────
   // Il menu «Incolla» vive dentro le pagine di qualunque sito: chi legge e chi scrive lo decide services/appuntiDaiSiti.js
@@ -348,10 +370,23 @@ module.exports = function register(on, ctx) {
 
   on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, msg.entry)) return vietato;
-    const e = msg.entry;
+    return inCronologia(msg.entry, msg.via);
+  });
+
+  on(MSG.COPY_TEXT_TO_CLIPBOARD, async (msg, sender, origin) => {
+    const text = typeof msg.text === 'string' ? msg.text : '';
+    if (!text) return { ok: false, error: 'empty' };
+    const entry = { type: 'text', text };
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, entry)) return vietato;
+    try { require('electron').clipboard.writeText(text); } catch (_) { return { ok: false, error: 'clipboard' }; }
+    await inCronologia(entry);
+    return { ok: true };
+  });
+
+  async function inCronologia(e, via) {
     if (!e) return { ok: true };
     // `tenuta: false` dice alla pagina di non far descrivere a un modello un'immagine che la cronologia non tiene.
-    if (!(await Tolti().daTenere(e, msg.via))) return { ok: true, tenuta: false };
+    if (!(await Tolti().daTenere(e, via))) return { ok: true, tenuta: false };
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
@@ -376,7 +411,7 @@ module.exports = function register(on, ctx) {
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, trimmed);
     clipboardChanged();
     return { ok: true };
-  });
+  }
 
   on(MSG.UPDATE_CLIPBOARD_DESCRIPTION, async (msg) => {
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);

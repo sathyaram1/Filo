@@ -207,7 +207,7 @@
   background: var(--sn-hover, #ffffff);
   border: 1px solid var(--sn-border, #e0dcd4);
   border-radius: var(--sn-radius, 6px);
-  box-shadow: var(--sn-shadow, 0 4px 16px rgba(0, 0, 0, 0.18));
+  box-shadow: var(--sn-shadow, 0 4px 16px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1))));
 }
 
 .sn-gloss-pop[hidden] { display: none; }
@@ -277,7 +277,7 @@ html:not([data-sn-theme]) body {
 <p>La regola non è &quot;mai il produttore&quot;: da Anthropic compro esattamente dal produttore, in quanto è l&#39;unico laboratorio di frontiera che voglio finanziare. La regola è <strong>non finanziare chi non ritengo si stia comportando responsabilmente</strong>, e per farlo basta non comprare da loro il servizio. I pesi sono un&#39;altra cosa: un modello aperto servito da terzi, o eseguito sul tuo computer, non genera un centesimo per il laboratorio che l&#39;ha addestrato.</p>
 <p>Non verranno quindi mai usati, attraverso i crediti di Filo, i <strong>servizi</strong> di <strong>OpenAI</strong> (ChatGPT), <strong>xAI/SpaceX</strong> (Grok), <strong>Meta</strong> (l&#39;azienda che controlla Facebook e Instagram, e produce MuseSpark), <strong>Google</strong> (formalmente Alphabet, che produce Gemini) e dei laboratori cinesi (Moonshot, Z.ai, Alibaba, DeepSeek...). Le ragioni sono nelle sezioni che seguono.</p>
 <p><strong>Come è applicata:</strong> Filo non compra dai fornitori direttamente: passa da un servizio (OpenRouter) che smista le richieste e sceglie da sé chi ospita ogni modello. Lasciato a sé, prima o poi manderebbe la richiesta anche al produttore escluso da questa policy. Quindi la lista di esclusione viaggia con ogni richiesta, e <strong>a risposta arrivata Filo registra chi l&#39;ha effettivamente servita</strong> e segnala se è qualcuno che doveva essere fuori.</p>
-<p><strong>Con una tua chiave OpenRouter puoi usare quello che vuoi:</strong> non ti impongo limiti con i tuoi soldi. I limiti valgono solo per i crediti di Filo.</p>
+<p><strong>Con una tua chiave OpenRouter puoi usare quello che vuoi, basta un interruttore nelle Opzioni:</strong> non ti impongo limiti con i tuoi soldi. I limiti valgono solo per i crediti di Filo.</p>
 <h2 id="se-non-la-pensi-come-me">Se non la pensi come me</h2>
 <p>Questo documento decide una cosa sola: <strong>dato che Filo usa LLM, quali usare</strong>. Non decide se valga la pena usarli. Non so con certezza se la singolarità sarà positiva per l&#39;umanità (anche se credo di sì) e capisco sia chi sostiene che accelerare sia la cosa giusta, sia chi sostiene il contrario.</p>
 <p>Chi risponde diversamente da me non deve forkare: <strong>un solo interruttore disattiva tutti i modelli proprietari</strong> — Anthropic inclusa, in modo che non vengano dati soldi a nessun produttore di modelli. Funziona anche con i crediti di Filo, con un click (per escludere Anthropic non serve una propria chiave, come serve invece per usare modelli che non supporto).</p>

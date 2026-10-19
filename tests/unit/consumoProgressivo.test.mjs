@@ -65,6 +65,18 @@ test('Haiku 5.5 nel battito: stesso listino e stessa soglia per richiesta del ra
   } finally { togliCartella(casa); }
 });
 
+test('modalità veloce nel battito: la stessa tariffa doppia del rapporto di fine sessione', async () => {
+  const { casa, principale } = progetto();
+  try {
+    writeFileSync(principale, riga('f1', 1000, { speed: 'fast' }) + riga('f2', 1000, { speed: 'standard' }));
+    const t = totaliDi(avanzaFile(principale, null));
+    // f2: 10·4 + 100·5 + 1000·0,2 + 1000·20 = 20.740; f1 è veloce, il doppio.
+    assert.ok(Math.abs(t.costo - (2 * 20740 + 20740) / 1e6) < 1e-12, String(t.costo));
+    const rep = await rapportoDi(principale);
+    assert.equal(Math.round(t.costo * 10000) / 10000, rep.costUsd);
+  } finally { togliCartella(casa); }
+});
+
 test('le righe che Claude Code riscrive in coda riprendendo una sessione non si ricontano, anche lette a pezzi', async () => {
   const { casa, principale } = progetto();
   try {

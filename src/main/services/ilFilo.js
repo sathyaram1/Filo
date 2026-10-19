@@ -10,6 +10,10 @@ const path = require('node:path');
 const E = () => globalThis.SN_FILO_EVENTI;
 const FILE_EVENTI = 'eventi.jsonl';
 const FILE_DISPOSITIVO = 'dispositivo';
+// Segno che le schede chiuse di prima del filo ci sono entrate (#872): dopo, entrano solo quelle di un backup.
+const FILE_SCHEDE_ENTRATE = 'schede-chiuse-entrate';
+// Una visita già nel filo per la stessa scheda chiusa: stesso indirizzo, aperta fra l'apertura e la chiusura (più un margine).
+const MARGINE_SCHEDA_MS = 2 * 60 * 1000;
 
 function disco() {
   try { return require('../shim/storage'); } catch (_) { return null; }
@@ -246,6 +250,33 @@ function creaFilo({ cartella } = {}) {
     return E().copiaChat(v.stato.chat.get(id));
   }
 
+  // Per la home (#869): tutte le chat col dispositivo di ogni messaggio, le pagine e il dispositivo di qui. `pos` cambia a
+  // ogni evento: chi ne ricava qualcosa di costoso lo tiene finché non cambia.
+  async function perLaCoda(opts) {
+    const v = await vista(opts);
+    return {
+      pos: v.stato.pos,
+      qui: normale.dispositivo,
+      chats: E().elencoChat(v.stato).map((c) => E().copiaChat(c, { dispositivi: true })),
+      pagine: E().pagineNelPeriodo(v.stato, { da: null, a: null }).map((p) => ({ ...p })),
+    };
+  }
+
+  // Dov'è un evento (messaggio o pagina visitata), per saltarci: null se non c'è più (#872).
+  async function dove(id, opts) {
+    const v = await vista(opts);
+    return E().dove(v.stato, id);
+  }
+
+  // L'evento dell'ultimo messaggio dell'utente in una chat: la fonte di una lezione chiesta a parole.
+  async function ultimaDomanda(id, opts) {
+    const v = await vista(opts);
+    const c = id ? E().copiaChat(v.stato.chat.get(String(id)), { ids: true }) : null;
+    if (!c) return '';
+    for (let i = c.messages.length - 1; i >= 0; i--) if (c.messages[i].role === 'user') return c.eids[i] || '';
+    return '';
+  }
+
   async function pagine(periodo, opts) {
     const v = await vista(opts);
     return E().pagineNelPeriodo(v.stato, periodo || { da: null, a: null }).map((p) => ({ ...p }));
@@ -275,12 +306,36 @@ function creaFilo({ cartella } = {}) {
 
   function cancellaPagine(periodo, opts) {
     if (!periodo) return Promise.resolve(0);
+    return cancella([periodo], opts);
+  }
+
+  // Visite tolte ({ ts, sito, url }, o una fila dello stesso sito con { da, a }), in una scrittura sola. `schedeChiuse:
+  // false` quando sono proprio le schede chiuse a portarle via (la Cronologia): quelle ancora aperte restano fuori.
+  function cancellaVisite(visite, opts, { schedeChiuse = true } = {}) {
+    const periodi = (Array.isArray(visite) ? visite : []).filter((p) => p && p.ts)
+      .map((p) => ({ da: p.da || p.ts, a: p.a || p.ts, sito: p.sito || '', url: p.url || null }));
+    return periodi.length ? cancella(periodi, opts, { schedeChiuse }) : Promise.resolve(0);
+  }
+
+  // Ogni strada che toglie pagine passa di qui, e da qui lo sanno le home aperte.
+  const pagineTolte = new Set();
+  function suPagineTolte(fn) { if (typeof fn === 'function') pagineTolte.add(fn); }
+
+  function cancella(periodi, opts, { schedeChiuse = true } = {}) {
     return transazione(async (t) => {
-      const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
-      const pagine = { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) };
-      const ev = t.evento(E().TIPI.CANCELLAZIONE, { pagine }, { autore: 'utente' });
-      const { tolti } = await t.scrivi([ev]);
-      try { await globalThis.SN_DELICATE?.dimentica(pagine); } catch (_) {}
+      const voci = periodi.map((periodo) => {
+        const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
+        return { pagine: { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) }, url: periodo.url || null };
+      });
+      const { tolti } = await t.scrivi(voci.map((v) => t.evento(E().TIPI.CANCELLAZIONE, { pagine: v.pagine }, { autore: 'utente' })));
+      // Il ricordo dei campi password va via per sito, e ogni volta si riscrive: un sito una volta sola («Svuota archivio»).
+      const siti = new Set();
+      for (const v of voci) {
+        const k = v.pagine.sito || `|${v.pagine.da}|${v.pagine.a}`;
+        if (!siti.has(k)) { siti.add(k); try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {} }
+        if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
+      }
+      for (const fn of pagineTolte) { try { fn({ incognito: t.incognito }); } catch (_) {} }
       return tolti;
     }, opts);
   }
@@ -316,6 +371,46 @@ function creaFilo({ cartella } = {}) {
     }, opts);
   }
 
+  // Le schede chiuse archiviate prima che il filo esistesse entrano alla loro data, una visita per scheda, legata alla
+  // sua voce d'archivio (riassunto e vettore restano lì). Si ripete senza doppioni: una scheda già legata, o che ha già
+  // una visita del suo indirizzo mentre era aperta, non rientra; una che una cancellazione copre non si scrive.
+  function entranoSchedeChiuse(schede, { unaVolta = false } = {}) {
+    return transazione(async (t) => {
+      if (t.incognito) return 0;
+      const segno = path.join(dir(), FILE_SCHEDE_ENTRATE);
+      if (unaVolta) { try { await fsp.access(segno); return 0; } catch (_) {} }
+      const st = normale.stato;
+      const legate = new Set();
+      const perUrl = new Map();
+      for (const p of st.pagine.values()) {
+        if (p.archivio) legate.add(p.archivio);
+        if (!perUrl.has(p.url)) perUrl.set(p.url, []);
+        perUrl.get(p.url).push(Date.parse(p.ts));
+      }
+      const eventi = [];
+      const ordinate = (Array.isArray(schede) ? schede : [])
+        .filter((s) => s && typeof s.id === 'string' && typeof s.url === 'string' && /^(https?|file):/i.test(s.url))
+        .map((s) => ({ s, t: Date.parse(s.openedAt) || Date.parse(s.closedAt) }))
+        .filter((x) => Number.isFinite(x.t))
+        .sort((a, b) => a.t - b.t);
+      for (const { s, t: inizio } of ordinate) {
+        if (legate.has(s.id)) continue;
+        const fine = Date.parse(s.closedAt) || inizio;
+        const viste = perUrl.get(s.url) || [];
+        if (viste.some((x) => x >= inizio - MARGINE_SCHEDA_MS && x <= fine + MARGINE_SCHEDA_MS)) continue;
+        eventi.push(t.evento(E().TIPI.NAVIGAZIONE, {
+          url: s.url, titolo: String(s.title && s.title !== s.url ? s.title : ''), archivio: s.id,
+        }, { autore: 'utente', ts: new Date(inizio).toISOString() }));
+      }
+      const { scritti } = eventi.length ? await t.scrivi(eventi) : { scritti: [] };
+      if (unaVolta) {
+        try { await fsp.mkdir(dir(), { recursive: true }); await fsp.writeFile(segno, new Date().toISOString() + '\n', 'utf8'); }
+        catch (e) { console.warn('[Filo] segno delle schede chiuse non scritto:', e?.message || e); }
+      }
+      return scritti.length;
+    }, { incognito: false });
+  }
+
   function resetIncognito() {
     incognito = { stato: E().nuovoStato(), eventi: [] };
   }
@@ -331,7 +426,8 @@ function creaFilo({ cartella } = {}) {
   }
 
   return {
-    carica, transazione, chats, chat, pagine, registraVisita, aggiornaTitolo, cancellaPagine, esporta, importa, importaChatSalvate,
+    carica, transazione, chats, chat, perLaCoda, pagine, dove, ultimaDomanda, entranoSchedeChiuse, registraVisita, aggiornaTitolo, cancellaPagine, cancellaVisite, suPagineTolte,
+    esporta, importa, importaChatSalvate,
     resetIncognito, dispositivo, quandoFermo, percorso: fileEventi,
   };
 }
