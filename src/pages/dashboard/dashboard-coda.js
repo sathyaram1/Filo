@@ -486,6 +486,7 @@
     });
     try {
       global.chrome.runtime.onMessage.addListener((m) => {
+        if (m && m.type === MSG.FILO_PAGINE_TOLTE) { ripassaPagine().catch(() => {}); return; }
         if (!m || m.type !== MSG.CAMBI_AGGIORNATI) return;
         clearTimeout(attesaCambi);
         attesaCambi = setTimeout(() => {
