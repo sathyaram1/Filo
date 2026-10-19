@@ -36,7 +36,15 @@ export const MCP_SENZA_LETTURA = Object.freeze([
   'mcp__Claude_Code_Remote__unarchive_session',
   'mcp__Claude_Code_Remote__interrupt_session',
   'mcp__Claude_Code_Remote__unwatch_url',
+  // L'app desktop: la lista dei passi e il riassunto del turno vanno all'app, e torna solo la sua conferma (#1252).
+  'mcp__ccd_turn__update_plan',
+  'mcp__ccd_turn__wrap_up',
 ]);
+// Strumenti dell'app desktop noti per nome ma non per server: valgono sotto un server ccd_ qualsiasi. Le sue letture
+// (eventi di altre sessioni, widget, browser) non ci stanno e sporcano.
+export const CCD_SENZA_LETTURA = Object.freeze(['mark_chapter']);
+const RE_CCD_SENZA_LETTURA = new RegExp(`^mcp__ccd(?:_[A-Za-z0-9-]+)+__(?:${CCD_SENZA_LETTURA.join('|')})$`);
+const mcpSenzaLettura = (nome) => MCP_SENZA_LETTURA.includes(nome) || RE_CCD_SENZA_LETTURA.test(nome);
 
 const pulisci = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, n);
 
