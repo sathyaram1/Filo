@@ -1020,13 +1020,24 @@
     // ── Funzionalità (interruttori) — reversibili, nessun rischio → costo 1 ──
     {
       scrive: ['featureFlags.spellcheck'],
-      aiuto: 'true | false (correttore ortografico AI)',
+      aiuto: 'true | false (correttore AI della lingua: lo zigzag blu)',
       costo: 1,
-      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione'],
+      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione', 'zigzag blu'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { featureFlags: { spellcheck: b } }, label: `Correttore ortografico → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    {
+      scrive: ['featureFlags.spellcheckContext'],
+      aiuto: 'true | false (coerenza col contesto della pagina: i puntini ocra sotto giorni, date e nomi che non tornano)',
+      costo: 1,
+      keys: ['coerenza', 'controllo coerenza', 'controllo di coerenza', 'coerenza col contesto', 'puntini ocra', 'sottolineatura ocra', 'incoerenze', 'contraddizioni'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { featureFlags: { spellcheckContext: b } }, label: `Controllo di coerenza → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
     {

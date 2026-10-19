@@ -94,6 +94,18 @@ module.exports = function register(on, ctx) {
     try { return Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) { return true; }
   }
 
+  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: il controllo di coerenza
+  // (#1115) parte col solo testo di chi scrive, e lo dice alla pagina, che allora non ha citazioni da confrontare.
+  async function senzaPaginaDelicata(msg, sender) {
+    if (!msg || msg.action !== SN_CONST.ACTIONS.SPELLCHECK_CONTEXT || !msg.payload) return false;
+    const url = String(sender?.tab?.url || sender?.url || '');
+    if (!/^https?:/i.test(url)) return false;
+    let delicata = true;
+    try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
+    if (delicata) msg.payload = { ...msg.payload, contesto: {} };
+    return delicata;
+  }
+
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
   // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
@@ -113,6 +125,7 @@ module.exports = function register(on, ctx) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
+    const senzaContesto = await senzaPaginaDelicata(msg, sender);
     // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
     const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
     if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
@@ -142,7 +155,7 @@ module.exports = function register(on, ctx) {
     const Cont = globalThis.SN_CONTATORI_MAIN;
     const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
     if (lettura) await lettura;
-    return { ok: true, ...r };
+    return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
   });
 
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────

@@ -169,7 +169,11 @@
     },
     altro: {
       titolo: 'Altro',
-      campi: { blocklist: 'blocklist' },
+      campi: {
+        blocklist: 'blocklist',
+        spellcheckBlu: 'featureFlags.spellcheck',
+        spellcheckOcra: 'featureFlags.spellcheckContext',
+      },
       gruppi: {},
       fuori: {},
       messaggi: {

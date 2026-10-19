@@ -16,6 +16,11 @@
     document.title = I18n.t('options_title') + ' — ' + I18n.t('options_other');
     $('title').textContent = I18n.t('options_other');
     $('backToModels').textContent = I18n.t('options_back_to_models');
+    $('h-correttore').textContent = 'Correttore';
+    for (const [id, chiave] of [['spellcheckBlu', 'spell_switch_blu'], ['spellcheckOcra', 'spell_switch_ocra']]) {
+      $(`${id}-label`).textContent = I18n.t(chiave);
+      $(`${id}-desc`).textContent = I18n.t(`${chiave}_desc`);
+    }
     $('h-blocklist').textContent = I18n.t('options_blocklist');
     $('blocklistDesc').textContent = I18n.t('options_blocklist_desc');
     $('h-categories').textContent = I18n.t('options_categories');
@@ -56,6 +61,7 @@
     disegnaScorciatoie(settings);
     $('blocklist').value = Siti.testoDaElenco(settings.blocklist);
     mostrato = $('blocklist').value;
+    for (const [id, flag] of INTERRUTTORI) $(id).checked = settings.featureFlags?.[flag] !== false;
     await renderCategories();
   }
 
@@ -189,6 +195,13 @@
     mostraSalvato._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
+  // I due segni del correttore stanno insieme qui e nella chat (#1115): ognuno si spegne da solo.
+  const INTERRUTTORI = [['spellcheckBlu', 'spellcheck'], ['spellcheckOcra', 'spellcheckContext']];
+  async function salvaInterruttore(id, flag) {
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { featureFlags: { [flag]: $(id).checked } } });
+    mostraSalvato();
+  }
+
   // L'elenco come la pagina l'ha letto o scritto l'ultima volta: un cambio arrivato da altrove (la chat, il tasto
   // destro) si mostra solo se qui non si sta scrivendo (#949). Le righe che non sono siti restano al loro posto.
   let mostrato = null;
@@ -240,11 +253,12 @@
       const el = $('blocklist');
       const scritti = Siti.elencoDaTesto(el.value).valid;
       // Uno stesso elenco con altre righe vuote non si riscrive: chi scrive perderebbe l'a capo appena battuto.
-      if (el.value !== mostrato || JSON.stringify(scritti) === JSON.stringify(msg.settings.blocklist || [])) return;
+      const tieniElenco = el.value !== mostrato || JSON.stringify(scritti) === JSON.stringify(msg.settings.blocklist || []);
       const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings, {
+        salta: (id) => id === 'blocklist' && tieniElenco,
         elenco: (_id, lista) => Siti.testoDaElenco(lista, scartate),
       });
-      if (toccati.length) mostrato = el.value;
+      if (toccati.includes('blocklist')) mostrato = el.value;
     });
   }
 
@@ -256,6 +270,7 @@
       caselle.cambiato('blocklist', e);
     });
     $('blocklist').addEventListener('change', () => save({ riscrivi: true }));
+    for (const [id, flag] of INTERRUTTORI) $(id).addEventListener('change', () => salvaInterruttore(id, flag));
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
     // riportata a fuoco invece di duplicarla.

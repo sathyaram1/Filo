@@ -333,6 +333,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
   safe(path.join(CONTENT, 'sidebar.js'));
+  safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
   safe(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2

@@ -897,7 +897,7 @@ service cloud.firestore {
       function funzioniContate() {
         return [
           'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
-          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic',
+          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
           'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
           'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
           'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',

@@ -118,6 +118,7 @@
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'notifications.soundVolume': { nome: 'volume del suono delle notifiche', valore: (v) => `${numero(v)}%`, livello: 1 },
     'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
+    'featureFlags.spellcheckContext': { nome: 'controllo di coerenza col contesto', valore: ATTIVO, livello: 1 },
     'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
     'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
