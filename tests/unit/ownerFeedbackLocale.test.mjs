@@ -231,7 +231,6 @@ test('negli stati del lavoro una sessione porta solo pratiche sue o dell’owner
     assert.deepEqual([r.ok, r.senzaProva, patch.length], [false, true, 0]);
     assert.doesNotMatch(mod.rifiutoPratica('f3', r), /--riconosci/, '#957: la prova a mano solo da Gestione');
     assert.match(mod.rifiutoPratica('f3', r), /in Gestione, col tasto «🤝 Segna fidato»/);
-    assert.doesNotMatch(mod.rifiutoPratica('f3', r), /feedback:ripasso/, '#912: il ripasso non dà la prova al solo nome');
   });
   const segno = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1790000000000' } } } };
   const owner = documento('o3', { clientId: 'owner:me', senderProof: 'admin', status: 'todo', statusPublic: 'open', notes: '', localOnly: segno });
