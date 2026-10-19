@@ -387,9 +387,17 @@
       if (!res || !res.ok || !primo) return;
       const da = ms(primo);
       const gruppi = new Map((res.elementi || []).filter((v) => v.k === 'pagine' && ms(v.ts) >= da).map((v) => [v.key, v]));
+      const perPagina = new Map();
+      for (const v of gruppi.values()) for (const p of v.pagine) perPagina.set(p.id, v);
       for (const r of [...d.bubblesEl.querySelectorAll('.dash-pagine')]) {
-        const v = gruppi.get(r.dataset.key);
-        if (v) { disegnaGruppo(r, v); gruppi.delete(r.dataset.key); } else r.remove();
+        // La riga resta la stessa (aperta, al suo posto) anche quando il gruppo ha cambiato nome.
+        const v = gruppi.get(r.dataset.key)
+          || ((r._gruppo && r._gruppo.pagine) || []).map((p) => perPagina.get(p.id)).find((x) => x && gruppi.has(x.key));
+        if (!v) { r.remove(); continue; }
+        gruppi.delete(v.key);
+        r.dataset.key = v.key;
+        r.dataset.ts = v.ts;
+        disegnaGruppo(r, v);
       }
       for (const v of gruppi.values()) metti(v, { scorri: false });
       segnaGiorni();
