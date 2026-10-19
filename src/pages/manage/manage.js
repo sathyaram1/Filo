@@ -6658,10 +6658,10 @@
     const aperto = fsPannelloAperto();
     if (!nuovi.length && !via.size && !aperto) return;
     if (nuovi.length || via.size) {
-      const perId = new Map();
-      for (const f of fsFeedbacks) if (f && f._id && !via.has(f._id)) perId.set(f._id, f);
-      for (const f of nuovi) if (f && f._id) perId.set(f._id, f);
-      fsFeedbacks = Array.from(perId.values());
+      // Il giro rilegge una PROIEZIONE: sostituita al documento intero si
+      // portava via l'esito del controllo di sicurezza (#677.5). Si fonde come
+      // fa la lista.
+      fsFeedbacks = LIVE.applyChanges(fsFeedbacks, { fresh: nuovi, removed: Array.from(via) });
     }
     // Il registro delle esecuzioni è l'ALTRA sorgente, e cammina per conto
     // suo: un'esplorazione che non trova niente lo fa crescere senza toccare
