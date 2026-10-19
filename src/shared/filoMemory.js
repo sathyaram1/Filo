@@ -308,19 +308,18 @@
   }
 
   // Dopo il compattatore: i moduli toccati prendono testo e righe del quaderno insieme, e dal buffer escono solo le
-  // lezioni che ha letto (quelle arrivate mentre lavorava aspettano il giro dopo). Una riga tolta dall'utente mentre
-  // il modello scriveva non torna con la sua uscita.
-  async function applicaCompattazione({ patch, righe, usate = [], inizio = null }) {
+  // lezioni che ha letto (quelle arrivate mentre lavorava aspettano il giro dopo). Se mentre il modello scriveva
+  // l'utente ha corretto, tolto o rimesso una riga (`versione` letta all'inizio), l'uscita non si applica: memoria e
+  // lezioni restano come le ha lasciate lui, e il giro dopo riparte da lì. Torna se l'ha applicata.
+  async function applicaCompattazione({ patch, righe, usate = [], versione }) {
     const meta = await getFonti();
-    const t0 = inizio ? Date.parse(inizio) : NaN;
-    const tolteDopo = Number.isFinite(t0) ? meta.nascoste.filter((n) => n.testo && Date.parse(n.tolta) >= t0) : [];
+    if (Number.isFinite(versione) && (meta.versione || 0) !== versione) return false;
     if (patch && Object.keys(patch).length) {
       const testi = {};
       for (const [nome, testo] of Object.entries(patch)) {
         const l = (righe && righe[nome]) || Q().righeDi(testo).map((t) => ({ testo: t, fonti: [], nata: null }));
-        const restano = l.filter((r) => !tolteDopo.some((n) => Q().simile(r.testo, n.testo)));
-        testi[nome] = restano.map((r) => r.testo).join('\n');
-        meta.righe[nome] = restano;
+        testi[nome] = l.map((r) => r.testo).join('\n');
+        meta.righe[nome] = l;
       }
       await patchMemory(testi);
       await setFonti(meta);
