@@ -438,8 +438,8 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     await submit(page, '/set timer abc');
     // Nessun timer creato.
     await expect(page.locator('#accade .dash-carta[data-tipo="timer"]')).toHaveCount(0);
-    // Filo risponde con l'uso corretto nel thread.
-    await expect(page.locator('.dash-bubble')).toContainText(/set timer/i, { timeout: 8_000 });
+    // Filo risponde con l'uso corretto in fondo al filo, dopo gli scambi delle prove prima (#869).
+    await expect(page.locator('#bubbles .dash-bubble').last()).toContainText(/set timer/i, { timeout: 8_000 });
   });
 
   test('"/set timer" con durata malformata coi due punti non crea timer', async () => {
