@@ -95,12 +95,33 @@ async function togliSchedeChiuse(schede, opts) {
     perUrl.get(s.url).push({ da: Number.isFinite(da) ? da : -Infinity, a: Number.isFinite(a) ? a : Infinity });
   }
   if (!perUrl.size) return 0;
-  const visite = (await F().pagine(null, opts)).filter((p) => {
+  const tutte = await F().pagine(null, opts);
+  const via = new Set(tutte.filter((p) => {
     const t = Date.parse(p.ts);
     return (perUrl.get(p.url) || []).some((r) => t >= r.da && t <= r.a);
-  });
-  if (!visite.length) return 0;
-  return F().cancellaVisite(visite.map((p) => ({ ts: p.ts, sito: C().sito(p.url), url: p.url })), opts, { schedeChiuse: false });
+  }).map((p) => p.id));
+  if (!via.size) return 0;
+  return F().cancellaVisite(file(tutte, via), opts, { schedeChiuse: false });
+}
+
+// Ogni cancellazione resta nel filo per sempre e si ripassa a ogni avvio: «Svuota archivio» non ne scrive una per visita.
+// Per sito, una sola per ogni fila di visite da togliere senza in mezzo una da tenere dello stesso sito.
+function file(tutte, via) {
+  const host = (u) => { try { return new URL(u).hostname.toLowerCase().replace(/^www\./, ''); } catch (_) { return ''; } };
+  const delHost = (h, s) => (s.includes('.') ? h === s || h.endsWith(`.${s}`) : h.split('.').includes(s));
+  const ordinate = tutte.map((p) => ({ p, h: host(p.url), t: Date.parse(p.ts) }))
+    .filter((x) => x.h && Number.isFinite(x.t)).sort((a, b) => a.t - b.t);
+  const out = [];
+  for (const s of new Set(ordinate.filter((x) => via.has(x.p.id)).map((x) => x.h))) {
+    let fila = null;
+    for (const x of ordinate) {
+      if (!delHost(x.h, s)) continue;
+      if (!via.has(x.p.id)) { if (fila) out.push(fila); fila = null; } else if (fila) fila.a = x.p.ts;
+      else fila = { ts: x.p.ts, da: x.p.ts, a: x.p.ts, sito: s };
+    }
+    if (fila) out.push(fila);
+  }
+  return out;
 }
 
 // Dalla ricerca si toglie una pagina, non una visita: tutte le sue visite e le schede chiuse con quell'indirizzo.
