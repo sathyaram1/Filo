@@ -66,6 +66,11 @@
   // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
   // Ignoriamo silenziosamente le ricerche oltre questo limite.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
+  // Ogni passo che l'Aiuto fa da solo è una chiamata pagata, e una pagina può chiederne all'infinito (#1049): oltre il
+  // tetto di fila si ferma e chiede. Largo, perché aprire una a una trenta sezioni è un uso vero e costa solo un clic.
+  const MAX_PASSI_DA_SOLO = 20;
+  let passiDaSolo = 0;
+  let continuaAperto = null;
 
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
   function isOpen() { return !!(root && root.isConnected); }
@@ -99,6 +104,8 @@
     ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
+    passiDaSolo = 0;
+    continuaAperto = null;
     session = newSession();
     // Ogni apertura è una conversazione sua anche nel filo.
     convFilo = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
@@ -1432,14 +1439,53 @@
     });
   }
 
+  // Il passo che non parte resta nella cronologia con la fermata, così il modello sa a che punto era anche se l'utente
+  // poi scrive altro; «Continua» sta nel documento del sito, e lo preme solo un gesto vero (#592.6).
+  function fermaPassiDaSolo(nota, dati, dopoDocumenti) {
+    if (continuaAperto) return;
+    const fermo = `Poi Filo ti ha fermato: avevi fatto ${MAX_PASSI_DA_SOLO} passi da solo di fila senza che l'utente toccasse niente, `
+      + 'e il passo dopo parte solo se te lo chiede lui';
+    const prima = String(nota || '').replace(/[\s.]+$/, '');
+    history.push({
+      role: 'user',
+      kind: 'action',
+      content: PROMPTS.turnoAutomaticoAiuto({ nota: prima ? `${prima}. ${fermo}` : fermo, dati, perCronologia: true }),
+    });
+    const riga = appendActionLog('');
+    if (!riga) return;
+    riga.classList.add('sn-sidebar-log-intera', 'sn-sidebar-log-passi');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-log-ferma';
+    btn.textContent = 'Continua';
+    btn.title = `Altri ${MAX_PASSI_DA_SOLO} passi`;
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e) || btn.disabled) return;
+      btn.disabled = true;
+      if (continuaAperto === btn) continuaAperto = null;
+      submit({ userAction: 'l\'utente ha chiesto di proseguire da dove ti eri fermato', preActionUrl: location.href, daGesto: true, dopoDocumenti });
+    });
+    riga.append(`mi sono fermato dopo ${MAX_PASSI_DA_SOLO} passi fatti da solo `, btn);
+    continuaAperto = btn;
+    expand({ ai: true });
+  }
+
   // submit({ userMessage }) — invio iniziale o domanda dell'utente
   // submit({ userAction }) — proseguimento automatico dopo un'azione utente
   // submit({ userAction, esterno }) — idem, quando la nota deve nominare
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false } = {}) {
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
     if (!root) return;
+    // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
+    if (userMessage || daGesto) {
+      passiDaSolo = 0;
+      if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
+    } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
+      fermaPassiDaSolo(userAction, esterno, dopoDocumenti);
+      return;
+    }
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
     // (dopo un click sul target) mantieni lo stato attuale: evita che il box
@@ -1880,6 +1926,7 @@
       userAction: aiNote,
       esterno: { elementoPagina: { etichetta: label, selettore: highlight.selector } },
       preActionUrl,
+      daGesto: true,
     });
   }
 
