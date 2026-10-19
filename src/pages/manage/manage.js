@@ -5629,8 +5629,8 @@
 
     const html = `
       <div class="mg-sender-info">
-        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId }))}</strong></div>
-        <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
+        <div class="mg-sender-stat"><strong>${esc(senderLabel(group[0] || { clientId: mittente }))}</strong></div>
+        <div class="mg-sender-stat">${esc(mittente === '__anon__' ? 'anonimo' : mittente)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
         <div class="mg-sender-segno" id="mgSideSegno" hidden></div>
