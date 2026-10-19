@@ -38,6 +38,7 @@ function confronta(trovati, inventario, cosa) {
 const CARTELLA_DATI = {
   'storage.json': { frase: 'Tutto quello che Filo sa di te vive nella sua cartella dei dati' },
   'identity.bin': { frase: 'un account anonimo che Filo crea da solo' },
+  'preload-pacchetto': { perche: 'il codice di Filo per le pagine web, ricomposto all\'avvio fuori dal pacchetto (npm start, i test): niente di chi usa l\'app' },
   'wallet.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },
   'wallet-stato.bin': { frase: 'l\'ultimo stato del tuo portafoglio letto dal server' },
   'auth.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },
@@ -76,6 +77,7 @@ const COLLEZIONI = {
   '/counters/{name}': { perche: 'il numero progressivo dei feedback: quanti ne sono arrivati, niente di chi scrive' },
   '/credits/{uid}': { frase: 'Con il login Google c\'è un secondo documento' },
   '/wallet-usage/{id}': { frase: 'Filo scrive anche un registro d\'uso' },
+  '/contatori-giornalieri/{docId}': { frase: 'Una volta al giorno, al primo avvio, Filo manda al server i numeri del giorno prima' },
   '/wallet-accounts/{uid}': { frase: 'tiene un documento con il tuo pseudonimo' },
   '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
   '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },

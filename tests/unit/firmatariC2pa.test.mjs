@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { pngFirmato, certificato, elencoPem, USO_MARCA } from '../helpers/immagineFirmata.mjs';
+import { letturaIsolata } from '../helpers/letturaIsolata.mjs';
 
 process.env.NODE_ENV = 'test';
 const DATI = cartellaTemporanea('filo-firmatari-');
@@ -18,6 +19,8 @@ process.env.FILO_USER_DATA = DATI;
 const require = createRequire(import.meta.url);
 require('../../src/shared/provenienzaImmagine.js');
 const F = require('../../src/main/services/firmatariC2pa.js');
+// Qui e non alla prima lettura: un pacchetto che manca fa cadere il file subito, col suo nome (#1231).
+const isolata = letturaIsolata();
 const P = globalThis.SN_PROVENIENZA;
 
 const RADICE = certificato({ organizzazione: 'Autorità di prova', nomeComune: 'Radice', ca: true });
@@ -36,12 +39,9 @@ globalThis.fetch = async (url) => {
   return new Response(r.corpo, { status: r.stato || 200, headers: { 'Content-Type': 'text/plain', 'Content-Length': String(Buffer.byteLength(r.corpo)) } });
 };
 // I tempi limite del modulo (lo scaricamento, il thread di lettura, l'attesa della prima volta) non scadono da soli.
-// Il thread di lettura non tiene vivo il processo e i timer finti nemmeno: lo tiene vivo un intervallo vero.
-const vivo = setInterval(() => {}, 60_000);
 beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
 afterEach(() => mock.timers.reset());
 after(() => {
-  clearInterval(vivo);
   globalThis.fetch = fetchVero;
   togliCartella(DATI);
 });
@@ -106,12 +106,12 @@ test('alla prima immagine firmata, un elenco in arrivo si aspetta invece di dire
   assert.ok(togliCartella(join(DATI, 'firmatari-c2pa')));
   let apri;
   risposte.set('/lento.pem', { corpo: elencoPem(RADICE), cancello: new Promise((r) => { apri = r; }) });
-  // L'elenco arriva solo dopo che la prima lettura dell'immagine lo ha trovato ancora in viaggio.
-  const isolata = require('../../src/main/services/provenienzaIsolata.js');
+  // L'elenco arriva solo dopo che la prima lettura dell'immagine lo ha trovato ancora in viaggio. Si apre anche se la
+  // lettura fallisce: rimasto chiuso, l'aggiornamento resterebbe in corso e le prove dopo lo aspetterebbero per sempre.
   const vera = isolata.analizza;
-  t.after(() => { isolata.analizza = vera; });
-  isolata.analizza = (...a) => vera(...a).then((r) => { setImmediate(apri); return r; });
+  isolata.analizza = (...a) => vera(...a).finally(() => setImmediate(apri));
   const giro = F.aggiorna({ forza: true, url: `${base}/lento.pem` });
+  t.after(() => { isolata.analizza = vera; apri(); return giro; });
   const r = await F.analizzaImmagine(IMMAGINE);
   assert.equal(r.firmatario, 'riconosciuto');
   await giro;

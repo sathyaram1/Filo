@@ -14,7 +14,7 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, oraLocale, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
-import { ENV_FILE as ENV_BIGLIETTO, attesePc, fineAttesa, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
 import { fusioniServer } from './lib/fusioni-server.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
 import { ensureCommentChar } from './lib/carattere-commento.mjs';
@@ -348,6 +348,28 @@ function pubblicaDavvero(P) {
   return esegui('npm', ['run', 'server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
 }
 
+/** L'automazione `file` è su main di filo-security: deploy.yml pubblica ogni spinta, regole.yml le regole ogni ora (#1159 fase 2). In dubbio no. */
+async function automazioneSuMain(P, file) {
+  if (!P.serverRadice) return false;
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.serverRadice });
+  if (f.code !== 0) return false;
+  return (await esegui('git', ['cat-file', '-e', `refs/remotes/origin/main:.github/workflows/${file}`], { cwd: P.serverRadice })).code === 0;
+}
+
+/**
+ * main di Filo appena letto da origin, in una cartella sua fuori dal repo (un worktree staccato): le prove di server:fondi
+ * lo leggono con le parti dell'app appena fuse (#1222). → { dir, togli() } | null.
+ */
+async function filoDiMain(P) {
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.radice });
+  if (f.code !== 0) return null;
+  const dir = join(P.note, `filo-main-${Date.now()}`);
+  mkdirSync(P.note, { recursive: true });
+  const w = await esegui('git', ['worktree', 'add', '--detach', '--quiet', dir, 'refs/remotes/origin/main'], { cwd: P.radice });
+  if (w.code !== 0) return null;
+  return { dir, togli: () => esegui('git', ['worktree', 'remove', '--force', dir], { cwd: P.radice }) };
+}
+
 function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
@@ -377,6 +399,8 @@ function depVere(P, opz, log) {
       return { ...verifyLocal.verdictForCurrentBranch(wt), dirty: verifyLocal.isDirty(wt) };
     },
     pubblica: () => pubblicaDavvero(P),
+    pubblicaGitHub: () => automazioneSuMain(P, 'deploy.yml'),
+    regoleGitHub: () => automazioneSuMain(P, 'regole.yml'),
     carico,
     dormi: (ms) => new Promise((ok) => setTimeout(ok, ms)),
     log,
@@ -422,6 +446,8 @@ function depAVuoto(P, stato, log) {
       return {};
     },
     pubblica: async () => { log(`[a vuoto] (${join(P.serverRadice, 'functions')}) npm run server:pubblica`); return { code: 0, out: '' }; },
+    pubblicaGitHub: async () => false,
+    regoleGitHub: async () => false,
     carico: async () => ({ cpu: 0, liberaGB: 99 }),
     dormi: () => new Promise((ok) => setImmediate(ok)),
     log,
@@ -552,9 +578,10 @@ async function main(argv) {
     return 0;
   }
 
-  // I lavori server passati in cloud aspettano il PC (#1159): fusione, deploy, e la parte dell'app torna alle routine.
+  // I lavori server passati in cloud aspettano il PC (#1159): prima la parte dell'app, poi il server, poi il deploy.
   const depFusioni = (log) => ({
-    attese: () => attesePc(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P), log, radice: P.radice,
+    attese: () => attesePcConStato(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P),
+    fondiApp: (id) => fondiApp(id), filoDiMain: () => filoDiMain(P), log, radice: P.radice,
   });
   const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
 

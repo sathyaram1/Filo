@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Quaderno delle memorie</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/storage.js"></script>
+  <script src="filo://shared/icons.js"></script>
+  <script src="filo://shared/confirmUi.js"></script>
+  <style>
+    /* Il quaderno (#872): pagine di carta a righe, una colonna per argomento, che si prendono tutta la larghezza. */
+    .sn-page.qd { max-width: none; padding: 28px clamp(16px, 3vw, 40px) 64px; }
+    .qd-testa { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+    .qd-testa h1 { margin: 0; }
+    .qd-esito { font-size: 13px; color: var(--sn-muted); min-height: 1.4em; }
+    .qd-esito[hidden] { display: none; }
+    .qd-esito button { border: 0; background: transparent; color: var(--sn-accent); cursor: pointer; font: inherit; padding: 0 4px; border-radius: 4px; }
+    .qd-esito button:hover { background: var(--sn-hover); }
+    .qd-gruppi { columns: 360px; column-gap: 28px; }
+    .qd-gruppo { break-inside: avoid; margin: 0 0 26px; }
+    .qd-gruppo[hidden] { display: none; }
+    .sn-page .qd-gruppo h2 { margin: 0 0 6px; font-size: 15px; display: flex; align-items: baseline; gap: 8px; }
+    .qd-conto { font-size: 12px; font-weight: 400; color: var(--sn-muted); }
+    .qd-riga {
+      display: flex; align-items: flex-start; gap: 8px; padding: 7px 6px 6px;
+      border-bottom: 1px solid color-mix(in srgb, var(--sn-border) 70%, transparent);
+      border-radius: 6px 6px 0 0;
+      transition: background calc(0.15s * var(--sn-motion, 1)) ease;
+    }
+    .qd-riga:hover, .qd-riga:focus-within { background: var(--sn-hover); }
+    .qd-riga.qd-viva { animation: qd-luce calc(1.2s * var(--sn-motion, 1)) ease-out; }
+    @keyframes qd-luce { from { background: rgba(var(--sn-accent-rgb), 0.22); } to { background: transparent; } }
+    .qd-corpo { flex: 1 1 auto; min-width: 0; }
+    .qd-testo { display: block; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
+    .qd-meta { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--sn-muted); margin-top: 2px; }
+    .qd-meta[hidden] { display: none; }
+    .qd-meta > * + *::before { content: '· '; color: var(--sn-muted); }
+    .qd-salto { border: 0; background: transparent; color: var(--sn-link); cursor: pointer; font: inherit; padding: 0 3px; margin: 0 -3px; border-radius: 4px; }
+    .qd-salto:hover, .qd-salto:focus-visible { background: rgba(var(--sn-accent-rgb), 0.12); text-decoration: underline; }
+    .qd-tasti { display: flex; gap: 2px; flex: 0 0 auto; opacity: 0; transition: opacity calc(0.15s * var(--sn-motion, 1)) ease; }
+    .qd-riga:hover .qd-tasti, .qd-riga:focus-within .qd-tasti { opacity: 1; }
+    .qd-tasto { border: 0; background: transparent; color: inherit; cursor: pointer; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; padding: 0; opacity: 0.6; transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease; }
+    .qd-tasto:hover, .qd-tasto:focus-visible { opacity: 1; background: color-mix(in srgb, var(--sn-fg) 8%, transparent); }
+    .qd-tasto.qd-via:hover { color: var(--sn-error); }
+    .qd-tasto svg { width: 15px; height: 15px; }
+    .qd-campo { width: 100%; box-sizing: border-box; font: inherit; line-height: 1.45; resize: none; overflow: hidden; }
+    .qd-errore { color: var(--sn-error); font-size: 12px; margin-top: 2px; }
+    .qd-errore[hidden] { display: none; }
+    .qd-nascosta .qd-testo { opacity: 0.6; }
+    .qd-nascoste summary { cursor: pointer; font-size: 13px; color: var(--sn-muted); padding: 4px 0; list-style: none; }
+    .qd-nascoste summary::-webkit-details-marker { display: none; }
+    .sn-page .qd-nascoste summary h2 { border-bottom: 0; padding-bottom: 0; margin: 0; }
+    .qd-nascoste summary:hover { color: var(--sn-fg); }
+    .qd-nascoste summary::before { content: '▸ '; }
+    .qd-nascoste[open] summary::before { content: '▾ '; }
+    .qd-vuoto { color: var(--sn-muted); padding: 40px 0; font-size: 15px; }
+    .qd-vuoto[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <main class="sn-page qd">
+    <div class="qd-testa">
+      <h1>Quaderno delle memorie</h1>
+      <span id="esito" class="qd-esito" aria-live="polite" hidden></span>
+    </div>
+    <p id="vuoto" class="qd-vuoto" hidden>Filo non ha ancora imparato niente su di te.</p>
+    <div id="gruppi" class="qd-gruppi"></div>
+  </main>
+  <script src="quaderno.js"></script>
+</body>
+</html>

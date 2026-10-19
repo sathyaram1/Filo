@@ -31,6 +31,7 @@
     isBlocked: () => isBlocked(),
     isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
+    spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
   MenuIcons.init({
     isContentFullscreen: () => contentFullscreen,
@@ -185,6 +186,8 @@
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
     self.SN_AVVISI?.imposta(settings.notifications);
+    // I tasti di Spiega e Aiuto scelti dall'utente: il menu li scrive accanto alle voci (#842).
+    Tasti.usaScorciatoieFilo(settings.scorciatoie);
 
     // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
     // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
@@ -330,10 +333,13 @@
       if (escInoltrato) return;
       escInoltrato = true;
       try {
-        document.dispatchEvent(new KeyboardEvent('keydown', {
+        const tasto = new KeyboardEvent('keydown', {
           key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
           bubbles: true, cancelable: true, composed: true,
-        }));
+        });
+        // Segnato come nostro: il primo ascolto della pagina lo dà ai riquadri di Filo prima che al sito (#859).
+        try { self.SN_FILO_UI?.nostro?.(tasto); } catch (_) {}
+        document.dispatchEvent(tasto);
       } catch (_) {}
       escInoltrato = false;
     };
@@ -421,16 +427,10 @@
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) {
-      self.__snFiloSpento = true;
-      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
-      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
-      });
-      return;
-    }
-
-    SpellCheck.init(settings);
+    // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
+    // isBlocked() quando scatta. Il ponte del tasto destro lo legge da qui, prima di dare l'evento al menu.
+    seguiSpento();
+    SpellCheck.init(isBlocked() ? { ...settings, featureFlags: { ...(settings.featureFlags || {}), spellcheck: false } } : settings);
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
@@ -453,7 +453,7 @@
       if (typeof self.__snSetMenuDelSitoPrima === 'function') self.__snSetMenuDelSitoPrima(menuDelSitoPrima);
     } else {
       window.addEventListener('contextmenu', (e) => {
-        if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
+        if (e.defaultPrevented || isBlocked()) return; // la pagina interna ha il SUO menu
         onContextMenu(e);
       });
     }
@@ -466,6 +466,8 @@
       document.addEventListener(tipo, (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
     }
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      // Spento sul sito tacciono le azioni sulla pagina; lo stato (impostazioni, schermo intero) si segue lo stesso.
+      if (isBlocked() && AZIONI_DA_FUORI.has(msg?.type)) return;
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
@@ -553,6 +555,17 @@
 
     // Primo campione dello scroll iniziale (alcune pagine aprono già scrollate).
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+  }
+
+  // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+
+  // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
+  // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
+  function seguiSpento() {
+    const spento = isBlocked();
+    if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
+    self.__snFiloSpento = spento;
   }
 
   function isBlocked() {
@@ -784,13 +797,21 @@
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
     // parola sotto il cursore (zigzag rosso del browser).
     try {
-      if (settings?.featureFlags?.spellcheck !== false && SpellCheck) {
+      const bluAttivo = settings?.featureFlags?.spellcheck !== false;
+      // Il segno ocra (#1115) ha il suo interruttore: col blu spento il suo menu resta.
+      const ocra = SpellCheck && SpellCheck.ocraAttiva?.() ? SpellCheck.findSupportedEditable(realTarget(e)) : null;
+      const ocraIssue = ocra ? SpellCheck.getContextIssueAt(ocra, e.clientX, e.clientY) : null;
+      if (ocraIssue && !bluAttivo) {
+        await openSpellBlueMenu(ocra, null, e, sito, ocraIssue);
+        return;
+      }
+      if (bluAttivo && SpellCheck) {
         const rt = realTarget(e);
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
           const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
-          if (blueIssue) {
-            await openSpellBlueMenu(editableEl, blueIssue, e, sito);
+          if (blueIssue || ocraIssue) {
+            await openSpellBlueMenu(editableEl, blueIssue, e, sito, ocraIssue);
             return;
           }
           const wordCtx = SpellCheck.getWordAt(editableEl, e.clientX, e.clientY);
@@ -1610,6 +1631,10 @@
     // il contesto è cambiato. In entrambi i casi potremmo finire per mostrare una
     // correzione che inizialmente non era visibile.
     const refireInBackground = !cached || contextChanged;
+    // La correzione preparata mentre si scriveva, mostrata adesso: è qui che la persona usa il correttore (#969).
+    if (!refireInBackground) {
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action: ACTIONS.SPELLCHECK_WORD, attesaMs: 0 })).catch(() => {}); } catch (_) {}
+    }
 
     let updateCorrection = null;
 
@@ -1733,36 +1758,73 @@
   // Click destro su un range "blu" (issue contestuale già rilevata): la correzione
   // (o l'esplicazione del problema) è già pronta, niente loading. Click sulla riga
   // = applica; freccetta = box con la spiegazione completa.
-  async function openSpellBlueMenu(editableEl, issue, mouseEvent, sito = null) {
+  async function openSpellBlueMenu(editableEl, issue, mouseEvent, sito = null, ocra = null) {
     const items = await buildBaseItemsAt(mouseEvent);
 
-    // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
-    // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
-    let label;
-    if (issue.correction) {
-      label = issue.correction;
-    } else if (issue.type === 'repetition') {
-      label = I18n.t('spell_resolve');
-    } else {
-      label = (issue.explanation || I18n.t('spell_semantic_issue')).slice(0, 60);
-    }
+    if (issue) {
+      // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
+      // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
+      let label;
+      if (issue.correction) {
+        label = issue.correction;
+      } else if (issue.type === 'repetition') {
+        label = I18n.t('spell_resolve');
+      } else {
+        label = (issue.explanation || I18n.t('spell_semantic_issue')).slice(0, 60);
+      }
 
-    items.unshift(
-      {
-        type: 'correction',
-        label,
-        loading: false,
-        onClick: () => {
-          SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, issue.correction || '', {
-            expectedSegment: issue.segment,
-          });
+      items.unshift(
+        {
+          type: 'correction',
+          label,
+          loading: false,
+          onClick: () => {
+            SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, issue.correction || '', {
+              expectedSegment: issue.segment,
+            });
+          },
+          subItems: buildBlueSubItems(issue),
         },
-        subItems: buildBlueSubItems(issue),
-      },
-      { type: 'separator' },
-    );
+        { type: 'separator' },
+      );
+    }
+    if (ocra) items.unshift(...buildOcraItems(editableEl, ocra));
     conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+  }
+
+  // Il segno ocra (#1115): perché c'è (con la citazione che lo motiva), la correzione se c'è, «Ignora». Mai applicato
+  // da solo: lo applica solo il clic sulla sua riga.
+  function buildOcraItems(editableEl, issue) {
+    const righe = [{
+      type: 'inline',
+      onMount(el) {
+        el.classList.add('sn-menu-coerenza');
+        const perche = document.createElement('div');
+        perche.textContent = issue.spiegazione || I18n.t('spell_ocra_controlla');
+        el.appendChild(perche);
+        if (issue.citazione) {
+          const prova = document.createElement('div');
+          prova.className = 'sn-menu-coerenza-citazione';
+          prova.textContent = I18n.t('spell_ocra_prima', issue.citazione);
+          el.appendChild(prova);
+        }
+      },
+    }];
+    for (const c of issue.correzioni || []) {
+      righe.push({
+        type: 'correction',
+        label: c,
+        loading: false,
+        onClick: () => SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, c, { expectedSegment: issue.segment }),
+        senzaFreccia: true,
+      });
+    }
+    righe.push(
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignoraCoerenza(editableEl, issue) },
+      { type: 'separator' },
+    );
+    return righe;
   }
 
   function buildFeedbackItem() {
@@ -1770,6 +1832,25 @@
       type: 'item',
       label: 'Invia feedback',
       onClick: () => openSurface('feedback', () => self.SN_FEEDBACK_UI?.open()),
+    };
+  }
+
+  // #843 — spegne Filo sul sito della scheda (anche dal menu di un riquadro: «questo sito» è quello che si sta visitando).
+  // Solo dove c'è un sito con un nome: una pagina di Filo, un IP o «localhost» non entrano nell'elenco.
+  function buildSpegniFiloItem() {
+    if (PAGINA_DI_FILO || !self.SN_NOMI_SITO) return null;
+    let host = '';
+    try {
+      const u = new URL(pageUrl || location.href);
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.hostname;
+    } catch (_) { host = ''; }
+    if (!self.SN_NOMI_SITO.daScritto(host)) return null;
+    return {
+      type: 'item',
+      label: I18n.t('menu_spegni_filo'),
+      onClick: () => {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
+      },
     };
   }
 
@@ -1802,9 +1883,9 @@
     // src/content/menuIcons.js (SN_MENU_ICONS), caricato prima di questo file.
     items.push(MenuIcons.buildGlobalIconRow(navState));
 
-    // 2. Aiuto — voce sempre presente, etichettata.
-    items.push({ type: 'separator' });
-    items.push(buildHelpItem());
+    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    const sezioneAiuto = [];
+    if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
     // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
     // vocale è in riproduzione, anche senza selezione/contesto, così la
@@ -1812,7 +1893,7 @@
     // è true anche se a leggere è un'ALTRA scheda: lo stop chiede al main di
     // inoltrare l'arresto alla scheda che legge davvero.
     if (TTS.isAnyReading()) {
-      items.push(TTS.buildStopReadingItem());
+      sezioneAiuto.push(TTS.buildStopReadingItem());
     }
 
     // 2c. Mostra originale — solo quando alla traduzione di pagina manca ancora
@@ -1825,7 +1906,7 @@
       && TranslatePage.showsRestore();
     if (TranslatePage && typeof TranslatePage.canContinue === 'function'
         && TranslatePage.canContinue() && !iconIsRestore) {
-      items.push(TranslatePage.buildRestoreOriginalItem());
+      sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
     // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
@@ -1834,7 +1915,8 @@
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
-    if (zoomItem) items.push(zoomItem);
+    if (zoomItem) sezioneAiuto.push(zoomItem);
+    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
@@ -1854,6 +1936,8 @@
     // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
+    const spegni = buildSpegniFiloItem();
+    if (spegni) items.push(spegni);
     // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
     refreshRedteamVisibile();
     if (redteamVisibile) items.push(buildRedteamAttackItem());
@@ -1936,7 +2020,7 @@
     return {
       type: 'item',
       label: I18n.t('menu_help'),
-      shortcut: Tasti.etichetta('Alt+H'),
+      shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
       onClick: () => openSurface('help', () => openHelpSidebar()),
     };
   }
@@ -2220,7 +2304,13 @@
   // ------------------------------------------------------------
   // Sidebar Aiuto (Fase 2)
   // ------------------------------------------------------------
+  // L'interruttore dell'Aiuto (#841): spento, nessuna strada apre il pannello e il tasto dice perché.
+  function aiutoAcceso() {
+    return !(settings && settings.featureFlags && settings.featureFlags.help === false);
+  }
+
   function openHelpSidebar(context) {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
 
@@ -2315,20 +2405,26 @@
     }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
+      seguiSpento();
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
       self.SN_AVVISI?.imposta(settings.notifications);
+      Tasti.usaScorciatoieFilo(settings.scorciatoie);
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.
       if (!IS_SUBFRAME) { try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {} }
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
-      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
+      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false } } : settings);
+      // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
+      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
+      // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
+      if (isBlocked()) return;
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }

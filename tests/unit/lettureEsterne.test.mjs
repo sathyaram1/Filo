@@ -20,22 +20,53 @@ const FP = '7'.repeat(64);
 const ctxPosix = { cwd: '/casa/Filo', win: false, cartelle: ['/casa/Filo', '/casa/filo-security', '/home/o/.claude'], file: ['/casa/LOCAL.md'] };
 const leggi = (file_path, ctx = ctxPosix) => L.motivoLettura({ tool_name: 'Read', tool_input: { file_path } }, ctx);
 
-test('classificatore: la rete, le risorse MCP e ogni mcp__ fuori dall’elenco chiuso sporcano; shell, ricerche nel disco e scritture no', () => {
+test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, ricerche nel disco, scritture, sotto-agenti locali, compiti), anche uno nuovo (#1211.2)', () => {
   assert.equal(L.motivoLettura({ tool_name: 'WebFetch', tool_input: { url: 'https://esempio.it/a?chiave=segreta' } }), 'WebFetch (esempio.it)');
   assert.equal(L.motivoLettura({ tool_name: 'WebFetch', tool_input: { url: 'non un indirizzo' } }), 'WebFetch');
-  assert.equal(L.motivoLettura({ tool_name: 'WebSearch', tool_input: { query: 'x' } }), 'WebSearch');
-  for (const n of ['ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData']) assert.equal(L.motivoLettura({ tool_name: n }), n);
-  assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action: 'read', url: 'https://claude.ai/artifact/x' } }), 'Artifact (read)');
-  assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action: 'list', scope: 'shared' } }), 'Artifact (list)');
-  for (const action of [undefined, 'publish', 'open', 'pin', 'delete']) assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action, file_path: '/tmp/p.html' } }), '', String(action));
+  // I cataloghi di estensioni, i messaggi fra sessioni, le uscite di un compito che può essere remoto, uno strumento
+  // che oggi non esiste: nessuno li ha messi fra i puliti, quindi sporcano.
+  for (const n of ['WebSearch', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData',
+    'SearchPlugins', 'ListPlugins', 'SearchSkills', 'ListSkills', 'SearchMcpRegistry', 'ListConnectors', 'SuggestConnectors', 'SuggestSkills',
+    'SuggestPluginInstall', 'DesignSync', 'ListAgents', 'SendMessage', 'TaskOutput', 'LSP', 'NotebookRead', 'StrumentoDiDomani']) {
+    assert.equal(L.motivoLettura({ tool_name: n, tool_input: { query: 'x' } }), n);
+  }
+  assert.equal(L.motivoLettura({ tool_name: 'Nuovo\ncon\u0000a capo' }), 'Nuovo con a capo');
   for (const n of ['mcp__github__get_file_contents', 'mcp__claude-in-chrome__get_page_text', 'mcp__plugin_posta_gmail__search', 'mcp__computer-use__screenshot']) {
     assert.equal(L.motivoLettura({ tool_name: n, tool_input: {} }), n);
   }
   for (const n of L.MCP_SENZA_LETTURA) assert.equal(L.motivoLettura({ tool_name: n }), '', n);
-  for (const n of ['Bash', 'PowerShell', 'Grep', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'Agent', 'TodoWrite', '', undefined]) {
+  for (const n of [...L.STRUMENTI_SENZA_LETTURA, '', undefined]) {
     assert.equal(L.motivoLettura({ tool_name: n, tool_input: { file_path: '/etc/passwd', path: '/etc', url: 'https://x.it' } }, ctxPosix), '', String(n));
   }
+  for (const n of ['Bash', 'PowerShell', 'Grep', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'Skill']) assert.ok(L.STRUMENTI_SENZA_LETTURA.includes(n), n);
   assert.equal(L.motivoLettura(null), '');
+});
+
+test('classificatore: un artefatto sporca anche quando si pubblica; solo aprirlo, appuntarlo e cancellarlo no (#1211.2)', () => {
+  const artefatto = (action, altro = {}) => L.motivoLettura({ tool_name: 'Artifact', tool_input: { action, ...altro } });
+  assert.equal(artefatto('read', { url: 'https://claude.ai/artifact/x' }), 'Artifact (read)');
+  assert.equal(artefatto('list', { scope: 'shared' }), 'Artifact (list)');
+  // Su una pagina modificata da altri il rifiuto restituisce la versione attuale; e chi pubblica riceve i commenti.
+  assert.equal(artefatto(undefined, { file_path: '/tmp/p.html', url: 'https://claude.ai/artifact/x' }), 'Artifact (publish)');
+  assert.equal(artefatto('publish', { file_path: '/tmp/p.html' }), 'Artifact (publish)');
+  assert.equal(artefatto('quickstart', { intent: 'slides' }), 'Artifact (quickstart)');
+  assert.equal(artefatto('azione-nuova'), 'Artifact (azione-nuova)');
+  for (const action of ['open', 'pin', 'unpin', 'delete']) assert.equal(artefatto(action, { url: 'https://claude.ai/artifact/x' }), '', action);
+});
+
+test('classificatore: un sotto-agente sporca solo se gira fuori dal computer; ToolSearch solo se può portare descrizioni MCP (#1211.2)', () => {
+  const agente = (tool_input, tool_name = 'Agent') => L.motivoLettura({ tool_name, tool_input });
+  assert.equal(agente({ prompt: 'leggi https://x.it', description: 'web', isolation: 'remote' }), 'Agent (remote)');
+  assert.equal(agente({ prompt: 'x', isolation: 'remote' }, 'Task'), 'Task (remote)');
+  assert.equal(agente({ prompt: 'x', isolation: 'cloud-di-domani' }), 'Agent (cloud-di-domani)');
+  assert.equal(agente({ prompt: 'x', isolation: { dove: 'remote' } }), 'Agent ([object Object])');
+  for (const isolation of [undefined, '', 'worktree']) assert.equal(agente({ prompt: 'x', subagent_type: 'Explore', isolation }), '', String(isolation));
+  assert.equal(agente({ prompt: 'x' }, 'Task'), '');
+  const cerca = (query) => L.motivoLettura({ tool_name: 'ToolSearch', tool_input: { query, max_results: 5 } });
+  for (const q of ['select:Monitor', 'select:TaskCreate, TaskUpdate,EnterWorktree', ' select:WebFetch']) assert.equal(cerca(q), '', q);
+  for (const q of ['select:mcp__github__get_me', 'select:Monitor,mcp__x__y', 'select:MCP__x', 'select:*', 'select:', 'select:Monitor,', 'notebook jupyter', '+slack send', '', undefined]) {
+    assert.equal(cerca(q), 'ToolSearch', String(q));
+  }
 });
 
 test('classificatore: Read sporca solo fuori dal repo, dal checkout del server accanto e dalla cartella di Claude; LOCAL.md sopra il repo no', () => {
@@ -134,6 +165,7 @@ test('gancio: annota la lettura accanto al biglietto della sessione dello stdin 
     assert.equal(L.gancio({ input: { ...input, session_id: 'altra' }, env: {}, avvia }).esito, 'senza biglietto', 'mai il biglietto di un’altra sessione');
     assert.equal(L.gancio({ input, env: { FILO_ROUTINE: '1' }, avvia }).esito, 'routine');
     assert.equal(L.gancio({ input: { ...input, tool_name: 'Bash' }, env: {}, avvia }).esito, 'nessuna lettura esterna');
+    assert.equal(L.gancio({ input: { ...input, tool_name: 'Agent', tool_input: { prompt: 'x' } }, env: {}, avvia }).esito, 'nessuna lettura esterna');
     assert.equal(L.gancio({ input: 'storto', env: {}, avvia }).esito, 'nessuna lettura esterna');
     assert.equal(avviati.length, 1);
     // Già sporco sul server: nessun processo in più, ma la lettura resta annotata, e un segno falso non pulisce niente.
@@ -203,6 +235,10 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
     assert.deepEqual(prova('Read', { file_path: join(dirname(ROOT), 'LOCAL.md') }), []);
     assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'plans', 'p.md') }, { env: { HOME: casa, USERPROFILE: casa } }), []);
     for (const n of ['Bash', 'Grep', 'Glob', 'mcp__ide__getDiagnostics']) assert.deepEqual(prova(n, { command: 'curl x', pattern: 'x', path: fuori }), [], n);
+    assert.deepEqual(prova('SearchPlugins', { query: 'posta' }), ['SearchPlugins']);
+    assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', isolation: 'remote' }), ['Agent (remote)']);
+    assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', subagent_type: 'Explore' }), [], 'un sotto-agente locale');
+    assert.deepEqual(prova('Artifact', { file_path: join(fuori, 'p.html'), url: 'https://claude.ai/artifact/x' }), ['Artifact (publish)']);
     assert.deepEqual(prova('WebFetch', { url: 'https://esempio.it' }, { env: { FILO_ROUTINE: '1' } }), [], 'nelle routine c’è il loro biglietto');
     // Il salto per le Read del repo guarda lo strumento chiamato: chiavi uguali nella risposta o nei parametri di un
     // mcp__ non lo attivano (#1211 giro 1).
@@ -235,18 +271,24 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
   }
 });
 
-test('cablaggio: il gancio sta dopo uno strumento riuscito e dopo uno fallito, su tutti e soli gli strumenti che possono leggere fuori', () => {
+test('cablaggio: il gancio sta dopo uno strumento riuscito e dopo uno fallito, su ogni strumento fuori dall’elenco dei puliti', () => {
   const s = JSON.parse(readFileSync(join(ROOT, '.claude', 'settings.local.json'), 'utf8'));
-  const possibili = ['Read', 'Artifact', ...L.STRUMENTI_ESTERNI, 'mcp__github__get_file_contents', 'mcp__plugin_posta_gmail__search', 'mcp__claude-in-chrome__navigate'];
+  const possibili = ['Read', 'Artifact', 'Agent', 'Task', 'ToolSearch', 'WebFetch', 'WebSearch', 'ArtifactComments', 'SearchPlugins', 'SendMessage', 'StrumentoDiDomani',
+    'BashX', 'XBash', 'Bash|Grep', 'mcp__github__get_file_contents', 'mcp__plugin_posta_gmail__search', 'mcp__claude-in-chrome__navigate', ...L.MCP_SENZA_LETTURA];
   for (const evento of ['PostToolUse', 'PostToolUseFailure']) {
     const voci = (s.hooks[evento] || []).filter((g) => (g.hooks || []).some((h) => /\.claude\/hooks\/letture-esterne\.sh/.test(h.command)));
     assert.equal(voci.length, 1, evento);
-    // Come Claude Code: con un carattere da espressione regolare il matcher è una RegExp non ancorata.
-    const re = new RegExp(voci[0].matcher);
-    for (const n of possibili) assert.ok(re.test(n), `${evento}: ${n} non fa partire il gancio`);
-    for (const n of possibili) assert.ok(L.puoLeggereFuori(n), n);
-    for (const n of ['Bash', 'Grep', 'Glob', 'Edit', 'Write', 'Agent']) assert.equal(re.test(n), false, `${evento}: ${n} lo farebbe partire per niente`);
+    assert.equal(voci[0].matcher, L.matcherDelGancio(), `${evento}: il matcher si rigenera da STRUMENTI_SENZA_LETTURA`);
+    // Come Claude Code: con un carattere da espressione regolare il matcher è una RegExp non ancorata. Si prova anche
+    // ancorata ai due capi, perché un'altra lettura del matcher non apra un buco.
+    for (const re of [new RegExp(voci[0].matcher), new RegExp(`^(?:${voci[0].matcher})$`)]) {
+      for (const n of possibili) assert.ok(re.test(n), `${evento}: ${n} non fa partire il gancio`);
+      for (const n of L.STRUMENTI_SENZA_LETTURA) assert.equal(re.test(n), false, `${evento}: ${n} lo farebbe partire per niente`);
+    }
   }
+  for (const n of possibili) assert.ok(L.puoLeggereFuori(n), n);
+  for (const n of [...L.STRUMENTI_SENZA_LETTURA, '', undefined]) assert.equal(L.puoLeggereFuori(n), false, String(n));
+  for (const n of L.STRUMENTI_SENZA_LETTURA) assert.match(n, /^[A-Za-z]+$/, 'un nome nel matcher non deve portare caratteri da espressione regolare');
   const src = readFileSync(GANCIO, 'utf8');
   assert.doesNotMatch(src, /\r\n/, 'fine riga LF');
   assert.match(src, /\[ -n "\$FILO_ROUTINE" \] && exit 0/);

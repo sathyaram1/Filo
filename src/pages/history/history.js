@@ -301,7 +301,7 @@
       render();
     });
     $('openArchive').addEventListener('click', () => {
-      chrome.tabs.create({ url: 'filo://archive/archive.html' });
+      chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' });
     });
     $('openHome').addEventListener('click', () => {
       // #252 — indirizzo canonico: una sola scheda per "Aperti per dopo".

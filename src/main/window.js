@@ -70,6 +70,19 @@ function wireWindowCommon(win, tabs) {
     }
   } catch (_) {}
 
+  // Chiudere la finestra distrugge le schede senza chiudere le loro pagine, e prima di `before-quit`: chi aveva
+  // caselle da spedire perdeva l'ultima modifica. Si aspetta come alla chiusura di una scheda (chiusuraConCaselle).
+  let congedoChiusuraFatto = false;
+  win.on('close', (e) => {
+    if (congedoChiusuraFatto) return;
+    congedoChiusuraFatto = true;
+    const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);
+    if (!attesa) return;
+    e.preventDefault();
+    const chiudi = () => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} };
+    attesa.then(chiudi, chiudi);
+  });
+
   win.on('resize', () => tabs.layout());
   // Se si chiude la finestra che stava suonando, il turno passa a un'altra:
   // senza questo avviso il rumore morirebbe con la finestra, scadenza viva.
@@ -155,7 +168,8 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,
@@ -212,7 +226,8 @@ function createIncognitoWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,

@@ -11,6 +11,8 @@
   const sino = (si, no) => (v) => (v ? si : no);
   const ATTIVO = sino('attivo', 'spento');
   const ATTIVA = sino('attiva', 'spenta');
+  const ATTIVE = sino('attive', 'spente');
+  const ATTIVI = sino('accesi', 'spenti');
   // I decimali restano quelli che il valore ha davvero; la parte intera prende il punto delle migliaia (1.500 ms).
   const intero = (n) => n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
   const numero = (v) => {
@@ -35,11 +37,24 @@
     return l && l !== k ? l : 'una funzione';
   }
   const NOMI_CHIAVI = { openrouter: 'OpenRouter', tavily: 'Tavily' };
+  function tastiDiFilo() {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    return global.SN_TASTI;
+  }
+  function nomeAzioneFilo(k) {
+    const T = tastiDiFilo();
+    const azione = T && T.AZIONI_FILO ? T.AZIONI_FILO.find((x) => x.id === k) : null;
+    return azione ? azione.nome : 'un\'azione di Filo';
+  }
+  function scorciatoiaLeggibile(v) {
+    const T = tastiDiFilo();
+    return v ? (T ? T.etichettaFilo(v) : String(v)) : 'quella di serie';
+  }
 
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
-    showHomeMessage: { nome: 'commento nella home', valore: sino('mostrato', 'nascosto'), livello: 1 },
+    showHomeMessage: { nome: 'Filo scrive per primo nella home', valore: sino('sì', 'no'), livello: 1 },
     'homeSistema.*': { nome: (k) => `voce «${k === 'bluetooth' ? 'Bluetooth' : k}» nella home`, valore: sino('mostrata', 'nascosta'), livello: 1 },
     'tabPreview.enabled': { nome: 'anteprima delle schede', valore: ATTIVA, livello: 1 },
     'tabPreview.size': { nome: 'dimensione dell\'anteprima delle schede', livello: 1 },
@@ -49,8 +64,11 @@
     timerRingtone: { nome: 'suoneria del timer', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     timerRingtoneVolume: { nome: 'volume della suoneria del timer', valore: (v) => `${numero(v)}%`, livello: 1 },
     'terminal.enabled': { nome: 'modalità terminale', valore: ATTIVA, livello: 2 },
+    'schermo.guarda': { nome: 'guardare lo schermo', valore: sino('acceso', 'spento'), livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
+    'propostaEmail.attiva': { nome: 'email del tuo account proposta nei siti', valore: ATTIVA, livello: 1 },
+    'propostaEmail.incognito': { nome: 'email proposta anche in incognito', valore: ATTIVA, livello: 1 },
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
     },
@@ -90,26 +108,41 @@
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
+    'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'contatori.attivi': { nome: 'contatori anonimi d\'uso', valore: ATTIVI, livello: 2 },
+    'avvisoCrediti.attivo': { nome: 'avviso prima che i crediti finiscano', valore: ATTIVO, livello: 1 },
+    'avvisoCrediti.giorni': { nome: 'giorni dell\'avviso dei crediti', valore: numero, livello: 1 },
+    'avvisoCrediti.percento': { nome: 'percentuale dell\'avviso dei crediti', valore: (v) => `${numero(v)}%`, livello: 1 },
     'notifications.durationSec': { nome: 'durata delle notifiche', valore: (v) => (Number(v) ? `${numero(v)} s` : 'finché non la chiudi'), livello: 1 },
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'notifications.soundVolume': { nome: 'volume del suono delle notifiche', valore: (v) => `${numero(v)}%`, livello: 1 },
     'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
-    'featureFlags.help': { nome: 'barra dell\'Aiuto', valore: ATTIVA, livello: 1 },
-    'featureFlags.categorize': { nome: 'categorizzazione automatica', valore: ATTIVA, livello: 1 },
-    blocklist: { nome: 'domini dove Filo non interviene', elenco: true, livello: 2 },
+    'featureFlags.spellcheckContext': { nome: 'controllo di coerenza col contesto', valore: ATTIVO, livello: 1 },
+    'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
+    'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
+    blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
     'menuDelSito.siti': { nome: 'siti dove il tasto destro apre il menu del sito', elenco: true, livello: 1 },
     'documenti.cartelle': { nome: 'cartelle dove Filo cerca i documenti', elenco: true, livello: 2 },
     provider: { nome: 'fornitore dei modelli', valori: { openrouter: 'OpenRouter' }, livello: 2 },
     useDefaultModels: { nome: 'modelli predefiniti', valore: sino('in uso', 'spenti'), livello: 2 },
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },
+    ownKeyAllProviders: { nome: 'fornitori esclusi con la tua chiave', valore: sino('usati', 'esclusi'), livello: 2 },
+    ordineHost: { nome: 'host dei modelli', valori: { '': 'scelti da Filo', throughput: 'più veloci', latency: 'risposta più pronta', price: 'più economici' }, livello: 2 },
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
+    'scorciatoie.*': { nome: (k) => `scorciatoia di «${nomeAzioneFilo(k)}»`, valore: scorciatoiaLeggibile, livello: 1 },
+    'modelliScelti.*': { nome: (k) => `modello scelto da te per «${etichettaFunzione(k)}»`, valore: (v) => v || 'quello predefinito', livello: 2 },
     'modelRegistry.*': { nome: (k) => `modello «${k}»`, valore: (v) => (v && v.model ? v.model : 'non c\'è'), livello: 2 },
     monthlyLimitEur: {
       nome: 'limite di spesa mensile',
       valore: (v) => `${Number(v).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(Number(v)) ? 0 : 2, maximumFractionDigits: 2 })} €`,
       livello: 2,
+    },
+    'costoModelli.soglia': {
+      nome: 'avviso sui modelli costosi',
+      valore: (v) => (Number(v) > 0 ? `oltre ${Number(v).toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 1 })} volte il predefinito` : 'mai'),
+      livello: 1,
     },
     'security.protectIpLeak': { nome: 'protezione dell\'IP locale (WebRTC)', valore: ATTIVA, livello: 2 },
     'security.blockPopups': { nome: 'blocco dei popup non richiesti', valore: ATTIVO, livello: 2 },
@@ -153,6 +186,7 @@
     'pricing.*': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
     usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
     azzeramento: 'cancellare tutti i dati non lascia traccia: è proprio quello che si è chiesto',
+    migrazione: 'un valore di serie che cambia con un aggiornamento non l\'ha scelto nessuno: un file di dati vecchio lo riceve come chi installa adesso',
     'timer:suona': 'un timer o una sveglia che arriva all\'ora e suona è il tempo che passa, non un cambio di qualcuno',
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',
@@ -407,6 +441,7 @@
     dashboard: 'dalla home',
     shell: 'dalla barra delle schede',
     'menu-scheda': 'dal menu della scheda',
+    'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
   };
   function provenienza(evento) {

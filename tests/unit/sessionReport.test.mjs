@@ -158,6 +158,51 @@ test('una versione che il listino non conosce per nome lascia la nota, col costo
   ]) assert.equal(famigliaPrezzo(model).known, true, model);
 });
 
+// #883: un turno veloce contato a tariffa normale faceva dire al rapporto la metà del costo vero.
+const UN_MILIONE = (speed) => ({
+  input_tokens: 1e6, cache_creation_input_tokens: 2e6,
+  cache_creation: { ephemeral_5m_input_tokens: 1e6, ephemeral_1h_input_tokens: 1e6 },
+  cache_read_input_tokens: 1e6, output_tokens: 1e6, ...(speed === undefined ? {} : { speed }),
+});
+
+test('un turno in modalità veloce costa la sua tariffa: il doppio su Opus 5.5, Opus 5 e Opus 4.8, senza nota', async () => {
+  for (const [model, normale] of [['claude-opus-5-5', 37.2], ['claude-opus-5-5[1m]', 37.2], ['claude-opus-5', 46.75], ['claude-opus-4-8', 46.75]]) {
+    const veloce = await analizzaRighe([assistant('v', model, UN_MILIONE('fast'), [], T('00:00'))]);
+    assert.equal(veloce.costUsd, normale * 2, model);
+    assert.deepEqual(veloce.notes, [], model);
+    for (const speed of ['standard', undefined]) {
+      const rep = await analizzaRighe([assistant('n', model, UN_MILIONE(speed), [], T('00:00'))]);
+      assert.equal(rep.costUsd, normale, `${model} ${speed}`);
+      assert.deepEqual(rep.notes, [], `${model} ${speed}`);
+    }
+  }
+  const misto = await analizzaRighe([
+    assistant('a', 'claude-opus-5-5', UN_MILIONE('standard'), [], T('00:00')),
+    assistant('b', 'claude-opus-5-5', UN_MILIONE('fast'), [], T('00:01')),
+  ]);
+  assert.equal(misto.costUsd, 111.6, 'in una sessione mista raddoppia solo il turno veloce');
+  assert.match(riassunto(misto)[3], /costo stimato: \$111\.6000/);
+});
+
+test('modalità veloce che il listino non conosce per quel modello: il doppio, e la nota come per un modello sconosciuto', async () => {
+  for (const [model, tariffa, normale] of [
+    ['claude-opus-4-7', 'Opus 5', 46.75], ['claude-sonnet-5-5', 'Sonnet 5', 18.7], ['claude-haiku-4-5', 'Haiku 4.5', 9.35],
+    ['claude-fable-5-1', 'Fable 5.1', 92.75], ['claude-opus-6', 'Opus 5', 46.75],
+  ]) {
+    const rep = await analizzaRighe([
+      assistant('v', model, UN_MILIONE('fast'), [], T('00:00')),
+      assistant('w', model, UN_MILIONE('fast'), [], T('00:01')),
+    ]);
+    assert.equal(rep.costUsd, normale * 4, model);
+    assert.ok(rep.notes.includes(`velocità «fast» non a listino per «${model}»: 2 turni calcolati a 2× la tariffa ${tariffa}`), `${model}: ${JSON.stringify(rep.notes)}`);
+  }
+  const ignota = await analizzaRighe([assistant('t', 'claude-opus-5-5', UN_MILIONE('Turbo'), [], T('00:00'))]);
+  assert.equal(ignota.costUsd, 37.2, 'una velocità che il listino non ha affatto resta a tariffa normale');
+  assert.deepEqual(ignota.notes, ['velocità «turbo» non a listino per «claude-opus-5-5»: 1 turno calcolato a tariffa Opus 5.5']);
+  assert.match(riassunto(ignota)[4], /note: velocità «turbo»/);
+  assert.equal(valutaUso(UN_MILIONE(42), 'claude-opus-5-5').costo, 37.2, 'un campo che non è testo non è una velocità');
+});
+
 // L'orchestratore delle routine gira su Haiku 5.5: prezzato come Haiku 4.5, il suo costo usciva dieci volte tanto.
 test('Haiku 5.5 e Sonnet 5.5 si riconoscono per nome, ognuno col suo listino e senza nota', async () => {
   for (const [model, key] of [
@@ -733,6 +778,36 @@ test('orchestratore su Haiku 5.5: prezzato col suo listino, e le sue richieste o
   } finally { togliCartella(base); }
 });
 
+test('orchestratore in modalità veloce: costa la sua tariffa, e la nota di una tariffa di ripiego arriva nel rapporto del worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-veloce-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const riga = (id, model, ts, tool = null) => JSON.stringify({
+      type: 'assistant', timestamp: ts, sessionId: id.startsWith('o') ? 'orch' : 'w5',
+      message: { id, model, usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1000000, speed: 'fast' }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+    });
+    writeFileSync(join(dir, 'orch.jsonl'), [
+      riga('o1', 'claude-sonnet-5-5', H('09:00:00')),
+      riga('o2', 'claude-opus-5-5', H('09:01:00'), { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} }),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w5.jsonl'), riga('w1', 'claude-opus-5-5', H('09:02:00')) + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'resolver', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w5');
+    assert.equal(rep.costUsd, 40, 'un milione in uscita su Opus 5.5 veloce: 40 $');
+    assert.equal(rep.orchestrator.costUsd, 60, 'Sonnet 5.5 veloce, non a listino, al doppio (20 $) più Opus 5.5 veloce (40 $)');
+    assert.deepEqual(rep.notes.filter((n) => /velocità/.test(n)),
+      ['orchestratore: velocità «fast» non a listino per «claude-sonnet-5-5»: 1 turno calcolato a 2× la tariffa Sonnet 5']);
+    assert.match(riassunto(rep)[4], /note: .*orchestratore: velocità «fast»/);
+  } finally { togliCartella(base); }
+});
+
 // Worker in sottofondo (il default di Claude Code): la chiamata riceve subito
 // «Async agent launched», la fine arriva come notifica in più forme.
 const lanciato = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Async agent launched successfully.\nagentId: x' }] }] } });
@@ -882,4 +957,20 @@ test('il marcatore di un altro biglietto non dà il momento del rilascio', async
     assert.equal(readTicketSince(base, { ticket: 'due' }), '');
     assert.equal(readTicketSince(base), since);
   } finally { togliCartella(base); }
+});
+
+// #882: chi confronta costi di prima e di dopo un cambio di prezzi deve vedere dove sta il salto.
+test('ogni rapporto porta la versione del listino, e un prezzo cambiato senza nuova versione è rosso', async () => {
+  const { LISTINO, VERSIONI, VELOCE, VELOCE_RIPIEGO } = await import('../../scripts/session-report.mjs');
+  const { createHash } = await import('node:crypto');
+  // Cambiando PREZZI, VERSIONI o i moltiplicatori della modalità veloce: LISTINO va alla data del nuovo listino, e qui si aggiunge la sua impronta.
+  const IMPRONTE = { '2026-10-06': '13fddb51dfc48202' };
+  const impronta = createHash('sha256').update(JSON.stringify({ p: PREZZI, v: VERSIONI, f: VELOCE, fr: VELOCE_RIPIEGO })).digest('hex').slice(0, 16);
+  assert.equal(IMPRONTE[LISTINO], impronta, `listino cambiato (impronta ${impronta}) senza una versione nuova in LISTINO`);
+  assert.equal(rapportoVuoto().listino, LISTINO);
+  const rep = await analizzaRighe([assistant('a', 'claude-opus-5-5', { input_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 1 }, [], T('00:00'))], { role: 'resolver' });
+  assert.equal(rep.listino, LISTINO, 'anche il rapporto di una sessione vera');
+  assert.match(riassunto(rep)[3], new RegExp(`listino ${LISTINO}`));
+  const senza = await generaRapporto({ transcript: join(cartellaTemporanea(), 'non-esiste.jsonl'), role: 'resolver' });
+  assert.equal(senza.listino, LISTINO, 'anche il rapporto minimo, senza transcript');
 });

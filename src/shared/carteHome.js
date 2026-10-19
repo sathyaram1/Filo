@@ -28,7 +28,8 @@
   const APP = [
     { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html' },
     { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html' },
-    { id: 'cronologia', titolo: 'Cronologia', icona: 'history', url: 'filo://archive/archive.html' },
+    // L'id resta quello della Cronologia, che il quaderno sostituisce (#872): le disposizioni salvate lo citano.
+    { id: 'cronologia', titolo: 'Memorie', icona: 'memory', url: 'filo://quaderno/quaderno.html' },
     { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html' },
   ];
 
@@ -125,6 +126,16 @@
     ].filter((v) => !nascoste.has(v.chiave));
     const perChiave = new Map(resto.map((v) => [v.chiave, v]));
     return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+  }
+
+  // La pagina di Filo a cui porta un avviso (#855), scritta dal main in `action.apri`: solo un indirizzo filo://, e
+  // gli avvisi che non la portano restano come sono.
+  function paginaDiAvviso(n) {
+    const a = n && n.action && typeof n.action === 'object' ? n.action : null;
+    const url = a && typeof a.apri === 'string' ? a.apri.trim() : '';
+    if (!/^filo:\/\/[a-z0-9-]+\/\S*$/i.test(url)) return null;
+    const etichetta = typeof a.etichetta === 'string' && a.etichetta.trim() ? a.etichetta.trim() : 'Apri';
+    return { url, etichetta };
   }
 
   // Le carte di sinistra che l'utente ha tolto e che ci sarebbero ancora: stanno in «altro», da cui si rimettono una per una.
@@ -252,6 +263,6 @@
   global.SN_CARTE_HOME = {
     CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
-    downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra,
+    downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra, paginaDiAvviso,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

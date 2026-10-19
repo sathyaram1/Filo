@@ -28,6 +28,14 @@ test('una routine fidata nei Ricevuti: niente «da ri-giudicare», la nota dice 
   assert.equal(MR.manageTabFor(fb), 'inbox');
 });
 
+test('l’allarme della pubblicazione non dice d’essere nato da un lavoro: lo apre il server (#1002)', () => {
+  const allarme = routine({ status: 'todo', clientId: 'agent:costruzione' });
+  assert.equal(MR.judgesSkippedText(allarme), 'Allarme aperto dal server: i giudici non servono.');
+  // Il nome senza la prova, o senza la fiducia, non ha la frase dell'allarme.
+  assert.doesNotMatch(MR.judgesSkippedText({ ...allarme, senderProof: undefined }), /Allarme/);
+  assert.equal(MR.judgesSkippedText({ ...allarme, fiducia: undefined }), '');
+});
+
 test('il fidato nato da te o da una sessione pulita, il lavoro locale e i documenti di prima hanno la loro frase', () => {
   const sessione = { status: 'todo', clientId: 'local:claude', senderProof: 'admin', fiducia: 'fidato', pipeline: pipeline('fidato') };
   assert.equal(MR.judgesSkippedText(sessione), 'Fidato: i giudici non servono.');

@@ -94,6 +94,18 @@ module.exports = function register(on, ctx) {
     try { return Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) { return true; }
   }
 
+  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: il controllo di coerenza
+  // (#1115) parte col solo testo di chi scrive, e lo dice alla pagina, che allora non ha citazioni da confrontare.
+  async function senzaPaginaDelicata(msg, sender) {
+    if (!msg || msg.action !== SN_CONST.ACTIONS.SPELLCHECK_CONTEXT || !msg.payload) return false;
+    const url = String(sender?.tab?.url || sender?.url || '');
+    if (!/^https?:/i.test(url)) return false;
+    let delicata = true;
+    try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
+    if (delicata) msg.payload = { ...msg.payload, contesto: {} };
+    return delicata;
+  }
+
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
   // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
@@ -113,11 +125,17 @@ module.exports = function register(on, ctx) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
+    const senzaContesto = await senzaPaginaDelicata(msg, sender);
     // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
     const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
     if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
       const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
       if (d) esterno.documenti = d; else delete esterno.documenti;
+    }
+    // Quando è stata aperta la scheda lo sa il main (#826): il valore che manda la pagina non conta.
+    if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
+      msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
+      msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
@@ -125,11 +143,19 @@ module.exports = function register(on, ctx) {
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
     // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
-    const chiedi = () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
+    const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+    const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    const chiedi = daSola
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
+      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
     const K = globalThis.SN_WALLET_MAIN;
-    const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
+    const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
+    // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
+    const Cont = globalThis.SN_CONTATORI_MAIN;
+    const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
     if (lettura) await lettura;
-    return { ok: true, ...r };
+    return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
   });
 
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
@@ -310,7 +336,14 @@ module.exports = function register(on, ctx) {
     return { ok: false, error, errorCode: errorCode || '', firstFallback };
   };
 
-  on(MSG.TTS_SYNTH, async (msg) => {
+  // Una lettura coi suoi ripieghi di voce e di fornitore è un uso solo, per i contatori giornalieri (#969); i pezzi
+  // dopo il primo di una lettura lunga (`parteDiUnUso`) contano solo se si guastano.
+  on(MSG.TTS_SYNTH, (msg) => {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    const misura = msg && msg.parteDiUnUso === true ? C && C.parteDiUnUso : C && C.unUso;
+    return typeof misura === 'function' ? misura(SN_CONST.ACTIONS.TTS, () => sintesiVocale(msg)) : sintesiVocale(msg);
+  });
+  async function sintesiVocale(msg) {
     // Sintesi vocale via modello. Costruisce la catena per l'azione TTS e
     // prova i fornitori che la implementano (il router, verso un host
     // indipendente). Se nessuno è disponibile o tutti falliscono, torna
@@ -375,6 +408,7 @@ module.exports = function register(on, ctx) {
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
+            try { globalThis.SN_CONTATORI_MAIN?.servitaDaCache(SN_CONST.ACTIONS.TTS); } catch (_) {}
             ttsFallbackAnnounced = ''; // sintesi disponibile: riarma l'avviso
             return {
               ok: true,
@@ -410,7 +444,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return ttsFallback(e?.message || String(e));
     }
-  });
+  }
 
   // Le voci del modello di lettura IN USO, per la tendina delle Preferenze:
   // quale modello legge (il primo della catena), il suo catalogo raggruppato
@@ -514,18 +548,26 @@ module.exports = function register(on, ctx) {
       if (modelBlocked) return { ok: false, error: modelBlocked };
       // Riga di un modello che non è di testo (voce, dettatura, indicizzazione):
       // si prova nel suo mestiere.
-      const kind = modelKind(provider, model, (s.modelRegistry || {})[msg.nickname] || null);
+      const rowEntry = (s.modelRegistry || {})[msg.nickname] || null;
+      // La riga delle Opzioni manda ordinamento e ragionamento già risolti al clic: la misura le verrà attribuita.
+      const sortRiga = typeof msg.sort === 'string' ? msg.sort : null;
+      const routing = sortRiga != null
+        ? providerRouting({ ...s, providerSort: '' }, sortRiga)
+        : providerRouting(s, rowEntry && rowEntry.sort);
+      const reasoningRiga = typeof msg.reasoning === 'string' ? msg.reasoning : (rowEntry && rowEntry.reasoning);
+      const kind = modelKind(provider, model, rowEntry);
       if (kind !== 'text') {
-        return await probeNonText({ settings: s, kind, provider, apiKey, model, routing: providerRouting(s), nickname: msg.nickname || '' });
+        return await probeNonText({ settings: s, kind, provider, apiKey, model, routing, nickname: msg.nickname || '' });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
       let charCount = 0;
-      // Anche la prova porta con sé chi NON deve servirla: senza, sarebbe
-      // l'unica richiesta di Filo che un fornitore escluso può servire.
+      // Anche la prova porta con sé chi NON deve servirla, e misura con l'ordinamento degli host e il
+      // ragionamento che la voce userebbe davvero: senza, la velocità letta parlerebbe di un'altra chiamata.
       const result = await probe({
-        settings: s, provider, apiKey, model, routing: providerRouting(s), method: 'streamComplete',
+        settings: s, provider, apiKey, model, routing, method: 'streamComplete',
+        reasoning: SN_CONST.normalizeReasoning(reasoningRiga) || undefined,
         args: {
           messages,
           onDelta: (delta) => {
@@ -561,9 +603,12 @@ module.exports = function register(on, ctx) {
     const s = await getEffectiveSettings();
     const interna = daFilo(origin, sender);
     let routing = providerRouting(s);
-    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando.
+    let filoPays;
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando,
+    // senza la lista della chiave propria di chi la modifica (#962), e coi vincoli dei crediti di Filo (#831).
     if (interna && Array.isArray(msg.excluded)) {
-      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string') });
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string'), excludedProvidersOwnKey: null });
+      filoPays = true;
     }
     let entry = null;
     if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
@@ -574,7 +619,7 @@ module.exports = function register(on, ctx) {
     }
     if (!entry || !entry.model) return { ok: true, verdict: 'na' };
     const v = await modelGate.hostVerdict({
-      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing,
+      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing, filoPays,
     });
     if (v.ok) return { ok: true, verdict: 'ok' };
     const many = v.excluded.length > 1 ? '_many' : '';
@@ -614,10 +659,10 @@ module.exports = function register(on, ctx) {
   // Le prove sono chiamate vere, pagate: passano dal cancello come le funzioni (limite, costo, chi ha servito).
   // La prova misura la chiave che l'utente ha davanti: se OpenRouter la
   // rifiuta lo deve dire, non rispondere coi crediti di Filo (#662).
-  function probe({ settings, provider, apiKey, model, routing, method, args }) {
+  function probe({ settings, provider, apiKey, model, routing, reasoning, method, args }) {
     const call = () => modelGate.call({
       action: SN_CONST.ACTIONS.PROVIDER_TEST, settings,
-      attempt: { provider, apiKey, model, providerRouting: routing }, method, args,
+      attempt: { provider, apiKey, model, providerRouting: routing, ...(reasoning ? { reasoning } : {}) }, method, args,
     });
     const K = globalThis.SN_WALLET_MAIN;
     return K && typeof K.senzaRipiego === 'function' ? K.senzaRipiego(call) : call();
@@ -690,6 +735,8 @@ module.exports = function register(on, ctx) {
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const d = Defaults.get();
       let provider; let modelId; let regEntry = null;
+      // Riga non ancora salvata: ordinamento e reasoning sono quelli scritti lì.
+      let tuning = { sort: msg.sort, reasoning: msg.reasoning };
       if (explicitModel) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
@@ -709,6 +756,7 @@ module.exports = function register(on, ctx) {
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
         regEntry = entry;
+        tuning = { sort: entry.sort, reasoning: entry.reasoning };
         const single = registryEntryToSingle(entry);
         provider = single.provider || 'openrouter';
         modelId = single.model || '';
@@ -731,8 +779,14 @@ module.exports = function register(on, ctx) {
       // dell'uso reale.
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
+      // L'editor e le Opzioni mandano l'ordinamento già risolto dalla pagina (al clic: la misura va a quello, anche se
+      // la tendina cambia intanto). Senza, una voce predefinita si prova con la scelta personale di questo utente.
+      const sortDelClic = !explicitModel && typeof msg.sort === 'string' ? msg.sort : null;
+      const routing = explicitModel || sortDelClic != null
+        ? providerRouting({ ...eff, providerSort: '' }, explicitModel ? tuning.sort : sortDelClic)
+        : providerRouting(eff, SN_CONST.ordinamentoPerUtente(eff.ordineHost, tuning.sort, ''));
       if (kind !== 'text') {
-        return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing: providerRouting(eff), nickname });
+        return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing, nickname });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
@@ -740,7 +794,8 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
       const result = await probe({
-        settings: eff, provider, apiKey, model, routing: providerRouting(eff), method: 'streamComplete',
+        settings: eff, provider, apiKey, model, routing, method: 'streamComplete',
+        reasoning: SN_CONST.normalizeReasoning(tuning.reasoning) || undefined,
         args: {
           messages,
           onDelta: (delta) => {
@@ -793,6 +848,16 @@ module.exports = function register(on, ctx) {
       const items = Caps.sortByRecency(raw.map((it) => ({ ...it, provider })))
         .map((it) => ({ id: it.id, label: Caps.categoryLabel(provider, it.id, it.meta) }));
       return { ok: true, provider, items };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  // Le stime di costo accanto ai modelli (#819): la pagina le calcola col contesto che solo il main ha.
+  on(MSG.STIMA_COSTO_MODELLI, soloFilo(async (msg) => {
+    try {
+      const contesto = await require('../costoModelli').contesto({ Defaults, forzaListino: Boolean(msg && msg.forzaListino) });
+      return { ok: true, contesto };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }

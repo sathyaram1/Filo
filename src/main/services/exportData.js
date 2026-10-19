@@ -135,9 +135,70 @@ function extractImages(node, images) {
 
 const VOCE_FILO = 'filo/eventi.jsonl';
 
-// Costruisce il Buffer ZIP a partire dallo storage Filo e, se c'è, dal filo.
-function buildExportZip(storageData, { filo = null } = {}) {
+// I segreti dell'utente (SN_CONST.campiSegreti) entrano nell'archivio solo se chi esporta lo chiede (#905).
+// Una chiave incollata in chat o copiata negli appunti è nell'archivio quanto quella delle Opzioni: si toglie ovunque.
+const SEGRETO_MIN = 12;
+const SEGRETO_TOLTO = '[chiave tolta dall’esportazione]';
+const CAMPI_PROXY = ['datacenter', 'residential'];
+const pieno = (v) => typeof v === 'string' && v.trim() !== '';
+
+function costanti() {
+  if (!globalThis.SN_CONST) require('../../shared/constants.js');
+  return globalThis.SN_CONST;
+}
+const campiSegreti = (settings) => costanti().campiSegreti(settings);
+const haSegreti = (storageData) => costanti().haSegreti(storageData && storageData.settings);
+
+function sostituisci(testo, segreti) {
+  let t = testo;
+  for (const s of segreti) if (t.includes(s)) t = t.split(s).join(SEGRETO_TOLTO);
+  return t;
+}
+
+function oscura(nodo, segreti) {
+  if (Array.isArray(nodo) || isPlainObject(nodo)) {
+    for (const k of Object.keys(nodo)) {
+      if (typeof nodo[k] === 'string') nodo[k] = sostituisci(nodo[k], segreti);
+      else oscura(nodo[k], segreti);
+    }
+  }
+}
+
+// Del proxy il segreto è utente e password, non l'indirizzo: senza, l'archivio rimesso altrove perdeva il proxy (#905.1).
+const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)([^/@\s]+)@/i;
+const proxySenzaCredenziali = (v) => v.trim().replace(CREDENZIALI_PROXY, '$1');
+const haCredenziali = (v) => pieno(v) && CREDENZIALI_PROXY.test(v.trim());
+
+// Toglie i segreti da una copia dei dati, e dal filo. Il campo va via, non diventa vuoto: all'importazione un campo
+// assente lascia quello di chi importa. `proxy`: i campi del proxy rimasti col solo indirizzo.
+function togliSegreti(dati, filo) {
+  const s = dati && dati.settings;
+  const campi = campiSegreti(s);
+  const segreti = new Set();
+  const proxy = [];
+  for (const [o, k] of campi) {
+    if (!pieno(o[k])) { delete o[k]; continue; }
+    const v = o[k].trim();
+    segreti.add(v);
+    const m = isPlainObject(s) && o === s.proxy ? CREDENZIALI_PROXY.exec(v) : null;
+    if (!m) { delete o[k]; continue; }
+    segreti.add(m[2]);
+    if (m[2].includes(':')) segreti.add(m[2].slice(m[2].indexOf(':') + 1));
+    o[k] = proxySenzaCredenziali(v);
+    proxy.push(k);
+  }
+  if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
+  // Il più lungo prima: l'indirizzo intero del proxy contiene la sua password.
+  const daTogliere = [...segreti].filter((v) => v.length >= SEGRETO_MIN).sort((a, b) => b.length - a.length);
+  if (daTogliere.length) oscura(dati, daTogliere);
+  if (!daTogliere.length || !filo || !filo.length) return { filo, proxy };
+  return { filo: Buffer.from(sostituisci(Buffer.isBuffer(filo) ? filo.toString('utf8') : String(filo), daTogliere), 'utf8'), proxy };
+}
+
+// Costruisce il Buffer ZIP a partire dallo storage Filo e, se c'è, dal filo. `chiavi`: anche i segreti.
+function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } = {}) {
   const clone = JSON.parse(JSON.stringify(storageData ?? {}));
+  const { filo, proxy } = chiavi ? { filo: filoDato, proxy: [] } : togliSegreti(clone, filoDato);
   const images = [];
   extractImages(clone, images);
 
@@ -146,8 +207,10 @@ function buildExportZip(storageData, { filo = null } = {}) {
     exportedAt: new Date().toISOString(),
     imageCount: images.length,
     filo: !!(filo && filo.length),
-    note: 'Esportazione dati Filo. data.json contiene tutte le impostazioni e i '
-      + 'contenuti; le immagini copiate/salvate sono nella cartella images/; '
+    chiavi: haSegreti(clone),
+    ...(proxy.length ? { proxySenzaCredenziali: proxy } : {}),
+    note: 'Esportazione dati Filo. data.json contiene le impostazioni e i '
+      + 'contenuti (le chiavi API solo se «chiavi» è true); le immagini copiate/salvate sono nella cartella images/; '
       + 'le chat con Filo e le pagine visitate stanno in filo/eventi.jsonl, un evento per riga.',
   };
 
@@ -321,6 +384,7 @@ function readExportZip(zipBuffer) {
   let dichiarate = 0;
   let filoDichiarato = null;
   let contoNoto = false;
+  let proxyTolti = [];
   const manifest = files.get(prefix + 'manifest.json');
   if (manifest) {
     try {
@@ -329,6 +393,7 @@ function readExportZip(zipBuffer) {
       dichiarate = Number.isInteger(m.imageCount) && m.imageCount > 0 ? m.imageCount : 0;
       if (typeof m.filo === 'boolean') filoDichiarato = m.filo;
       contoNoto = Number.isInteger(m.imageCount);
+      if (Array.isArray(m.proxySenzaCredenziali)) proxyTolti = CAMPI_PROXY.filter((k) => m.proxySenzaCredenziali.includes(k));
     } catch (_) {}
   }
 
@@ -343,7 +408,7 @@ function readExportZip(zipBuffer) {
     || filoDichiarato === true || (mancanti > 0 && filoDichiarato !== false));
   return {
     data, imageCount: stats.images, immaginiPerse: stats.perse, filoPerso, saltate,
-    exportedAt, sectionCount: Object.keys(data).length, filo,
+    exportedAt, sectionCount: Object.keys(data).length, filo, proxySenzaCredenziali: proxyTolti,
   };
 }
 
@@ -448,6 +513,7 @@ const REGOLE_IMPORT = {
   FILO_LESSONS_BUFFER: 'contenuto',
   FILO_CHATS: 'contenuto',
   FILO_MEMORY: 'contenuto',
+  FILO_MEMORY_FONTI: 'contenuto',
   FILO_DASHBOARD_CACHE: 'stato',
   FILO_NOTES: 'contenuto',
   FILO_TIMERS: 'sveglie',
@@ -463,6 +529,7 @@ const REGOLE_IMPORT = {
   LAST_SEEN_VERSION: 'stato',
   LAST_SEEN_NOTES: 'stato',
   FILO_PROXY_RULES: 'contenuto',
+  FILO_KEEP_OPEN: 'contenuto',
   FILO_CAMBI: 'stato',
   // Un backup non accende le operazioni automatiche, come non alza l'autonomia (#530).
   AUTO_MODE: 'stato',
@@ -471,23 +538,26 @@ const REGOLE_IMPORT = {
   AUTOMATION_CAP1: 'stato',
   AUTOMATION_CAP0: 'stato',
 };
-// Fuori da STORAGE_KEYS, per chiave: code e segni del portafoglio, bandierine di migrazione.
+// Fuori da STORAGE_KEYS, per chiave: code e segni del portafoglio, avvisi già dati, bandierine di migrazione.
 const REGOLE_ALTRE_CHIAVI = {
   walletLocalDeclared: 'stato',
   walletOwnKeyRefusal: 'stato',
   walletNotice: 'stato',
   walletPendingInvite: 'stato',
   walletUsageQueue: 'stato',
+  // I contatori di questa copia di Filo (#969): portati su un'altra, la stessa copia conterebbe due volte.
+  contatoriGiornalieri: 'stato',
+  avvisoChiaviInChiaro: 'stato',
   'filo.editor.notesMigrated': 'stato',
   sn_qr_in_primary_migrated: 'stato',
+  sn_aiuto_di_serie_migrated: 'stato',
 };
 
 let regolePerChiave = null;
 function regolaImport(chiave) {
   if (!regolePerChiave) {
-    if (!globalThis.SN_CONST) require('../../shared/constants.js');
     regolePerChiave = new Map(Object.entries(REGOLE_ALTRE_CHIAVI));
-    for (const [nome, valore] of Object.entries(globalThis.SN_CONST.STORAGE_KEYS)) {
+    for (const [nome, valore] of Object.entries(costanti().STORAGE_KEYS)) {
       if (REGOLE_IMPORT[nome]) regolePerChiave.set(valore, REGOLE_IMPORT[nome]);
     }
   }
@@ -558,9 +628,29 @@ function unisciSveglie(local, imported, prossima, adesso) {
 
 // `opzioni`: { tettoPagine, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche contano le sezioni di primo
 // livello; `restano` sono quelle del backup che non si importano perché sono stato.
+// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); un proxy arrivato
+// senza utente e password non prende il posto di quello di qui che li ha.
+function senzaSegretiVuoti(dati, cur) {
+  if (!isPlainObject(dati.settings)) return dati;
+  const settings = JSON.parse(JSON.stringify(dati.settings));
+  const via = (o, campi) => { if (isPlainObject(o)) for (const k of campi) if (k in o && !pieno(o[k])) delete o[k]; };
+  via(settings.apiKeys, isPlainObject(settings.apiKeys) ? Object.keys(settings.apiKeys) : []);
+  via(settings.proxy, CAMPI_PROXY);
+  const proxyQui = isPlainObject(cur) && isPlainObject(cur.settings) && isPlainObject(cur.settings.proxy) ? cur.settings.proxy : {};
+  if (isPlainObject(settings.proxy)) {
+    for (const k of CAMPI_PROXY) {
+      const v = settings.proxy[k];
+      if (pieno(v) && !haCredenziali(v) && haCredenziali(proxyQui[k])) delete settings.proxy[k];
+    }
+  }
+  via(isPlainObject(settings.security) ? settings.security.safeBrowse : null, ['safeBrowsingKey']);
+  if ('apiKeys' in settings && !isPlainObject(settings.apiKeys)) delete settings.apiKeys;
+  return { ...dati, settings };
+}
+
 function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
-  const imp = imported && typeof imported === 'object' ? imported : {};
+  const imp = senzaSegretiVuoti(require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {}), cur);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = { added: 0, updated: 0, unchanged: 0, restano: 0, pagineFuori: 0, pagineMieFuori: 0 };
@@ -593,13 +683,22 @@ function mergeImportedData(current, imported, opzioni = {}) {
   return { merged, stats };
 }
 
+// I campi del proxy che dopo l'importazione restano col solo indirizzo perché l'archivio li portava così: si dice
+// prima del sì, ché senza utente e password il proxy non funziona.
+function proxyDaCompletare(merged, campi) {
+  const proxy = isPlainObject(merged) && isPlainObject(merged.settings) && isPlainObject(merged.settings.proxy) ? merged.settings.proxy : {};
+  return (Array.isArray(campi) ? campi : []).filter((k) => pieno(proxy[k]) && !haCredenziali(proxy[k]));
+}
+
 module.exports = {
   buildExportZip,
+  proxyDaCompletare,
   zipStore,
   crc32,
   unzip,
   readExportZip,
   mergeImportedData,
+  haSegreti,
   REGOLE_IMPORT,
   REGOLE_ALTRE_CHIAVI,
   regolaImport,

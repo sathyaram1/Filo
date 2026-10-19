@@ -34,7 +34,7 @@
 // FORMA DEL JSONL (verificata su file veri il 16/09/2026)
 //   righe {"type":"assistant","timestamp":…,"message":{"id","model","usage":{
 //     input_tokens, cache_creation_input_tokens, cache_read_input_tokens,
-//     output_tokens}, "content":[{type:"tool_use", id, name}]}} — un messaggio
+//     output_tokens, speed}, "content":[{type:"tool_use", id, name}]}} — un messaggio
 //   può stare su PIÙ righe (una per blocco di contenuto), con lo stesso `id` e
 //   la stessa `usage` ripetuta: si conta una volta per `id`; in cima alla
 //   riga c'è anche `effort` (lo sforzo del turno: "high", "xhigh"…);
@@ -61,6 +61,8 @@ import { fileURLToPath } from 'node:url';
 // famiglia (opus se non ne ha una), con una nota nel rapporto.
 // Haiku 5.5 (tabella del 2026-10-06) ha due listini: una richiesta col prompt
 // (input + cache letta e scritta) oltre `soglia` paga tutta la tariffa `oltre`.
+// Modalità veloce (`usage.speed: "fast"`, stessa tabella): ogni voce, cache
+// compresa, a `VELOCE` volte il listino; Opus 5.5 8/40, Opus 5 e 4.8 10/50.
 //
 // Le due durate si distinguono nel transcript (`usage.cache_creation.
 // ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`; la somma è
@@ -98,8 +100,19 @@ export function scrittureCache(u) {
   return { cw5m: cw5m + resto, cw1h };
 }
 
+/** Il moltiplicatore della modalità veloce per le versioni che il listino conosce; le altre: `VELOCE_RIPIEGO`, con la nota. */
+export const VELOCE = Object.freeze({ opus: Object.freeze({ '5-5': 2, 5: 2, '4-8': 2 }) });
+export const VELOCE_RIPIEGO = 2;
+
+/**
+ * La versione del listino (PREZZI, VERSIONI, VELOCE), scritta in ogni rapporto: chi confronta costi di prima e di dopo
+ * un cambio di prezzi vede dove sta il salto (#882). I rapporti senza il campo non si ricalcolano: fino al 02/10/2026
+ * contavano Opus 5.5 al listino di Opus 5. Si cambia insieme ai prezzi: sentinella in sessionReport.test.
+ */
+export const LISTINO = '2026-10-06';
+
 /** Le versioni che il listino conosce per nome, con la tariffa che devono avere. */
-const VERSIONI = Object.freeze({
+export const VERSIONI = Object.freeze({
   opus: { '5-5': 'opus-5-5', 5: 'opus', '4-8': 'opus', '4-7': 'opus', '4-6': 'opus', '4-5': 'opus' },
   sonnet: { '5-5': 'sonnet', 5: 'sonnet', '4-6': 'sonnet-4', '4-5': 'sonnet-4', 4: 'sonnet-4' },
   haiku: { '5-5': 'haiku-5-5', '4-5': 'haiku' },
@@ -131,7 +144,20 @@ export function famigliaPrezzo(model) {
   }
   // La minore ha una o due cifre: un suffisso di data (otto) non è una versione.
   const v = /(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d{1,2})(?!\d))?/.exec(m);
-  return { key, known: !!v && VERSIONI[v[1]][v[3] ? `${v[2]}-${v[3]}` : v[2]] === key };
+  const versione = v ? (v[3] ? `${v[2]}-${v[3]}` : v[2]) : '';
+  return { key, known: !!v && VERSIONI[v[1]][versione] === key, famiglia: v ? v[1] : '', versione };
+}
+
+/**
+ * Il moltiplicatore della velocità di una usage: { molt, speed, known }, `speed` '' a velocità normale. PURA.
+ * `known` è falso per una velocità che il listino non conosce su quel modello: il rapporto lo dice.
+ */
+export function velocitaPrezzo(u, fam) {
+  const speed = typeof (u && u.speed) === 'string' ? u.speed.trim().toLowerCase().slice(0, 40) : '';
+  if (!speed || speed === 'standard') return { molt: 1, speed: '', known: true };
+  if (speed !== 'fast') return { molt: 1, speed, known: false };
+  const molt = fam && fam.known && VELOCE[fam.famiglia] ? VELOCE[fam.famiglia][fam.versione] : 0;
+  return molt ? { molt, speed, known: true } : { molt: VELOCE_RIPIEGO, speed, known: false };
 }
 
 /**
@@ -148,8 +174,9 @@ export function valutaUso(u, model) {
   const listino = PREZZI[fam.key];
   const oltreSoglia = !!listino.oltre && input + cw5m + cw1h + cacheRead > listino.soglia;
   const p = oltreSoglia ? listino.oltre : listino;
-  const costo = (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
-  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam, oltreSoglia };
+  const velocita = velocitaPrezzo(u, fam);
+  const costo = velocita.molt * (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
+  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam, oltreSoglia, velocita };
 }
 
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
@@ -174,6 +201,7 @@ function testoDi(content) {
 export function rapportoVuoto({ role = '', ticket = '' } = {}) {
   return {
     v: 3,
+    listino: LISTINO,
     role: String(role || ''),
     ticket: String(ticket || ''),
     sessionId: '',
@@ -409,6 +437,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   const inCorso = new Map();
   const modelli = new Set();
   const sconosciuti = new Map();
+  const velocitaIgnote = new Map();
   // `since`: solo quello che è successo da quel momento (il biglietto di
   // questo giro): quando l'orchestratore rilascia il biglietto di un worker
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
@@ -489,7 +518,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // di prima comparsa: il primo turno non è mai «freddo»).
   let costo = 0;
   for (const { u, model, effort } of usi.values()) {
-    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, oltreSoglia } = valutaUso(u, model);
+    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, oltreSoglia, velocita } = valutaUso(u, model);
     rep.turns += 1;
     if (oltreSoglia) rep.oltreSoglia[chiaveSicura(model)] = (rep.oltreSoglia[chiaveSicura(model)] || 0) + 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
@@ -502,6 +531,11 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     rep.tokens.output += out;
     if (typeof model === 'string' && model) modelli.add(model);
     if (!fam.known && model) sconosciuti.set(String(model), fam.key);
+    if (!velocita.known) {
+      const k = JSON.stringify([String(model || ''), velocita.speed]);
+      const prima = velocitaIgnote.get(k);
+      velocitaIgnote.set(k, { model: String(model || ''), speed: velocita.speed, molt: velocita.molt, key: fam.key, turni: (prima ? prima.turni : 0) + 1 });
+    }
     costo += c;
   }
 
@@ -511,6 +545,11 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   if (Number.isFinite(primoMs) && Number.isFinite(ultimoMs)) rep.durationS = Math.round((ultimoMs - primoMs) / 1000);
   rep.costUsd = Math.round(costo * 10000) / 10000;
   for (const [m, key] of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa ${NOMI_TARIFFA[key]}`);
+  for (const v of velocitaIgnote.values()) {
+    const turni = v.turni === 1 ? '1 turno calcolato' : `${v.turni} turni calcolati`;
+    const tariffa = v.molt === 1 ? `a tariffa ${NOMI_TARIFFA[v.key]}` : `a ${v.molt}× la tariffa ${NOMI_TARIFFA[v.key]}`;
+    rep.notes.push(`velocità «${v.speed}» non a listino per «${v.model || '(senza modello)'}»: ${turni} ${tariffa}`);
+  }
   if (illeggibili) rep.notes.push(`${illeggibili} righe del transcript non erano JSON e sono state saltate`);
   return rep;
 }
@@ -787,10 +826,12 @@ async function lineeDi(file) {
   return linee;
 }
 
-async function rapportoOrchestratore(principale) {
+async function rapportoOrchestratore(principale, note = []) {
   if (!existsSync(principale)) return null;
   const { righe, attesaPrimaS, continua } = finestraOrchestratore(await lineeDi(principale));
   const r = await analizzaRighe(righe, { role: 'orchestrator', continua });
+  // Le sue note (una tariffa di ripiego) vanno nel rapporto: il suo costo è stimato quanto quello del worker.
+  for (const n of r.notes) if (!note.includes(`orchestratore: ${n}`)) note.push(`orchestratore: ${n}`);
   return {
     costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
     maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, oltreSoglia: r.oltreSoglia, startedAt: r.startedAt, endedAt: r.endedAt,
@@ -881,7 +922,7 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     }
     if (sottoAgente) {
       try {
-        rep.orchestrator = await rapportoOrchestratore(`${dirname(dirname(trovato.file))}.jsonl`);
+        rep.orchestrator = await rapportoOrchestratore(`${dirname(dirname(trovato.file))}.jsonl`, rep.notes);
       } catch (e) {
         rep.notes.push(`thread principale illeggibile: ${String((e && e.message) || e)}`);
       }
@@ -908,7 +949,7 @@ export function riassunto(rep) {
     `rapporto sessione — ruolo: ${rep.role || '(nessuno)'}, biglietto: ${rep.ticket ? `${rep.ticket.slice(0, 8)}…` : '(nessuno)'}, sessione: ${rep.sessionId || '(sconosciuta)'}`,
     `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}, sforzo: ${Object.entries(rep.effort || {}).map(([k, n]) => `${k} ${n}`).join(', ') || '(non dichiarato)'}`,
     `token: input ${rep.tokens.input}, cache letta ${rep.tokens.cacheRead}, cache scritta ${rep.tokens.cacheWrite}, output ${rep.tokens.output}`,
-    `costo stimato: $${rep.costUsd.toFixed(4)}${rep.orchestrator ? ` + orchestratore $${rep.orchestrator.costUsd.toFixed(4)} (${rep.orchestrator.turns} turni, contesto ${rep.orchestrator.maxContextTokens}, ${rep.orchestrator.rewarmTurns} da riscaldare, fermo ${rep.orchestrator.attesaPrimaS}s${oltreOrch ? `, oltre soglia: ${oltreOrch}` : ''})` : ''} · cache riscaldata ${rep.rewarmTurns} volte${oltre ? ` · richieste oltre la soglia del prompt: ${oltre}` : ''}`,
+    `costo stimato: $${rep.costUsd.toFixed(4)} (listino ${rep.listino || 'non dichiarato'})${rep.orchestrator ? ` + orchestratore $${rep.orchestrator.costUsd.toFixed(4)} (${rep.orchestrator.turns} turni, contesto ${rep.orchestrator.maxContextTokens}, ${rep.orchestrator.rewarmTurns} da riscaldare, fermo ${rep.orchestrator.attesaPrimaS}s${oltreOrch ? `, oltre soglia: ${oltreOrch}` : ''})` : ''} · cache riscaldata ${rep.rewarmTurns} volte${oltre ? ` · richieste oltre la soglia del prompt: ${oltre}` : ''}`,
     `strumenti: ${rep.tools.total} (timeout ${rep.tools.timeouts}, errori ${rep.tools.errors}, sotto-agenti ${rep.subagents}, il più lungo ${rep.longestToolS}s) · sotto-agenti letti: ${Number(rep.subagentRuns) || 0}, il loro costo $${(Number(rep.subagentCostUsd) || 0).toFixed(4)}${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`,
   ];
 }

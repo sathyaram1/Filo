@@ -194,3 +194,34 @@ export function absolutizeRecipe(text, toolsRoot = TOOLS_ROOT, repoRoot = '') {
   const base = tools.replace(/\\/g, '/');
   return t.replace(/\bnode\s+scripts\/([A-Za-z0-9._/-]+)/g, `node "${base}/scripts/$1"`);
 }
+
+/**
+ * Un pezzo stampato, coi comandi riscritti come nelle ricette. Un JSON resta com'è: dentro c'è testo di altri
+ * (il feedback), e le virgolette aggiunte romperebbero la busta. PURA.
+ */
+export function absolutizePrinted(chunk, toolsRoot = TOOLS_ROOT, repoRoot = '') {
+  if (typeof chunk !== 'string' || !/\bnode\s+scripts\//.test(chunk)) return chunk;
+  if (/^\s*[[{]/.test(chunk)) {
+    try { JSON.parse(chunk); return chunk; } catch (_) { /* testo che comincia con una parentesi */ }
+  }
+  return absolutizeRecipe(chunk, toolsRoot, repoRoot);
+}
+
+const OUTPUT_MARK = Symbol.for('filo.absolutizeOutput');
+
+/**
+ * Da qui ogni testo che il processo stampa passa da absolutizePrinted, scritto dallo strumento o arrivato dal server
+ * (istruzioni, motivi di rifiuto) (#763). La chiama all'avvio ogni strumento che le ricette nominano (sentinella in
+ * tests/unit/toolsPin.test.mjs). A strumenti non fissati non tocca niente.
+ */
+export function absolutizeOutput(repoRoot = '', { toolsRoot = TOOLS_ROOT, streams = [process.stdout, process.stderr] } = {}) {
+  const repo = repoRoot || pinnedRepoRoot(toolsRoot);
+  if (!repo || resolve(repo) === resolve(toolsRoot)) return false;
+  for (const s of streams) {
+    if (!s || typeof s.write !== 'function' || s[OUTPUT_MARK]) continue;
+    const write = s.write;
+    s.write = (chunk, ...rest) => write.call(s, absolutizePrinted(chunk, toolsRoot, repo), ...rest);
+    s[OUTPUT_MARK] = true;
+  }
+  return true;
+}

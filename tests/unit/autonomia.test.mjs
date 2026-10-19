@@ -275,7 +275,7 @@ test('i nomi delle reti Wi-Fi e dei dispositivi Bluetooth elencati sono di altri
 test('la ricerca dell\'Aiuto passa da NAVIGA col testo cercato: costo 2 lì, una domanda sola', () => {
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), 2);
   assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://esempio.it/' }), 1);
-  assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n“gatti”/);
+  assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n«gatti»/);
   const side = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
   for (const op of ['search_text', 'search_image']) {
     assert.match(side, new RegExp(`${op}:\\s*\\{[^}]*viaFilo: true`), `${op} non chiede anche lui prima del dispatch`);
@@ -324,7 +324,7 @@ test('elenco fisso nel registro: cancellare la memoria, cambiare il livello, far
   assert.equal(risposta({ type: 'CANCELLA_MEMORIA' }, { livello: 'automatico' }), 'no');
   assert.equal(risposta({ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }), 'no');
   assert.equal(AL.ingressi({ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }).elenco, 'regole');
-  assert.match(AL.ingressi({ type: 'CANCELLA_MEMORIA' }).dove, /Memoria di Filo/);
+  assert.match(AL.ingressi({ type: 'CANCELLA_MEMORIA' }).dove, /quaderno delle memorie/);
   assert.equal(risposta({ type: 'NAVIGA', url: 'https://x.example/?password=Gatto2024!' }), 'no');
   assert.equal(risposta({ type: 'CERCA_WEB', query: 'il mio codice di verifica è 482913' }), 'no');
   assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'la mia chiave è sk-or-v1-0123456789abcdef0123456789abcdef' }), 'no');

@@ -30,7 +30,7 @@
 //     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
 //     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
-//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
+//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito (payload.name = titolo già scelto)
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
@@ -136,9 +136,11 @@
       ? String(payload.submissionId)
       : `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const dallOwner = !!(opts && opts.dallOwner);
+    // Un titolo già scritto (quello che Filo propone in chat e l'utente conferma) non si rigenera.
+    const titolo = payload && typeof payload.name === 'string' && payload.name.trim() ? payload.name : null;
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
     if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0, dallOwner });
+      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner });
       if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
       await persist();
     }

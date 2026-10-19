@@ -25,7 +25,63 @@
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/filoContesto.js"></script>
   <script src="filo://shared/lunghezzaRisposte.js"></script>
+  <script src="filo://shared/creditiAvviso.js"></script>
   <style>
+    /* Le scorciatoie di Filo (#842): i tasti hanno la forma di tasti veri, e la riga in ascolto si accende. */
+    .sc-lista { display: flex; flex-direction: column; gap: 2px; max-width: 620px; }
+    .sc-riga {
+      display: grid;
+      grid-template-columns: 150px auto 28px;
+      justify-content: start;
+      align-items: center;
+      column-gap: 10px;
+      padding: 4px 0;
+    }
+    .sc-nome { color: var(--sn-fg); }
+    .sc-riga.sc-cambiata .sc-nome { color: var(--sn-accent); font-weight: 600; }
+    .sc-tasti {
+      justify-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 30px;
+      padding: 3px 8px;
+      border: 1px solid var(--sn-border);
+      border-radius: var(--sn-radius);
+      background: var(--sn-bg);
+      color: var(--sn-fg);
+      font: inherit;
+      cursor: pointer;
+      transition: border-color calc(120ms * var(--sn-motion, 1)), background calc(120ms * var(--sn-motion, 1)), box-shadow calc(120ms * var(--sn-motion, 1));
+    }
+    .sc-tasti:hover, .sc-tasti:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
+    .sc-kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      padding: 1px 7px;
+      border: 1px solid var(--sn-border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--sn-hover);
+    }
+    .sc-piu { color: var(--sn-muted); font-size: 11px; }
+    .sc-riga.sc-registra .sc-tasti {
+      border-color: var(--sn-accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-accent) 22%, transparent);
+    }
+    .sc-attesa { color: var(--sn-muted); font-style: italic; }
+    .sc-ripristina {
+      background: transparent;
+      border: none;
+      color: var(--sn-muted);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      padding: 3px 5px;
+      border-radius: 4px;
+    }
+    .sc-ripristina:hover { color: var(--sn-fg); background: var(--sn-hover); }
+    .sc-errore { grid-column: 2 / -1; color: var(--sn-error); font-size: 12px; margin-top: 2px; }
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
     .onb-conv > summary {
@@ -38,7 +94,7 @@
       gap: 10px;
     }
     .onb-conv > summary::-webkit-details-marker { display: none; }
-    .onb-conv > summary::before { content: '▸'; opacity: 0.6; transition: transform 0.15s ease; }
+    .onb-conv > summary::before { content: '▸'; opacity: 0.6; transition: transform calc(0.15s * var(--sn-motion, 1)) ease; }
     .onb-conv[open] > summary::before { content: '▾'; }
     .onb-conv > summary:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
     .onb-conv-when { font-weight: 600; }
@@ -51,14 +107,12 @@
     .agent-style-note { margin: 6px 0 0; font-size: 12px; color: var(--sn-muted); text-align: right; }
     .agent-style-note.agent-style-over { color: var(--sn-error); text-align: left; }
     #agentStyleText.agent-style-over { border-color: var(--sn-error); }
-    /* Memoria di Filo: una riga per cosa imparata, ognuna si toglie da sola (#592). */
+    /* Righe che si tolgono una alla volta (cartelle dei documenti): la × si accende al passaggio. */
     .mem-box { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
-    .mem-gruppo { margin: 12px 0 4px; font-size: 13px; font-weight: 600; opacity: 0.8; }
-    .mem-gruppo:first-child { margin-top: 0; }
-    .mem-riga { display: flex; align-items: flex-start; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background 0.15s ease; }
+    .mem-riga { display: flex; align-items: flex-start; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background calc(0.15s * var(--sn-motion, 1)) ease; }
     .mem-riga:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
     .mem-testo { flex: 1 1 auto; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .mem-via { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 6px; opacity: 0.35; transition: opacity 0.15s ease, background 0.15s ease; }
+    .mem-via { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 6px; opacity: 0.35; transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease; }
     .mem-riga:hover .mem-via, .mem-via:focus-visible { opacity: 0.85; }
     .mem-via:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.18)); color: var(--sn-error); }
     .mem-via:disabled { cursor: default; opacity: 0.2; }
@@ -66,7 +120,7 @@
     .doc-dove { display: block; font-size: 12px; color: var(--sn-muted); overflow-wrap: anywhere; }
     .doc-tolta .mem-testo { opacity: 0.55; }
     .doc-dove.doc-negata { color: var(--sn-error); }
-    .doc-rimetti { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 13px; padding: 2px 8px; border-radius: 6px; opacity: 0.6; transition: opacity 0.15s ease, background 0.15s ease; }
+    .doc-rimetti { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 13px; padding: 2px 8px; border-radius: 6px; opacity: 0.6; transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, background calc(0.15s * var(--sn-motion, 1)) ease; }
     .doc-rimetti:hover, .doc-rimetti:focus-visible { opacity: 1; background: var(--sn-hover, rgba(127, 127, 127, 0.18)); }
     .doc-cercate { margin-top: 2px; }
     .doc-piede { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
@@ -99,12 +153,11 @@
     </section>
 
     <section>
-      <h2>Commento nella home</h2>
-      <p class="sn-muted">Il messaggio proattivo di Filo al centro della pagina Nuova scheda.</p>
+      <h2>Filo scrive per primo</h2>
       <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="showHomeMessage" />
-          <span>Mostra il commento di Filo al centro della home</span>
+          <span>Quando suona un timer, finisce un download, arriva un avviso o comincia la giornata, Filo lo scrive nella home</span>
         </label>
       </div>
     </section>
@@ -202,9 +255,8 @@
 
     <section>
       <h2>Memoria di Filo</h2>
-      <p class="sn-muted">Quello che Filo ha imparato su di te mentre parlavate. Entra in ogni conversazione: se una riga non ti torna, toglila.</p>
-      <div id="memoria" class="mem-box"></div>
-      <span id="memoriaHint" class="sn-saved-indicator" aria-live="polite">Dimenticato</span>
+      <p class="sn-muted">Quello che Filo ha imparato su di te entra in ogni conversazione. Nel quaderno lo rileggi, lo correggi e vedi da dove viene.</p>
+      <button type="button" class="sn-btn sn-btn-secondary" id="apriQuaderno">Apri il quaderno delle memorie</button>
     </section>
 
     <section>
@@ -319,6 +371,17 @@
       </select>
     </section>
 
+    <section id="sec-schermo">
+      <h2>Guardare lo schermo</h2>
+      <p class="sn-muted">Chiedi in chat «cosa mi sta chiedendo questa finestra?» o «leggimi l'errore di Word». Filo cattura quella finestra, la fa leggere a un modello che vede le immagini e ti risponde. La prima volta che guarda una finestra di un'altra app ti chiede l'OK. Non clicca, non scrive e non salva l'immagine.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="schermoGuarda" />
+          <span>Filo può guardare lo schermo</span>
+        </label>
+      </div>
+    </section>
+
     <section id="sec-nomi-file">
       <h2>Nomi dei file scaricati</h2>
       <p class="sn-muted">Un file che arriva con un nome che non dice niente («scan_00231.pdf», «IMG_2026…», «documento (3)») prende un nome che dice cosa contiene, come «Bolletta luce marzo 2026.pdf». Filo ne legge l'inizio o una miniatura, l'estensione resta quella, e l'avviso che compare ha «Annulla». I nomi scelti da qualcuno restano com'erano, e nelle finestre in incognito non succede.</p>
@@ -353,6 +416,29 @@
       <h2>Impostazioni avanzate</h2>
       <p class="sn-muted">Qui puoi modificare ogni aspetto estetico di Filo. Ricorda però che puoi sempre chiedere a Filo di fare le modifiche, se non ti va di cercare l'impostazione giusta.</p>
 
+      <!-- #841 — gli interruttori di funzione che prima si cambiavano solo a parole. -->
+      <section id="sec-funzioni">
+        <h2>Funzioni</h2>
+        <div class="sn-toggle-row">
+          <label title="L'assistente che vede la pagina: la voce «Aiuto» del tasto destro, sulla pagina e sulla linguetta, e la sua scorciatoia.">
+            <input type="checkbox" id="aiutoAcceso" />
+            <span>Aiuto nelle pagine</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Le sottolineature blu mentre scrivi e le correzioni proposte col tasto destro.">
+            <input type="checkbox" id="correttoreAcceso" />
+            <span>Correttore ortografico</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Ogni pagina che salvi per dopo prende una categoria scelta da un modello, e la lista si raggruppa per categoria.">
+            <input type="checkbox" id="categorieAutomatiche" />
+            <span>Categorie automatiche in «Aperti per dopo»</span>
+          </label>
+        </div>
+      </section>
+
       <section id="sec-barra">
         <h2>Barra laterale</h2>
         <p class="sn-muted">La barra che si apre dal bordo sinistro con indietro, avanti, ricarica e home. Resta sempre raggiungibile dalla linguetta a sinistra delle schede e con la scorciatoia.</p>
@@ -372,6 +458,16 @@
         <input type="number" id="barraAttesa" min="100" max="3000" step="50" style="width:120px;" />
         <label for="barraUscita" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dopo quanto si chiude quando il mouse esce (millisecondi, da 100 a 5.000)</label>
         <input type="number" id="barraUscita" min="100" max="5000" step="50" style="width:120px;" />
+      </section>
+
+      <!-- #842 — i tasti di Spiega, Traduci, Salva per dopo e Aiuto: le righe le scrive preferences.js. -->
+      <section id="sec-scorciatoie">
+        <h2>Scorciatoie da tastiera</h2>
+        <div id="scorciatoieFilo" class="sc-lista" role="group" aria-label="Scorciatoie di Filo"></div>
+        <div class="sn-row" style="margin-top:12px;">
+          <button class="sn-btn sn-btn-secondary" id="scorciatoieRipristina" type="button">Ripristina i tasti di serie</button>
+          <span id="scorciatoieHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+        </div>
       </section>
 
       <section id="sec-tokens">
@@ -426,6 +522,50 @@
         </div>
       </section>
 
+      <!-- #818 — quando Filo avvisa che i crediti stanno per finire, e il pre-calcolo che li consuma senza che si veda. -->
+      <section id="sec-crediti">
+        <h2>Crediti</h2>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="avvisoCreditiAttivo" />
+            <span>Avvisami prima che i crediti finiscano</span>
+          </label>
+        </div>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Avvisa quando, al ritmo di questi giorni e contando la quota che arriva ogni notte, i crediti durano al più questi giorni. 0 spegne questa condizione.">
+            <span>Quando durano al più (giorni)</span>
+            <input type="number" id="avvisoCreditiGiorni" min="0" max="30" step="0.5" style="width:120px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Avvisa quando il saldo scende sotto questa parte dei crediti che avevi all'ingresso. 0 spegne questa condizione.">
+            <span>O sotto (% di quelli d'ingresso)</span>
+            <input type="number" id="avvisoCreditiPercento" min="0" max="100" step="1" style="width:120px;" />
+          </label>
+        </div>
+        <div class="sn-toggle-row" style="margin-top:12px">
+          <label title="Al tasto destro la spiegazione è già pronta, ma la paghi anche le volte che non la apri.">
+            <input type="checkbox" id="spiegaAnticipata" />
+            <span>Prepara la spiegazione appena selezioni un testo</span>
+          </label>
+        </div>
+      </section>
+
+      <section id="sec-proposta-email">
+        <h2>La tua email nei siti</h2>
+        <p class="sn-muted">Quando entri in un campo che chiede l'email o il nome utente, Filo ti propone quella del tuo account. Il sito la riceve solo quando la scegli.</p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="propostaEmailAttiva" />
+            <span>Proponi l'email del tuo account nei campi di accesso</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="propostaEmailIncognito" />
+            <span>Anche nelle finestre in incognito</span>
+          </label>
+        </div>
+      </section>
+
       <section id="sec-aggiornamenti">
         <h2>Aggiornamenti</h2>
         <p class="sn-muted">A ogni avvio Filo controlla se c'è una versione nuova, la scarica e la installa. Se togli la spunta ti avvisa nella home e aspetta che premi «Installa». Fino ad allora restano aperti anche i problemi di sicurezza già corretti nella versione nuova.</p>
@@ -443,6 +583,18 @@
             <option value="avvio">La prossima volta che apro Filo, con la barra di avanzamento</option>
             <option value="chiusura">In silenzio, quando chiudo Filo</option>
           </select>
+        </div>
+      </section>
+
+      <!-- #969 — i contatori giornalieri: cosa esce lo dice la pagina Privacy, che dice anche come spegnerli. -->
+      <section id="sec-contatori">
+        <h2>Contatori anonimi</h2>
+        <p class="sn-muted">Una volta al giorno Filo manda a chi lo sviluppa solo dei numeri: quante volte usi ogni funzione, quanto aspetti la risposta, quante chiamate falliscono. Niente testi, indirizzi o nomi di file, con un codice che cambia ogni mese. In incognito non conta niente. <a id="contatoriPrivacy" href="filo://transparency/transparency.html?doc=privacy">Cosa esce, nel dettaglio</a></p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="contatoriAttivi" />
+            <span>Manda i contatori anonimi</span>
+          </label>
         </div>
       </section>
 

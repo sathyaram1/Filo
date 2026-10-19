@@ -14,6 +14,9 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
+try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
+
 // Prima di qualsiasi sessione, che caricherebbe subito i dizionari del correttore scaricandoli da Google (#1084).
 try { require('./services/dizionari').prepara(app); } catch (_) {}
 
@@ -82,6 +85,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoAuth = require('./auth/google-auth');
     globalThis.__filoUpdater = require('./updater');
     globalThis.__filoAlarmWatcher = require('./services/alarmWatcher');
+    globalThis.__filoCancellaTutto = require('./cancellaTutto');
   } catch (_) {}
 }
 
@@ -192,6 +196,8 @@ function configureSpellchecker() {
 
 app.whenReady().then(async () => {
   // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
+  // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
+  try { await require('./services/interruttoreAiuto').migra(); } catch (e) { console.warn('[Filo] interruttore dell\'Aiuto:', e?.message || e); }
   let impostazioniAvvio = {};
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
   try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
@@ -207,6 +213,7 @@ app.whenReady().then(async () => {
   try {
     const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
+    try { require('./movimento').segui(s); } catch (_) {}
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
@@ -238,6 +245,9 @@ app.whenReady().then(async () => {
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
+    // Le scorciatoie scelte dall'utente (#842) valgono dal primo tasto premuto.
+    try { require('./shortcuts').configura(s); } catch (_) {}
+    require('./shortcuts').seguiModuliEditor().catch(() => {});
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
@@ -277,6 +287,7 @@ app.whenReady().then(async () => {
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  try { require('./cancellaTutto').annuncia(); } catch (_) {}
   // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
   // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
   if (process.env.NODE_ENV !== 'test') {
@@ -386,9 +397,10 @@ app.whenReady().then(async () => {
           const captureWin = new BrowserWindow({
             width: 1280, height: 800, show: true,
             webPreferences: {
-              preload: path.join(__dirname, '..', 'preload', preloadName),
+              // Come le schede: la pagina web col preload impacchettato, in sandbox; quella interna col suo.
+              preload: preloadName === 'page-preload.js' ? require('./preloadPacchetto').percorsoDelPreload() : path.join(__dirname, '..', 'preload', preloadName),
               contextIsolation: preloadName !== 'internal-preload.js',
-              sandbox: false, nodeIntegration: false,
+              sandbox: preloadName !== 'internal-preload.js', nodeIntegration: false,
             },
           });
           captureWin.loadURL(url);
@@ -479,6 +491,23 @@ app.on('before-quit', () => {
       Storage.setSync({ [key]: tm.sessionState() });
     } else Storage?.flushSync?.();
   } catch (_) {}
+});
+
+// Uscire distrugge le schede senza chiudere le loro pagine: chi aveva caselle da spedire perdeva l'ultima modifica.
+// Si aspetta come alla chiusura di una scheda (chiusuraConCaselle), una volta sola.
+let congedoUscitaFatto = false;
+app.on('before-quit', (e) => {
+  if (congedoUscitaFatto) return;
+  congedoUscitaFatto = true;
+  // Tutte le finestre: una che rifiuta di chiudersi mentre aspetta annullerebbe l'uscita (su Mac Filo resterebbe aperto).
+  const { congedaSchede } = require('./tabs/chiusuraConCaselle');
+  const attese = BrowserWindow.getAllWindows()
+    .map((w) => { try { return w.isDestroyed() ? null : congedaSchede(w._filoTabs); } catch (_) { return null; } })
+    .filter(Boolean);
+  if (!attese.length) return;
+  e.preventDefault();
+  const esci = () => { try { app.quit(); } catch (_) {} };
+  Promise.all(attese).then(esci, esci);
 });
 
 // Wipe dei cookie-tracker all'uscita (modalità 'default'): i cookie funzionali e

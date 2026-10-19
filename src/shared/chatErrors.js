@@ -41,6 +41,8 @@
 //   SN_CHAT_ERRORS.rimedioPagina(code) → { dove, url, label } | null
 //     La stessa cosa già pronta da mostrare: ogni superficie usa questa, così
 //     l'indirizzo e l'etichetta non vengono riscritti uno per riquadro.
+//   SN_CHAT_ERRORS.fraseNessunHost({ modello, funzione, motivo, rimedio })
+//     → la frase di un modello che nessun host ammesso serve (#828), la stessa ovunque.
 //
 // Logica PURA: niente I/O, niente Electron → unit-testabile.
 
@@ -97,7 +99,7 @@
   // codice nuovo dimenticato qui diventa «qualcosa è andato storto» (#663).
   const CODICI_GIA_SCRITTI = [
     'NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
-    'FEEDBACK_READ_DENIED',
+    'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
   ];
 
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
@@ -107,6 +109,7 @@
     NO_API_KEY: 'crediti',
     NO_MODEL_FOR_ACTION: 'opzioni',
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
+    NO_ALLOWED_HOST: 'opzioni',
     LIMIT_REACHED: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
@@ -135,6 +138,76 @@
   function rimedioPagina(x) {
     const dove = rimedio(x);
     return dove ? { dove, ...RIMEDIO_PAGINE[dove] } : null;
+  }
+
+  // «Nessun host ammesso per questo modello» (#828): la frase la compone solo fraseNessunHost, e chi ha un altro
+  // motivo o un altro posto dove si rimedia li passa. Senza «riprova»: finché il modello resta quello, non cambia niente.
+  const NESSUN_HOST_MOTIVO = 'nessun fornitore ammesso lo ospita';
+  const RIMEDI_NESSUN_HOST = {
+    opzioni: 'Scegline un altro in Opzioni → Modelli per azione.',
+    predefiniti: 'Per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni e impostalo in Modelli per azione.',
+    gestione: 'Scegline un altro in Gestione → Automazioni, fra i Modelli di supporto.',
+    // In coda agli altri quando la richiesta l'ha pagata la chiave propria con l'interruttore spento (#962).
+    chiavePropria: 'Visto che paghi con la tua chiave, puoi anche accendere «Con la mia chiave, usa anche i fornitori esclusi» in Opzioni.',
+  };
+  const NOMI_MOSTRATI = 5;
+  const breve = (s, max = 120) => {
+    const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    return t.length > max ? `${t.slice(0, max)}…` : t;
+  };
+  function elencoNomi(nomi) {
+    const visti = [];
+    for (const n of Array.isArray(nomi) ? nomi : []) {
+      const b = breve(n, 60);
+      if (b && !visti.some((v) => v.toLowerCase() === b.toLowerCase())) visti.push(b);
+    }
+    const mostrati = visti.slice(0, NOMI_MOSTRATI);
+    const altri = visti.length - mostrati.length;
+    if (altri > 0) mostrati.push(altri === 1 ? 'un altro' : `altri ${altri}`);
+    if (mostrati.length < 2) return { testo: mostrati.join(''), quanti: visti.length };
+    return { testo: `${mostrati.slice(0, -1).join(', ')} e ${mostrati[mostrati.length - 1]}`, quanti: visti.length };
+  }
+  function motivoHostEsclusi(hosts) {
+    const { testo, quanti } = elencoNomi(hosts);
+    if (!quanti) return NESSUN_HOST_MOTIVO;
+    return `${NESSUN_HOST_MOTIVO}. ${quanti > 1 ? 'Lo servono' : 'Lo serve'} solo ${testo}, che Filo esclude`;
+  }
+  // Coi crediti di Filo si chiedono solo host a ritenzione zero (#831): quando sono loro a mancare il motivo è questo.
+  const NESSUN_HOST_ZDR = 'nessun fornitore ammesso lo ospita senza conservare i dati, e coi crediti di Filo è una condizione';
+  // Voce e dettatura sanno anche quali host conservano, e se il router potrebbe sceglierne uno fra altri che no.
+  function motivoNessunHost(err) {
+    const reason = err && err.reason;
+    const { testo, quanti } = elencoNomi(err && err.hosts);
+    const loro = quanti > 1 ? ['Lo servono', 'si impegnano', 'loro'] : ['Lo serve', 'si impegna', 'lui'];
+    if (reason === 'zdr') return quanti ? `${NESSUN_HOST_ZDR}. ${loro[0]} solo ${testo}, che non ${loro[1]} a non conservarli` : NESSUN_HOST_ZDR;
+    if (reason === 'zdrmixed') {
+      return quanti ? `${loro[0].toLowerCase()} anche ${testo}, che non ${loro[1]} a non conservare i dati, e con l'audio non posso impedire che tocchi a ${loro[2]}. Coi crediti di Filo è una condizione` : NESSUN_HOST_ZDR;
+    }
+    if (reason === 'zdrunknown') return 'non so quali dei suoi fornitori si impegnano a non conservare i dati, e coi crediti di Filo è una condizione';
+    return motivoHostEsclusi(err && err.hosts);
+  }
+  // Un modello da comprare solo dal produttore (#904) che il produttore adesso non serve (#829): nessun altro host lo può.
+  function motivoProduttoreGiu(nome) {
+    const n = breve(nome, 60);
+    return `questo modello lo serve solo ${n || 'il suo produttore'}, e adesso non risponde`;
+  }
+  // Il rimedio per dove si sceglie il modello ('opzioni' | 'predefiniti' | 'gestione'); se l'ha pagata la chiave
+  // propria con l'interruttore dei fornitori esclusi spento (#962), anche la strada di accenderlo.
+  function rimedioNessunHost(dove, err, effettive) {
+    const base = RIMEDI_NESSUN_HOST[dove] || RIMEDI_NESSUN_HOST.opzioni;
+    // Il vincolo del produttore vale anche con la chiave propria: accendere i fornitori esclusi non lo scioglie.
+    const spento = Boolean(err && err.keySource === 'own') && err.reason !== 'produttore'
+      && !Array.isArray(effettive && effettive.excludedProvidersOwnKey);
+    return spento ? `${base} ${RIMEDI_NESSUN_HOST.chiavePropria}` : base;
+  }
+  function fraseNessunHost({ modello, funzione, motivo, rimedio: dove } = {}) {
+    const m = breve(modello);
+    const f = breve(funzione);
+    const chi = f ? `La funzione «${f}»` : 'Filo';
+    const perche = String(motivo == null ? '' : motivo).trim().replace(/[.\s]+$/, '') || NESSUN_HOST_MOTIVO;
+    let cosaFare = String(dove == null ? '' : dove).trim() || RIMEDI_NESSUN_HOST.opzioni;
+    if (!/[.!?]$/.test(cosaFare)) cosaFare += '.';
+    return `${chi} non può usare ${m ? `«${m}»` : 'il modello scelto'} perché ${perche}. ${cosaFare}`;
   }
 
   // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
@@ -365,6 +438,7 @@
 
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
+    fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

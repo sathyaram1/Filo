@@ -114,7 +114,7 @@
   background: transparent;
   color: var(--sn-fg);
   cursor: pointer;
-  transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
+  transition: background-color calc(.15s * var(--sn-motion, 1)) ease, border-color calc(.15s * var(--sn-motion, 1)) ease, transform calc(.15s * var(--sn-motion, 1)) ease;
 }
 .sn-wallet-invite-link { font-size: 14px; letter-spacing: 0; border-style: solid; }
 .sn-wallet-code:hover:not(:disabled),
@@ -144,6 +144,30 @@
   background: var(--sn-hover, rgba(0,0,0,.08)); overflow: hidden;
 }
 .sn-wallet-numero-barra > span { display: block; height: 100%; background: var(--sn-accent); }
+.sn-wallet-numero-nota { font-size: 12px; color: var(--sn-muted); }
+.sn-wallet-installazioni { margin-top: 14px; }
+.sn-wallet-numero.is-allarme .sn-wallet-numero-valore,
+.sn-wallet-numero.is-allarme .sn-wallet-numero-nome { color: var(--sn-error); }
+/* Un numero che apre le persone contate (#820): si capisce dal puntatore e dal fondo al passaggio, e resta acceso
+   finché la tabella mostra solo loro. */
+.sn-wallet-numero.is-apribile {
+  cursor: pointer; border-radius: 8px; padding: 2px 8px; margin: -2px -8px;
+  transition: background-color calc(120ms * var(--sn-motion, 1)) ease, box-shadow calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-wallet-numero.is-apribile:hover { background: rgba(var(--sn-accent-rgb), 0.12); }
+.sn-wallet-numero.is-apribile:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--sn-accent); }
+.sn-wallet-numero.is-apribile:active { transform: scale(.98); }
+.sn-wallet-numero.is-attivo { background: rgba(var(--sn-accent-rgb), 0.18); }
+.sn-wallet-numero.is-attivo .sn-wallet-numero-valore { color: var(--sn-accent); }
+/* Il conto che non regge: la prima cosa della pagina, nel colore degli errori che l'utente può cambiare. */
+.sn-wallet-allarme {
+  margin: 4px 0 14px; padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--sn-error);
+  background: color-mix(in srgb, var(--sn-error) 9%, transparent); color: var(--sn-error); font-weight: 600;
+}
+.sn-page button.sn-btn.sn-wallet-allarme-ricarica { display: block; margin-top: 8px; font-weight: 600; }
+.sn-wallet-conto-nota { margin: 6px 0 0; }
+.sn-wallet-filtro { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
+.sn-wallet-table tr.is-fuori { display: none; }
 
 /* Le manopole vanno in griglia, tante per riga quante ce ne stanno: in colonna lasciavano vuoti due terzi
    di finestra e spingevano la tabella degli utenti sotto la piega. */
@@ -170,7 +194,7 @@
 /* Il menu del tasto destro su una persona riusa il popup di Filo (.sn-select-pop in theme.css), che però
    nasce ancorato al suo campo: qui si posa dove ha cliccato il cursore. */
 .sn-wallet-ctx { position: fixed; left: 0; top: 0; right: auto; min-width: 190px; }
-.sn-wallet-ctx .sn-select-option { transition: background-color 120ms ease; }
+.sn-wallet-ctx .sn-select-option { transition: background-color calc(120ms * var(--sn-motion, 1)) ease; }
 .sn-wallet-ctx .sn-select-option:hover,
 .sn-wallet-ctx .sn-select-option:focus-visible {
   background-color: rgba(var(--sn-accent-rgb), 0.18);
@@ -235,3 +259,22 @@
 .sn-ownkey-refusal { color: var(--sn-danger, #c45a3b); }
 .sn-ownkey-rule { margin: 6px 0 0; font-size: 13px; }
 .sn-ownkey-actions { margin-top: 10px; }
+
+/* #818 — l'avviso prima che i crediti finiscano: la frase, poi un rimedio per riga col pulsante a destra. */
+.sn-crediti-avviso-testo { margin: 4px 0 8px; font-size: 15px; color: var(--sn-fg); }
+.sn-crediti-rimedi { list-style: none; padding: 0; margin: 0; max-width: 640px; }
+.sn-crediti-rimedio {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sn-border);
+}
+.sn-crediti-rimedio:last-child { border-bottom: none; }
+.sn-crediti-rimedio-corpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
+.sn-crediti-rimedio-cifra { color: var(--sn-accent); font-size: 13px; }
+.sn-crediti-rimedio-dettaglio { color: var(--sn-muted); font-size: 12.5px; }
+.sn-crediti-rimedio-esito { color: var(--sn-muted); font-size: 12.5px; font-style: italic; }
+.sn-crediti-rimedio-btn { flex: 0 0 auto; }
+.sn-crediti-rimedio[data-applicato="1"] .sn-crediti-rimedio-testo { color: var(--sn-muted); }

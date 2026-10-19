@@ -62,7 +62,7 @@
       el.id = 'dl-flash';
       el.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);'
         + 'background:var(--sn-fg);color:var(--sn-bg);padding:8px 14px;border-radius:8px;'
-        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity .15s ease;pointer-events:none;'
+        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity calc(.15s * var(--sn-motion, 1)) ease;pointer-events:none;'
         + 'max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       document.body.appendChild(el);
     }
@@ -90,7 +90,7 @@
     // popup lo chiede qui, con le parole che il main ha scritto per l'utente.
     if (res.needsConfirm) {
       const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : window.confirm(res.text);
       if (ok) await openFile(r, true);
       return;

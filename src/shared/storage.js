@@ -49,7 +49,17 @@
     if (!stored.models && global.SN_TEST_MODELS && global.SN_TEST_MODELS.models) {
       stored.models = { ...global.SN_TEST_MODELS.models };
     }
-    return deepMerge(DEFAULT_SETTINGS, stored);
+    return siti(deepMerge(DEFAULT_SETTINGS, stored));
+  }
+
+  // I siti dove Filo è spento si confrontano per nome: un indirizzo incollato prima di #843 («https://sito.it/x»)
+  // non escludeva niente. Ogni lettura e ogni scrittura li vede ridotti, chiunque li abbia scritti.
+  function siti(settings) {
+    const N = global.SN_NOMI_SITO;
+    if (!N || !settings || !Array.isArray(settings.blocklist)) return settings;
+    const ridotti = N.ripulisciElenco(settings.blocklist);
+    const uguale = ridotti.length === settings.blocklist.length && ridotti.every((x, i) => x === settings.blocklist[i]);
+    return uguale ? settings : { ...settings, blocklist: ridotti };
   }
 
   async function getSettings() {
@@ -63,7 +73,7 @@
 
   async function updateSettings(partial) {
     const current = await getSettings();
-    const merged = deepMerge(current, partial);
+    const merged = siti(deepMerge(current, partial));
     await setSettings(merged);
     return merged;
   }

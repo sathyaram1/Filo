@@ -61,3 +61,59 @@ test('una WebContents già distrutta o senza isDestroyed non fa danni', () => {
   assert.equal(chiusa, 1);
   C.chiudi(null);
 });
+
+// Chiudere la finestra e uscire da Filo distruggono le schede senza chiamare `chiudi`: si aspettano le pagine in sospeso.
+test('alla chiusura della finestra si aspettano solo le pagine in sospeso, e il «niente più» sblocca', async () => {
+  const ferma = finta();
+  const scritta = finta();
+  const morta = finta();
+  morta.morta = true;
+  C.segna(scritta, true);
+  C.segna(morta, true);
+  assert.equal(C.congedaSchede({ tabs: [{ view: { webContents: ferma } }] }), null);
+  assert.equal(C.congedaSchede(null), null);
+  const attesa = C.congedaSchede({ tabs: [{ view: { webContents: ferma } }, { view: { webContents: scritta } }, { view: { webContents: morta } }, {}] });
+  assert.ok(attesa);
+  assert.deepEqual(ferma.inviati, []);
+  assert.deepEqual(scritta.inviati, [['filo:broadcast', { type: 'tab_in_vista', inVista: false }]]);
+  // La distruzione la fa la finestra: qui nessuno chiude la pagina.
+  C.segna(scritta, false);
+  await attesa;
+  assert.equal(scritta.chiusa, 0);
+});
+
+test('una pagina che non risponde non trattiene la finestra oltre il tetto', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const wc = finta();
+  C.segna(wc, true);
+  let finito = false;
+  const attesa = C.congedaSchede({ tabs: [{ view: { webContents: wc } }] }).then(() => { finito = true; });
+  const microtask = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
+  t.mock.timers.tick(C.TETTO_MS - 1);
+  await microtask();
+  assert.equal(finito, false);
+  t.mock.timers.tick(1);
+  await attesa;
+  assert.equal(finito, true);
+});
+
+test('la scheda che si chiude mentre la finestra aspetta riceve un avviso solo', () => {
+  const wc = finta();
+  C.segna(wc, true);
+  C.congedaSchede({ tabs: [{ view: { webContents: wc } }] });
+  C.chiudi(wc);
+  assert.equal(wc.inviati.length, 1);
+  C.segna(wc, false);
+  assert.equal(wc.chiusa, 1);
+});
+
+// Le tre uscite di una pagina interna passano tutte di qui: chiudere la scheda, chiudere la finestra, spegnere Filo.
+test('scheda, finestra e uscita da Filo chiedono tutte a chiusuraConCaselle', async () => {
+  const { readFileSync } = await import('node:fs');
+  const leggi = (f) => readFileSync(new URL(`../../src/main/${f}`, import.meta.url), 'utf8');
+  const tabs = leggi('tabs.js');
+  assert.doesNotMatch(tabs, /\.webContents\.close\(\)/, 'una scheda chiusa senza aspettare le sue caselle');
+  assert.match(tabs, /ChiusuraConCaselle\.chiudi\(/);
+  assert.match(leggi('window.js'), /on\('close'[\s\S]{0,400}congedaSchede\(/);
+  assert.match(leggi('main.js'), /on\('before-quit'[\s\S]{0,600}congedaSchede\(/);
+});

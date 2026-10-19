@@ -71,7 +71,7 @@ function senderInfo(event) {
   }
   return {
     riserva,
-    tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
+    tab: tab ? { id: tab.id, url: tab.url, title: tab.title, openedAt: tab.openedAt || null, paginaDal: tab.paginaDal || null } : null,
     url: wc.getURL(),
     isShell: Boolean(finestraDellaBarra(wc)),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
@@ -145,7 +145,13 @@ function registerIpcHandlers() {
       if (top) {
         for (const w of BrowserWindow.getAllWindows()) {
           const tm = w._filoTabs;
-          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) { out = tm.takeCookieWipe(String(href || '')); break; }
+          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) {
+            out = tm.takeCookieWipe(String(href || ''));
+            // La memoria della pagina che «Resta connesso» ha portato nel jar nuovo (tabs/tabRestaConnesso.js).
+            const semina = tm.takeSemina(wc, String(href || ''));
+            if (semina) out = { ...(out || {}), semina: semina.locale, seminaSessione: semina.sessione, seminaDb: semina.database };
+            break;
+          }
         }
       }
     } catch (_) { out = null; }
@@ -209,6 +215,17 @@ function registerIpcHandlers() {
   ipcMain.on('filo:apertura-scelta', (event, url) => {
     require('./services/permessiPagine').aperturaScelta(event.sender, url);
     event.returnValue = true;
+  });
+  // #965 — il clic su un link «scarica» verso un file da avviso: vero se l'avviso lo ferma prima che parta.
+  ipcMain.on('filo:scaricamento-scelto', (event, url, nome) => {
+    let fermo = false;
+    try {
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      const tab = win && win._filoTabs.tabs.find((t) => t.view.webContents === wc);
+      if (tab) fermo = win._filoTabs._sbScaricamentoScelto(tab, String(url || ''), String(nome || '')) === true;
+    } catch (_) {}
+    event.returnValue = fermo;
   });
   ipcMain.on('filo:indirizzo-rifiutato', (event, url) => {
     try {
@@ -602,6 +619,15 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
+  });
+  // #759 — «Resta connesso qui» dal menu della scheda (id) o dalla proposta dopo un accesso (sito). Solo dalla
+  // shell e solo nel profilo normale: l'incognito non ha jar persistenti.
+  ipcMain.handle('tabs:resta-connesso', async (event, { id, on, sito } = {}) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win || win._filoIncognito || !win._filoTabs) return { ok: false, error: 'forbidden' };
+    const dove = sito ? 'proposta-accesso' : 'menu-scheda';
+    return require('./services/registroCambi').con({ via: 'interfaccia', dove },
+      () => win._filoTabs.restaConnesso({ tabId: id, sito: typeof sito === 'string' ? sito : null, on: !!on }));
   });
   // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
   // Solo dalla shell: scrive le impostazioni.
