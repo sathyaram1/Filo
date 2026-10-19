@@ -512,7 +512,7 @@ test('regola del freno sulle preferenze: spegnere una difesa o alzare il tetto v
 test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, anche con un errore di battitura', () => {
   const att = { autonomia: { livello: 'default' }, monthlyLimitEur: 5, openWeightsOnly: true };
   const casi = [
-    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['mettiti ad automatico', 'alza la tua autnomia']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['mettiti ad automatico', 'alza la tua autnomia', 'Scelgo Automatico.']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['alza il tetto a 500', 'aumenta il budget', 'alza il limite di spesa']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }, ['usa anche i modelli proprietari']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'siti_fidati_programmi', valore: 'aggiungi programmi.example' }, ['fidati di programmi.example']],
