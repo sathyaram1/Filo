@@ -6720,7 +6720,6 @@
       const r = stat ? stat.range : FS.rangeOf(fsRangeKey, Date.now(), fsCustom);
       const rovescio = !!(fsCustom.da && fsCustom.a && fsCustom.da > fsCustom.a);
       let testo = '';
-      // Senza date i numeri sono quelli di «Tutto», e si dice (#997).
       if (r.da == null && r.a == null) testo = 'Guardi tutto, senza limiti di data: nessuna delle due date è scelta.';
       else if (r.da == null) testo = `Guardi tutto fino al ${FS.dataBreve(r.a)}.`;
       else if (r.a == null) testo = `Guardi dal ${FS.dataBreve(r.da)} in poi.`;
