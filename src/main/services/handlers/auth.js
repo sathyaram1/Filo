@@ -11,6 +11,7 @@ const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const { consiglioPortachiavi } = require('../../portachiavi');
+const ChiaveFeedback = require('../chiaveFeedback');
 require('../../../shared/routineCrediti.js');
 
 // Chi accede su un computer senza portachiavi di sistema scopriva solo alla
