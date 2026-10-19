@@ -951,6 +951,8 @@
     // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }. Con { url }: ogni visita di quell'indirizzo
     // e le sue schede chiuse (dalla ricerca, dove una pagina è un indirizzo).
     FILO_CODA_TOGLI_PAGINE: 'filo_coda_togli_pagine',
+    // ANNUNCIO (main → pagine di Filo, senza dati): pagine tolte dal filo, da qualunque strada; chi le mostra le rilegge.
+    FILO_PAGINE_TOLTE: 'filo_pagine_tolte',
     // ANNUNCIO (main → schede): Filo ha scritto di sua iniziativa. { chat, i, ts, testo, fuso }.
     FILO_PARLA: 'filo_parla',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
