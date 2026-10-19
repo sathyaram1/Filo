@@ -685,6 +685,7 @@ async function apriSito() {
         return;
       }
       if (percorso === '/api/cade') { req.socket.destroy(); return; }
+      if (percorso === '/vuoto') { res.writeHead(204); res.end(); return; }
       if (percorso === '/invia-scaduta') { res.writeHead(302, { Location: '/login' }); res.end(); return; }
       if (percorso === '/login') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Accedi</title><p>Sessione scaduta: accedi di nuovo'); return; }
       if (percorso === '/invia-500') { res.writeHead(500, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Errore</title><p>Errore del server'); return; }
@@ -1010,5 +1011,29 @@ test('un modulo mandato bene a un sito con l’accesso in testata e un post pass
     const aperte = await archiviaTutto(app, shell, sito);
     expect.soft(aperte, 'accesso in testata').not.toContain(idContatti);
     expect.soft(aperte, 'service worker').not.toContain(idSocial);
+  } finally { await sito.chiudi(); }
+});
+
+test('un modulo mandato in un\'altra scheda, in un riquadro o senza cambiare pagina lascia il testo nella casella: la scheda resta aperta (#824)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    for (const [nome, attributi, dopo] of [
+      ['Anteprima', 'action="/api/anteprima" target="_blank"', ''],
+      ['Nascosto', 'action="/api/salva" target="dietro"', '<iframe name="dietro" style="width:10px;height:10px"></iframe>'],
+      ['Vuota', 'action="/vuoto"', ''],
+    ]) {
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${nome}</title>
+        <form method="post" ${attributi}><textarea name="corpo" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>${dopo}`));
+      await page.locator('#c').click();
+      await page.keyboard.type(POST_LUNGO);
+      await expect.poll(async () => (await schedeConId(shell)).find((t) => t.title === nome)?.formDirty, { timeout: 8_000 }).toBe(true);
+      ids[nome] = (await schedeConId(shell)).find((t) => t.title === nome).id;
+      await page.locator('#pub').click();
+      await page.waitForTimeout(1200);
+      expect(await page.locator('#c').inputValue()).toBe(POST_LUNGO);
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    for (const [nome, id] of Object.entries(ids)) expect.soft(aperte, nome).toContain(id);
   } finally { await sito.chiudi(); }
 });
