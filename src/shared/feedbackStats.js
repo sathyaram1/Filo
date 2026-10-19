@@ -842,10 +842,12 @@
         creatoriTutti: creatoriOrdinati(perCreatoreTutti, idsPerCreatoreTutti),
         serie: serieTemporale(vociRicevuti, range),
         senzaData: senzaData,
+        senzaDataIds: senzaDataIds,
         // Quante segnalazioni della finestra hanno un mittente che non si è
         // potuto leggere: chi disegna lo dichiara, invece di lasciar credere
         // che la ripartizione per mittente sia completa.
         mittentiIgnoti: mittentiIgnoti,
+        mittentiIgnotiIds: mittentiIgnotiIds,
       },
       lavorati: {
         totale: seNoto(numeriLavorati.length),
