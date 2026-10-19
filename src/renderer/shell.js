@@ -2254,8 +2254,11 @@
       });
     }
 
-    chiediApertura = (id, testo) => {
-      domandeApri.set(id, testo || 'È un programma: aprirlo vuol dire eseguirlo.');
+    chiediApertura = (id, parti) => {
+      const r = dls.get(id);
+      let d = Array.isArray(parti) && parti.length ? parti : null;
+      if (!d && r) { try { d = window.SN_ESEGUIBILI.partiApri(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {} }
+      domandeApri.set(id, d || ['È un programma: aprirlo vuol dire eseguirlo.']);
       mostraRiga(id);
     };
 
