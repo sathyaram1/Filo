@@ -804,8 +804,15 @@
       if (!statiLavorati[cat2.key]) statiLavorati[cat2.key] = { key: cat2.key, label: cat2.label, n: 0, ids: [] };
       statiLavorati[cat2.key].n += 1;
       if (d2._id) statiLavorati[cat2.key].ids.push(d2._id);
-      var es = esitoAudit(d2);
-      if (es) { audit[es] += 1; if (d2._id) auditIds[es].push(d2._id); }
+      // L'esito sta fra i campi di DETTAGLIO: una riga d'elenco (la proiezione
+      // del ripiego, #677.5) non lo porta, e «non letto» non è «non fatto».
+      if (d2._proiezione) {
+        auditNonLetti += 1;
+        if (d2._id) auditNonLettiIds.push(d2._id);
+      } else {
+        var es = esitoAudit(d2);
+        if (es) { audit[es] += 1; if (d2._id) auditIds[es].push(d2._id); }
+      }
       var st = Number(d2.stalls) || Number(d2.workingResets) || 0;
       if (st > 0) {
         arenamenti += st;
