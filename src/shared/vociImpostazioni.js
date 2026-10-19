@@ -196,9 +196,6 @@
     },
   };
 
-  // Quando la chiave manca: il valore che la pagina mostra e che il main applica. Il resto viene dai default.
-  const ASSENTE = { 'security.autoFeedback': true };
-
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   function dentro(o, percorso) {
     return String(percorso).split('.').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
@@ -233,7 +230,6 @@
   function leggi(settings, percorso) {
     const v = dentro(settings, percorso);
     if (v !== undefined && v !== null) return v;
-    if (has(ASSENTE, percorso)) return ASSENTE[percorso];
     const C = global.SN_CONST;
     const d = C && C.DEFAULT_SETTINGS ? dentro(C.DEFAULT_SETTINGS, percorso) : undefined;
     return d === undefined ? v : d;

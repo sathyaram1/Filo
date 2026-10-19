@@ -92,15 +92,28 @@
     return C && C.AGENT_STYLE_MAX ? `al massimo ${C.AGENT_STYLE_MAX} caratteri` : 'con un tetto di lunghezza';
   }
 
+  // Una voce che vale solo con un interruttore principale acceso: chiesta con quello spento, Filo lo dice (#835),
+  // così «blocca x.com» non promette un blocco che non c'è.
+  const PRINCIPALI = {
+    bloccoSiti: { percorso: 'security.siteBlock.enabled', nome: 'il blocco dei siti in blacklist', chiave: 'blocco_siti' },
+    sitiPericolosi: { percorso: 'security.safeBrowse.enabled', nome: 'l\'avviso sui siti pericolosi', chiave: 'navigazione_sicura' },
+  };
+  function principaleSpento(sotto, attuali) {
+    const m = sotto && PRINCIPALI[sotto];
+    if (!m || !attuali || dentro(attuali, m.percorso) !== false) return '';
+    return `${m.nome} è spento: finché non si riaccende (chiave ${m.chiave}) questo cambio non ha effetto`;
+  }
+
   // Un interruttore della pagina Sicurezza: a parole sì/no, costo 2 col rischio in chiaro (#949). Spegnerlo
   // abbassa una difesa (#530), tranne dove `spentoAllenta` è falso.
-  function interruttore({ keys, percorso, nome, risk, aiuto, stati = ['attivo', 'disattivato'], spentoAllenta = true }) {
+  function interruttore({ keys, percorso, nome, risk, aiuto, stati = ['attivo', 'disattivato'], spentoAllenta = true, sotto = '' }) {
     return {
       keys,
       scrive: [percorso],
       aiuto: aiuto || 'true | false',
       costo: 2,
       allenta: (r) => spentoAllenta && dentro(r.partial, percorso) === false,
+      avviso: (r, at) => (dentro(r.partial, percorso) === true ? principaleSpento(sotto, at) : ''),
       risk,
       build(v) {
         const b = parsePrefBool(v);
@@ -326,12 +339,13 @@
   }
   // `allentaSe` (#530): il verso che abbassa una difesa. 'togli' per un elenco che protegge (un sito tolto
   // torna libero), 'aggiungi' per un elenco di eccezioni; senza l'elenco di adesso «solo …» vale come abbassare.
-  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null }) {
+  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null, sotto = '' }) {
     return {
       keys,
       scrive: [percorso],
       aiuto: `"aggiungi <siti>" | "togli <siti>" | "solo <siti>" | "svuota" (${aiuto}; più siti separati da virgole)`,
       costo: 2,
+      avviso: (r, at) => (r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length ? principaleSpento(sotto, at) : ''),
       allenta: (r, at) => {
         const e = r.elenco;
         if (!allentaSe || !e) return false;
@@ -1447,6 +1461,7 @@
     interruttore({
       keys: ['liste_pubbliche_blocco', 'liste pubbliche', 'liste pubbliche come blacklist', 'usa le liste pubbliche'],
       percorso: 'security.siteBlock.useAdblockLists',
+      sotto: 'bloccoSiti',
       nome: 'Liste pubbliche come blacklist',
       stati: ['in uso', 'spente'],
       aiuto: 'true | false (tratta come bloccati anche i siti di pubblicità e tracciamento delle liste pubbliche)',
@@ -1456,19 +1471,23 @@
     interruttore({
       keys: ['controlli_rete_siti', 'controlli di rete', 'controlli rete', 'età del dominio', 'eta del dominio'],
       percorso: 'security.safeBrowse.networkSignals',
+      sotto: 'sitiPericolosi',
       nome: 'Controlli di rete sui siti',
       stati: ['attivi', 'spenti'],
       aiuto: 'true | false (chiede a servizi pubblici l\'età del dominio e del certificato, per riconoscere le truffe)',
-      risk: 'Controlla le richieste a servizi pubblici sull’età del dominio e del certificato, un forte segnale di truffa. '
-        + 'Spegnerle rende meno probabile l’avviso su un sito nato da pochi giorni per ingannarti.',
+      risk: 'Quando un sito ha già un indizio sospetto, Filo ne manda il nome a due servizi pubblici (rdap.org e crt.sh) '
+        + 'per sapere da quanto esistono il dominio e il suo certificato: un sito nato da pochi giorni è un forte segnale '
+        + 'di truffa. Spenti, quel nome non esce dal computer, ma l’avviso su un sito appena nato per ingannarti diventa meno probabile.',
     }),
     interruttore({
       keys: ['giudizio_ai_siti', 'giudizio ai', 'giudizio ai sui siti', 'giudizio ai sui casi sospetti'],
       percorso: 'security.safeBrowse.llmJudge',
+      sotto: 'sitiPericolosi',
       nome: 'Giudizio AI sui siti sospetti',
       aiuto: 'true | false (un modello valuta gli indizi di identità di un sito rimasto dubbio)',
-      risk: 'Controlla il giudizio di un modello AI sui siti che restano dubbi. Spegnerlo toglie un controllo: '
-        + 'un sito sospetto può aprirsi senza avviso.',
+      risk: 'Quando un sito resta dubbio, Filo ne manda il nome e gli indizi (età, certificato, da dove arriva il link, '
+        + 'se chiede password o pagamento) al modello AI scelto per il giudizio dei siti, mai il testo della pagina. '
+        + 'Spento, niente esce dal computer, ma un sito sospetto può aprirsi senza avviso.',
     }),
     interruttore({
       keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata'],
@@ -1506,6 +1525,7 @@
       keys: ['siti_bloccati', 'siti bloccati', 'blacklist', 'domini in blacklist', 'elenco dei siti bloccati', 'lista dei siti bloccati'],
       percorso: 'security.siteBlock.blacklist',
       allentaSe: 'togli',
+      sotto: 'bloccoSiti',
       nome: 'Siti bloccati',
       aiuto: 'siti che Filo non apre',
       risk: 'Cambia l’elenco dei siti che Filo non apre. Un sito tolto si riapre da ogni strada; uno aggiunto non si apre '
@@ -1852,7 +1872,7 @@
   }
 
   // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, elencoFisso, dove,
-  // risk, testo? }; `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
+  // risk, testo?, avviso? }; `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
   // Oppure { rifiuto, perModello? } se va rifiutato spiegando perché (`rifiuto` lo legge l'utente, `perModello` dice al
   // modello come rimediare), o null se chiave/valore non validi (il perché lo dà spiegaNonValida).
   function buildPreferencePartial(rawKey, rawVal, { attuali = null } = {}) {
@@ -1872,11 +1892,14 @@
     try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(b, attuali) : false; } catch (_) { allenta = true; }
     let chiede = false;
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
+    let avviso = '';
+    try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
     return {
       ...b,
       costo: setter.costo,
       allenta,
       ...(chiede ? { chiede: true } : {}),
+      ...(avviso ? { avviso } : {}),
       elencoFisso: setter.elencoFisso || '',
       dove: setter.dove || '',
       risk: setter.risk || '',
