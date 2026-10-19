@@ -769,6 +769,8 @@
     list.unshift(entry);
     if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
     await setRaw(KEYS.FILO_NOTIFICATIONS, list);
+    // Nel main un avviso nuovo è una cosa successa: Filo lo scrive nel filo (#869).
+    try { global.SN_FILO_PARLA?.segnala({ tipo: 'avviso', testo: entry.text }); } catch (_) {}
     return entry;
   }
 

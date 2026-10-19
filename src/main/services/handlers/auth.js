@@ -1477,29 +1477,14 @@ module.exports = function register(on, ctx) {
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
 
-      // Il contatore dei numeri: lo crea e lo rimette in pari l'app
-      // dell'owner, che è l'unica a poterlo scrivere a piacere. Senza, un
-      // feedback nuovo arriverebbe senza numero.
-      //
-      // Il massimo si CHIEDE al server con una query sua (una lettura), non si
-      // ricava dai feedback caricati: quelli sono i 500 più recenti per data, e
-      // il numero più alto potrebbe stare fuori. Con il massimo vero,
-      // `allowLower` è sempre lecito, ed è l'unico modo perché la cura funzioni:
-      // chiunque può far avanzare il contatore di uno, e prima si abbassava solo
-      // quando il caricamento non toccava il tetto, cioè mai più.
+      // Il contatore dei numeri si alza solo fino a un numero provato (#923); il massimo di tutti si
+      // chiede al server (i caricati sono solo i più recenti) e fa da pavimento per riportarlo giù.
+      const provato = FB.maxSeqProvato(raw);
       let piuAlto = null;
       try { piuAlto = await FB.maxSeq({ idToken, timeoutMs: 15000 }); }
       catch (e) { console.warn('[feedback] numero più alto non letto:', e?.message || e); }
-      if (piuAlto === null) {
-        // Non lo sappiamo: al massimo alziamo il contatore fino a quello che
-        // abbiamo visto, mai abbassarlo alla cieca.
-        const visto = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
-        if (visto > 0) {
-          try { await FB.ensureSeqCounter(visto, { idToken }); }
-          catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
-        }
-      } else if (piuAlto > 0) {
-        try { await FB.ensureSeqCounter(piuAlto, { idToken, allowLower: true }); }
+      if (provato > 0 || piuAlto > 0) {
+        try { await FB.ensureSeqCounter(provato, { idToken, pavimento: piuAlto }); }
         catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
       }
 

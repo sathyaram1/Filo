@@ -39,7 +39,8 @@
 
   const SLASH_COMMANDS = {
     '/home': () => { goHome(); },
-    '/clear': () => { goHome(); },
+    // Il filo è uno (#869): «pulisci» chiude la conversazione in corso, e il messaggio dopo ne comincia un'altra.
+    '/clear': () => { goHome({ nuova: true }); },
     '/clear all': () => { send({ type: MSG.CLOSE_ALL_TABS }); },
     '/kill': () => { send({ type: MSG.QUIT_APP }); },
     '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
@@ -73,7 +74,8 @@
     '/help': (text, chat) => {
       if (document.body.dataset.state !== 'thread') goThread();
       const lines = [
-        '/home, /clear — ricarica la dashboard',
+        '/home — torna in fondo al filo',
+        '/clear — chiudi la conversazione in corso: il messaggio dopo ne apre un\'altra',
         '/clear all — chiudi tutte le schede',
         '/kill — chiudi Filo',
         '/newtab — apri una nuova scheda',

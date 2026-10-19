@@ -73,6 +73,7 @@ require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalo
 require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
 require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
+require(path.join(SHARED, 'filoCoda.js'));  // #869 — la home come coda del filo: righe, pezzi, ricerca (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
 require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
 require(path.join(SHARED, 'dashboardRefresh.js'));

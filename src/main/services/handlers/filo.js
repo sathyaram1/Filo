@@ -460,6 +460,23 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_RIGHE_APP, soloFilo(async (msg) => (
     { ok: true, righe: await globalThis.SN_CONVERSAZIONI_APP.righe({ chat: msg.chat || null }) })));
 
+  // #869 — la home come coda del filo: a pezzi, la ricerca, le pagine tolte. La prima apertura della giornata è una
+  // cosa successa: Filo la saluta (una volta).
+  const Coda = require('../codaFilo');
+  const isoO = (x) => (typeof x === 'string' && !Number.isNaN(Date.parse(x)) ? x : null);
+  on(MSG.FILO_CODA, soloFilo(async (msg) => {
+    const r = await Coda.pezzo({ prima: isoO(msg.prima), fino: isoO(msg.fino), dopo: isoO(msg.dopo), quanti: Number(msg.quanti) || undefined });
+    // L'incognito non saluta: il saluto sta nel filo di disco, che da lì non si vede.
+    if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
+    return { ok: true, ...r };
+  }));
+  on(MSG.FILO_CERCA, soloFilo(async (msg) => ({ ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
+  on(MSG.FILO_CODA_TOGLI_PAGINE, soloFilo(async (msg) => {
+    const url = msg && typeof msg.url === 'string' ? msg.url : '';
+    const tolte = url ? await Coda.togliIndirizzo(url) : await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);
+    return { ok: true, tolte };
+  }));
+
   // #866 — le pagine visitate del filo: quante sono in un periodo, e cancellarle (pagina Sicurezza).
   const periodoDa = (msg) => globalThis.SN_FILO_EVENTI.periodo(msg && msg.periodo);
   on(MSG.FILO_PAGINE_CONTA, soloFilo(async (msg) => {

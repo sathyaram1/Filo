@@ -238,6 +238,19 @@
     return true;
   }
 
+  // Una riga che arriva con la coda del filo (#869): resta finché la coda la mostra, anche fuori dalle righe del momento.
+  function daCoda(v) {
+    let r = righe.get(v.id);
+    if (!r) { r = crea(v); righe.set(v.id, r); } else disegna(r, v);
+    fisse.add(v.id);
+    return r.el;
+  }
+
+  function apriRiga(el) {
+    const r = [...righe.values()].find((x) => x.el === el);
+    if (r && !r.aperta) alterna(r, true).catch(() => {});
+  }
+
   function init(deps) {
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
@@ -255,5 +268,5 @@
     } catch (_) {}
   }
 
-  global.SN_DASH_RIGHE = { init, aggiorna, mostraSola, quando };
+  global.SN_DASH_RIGHE = { init, aggiorna, mostraSola, quando, daCoda, apri: apriRiga };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -464,6 +464,7 @@ function completa(rec) {
   if (!rec.endedAt) rec.endedAt = new Date().toISOString();
   persist();
   broadcast('done', rec);
+  if (!scopeOf(rec)) { try { globalThis.SN_FILO_PARLA?.segnala({ tipo: 'download', testo: rec.filename }); } catch (_) {} }
   // Toast di conferma con azioni: le azioni dichiarative sono tradotte dalla
   // shell in api.downloads.openFile / openFolder (vedi shell.js onToast).
   shellToast(`Scaricato: ${shortName(rec.filename)}`, {
