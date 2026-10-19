@@ -832,7 +832,6 @@
           if (ora && ora !== pulito(base) && !sostituito(a)) conTesto = true;
           const t = lunghe.has(a) ? ora : '';
           if (t && t !== pulito(base)) partiti.add(impronta(t));
-          aree.delete(a);
         }
         // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main).
         // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
