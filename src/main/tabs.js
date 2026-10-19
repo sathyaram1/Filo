@@ -46,6 +46,7 @@ const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 const { PropostaEmail } = require('./propostaEmail');
+const { StratoDelMenu } = require('./stratoDelMenu');
 const Storia = require('./tabs/storia');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
@@ -423,7 +424,7 @@ class TabManager {
       window.once('closed', () => { this.anteprime.chiudi(); this.riserva.spegni(); this.codaRiapertura.chiudi(); });
     }
     this.avvisi = new AvvisiSopraPagina(window, {
-      dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); },
+      dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); if (this.strato) this.strato.inCima(); },
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       schedaAttiva: () => {
@@ -445,6 +446,14 @@ class TabManager {
       restituisci: () => this._tastieraAllaSchedaAttiva(),
       sotto: () => [...this.tabs.map((t) => t.view), this.avvisoSito.vista, this.avvisi.vista].filter(Boolean),
       dopoInCima: () => { this.conferme.inCima(); this.barra._inCima(); },
+    });
+    // Lo strato del menu del tasto destro (#1053): sopra tutto, grande quanto la scheda davanti.
+    this.strato = new StratoDelMenu(window, {
+      schedaAttiva: () => { const t = schedaDavanti(); return (t && t.view && t.view.webContents) || null; },
+      area: () => {
+        const t = schedaDavanti();
+        return t && t.view && !this._attivaNascosta ? t.view.getBounds() : null;
+      },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
@@ -627,6 +636,7 @@ class TabManager {
     this.azzeraRivendicazioniEsc();
     if (this.contentFullscreen === on) return on;
     this.contentFullscreen = on;
+    this.strato.nascondi();
     this.layout();
     try {
       if (typeof this.win.setFullScreen === 'function') this.win.setFullScreen(on);
@@ -2312,6 +2322,7 @@ class TabManager {
     if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
     this.avvisoSito.nascondi(!visible);
     this.propostaEmail.posa();
+    this.strato.posa();
   }
 
   // Solo la scheda davanti si vede; una aperta dietro resta «visibile» a 0×0 finché non ha l'anteprima (#430).
@@ -2353,6 +2364,7 @@ class TabManager {
     this.propostaEmail.posa();
     this.conferme.posa();
     this.barra.posa();
+    this.strato.posa();
   }
 
   // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────
@@ -2518,6 +2530,10 @@ class TabManager {
       // dentro quel giro che la pagina chiede.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
       if (staRegistrandoTasti(wc)) return;
+      if (this.strato.tasto(input)) {
+        event.preventDefault();
+        return;
+      }
       // La barra laterale prima di tutto: il suo tasto, e l'Esc che la chiude prima della modalità.
       if (this.barra.tasto(input)) {
         event.preventDefault();
@@ -2984,6 +3000,7 @@ class TabManager {
     // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
     // content script perché li mostri nel menu di correzione custom.
     wc.on('context-menu', (_e, params) => {
+      if (this.strato.acceso) this.strato.mostra(wc, { x: params.x, y: params.y });
       if (params.misspelledWord) {
         // #405 — il click destro può essere avvenuto dentro un riquadro
         // incorporato (iframe): il menu di correzione lo costruisce il content
