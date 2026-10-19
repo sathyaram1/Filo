@@ -5597,6 +5597,7 @@
   function openSidebarSender(clientId) {
     const group = allByClient[clientId] || [];
     const total = group.length;
+    const mittente = group[0] ? chiaveServerMittente(group[0]) : mittenteDaChiave(clientId);
 
     // Età account: createdAt più vecchio
     let oldest = null;
