@@ -829,8 +829,8 @@ Da sistemare prima dei worker in parallelo:
   chiede al server dei compiti figli (§ 6), col ruolo e i numeri, mai testo
   libero, come per l'unione (§ 1.3). Ognuno ha il suo biglietto, e
   l'orchestratore li lancia come gli altri, dentro N e K. I figli sono legati
-  al padre, non al feedback (§ 6.1), e ne ereditano l'urgenza, modello e
-  sforzo, e la fiducia che ha in quel momento. Il padre aspetta i loro esiti
+  al padre, non al feedback (§ 6.1), e ne ereditano urgenza, modello e
+  sforzo, e la fiducia che il padre ha in quel momento. Il padre aspetta i loro esiti
   dal server.
   Le chiusure a metà e i crash li segue il monitoraggio.
 - **Le prove** non devono contendersi display virtuali, porte o cartelle: vanno
