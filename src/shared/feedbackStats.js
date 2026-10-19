@@ -571,7 +571,9 @@
     var attesePresa = [];
     var attesePresaIds = [];
     var senzaData = 0;
+    var senzaDataIds = [];
     var mittentiIgnoti = 0;
+    var mittentiIgnotiIds = [];
     for (i = 0; i < feedbacks.length; i++) {
       var f = feedbacks[i];
       // Una data d'arrivo che non si legge non cade in nessuna finestra, «Tutto»
