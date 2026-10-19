@@ -151,14 +151,16 @@ test('doppia estensione: aprire /fattura.pdf.exe, o scaricare fattura.pdf.exe co
   expect(aperta.level).toBe('sospetto');
   expect(aperta.body).toContain('«fattura.pdf.exe»: sembra un documento, ma è un programma');
 
+  // Il link a un file travestito si ferma al clic (#965): prima l'avviso, poi, con «Continua», la domanda sui programmi.
   const archivio = await openTab('https://archivio-fatture.it/');
-  await archivio.click('#fattura');
-  const scaricata = await avvisoDi(app, 'archivio-fatture.it');
-  expect(scaricata.level).toBe('sospetto');
-  expect(scaricata.title).toBe('Programma travestito da documento');
-  expect(scaricata.body).toContain('ti fa scaricare «fattura.pdf.exe»');
+  await archivio.click('#fattura', { noWaitAfter: true });
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible({ timeout: 6000 });
   // Il clic c'è stato: il file non è partito da solo.
-  expect(scaricata.body).not.toContain('da sola');
+  await expect(avviso.getByText(/da sola/)).toHaveCount(0);
+  const continua = avviso.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeEnabled({ timeout: 5000 });
+  await continua.click();
   await expect.poll(() => statoDi(shell, 'fattura.pdf.exe'), { timeout: 10000 }).toBe('pending');
 });
 
