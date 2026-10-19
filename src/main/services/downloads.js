@@ -99,10 +99,7 @@ function sitoDi(url, webContents) {
     if (webContents && !webContents.isDestroyed?.()) {
       pagina = leggi(webContents.getURL() || '');
       const riquadri = webContents.mainFrame ? webContents.mainFrame.framesInSubtree : [];
-      incerto = !pagina || riquadri.some((f) => {
-        const h = leggi(f.origin);
-        return !(h && (h === pagina || h.endsWith('.' + pagina)));
-      });
+      incerto = !pagina || ESE().riquadriDiAltri(pagina, riquadri.map((f) => f.origin));
     }
   } catch (_) { incerto = true; }
   return { sito: pagina, incerto };

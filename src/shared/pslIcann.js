@@ -1,10 +1,11 @@
 // Le regole della sezione ICANN della Public Suffix List (publicsuffix.org) con più di un'etichetta, in ASCII
 // (punycode): ogni riga è un dominio di primo livello seguito dalle regole sotto di lui, `*` jolly e `!` eccezione
-// (`jp chiyoda.tokyo *.kawasaki !city.kawasaki`). Dati, non logica: li legge solo safebrowse/psl.js. Si rigenera intera.
+// (`jp chiyoda.tokyo *.kawasaki !city.kawasaki`). Dati, non logica: li legge solo stessoSito.js. Si rigenera intera.
 
-'use strict';
+(function (global) {
+  'use strict';
 
-module.exports = `
+  const REGOLE = `
 ac com edu gov mil net org
 ae ac co gov mil net org sch
 aero airline airport accident-investigation accident-prevention aerobatic aeroclub aerodrome agents air-surveillance
@@ -620,3 +621,7 @@ za ac agric alt co edu gov grondar law mil net ngo nic nis nom org school tm web
 zm ac biz co com edu gov info mil net org sch
 zw ac co gov mil org
 `;
+
+  global.SN_PSL_ICANN = REGOLE;
+  if (typeof module !== 'undefined' && module.exports) module.exports = REGOLE;
+})(typeof globalThis !== 'undefined' ? globalThis : self);
