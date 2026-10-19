@@ -41,6 +41,17 @@ falso, riparte da zero voci e fa uscire `null` da ogni numero che veniva da
 quella sorgente, id compresi. In pagina, `fsNum()` traduce `null` in `—`, e i
 riquadri interessati lo scrivono anche a parole nel sottotitolo.
 
+La sorgente che manca può essere anche solo un **campo**. Una riga d'elenco
+(la proiezione, `_proiezione`) non porta i campi di dettaglio: nel ripiego
+sulla lista in pagina l'esito del controllo di sicurezza, che sta in
+`livelli`, mancava a ogni lavoro e il riquadro scriveva zero (#997, che
+assorbe #677.5). Un conto che legge un campo di dettaglio tratta quella riga
+come «non letta» e lo dice col suo numero (`audit.nonLetti`); un conto che ha
+bisogno di tutte e due le sorgenti (i documenti dei lavori che il registro
+nomina) esce `null` se ne manca una qualunque. E chi aggiorna un documento
+intero con una riga riletta la FONDE (`SN_FEEDBACK_LIVE.applyChanges`), non la
+sostituisce: sostituirla cancellava il campo che si era letto.
+
 Due cose da non confondere:
 
 - **letto e vuoto** è un dato: quello è uno zero vero, e si scrive 0;
