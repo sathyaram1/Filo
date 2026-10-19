@@ -85,7 +85,7 @@
     // popup lo chiede qui, con le parole che il main ha scritto per l'utente.
     if (res.needsConfirm) {
       const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : window.confirm(res.text);
       if (ok) await openFile(r, true);
       return;

@@ -556,7 +556,7 @@
     return !!info && info.tab === 'inbox';
   }
 
-  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica per lettore e ripasso. */
+  /** Cosa hanno segnalato filtro e giudici (`pipeline` decifrato). PURA. Fonte unica: chi guarda i giudizi la chiede qui. */
   function segnaliDeiGiudici(pipeline) {
     const p = pipeline && typeof pipeline === 'object' ? pipeline : null;
     if (!p) return { attacco: false, spam: false };

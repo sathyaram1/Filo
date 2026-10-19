@@ -1519,3 +1519,320 @@ for (const [come, chiudi] of [
     expect(await page.evaluate(() => !!(document.activeElement && document.activeElement.closest('#mgFsLegend')))).toBe(true);
   });
 }
+
+// ══ #997 — l'ultimo lavoro sui difetti ══════════════════════════════════════
+
+// ── 1. Un pannello aperto segue la finestra e il filtro ────────────────────
+// Un riquadro che smette di potersi aprire perde anche «chiudi»: il pannello
+// aperto sotto deve chiudersi con lui, da qualunque strada si cambi il conto.
+
+const lavoroControllato = (over = {}) => fb({ _id: 'au1', seq: 1, createdAt: g(20), status: 'done', name: 'controllato', livelli: { l4: { esito: 'pass' } }, ...over });
+const registroControllato = (quando) => [
+  { role: 'fixer', startedAt: g(quando), num: '1' },
+  { role: 'verifier', startedAt: g(quando), num: '1' },
+];
+
+test('#997 cambiando finestra il dettaglio del controllo di sicurezza si chiude invece di restare senza uscita', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, { feedbacks: [lavoroControllato()], workerLog: registroControllato(20) });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toBeVisible();
+
+  // «Oggi» non ha controlli: il riquadro non si apre più, e il pannello va via.
+  await page.locator('[data-fs-range="oggi"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toHaveCount(0);
+  expect((await page.evaluate(() => window.__mgTest.getFsState())).aperto).toBe('');
+
+  // Tornando a «Tutto» il riquadro si riapre normalmente.
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toContainText('Passati');
+});
+
+test('#997 lo stesso dal filtro per creatore e dal tasto destro', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, { feedbacks: [lavoroControllato({ createdAt: g(2) })], workerLog: registroControllato(2) });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toBeVisible();
+  await page.locator('[data-fs-creator="__routine"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toHaveCount(0);
+
+  await page.locator('[data-fs-creator="__tutti"]').click();
+  await page.locator('[data-fs-tile="audit"]').click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toBeVisible();
+  await page.locator('[data-fs-range="oggi"]').click({ button: 'right' });
+  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Guarda questa finestra' }).click();
+  await expect(page.locator('#mgFsAltro .mg-fs-detail')).toHaveCount(0);
+});
+
+test('#997 col registro che smette di rispondere, il dettaglio dei lavorati si chiude', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const feedbacks = [fb({ _id: 'lv1', seq: 1, createdAt: g(2), status: 'done' })];
+  await apri(page, { feedbacks, workerLog: registroControllato(2) });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="lavorati"]').click();
+  await expect(page.locator('#mgFsTiles .mg-fs-detail')).toBeVisible();
+  await page.evaluate((f) => window.__mgTest.setFsData({ feedbacks: f, workerLog: [], logOk: false }), feedbacks);
+  await expect(page.locator('[data-fs-id="lavorati"] .mg-tile-n')).toHaveText('—');
+  await expect(page.locator('#mgFsTiles .mg-fs-detail')).toHaveCount(0);
+});
+
+test('#997 un dettaglio che si può ancora aprire si aggiorna sul conto nuovo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, {
+    feedbacks: [
+      fb({ _id: 'ag1', seq: 1, createdAt: g(1), status: 'todo' }),
+      fb({ _id: 'ag2', seq: 2, createdAt: g(20), status: 'done' }),
+    ],
+    workerLog: [],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await page.locator('[data-fs-tile="ricevuti"]').click();
+  const categorie = page.locator('#mgFsTiles [data-fs-bargroup="categorie"]');
+  await expect(categorie).toHaveCount(2);
+  await page.locator('[data-fs-range="7g"]').click();
+  await expect(page.locator('#mgFsTiles .mg-fs-detail')).toBeVisible();
+  await expect(categorie).toHaveCount(1);
+  await expect(page.locator('[data-fs-tile="ricevuti"]')).toHaveAttribute('aria-expanded', 'true');
+});
+
+// ── 2. I due numeri sotto i filtri si aprono come gli altri ─────────────────
+
+const cifrato = '[cifrato — chiave privata non configurata]';
+async function schedaConNota(openTab) {
+  const page = await openTab(URL);
+  await apri(page, {
+    feedbacks: [
+      fb({ _id: 'ok1', seq: 1, createdAt: g(2) }),
+      fb({ _id: 'sd1', seq: 2, createdAt: 'non è una data', name: 'la prima senza data' }),
+      fb({ _id: 'sd2', seq: 3, createdAt: null, name: 'la seconda senza data' }),
+      fb({ _id: 'mi1', seq: 4, createdAt: g(3), clientId: cifrato, name: 'mittente cifrato' }),
+    ],
+    workerLog: [],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  return page;
+}
+
+test('#997 il conto delle segnalazioni senza data si apre su quelle, col clic e da tastiera', async ({ openTab }) => {
+  const page = await schedaConNota(openTab);
+  const numero = page.locator('#mgFsNota [data-fs-esito="senzaData"]');
+  await expect(numero).toHaveText('2');
+  await page.locator('#mgFsRoot').screenshot({ path: 'tests/.shots/997-riga-sotto-i-filtri.png' });
+  await numero.click();
+  await expect(page.locator('#mgFsDrill')).toBeVisible();
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('data d\'arrivo');
+  await expect(page.locator('#mgFsDrillList')).toContainText('la prima senza data');
+  await expect(page.locator('#mgFsDrillList')).toContainText('la seconda senza data');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#mgFsDrill')).toBeHidden();
+
+  await numero.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(2);
+});
+
+test('#997 il conto dei mittenti illeggibili si apre su quelle segnalazioni', async ({ openTab }) => {
+  const page = await schedaConNota(openTab);
+  await page.locator('#mgFsNota [data-fs-esito="mittentiIgnoti"]').click();
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('Mittente non leggibile');
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
+  await expect(page.locator('#mgFsDrillList')).toContainText('mittente cifrato');
+});
+
+test('#997 il tasto destro sulla riga sotto i filtri offre i suoi due conti', async ({ openTab }) => {
+  const page = await schedaConNota(openTab);
+  await page.locator('#mgFsNota').click({ button: 'right', position: { x: 2, y: 2 } });
+  const voci = page.locator('.mg-ctxmenu .sn-select-option');
+  await expect(voci.filter({ hasText: 'data d\'arrivo' })).toHaveCount(1);
+  await expect(voci.filter({ hasText: 'Mittente non leggibile' })).toHaveCount(1);
+  await voci.filter({ hasText: 'data d\'arrivo' }).click();
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(2);
+});
+
+// ── 3. «Scegli tu» senza date dice che sta mostrando tutto ──────────────────
+
+test('#997 con «Scegli tu» a campi vuoti la scheda dice che sta guardando tutto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const feedbacks = [];
+  for (let i = 0; i < 6; i++) feedbacks.push(fb({ _id: 'st' + i, seq: 10 + i, createdAt: g(i * 15) }));
+  await apri(page, { feedbacks, workerLog: [] });
+  await page.locator('[data-fs-range="tutto"]').click();
+  const tutto = await tile(page, 'ricevuti').innerText();
+  await page.locator('[data-fs-range="7g"]').click();
+  expect(await tile(page, 'ricevuti').innerText()).not.toBe(tutto);
+
+  await page.locator('[data-fs-range="custom"]').click();
+  await expect(tile(page, 'ricevuti')).toHaveText(tutto);
+  await expect(page.locator('#mgFsFinestra')).toBeVisible();
+  await expect(page.locator('#mgFsFinestra')).toContainText('Guardi tutto');
+  await expect(page.locator('#mgFsFinestra')).toContainText('senza limiti di data');
+
+  // Scritta una data, la frase passa a dire la finestra vera.
+  await page.locator('#mgFsFrom').fill(new Date(Date.now() - 20 * GIORNO).toISOString().slice(0, 10));
+  await page.locator('#mgFsFrom').dispatchEvent('change');
+  await expect(page.locator('#mgFsFinestra')).toContainText('in poi');
+});
+
+// ── 4. Se la lettura completa non riesce, trattino e motivo, mai zero ───────
+
+test('#997 ripiego sulla lista in pagina: il controllo di sicurezza scrive un trattino e il motivo', async ({ openTab }) => {
+  const page = await openTab(URL);
+  // Com'è in pagina: la riga d'elenco non porta l'esito del controllo.
+  const proiettato = fb({ _id: 'rp2', seq: 2, status: 'done', createdAt: g(4), reviewedAt: g(3), name: 'riga d\'elenco', _proiezione: true });
+  await apri(page, {
+    feedbacks: [proiettato],
+    workerLog: [{ role: 'new-work', startedAt: g(3), num: '2' }, { role: 'secaudit', startedAt: g(2), num: '2' }],
+    ripiego: true,
+  });
+  await page.locator('[data-fs-range="7g"]').click();
+  await expect(tile(page, 'audit')).toHaveText('—');
+  const sotto = page.locator('[data-fs-id="audit"] .mg-tile-sub');
+  await expect(sotto).toContainText('esito non letto su 1 lavoro');
+  await expect(sotto).not.toContainText('0 bocciati');
+  await page.locator('#mgFsAltro').screenshot({ path: 'tests/.shots/997-ripiego-audit.png' });
+  // La riga piccola conta un lavoro e si apre su quello.
+  await sotto.click();
+  await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
+  await expect(page.locator('#mgFsDrillList')).toContainText('riga d\'elenco');
+});
+
+test('#997 lettura fallita e nessun ripiego: i riquadri dei lavori non scrivono zero', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await apri(page, {
+    feedbacks: [],
+    workerLog: [{ role: 'new-work', startedAt: g(3), num: '5' }, { role: 'verifier', startedAt: g(2), num: '5' }],
+    ripiego: true,
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  // Il registro ha risposto: quanti lavori si sa.
+  await expect(tile(page, 'lavorati')).toHaveText('1');
+  for (const id of ['ricevuti', 'audit', 'arenati']) {
+    await expect(tile(page, id), `«${id}» scrive un numero che nessuno ha letto`).toHaveText('—');
+    await expect(page.locator(`[data-fs-id="${id}"] .mg-tile-sub`)).toContainText('non lette');
+  }
+  const esiti = await page.locator('#mgFsEsiti').innerText();
+  expect(/(^|\s)0(\s|$)/.test(esiti), `le righe di esito scrivono uno zero: «${esiti}»`).toBe(false);
+  await expect(page.locator('#mgFsPieVuoto')).toContainText('non si sono lette');
+  await expect(page.locator('#mgFsPieVuoto')).not.toContainText('Nessun lavoro verificato');
+});
+
+test('#997 il giro di aggiornamento non porta via l\'esito del controllo già letto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const intero = fb({ _id: 'lv-a', seq: 7, status: 'done', createdAt: g(4), livelli: { l4: { esito: 'pass' } }, _updateTime: 't1' });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate((a) => window.__mgTest.setData([a]), intero);
+  await apriScheda(page, 'fbstats');
+  await page.evaluate((a) => window.__mgTest.setFsData({
+    feedbacks: [a],
+    workerLog: [{ role: 'fixer', startedAt: new Date(Date.now() - 3 * 864e5).toISOString(), num: '7' }],
+  }), intero);
+  await page.locator('[data-fs-range="tutto"]').click();
+  await expect(tile(page, 'audit')).toHaveText('1');
+
+  // Il giro rilegge la RIGA: senza esito, marcata come proiezione.
+  const riga = { ...intero, name: 'titolo cambiato', _updateTime: 't2', _proiezione: true };
+  delete riga.livelli;
+  await page.evaluate((r) => {
+    window.__liveState = { versions: [{ _id: r._id, _updateTime: 't2' }], docs: { [r._id]: r } };
+    window.__mgTest.setLiveSources({
+      listVersions: async () => window.__liveState.versions,
+      getMany: async (ids) => ids.map((id) => window.__liveState.docs[id]).filter(Boolean),
+    });
+  }, riga);
+  await page.evaluate(() => window.__mgTest.pollNow());
+  // Il giro è arrivato (il titolo nuovo è nell'elenco), e l'esito è rimasto.
+  await page.locator('[data-fs-id="audit"]').click({ button: 'right' });
+  await page.locator('.mg-ctxmenu .sn-select-option').first().click();
+  await expect(page.locator('#mgFsDrillList')).toContainText('titolo cambiato');
+  await expect(tile(page, 'audit')).toHaveText('1');
+});
+
+// Una segnalazione NUOVA arriva col giro come riga d'elenco, senza esito: a
+// scheda aperta la si legge intera, o il riquadro dice che l'esito non è letto.
+for (const [come, dettagli, atteso, sotto] of [
+  ['letta intera', 'ok', '1', '0 bocciati'],
+  ['lettura intera fallita', 'ko', '—', 'esito non letto su 1 lavoro'],
+]) {
+  test(`#997 una segnalazione arrivata col giro, ${come}: il controllo di sicurezza non diventa zero`, async ({ openTab }) => {
+    const page = await openTab(URL);
+    const nuova = fb({ _id: 'lv-n', seq: 8, status: 'done', createdAt: g(1), livelli: { l4: { esito: 'pass' } }, _updateTime: 't1' });
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.filo);
+    await page.evaluate(() => window.__mgTest.whenReady());
+    await page.evaluate(() => window.__mgTest.setAdmin(true));
+    await page.evaluate(() => window.__mgTest.setData([]));
+    await apriScheda(page, 'fbstats');
+    // Il registro la nomina già: la lista la porterà il giro.
+    await page.evaluate(() => window.__mgTest.setFsData({
+      feedbacks: [],
+      workerLog: [{ role: 'secaudit', startedAt: new Date(Date.now() - 864e5).toISOString(), num: '8' }],
+    }));
+    await page.locator('[data-fs-range="tutto"]').click();
+
+    const riga = { ...nuova, _proiezione: true };
+    delete riga.livelli;
+    await page.evaluate(({ riga, intera, dettagli }) => {
+      window.__mgTest.setLiveSources({
+        listVersions: async () => [{ _id: riga._id, _updateTime: 't1' }],
+        getMany: async () => [riga],
+        getDettagli: async () => {
+          if (dettagli === 'ko') throw new Error('rete giù');
+          return [intera];
+        },
+      });
+    }, { riga, intera: nuova, dettagli });
+    await page.evaluate(() => window.__mgTest.pollNow());
+    await expect(page.locator('[data-fs-id="audit"] .mg-tile-sub')).toContainText(sotto);
+    await expect(tile(page, 'audit')).toHaveText(atteso);
+  });
+}
+
+// ── 5. La fetta «3 o più» dice quante critiche ha avuto ogni lavoro ─────────
+
+test('#997 aperta la fetta «3 o più», ogni lavoro dice quante critiche ha avuto', async ({ openTab }) => {
+  const page = await openTab(URL);
+  const verifiche = (num, n) => Array.from({ length: n }, () => ({ role: 'verifier', startedAt: g(2), num }));
+  await apri(page, {
+    feedbacks: [
+      fb({ _id: 'c3', seq: 30, status: 'done', createdAt: g(5), name: 'tre critiche' }),
+      fb({ _id: 'c5', seq: 50, status: 'done', createdAt: g(5), name: 'cinque critiche' }),
+      fb({ _id: 'c1', seq: 10, status: 'done', createdAt: g(5), name: 'una critica' }),
+    ],
+    workerLog: [...verifiche('30', 4), ...verifiche('50', 6), ...verifiche('10', 2)],
+  });
+  await page.locator('[data-fs-range="tutto"]').click();
+  await setData(page, [
+    fb({ _id: 'c3', seq: 30, status: 'done', createdAt: g(5), name: 'tre critiche' }),
+    fb({ _id: 'c5', seq: 50, status: 'done', createdAt: g(5), name: 'cinque critiche' }),
+  ]);
+
+  await cliccaFetta(page, 'g3');
+  await expect(page.locator('#mgFsDrillTitle')).toContainText('3 o più critiche');
+  const riga = (id) => page.locator(`#mgFsDrillList [data-fs-open="${id}"]`);
+  await expect(riga('c3').locator('.mg-fs-drill-giri')).toHaveText('3 critiche');
+  await expect(riga('c5').locator('.mg-fs-drill-giri')).toHaveText('5 critiche');
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.locator('#mgFsDrill').screenshot({ path: `tests/.shots/997-fetta-g3-${tema}.png` });
+  }
+  await page.locator('#mgFsDrillClose').click();
+
+  // Dalla legenda, la stessa cosa.
+  await page.locator('#mgFsLegend li[data-group="g3"]').click();
+  await expect(riga('c5').locator('.mg-fs-drill-giri')).toHaveText('5 critiche');
+
+  // Le altre fette dicono già il numero nel nome: lì la colonna non serve.
+  await page.locator('#mgFsLegend li[data-group="g1"]').click();
+  await expect(page.locator('#mgFsDrillList .mg-fs-drill-giri')).toHaveCount(0);
+});
+
+async function setData(page, righe) {
+  await page.evaluate((r) => window.__mgTest.setData(r), righe);
+}

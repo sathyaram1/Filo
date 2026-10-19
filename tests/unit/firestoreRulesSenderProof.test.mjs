@@ -52,12 +52,14 @@ test('nessun ramo non-admin può scrivere senderProof, e ognuno ha la sua hasOnl
   }
 });
 
-test('il ramo update admin ammette senderProof solo con i valori admin e server', () => {
-  const admin = scritture().filter((s) => s.verbi.includes('update') && /^isAdmin\(\)/.test(s.cond));
+// #1037: la prova nasce col documento. Un update che la aggiunge o la cambia, anche dell'admin (che è ogni
+// sessione locale), sarebbe una prova data dopo, da chi non ha visto nascere il feedback.
+test('nessun ramo update, nemmeno quello admin, ammette senderProof', () => {
+  const update = scritture().filter((s) => s.verbi.includes('update') || s.verbi.includes('write'));
+  const admin = update.filter((s) => /^isAdmin\(\)/.test(s.cond));
   assert.equal(admin.length, 1, 'atteso un solo ramo update admin');
-  assert.ok(liste(admin[0].cond)[0].includes('senderProof'), 'serve al ripasso dei documenti vecchi');
-  assert.ok(
-    admin[0].cond.includes("request.resource.data.senderProof in ['admin', 'server']"),
-    'sparito il vincolo sul valore di senderProof nel ramo admin',
-  );
+  assert.match(admin[0].cond, /affectedKeys\(\)\s*\.hasOnly\(/, 'il ramo update admin senza affectedKeys().hasOnly scriverebbe qualunque campo');
+  for (const s of update) {
+    assert.ok(!liste(s.cond).flat().includes('senderProof'), `ramo update che ammette senderProof: ${s.cond.slice(0, 120)}`);
+  }
 });

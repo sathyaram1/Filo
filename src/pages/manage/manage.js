@@ -6276,6 +6276,7 @@
     ]);
 
     fsFeedbacks = Array.isArray(lista.rows) ? lista.rows : [];
+    fsChiesteIntere = new Set();
     fsCompleto  = lista.complete;
     fsRipiego   = lista.ripiego;
     if (lista.ripiego && lista.err && lista.err.code === 'FEEDBACK_READ_DENIED') {
@@ -6303,7 +6304,7 @@
   // scheda non seguiva quel giro, chi la lasciava aperta guardava i numeri di
   // quando l'aveva aperta: proprio mentre le routine lavorano, che è quando li
   // si guarda. I documenti freschi li ha già letti il giro della pagina, quindi
-  // qui non si ricarica niente dalla rete: si applicano.
+  // si applicano; dalla rete si legge solo una segnalazione nuova, intera.
   async function fsSegueLive(fresh, removed) {
     if (!fsCaricato || !Array.isArray(fsFeedbacks)) return;
     const via = new Set(Array.isArray(removed) ? removed : []);
@@ -6311,10 +6312,10 @@
     const aperto = fsPannelloAperto();
     if (!nuovi.length && !via.size && !aperto) return;
     if (nuovi.length || via.size) {
-      const perId = new Map();
-      for (const f of fsFeedbacks) if (f && f._id && !via.has(f._id)) perId.set(f._id, f);
-      for (const f of nuovi) if (f && f._id) perId.set(f._id, f);
-      fsFeedbacks = Array.from(perId.values());
+      // Il giro rilegge una PROIEZIONE: sostituita al documento intero si
+      // portava via l'esito del controllo di sicurezza (#677.5). Si fonde come
+      // fa la lista.
+      fsFeedbacks = LIVE.applyChanges(fsFeedbacks, { fresh: nuovi, removed: Array.from(via) });
     }
     // Il registro delle esecuzioni è l'ALTRA sorgente, e cammina per conto
     // suo: un'esplorazione che non trova niente lo fa crescere senza toccare
@@ -6330,6 +6331,33 @@
       } catch (_) { /* il registro resta quello di prima: la nota lo dice già */ }
     }
     renderFs();
+    if (aperto && !fsRipiego) fsCompletaRighe().then((fatto) => { if (fatto) renderFs(); }).catch(() => {});
+  }
+
+  // Una segnalazione NUOVA arrivata col giro è una riga d'elenco: senza i campi
+  // di dettaglio il suo controllo di sicurezza risulterebbe «non letto» (#997).
+  // A scheda davanti la si legge intera, una volta per caricamento.
+  let fsChiesteIntere = new Set();
+  async function fsCompletaRighe() {
+    const ids = (fsFeedbacks || [])
+      .filter((f) => f && f._proiezione && f._id && !fsChiesteIntere.has(f._id))
+      .map((f) => f._id);
+    if (!ids.length) return false;
+    for (const id of ids) fsChiesteIntere.add(id);
+    let interi;
+    try {
+      interi = await liveSources.getDettagli(ids);
+    } catch (_) {
+      return false;   // resta la riga, e il riquadro dice che l'esito non è letto
+    }
+    interi = (Array.isArray(interi) ? interi : []).filter((f) => f && f._id && !f._proiezione);
+    if (!interi.length) return false;
+    try {
+      const r = await sendToMain({ type: 'feedback_decrypt_fields', list: interi });
+      if (r && r.ok && Array.isArray(r.list)) interi = r.list;
+    } catch (_) { /* come al caricamento: senza chiave lo dice la voce «non leggibile» */ }
+    fsFeedbacks = LIVE.applyChanges(fsFeedbacks, { fresh: interi });
+    return true;
   }
 
   function fsPannelloAperto() {
@@ -6373,7 +6401,7 @@
       const r = stat ? stat.range : FS.rangeOf(fsRangeKey, Date.now(), fsCustom);
       const rovescio = !!(fsCustom.da && fsCustom.a && fsCustom.da > fsCustom.a);
       let testo = '';
-      if (r.da == null && r.a == null) testo = 'Scegli le due date, o lascia vuota una delle due.';
+      if (r.da == null && r.a == null) testo = 'Guardi tutto, senza limiti di data: nessuna delle due date è scelta.';
       else if (r.da == null) testo = `Guardi tutto fino al ${FS.dataBreve(r.a)}.`;
       else if (r.a == null) testo = `Guardi dal ${FS.dataBreve(r.da)} in poi.`;
       else testo = `Guardi dal ${FS.dataBreve(r.da)} al ${FS.dataBreve(r.a)}.`;
@@ -6419,35 +6447,43 @@
       + `<span class="mg-chip-n">${esc(fsNum(tuttiN))}</span></button>` + voci;
   }
 
+  // Un conto scritto dentro una frase: resta parte della frase, ma si apre su
+  // ciò che ha contato come ogni altro numero della scheda.
+  function fsContoInFrase(chiave, n, testo) {
+    return `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
+      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(testo)}</button>`;
+  }
+
   // ── Da dove partono davvero i numeri ─────────────────────────────────────
   // Un conteggio che afferma un totale che non conosce è peggio di nessun
   // conteggio (CLAUDE.md § Limiti). Qui si dice, in una riga, fin dove
-  // arrivano le due sorgenti.
+  // arrivano le due sorgenti. `righe` porta HTML: il testo passa da `esc`.
   function renderFsNota(stat) {
     const righe = [];
+    const testo = (t) => righe.push(esc(t));
     if (fsRipiego) {
-      righe.push(fsErrore
+      testo(fsErrore
         ? fsErrore
         : `Non è riuscita la lettura di tutte le segnalazioni: i numeri vengono dalla lista già in pagina${caricoIncompleto ? ", che è incompleta: sono minimi, non totali" : ", senza i campi di dettaglio"}.`);
     } else if (!fsCompleto) {
-      righe.push('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
+      testo('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
     }
     const cop = stat.copertura;
     if (!fsLogOk) {
-      righe.push('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
+      testo('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
     } else if (cop.logVuoto) {
-      righe.push('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
+      testo('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
     } else if (cop.logCorto) {
-      righe.push(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
+      testo(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
     }
     // Una segnalazione con la data d'arrivo mancante o illeggibile non cade in
-    // nessuna finestra, «Tutto» compreso. Sparire in silenzio da un totale è la
-    // cosa che non deve succedere: qui si dice quante sono.
+    // nessuna finestra, «Tutto» compreso: qui si dice quante sono, e il numero
+    // è l'unica strada per vederle.
     const sd = stat.ricevuti.senzaData;
     if (sd > 0) {
       righe.push(sd === 1
-        ? 'Una segnalazione non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.'
-        : `${fsNum(sd)} segnalazioni non hanno una data d'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.`);
+        ? `${fsContoInFrase('senzaData', 1, 'Una segnalazione')} ${esc('non ha una data d\'arrivo leggibile: resta fuori da ogni finestra, «Tutto» compreso.')}`
+        : `${fsContoInFrase('senzaData', sd, fsNum(sd))} ${esc('segnalazioni non hanno una data d\'arrivo leggibile: restano fuori da ogni finestra, «Tutto» compreso.')}`);
     }
     // Il mittente viaggia cifrato come lo stato. Senza la chiave privata non si
     // legge, e la ripartizione per mittente (una delle cose chieste) non può
@@ -6455,10 +6491,10 @@
     const mi = stat.ricevuti.mittentiIgnoti;
     if (mi > 0) {
       righe.push(mi === 1
-        ? 'Di una segnalazione non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.'
-        : `Di ${fsNum(mi)} segnalazioni non si è potuto leggere il mittente: serve la chiave dell'owner su questo computer. Nel filtro per creatore non ci sono.`);
+        ? `Di ${fsContoInFrase('mittentiIgnoti', 1, 'una segnalazione')} ${esc('non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non c\'è.')}`
+        : `Di ${fsContoInFrase('mittentiIgnoti', mi, fsNum(mi))} ${esc('segnalazioni non si è potuto leggere il mittente: serve la chiave dell\'owner su questo computer. Nel filtro per creatore non ci sono.')}`);
     }
-    mgFsNota.textContent = righe.join(' ');
+    mgFsNota.innerHTML = righe.join(' ');
     mgFsNota.hidden = righe.length === 0;
   }
 
@@ -6521,6 +6557,7 @@
   // «Nome: conto», per ogni etichetta che porta un numero, compresi i
   // suggerimenti col mouse: lì il conto si leggeva «1200» e la legenda «1.200».
   function fsRigaConto(label, n) { return `${label}: ${fsNum(n)}`; }
+  function fsRigaCritiche(n) { return n === 1 ? '1 critica' : `${fsNum(n)} critiche`; }
 
   /**
    * `sottoId`: il sottotitolo conta delle segnalazioni SUE, diverse da quelle
@@ -6625,8 +6662,23 @@
   // ripartizione compariva in mezzo ai riquadri sbagliati.
   const FS_DETTAGLI_TILES = ['ricevuti', 'lavorati', 'lanci'];
 
+  // Quali riquadri si aprono qui sotto, sul conto di ADESSO. La leggono chi
+  // disegna e chi tiene aperto il pannello: un riquadro che non si apre più
+  // perde anche «chiudi», e il suo pannello restava lì senza uscita (#997).
+  function fsEspandibili(stat) {
+    const ko = stat.copertura.registroLetto === false;
+    const a = stat.audit;
+    return {
+      ricevuti: stat.copertura.feedbackLetti !== false,
+      lavorati: !ko,
+      lanci: !ko,
+      audit: ((a.pass || 0) + (a.fail || 0) + (a.saltato || 0)) > 0,
+    };
+  }
+
   function renderFsTiles(stat) {
     const det = FS_DETTAGLI_TILES.includes(fsAperto) ? fsDettaglio(stat) : null;
+    const esp = fsEspandibili(stat);
     // Col registro non letto i tre riquadri che ne vivono non hanno un numero.
     // Il trattino da solo non basta: lo dicono anche sul riquadro, perché la
     // riga sopra sta in dodici pixel e il numero grande ne ha trenta.
@@ -6635,7 +6687,7 @@
     const fbKo = stat.copertura.feedbackLetti === false;
     mgFsTiles.innerHTML = [
       fsTile('ricevuti', stat.ricevuti.totale, 'Feedback ricevuti',
-        fbKo ? 'segnalazioni non lette' : '', fbKo ? false : 'espandi'),
+        fbKo ? 'segnalazioni non lette' : '', esp.ricevuti ? 'espandi' : false),
       // «in tutto» prometteva un totale che questo numero non ha: conta le
       // verifiche partite DENTRO la finestra, mentre la torta qui sotto conta
       // le critiche di un lavoro su tutto il registro. Con una finestra
@@ -6644,7 +6696,7 @@
       fsTile('lavorati', stat.lavorati.totale, 'Feedback lavorati',
         ko ? noto : (stat.lavorati.verifiche
           ? `${fsNum(stat.lavorati.verifiche)} ${stat.lavorati.verifiche === 1 ? 'verifica partita' : 'verifiche partite'} in questa finestra`
-          : ''), ko ? false : 'espandi'),
+          : ''), esp.lavorati ? 'espandi' : false),
       // Il numero grande conta PARTENZE dell'esplorazione: non sono
       // segnalazioni e non si aprono su niente, quindi il riquadro non promette
       // di aprirsi. A portare alle segnalazioni è la riga piccola, che è
@@ -6657,7 +6709,7 @@
             : `${fsNum(stat.prober.ritrovamenti)} ${stat.prober.ritrovamenti === 1 ? 'segnalazione' : 'segnalazioni'} dall'esploratore`),
         false,
         stat.prober.ritrovamentiIds.length ? 'proberTrovate' : ''),
-      fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', ko ? false : 'espandi'),
+      fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', esp.lanci ? 'espandi' : false),
     ].join('') + (det
       ? `<div class="mg-fs-detail"><h4>${esc(det.titolo)}</h4>${det.html}</div>`
       : '');
@@ -6686,9 +6738,7 @@
     // che ha contato: erano gli ultimi rimasti muti, e il caso più comune —
     // il registro conserva solo le ultime esecuzioni — finisce proprio qui.
     const coda = [];
-    const numeroApribile = (chiave, n) =>
-      `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
-      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(fsNum(n))}</button>`;
+    const numeroApribile = (chiave, n) => fsContoInFrase(chiave, n, fsNum(n));
     if (aperti) coda.push(`${numeroApribile('aperti', aperti)} ${aperti === 1 ? 'lavoro è ancora in mezzo al giro e non entra' : 'lavori sono ancora in mezzo al giro e non entrano'} nel conto.`);
     // Senza la chiave dell'owner lo stato non si legge, e dove sia arrivato
     // quel lavoro è proprio la domanda a cui la torta risponde: si dichiara,
@@ -6713,6 +6763,14 @@
       mgFsPieHint.textContent = 'Quanto è costato ogni lavoro si conta sul registro delle esecuzioni delle routine, '
         + 'e quel registro non si è letto: finché non torna, qui non c\'è niente da contare.';
       fsTortaVuota('Il registro delle esecuzioni non si è letto, quindi quanto è costato ogni lavoro non si sa.');
+      return;
+    }
+    // La porta gemella: dove sia arrivato ogni lavoro sta sulla sua
+    // segnalazione, e le segnalazioni non si sono lette.
+    if (stat.copertura.feedbackLetti === false) {
+      mgFsPieHint.textContent = 'Dove è arrivato ogni lavoro si legge sulla sua segnalazione, '
+        + 'e le segnalazioni non si sono lette: finché non tornano, qui non c\'è niente da contare.';
+      fsTortaVuota('Le segnalazioni non si sono lette, quindi quanto è costato ogni lavoro non si sa.');
       return;
     }
     const soloRegistro = stat.copertura.logCorto
@@ -6893,7 +6951,14 @@
     // quelle: erano gli ultimi quattro rimasti muti.
     const ko = stat.copertura.registroLetto === false;
     const noto = 'registro delle routine non letto';
-    const auditN = ko ? 0 : stat.audit.pass + stat.audit.fail + stat.audit.saltato;
+    // Senza segnalazioni lette, l'esito del controllo e gli arenamenti (che
+    // stanno sui documenti dei lavori) non si sanno: trattino e motivo.
+    const fbKo = stat.copertura.feedbackLetti === false;
+    const nonLetti = stat.audit.nonLetti || 0;
+    let auditSotto = `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`;
+    if (ko) auditSotto = noto;
+    else if (fbKo) auditSotto = 'segnalazioni non lette';
+    else if (nonLetti) auditSotto = `esito non letto su ${fsNum(nonLetti)} ${nonLetti === 1 ? 'lavoro' : 'lavori'}`;
     const det = fsAperto === 'audit' ? fsDettaglio(stat) : null;
     mgFsAltro.innerHTML = [
       fsTile('attesa', FS.durata(t.presaInCarico.mediana), 'Attesa prima che tu lo prendessi in mano',
@@ -6906,14 +6971,15 @@
         t.lavorazione.ids.length ? 'apri' : false),
       // Il controllo di sicurezza e gli arenamenti si leggono sulle lavorazioni
       // della finestra, e quali siano lo dice il registro: senza, non sono zero.
-      fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati',
-        ko ? noto : `${fsNum(stat.audit.fail)} bocciati · ${fsNum(stat.audit.saltato)} saltati da te`,
-        auditN ? 'espandi' : false),
+      // La riga piccola dei lavori senza esito letto si apre su quelli.
+      fsTile('audit', stat.audit.pass, 'Controlli di sicurezza passati', auditSotto,
+        fsEspandibili(stat).audit ? 'espandi' : false,
+        !ko && !fbKo && nonLetti ? 'auditNonLetti' : ''),
       // Il numero grande conta ARENAMENTI: una segnalazione arenata due volte
       // ne vale due, quindi non è un conto di segnalazioni e non si apre.
       // Ad aprirle è la riga piccola, come nel riquadro delle esplorazioni.
       fsTile('arenati', stat.arenati.lavorazioni, 'Lavorazioni arenate e rimesse in coda',
-        ko ? noto : (stat.arenati.feedback
+        ko ? noto : fbKo ? 'segnalazioni non lette' : (stat.arenati.feedback
           ? `su ${fsNum(stat.arenati.feedback)} ${stat.arenati.feedback === 1 ? 'segnalazione' : 'segnalazioni'}`
           : 'nessuna'),
         false,
@@ -6990,7 +7056,8 @@
     if (desc.tipo === 'fetta') {
       const f = trova(fsStat.giri.fette, chiave);
       if (!f || !f.ids || !f.ids.length) return null;
-      return { ...desc, titolo: f.label, ids: f.ids };
+      // Le altre fette dicono già il loro numero di critiche nel nome.
+      return { ...desc, titolo: f.label, ids: f.ids, critiche: f.key === 'g3' ? f.critiche : null };
     }
 
     if (desc.tipo === 'punto') {
@@ -7009,6 +7076,9 @@
         statoIgnoto: { titolo: 'Stato cifrato: non leggibile con questa chiave', ids: fsStat.giri.statoIgnotoIds },
         senzaGiri:   { titolo: 'Passati, ma le loro verifiche sono più vecchie del registro', ids: fsStat.giri.senzaGiriIds },
         ignoti:      { titolo: 'Lavorati, ma non fra le segnalazioni caricate', ids: [], mancanti: fsStat.giri.ignotiNumeri },
+        // I due conti della riga sotto i filtri.
+        senzaData:      { titolo: 'Senza una data d\'arrivo leggibile', ids: fsStat.ricevuti.senzaDataIds || [] },
+        mittentiIgnoti: { titolo: 'Mittente non leggibile con questa chiave', ids: fsStat.ricevuti.mittentiIgnotiIds || [] },
       };
       const v = mappa[chiave];
       if (!v) return null;
@@ -7047,6 +7117,7 @@
         attesa:   ['Segnalazioni che hai preso in mano', fsStat.tempi.presaInCarico.ids],
         durata:   ['Lavorazioni misurate in questa finestra', fsStat.tempi.lavorazione.ids, fsStat.tempi.lavorazione.mancanti],
         audit:    ['Controllo di sicurezza passato', (fsStat.auditIds || {}).pass],
+        auditNonLetti: ['Lavori con l\'esito del controllo di sicurezza non letto', (fsStat.auditIds || {}).nonLetti],
         arenatiFeedback: ['Segnalazioni la cui lavorazione si è arenata', fsStat.arenati.ids],
       }[chiave];
       if (!dietro) return null;
@@ -7109,11 +7180,16 @@
       // le più recenti: una che sta qui e non lì non si può aprire, e la riga
       // lo dice invece di non fare niente al clic.
       const apribile = allFeedbacks.some((f) => f._id === id);
+      const critiche = src.critiche ? src.critiche[id] : null;
       return `<li><button type="button" class="mg-fs-drill-row" data-fs-open="${esc(id)}"${apribile ? '' : ' disabled'}`
         + ` title="${esc(apribile ? 'Apri la segnalazione' : 'Non è fra le segnalazioni caricate nella lista: aprila dalla colonna di sinistra')}">`
         + `<span class="mg-fs-drill-num">${num ? '#' + esc(num) : '—'}</span>`
         + `<span class="mg-fs-drill-t">${esc(titolo)}</span>`
-        + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span></button></li>`;
+        + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span>`
+        + (typeof critiche === 'number'
+          ? `<span class="mg-fs-drill-giri">${esc(fsRigaCritiche(critiche))}</span>`
+          : '')
+        + '</button></li>';
     }).join('') + righeMancanti;
   }
 
@@ -7428,6 +7504,7 @@
       return;
     }
     fsStat = stat;
+    if (fsAperto && !fsEspandibili(stat)[fsAperto]) fsAperto = '';
     // L'elenco aperto su un conto vecchio non vale più: cambiata la finestra o
     // il filtro, quei numeri non sono più quelli. Si richiude da solo invece di
     // restare lì a dire una cosa che la scheda sopra non dice più.
@@ -7587,6 +7664,7 @@
   window.__mgTest.setFsData = (dati) => {
     const d = dati || {};
     fsFeedbacks = Array.isArray(d.feedbacks) ? d.feedbacks : [];
+    fsChiesteIntere = new Set();
     fsLog       = Array.isArray(d.workerLog) ? d.workerLog : [];
     fsCompleto  = d.complete !== false;
     fsRipiego   = d.ripiego === true;

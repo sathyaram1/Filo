@@ -2248,6 +2248,7 @@ class TabManager {
     });
     collegaScorciatoie(wc, () => this.win);
     this._sbGuardiaTastiera(tab, wc);
+    this._sbSeguiPuntatore(tab, wc);
     wc.on('before-input-event', (event, input) => {
       // #514 — si segna qui perché questo evento arriva PRIMA che il documento
       // veda il tasto, ed è dentro quel giro che la pagina chiede lo schermo.

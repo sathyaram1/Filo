@@ -9,6 +9,9 @@
 //                                  onUpdate(verdict). Le chiamate NON bloccano.
 //                                  ctx.daAprire: un link non ancora aperto (solo
 //                                  lì la sandbox); ctx.incognito: niente LLM né sandbox.
+//   preverifica(url, ctx)          puntatore fermo su un link accorciato o di rimando
+//                                  (#966): lista nera e destinazione prima del clic.
+//   preverdetto(url)               il risultato di preverifica per quel link, se c'è.
 //   recordCert(host, st)           registra l'esito del certificato visto da
 //                                  Electron (certificate-error / did-navigate).
 //   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
@@ -30,6 +33,7 @@ const net = require('./net');
 const gsb = require('./gsb');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
+const rimandi = require('./rimandi');
 
 class TtlCache {
   constructor(ttlMs) { this.ttl = ttlMs; this.m = new Map(); }
@@ -53,7 +57,7 @@ const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
 
 // Fetcher di rete iniettabili (default: assenti = best-effort no-op). gsbPeek dà il verdetto già in cache, senza rete.
-let providers = { gsb: null, gsbPeek: null, rdap: null, ct: null, sandbox: null, llm: null };
+let providers = { gsb: null, gsbPeek: null, rdap: null, ct: null, sandbox: null, destinazione: null, llm: null };
 // Chiave GSB letta a ogni verifica: la decide chi è dentro ADESSO (l'admin esce o entra senza ricollegare nulla, #679.4).
 let gsbKeyOf = null;
 function setProviders(fns) {
@@ -85,6 +89,7 @@ function configure(opts = {}) {
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
     sandbox: enableSandbox ? ((url) => sandbox.detonate(url, (finalUrl) => checkSync(finalUrl))) : null,
+    destinazione: enableSandbox ? ((url) => sandbox.destinazione(url, rimandi.siApre)) : null,
   });
   gsbKeyOf = keyOf;
 }
@@ -371,7 +376,107 @@ function analyze(url, ctx = {}, onUpdate) {
   return first;
 }
 
-// Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza e identità.
+// ── Link accorciati e di rimando, prima del clic (#966) ─────────────────
+// Il risultato è del link esatto: due link dello stesso accorciatore portano in posti diversi.
+const PRE_TTL = 30 * MIN;
+const preCache = new TtlCache(PRE_TTL);
+// Per sito della pagina: chi ci passa sopra a mano non arriva al tetto, una pagina che cambia i link sotto il puntatore sì.
+const PRE_PER_ORA = 120;
+const preBudget = createOwnerBudget({ perHour: PRE_PER_ORA });
+const MAX_PASSI = 8;
+
+function preverdetto(url) {
+  return preCache.get(String(url || '')) || null;
+}
+
+// Un link qualunque non manda niente in rete prima del clic: solo un accorciato o un rimando noto. La lista nera per
+// ogni indirizzo da cui il link passa; la finestra nascosta solo se la destinazione non è scritta nel link, mai in
+// incognito (#1081). Torna la promessa del risultato, o null se non parte niente.
+function preverifica(url, ctx = {}) {
+  const link = String(url || '');
+  if (!rimandi.tipo(link) || (!providers.gsb && !providers.destinazione)) return null;
+  const gia = preCache.get(link);
+  // Senza finestra (in incognito, o a interruttore spento) la destinazione non si è cercata: dove si può, si cerca.
+  if (gia && !(gia.finito && gia.senzaFinestra && !ctx.incognito && providers.destinazione)) return gia.pronto;
+  const chi = (ctx.pagina && ownerOf(ctx.pagina)) || 'filo';
+  if (!preBudget.spend(chi)) {
+    console.warn(`[safebrowse] ${PRE_PER_ORA} link accorciati controllati in un'ora su ${chi}: ${link} si controlla all'apertura`);
+    return null;
+  }
+  const voce = { link, passi: [link], destinazione: null, verdetto: null, finito: false };
+  voce.pronto = track(preEsegui(voce, ctx).catch(() => {}).then(() => {
+    voce.finito = true;
+    // Lasciato a un link più recente: ripassandoci sopra si ricomincia, a meno che la lista nera abbia già parlato.
+    if (voce.annullato && !(voce.verdetto && voce.verdetto.level !== 'safe')) preCache.delete(link);
+    else preCache.set(link, voce, voce.destinazione ? PRE_TTL : FAILED_RETRY_MS);
+    return voce;
+  }));
+  preCache.set(link, voce);
+  return voce.pronto;
+}
+
+async function preEsegui(voce, ctx) {
+  const chieste = new Map();
+  const chiedi = (u) => {
+    if (chieste.has(u)) return;
+    const n = normalizeMod.normalize(u);
+    const gsb = providers.gsb;
+    chieste.set(u, gsb && n && n.ok && !isHomeNetwork(n)
+      ? once('gsb:' + u, () => gsb(u, n)).catch(() => null) : Promise.resolve(null));
+  };
+  chiedi(voce.link);
+  voce.destinazione = await preDestinazione(voce, ctx);
+  for (const p of voce.passi) chiedi(p);
+  const esiti = new Map();
+  await Promise.all([...chieste].map(([u, p]) => p.then((r) => { esiti.set(u, r); })));
+  voce.verdetto = verdettoDelLink(voce, esiti);
+}
+
+async function preDestinazione(voce, ctx) {
+  let cur = voce.link;
+  for (let i = 0; i < MAX_PASSI; i++) {
+    const t = rimandi.tipo(cur);
+    if (!t) return cur;
+    if (t.destinazione) { cur = t.destinazione; voce.passi.push(cur); continue; }
+    if (ctx.incognito || !providers.destinazione) { voce.senzaFinestra = true; return null; }
+    const r = await providers.destinazione(cur);
+    if (!r || r.annullato) { voce.annullato = true; return null; }
+    voce.passi.push(...(r.passi || []).slice(1));
+    if (!r.destinazione) return null;
+    cur = r.destinazione;
+  }
+  return null;
+}
+
+const breve = (u) => {
+  try { const x = new URL(u); const s = x.host + x.pathname; return s.length > 60 ? s.slice(0, 59) + '…' : s; } catch (_) { return String(u); }
+};
+
+// Il verdetto della destinazione; ma se un indirizzo da cui il link passa è in lista, il link è pericoloso comunque.
+function verdettoDelLink(voce, esiti) {
+  const dest = voce.destinazione;
+  let v = null;
+  if (dest) {
+    const n = normalizeMod.normalize(dest);
+    const dati = n && n.ok ? assembleCached(n, dest) : {};
+    if (dati.gsb === undefined && esiti.get(dest)) dati.gsb = esiti.get(dest);
+    v = engine.evaluate(dest, {}, dati);
+  }
+  const inLista = voce.passi.find((u) => u !== dest && esiti.get(u) && esiti.get(u).listed);
+  if (!inLista || (v && v.level === 'pericoloso')) return v;
+  const g = esiti.get(inLista);
+  return {
+    level: 'pericoloso',
+    reasons: ['gsb_' + (g.category || 'listed'), 'link'],
+    message: {
+      title: 'Link segnalato come pericoloso',
+      body: `Questo link passa da ${breve(inLista)}, che Google Safe Browsing classifica come ${engine.gsbText(g.category)}.`,
+    },
+    gsb: g,
+  };
+}
+
+// Metadati (MAI contenuto pagina) passati all'LLM: solo provenienza/identità.
 function buildLlmMeta(norm, ctx, verdict) {
   const imp = verdict.imp || null;
   return {
@@ -409,6 +514,9 @@ const API = {
   ownerOf,
   createOwnerBudget,
   analyze,
+  preverifica,
+  preverdetto,
+  tipoLink: rimandi.tipo,
   evaluate: engine.evaluate,
   recordCert,
   setProviders,
@@ -421,11 +529,13 @@ const API = {
       ct: !!providers.ct,
       llm: !!providers.llm,
       sandbox: !!providers.sandbox,
+      destinazione: !!providers.destinazione,
     };
   },
   // cache (per test / invalidazione)
   DEEP_BUDGET,
-  _caches: { ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed },
+  PRE_PER_ORA,
+  _caches: { ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed, preCache, preBudget },
   _settled: settled,
   _gsbLookup: gsbLookup,
   // sotto-moduli (per test)
@@ -441,6 +551,7 @@ const API = {
   gsb,
   llm,
   sandbox,
+  rimandi,
 };
 
 globalThis.SN_SAFEBROWSE = API;

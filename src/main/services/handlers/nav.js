@@ -251,8 +251,31 @@ module.exports = function register(on, ctx) {
     type: MSG.CLOSE_OTHER_MENUS,
   }));
 
-  // «Traduci» deve arrivare anche nei riquadri, e può indire il giro solo il frame PRINCIPALE:
-  // un riquadro che comandasse i fratelli muoverebbe traduzioni non sue.
+  // #589.11 — alla sola pagina che contiene il riquadro mittente: è il main a dire chi chiede, non lo script del
+  // riquadro, che da qui non passa.
+  on(MSG.VISTO_SOSPENDI, async (msg, sender) => {
+    const madre = sender && sender.frame && sender.frame.parent;
+    if (!madre || madre.detached) return { ok: false, error: 'no-parent' };
+    try {
+      madre.send('filo:broadcast', { type: MSG.VISTO_PERMESSO, n: String(msg?.n || '').slice(0, 64), si: msg?.si ? 1 : 0 });
+    } catch (e) {
+      return { ok: false, error: e.message || String(e) };
+    }
+    return { ok: true };
+  });
+
+  // #407 — «Traduci la pagina» deve arrivare anche dentro i riquadri
+  // incorporati (post incorporati, blocchi commenti, moduli di iscrizione).
+  // Il frame principale non può toccarne il testo — sono altre origini — ma il
+  // content script di Filo gira anche lì: qui gli si passa parola.
+  //
+  // Solo il frame PRINCIPALE può indire il giro. Un riquadro che comandasse i
+  // suoi fratelli non risolverebbe niente e aprirebbe una strada perché un sito
+  // incorporato muova la traduzione dentro riquadri che non sono suoi.
+  //
+  // La risposta dice a quanti riquadri è stata passata parola: è la base del
+  // conto con cui la pagina decide se l'avviso finale può dire "Pagina
+  // tradotta" o deve dire che una parte è rimasta fuori.
   on(MSG.TRANSLATE_FRAMES, async (msg, sender) => {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };

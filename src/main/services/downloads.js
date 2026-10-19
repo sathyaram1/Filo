@@ -919,8 +919,13 @@ function openFile(id, opts, scope = '') {
   if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain, servitoDi(rec))) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy); title = ESE().titoloApri(rec.filename); } catch (_) {}
-    return { ok: false, needsConfirm: true, exe: true, title, text };
+    let parti = null;
+    try {
+      text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy);
+      parti = ESE().partiApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy);
+      title = ESE().titoloApri(rec.filename);
+    } catch (_) {}
+    return { ok: false, needsConfirm: true, exe: true, title, text, parti };
   }
   try {
     const r = electron().shell.openPath(rec.savePath);

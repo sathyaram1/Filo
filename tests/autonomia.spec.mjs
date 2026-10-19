@@ -409,7 +409,8 @@ test('Conservativo dopo una ricerca: «cerca sul web» dall\'Aiuto chiede una vo
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8000 });
   const testo = await confirmText(page);
   // A Conservativo il costo 2 chiede anche a compito pulito: il perché della lettura qui non serve.
-  expect(testo).toContain('Cercare sul web:\n“gatti”');
+  // Il testo cercato sta nel suo riquadro (#592.7): nel testo del popup arriva sulla riga dopo.
+  expect(testo).toContain('Cercare sul web:\ngatti');
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'ok');
   await expect.poll(() => page.evaluate(() => window.__aperte), { timeout: 8000 }).toBe(1);

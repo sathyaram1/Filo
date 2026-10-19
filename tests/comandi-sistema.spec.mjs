@@ -223,7 +223,7 @@ test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma 
     { text: 'Ti chiedo conferma.' },
   ]);
   await chiedi(page, 'collegati alla rete dell\'ufficio');
-  await expect.poll(() => confirmText(page)).toContain('Collegare il computer alla rete Wi-Fi «Ufficio 5G»');
+  await expect.poll(() => confirmText(page)).toContain('Collegare il computer alla rete Wi-Fi\nUfficio 5G\n');
   expect((await chiamate(app)).some((c) => c[0] === 'wifiCollega')).toBe(false);
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Ufficio 5G');
@@ -239,7 +239,7 @@ test('in chat: la conferma nomina la rete che partirà anche trovata per somigli
     { text: 'Ti chiedo conferma.' },
   ]);
   await chiedi(page, 'collegati a Casa');
-  await expect.poll(() => confirmText(page)).toContain('alla rete Wi-Fi «Cava»');
+  await expect.poll(() => confirmText(page)).toContain('alla rete Wi-Fi\nCava\n');
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Cava');
   await ripristina(app);
@@ -279,7 +279,7 @@ test('in chat, le parole dell\'utente bastano: «le cuffie Sony» collega le Cuf
     { text: 'Ti chiedo conferma.' },
   ]);
   await chiedi(page, 'collegati alla rete di casa');
-  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('alla rete Wi-Fi «Casa»');
+  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('alla rete Wi-Fi\nCasa\n');
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Casa');
 });

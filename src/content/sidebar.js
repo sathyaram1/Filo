@@ -869,7 +869,7 @@
     // l'azione riparte, riclassificata di nuovo nel main.
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
-      const opts = { title: 'Filo chiede conferma', text: res.describe || '', avviso: res.avviso || '' };
+      const opts = { title: 'Filo chiede conferma', text: res.describe || '', parti: res.parti, avviso: res.avviso || '' };
       let ok = false;
       try {
         ok = Ui
@@ -1187,12 +1187,15 @@
       if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
       if (risposta !== 'si') {
         const Ui = global.SN_CONFIRM_UI;
+        // Il testo intero e nel suo riquadro: si conferma quello che si legge, e il
+        // testo non può chiudere le virgolette e parlare come Filo (#592.7).
         let detail = '';
-        if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+        if (spec.target === 'text') detail = text;
         else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
         else if (linkEl) detail = linkEl.href || '';
         const perche = d && d.perche ? `\n\n${d.perche}` : '';
-        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}` };
+        const parti = [...(detail ? [`${label}:`, { citazione: detail, nuda: spec.target !== 'text' }] : [label]), ...(perche ? [perche] : [])];
+        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}`, parti };
         let ok = false;
         try {
           ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);

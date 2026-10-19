@@ -234,6 +234,24 @@
     return `«${nomeVisibile(nome)}» è un programma scaricato${da}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
   }
 
+  // Lo stesso testo a pezzi per il popup: il nome lo sceglie il sito, e sta nel suo riquadro (#592.7).
+  function partiApri(nome, url, incerto, servito) {
+    const da = daSito(url, incerto, servito, nome);
+    const cosa = eImmagineDisco(nome)
+      ? `è un'immagine disco scaricata${da}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Fallo solo se sai da chi arriva.`
+      : `è un programma scaricato${da}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
+    return ['Il file', { citazione: nomeVisibile(nome) }, cosa];
+  }
+
+  // La domanda prima dello scaricamento, a pezzi come quella dell'apertura: il nome nel suo riquadro.
+  function partiScarica(nome, url, incerto, servito) {
+    const da = daSito(url, incerto, servito, nome);
+    const cosa = eImmagineDisco(nome)
+      ? `è un'immagine disco${da}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Scaricarla?`
+      : `è un programma${da}. Se lo apri può cambiare il computer. Scaricarlo?`;
+    return ['Il file', { citazione: nomeVisibile(nome) }, cosa];
+  }
+
   const TITOLO_APRI = 'Aprire un programma?';
 
   function titoloApri(nome) {
@@ -259,6 +277,8 @@
     provenienza,
     testoScarica,
     testoApri,
+    partiApri,
+    partiScarica,
     TITOLO_APRI,
     titoloApri,
   };

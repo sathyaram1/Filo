@@ -2429,8 +2429,16 @@
     security: {
       protectIpLeak: true,
       blockPopups: true,
-      // Rilevamento siti pericolosi: i controlli locali sono gratuiti e attivi di default,
-      // quelli di rete sono best-effort e non bloccano mai la navigazione.
+      // Rilevamento siti pericolosi (phishing/impersonazione/malware). Vedi
+      // src/main/services/safebrowse/. Tutti i controlli locali (omoglifi,
+      // typo, combosquat, trasporto) sono gratuiti e attivi di default. I
+      // controlli di rete sono best-effort e non bloccano mai la navigazione:
+      // - safeBrowsing: blacklist Google Safe Browsing. Richiede una API key
+      //   (gratuita su Google Cloud). Senza chiave lo stage viene saltato.
+      // - networkSignals: età dominio (RDAP) + età primo certificato (CT).
+      //   Keyless. Disattivabile da chi non vuole alcuna chiamata esterna.
+      // - llmJudge: giudizio LLM solo-metadati sui casi sospetti non conclusivi.
+      // - sandbox: finestra isolata che scopre la destinazione di un link accorciato prima del clic (#966).
       safeBrowse: {
         enabled: true,
         safeBrowsingKey: '',

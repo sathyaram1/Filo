@@ -1151,6 +1151,19 @@ html, body {
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
 .dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
+/* La richiesta scritta dal modello, su un foglietto suo come il testo altrui nei popup di conferma (#592.7):
+   il filo a sinistra è per metà colore del testo, così un accento spento non lo spegne. */
+.dash-delete-query {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--sn-accent, #c45a3b) 50%, currentColor);
+  border-radius: 6px;
+}
 /* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
 .dash-delete-note[data-cerco="1"]::before {
   content: '';
