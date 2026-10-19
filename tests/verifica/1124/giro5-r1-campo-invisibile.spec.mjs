@@ -41,5 +41,3 @@ for (const id of ['incolore', 'velato']) {
     expect(await mostrata(app), `campo ${id}`).toBe(false);
   });
 }
-
-void aspettaFinestra;
