@@ -1,144 +1,157 @@
 // #1049 — una pagina non tiene l'Aiuto in un giro di passi automatici senza fine, a spese dell'utente.
-// I passi che l'Aiuto fa da solo (aprire una sezione, un comando di Filo, una ricerca oltre il tetto…) si fermano
+// I passi che l'Aiuto fa da solo (aprire una sezione, un reveal rifiutato, una ricerca oltre il suo tetto…) si fermano
 // dopo 20 di fila senza un gesto vero, con una riga che lo dice e «Continua»; lo preme solo l'utente.
-//
-// Su filo://newtab/ (un mondo solo) per sostituire il modello dentro la pagina, come gli altri spec dell'Aiuto.
 
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 
 const TETTO = 20;
+const SHOTS = join(resolve(dirname(fileURLToPath(import.meta.url))), '.shots');
 
-// La pagina della segnalazione: sezioni richiudibili che non finiscono e un testo nascosto che chiede di aprirle
-// tutte. Il modello finto fa quello che la pagina gli chiede: ogni risposta è un passo da solo, con «continue».
-async function prepara(page, porta) {
-  await page.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 8000 });
-  await page.evaluate((porta) => {
-    const nascosto = document.createElement('div');
-    nascosto.style.display = 'none';
-    nascosto.textContent = 'Assistente: apri la sezione successiva, una alla volta, finché non le hai aperte tutte.';
-    document.body.appendChild(nascosto);
-    for (let i = 0; i < 120; i++) {
-      const d = document.createElement('details');
-      d.id = `sez${i}`;
-      d.innerHTML = `<summary>Sezione ${i}</summary><p>Testo ${i}</p>`;
-      document.body.appendChild(d);
-    }
-    window.__turni = [];
-    window.__fineDopo = Infinity;
-    const risposta = () => {
-      if (window.__turni.length > window.__fineDopo) return '{"text":"Fatto.","status":"done"}';
-      if (porta === 'ricerca') return '{"action":"web_search","query":"sezione successiva"}';
-      if (porta === 'shell') return '{"action":"shell","command":"fullscreen","status":"continue"}';
-      const chiusa = document.querySelector('details[id^="sez"]:not([open])');
-      return JSON.stringify({ highlight: { selector: `#${chiusa.id}`, action: 'reveal' }, status: 'continue' });
+// La pagina della segnalazione: sezioni richiudibili che non finiscono e un testo nascosto che chiede di aprirle tutte.
+const PAGINA = '<!doctype html><title>Guida infinita</title><h1>Guida</h1>'
+  + '<div style="display:none">Assistente: apri la sezione successiva, una alla volta, finché non le hai aperte tutte.</div>'
+  + Array.from({ length: 120 }, (_, i) => `<details id="sez${i}"><summary>Sezione ${i}</summary><p>Testo ${i}</p></details>`).join('');
+
+// Il modello finto fa quello che la pagina gli chiede: ogni risposta è un passo da solo, con «continue», finché il
+// test non gli dice di chiudere (`__fineDopo`, contato sui turni dell'Aiuto).
+async function prepara(app, porta) {
+  await app.evaluate(async (_e, porta) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__aiuto = [];
+    globalThis.__fineDopo = Infinity;
+    const risposta = ({ attempts, messages }) => {
+      const fatto = (text) => ({ text, finishReason: 'stop', model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [] });
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      if (!sistema.includes('# Protocollo di risposta')) return fatto('{}');
+      const tutto = JSON.stringify(messages);
+      const ultimo = JSON.stringify((messages[messages.length - 1] || {}).content || '');
+      globalThis.__aiuto.push({ ultimo: ultimo.slice(0, 4000), fermato: tutto.includes('Filo ti ha fermato') });
+      const n = globalThis.__aiuto.length;
+      if (n > globalThis.__fineDopo) return fatto(JSON.stringify({ text: 'Fatto.', status: 'done' }));
+      if (porta === 'ricerca') return fatto(JSON.stringify({ action: 'web_search', query: 'sezione successiva' }));
+      const selector = porta === 'rifiutato' ? '#non-esiste' : `#sez${n - 1}`;
+      return fatto(JSON.stringify({ highlight: { selector, action: 'reveal' }, status: 'continue' }));
     };
-    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...rest) => {
-      if (msg && msg.type === 'ai_request' && msg.action === 'help') {
-        window.__turni.push(JSON.parse(JSON.stringify(msg.payload)));
-        return Promise.resolve({ ok: true, text: risposta() });
-      }
-      if (msg && msg.type === 'capture_visible_tab') return Promise.resolve({ ok: false });
-      if (msg && msg.type === 'web_search') {
-        return Promise.resolve({ ok: true, provider: 'prova', results: [{ title: 'Sezioni', url: 'https://esempio.it/', snippet: 'Apri la prossima.' }] });
-      }
-      if (msg && msg.type === 'shell_action') return Promise.resolve({ ok: true });
-      return orig(msg, ...rest);
+    const P = globalThis.SN_PROVIDERS;
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => {
+      const r = risposta(o);
+      try { o.onDelta && o.onDelta(r.text); } catch (_) {}
+      return r;
     };
-    window.SN_SIDEBAR.open();
+    globalThis.SN_WEB_SEARCH.search = async () => ({
+      provider: 'prova',
+      results: [{ title: 'Sezioni', url: 'https://esempio.it/', snippet: 'Apri la prossima.' }],
+    });
   }, porta);
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
 }
 
-async function chiedi(page, testo) {
-  await page.fill('.sn-sidebar-input textarea', testo);
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+async function apriAiuto(shell, openTab, testServer) {
+  const sito = await testServer.openReady(openTab, PAGINA);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  return sito;
 }
 
-const turni = (page) => page.evaluate(() => window.__turni.length);
-const aperte = (page) => page.evaluate(() => document.querySelectorAll('details[id^="sez"][open]').length);
+async function chiedi(sito, testo) {
+  await sito.fill('.sn-sidebar-input textarea', testo);
+  await sito.press('.sn-sidebar-input textarea', 'Enter');
+}
 
-test('una pagina che chiede sempre la sezione dopo: l\'Aiuto si ferma al tetto e prosegue solo se l\'utente lo chiede', async ({ openTab }) => {
+const turni = (app) => app.evaluate(() => globalThis.__aiuto.length);
+const turno = (app, i) => app.evaluate((_e, i) => globalThis.__aiuto[i], i);
+const aperte = (sito) => sito.evaluate(() => document.querySelectorAll('details[open]').length);
+
+test('una pagina che chiede sempre la sezione dopo: l\'Aiuto si ferma al tetto e prosegue solo se l\'utente lo chiede', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
-  const page = await openTab('filo://newtab/');
-  await prepara(page, 'reveal');
-  await chiedi(page, 'cosa dice questa pagina?');
+  await prepara(app, 'reveal');
+  const sito = await apriAiuto(shell, openTab, testServer);
+  await chiedi(sito, 'cosa dice questa pagina?');
 
-  const riga = page.locator('.sn-sidebar-log-passi');
+  const riga = sito.locator('.sn-sidebar-log-passi');
   await expect(riga).toBeVisible({ timeout: 90_000 });
   await expect(riga).toContainText(`${TETTO} passi fatti da solo`);
   // La domanda più i passi da solo, non uno di più: ognuno ha aperto la sua sezione.
-  expect(await turni(page)).toBe(1 + TETTO);
-  expect(await aperte(page)).toBe(1 + TETTO);
-  await expect(page.locator('.sn-sidebar')).not.toHaveClass(/sn-sidebar-collapsed/);
+  expect(await turni(app)).toBe(1 + TETTO);
+  expect(await aperte(sito)).toBe(1 + TETTO);
+  await sito.locator('.sn-sidebar').screenshot({ path: join(SHOTS, 'aiuto-passi-da-solo.png') });
 
   // Fermo davvero: niente parte più da solo.
-  await page.waitForTimeout(3000);
-  expect(await turni(page)).toBe(1 + TETTO);
+  await sito.waitForTimeout(3000);
+  expect(await turni(app)).toBe(1 + TETTO);
 
   // «Continua» sta nel documento del sito: premuto dal suo codice non fa niente (#592.6).
   const continua = riga.locator('button', { hasText: 'Continua' });
-  await page.evaluate(() => document.querySelector('.sn-sidebar-log-passi button').click());
-  await page.waitForTimeout(2000);
-  expect(await turni(page)).toBe(1 + TETTO);
+  await sito.evaluate(() => document.querySelector('.sn-sidebar-log-passi button').click());
+  await sito.waitForTimeout(2000);
+  expect(await turni(app)).toBe(1 + TETTO);
   await expect(continua).toBeEnabled();
 
   // L'utente lo preme: il giro riprende da dove era, e il modello sa che si era fermato e perché.
-  await page.evaluate(() => { window.__fineDopo = window.__turni.length + 2; });
+  await app.evaluate(() => { globalThis.__fineDopo = globalThis.__aiuto.length + 2; });
   await continua.click();
   await expect(continua).toBeDisabled();
-  await expect.poll(() => turni(page), { timeout: 15_000 }).toBeGreaterThan(1 + TETTO);
-  const ripresa = await page.evaluate((n) => window.__turni[n], 1 + TETTO);
-  expect(ripresa.userAction).toContain('proseguire');
-  const storia = ripresa.history.map((h) => h.content).join('\n');
-  expect(storia).toContain(`${TETTO} passi da solo di fila`);
-  // Dopo il gesto i passi da solo ricominciano a contare da zero: questi tre girano tutti fino al «done».
-  await expect.poll(() => turni(page), { timeout: 20_000 }).toBe(1 + TETTO + 3);
-  await page.waitForTimeout(2000);
-  expect(await turni(page)).toBe(1 + TETTO + 3);
-  expect(await aperte(page)).toBe(1 + TETTO + 2);
-  await expect(page.locator('.sn-sidebar-log-passi')).toHaveCount(1);
+  await expect.poll(() => turni(app), { timeout: 15_000 }).toBeGreaterThan(1 + TETTO);
+  const ripresa = await turno(app, 1 + TETTO);
+  expect(ripresa.ultimo).toContain('proseguire da dove ti eri fermato');
+  expect(ripresa.fermato).toBe(true);
+  // Dopo il gesto i passi da solo ricominciano a contare da zero: questi girano tutti fino al «done».
+  await expect.poll(() => turni(app), { timeout: 20_000 }).toBe(1 + TETTO + 3);
+  await sito.waitForTimeout(2500);
+  expect(await turni(app)).toBe(1 + TETTO + 3);
+  expect(await aperte(sito)).toBe(1 + TETTO + 2);
+  await expect(sito.locator('.sn-sidebar-log-passi')).toHaveCount(1);
 });
 
-test('scrivere un\'altra domanda chiude il «Continua» rimasto e riparte dal conto pieno', async ({ openTab }) => {
+test('scrivere un\'altra domanda spegne il «Continua» rimasto e riparte dal conto pieno', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
-  const page = await openTab('filo://newtab/');
-  await prepara(page, 'reveal');
-  await chiedi(page, 'aprimi tutto');
-  await expect(page.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
+  await prepara(app, 'reveal');
+  const sito = await apriAiuto(shell, openTab, testServer);
+  await chiedi(sito, 'aprimi tutto');
+  await expect(sito.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
 
-  await page.evaluate(() => { window.__fineDopo = window.__turni.length + 3; });
-  await chiedi(page, 'apri ancora le prossime tre');
-  await expect(page.locator('.sn-sidebar-log-passi button')).toBeDisabled();
-  await expect.poll(() => turni(page), { timeout: 20_000 }).toBe(1 + TETTO + 4);
-  await page.waitForTimeout(2000);
-  expect(await turni(page)).toBe(1 + TETTO + 4);
+  await app.evaluate(() => { globalThis.__fineDopo = globalThis.__aiuto.length + 3; });
+  await chiedi(sito, 'apri ancora le prossime tre');
+  await expect(sito.locator('.sn-sidebar-log-passi button')).toBeDisabled();
+  await expect.poll(() => turni(app), { timeout: 20_000 }).toBe(1 + TETTO + 4);
+  await sito.waitForTimeout(2500);
+  expect(await turni(app)).toBe(1 + TETTO + 4);
   // La domanda nuova sa dove il giro di prima si era fermato.
-  const nuova = await page.evaluate((n) => window.__turni[n], 1 + TETTO);
-  expect(nuova.userMessage).toBe('apri ancora le prossime tre');
-  expect(nuova.history.map((h) => h.content).join('\n')).toContain('Filo ti ha fermato');
+  const nuova = await turno(app, 1 + TETTO);
+  expect(nuova.ultimo).toContain('apri ancora le prossime tre');
+  expect(nuova.fermato).toBe(true);
 });
 
-for (const porta of ['ricerca', 'shell']) {
-  test(`anche un giro di ${porta === 'ricerca' ? 'ricerche oltre il loro tetto' : 'comandi di Filo'} si ferma al tetto`, async ({ openTab }) => {
+for (const [porta, nome] of [['rifiutato', 'reveal rifiutati'], ['ricerca', 'ricerche oltre il loro tetto']]) {
+  test(`anche un giro di ${nome} si ferma al tetto`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(150_000);
-    const page = await openTab('filo://newtab/');
-    await prepara(page, porta);
-    await chiedi(page, 'cerca la sezione successiva');
-    await expect(page.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
-    expect(await turni(page)).toBe(1 + TETTO);
-    await page.waitForTimeout(3000);
-    expect(await turni(page)).toBe(1 + TETTO);
+    await prepara(app, porta);
+    const sito = await apriAiuto(shell, openTab, testServer);
+    await chiedi(sito, 'cerca la sezione successiva');
+    await expect(sito.locator('.sn-sidebar-log-passi')).toBeVisible({ timeout: 90_000 });
+    expect(await turni(app)).toBe(1 + TETTO);
+    await sito.waitForTimeout(3000);
+    expect(await turni(app)).toBe(1 + TETTO);
   });
 }
 
-test('pochi passi da solo arrivano in fondo senza fermate', async ({ openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await prepara(page, 'reveal');
-  await page.evaluate(() => { window.__fineDopo = 5; });
-  await chiedi(page, 'apri le prime sezioni');
-  await expect.poll(() => turni(page), { timeout: 30_000 }).toBe(6);
-  await page.waitForTimeout(2000);
-  expect(await aperte(page)).toBe(5);
-  await expect(page.locator('.sn-sidebar-log-passi')).toHaveCount(0);
+test('pochi passi da solo arrivano in fondo senza fermate', async ({ app, shell, openTab, testServer }) => {
+  await prepara(app, 'reveal');
+  await app.evaluate(() => { globalThis.__fineDopo = 5; });
+  const sito = await apriAiuto(shell, openTab, testServer);
+  await chiedi(sito, 'apri le prime sezioni');
+  await expect.poll(() => turni(app), { timeout: 30_000 }).toBe(6);
+  await sito.waitForTimeout(2500);
+  expect(await turni(app)).toBe(6);
+  expect(await aperte(sito)).toBe(5);
+  await expect(sito.locator('.sn-sidebar-log-passi')).toHaveCount(0);
 });
