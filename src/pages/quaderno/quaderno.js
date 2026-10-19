@@ -160,16 +160,17 @@
     meta.className = 'qd-meta';
     const fonti = Array.isArray(it.fonti) ? it.fonti : [];
     if (fonti.length) {
+      const origine = nascita(fonti);
       const a = document.createElement('button');
       a.type = 'button';
       a.className = 'qd-salto';
-      a.textContent = quando(fonti[0].ts) || 'nel filo';
-      a.title = `Vai alla conversazione da cui è nata (${quando(fonti[0].ts, { lunga: true })})`;
-      a.addEventListener('click', () => vai(fonti[0]));
+      a.textContent = quando(origine.ts) || 'nel filo';
+      a.title = `Vai alla conversazione da cui è nata (${quando(origine.ts, { lunga: true })})`;
+      a.addEventListener('click', () => vai(origine));
       meta.append(a);
       if (fonti.length > 1) {
         const n = document.createElement('span');
-        n.textContent = `· ${fonti.length} punti del filo`;
+        n.textContent = `${fonti.length} punti del filo`;
         n.title = 'Il tasto destro sulla riga li elenca tutti';
         meta.append(n);
       }
@@ -181,13 +182,13 @@
     }
     if (it.corretta) {
       const c = document.createElement('span');
-      c.textContent = '· corretta da te';
+      c.textContent = 'corretta da te';
       c.title = quando(it.corretta, { lunga: true });
       meta.append(c);
     }
     if (it.tipo === 'nascosta' && it.tolta) {
       const c = document.createElement('span');
-      c.textContent = `· tolta ${quando(it.tolta)}`;
+      c.textContent = `tolta ${quando(it.tolta)}`;
       meta.append(c);
     }
     meta.hidden = !meta.childNodes.length;
@@ -259,6 +260,10 @@
     esito(r && r.ok && r.cancellata ? 'Cancellata per sempre' : 'Non c\'era più: ecco com\'è adesso');
     await carica();
   }
+
+  // Dove una riga è nata: il primo messaggio dell'utente fra le sue fonti, se c'è (la risposta di Filo viene dopo).
+  const nascita = (fonti) => fonti.find((f) => f.role === 'user') || fonti[0];
+  const nomeFonte = (f) => `${f.role === 'user' ? 'Vai al tuo messaggio' : 'Vai alla risposta di Filo'} · ${quando(f.ts)}`;
 
   function vai(fonte) {
     if (!fonte || !fonte.id) return;
@@ -341,14 +346,10 @@
       voci.push({ type: 'item', icon: icona('trash', 16), label: 'Cancella per sempre', onClick: () => { perSempre(it).catch(() => {}); } });
     }
     const fonti = Array.isArray(it.fonti) ? it.fonti : [];
-    fonti.slice(0, 8).forEach((f, i) => {
-      voci.push({
-        type: 'item', icon: icona('filoLogo', 16),
-        label: fonti.length === 1 ? 'Vai al punto del filo' : `Vai al punto del filo: ${quando(f.ts)}${i === 0 ? ' (dove è nata)' : ''}`,
-        onClick: () => vai(f),
-      });
-    });
-    if (fonti.length > 8) voci.push({ type: 'item', icon: icona('filoLogo', 16), label: `Vai all'ultimo punto: ${quando(fonti[fonti.length - 1].ts)}`, onClick: () => vai(fonti[fonti.length - 1]) });
+    if (fonti.length === 1) voci.push({ type: 'item', icon: icona('filoLogo', 16), label: 'Vai al punto del filo', onClick: () => vai(fonti[0]) });
+    // Tante fonti: le prime dove la riga è nata, l'ultima dove è stata ripresa; le altre stanno nel filo fra le due.
+    const elenco = fonti.length > 8 ? [...fonti.slice(0, 7), fonti[fonti.length - 1]] : (fonti.length > 1 ? fonti : []);
+    for (const f of elenco) voci.push({ type: 'item', icon: icona('filoLogo', 16), label: nomeFonte(f), onClick: () => vai(f) });
     voci.push({ type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(it.testo).catch(() => {}); } });
     return voci;
   }

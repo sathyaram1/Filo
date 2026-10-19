@@ -263,6 +263,7 @@
       { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
       { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { label: 'Memorie', icon: 'memory', url: 'filo://quaderno/quaderno.html' },
       { type: 'separator' },
       { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
     ];

@@ -342,7 +342,7 @@ test('le voci che stavano in alto nella home sono in fondo alla barra; in alto a
   await expect(barra.locator('#ora')).toHaveText(/^\d{2}:\d{2}$/);
 
   await barra.locator('#fisse [data-comando="history"]').click();
-  await expect.poll(() => app.windows().some((w) => { try { return w.url().startsWith('filo://archive/'); } catch (_) { return false; } })).toBe(true);
+  await expect.poll(() => app.windows().some((w) => { try { return w.url().startsWith('filo://quaderno/'); } catch (_) { return false; } })).toBe(true);
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   await barra.locator('#fisse [data-comando="redteam"]').click();

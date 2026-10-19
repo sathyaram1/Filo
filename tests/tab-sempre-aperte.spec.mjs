@@ -121,16 +121,16 @@ test('«tienimi sempre aperta questa scheda» davanti a un sito locale (localhos
   expect(dopo.some((u) => u.startsWith('http://sito-pubblico.test:'))).toBe(false);
 });
 
-test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «non tenerla più aperta» pure',async ({ app, openTab }) => {
+test('le regole si vedono nel quaderno delle memorie, la × le toglie, e «non tenerla più aperta» pure',async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.addKeepOpen('example.org');
     await globalThis.SN_FILO_MEMORY.addKeepOpen('web.whatsapp.com');
   });
-  const pref = await openTab('filo://preferences/preferences.html');
-  const gruppo = pref.locator('#memoria .mem-gruppo', { hasText: 'Siti sempre aperti' });
+  const pref = await openTab('filo://quaderno/quaderno.html');
+  const gruppo = pref.locator('.qd-gruppo', { hasText: 'Siti sempre aperti' });
   await expect(gruppo).toHaveCount(1, { timeout: 10_000 });
-  const riga = (host) => pref.locator('#memoria .mem-riga', { hasText: host });
+  const riga = (host) => pref.locator('.qd-riga', { hasText: host });
   await expect(riga('example.org')).toHaveCount(1);
   await expect(riga('web.whatsapp.com')).toHaveCount(1);
   await riga('example.org').scrollIntoViewIfNeeded();
@@ -145,9 +145,10 @@ test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «n
     await pref.screenshot({ path: `tests/.shots/sempre-aperte-preferenze-${tema}.png` });
   }
 
-  await riga('example.org').locator('.mem-via').click();
+  await riga('example.org').hover();
+  await riga('example.org').locator('.qd-tasto[title="Non tenerlo più aperto"]').click();
   await expect(riga('example.org')).toHaveCount(0);
-  await expect(pref.locator('#memoriaHint')).toHaveText('Dimenticato');
+  await expect(pref.locator('#esito')).toHaveText('example.org non resta più aperto');
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['web.whatsapp.com']);
 
   // Detto in chat: «non tenere più aperto WhatsApp» col dominio largo toglie la regola più precisa salvata.
@@ -162,7 +163,7 @@ test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «n
   await expect(chat.locator('.dash-activity-row', { hasText: 'Non più tenuto aperto · web.whatsapp.com' })).toHaveCount(1);
   await ripristina(app);
   expect(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen())).toEqual({});
-  // Le Preferenze aperte si aggiornano da sole: niente gruppo, e nessuna riga rimasta indietro.
+  // Il quaderno aperto si aggiorna da solo: niente gruppo, e nessuna riga rimasta indietro.
   await expect(gruppo).toHaveCount(0);
 });
 

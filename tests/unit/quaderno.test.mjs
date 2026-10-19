@@ -49,7 +49,7 @@ test('il filo dice dove sta un messaggio dal suo evento, anche dopo una fusione,
   const f1 = E.crea(E.TIPI.MESSAGGIO, { chat: 'c1', msg: { role: 'filo', text: 'Ciao', spontaneo: true } }, { dispositivo: 'd', autore: 'filo', ts: '2026-10-01T10:00:02.000Z' });
   const f2 = E.crea(E.TIPI.MESSAGGIO, { chat: 'c1', msg: { role: 'filo', text: 'Ciao, e il timer è finito', spontaneo: true, fonde: true } }, { dispositivo: 'd', autore: 'filo', ts: '2026-10-01T10:05:00.000Z' });
   for (const ev of [a, u, f1, f2]) E.applica(st, ev);
-  assert.deepEqual(E.dove(st, u.id), { tipo: 'messaggio', chat: 'c1', i: 0, ts: '2026-10-01T10:00:01.000Z', app: null });
+  assert.deepEqual(E.dove(st, u.id), { tipo: 'messaggio', chat: 'c1', i: 0, ts: '2026-10-01T10:00:01.000Z', role: 'user', app: null });
   assert.equal(E.dove(st, f1.id).i, 1);
   assert.equal(E.dove(st, f2.id).i, 1, 'il messaggio fuso si ritrova da tutti e due gli eventi');
   const copia = E.copiaChat(st.chat.get('c1'), { ids: true });

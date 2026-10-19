@@ -47,9 +47,11 @@ const turno = (app, chatId, userMessage) => app.evaluate(
 );
 const memoria = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getMemory());
 const lezioni = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getLessonsBuffer());
-const riga = (page, testo) => page.locator('.qd-riga', { hasText: testo });
+// Una riga per il suo testo intero: «È vegetariano» è anche dentro «L’utente è vegetariano.».
+const esatto = (t) => new RegExp(`^${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+const riga = (page, testo) => page.locator('.qd-riga').filter({ has: page.locator('.qd-testo', { hasText: esatto(testo) }) });
 const vociMenu = (page, testo) => page.evaluate((t) => {
-  const el = [...document.querySelectorAll('.qd-riga')].find((r) => r.textContent.includes(t));
+  const el = [...document.querySelectorAll('.qd-riga')].find((r) => r.querySelector('.qd-testo').textContent === t);
   return (window.SN_VOCI_PAGINA || []).flatMap((f) => f(el) || []).map((v) => v.label);
 }, testo);
 
@@ -71,11 +73,11 @@ test('dico in chat che sono vegetariano: dopo il compattatore il quaderno lo mos
 
   const page = await openTab(QUADERNO);
   // Prima del riordino è fra le cose imparate da poco, già col suo collegamento.
-  await expect(page.locator('.qd-gruppo', { hasText: 'Imparato da poco' }).locator('.qd-riga', { hasText: 'vegetariano' })).toHaveCount(1, { timeout: 8_000 });
+  await expect(page.locator('.qd-gruppo', { hasText: 'Imparato da poco' }).locator(riga(page, 'L’utente è vegetariano.'))).toHaveCount(1, { timeout: 8_000 });
   await page.evaluate((m) => chrome.runtime.sendMessage({ type: m }), 'filo_compact_memory');
   expect((await memoria(app)).PREFERENZE).toBe('È vegetariano');
   const pref = page.locator('.qd-gruppo', { hasText: 'Cosa preferisci' });
-  const nota = pref.locator('.qd-riga', { hasText: 'È vegetariano' });
+  const nota = pref.locator('.qd-riga').filter({ has: page.locator('.qd-testo', { hasText: esatto('È vegetariano') }) });
   await expect(nota).toHaveCount(1, { timeout: 8_000 });
   await expect(page.locator('.qd-gruppo', { hasText: 'Imparato da poco' })).toHaveCount(0);
   const data = nota.locator('.qd-salto');
@@ -120,15 +122,15 @@ test('correggo in «vegano»: al turno dopo Filo usa la correzione, e la riga ti
   expect(prompt).not.toContain('È vegetariano');
 
   // Esc lascia com'era; un testo oltre il tetto si rifiuta dicendolo e resta nel campo.
-  await corretta.dblclick();
+  await corretta.locator('.qd-testo').dblclick();
   await page.locator('.qd-campo').fill('qualcos’altro');
   await page.locator('.qd-campo').press('Escape');
   await expect(riga(page, 'È vegano')).toHaveCount(1);
   await corretta.locator('.qd-testo').dblclick();
   await page.locator('.qd-campo').fill('x'.repeat(900));
   await page.locator('.qd-campo').press('Enter');
-  await expect(corretta.locator('.qd-errore')).toBeVisible();
-  await expect(corretta.locator('.qd-errore')).toContainText('800');
+  await expect(page.locator('.qd-errore:not([hidden])')).toContainText('800');
+  await expect(page.locator('.qd-campo')).toBeFocused();
   expect((await memoria(app)).PREFERENZE).toBe('È vegano');
 });
 
@@ -150,9 +152,10 @@ test('tolgo una riga: sparisce, il prompt non la vede, non ricompare dallo stess
   expect((await memoria(app)).PREFERENZE).toBe('');
   const nascoste = page.locator('.qd-gruppo[data-gruppo="nascoste"]');
   await expect(nascoste).toContainText('Nascoste');
-  await expect(nascoste.locator('.qd-riga', { hasText: 'È vegetariano' })).toBeHidden();
+  await expect(riga(page, 'È vegetariano')).toBeHidden();
   await nascoste.locator('summary').click();
-  await expect(nascoste.locator('.qd-riga', { hasText: 'È vegetariano' })).toBeVisible();
+  await expect(riga(page, 'È vegetariano')).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/quaderno-nascoste.png' });
 
   // Lo stesso scambio rianalizzato e il compattatore che lo riscrive: non torna.
   await app.evaluate(async () => {
@@ -169,21 +172,29 @@ test('tolgo una riga: sparisce, il prompt non la vede, non ricompare dallo stess
   expect((await memoria(app)).PREFERENZE).toBe('Ama le spezie');
   await expect(riga(page, 'Ama le spezie')).toHaveCount(1, { timeout: 5_000 });
   await turno(app, 'chat-cena', 'cosa mi cucino?');
-  expect(await app.evaluate(() => globalThis.__q_prompt[globalThis.__q_prompt.length - 1])).not.toContain('vegetariano');
+  // La memoria del prompt non la porta più (il messaggio di allora resta nel filo, ed è giusto che il modello lo veda).
+  const ultimo = await app.evaluate(() => globalThis.__q_prompt[globalThis.__q_prompt.length - 1]);
+  const preferenze = ultimo.slice(ultimo.indexOf('PREFERENZE:')).split('\n\n')[0];
+  expect(preferenze).toContain('Ama le spezie');
+  expect(preferenze).not.toContain('vegetariano');
 
   // Tasto destro sulla nascosta: rimetti.
-  expect(await vociMenu(page, 'È vegetariano')).toEqual(expect.arrayContaining(['Rimetti in memoria', 'Cancella per sempre', 'Vai al punto del filo', 'Copia il testo']));
-  await nascoste.locator('.qd-riga', { hasText: 'È vegetariano' }).hover();
+  const voci = await vociMenu(page, 'È vegetariano');
+  expect(voci.slice(0, 2)).toEqual(['Rimetti in memoria', 'Cancella per sempre']);
+  expect(voci[2]).toMatch(/^Vai al tuo messaggio · oggi, \d{2}:\d{2}$/);
+  expect(voci[3]).toMatch(/^Vai alla risposta di Filo · oggi, \d{2}:\d{2}$/);
+  expect(voci[4]).toBe('Copia il testo');
+  await riga(page, 'È vegetariano').hover();
   await nascoste.locator('.qd-tasto[title="Rimetti in memoria"]').click();
-  await expect(page.locator('.qd-gruppo', { hasText: 'Cosa preferisci' }).locator('.qd-riga', { hasText: 'È vegetariano' })).toHaveCount(1, { timeout: 5_000 });
+  await expect(page.locator('.qd-gruppo', { hasText: 'Cosa preferisci' }).locator(riga(page, 'È vegetariano'))).toHaveCount(1, { timeout: 5_000 });
   expect((await memoria(app)).PREFERENZE.split('\n')).toContain('È vegetariano');
 
   // Per sempre: chiede conferma, poi il testo non è più da nessuna parte.
   await riga(page, 'È vegetariano').hover();
   await riga(page, 'È vegetariano').locator('.qd-tasto[title="Togli dalla memoria"]').click();
   await expect(page.locator('#esito button', { hasText: 'Rimetti' })).toBeVisible();
-  await page.locator('.qd-nascoste[open], .qd-nascoste').first().evaluate((d) => { d.open = true; });
-  await nascoste.locator('.qd-riga', { hasText: 'È vegetariano' }).hover();
+  await page.locator('.qd-nascoste').evaluate((d) => { d.open = true; });
+  await riga(page, 'È vegetariano').hover();
   await nascoste.locator('.qd-tasto[title="Cancella per sempre"]').click();
   await clickConfirm(page, 'ok');
   await expect(page.locator('.qd-gruppo[data-gruppo="nascoste"]')).toHaveCount(0, { timeout: 5_000 });
@@ -191,7 +202,7 @@ test('tolgo una riga: sparisce, il prompt non la vede, non ricompare dallo stess
   expect(disco).not.toContain('vegetariano');
 });
 
-test('una nota nata prima del filo si vede e si corregge, senza collegamento; il tasto destro e gli hover ci sono', async ({ app, shell, openTab }) => {
+test('una nota nata prima del filo si legge e si cambia, senza collegamento; tasto destro e passaggio del mouse', async ({ app, shell, openTab }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Si chiama Marta\nVive a Lisbona', PREFERENZE: 'Risposte brevi', PROGETTO_ORTO: 'Coltiva pomodori' });
@@ -205,10 +216,10 @@ test('una nota nata prima del filo si vede e si corregge, senza collegamento; il
   await expect(page.locator('.qd-gruppo h2', { hasText: 'Progetto orto' })).toHaveCount(1);
   await expect(riga(page, 'Vive a Lisbona').locator('.qd-salto')).toHaveCount(0);
   expect(await vociMenu(page, 'Vive a Lisbona')).toEqual(['Correggi', 'Togli dalla memoria', 'Copia il testo']);
-  expect(await vociMenu(page, 'web.whatsapp.com')).toEqual(['Non tenerlo più aperto', 'Copia il testo']);
+  expect(await vociMenu(page, 'Tieni sempre aperto web.whatsapp.com')).toEqual(['Non tenerlo più aperto', 'Copia il testo']);
   await riga(page, 'Vive a Lisbona').hover();
   await expect(riga(page, 'Vive a Lisbona').locator('.qd-tasto[title="Correggi"]')).toBeVisible();
-  await expect(riga(page, 'Si chiama Marta').locator('.qd-tasto[title="Correggi"]')).toHaveCSS('opacity', '0');
+  await expect(riga(page, 'Si chiama Marta').locator('.qd-tasti')).toHaveCSS('opacity', '0');
 
   await riga(page, 'Vive a Lisbona').locator('.qd-testo').dblclick();
   await page.locator('.qd-campo').fill('Vive a Porto');
@@ -218,7 +229,7 @@ test('una nota nata prima del filo si vede e si corregge, senza collegamento; il
 
   // Testo dell'utente mostrato come testo, mai come markup.
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.patchMemory({ PREFERENZE: '<img src=x onerror="window.__rotto=1"> Ama il <b>grassetto</b>' }));
-  await expect(riga(page, '<b>grassetto</b>')).toHaveCount(1, { timeout: 5_000 });
+  await expect(page.locator('.qd-testo', { hasText: 'Ama il <b>grassetto</b>' })).toHaveCount(1, { timeout: 5_000 });
   expect(await page.evaluate(() => window.__rotto || 0)).toBe(0);
 
   // Da un sito visitato il quaderno non si legge e non si tocca.
@@ -237,8 +248,10 @@ test('una nota nata prima del filo si vede e si corregge, senza collegamento; il
   expect(sito).toEqual([false, false, false, false, false]);
 
   for (const tema of ['light', 'dark']) {
-    await page.evaluate((t) => window.SN_PAGE_BOOTSTRAP.applyTheme(t), tema);
+    await app.evaluate((_e, t) => globalThis.SN_STORAGE.updateSettings({ theme: t }), tema);
+    await page.reload();
     await riga(page, 'Si chiama Marta').hover();
+    await expect(riga(page, 'Si chiama Marta').locator('.qd-tasti')).toHaveCSS('opacity', '1');
     await page.screenshot({ path: `tests/.shots/quaderno-${tema}.png` });
   }
 });

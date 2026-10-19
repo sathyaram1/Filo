@@ -217,3 +217,25 @@ test('con migliaia di eventi le righe e il pezzo da mostrare si fanno senza atte
   assert.ok(r.elementi.length > 0 && r.elementi.length <= C.PEZZO + 2);
   assert.ok(c.entro, c.come);
 });
+
+// #872 — la Cronologia non c'è più: una scheda chiusa ritrovata nel filo porta la sua voce d'archivio, così si riapre
+// com'era (scroll, paese), anche quando la ricerca l'ha trovata fra le visite per il titolo.
+test('una scheda chiusa ritrovata nel filo porta la sua voce d’archivio', () => {
+  const C = globalThis.SN_FILO_CODA;
+  const pagine = [{ id: 'v1', ts: '2026-09-01T10:00:00.000Z', url: 'https://a.test/orche', titolo: 'Orche' }];
+  const schede = [
+    { id: 'arch-vecchia', url: 'https://a.test/orche', title: 'Orche', closedAt: '2026-08-01T10:00:00.000Z' },
+    { id: 'arch-nuova', url: 'https://a.test/orche', title: 'Orche', closedAt: '2026-09-01T11:00:00.000Z' },
+    { id: 'arch-contenuto', url: 'https://b.test/', title: 'Altro', summary: 'branchi di orche nel nord', closedAt: '2026-08-02T10:00:00.000Z' },
+  ];
+  const r = C.cerca({ chats: [], pagine, schede }, 'orche');
+  const titolo = r.pagine.find((p) => p.url === 'https://a.test/orche');
+  assert.equal(titolo.archivio, 'arch-nuova');
+  assert.equal(titolo.id, 'v1');
+  const contenuto = r.pagine.find((p) => p.url === 'https://b.test/');
+  assert.equal(contenuto.archivio, 'arch-contenuto');
+  assert.ok(contenuto.estratto.includes('orche'));
+  // Una visita entrata dall'archivio (le schede di prima del filo) lo dice da sé.
+  const migrata = C.cerca({ chats: [], pagine: [{ id: 'v9', ts: '2026-01-01T00:00:00.000Z', url: 'https://c.test/', titolo: 'Delfini', archivio: 'arch-9' }], schede: [] }, 'delfini');
+  assert.equal(migrata.pagine[0].archivio, 'arch-9');
+});

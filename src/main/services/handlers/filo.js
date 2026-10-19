@@ -297,7 +297,7 @@ module.exports = function register(on, ctx) {
     for (const id of Array.isArray(ids) ? ids : []) {
       let d = null;
       try { d = await IlFilo().dove(id, { incognito: false }); } catch (_) {}
-      if (d && d.tipo === 'messaggio') out.push({ id, ts: d.ts, chat: d.chat, i: d.i, app: d.app || null });
+      if (d && d.tipo === 'messaggio') out.push({ id, ts: d.ts, chat: d.chat, i: d.i, role: d.role, app: d.app || null });
     }
     return out.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
   }

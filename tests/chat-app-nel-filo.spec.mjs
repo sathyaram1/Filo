@@ -214,22 +214,17 @@ test('con modello finto la chat della home ha davanti la riga, non lo scambio, e
   expect(ordine.indexOf('dash-riga-app')).toBeLessThan(ordine.indexOf('dash-bubble'));
 });
 
-test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col nome dell’app', async ({ app, shell, openTab }) => {
+test('la riga si toglie dal filo col tasto destro, e la ricerca del filo la trova dal testo dello scambio', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
   await chatDellEditor(openTab, 'appunti', 'Mi riassumi i licheni?');
 
-  const archivio = await openTab('filo://archive/archive.html');
-  const voce = archivio.locator('.arc-chat[data-app="editor"]');
-  await expect(voce.locator('.arc-chat-title')).toHaveText('Editor · appunti', { timeout: 10_000 });
-  await expect(voce.locator('.arc-chat-date')).not.toHaveText('In corso');
-  // La ricerca della Cronologia la trova dal testo dello scambio.
-  await archivio.fill('#search', 'licheni');
-  await expect(voce).toBeVisible({ timeout: 10_000 });
-  await archivio.fill('#search', '');
-
   await attiva(shell, 'filo://newtab');
+  // La ricerca del filo la trova dal testo dello scambio (la Cronologia, che lo faceva, non c'è più: #872).
+  await casa.locator('#cercaInput').fill('licheni');
+  await expect(casa.locator('.dash-cerca-msg', { hasText: 'licheni' }).first()).toBeVisible({ timeout: 10_000 });
+  await casa.locator('#cercaInput').press('Escape');
   const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
   await riga.locator('.dash-riga-app-testa').click({ button: 'right' });
@@ -245,8 +240,6 @@ test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col
   await clickConfirm(casa, 'ok');
   await expect(riga).toHaveCount(0);
   await expect.poll(async () => (await righeFilo(app)).length).toBe(0);
-  // La Cronologia aperta si riallinea da sola.
-  await expect(voce).toBeHidden({ timeout: 10_000 });
 });
 
 test('da un sito parla solo l’Aiuto, e il sito lo dice l’indirizzo di chi manda; righe e cancellazioni solo da Filo', async ({ app }) => {

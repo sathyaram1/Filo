@@ -86,13 +86,14 @@ async function semina(app, shell) {
 
 // Quello che l'utente vede: dopo la cancellazione nessuna pagina deve mostrare il segreto.
 async function nienteInVista(app, shell) {
-  const pref = await pagina(app, shell, 'filo://preferences/preferences.html');
-  await expect(pref.locator('#memoria')).toBeAttached();
-  await expect(pref.locator('#memoria .mem-riga', { hasText: 'Marta' })).toHaveCount(0);
-  const archivio = await pagina(app, shell, 'filo://archive/archive.html');
-  await expect(archivio.locator('#empty')).toBeVisible({ timeout: 10_000 });
-  await expect(archivio.locator('.arc-tab')).toHaveCount(0);
-  await expect(archivio.locator('.arc-chat')).toHaveCount(0);
+  const quaderno = await pagina(app, shell, 'filo://quaderno/quaderno.html');
+  await expect(quaderno.locator('#vuoto')).toBeVisible({ timeout: 10_000 });
+  await expect(quaderno.locator('.qd-riga', { hasText: 'Marta' })).toHaveCount(0);
+  // Chat e schede chiuse stanno nel filo: la ricerca della home non le ritrova.
+  const casa = await pagina(app, shell, 'filo://newtab/');
+  await casa.locator('#cercaInput').fill('ZQX');
+  await expect(casa.locator('#cercaRisultati .dash-cerca-niente').first()).toBeVisible({ timeout: 10_000 });
+  await expect(casa.locator('#cercaRisultati .dash-cerca-pagina, #cercaRisultati .dash-cerca-msg')).toHaveCount(0);
   const editor = await pagina(app, shell, 'filo://editor/editor.html');
   await editor.waitForSelector('#doc');
   await editor.click('#docSwitch');
