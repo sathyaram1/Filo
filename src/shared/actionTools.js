@@ -422,8 +422,8 @@
           ? P.righeDescrizione({ sistema, shellPref: sistemaInfo(sistema).shellPref }) : [];
         return 'Modifica un\'impostazione dell\'app: ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro ha la sua chiave qui sotto. '
           + 'Una sola chiave per chiamata (chiama più volte per più impostazioni). Per le impostazioni segnate [conferma] il sistema può '
-          + 'chiedere l\'OK all\'utente da sé: tu non chiederlo a parole. Il livello di autonomia di Filo non è fra queste: lo sceglie solo '
-          + 'l\'utente, in Preferenze. Per un cambio relativo («un po\' più veloce») '
+          + 'chiedere l\'OK all\'utente da sé: tu non chiederlo a parole. Il livello di autonomia (chiave autonomia) lo cambi solo se '
+          + 'l\'utente te lo chiede: abbassarlo vale subito, alzarlo vuole che scriva «conferma». Per un cambio relativo («un po\' più veloce») '
           + 'o per dire com\'era prima, leggi il valore attuale con LEGGI_IMPOSTAZIONI. Chiavi valide e valori ammessi:\n'
           + righe.join('\n');
       },
