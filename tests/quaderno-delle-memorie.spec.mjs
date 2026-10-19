@@ -31,7 +31,11 @@ async function configura(app, { compattatore = 'PREFERENZE:\nÈ vegetariano (fon
       if (joined.includes('analizzare l\'ultima interazione')) {
         return { ...base, text: /UTENTE: [^\n]*vegetarian/i.test(joined) ? 'LEZIONE: L’utente è vegetariano.' : 'NULLA DA IMPARARE' };
       }
-      if (joined.includes('integrare le nuove lezioni')) return { ...base, text: globalThis.__q_compattatore };
+      if (joined.includes('integrare le nuove lezioni')) {
+        // Un compattatore lento, quando la prova lo trattiene: l'utente intanto lavora nel quaderno.
+        if (globalThis.__q_attesa) await globalThis.__q_attesa;
+        return { ...base, text: globalThis.__q_compattatore };
+      }
       if (joined.includes('Classifichi le conversazioni')) return { ...base, text: JSON.stringify({ tipo: 'conversazione', titolo: 'Cibo' }) };
       globalThis.__q_prompt.push(joined);
       // Un giro con le azioni che il modello emette, se la prova le ha messe in fila.
