@@ -1,10 +1,11 @@
 // #600: su un sito con CSP (WhatsApp Web) il pannello "Invia attacco" usciva senza stile, in fondo alla pagina.
-// La CSP blocca il <link filo://style/>: arriva solo il CSS che tabs.js inietta con insertCSS. Qui il pannello,
-// aperto dal tasto destro, deve stare sopra la pagina come riquadro di Filo.
+// La CSP blocca il <link filo://style/>: il pannello, aperto dal tasto destro, deve stare lo stesso sopra la pagina
+// come riquadro di Filo.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
+import { nelMondoDiFilo, statoDi } from './helpers/riquadri.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;font:16px sans-serif">
   <div style="height:100vh;padding:40px" id="p">Chat del sito, tasto destro qui.</div>
@@ -50,10 +51,10 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
   }, { timeout: 10_000 }).toBe(true);
   await voce.click();
 
-  const overlay = page.locator('.sn-rt-overlay');
-  const modal = overlay.locator('.sn-rt-modal');
-  await expect(modal).toBeVisible();
-  const stile = await overlay.evaluate((el) => {
+  // Sui siti il pannello sta in uno shadow root chiuso (#1071): si guarda dal mondo dei content script.
+  await expect.poll(async () => !!(await statoDi(app, page, '.sn-rt-overlay .sn-rt-modal'))?.visibile, { timeout: 5000 }).toBe(true);
+  const stile = await nelMondoDiFilo(app, page, () => {
+    const el = globalThis.SN_FILO_UI._test.trova('.sn-rt-overlay');
     const m = el.querySelector('.sn-rt-modal');
     const r = m.getBoundingClientRect();
     return {
