@@ -689,6 +689,13 @@ async function apriSito() {
       if (percorso === '/invia-cade') { req.socket.destroy(); return; }
       if (percorso === '/invia-ok') { res.writeHead(302, { Location: '/discussione' }); res.end(); return; }
       if (percorso === '/discussione') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Discussione</title><p>Il tuo post è pubblicato'); return; }
+      if (percorso === '/contatto') { res.writeHead(302, { Location: '/grazie' }); res.end(); return; }
+      if (percorso === '/grazie') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(`<!doctype html><title>Grazie</title>${TESTATA_ACCESSO}<p>Grazie, ti risponderemo presto`); return; }
+      if (percorso === '/sw.js') {
+        res.writeHead(200, { 'Content-Type': 'text/javascript' });
+        res.end("self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',(e)=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',(e)=>{e.respondWith(fetch(e.request));});");
+        return;
+      }
       if (percorso === '/api/anteprima') {
         let t = '';
         try { t = JSON.parse(corpo).testo || ''; } catch (_) {}
