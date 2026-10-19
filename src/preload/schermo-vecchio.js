@@ -68,14 +68,22 @@ function buildSchermoVecchioCorpo() {
     var WP = w.MediaDevices && w.MediaDevices.prototype;
     if (WP && typeof WP.getUserMedia === 'function') {
       var gum = WP.getUserMedia;
-      metti(WP, 'getUserMedia', { getUserMedia(c) { return vecchia(c) ? rifiuta() : gum.apply(this, arguments); } }.getUserMedia);
+      metti(WP, 'getUserMedia', { getUserMedia(c) {
+        if (!arguments.length) return gum.apply(this, arguments);
+        var d;
+        try { d = copia(c, 0); } catch (e) { return Promise.reject(e); }
+        return vecchia(d) ? rifiuta() : gum.call(this, d);
+      } }.getUserMedia);
     }
     var N = w.Navigator && w.Navigator.prototype;
     ['webkitGetUserMedia', 'getUserMedia'].forEach(function (nome) {
       var f = N && N[nome];
       if (typeof f !== 'function') return;
       metti(N, nome, { [nome](c, ok, err) {
-        if (!vecchia(c)) return f.apply(this, arguments);
+        if (!arguments.length) return f.apply(this, arguments);
+        var a = Array.prototype.slice.call(arguments);
+        a[0] = copia(c, 0);
+        if (!vecchia(a[0])) return f.apply(this, a);
         rifiuta().catch(function (e) { if (typeof err === 'function') err(e); });
       } }[nome]);
     });
