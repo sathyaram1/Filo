@@ -6876,6 +6876,7 @@
   // «Nome: conto», per ogni etichetta che porta un numero, compresi i
   // suggerimenti col mouse: lì il conto si leggeva «1200» e la legenda «1.200».
   function fsRigaConto(label, n) { return `${label}: ${fsNum(n)}`; }
+  function fsRigaCritiche(n) { return n === 1 ? '1 critica' : `${fsNum(n)} critiche`; }
 
   /**
    * `sottoId`: il sottotitolo conta delle segnalazioni SUE, diverse da quelle
