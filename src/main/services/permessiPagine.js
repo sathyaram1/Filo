@@ -258,8 +258,13 @@ function seguiGesti(wc) {
 }
 
 function gestoRecente(wc) {
+  return gestoEntro(wc, GESTO_MS);
+}
+
+// Un clic o un tasto vero sulla pagina negli ultimi `ms`: il conto riparte a ogni navigazione della pagina intera.
+function gestoEntro(wc, ms) {
   const t = wc && wc._filoGestoAlle;
-  return Boolean(t && Date.now() - t < GESTO_MS);
+  return Boolean(t && Date.now() - t < ms);
 }
 
 // Il gesto di chi chiede: un clic dentro il riquadro di un altro sito non passa da `input-event` e lo riferisce il
@@ -279,9 +284,10 @@ function gestoDellaPagina(wc, frame, tasto) {
   try {
     const daTastiera = Boolean(tasto && typeof tasto === 'object');
     // Il clic di Filo arriva al preload come quello del mouse; un tasto premuto intanto è dell'utente.
-    if (!wc || (!daTastiera && clicDiFiloInCorso(wc)) || (daTastiera && !tastoPerLaPagina(tasto))) return;
+    if (!wc || (!daTastiera && clicDiFiloInCorso(wc)) || (daTastiera && !tastoPerLaPagina(tasto))) return false;
     segnaGestoPerFinestra(wc, originiDelFrame(frame || wc.mainFrame, wc));
-  } catch (_) {}
+    return true;
+  } catch (_) { return false; }
 }
 
 // Come in Chromium il gesto attiva il frame che l'ha ricevuto e i suoi antenati, non i riquadri di altri siti che
@@ -367,6 +373,14 @@ function perUnaFinestra(wc, url, referrer) {
   return true;
 }
 
+// L'apertura che l'utente ha scelto dall'interfaccia di Filo sulla pagina (il tasto destro «Apri in nuova tab»), col suo
+// clic vero: per il rilevatore dei siti pericolosi vale come il clic sul link (#814).
+function sceltaDallUtente(wc, url) {
+  const u = indirizzoPieno(url);
+  const ora = Date.now();
+  return Boolean(u && wc && (wc._filoAperture || []).some((x) => x.url === u && x.fino > ora) && gestoDellUtente(wc));
+}
+
 function indirizzoPieno(url) {
   try { return new URL(String(url || '')).href; } catch (_) { return ''; }
 }
@@ -382,6 +396,13 @@ function origineDelReferrer(referrer) {
   const u = referrer && typeof referrer === 'object' ? referrer.url : referrer;
   if (!u) return '';
   try { const o = new URL(String(u)).origin; return o && o !== 'null' ? o : ''; } catch (_) { return ''; }
+}
+
+// Un clic o un tasto vero sulla scheda, anche sull'interfaccia di Filo disegnata sopra la pagina: vale per ciò che Filo
+// apre su richiesta dell'utente (il rilevatore dei siti pericolosi, #814), mai per i permessi della pagina.
+function gestoDellUtente(wc) {
+  const t = wc && Math.max(wc._filoGestoAlle || 0, wc._filoGestoUiAlle || 0);
+  return Boolean(t && Date.now() - t < GESTO_MS);
 }
 
 // Il gesto vale anche per la navigazione che ha fatto partire, finché non arriva: un rinvio del sito resta del clic.
@@ -804,9 +825,9 @@ function statoNotifiche(ses, url) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, perUnaFinestra, chiediScrittura,
+  gestoDiFilo, aperturaScelta, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
   _usaFontiSchermo: (f) => { fontiDelloSchermo = f; },

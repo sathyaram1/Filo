@@ -2492,7 +2492,14 @@ async function eseguiAzioneFilo(action, {
           const win = winOf(sender);
           const tm = win && win._filoTabs;
           if (tm && typeof tm.openTab === 'function') {
-            tabId = tm.openTab(url, { activate: !background });
+            // Per il giudizio sui siti chiedere a parole vale un clic (la pagina di ringraziamento scarica per richiesta), e
+            // l'assistente di una pagina apre un indirizzo che quella pagina gli ha messo davanti: arriva da quel sito.
+            // Vale anche il clic vero sull'interfaccia di Filo sopra la pagina (il tasto destro «Apri in nuova tab»).
+            const chiesto = !!String(parole || '').trim() || require('./permessiPagine').gestoDellUtente(sender && sender.wc);
+            let daPagina = '';
+            try { daPagina = assistente && sender && sender.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+            const origine = /^https?:/i.test(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
+            tabId = tm.openTab(url, { activate: !background, origine });
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
             // L'assistente sulla pagina può poi chiedere «Apri comunque» solo per quello che gli è stato fermato.
@@ -3833,11 +3840,13 @@ async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = tru
   const tm = win && win._filoTabs;
   if (!tm || typeof tm.openTab !== 'function') return { ok: false, trovata: true, error: 'no_window' };
   let tabId = null;
+  // Per il giudizio sui siti la pagina salvata la chiede l'utente, col clic o a parole (#814).
+  const origine = { tipo: 'filo', gesto: true };
   if (porta) {
-    const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
+    const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true, origine }); } });
     if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma, parti: r.parti } : {}), ...(r.frase ? { frase: r.frase } : {}) };
   } else {
-    tabId = tm.openTab(voce.url, { activate: true });
+    tabId = tm.openTab(voce.url, { activate: true, origine });
   }
   if (!tabId) {
     let d = null;

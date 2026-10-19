@@ -36,6 +36,7 @@ const llm = require('./llm');
 const sandbox = require('./sandbox');
 const rimandi = require('./rimandi');
 const links = require('./links');
+const { origineLink } = require('./origine');
 
 // ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
@@ -518,6 +519,7 @@ const API = {
   checkLink: (url, nome) => links.esaminaLink(url, checkSync, nome),
   checkLinks: (urls, opts = {}) => links.esaminaAFette(urls, { ...opts, checkSync }),
   scopeOf,
+  origineLink,
   ownerOf,
   createOwnerBudget,
   analyze,

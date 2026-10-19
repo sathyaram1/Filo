@@ -216,7 +216,8 @@ module.exports = function register(on, ctx) {
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
       const scroll = voce ? voce.scrollPosition : msg.scrollPct;
       const pct = typeof scroll === 'number' ? scroll : null;
-      const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct });
+      // Per il giudizio sui siti la riapertura è di Filo: la chiedono solo le sue pagine (#814).
+      const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct, origine: { tipo: 'filo' } });
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.

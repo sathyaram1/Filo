@@ -129,12 +129,14 @@ module.exports = function register(on, ctx) {
     const web = /^https?:/i.test(url);
     if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const win = winOf(sender);
+    // Il clic sul collegamento vale per la pagina d'arrivo come un clic su un sito: si legge prima della porta, che può attendere.
+    const origine = { tipo: 'filo', gesto: require('../permessiPagine').gestoDellUtente(sender?.wc) };
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: false,
       apri: () => {
         const tm = win?._filoTabs;
         if (!tm) return;
-        const apri = (segna) => { const id = tm.openTab(url); if (segna) segna(tm.tabs.find((t) => t.id === id)); };
+        const apri = (segna) => { const id = tm.openTab(url, { origine }); if (segna) segna(tm.tabs.find((t) => t.id === id)); };
         const da = schedaDi(tm, sender);
         if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
       },
@@ -152,9 +154,10 @@ module.exports = function register(on, ctx) {
     const avvisato = isFilo(origin);
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+    const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
-      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender) }); },
+      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender), gesto }); },
     });
     return { ok: true, ...r, avvisato };
   });
