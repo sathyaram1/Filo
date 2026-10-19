@@ -1649,7 +1649,8 @@ class TabManager {
             ),
             new Promise((r) => setTimeout(() => r(null), 1000)),
           ]);
-          if (p) inv.accesso = !!p.pw || PAGINA_DI_ACCESSO.test(String(p.dove || '')) || PAGINA_DI_ACCESSO.test(String(p.titolo || ''));
+          // Una password che c'era già nella pagina dell'invio (l'accesso in testata) non dice che la sessione è scaduta.
+          if (p) inv.accesso = (!!p.pw && !inv.pwPrima) || PAGINA_DI_ACCESSO.test(String(p.dove || '')) || PAGINA_DI_ACCESSO.test(String(p.titolo || ''));
         } catch (_) {}
       }
       // Le impronte del documento di prima: la pagina nuova può mostrare il testo mandato al server.
