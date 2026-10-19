@@ -745,7 +745,11 @@
       // compattate e le righe nascoste del quaderno. Irreversibile: cancellare per sempre, costo 4.
       costo: 4,
       campo: null,
-      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['memoria', 'memorie', 'ricordi', 'ricorda', 'dimentica', 'dimenticare', 'profilo', 'azzera', 'reset', 'sai di me', 'sai su di me', 'cancella tutto'] }),
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), {
+        frasi: ['dimentica tutto', 'dimenticati tutto', 'dimenticati di me', 'dimentica ogni cosa'],
+        verbi: VERBI_CANCELLA,
+        oggetti: ['memoria', 'memorie', 'ricordi', 'sai di me', 'sai su di me', 'sai di noi', 'profilo', 'hai imparato', 'ricordi di me'],
+      }),
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
