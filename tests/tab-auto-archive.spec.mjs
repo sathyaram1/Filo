@@ -669,6 +669,8 @@ test('il testo mandato al sito senza cambiare pagina non protegge la scheda: un 
 });
 
 // Un sito che risponde come quelli veri: un rifiuto, una connessione che cade, un'anteprima, i suggerimenti.
+const TESTATA_ACCESSO = '<header><form action="/entra" method="post">Utente <input name="u"> Password <input type="password" name="p"><button>Entra</button></form></header>';
+
 async function apriSito() {
   const pagine = new Map();
   let n = 0;
