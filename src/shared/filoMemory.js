@@ -114,6 +114,13 @@
     await setRaw(KEYS.FILO_MEMORY_FONTI, meta);
   }
 
+  // Ogni cambio dell'utente (correggere, togliere, rimettere, svuotare) sale di versione: un compattatore partito prima
+  // non scrive sopra quello che l'utente ha fatto mentre il modello lavorava (applicaCompattazione).
+  function toccata(meta) {
+    meta.versione = (Number.isFinite(meta.versione) ? meta.versione : 0) + 1;
+    return meta;
+  }
+
   // Le lezioni ancora da riordinare che ridicono una riga appena tolta o corretta, dallo stesso tratto, se ne vanno con
   // lei: il compattatore la riscriverebbe com'era.
   async function togliLezioniSimili(testo, fonti) {

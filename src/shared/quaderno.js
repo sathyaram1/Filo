@@ -30,6 +30,18 @@
     return comuni / Math.min(pa.size, pb.size) >= 0.75;
   }
 
+  // Più stretta di `simile`: la riga riordinata dice la stessa cosa e non altro. Una riga che ne ha assorbite altre non
+  // passa, così una correzione non cancella quello che il compattatore ci ha unito.
+  function stessoSenso(a, b) {
+    if (norma(a) === norma(b)) return true;
+    const pa = parole(a);
+    const pb = parole(b);
+    if (!pa.size || !pb.size) return false;
+    let comuni = 0;
+    for (const w of pa) if (pb.has(w)) comuni++;
+    return comuni / Math.max(pa.size, pb.size) >= 0.75;
+  }
+
   // Le fonti sono id di eventi del filo: stringhe, senza doppioni. Il tetto è largo e non taglia in silenzio quelle
   // vecchie: tiene le prime (dove la nota è nata) e le ultime.
   function unisci(...liste) {
@@ -60,8 +72,9 @@
     return null;
   }
 
+  // `versione` sale a ogni cambio dell'utente: il compattatore applica la sua uscita solo sulla versione che ha letto.
   function metaVuota() {
-    return { righe: {}, nascoste: [] };
+    return { righe: {}, nascoste: [], versione: 0 };
   }
 
   function normaMeta(m) {
@@ -78,6 +91,7 @@
     if (Array.isArray(m.nascoste)) {
       out.nascoste = m.nascoste.filter((n) => n && typeof n.id === 'string').map((n) => ({ ...n, fonti: unisci(n.fonti) }));
     }
+    if (Number.isFinite(m.versione)) out.versione = m.versione;
     return out;
   }
 
@@ -168,6 +182,6 @@
   }
 
   global.SN_QUADERNO = {
-    FONTI_MAX, norma, simile, unisci, tornaDaTolta, metaVuota, normaMeta, metaDi, righeDi, perCompattatore, leggiCompattatore,
+    FONTI_MAX, norma, simile, stessoSenso, contenute, unisci, tornaDaTolta, metaVuota, normaMeta, metaDi, righeDi, perCompattatore, leggiCompattatore,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
