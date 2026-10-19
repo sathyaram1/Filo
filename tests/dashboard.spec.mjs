@@ -40,9 +40,9 @@ test('la dashboard renderizza le tre zone + barra input', async ({ app, shell })
   await expect(page.locator('#right')).toBeAttached();
   await expect(page.locator('#input')).toBeVisible();
   await expect(page.locator('#sendBtn')).toBeVisible();
-  // Impostazioni/Home sono nella toolbar della shell, non nella dashboard.
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'home');
-  await expect(page.locator('#threadView')).toBeHidden();
+  // Il centro è il filo (#869), col campo per cercarci dentro.
+  await expect(page.locator('#threadView')).toBeVisible();
+  await expect(page.locator('#cercaInput')).toBeVisible();
 });
 
 test('senza API key la home indica il codice d\'invito (non una chiave da mettere)', async ({ app, shell }) => {

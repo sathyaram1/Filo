@@ -42,9 +42,8 @@ module.exports = function register(on, ctx) {
   // da solo al primo avvio continuava a dire «Per attivare Filo serve un
   // codice d'invito», col primo suggerimento che portava a riscattare un
   // invito già riscattato. Qui la home si rifà e si spinge alle pagine aperte.
-  // Senza chiave il messaggio si ricostruisce sul posto e non costa niente;
-  // con la chiave il ricalcolo passa dal solito giro in background, che si
-  // annuncia da sé quando è pronto, e qui non si spinge una cache vecchia.
+  // Senza chiave la frase si ricostruisce sul posto e non costa niente; con la
+  // chiave la home la toglie da sé (FILO_READY_CHANGED) e il modello non parte (#869).
   async function rinfrescaHome() {
     try {
       const r = await ctx.handleFiloGenerateDashboard({ openTabsCount: 0 });

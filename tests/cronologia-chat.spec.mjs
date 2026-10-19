@@ -185,17 +185,17 @@ test('una chat si riapre per intero e ci si continua a scrivere dentro', async (
   await preparaDueChat(app);
 
   const dash = await openTab('filo://dashboard/dashboard.html?chat=chat-discussione');
-  const bolle = dash.locator('.dash-bubble');
+  // La conversazione riaperta sta nel filo con le altre (#869), e il filo va al suo punto.
+  const bolle = dash.locator('.dash-bubble[data-chat="chat-discussione"]');
   await expect(bolle).toHaveCount(2);
   await expect(bolle.nth(0)).toContainText('Secondo te la coscienza è emergente?');
   await expect(bolle.nth(1)).toContainText('Va bene, ci penso.');
-  // La conversazione riaperta è in primo piano, non la home.
-  await expect(dash.locator('body')).toHaveAttribute('data-state', 'thread');
+  await expect(bolle.nth(0)).toBeInViewport();
 
   // Si scrive ancora: il messaggio nuovo va nella STESSA chat, non in una gemella.
   await dash.locator('#input').fill('E il libero arbitrio?');
   await dash.locator('#input').press('Enter');
-  await expect(bolle).toHaveCount(4);
+  await expect(dash.locator('.dash-bubble-user', { hasText: 'E il libero arbitrio?' })).toBeVisible();
 
   await expect.poll(async () => {
     const chats = await leggiArchivio(app);
@@ -850,9 +850,12 @@ test('una chat cancellata non rinasce al messaggio dopo', async ({ app, openTab 
   await page.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
   await expect.poll(async () => (await leggiArchivio(app)).length).toBe(0);
 
+  // Cancellata altrove, la conversazione se ne va anche dal filo a schermo (#869).
+  await expect(dash.locator('.dash-bubble-user', { hasText: 'Barocco' })).toHaveCount(0);
   await dash.locator('#input').fill('E del Rococò?');
   await dash.locator('#input').press('Enter');
-  await expect(dash.locator('.dash-bubble-filo').nth(1)).toBeVisible({ timeout: 20_000 });
+  await expect(dash.locator('.dash-bubble-user', { hasText: 'E del Rococò?' })).toBeVisible();
+  await expect.poll(async () => (await leggiArchivio(app)).length, { timeout: 20_000 }).toBe(1);
 
   const dopo = await leggiArchivio(app);
   expect(dopo.map((c) => c.id)).not.toContain(cancellata);
@@ -954,7 +957,8 @@ test('un comando di terminale e il suo esito restano nella chat che li conteneva
     { timeout: 40_000 },
   ).toContain('ciao-dal-terminale');
 
-  await dash.locator('#input').fill('/home');
+  // Tornare alla home non chiude la conversazione (#869): la chiude «/clear».
+  await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
@@ -1066,10 +1070,8 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   await dash.locator('#input').fill("/sleep 4; echo ESIT''O-TARDIVO");
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(700);
-  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');
-  await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
-    .toBe('home');
 
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
@@ -1081,8 +1083,6 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   expect(chats.length).toBe(1);
   const testi = chats[0].messages.map((m) => m.text).join('\n');
   expect(testi).toContain('sleep 4');
-  // E non ti riporta dentro la chat che avevi chiuso.
-  expect(await dash.evaluate(() => document.body.dataset.state)).toBe('home');
 });
 
 test('il resoconto di un comando con lo slash non riapre la chat che hai chiuso', async ({ app, openTab }) => {
@@ -1115,18 +1115,15 @@ test('il resoconto di un comando con lo slash non riapre la chat che hai chiuso'
   await expect.poll(async () => dash.evaluate(() => document.body.innerText), { timeout: 20_000 })
     .toContain('Riordino in corso');
 
-  await dash.locator('#input').fill('/home');
+  await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');
-  await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
-    .toBe('home');
 
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
     return c ? c.messages.map((m) => m.text).join('\n') : '';
   }, { timeout: 40_000 }).toContain('Archiviate 2');
 
-  // La home resta la home, e la conversazione è una sola.
-  expect(await dash.evaluate(() => document.body.dataset.state)).toBe('home');
+  // La conversazione è una sola: il resoconto è tornato in quella dove il comando era stato dato.
   expect((await leggiArchivio(app)).length).toBe(1);
 });
 

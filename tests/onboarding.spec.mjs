@@ -206,7 +206,9 @@ test('«basta così»: chiude, fissa in memoria quello che ha imparato e apre la
   // L'ultimo atto non è un "fatto": è la home personale, costruita sul profilo
   // appena imparato, che prende il posto della chat.
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
-  await expect(page.locator('#homeMessage')).toContainText('Buongiorno Anna', { timeout: 40_000 });
+  // È il primo turno di Filo nel filo (#869), dopo l'intervista che ne resta il primo tratto.
+  await expect(page.locator('.dash-bubble-filo[data-spontaneo="1"]')).toContainText('Buongiorno Anna', { timeout: 40_000 });
+  await expect(page.locator('.dash-bubble-user', { hasText: 'sono Anna, insegnante' })).toBeVisible();
 
   // Il segno "già accolto" si scrive ADESSO, non prima.
   expect((await onbState(app)).done).toBe(true);
@@ -224,7 +226,9 @@ test('«basta così»: chiude, fissa in memoria quello che ha imparato e apre la
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(800);
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home');
-  await expect(page.locator('#bubbles')).not.toContainText('Ciao, sono Filo');
+  // L'intervista resta nel filo una volta sola, com'era: non riparte.
+  await expect(page.locator('#bubbles .dash-bubble-filo', { hasText: 'Ciao, sono Filo' })).toHaveCount(1);
+  await expect(page.locator('#bubbles .dash-bubble-filo').last()).toContainText('Buongiorno Anna');
 });
 
 test('da Preferenze l’intervista si rifà, anche dopo settimane', async ({ app, shell, openTab }) => {
