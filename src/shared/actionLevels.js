@@ -806,12 +806,7 @@
         return !!(built && !built.rifiuto && built.allenta);
       },
       dove: (a) => { const built = prefBuilt(a); return (built && built.dove) || ''; },
-      chiesta: (a, ctx) => {
-        const P = global.SN_PREF;
-        if (!P || !P.paroleDellaVoce) return false;
-        const v = P.paroleDellaVoce(a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza, a.valore ?? a.value ?? a.valoreNuovo ?? a.val);
-        return nominata(richiestaDi(ctx), { parole: [...v.parole, ...v.valori] });
-      },
+      chiesta: chiestaPreferenza,
       // Un setter che vuole sempre l'OK (`chiede` in preferences.js) sta fuori dal perimetro: un clic, a ogni livello.
       perimetro: (a) => {
         if (a && a._invariato) return true;
