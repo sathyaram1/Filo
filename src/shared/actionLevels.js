@@ -103,7 +103,7 @@
       const scritte = pianoTesto(riga).split(' ').filter(Boolean);
       if (!scritte.length) continue;
       if (frasi.some((f) => contiene(scritte, f))) return true;
-      if (verbi.length && scritte.some((w) => verbi.some((v) => w.startsWith(v))) && oggetti.some((o) => contiene(scritte, o))) return true;
+      if (verbi.length && scritte.some((w) => verbi.some((v) => verbo(w, v))) && oggetti.some((o) => contiene(scritte, o))) return true;
     }
     return false;
   }
