@@ -120,7 +120,9 @@
     const intero = typeof valore === 'string' || typeof valore === 'number' ? [String(valore)] : [];
     const valori = [...intero, ...v.valori].filter((w) => /^\d+$/.test(w) || (pianoTesto(w).length >= 4 && !PAROLE_COMUNI.has(pianoTesto(w))));
     const unico = typeof valore === 'string' && valore.trim().length >= 16 && /\d/.test(valore) && /[a-z]/i.test(valore) ? [valore.trim()] : [];
-    return nominata(richiestaDi(ctx), { frasi: unico, verbi: VERBI_CAMBIO, oggetti: [...v.frasi, ...valori] });
+    return nominata(richiestaDi(ctx), {
+      frasi: unico, verbi: VERBI_CAMBIO, oggetti: [...v.frasi, ...valori], risposte: valori.filter((w) => !/^\d+$/.test(w)),
+    });
   }
   const richiestaDi = (ctx) => String((ctx && ctx.richiesta) || '');
 
