@@ -7084,6 +7084,14 @@
       fsTortaVuota('Il registro delle esecuzioni non si è letto, quindi quanto è costato ogni lavoro non si sa.');
       return;
     }
+    // La porta gemella: dove sia arrivato ogni lavoro sta sulla sua
+    // segnalazione, e le segnalazioni non si sono lette.
+    if (stat.copertura.feedbackLetti === false) {
+      mgFsPieHint.textContent = 'Dove è arrivato ogni lavoro si legge sulla sua segnalazione, '
+        + 'e le segnalazioni non si sono lette: finché non tornano, qui non c\'è niente da contare.';
+      fsTortaVuota('Le segnalazioni non si sono lette, quindi quanto è costato ogni lavoro non si sa.');
+      return;
+    }
     const soloRegistro = stat.copertura.logCorto
       ? `Si contano i giri che il registro conserva, che parte dal ${FS.dataBreve(stat.copertura.logDa)}: un lavoro cominciato prima può risultare più economico di quanto è stato. `
       : 'Le critiche si contano su tutta la storia del lavoro che il registro conserva, anche i giri successi fuori dalla finestra. ';
