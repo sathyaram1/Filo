@@ -105,11 +105,15 @@
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
       activeMenu = null;
       chiudiStrato();
+      try { allaChiusura?.(); } catch (_) {}
     }
     try { global.SN_POPUP?.sottoIlMenu?.(false); } catch (_) {}
     // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
     dropZones.length = 0;
   }
+
+  // Lo strato sopra la scheda (#1054) sa così che il menu si è chiuso da sé: una voce, un clic fuori, Esc.
+  let allaChiusura = null;
 
   // La cronologia degli appunti non sta nel documento ma dentro un host suo (`subHost`): si stacca quello.
   function staccaSub() {
@@ -775,7 +779,10 @@
     fogli = [foglio];
     return fogli;
   }
+  // Nello strato di Filo sopra la scheda (#1054) non c'è un sito da cui chiuderla: il pannello sta nel documento.
+  const NELLO_STRATO = (() => { try { return location.href.startsWith('filo://menu/'); } catch (_) { return false; } })();
   function pannelloChiuso(contenuto) {
+    if (NELLO_STRATO) return contenuto;
     const host = document.createElement('div');
     global.SN_FILO_UI?.mark(host);
     host.style.cssText = HOST_CHIUSO;
@@ -1630,6 +1637,8 @@
     computeSubOffset,
     openGenericSubmenu,
     openIconGridSubmenu,
+    closeSubmenu,
+    allaChiusura: (fn) => { allaChiusura = typeof fn === 'function' ? fn : null; },
     refreshIconRow,
     refreshIconGrid,
     isSubMenuOpen,
