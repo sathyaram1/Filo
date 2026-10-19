@@ -492,11 +492,18 @@ e controllo cieco. La funzione gira in due momenti:
   avanti si chiude come «superato».
 
 Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
-Invariante, con sentinella: al massimo un compito aperto per feedback.
+Invariante, con sentinella: al massimo un compito di fase aperto per feedback.
+I figli non contano.
 
 **Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
 (§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), e i compiti creati a
 mano dall'owner o da una sessione locale.
+
+**Da un altro compito:** i figli (§ 12.2). Un figlio è legato al compito padre,
+non al feedback, e il feedback lo raggiunge attraverso il padre. Così un padre
+di fase con i suoi figli aperti resta, per l'invariante, un compito solo. I
+figli seguono il padre: quando il trigger o il pacemaker ne ricalcola l'urgenza
+o lo chiude come «superato», lo stesso vale per i figli ancora aperti.
 
 **Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
 server), il blocco di sicurezza (diventa una domanda), la segnalazione (diventa
