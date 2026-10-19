@@ -42,7 +42,7 @@ export const MCP_SENZA_LETTURA = Object.freeze([
 ]);
 // Strumenti dell'app desktop noti per nome ma non per server: valgono sotto un server ccd_ qualsiasi. Le sue letture
 // (eventi di altre sessioni, widget, browser) non ci stanno e sporcano.
-export const CCD_SENZA_LETTURA = Object.freeze(['mark_chapter']);
+const CCD_SENZA_LETTURA =Object.freeze(['mark_chapter']);
 const RE_CCD_SENZA_LETTURA = new RegExp(`^mcp__ccd(?:_[A-Za-z0-9-]+)+__(?:${CCD_SENZA_LETTURA.join('|')})$`);
 const mcpSenzaLettura = (nome) => MCP_SENZA_LETTURA.includes(nome) || RE_CCD_SENZA_LETTURA.test(nome);
 
