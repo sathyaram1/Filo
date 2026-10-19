@@ -181,4 +181,4 @@ function dimentica() {
   return { ok: true };
 }
 
-module.exports = { leggi, stato, caricaDaFile, dimentica, candidate, fileDiSviluppo };
+module.exports = { leggi, stato, caricaDaFile, dimentica, fileDiSviluppo };
