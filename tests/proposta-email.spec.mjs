@@ -193,12 +193,21 @@ const INVISIBILI = `<!doctype html><body style="margin:0;padding:40px;height:200
   <input type="email" id="fuori" style="position:fixed;left:-400px;top:100px;width:200px;height:30px">
   <input type="email" id="vero" style="width:260px">
   <span id="lb">Email address</span><input type="text" id="aria" aria-labelledby="lb" style="width:260px;margin-left:20px">
+  <input type="email" id="incolore" style="position:absolute;left:600px;top:300px;width:200px;height:30px;background:transparent;border:0;outline:0;color:transparent;caret-color:transparent">
+  <input type="email" id="sottovelo" style="position:absolute;left:600px;top:500px;width:200px;height:30px">
+  <div style="position:absolute;left:590px;top:490px;width:240px;height:60px;background:#fff;pointer-events:none"></div>
+  <div style="position:relative;width:260px;margin-top:20px">
+    <input type="email" id="materiale" style="width:260px;height:40px;box-sizing:border-box;padding:0 12px;background:transparent;border:0;outline:none;font-size:16px">
+    <div style="position:absolute;inset:0;border:1px solid #888;border-radius:4px;pointer-events:none"></div>
+    <span style="position:absolute;left:12px;top:10px;pointer-events:none;color:#666">Email o telefono</span>
+  </div>
 </body>`;
 
 test('un campo che l\'utente non vede, a fuoco per mano della pagina, non riceve la proposta; uno visibile sì', async ({ app, openTab, testServer }) => {
   await accountFinto(app);
   const page = await testServer.openReady(openTab, INVISIBILI);
-  for (const id of ['trasparente', 'velato', 'pixel', 'coperto', 'fuori']) {
+  // Anche senza niente di suo da disegnare, o sotto un velo che lascia passare i clic (#1124 giro 5).
+  for (const id of ['trasparente', 'velato', 'pixel', 'coperto', 'fuori', 'incolore', 'sottovelo']) {
     await page.evaluate((x) => document.getElementById(x).focus({ preventScroll: true }), id);
     await page.waitForTimeout(900);
     expect(await mostrata(app), `campo ${id}`).toBe(false);
@@ -218,6 +227,13 @@ test('un campo che l\'utente non vede, a fuoco per mano della pagina, non riceve
 
   // Il nome «Email address» collegato come etichetta accessibile basta.
   await page.click('#aria');
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  await page.evaluate(() => document.activeElement.blur());
+  await expect.poll(() => mostrata(app)).toBe(false);
+
+  // Il campo alla Google: senza fondo né bordo suoi, col contorno e l'etichetta disegnati sopra da nodi che lasciano
+  // passare i clic. Si vede (il cursore lampeggia), e a fuoco per mano della pagina la riceve.
+  await page.evaluate(() => document.getElementById('materiale').focus());
   await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
 });
 
@@ -324,12 +340,16 @@ test('un riquadro di un\'altra origine che l\'utente non vede non fa comparire l
   const dentro = altraOrigine(testServer.html(RIQUADRO));
   const page = await testServer.openReady(openTab, `<!doctype html><body style="margin:0;padding:30px">
     <button style="position:absolute;left:40px;top:40px;width:300px;height:60px">Accetta</button>
-    <iframe id="r" src="${dentro}" style="opacity:0.05;position:absolute;left:20px;top:20px;width:400px;height:100px;border:0"></iframe></body>`);
+    <iframe id="r" src="${dentro}" style="opacity:0.05;position:absolute;left:20px;top:20px;width:400px;height:100px;border:0"></iframe>
+    <div id="velo" style="display:none;position:absolute;left:10px;top:10px;width:420px;height:120px;background:#fff;pointer-events:none"></div></body>`);
   await page.frameLocator('#r').locator('#u').click();
   await page.waitForTimeout(1200);
   expect(await mostrata(app)).toBe(false);
   await page.evaluate(() => { document.getElementById('r').style.opacity = '1'; });
   await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  // Coperto da un velo che lascia passare i clic: il clic arriva al campo, ma l'utente vede il velo (#1124 giro 5).
+  await page.evaluate(() => { document.getElementById('velo').style.display = 'block'; });
+  await expect.poll(() => mostrata(app), { timeout: 4000 }).toBe(false);
 });
 
 test('in un riquadro di un\'altra origine dentro un altro riquadro di un\'altra origine la proposta sta sotto il campo', async ({ app, openTab, testServer }) => {
