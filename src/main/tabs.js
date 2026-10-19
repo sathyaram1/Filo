@@ -2036,7 +2036,7 @@ class TabManager {
       if (activity.formDirty) tab._moduli.add(k); else tab._moduli.delete(k);
       tab.formDirty = tab._moduli.size > 0;
     }
-    if (activity.invioPagina === true) { tab._invioPagina = Date.now(); tab._invioFallito = false; }
+    if (activity.invioPagina === true) { tab._invioPagina = Date.now(); tab._invioFallito = false; tab._invioPwPrima = activity.pwPrima === true; }
     if (Array.isArray(activity.impronte)) {
       if (!tab._impronte) tab._impronte = new Map();
       const imp = activity.impronte.filter((x) => typeof x === 'string' && x.length <= 32).slice(0, 50);
