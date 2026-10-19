@@ -103,8 +103,10 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   da un file. Un check per flag si aggira con un altro flag.
 - **Un comando che manda qualcosa fuori è costo 3 (#530).** Il comando dichiara
   anche la sua `uscita` (#530.3): una chiave in un curl o in un git clone ha la
-  risposta di un link con la stessa chiave. Un comando di sola lettura (costo 1)
-  resta sul computer e non dichiara niente: il suo testo entra come lettura. Quando a Normale il costo 2 partirà
+  risposta di un link con la stessa chiave. Un comando di sola lettura (costo 1),
+  o uno che non nomina altro che il computer stesso (un docker con la password del
+  database, un `.env`, un database su localhost), resta sul computer e non dichiara
+  niente: altrimenti ogni password scritta dal modello in locale era un «no» (#1312). Quando a Normale il costo 2 partirà
   da solo (col guardiano), «2» non vorrà più dire «popup»: un file caricato con
   `curl -F`, un `-X DELETE` sul server, un `git push` verso un indirizzo scritto
   nel comando o un remoto riscritto (`remote add`/`set-url`, `remote.*.url`) non
