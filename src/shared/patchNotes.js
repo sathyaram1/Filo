@@ -17,6 +17,7 @@
         'Ctrl+L (Cmd+L su Mac) sulla home non cancella più quello che stavi scrivendo. Porta il cursore nel campo e seleziona il testo, come la barra degli indirizzi di un browser.',
         'Ctrl+L (Cmd+L su Mac) su una pagina dove stai scrivendo apre la home in una scheda accanto, così il testo che hai scritto resta dov\'era.',
         'Se le pagine che Filo legge per risponderti sono troppe per il modello tutte insieme, Filo risponde con quelle che ci stanno e sotto la risposta ti dice quali siti ha lasciato fuori. Se ti servono, chiediglielo e le rilegge. Prima la risposta non arrivava, e l\'errore consigliava di cambiare modello.',
+        'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
       ],
     },
     {

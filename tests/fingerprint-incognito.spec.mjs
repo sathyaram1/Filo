@@ -3,6 +3,7 @@
 // accesso nato da una sua scheda). Con la protezione su Off, in incognito i pixel tornano esatti.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { guardiaAccesa } from './helpers/guardia.mjs';
 import { fileURLToPath } from 'node:url';
 
 const PAGE_PRELOAD = fileURLToPath(new URL('../src/preload/page-preload.js', import.meta.url));
@@ -23,7 +24,7 @@ const PROBE = `(() => {
   const d = ctx.getImageData(0, 0, W, H).data;
   let deviating = 0;
   for (let i = 0; i < d.length; i += 4) if (d[i] !== 120 || d[i + 1] !== 60 || d[i + 2] !== 200) deviating++;
-  return { prima: hash(), seconda: hash(), deviating, guard: !!window.__filoFpGuard };
+  return { prima: hash(), seconda: hash(), deviating, guard: deviating > 0 };
 })()`;
 
 async function trovaPagina(app, url, tetto = 15_000) {
@@ -52,7 +53,7 @@ async function apriIncognito(app, shell) {
 
 async function leggi(page, { protetta = true } = {}) {
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
-  if (protetta) await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  if (protetta) await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   return page.evaluate(PROBE);
 }
 

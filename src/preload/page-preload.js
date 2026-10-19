@@ -201,17 +201,27 @@ try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console
 // ad alta entropia. Il seed arriva SINCRONO dal main (HMAC col master secret),
 // così il secret non tocca mai il mondo non fidato della pagina. Solo http(s);
 // se la protezione è spenta (livello 0) non iniettiamo nulla.
-// Solo nel frame principale: la protezione si applica alla pagina che l'utente
-// ha aperto. Estenderla a ogni riquadro incorporato cambierebbe i segnali di
-// widget di terze parti (mappe, player) che oggi non tocchiamo — è una scelta
-// a sé, non un effetto collaterale del tasto destro nei riquadri (#405).
-if (!IS_SUBFRAME) try {
+// Un riquadro la riceve, col seme della pagina principale, se è del suo stesso sito o è contenuto suo (srcdoc,
+// data:, blob:): lo decide il main dal frame che chiede (#798). I widget di altri siti restano come sono, scelta a sé
+// (#405). I riquadri vuoti non ricevono il preload: li raggiunge la guardia della pagina (fingerprint-guard.js).
+try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) {
-    const cfg = ipcRenderer.sendSync('filo:fp-config', loc) || { level: 0, seed: 0 };
+  if (IS_SUBFRAME ? /^(https?|data|blob):|^about:srcdoc$/i.test(loc) : /^https?:/i.test(loc)) {
+    const cfg = ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: IS_SUBFRAME }) || { level: 0, seed: 0 };
     if (cfg && cfg.level > 0) {
-      const { buildGuardSource } = require('./fingerprint-guard.js');
-      webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), false).catch(() => {});
+      // Un riquadro della stessa origine chiede prima la guardia della finestra che lo contiene: se gliela monta lei,
+      // le due finestre condividono ciò che sanno dei canvas (fingerprint-guard.js, ascolta).
+      let unito = false;
+      if (IS_SUBFRAME && cfg.canale) {
+        try {
+          const el = window.frameElement;
+          if (el) unito = !el.dispatchEvent(new Event(cfg.canale, { cancelable: true, composed: true }));
+        } catch (_) { unito = false; }
+      }
+      if (!unito) {
+        const { buildGuardSource } = require('./fingerprint-guard.js');
+        webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level, cfg.canale, cfg.sonda), false).catch(() => {});
+      }
     }
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }

@@ -129,9 +129,21 @@ function registerIpcHandlers() {
 
   // SINCRONO perché il preload deve installare gli override PRIMA degli script
   // di pagina. Passa { level, seed }: il master secret NON attraversa mai qui.
-  ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href) => {
+  // Per un riquadro conta la catena dei frame vista dal main, non l'indirizzo che il riquadro dichiara (#798).
+  // `canale`: il tipo dell'evento con cui un riquadro chiede la guardia di chi lo contiene, segreto per la sessione.
+  // `sonda`: nelle prove la guardia si lascia riconoscere (preload/fingerprint-guard.js), fuori mai.
+  const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
+  const SONDA_FP = !!process.env.FILO_USER_DATA;
+  const conCanale = (cfg) => (cfg && cfg.level > 0 ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP } : cfg);
+  ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href, opts) => {
     try {
-      event.returnValue = require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
+      const F = require('./services/fingerprint');
+      const ambito = ambitoIncognitoDi(senderInfo(event));
+      const fr = event.senderFrame;
+      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito)); return; }
+      const catena = [];
+      for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
+      event.returnValue = catena.length > 1 ? conCanale(F.configForFrames(catena, ambito)) : { level: 0, seed: 0 };
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
