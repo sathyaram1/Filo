@@ -112,3 +112,30 @@ for (const [nome, url, id, a, b] of [
     console.log(nome, 'HINT', JSON.stringify(await page.evaluate(() => window.__hint)));
   });
 }
+
+test('aspetto admin', async ({ app, openTab }) => {
+  const page = await openTab('filo://admin-defaults/admin-defaults.html');
+  await page.addInitScript(() => {
+    const config = () => ({ apiKeysPresent: { openrouter: true, tavily: false }, safeBrowsingKeyPresent: false, providerSort: 'throughput',
+      modelRegistry: { 'deepseek-flash': { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash', reasoning: 'low', sort: 'latency' }, 'gemma': { provider: 'openrouter', model: 'google/gemma-4-26b-a4b-it' } },
+      models: {}, excludedProviders: [] });
+    const stub = async (msg) => {
+      if (msg.type === 'defaults_get') return { ok: true, config: config() };
+      if (msg.type === 'defaults_update') return { ok: true, config: config() };
+      if (msg.type === 'test_default_model') { await new Promise((r) => setTimeout(r, 300)); return { ok: true, ttftMs: 100, tokensPerSec: 50 }; }
+      if (msg.type === 'default_models_list') return { ok: true, provider: msg.provider, items: [] };
+      return window.__veroSend ? window.__veroSend(msg) : { ok: true };
+    };
+    window.__veroSend = window.chrome.runtime.sendMessage.bind(window.chrome.runtime);
+    window.chrome.runtime.sendMessage = stub;
+  });
+  await page.reload();
+  await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
+  const r = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await r.getByRole('button', { name: 'Prova' }).click();
+  await page.waitForTimeout(800);
+  await r.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/1121g2-admin.png' });
+  await page.locator('#providerSort').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/1121g2-admin-generale.png' });
+});
