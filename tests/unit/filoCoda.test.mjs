@@ -134,20 +134,37 @@ test('cercare nel filo: tutte le parole, senza accenti né maiuscole, nei messag
   assert.equal(C.cerca({ chats }, ' ').messaggi.length, 0);
 });
 
-test('due messaggi di Filo scritti di sua iniziativa, uno dopo l’altro, sono uno; con l’utente in mezzo restano due', () => {
+test('un messaggio di Filo che si fonde riscrive il suo di prima; senza il segno, o con l’utente in mezzo, restano due', () => {
   const st = E.nuovoStato();
   const scrivi = (msg, ts) => E.applica(st, E.crea(E.TIPI.MESSAGGIO, { chat: 'h', msg }, { ts, dispositivo: 'qui', autore: msg.role === 'user' ? 'utente' : 'filo' }));
   scrivi({ role: 'filo', text: 'Il timer è suonato.', spontaneo: true }, fa(10));
-  scrivi({ role: 'filo', text: 'Il timer è suonato e il download è finito.', spontaneo: true }, fa(9));
+  scrivi({ role: 'filo', text: 'Il timer è suonato e il download è finito.', spontaneo: true, fonde: true }, fa(9));
   let c = E.copiaChat(st.chat.get('h'), { dispositivi: true });
   assert.deepEqual(c.messages.map((x) => x.text), ['Il timer è suonato e il download è finito.']);
   assert.equal(c.messages[0].ts, fa(10), 'il messaggio resta dov’era nel filo');
   assert.deepEqual(c.dispositivi, ['qui']);
+  assert.equal(c.messages[0].fonde, undefined);
   scrivi({ role: 'user', text: 'grazie' }, fa(8));
-  scrivi({ role: 'filo', text: 'Buongiorno.', spontaneo: true }, fa(7));
+  scrivi({ role: 'filo', text: 'Buongiorno.', spontaneo: true, fonde: true }, fa(7));
   c = E.copiaChat(st.chat.get('h'));
   assert.equal(c.messages.length, 3);
   assert.equal(c.dispositivi, undefined);
+  scrivi({ role: 'filo', text: 'Il download è finito.', spontaneo: true }, fa(1));
+  c = E.copiaChat(st.chat.get('h'));
+  assert.deepEqual(c.messages.slice(-2).map((x) => [x.text, x.ts]), [['Buongiorno.', fa(7)], ['Il download è finito.', fa(1)]], 'senza il segno è un messaggio nuovo, alla sua ora');
+});
+
+test('si fonde solo un messaggio di Filo recente, di oggi, con niente in mezzo nel filo', () => {
+  const saluto = chat('h', [m('filo', 'Buongiorno.', fa(10), { spontaneo: true })]);
+  assert.equal(C.siFonde({ chats: [saluto] }, 'h', { ora: ORA }), true);
+  assert.equal(C.siFonde({ chats: [chat('h', [m('filo', 'Buongiorno.', fa(5 * 60), { spontaneo: true })])] }, 'h', { ora: ORA }), false, 'ore dopo è un messaggio nuovo');
+  const mezzanotte = new Date(2026, 9, 19, 0, 5).getTime();
+  assert.equal(C.siFonde({ chats: [chat('h', [m('filo', 'x', new Date(2026, 9, 18, 23, 55).toISOString(), { spontaneo: true })])] }, 'h', { ora: mezzanotte }), false, 'mai fra un giorno e l’altro');
+  assert.equal(C.siFonde({ chats: [saluto], pagine: [{ id: 'p', ts: fa(5), url: 'https://a.it/' }] }, 'h', { ora: ORA }), false, 'una pagina visitata in mezzo');
+  assert.equal(C.siFonde({ chats: [saluto], cambi: [{ id: 'c', ts: fa(5), via: 'interfaccia' }] }, 'h', { ora: ORA }), false, 'un cambio fatto in mezzo');
+  assert.equal(C.siFonde({ chats: [saluto, chat('e', [m('user', 'riassumi', fa(4))], { app: 'editor' })] }, 'h', { ora: ORA }), false, 'un messaggio altrove in mezzo');
+  assert.equal(C.siFonde({ chats: [saluto], pagine: [{ id: 'p', ts: fa(20), url: 'https://a.it/' }] }, 'h', { ora: ORA }), true, 'quello che è venuto prima non conta');
+  assert.equal(C.siFonde({ chats: [chat('h', [m('filo', 'Fatto.', fa(2))])] }, 'h', { ora: ORA }), false, 'una risposta non si riscrive');
 });
 
 test('Filo parla per primo: il secondo evento finisce nello stesso messaggio, e per il modello resta una lettura (#592.4)', async () => {

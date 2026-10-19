@@ -89,5 +89,15 @@ async function togliPagine(ids, opts) {
   return tolte;
 }
 
-module.exports = { pezzo, chatCorrente, siFonde, serveGiornata, cerca, togliPagine };
+// Dalla ricerca si toglie una pagina, non una visita: tutte le sue visite e le schede chiuse con quell'indirizzo.
+async function togliIndirizzo(url, opts) {
+  const u = String(url || '');
+  if (!u) return 0;
+  const ids = (await F().pagine(null, opts)).filter((p) => p.url === u).map((p) => p.id);
+  let tolte = ids.length ? await togliPagine(ids, opts) : 0;
+  try { tolte += await globalThis.SN_ARCHIVED_TABS.dimenticaPagine({ url: u }); } catch (_) {}
+  return tolte;
+}
+
+module.exports = { pezzo, chatCorrente, siFonde, serveGiornata, cerca, togliPagine, togliIndirizzo };
 globalThis.SN_CODA_FILO = module.exports;

@@ -437,7 +437,8 @@ module.exports = function register(on, ctx) {
   }));
   on(MSG.FILO_CERCA, soloFilo(async (msg) => ({ ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
   on(MSG.FILO_CODA_TOGLI_PAGINE, soloFilo(async (msg) => {
-    const tolte = await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);
+    const url = msg && typeof msg.url === 'string' ? msg.url : '';
+    const tolte = url ? await Coda.togliIndirizzo(url) : await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);
     return { ok: true, tolte };
   }));
 

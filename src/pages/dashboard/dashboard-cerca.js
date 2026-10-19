@@ -71,6 +71,13 @@
     await d.coda.vaiA({ chat: r.chat, i: r.i, app: !!r.app, ts: r.ts });
   }
 
+  async function togli(r) {
+    const res = await d.send({ type: MSG.FILO_CODA_TOGLI_PAGINE, url: r.url });
+    if (!res || !res.ok) return;
+    if (d.coda.togliIndirizzo) d.coda.togliIndirizzo(r.url);
+    if (!pannello.hidden) await cerca();
+  }
+
   function disegna(res, q) {
     pannello.replaceChildren();
     const messaggi = Array.isArray(res.messaggi) ? res.messaggi : [];
@@ -117,6 +124,7 @@
       return [
         { type: 'item', icon: icona('globe', 16), label: 'Riapri la pagina', onClick: () => { apri(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: 'Copia l’indirizzo', onClick: () => { navigator.clipboard.writeText(r.url).catch(() => {}); } },
+        { type: 'item', icon: icona('trash', 16), label: 'Togli dal filo', onClick: () => { togli(r).catch(() => {}); } },
       ];
     }
     return [

@@ -948,7 +948,8 @@
     FILO_CODA: 'filo_coda',
     // Cercare nel filo senza passare dal modello: { q } → { ok, messaggi, pagine, termini, tanti }.
     FILO_CERCA: 'filo_cerca',
-    // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }.
+    // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }. Con { url }: ogni visita di quell'indirizzo
+    // e le sue schede chiuse (dalla ricerca, dove una pagina è un indirizzo).
     FILO_CODA_TOGLI_PAGINE: 'filo_coda_togli_pagine',
     // ANNUNCIO (main → schede): Filo ha scritto di sua iniziativa. { chat, i, ts, testo, fuso }.
     FILO_PARLA: 'filo_parla',

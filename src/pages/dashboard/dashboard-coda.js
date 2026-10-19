@@ -188,6 +188,19 @@
     segnaGiorni();
   }
 
+  // Una pagina tolta altrove (dalla ricerca): via da ogni gruppo che la mostra.
+  function togliIndirizzo(url) {
+    if (!d) return;
+    for (const r of [...d.bubblesEl.querySelectorAll('.dash-pagine')]) {
+      const g = r._gruppo;
+      if (!g || !g.pagine.some((p) => p.url === url)) continue;
+      const resto = { ...g, pagine: g.pagine.filter((p) => p.url !== url) };
+      if (!resto.pagine.length) r.remove();
+      else disegnaGruppo(r, resto);
+    }
+    segnaGiorni();
+  }
+
   function rigaDi(v) {
     if (v.k === 'cambio') return rigaCambio(v);
     if (v.k === 'pagine') return rigaPagine(v);
@@ -462,5 +475,5 @@
     } catch (_) {}
   }
 
-  global.SN_DASH_CODA = { init, carica, sali, allinea, metti, vaiA, togliChat, segnaGiorni, nomeDelGiorno };
+  global.SN_DASH_CODA = { init, carica, sali, allinea, metti, vaiA, togliChat, togliIndirizzo, segnaGiorni, nomeDelGiorno };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

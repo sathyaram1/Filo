@@ -337,6 +337,92 @@ test('una pagina tolta dal filo, o cancellata dalla Sicurezza, non torna dalla r
   expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => t.title))).toEqual(['ieri']);
 });
 
+test('il timer che suona ore dopo il saluto, con pagine visitate in mezzo, è un messaggio nuovo in fondo al filo', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const inizio = new Date();
+  inizio.setHours(0, 5, 0, 0);
+  const passo = Math.max(60_000, Math.floor((Date.now() - inizio.getTime()) / 5));
+  await app.evaluate(async (_e, d) => {
+    const E = globalThis.SN_FILO_EVENTI;
+    const qui = await globalThis.SN_IL_FILO.dispositivo();
+    const msg = { role: 'filo', text: 'Buongiorno.', spontaneo: true, motivi: [{ tipo: 'giornata' }] };
+    const ev = [E.crea(E.TIPI.CHAT_APERTA, { chat: 'mattina' }, { ts: d.saluto, dispositivo: qui }), E.crea(E.TIPI.MESSAGGIO, { chat: 'mattina', msg }, { ts: d.saluto, dispositivo: qui, autore: 'filo' })];
+    for (const p of d.pagine) ev.push(E.crea(E.TIPI.NAVIGAZIONE, { url: p.url, titolo: p.titolo }, { ts: p.ts, dispositivo: qui }));
+    await globalThis.SN_IL_FILO.importa(ev.map(E.riga).join(''));
+  }, {
+    saluto: inizio.toISOString(),
+    pagine: [1, 2, 3].map((k) => ({ url: `https://esempio.it/${k}`, titolo: `pagina ${k}`, ts: new Date(inizio.getTime() + k * passo).toISOString() })),
+  });
+  const casa = await home(app);
+  await modelli(app);
+  await app.evaluate(() => globalThis.SN_FILO_PARLA.giro({ subito: [{ tipo: 'timer', testo: 'timer «pasta»' }] }));
+  const spontanei = casa.locator('.dash-bubble-filo[data-spontaneo="1"]');
+  await expect(spontanei.last()).toHaveText('Il timer della pasta è suonato.');
+  const page = await openTab('filo://newtab/');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Buongiorno.' })).toHaveText('Buongiorno.');
+  const inFondo = await page.evaluate(() => {
+    const figli = [...document.querySelectorAll('#bubbles > *')];
+    const t = figli.findIndex((n) => n.classList.contains('dash-bubble') && /pasta/.test(n.textContent || ''));
+    const p = figli.findIndex((n) => n.classList.contains('dash-pagine'));
+    return p >= 0 && t > p;
+  });
+  expect(inFondo).toBe(true);
+});
+
+test('una pagina tolta dal filo mentre la sua scheda è aperta non torna nella ricerca quando la scheda si chiude', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const url = testServer.html('<title>orche marine</title><p>le orche</p>');
+  const p = await openTab(url);
+  await p.waitForFunction(() => document.title === 'orche marine');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBeGreaterThan(0);
+  const page = await openTab('filo://newtab/');
+  const riga = page.locator('.dash-pagine').last();
+  await riga.locator('.dash-pagine-testa').click();
+  const orche = riga.locator('.dash-pagina', { hasText: 'orche marine' });
+  await orche.click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect(orche).toHaveCount(0);
+  await shell.evaluate(async (u) => {
+    const s = await window.filoShell.tabs.snapshot();
+    await window.filoShell.tabs.close(s.tabs.find((x) => x.url === u).id);
+  }, url);
+  await shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    await window.filoShell.tabs.activate(s.tabs.filter((x) => String(x.url).startsWith('filo://newtab')).pop().id);
+  });
+  // Una pagina aperta dopo, sullo stesso sito, entra nelle schede chiuse come sempre.
+  const dopo = testServer.html('<title>delfini</title>');
+  const pd = await openTab(dopo);
+  await pd.waitForFunction(() => document.title === 'delfini');
+  await shell.evaluate(async (u) => {
+    const s = await window.filoShell.tabs.snapshot();
+    await window.filoShell.tabs.close(s.tabs.find((x) => x.url === u).id);
+  }, dopo);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((t) => t.title))).toEqual(['delfini']);
+  await page.locator('#cercaInput').fill('orche');
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
+});
+
+test('dalla ricerca una pagina si toglie dal filo col tasto destro: tutte le sue visite e le schede chiuse', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const url = 'https://www.youtube.com/watch?v=orche';
+  await semina(app, { pagine: [{ url, titolo: 'YouTube: orche', ts: new Date(Date.now() - 900_000).toISOString() }, { url, titolo: 'YouTube: orche', ts: new Date(Date.now() - 600_000).toISOString() }] });
+  await app.evaluate((_e, u) => globalThis.SN_ARCHIVED_TABS.archive({ url: u, title: 'YouTube: orche', closedAt: new Date().toISOString() }), url);
+  const page = await openTab('filo://newtab/');
+  await expect(page.locator('.dash-pagine-testo').last()).toHaveText('2 pagine, fra cui YouTube: orche');
+  await page.locator('#cercaInput').fill('orche');
+  const voce = page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'YouTube: orche' });
+  await expect(voce).toHaveCount(1);
+  await voce.click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(0);
+  expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(0);
+  await expect(page.locator('.dash-pagine')).toHaveCount(0);
+  await page.locator('#cercaInput').fill('');
+  await page.locator('#cercaInput').fill('orche');
+  await expect(page.locator('#cercaRisultati .dash-cerca-niente')).toBeVisible();
+});
+
 test('senza un modello la frase dice perché e la strada porta ai Crediti', async ({ app }) => {
   const casa = await home(app);
   await expect(casa.locator('#homeMessage')).toContainText('codice d\'invito');
