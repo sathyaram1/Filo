@@ -242,6 +242,18 @@ function impostazioniPerWeb(settings, indirizzi = []) {
   return out;
 }
 
+// Le risposte che portano un elenco di tutti i siti: a un sito torna solo la sua voce, come nella lettura delle
+// impostazioni (#589.1 giro 4). Una domanda ammessa che risponde con dati degli altri siti si ritaglia qui.
+const RISPOSTE_WEB = new Map([
+  ['filo_spento_imposta', (r, indirizzi) => ({ ...r, siti: esclusiDelSito(r.siti, indirizzi) })],
+  ['menu_del_sito_imposta', (r, indirizzi) => ({ ...r, siti: esclusiDelSito(r.siti, indirizzi) })],
+]);
+function rispostaPerUnSito(type, risposta, indirizzi = []) {
+  const ritaglia = RISPOSTE_WEB.get(type);
+  if (!ritaglia || !risposta || typeof risposta !== 'object' || !own(risposta, 'siti')) return risposta;
+  return ritaglia(risposta, indirizzi);
+}
+
 function impostazioniPerOrigine(settings, origine, indirizzi = [origine]) {
   return isFilo(origine) ? settings : impostazioniPerWeb(settings, indirizzi);
 }
