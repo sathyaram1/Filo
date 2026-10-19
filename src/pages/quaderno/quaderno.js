@@ -295,7 +295,8 @@
       r.chiudi = null;
       const nuovo = campo.value.replace(/\s+/g, ' ').trim();
       if (salva && nuovo && nuovo !== r.it.testo) {
-        const res = await send({ type: MSG.FILO_MEMORY_EDIT, via: r.it.via, testo: nuovo });
+        const fonti = (Array.isArray(r.it.fonti) ? r.it.fonti : []).map((f) => f && f.id).filter(Boolean);
+        const res = await send({ type: MSG.FILO_MEMORY_EDIT, via: r.it.via, testo: nuovo, fonti });
         if (!res || !res.ok) {
           finito = false;
           r.chiudi = chiudi;
