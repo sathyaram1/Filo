@@ -60,7 +60,7 @@ test('r1 una riga corretta nel quaderno mentre il compattatore scrive resta corr
     await globalThis.SN_FILO_MEMORY.appendLesson('Ama le spezie', { fonti: ['altro'] });
     globalThis.__q_compattatore = 'PREFERENZE:\nÈ vegetariano (fonti: R1)\nAma le spezie (fonti: L1)';
     globalThis.__q_attesa = new Promise((r) => { globalThis.__q_via = r; });
-    globalThis.__q_fatto = globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_COMPACT_MEMORY }, { url: QUADERNO });
+    globalThis.__q_fatto = globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_COMPACT_MEMORY }, { url: 'filo://quaderno/quaderno.html' });
   });
   await page.waitForTimeout(300);
   await riga(page, 'È vegetariano').locator('.qd-testo').dblclick();
@@ -88,7 +88,7 @@ test('r1 una lezione che sto correggendo non sparisce col compattatore che la ri
   await lez.locator('.qd-testo').dblclick();
   await page.locator('.qd-campo').fill('L’utente è vegano.');
   // Il compattatore riordina mentre il campo è aperto; poi l'utente conferma.
-  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_COMPACT_MEMORY }, { url: QUADERNO }));
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_COMPACT_MEMORY }, { url: 'filo://quaderno/quaderno.html' }));
   await page.waitForTimeout(800);
   if (await page.locator('.qd-campo').count()) await page.locator('.qd-campo').press('Enter');
   await page.waitForTimeout(800);
