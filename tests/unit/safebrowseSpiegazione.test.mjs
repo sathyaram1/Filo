@@ -42,7 +42,7 @@ test('la chat che riceve «Filo mi protegge dal phishing?» ha la voce nell\'ind
   ]) assert.match(d, re, `il dettaglio dice ${cosa}`);
   for (const [cosa, re] of [
     ['che una pagina aperta senza un clic su un link carica sotto l\'avviso', /carica sotto l'avviso/],
-    ['che prima del clic non esce niente', /Prima del clic su un link non chiede niente alla rete/],
+    ['che prima del clic su un link qualunque non esce niente', /Prima del clic su un link qualunque non chiede niente alla rete/],
     ['che la conferma vale per la scheda', /La conferma vale solo per quella scheda/],
     ['che il testo della pagina non si legge', /non legge il testo della pagina: guarda solo se ci sono campi password o carta/],
   ]) assert.match(v.doesNot, re, `i limiti dicono ${cosa}`);
