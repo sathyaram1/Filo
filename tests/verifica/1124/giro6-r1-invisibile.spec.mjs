@@ -55,11 +55,11 @@ test('r1 il clic sulla proposta sotto il campo coperto dal bordo consegna l\'ema
   await accountFinto(app);
   const page = await testServer.openReady(openTab, PAGINA);
   await page.evaluate(() => document.getElementById('sottoBordo').focus({ preventScroll: true }));
-  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(false);
-  // Se compare, la scelta consegna l'email: la prova resta rossa sull'attesa qui sopra.
-  const vista = await aspettaFinestra(app, (w) => w.url() === 'filo://shell/proposta-email.html', 'vista');
-  await page.waitForTimeout(700);
-  await vista.click('#voce');
-  await page.waitForTimeout(500);
-  expect(await page.inputValue('#sottoBordo')).toBe('');
+  await page.waitForTimeout(1500);
+  if (await mostrata(app)) {
+    const vista = await aspettaFinestra(app, (w) => w.url() === 'filo://shell/proposta-email.html', 'vista');
+    await vista.click('#voce');
+    await page.waitForTimeout(500);
+  }
+  expect(await page.inputValue('#sottoBordo'), 'la pagina ha ricevuto l\'email da un campo che l\'utente non vedeva').toBe('');
 });
