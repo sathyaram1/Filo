@@ -366,16 +366,18 @@ istanze non si accumulano.
 Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
 l'ambito, non il ruolo.
 
-| Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
-|---|---|---|---|---|
-| ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus |
-| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus |
-| ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
-| lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
-| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare |
-| domenica | audit di sicurezza | `lavoro` | 45 | Opus |
+| Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale | Sforzo iniziale |
+|---|---|---|---|---|---|
+| ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus | `high` |
+| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus | `high` |
+| ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus | `high` |
+| lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) | `high` |
+| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare | `high` |
+| domenica | audit di sicurezza | `lavoro` | 45 | Opus | `high` |
 
-Si vedono e si cambiano in Routine → Compiti ricorrenti.
+Lo sforzo parte da `high` come nelle fasi di un feedback dopo il primo lavoro
+(§ 6.4): nessun ricorrente costruisce codice da zero. Modello e sforzo si
+vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti.
 
 ### 4.2 Due canali di aggiornamento
 
