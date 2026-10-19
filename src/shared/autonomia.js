@@ -228,6 +228,8 @@
   // Un token nell'intestazione di autorizzazione, di qualunque forma, e la password dentro un indirizzo (utente:password@).
   const INTESTAZIONE = /\bAuthorization[ \t]*:[ \t]*(?:Bearer|Basic|Token|Digest)[ \t]+([A-Za-z0-9._~+\/=-]{8,})/gi;
   const NELL_INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s\/:@"'`]+:([^\s\/@"'`]{4,})@/gi;
+  // utente:password dato a un programma di rete (`curl -u`, `--user`): diventa la stessa intestazione di autorizzazione.
+  const OPZIONE_UTENTE = /(?:^|\s)(?:-u|--user|--proxy-user)(?:=|\s+)["']?[^\s:"'\/@]+:([^\s"']{4,})/g;
   const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s+d['’]ordine|chiave\s+segreta|secret)\s*(?:[:=]|\bè\b|\bis\b|\bera\b)\s*["'«“]?([^\s"'»”,;&]{4,})/gi;
   const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s+(?:di\s+)?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s+codes?\b)[\s:=]*(?:(?:è|e'|is|era|was)\s+)?["'«“]?(\d[A-Za-z0-9]{3,}|[A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){1,9})/gi;
 
