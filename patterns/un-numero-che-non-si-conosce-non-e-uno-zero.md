@@ -67,4 +67,4 @@ letti.
 `tests/unit/feedbackStats.test.mjs` («registro non letto: i numeri che ne
 vengono sono null, non zero», e il suo gemello sul registro letto e vuoto) e
 `tests/manage-statistiche-feedback.spec.mjs` («col registro irraggiungibile i
-suoi riquadri scrivono un trattino, non uno zero»).
+suoi riquadri scrivono un trattino, non uno zero», e i tre del punto 4 di #997).
