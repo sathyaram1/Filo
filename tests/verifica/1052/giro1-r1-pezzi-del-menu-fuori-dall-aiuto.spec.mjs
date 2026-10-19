@@ -26,5 +26,5 @@ test('r1 la sentinella vede chi cerca sulla pagina l\'immagine del trascinamento
 
 test('r1 la prova della barra laterale trova l\'immagine del trascinamento del menu dall\'aiuto', () => {
   const testo = readFileSync(join(ROOT, 'tests', 'barra-laterale.spec.mjs'), 'utf8');
-  expect(testo).not.toMatch(/page\.locator\(\s*['"`]\.sn-drag-preview/);
+  expect(/page\.locator\(\s*['"`]\.sn-drag-preview/.test(testo)).toBe(false);
 });
