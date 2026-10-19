@@ -183,16 +183,19 @@ test('#509 — se gli stati non si leggono la pagina tace invece di scrivere «(
 });
 
 test('#509 — una segnalazione storta non toglie le sezioni a tutte le altre', async ({ openTab }) => {
-  // Il silenzio scatta quando la pagina non legge NESSUNO stato, che è il caso
-  // vero (o hai la chiave, o non ce l'hai). Con una sola illeggibile in mezzo a
-  // stati buoni la barra resta: toglierla farebbe divergere questa pagina dalla
-  // dashboard di gestione, cioè rimetterebbe il difetto che #509 doveva togliere.
+  // Il silenzio scatta quando una parte non trascurabile degli stati non si
+  // legge (#1042). Con una sola illeggibile in mezzo a tanti stati buoni la
+  // barra resta: toglierla farebbe divergere questa pagina dalla dashboard di
+  // gestione, cioè rimetterebbe il difetto che #509 doveva togliere.
   const page = await openTab(FEEDBACK_URL);
   await page.waitForFunction(() => Boolean(window.__fbTest), null, { timeout: 10_000 });
   await page.evaluate(() => window.__fbTest.setData([
     { _id: 'm1', seq: 41, status: 'FENC1:blob', statusPublic: 'open', name: 'Storta', text: 'Una', createdAt: '2026-08-20T10:00:00Z' },
     { _id: 'm2', seq: 42, status: 'todo', name: 'In coda', text: 'Due', createdAt: '2026-08-19T10:00:00Z' },
     { _id: 'm3', seq: 43, status: 'archived', name: 'Archiviata', text: 'Tre', createdAt: '2026-08-18T10:00:00Z' },
+    ...Array.from({ length: 8 }, (_, i) => ({
+      _id: `r${i}`, seq: 50 + i, status: 'unlabeled', name: `Ricevuta ${i}`, text: 'Altra', createdAt: `2026-08-1${i}T09:00:00Z`,
+    })),
   ]));
 
   await expect(page.locator('#tabs')).toBeVisible();
