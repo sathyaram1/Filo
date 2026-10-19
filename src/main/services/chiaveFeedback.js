@@ -126,7 +126,7 @@ function candidate(testo) {
 // sparirebbe fra i NUL.
 function comeTesto(buf) {
   if (buf[0] === 0xFF && buf[1] === 0xFE) return buf.subarray(2).toString('utf16le');
-  if (buf[0] === 0xFE && buf[1] === 0xFF) return Buffer.from(buf.subarray(2)).swap16().toString('utf16le');
+  if (buf[0] === 0xFE && buf[1] === 0xFF) return Buffer.from(buf.subarray(2, buf.length - (buf.length % 2))).swap16().toString('utf16le');
   return buf.toString('utf8').replace(/^﻿/, '');
 }
 
