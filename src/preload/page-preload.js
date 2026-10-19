@@ -206,7 +206,7 @@ try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console
 // (#405). I riquadri vuoti non ricevono il preload: li raggiunge la guardia della pagina (fingerprint-guard.js).
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (IS_SUBFRAME ? /^(https?|data|blob):|^about:srcdoc$/i.test(loc) : /^https?:/i.test(loc)) {
+  if (IS_SUBFRAME ? /^(https?|data|blob):|^about:(srcdoc|blank)$/i.test(loc) : /^https?:/i.test(loc)) {
     const cfg = ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: IS_SUBFRAME }) || { level: 0, seed: 0 };
     if (cfg && cfg.level > 0) {
       // Un riquadro della stessa origine chiede prima la guardia della finestra che lo contiene: se gliela monta lei,
