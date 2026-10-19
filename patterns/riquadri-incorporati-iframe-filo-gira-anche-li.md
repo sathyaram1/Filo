@@ -131,9 +131,7 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   coprirli spegne Filo in quei riquadri. In Automatico restano aperti per scelta
   dell'owner (Automatico promette nessun impatto); in Privacy massima un riquadro
   ancora vuoto dopo qualche secondo si copre, e il contenuto che arriva dopo ha il
-  rumore ma non Filo. Per indice restano aperti anche un riquadro tornato vuoto
-  letto prima del suo `load` e un `embed` nascosto che compare più tardi.
-  **Un preambolo per albero della stessa
+  rumore ma non Filo. **Un preambolo per albero della stessa
   origine**: il preload di un riquadro della stessa origine chiede la guardia
   alla finestra che lo contiene con un evento sull'elemento, il cui tipo è un
   segreto della sessione; se nessuno risponde la inietta da sé. Senza, un canvas
