@@ -375,8 +375,8 @@ l'ambito, non il ruolo.
 | lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare | `high` |
 | domenica | audit di sicurezza | `lavoro` | 45 | Opus | `high` |
 
-Lo sforzo parte da `high` come nelle fasi di un feedback dopo il primo lavoro
-(§ 6.4): nessun ricorrente costruisce codice da zero. Modello e sforzo si
+Lo sforzo parte da `high`, come nelle fasi di un feedback dopo il primo lavoro
+(§ 6.4), perché nessun ricorrente costruisce codice da zero. Modello e sforzo si
 vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti.
 
 ### 4.2 Due canali di aggiornamento
