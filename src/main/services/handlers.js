@@ -3104,6 +3104,8 @@ async function eseguiAzioneFilo(action, {
         try {
           await FiloMem.setMemory({ PROFILO: '', PREFERENZE: '' });
           await FiloMem.clearLessonsBuffer();
+          // Anche le righe nascoste del quaderno: «tutto» comprende quello che l'utente aveva solo tolto (#872).
+          await FiloMem.svuotaQuaderno();
           broadcastLiveUpdate();
           return { executed: true, kept: false };
         } catch (e) {
@@ -6591,6 +6593,20 @@ try {
   programmaIndiceArchivio(10_000);
   ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
 } catch (_) {}
+
+// #872 — le schede chiuse archiviate prima che il filo esistesse ci entrano alla loro data, una volta sola: la
+// Cronologia non c'è più, e si ritrovano dalla ricerca del filo. Dopo la partenza, per non rallentarla.
+async function schedeChiuseNelFilo({ unaVolta = true } = {}) {
+  if (Disco.inIncognito()) return 0;
+  const IlFilo = globalThis.SN_IL_FILO;
+  if (!IlFilo || !IlFilo.entranoSchedeChiuse) return 0;
+  return IlFilo.entranoSchedeChiuse(await ArchivedTabs.list(), { unaVolta });
+}
+globalThis.SN_SCHEDE_NEL_FILO = schedeChiuseNelFilo;
+if (process.env.NODE_ENV !== 'test' || process.env.FILO_SCHEDE_NEL_FILO === '1') {
+  const t = setTimeout(() => { schedeChiuseNelFilo().catch((e) => console.warn('[Filo] schede chiuse nel filo:', e?.message || e)); }, 4000);
+  t.unref?.();
+}
 
 // Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
 function testoPiano(testo) {

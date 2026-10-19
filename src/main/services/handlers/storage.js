@@ -318,6 +318,8 @@ module.exports = function register(on, ctx) {
       await require('../registroCambi').con({ via: 'importazione' }, async () => {
         if (Object.keys(rest).length) await DiskStorage.set(rest);
         await ArchivedTabs.importa(merged[ARCHIVE_KEY]);
+        // Le schede chiuse di un backup entrano anche nel filo, alla loro data (#872): la Cronologia non c'è più.
+        try { await globalThis.SN_SCHEDE_NEL_FILO?.({ unaVolta: false }); } catch (e) { console.warn('[Filo] schede del backup nel filo:', e?.message || e); }
         await History.importa(merged[HISTORY_KEY]);
         if (Mie) await Mie.importa(merged[MIE_KEY]);
         if (settings && typeof settings === 'object') await applySettingsUpdate(settings);

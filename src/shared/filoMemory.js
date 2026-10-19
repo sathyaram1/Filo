@@ -251,6 +251,10 @@
     return { moduli, lezioni, sempreAperte, nascoste };
   }
 
+  async function svuotaQuaderno() {
+    await setFonti({ righe: {}, nascoste: [] });
+  }
+
   // Quello che il compattatore deve sapere delle righe tolte: testo (se c'è ancora) e fonti.
   async function righeTolte() {
     return (await getFonti()).nascoste.map((n) => ({ testo: n.testo || '', fonti: n.fonti }));
@@ -1129,7 +1133,7 @@
     getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
     setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine: inFila(forgetLine),
     // quaderno delle memorie (#872)
-    getFonti, quaderno, righeTolte, hideLine: inFila(hideLine), restoreHidden: inFila(restoreHidden),
+    getFonti, quaderno, righeTolte, svuotaQuaderno: inFila(svuotaQuaderno), hideLine: inFila(hideLine), restoreHidden: inFila(restoreHidden),
     forgetHiddenForever: inFila(forgetHiddenForever), editLine: inFila(editLine), applicaCompattazione: inFila(applicaCompattazione),
     // onboarding (#524)
     getOnboarding, setOnboarding,
