@@ -1,5 +1,6 @@
-// #589.1 giro 4, rilievo 1 — il caso ancora aperto: il controllo del campo dice a un sito se un suo testo è un
-// segreto che Filo ha letto su un'altra pagina, e su quale (decisione chiesta all'owner). Isolamento rotto: mondo 999.
+// #589.1 giro 4, rilievo 1 — domande che la lista ammette rispondono a un sito con ciò che Filo sa degli altri siti:
+// i siti dove l'utente ha spento Filo o tiene il menu del sito, e se un testo è un segreto letto su un'altra pagina
+// (e su quale). Isolamento rotto: mondo 999.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { join } from 'node:path';
@@ -20,6 +21,25 @@ function dalPreload(app, quale) {
   }, { src: quale.toString(), codice });
 }
 const chiedi = (tipo, extra = {}) => `chrome.runtime.sendMessage(${JSON.stringify({ type: tipo, ...extra })})`;
+
+test('r1 un sito non si fa dire dove l\'utente ha spento Filo né dove tiene il menu del sito', async ({ app, shell, openTab, testServer }) => {
+  await shell.evaluate(async () => {
+    await window.filoShell.message({ type: 'update_settings', settings: { blocklist: ['banca-privata.example', 'clinica.example'], menuDelSito: { siti: ['figma.example'] } } });
+  });
+  await testServer.openReady(openTab, '<h1>sito</h1>', { pubblico: true });
+  await openTab(testServer.html('<h1>quella che guardo</h1>'));
+  const sito = dalPreload(app, (u) => u.startsWith('http://sito-pubblico.test'));
+
+  const spento = await sito(chiedi('filo_spento_imposta', { spento: false }));
+  const menu = await sito(chiedi('menu_del_sito_imposta', { attivo: false }));
+  for (const r of [spento, menu]) {
+    expect(r.nonTrovata || r.errore, 'il preload del sito non è stato raggiunto').toBeFalsy();
+    const testo = JSON.stringify(r.risposta);
+    expect(testo, 'la risposta a un sito porta i siti dove l\'utente ha spento Filo').not.toContain('banca-privata.example');
+    expect(testo).not.toContain('clinica.example');
+    expect(testo, 'la risposta a un sito porta i siti dove l\'utente tiene il menu del sito').not.toContain('figma.example');
+  }
+});
 
 test('r1 un sito non controlla se un suo testo è un segreto che Filo ha letto su un\'altra pagina', async ({ app, openTab, testServer }) => {
   await app.evaluate((_e, { dir, iban }) => {
