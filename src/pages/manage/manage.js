@@ -7466,11 +7466,16 @@
       // le più recenti: una che sta qui e non lì non si può aprire, e la riga
       // lo dice invece di non fare niente al clic.
       const apribile = allFeedbacks.some((f) => f._id === id);
+      const critiche = src.critiche ? src.critiche[id] : null;
       return `<li><button type="button" class="mg-fs-drill-row" data-fs-open="${esc(id)}"${apribile ? '' : ' disabled'}`
         + ` title="${esc(apribile ? 'Apri la segnalazione' : 'Non è fra le segnalazioni caricate nella lista: aprila dalla colonna di sinistra')}">`
         + `<span class="mg-fs-drill-num">${num ? '#' + esc(num) : '—'}</span>`
         + `<span class="mg-fs-drill-t">${esc(titolo)}</span>`
-        + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span></button></li>`;
+        + `<span class="mg-fs-drill-cat">${esc(cat.label)}</span>`
+        + (typeof critiche === 'number'
+          ? `<span class="mg-fs-drill-giri">${esc(fsRigaCritiche(critiche))}</span>`
+          : '')
+        + '</button></li>';
     }).join('') + righeMancanti;
   }
 
