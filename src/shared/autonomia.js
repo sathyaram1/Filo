@@ -272,6 +272,7 @@
     for (const m of t.matchAll(INTESTAZIONE)) yield { tipo: 'chiave', valore: m[1] };
     for (const m of t.matchAll(PAROLA_PASSWORD)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
     for (const m of t.matchAll(NELL_INDIRIZZO)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
+    for (const m of t.matchAll(OPZIONE_UTENTE)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
     for (const m of t.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) yield { tipo: 'codice', valore: m[1] };
     for (const m of t.matchAll(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}/g)) {
       const s = soloAlnum(m[0]);
