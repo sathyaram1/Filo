@@ -1441,7 +1441,7 @@
 
   // Il passo che non parte resta nella cronologia con la fermata, così il modello sa a che punto era anche se l'utente
   // poi scrive altro; «Continua» sta nel documento del sito, e lo preme solo un gesto vero (#592.6).
-  function fermaPassiDaSolo(nota, dati) {
+  function fermaPassiDaSolo(nota, dati, dopoDocumenti) {
     if (continuaAperto) return;
     const fermo = `Poi Filo ti ha fermato: avevi fatto ${MAX_PASSI_DA_SOLO} passi da solo di fila senza che l'utente toccasse niente, `
       + 'e il passo dopo parte solo se te lo chiede lui';
@@ -1463,7 +1463,7 @@
       if (!gestoVero(e) || btn.disabled) return;
       btn.disabled = true;
       if (continuaAperto === btn) continuaAperto = null;
-      submit({ userAction: 'l\'utente ha chiesto di proseguire da dove ti eri fermato', preActionUrl: location.href, daGesto: true });
+      submit({ userAction: 'l\'utente ha chiesto di proseguire da dove ti eri fermato', preActionUrl: location.href, daGesto: true, dopoDocumenti });
     });
     riga.append(`mi sono fermato dopo ${MAX_PASSI_DA_SOLO} passi fatti da solo `, btn);
     continuaAperto = btn;
@@ -1483,7 +1483,7 @@
       passiDaSolo = 0;
       if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
     } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
-      fermaPassiDaSolo(userAction, esterno);
+      fermaPassiDaSolo(userAction, esterno, dopoDocumenti);
       return;
     }
     const wasCollapsed = collapsed;

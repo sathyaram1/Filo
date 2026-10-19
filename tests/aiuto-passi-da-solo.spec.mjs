@@ -83,7 +83,11 @@ test('una pagina che chiede sempre la sezione dopo: l\'Aiuto si ferma al tetto e
   // La domanda più i passi da solo, non uno di più: ognuno ha aperto la sua sezione.
   expect(await turni(app)).toBe(1 + TETTO);
   expect(await aperte(sito)).toBe(1 + TETTO);
-  await sito.locator('.sn-sidebar').screenshot({ path: join(SHOTS, 'aiuto-passi-da-solo.png') });
+  for (const tema of ['light', 'dark']) {
+    await app.evaluate((_e, theme) => globalThis.SN_STORAGE.updateSettings({ theme }), tema);
+    await sito.waitForTimeout(600);
+    await sito.locator('.sn-sidebar').screenshot({ path: join(SHOTS, `aiuto-passi-da-solo-${tema}.png`) });
+  }
 
   // Fermo davvero: niente parte più da solo.
   await sito.waitForTimeout(3000);
