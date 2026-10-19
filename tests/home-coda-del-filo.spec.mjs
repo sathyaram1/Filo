@@ -4,7 +4,7 @@
 // e si tolgono anche dal disco, la ricerca nel filo senza la chat, le azioni fatte dall'interfaccia come righe sottili.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { home, modelloFinto, chiedi } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { readFileSync, mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
@@ -201,19 +201,12 @@ test('Filo che scrive mentre la scheda nuova legge ancora il filo compare una vo
   await expect(page.locator('.dash-bubble-user', { hasText: 'ciao' })).toBeVisible();
   await new Promise((r) => setTimeout(r, 500));
   await expect(spontanei).toHaveCount(1);
-  // Il turno dopo continua la stessa conversazione, e il modello legge anche quello che c'era prima dell'annuncio.
-  await app.evaluate(() => {
-    const P = globalThis.SN_PROVIDERS;
-    const prima = P.completeWithFallback;
-    P.completeWithFallback = async (o) => {
-      const tutto = o.messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
-      if (!tutto.includes('preparare la dashboard')) globalThis.__turno = tutto;
-      return prima(o);
-    };
-  });
+  // Il turno dopo continua la stessa conversazione, con lo storico di prima dell'annuncio.
+  await modelloFinto(app, [{ text: 'Scolala.' }]);
   await chiedi(page, 'e adesso?');
-  await expect.poll(() => app.evaluate(() => globalThis.__turno || ''), { timeout: 15_000 }).toContain('e adesso?');
-  const turno = await app.evaluate(() => globalThis.__turno);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Scolala.' })).toBeVisible();
+  const chiamate = await chiamateAlModello(app);
+  const turno = JSON.stringify(chiamate[chiamate.length - 1]);
   expect(turno).toContain('ciao');
   expect(turno).toContain('Il timer della pasta è suonato.');
   const chats = await app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).filter((c) => !c.app).map((c) => c.id));
