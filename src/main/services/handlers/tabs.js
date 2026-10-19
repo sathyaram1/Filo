@@ -30,10 +30,25 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  // Arriva dai content script di Filo, che la pagina non può chiamare: vale solo per la scheda che l'ha mandato.
-  on(MSG.PERMESSO_FILO, async (msg, sender) => {
+  // Arriva dai content script di Filo, che la pagina non può chiamare: «Incolla» legge qui, e il sito resta senza permesso.
+  on(MSG.APPUNTI_DI_FILO, async (_msg, sender) => {
     if (!sender || !sender.tab || !sender.wc) return { ok: false };
-    return { ok: require('../permessiPagine').lasciapassare(sender.wc, msg && msg.tipo) };
+    const { clipboard } = require('electron');
+    let immagine = '';
+    try {
+      const voci = await clipboard.read();
+      for (const prima of [true, false]) {
+        for (const v of voci) {
+          const t = v.types.find((x) => (prima ? x === 'image/png' : /^image\//.test(x)));
+          if (!t || immagine) continue;
+          const b = Buffer.from(await (await v.getType(t)).arrayBuffer());
+          if (b.length) immagine = `data:${t};base64,${b.toString('base64')}`;
+        }
+      }
+    } catch (_) {}
+    let testo = '';
+    try { testo = String((await clipboard.readText()) || ''); } catch (_) {}
+    return { ok: true, testo, immagine };
   });
 
   // Le scelte ricordate stanno solo nelle pagine di Filo: un sito non le legge e non le cambia.

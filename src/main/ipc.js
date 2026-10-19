@@ -212,6 +212,10 @@ function registerIpcHandlers() {
     require('./services/permessiPagine').gestoDiFilo(event.sender);
     event.returnValue = true;
   });
+  ipcMain.on('filo:schermo-vecchio', (event) => {
+    require('./services/permessiPagine').schermoVecchio(event.sender, event.senderFrame);
+    event.returnValue = true;
+  });
   ipcMain.on('filo:apertura-scelta', (event, url) => {
     require('./services/permessiPagine').aperturaScelta(event.sender, url);
     event.returnValue = true;
@@ -574,10 +578,11 @@ function registerIpcHandlers() {
     if (!win?._filoTabs) return { activeId: null, tabs: [] };
     return win._filoTabs.snapshot();
   });
+  require('./services/microfonoDiFilo').registra({ ipcMain, BrowserWindow });
   // Solo la cornice risponde a una domanda di permesso: è l'unico posto dove l'ha vista l'utente (#591.1).
-  ipcMain.handle('tabs:permesso-risposta', (event, { id, si } = {}) => {
+  ipcMain.handle('tabs:permesso-risposta', (event, { id, si, fonte } = {}) => {
     if (!finestraDellaBarra(event.sender) || !id) return { ok: false };
-    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true) };
+    return { ok: require('./services/permessiPagine').rispondi(String(id), si === true, typeof fonte === 'string' ? fonte.slice(0, 200) : undefined) };
   });
   // Le scelte ricordate per il sito di una scheda: il suo menu le mostra e le toglie (#591.1).
   const paginaDiScheda = (event, id) => {

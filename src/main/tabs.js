@@ -117,6 +117,12 @@ function installaPermessi(ses) {
     },
     schedaDi: schedaPerPermessi,
     esterno: isOsDelegatedScheme,
+    aggiorna: (wc) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tm = w._filoTabs;
+        if (tm && Array.isArray(tm.tabs) && tm.tabs.some((x) => x && x.view && x.view.webContents === wc)) { tm._broadcast(); return; }
+      }
+    },
   });
 }
 
@@ -3743,6 +3749,8 @@ class TabManager {
         cookies: this._cookieState(t),
         // «Resta connesso qui» (Privacy massima e Automatico): null se la voce non va mostrata.
         connesso: this._connessoState(t),
+        // Cosa il sito della pagina ha avuto o si è visto negare (#586): il segno sulla scheda.
+        permessi: Permessi.segniDi(t.view && t.view.webContents),
       })),
     };
   }
