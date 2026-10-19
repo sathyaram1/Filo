@@ -218,3 +218,8 @@ test('la sentinella riconosce chi cerca il menu senza l\'aiuto', () => {
   ];
   for (const [codice, attese] of casi) assert.equal(cercheFuoriDallAiuto(codice).length, attese, codice);
 });
+
+test('i pezzi del menu fuori dalle voci (etichetta delle icone, immagine del trascinamento) contano come menu', () => {
+  for (const c of ['sn-tooltip', 'sn-drag-preview']) assert.ok(CLASSI_DEL_MENU.includes(c), c);
+  assert.ok(!CLASSI_DEL_MENU.includes('sn-disabled'), 'sn-disabled la assegnano anche altri riquadri');
+});
