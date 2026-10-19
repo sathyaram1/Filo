@@ -185,7 +185,7 @@
       await setMemory({ ...mem, [nome]: prima ? `${prima}\n${n.testo}` : n.testo });
       meta.righe[nome] = [...(meta.righe[nome] || []), { testo: n.testo, fonti: n.fonti, nata: n.nata || null }];
     }
-    await setFonti(meta);
+    await setFonti(toccata(meta));
     return true;
   }
 
