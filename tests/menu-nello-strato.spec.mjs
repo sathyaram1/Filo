@@ -435,4 +435,37 @@ test.describe('il menu nello strato', () => {
       await chiusoLoStrato(app);
     }
   });
+
+  test('il menu di una selezione resta mentre la rotella fa scorrere la pagina sotto; quello normale si chiude', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;font:18px sans-serif">
+      <p id="testo" style="margin:40px">Una frase da selezionare qui.</p><div style="height:3000px"></div></body>`);
+    const p = await page.evaluate(() => {
+      const t = document.getElementById('testo').firstChild;
+      const r = document.createRange();
+      r.setStart(t, 4);
+      r.setEnd(t, 9);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    });
+    await page.mouse.click(p.x, p.y, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    const strato = menuDi(page).superficie;
+    await strato.mouse.move(900, 500);
+    await strato.mouse.wheel(0, 400);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+    expect((await statoDelloStrato(app)).aperto, 'il menu della selezione resta aperto').toBe(true);
+    await strato.keyboard.press('Escape');
+    await chiusoLoStrato(app);
+
+    await page.evaluate(() => { getSelection().removeAllRanges(); window.scrollTo(0, 0); });
+    await page.mouse.click(300, 300, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    await strato.mouse.move(900, 500);
+    await strato.mouse.wheel(0, 400);
+    await chiusoLoStrato(app);
+  });
 });

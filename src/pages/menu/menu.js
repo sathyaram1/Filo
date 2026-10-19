@@ -213,7 +213,7 @@
     if (!d.menu || typeof d.menu.id !== 'string') return;
     m = {
       id: d.menu.id, ancore: new Map(), segni: new WeakMap(), inline: new Map(), correzioni: new Map(),
-      attese: new Map(), inVolo: new Map(),
+      attese: new Map(), inVolo: new Map(), restaAperto: !!d.menu.keepOnScroll,
     };
     applicaTema(d.tema, d.tokens);
     const cronologia = Array.isArray(d.cronologia) ? d.cronologia.filter((e) => e && typeof e === 'object') : [];
@@ -300,14 +300,21 @@
     },
   });
 
-  // Fuori dal menu c'è solo lo strato vuoto: chiude, e un tasto destro lì apre il menu nuovo sulla scheda.
+  // Fuori dal menu c'è solo lo strato vuoto: chiude, e un tasto destro lì apre il menu nuovo sulla scheda (il Ctrl+clic
+  // del Mac arriva già come tasto destro).
   const vuoto = (t) => t === document.documentElement || t === document.body || t === ancora;
   const fuori = (e) => {
     if (!seq || !vuoto(e.target)) return;
     e.preventDefault();
-    api.fuori(seq, e.type === 'pointerdown' && e.button === 2 ? { x: e.clientX, y: e.clientY } : null);
+    api.fuori(seq, e.button === 2 ? { x: e.clientX, y: e.clientY } : null);
   };
   document.addEventListener('pointerdown', fuori, true);
-  document.addEventListener('wheel', fuori, { capture: true, passive: false });
+  // Il menu di una selezione o di una parola resta mentre la pagina scorre, come nella pagina: la rotella passa sotto.
+  document.addEventListener('wheel', (e) => {
+    if (!seq || !vuoto(e.target)) return;
+    e.preventDefault();
+    if (m && m.restaAperto) api.chiedi('rotella', { seq, id: m.id, x: e.clientX, y: e.clientY, dx: e.deltaX, dy: e.deltaY });
+    else api.fuori(seq);
+  }, { capture: true, passive: false });
   document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
 })();

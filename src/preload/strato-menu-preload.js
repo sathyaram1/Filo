@@ -3,7 +3,7 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-const CANALI = new Set(['esegui', 'incolla', 'scegli', 'togli', 'svuota', 'tastiera']);
+const CANALI = new Set(['esegui', 'incolla', 'scegli', 'togli', 'svuota', 'tastiera', 'rotella']);
 
 contextBridge.exposeInMainWorld('strato', {
   onMostra: (fn) => {

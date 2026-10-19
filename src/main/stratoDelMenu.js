@@ -243,6 +243,14 @@ class StratoDelMenu {
       try { this.vista.webContents.focus(); } catch (_) {}
       return;
     }
+    // La rotella fuori da un menu che resta aperto scorre la pagina sotto, come se lo strato non ci fosse.
+    if (canale === 'strato:rotella') {
+      const q = puntoNellArea({ x: d.x, y: d.y }, a.area);
+      const delta = (v) => (Number.isFinite(Number(v)) ? Math.max(-10000, Math.min(10000, Number(v))) : 0);
+      if (!q || m.wc.isDestroyed()) return;
+      try { m.wc.sendInputEvent({ type: 'mouseWheel', x: q.x, y: q.y, deltaX: -delta(d.dx), deltaY: -delta(d.dy), canScroll: true }); } catch (_) {}
+      return;
+    }
     if (canale === 'strato:esegui') {
       if (d.inline != null) {
         const cammino = interi(d.cammino);
@@ -458,7 +466,7 @@ class StratoDelMenu {
         if (dati.destro && Date.now() - this.clicAlle <= GESTO_MS) this._rigiocaDestro(sotto, dati.destro);
         return;
       }
-      if (/^strato:(esegui|incolla|scegli|togli|svuota|tastiera)$/.test(canale)) this._dalloStrato(canale, dati).catch(() => {});
+      if (/^strato:(esegui|incolla|scegli|togli|svuota|tastiera|rotella)$/.test(canale)) this._dalloStrato(canale, dati).catch(() => {});
     });
     try { wc.ipc.handle('strato:barra', (_e, dati) => this._versoLaBarra(dati)); } catch (_) {}
     wc.once('did-finish-load', () => {
