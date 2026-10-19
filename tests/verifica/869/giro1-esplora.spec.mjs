@@ -87,15 +87,20 @@ test('titoli con markup restano testo nella riga delle pagine e nella ricerca', 
   expect(await page.evaluate(() => window.__x)).toBeUndefined();
 });
 
-test('due home aperte: lo scambio scritto in una compare nell’altra e lì si continua', async ({ app, openTab }) => {
+test('due home aperte: lo scambio scritto in una compare nell’altra e lì si continua', async ({ app, shell, openTab }) => {
   test.setTimeout(60_000);
   const a = await home(app);
   const b = await openTab('filo://newtab/');
+  const attiva = (quale) => shell.evaluate(async (q) => {
+    const s = await window.filoShell.tabs.snapshot();
+    const tutte = s.tabs.filter((x) => String(x.url).startsWith('filo://newtab'));
+    await window.filoShell.tabs.activate((q === 'a' ? tutte[0] : tutte[tutte.length - 1]).id);
+  }, quale);
   await modelloFinto(app, [{ text: 'Le orche cacciano in branco.' }, { text: 'Anche le balene.' }]);
-  await a.bringToFront();
+  await attiva('a');
   await chiedi(a, 'come cacciano le orche?');
   await expect(a.locator('.dash-bubble-filo', { hasText: 'Le orche cacciano in branco.' })).toBeVisible();
-  await b.bringToFront();
+  await attiva('b');
   await expect(b.locator('.dash-bubble-filo', { hasText: 'Le orche cacciano in branco.' })).toHaveCount(1);
   await expect(b.locator('.dash-bubble-user', { hasText: 'come cacciano le orche?' })).toHaveCount(1);
   await chiedi(b, 'e le balene?');
