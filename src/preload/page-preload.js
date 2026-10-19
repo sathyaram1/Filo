@@ -634,11 +634,19 @@ try {
     e.preventDefault();
     scaricaDaRifare = a;
   };
-  globalThis.SN_RISCARICA = (url) => {
+  // `nome`: un file che la pagina ha costruito da sé (blob:, data:) e scaricato senza un link cliccato, rifatto col suo nome.
+  globalThis.SN_RISCARICA = (url, nome) => {
     const a = scaricaDaRifare;
     scaricaDaRifare = null;
-    if (!a || !a.isConnected || String(a.href) !== String(url)) return false;
-    a.click();
+    if (a && a.isConnected && String(a.href) === String(url)) { a.click(); return true; }
+    if (!nome || !/^(blob|data|filesystem):/i.test(String(url))) return false;
+    const b = document.createElement('a');
+    b.href = String(url);
+    b.download = String(nome);
+    b.style.display = 'none';
+    (document.body || document.documentElement).appendChild(b);
+    b.click();
+    b.remove();
     return true;
   };
   const ascolta = (win) => {
