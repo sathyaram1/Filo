@@ -107,6 +107,11 @@
     return costEur / CREDIT.EUR_PER_CREDIT;
   }
 
+  // Quanti crediti locali vale un dollaro, col cambio con cui costTracker passa agli euro (stime di costo, #819).
+  function creditiPerDollaro(usdToEur) {
+    return costEurToCredits(Number(usdToEur) || 0.92);
+  }
+
   // Ricompensa (crediti) per la RISOLUZIONE di un feedback in base alla priorità
   // dell'utente (0-3). Priorità mancante/fuori scala → fascia 0. (C5)
   function rewardForPriority(priority) {
@@ -333,7 +338,7 @@
 
   global.SN_CREDITS = {
     // pure (per i test e la logica)
-    freshState, ensure, applyRefill, costEurToCredits, rewardForPriority,
+    freshState, ensure, applyRefill, costEurToCredits, creditiPerDollaro, rewardForPriority,
     applyConsumption, applyAward, applyAnnounced, isVoteRewardPending, applyConsumptionIfAffordable,
     publicView, dateKey, daysBetween,
     // async (runtime)

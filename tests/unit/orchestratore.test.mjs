@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, oraLocale, passoDalRamo,
+  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, INCORPORATI_DAL_SERVER, nuovaPratica, oraLocale, passoDalRamo,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
@@ -105,8 +105,12 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
 
 const indice = (righe, re) => righe.findIndex((r) => re.test(r));
 
-test('giro intero: lavoratore, due verifiche, server su main, app, deploy, rilievi aperti come feedback, worktree tolti', async () => {
-  const b = banco({ verdetti: ['fixed', 'pass'], derived: [{ level: 1, sede: 'e', text: 'altro lavoro Z' }] });
+test('giro intero: lavoratore, due verifiche, app su main, poi server, deploy, rilievi aperti come feedback, worktree tolti', async () => {
+  let filo = null;
+  const b = banco({
+    verdetti: ['fixed', 'pass'], derived: [{ level: 1, sede: 'e', text: 'altro lavoro Z' }],
+    risposte: [[/server-fondi-pratica/, (riga, o) => { filo = o.env && o.env.FILO_PUBLIC_REPO; }]],
+  });
   const fine = await b.motore.avvia();
   const p = fine.pratiche[7];
   assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
@@ -114,8 +118,11 @@ test('giro intero: lavoratore, due verifiche, server su main, app, deploy, rilie
   assert.deepEqual(p.fusa, { app: true, server: true, deploy: true });
   assert.deepEqual(p.derivatiAperti.map((d) => d.num), [1001]);
   assert.equal(p.costo, 1.5);
+  // Le prove di server:fondi leggono il ramo del lavoro, con la parte dell'app, come la suite di GitHub (#1222).
+  assert.equal(filo, '/r/.claude/worktrees/sette');
   const r = b.righe();
-  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /finish-local\.mjs --feedback 7/, /server:pubblica/, /scollega/, /worktree remove/];
+  // Prima l'app, poi il server, come dal cancello: la pubblicazione incorpora main di Filo con la parte dell'app (#1222).
+  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
   let prima = -1;
   for (const re of ordine) {
     const i = r.findIndex((x, k) => k > prima && re.test(x));
@@ -160,6 +167,33 @@ test('solo server: --solo-server, niente finish', async () => {
   assert.equal(fine.pratiche[7].fase, 'fuso');
   assert.ok(indice(b.righe(), /server-fondi-pratica\.mjs claude\/sette --feedback 7 --solo-server/) >= 0);
   assert.equal(indice(b.righe(), /finish-local/), -1);
+});
+
+test('deploy.yml su main di filo-security: la spinta del server la pubblica GitHub, il PC non lancia un secondo deploy insieme', async () => {
+  const soloScript = [/diff --name-only/, { code: 0, out: 'scripts/a.mjs' }];
+  const b = banco({ risposte: [soloScript] });
+  b.dep.pubblicaGitHub = async () => true;
+  const fine = await b.motore.avvia();
+  const p = fine.pratiche[7];
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.deepEqual(p.fusa, { app: true, server: true, deploy: true });
+  assert.equal(indice(b.righe(), /server:pubblica/), -1, b.righe().join('\n'));
+  assert.match(p.avvisi.join('\n'), /lo pubblica GitHub/);
+  // Un file incorporato cambiato dall'app: la spinta del server arriva dopo l'app, e GitHub incorpora anche lui (#1222).
+  const inc = banco();
+  inc.dep.pubblicaGitHub = async () => true;
+  await inc.motore.avvia();
+  assert.equal(indice(inc.righe(), /server:pubblica/), -1, inc.righe().join('\n'));
+  // Senza una spinta del server dopo l'app (lavoro solo dell'app, o server fuso prima), il deploy resta al PC.
+  const soloApp = banco({ server: false });
+  soloApp.dep.pubblicaGitHub = async () => true;
+  await soloApp.motore.avvia();
+  assert.ok(indice(soloApp.righe(), /server:pubblica/) >= 0);
+  // Senza deploy.yml su main, come prima.
+  const senza = banco({ risposte: [soloScript] });
+  senza.dep.pubblicaGitHub = async () => false;
+  await senza.motore.avvia();
+  assert.ok(indice(senza.righe(), /server:pubblica/) >= 0);
 });
 
 test('tetto dei giri: si ferma senza lanciare un verificatore in più', async () => {
@@ -387,17 +421,37 @@ test('finish: conflitto → riallineamento e nuova verifica; rosso transitorio �
   assert.equal(classificaFinish({ code: 30, out: '' }), 'superato');
 });
 
-test('fuso a metà (server sì, app no) e ripreso: non rifonde il server', async () => {
-  const b = banco({ risposte: [[/finish-local/, { code: 1, out: 'unit rosso' }]] });
+test('fuso a metà (app sì, server no) e ripreso: non rifonde l’app, e il fermo dice che l’app è già su main', async () => {
+  let volte = 0;
+  const b = banco({ risposte: [[/server-fondi-pratica/, () => (volte++ === 0 ? { code: 1, out: 'test rossi' } : null)]] });
   let p = (await b.motore.avvia()).pratiche[7];
   assert.equal(p.fase, 'fermo');
-  assert.equal(p.fusa.server, true);
+  assert.deepEqual([p.fusa.app, !!p.fusa.server], [true, false]);
+  assert.match(p.fermo.motivo, /la parte dell’app è già su main di Filo, il server no: server:fondi non ha fuso/);
   const q = riprendi(p, '');
   assert.equal(q.fase, 'chiusura');
   b.stato.pratiche[7] = q;
-  const prima = b.righe().filter((x) => /server-fondi/.test(x)).length;
+  const prima = b.righe().filter((x) => /finish-local/.test(x)).length;
   p = (await b.motore.avvia()).pratiche[7];
-  assert.equal(b.righe().filter((x) => /server-fondi/.test(x)).length, prima);
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(b.righe().filter((x) => /finish-local/.test(x)).length, prima);
+});
+
+test('app ferma al finish: il server non va su main', async () => {
+  const b = banco({ risposte: [[/finish-local/, { code: 1, out: 'unit rosso' }]] });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  assert.equal(!!p.fusa.server, false);
+  assert.equal(indice(b.righe(), /server-fondi/), -1);
+});
+
+test('ramo del server che non contiene main di filo-security: ci si ferma prima che l’app vada su main', async () => {
+  const b = banco({ risposte: [[/merge-base --is-ancestor refs\/remotes\/origin\/main refs\/heads\/claude\/sette/, { code: 1, out: '' }]] });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  assert.match(p.fermo.motivo, /non contiene main di filo-security.*l’app non è andata su main.*riprendi 7/);
+  assert.equal(indice(b.righe(), /finish-local/), -1);
+  assert.equal(indice(b.righe(), /server-fondi/), -1);
 });
 
 test('regole toccate: avviso per la pubblicazione a Filo chiuso, il lavoro si chiude lo stesso', async () => {
@@ -406,6 +460,26 @@ test('regole toccate: avviso per la pubblicazione a Filo chiuso, il lavoro si ch
   assert.equal(p.fase, 'fuso');
   assert.match(p.avvisi.join('\n'), /regole:pubblica/);
   assert.equal(toccaRegole(['src/x.js']), false);
+  // Con regole.yml su main di filo-security le pubblica GitHub: l'avviso lo dice, il comando resta per averle subito.
+  const cloud = banco({ server: false, risposte: [[/diff --name-only/, { code: 0, out: 'firestore.rules' }]] });
+  cloud.dep.regoleGitHub = async () => true;
+  const q = (await cloud.motore.avvia()).pratiche[7];
+  assert.equal(q.fase, 'fuso');
+  const avviso = q.avvisi.find((a) => a.startsWith('regole'));
+  assert.match(avviso, /le pubblica GitHub entro un’ora/);
+  assert.match(avviso, /se la corsa è rossa, npm run regole:pubblica/);
+});
+
+test('il PC conosce tutte le fonti che il server incorpora: con una sola mancante pubblicherebbe GitHub col main di Filo di prima', () => {
+  const guardia = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'filo-security', 'functions', 'tools', 'guardia-deploy.js');
+  const attese = ['src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt'];
+  assert.deepEqual([...INCORPORATI_DAL_SERVER].sort(), [...attese].sort());
+  // Accanto al checkout principale c'è il server: il suo elenco deve essere lo stesso.
+  if (existsSync(guardia)) {
+    const m = /const FONTI_BAKE = \[([^\]]*)\]/.exec(readFileSync(guardia, 'utf8'));
+    assert.ok(m, 'FONTI_BAKE non trovato nella guardia del server');
+    assert.deepEqual([...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort(), [...INCORPORATI_DAL_SERVER].sort());
+  }
 });
 
 test('il collegamento a node_modules che non si toglie lascia il worktree al suo posto', async () => {

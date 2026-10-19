@@ -1,5 +1,5 @@
 // Siti ospitati su piattaforme a sottodominio per utente (github.io, vercel.app, s3…): il dominio che conta è
-// quello dell'utente, non la piattaforma. Regola in src/main/services/safebrowse/psl.js.
+// quello dell'utente, non la piattaforma. Regola in src/shared/stessoSito.js (safebrowse/psl.js la riesporta).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -86,8 +86,10 @@ test('i cookie della modalità privacy seguono solo le piattaforme che il web gi
   assert.equal(perCookie('https://sathya.github.io/'), 'sathya.github.io');
   // Per il giudizio invece il blog è un sito a sé.
   assert.equal(normalize('https://myblog.wordpress.com/').registrable, 'myblog.wordpress.com');
-  const sito = readFileSync(new URL('../../src/main/services/stessoSito.js', import.meta.url), 'utf8');
-  assert.match(sito, /normalize\(url, \{ soloPsl: true \}\)/);
+  // Il sito dei cookie (src/shared/stessoSito.js) è lo stesso.
+  const Sito = require('../../src/shared/stessoSito.js');
+  assert.equal(Sito.sitoDi('https://myblog.wordpress.com/'), 'wordpress.com');
+  assert.equal(Sito.sitoDi('https://myblog.wordpress.com/', { tutteLePiattaforme: true }), 'myblog.wordpress.com');
 });
 
 test('un Microsoft Form su cloud.microsoft resta una pagina ospitata da giudicare', () => {
@@ -107,7 +109,7 @@ test('sotto un suffisso nazionale ogni sito è suo, e una voce fidata che è un 
 });
 
 // #730 — la piattaforma che ospita non va riconosciuta a mano: vale tutta la sezione privata della PSL.
-const PSL = JSON.parse(readFileSync(new URL('../../src/vendor/public-suffix-list/privata.json', import.meta.url), 'utf8'));
+const PSL = require('../../src/vendor/public-suffix-list/privata.js');
 const { PRIVATE_AVVISO, DEL_MARCHIO } = require('../../src/main/services/safebrowse/psl.js');
 
 test('un sosia ospitato viene segnalato anche su piattaforme che nessuno ha elencato a mano', () => {

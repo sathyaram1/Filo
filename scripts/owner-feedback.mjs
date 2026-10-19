@@ -39,6 +39,8 @@
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
+//   node scripts/owner-feedback.mjs <n|id> --aspetta 676,663.2   (l'elenco intero: sostituisce quello di prima, e dice cosa toglie)
+//   node scripts/owner-feedback.mjs <n|id> --aspetta-niente
 //
 //   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
 //   `--priorita`: come il pallino di Gestione (cifrata, `priorityManual`: il giudice non la riabbassa). Da sola vale
@@ -90,6 +92,7 @@ import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
+import '../src/shared/feedbackAttese.js';
 import '../src/shared/manageReview.js';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
@@ -258,6 +261,86 @@ async function togliScheda(id, bearer) {
     method: 'DELETE', headers: { Authorization: `Bearer ${bearer}` },
   });
   return res.ok || res.status === 404 ? '' : `la scheda nella bacheca pubblica è rimasta (${res.status})`;
+}
+
+/**
+ * Le attese (#903), stato invariato: `numeri` come li scrive l'owner («676,663.2»), '' per toglierle. Le regole sono
+ * quelle di Gestione (SN_FB_ATTESE.valida): numeri inesistenti, sé stesso, giri e più di venti si rifiutano col motivo.
+ * @returns {Promise<{ ok: true, attese: Array<{id,num}>, dryRun?: true } | { ok: false, motivo: string }>}
+ */
+export async function segnaAttese(id, numeri, opts = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const letti = ATT.leggiNumeri(numeri || '');
+  if (!letti.ok) return letti;
+  const bearer = opts.bearer || await acquireBearer();
+  // Anche le attese di adesso e lo stato: la risposta dice cosa sostituisce e cosa succede dopo, non lo presume.
+  const doc = await getDoc(id, bearer, ['seq', 'subSeq', 'status', 'localOnly', ATT.CAMPO]);
+  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const f = doc.fields || {};
+  const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) });
+  const { from, leggibile } = await statoAttuale(doc);
+  const pratica = { stato: leggibile ? from : '', locale: !!f.localOnly?.mapValue };
+  let attese = [];
+  if (letti.numeri.length) {
+    const v = await ATT.valida({
+      id,
+      num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)),
+      numeri: letti.numeri,
+      gia: prima,
+      risolvi: async (n) => {
+        const r = await risolviFeedback(n, { bearer, base: FIRESTORE_BASE });
+        if (r.ok) return r.id;
+        if (/^nessun feedback/.test(r.motivo)) return null;
+        throw new Error(r.motivo);
+      },
+      leggiAttese: async (ids) => new Map(await Promise.all(ids.map(async (x) => {
+        const d = await getDoc(x, bearer, [ATT.CAMPO]);
+        return [x, ATT.atteseDi({ waitsFor: atteseDaCampo(d?.fields?.[ATT.CAMPO]) })];
+      }))),
+    });
+    if (!v.ok) return v;
+    attese = v.attese;
+  }
+  const tolte = prima.filter((w) => !attese.some((a) => a.id === w.id));
+  if (opts.dryRun) return { ok: true, dryRun: true, attese, prima, tolte, pratica };
+  const fields = attese.length ? { [ATT.CAMPO]: toFsValue(attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=${ATT.CAMPO}&updateMask.fieldPaths=updatedAt`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true, attese, prima, tolte, pratica };
+}
+
+/** La risposta a `--aspetta`/`--aspetta-niente`: l'elenco nuovo, quelle che sostituisce, e cosa succede dopo per QUESTO stato. */
+export function rispostaAttese(rif, r) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const tolte = (r.tolte || []).length ? ATT.testoAttese(r.tolte) : '';
+  const una = (r.tolte || []).length === 1;
+  if (r.dryRun) {
+    const cosa = r.attese.length ? `scriverei «aspetta ${ATT.testoAttese(r.attese)}»` : (tolte ? 'toglierei le attese' : 'non c’è nessuna attesa da togliere');
+    return `[dry-run] ${rif}: ${cosa}${r.attese.length && tolte ? ` e toglierei ${una ? "quella" : "quelle"} su ${tolte}, che c’${una ? "era" : "erano"} prima` : ''}${!r.attese.length && tolte ? ` (${tolte})` : ''}, stato invariato`;
+  }
+  if (!r.attese.length) return tolte ? `${rif}: non aspetta più niente (${una ? "tolta l’attesa" : "tolte le attese"} su ${tolte}).` : `${rif}: non aspettava niente, e non aspetta niente.`;
+  const s = (r.pratica && r.pratica.stato) || '';
+  let dopo;
+  if (!s) dopo = 'Nessuna routine lo prende finché non sono tutti fusi.';
+  else if (['done', 'archived', 'attack_confirmed', 'spam_confirmed'].includes(s)) dopo = 'È chiuso: le attese contano solo se si riapre.';
+  else if (MR.isRicevutiStatus(s)) dopo = 'È nei Ricevuti: in coda lo mette l’owner, e da lì nessuna routine lo prende finché non sono tutti fusi.';
+  else if (r.pratica.locale) dopo = 'Ha il segno «solo in locale»: le routine non lo prendono comunque.';
+  else if (s === 'working') dopo = 'Una routine ci sta lavorando adesso: le attese contano dal giro dopo, finché non sono tutti fusi.';
+  else if (s === 'todo') dopo = 'Nessuna routine lo prende finché non sono tutti fusi; poi entra in coda da solo.';
+  else dopo = 'Nessuna routine lo riprende finché non sono tutti fusi; poi il giro riparte da solo.';
+  return `${rif}: aspetta ${ATT.testoAttese(r.attese)}.${tolte ? ` ${una ? "Tolta l’attesa" : "Tolte le attese"} su ${tolte}, che c’${una ? "era" : "erano"} prima.` : ''} ${dopo}`;
+}
+
+/** Il campo `waitsFor` letto dall'API REST: [{ id, num }]. */
+function atteseDaCampo(v) {
+  return (v?.arrayValue?.values || []).map((x) => ({
+    id: x?.mapValue?.fields?.id?.stringValue || '', num: x?.mapValue?.fields?.num?.stringValue || '',
+  }));
 }
 
 /**
@@ -520,7 +603,7 @@ export async function scriviPriorita(id, raw, opts = {}) {
 }
 
 // Come li legge chi lancia la prova a vuoto: il valore che avrebbero, non solo il nome.
-const CAMPI_SPIEGATI = Object.freeze({ priority: 'cifrata', priorityManual: 'true, decisa a mano', updatedAt: 'adesso' });
+const CAMPI_SPIEGATI = Object.freeze({ priority: 'cifrata', priorityManual: 'true, decisa a mano', updatedAt: 'adesso', localMerges: 'via: riaperta, le parti su main ripartono da zero' });
 export function campiLeggibili(campi, priorita) {
   return (campi || []).map((c) => {
     if (c === 'priority' && Number.isInteger(priorita)) return `priority (${priorita}, cifrata)`;
@@ -662,6 +745,9 @@ export async function scrivi(id, to, nota, opts = {}) {
   set('status', fine);
   set('statusPublic', statusToPublic ? statusToPublic(to) : 'open');
   set('workingSince', to === 'working' ? new Date().toISOString() : '');
+  // Riaperta, la pratica riparte col registro delle parti vuoto (#938, regola: SN_FEEDBACK.riapre). Maschera senza
+  // campo: per Firestore vuol dire «via».
+  if (doc.fields?.localMerges && globalThis.SN_FEEDBACK?.riapre?.(statusToPublic(from), to)) mask.push('localMerges');
 
   // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8): il report per te viaggia
   // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
@@ -707,7 +793,7 @@ export async function scrivi(id, to, nota, opts = {}) {
     body: JSON.stringify({ fields }),
   }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, from, to };
+  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}) };
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -728,6 +814,7 @@ if (isMain) {
     console.error('     node scripts/owner-feedback.mjs <numero|id> --priorita <0-3>              (solo la priorità, decisa a mano: stato invariato, anche nei Ricevuti)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta 676,663.2 | --aspetta-niente   (l’elenco intero delle attese, stato invariato)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
@@ -744,8 +831,8 @@ if (isMain) {
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--priorita', '--dry-run', '--come-routine', '--starred', '--unstar',
-      '--solo-locale', '--non-locale', '--serve-locale'],
-    conValore: ['--branch', '--reason', '--frase', '--priorita'],
+      '--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-niente'],
+    conValore: ['--branch', '--reason', '--frase', '--priorita', '--aspetta'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
   const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
@@ -794,9 +881,25 @@ if (isMain) {
     if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo} — non ho toccato niente.`); process.exit(1); }
     priorita = p.valore;
     const conStato = ['--frase', '--branch', '--reason', '--starred', '--unstar', '--come-routine'];
-    const altre = ['--solo-locale', '--non-locale', '--serve-locale', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
+    const altre = ['--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-niente', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
     if (altre.length) {
       console.error(`RIFIUTATO: --priorita ${status ? 'non va' : 'senza stato va da sola, non'} con ${altre.join(' ')}: lancia un comando per ciascuno — non ho toccato niente.`);
+      process.exit(1);
+    }
+  }
+
+  // Un comando senza stato fa una cosa sola: ogni altra opzione andrebbe persa in silenzio, quindi si rifiuta.
+  // --serve-locale prende la posizione dello stato per il suo perché, e vale come comando senza stato.
+  if (!status || argv.includes('--serve-locale')) {
+    const soloConStato = ['--branch', '--reason', '--come-routine', '--starred', '--unstar'].filter((o) => argv.includes(o));
+    if (soloConStato.length) {
+      console.error(`RIFIUTATO: ${soloConStato.join(' ')} vale solo insieme a uno stato (<n> <stato> "nota"): senza, non lo scriverei — non ho toccato niente.`);
+      process.exit(1);
+    }
+    const comandi = [['--frase'], ['--solo-locale', '--non-locale', '--serve-locale'], ['--aspetta', '--aspetta-niente']]
+      .map((g) => g.find((o) => argv.includes(o))).filter(Boolean);
+    if (comandi.length > 1) {
+      console.error(`RIFIUTATO: ${comandi.join(' e ')} sono due comandi: lancia un comando per ciascuno — non ho toccato niente.`);
       process.exit(1);
     }
   }
@@ -814,6 +917,23 @@ if (isMain) {
     const r = await idDelFeedback(riferimento, { bearer });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
     id = r.id;
+  }
+
+  // Le attese (#903): da sole, senza stato. Il valore di --aspetta è uno solo: «676,663.2» (o fra virgolette, con gli spazi).
+  const attese = ['--aspetta', '--aspetta-niente'].filter((o) => argv.includes(o));
+  if (attese.length) {
+    if (!id) { uso(); process.exit(1); }
+    if (attese.length > 1) { console.error('RIFIUTATO: --aspetta e --aspetta-niente insieme — non ho toccato niente.'); process.exit(1); }
+    if (status) {
+      console.error(`RIFIUTATO: ${attese[0]} va da solo, senza stato né nota — non ho toccato niente.`);
+      process.exit(1);
+    }
+    const valore = attese[0] === '--aspetta' ? String(flag('aspetta') || '') : '';
+    if (attese[0] === '--aspetta' && !valore.trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2); per toglierle --aspetta-niente.'); process.exit(1); }
+    const r = await segnaAttese(id, valore, { dryRun, bearer });
+    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
+    console.log(rispostaAttese(riferimento, r));
+    process.exit(0);
   }
 
   // Il segno «solo in locale» e il ritorno nei Ricevuti: da soli, senza stato.
@@ -864,10 +984,6 @@ if (isMain) {
 
   // Solo la frase per chi ha segnalato, stato invariato: `<id> --frase "…"`.
   if (id && !status && typeof frase === 'string') {
-    if (typeof starred === 'boolean' || branch !== undefined || reason !== undefined) {
-      console.error('RIFIUTATO: --frase senza stato va da sola — non ho toccato niente.');
-      process.exit(1);
-    }
     const r = await scriviFrase(id, frase, { dryRun, bearer });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
     console.log(r.dryRun
@@ -894,7 +1010,7 @@ if (isMain) {
   }
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
-    : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}.`);
+    : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}${r.partiAzzerate ? '; le parti del lavoro già su main ripartono da zero' : ''}.`);
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });

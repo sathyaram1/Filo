@@ -73,17 +73,8 @@
     return !!t && t.type === 'color';
   }
 
-  // Messaggio d'errore puntuale per tipo di token.
   function tokenErrorMsg(name) {
-    const t = Tokens && Tokens.get(name);
-    switch (t && t.type) {
-      case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
-      case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
-      case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
-      case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
-      case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
-      default: return 'Valore non valido.';
-    }
+    return Tokens ? Tokens.errorMessage(name) : 'Valore non valido.';
   }
 
   // (Ri)disegna una singola riga dal modello: valore effettivo, stato
@@ -207,7 +198,7 @@
     for (const name of tokenInCorso) {
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
-      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
+      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
     }
     chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
     if (caselle.aggiornata('token', biglietto)) flashSaved('tokenSavedHint');
@@ -252,11 +243,12 @@
     row.classList.remove('sn-token-invalid');
     if (v !== '' && !Tokens.validate(name, v)) return;
 
-    if (v === '' || v === Tokens.defaultValue(name, resolvedTheme())) {
+    const canonico = v === '' ? '' : Tokens.normalize(name, v);
+    if (canonico === '' || canonico === Tokens.defaultValue(name, resolvedTheme())) {
       // Vuoto o uguale al predefinito del tema corrente: nessun override.
       delete currentOverrides[name];
     } else {
-      currentOverrides[name] = v;
+      currentOverrides[name] = canonico;
     }
     row.classList.toggle('sn-token-modified', !!Tokens.validate(name, currentOverrides[name]));
     if (isColorToken(name)) {
@@ -856,8 +848,11 @@
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'timerRingtoneVolume': return volumeDa('timerRingtoneVolume');
       case 'terminal.enabled': return $('terminalEnabled').checked;
+      case 'schermo.guarda': return $('schermoGuarda').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
+      case 'propostaEmail.attiva': return $('propostaEmailAttiva').checked;
+      case 'propostaEmail.incognito': return $('propostaEmailIncognito').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
@@ -884,9 +879,24 @@
       case 'lunghezzaRisposte.conversazioni': return tettoRisposte($('lunghezzaConversazioni').value);
       case 'lunghezzaRisposte.testi': return tettoRisposte($('lunghezzaTesti').value);
       case 'lunghezzaRisposte.brevi': return tettoRisposte($('lunghezzaBrevi').value);
+      case 'avvisoCrediti.attivo': return $('avvisoCreditiAttivo').checked;
+      case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
+      case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
+      case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'contatori.attivi': return $('contatoriAttivi').checked;
+      case 'featureFlags.help': return $('aiutoAcceso').checked;
+      case 'featureFlags.spellcheck': return $('correttoreAcceso').checked;
+      case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
       default: return undefined;
     }
   }
+
+  // Gli interruttori di funzione con il loro valore di serie: acceso finché non è `false`, o spento finché non è `true`.
+  const INTERRUTTORI = [['help', 'aiutoAcceso', true], ['spellcheck', 'correttoreAcceso', true], ['categorize', 'categorieAutomatiche', false]];
+  const interruttore = (s, nome, diSerie) => {
+    const v = s.featureFlags && s.featureFlags[nome];
+    return diSerie ? v !== false : v === true;
+  };
 
   // Lo stesso valore letto dalla memoria, con le stesse regole di riempi().
   function valoreSalvato(s, k) {
@@ -909,8 +919,11 @@
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'timerRingtoneVolume': return volumeSalvato(s.timerRingtoneVolume);
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
+      case 'schermo.guarda': return !!(s.schermo && s.schermo.guarda === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
+      case 'propostaEmail.attiva': return !(s.propostaEmail && s.propostaEmail.attiva === false);
+      case 'propostaEmail.incognito': return !!(s.propostaEmail && s.propostaEmail.incognito === true);
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
@@ -937,8 +950,26 @@
       case 'lunghezzaRisposte.conversazioni':
       case 'lunghezzaRisposte.testi':
       case 'lunghezzaRisposte.brevi': return tettoRisposte(s.lunghezzaRisposte && s.lunghezzaRisposte[k.split('.')[1]]);
+      case 'avvisoCrediti.attivo': return !(s.avvisoCrediti && s.avvisoCrediti.attivo === false);
+      case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
+      case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
+      case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
+      case 'featureFlags.help':
+      case 'featureFlags.spellcheck':
+      case 'featureFlags.categorize': {
+        const [nome, , diSerie] = INTERRUTTORI.find(([n]) => k === `featureFlags.${n}`);
+        return interruttore(s, nome, diSerie);
+      }
       default: return undefined;
     }
+  }
+
+  // Le soglie dell'avviso dei crediti (#818): vuoto = il predefinito, fuori scala torna dentro come nella chat.
+  const sogliaCrediti = (k, v) => window.SN_CREDITI_AVVISO.numeroSoglia(k, v);
+  const CAMPI_CREDITI = [['giorni', 'avvisoCreditiGiorni'], ['percento', 'avvisoCreditiPercento']];
+  function canonCrediti() {
+    for (const [k, id] of CAMPI_CREDITI) $(id).value = String(sogliaCrediti(k, $(id).value));
   }
 
   // Quanto ricorda la chat (#868): vuoto = come i predefiniti; fuori scala si riporta dentro come fa il main.
@@ -1067,8 +1098,12 @@
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
+    if (vuole('schermo.guarda')) $('schermoGuarda').checked = !!(settings.schermo && settings.schermo.guarda === true);
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
+    if (vuole('propostaEmail.attiva')) $('propostaEmailAttiva').checked = !(settings.propostaEmail && settings.propostaEmail.attiva === false);
+    if (vuole('propostaEmail.incognito')) $('propostaEmailIncognito').checked = !!(settings.propostaEmail && settings.propostaEmail.incognito === true);
+    $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
     }
@@ -1108,6 +1143,16 @@
     const lr = settings.lunghezzaRisposte || {};
     for (const [f, id] of CAMPI_LUNGHEZZA) {
       if (vuole(`lunghezzaRisposte.${f}`)) $(id).value = lr[f] == null ? '' : String(lr[f]);
+    }
+    const ac = settings.avvisoCrediti || {};
+    if (vuole('avvisoCrediti.attivo')) $('avvisoCreditiAttivo').checked = ac.attivo !== false;
+    for (const [k, id] of CAMPI_CREDITI) {
+      if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
+    }
+    if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    if (vuole('contatori.attivi')) $('contatoriAttivi').checked = !(settings.contatori && settings.contatori.attivi === false);
+    for (const [nome, id, diSerie] of INTERRUTTORI) {
+      if (vuole(`featureFlags.${nome}`)) $(id).checked = interruttore(settings, nome, diSerie);
     }
 
     if (vuole('timerRingtone')) {
@@ -1171,7 +1216,7 @@
     if (r && r.ok) disegnaMemoria(r);
   }
 
-  function disegnaMemoria({ moduli = [], lezioni = [] }) {
+  function disegnaMemoria({ moduli = [], lezioni = [], sempreAperte = [] }) {
     const box = $('memoria');
     if (!box) return;
     box.textContent = '';
@@ -1183,6 +1228,10 @@
     }
     if (lezioni.length) {
       gruppi.push({ titolo: 'Imparato da poco', righe: lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })) });
+    }
+    // La pulizia delle schede non li archivia (#823): si tolgono da qui come le altre righe.
+    if (Array.isArray(sempreAperte) && sempreAperte.length) {
+      gruppi.push({ titolo: 'Siti sempre aperti', righe: sempreAperte.map((host) => ({ testo: host, via: { sempreAperta: host } })) });
     }
     if (!gruppi.length) {
       const p = document.createElement('p');
@@ -1428,6 +1477,225 @@
     flashSaved('menuDelSitoHint');
   }
 
+  // ── Scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto (#842) ────────
+  // Si cambiano premendo i tasti nuovi; lettura e controlli stanno in SN_TASTI, gli stessi della chat. Mentre si
+  // registra, il main lascia arrivare qui anche i tasti che prende prima della pagina: Ctrl+T si rifiuta col perché.
+  let scorciatoieSalvate = {};
+  let registrando = null;
+
+  // I moduli dell'Editor tengono le loro combinazioni nei documenti: una delle quattro sopra le spegnerebbe.
+  const COLLEZIONE_EDITOR = 'filo.editor.collection';
+  async function caricaModuliEditor() {
+    try {
+      const r = await chrome.storage.local.get(COLLEZIONE_EDITOR);
+      window.SN_TASTI?.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+    } catch (_) {}
+  }
+
+  function rigaScorciatoia(id) {
+    return document.querySelector(`#scorciatoieFilo .sc-riga[data-azione="${id}"]`);
+  }
+
+  // I tasti di una combinazione come tasti veri, uno per pezzo.
+  function mostraTasti(el, etichetta) {
+    el.textContent = '';
+    String(etichetta).split('+').forEach((pezzo, i) => {
+      if (i) {
+        const piu = document.createElement('span');
+        piu.className = 'sc-piu';
+        piu.textContent = '+';
+        el.appendChild(piu);
+      }
+      const k = document.createElement('kbd');
+      k.className = 'sc-kbd';
+      k.textContent = pezzo;
+      el.appendChild(k);
+    });
+  }
+
+  function mostraErroreScorciatoia(id, testo) {
+    const riga = rigaScorciatoia(id);
+    const err = riga && riga.querySelector('.sc-errore');
+    if (!err) return;
+    err.textContent = testo || '';
+    err.hidden = !testo;
+  }
+
+  function disegnaScorciatoie(mappa) {
+    const box = $('scorciatoieFilo');
+    const T = window.SN_TASTI;
+    if (!box || !T) return;
+    scorciatoieSalvate = { ...((mappa && typeof mappa === 'object') ? mappa : {}) };
+    T.usaScorciatoieFilo(scorciatoieSalvate);
+    // La riga in ascolto non si ridisegna sotto le dita: lo fa chi chiude l'ascolto.
+    if (registrando) return;
+    box.textContent = '';
+    for (const s of T.scorciatoieFilo()) {
+      const riga = document.createElement('div');
+      riga.className = `sc-riga${s.diSerie ? '' : ' sc-cambiata'}`;
+      riga.dataset.azione = s.id;
+
+      const nome = document.createElement('span');
+      nome.className = 'sc-nome';
+      nome.textContent = s.nome;
+
+      const tasti = document.createElement('button');
+      tasti.type = 'button';
+      tasti.className = 'sc-tasti';
+      tasti.title = 'Cambia';
+      tasti.setAttribute('aria-label', `${s.nome}: ${s.etichetta}. Premi per cambiarla`);
+      mostraTasti(tasti, s.etichetta);
+      tasti.addEventListener('click', () => avviaRegistrazione(s.id));
+      tasti.addEventListener('blur', () => { if (registrando && registrando.id === s.id) fermaRegistrazione(); });
+
+      const serie = T.etichettaFilo(s.serie);
+      const rip = document.createElement('button');
+      rip.type = 'button';
+      rip.className = 'sc-ripristina';
+      rip.textContent = '↺';
+      rip.title = `Rimetti ${serie}`;
+      rip.setAttribute('aria-label', `Rimetti ${serie} per ${s.nome}`);
+      rip.hidden = s.diSerie;
+      rip.addEventListener('click', () => salvaScorciatoia(s.id, s.serie));
+
+      const err = document.createElement('span');
+      err.className = 'sc-errore';
+      err.setAttribute('role', 'alert');
+      err.hidden = true;
+
+      riga.append(nome, tasti, rip, err);
+      box.appendChild(riga);
+    }
+  }
+
+  // Il main tiene l'ascolto al più un minuto: finché la riga ascolta lo si rinnova.
+  function chiediTasti(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REGISTRA_TASTI, attivo })).catch(() => {}); } catch (_) {}
+  }
+
+  function avviaRegistrazione(id) {
+    if (registrando && registrando.id === id) return;
+    fermaRegistrazione();
+    const riga = rigaScorciatoia(id);
+    if (!riga) return;
+    const tasti = riga.querySelector('.sc-tasti');
+    registrando = { id, tasti, ctrlZ: document.documentElement.dataset.filoCtrlZ, rinnovo: setInterval(() => chiediTasti(true), 20000) };
+    // Ctrl+Z qui è un tasto da registrare, non «torna alla pagina di prima».
+    document.documentElement.dataset.filoCtrlZ = 'pagina';
+    chiediTasti(true);
+    caricaModuliEditor();
+    riga.classList.add('sc-registra');
+    mostraErroreScorciatoia(id, '');
+    attesaTasti();
+    tasti.focus();
+  }
+
+  function attesaTasti(mods) {
+    if (!registrando) return;
+    const el = registrando.tasti;
+    if (mods && mods.length) { mostraTasti(el, [...mods, '…'].join('+')); return; }
+    el.textContent = '';
+    const s = document.createElement('span');
+    s.className = 'sc-attesa';
+    s.textContent = 'Premi i tasti…';
+    el.appendChild(s);
+  }
+
+  function fermaRegistrazione() {
+    if (!registrando) return;
+    const r = registrando;
+    registrando = null;
+    clearInterval(r.rinnovo);
+    if (r.ctrlZ === undefined) delete document.documentElement.dataset.filoCtrlZ;
+    else document.documentElement.dataset.filoCtrlZ = r.ctrlZ;
+    chiediTasti(false);
+    const tornaIlFuoco = document.activeElement === r.tasti;
+    disegnaScorciatoie(scorciatoieSalvate);
+    if (tornaIlFuoco) { const t = rigaScorciatoia(r.id)?.querySelector('.sc-tasti'); if (t) t.focus(); }
+  }
+
+  // I modificatori tenuti premuti, coi nomi di questa tastiera.
+  function modificatoriPremuti(e) {
+    const mac = window.SN_TASTI.suMac();
+    const [meta, ctrl] = [e.metaKey, e.ctrlKey];
+    const out = [];
+    if (meta) out.push(mac ? 'Cmd' : 'Win');
+    if (ctrl) out.push('Ctrl');
+    if (e.altKey) out.push(mac ? 'Opzione' : 'Alt');
+    if (e.shiftKey) out.push('Shift');
+    return out;
+  }
+
+  function tastoRegistrato(e) {
+    if (!registrando) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.isComposing || e.repeat) return;
+    const T = window.SN_TASTI;
+    const libero = !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey;
+    if (libero && (e.key === 'Escape' || e.key === 'Tab')) { fermaRegistrazione(); return; }
+    const r = T.scorciatoiaDaEvento(e);
+    if (!r) return;
+    if (r.attesa) { attesaTasti(modificatoriPremuti(e)); return; }
+    const no = r.rifiuto || T.rifiutoScorciatoiaFilo(registrando.id, r.accel);
+    if (no) {
+      attesaTasti();
+      mostraErroreScorciatoia(registrando.id, T.testoRifiutoFilo(no));
+      return;
+    }
+    salvaScorciatoia(registrando.id, r.accel);
+  }
+
+  async function salvaScorciatoia(id, accel) {
+    const T = window.SN_TASTI;
+    const no = T.rifiutoScorciatoiaFilo(id, accel);
+    if (no) { mostraErroreScorciatoia(id, T.testoRifiutoFilo(no)); return; }
+    await salvaMappaScorciatoie({ [id]: T.valoreDaSalvare(id, accel) }, id);
+  }
+
+  async function salvaMappaScorciatoie(richiesto, id) {
+    const T = window.SN_TASTI;
+    await caricaModuliEditor();
+    // «Ripristina» ne tocca quattro: quella che non può tornare di serie resta com'è, col perché sulla sua riga.
+    const dopo = Object.fromEntries(T.AZIONI_FILO.map((a) => {
+      const v = Object.prototype.hasOwnProperty.call(richiesto, a.id) ? richiesto[a.id] : scorciatoieSalvate[a.id];
+      return [a.id, v || a.serie];
+    }));
+    const cambio = {};
+    const rifiutate = [];
+    for (const [x, v] of Object.entries(richiesto)) {
+      const no = T.rifiutoScorciatoiaFilo(x, v || T.AZIONI_FILO.find((a) => a.id === x).serie, undefined, dopo);
+      if (no) rifiutate.push([x, T.testoRifiutoFilo(no)]);
+      else cambio[x] = v;
+    }
+    const mostraRifiutate = () => { for (const [x, testo] of rifiutate) mostraErroreScorciatoia(x, testo); };
+    if (!Object.keys(cambio).length) { if (registrando) fermaRegistrazione(); mostraRifiutate(); return; }
+    scorciatoieSalvate = { ...scorciatoieSalvate, ...cambio };
+    if (registrando) fermaRegistrazione();
+    else disegnaScorciatoie(scorciatoieSalvate);
+    const r = await Promise.resolve(chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { scorciatoie: cambio } })).catch(() => null);
+    if (r && r.ok) {
+      flashSaved('scorciatoieHint');
+      disegnaScorciatoie(r.settings && r.settings.scorciatoie);
+      mostraRifiutate();
+    } else if (id) {
+      mostraErroreScorciatoia(id, 'Non sono riuscito a salvarla: riprova.');
+    }
+  }
+
+  function vociScorciatoia(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const riga = el && el.closest ? el.closest('#scorciatoieFilo .sc-riga') : null;
+    const T = window.SN_TASTI;
+    const s = riga && T ? T.scorciatoieFilo().find((x) => x.id === riga.dataset.azione) : null;
+    if (!s) return [];
+    const voci = [{ type: 'item', label: `Cambia la scorciatoia di «${s.nome}»`, onClick: () => avviaRegistrazione(s.id) }];
+    if (!s.diSerie) voci.push({ type: 'item', label: `Rimetti ${T.etichettaFilo(s.serie)}`, onClick: () => salvaScorciatoia(s.id, s.serie) });
+    return voci;
+  }
+  window.SN_VOCI_PAGINA = Array.isArray(window.SN_VOCI_PAGINA) ? window.SN_VOCI_PAGINA : [];
+  if (!window.SN_VOCI_PAGINA.includes(vociScorciatoia)) window.SN_VOCI_PAGINA.push(vociScorciatoia);
+
   let caricato = false;
 
   // ── Autonomia di Filo (#530) ─────────────────────────────────────────────
@@ -1508,6 +1776,7 @@
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
     disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
+    disegnaScorciatoie(settings.scorciatoie);
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
@@ -1547,6 +1816,7 @@
     }
     const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
     if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
+    if (JSON.stringify(settings.scorciatoie || {}) !== JSON.stringify(scorciatoieSalvate)) disegnaScorciatoie(settings.scorciatoie);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1566,6 +1836,16 @@
     load();
     caricaMemoria();
     $('documentiAggiungi').addEventListener('click', aggiungiCartella);
+    window.addEventListener('keydown', tastoRegistrato, true);
+    window.addEventListener('keyup', (e) => {
+      if (!registrando) return;
+      e.preventDefault();
+      attesaTasti(modificatoriPremuti(e));
+    }, true);
+    window.addEventListener('blur', fermaRegistrazione);
+    $('scorciatoieRipristina').addEventListener('click', () => {
+      salvaMappaScorciatoie(Object.fromEntries(window.SN_TASTI.AZIONI_FILO.map((a) => [a.id, ''])));
+    });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) caricaStatoDocumenti(); });
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
@@ -1597,8 +1877,15 @@
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
+    $('schermoGuarda').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('aggiornamentiAutomatici').addEventListener('change', persist);
+    // Spenta la proposta, «anche in incognito» non ha niente da aggiungere.
+    $('propostaEmailAttiva').addEventListener('change', () => {
+      $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
+      persist();
+    });
+    $('propostaEmailIncognito').addEventListener('change', persist);
     for (const id of ['contestoGiorni', 'contestoToken']) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
@@ -1608,6 +1895,15 @@
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
       $(id).addEventListener('blur', canonLunghezza);
+    }
+    $('avvisoCreditiAttivo').addEventListener('change', persist);
+    $('spiegaAnticipata').addEventListener('change', persist);
+    $('contatoriAttivi').addEventListener('change', persist);
+    for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
+    for (const [, id] of CAMPI_CREDITI) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonCrediti);
     }
     segnapostiContesto();
     $('terminalShell').addEventListener('change', persist);

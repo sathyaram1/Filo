@@ -9,13 +9,94 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.243', date: '2026-10-16',
+      features: [
+        'Nelle Opzioni, sotto «Host dei modelli», scegli se i modelli rispondono dagli host più veloci, da quelli che cominciano a rispondere prima o dai più economici. Lo puoi chiedere anche a Filo, per esempio «voglio la chat più veloce». I fornitori esclusi restano esclusi.',
+        'Il pulsante «Prova» dei modelli predefiniti misura il modello come lo useresti davvero e la misura resta: riapri la pagina e ritrovi latenza e velocità. Se cambi modello o host la misura sparisce, e se non è di oggi porta la sua data.',
+        'Se paghi con una tua chiave OpenRouter, nelle Opzioni trovi «Con la mia chiave, usa anche i fornitori esclusi». Acceso, le richieste pagate con la tua chiave possono andare anche ai fornitori che Filo esclude, quindi funzionano anche modelli come Gemini o Grok. È spento di serie e lo accendi anche chiedendolo a Filo. Coi crediti di Filo l\'esclusione resta.',
+        'Quando un sito ti chiede l\'email o il nome utente, per esempio la pagina di accesso di Google, sotto il campo compare l\'email del tuo account Filo: un clic, oppure freccia giù e Invio, e la trovi scritta. Il sito la vede solo dopo che l\'hai scelta. Se non la vuoi, la spegni col tasto destro sulla proposta o in Preferenze, nelle impostazioni avanzate.',
+        'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
+        'Quando chiedi a Filo di segnarti un appuntamento, il bottone «Aggiungi al calendario» ora funziona davvero: apre l’evento nel calendario del tuo computer, con giorno, ora, durata e note già scritti. Un compleanno o una scadenza, che un’ora non ce l’hanno, entrano come evento di tutto il giorno, le ferie occupano tutti i loro giorni e un viaggio arriva fino al giorno del ritorno. Se le date non tornano, Filo ti dice cosa non va. Prima il bottone era spento e la proposta non portava da nessuna parte.',
+      ],
+      fixes: [
+        'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il testo e il nome di un documento dell\'Editor, le correzioni del Correttore e il titolo di una chat in Cronologia.',
+        'In Preferenze, Opzioni, Altro e Sicurezza la scritta «Salvato» compare per l\'ultima cosa che hai toccato, non per una modifica di prima.',
+        'L\'archivio che esporti da Sicurezza non porta più le tue chiavi API, nemmeno quelle copiate o scritte in chat, a meno che tu non spunti «Includi le chiavi». Importarlo non tocca le chiavi che hai già. Gli archivi fatti prima le contengono, quindi trattali come una password. Su un computer senza portachiavi di sistema, Filo ti dice una volta che salva le chiavi in chiaro.',
+        'Filo non chiede più a Google le icone dei siti che ti suggerisce nella home o che apre per te in chat, e Google non vede più quali siti frequenti. Usa quelle già viste nelle tue schede, nell\'archivio e nelle pagine salvate, o le chiede al sito stesso.',
+        'Se chiedi un comando mentre la modalità terminale è spenta, Filo torna a spiegarti perché non è partito, e il riquadro ti porta dove si accende. Prima restava un «Azione non riuscita» che non diceva niente a chi non sapeva dell’esistenza di quell’interruttore.',
+        'Quando confermi un’impostazione dopo che Filo ha già risposto, la riga in cima al blocco del lavoro la conta, invece di restare su «Come ha lavorato».',
+        'Quando confermi un’azione nel popup, il diario del lavoro la registra e il bottone diventa la ricevuta di quello che è successo. Se invece non riesce, il bottone ti dice perché, al posto di un semplice «Non eseguita».',
+        'Il riordino delle schede che non riesce a partire te lo dice, invece di rispondere «nessuna scheda da archiviare» come quando è andato tutto bene e non c\'era niente da chiudere. Vale dalla chat, dal suggerimento della home e da «/pulisci».',
+        'Se chiedi «portami alla home» mentre sei già nella home, Filo non ricarica più la pagina: prima si portava via quello che aveva appena fatto e la risposta, prima che tu potessi leggerle. Ora te lo dice, e sotto la risposta hai un bottone per svuotare la conversazione quando hai finito.',
+        'Se chiedi in chat di spegnere i controlli di rete o il giudizio AI sui siti, il riquadro di conferma ti dice quale nome usciva dal computer e verso chi. Quello che chiede di scrivere «conferma» per abbassare una protezione spiega il motivo una volta sola.',
+        'Se chiedi a Filo di bloccare un sito mentre il blocco dei siti è spento, ti avvisa che il sito si apre ancora e ti propone di riaccenderlo. Vale anche per le liste pubbliche, i controlli di rete e il giudizio AI chiesti con il loro interruttore principale spento.',
+        'Fra i siti fidati per i programmi scaricati non entra più un servizio che ospita i siti di chiunque, come github.io o vercel.app. Filo ti dice perché e ti propone il sito preciso, per esempio quello da cui hai appena scaricato. Anche se ti fidi di google.com o di Discord, un programma che chiunque condivide su Google Drive o negli allegati di Discord ti viene chiesto. E un programma che arriva da un riquadro dello stesso sito non viene più detto «da una pagina con parti di altri siti».',
+        'Fra i siti dove resti connesso puoi scrivere il nome che vedi o incollare l\'indirizzo dalla barra, come mail.google.com: l\'elenco mostra il sito che resta connesso, qui google.com. E se avevi aggiunto gmail.com, adesso ti tiene davvero connesso a Gmail.',
+      ],
+    },
+    {
+      version: '0.2.242', date: '2026-10-16',
+      features: [
+        'Puoi togliere dal computer, in un colpo, tutto quello che Filo sa di te. In Sicurezza, sotto Esporta e Importa, c\'è «Cancella tutti i dati di Filo». Ti propone di esportare prima, ti dice cosa sparisce e parte solo quando scrivi «conferma». Poi Filo si riapre come appena installato. I tuoi crediti restano, a meno che tu non scelga di cancellare anche la loro identità. Se lo chiedi in chat, Filo ti porta a quel tasto.',
+        'Sotto ogni risposta nel riquadro di Spiega e Traduci c\'è «Copia». Un clic mette il testo negli appunti senza asterischi o simboli di formattazione, pronto da incollare dove ti serve.',
+        'Le pagine salvate per dopo si ritrovano chiedendolo a Filo. Scrivi in chat «dov\'era quella ricetta che avevo salvato?» o «aprimi le pagine salvate sul campeggio» e Filo ti mostra quelle giuste da cliccare, o ti dice che non ce ne sono. «Aprila» la apre e la toglie da «Aperti per dopo», come il clic sulla lista. Sopra una pagina basta dire all\'Aiuto «salvala per dopo». La mette da parte con l\'anteprima, come il menu, e chiude la scheda.',
+        'In «Aperti per dopo» il tasto destro su una pagina salvata ti lascia aprirla tenendola in lista, copiarne il link, spostarla in un\'altra categoria o in una nuova, e rimuoverla. Se la rimuovi per sbaglio, «Annulla» nell\'avviso la rimette dov\'era. Il menu si apre anche da tastiera, col tasto Menu o Maiusc+F10.',
+        'Puoi spegnere Filo su un sito col tasto destro sulla pagina, «Spegni Filo su questo sito», o chiedendolo a Filo («spegni Filo su docs.google.com»). Lì il tasto destro lascia il clic al sito, e dove il sito non ha un suo menu trovi «Riaccendi Filo su questo sito». Le schede già aperte cambiano subito, senza ricaricare. Nella pagina Altro, sotto «Siti dove Filo è spento», puoi incollare un indirizzo intero e Filo lo riduce al nome del sito. Prima un indirizzo incollato lì non spegneva niente.',
+        'F11 mette Filo a schermo intero, come negli altri browser, e premuto di nuovo lo toglie. Su Mac il tasto è Ctrl+Cmd+F. Funziona su qualunque pagina, anche mentre scrivi, ed Esc continua a farti uscire.',
+        'Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto adesso le scegli tu. In Preferenze, nelle impostazioni avanzate, clicchi la combinazione e premi i tasti nuovi, oppure lo chiedi a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl). Se quei tasti li usa già Filo o il sistema, Filo te lo dice e tiene quelli di prima. Il menu del tasto destro e l\'elenco in Opzioni → Altro mostrano i tasti che hai scelto.',
+      ],
+      fixes: [
+        'Su alcuni siti Esc non chiudeva il menu del tasto destro né gli altri riquadri di Filo, e a schermo intero ti faceva uscire lasciandoli aperti sopra la pagina. Adesso il primo Esc chiude il riquadro e lo schermo intero resta. Con l\'Esc dopo esci.',
+        'Nell\'Editor Ctrl+Shift+T, W, L e R non si possono più dare a un modulo: Filo ti dice che aprono una scheda, la chiudono, portano alla home o ricaricano la pagina. Prima si salvavano senza avvisi e alla pressione facevano quello invece del modulo.',
+      ],
+    },
+    {
+      version: '0.2.241', date: '2026-10-15',
+      features: [
+        'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',
+        'Puoi cambiare anche il font dei link, la durata delle animazioni e l\'intensità delle ombre, dalle Preferenze o chiedendolo a Filo. «Togli le animazioni» le spegne in tutta l\'app, «animazioni più lente» le rallenta.',
+        'Filo può guardare una finestra aperta sul computer, o lo schermo intero, e dirti cosa c\'è scritto. Chiedilo in chat, per esempio «cosa mi sta chiedendo questa finestra?» o «leggimi l\'errore di Word». Si accende in Preferenze, alla voce «Guardare lo schermo», e la prima volta che guarda la finestra di un\'altra app ti chiede l\'OK. Guarda soltanto: non clicca e non salva l\'immagine.',
+        'Di\' a Filo «tienimi sempre aperta WhatsApp» e la pulizia automatica delle schede non la archivia più, nemmeno quando riapri Filo o usi /pulisci. I siti che tieni aperti li trovi in Preferenze, sotto «Memoria di Filo»: li togli da lì o dicendo «non tenerla più aperta».',
+      ],
+      fixes: [
+        'Se chiedi a Filo di spegnere l\'Aiuto, adesso si spegne davvero. La voce «Aiuto» sparisce dal tasto destro sulla pagina e sulla linguetta, e la scorciatoia non lo apre più. Prima Filo diceva «fatto» e l\'Aiuto restava. Lo riaccendi chiedendolo, o con l\'interruttore in Preferenze, nelle Impostazioni avanzate, dove trovi anche quelli del correttore ortografico e delle categorie automatiche di «Aperti per dopo».',
+        'La protezione dal fingerprinting copre anche l\'impronta audio calcolata come fa la maggior parte degli script di tracciamento. Prima quegli script leggevano il suono della tua macchina prima che Filo ci aggiungesse il rumore, e potevano riconoscerti da un sito all\'altro.',
+      ],
+    },
+    {
+      version: '0.2.240', date: '2026-10-15',
+      features: [
+        'Ogni versione di Filo su GitHub ha una sezione «Verifica» con l\'impronta di ogni file da scaricare e il link alla costruzione pubblica che l\'ha prodotto. Se il file che hai scaricato ha la stessa impronta, è quello costruito dal codice pubblico.',
+        'Nella schermata Mazzi ogni mazzo mostra quanto costa in tutto, senza doverlo aprire. Se di qualche carta il prezzo non è noto, davanti al totale c\'è «≥». Col tasto destro su un mazzo lo puoi anche esportare come lista o rinominare, oltre a duplicarlo ed eliminarlo.',
+        'Nelle Opzioni, accanto a ogni modello di ogni funzione, vedi quanto costa usarla, per esempio «≈ 3 crediti» per un messaggio in chat. Se scegli un modello che costa molto più di quello predefinito, sotto compare per quanti messaggi ti bastano i crediti che hai. Se usi i tuoi modelli puoi cambiarli anche chiedendolo a Filo, e la conferma ti dice le stesse cifre. Con una tua chiave OpenRouter il costo è in dollari.',
+        'Nel Deck builder MTG il calcolatore di probabilità ti lascia scegliere la partita (a più giocatori, oppure a due iniziando tu o l\'avversario), quante volte rifai la mano e cosa deve avere per tenerla, e le carte che peschi in più. Puoi dirlo anche in chat, per esempio «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre».',
+        'Quando i crediti di Filo stanno per finire, Filo te lo dice prima, una volta: quanti ne restano, quando finiscono al ritmo di oggi e come farli durare, con quanto risparmi al giorno. Puoi passare a modelli più economici le funzioni che consumano di più, spegnere quelle automatiche, mettere una tua chiave o aspettare la quota della notte. Un clic applica, lo stesso pulsante rimette com\'era, e lo puoi chiedere anche a parole («sì, usa i modelli più economici»). Soglie e avviso li cambi in Preferenze o chiedendolo a Filo. Lì puoi anche spegnere la spiegazione che Filo prepara appena selezioni un testo: partirà solo dal tasto destro, e spendi meno.',
+      ],
+      fixes: [
+        'Quando Filo riordina le schede per colore, i siti bianchi come Wikipedia vanno in testa e quelli neri come GitHub dopo l\'ultimo colore. Prima finivano in coda, mescolati alle schede senza icona. Ogni giorno della Cronologia segue lo stesso ordine.',
+        'Nel Deck builder MTG il calcolatore di probabilità conta la pescata del primo turno, come in una partita Commander vera, e il mulligan mette le carte in fondo al mazzo come vuole la regola attuale. Prima le probabilità uscivano più basse del vero.',
+        'Chiedi a Filo «mi protegge dai siti truffa?» o «come tolgo questo avviso?» e ti risponde con quello che fa davvero: cosa controlla, i due livelli di avviso, cosa esce dal computer e dove si spegne. Le descrizioni nella pagina Sicurezza adesso dicono la stessa cosa.',
+        'Se il modello scelto per una funzione lo servono solo fornitori che Filo esclude, la chat, la funzione e il tasto «Prova» delle Opzioni ti dicono quale modello è e dove sceglierne un altro. Prima un messaggio generico ti invitava a riprovare, e riprovare non serviva.',
+      ],
+    },
+    {
+      version: '0.2.239', date: '2026-10-15',
+      features: [
+        'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
+        'L\'Aiuto di una scheda comincia a rispondere prima a ogni passo, perché la foto della pagina che manda al modello adesso pesa molto meno. Si sente di più sugli schermi con la scala al 125% o più.',
+        'La scheda nuova compare subito. Filo ne tiene una pronta in ogni finestra, anche in incognito, e Ctrl+T, il «+» o la chiusura dell\'ultima scheda ti mostrano la home già disegnata invece di un attimo di vuoto.',
+      ],
+      fixes: [
+        'Nel terminale della home un comando valido non diventa più rosso quando il computer è lento a controllarlo. Il rosso compare solo se Filo ha verificato che il comando non esiste.',
+        'Una password o un\'immagine tolta dalla cronologia appunti resta tolta anche se è ancora negli appunti e la incolli di nuovo, pure dopo aver chiuso e riaperto Filo.',
+      ],
+    },
+    {
       version: '0.2.238', date: '2026-10-07',
       features: [
         'Sui siti con un loro menu del tasto destro, come Google Docs e Figma, il menu di Filo ha in cima «Menu di Google Docs»: un clic e si apre quello del sito, nello stesso punto. Se lo scegli spesso, Filo ti propone di aprirlo subito col tasto destro, e quello di Filo resta a Shift + tasto destro. Cambi idea dalle Preferenze, dal menu di Filo su quel sito o chiedendolo a Filo.',
         'Le chat che fai nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito compaiono nella home come una riga, per esempio «4 messaggi nell\'Editor su tesi». La apri con un clic e rileggi lo scambio. Filo sa che c\'è stata e, se gliene chiedi, la ritrova senza che tu la ripeta.',
         'L\'accesso a Filo con Google adesso si fa in una scheda di Filo. Appena hai scelto l\'account la scheda si chiude da sola, e YouTube, Gmail e Drive nelle schede sono già collegati allo stesso account, senza un secondo accesso. Se eri già entrato in Filo, nel menu dell\'account trovi «Collega anche i prodotti Google». Uscire da Filo non ti fa uscire da Google nelle schede. Se Google non accetta l\'accesso dentro Filo, Filo lo apre nel browser come prima e te lo dice. In Privacy massima Google e YouTube tengono i cookie nello stesso spazio, e dopo l\'accesso Google entra fra i siti fidati, così resti collegato.',
-        'Nelle Opzioni, sotto «Host dei modelli», scegli se i modelli rispondono dagli host più veloci, da quelli che cominciano a rispondere prima o dai più economici. Lo puoi chiedere anche a Filo, per esempio «voglio la chat più veloce». I fornitori esclusi restano esclusi.',
-        'Il pulsante «Prova» dei modelli predefiniti misura il modello come lo useresti davvero e la misura resta: riapri la pagina e ritrovi latenza e velocità. Se cambi modello o host la misura sparisce, e se non è di oggi porta la sua data.',
         'Chiedi a Filo un tuo documento descrivendolo, anche a voce: «mi serve la bolletta della luce di marzo». Lo trova leggendo il contenuto dei file in Documenti, Download e Scrivania, anche se si chiama «scan_00231.pdf», e ti risponde col file da aprire con un clic. Le cartelle si cambiano in Preferenze, e il testo dei documenti resta sul tuo computer.',
         'Il documento lo trova anche l\'Aiuto di una scheda, mentre compili un modulo su un sito: chiedigli la bolletta, dai l\'OK, e trascina il file che ti propone nel campo per caricarlo.',
         'Filo legge anche i documenti Word (.docx) e LibreOffice (.odt), oltre ai PDF e ai file di testo.',
@@ -60,8 +141,6 @@
         'Se Filo si chiude di colpo mentre salva, o il disco è pieno, i tuoi dati non si perdono più. Il file di prima resta intatto finché quello nuovo non è scritto tutto, e se il disco non lascia salvare te lo dice un avviso. Se il file si rovina lo stesso, Filo riparte dalla sua copia di riserva e ti spiega cosa è successo. Prima ripartiva vuoto senza dire niente.',
         'Nella ricerca della cronologia degli appunti Ctrl+Z annulla quello che hai scritto, invece di riportarti alla pagina di prima.',
         'La spiegazione che Filo prepara mentre selezioni e il correttore partono solo quando selezioni o scrivi tu. Un sito non li può più far partire da solo, e i tuoi crediti vanno solo a quello che usi.',
-        'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il testo e il nome di un documento dell\'Editor, le correzioni del Correttore e il titolo di una chat in Cronologia.',
-        'In Preferenze, Opzioni, Altro e Sicurezza la scritta «Salvato» compare per l\'ultima cosa che hai toccato, non per una modifica di prima.',
         'Al primo avvio Filo torna a presentarsi. L\'intervista di benvenuto parte e la prima home nasce dalle tue risposte; prima Filo restava muto e mostrava la home di chi non ha ancora i crediti, anche a chi li aveva. E appena un modello da chiamare c\'è, la home aperta se ne accorge da sola: non devi più ricaricarla o aprire una scheda nuova. Se invece manca davvero un modello, adesso la home lo scrive invece di parlare di crediti, e se a escluderli tutti è «solo modelli a pesi aperti» lo dice, così non vai a cercare l\'errore in una configurazione che è a posto. Lo stesso vale se invece di leggere scrivi nella barra, e vale anche quando la domanda parte dall\'Aiuto su una pagina qualunque: la risposta dice cosa manca e ti porta dove si sistema, invece di un «qualcosa è andato storto» e un «Riprova» che non poteva funzionare. E se cambi qualcosa nelle Opzioni e il motivo del silenzio diventa un altro, la home se ne accorge: non ti chiede più di fare una cosa che hai appena fatto.',
         'Quando Filo non può rispondere, adesso te lo dice anche fuori dalla home. Il riquadro che spiega una parola selezionata, la dettatura, la trascrizione di una regione e la riscrittura di un testo scrivevano «il provider AI ha fallito», o la riga grezza del servizio con le parentesi graffe: adesso dicono cosa manca davvero, che siano i crediti finiti, l\'invito da riscattare o un modello da scegliere. E dove serve aprire una pagina di Filo per sistemarlo, il tasto per andarci è lì sotto.',
         'Il motore che apre le pagine web è passato all\'ultima versione stabile, che riceve ancora le correzioni di sicurezza. Quella di prima non le riceveva più.',

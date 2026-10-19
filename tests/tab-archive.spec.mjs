@@ -180,3 +180,19 @@ test('"Svuota archivio" usa il popup stilizzato di Filo, non il confirm nativo',
   await expect(archive.locator('.arc-tab')).toHaveCount(0, { timeout: 8_000 });
   await expect(archive.locator('#empty')).toBeVisible();
 });
+
+test('nella Cronologia il giorno segue l\'ordine della barra: bianco, colori, nero, senza colore (#822)', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    const closedAt = new Date().toISOString();
+    for (const [title, identityColor] of [
+      ['Nero', 'rgb(0, 0, 0)'], ['Senza', null], ['Blu', 'rgb(0, 0, 255)'],
+      ['Bianco', 'rgb(255, 255, 255)'], ['Rosso', 'rgb(255, 0, 0)'],
+    ]) {
+      await globalThis.SN_ARCHIVED_TABS.archive({ url: `https://esempio.test/${title}`, title, identityColor, closedAt });
+    }
+  });
+  const archive = await openTab('filo://archive/archive.html');
+  await archive.waitForLoadState('domcontentloaded');
+  const giorno = archive.locator('.arc-day').first().locator('.arc-tab .arc-title');
+  await expect(giorno).toHaveText(['Bianco', 'Rosso', 'Blu', 'Nero', 'Senza'], { timeout: 8_000 });
+});

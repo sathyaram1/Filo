@@ -62,7 +62,7 @@
       el.id = 'dl-flash';
       el.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);'
         + 'background:var(--sn-fg);color:var(--sn-bg);padding:8px 14px;border-radius:8px;'
-        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity .15s ease;pointer-events:none;'
+        + 'font-size:13px;z-index:9999;opacity:0;transition:opacity calc(.15s * var(--sn-motion, 1)) ease;pointer-events:none;'
         + 'max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       document.body.appendChild(el);
     }

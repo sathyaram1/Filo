@@ -1,4 +1,4 @@
-// La pagina «Inviti e utenti» dell'owner (#652): le sette manopole dei crediti
+// La pagina «Inviti e utenti» dell'owner (#652): le manopole dei crediti
 // si cambiano da qui, i numeri che il server calcola si guardano e basta, e
 // ogni riga della tabella apre la scheda della persona.
 //
@@ -35,6 +35,8 @@ const patch = [];
 // comporta Firestore quando le regole non lasciano scrivere.
 let rifiutaPatch = false;
 const detailChiesti = [];
+// Quante volte la pagina ha chiesto i numeri calcolati: dopo un salvataggio li rilegge.
+let overviewChiesti = 0;
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
@@ -75,6 +77,17 @@ function configDiPartenza() {
     eurUsd: 1.17,
     totalLimitUsd: 4.2,
   };
+}
+
+// Le persone che la vista elenca: una prova le cambia per vedere cosa fa la pagina quando la vista si rilegge.
+let persone = [];
+function personeDiPartenza() {
+  return [{
+    pseudonym: PSEUDONIMO,
+    balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+    invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
+    reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
+  }];
 }
 
 test.beforeAll(async () => {
@@ -118,6 +131,7 @@ test.beforeAll(async () => {
 
       if (url === '/walletState') return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
       if (url === '/walletOverview') {
+        overviewChiesti += 1;
         const cfg = { ...configDoc, eurUsdAt: '2026-09-18', maxGrantUsd: 57.33, migrateLocalMax: 10000 };
         return json(res, 200, {
           result: {
@@ -130,23 +144,19 @@ test.beforeAll(async () => {
               { code: 'AAAA2222', max: 3, used: 1, uses: [{ pseudonym: 'fedebb00', at: '2026-09-17T10:00:00.000Z' }], createdAt: '2026-09-11T09:00:00.000Z' },
               { code: 'CCCC4444', max: 3, used: 3, uses: [], createdAt: '2026-09-11T09:00:00.000Z' },
             ],
-            users: [{
-              pseudonym: PSEUDONIMO,
-              balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
-              invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
-              reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
-            }],
+            users: persone,
           },
         });
       }
       if (url === '/walletUserDetail') {
         detailChiesti.push(body.data);
-        if (!body.data || body.data.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
+        const lei = persone.find((p) => body.data && p.pseudonym === body.data.pseudonym);
+        if (!lei || lei.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
         return json(res, 200, {
           result: {
             found: true,
             pseudonym: PSEUDONIMO,
-            balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+            balance: lei.balance,
             createdAt: '2026-09-10T08:00:00.000Z',
             invitedBy: 'owner',
             reconcile: { flagged: false },
@@ -185,9 +195,11 @@ test.afterAll(async () => {
 
 test.beforeEach(() => {
   configDoc = configDiPartenza();
+  persone = personeDiPartenza();
   patch.length = 0;
   rifiutaPatch = false;
   detailChiesti.length = 0;
+  overviewChiesti = 0;
 });
 
 async function simulaOwner(app) {
@@ -238,13 +250,13 @@ async function apriOwner(app) {
   return page;
 }
 
-test('le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
+test('le manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
-  // Ci sono tutte e sette, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(7, { timeout: 15_000 });
+  // Ci sono tutte, col valore che ha il server adesso.
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(8, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
@@ -313,28 +325,158 @@ test('le sette manopole si salvano davvero, un numero storto non arriva al serve
   expect(patch.length).toBe(2);
 });
 
+// #854 — gli ingressi con invito erano un numero in sola lettura: per aprire Filo a più persone l'owner
+// doveva passare dalla console di Firebase.
+test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre manopole', async ({ app }) => {
+  configDoc.invitesRemaining = 0;
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+
+  const campo = page.locator('#knob-invitesRemaining');
+  const msg = page.locator('#knob-invitesRemaining-msg');
+  const riga = page.locator('.sn-manopola[data-chiave="invitesRemaining"]');
+  await expect(campo).toHaveValue('0', { timeout: 15_000 });
+  await expect(riga.locator('label')).toHaveText('Ingressi con invito rimasti');
+  await expect(campo).toHaveAttribute('title', 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.');
+  // Il numero sta in un posto solo: la manopola.
+  await expect(page.locator('#ownerNumeri')).not.toContainText('riscatti');
+
+  await page.fill('#knob-invitesRemaining', '-1');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: non può essere negativo.');
+  await expect(msg).toHaveClass(/is-error/);
+
+  // Scritto alla italiana, con la virgola: con il sistema in inglese il campo numerico buttava via la virgola,
+  // e «2,5» partiva come 25. Scritto o incollato, è un decimale.
+  await page.fill('#knob-invitesRemaining', '');
+  await campo.pressSequentially('2,5');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: un numero intero, senza virgola.');
+  await page.fill('#knob-invitesRemaining', '');
+  await app.evaluate(({ clipboard }) => clipboard.writeText('2,5'));
+  await campo.focus();
+  await page.keyboard.press('ControlOrMeta+V');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: un numero intero, senza virgola.');
+  await page.fill('#knob-invitesRemaining', '');
+  await campo.pressSequentially('venti');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: ci vuole un numero.');
+  expect(patch.length).toBe(0);
+
+  // Il main rifà il controllo: una parola, un negativo o un decimale non arrivano a config/credits nemmeno
+  // saltando la pagina.
+  const diretti = await page.evaluate(async (valori) => {
+    const out = [];
+    for (const v of valori) {
+      const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_OWNER_KNOBS_SET, patch: { invitesRemaining: v } });
+      out.push({ ok: Boolean(r && r.ok), error: String((r && r.error) || '') });
+    }
+    return out;
+  }, ['venti', -1, 2.5]);
+  expect(diretti.map((d) => d.ok)).toEqual([false, false, false]);
+  expect(diretti[0].error).toContain('ci vuole un numero');
+  expect(diretti[1].error).toContain('non può essere negativo');
+  expect(diretti[2].error).toContain('un numero intero');
+  expect(patch.length).toBe(0);
+  expect(configDoc.invitesRemaining).toBe(0);
+
+  // Da 0 a 20: arriva al server solo quel campo, e i numeri calcolati accanto si rileggono.
+  const letturePrima = overviewChiesti;
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch.length).toBe(1);
+  expect(patch[0].mask).toEqual(['invitesRemaining']);
+  expect(patch[0].valori).toEqual({ invitesRemaining: 20 });
+  expect(configDoc.dailyCredits).toBe(100);
+  await expect(campo).toHaveValue('20');
+  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(letturePrima);
+
+  // «Rimetti com'era» riporta lo zero, sul server.
+  await page.click('#knob-invitesRemaining-rimetti');
+  await expect(msg).toHaveText('Rimesso com’era.', { timeout: 15_000 });
+  await expect(campo).toHaveValue('0');
+  expect(patch[1].valori).toEqual({ invitesRemaining: 0 });
+  expect(configDoc.invitesRemaining).toBe(0);
+
+  // Risalvato a 20 e riaperta la pagina, si legge 20.
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(20);
+  await page.reload();
+  await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
+  await expect(page.locator('#knob-invitesRemaining')).toHaveValue('20', { timeout: 15_000 });
+  expect(patch.length).toBe(3);
+
+  // Mille scritto alla italiana è mille, non uno.
+  await page.locator('#knob-invitesRemaining').fill('');
+  await page.locator('#knob-invitesRemaining').pressSequentially('1.000');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(page.locator('#knob-invitesRemaining-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(1000);
+  await expect(page.locator('#knob-invitesRemaining')).toHaveValue('1000');
+});
+
+// #854 — il contatore degli ingressi lo scala il server a ogni riscatto: una manopola appena salvata restava ferma
+// sul numero salvato finché non si riapriva la pagina.
+test('dopo un salvataggio la manopola degli ingressi segue il numero che il server ha scalato, e si può ancora rimettere com’era', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  const campo = page.locator('#knob-invitesRemaining');
+  const msg = page.locator('#knob-invitesRemaining-msg');
+  await expect(campo).toHaveValue('9', { timeout: 15_000 });
+
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+
+  // Tre persone entrano con un invito; poi l'owner cambia un'altra manopola e la pagina rilegge i numeri.
+  configDoc.invitesRemaining = 17;
+  const prima = overviewChiesti;
+  await page.fill('#knob-dailyCredits', '120');
+  await page.click('#knob-dailyCredits-salva');
+  await expect(page.locator('#knob-dailyCredits-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(prima);
+  await expect(campo).toHaveValue('17', { timeout: 10_000 });
+  // Il campo salvato prima resta lì col suo valore e col suo «rimetti com'era».
+  await expect(page.locator('#knob-dailyCredits')).toHaveValue('120');
+
+  await page.click('#knob-invitesRemaining-rimetti');
+  await expect(msg).toHaveText('Rimesso com’era.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(9);
+  await expect(campo).toHaveValue('9');
+});
+
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
   const numeri = page.locator('#ownerNumeri .sn-wallet-numero');
-  await expect(numeri).toHaveCount(6, { timeout: 15_000 });
+  await expect(numeri).toHaveCount(8, { timeout: 15_000 });
   // Un utente si conta al singolare.
   await expect(numeri.nth(0)).toContainText('utente');
   await expect(numeri.nth(0)).not.toContainText('utenti');
+  // Chi l'ha usato davvero (#820): attivi a 7 e 30 giorni.
+  await expect(numeri.nth(1)).toContainText('negli ultimi 7 giorni');
+  await expect(numeri.nth(2)).toContainText('negli ultimi 30 giorni');
   // Elargiti contro il tetto, e quanto manca (70.000 − 5.128).
-  await expect(numeri.nth(1)).toContainText('5.128');
-  await expect(numeri.nth(1)).toContainText('su 70.000');
-  await expect(numeri.nth(2)).toContainText('64.872');
-  await expect(numeri.nth(2)).toContainText('ancora elargibili');
+  await expect(numeri.nth(3)).toContainText('5.128');
+  await expect(numeri.nth(3)).toContainText('su 70.000');
+  await expect(numeri.nth(4)).toContainText('64.872');
+  await expect(numeri.nth(4)).toContainText('ancora elargibili');
   // Crediti vivi: la somma dei saldi.
-  await expect(numeri.nth(3)).toContainText('4.890,5');
+  await expect(numeri.nth(5)).toContainText('4.890,5');
+  await expect(numeri.nth(6)).toContainText('crediti spesi');
   // Inviti ancora da dare: uno dei due ha posti liberi.
-  await expect(numeri.nth(4)).toContainText('tuo invito da dare');
-  // Riscatti rimasti.
-  await expect(numeri.nth(5)).toContainText('9');
-  await expect(numeri.nth(5)).toContainText('riscatti rimasti');
+  await expect(numeri.nth(7)).toContainText('tuo invito da dare');
+  // Gli ingressi con invito rimasti sono una manopola (#854): fra i numeri non si ripetono.
+  await expect(page.locator('#ownerNumeri')).not.toContainText('riscatti');
+  await expect(page.locator('#ownerNumeri')).not.toContainText('Ingressi con invito');
   // Sono numeri, non campi: nessuno di questi si scrive.
   expect(await page.locator('#ownerNumeri input').count()).toBe(0);
 });
@@ -405,7 +547,7 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
 
   const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -449,7 +591,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
 
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
@@ -510,6 +652,67 @@ test('il tasto destro su una persona apre un menu suo: scheda, pseudonimo, regal
   await expect(page.locator('.sn-wallet-ctxmenu')).toHaveCount(0);
 });
 
+// #1087.4 — la vista si rilegge a ogni movimento di crediti, anche di un'altra scheda, e rifaceva da capo la tabella:
+// sotto le mani dell'owner sparivano il menu del tasto destro e la scheda aperta, e il fuoco cadeva dalla riga.
+test('una rilettura della vista lascia aperti il menu e la scheda di una persona, col fuoco sulla sua riga', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  const righe = page.locator('#ownerUsers tr.sn-wallet-user');
+  const lei = righe.filter({ hasText: PSEUDONIMO });
+  const scheda = page.locator('#ownerUsers .sn-wallet-scheda');
+  const menu = page.locator('.sn-wallet-ctxmenu');
+  const fuocoSu = () => page.evaluate(() => {
+    const a = document.activeElement;
+    return a && a.classList.contains('sn-wallet-user') ? a.cells[0].textContent : null;
+  });
+  const rileggi = () => app.evaluate(() => globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED }));
+
+  await expect(righe).toHaveCount(1, { timeout: 15_000 });
+  await lei.click();
+  await expect(scheda).toContainText('4.890,5', { timeout: 15_000 });
+  await lei.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Le arrivano crediti: la riga e la scheda aperta prendono il numero nuovo, e niente si chiude.
+  persone[0] = { ...persone[0], balance: { ...persone[0].balance, credits: 5890.5, creditsGranted: 6128 } };
+  await rileggi();
+  await expect(lei.locator('td').nth(1)).toHaveText('5.890,5', { timeout: 15_000 });
+  await expect(scheda).toContainText('5.890,5', { timeout: 15_000 });
+  expect(detailChiesti.length).toBe(2);
+  await expect(menu).toHaveCount(1);
+  await expect(menu).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Entra una persona nuova, in cima: la riga col fuoco non si sposta e non lo perde.
+  persone.unshift({
+    pseudonym: 'f00dfeed00000001', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0, limitUsd: 3.5 },
+    invitedBy: 'owner', createdAt: '2026-10-01T08:00:00.000Z', reconcile: null, usage: { rows: 0, byAction: {}, byDay: {} },
+  });
+  await rileggi();
+  await expect(righe).toHaveCount(2, { timeout: 15_000 });
+  await expect(righe.first()).toContainText('f00dfeed00000001');
+  await expect(menu).toBeVisible();
+  await expect(scheda).toBeVisible();
+  expect(await fuocoSu()).toBe(PSEUDONIMO);
+
+  // Esc chiude il menu, e il fuoco è ancora sulla riga: Invio richiude la scheda.
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(scheda).toBeHidden();
+
+  // Una persona che il server non elenca più porta via la sua riga e il menu aperto su di lei.
+  await lei.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  persone = persone.filter((p) => p.pseudonym !== PSEUDONIMO);
+  await rileggi();
+  await expect(righe).toHaveCount(1, { timeout: 15_000 });
+  await expect(lei).toHaveCount(0);
+  await expect(menu).toHaveCount(0);
+});
+
 // Tema chiaro e tema scuro: le manopole e i riquadri dei numeri sono roba
 // nuova sulla pagina, e devono leggersi in tutti e due. Gli screenshot
 // finiscono in tests/.shots/ (non tracciati) e li guarda chi lavora.
@@ -530,7 +733,7 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
     await page.reload();
     await page.waitForFunction(() => {
       const s = document.getElementById('ownerSection');
-      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7;
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8;
     }, null, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);

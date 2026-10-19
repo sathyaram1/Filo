@@ -231,12 +231,12 @@
   // I creatori, nell'ordine della coda (prima le persone, poi le istanze di
   // Claude dalla più vicina all'owner, in fondo Filo). Stesso ordine di
   // AUTHOR_RANK in manage.js: chi legge le due superfici non deve reimparare.
-  var CREATORI = ['owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'claude', 'filo'];
+  var CREATORI = ['owner', 'user', 'local', 'worker', 'verifier', 'residuo', 'prober', 'costruzione', 'claude', 'filo'];
 
   // ── Le due domande che ci si fa davanti a questa scheda ──────────────────
   // «Quanto è arrivato dalle persone» e «quanto hanno prodotto le routine».
   // Con una pasticca per mittente, la seconda costava sei clic e la
-  // conoscenza di quale delle nove voci è una routine: la segnalazione
+  // conoscenza di quale delle voci è una routine: la segnalazione
   // chiedeva per esempio «i feedback lanciati da prober o altre routine
   // cloud», e quello è un gruppo, non un mittente.
   //
@@ -244,10 +244,11 @@
   // Filo è la voce di un utente vero filtrata da un modello, non un processo
   // dell'owner (stessa scelta di feedbackThread.js). La sessione locale sta
   // invece con le routine: è un'istanza di Claude, gira solo sul computer
-  // dell'owner.
+  // dell'owner. Con le routine anche gli allarmi della pubblicazione: li apre
+  // il server, non una persona.
   var GRUPPI_CREATORI = [
     { key: '__persone', label: 'Persone', kinds: ['owner', 'user', 'filo'] },
-    { key: '__routine', label: 'Routine', kinds: ['local', 'worker', 'verifier', 'residuo', 'prober', 'claude'] },
+    { key: '__routine', label: 'Routine', kinds: ['local', 'worker', 'verifier', 'residuo', 'prober', 'costruzione', 'claude'] },
   ];
 
   // ── Il registro dei worker ────────────────────────────────────────────────

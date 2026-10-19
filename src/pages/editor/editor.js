@@ -769,6 +769,7 @@
   // decide quando scrivere).
   function activateFile(raw) {
     doc = parseStoredDoc(raw) || parseStoredDoc(blankFileSerialized());
+    convertiScorciatoie(doc.modules);
     collection.activeId = doc.id;
     // Stato di vista che non deve "trascinarsi" da un file all'altro: torna
     // sempre alla vista testo (fuori dalla modalità modifica moduli).
@@ -2569,8 +2570,8 @@
   // (src/content/content.js): se un modulo l'ha salvato, qui vince il modulo (#545).
   function dichiaraCtrlZ() {
     const annulla = TASTI_EDITOR.find((t) => t.suo === 'undo');
-    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut
-      && prendeIlTasto(annulla, TASTI.pressioneScritta(m.data.shortcut) || {}));
+    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && candidatoDi(m.data)
+      && prendeIlTasto(annulla, pressioneDi(candidatoDi(m.data)) || {}));
     if (preso) document.documentElement.dataset.filoCtrlZ = 'pagina';
     else delete document.documentElement.dataset.filoCtrlZ;
   }
@@ -3232,7 +3233,7 @@
       // portano da nessuna parte. La sezione si riapre da sé, poi la vista ci
       // arriva sopra (feedback #385).
       revealCollapsedFor(node, { temporary: true });
-      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      node.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
     };
     if (opts && opts.immediate) go();
     else findRevealTimer = setTimeout(go, FIND_REVEAL_DELAY_MS);
@@ -4002,11 +4003,14 @@
     const deletable = !isPinned(m);
     const libera = scorciatoiaLibera(m);
     const senzaAzione = !AZIONE_SCORCIATOIA[m.type];
+    const giaSalvata = candidatoDi(m.data);
+    const mostrata = nomeMostrato(giaSalvata);
     openOverlay(`<h3>${meta.label}</h3>
-      <div class="ed-field"${senzaAzione && !m.data.shortcut ? ' hidden' : ''}><label>Scorciatoia da tastiera</label>
-        <input type="text" id="cfgShortcut" placeholder="${libera ? `es. ${escapeHtml(libera)}` : ''}" value="${escapeHtml(m.data.shortcut || '')}" />
+      <div class="ed-field"${senzaAzione && !giaSalvata ? ' hidden' : ''}><label for="cfgShortcut">Scorciatoia da tastiera</label>
+        <input type="text" id="cfgShortcut" autocomplete="off" spellcheck="false" placeholder="Premi i tasti${libera ? `, es. ${escapeHtml(libera)}` : ''}" value="${escapeHtml(mostrata)}" />
         <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt)${libera ? `, es. ${escapeHtml(libera)}` : ''}, così non ruba una lettera mentre scrivi.</div>
-        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
+        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div>
+        <div class="ed-field-hint ed-field-nota" id="cfgShortcutNota" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
         ${deletable ? '<button class="ed-btn danger" id="cfgDelete">Elimina</button>' : ''}
@@ -4024,10 +4028,26 @@
     const cfgShortcut = $('cfgShortcut');
     const cfgShortcutHint = $('cfgShortcutHint');
     const cfgShortcutTaken = $('cfgShortcutTaken');
-    cfgShortcut.addEventListener('input', () => {
+    const cfgShortcutNota = $('cfgShortcutNota');
+    // L'ultima combinazione premuta nel campo: { mostrata, c }. Riscrivere a mano il campo la lascia.
+    let registrata = null;
+    let primaDellAttesa = null;
+    function pulisci() {
       cfgShortcut.classList.remove('ed-field-invalid');
       cfgShortcutHint.hidden = true;
       cfgShortcutTaken.hidden = true;
+      cfgShortcutNota.hidden = true;
+    }
+    cfgShortcut.addEventListener('input', () => { registrata = null; primaDellAttesa = null; pulisci(); });
+    // Una combinazione premuta (o quella salvata) è un pezzo solo: Backspace e Canc la tolgono tutta.
+    cfgShortcut.addEventListener('keydown', (e) => {
+      if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const v = cfgShortcut.value;
+      if (!v || !((registrata && v === registrata.mostrata) || (giaSalvata && v === mostrata))) return;
+      e.preventDefault();
+      cfgShortcut.value = '';
+      registrata = null;
+      pulisci();
     });
     function mostraAvviso(testo) {
       cfgShortcut.classList.add('ed-field-invalid');
@@ -4040,24 +4060,76 @@
       cfgShortcutHint.hidden = false;
     }
     const AVVISO_SENZA_AZIONE = `«${meta.label}» non ha un'azione unica da far partire con un tasto: svuota il campo e salva.`;
+    // Col fuoco nel campo una combinazione con Ctrl, Cmd o Alt si registra invece di fare la sua cosa (#893);
+    // le lettere si scrivono, perché una scorciatoia si può anche scrivere a mano.
+    cfgShortcut.addEventListener('focus', () => avviaAscolto(cfgShortcut, {
+      premuto(e) {
+        const plat = TASTI.piattaforma();
+        const r = TASTI.tastoFisicoDaEvento(e, layoutTastiera, plat);
+        if (!r) return;
+        if (r.attesa) {
+          if (primaDellAttesa == null) primaDellAttesa = cfgShortcut.value;
+          const mac = plat === 'darwin';
+          const tenuti = [(e.ctrlKey || (e.metaKey && mac)) && 'Ctrl', e.metaKey && !mac && 'Win', e.altKey && 'Alt', e.shiftKey && 'Shift', '…'].filter(Boolean);
+          cfgShortcut.value = TASTI.etichettaScritta(tenuti.join('+'), plat);
+          return;
+        }
+        if (primaDellAttesa != null) cfgShortcut.value = primaDellAttesa;
+        primaDellAttesa = null;
+        pulisci();
+        if (r.rifiuto) { mostraRifiuto(r.rifiuto); return; }
+        const c = { nome: r.nome, tasto: r.tasto, car: r.car };
+        registrata = { mostrata: TASTI.etichettaScritta(r.nome, plat), c };
+        cfgShortcut.value = registrata.mostrata;
+        const no = senzaAzione ? null : rifiuto(c, m);
+        if (no) mostraRifiuto(no);
+      },
+      lasciato(e) {
+        if (primaDellAttesa == null || e.ctrlKey || e.metaKey || e.altKey) return;
+        cfgShortcut.value = primaDellAttesa;
+        primaDellAttesa = null;
+      },
+    }));
+    cfgShortcut.addEventListener('blur', () => {
+      if (primaDellAttesa != null) cfgShortcut.value = primaDellAttesa;
+      primaDellAttesa = null;
+      fermaAscolto();
+    });
     // Una scorciatoia salvata prima di questi controlli può essere già morta:
     // lo si dice all'apertura, non solo quando la si riscrive.
-    const giaSalvata = String(m.data.shortcut || '').trim();
     const rifiutoGiaSalvata = rifiuto(giaSalvata, m);
     if (giaSalvata && senzaAzione) mostraAvviso(AVVISO_SENZA_AZIONE);
     else if (rifiutoGiaSalvata) mostraRifiuto(rifiutoGiaSalvata);
+    else if (giaSalvata && !giaSalvata.tasto) {
+      cfgShortcutNota.textContent = `Non so ancora quale tasto è ${mostrata} su questa tastiera: premi la combinazione per fissarla. Intanto parte come prima.`;
+      cfgShortcutNota.hidden = false;
+    }
     $('cfgSave').addEventListener('click', () => {
-      const rawShortcut = cfgShortcut.value.trim();
-      if (rawShortcut && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
-      const r = rifiuto(rawShortcut, m);
+      const scritta = cfgShortcut.value.trim();
+      if (scritta && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
+      let c = null;
+      if (scritta && registrata && scritta === registrata.mostrata) c = registrata.c;
+      else if (scritta && giaSalvata && scritta === mostrata) c = giaSalvata;
+      else if (scritta) {
+        const v = daScritta(scritta, m);
+        if (v.rifiuto) { mostraRifiuto(v.rifiuto); cfgShortcut.focus(); return; }
+        c = v.c;
+      }
+      const r = rifiuto(c, m);
       if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
-      m.data.shortcut = rawShortcut;
+      // Le scorciatoie di Filo la confrontano con quelle dei moduli salvati: un attimo dopo sarebbe già tardi (#842).
+      const prima = `${m.data.shortcut || ''}|${m.data.tasto || ''}`;
+      m.data.shortcut = c ? c.nome : '';
+      if (c && c.tasto) m.data.tasto = c.tasto;
+      else delete m.data.tasto;
+      const nuovaScorciatoia = prima !== `${m.data.shortcut}|${m.data.tasto || ''}`;
       if (m.type === 'word-count') m.data.count = $('cfgCount').value;
       if (m.type === 'switch') {
         overlayBox.querySelectorAll('[data-pname]').forEach((inp) => { m.data.pages[Number(inp.dataset.pname)].name = inp.value; });
         overlayBox.querySelectorAll('[data-picon]').forEach((sel) => { m.data.pages[Number(sel.dataset.picon)].icon = sel.value; });
       }
       closeOverlay(); renderGrid(); markDirty();
+      if (nuovaScorciatoia) save(false);
     });
     // Invio in un campo conferma come «Salva», come Esc annulla (#545).
     overlayBox.querySelectorAll('input[type="text"]').forEach((inp) => inp.addEventListener('keydown', (e) => {
@@ -4068,18 +4140,125 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  // Nome scritto e tasto premuto si leggono SOLO con SN_TASTI: ogni lettura fatta
-  // qui in casa divergeva («Ctrl+Minus», «Ctrl++») e salvava tasti morti (#545).
+  // Nome scritto, tasto premuto e controlli comuni (tasti di Filo e del sistema, nomi sconosciuti, simboli che
+  // cambiano) stanno in SN_TASTI, la stessa regola delle scorciatoie di Filo: qui solo l'Editor e i suoi moduli (#545, #842).
+  // Si salva il tasto fisico (m.data.tasto, #893); m.data.shortcut ne tiene il nome, e da solo è una scorciatoia
+  // salvata come testo prima, che parte come allora.
+
+  // Cosa scrive ogni tasto lo dice il sistema, e cambia se l'utente cambia tastiera: si richiede a ogni campo.
+  let layoutTastiera = null;
+  function leggiLayout() {
+    try {
+      const k = navigator.keyboard;
+      if (!k || typeof k.getLayoutMap !== 'function') return Promise.resolve(layoutTastiera);
+      return Promise.resolve(k.getLayoutMap()).then((mappa) => {
+        const o = {};
+        mappa.forEach((v, c) => { o[c] = v; });
+        layoutTastiera = o;
+        return o;
+      }, () => layoutTastiera);
+    } catch (_) { return Promise.resolve(layoutTastiera); }
+  }
+
+  // Una scorciatoia di modulo: { nome } in forma Windows, `tasto` se è legata al tasto fisico, `car` il carattere
+  // uscito premendola (solo appena premuta: serve ai confronti coi tasti scritti a nome, come «Ctrl+?»).
+  function candidatoDi(data) {
+    const nome = data && typeof data.shortcut === 'string' ? data.shortcut.trim() : '';
+    if (!nome) return null;
+    return TASTI.tastoValido(data.tasto) ? { nome, tasto: data.tasto } : { nome };
+  }
+  function nomeMostrato(c) {
+    if (!c) return '';
+    if (!c.tasto) return c.nome;
+    return TASTI.etichettaScritta((layoutTastiera && TASTI.nomeTastoFisico(c.tasto, layoutTastiera)) || c.nome, TASTI.piattaforma());
+  }
+  function pressioneDi(c) {
+    if (!c) return null;
+    return c.tasto ? TASTI.pressioneFisica(c.tasto, layoutTastiera, TASTI.piattaforma(), c.car) : TASTI.pressioneScritta(c.nome);
+  }
+  function colpisce(c, e) {
+    return !!c && !!e && (c.tasto ? TASTI.combaciaFisico(e, c.tasto) : matchShortcut(e, c.nome));
+  }
+  // Due scorciatoie partono dallo stesso tasto? Quella scritta si prova sulla pressione dell'altra, come farebbe il tasto vero.
+  function stessoTasto(a, b) {
+    if (a.tasto && b.tasto) return a.tasto === b.tasto;
+    const [fisica, altra] = b.tasto ? [b, a] : [a, b];
+    return colpisce(altra, pressioneDi(fisica));
+  }
+  // Scritta a mano: { c } o { rifiuto }. Senza sapere com'è fatta la tastiera, una lettera o un simbolo restano testo.
+  function daScritta(sc, m) {
+    const r = TASTI.tastoFisicoDaScritta(sc, layoutTastiera, TASTI.piattaforma());
+    // Un simbolo da premere che però Filo o l'Editor si prendono comunque («Ctrl+_» è lo zoom): meglio dire quello.
+    if (r && r.rifiuto && m && (r.rifiuto.tipo === 'senzaTastoProprio' || r.rifiuto.tipo === 'simbolo')) {
+      const comeTesto = rifiuto({ nome: String(sc).trim() }, m);
+      if (comeTesto && (comeTesto.tipo === 'presa' || comeTesto.tipo === 'sistema')) return { rifiuto: comeTesto };
+    }
+    if (r && r.rifiuto) return { rifiuto: r.rifiuto };
+    return { c: r ? { nome: r.nome, tasto: r.tasto } : { nome: String(sc).trim() } };
+  }
+
+  // Le scorciatoie salvate come testo si legano al tasto appena si sa com'è fatta la tastiera; quelle che non si
+  // convertono (un simbolo senza un tasto suo) restano testo, e il pannello del modulo lo dice.
+  function convertiScorciatoie(moduli) {
+    let cambiate = 0;
+    for (const m of moduli || []) {
+      const d = m && m.data;
+      if (!d || typeof d.shortcut !== 'string' || !d.shortcut.trim() || TASTI.tastoValido(d.tasto)) continue;
+      const r = TASTI.tastoFisicoDaScritta(d.shortcut, layoutTastiera, TASTI.piattaforma());
+      if (!r || !r.tasto) continue;
+      d.tasto = r.tasto;
+      d.shortcut = r.nome;
+      cambiate++;
+    }
+    return cambiate;
+  }
+  function convertiCollezione() {
+    let n = doc ? convertiScorciatoie(doc.modules) : 0;
+    for (const f of (collection && collection.files) || []) n += convertiScorciatoie(f.modules);
+    if (!n) return;
+    writeCollection();
+    dichiaraCtrlZ();
+  }
+
+  // Il campo che sta registrando una combinazione: il main gli lascia anche i tasti che si prende prima della
+  // pagina (patterns/chi-registra-una-combinazione-riceve-anche-i-tasti-che-filo.md), e li rinnova finché ascolta.
+  let ascolto = null;
+  function chiediTasti(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REGISTRA_TASTI, attivo })).catch(() => {}); } catch (_) {}
+  }
+  function avviaAscolto(el, gestori) {
+    if (ascolto && ascolto.el === el) return;
+    fermaAscolto();
+    const html = document.documentElement;
+    ascolto = { el, ...gestori, ctrlZ: html.dataset.filoCtrlZ, rinnovo: setInterval(() => chiediTasti(true), 20000) };
+    // Ctrl+Z qui è un tasto da registrare, non «torna alla pagina di prima».
+    html.dataset.filoCtrlZ = 'pagina';
+    chiediTasti(true);
+    leggiLayout();
+  }
+  function fermaAscolto() {
+    if (!ascolto) return;
+    const a = ascolto;
+    ascolto = null;
+    clearInterval(a.rinnovo);
+    if (a.ctrlZ === undefined) delete document.documentElement.dataset.filoCtrlZ;
+    else document.documentElement.dataset.filoCtrlZ = a.ctrlZ;
+    chiediTasti(false);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (!ascolto || e.target !== ascolto.el || !(e.ctrlKey || e.metaKey || e.altKey)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.isComposing || e.repeat) return;
+    ascolto.premuto(e);
+  }, true);
+  window.addEventListener('keyup', (e) => { if (ascolto && e.target === ascolto.el) ascolto.lasciato(e); }, true);
+
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
     const p = TASTI.pressioneScritta(sc);
     return !!p && (p.ctrlKey || p.metaKey || p.altKey);
-  }
-  // Valida: un modificatore reale e un tasto finale, così non coincide con la
-  // digitazione di una lettera.
-  function isValidShortcut(sc) {
-    return shortcutHasRealModifier(sc) && !TASTI.tipoModificatore(TASTI.pressioneScritta(sc).key);
   }
   function isEditableTarget(t) {
     if (!t) return false;
@@ -4115,57 +4294,56 @@
     { tasti: ['v'], cosa: 'incolla', delBrowser: true, fa: null },
     { tasti: ['v'], shift: true, cosa: 'incolla senza formattazione', delBrowser: true, fa: null },
     { tasti: ['a'], cosa: 'seleziona tutto', delBrowser: true, fa: null },
+    // Cancellare e muoversi per parole, o fino all'inizio e alla fine: un modulo li toglierebbe a chi scrive.
+    { cosa: 'serve a cancellare e a muoversi nel testo', scrittura: true, fa: null },
   ];
+  const TASTI_SCRITTURA = ['Backspace', 'Canc', '←', '→', '↑', '↓', 'Inizio', 'Fine'];
+  // Su Mac per parole si va con Opzione; Cmd vale Ctrl come ovunque.
+  function tastoDiScrittura(e) {
+    const mod = TASTI.suMac() && e.altKey && !e.ctrlKey && !e.metaKey ? 'Alt' : (e.ctrlKey || e.metaKey) ? 'Ctrl' : '';
+    return !!mod && TASTI_SCRITTURA.some((k) => TASTI.combacia(e, `${mod}+${k}`) || TASTI.combacia(e, `${mod}+Shift+${k}`));
+  }
   function prendeIlTasto(t, e) {
+    if (t.scrittura) return tastoDiScrittura(e);
     if (!(e.ctrlKey || e.metaKey)) return false;
     if (t.delBrowser && TASTI.suMac()) return false;
     if (t.prende) return t.prende(e);
     return t.tasti.some((k) => TASTI.combacia(e, ['Ctrl', ...(t.shift ? ['Shift'] : []), k].join('+')));
   }
-  function tastoEditorDi(sc) {
-    const e = TASTI.pressioneScritta(sc);
-    return (e && TASTI_EDITOR.find((t) => prendeIlTasto(t, e))) || null;
-  }
-  // Perché una scorciatoia non partirebbe mai su questo modulo ('' = va bene).
-  function motivoScorciatoiaPresa(sc, m) {
-    if (!sc) return '';
-    const nome = TASTI ? TASTI.etichettaScritta(sc) : sc;
-    if (TASTI && TASTI.riservato(sc)) {
-      return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
-    }
-    // Prima dei tasti dell'Editor: la pressione che descrive non è quella vera.
-    const cambia = TASTI.modificatoreCheCambiaSimbolo(sc);
-    if (cambia === 'Shift') return `Con Shift il simbolo cambia, quindi ${nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift)`;
-    if (cambia) return `Con ${tasto(cambia)} il simbolo cambia, quindi ${nome} non partirebbe mai`;
-    const t = tastoEditorDi(sc);
+  // Perché una scorciatoia non partirebbe mai su questo modulo per i tasti dell'Editor o di un altro modulo ('' = va bene).
+  // Il tasto si prova con la pressione che fa su questa tastiera: sulla francese Ctrl+6 scrive «-», ed è lo zoom.
+  function motivoScorciatoiaPresa(c, m) {
+    const e = pressioneDi(c);
+    if (!e) return '';
+    const nome = TASTI.etichettaScritta(c.nome, TASTI.piattaforma());
+    const t = TASTI_EDITOR.find((x) => prendeIlTasto(x, e));
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
-    const e = TASTI.pressioneScritta(sc);
-    const altro = e && doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && x.data && x.data.shortcut && matchShortcut(e, x.data.shortcut));
+    const altro = doc.modules.find((x) => x !== m && AZIONE_SCORCIATOIA[x.type] && candidatoDi(x.data) && stessoTasto(c, candidatoDi(x.data)));
     if (altro) {
       const etich = (MODULE_TYPES[altro.type] && MODULE_TYPES[altro.type].label) || altro.type;
       return `${nome} è già la scorciatoia di «${etich}», e partirebbe solo quello`;
     }
     return '';
   }
-  // Perché una scorciatoia scritta non si salva su questo modulo, o null. La
+  // Perché una scorciatoia (un candidato, vedi `candidatoDi`) non si salva su questo modulo, o null. La
   // stessa regola rifiuta al salvataggio, avvisa all'apertura e sceglie gli
   // esempi degli avvisi: un esempio che poi si rifiuta non esce (#545).
-  function rifiuto(sc, m) {
-    if (!sc) return null;
-    const ignoto = TASTI.pezzoSconosciuto(sc);
-    if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
-    const conReale = sc.split(/[+\s-]+/).some((p) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(p)));
-    if (conReale && TASTI.soloModificatori(sc)) return { tipo: 'senzaTasto', nome: TASTI.etichettaScritta(sc.replace(/[+\s-]+$/, '')) };
-    // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive.
-    if (!isValidShortcut(sc)) return { tipo: 'senzaModificatore' };
-    if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
-    if (TASTI.delSistema(sc)) return { tipo: 'sistema', nome: TASTI.etichettaScritta(sc) };
-    const motivo = motivoScorciatoiaPresa(sc, m);
+  function rifiuto(c, m) {
+    if (!c) return null;
+    const plat = TASTI.piattaforma();
+    const comune = c.tasto
+      ? TASTI.rifiutoFisico(c.tasto, layoutTastiera, plat, { car: c.car, nome: TASTI.etichettaScritta(c.nome, plat) })
+      : TASTI.rifiutoScritta(c.nome, plat);
+    if (comune) return comune;
+    const motivo = motivoScorciatoiaPresa(c, m);
     return motivo ? { tipo: 'presa', motivo } : null;
   }
   function testoRifiuto(r, m) {
     const libera = scorciatoiaLibera(m);
     const perEsempio = libera ? `, per esempio ${libera}` : '';
+    if (r.tipo === 'senzaTastoProprio') return `Su questa tastiera «${r.nome}» non ha un tasto suo: premi la combinazione invece di scriverla.`;
+    if (r.tipo === 'macControl') return `Su Mac le scorciatoie dei moduli si fanno con ${tasto('Ctrl')}, non con Control.`;
+    if (r.tipo === 'win') return `Il tasto ${TASTI.piattaforma() === 'linux' ? 'Super' : 'Windows'} lo usa il sistema: usa Ctrl o Alt.`;
     if (r.tipo === 'modificatore') {
       return `Non riconosco «${r.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc)${libera ? `, es. ${libera}` : ''}.`;
     }
@@ -4175,13 +4353,20 @@
       return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1…${conNome ? ` (es. ${conNome})` : ''}.`;
     }
     if (r.tipo === 'sistema') return `${r.nome} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra${perEsempio}.`;
-    return `${r.motivo}: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'altgr') return `${r.nome} su Windows è anche AltGr, che scrive caratteri come € e @: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'simbolo') {
+      return r.modificatore === 'Shift'
+        ? `Con Shift il simbolo cambia, quindi ${r.nome} scritta così non partirebbe mai: premi la combinazione invece di scriverla, o scegline un'altra${perEsempio}.`
+        : `Con ${tasto(r.modificatore)} il simbolo cambia, quindi ${r.nome} non partirebbe mai: scegline un'altra${perEsempio}.`;
+    }
+    const motivo = r.cosa ? `${r.nome} è già di Filo (${r.cosa}) e non arriverebbe mai a questo modulo` : r.motivo;
+    return `${motivo}: scegline un'altra${perEsempio}.`;
   }
   // Gli esempi escono coi nomi dei tasti di chi legge; '' se sono tutti presi.
   const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => tasto(`${mods}+${d}`)));
   const ESEMPI_CON_NOME = ['Ctrl+Shift+Spazio', 'Ctrl+Alt+Spazio', 'Ctrl+Shift+Invio', 'Ctrl+Alt+Invio'].map((a) => tasto(a));
   function primaLibera(candidati, m) {
-    return candidati.find((sc) => !rifiuto(sc, m)) || '';
+    return candidati.find((sc) => { const v = daScritta(sc, m); return !!v.c && !rifiuto(v.c, m); }) || '';
   }
   function scorciatoiaLibera(m) { return primaLibera(ESEMPI_LIBERI, m); }
 
@@ -4212,8 +4397,9 @@
   // il colpo di coda cade su un comando del pannello nuovo; chiuso, cade sul
   // foglio dietro (che apre "Aggiungi modulo"). Armano tutti e due.
   let overlayGen = 0;
-  function openOverlay(html) { staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
-  function closeOverlay() { staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
+  // Un campo tolto col fuoco dentro non sempre manda il blur: l'ascolto dei tasti si chiude qui.
+  function openOverlay(html) { fermaAscolto(); staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
+  function closeOverlay() { fermaAscolto(); staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
   // Allo scadere chiude solo sé stesso: chiudeva qualunque pannello ci fosse, compreso il commento aperto nel frattempo.
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
@@ -4267,6 +4453,7 @@
   // si crederebbe in overflow e resterebbe con la barra di scorrimento addosso
   // per sempre (due soli avvisi mostravano la scrollbar).
   let edToastOverflowTimer = null;
+  const motionMs = (ms) => (window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionMs(ms) : ms);
   function syncEdToastOverflow() {
     clearTimeout(edToastOverflowTimer);
     edToastOverflowTimer = setTimeout(() => {
@@ -4274,7 +4461,7 @@
       const scrollable = host.scrollHeight - host.clientHeight > 2;
       host.classList.toggle('scrolling', scrollable);
       if (scrollable) host.scrollTop = host.scrollHeight;
-    }, 260); // > della transizione di entrata/uscita (0.18s / 0.22s)
+    }, motionMs(260)); // > della transizione di entrata/uscita (0.18s / 0.22s)
   }
   function removeEdToast(el, immediate) {
     if (!el || el.dataset.closing === '1') return;
@@ -4286,7 +4473,7 @@
     el.classList.remove('show');
     const via = () => { try { el.remove(); } catch (_) {} edToastTempi.lascia(el); syncEdToastOverflow(); };
     if (immediate) { via(); return; }
-    setTimeout(via, 220);
+    setTimeout(via, motionMs(220));
   }
   // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).
@@ -4467,11 +4654,12 @@
     }
     // scorciatoie personalizzate dei moduli
     for (const m of doc.modules) {
-      if (AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut && matchShortcut(e, m.data.shortcut)) {
+      const c = AZIONE_SCORCIATOIA[m.type] && candidatoDi(m.data);
+      if (c && colpisce(c, e)) {
         // Difesa per le scorciatoie senza modificatore già salvate (prima della
         // validazione): mentre si scrive nel documento o in un campo di testo NON
         // devono rubare il tasto — lascia digitare normalmente la lettera.
-        if (!shortcutHasRealModifier(m.data.shortcut) && isEditableTarget(e.target)) continue;
+        if (!c.tasto && !shortcutHasRealModifier(c.nome) && isEditableTarget(e.target)) continue;
         e.preventDefault(); triggerModuleShortcut(m); return;
       }
     }
@@ -4494,6 +4682,8 @@
     try {
       const settings = await (window.SN_STORAGE?.getSettings?.());
       if (!settings) return;
+      // I tasti di Spiega, Traduci, Salva e Aiuto li sceglie l'utente: la vecchia si libera per i moduli, la nuova è presa (#842).
+      TASTI.usaScorciatoieFilo(settings.scorciatoie);
       window.SN_PAGE_THEME = settings.theme || 'system';
       let theme = settings.theme || 'system';
       if (theme === 'system') theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -4533,7 +4723,9 @@
   // nell'archivio (un appunto scritto da Filo a editor chiuso): lo si cerca di nuovo dopo la fusione.
   const fileChiesto = (() => { try { return new URLSearchParams(location.search).get('file') || ''; } catch (_) { return ''; } })();
   activateFile((fileChiesto && STORE.findFile(collection, fileChiesto)) || STORE.activeFile(collection));
-  reloadFromArchive().then(() => {
+  const archivioLetto = reloadFromArchive().then(() => {
     if (fileChiesto && STORE.findFile(collection, fileChiesto) && (!doc || doc.id !== fileChiesto)) switchToFile(fileChiesto);
   });
+  // Dopo la fusione con l'archivio: scrivere prima cancellerebbe gli appunti che Filo ci ha messo (vedi loadCollection).
+  Promise.all([archivioLetto, leggiLayout()]).then(convertiCollezione, () => {});
 })();

@@ -4,7 +4,7 @@
 const { safeFetch } = require('../safe-fetch');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const Foto = require('../fotoDellaPagina');
-const auth = require('../../auth/google-auth');
+const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
 const identitaInvio = require('../../auth/identita-invio');
@@ -327,7 +327,9 @@ module.exports = function register(on, ctx) {
     const wc = Foto.paginaDaFotografare(sender);
     if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     const img = await wc.capturePage();
-    return { ok: true, dataUrl: img.toDataURL() };
+    if (!msg || msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL() };
+    const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
+    return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
   });
 
   // "Salva immagine come…" (#274). Il vecchio cammino era un <a download>
@@ -697,10 +699,7 @@ module.exports = function register(on, ctx) {
       // Chiesto al momento della spedizione: fra l'accodamento e l'invio
       // possono passare ore (offline), e l'owner può aver chiuso la sessione.
       // '' = l'accesso non c'è; un errore con la sessione ancora aperta è la rete, e la coda riprova senza dire niente.
-      tokenOwner: async () => {
-        if (!auth.isAdmin()) return '';
-        try { return (await auth.getIdToken()) || ''; } catch (e) { if (!auth.isAdmin()) return ''; throw e; }
-      },
+      tokenOwner: Mittente.tokenOwner,
       onAttesaOwner: (_item, perche) => avvisoNellaFinestra(
         perche === 'rifiutato'
           ? 'Il tuo feedback aspetta la tua firma da owner: il server non accetta il tuo accesso. Riparte quando rientri, o al prossimo avvio di Filo.'
@@ -751,19 +750,12 @@ module.exports = function register(on, ctx) {
         };
       }
       const payload = msg.payload || {};
-      // Se l'utente è loggato come admin (l'owner), marca il suo invio come
-      // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
-      // esterni (arancione). L'identità owner è nota solo qui nel main (auth
-      // singleton): il content script che genera il clientId non sa di esserlo.
-      // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
+      // Il mittente lo decide il main, non il payload: il content script non sa di essere dell'owner (#595).
       let dallOwner = false;
       try {
-        // #912: anche l'owner appena buttato fuori da un rinnovo fallito: il suo feedback aspetta che rientri.
-        const owner = auth.isAdmin() || !!auth.accessoOwnerCaduto?.();
-        if (owner && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
-          payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
-          dallOwner = String(payload.clientId || '').startsWith('owner:');
-        }
+        const firmato = Mittente.firma(payload.clientId);
+        payload.clientId = firmato.clientId;
+        dallOwner = firmato.dallOwner;
       } catch (_) {}
       console.log('[Filo feedback] submit start', {
         textLen: (payload.text || '').length,

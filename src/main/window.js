@@ -168,7 +168,8 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,
@@ -225,7 +226,8 @@ function createIncognitoWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
       contextIsolation: true,
-      sandbox: false,
+      // shell-preload.js chiede solo electron: la shell non ha bisogno di Node (#834).
+      sandbox: true,
       nodeIntegration: false,
     },
     autoHideMenuBar: true,

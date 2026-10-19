@@ -17,6 +17,7 @@
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
+  <script src="filo://shared/nomiSito.js"></script>
 </head>
 <body>
   <main class="sn-page" id="page">
@@ -27,8 +28,9 @@
 
     <section>
       <h2 id="h-blocklist"></h2>
-      <p class="sn-muted">Domini su cui l'estensione è disabilitata (uno per riga).</p>
-      <textarea id="blocklist"></textarea>
+      <p class="sn-muted" id="blocklistDesc"></p>
+      <textarea id="blocklist" aria-labelledby="h-blocklist" spellcheck="false"></textarea>
+      <p class="sn-chain-warn" id="blocklistError" role="alert" aria-live="polite" hidden></p>
     </section>
 
     <section>
@@ -41,6 +43,7 @@
     <section>
       <h2 id="h-shortcuts"></h2>
       <ul id="shortcutsList" class="sn-muted" style="line-height:1.7"></ul>
+      <button class="sn-btn sn-btn-secondary" id="cambiaScorciatoie" type="button">Cambiale in Preferenze</button>
     </section>
 
     <div class="sn-toolbar" style="margin-top: 24px;">

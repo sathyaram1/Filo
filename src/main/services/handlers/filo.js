@@ -231,6 +231,41 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Filo non ha un calendario suo: scrive l'evento in un .ics e lo passa al
+  // programma dell'utente, che è la porta che ogni calendario sa aprire. Se il
+  // sistema non lo apre torna il percorso, così il bottone non finisce nel nulla.
+  on(MSG.CALENDAR_ADD, soloDaFilo(async (msg) => {
+    const C = globalThis.SN_CALENDAR;
+    const ev = C && C.normalize(msg && msg.evento);
+    if (!ev) return { ok: false, error: 'evento incompleto' };
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const { app, shell } = require('electron');
+    let file = '';
+    try {
+      const dir = path.join(app.getPath('temp'), 'filo-eventi');
+      await fs.promises.mkdir(dir, { recursive: true });
+      // Un evento consegnato al calendario di ieri non serve più a nessuno:
+      // senza questa ripulita la cartella cresce a ogni uso e non la svuota nessuno.
+      const limite = Date.now() - 24 * 60 * 60 * 1000;
+      for (const nome of await fs.promises.readdir(dir)) {
+        if (!nome.endsWith('.ics')) continue;
+        const vecchio = path.join(dir, nome);
+        try {
+          const st = await fs.promises.stat(vecchio);
+          if (st.mtimeMs < limite) await fs.promises.unlink(vecchio);
+        } catch (_) {}
+      }
+      file = path.join(dir, `${Date.now().toString(36)}-${C.fileName(ev)}`);
+      await fs.promises.writeFile(file, C.buildIcs(ev, { uid: `${C.uidPer(ev)}@filo` }), 'utf8');
+    } catch (e) {
+      return { ok: false, error: e?.message || 'file non scritto' };
+    }
+    let apertura = '';
+    try { apertura = await shell.openPath(file); } catch (e) { apertura = e?.message || 'apertura non riuscita'; }
+    return { ok: true, file, aperto: !apertura, error: apertura || '', quando: ev.quando, titolo: ev.titolo };
+  }));
+
   on(MSG.FILO_GET_MEMORY, soloFilo(async () => ({ ok: true, memory: await FiloMem.getMemory() })));
 
   // Rileggere e togliere una riga di memoria alla volta (#592): è il posto dove
@@ -245,7 +280,8 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const lezione = msg && msg.lezione && typeof msg.lezione === 'object';
     const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
-    if (!lezione && !riga) return { ok: false, error: 'bad_request' };
+    const sempreAperta = msg && typeof msg.sempreAperta === 'string';
+    if (!lezione && !riga && !sempreAperta) return { ok: false, error: 'bad_request' };
     return { ok: true, tolta: await FiloMem.forgetLine(msg) };
   });
 
@@ -333,8 +369,12 @@ module.exports = function register(on, ctx) {
     const esterno = role === 'filo' && Object.hasOwn(ESTERNI, msg.esterno) ? ESTERNI[msg.esterno] : '';
     // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
     const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
+    // Una finestra guardata dopo l'OK (#778): ne resta il nome, che toStoredMessage accorcia.
+    const guardate = role === 'filo' && actions.some((a) => a.type === 'VEDI_SCHERMO')
+      ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     await FiloChats.append(id, {
       role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
+      ...(guardate.length ? { guardate } : {}),
     });
     return { ok: true };
   });
@@ -464,7 +504,8 @@ module.exports = function register(on, ctx) {
     // Chi apre una seconda scheda nuova mentre la prima aspetta la risposta
     // riceve `resume: false`: vede la conversazione e si aggiorna con
     // FILO_ONBOARDING_UPDATED, invece di rilanciare lo stesso messaggio.
-    const resume = Onboarding.hasPendingTurn(state) && claimOnboardingResume();
+    // La home pronta per la scheda nuova (#1128) non la prende: nessuno la guarda, e la chiede quando arriva davanti.
+    const resume = Onboarding.hasPendingTurn(state) && !sender?.riserva && claimOnboardingResume();
     return {
       ok: true,
       ready: true,

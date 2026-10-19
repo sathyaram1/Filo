@@ -546,3 +546,16 @@ test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ri
   await page.keyboard.type(' poi xqseconda2 ');
   await expect(page.locator('.sn-spell-overlay .sn-semantic-error')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
 });
+
+test('spenta la spiegazione preparata (#818), il doppio clic non la paga; il tasto destro sì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ spiegaAnticipata: { enabled: false } }); });
+  const page = await apri(app, openTab, testServer);
+  const p = await puntoDellaParola(page, 'p2', 'Pitagora');
+  await page.mouse.dblclick(p.x, p.y);
+  await pausa(1500);
+  expect((await conti(app)).spiega).toBe(0);
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  await expect(page.locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
+  expect((await conti(app)).spiega).toBe(1);
+});

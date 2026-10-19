@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import * as Letture from '../../scripts/lib/letture-esterne.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
@@ -117,6 +119,14 @@ test('il lavoro fidato fonde senza il clic, la pre-approvazione non c\'è più, 
   legame(false, sicurezza, 'Due strade però non passano da quel clic', 'le due strade di prima');
   legame(false, sicurezza, 'Nessuno strumento da terminale lo fa', 'approvazione solo dall\'app');
   legame(!preapprovaTolta, sicurezza, 'fondi senza chiedermelo', 'la pre-approvazione');
+});
+
+test('la memoria e gli appunti di Claude non sporcano chi li legge, e il documento sulla sicurezza lo dice fra i punti deboli', () => {
+  const ctx = Letture.contestoLettura({ cwd: ROOT, env: { CLAUDE_PROJECT_DIR: ROOT } });
+  const pulita = (f) => Letture.motivoLettura({ tool_name: 'Read', tool_input: { file_path: f } }, ctx) === '';
+  const memoria = pulita(join(homedir(), '.claude', 'projects', 'x', 'memory', 'MEMORY.md'));
+  const appunti = pulita(join(tmpdir(), 'claude', ROOT.replace(/[^A-Za-z0-9]/g, '-'), 's', 'scratchpad', 'nota.md'));
+  legame(memoria && appunti, sicurezza, 'Il testo che una sessione sporca lascia fuori dal ramo può arrivare a una sessione pulita', 'testo delle sessioni sporche che arriva a quelle pulite (#1209)');
 });
 
 test('il tasto destro su un link chiede da solo titolo e descrizione al sito e spiega il link con un modello, e il documento sulla privacy lo dice', () => {

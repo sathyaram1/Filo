@@ -860,7 +860,7 @@ async function setRedteamOpen(on, idToken) {
 }
 
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
-// Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
+// Le impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
 // src/shared/wallet.js: qui si applica, non si ridichiara.
 //

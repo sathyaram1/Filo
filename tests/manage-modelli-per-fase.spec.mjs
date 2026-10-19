@@ -2,6 +2,7 @@
 // finto che applica la maschera foglia per foglia come quello vero (apici inversi compresi). Quello che difendono:
 // la scelta arriva in config/routines.roleModels, si ritrova riaprendo la pagina, si toglie, e mai un valore non letto.
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -109,7 +110,7 @@ async function sulServer(app) {
 async function pronta(page) {
   await page.waitForFunction(() => window.__mgTest && window.filo && window.SN_ROUTINE_MODELLI);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   return page;
 }
 const apri = async (openTab) => pronta(await openTab(URL));
@@ -247,7 +248,7 @@ test('prima che il server risponda nessun controllo delle automazioni dice un va
   await preparaServer(app, { routines: { accountAOff: true, roleModels: { secaudit: { model: 'sonnet' } } }, ritardoGet: 3000 });
   const page = await openTab(URL);
   await page.waitForFunction(() => window.__mgTest && window.SN_ROUTINE_MODELLI);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#panel-automation')).toHaveAttribute('aria-busy', 'true');
   // «Definizione dell'agente» e una levetta accesa sarebbero già risposte, e non le abbiamo ancora.
   await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('');

@@ -9,6 +9,7 @@
 // close, per evitare il costo di reload ad ogni hover).
 
 const { BrowserWindow, nativeTheme } = require('electron');
+const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
 const { quandoSparita } = require('./popup-anteprima');
 
@@ -38,10 +39,9 @@ html,body{background:transparent;overflow:hidden;height:100%;
 :root.dark{--bg:#1d1a16;--fg:#f1e7d6;--border:#3b332a}
 </style></head><body><div id="tip"></div>
 <script>
-  // API minimale: il main process chiama webContents.send('set', {text, dark, giro}); 'size' riporta il giro.
+  // Il main manda {text, dark, giro} (tooltip-preload.js); la misura torna col suo giro.
   const tip = document.getElementById('tip');
-  const { ipcRenderer } = require('electron');
-  ipcRenderer.on('set', (_e, { text, dark, giro }) => {
+  window.fumetto.onTesto(({ text, dark, giro }) => {
     document.documentElement.classList.toggle('dark', !!dark);
     tip.textContent = text || '';
     // Misura sincrona: requestAnimationFrame non scatta quando la BrowserWindow
@@ -49,7 +49,7 @@ html,body{background:transparent;overflow:hidden;height:100%;
     // restava bloccato. getBoundingClientRect forza un layout reflow sincrono
     // anche con window nascosta, quindi le misure sono affidabili.
     const r = tip.getBoundingClientRect();
-    ipcRenderer.send('size', { w: Math.ceil(r.width), h: Math.ceil(r.height), giro });
+    window.fumetto.misura({ w: Math.ceil(r.width), h: Math.ceil(r.height), giro });
   });
 </script></body></html>`;
 }
@@ -71,9 +71,10 @@ function ensureWin(parentWin) {
     width: 200,
     height: 30,
     webPreferences: {
-      contextIsolation: false,
-      nodeIntegration: true,
-      sandbox: false,
+      preload: path.join(__dirname, '..', 'preload', 'tooltip-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
   // Il fumetto compare sotto il puntatore: se prendesse lui il mouse, la barra non saprebbe che il

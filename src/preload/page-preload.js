@@ -5,8 +5,8 @@
 //     spellcheck, feedback)
 //   - espone chrome.* dentro il mondo isolato del preload (NON in main world:
 //     la pagina è codice non fidato; i content script girano qui)
-//   - carica i moduli SN_* (shared) via require()
-//   - carica i content script via require()
+//   - carica i moduli SN_* (shared) e i content script via require(): gira in
+//     sandbox, impacchettato con tutto ciò che richiede (src/main/preloadPacchetto.js)
 //
 // contextIsolation è TRUE per queste pagine, quindi globalThis qui è isolato
 // dal main world della pagina. Le scritture su globalThis NON sono visibili
@@ -130,6 +130,8 @@ try {
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
     const clic = Date.now();
+    // Filo spento sul sito (#843): il clic è della pagina, e se lei tace il menu di riserva offre di riaccenderlo.
+    if (globalThis.__snFiloSpento === true) { riservaSeLaPaginaTace(e, clic); return; }
     const prima = typeof contextMenuHandler === 'function' && sitoPrima();
     // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sui siti dove il tasto
     // destro apre il loro menu, Shift è la strada per quello di Filo.
@@ -160,20 +162,34 @@ try {
 // per questo l'ascolto nasce qui, a document_start. Lo smista SN_FILO_UI.tastoNelRiquadro (src/shared/filoUi.js).
 try {
   for (const tipo of ['keydown', 'keypress', 'keyup']) {
-    window.addEventListener(tipo, (e) => {
+    const ascolto = (e) => {
       const UI = globalThis.SN_FILO_UI;
+      // L'Esc va prima a ogni ascolto di Filo: un sito che lo ferma sulla finestra lasciava aperto il riquadro (#859).
+      if (tipo === 'keydown' && e.key === 'Escape') { escPrimaAFilo(e, ascolto, UI); return; }
       if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
-    }, { capture: true });
+    };
+    window.addEventListener(tipo, ascolto, { capture: true });
   }
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
+
+// Solo il tasto dell'utente, o quello che il main ci consegna sopra lo schermo pieno del sito: uno fabbricato dal sito
+// fa il giro di sempre.
+function escPrimaAFilo(e, ascolto, UI) {
+  try {
+    if (!riscrittura || typeof riscrittura.anticipa !== 'function') return;
+    if (!e.isTrusted && !(UI && typeof UI.veroONostro === 'function' && UI.veroONostro(e))) return;
+    if (riscrittura.anticipa(e, ascolto)) e.stopImmediatePropagation();
+  } catch (_) {}
+}
 
 // Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
 function replayContextMenu(e, clic) {
   const copy = require('./menu-del-sito.js').copiaDelClic(e);
   const deadline = Date.now() + 3000;
   const tick = () => {
+    if (globalThis.__snFiloSpento === true) { menuDiRiserva(clic); return; }
     if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
-    if (globalThis.__snFiloSpento === true || Date.now() > deadline) { menuDiRiserva(clic); return; }
+    if (Date.now() > deadline) { menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);
@@ -799,6 +815,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
@@ -824,6 +841,8 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'riquadroRotto.js')); } catch (e) { console.error('[Filo CS] riquadroRotto', e); } // #760 — la proposta sopra il riquadro
   try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
+  try { require(path.join(SHARED_DIR, 'campoAccesso.js')); } catch (e) { console.error('[Filo CS] campoAccesso', e); } // #1124 — quali campi chiedono l'email
+  try { require(path.join(CONTENT_DIR, 'propostaEmail.js')); } catch (e) { console.error('[Filo CS] propostaEmail', e); } // #1124 — anche nei riquadri: il campo può stare lì
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
@@ -949,5 +968,15 @@ if (!IS_SUBFRAME) {
       window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });
     } catch (_) {}
   }
+  // #1124 — un campo email in un riquadro qui dentro chiede dove sta: il gesto è stato là, ma la misura tocca a noi.
+  try {
+    window.addEventListener('message', (e) => {
+      const segno = e.data && typeof e.data === 'object' ? e.data.filoPropostaEmail : null;
+      if (contentScriptsStarted || typeof segno !== 'string' || !e.source) return;
+      const sorgente = e.source;
+      ensureContentScripts();
+      waitForContentScripts(() => { try { globalThis.SN_PROPOSTA_EMAIL?.segno?.(segno, sorgente); } catch (_) {} });
+    });
+  } catch (_) {}
 }
 

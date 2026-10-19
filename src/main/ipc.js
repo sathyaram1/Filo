@@ -60,8 +60,18 @@ function senderInfo(event) {
       if (t) { tab = t; win = w; break; }
     }
   }
+  // La home pronta per la scheda nuova (#1128) parla già come la scheda che diventerà, nella sua finestra: senza,
+  // in incognito leggerebbe e scriverebbe il disco, e nessuno saprebbe che non è davanti agli occhi.
+  let riserva = false;
+  if (!tab) {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const r = w._filoTabs?.riserva;
+      if (r && r.possiede(wc)) { tab = { id: r.id, url: wc.getURL(), title: '' }; win = w; riserva = true; break; }
+    }
+  }
   return {
-    tab: tab ? { id: tab.id, url: tab.url, title: tab.title } : null,
+    riserva,
+    tab: tab ? { id: tab.id, url: tab.url, title: tab.title, openedAt: tab.openedAt || null, paginaDal: tab.paginaDal || null } : null,
     url: wc.getURL(),
     isShell: Boolean(finestraDellaBarra(wc)),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato
@@ -396,7 +406,8 @@ function registerIpcHandlers() {
       const exists = await commandExists({ shell, cwd, command });
       return { ok: true, exists };
     } catch (_) {
-      return { ok: false, exists: false };
+      // Un controllo andato storto non sa niente: `null` lascia il comando senza colore, mai rosso (#1176).
+      return { ok: false, exists: null };
     }
   });
 

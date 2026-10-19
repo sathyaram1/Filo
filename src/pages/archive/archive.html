@@ -44,7 +44,7 @@
       background: var(--arc-bg, var(--sn-hover));
       color: var(--arc-ink, var(--sn-fg));
       cursor: pointer;
-      transition: background 0.1s ease;
+      transition: background calc(0.1s * var(--sn-motion, 1)) ease;
     }
     .arc-tab:hover, .arc-tab:focus-visible {
       background: var(--arc-bg-hover, color-mix(in srgb, var(--sn-hover) 55%, var(--sn-bg)));
@@ -95,7 +95,7 @@
       padding: 8px 10px; border-radius: var(--sn-radius);
       cursor: pointer; color: var(--sn-fg);
       border: 1px solid transparent;
-      transition: background 0.1s ease, border-color 0.1s ease;
+      transition: background calc(0.1s * var(--sn-motion, 1)) ease, border-color calc(0.1s * var(--sn-motion, 1)) ease;
     }
     .arc-chat:hover, .arc-chat:focus-visible { background: var(--sn-hover); }
     .arc-chat:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }

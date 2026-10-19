@@ -30,6 +30,7 @@
   const GLIFO_RIPRENDI = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
+  const DOPO_OK = '[L\'utente ha dato l\'OK qui sopra: riprendi la sua richiesta da lì e rispondigli.]';
   // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
   const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
     + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
@@ -105,7 +106,7 @@
 
   Att.init({
     send,
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url) => iconaDelSito(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
@@ -113,10 +114,24 @@
     sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
-    archiviaAzione: (type, cambi) => {
+    archiviaAzione: (type, cambi, a) => {
       const id = chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
-      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}) }); } catch (_) {} }
+      // Di una finestra guardata resta il nome e basta (#778).
+      const guardata = type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
+      if (id) {
+        try {
+          send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}), ...(guardata ? { guardate: [guardata] } : {}) });
+        } catch (_) {}
+      }
+    },
+    // #778 — dopo l'OK a guardare una finestra la richiesta riprende da sola: un turno interno, come «Riprendi».
+    prosegui: () => {
+      if (sending) return;
+      sending = true;
+      aggiornaTasto();
+      threadHistory.push({ role: 'user', text: DOPO_OK, interno: true });
+      runTurnAndContinue({ userMessage: DOPO_OK, internal: true }).catch(() => {});
     },
   });
   // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
@@ -253,7 +268,7 @@
     refreshLive: () => refreshLive(),
     onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
     aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
-    faviconUrl: (url) => faviconUrl(url),
+    iconaDelSito: (url, opz) => iconaDelSito(url, opz),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
     chatCorrente: () => chatId,
@@ -430,6 +445,15 @@
         note.textContent = Att.summarizeActivity(types, false);
         bubblesEl.appendChild(note);
       }
+      // #778 — di una finestra guardata l'archivio tiene il nome: l'immagine e quello che c'era non si conservano.
+      const guardate = !isUser && Array.isArray(m.guardate) ? m.guardate.filter((n) => typeof n === 'string' && n.trim()) : [];
+      for (const nome of guardate) {
+        const nota = document.createElement('div');
+        nota.className = 'dash-bubble-note';
+        nota.dataset.replay = '1';
+        nota.textContent = `Ho guardato «${nome}»: l'immagine non è conservata`;
+        bubblesEl.appendChild(nota);
+      }
       // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
       const fuori = isUser ? {} : {
         ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
@@ -438,7 +462,11 @@
       };
       threadHistory.push(isUser
         ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
+        : {
+          role: 'filo', text, ...fuori,
+          actions: [...types.filter((t) => !(t === 'VEDI_SCHERMO' && guardate.length)).map((t) => ({ type: t })),
+            ...guardate.map((nome) => ({ type: 'VEDI_SCHERMO', _output: { finestra: nome, nonConservata: true } }))],
+        });
     }
     Term.nuovaChat(chat.messages.some((m) => (
       (m.role !== 'user' && Array.isArray(m.actions) && m.actions.includes('ESEGUI_COMANDO'))
@@ -490,9 +518,6 @@
   }
 
   // ===== Suggerimenti =====
-  // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
-  // gratis, niente API key, regge i casi mancanti restituendo un'icona
-  // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
   // Quello che l'utente ha scritto in questa chat: un codice scritto da lui può uscire (#810). Il testo di un
   // suggerimento della home no, l'ha scritto un modello.
   function paroleUtente() {
@@ -553,13 +578,26 @@
     ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
   }, true);
 
-  function faviconUrl(rawUrl) {
-    if (!rawUrl) return '';
+  // L'icona di un sito la cerca il main, mai un servizio di terzi (#848). Si ricorda solo quella trovata:
+  // un sito che non ha risposto si richiede al giro dopo, e lì decide il main quando riprovare.
+  // `soloCopie`: l'indirizzo al clic chiede l'OK, quindi l'icona non contatta il sito prima (#848).
+  const iconeSiti = new Map();
+  function iconaDelSito(rawUrl, { soloCopie = false } = {}) {
+    let host = '';
     try {
-      const u = new URL(rawUrl);
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(u.hostname)}&sz=64`;
-    } catch (_) { return ''; }
+      const u = new URL(String(rawUrl || ''));
+      if (u.protocol === 'http:' || u.protocol === 'https:') host = u.host.toLowerCase();
+    } catch (_) {}
+    if (!host) return Promise.resolve('');
+    const chiave = `${soloCopie ? 'c' : 'r'}|${host}`;
+    if (!iconeSiti.has(chiave)) {
+      const dimentica = () => { iconeSiti.delete(chiave); return ''; };
+      iconeSiti.set(chiave, send({ type: MSG.ICONA_SITO, url: String(rawUrl), soloCopie }).then((r) => {
+        const dato = r && r.ok && typeof r.dato === 'string' && /^data:image\//.test(r.dato) ? r.dato : '';
+        return dato || dimentica();
+      }, dimentica));
+    }
+    return iconeSiti.get(chiave);
   }
 
   // I suggerimenti sono UNA carta fra le altre (#870): li disegna la parte delle carte.
@@ -573,8 +611,20 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530).
-      Att.riordinaSchede();
+      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530). L'esito si legge
+      // sul suggerimento stesso: un riordino mai partito non deve somigliare a uno in cui non c'era niente da chiudere.
+      const testo = vicino && vicino.querySelector('.dash-carta-voce-testo');
+      const prima = testo ? testo.textContent : '';
+      if (vicino) vicino.disabled = true;
+      if (testo) testo.textContent = 'Riordino in corso…';
+      const e = await Att.riordinaSchede();
+      if (e.annullato) {
+        if (testo) testo.textContent = prima;
+        if (vicino) vicino.disabled = false;
+        return;
+      }
+      if (testo) testo.textContent = `${e.ok ? '✓' : '✗'} ${e.testo}`;
+      if (!e.ok && vicino) { vicino.disabled = false; vicino.title = `${e.motivo} Puoi riprovare.`; }
       return;
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
@@ -638,6 +688,19 @@
     homeMessageEl.textContent = (r?.ok && r.message) || 'Filo è in ascolto.';
     if (!force && spinteDashboard) { renderSuggestions(); return; }
     suggestions = (r?.ok && Array.isArray(r.suggestions)) ? r.suggestions : [];
+    renderSuggestions();
+  }
+
+  // Come loadDashboard, ma la home è già a schermo: niente passaggio dal vuoto, cambia solo se il main ha di meglio.
+  async function aggiornaDashboardInSilenzio() {
+    const giro = giroDashboard;
+    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD });
+    if (giro !== giroDashboard || !r?.ok) return;
+    const messaggio = r.message || 'Filo è in ascolto.';
+    if (homeMessageEl.textContent !== messaggio) homeMessageEl.textContent = messaggio;
+    const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
+    if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
+    suggestions = nuovi;
     renderSuggestions();
   }
 
@@ -710,7 +773,10 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    VEDI_SCHERMO: 'Guardo lo schermo…',
     CERCA_DOCUMENTI: 'Cerco fra i tuoi documenti…',
+    CERCA_SALVATE: 'Cerco fra le pagine salvate…',
+    APRI_SALVATA: 'Apro la pagina salvata…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
@@ -731,6 +797,7 @@
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
+    RIMEDIO_CREDITI: 'Guardo i crediti…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
@@ -1572,8 +1639,60 @@
   });
 
   // ===== Bridge cambio stato live dal background =====
+  // #818 — l'avviso prima che i crediti finiscano lo prende la home con una conversazione aperta, e arriva in fondo
+  // alla conversazione, dopo la risposta che sta arrivando. Senza conversazione lo lascia alla notifica della finestra.
+  // Un rimedio applicato altrove (pagina Crediti, o chiesto a parole) cambia anche i pulsanti sotto l'avviso in chat;
+  // la frase dell'ultimo clic resta sotto il suo rimedio anche dopo il riallineamento.
+  let rimediInChat = null;
+  let esitoInChat = null;
+  const opzRimediInChat = {
+    invia: send, classeBottone: 'dash-action-btn',
+    apriChiave: () => chrome.tabs.create({ url: 'filo://credits/credits.html#chiave' }),
+    onEsito: (id, frase) => { esitoInChat = frase ? { id, frase } : null; },
+  };
+  async function riallineaRimediInChat() {
+    if (!rimediInChat || !rimediInChat.isConnected) { rimediInChat = null; return; }
+    let st = null;
+    try { st = await send({ type: MSG.CREDITS_WARNING_STATE }); } catch (_) { st = null; }
+    if (!st || !st.ok || !st.mostra || !st.avviso || !rimediInChat) return;
+    // Senza la frase le soglie non dicono più niente e lo stato porta solo i rimedi applicati: gli altri in chat restano.
+    if (!st.avviso.testo) {
+      const applicati = new Map(st.avviso.rimedi.map((x) => [x.id, x]));
+      const correnti = Array.from(rimediInChat.children).map((li) => li._rimedio).filter(Boolean);
+      st.avviso = { rimedi: correnti.map((x) => applicati.get(x.id) || x) };
+    }
+    window.SN_CREDITI_AVVISO_UI.aggiorna(rimediInChat, { avviso: st.avviso, esito: esitoInChat, ...opzRimediInChat });
+  }
+
+  async function avvisoCrediti(id) {
+    if (body.dataset.state !== 'thread' || inRiserva === true || Accoglienza.isActive()) return;
+    let r = null;
+    try { r = await send({ type: MSG.CREDITS_WARNING_CLAIM, id }); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.avviso) return;
+    const chat = chatId;
+    const fine = Date.now() + 10 * 60 * 1000;
+    while (sending && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 250));
+    // Nel filo va l'avviso intero, rimedi compresi: a una risposta a parole Filo sa cosa ha proposto.
+    const perFilo = r.avviso.perFilo || r.avviso.testo;
+    archiviaRiga(perFilo, 'filo', chat);
+    // Tornata alla home mentre aspettava: la riga resta nella chat, e i rimedi nella pagina Crediti.
+    if (!inChatAperta(chat) || body.dataset.state !== 'thread') return;
+    const inFondo = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
+    const bolla = makeBubble({ role: 'filo', text: r.avviso.testo });
+    bolla.classList.add('dash-crediti-avviso');
+    const elenco = window.SN_CREDITI_AVVISO_UI.elenco({ avviso: r.avviso, ...opzRimediInChat });
+    bolla.appendChild(elenco);
+    rimediInChat = elenco;
+    esitoInChat = null;
+    bubblesEl.appendChild(bolla);
+    threadHistory.push({ role: 'filo', text: perFilo });
+    if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+    if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
+      avvisoCrediti(String(msg.id)).catch(() => {});
+    } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
@@ -1638,6 +1757,7 @@
       // scheda nuova.
       if (msg.signedIn) Accoglienza.maybeOpenOnboardingLater();
     } else if (msg?.type === MSG.CREDITS_CHANGED) {
+      if (msg.avvisoCrediti) riallineaRimediInChat().catch(() => {});
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
       // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
@@ -1733,9 +1853,8 @@
     }
   }
 
-  // Le fusioni in attesa del via libera dell'owner NON compaiono più qui: la
-  // decisione vive in cima ai Ricevuti della dashboard di gestione, insieme
-  // alle altre cose che aspettano lui (scelta owner 2026-08-26).
+  // Le fusioni in attesa del via libera dell'owner NON compaiono qui: la
+  // decisione vive in Gestione (scelta owner 2026-08-26), dove stanno le altre.
 
   // ===== Recap aggiornamento (C4) =====
   // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
@@ -1933,9 +2052,29 @@
   // all'apertura) e a ogni home aperta: lo racconta una scheda sola (#664),
   // la prima che l'utente ha davanti. Una home dietro aspetta di tornare
   // visibile, poi lo chiede al main, che lo dà a una sola.
-  function quandoVisibile() {
-    if (document.visibilityState !== 'hidden') return Promise.resolve();
-    return new Promise((ok) => {
+  // La home pronta per la scheda nuova (#1128) è caricata ma nessuno la guarda, e `document.hidden` in una scheda non
+  // cambia mai: lo sa dal main, e quello che va fatto davanti all'utente aspetta che diventi una scheda. Le home che
+  // sono già schede restano come prima.
+  let inRiserva = null;
+  const attesiConsegna = [];
+  function nonPiuRiserva() {
+    const era = inRiserva === true;
+    inRiserva = false;
+    for (const ok of attesiConsegna.splice(0)) ok();
+    if (era) allaComparsa();
+  }
+  send({ type: MSG.TAB_IN_VISTA_GET }).then((r) => !!(r && r.riserva), () => false).then((si) => {
+    if (inRiserva !== null) return;
+    if (si) inRiserva = true;
+    else nonPiuRiserva();
+  });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista && inRiserva !== false) nonPiuRiserva();
+  });
+  async function quandoVisibile() {
+    if (inRiserva !== false) await new Promise((ok) => attesiConsegna.push(ok));
+    if (document.visibilityState !== 'hidden') return;
+    await new Promise((ok) => {
       const guarda = () => {
         if (document.visibilityState === 'hidden') return;
         document.removeEventListener('visibilitychange', guarda);
@@ -1955,6 +2094,34 @@
       text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
       okLabel: 'Evviva!',
     });
+  }
+  // Il conto OpenRouter che non regge i crediti vivi o il tetto (#820): l'owner lo sa all'avvio senza aprire la sua
+  // pagina. Per chi non è owner il main risponde null senza chiedere niente al server.
+  function finoAChiusura(id) {
+    return new Promise((ok) => {
+      if (!document.getElementById(id)) { ok(); return; }
+      const obs = new MutationObserver(() => { if (!document.getElementById(id)) { obs.disconnect(); ok(); } });
+      obs.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+  // Si scioglie quando questa home ha avuto risposta sull'allarme del conto: gli spec la aspettano prima di cambiare chi è owner.
+  let fineAllarmeOwner = () => {};
+  const allarmeOwnerChiesto = new Promise((ok) => { fineAllarmeOwner = ok; });
+  async function chiediAllarmeOwner() {
+    await quandoVisibile();
+    // Recap e ringraziamento non tengono la coda fino alla chiusura: si aspetta che se ne vadano, mai sopra di loro.
+    await ricompenseAvvio;
+    await finoAChiusura('recapOverlay');
+    await finoAChiusura('thanksOverlay');
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_OWNER_ALARM_PENDING }); } catch (_) { r = null; }
+    fineAllarmeOwner();
+    const a = r && r.ok && r.alarm;
+    if (!a || !window.SN_CONFIRM_UI?.confirm) return;
+    const apri = await window.SN_CONFIRM_UI.confirm({
+      title: a.title, text: a.text, okLabel: 'Apri Inviti e utenti', cancelLabel: 'Più tardi',
+    });
+    if (apri) send({ type: MSG.OPEN_URL, url: 'filo://credits/owner.html' });
   }
   async function chiediBenvenuto() {
     await quandoVisibile();
@@ -1993,7 +2160,9 @@
     try {
       const reduce = !!(window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-      if (reduce) return;
+      // Token `motion`: moltiplica le durate; a 0 il volo non parte, come col movimento ridotto del sistema.
+      const k = self.SN_THEME_TOKENS ? self.SN_THEME_TOKENS.motionFactor(document) : 1;
+      if (reduce || !k) return;
       const n = Math.max(1, Math.round(Number(amount) || 0));
       const target = (accountCtrlBtn && accountCtrlBtn.getBoundingClientRect()) || null;
       const tx = target ? target.left + target.width / 2 : Math.max(24, window.innerWidth - 26);
@@ -2013,7 +2182,7 @@
 
       const coinSvg = (self.SN_ICONS?.credits?.(22)) || '●';
       const count = Math.min(9, Math.max(5, Math.round(n / 40) + 4));
-      let maxEnd = 1000;
+      let maxEnd = 1000 * k;
       for (let i = 0; i < count; i++) {
         const c = document.createElement('div');
         c.innerHTML = coinSvg;
@@ -2027,8 +2196,8 @@
         const sy = oy + (Math.random() - 0.5) * 80;
         const mx = (sx + tx) / 2 + (Math.random() - 0.5) * 80;
         const my = Math.min(sy, ty) - 50 - Math.random() * 50;
-        const delay = i * 45;
-        const dur = 700 + i * 50 + Math.random() * 140;
+        const delay = i * 45 * k;
+        const dur = (700 + i * 50 + Math.random() * 140) * k;
         maxEnd = Math.max(maxEnd, delay + dur);
         try {
           c.animate([
@@ -2181,6 +2350,14 @@
     }
   }
 
+  // La home pronta (#1128) arriva davanti con quello che gli annunci le hanno portato: rilegge solo ciò che una home
+  // nuova chiede aprendosi e che nessun annuncio porta.
+  function allaComparsa() {
+    richiestaDellAvviso(Accoglienza.isActive()).catch(() => {});
+    if (Accoglienza.isActive()) Accoglienza.riprendiAllaComparsa().catch(() => {});
+    else if (body.dataset.state === 'home') aggiornaDashboardInSilenzio().catch(() => {});
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
@@ -2236,11 +2413,14 @@
     inCodaPopup(chiediBenvenuto);
     if (onbState) { fineRicompenseAvvio(); return; }
     inCodaPopup(async () => {
+      // Recap e ringraziamento non li prende la home pronta per la scheda nuova: si consumerebbero dove nessuno li guarda.
+      await quandoVisibile();
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
         if (!shown) await maybeShowFeedbackRewards();
       } catch (_) {}
     });
+    inCodaPopup(chiediAllarmeOwner);
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
@@ -2252,5 +2432,6 @@
     getCwd: Term.getCwd,
     refreshAccountControl,
     ricompenseAvvio: () => ricompenseAvvio,
+    allarmeOwnerChiesto: () => allarmeOwnerChiesto,
   };
 })();

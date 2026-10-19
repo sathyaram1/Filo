@@ -5,8 +5,10 @@
 //   2. Automazioni: l'interruttore «Lavori server alle routine» nasce spento (campo assente), si accende e si spegne,
 //      e ogni gesto arriva al main come `lavoriServer` vero/falso; un salvataggio fallito torna indietro e lo dice.
 //   3. Una pratica passata in cloud che aspetta il PC lo dice sulla scheda («Pronto: aspetta il PC»); rimessa in coda no.
+//   4. Fase 2 (#1222): la scheda dice anche quando aspetta la suite del server o la pubblicazione da GitHub.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const FEEDBACK = 'filo://feedback/feedback.html';
@@ -44,7 +46,7 @@ async function stubAutomazioni(page, { lavoriServer, rompi = false } = {}) {
 async function apriAutomazioni(page, opts) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubAutomazioni(page, opts);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
@@ -102,7 +104,7 @@ test('Automazioni: chi non è owner vede l’interruttore ma non lo muove', asyn
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await page.evaluate(() => window.__mgTest.setAdmin(false));
   await expect(page.locator('#mgLavoriServer')).toBeDisabled();
 });
@@ -123,4 +125,26 @@ test('una pratica passata che aspetta il PC lo dice sulla scheda; rimessa in cod
   await expect(page.locator('.mg-item[data-id="srv-1"]')).not.toContainText('sessione locale');
   await expect(page.locator('.mg-item[data-id="srv-2"]')).toBeVisible();
   await expect(page.locator('.mg-item[data-id="srv-2"] .mg-attesa-server')).toHaveCount(0);
+});
+
+test('#1222: la scheda dice quando il server aspetta la suite; un segno di attesa che non esiste non si mostra', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await stubAutomazioni(page);
+  const suite = fb({ _id: 'srv-3', seq: 1202, status: 'revision_security', attesa: 'suite_server', branch: 'worker/srv-3-20261014T090000Z' });
+  const deploy = fb({ _id: 'srv-4', seq: 1203, status: 'revision_security', attesa: 'deploy_server', branch: 'worker/srv-4-20261014T090000Z' });
+  const altro = fb({ _id: 'srv-5', seq: 1204, status: 'revision_security', attesa: 'boh', branch: 'worker/srv-5-20261014T090000Z' });
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [suite, deploy, altro]);
+  await page.evaluate(() => window.__mgTest.setTab('local'));
+  const s = page.locator('.mg-item[data-id="srv-3"] .mg-attesa-server');
+  await expect(s).toHaveText('Aspetta le prove del server');
+  await expect(s).toHaveAttribute('title', /suite di GitHub è verde su quel commit/);
+  await expect(s).toHaveAttribute('title', /prima la parte dell’app|la parte dell’app e poi il ramo di filo-security/);
+  // L'app si fonde prima del server (#1222): l'attesa della pubblicazione non c'è più, e un segno rimasto non si mostra.
+  await expect(page.locator('.mg-item[data-id="srv-4"]')).toBeVisible();
+  await expect(page.locator('.mg-item[data-id="srv-4"] .mg-attesa-server')).toHaveCount(0);
+  await expect(page.locator('.mg-item[data-id="srv-5"]')).toBeVisible();
+  await expect(page.locator('.mg-item[data-id="srv-5"] .mg-attesa-server')).toHaveCount(0);
 });

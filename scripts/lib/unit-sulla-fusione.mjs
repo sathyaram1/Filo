@@ -326,17 +326,18 @@ export const PASSI_STORIA = Object.freeze([50, 200, 1000]);
 
 /**
  * Su un clone poco profondo (le routine in cloud) ramo e main non hanno una base comune in locale e la fusione di
- * prova fallisce con «unrelated histories» (#958): si scarica storia a passi finché la base compare, poi tutta.
- * `storia` va al server, che la registra: è la misura della profondità dei cloni veri.
+ * prova fallisce con «unrelated histories» (#958), e il diff del controllo di sicurezza esce vuoto (#740): si scarica
+ * storia a passi finché la base compare, poi tutta. `storia` va al server, che la registra: è la misura della
+ * profondità dei cloni veri.
  */
-export function assicuraStoria({ git, mainSha, punta, passi = PASSI_STORIA } = {}) {
+export function assicuraStoria({ git, mainSha, punta, passi = PASSI_STORIA, main = MAIN } = {}) {
   const superficiale = () => { const r = git(['rev-parse', '--is-shallow-repository']); return r.ok && r.out.trim() === 'true'; };
   if (!superficiale()) return { storia: { superficiale: false } };
   const base = () => git(['merge-base', mainSha, punta]).ok;
   const storia = { superficiale: true, approfondito: 0, intera: false };
   if (base()) return { storia };
   // --deepen sposta TUTTI i confini del clone, anche quello del ramo, che è il lato tagliato.
-  const prendi = (extra) => git(['fetch', '--quiet', ...extra, 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  const prendi = (extra) => git(['fetch', '--quiet', ...extra, 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
   for (const n of passi) {
     const f = prendi([`--deepen=${n}`]);
     if (!f.ok) return { errore: `non riesco a scaricare la storia che manca (${primaRiga(f.out)})`, storia };

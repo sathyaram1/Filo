@@ -5,7 +5,7 @@
 'use strict';
 
 const { rifiutoDiGoogle } = require('./rifiutoGoogle');
-const { diGoogle } = require('../services/dominiGoogle');
+const { diGoogle } = require('../../shared/dominiGoogle');
 
 function hostDi(url) {
   try { return new URL(String(url)).hostname.toLowerCase(); } catch (_) { return ''; }

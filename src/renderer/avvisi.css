@@ -9,11 +9,11 @@
   color: var(--fg);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
   font-size: 13px;
   opacity: 0;
   transform: translateX(12px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity calc(0.2s * var(--sn-motion, 1)) ease, transform calc(0.2s * var(--sn-motion, 1)) ease;
   pointer-events: auto;
 }
 .shell-notif.show { opacity: 1; transform: translateX(0); }

@@ -10,11 +10,22 @@ import { fileURLToPath } from 'node:url';
 import * as B from './biglietto-locale.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 
-// Sempre esterni: la rete, le risorse dei server MCP lette senza passare da un mcp__, i commenti e i dati che gli altri
-// scrivono negli artefatti.
-export const STRUMENTI_ESTERNI = Object.freeze(['WebFetch', 'WebSearch', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData']);
-// Artifact pubblica, e legge solo con queste azioni: una pagina, anche propria, la possono aver scritta altri.
-const ARTIFACT_LETTURE = Object.freeze(['read', 'list']);
+// Gli strumenti di Claude Code che non portano dentro niente da fuori. Elenco chiuso: uno che non c'è, anche nuovo o
+// sconosciuto, sporca (#1211.2). Read, Artifact, Agent e ToolSearch li decide motivoLettura dai parametri.
+export const STRUMENTI_SENZA_LETTURA = Object.freeze([
+  // La shell: quello che scarica lo dichiara la sessione (SPEC-DOMANDE.md §1.2).
+  'Bash', 'PowerShell', 'BashOutput', 'KillShell', 'Monitor',
+  'Grep', 'Glob', 'LS',
+  'Edit', 'MultiEdit', 'Write', 'NotebookEdit',
+  'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate', 'TaskStop', 'CronCreate', 'CronDelete', 'CronList',
+  'EnterPlanMode', 'ExitPlanMode', 'EnterWorktree', 'ExitWorktree', 'AskUserQuestion',
+  // Le abilità le installa l'owner, e stanno dove Read non sporca: il progetto e la cartella di Claude.
+  'Skill', 'SlashCommand',
+  'PushNotification', 'SendUserFile', 'SubagentHandback',
+]);
+// Artifact non porta dentro niente solo con queste azioni. Pubblicare sì: un rifiuto restituisce la pagina con le
+// modifiche di chi l'ha aperta, e la sessione resta in ascolto dei commenti.
+const ARTIFACT_SENZA_LETTURA = Object.freeze(['open', 'pin', 'unpin', 'delete']);
 // Gli strumenti MCP che agiscono e rispondono con un esito, mai con testo scritto da altri. Elenco chiuso: un mcp__ che
 // non c'è sporca.
 export const MCP_SENZA_LETTURA = Object.freeze([
@@ -29,10 +40,24 @@ export const MCP_SENZA_LETTURA = Object.freeze([
 
 const pulisci = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, n);
 
-/** Lo strumento può portare dentro testo esterno? Senza guardare dove legge: serve a uscire prima di chiedere a git. PURA. */
+/** Lo strumento può portare dentro testo esterno? Senza guardare i parametri. PURA. */
 export function puoLeggereFuori(nome) {
   const n = String(nome || '');
-  return n === 'Read' || n === 'Artifact' || STRUMENTI_ESTERNI.includes(n) || n.startsWith('mcp__');
+  return !!n && !STRUMENTI_SENZA_LETTURA.includes(n);
+}
+
+/** Il matcher del gancio nelle impostazioni: ogni strumento fuori da STRUMENTI_SENZA_LETTURA. PURA. */
+export function matcherDelGancio() {
+  // `.*` in coda: vale sia come RegExp non ancorata sia ancorata ai due capi.
+  return `^(?!(?:${STRUMENTI_SENZA_LETTURA.join('|')})$).*`;
+}
+
+// ToolSearch porta le descrizioni scritte da chi fa i server MCP: non sporca solo quando chiede per nome strumenti che
+// non lo sono.
+function cercaSoloStrumentiDiClaude(query) {
+  const m = /^\s*select:([\s\S]*)$/.exec(String(query || ''));
+  const nomi = m ? m[1].split(',').map((s) => s.trim()) : [];
+  return nomi.length > 0 && nomi.every((n) => /^[A-Za-z][A-Za-z0-9_]*$/.test(n) && !/^mcp/i.test(n));
 }
 
 function dentro(file, cartella, P, win) {
@@ -53,10 +78,19 @@ export function motivoLettura(input, ctx = {}) {
     try { host = new URL(String(dati.url || '')).hostname; } catch (_) { /* resta senza */ }
     return host ? `WebFetch (${pulisci(host, 120)})` : 'WebFetch';
   }
-  if (STRUMENTI_ESTERNI.includes(nome)) return nome;
-  if (nome === 'Artifact') return ARTIFACT_LETTURE.includes(String(dati.action || '')) ? `Artifact (${dati.action})` : '';
+  if (nome === 'Artifact') {
+    const azione = String(dati.action || 'publish');
+    return ARTIFACT_SENZA_LETTURA.includes(azione) ? '' : `Artifact (${pulisci(azione, 40)})`;
+  }
+  // Un sotto-agente locale passa da questo gancio con le sue chiamate. Uno che gira altrove no, e il suo rapporto
+  // arriva senza strumento: sporca alla partenza.
+  if (nome === 'Agent' || nome === 'Task') {
+    const dove = String(dati.isolation || '');
+    return dove === '' || dove === 'worktree' ? '' : `${nome} (${pulisci(dove, 40)})`;
+  }
+  if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
   if (nome.startsWith('mcp__')) return MCP_SENZA_LETTURA.includes(nome) ? '' : pulisci(nome, 160);
-  if (nome !== 'Read') return '';
+  if (nome !== 'Read') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
   const grezzo = String(dati.file_path || '').trim();
   if (!grezzo) return '';
   const win = !!ctx.win;
@@ -146,6 +180,9 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
   try {
     if (env.FILO_ROUTINE) return { esito: 'routine' };
     if (!input || typeof input !== 'object' || !puoLeggereFuori(input.tool_name)) return { esito: 'nessuna lettura esterna' };
+    // Le cartelle fidate (altre chiamate a git) servono solo a Read: per il resto il motivo si sa subito.
+    const subito = input.tool_name === 'Read' ? null : motivoLettura(input);
+    if (subito === '') return { esito: 'nessuna lettura esterna' };
     const cwd = String(input.cwd || env.CLAUDE_PROJECT_DIR || process.cwd());
     const sessione = String(input.session_id || '').trim();
     const envSessione = sessione ? { ...env, [B.ENV_SESSIONE]: sessione } : env;
@@ -155,8 +192,7 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     const progetto = String(env.CLAUDE_PROJECT_DIR || '').trim();
     if (!biglietti.length && progetto && progetto !== cwd) biglietti = B.trovaBiglietti({ env: envSessione, cwd: progetto });
     if (!biglietti.length) return { esito: 'senza biglietto' };
-    // Le cartelle fidate (altre chiamate a git) servono solo a Read.
-    const motivo = motivoLettura(input, input.tool_name === 'Read' ? contesto({ cwd, env, biglietti }) : {});
+    const motivo = subito ?? motivoLettura(input, contesto({ cwd, env, biglietti }));
     if (!motivo) return { esito: 'nessuna lettura esterna' };
     for (const b of biglietti) {
       let annotato = true;

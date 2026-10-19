@@ -45,6 +45,7 @@
         timerRingtone: 'timerRingtone',
         timerRingtoneVolume: 'timerRingtoneVolume',
         terminalEnabled: 'terminal.enabled',
+        schermoGuarda: 'schermo.guarda',
         terminalShell: 'terminal.shell',
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
         barraSpinta: 'barraLaterale.spinta',
@@ -53,13 +54,26 @@
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        propostaEmailAttiva: 'propostaEmail.attiva',
+        propostaEmailIncognito: 'propostaEmail.incognito',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
         lunghezzaConversazioni: 'lunghezzaRisposte.conversazioni',
         lunghezzaTesti: 'lunghezzaRisposte.testi',
         lunghezzaBrevi: 'lunghezzaRisposte.brevi',
+        avvisoCreditiAttivo: 'avvisoCrediti.attivo',
+        avvisoCreditiGiorni: 'avvisoCrediti.giorni',
+        avvisoCreditiPercento: 'avvisoCrediti.percento',
+        spiegaAnticipata: 'spiegaAnticipata.enabled',
+        contatoriAttivi: 'contatori.attivi',
+        aiutoAcceso: 'featureFlags.help',
+        correttoreAcceso: 'featureFlags.spellcheck',
+        categorieAutomatiche: 'featureFlags.categorize',
       },
-      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti' },
+      gruppi: {
+        tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti',
+        scorciatoieFilo: 'scorciatoie.*',
+      },
       altrove: { documentiCercate: 'cartelleCercate' },
       fuori: {},
       messaggi: {
@@ -75,6 +89,7 @@
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
         OPEN_URL: 'apre una pagina collegata: non salva niente',
+        REGISTRA_TASTI: 'lascia arrivare alla pagina i tasti premuti mentre si registra una scorciatoia: dalla chat la combinazione si scrive (scorciatoia)',
       },
     },
     security: {
@@ -109,6 +124,10 @@
       altrove: { 'sec-perm-list': 'permessiSiti' },
       fuori: {
         'sec-clip-search': 'cerca fra le voci della cronologia appunti mostrate nella pagina: non è un valore da salvare',
+        'sec-wipe-identity': 'sceglie se «Cancella tutti i dati di Filo» porta via anche l’identità dei crediti: vale per quella conferma, non è un valore da salvare',
+        'sec-wipe-word': 'la parola «conferma» che sblocca «Cancella tutti i dati di Filo»: la scrive l’utente, non è un valore da salvare',
+        'sec-export-keys': 'sceglie se l’archivio esportato porta anche le chiavi API: vale per quell’esportazione, non è un valore da salvare',
+        'sec-wipe-export-keys': 'la stessa scelta di «Includi le chiavi» dentro la conferma di «Cancella tutti i dati di Filo»: vale per quell’esportazione, non è un valore da salvare',
       },
       messaggi: {
         PERMESSI_SITI_GET: 'LEGGI_IMPOSTAZIONI',
@@ -118,9 +137,12 @@
         COOKIES_SITES: 'mostra i siti dove Filo ha già rifiutato i banner, da passare all’elenco dei banner visibili',
         PAGINE_DELICATE_CAMPI: 'mostra i siti dove Filo ha visto un campo password o carta; toglierne uno è l’elenco siti_non_delicati',
         PROXY_STATUS: 'mostra se la connessione da un altro paese è configurata: non è un valore da cambiare qui',
-        EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file): resta nella pagina',
+        DOWNLOADS_LIST: 'legge i siti da cui sono scesi programmi, per proporre il sito preciso a chi scrive una piattaforma fra i programmi fidati: non è un valore da cambiare',
+        EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file, le chiavi solo con la spunta): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
+        CANCELLA_TUTTI_I_DATI: 'pulsante che fa un’azione (cancella tutti i dati di Filo con la parola scritta): resta nella pagina, la chat ci porta con NAVIGA e non cancella',
+        CANCELLA_TUTTI_I_DATI_STATO: 'dice alla conferma di «Cancella tutti i dati di Filo» se c’è un’identità dei crediti da tenere: non è un valore da cambiare',
         GET_CLIPBOARD_HISTORY: 'la cronologia appunti è un dato dell’utente (anche password copiate), non un’impostazione: si legge nella pagina',
         REMOVE_CLIPBOARD_ENTRY: 'pulsante che fa un’azione (toglie una voce della cronologia appunti): resta nella pagina',
         CLEAR_CLIPBOARD_HISTORY: 'pulsante che fa un’azione (svuota la cronologia appunti): resta nella pagina',
@@ -131,16 +153,19 @@
       campi: {
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
+        ownKeyAllProviders: 'ownKeyAllProviders',
         ordineHost: 'ordineHost',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',
+        costWarnRatio: 'costoModelli.soglia',
       },
       gruppi: {},
       fuori: {},
       messaggi: {
         DEFAULT_MODELS_PUBLIC: 'legge i modelli predefiniti condivisi per mostrarli: non salva niente',
         GET_COSTS: 'legge la spesa del mese per mostrarla: non salva niente',
+        STIMA_COSTO_MODELLI: 'legge listino, saldo e token medi per stimare il costo accanto ai modelli: non salva niente',
         TEST_DEFAULT_MODEL: 'prova di un modello: non salva niente',
         TEST_PROVIDER: 'prova della chiave: non salva niente',
       },
@@ -175,9 +200,6 @@
     },
   };
 
-  // Quando la chiave manca: il valore che la pagina mostra e che il main applica. Il resto viene dai default.
-  const ASSENTE = { 'security.autoFeedback': true };
-
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   function dentro(o, percorso) {
     return String(percorso).split('.').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
@@ -185,13 +207,18 @@
   function jolly(percorso) {
     return String(percorso).endsWith('.*');
   }
-  // Le voci di un percorso jolly: i token estetici, i sei parametri del colore delle tab.
+  // Le voci di un percorso jolly: i token estetici, i sei parametri del colore delle tab, le quattro scorciatoie di Filo.
   function espandi(percorso) {
     if (!jolly(percorso)) return [percorso];
     const base = percorso.slice(0, -2);
     if (base === 'themeTokens') {
       const T = global.SN_THEME_TOKENS;
       return T && T.names ? T.names().map((n) => `themeTokens.${n}`) : [];
+    }
+    if (base === 'scorciatoie') {
+      if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+      const T = global.SN_TASTI;
+      return T && T.AZIONI_FILO ? T.AZIONI_FILO.map((a) => `scorciatoie.${a.id}`) : [];
     }
     if (base === 'tabColor') {
       const TC = global.SN_TAB_COLOR;
@@ -207,7 +234,6 @@
   function leggi(settings, percorso) {
     const v = dentro(settings, percorso);
     if (v !== undefined && v !== null) return v;
-    if (has(ASSENTE, percorso)) return ASSENTE[percorso];
     const C = global.SN_CONST;
     const d = C && C.DEFAULT_SETTINGS ? dentro(C.DEFAULT_SETTINGS, percorso) : undefined;
     return d === undefined ? v : d;
@@ -346,6 +372,12 @@
       return `${l.length} ${l.length === 1 ? 'voce' : 'voci'}${trovati ? `${trovati}; elenco` : ''}: ${l.slice(0, MAX_ELENCO).join(', ')}${altri}`;
     }
     if (voce && voce.testo) return String(v || '').trim() ? `«${String(v).trim()}»` : 'nessuno';
+    // Una scorciatoia di Filo vuota è quella di serie: si dice quale, coi tasti di chi chiede (#842).
+    if (percorso.startsWith('scorciatoie.') && global.SN_TASTI) {
+      const T = global.SN_TASTI;
+      const a = T.AZIONI_FILO.find((x) => `scorciatoie.${x.id}` === percorso);
+      if (a) return typeof v === 'string' && v ? T.etichettaFilo(v, sistema || undefined) : `${T.etichettaFilo(a.serie, sistema || undefined)} (di serie)`;
+    }
     if (percorso === 'terminal.shell' && sistema && sistema !== 'win32' && !['bash', 'sh'].includes(v)) return 'shell di sistema (sh)';
     if (percorso === 'aggiornamenti.installa') {
       const A = global.SN_AGGIORNAMENTI;

@@ -31,6 +31,17 @@
         ]
       }
     ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|NotebookEdit",
@@ -51,7 +62,7 @@
         ]
       },
       {
-        "matcher": "WebFetch|WebSearch|Read|mcp__.*|ListMcpResourcesTool|ReadMcpResourceTool|ReadMcpResourceDirTool|Artifact|ArtifactComments|ArtifactData",
+        "matcher": "^(?!(?:Bash|PowerShell|BashOutput|KillShell|Monitor|Grep|Glob|LS|Edit|MultiEdit|Write|NotebookEdit|TodoWrite|TaskCreate|TaskGet|TaskList|TaskUpdate|TaskStop|CronCreate|CronDelete|CronList|EnterPlanMode|ExitPlanMode|EnterWorktree|ExitWorktree|AskUserQuestion|Skill|SlashCommand|PushNotification|SendUserFile|SubagentHandback)$).*",
         "hooks": [
           {
             "type": "command",
@@ -62,7 +73,7 @@
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "WebFetch|WebSearch|Read|mcp__.*|ListMcpResourcesTool|ReadMcpResourceTool|ReadMcpResourceDirTool|Artifact|ArtifactComments|ArtifactData",
+        "matcher": "^(?!(?:Bash|PowerShell|BashOutput|KillShell|Monitor|Grep|Glob|LS|Edit|MultiEdit|Write|NotebookEdit|TodoWrite|TaskCreate|TaskGet|TaskList|TaskUpdate|TaskStop|CronCreate|CronDelete|CronList|EnterPlanMode|ExitPlanMode|EnterWorktree|ExitWorktree|AskUserQuestion|Skill|SlashCommand|PushNotification|SendUserFile|SubagentHandback)$).*",
         "hooks": [
           {
             "type": "command",

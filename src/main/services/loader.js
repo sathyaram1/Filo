@@ -39,6 +39,7 @@ require(path.join(SHARED, 'modelCaps.js'));
 // dell'elenco di funzioni impostabili, quindi va caricato PRIMA dell'editor
 // delle catene (che da lì prende l'elenco).
 require(path.join(SHARED, 'modelUsage.js'));
+require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori giornalieri: elenchi chiusi e forma del documento
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
 // Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM
@@ -49,6 +50,8 @@ require(path.join(SHARED, 'themeTokens.js'));
 require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
+require(path.join(SHARED, 'stessoSito.js')); // #876 — «stesso sito» e Public Suffix List: prima di eseguibili e preferences
+require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google sono un accesso solo (dopo stessoSito)
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
 require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
@@ -80,11 +83,13 @@ require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a s
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
 require(path.join(SHARED, 'domande.js')); // #1149 — azioni delle domande all'owner come dati (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
+require(path.join(SHARED, 'feedbackAttese.js')); // #903 — «aspetta #N»: prima di manageReview, che ne fa una sezione
 require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'manageSearch.js')); // #1118 — la ricerca fra i feedback: il classificatore gira nel main
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
 require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback hanno una scheda pubblica, e con quali campi (dopo manageReview: la usa)
 require(path.join(SHARED, 'preferences.js'));
+require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
@@ -93,11 +98,14 @@ require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete 
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli
 require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: righe del registro, 402, messaggi
+require(path.join(SHARED, 'stimaCosto.js'));  // #819 — quanto costa un uso tipico di una funzione con un modello
+require(path.join(SHARED, 'creditiAvviso.js')); // #818 — proiezione dei crediti, soglie e rimedi
 // #652 — una manopola numerica: controllo del numero e frase di rifiuto. La
 // parte pura serve anche al main, che rifiuta gli stessi valori della pagina.
 require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
+require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'owner sui crediti: stesse regole in pagina e nel main
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.

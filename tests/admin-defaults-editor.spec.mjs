@@ -430,6 +430,97 @@ test('salvare i modelli predefiniti tiene la catena delle funzioni spostate in G
   expect(upd2.config.models.manage_search).toBe('esistente');
 });
 
+// #833 — I modelli predefiniti veri stanno nella config condivisa: una scelta dell'owner può fermare una funzione a
+// chi ha acceso «Solo modelli a pesi aperti». La pagina lo dice prima del salvataggio, senza impedirlo, e chiama le
+// funzioni coi nomi della griglia, che sono quelli delle Opzioni.
+const PESI_APERTI = {
+  modelRegistry: {
+    chiuso: { provider: 'openrouter', model: 'openai/gpt-5.2' },
+    aperto: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
+    claude: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.5' },
+    deepseek: { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro' },
+  },
+  models: { explain: 'chiuso', filo_chat: 'claude', translate_selection: 'aperto' },
+};
+
+function cellaDi(page, action) {
+  return page.evaluate((a) => window.SN_MODEL_CHAIN.actionLabels().findIndex(([x]) => x === a), action)
+    .then((idx) => page.locator('#modelsGrid > div').nth(idx));
+}
+
+test('pesi aperti: una funzione col solo modello chiuso senza sostituto è fra quelle che si fermano, e ne esce con un modello aperto in coda (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, PESI_APERTI);
+  const [spiega, chat] = await page.evaluate(() => [window.SN_I18N.t('options_action_explain'), window.SN_I18N.t('options_action_filo_chat')]);
+
+  const box = page.locator('#openWeightsImpact');
+  const ferme = box.locator('.sn-ow-stop');
+  await expect(box).toBeVisible();
+  await expect(box.locator('.sn-info-box-title')).toHaveText('Per chi accende «Solo modelli a pesi aperti»');
+  // Lo stesso nome della griglia, che è quello delle Opzioni; la chat ha un sostituto e non si ferma.
+  const cella = await cellaDi(page, 'explain');
+  await expect(cella.locator('label')).toHaveText(spiega);
+  await expect(ferme).toHaveText(`Si fermano (nessun equivalente a pesi aperti): ${spiega}`);
+  await expect(box).toContainText(`Passano a deepseek: ${chat}`);
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-open-weights-ferme.png', fullPage: true }).catch(() => {});
+
+  // In coda alla catena un modello a pesi aperti: con l'interruttore acceso la funzione gira su quello.
+  await cella.locator('.sn-chain-add').click();
+  await expect(cella.locator('.sn-chain-input')).toHaveCount(2);
+  await cella.locator('.sn-chain-input').nth(1).click();
+  await cella.locator('.sn-chain-pop .sn-select-option', { hasText: 'aperto' }).click();
+  await expect(cella.locator('.sn-chain-input').nth(1)).toHaveValue('aperto');
+  await expect(ferme).toHaveCount(0);
+  await expect(box).toContainText(`Passano a aperto: ${spiega}`);
+  await expect(box).toContainText('Nessuna funzione si ferma.');
+
+  // È un avviso: niente è partito prima del clic, e il salvataggio resta libero.
+  expect(await page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(false);
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(true);
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd.config.models.explain).toBe('chiuso, aperto');
+});
+
+test('pesi aperti: tolto dal registro il sostituto aperto, la funzione che contava su di lui passa fra le ferme (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, PESI_APERTI);
+  const chat = await page.evaluate(() => window.SN_I18N.t('options_action_filo_chat'));
+  const ferme = page.locator('#openWeightsImpact .sn-ow-stop');
+  await expect(ferme).not.toContainText(chat);
+
+  const righe = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+  const idx = await righe.evaluateAll((els) => els.findIndex((r) => r.querySelector('.sn-model-nick').value === 'deepseek'));
+  expect(idx).toBeGreaterThanOrEqual(0);
+  await righe.nth(idx).getByRole('button', { name: 'Rimuovi', exact: true }).click();
+  await expect(ferme).toContainText(chat);
+  await expect(page.locator('#openWeightsImpact')).not.toContainText('Passano a deepseek');
+});
+
+test('pesi aperti: con tutte le funzioni già su modelli aperti la pagina lo dice in una riga, e cambiando un modello torna l\'elenco (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, { ...PESI_APERTI, models: { explain: 'aperto', translate_selection: 'aperto, deepseek' } });
+  const box = page.locator('#openWeightsImpact');
+  await expect(box).toHaveText('Con «Solo modelli a pesi aperti» acceso non cambia niente. Tutte le funzioni partono già da modelli a pesi aperti.');
+  await expect(box).not.toHaveClass(/sn-info-box/);
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-open-weights-tutte.png', fullPage: true }).catch(() => {});
+
+  // Sostituito il modello aperto con uno chiuso (scelto dal menu, come farebbe l'owner), l'avviso si accende.
+  const cella = await cellaDi(page, 'explain');
+  const campo = cella.locator('.sn-chain-input').first();
+  await campo.click();
+  await campo.fill('');
+  await cella.locator('.sn-chain-pop .sn-select-option', { hasText: 'chiuso' }).click();
+  await expect(campo).toHaveValue('chiuso');
+  const spiega = await page.evaluate(() => window.SN_I18N.t('options_action_explain'));
+  await expect(box.locator('.sn-ow-stop')).toHaveText(`Si fermano (nessun equivalente a pesi aperti): ${spiega}`);
+  await page.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('dark'));
+  await page.screenshot({ path: 'tests/.shots/admin-defaults-open-weights-scuro.png', fullPage: true }).catch(() => {});
+});
+
+test('pesi aperti: senza nessun modello scelto la riga non compare (#833)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  await expect(page.locator('#modelsGrid .sn-chain').first()).toBeVisible();
+  await expect(page.locator('#openWeightsImpact')).toBeHidden();
+});
+
 test('la conferma del salvataggio non sopravvive alla modifica dopo: lo schermo dice che non è ancora propagato', async ({ openTab }) => {
   const page = await openStubbedEditor(openTab);
   const stato = page.locator('#saveStatus');

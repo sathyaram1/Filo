@@ -62,8 +62,8 @@ service cloud.firestore {
     // sicurezza, anche quando passa, e il salto dell'owner). Li scrive SOLO il
     // server con la sua identità; qui la forma, così una voce storpiata non
     // passa da nessuno dei due rami di triage. `testo` è cifrato come `notes`,
-    // e il tetto è abbondante (CLAUDE.md § Limiti): 12.000 caratteri in
-    // chiaro, cifrati, stanno in 20.000.
+    // e il tetto è abbondante (CLAUDE.md § Limiti): 12.000 byte in chiaro
+    // (non caratteri: in cirillico sarebbero il doppio), cifrati, stanno in 20.000.
     function livelloValido(l) {
       return l is map
         && l.keys().hasOnly(['esito', 'at', 'ruolo', 'by', 'testo'])
@@ -99,6 +99,14 @@ service cloud.firestore {
             && d.localOnly.get('by', '').size() <= 120
             && d.localOnly.get('at', 0) is int
             && d.localOnly.get('at', 0) > 0);
+    }
+
+    // `waitsFor` [{ id, num }] (#903): i feedback che devono essere fusi prima; la coda
+    // non dà lavoro finché uno non lo è. Solo l'admin; da 1 a 20, e chi scrive rifiuta
+    // numeri inesistenti, sé stesso e i giri (src/shared/feedbackAttese.js). Togliere = cancellare il campo.
+    function waitsForValido(d) {
+      return !('waitsFor' in d)
+        || (d.waitsFor is list && d.waitsFor.size() >= 1 && d.waitsFor.size() <= 20);
     }
 
     // `localMerges` { app?, server?, solo?, ramo? } (#915): quando ogni parte di un
@@ -315,6 +323,7 @@ service cloud.firestore {
       // del biglietto della sessione) solo qui, alla nascita. Sentinella:
       // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
+        && waitsForValido(request.resource.data)
         && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved'])
         && bigliettoLocaleValido(request.resource.data)
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
@@ -425,6 +434,8 @@ service cloud.firestore {
                     'localMerges',
                     // #913: l'approvazione dell'owner come lavoro locale (forma: localApprovalValido).
                     'localApproval',
+                    // #903: i feedback che aspetta (forma: waitsForValido).
+                    'waitsFor',
                     // #595: il ripasso dei documenti vecchi con prefisso riservato.
                     'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
@@ -455,9 +466,10 @@ service cloud.firestore {
         // QUALUNQUE scrittura sul feedback (anche il solo cambio di stato) —
         // il feedback diventerebbe immobile. Tenere allineato a
         // SN_FEEDBACK_THREAD.NOTES_MAX (src/shared/feedbackThread.js), che
-        // taglia i turni più vecchi lato scrittura.
+        // taglia i turni più vecchi lato scrittura: 400.000 byte in chiaro,
+        // cifrati, stanno in 540.000.
         && request.resource.data.get('notes', '') is string
-        && request.resource.data.get('notes', '').size() <= 60000
+        && request.resource.data.get('notes', '').size() <= 540000
         // La frase per l'utente e' corta per costruzione: e' l'unico dei due
         // testi che resta leggibile da tutti, e un tetto stretto la tiene tale.
         && request.resource.data.get('userNote', '') is string
@@ -539,6 +551,7 @@ service cloud.firestore {
         && localOnlyValido(request.resource.data)
         && localMergesValido(request.resource.data)
         && localApprovalValido(request.resource.data)
+        && waitsForValido(request.resource.data)
         && (!('senderProof' in request.resource.data)
             || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
@@ -621,7 +634,7 @@ service cloud.firestore {
         // rami devono restare allineati, o una routine potrebbe scrivere note
         // che poi bloccano l'owner.
         && request.resource.data.get('notes', '') is string
-        && request.resource.data.get('notes', '').size() <= 60000
+        && request.resource.data.get('notes', '').size() <= 540000
         && (!('updatedAt' in request.resource.data)
             || request.resource.data.updatedAt is timestamp)
         && livelliValidi(request.resource.data);
@@ -864,6 +877,55 @@ service cloud.firestore {
     match /wallet-state/{doc} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    // ── I contatori giornalieri (#969) ───────────────────────────────────────
+    //
+    // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), quante
+    // chiamate sono fallite e di che tipo, la versione dell'app e la famiglia di sistema. Un documento per copia di
+    // Filo e per giorno: l'id è pseudonimo più giorno, e si scrive una volta sola (create, mai update). Lo pseudonimo è
+    // casuale, cambia ogni mese, e non è il codice dei feedback né lo pseudonimo dei crediti.
+    //
+    // SOLA CREAZIONE E SENZA LOGIN, come i feedback: chi ha la chiave web può scrivere numeri falsi, e i contatori
+    // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, le chiavi delle
+    // mappe dall'elenco chiuso delle funzioni, e i valori annidati: ognuno è una stringa di forma fissa (le regole non
+    // passano in rassegna una mappa, ma ne uniscono i valori in una stringa sola, che si misura e si confronta).
+    // L'elenco contiene quello dell'app (tests/unit/firestoreRulesContatori.test.mjs): una funzione nuova va aggiunta
+    // e ripubblicata, o i giorni che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
+    // Legge solo l'admin.
+    match /contatori-giornalieri/{docId} {
+      function funzioniContate() {
+        return [
+          'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
+          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic',
+          'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
+          'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
+          'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
+          'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
+          'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
+        ];
+      }
+      function contatoriValidi(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && docId == d.pseudonimo + '_' + d.giorno
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && d.uso is map && d.uso.keys().hasOnly(funzioniContate())
+          && d.uso.values().join('#').size() <= 8000
+          && d.uso.values().join('#').matches('^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && d.errori is map && d.errori.keys().hasOnly(funzioniContate())
+          && d.errori.values().join('#').size() <= 600000
+          && d.errori.values().join('#').matches('^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriValidi(request.resource.data);
+      allow update, delete: if false;
     }
 
     // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
