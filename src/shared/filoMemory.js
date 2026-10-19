@@ -298,7 +298,8 @@
   }
 
   async function svuotaQuaderno() {
-    await setFonti({ righe: {}, nascoste: [] });
+    const { versione } = await getFonti();
+    await setFonti(toccata({ righe: {}, nascoste: [], versione }));
   }
 
   // Quello che il compattatore deve sapere delle righe tolte: testo (se c'è ancora) e fonti.
