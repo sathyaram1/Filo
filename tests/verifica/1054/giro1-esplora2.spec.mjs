@@ -37,6 +37,7 @@ for (const acceso of [false, true]) {
       esiti.copia = await leggi(app);
       esiti.selezioneDopo = await page.evaluate(() => String(getSelection()));
       // Copia URL
+      await page.evaluate(() => getSelection().removeAllRanges());
       await page.locator('#l').click({ button: 'right' });
       await menuDi(page).voce('Copia URL').click();
       await pausa(800);
