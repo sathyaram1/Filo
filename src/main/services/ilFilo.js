@@ -290,11 +290,11 @@ function creaFilo({ cartella } = {}) {
     return cancella([periodo], opts);
   }
 
-  // Visite tolte una per una ({ ts, sito, url }), in una scrittura sola. `schedeChiuse: false` quando sono proprio le
-  // schede chiuse a portarle via (la Cronologia): le schede ancora aperte restano fuori dalla cancellazione.
+  // Visite tolte ({ ts, sito, url }, o una fila dello stesso sito con { da, a }), in una scrittura sola. `schedeChiuse:
+  // false` quando sono proprio le schede chiuse a portarle via (la Cronologia): quelle ancora aperte restano fuori.
   function cancellaVisite(visite, opts, { schedeChiuse = true } = {}) {
     const periodi = (Array.isArray(visite) ? visite : []).filter((p) => p && p.ts)
-      .map((p) => ({ da: p.ts, a: p.ts, sito: p.sito || '', url: p.url || null }));
+      .map((p) => ({ da: p.da || p.ts, a: p.a || p.ts, sito: p.sito || '', url: p.url || null }));
     return periodi.length ? cancella(periodi, opts, { schedeChiuse }) : Promise.resolve(0);
   }
 
