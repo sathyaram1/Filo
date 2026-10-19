@@ -6766,17 +6766,17 @@
       + `<span class="mg-chip-n">${esc(fsNum(tuttiN))}</span></button>` + voci;
   }
 
-  // ── Da dove partono davvero i numeri ─────────────────────────────────────
-  // Un conteggio che afferma un totale che non conosce è peggio di nessun
-  // conteggio (CLAUDE.md § Limiti). Qui si dice, in una riga, fin dove
-  // arrivano le due sorgenti.
-  // `righe` porta HTML già sicuro: il testo passa da `esc`, i conti sono
-  // pulsanti che si aprono su ciò che hanno contato, come quelli sotto la torta.
+  // Un conto scritto dentro una frase: resta parte della frase, ma si apre su
+  // ciò che ha contato come ogni altro numero della scheda.
   function fsContoInFrase(chiave, n, testo) {
     return `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
       + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(testo)}</button>`;
   }
 
+  // ── Da dove partono davvero i numeri ─────────────────────────────────────
+  // Un conteggio che afferma un totale che non conosce è peggio di nessun
+  // conteggio (CLAUDE.md § Limiti). Qui si dice, in una riga, fin dove
+  // arrivano le due sorgenti. `righe` porta HTML: il testo passa da `esc`.
   function renderFsNota(stat) {
     const righe = [];
     const testo = (t) => righe.push(esc(t));
