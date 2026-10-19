@@ -26,7 +26,8 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   dalla posizione del cursore sullo schermo: su Linux con Wayland non è affidabile. La pagina dello strato
   ha zoom 1, così i suoi px sono quelli del punto.
 - **Si chiude da solo** quando cambia la scheda davanti o la sua area (layout), quando la scheda naviga a un
-  documento nuovo, si chiude o il suo renderer muore, entrando o uscendo dallo schermo intero, con Esc
+  documento nuovo, si chiude o il suo renderer muore, entrando o uscendo dallo schermo intero, quando la
+  finestra perde il fuoco, con Esc
   (dalla scheda, dallo strato o dalla barra: prima di ogni altro uso del tasto) e con un clic fuori, anche
   sulla barra. Se aveva la tastiera, la restituisce alla scheda.
 - **Test:** `tests/strato-del-menu.spec.mjs`. Il tasto destro passa da `page.mouse` (lo smistamento di
