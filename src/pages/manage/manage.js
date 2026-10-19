@@ -6770,14 +6770,22 @@
   // Un conteggio che afferma un totale che non conosce è peggio di nessun
   // conteggio (CLAUDE.md § Limiti). Qui si dice, in una riga, fin dove
   // arrivano le due sorgenti.
+  // `righe` porta HTML già sicuro: il testo passa da `esc`, i conti sono
+  // pulsanti che si aprono su ciò che hanno contato, come quelli sotto la torta.
+  function fsContoInFrase(chiave, n, testo) {
+    return `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
+      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(testo)}</button>`;
+  }
+
   function renderFsNota(stat) {
     const righe = [];
+    const testo = (t) => righe.push(esc(t));
     if (fsRipiego) {
-      righe.push(fsErrore
+      testo(fsErrore
         ? fsErrore
         : `Non è riuscita la lettura di tutte le segnalazioni: i numeri vengono dalla lista già in pagina${caricoIncompleto ? ", che è incompleta: sono minimi, non totali" : ", senza i campi di dettaglio"}.`);
     } else if (!fsCompleto) {
-      righe.push('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
+      testo('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
     }
     const cop = stat.copertura;
     if (!fsLogOk) {
