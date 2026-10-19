@@ -67,3 +67,32 @@ export async function nelMondoDelMenu(app, scheda, codice) {
 export function statoCronologia(app, scheda) {
   return nelMondoDelMenu(app, scheda, 'globalThis.SN_MENU?._test?.cronologia() ?? null');
 }
+
+// Lo strato del menu sopra la scheda (#1053, spento di serie: `test.use({ stratoDelMenu: true })`). La sua pagina
+// filo://menu/ fuori dal documento del sito, e lo stato visto dal main: aperto, punto (px della scheda), area, e se la
+// vista è a schermo, in cima alle viste della finestra e dove dice l'area.
+export async function paginaDelloStrato(app) {
+  const { expect } = await import('@playwright/test');
+  let pagina = null;
+  await expect.poll(() => Boolean(pagina = app.windows().find((w) => w.url().startsWith('filo://menu/')) || null),
+    { message: 'lo strato del menu non è nato', timeout: 0, intervals: [100] }).toBe(true);
+  return pagina;
+}
+
+export function statoDelloStrato(app) {
+  return app.evaluate(({ BrowserWindow, webContents }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && w._filoTabs.strato);
+    if (!win) return null;
+    const strato = win._filoTabs.strato;
+    const s = strato.stato();
+    const v = strato.vista;
+    const figli = win.contentView.children || [];
+    return {
+      ...s,
+      visibile: !!v && v.getVisible(),
+      inCima: !!v && figli[figli.length - 1] === v,
+      bounds: v ? v.getBounds() : null,
+      tastiera: !!v && webContents.getFocusedWebContents() === v.webContents,
+    };
+  });
+}
