@@ -29,6 +29,11 @@ async function porte(innerUrl) {
   { const f = document.createElement('iframe'); f.src = innerUrl; document.body.appendChild(f); await attendiLoad(f); const i = window.length - 1; f.src = 'about:blank'; await attendiLoad(f); out.srcPoiAboutBlank = leggi(window[i]); }
   { const f = document.createElement('iframe'); document.body.appendChild(f); const i = window.length - 1; f.src = 'about:blank'; await attendiLoad(f); out.vuotoPoiAboutBlank = leggi(window[i]); }
   { const e = document.createElement('embed'); e.type = 'text/html'; e.src = 'about:blank'; document.body.appendChild(e); await new Promise((r) => setTimeout(r, 800)); out.embedLen = window.length; out.embed = leggi(ultimo()); }
+  { const f = document.createElement('iframe'); document.body.appendChild(f); const i = window.length - 1; f.srcdoc = '<p>s</p>'; await attendiLoad(f); out.vuotoPoiSrcdoc = leggi(window[i]); }
+  { const f = document.createElement('iframe'); document.body.appendChild(f); const i = window.length - 1; f.src = innerUrl; await attendiLoad(f); out.vuotoPoiStessaOrigine = leggi(window[i]); }
+  { const f = document.createElement('iframe'); f.src = "javascript:'<p>js</p>'"; document.body.appendChild(f); const i = window.length - 1; await attendiLoad(f); out.jsUrl = leggi(window[i]); }
+  { const f = document.createElement('iframe'); f.name = 'nominato'; f.src = innerUrl; document.body.appendChild(f); await attendiLoad(f); window.nominato.location = 'about:blank'; await attendiLoad(f); out.nomePoiAboutBlank = leggi(window.nominato); }
+  { document.body.insertAdjacentHTML('beforeend', '<embed type="text/html" src="about:blank">'); await new Promise((r) => setTimeout(r, 800)); out.embedHtml = leggi(ultimo()); }
   // costo
   const t0 = performance.now(); const box = document.createElement('div'); document.body.appendChild(box);
   for (let i = 0; i < 100000; i++) { const d = document.createElement('div'); d.textContent = 'x'; box.appendChild(d); }
