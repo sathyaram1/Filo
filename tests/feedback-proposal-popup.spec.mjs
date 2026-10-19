@@ -58,8 +58,8 @@ test('la segnalazione proposta apre il popup da sola e mostra il testo per inter
   expect(shown).toContain('L\'utente ha richiesto di chiudere');
   expect(shown).toContain(CODA);
   expect(shown).not.toContain('…');
-  // Il testo che parte a nome dell'utente sta nel suo riquadro (#592.7).
-  expect((await confirmState(page)).citazioni).toEqual([TESTO]);
+  // Titolo e testo che partono a nome dell'utente stanno nel loro riquadro, tutti e due (#592.7).
+  expect((await confirmState(page)).citazioni).toEqual(['chiudere le altre schede', TESTO]);
 
   // Il chip in chat NON è stato cliccato da nessuno: è rimasto lì come ripiego.
   const btnText = await page.locator('#test-proposal .dash-action-btn').textContent();

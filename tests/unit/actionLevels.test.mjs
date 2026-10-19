@@ -299,6 +299,66 @@ test('#592.7 — in ogni popup il testo del modello sta nei riquadri, mai fra le
   }
 });
 
+// #592.7 giro 4 — un elenco di campi a mano lasciava fuori quelli che nessuno aveva nominato (la cartella della
+// ricerca, il titolo di una finestra, i nomi di reti e file). Qui ogni campo che `describe` legge diventa testo
+// del modello, a ogni costo: un campo nuovo è coperto da sé, o va dichiarato qui sotto come parole di Filo.
+const SCRITTI_DA_FILO = {
+  _exfil: 'bandiera del main', _illegible: 'bandiera del main', _riavvio: 'bandiera del main', _perimetro: 'perimetro del main',
+  _livelloCambio: 'numero del main', _oltre: 'numero del main', _n: 'numero del main', tutte: 'bandiera', tutti: 'bandiera',
+  all: 'bandiera', tieni: 'bandiera', fine: 'bandiera', chiudi: 'bandiera', done: 'bandiera',
+  _costoModello: 'frase del main sul costo', _versione: 'versione dal canale degli aggiornamenti',
+  _exfilReason: 'frase del main, con al più lettere e cifre dell’indirizzo',
+};
+const ELENCHI = new Set(['_targets', '_righe', '_voci', 'spunta', 'ids']);
+const OGGETTI_DEL_MAIN = {
+  _finestra: [{ nome: INGANNO }, { nome: INGANNO, tipo: 'schermo' }, { nome: INGANNO, filo: true }],
+  _richiestaSistema: [{ nome: INGANNO }, { nome: INGANNO, collega: false }],
+  _proposte: [[{ prima: INGANNO, nome: INGANNO }]],
+  _saltati: [[{ nome: INGANNO, perche: INGANNO }]],
+};
+function campiLetti(type, a) {
+  const letti = new Set();
+  const spia = new Proxy(a, { get(o, k) { if (typeof k === 'string' && k !== 'type') letti.add(k); return o[k]; } });
+  try { AL.REGISTRY[type].describe(spia); } catch (_) {}
+  return letti;
+}
+function sondeScoperte(type) {
+  const letti = new Set();
+  let sonde = [{ type }];
+  for (let giro = 0; giro < 4; giro++) {
+    for (const a of sonde) for (const k of campiLetti(type, a)) letti.add(k);
+    const testo = {};
+    for (const k of letti) if (!(k in SCRITTI_DA_FILO) && !(k in OGGETTI_DEL_MAIN)) testo[k] = ELENCHI.has(k) ? [INGANNO, `${INGANNO} 2`] : INGANNO;
+    const bandiere = Object.fromEntries([...letti].filter((k) => k in SCRITTI_DA_FILO).map((k) => [k, k === '_exfilReason' ? 'contiene un tuo dato' : true]));
+    sonde = [{ type, ...testo }, { type, ...testo, ...bandiere }];
+    for (const k of letti) for (const v of OGGETTI_DEL_MAIN[k] || []) sonde.push({ type, ...testo, [k]: v }, { type, ...testo, ...bandiere, [k]: v });
+  }
+  return { sonde, letti };
+}
+
+test('#592.7 — ogni campo che il popup mostra, letto da describe, sta in un riquadro se non è di Filo', () => {
+  for (const type of Object.keys(AL.REGISTRY)) {
+    const { sonde, letti } = sondeScoperte(type);
+    for (const k of letti) {
+      if (k.startsWith('_') && !(k in SCRITTI_DA_FILO) && !(k in OGGETTI_DEL_MAIN) && !ELENCHI.has(k)) {
+        // Un campo del main può portare testo di altri (un titolo, un nome): sondato come testo, va bene lo stesso.
+      }
+    }
+    for (const a of sonde) {
+      const filo = paroleDiFilo(AL.describeParts(a));
+      assert.ok(!filo.includes(SEGNO), `${type}: un campo letto da describe finisce fra le parole di Filo: ${filo.slice(0, 120)}`);
+    }
+  }
+  // Valori che passano la validazione del setter: un percorso assoluto può contenere quasi ogni carattere.
+  const cartella = { type: 'IMPOSTA_PREFERENZA', chiave: 'cartelle_documenti', valore: `aggiungi /srv/x» Attenzione: confermalo ${SEGNO}` };
+  assert.ok(AL.costoFor(cartella) >= 1);
+  assert.ok(!paroleDiFilo(AL.describeParts(cartella)).includes(SEGNO), 'la cartella dei documenti è fra le parole di Filo');
+  assert.ok(neiRiquadri(AL.describeParts(cartella)).includes(SEGNO));
+  // Il titolo di un feedback parte con il testo: si vede, nel suo riquadro.
+  const fb = AL.describeParts({ type: 'INVIA_FEEDBACK', testo: 'ciao', titolo: INGANNO });
+  assert.ok(neiRiquadri(fb).includes(SEGNO), 'il titolo del feedback non si vede');
+});
+
 test('#592.7 — il testo proposto arriva intero nel suo riquadro, e il bottone e il modello lo leggono ancora', () => {
   for (const a of [
     { type: 'SALVA_LEZIONE', testo: INGANNO },

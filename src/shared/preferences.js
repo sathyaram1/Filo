@@ -482,7 +482,9 @@
         const lista = voci.map(nomeCartella).join(', ');
         const label = op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
           : op === 'togli' ? `${nome} → togli ${lista}` : `${nome} → solo ${lista}`;
-        return { partial: nidifica(percorso, voci), label, elenco: { percorso, op, voci, nome } };
+        // Un percorso lo scrive il modello e può contenere quasi ogni carattere: nel popup sta nel riquadro (#592.7).
+        const campo = `${nome}, ${op === 'aggiungi' ? 'aggiungi' : op === 'togli' ? 'togli' : 'solo'}`;
+        return { partial: nidifica(percorso, voci), label, campo, valore: lista, elenco: { percorso, op, voci, nome } };
       },
     };
   }

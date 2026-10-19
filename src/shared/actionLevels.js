@@ -120,7 +120,7 @@
     const cosa = /timer/.test(kind) ? 'i timer' : (/svegli|alarm/.test(kind) ? 'le sveglie' : 'sveglie e timer');
     const etichetta = String((action && (action.etichetta ?? action.label ?? action.nome)) || '').trim();
     if (wantsAll(action) && !etichetta) return `TUTTI ${cosa}`;
-    if (etichetta) return `“${etichetta}”`;
+    if (etichetta) return cit(etichetta);
     return cosa;
   }
   function repeatLabel(action) {
@@ -136,14 +136,15 @@
     // Un nome di destra si riconosce solo esatto: «lo scaricamento del file» è una carta di sinistra, non l'Editor.
     const id = C ? C.risolvi(a && a.carta, { esatto: true }) : null;
     const detto = String((a && a.carta) || '').trim();
-    // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza.
-    const nome = id ? ` «${C.carta(id).titolo}»` : (detto && !/^[a-z]+:/.test(detto) ? ` «${detto.length > 60 ? `${detto.slice(0, 59)}…` : detto}»` : '');
+    // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza. Un nome non riconosciuto è del modello.
+    const nome = id ? [` «${C.carta(id).titolo}»`] : (detto && !/^[a-z]+:/.test(detto) ? [' ', cit(detto.length > 60 ? `${detto.slice(0, 59)}…` : detto)] : []);
     const op = String((a && (a.operazione ?? a.op)) || '').toLowerCase();
+    const frase = (prima, dopo) => (fatto ? piatto([prima, ...nome, dopo]) : [prima, ...nome, dopo]);
     if (op === 'ripristina') return fatto ? 'Carte della home rimesse com\'erano all\'inizio' : 'Rimettere le carte della home com\'erano all\'inizio';
-    if (op === 'togli' && !id) return fatto ? `Carta${nome} tolta dalla home` : `Togliere la carta${nome} dalla home`;
-    if (op === 'togli') return fatto ? `Carta${nome} tolta dalla home: ora è un'icona in «altro»` : `Togliere la carta${nome} dalla home`;
-    if (op === 'rimetti' || op === 'aggiungi') return fatto ? `Carta${nome} rimessa nella home` : `Rimettere la carta${nome} nella home`;
-    return fatto ? `Carta${nome} spostata nella home` : `Spostare la carta${nome} nella home`;
+    if (op === 'togli' && !id) return fatto ? frase('Carta', ' tolta dalla home') : frase('Togliere la carta', ' dalla home');
+    if (op === 'togli') return fatto ? frase('Carta', ' tolta dalla home: ora è un\'icona in «altro»') : frase('Togliere la carta', ' dalla home');
+    if (op === 'rimetti' || op === 'aggiungi') return fatto ? frase('Carta', ' rimessa nella home') : frase('Rimettere la carta', ' nella home');
+    return fatto ? frase('Carta', ' spostata nella home') : frase('Spostare la carta', ' nella home');
   }
 
   // Perché la cartella di CERCA_DOCUMENTI esce dal perimetro ('' se ci sta, o se si cerca nelle cartelle di sempre).
@@ -188,13 +189,15 @@
     const proposte = Array.isArray(a && a._proposte) ? a._proposte : [];
     const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
     const n = proposte.length;
-    const righe = proposte.map((p) => `«${nomeLeggibile(p && p.prima)}» → «${nomeLeggibile(p && p.nome)}»`);
-    let t = `${n === 1 ? 'Rinominare questo file' : `Rinominare questi ${n} file`}:\n${righe.join('\n')}`;
+    // I nomi li scelgono chi ha salvato il file e il modello: stanno nell'elenco, una voce per file.
+    const t = [`${n === 1 ? 'Rinominare questo file' : `Rinominare questi ${n} file`}:\n`,
+      elenco(proposte.map((p) => `«${nomeLeggibile(p && p.prima)}» → «${nomeLeggibile(p && p.nome)}»`))];
     if (saltati.length) {
-      t += `\n\nRestano come sono:\n${saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`).join('\n')}`;
+      t.push('\n\nRestano come sono:\n', elenco(saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`)));
     }
-    if (a && a._oltre > 0) t += `\n\nNe restano altri ${a._oltre}: chiedimelo di nuovo dopo questi.`;
-    return `${t}\n\nL'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».`;
+    if (a && a._oltre > 0) t.push(`\n\nNe restano altri ${Number(a._oltre)}: chiedimelo di nuovo dopo questi.`);
+    t.push('\n\nL\'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».');
+    return t;
   }
 
   const REGISTRY = {
@@ -225,7 +228,10 @@
     APRI_FILE: {
       costo: 0,
       campo: 'file',
-      describe: (a) => `Mostrare in chat il file ${a.percorso || a.path || ''}`.trim(),
+      describe: (a) => {
+        const f = String(a.percorso || a.path || '').trim();
+        return f ? ['Mostrare in chat il file ', cit(f, true)] : 'Mostrare in chat un file';
+      },
     },
     TIMER: {
       costo: 1,
@@ -275,8 +281,7 @@
           return [`Filo sta per togliere ${list.length === 1 ? 'questa voce' : `queste ${list.length} voci`}:\n`,
             elenco(list), list.length === 1 ? '\n\nUna volta tolta non suonerà più.' : '\n\nUna volta tolte non suoneranno più.'];
         }
-        const what = timerRefLabel(a);
-        return `Togliere ${what}`;
+        return ['Togliere ', timerRefLabel(a)];
       },
     },
     MODIFICA_SVEGLIA: {
@@ -298,7 +303,8 @@
           return [`Filo sta per spostare${cifre ? dove : ''}${quando} queste ${list.length} voci:\n`, elenco(list),
             ...(cifre ? [] : ['\n\nNuovo orario:\n', cit(when, true)])];
         }
-        return `Spostare ${timerRefLabel(a)}${dove}${quando}`;
+        const cifre = !when || /^\d{1,2}(?:[:.]\d{2})?$/.test(when);
+        return ['Spostare ', timerRefLabel(a), `${cifre ? dove : ''}${quando}`, ...(cifre ? [] : ['\n\nNuovo orario:\n', cit(when, true)])];
       },
     },
     SALVA_APPUNTO: {
@@ -334,8 +340,11 @@
         // che parte a nome dell'utente, e un consenso su un testo che non si
         // può leggere per intero non è un consenso. Se è lungo, è il popup a
         // scorrere (src/shared/confirmUi.js), non il testo ad accorciarsi.
+        // Il titolo parte con il testo: si vede anche lui, intero.
         const testo = String(a.testo ?? a.text ?? a.messaggio ?? '').trim();
-        return ['Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n', testo ? cit(testo) : '(vuoto)'];
+        const titolo = String(a.titolo ?? a.title ?? a.name ?? '').trim();
+        return ['Inviare questo feedback agli sviluppatori di Filo a tuo nome:\n', ...(titolo ? ['Titolo:\n', cit(titolo), '\nTesto:\n'] : []),
+          testo ? cit(testo) : '(vuoto)'];
       },
     },
     CERCA_WEB: {
@@ -355,7 +364,7 @@
           return [`Cercare sul web un testo${why}:\n`, cit(q),
             '\n\nPotrebbe inviare tuoi dati a un motore di ricerca. Cerca solo se l\'hai chiesto tu.'];
         }
-        return `Cercare sul web "${q}"`;
+        return ['Cercare sul web ', cit(q)];
       },
     },
     ONBOARDING: {
@@ -372,7 +381,7 @@
         if (a && /^(true|1|si|sì|yes)$/i.test(String(a.autonomia ?? ''))) return 'Mostrarti i livelli di autonomia, da scegliere tu';
         if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
         const ids = Array.isArray(a?.spunta) ? a.spunta : [];
-        return `Segnare come fatto nell’intervista di benvenuto${ids.length ? `: ${ids.join(', ')}` : ''}`;
+        return ids.length ? ['Segnare come fatto nell’intervista di benvenuto:\n', elenco(ids)] : 'Segnare come fatto nell’intervista di benvenuto';
       },
     },
     CAPACITA_DETTAGLIO: {
@@ -383,7 +392,7 @@
       campo: null,
       describe: (a) => {
         const ids = Array.isArray(a.ids) ? a.ids : (a.id ? [a.id] : []);
-        return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
+        return ids.length ? ['Verificare cosa sa fare Filo:\n', elenco(ids)] : 'Verificare cosa sa fare Filo';
       },
     },
     // #949 — togliere una risposta ricordata non concede niente: il sito torna a chiedere.
@@ -407,7 +416,7 @@
       campo: null,
       describe: (a) => {
         const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
-        return cerca ? `Leggere com'è impostato «${cerca.slice(0, 60)}»` : 'Leggere le impostazioni';
+        return cerca ? ['Leggere com\'è impostato ', cit(cerca.slice(0, 60))] : 'Leggere le impostazioni';
       },
       describeDone: (a) => {
         const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
@@ -425,7 +434,7 @@
       describe: (a) => {
         const q = String((a && (a.query ?? a.testo)) || '').trim();
         if (a && a.id && !q) return 'Rileggere una conversazione passata';
-        return `Cercare nel filo${q ? ` ("${q}")` : ''}`;
+        return q ? ['Cercare nel filo ', cit(q)] : 'Cercare nel filo';
       },
     },
     // #845 — la lista «Aperti per dopo»: l'ha fatta l'utente, ma titoli e indirizzi li hanno scritti i siti che ha
@@ -438,7 +447,7 @@
         : null),
       describe: (a) => {
         const q = String((a && (a.cerca ?? a.query ?? a.testo)) || '').replace(/\s+/g, ' ').trim();
-        return q ? `Cercare fra le pagine salvate per dopo «${q.slice(0, 60)}»` : 'Guardare le pagine salvate per dopo';
+        return q ? ['Cercare fra le pagine salvate per dopo ', cit(q.slice(0, 60))] : 'Guardare le pagine salvate per dopo';
       },
     },
     // Come il clic sulla lista: apre la pagina e la toglie, che si rimette salvandola di nuovo → costo 1.
@@ -448,8 +457,8 @@
       campo: 'web',
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-        const quale = t ? `«${t}»` : 'una pagina salvata per dopo';
-        return a && a.tieni === true ? `Aprire ${quale}, lasciandola in «Aperti per dopo»` : `Aprire ${quale} e toglierla da «Aperti per dopo»`;
+        const quale = t ? cit(t) : 'una pagina salvata per dopo';
+        return ['Aprire ', quale, a && a.tieni === true ? ', lasciandola in «Aperti per dopo»' : ' e toglierla da «Aperti per dopo»'];
       },
       describeDone: (a) => {
         const o = (a && a._output) || {};
@@ -469,7 +478,7 @@
       fonte: (a, out) => (out.text ? { classe: 2, campo: 'file', chiave: `editor:${a.fileId ?? a.id ?? ''}`, motivo: 'ho letto un file dell\'editor' } : null),
       describe: (a) => {
         const id = a && (a.fileId ?? a.id ?? a.file);
-        return `Leggere per intero un documento dell'editor${id ? ` (${id})` : ''}`;
+        return id ? ['Leggere per intero un documento dell\'editor ', cit(String(id), true)] : 'Leggere per intero un documento dell\'editor';
       },
     },
     LEGGI_DOCUMENTO: {
@@ -493,8 +502,8 @@
       describe: (a) => {
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
         const perche = documentoFuori(a);
-        if (perche && p) return ['Leggere il documento ', cit(p, true), `\nPerché te lo chiedo: ${perche}`];
-        return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+        const motivo = perche ? [`\nPerché te lo chiedo: ${perche}`] : [];
+        return p ? ['Leggere il documento ', cit(p, true), ...motivo] : ['Leggere il documento', ...motivo];
       },
     },
     VEDI_SCHERMO: {
@@ -523,13 +532,15 @@
       },
       describe: (a) => {
         const f = (a && a._finestra) || {};
+        // Il nome è il titolo che sceglie chi ha aperto la finestra (per una scheda, il sito): sta nel riquadro.
         const nome = String(f.nome || (a && a.finestra) || '').trim();
-        let quale = nome ? `la finestra «${nome}»` : 'una finestra';
-        if (f.tipo === 'schermo') quale = nome ? `«${nome}»` : 'lo schermo';
-        else if (f.tipo === 'selettore') quale = 'una finestra o lo schermo, che scegli tu nel selettore del sistema';
-        else if (f.filo) quale = `la finestra di Filo «${nome}»`;
-        return `Filo vuole guardare ${quale}.\n\nNe cattura l'immagine e la fa leggere al modello che descrive le immagini, `
-          + 'insieme alla tua domanda. Non clicca, non scrive e non salva l\'immagine.';
+        let quale = nome ? ['la finestra ', cit(nome)] : ['una finestra'];
+        if (f.tipo === 'schermo') quale = nome ? [cit(nome)] : ['lo schermo'];
+        else if (f.tipo === 'selettore') quale = ['una finestra o lo schermo, che scegli tu nel selettore del sistema'];
+        else if (f.filo) quale = nome ? ['la finestra di Filo ', cit(nome)] : ['una finestra di Filo'];
+        return ['Filo vuole guardare ', ...quale, typeof quale[quale.length - 1] === 'string' ? '.' : '',
+          '\n\nNe cattura l\'immagine e la fa leggere al modello che descrive le immagini, '
+          + 'insieme alla tua domanda. Non clicca, non scrive e non salva l\'immagine.'];
       },
       describeDone: (a) => {
         const o = (a && a._output) || {};
@@ -556,8 +567,9 @@
         const q = String((a && (a.cosa ?? a.query ?? a.testo)) || '').trim();
         const c = String((a && a.cartella) || '').trim();
         const perche = cartellaDocumentiFuori(a);
-        return `Cercare fra i tuoi documenti${q ? ` «${q.length > 80 ? `${q.slice(0, 79)}…` : q}»` : ''}${c ? ` nella cartella ${c}` : ''}`
-          + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+        // Richiesta e cartella le scrive il modello: intere, nel loro riquadro, come nell'Aiuto.
+        return ['Cercare fra i tuoi documenti', ...(q ? [' ', cit(q)] : []), ...(c ? [' nella cartella ', cit(c, true)] : []),
+          ...(perche ? [`\nPerché te lo chiedo: ${perche}`] : [])];
       },
     },
     LEGGI_TRASPARENZA: {
@@ -566,7 +578,7 @@
       // testo statico incluso nell'app, nessuna uscita verso l'esterno → 1.
       costo: 0,
       campo: null,
-      describe: (a) => `Rileggere la pagina di trasparenza${a && a.doc ? ` (${a.doc})` : ''}`,
+      describe: (a) => (a && a.doc ? ['Rileggere la pagina di trasparenza ', cit(String(a.doc), true)] : 'Rileggere la pagina di trasparenza'),
     },
     EVENTO_CALENDARIO: {
       costo: 1,
@@ -762,7 +774,7 @@
         // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
         const sp = spiegazioneComando(a);
         return [sp === SPIEGAZIONE_DI_FILO ? sp : cit(sp, true), '\n\nIl comando, nel terminale:\n', cmd ? cit(cmd, true) : '(comando vuoto)',
-          (cwd ? `\nCartella di lavoro: ${cwd}` : '') + (perche ? `\nPerché te lo chiedo: ${perche}` : '')];
+          ...(cwd ? ['\nCartella di lavoro:\n', cit(cwd, true)] : []), perche ? `\nPerché te lo chiedo: ${perche}` : ''];
       },
     },
     // ── proxy per-tab via linguaggio naturale (#152) ──────────────────────────
@@ -884,10 +896,11 @@
       describe: (a) => {
         const D = global.SN_DISPOSIZIONE_ICONE;
         const id = String((a && (a.icona ?? a.id)) || '').trim();
-        const nome = D && D.noto(id) ? D.nome(id) : (id || 'un\'icona');
+        // Un nome che Filo non conosce l'ha scritto il modello: nel riquadro.
+        const nome = D && D.noto(id) ? `«${D.nome(id)}»` : (id ? cit(id) : 'un\'icona');
         const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
         const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
-        return d ? `Spostare «${nome}» ${d}` : `Spostare «${nome}»`;
+        return ['Spostare ', nome, d ? ` ${d}` : ''];
       },
       describeDone: (a) => {
         const D = global.SN_DISPOSIZIONE_ICONE;
@@ -906,10 +919,11 @@
       campo: null,
       difesa: (a) => !(a && a._livelloCambio === 1),
       describe: (a) => {
+        // La frase del cambio riporta testi salvati (uno stile, un'etichetta, una cartella): sta tutta nel riquadro.
         const f = String((a && a._fraseCambio) || '').trim();
-        const base = f ? `Filo vuole rimettere com'era prima di: ${f}.` : 'Filo vuole rimettere com\'era l\'ultimo cambio.';
+        const base = f ? ['Filo vuole rimettere com\'era prima di:\n', cit(f, true)] : ['Filo vuole rimettere com\'era l\'ultimo cambio.'];
         if (a && a._livelloCambio === 1) return base;
-        return `${base}\n\nTocca un'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l'hai chiesto tu.`;
+        return [...base, '\n\nTocca un\'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
       },
       describeDone: (a) => {
         const f = String((a && a._fraseCambio) || '').trim();
@@ -946,9 +960,10 @@
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
         if (r.nome && r.collega === false) {
-          return `Scollegare «${nome}» dal Bluetooth.\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.`;
+          return ['Scollegare dal Bluetooth ', cit(nome), '\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.'];
         }
-        if (r.nome) return `Collegare «${nome}» col Bluetooth`;
+        // Il nome del dispositivo lo sceglie chi l'ha fatto, o il modello: nel riquadro.
+        if (r.nome) return ['Collegare col Bluetooth ', cit(nome)];
         if (r.acceso === true) return 'Accendere il Bluetooth';
         if (r.acceso === false) {
           return 'Spegnere il Bluetooth.\n\nCuffie, casse, tastiere e mouse Bluetooth si scollegano finché non lo riaccendi, dal tasto nella home o chiedendolo a Filo.';
@@ -977,7 +992,7 @@
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
         if (r.nome) {
-          return `Collegare il computer alla rete Wi-Fi «${nome}».\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.`;
+          return ['Collegare il computer alla rete Wi-Fi ', cit(nome), '\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.'];
         }
         if (r.acceso === true) return 'Accendere il Wi-Fi';
         if (r.acceso === false) {
