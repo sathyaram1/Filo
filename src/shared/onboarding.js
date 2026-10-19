@@ -85,7 +85,7 @@
       kind: 'scoprire',
       label: 'Quanto vuole che Filo faccia da solo',
       detail: 'Se preferisce che gli chieda prima di quasi tutto, che faccia da solo quello che si rimedia, o anche di più.',
-      applica: 'Chiediglielo con parole tue e nello stesso turno emetti ONBOARDING con "autonomia": true: sotto la tua risposta compaiono i livelli e sceglie lui con un clic, che ti arriva come suo messaggio. Il livello lo cambia solo lui, tu non hai un’azione per farlo: non dire di averlo cambiato. Se risponde a parole, rimostra la scelta e digli quale livello corrisponde a quello che ha detto. Spunta la voce quando ha scelto o ti ha detto che va bene com’è, non nel turno in cui mostri la scelta.',
+      applica: 'Chiediglielo con parole tue e nello stesso turno emetti ONBOARDING con "autonomia": true: sotto la tua risposta compaiono i livelli e sceglie lui con un clic, che ti arriva come suo messaggio. Il livello lo sceglie lui: se a parole ne nomina uno, emetti IMPOSTA_PREFERENZA con chiave autonomia (alzarlo gli fa scrivere «conferma»); se non è chiaro quale, rimostra la scelta e digli quale livello corrisponde a quello che ha detto. Non dire di averlo cambiato finché l’esito non lo dice. Spunta la voce quando ha scelto o ti ha detto che va bene com’è, non nel turno in cui mostri la scelta.',
     },
     {
       id: 'estetica',
