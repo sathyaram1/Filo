@@ -177,13 +177,10 @@ const MARCHI_PAROLA = new Map([
   ['discord', ['discordapp', 'discordnitro']],
   ['outlook', ['outlookweb', 'outlooklogin']],
   ['telegram', ['telegramweb']],
-  // Le sigle e i nomi corti dei marchi italiani (#725.8): spider non è SPID, glsl non è GLS.
-  ['spid', []],
-  ['brt', []],
   ['gls', ['glsitaly']],
   ['dhl', ['dhlexpress', 'dhlparcel']],
-  ['bnl', []],
 ]);
+const CORTO = 4;
 // La forma tipica di un sosia, per tutti i marchi-parola: il marchio con accanto solo queste parole, intere
 // (krakenlogin, securechase, postespedizioni). Le radici italiane prendono la desinenza (rimborso, notifiche).
 const PAROLE_TRUFFA = [
