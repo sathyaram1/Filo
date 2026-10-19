@@ -254,7 +254,7 @@
 
   // Un riquadro (iframe) che l'utente non vede, o che la pagina copre per intero, nasconde il campo che contiene.
   function riquadroVisto(fe, fr, win) {
-    return !tenue(fe, fr) && scoperto(fe, fr, win, ...PUNTI_RIQUADRO);
+    return !tenue(fe, fr) && scoperto(fe, fr, win, ...PUNTI_RIQUADRO) && !velato(fe, fr, win, ...PUNTI_RIQUADRO);
   }
 
   function fuoriVista(r, win) {
@@ -286,11 +286,13 @@
   }
 
   // Il campo in px CSS della scheda (o del suo riquadro di un'altra origine, `ancora`); { w: 0 } se non si vede.
-  // Coperto conta solo se il fuoco l'ha dato la pagina: un clic vero sul campo dice che l'utente lo vede.
+  // Coperto da un nodo che prende i clic conta solo se il fuoco l'ha dato la pagina: un clic vero arrivato al campo
+  // dice che l'utente lo vede. Un velo che lascia passare i clic conta sempre: il clic l'ha attraversato.
   function rettangolo(el, { utente = false } = {}) {
     let r;
     try { r = el.getBoundingClientRect(); } catch (_) { return null; }
-    if (tenue(el, r) || (!utente && !scoperto(el, r, window, ...PUNTI_CAMPO))) return { x: 0, y: 0, w: 0, h: 0, ancora: null };
+    if (tenue(el, r) || spoglio(el) || (!utente && !scoperto(el, r, window, ...PUNTI_CAMPO))
+      || velato(el, r, window, ...PUNTI_CAMPO, { dubbio: !utente })) return { x: 0, y: 0, w: 0, h: 0, ancora: null };
     const p = risali(r, window);
     if (!p) return null;
     if (p.fuori) return { x: 0, y: 0, w: 0, h: 0, ancora: null };
