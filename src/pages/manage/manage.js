@@ -7343,7 +7343,8 @@
     if (desc.tipo === 'fetta') {
       const f = trova(fsStat.giri.fette, chiave);
       if (!f || !f.ids || !f.ids.length) return null;
-      return { ...desc, titolo: f.label, ids: f.ids };
+      // Le altre fette dicono già il loro numero di critiche nel nome.
+      return { ...desc, titolo: f.label, ids: f.ids, critiche: f.key === 'g3' ? f.critiche : null };
     }
 
     if (desc.tipo === 'punto') {
