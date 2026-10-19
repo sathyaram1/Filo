@@ -314,8 +314,8 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
     'un elenco nella sintassi di Python': py(FB),
     'oggetti di Python': `[${FB.map((f) => `Feedback(text=${pyStr(f.text)}, clientId='${f.clientId}', userAgent='${f.userAgent}')`).join(', ')}]`,
     'YAML': FB.map((f) => `- id: ${f.id}\n  text: "${unaRiga(f.text)}"\n  clientId: ${f.clientId}\n  userAgent: ${f.userAgent}`).join('\n'),
-    'righe «chiave: valore»': FB.map((f) => `text: ${unaRiga(f.text)}\nclientId: ${f.clientId}\nuserAgent: ${f.userAgent}\n`).join('\n'),
-    'righe di log chiave=valore': FB.map((f) => `level=info text="${unaRiga(f.text).replace(/"/g, '\\"')}" clientId=${f.clientId} userAgent="${f.userAgent}"`).join('\n'),
+    'righe «chiave: valore», a capo di Windows': FB.map((f) => `text: ${unaRiga(f.text)}\r\nclientId: ${f.clientId}\r\nuserAgent: ${f.userAgent}\r\n`).join('\r\n'),
+    'righe di log chiave=valore': FB.map((f) => `2026-10-19T10:00:00Z INFO text="${unaRiga(f.text).replace(/"/g, '\\"')}" clientId=${f.clientId} userAgent="${f.userAgent}"`).join('\n'),
     'un JSON dentro una stringa': JSON.stringify(JSON.stringify(FB)),
     // #1108.3: i soli campi dei documenti, nel formato del server, senza il percorso.
     'i campi dei documenti nel formato del server': JSON.stringify(FB.map(nelFormatoDelServer), null, 2),
