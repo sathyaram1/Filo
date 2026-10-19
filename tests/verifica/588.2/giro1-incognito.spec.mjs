@@ -78,7 +78,8 @@ test('incognito: il programma chiede, dice il sito, entra nell’elenco solo di 
 
     await page.locator('#exe').click();
     await expect.poll(() => statoDi(inc, 'setup.exe'), { timeout: 20000 }).toBe('pending');
-    const domanda = inc.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: '«setup.exe»' });
+    const domanda = inc.locator('#dl-panel .dl-row[data-chiede="1"]')
+      .filter({ has: inc.locator('.dl-row-ask-nome', { hasText: /^setup\.exe$/ }) }); // il nome sta nel suo riquadro (#592.7)
     await expect(domanda).toBeVisible({ timeout: 10000 });
     await expect(domanda).toContainText('programma');
     await expect(domanda).toContainText('localhost');
