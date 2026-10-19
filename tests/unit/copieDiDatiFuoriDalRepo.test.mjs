@@ -341,6 +341,40 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
     for (const [forma, testo] of Object.entries(FORME)) assert.notEqual(motivoCopiaTesto(testo), '', `${forma}: è una copia\n${testo}`);
   });
 
+  // Senza i nomi esatti del server (jq @csv, la coda di un file, colonne rinominate) i dati sono gli stessi.
+  test('una copia senza i nomi dei campi, o con altri nomi, o di cui resta solo la coda, è una copia', () => {
+    const UA_VERO = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Filo/0.9.3 Chrome/130.0 Safari/537.36';
+    const tanti = Array.from({ length: 30 }, (_, i) => ({
+      id: `fbId${i}abcdefghijklmn`, text: `il tasto ${i} non risponde quando apro la scheda`, userAgent: UA_VERO, clientIdHash: String(i).padStart(32, 'a'),
+    }));
+    const righe = (elenco, d = ',') => elenco.map((f) => Object.values(f).map((v) => (d === ',' ? `"${v}"` : v)).join(d)).join('\n');
+    const senzaIntestazione = righe(tanti);
+    const conIntestazione = `id,text,userAgent,clientIdHash\n${senzaIntestazione}\n`;
+    const forme = {
+      'un CSV senza intestazione (jq @csv)': senzaIntestazione,
+      'la coda di un CSV': conIntestazione.split('\n').slice(-20).join('\n'),
+      'la coda di un TSV, senza virgolette': righe(tanti.slice(-5), '\t'),
+      'un elenco di soli valori (jq -c)': tanti.slice(0, 3).map((f) => JSON.stringify(Object.values(f))).join('\n'),
+      'colonne user_agent e client_id_hash': `id,text,user_agent,client_id_hash\n${righe(tanti.slice(0, 3))}`,
+      'una colonna «User Agent»': `id,text,User Agent,clientIdHash\n${righe(tanti.slice(0, 3))}`,
+      'una colonna useragent': `id,text,useragent,clientIdHash\n${righe(tanti.slice(0, 3))}`,
+      'chiavi user_agent in JSON': JSON.stringify(tanti.slice(0, 3).map((f) => ({ id: f.id, text: f.text, user_agent: f.userAgent }))),
+      'righe «User Agent: …»': `text: ${tanti[0].text}\nUser Agent: ${UA_VERO}\n`,
+      'la coda di un elenco nel formato del server': JSON.stringify(tanti.map(nelFormatoDelServer), null, 2).split('\n').slice(-12).join('\n'),
+      'la coda di una risposta di Firestore': JSON.stringify({ documents: tanti.map(documento) }, null, 2).split('\n').slice(-10).join('\n'),
+      'la coda di una stampa di node in una riga': JSON.stringify(tanti.slice(0, 2)).slice(JSON.stringify(tanti.slice(0, 2)).lastIndexOf('"id"')),
+    };
+    for (const [forma, testo] of Object.entries(forme)) assert.notEqual(motivoCopiaTesto(testo), '', `${forma}: è una copia\n${testo}`);
+    const non = {
+      'una configurazione di dispositivi': JSON.stringify({ 'Desktop Chrome': { userAgent: UA_VERO, defaultBrowserType: 'chromium', viewport: { width: 1280, height: 720 } } }, null, 2),
+      'un log di accessi': `1.2.3.4 - - [19/Oct/2026:10:00:00] "GET / HTTP/1.1" 200 512 "-" "${UA_VERO}"\n`,
+      'un user agent da solo in un CSV': `"${UA_VERO}",200,ok\n`,
+      'un elenco di regole che nomina i campi': "        ['text', 'url', 'title', 'userAgent', 'clientId',\n         'files', 'createdAt', 'seq']\n",
+      'la coda di un documento senza chi scrive': '    "titolo": "tasto"\n  },\n  "text": "il tasto non va"\n}\n',
+    };
+    for (const [caso, testo] of Object.entries(non)) assert.equal(motivoCopiaTesto(testo), '', `${caso}: non è una copia\n${testo}`);
+  });
+
   test('lettura intera e interrotta seguono la stessa regola', () => {
     for (const [forma, testo] of Object.entries(FORME)) {
       // Da quando c'è il primo identificativo, o il percorso del primo documento, ogni taglio è una copia.
