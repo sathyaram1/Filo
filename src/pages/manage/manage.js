@@ -2451,9 +2451,28 @@
   // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
   function mostraSezioni() {
     const ok = sezioniAttendibili();
-    if (mgNoSections && !ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
     aggiornaSchedeVisibili();
+    if (!ok) avvisoChiave.aggiorna();
     return ok;
+  }
+
+  // L'avviso con l'azione che carica la chiave (#1042): parole e azione sono le stesse della pagina dei feedback.
+  const avvisoChiave = window.SN_AVVISO_CHIAVE.monta(mgNoSections, {
+    invia: sendToMain,
+    admin: () => isAdmin,
+    onCambiata: ricaricaConLaChiave,
+  });
+
+  // Con la chiave cambiata le segnalazioni si rileggono da capo: quelle in mano sono già passate dalla decifratura
+  // e al posto dei campi cifrati hanno il segnaposto. Le risposte tenute da parte sugli allegati dicevano «manca la
+  // chiave», e vanno buttate come a un cambio di chi guarda.
+  async function ricaricaConLaChiave() {
+    imgCache.clear();
+    segniMittente.clear();
+    fileWhyCache.clear();
+    if (testDataInjected) return;
+    firstListPromise = null;
+    await loadData();
   }
   // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
   // l'intestazione della colonna e per la ricerca.
