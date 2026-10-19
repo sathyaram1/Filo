@@ -1,22 +1,17 @@
-// Sorgente della guardia anti-fingerprint, iniettata dal page-preload nel main world prima degli
-// script della pagina. Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
-// Il rumore è legato alla posizione del pixel nell'immagine: stesso pixel, stesso rumore, da ogni porta.
+// Sorgente del preambolo che il page-preload inietta nel main world prima degli script della pagina: oggi la guardia
+// anti-fingerprint, una parte fra quelle che il preambolo porta in ogni finestra della stessa origine (#798; #753 ci
+// aggiunge GPC). Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
 
-function buildGuardSource(seed, level) {
-  const s = (seed >>> 0);
-  const lvl = level | 0;
-  return `(function(){
-  'use strict';
-  if (window.__filoFpGuard) return;
-  var SEED = ${s} >>> 0;
-  var LEVEL = ${lvl};
-  if (!LEVEL) return;
-  try { Object.defineProperty(window, '__filoFpGuard', { value: true, enumerable: false, configurable: true }); } catch(e) {}
+// La guardia: rumore legato alla posizione del pixel nell'immagine, stesso pixel stesso rumore da ogni porta.
+// La parte che aggiunge a `parti` la monta nella finestra che riceve, sulle copie native di quella finestra.
+function parteFingerprint(seed) {
+  return `
+  var SEED = ${seed >>> 0} >>> 0;
 
   function ph(x, y) {
-    var h = (SEED ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263)) >>> 0;
-    h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0;
-    h = Math.imul(h ^ (h >>> 13), 3266489917) >>> 0;
+    var h = (SEED ^ imul(x | 0, 374761393) ^ imul(y | 0, 668265263)) >>> 0;
+    h = imul(h ^ (h >>> 15), 2246822519) >>> 0;
+    h = imul(h ^ (h >>> 13), 3266489917) >>> 0;
     return (h ^ (h >>> 16)) >>> 0;
   }
 
@@ -42,28 +37,10 @@ function buildGuardSource(seed, level) {
     }
   }
 
-  // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
-  // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799).
-  var masked = new WeakMap();
-  function mask(fn, orig, name) {
-    var m = fn;
-    try {
-      m = ({ [name]() { return fn.apply(this, arguments); } })[name];
-      Object.defineProperty(m, 'length', { value: orig.length, configurable: true });
-      masked.set(m, 'function ' + name + '() { [native code] }');
-    } catch (e) {}
-    return m;
-  }
-  try {
-    var FP = Function.prototype, oFnToString = FP.toString;
-    FP.toString = mask(function toString() {
-      return (typeof this === 'function' && masked.get(this)) || oFnToString.apply(this, arguments);
-    }, oFnToString, 'toString');
-  } catch (e) {}
-
   // ---- Canvas (elemento e OffscreenCanvas) ----
   // Il contesto di un canvas si annota quando la pagina lo crea: chiederlo alla guardia con
-  // getContext('2d') ne creerebbe uno, e il canvas non potrebbe più diventare WebGL.
+  // getContext('2d') ne creerebbe uno, e il canvas non potrebbe più diventare WebGL. L'annotazione è
+  // di tutte le finestre: un canvas della pagina si legge anche con le funzioni di un suo riquadro.
   var ctxOf = new WeakMap();
   var MAXPX = 8000000;
 
@@ -71,8 +48,8 @@ function buildGuardSource(seed, level) {
     var o = proto && proto.getContext;
     if (!o) return null;
     proto.getContext = mask(function getContext() {
-      var ctx = o.apply(this, arguments);
-      if (ctx && !ctxOf.has(this)) ctxOf.set(this, ctx);
+      var ctx = R(o, this, arguments);
+      if (ctx && !R(wmHas, ctxOf, [this])) R(wmSet, ctxOf, [this, ctx]);
       return ctx;
     }, o, 'getContext');
     return o;
@@ -82,7 +59,7 @@ function buildGuardSource(seed, level) {
     var o = proto && proto.getImageData;
     if (!o) return null;
     proto.getImageData = mask(function getImageData(sx, sy, sw, sh) {
-      var img = o.apply(this, arguments);
+      var img = R(o, this, arguments);
       try {
         var x0 = (sx | 0) + ((sw | 0) < 0 ? (sw | 0) : 0);
         var y0 = (sy | 0) + ((sh | 0) < 0 ? (sh | 0) : 0);
@@ -96,9 +73,7 @@ function buildGuardSource(seed, level) {
   function family(CanvasCtor, CtxCtor, make) {
     var cp = CanvasCtor && CanvasCtor.prototype, xp = CtxCtor && CtxCtor.prototype;
     if (!cp || !xp || !xp.getImageData) return null;
-    var F = { put: xp.putImageData, draw: xp.drawImage, make: make };
-    F.getCtx = track(cp);
-    F.get = patchGet(xp);
+    var F = { __proto__: null, put: xp.putImageData, draw: xp.drawImage, make: make, getCtx: track(cp), get: patchGet(xp) };
     return F.getCtx ? F : null;
   }
 
@@ -106,96 +81,97 @@ function buildGuardSource(seed, level) {
   // un istante, e toBlob/convertToBlob, che finiscono dopo, non ripristinano sopra un disegno nuovo.
   // Senza contesto il canvas è vuoto, uguale per tutti: null, e si esporta com'è.
   function noisyCopy(src, F) {
-    var ctx = ctxOf.get(src);
+    var ctx = R(wmGet, ctxOf, [src]);
     if (!ctx || !F) return null;
-    var w = src.width | 0, h = src.height | 0;
-    if (w <= 0 || h <= 0 || (w * h) > MAXPX) return null;
+    var W = src.width | 0, H = src.height | 0;
+    if (W <= 0 || H <= 0 || (W * H) > MAXPX) return null;
     var img = null, cs;
-    try { img = F.get.call(ctx, 0, 0, w, h); cs = img.colorSpace; }
+    try { img = R(F.get, ctx, [0, 0, W, H]); cs = img.colorSpace; }
     catch (e) { img = null; try { cs = ctx.drawingBufferColorSpace; } catch (e2) {} }
-    var tmp = F.make(w, h);
-    var t = F.getCtx.call(tmp, '2d', { colorSpace: cs || 'srgb', willReadFrequently: true });
-    if (!img) { F.draw.call(t, src, 0, 0); img = F.get.call(t, 0, 0, w, h); }
-    perturb(img.data, w, h, 0, 0);
-    F.put.call(t, img, 0, 0);
+    var tmp = F.make(W, H);
+    var t = R(F.getCtx, tmp, ['2d', { __proto__: null, colorSpace: cs || 'srgb', willReadFrequently: true }]);
+    if (!img) { R(F.draw, t, [src, 0, 0]); img = R(F.get, t, [0, 0, W, H]); }
+    perturb(img.data, W, H, 0, 0);
+    R(F.put, t, [img, 0, 0]);
     return tmp;
   }
   function copyOrNull(src, F) { try { return noisyCopy(src, F); } catch (e) { return null; } }
 
-  try {
-    var oCreate = Document.prototype.createElement;
-    var HTML = family(window.HTMLCanvasElement, window.CanvasRenderingContext2D, function (w, h) {
-      var c = oCreate.call(document, 'canvas'); c.width = w; c.height = h; return c;
+  // La copia nasce nel documento della finestra a cui appartiene la funzione: il Blob che ne esce è suo.
+  function canvasHtml(w) {
+    var oCreate = w.Document.prototype.createElement;
+    var F = family(w.HTMLCanvasElement, w.CanvasRenderingContext2D, function (W, H) {
+      var c = R(oCreate, w.document, ['canvas']); c.width = W; c.height = H; return c;
     });
-    var CanProto = HTML && window.HTMLCanvasElement.prototype;
-    if (CanProto && CanProto.toDataURL) {
-      var oToData = CanProto.toDataURL;
-      CanProto.toDataURL = mask(function toDataURL() {
-        return oToData.apply(copyOrNull(this, HTML) || this, arguments);
+    var P = F && w.HTMLCanvasElement.prototype;
+    if (P && P.toDataURL) {
+      var oToData = P.toDataURL;
+      P.toDataURL = mask(function toDataURL() {
+        return R(oToData, copyOrNull(this, F) || this, arguments);
       }, oToData, 'toDataURL');
     }
-    if (CanProto && CanProto.toBlob) {
-      var oToBlob = CanProto.toBlob;
-      CanProto.toBlob = mask(function toBlob(cb) {
-        var tmp = typeof cb === 'function' ? copyOrNull(this, HTML) : null;
-        return oToBlob.apply(tmp || this, arguments);
+    if (P && P.toBlob) {
+      var oToBlob = P.toBlob;
+      P.toBlob = mask(function toBlob(cb) {
+        var tmp = typeof cb === 'function' ? copyOrNull(this, F) : null;
+        return R(oToBlob, tmp || this, arguments);
       }, oToBlob, 'toBlob');
     }
-  } catch (e) {}
+  }
 
-  try {
-    var OC = window.OffscreenCanvas;
-    var OFF = family(OC, window.OffscreenCanvasRenderingContext2D, function (w, h) { return new OC(w, h); });
-    var OffProto = OFF && OC.prototype;
-    if (OffProto && OffProto.convertToBlob) {
-      var oConvert = OffProto.convertToBlob;
-      OffProto.convertToBlob = mask(function convertToBlob() {
-        return oConvert.apply(copyOrNull(this, OFF) || this, arguments);
+  function canvasOffscreen(w) {
+    var OC = w.OffscreenCanvas;
+    var F = family(OC, w.OffscreenCanvasRenderingContext2D, function (W, H) { return new OC(W, H); });
+    var P = F && OC.prototype;
+    if (P && P.convertToBlob) {
+      var oConvert = P.convertToBlob;
+      P.convertToBlob = mask(function convertToBlob() {
+        return R(oConvert, copyOrNull(this, F) || this, arguments);
       }, oConvert, 'convertToBlob');
     }
-  } catch (e) {}
+  }
 
   // ---- WebGL readPixels ----
   // Righe e posizioni come le vede toDataURL dello stesso canvas: le due letture devono coincidere.
-  try {
-    var patchGL = function (proto, gl2) {
-      if (!proto || !proto.readPixels) return;
-      var oRead = proto.readPixels, oParam = proto.getParameter;
-      var dbh = Object.getOwnPropertyDescriptor(proto, 'drawingBufferHeight');
-      var dbhGet = dbh && dbh.get;
-      var nf = function readPixels(x, y, width, height, format, type, pixels, dstOffset) {
-        oRead.apply(this, arguments);
-        try {
-          if (format !== 0x1908 || type !== 0x1401) return;
-          if (!(pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray)) return;
-          var w = width | 0, h = height | 0;
-          var align = (oParam.call(this, 0x0D05) | 0) || 4;
-          var rowLen = 0, skipR = 0, skipP = 0;
-          if (gl2) {
-            rowLen = oParam.call(this, 0x0D02) | 0;
-            skipR = oParam.call(this, 0x0D03) | 0;
-            skipP = oParam.call(this, 0x0D04) | 0;
-          }
-          var stride = Math.ceil((rowLen > 0 ? rowLen : w) * 4 / align) * align;
-          var base = (gl2 ? (dstOffset | 0) : 0) + skipR * stride + skipP * 4;
-          var H = dbhGet ? (dbhGet.call(this) | 0) : 0;
-          perturb(pixels, w, h, x | 0, H - 1 - (y | 0), base, stride, -1);
-        } catch (e) {}
-      };
-      proto.readPixels = mask(nf, oRead, 'readPixels');
+  // Il buffer si riconosce dal tipo e non con instanceof: può venire da un'altra finestra.
+  var tagTA = gOPD(getProto(Uint8Array.prototype), Symbol.toStringTag).get;
+  function patchGL(proto, gl2) {
+    if (!proto || !proto.readPixels) return;
+    var oRead = proto.readPixels, oParam = proto.getParameter;
+    var dbh = gOPD(proto, 'drawingBufferHeight');
+    var dbhGet = dbh && dbh.get;
+    var nf = function readPixels(x, y, width, height, format, type, pixels, dstOffset) {
+      R(oRead, this, arguments);
+      try {
+        if (format !== 0x1908 || type !== 0x1401) return;
+        var tipo = R(tagTA, pixels, []);
+        if (tipo !== 'Uint8Array' && tipo !== 'Uint8ClampedArray') return;
+        var w = width | 0, h = height | 0;
+        var align = (R(oParam, this, [0x0D05]) | 0) || 4;
+        var rowLen = 0, skipR = 0, skipP = 0;
+        if (gl2) {
+          rowLen = R(oParam, this, [0x0D02]) | 0;
+          skipR = R(oParam, this, [0x0D03]) | 0;
+          skipP = R(oParam, this, [0x0D04]) | 0;
+        }
+        var stride = ceil((rowLen > 0 ? rowLen : w) * 4 / align) * align;
+        var base = (gl2 ? (dstOffset | 0) : 0) + skipR * stride + skipP * 4;
+        var H = dbhGet ? (R(dbhGet, this, []) | 0) : 0;
+        perturb(pixels, w, h, x | 0, H - 1 - (y | 0), base, stride, -1);
+      } catch (e) {}
     };
-    patchGL((window.WebGLRenderingContext || {}).prototype, false);
-    patchGL((window.WebGL2RenderingContext || {}).prototype, true);
-  } catch (e) {}
+    proto.readPixels = mask(nf, oRead, 'readPixels');
+  }
 
   // ---- AudioContext (OfflineAudioContext.startRendering) ----
   // Lo stesso buffer arriva dall'evento complete, i cui gestori girano prima di ogni .then della
   // promessa: il rumore lo mette chi lo tocca per primo, una volta sola (sommato due volte, evento
   // e promessa darebbero impronte diverse). Solo da un evento vero: un buffer della pagina non si tocca.
-  var rumoreAudio = new WeakSet();
+  // Un insieme per tutte le finestre: lo stesso buffer può passare da quelle di due riquadri.
+  var WSA = WeakSet.prototype, waHas = WSA.has, waAdd = WSA.add, rumoreAudio = new WeakSet();
   function noiseAudio(buf) {
-    if (!buf || rumoreAudio.has(buf)) return;
-    rumoreAudio.add(buf);
+    if (!buf || R(waHas, rumoreAudio, [buf])) return;
+    R(waAdd, rumoreAudio, [buf]);
     try {
       for (var ch = 0; ch < buf.numberOfChannels; ch++) {
         var d = buf.getChannelData(ch);
@@ -205,36 +181,288 @@ function buildGuardSource(seed, level) {
       }
     } catch (e) {}
   }
-  try {
-    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  function audio(w) {
+    var OAC = w.OfflineAudioContext || w.webkitOfflineAudioContext;
     if (OAC && OAC.prototype && OAC.prototype.startRendering) {
       var oStart = OAC.prototype.startRendering;
-      var nf2 = function startRendering() {
-        var p = oStart.apply(this, arguments);
+      var nf = function startRendering() {
+        var p = R(oStart, this, arguments);
         if (p && typeof p.then === 'function') {
           return p.then(function (buf) { noiseAudio(buf); return buf; });
         }
         return p;
       };
-      OAC.prototype.startRendering = mask(nf2, oStart, 'startRendering');
+      OAC.prototype.startRendering = mask(nf, oStart, 'startRendering');
     }
-  } catch (e) {}
-  try {
-    var OACE = window.OfflineAudioCompletionEvent && window.OfflineAudioCompletionEvent.prototype;
-    var dRB = OACE && Object.getOwnPropertyDescriptor(OACE, 'renderedBuffer');
+    var OACE = w.OfflineAudioCompletionEvent && w.OfflineAudioCompletionEvent.prototype;
+    var dRB = OACE && gOPD(OACE, 'renderedBuffer');
     if (dRB && dRB.get && dRB.configurable) {
       var oRB = dRB.get;
-      Object.defineProperty(OACE, 'renderedBuffer', {
+      defP(OACE, 'renderedBuffer', {
+        __proto__: null,
         get: mask(function () {
-          var buf = oRB.call(this);
+          var buf = R(oRB, this, []);
           if (this.isTrusted === true) noiseAudio(buf);
           return buf;
         }, oRB, 'get renderedBuffer'),
         set: dRB.set, enumerable: dRB.enumerable, configurable: true,
       });
     }
-  } catch (e) {}
+  }
+
+  parti.push(function (w) {
+    try { canvasHtml(w); } catch (e) {}
+    try { canvasOffscreen(w); } catch (e) {}
+    try { patchGL((w.WebGLRenderingContext || {}).prototype, false); } catch (e) {}
+    try { patchGL((w.WebGL2RenderingContext || {}).prototype, true); } catch (e) {}
+    try { audio(w); } catch (e) {}
+  });`;
+}
+
+// Ogni finestra ha le sue copie native: una pagina che crea un riquadro vuoto (o della sua origine) e ne usa le
+// funzioni le troverebbe intatte. Il preambolo si monta in ogni finestra vuota della pagina prima che la pagina la
+// raggiunga: dall'elemento sempre, per indice o per nome appena il riquadro entra nel documento (anche da uno script).
+// Un riquadro che carica un documento della stessa origine non si tocca prima: il documento erediterebbe la finestra
+// senza il preload. Nessun segno sulla finestra: un sito vedrebbe chi usa Filo (regole e porte rimaste:
+// patterns/riquadri-incorporati-iframe-filo-gira-anche-li.md).
+const PROPAGAZIONE = `
+  var CORNICI = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'];
+  var NP = Node.prototype, EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute;
+  var qsaE = EP.querySelectorAll, qsaF = DocumentFragment.prototype.querySelectorAll, qsaD = Document.prototype.querySelectorAll;
+  var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(NP, 'nodeType').get, genitore = gOPD(NP, 'parentNode').get;
+  var docDi = gOPD(NP, 'ownerDocument').get, baseDi = gOPD(NP, 'baseURI').get, quanti = gOPD(NodeList.prototype, 'length').get;
+  var primoFiglio = gOPD(EP, 'firstElementChild').get;
+  var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice, cerca = SP.indexOf;
+  var URLc = URL, origineUrl = gOPD(URL.prototype, 'origin').get, costruisci = Reflect.construct;
+  var MO = MutationObserver, moObserve = MO.prototype.observe;
+  var addEL = EventTarget.prototype.addEventListener, bersaglio = gOPD(Event.prototype, 'target').get;
+  var annulla = Event.prototype.preventDefault, proprio = Object.prototype.hasOwnProperty;
+  var WSP = WeakSet.prototype, wsHas = WSP.has, wsAdd = WSP.add, preparate = new WeakSet();
+  var GETTER = { __proto__: null };
+  for (var k = 0; k < CORNICI.length; k++) {
+    var CC = window[CORNICI[k]], dcw = CC && gOPD(CC.prototype, 'contentWindow');
+    if (dcw && dcw.get) GETTER[k === 0 ? 'IFRAME' : k === 1 ? 'FRAME' : 'OBJECT'] = dcw.get;
+  }
+
+  // Una finestra con un documento suo ha già il preambolo dal suo preload: un secondo annullerebbe il rumore.
+  // La forza la passa solo chi lo chiede per sé (questa finestra, un riquadro che si unisce).
+  function prepara(w, forza) {
+    try {
+      if (!w || R(wsHas, preparate, [w])) return;
+      if (!forza && R(taglia, '' + w.location.href, [0, 11]) !== 'about:blank') return;
+      R(wsAdd, preparate, [w]);
+    } catch (e) { return; }
+    try { mascheraToString(w); } catch (e) {}
+    for (var i = 0; i < parti.length; i++) { try { parti[i](w); } catch (e) {} }
+    try { riquadri(w); } catch (e) {}
+  }
+
+  function avvolgi(CP, prop, cw) {
+    var d = gOPD(CP, prop);
+    if (!d || !d.get || !d.configurable) return;
+    var orig = d.get;
+    defP(CP, prop, {
+      __proto__: null,
+      get: mask(function () {
+        var r = R(orig, this, arguments);
+        if (r) { try { prepara(R(cw, this, [])); } catch (e) {} }
+        return r;
+      }, orig, 'get ' + prop),
+      set: d.set, enumerable: d.enumerable, configurable: true,
+    });
+  }
+
+  // Si tocca in anticipo un riquadro che resterà la finestra vuota della pagina, o che andrà su un'altra origine e
+  // avrà una finestra nuova; mai uno che carica un documento della stessa origine.
+  function anticipabile(el, tag) {
+    if (R(haAttr, el, ['srcdoc'])) return false;
+    var s = R(leggiAttr, el, [tag === 'OBJECT' ? 'data' : 'src']);
+    if (s === null) return true;
+    s = R(lower, R(trim, '' + s, []), []);
+    if (s === '' || R(taglia, s, [0, 11]) === 'about:blank' || R(taglia, s, [0, 11]) === 'javascript:') return true;
+    try {
+      return R(origineUrl, costruisci(URLc, [s, R(baseDi, el, [])]), []) !== R(docDi, el, []).location.origin;
+    } catch (e) { return false; }
+  }
+  // In Automatico un riquadro della stessa origine lento o muto resta scoperto per indice: coprirlo spegne Filo lì
+  // dentro se il documento arriva dopo. In Privacy massima, dopo qualche secondo ancora vuoto, si copre (decisione owner).
+  var ATTESA_VUOTO = 3000, attesi = new WeakSet();
+  function tocca(el) {
+    var tag = R(tagName, el, []), g = GETTER[tag];
+    if (!g) return;
+    if (anticipabile(el, tag)) { prepara(R(g, el, [])); return; }
+    if (LIVELLO < 2 || R(wsHas, attesi, [el])) return;
+    R(wsAdd, attesi, [el]);
+    R(aspetta, window, [function () { try { prepara(R(g, el, [])); } catch (e) {} }, ATTESA_VUOTO]);
+  }
+  var SEL = 'iframe,frame,object';
+  function cornici(n, fa) {
+    var t = R(nodeType, n, []), l = null;
+    if (t === 1) {
+      if (GETTER[R(tagName, n, [])]) fa(n);
+      if (R(primoFiglio, n, [])) l = R(qsaE, n, [SEL]);
+    } else if (t === 11) l = R(qsaF, n, [SEL]);
+    else if (t === 9) l = R(qsaD, n, [SEL]);
+    if (l) for (var i = 0, m = R(quanti, l, []); i < m; i++) fa(l[i]);
+  }
+
+  // Il parser segna un riquadro scritto nell'HTML prima di eseguire lo script che lo segue.
+  function osserva(w) {
+    var mo = new MO(function (rec) {
+      for (var i = 0; i < rec.length; i++) {
+        var nodi = rec[i].addedNodes;
+        for (var j = 0; j < nodi.length; j++) { try { cornici(nodi[j], tocca); } catch (e) {} }
+      }
+    });
+    R(moObserve, mo, [w.document, { __proto__: null, childList: true, subtree: true }]);
+  }
+
+  // Uno script che inserisce un riquadro lo legge per indice nella riga dopo, prima dell'osservatore: le funzioni che
+  // inseriscono lo segnano subito. I riquadri di un frammento si contano prima, dopo il frammento è vuoto.
+  function raccogli(args) {
+    var out = { __proto__: null, n: 0 };
+    for (var i = 0; i < args.length; i++) {
+      var a = args[i];
+      if (a === null || typeof a !== 'object') continue;
+      try { cornici(a, function (el) { out[out.n++] = el; }); } catch (e) {}
+    }
+    return out;
+  }
+  function conNodi(P, nome) {
+    var d = P && gOPD(P, nome), orig = d && R(proprio, d, ['value']) ? d.value : null;
+    if (typeof orig !== 'function') return;
+    P[nome] = mask(function () {
+      var c = raccogli(arguments);
+      var r = R(orig, this, arguments);
+      for (var i = 0; i < c.n; i++) { try { tocca(c[i]); } catch (e) {} }
+      return r;
+    }, orig, nome);
+  }
+  function conCornici(args) {
+    for (var i = 0; i < args.length; i++) {
+      var a = args[i];
+      if (typeof a === 'string') {
+        var s = R(lower, a, []);
+        if (R(cerca, s, ['frame']) >= 0 || R(cerca, s, ['object']) >= 0) return true;
+      } else if (a !== null && typeof a === 'object') return true;
+    }
+    return false;
+  }
+  function conTesto(P, nome, dove) {
+    var d = P && gOPD(P, nome);
+    if (!d) return;
+    var dopo = function (c, args) { if (c && conCornici(args)) { try { cornici(c, tocca); } catch (e) {} } };
+    if (R(proprio, d, ['value'])) {
+      var orig = d.value;
+      if (typeof orig !== 'function') return;
+      P[nome] = mask(function () {
+        var c = dove(this), r = R(orig, this, arguments);
+        dopo(c, arguments);
+        return r;
+      }, orig, nome);
+    } else if (d.set && d.configurable) {
+      var os = d.set;
+      defP(P, nome, {
+        __proto__: null, get: d.get, enumerable: d.enumerable, configurable: true,
+        set: mask(function () { var c = dove(this); R(os, this, arguments); dopo(c, arguments); }, os, 'set ' + nome),
+      });
+    }
+  }
+  function se(t) { return t; }
+  function suo(t) { try { return R(genitore, t, []); } catch (e) { return null; } }
+  function suoOSe(t) { return suo(t) || t; }
+  function inserimenti(w) {
+    var p = function (n) { var C = w[n]; return C && C.prototype; };
+    var N = p('Node'), E = p('Element'), F = p('DocumentFragment'), D = p('Document'), C = p('CharacterData');
+    var T = p('DocumentType'), G = p('Range'), S = p('ShadowRoot');
+    var nodi = [[N, 'appendChild'], [N, 'insertBefore'], [N, 'replaceChild'], [E, 'append'], [E, 'prepend'],
+      [E, 'replaceChildren'], [E, 'before'], [E, 'after'], [E, 'replaceWith'], [E, 'insertAdjacentElement'],
+      [F, 'append'], [F, 'prepend'], [F, 'replaceChildren'], [D, 'append'], [D, 'prepend'], [D, 'replaceChildren'],
+      [C, 'before'], [C, 'after'], [C, 'replaceWith'], [T, 'before'], [T, 'after'], [T, 'replaceWith'],
+      [G, 'insertNode'], [G, 'surroundContents']];
+    for (var i = 0; i < nodi.length; i++) { try { conNodi(nodi[i][0], nodi[i][1]); } catch (e) {} }
+    var testi = [[E, 'innerHTML', se], [S, 'innerHTML', se], [E, 'outerHTML', suo], [E, 'insertAdjacentHTML', suoOSe],
+      [E, 'setHTMLUnsafe', se], [S, 'setHTMLUnsafe', se], [D, 'write', se], [D, 'writeln', se], [D, 'execCommand', se]];
+    for (var j = 0; j < testi.length; j++) { try { conTesto(testi[j][0], testi[j][1], testi[j][2]); } catch (e) {} }
+  }
+
+  // Un riquadro della stessa origine col suo preload chiede, prima dei suoi script, questo stesso preambolo: un canvas
+  // annotato da uno si legge con le funzioni dell'altro. Il tipo dell'evento è un segreto della sessione.
+  // Con l'aggiunta della finestra stessa: quella di questa può essere già avvolta da chi gira prima della pagina.
+  function ascolta(w) {
+    if (!CANALE) return;
+    var d = gOPD(w.EventTarget.prototype, 'addEventListener'), add = d && R(proprio, d, ['value']) ? d.value : addEL;
+    R(add, w, [CANALE, function (e) {
+      try {
+        var el = R(bersaglio, e, []), g = GETTER[R(tagName, el, [])];
+        if (!g) return;
+        var cw = R(g, el, []);
+        prepara(cw, true);
+        if (R(wsHas, preparate, [cw])) R(annulla, e, []);
+      } catch (x) {}
+    }, true]);
+  }
+
+  function riquadri(w) {
+    for (var i = 0; i < CORNICI.length; i++) {
+      var C = w[CORNICI[i]], CP = C && C.prototype, d = CP && gOPD(CP, 'contentWindow');
+      if (!d || !d.get) continue;
+      avvolgi(CP, 'contentDocument', d.get);
+      avvolgi(CP, 'contentWindow', d.get);
+    }
+    try { inserimenti(w); } catch (e) {}
+    try { osserva(w); } catch (e) {}
+    try { ascolta(w); } catch (e) {}
+  }
+
+  prepara(window, true);`;
+
+// Solo nelle prove: un segno sul prototipo che le prove dei giri leggono, mai una proprietà della finestra; fuori dalle
+// prove il preambolo non ne contiene nemmeno il nome.
+const SONDA = `
+  try { defP(getProto(window), '__filoFpGuard', { __proto__: null, get: function () { return true; }, configurable: true }); } catch (e) {}`;
+
+function buildPreamboloSource({ fp, canale, sonda } = {}) {
+  const parti = [];
+  if (fp && (fp.level | 0) > 0) parti.push(parteFingerprint(fp.seed));
+  if (!parti.length) return '';
+  return `(function(){
+  'use strict';
+  // Presi prima degli script della pagina: un riquadro si prepara quando la pagina ha già riscritto ciò che voleva,
+  // e da un call o un apply riscritti uscirebbero le copie native. I descrittori senza prototipo non leggono
+  // proprietà messe dalla pagina su Object.prototype.
+  var R = Reflect.apply, defP = Object.defineProperty, gOPD = Object.getOwnPropertyDescriptor;
+  var getProto = Object.getPrototypeOf, setProto = Object.setPrototypeOf, imul = Math.imul, ceil = Math.ceil;
+  var WMP = WeakMap.prototype, wmGet = WMP.get, wmSet = WMP.set, wmHas = WMP.has;
+  var parti = [], CANALE = ${JSON.stringify(String(canale || ''))}, LIVELLO = ${(fp && fp.level) | 0}, aspetta = setTimeout;
+
+  // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
+  // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799), e
+  // prototipo del nativo che sostituisce, anche quando è di un'altra finestra.
+  var masked = new WeakMap();
+  function mask(fn, orig, name) {
+    var m = fn;
+    try {
+      m = ({ [name]() { return R(fn, this, arguments); } })[name];
+      defP(m, 'length', { __proto__: null, value: orig.length, configurable: true });
+      setProto(m, getProto(orig));
+      R(wmSet, masked, [m, 'function ' + name + '() { [native code] }']);
+    } catch (e) {}
+    return m;
+  }
+  function mascheraToString(w) {
+    var FP = w.Function.prototype, o = FP.toString;
+    FP.toString = mask(function toString() {
+      return (typeof this === 'function' && R(wmGet, masked, [this])) || R(o, this, arguments);
+    }, o, 'toString');
+  }
+${parti.join('\n')}
+${PROPAGAZIONE}${sonda ? SONDA : ''}
 })();`;
 }
 
-module.exports = { buildGuardSource };
+function buildGuardSource(seed, level, canale, sonda) {
+  return buildPreamboloSource({ fp: { seed, level }, canale, sonda });
+}
+
+module.exports = { buildGuardSource, buildPreamboloSource };
