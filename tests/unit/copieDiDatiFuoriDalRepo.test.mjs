@@ -10,6 +10,7 @@ import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspect } from 'node:util';
+import { Console } from 'node:console';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { scene, togliScene, runHookRaw, stdinEdit, git as gitScena } from '../helpers/scenaHook.mjs';
 import {
