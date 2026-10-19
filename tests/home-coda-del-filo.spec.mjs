@@ -180,6 +180,29 @@ test('un timer che scade con la home aperta fa scrivere Filo nel filo; un evento
   await casa.screenshot({ path: `${SHOTS}/home-coda-filo-parla.png` });
 });
 
+test('Filo che scrive mentre la scheda nuova legge ancora il filo compare una volta sola', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await home(app);
+  await semina(app, { chats: [{ id: 'adesso', messaggi: [{ role: 'user', text: 'ciao', ts: new Date(Date.now() - 60_000).toISOString() }] }] });
+  await modelli(app);
+  // La prima lettura della coda aspetta un cancello: il messaggio di Filo arriva alla scheda prima della coda che lo porta.
+  await app.evaluate(() => {
+    const C = globalThis.SN_CODA_FILO;
+    const vero = C.pezzo;
+    globalThis.__cancello = new Promise((r) => { globalThis.__apri = r; });
+    C.pezzo = async (o = {}) => { if (!o.prima && !o.dopo && !o.fino) await globalThis.__cancello; return vero(o); };
+  });
+  const page = await openTab('filo://newtab/');
+  await app.evaluate(() => globalThis.SN_FILO_PARLA.giro({ subito: [{ tipo: 'timer', testo: 'timer «pasta»' }] }));
+  await new Promise((r) => setTimeout(r, 500));
+  await app.evaluate(() => globalThis.__apri());
+  const spontanei = page.locator('.dash-bubble-filo[data-spontaneo="1"]');
+  await expect(spontanei).toHaveText('Il timer della pasta è suonato.');
+  await expect(page.locator('.dash-bubble-user', { hasText: 'ciao' })).toBeVisible();
+  await new Promise((r) => setTimeout(r, 500));
+  await expect(spontanei).toHaveCount(1);
+});
+
 test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta, e tolte col tasto destro spariscono dal disco', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const casa = await home(app);
