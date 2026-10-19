@@ -107,7 +107,7 @@ function buildRiquadriVuotiSource(corpi) {
       ['contentWindow', 'contentDocument'].forEach(function (p) { prima(proto(w, c), p); });
     });
     ['HTMLIFrameElement', 'HTMLObjectElement', 'HTMLEmbedElement'].forEach(function (c) { prima(proto(w, c), 'getSVGDocument'); });
-    dopo(w, 'open', function (_, r) { if (finestra(r)) applica(r); });
+    dopo(D(w, 'open') ? w : proto(w, 'Window'), 'open', function (_, r) { if (finestra(r)) applica(r); });
   }
   visti.add(document);
   for (var i = 0; i < corpi.length; i++) { try { corpi[i](window); } catch (e) {} }
