@@ -5751,8 +5751,18 @@
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
   // caricamento e a ogni giro di aggiornamento.
   // Chiave del mittente = la stessa del server: chi copia il clientId dell'owner senza prova sta in un gruppo suo.
-  function senderKeyOf(fb) {
+  function chiaveServerMittente(fb) {
     return (MR.effectiveClientId ? MR.effectiveClientId(fb) : String((fb && fb.clientId) || '')) || '__anon__';
+  }
+  // Il pannello tiene a parte anche ciò che Filo manda con la prova dell'owner, non con gli estranei dello stesso
+  // nome (#953). Il prefisso è su ogni chiave: nessun clientId scelto apposta entra in quel gruppo.
+  function senderKeyOf(fb) {
+    const perOwner = authorKindOf(fb) === 'filo' && !!(TH && TH.filoPerConto) && TH.filoPerConto(fb || {}) === 'owner';
+    return (perOwner ? 'owner|' : 'm|') + chiaveServerMittente(fb);
+  }
+  function mittenteDaChiave(key) {
+    const s = String(key || '');
+    return s.slice(s.indexOf('|') + 1);
   }
   function reindexByClient() {
     allByClient = {};
