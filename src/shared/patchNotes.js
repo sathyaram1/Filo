@@ -40,6 +40,7 @@
         'Se chiedi a Filo di bloccare un sito mentre il blocco dei siti è spento, ti avvisa che il sito si apre ancora e ti propone di riaccenderlo. Vale anche per le liste pubbliche, i controlli di rete e il giudizio AI chiesti con il loro interruttore principale spento.',
         'Fra i siti fidati per i programmi scaricati non entra più un servizio che ospita i siti di chiunque, come github.io o vercel.app. Filo ti dice perché e ti propone il sito preciso, per esempio quello da cui hai appena scaricato. Anche se ti fidi di google.com o di Discord, un programma che chiunque condivide su Google Drive o negli allegati di Discord ti viene chiesto. E un programma che arriva da un riquadro dello stesso sito non viene più detto «da una pagina con parti di altri siti».',
         'Fra i siti dove resti connesso puoi scrivere il nome che vedi o incollare l\'indirizzo dalla barra, come mail.google.com: l\'elenco mostra il sito che resta connesso, qui google.com. E se avevi aggiunto gmail.com, adesso ti tiene davvero connesso a Gmail.',
+        'Su Windows, se un programma lanciato dal terminale esce con un errore, il comando risulta fallito anche quando dopo c\'è altro che riesce, come una compilazione fallita seguita da un messaggio di fine o uno script che termina con quella compilazione. Prima risultava riuscito, sia a Filo sia nel terminale che usi tu.',
       ],
     },
     {
@@ -220,7 +221,6 @@
       ],
       fixes: [
         'Un sito dal nome comune non passa pi\u00f9 per l\'imitazione di un marchio. team.com, email.com, apply.com, telegraph.co.uk e le altre parole vicine a Steam, Gmail, Apple o Telegram aprivano il blocco a tutta pagina, quello che si toglie solo scrivendo \u00abconfermo\u00bb. Adesso trovi un avviso che chiudi con un clic. Il blocco resta sui sosia scritti con lettere che si somigliano, come paypa1 o g00gle, e su ogni sito che oltre al nome somigliante \u00e8 stato registrato da poco, ha il certificato rotto o ti chiede la password, anche se il modulo compare dopo.',
-        'Su Windows, se un programma lanciato dal terminale esce con un errore, il comando risulta fallito anche quando dopo c\'è altro che riesce, come una compilazione fallita seguita da un messaggio di fine o uno script che termina con quella compilazione. Prima risultava riuscito, sia a Filo sia nel terminale che usi tu.',
       ],
     },
     {

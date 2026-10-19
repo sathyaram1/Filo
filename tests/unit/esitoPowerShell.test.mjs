@@ -8,8 +8,9 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, rmSync, readFileSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { writeFileSync, readFileSync } from 'node:fs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -19,7 +20,7 @@ const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
 const ENV = { ...process.env, TERM: 'dumb', POWERSHELL_TELEMETRY_OPTOUT: '1' };
 const POWERSHELL = (() => {
   const nome = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
-  const r = spawnSync(nome, ['-NoProfile', '-NonInteractive', '-Command', '1'], { env: ENV, encoding: 'utf8', timeout: 60_000 });
+  const r = spawnSync(nome, ['-NoProfile', '-NonInteractive', '-Command', '1'], { env: ENV, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   return r.status === 0 ? nome : null;
 })();
 const salta = POWERSHELL ? false : 'nessuna PowerShell su questa macchina';
@@ -71,7 +72,7 @@ function comeSuWindows(fn) {
 function assistente(comando) {
   const mark = T.nuovoMarcatore();
   const inv = comeSuWindows(() => T.invocazione('powershell', comando, { trackCwd: true, mark }));
-  const r = spawnSync(POWERSHELL, inv.args, { cwd: TMP, env: ENV, input: inv.stdin, encoding: 'utf8', timeout: 60_000 });
+  const r = spawnSync(POWERSHELL, inv.args, { cwd: TMP, env: ENV, input: inv.stdin, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   return { r, sonda: T.extractCwdMark(r.stdout, mark) };
 }
 
@@ -92,7 +93,7 @@ test('terminale della dashboard: stessa regola, nella stessa sessione un comando
   const sid = 'prova718';
   const stdin = T.PREPARA_STDIN_POWERSHELL
     + CASI.map(([c]) => T.righePowerShell(c, `FILO_META_${sid}`, S.comandoPerPowerShell)).join('') + 'exit\n';
-  const r = spawnSync(POWERSHELL, ['-NoLogo', '-NoProfile', '-Command', '-'], { cwd: TMP, env: ENV, input: stdin, encoding: 'utf8', timeout: 120_000 });
+  const r = spawnSync(POWERSHELL, ['-NoLogo', '-NoProfile', '-Command', '-'], { cwd: TMP, env: ENV, input: stdin, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   const pezzi = r.stdout.replace(/\r/g, '').split(new RegExp(`FILO_META_${sid}:(-?\\d+):[^\\n]*\\n?`));
   const codici = pezzi.filter((_, i) => i % 2 === 1).map(Number);
   assert.equal(codici.length, CASI.length, `esiti arrivati: ${codici.length}. ${r.stderr.slice(0, 300)}`);
@@ -123,7 +124,7 @@ test('un errore indica la riga e il testo che l\'utente ha scritto, non quelli d
 
   const riga = `Write-Output x; ${MANCA_CORTO}`;
   const stdin = T.PREPARA_STDIN_POWERSHELL + T.righePowerShell(riga, 'FILO_META_riga718', S.comandoPerPowerShell) + 'exit\n';
-  const d = spawnSync(POWERSHELL, ['-NoLogo', '-NoProfile', '-Command', '-'], { cwd: TMP, env: ENV, input: stdin, encoding: 'utf8', timeout: 60_000 });
+  const d = spawnSync(POWERSHELL, ['-NoLogo', '-NoProfile', '-Command', '-'], { cwd: TMP, env: ENV, input: stdin, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   assert.match(d.stderr, /manca-corto\.txt/);
   const pos = rigaErrore(d.stderr);
   if (pos) assert.deepEqual(pos, { riga: 1, testo: riga }, d.stderr);
@@ -135,4 +136,4 @@ test('la shell persistente incarta i comandi con la stessa regola dell\'assisten
   assert.match(src, /function comandoPerPowerShell\(command, coda = ''\) \{\n  return invocaCodificato\(/);
 });
 
-test.after(() => rmSync(TMP, { recursive: true, force: true }));
+test.after(() => togliCartella(TMP));
