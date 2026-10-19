@@ -12,13 +12,13 @@ async function server() {
     const p = String(req.url || '').split('?')[0];
     if (p === '/p.html') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end('<!doctype html><html><body style="padding:40px"><a id="l" href="/f">scarica la fattura</a></body></html>');
+      res.end(`<!doctype html><html><body style="padding:40px"><a id="l" href="/f/${encodeURIComponent(NOME)}">scarica la fattura</a></body></html>`);
       return;
     }
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Length': EXE.length,
-      'Content-Disposition': `attachment; filename="setup.exe"; filename*=UTF-8''${encodeURIComponent(NOME)}`,
+      'Content-Disposition': 'attachment',
     });
     res.end(EXE);
   });
