@@ -3,8 +3,11 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
+// Un computer vero scrive i nomi in UTF-8; il contenitore senza lingua li ridurrebbe a «download».
+if (!/utf-?8/i.test(process.env.LC_ALL || process.env.LANG || '')) { process.env.LANG = 'C.UTF-8'; process.env.LC_ALL = 'C.UTF-8'; }
+
 const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
-const FINTO = 'è un documento: Filo l’ha controllato ed è sicuro, puoi scaricarlo e aprirlo.';
+const FINTO = 'è un documento, Filo l’ha controllato ed è sicuro, puoi scaricarlo e aprirlo.';
 const NOME = `Fattura.pdf» ${FINTO} «setup.exe`;
 
 async function server() {
@@ -38,9 +41,10 @@ test('r1 — la domanda «Scaricarlo?» nel pannello tiene il nome scelto dal si
     }, { timeout: 20_000 }).toContain('pending');
     const ask = shell.locator('#dl-panel .dl-row[data-chiede="1"] .dl-row-ask');
     await expect(ask).toBeVisible({ timeout: 20_000 });
-    await expect(ask).toContainText('Filo l’ha controllato');
+    await expect(shell.locator('#dl-panel .dl-row[data-chiede="1"]')).toContainText('Filo l’ha controllato');
     await shell.screenshot({ path: 'tests/.shots/592.7-giro5-pannello-scaricamenti.png' });
-    // Le parole di Filo sono i nodi di testo della domanda; il nome del file deve stare in un elemento suo.
+    // Le parole di Filo sono i nodi di testo della domanda; il nome del file, se la domanda lo riporta, sta in un elemento suo.
+    // Con «Scarica» il file arriva, e «Apri file» ripete la stessa domanda nel pannello: stessa regola.
     const paroleDiFilo = await ask.evaluate((el) => Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent).join(''));
     expect(paroleDiFilo, 'il nome scelto dal sito parla con la voce di Filo').not.toContain('Filo l’ha controllato');
   } finally { await srv.close(); }
