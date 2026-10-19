@@ -7362,6 +7362,9 @@
         statoIgnoto: { titolo: 'Stato cifrato: non leggibile con questa chiave', ids: fsStat.giri.statoIgnotoIds },
         senzaGiri:   { titolo: 'Passati, ma le loro verifiche sono più vecchie del registro', ids: fsStat.giri.senzaGiriIds },
         ignoti:      { titolo: 'Lavorati, ma non fra le segnalazioni caricate', ids: [], mancanti: fsStat.giri.ignotiNumeri },
+        // I due conti della riga sotto i filtri.
+        senzaData:      { titolo: 'Senza una data d\'arrivo leggibile', ids: fsStat.ricevuti.senzaDataIds || [] },
+        mittentiIgnoti: { titolo: 'Mittente non leggibile con questa chiave', ids: fsStat.ricevuti.mittentiIgnotiIds || [] },
       };
       const v = mappa[chiave];
       if (!v) return null;
