@@ -80,13 +80,27 @@ async function cerca(q, opts) {
 async function togliPagine(ids, opts) {
   const voluti = new Set((Array.isArray(ids) ? ids : []).map(String));
   if (!voluti.size) return 0;
-  const tutte0 = await F().pagine(null, opts);
-  let tolte = 0;
-  for (const p of tutte0) {
-    if (!voluti.has(String(p.id))) continue;
-    tolte += await F().cancellaPagine({ da: p.ts, a: p.ts, sito: C().sito(p.url), url: p.url }, opts);
+  const visite = (await F().pagine(null, opts)).filter((p) => voluti.has(String(p.id)));
+  return visite.length ? F().cancellaVisite(visite.map((p) => ({ ts: p.ts, sito: C().sito(p.url), url: p.url })), opts) : 0;
+}
+
+// Una scheda chiusa eliminata dalla Cronologia porta via le sue visite: lo stesso indirizzo, mentre era aperta.
+async function togliSchedeChiuse(schede, opts) {
+  const perUrl = new Map();
+  for (const s of Array.isArray(schede) ? schede : []) {
+    if (!s || typeof s.url !== 'string' || !s.url) continue;
+    const da = Date.parse(s.openedAt);
+    const a = Date.parse(s.closedAt);
+    if (!perUrl.has(s.url)) perUrl.set(s.url, []);
+    perUrl.get(s.url).push({ da: Number.isFinite(da) ? da : -Infinity, a: Number.isFinite(a) ? a : Infinity });
   }
-  return tolte;
+  if (!perUrl.size) return 0;
+  const visite = (await F().pagine(null, opts)).filter((p) => {
+    const t = Date.parse(p.ts);
+    return (perUrl.get(p.url) || []).some((r) => t >= r.da && t <= r.a);
+  });
+  if (!visite.length) return 0;
+  return F().cancellaVisite(visite.map((p) => ({ ts: p.ts, sito: C().sito(p.url), url: p.url })), opts, { schedeChiuse: false });
 }
 
 // Dalla ricerca si toglie una pagina, non una visita: tutte le sue visite e le schede chiuse con quell'indirizzo.
