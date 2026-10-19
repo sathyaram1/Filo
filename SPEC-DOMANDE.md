@@ -501,7 +501,7 @@ I compiti figli, qui sotto, non contano.
 mano dall'owner o da una sessione locale.
 
 **Da un altro compito:** i figli (§ 12.2). Un figlio è legato al compito padre,
-non al feedback: al feedback arriva attraverso il padre. Così un padre di fase
+non al feedback, e al feedback arriva attraverso il padre. Così un padre di fase
 con i suoi figli aperti resta, per l'invariante, un compito solo. I figli
 seguono il padre: quando il trigger o il pacemaker ne ricalcola l'urgenza
 o lo chiude come «superato», lo stesso vale per i figli ancora aperti.
