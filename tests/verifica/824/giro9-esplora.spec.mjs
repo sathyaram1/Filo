@@ -83,9 +83,22 @@ test('giro 8 r1: un modulo vero mandato dalla pagina con uno script e respinto d
       <form id="f" method="post" action="/invia-500"><textarea name="corpo" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>
       <script>f.addEventListener('submit', (e) => { e.preventDefault(); setTimeout(() => f.submit(), 300); });</script>`));
     const idAnti = await scriviEManda(app, shell, anti, 'Contatti');
+    const ed = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Classe</title>
+      <form id="f" method="post" action="/invia-500"><textarea name="corpo" id="nasc" style="display:none"></textarea>
+      <iframe id="ifr" style="width:420px;height:120px"></iframe><button id="pub">Invia</button></form>
+      <script>const d = ifr.contentDocument; d.open(); d.write('<body contenteditable="true" id="c" style="min-height:100px"></body>'); d.close();
+        f.addEventListener('submit', () => { nasc.value = ifr.contentDocument.body.innerHTML; });</script>`));
+    await ed.frameLocator('#ifr').locator('body').click();
+    await ed.keyboard.type(POST);
+    await expect.poll(async () => (await schede(shell)).find((t) => t.title === 'Classe')?.formDirty, { timeout: 8_000 }).toBe(true);
+    const idEd = (await schede(shell)).find((t) => t.title === 'Classe').id;
+    await ed.locator('#pub').click();
+    await expect.poll(async () => (await schede(shell)).find((t) => t.id === idEd)?.title, { timeout: 10_000 }).not.toBe('Classe');
+    await ed.waitForTimeout(800);
     const aperte = await pulisciTutto(app, shell, sito);
     expect.soft(aperte, 'collegamento «Pubblica»').toContain(idLink);
     expect.soft(aperte, 'controllo antispam').toContain(idAnti);
+    expect.soft(aperte, 'editor classico in un riquadro').toContain(idEd);
   } finally { await sito.chiudi(); }
 });
 
