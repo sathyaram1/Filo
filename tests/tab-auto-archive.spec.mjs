@@ -933,3 +933,82 @@ test('un post mandato con un modulo vero e respinto dal sito tiene aperta la sch
     expect(aperte).not.toContain(accessoSbagliato);
   } finally { await sito.chiudi(); }
 });
+
+const POST_LUNGO = 'Un post lungo scritto con calma sul consiglio di quartiere di ieri sera';
+
+// Scrive dove dice `campo`, preme `#pub` e aspetta il cambio di pagina.
+async function scriviEPubblica(shell, page, titolo, campo) {
+  await campo.click();
+  await page.keyboard.type(POST_LUNGO);
+  await expect.poll(async () => (await schedeConId(shell)).find((t) => t.title === titolo)?.formDirty, { timeout: 8_000 }).toBe(true);
+  const id = (await schedeConId(shell)).find((t) => t.title === titolo).id;
+  await page.locator('#pub').click();
+  await expect.poll(async () => (await schedeConId(shell)).find((t) => t.id === id)?.title, { timeout: 10_000 }).not.toBe(titolo);
+  await page.waitForTimeout(800);
+  return id;
+}
+
+async function archiviaTutto(app, shell, sito) {
+  await apriEsatta(app, shell, sito.pagina('<!doctype html><title>Altra</title><p>altra pagina'));
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.SN_TAB_TRIAGE_DECIDE = async ({ tabs }) => ({ decisions: tabs.map((t, i) => ({ i, action: 'archive', reason: 'pulizia' })) });
+    return win._filoTabs.runAutoTriage({ trigger: 'manual' });
+  });
+  return (await schedeConId(shell)).map((t) => t.id);
+}
+
+test('un modulo vero mandato dalla pagina senza il suo bottone e respinto dal sito tiene aperta la scheda (#824)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const link = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Forum</title>
+      <form id="f" method="post" action="/invia-500"><textarea name="corpo" id="c" style="width:400px;height:100px"></textarea></form>
+      <a href="#" id="pub" onclick="document.getElementById('f').submit();return false">Pubblica</a>`));
+    const idLink = await scriviEPubblica(shell, link, 'Forum', link.locator('#c'));
+    const anti = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Contatti</title>
+      <form id="f" method="post" action="/invia-500"><textarea name="corpo" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>
+      <script>f.addEventListener('submit', (e) => { e.preventDefault(); setTimeout(() => f.submit(), 300); });</script>`));
+    const idAnti = await scriviEPubblica(shell, anti, 'Contatti', anti.locator('#c'));
+    const ed = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Classe</title>
+      <form id="f" method="post" action="/invia-500"><textarea name="corpo" id="nasc" style="display:none"></textarea>
+      <iframe id="ifr" style="width:420px;height:120px"></iframe><button id="pub">Invia</button></form>
+      <script>const d = ifr.contentDocument; d.open(); d.write('<body contenteditable="true" style="min-height:100px"></body>'); d.close();
+        f.addEventListener('submit', () => { nasc.value = '<p>' + ifr.contentDocument.body.innerHTML + '</p>'; });</script>`));
+    const idEd = await scriviEPubblica(shell, ed, 'Classe', ed.frameLocator('#ifr').locator('body'));
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'collegamento «Pubblica»').toContain(idLink);
+    expect.soft(aperte, 'controllo antispam').toContain(idAnti);
+    expect.soft(aperte, 'editor classico in un riquadro').toContain(idEd);
+  } finally { await sito.chiudi(); }
+});
+
+test('un modulo mandato bene a un sito con l’accesso in testata e un post passato dal service worker non proteggono la scheda (#824)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const contatti = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Scrivici</title>${TESTATA_ACCESSO}
+      <form method="post" action="/contatto"><textarea name="msg" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>`));
+    const idContatti = await scriviEPubblica(shell, contatti, 'Scrivici', contatti.locator('#c'));
+
+    const social = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Social</title>
+      <div id="box"><textarea id="c" style="width:400px;height:100px"></textarea><button id="pub">Pubblica</button></div><p id="esito"></p>
+      <script>
+        window.pronto = navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready).then(() => new Promise((r) => {
+          if (navigator.serviceWorker.controller) return r(true);
+          navigator.serviceWorker.addEventListener('controllerchange', () => r(true));
+        }));
+        pub.onclick = async () => { await ${MANDA_JSON('/api/post', 'c.value')}; box.remove(); esito.textContent = 'Post pubblicato'; };
+      </script>`));
+    expect(await social.evaluate(() => window.pronto)).toBe(true);
+    await social.locator('#c').click();
+    await social.keyboard.type(POST_LUNGO);
+    await expect.poll(async () => (await schedeConId(shell)).find((t) => t.title === 'Social')?.formDirty, { timeout: 8_000 }).toBe(true);
+    const idSocial = (await schedeConId(shell)).find((t) => t.title === 'Social').id;
+    await social.locator('#pub').click();
+    await expect(social.locator('#esito')).toHaveText('Post pubblicato');
+    await expect.poll(async () => (await schedeConId(shell)).find((t) => t.id === idSocial)?.formDirty, { timeout: 8_000 }).toBe(false);
+
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'accesso in testata').not.toContain(idContatti);
+    expect.soft(aperte, 'service worker').not.toContain(idSocial);
+  } finally { await sito.chiudi(); }
+});
