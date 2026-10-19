@@ -99,6 +99,12 @@ function urlDi(wc) {
 function origineDi(wc, altro) {
   const cima = urlDi(wc);
   const c = classifica(cima || altro);
+  // La finestra vuota che il sito apre (window.open) è del sito: l'indirizzo non lo dice, l'origine del suo frame sì.
+  if (!c.filo && !c.origine && (!cima || /^about:/i.test(cima))) {
+    let ereditata = null;
+    try { ereditata = origineWeb(wc.mainFrame.origin); } catch (_) {}
+    if (ereditata) return { origine: ereditata };
+  }
   if (!c.filo || !cima) return c;
   const r = classifica(altro);
   return r.origine ? r : c;

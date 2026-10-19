@@ -20,28 +20,31 @@ function buildSchermoVecchioCorpo() {
       });
     } catch (e) { return false; }
   }
-  // Chromium rilegge i vincoli dopo di noi: un getter o un Proxy che alla seconda lettura dice desktop chiuderebbe la
-  // scheda (#1057). Si guarda e si passa una copia di soli dati, letta una volta; quello che la copia non ha, Chromium non lo vede.
-  var nomiDi = Object.getOwnPropertyNames, protoDi = Object.getPrototypeOf, defP = Object.defineProperty, isArr = Array.isArray;
+  // Chromium rilegge i vincoli: un getter o un Proxy che alla seconda lettura dice desktop chiude la scheda (#1057). Si
+  // guarda e si passa una copia di soli dati, letta una volta, con attrezzi presi prima che la pagina li possa cambiare.
+  var nomiDi = Object.getOwnPropertyNames, protoDi = Object.getPrototypeOf, defP = Object.defineProperty;
+  var crea = Object.create, isArr = Array.isArray, minimo = Math.min, numero = Number;
   var FINE = [Object.prototype, Function.prototype, Array.prototype];
+  function finale(o) { return o === FINE[0] || o === FINE[1] || o === FINE[2]; }
+  function metto(o, k, v) { defP(o, k, { value: v, enumerable: true, writable: true, configurable: true }); }
   function copia(v, prof) {
     if (v === null || (typeof v !== 'object' && typeof v !== 'function')) return v;
-    if (prof > 8) return {};
-    var out;
+    if (prof > 8) return crea(null);
+    var out, i, n;
     if (isArr(v)) {
       out = [];
-      for (var i = 0, n = Math.min(Number(v.length) || 0, 1024); i < n; i++) out.push(copia(v[i], prof + 1));
+      for (i = 0, n = minimo(numero(v.length) || 0, 1024); i < n; i++) metto(out, i, copia(v[i], prof + 1));
       return out;
     }
-    out = Object.create(null);
-    var visti = Object.create(null);
-    for (var o = v, giri = 0; o && FINE.indexOf(o) < 0 && giri < 16; o = protoDi(o), giri++) {
+    out = crea(null);
+    var visti = crea(null);
+    for (var o = v, giri = 0; o && !finale(o) && giri < 16 && (o === v || protoDi(o) !== null); o = protoDi(o), giri++) {
       var nomi = nomiDi(o);
-      for (var j = 0; j < nomi.length; j++) {
-        var k = nomi[j];
+      for (i = 0; i < nomi.length; i++) {
+        var k = nomi[i];
         if (k === 'constructor' || k === '__proto__' || visti[k]) continue;
         visti[k] = true;
-        defP(out, k, { value: copia(v[k], prof + 1), enumerable: true, writable: true, configurable: true });
+        metto(out, k, copia(v[k], prof + 1));
       }
     }
     return out;
@@ -81,8 +84,7 @@ function buildSchermoVecchioCorpo() {
       if (typeof f !== 'function') return;
       metti(N, nome, { [nome](c, ok, err) {
         if (!arguments.length) return f.apply(this, arguments);
-        var a = Array.prototype.slice.call(arguments);
-        a[0] = copia(c, 0);
+        var a = [copia(c, 0), ok, err];
         if (!vecchia(a[0])) return f.apply(this, a);
         rifiuta().catch(function (e) { if (typeof err === 'function') err(e); });
       } }[nome]);
