@@ -104,10 +104,43 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   riquadri senza indirizzo: in quelli con un indirizzo vero il content script
   c'è e traduce da sé, e leggerli anche da fuori è pagare due volte.
 
+- **Ciò che Filo mette nel mondo della pagina va in ogni sua finestra** (#798,
+  la guardia anti-fingerprint; #753, GPC, passa dallo stesso preambolo). Ogni
+  riquadro della stessa origine è un'altra finestra con le sue copie native di
+  canvas, WebGL e audio: una pagina che crea un `iframe` vuoto e ne usa le
+  funzioni legge senza la guardia. Le regole, provate negli spec:
+  il preload entra in `srcdoc`, `data:`, `blob:` e negli indirizzi veri, non in
+  `about:blank`; il riquadro vuoto lo prepara la finestra che lo contiene,
+  dall'elemento (`contentWindow`, `contentDocument`) e, per indice o per nome,
+  appena entra nel documento: dalle funzioni che inseriscono (nodi e testo
+  HTML, anche nelle ombre) nella stessa riga, dall'osservatore per ciò che
+  scrive il parser. **Un riquadro che carica un documento della stessa origine
+  non si tocca prima**: la sua finestra vuota, toccata, la riusa il documento
+  vero e il preload non gira più (niente Filo lì dentro, provato anche con la
+  protezione spenta); la pagina che la tocca da sé l'ha già creata, quindi lì
+  prepararla non costa niente. Uno che va su un'altra origine sì: avrà una
+  finestra nuova. Restano scoperti, per indice, solo `srcdoc` prima che carichi
+  e un indirizzo della stessa origine che non arriva mai (un 204) o è lento:
+  coprirli spegne Filo in quei riquadri. In Automatico restano aperti per scelta
+  dell'owner (Automatico promette nessun impatto); in Privacy massima un riquadro
+  ancora vuoto dopo qualche secondo si copre, e il contenuto che arriva dopo ha il
+  rumore ma non Filo. **Un preambolo per albero della stessa
+  origine**: il preload di un riquadro della stessa origine chiede la guardia
+  alla finestra che lo contiene con un evento sull'elemento, il cui tipo è un
+  segreto della sessione; se nessuno risponde la inietta da sé. Senza, un canvas
+  annotato da uno e letto con le funzioni dell'altro uscirebbe pulito. **Nessun
+  segno sulla finestra**: una proprietà della guardia la vede ogni sito, e dice
+  che lì c'è Filo; chi è già preparato lo sa la guardia, i test guardano il
+  rumore (`tests/helpers/guardia.mjs`). **Ciò che il preambolo usa dopo l'avvio si prende all'avvio**
+  (`Reflect.apply`, `Object.*`, descrittori senza prototipo): un riquadro si
+  prepara quando la pagina ha già riscritto quello che voleva. Quali riquadri
+  con un documento loro la ricevono lo decide il main dalla catena dei frame
+  (`configForFrames`), mai dall'indirizzo che il riquadro dichiara.
+
 Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
 diventa scorrevole invece di essere tagliato.
 
 **Dove:** `_makeView` in `src/main/tabs.js`, `src/preload/page-preload.js`,
 `IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
-`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`,
-`tests/translate-page.spec.mjs`.
+`src/main/services/handlers/nav.js`, preambolo in `src/preload/fingerprint-guard.js`. Test:
+`tests/iframe-context-menu.spec.mjs`, `tests/translate-page.spec.mjs`, `tests/fingerprint-riquadri.spec.mjs`.
