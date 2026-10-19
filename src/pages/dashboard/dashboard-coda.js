@@ -142,6 +142,7 @@
   }
   function disegnaGruppo(r, g) {
     r._gruppo = g;
+    r.querySelector('.dash-pagine-ora').textContent = ora(g.ts);
     r.querySelector('.dash-pagine-testo').textContent = testoGruppo(g);
     r.querySelector('.dash-pagine-testa').title = r.classList.contains('dash-pagine-aperte') ? 'Chiudi le pagine' : 'Mostra le pagine';
     const elenco = r.querySelector('.dash-pagine-elenco');
