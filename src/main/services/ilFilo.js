@@ -287,13 +287,33 @@ function creaFilo({ cartella } = {}) {
 
   function cancellaPagine(periodo, opts) {
     if (!periodo) return Promise.resolve(0);
+    return cancella([periodo], opts);
+  }
+
+  // Visite tolte una per una ({ ts, sito, url }), in una scrittura sola. `schedeChiuse: false` quando sono proprio le
+  // schede chiuse a portarle via (la Cronologia): le schede ancora aperte restano fuori dalla cancellazione.
+  function cancellaVisite(visite, opts, { schedeChiuse = true } = {}) {
+    const periodi = (Array.isArray(visite) ? visite : []).filter((p) => p && p.ts)
+      .map((p) => ({ da: p.ts, a: p.ts, sito: p.sito || '', url: p.url || null }));
+    return periodi.length ? cancella(periodi, opts, { schedeChiuse }) : Promise.resolve(0);
+  }
+
+  // Ogni strada che toglie pagine passa di qui, e da qui lo sanno le home aperte.
+  const pagineTolte = new Set();
+  function suPagineTolte(fn) { if (typeof fn === 'function') pagineTolte.add(fn); }
+
+  function cancella(periodi, opts, { schedeChiuse = true } = {}) {
     return transazione(async (t) => {
-      const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
-      const pagine = { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) };
-      const ev = t.evento(E().TIPI.CANCELLAZIONE, { pagine }, { autore: 'utente' });
-      const { tolti } = await t.scrivi([ev]);
-      try { await globalThis.SN_DELICATE?.dimentica(pagine); } catch (_) {}
-      try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...pagine, url: periodo.url || null }); } catch (_) {}
+      const voci = periodi.map((periodo) => {
+        const sito = periodo.sito ? E().normaSito(periodo.sito) : '';
+        return { pagine: { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) }, url: periodo.url || null };
+      });
+      const { tolti } = await t.scrivi(voci.map((v) => t.evento(E().TIPI.CANCELLAZIONE, { pagine: v.pagine }, { autore: 'utente' })));
+      for (const v of voci) {
+        try { await globalThis.SN_DELICATE?.dimentica(v.pagine); } catch (_) {}
+        if (schedeChiuse) { try { await globalThis.SN_ARCHIVED_TABS?.dimenticaPagine({ ...v.pagine, url: v.url }); } catch (_) {} }
+      }
+      for (const fn of pagineTolte) { try { fn({ incognito: t.incognito }); } catch (_) {} }
       return tolti;
     }, opts);
   }
