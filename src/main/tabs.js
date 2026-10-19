@@ -1617,6 +1617,7 @@ class TabManager {
     }
     tab._invioPagina = 0;
     tab._invioFallito = false;
+    tab._invioPwPrima = false;
   }
 
   _invioNonTenuto(tab) {
