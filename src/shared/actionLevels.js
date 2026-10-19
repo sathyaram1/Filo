@@ -36,10 +36,25 @@
     const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
     return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h === '0.0.0.0' || /^127(?:\.\d{1,3}){3}$/.test(h);
   }
+  // I client dei database e i login ai registri si collegano al server che nominano (#1312): un database senza
+  // server nominato è quello del computer, un login senza registro va al registro pubblico. Una cartella è un socket.
+  const CLIENT_DB = /\b(?:mysql|mariadb|mysqldump|psql|pg_dump|pg_dumpall|pg_restore|mongo|mongosh|mongodump|mongorestore|redis-cli|sqlcmd|cqlsh|clickhouse-client)\b/i;
+  const LOGIN_REGISTRO = /\b(?:docker|podman|buildah|helm(?:\s+registry)?|oras|skopeo)\s+login\b/i;
+  const HOST_OPZIONE = /(?:^|\s)(?:-h|--host|--hostname)(?:=|\s*)["']?([^\s"';|&]+)/g;
+  const HOST_VARIABILE = /\b(?:PGHOST|MYSQL_HOST|REDIS_HOST|MONGO_HOST|DB_HOST|DATABASE_HOST)=["']?([^\s"';|&]+)/g;
+  function serverNominati(testo) {
+    return [...testo.matchAll(HOST_OPZIONE), ...testo.matchAll(HOST_VARIABILE), ...testo.matchAll(HOST_UTENTE)].map((m) => m[1])
+      .filter((h) => h && !h.startsWith('/') && !h.startsWith('-'));
+  }
   function comandoEsce(testo) {
     if (DNS.test(testo)) return true;
     const dagliIndirizzi = [...testo.matchAll(HOST_URL)].map((m) => m[1]).filter(Boolean);
     if (dagliIndirizzi.some((h) => !questoComputer(h))) return true;
+    if (CLIENT_DB.test(testo) && serverNominati(testo).some((h) => !questoComputer(h))) return true;
+    if (LOGIN_REGISTRO.test(testo)) {
+      const registri = [...testo.matchAll(HOST_NUDO)].map((m) => m[1]);
+      return !registri.length || registri.some((h) => !questoComputer(h));
+    }
     if (!RETE.test(testo)) return false;
     const altri = [...testo.matchAll(HOST_UTENTE)].map((m) => m[1]);
     if (!dagliIndirizzi.length) altri.push(...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]));
