@@ -341,3 +341,61 @@ test('ogni strada che portava alla Cronologia porta al quaderno', async ({ app, 
     expect(menu).not.toContain('Cronologia');
   }
 });
+
+test('una correzione fatta mentre il compattatore lavora resta, anche su una lezione che lui intanto riordina', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await configura(app);
+  await turno(app, 'chat-cibo', 'sono vegetariano');
+  await expect.poll(async () => (await lezioni(app)).length, { timeout: 10_000 }).toBe(1);
+  const page = await openTab(QUADERNO);
+
+  // Il campo aperto su una lezione mentre il compattatore la porta fra le preferenze: il campo resta, e la
+  // correzione va alla riga che ne è nata.
+  const lez = riga(page, 'L’utente è vegetariano.');
+  await expect(lez).toHaveCount(1, { timeout: 8_000 });
+  await lez.locator('.qd-testo').dblclick();
+  await page.locator('.qd-campo').fill('È vegano');
+  await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_compact_memory' }));
+  await expect(page.locator('.qd-gruppo', { hasText: 'Cosa preferisci' })).toHaveCount(1, { timeout: 5_000 });
+  await expect(page.locator('.qd-campo')).toHaveValue('È vegano');
+  await page.locator('.qd-campo').press('Enter');
+  await expect(page.locator('#esito')).toContainText('Corretta');
+  expect((await memoria(app)).PREFERENZE).toBe('È vegano');
+  await expect(riga(page, 'È vegano')).toHaveCount(1, { timeout: 5_000 });
+
+  // Una correzione salvata mentre il modello scrive: il compattatore non la riscrive com'era, e riparte al giro dopo.
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.appendLesson('Ama le spezie', { fonti: ['altro-tratto'] });
+    globalThis.__q_compattatore = 'PREFERENZE:\nÈ vegano (fonti: R1)\nAma le spezie (fonti: L1)';
+    globalThis.__q_attesa = new Promise((r) => { globalThis.__q_via = r; });
+    globalThis.__q_fatto = globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_COMPACT_MEMORY }, { url: 'filo://quaderno/quaderno.html' });
+  });
+  await riga(page, 'È vegano').locator('.qd-testo').dblclick();
+  await page.locator('.qd-campo').fill('È vegano da tre anni');
+  await page.locator('.qd-campo').press('Enter');
+  await expect(riga(page, 'È vegano da tre anni')).toHaveCount(1, { timeout: 5_000 });
+  await app.evaluate(async () => { globalThis.__q_attesa = null; globalThis.__q_via(); await globalThis.__q_fatto; });
+  expect((await memoria(app)).PREFERENZE).toBe('È vegano da tre anni');
+  expect((await lezioni(app)).map((l) => l.text)).toEqual(['Ama le spezie']);
+  await page.evaluate(() => chrome.runtime.sendMessage({ type: 'filo_compact_memory' }));
+  await expect.poll(async () => (await lezioni(app)).length).toBe(0);
+});
+
+test('una riga corretta nel testo di un\'altra diventa una riga sola, e togliendola se ne va', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: '', PREFERENZE: 'Ama il tè\nAma il caffè' }));
+  const page = await openTab(QUADERNO);
+  await expect(page.locator('.qd-riga')).toHaveCount(2, { timeout: 8_000 });
+  await riga(page, 'Ama il caffè').locator('.qd-testo').dblclick();
+  await page.locator('.qd-campo').fill('Ama il tè');
+  await page.locator('.qd-campo').press('Enter');
+  await expect(page.locator('#esito')).toContainText('Corretta');
+  expect((await memoria(app)).PREFERENZE).toBe('Ama il tè');
+  await expect(page.locator('.qd-riga')).toHaveCount(1);
+  await expect(page.locator('.qd-gruppo h2 .qd-conto').first()).toHaveText('1');
+  await riga(page, 'Ama il tè').hover();
+  await riga(page, 'Ama il tè').locator('.qd-tasto[title="Togli dalla memoria"]').click();
+  await expect(page.locator('#esito')).toContainText('Tolta');
+  expect((await memoria(app)).PREFERENZE).toBe('');
+});

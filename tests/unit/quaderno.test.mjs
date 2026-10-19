@@ -183,3 +183,47 @@ test('le fonti non hanno doppioni, e oltre il tetto tengono la nascita e le ulti
   assert.equal(u[0], 'e0');
   assert.equal(u[u.length - 1], `e${Q.FONTI_MAX + 49}`);
 });
+
+test('il compattatore non scrive sopra un cambio dell’utente fatto mentre il modello lavorava, e la lezione aspetta', async () => {
+  disco();
+  await M.setMemory({ PROFILO: '', PREFERENZE: 'È vegetariano' });
+  await M.appendLesson('Ama le spezie', { fonti: ['ev-s'] });
+  const meta = await M.getFonti();
+  const buf = await M.getLessonsBuffer();
+  const { rif } = Q.perCompattatore(await M.getMemory(), meta, buf);
+  assert.equal(await M.editLine({ modulo: 'PREFERENZE', riga: 'È vegetariano' }, 'È vegano'), true);
+  const letto = Q.leggiCompattatore({ PREFERENZE: 'È vegetariano (fonti: R1)\nAma le spezie (fonti: L1)' }, { rif, meta, tolte: [] });
+  assert.equal(await M.applicaCompattazione({ patch: letto.patch, righe: letto.righe, usate: buf, versione: meta.versione || 0 }), false);
+  assert.equal((await M.getMemory()).PREFERENZE, 'È vegano');
+  assert.deepEqual((await M.getLessonsBuffer()).map((l) => l.text), ['Ama le spezie']);
+  // Senza cambi in mezzo l'uscita si applica.
+  const m2 = await M.getFonti();
+  assert.equal(await M.applicaCompattazione({ patch: { PREFERENZE: 'È vegano\nAma le spezie' }, usate: await M.getLessonsBuffer(), versione: m2.versione }), true);
+  assert.equal((await M.getMemory()).PREFERENZE, 'È vegano\nAma le spezie');
+});
+
+test('una lezione già riordinata si corregge nella riga che ne è nata, mai in una che ne ha assorbite altre', async () => {
+  disco();
+  await M.setMemory({ PROFILO: '', PREFERENZE: '' });
+  await M.appendLesson('L’utente è vegetariano.', { fonti: ['ev-u1', 'ev-f1'] });
+  const [l] = await M.getLessonsBuffer();
+  await compatta('PREFERENZE:\nÈ vegetariano (fonti: L1)');
+  assert.equal(await M.editLine({ lezione: { ts: l.ts, text: l.text } }, 'È vegano', { fonti: ['ev-u1'] }), true);
+  assert.equal((await M.getMemory()).PREFERENZE, 'È vegano');
+  disco();
+  await M.setMemory({ PROFILO: '', PREFERENZE: '' });
+  await M.appendLesson('L’utente è vegetariano.', { fonti: ['ev-u1'] });
+  const [l2] = await M.getLessonsBuffer();
+  await compatta('PREFERENZE:\nÈ vegetariano, ama le spezie e cucina curry il sabato (fonti: L1)');
+  assert.equal(await M.editLine({ lezione: { ts: l2.ts, text: l2.text } }, 'È vegano', { fonti: ['ev-u1'] }), false);
+  assert.equal(await M.editLine({ lezione: { ts: l2.ts, text: l2.text } }, 'È vegano'), false, 'senza fonti non si indovina');
+});
+
+test('due righe uguali in un modulo sono una sola, anche quando una correzione le fa coincidere', async () => {
+  disco();
+  await M.setMemory({ PROFILO: '', PREFERENZE: 'Ama il tè\nAma il caffè\nama il tè' });
+  assert.equal((await M.getMemory()).PREFERENZE, 'Ama il tè\nAma il caffè');
+  assert.equal(await M.editLine({ modulo: 'PREFERENZE', riga: 'Ama il caffè' }, 'Ama il tè'), true);
+  assert.equal((await M.getMemory()).PREFERENZE, 'Ama il tè');
+  assert.equal((await M.quaderno()).moduli.find((m) => m.nome === 'PREFERENZE').righe.length, 1);
+});

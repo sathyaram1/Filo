@@ -36,6 +36,12 @@ testo e tiene solo gli id del tratto.
   ridice la riporta. Lezioni e compattatore ricevono anche il testo delle righe tolte, per non riscriverle.
 - **Le scritture della memoria vanno in fila** (`inCodaMemoria`), e il compattatore toglie dal buffer solo le lezioni
   che ha letto: una lezione arrivata mentre il modello scriveva non si perde.
+- **Il compattatore non scrive sopra l'utente.** Ogni cambio dell'utente (correggere, togliere, rimettere, svuotare)
+  alza `versione` nelle fonti; il compattatore la legge per prima e applica la sua uscita solo se è ancora quella,
+  altrimenti tutto resta com'è e riparte al giro dopo. Un campo aperto su una riga che intanto è stata riordinata
+  resta aperto, e la correzione va alla riga nata da lei (stesse fonti, stesso senso: `erede`), mai a una che ne ha
+  assorbite altre.
+- **Due righe uguali in un modulo sono una** (`setMemory`): il quaderno riconosce le righe dal testo.
 - **Il salto**: il quaderno apre la home con `?evento=<id>`, la home chiede `FILO_DOVE` e va al messaggio
   (`SN_DASH_CODA.vaiA`). Le fonti che il filo non ha più (una chat tolta) spariscono dalla riga.
 - **Le schede chiuse di prima del filo** entrano nel filo alla loro data, legate alla loro voce d'archivio, che tiene
