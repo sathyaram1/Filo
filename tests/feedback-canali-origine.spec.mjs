@@ -81,6 +81,10 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       giroIscrizione: { type: MSG.FEEDBACK_LIVE_SUBSCRIBE },
       // L'«Annulla» del toast della segnalazione automatica: scrive `ignored` col token di chi è dentro (#784.3).
       annullaSegnalazioneAutomatica: { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-uno' },
+      // La chiave privata dei feedback (#1042): da dove arriva, la finestra che la carica, l'oblio.
+      chiaveStato: { type: MSG.FEEDBACK_CHIAVE_STATO },
+      chiaveCarica: { type: MSG.FEEDBACK_CHIAVE_CARICA },
+      chiaveDimentica: { type: MSG.FEEDBACK_CHIAVE_DIMENTICA },
       _mittente: mittente,
     });
     const esegui = async (mittente) => {
