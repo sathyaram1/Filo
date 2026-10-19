@@ -114,6 +114,8 @@ const SUFFISSI_AMMESSI = {
   'src/shared/authPopup.js': ['firebaseapp.com', 'amazoncognito.com'],
   // Il nome delle reti di casa (RFC 8375), che non ha un sito.
   'src/shared/urlNav.js': ['home.arpa'],
+  // La home di Google Drive fra i siti che il modello scrive a memoria: un host esatto da riconoscere, non un suffisso.
+  'src/shared/sitiComuni.js': ['drive.google.com'],
 };
 
 test('una sola lista di suffissi: la Public Suffix List di src/shared/stessoSito.js', () => {
