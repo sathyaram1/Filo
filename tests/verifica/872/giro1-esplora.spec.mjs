@@ -121,3 +121,25 @@ test('correggo una riga nel testo di un\'altra', async ({ app, shell, openTab })
   console.log('righe:', await page.locator('.qd-testo').allTextContents(), 'conto:', await page.locator('.qd-conto').allTextContents());
   await expect(page.locator('.qd-riga')).toHaveCount(2);
 });
+
+test('tasto destro vero su una riga e correzione di una lezione mentre il compattatore la sposta', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await configura(app);
+  await turno(app, 'chat-cibo', 'sono vegetariano');
+  await expect.poll(async () => (await lezioni(app)).length, { timeout: 10_000 }).toBe(1);
+  const page = await openTab(QUADERNO);
+  const lez = riga(page, 'L’utente è vegetariano.');
+  await expect(lez).toHaveCount(1, { timeout: 8_000 });
+  await lez.locator('.qd-testo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
+  console.log('voci menu:', await page.locator('.sn-menu').innerText());
+  await page.keyboard.press('Escape');
+  await lez.locator('.qd-testo').dblclick();
+  await page.locator('.qd-campo').fill('L’utente è vegano.');
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_COMPACT_MEMORY }, { url: 'filo://quaderno/quaderno.html' }));
+  await page.waitForTimeout(1500);
+  console.log('campo ancora aperto:', await page.locator('.qd-campo').count(), 'esito:', await page.locator('#esito').innerText().catch(() => ''));
+  console.log('memoria:', JSON.stringify(await memoria(app)), 'lezioni:', JSON.stringify((await lezioni(app)).map((l) => l.text)));
+  await page.screenshot({ path: 'tests/.shots/v872-lezione-spostata.png' });
+});
