@@ -153,6 +153,26 @@
     return { removed, remaining: d.numero() };
   }
 
+  // Le pagine tolte dal filo se ne vanno anche da qui, o la ricerca nel filo le ritroverebbe (#869): conta una scheda
+  // aperta nel periodo, sul sito detto, e con quell'indirizzo se ne è dato uno (una visita tolta da sola).
+  async function dimenticaPagine({ da = null, a = null, sito = null, url = null } = {}) {
+    if (Disco.inIncognito()) return 0;
+    const E = global.SN_FILO_EVENTI;
+    const t0 = da != null ? Date.parse(da) : -Infinity;
+    const t1 = a != null ? Date.parse(a) : Infinity;
+    const d = await apri();
+    const ids = d.tutti().filter((t) => {
+      if (!t || !t.url || (url && t.url !== url)) return false;
+      if (sito && !(E && E.delSito(t.url, sito))) return false;
+      const chiusa = Date.parse(t.closedAt);
+      const aperta = Date.parse(t.openedAt);
+      const fine = Number.isFinite(chiusa) ? chiusa : Infinity;
+      const inizio = Number.isFinite(aperta) ? aperta : (url ? -Infinity : fine);
+      return inizio <= t1 && fine >= t0;
+    }).map((t) => t.id);
+    return ids.length ? togli(d, ids) : 0;
+  }
+
   async function clear() {
     if (Disco.inIncognito()) return [];
     (await apri()).svuota();

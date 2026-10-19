@@ -97,6 +97,9 @@ test('la conversazione che una scheda nuova continua: entro un’ora, o se l’u
   assert.equal(C.chatCorrente([vecchia], { ora: ORA }), null);
   const spontanea = chat('s', [m('filo', 'Il timer è suonato.', fa(150), { spontaneo: true })]);
   assert.equal(C.chatCorrente([vecchia, spontanea], { ora: ORA }).id, 's');
+  const ieri = new Date(ORA - 86400000).toISOString();
+  const spontaneaDiIeri = chat('y', [m('filo', 'Il timer è suonato.', ieri, { spontaneo: true })]);
+  assert.equal(C.chatCorrente([spontaneaDiIeri], { ora: ORA }), null, 'il saluto di oggi non si fonde con la parola spontanea di ieri');
   const acc = chat('o', [m('user', 'mi chiamo Ada', fa(5))], { onboarding: true });
   const app = chat('e', [m('user', 'x', fa(2))], { app: 'editor', rif: 'f' });
   assert.equal(C.chatCorrente([acc, app], { ora: ORA }), null, 'l’accoglienza e le chat delle app non si continuano dalla home');
