@@ -319,6 +319,7 @@
       }
       if (inModifica === k) inModifica = null;
       riempiRiga(r);
+      disegna();
     };
     r.chiudi = chiudi;
     campo.addEventListener('input', () => { adatta(); r.errore.hidden = true; });
