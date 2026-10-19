@@ -50,6 +50,7 @@
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
     DIMENTICA: 'eraser',
+    CORREGGI_MEMORIA: 'pencil',
     CANCELLA_PAGINE: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',

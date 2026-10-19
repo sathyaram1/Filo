@@ -406,6 +406,14 @@
       },
       required: ['testo'],
     },
+    CORREGGI_MEMORIA: {
+      description: () => 'Corregge UNA riga della memoria di Filo quando l\'utente dice che è sbagliata o cambiata ("non sono vegetariano, sono vegano", "correggi: vivo a Porto, non a Lisbona"): `testo` è la riga com\'è nella memoria (basta un pezzo che la identifichi), `nuovo` la riga giusta, breve e in terza persona come le altre. La riga tiene la conversazione da cui era nata e la correzione vale dal messaggio dopo. Se serve l\'OK il sistema mostra prima e dopo e lo chiede da sé. Al massimo ' + tettoLezione() + '. Per togliere una riga c\'è DIMENTICA.',
+      properties: {
+        testo: S('La riga da correggere, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).'),
+        nuovo: S('La riga corretta, breve e in terza persona.'),
+      },
+      required: ['testo', 'nuovo'],
+    },
     IMPOSTA_PREFERENZA: {
       // L'elenco delle chiavi esce dai setter (SN_PREF.righeDescrizione): una voce nuova arriva da sola (#949).
       description: ({ sistema }) => {

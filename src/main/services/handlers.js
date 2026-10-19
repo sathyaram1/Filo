@@ -2222,6 +2222,26 @@ async function eseguiAzioneFilo(action, {
     action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
   }
 
+  // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
+  let rigaDaCorreggere = null;
+  if (type === 'CORREGGI_MEMORIA') {
+    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+    }
+    let trovate = [];
+    try {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        trovate = await FiloMem.linesWithText(visti && Array.isArray(visti.righe) ? visti.righe : []);
+      } else {
+        trovate = (await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? ''))
+          .filter((r) => r.via && typeof r.via.sempreAperta !== 'string');
+      }
+    } catch (_) {}
+    action._righe = trovate.map((r) => r.testo);
+    rigaDaCorreggere = trovate.length === 1 ? trovate[0] : null;
+  }
+
   // «Tieni sempre aperto X» (#823): il sito lo risolve il main (detto, o la scheda web davanti), così il popup e
   // l'esito dicono quello che si salva o si toglie davvero.
   if (type === 'TIENI_APERTA' || type === 'NON_TENERE_APERTA') {
@@ -3112,6 +3132,15 @@ async function eseguiAzioneFilo(action, {
           console.warn('[Filo] cancella memoria fallito', e?.message || e);
           return { executed: false, kept: false };
         }
+      }
+      case 'CORREGGI_MEMORIA': {
+        const l = global.SN_PREF.lezioneDaAzione({ testo: String(action.nuovo ?? '').replace(/\s*[\r\n]+\s*/g, ' ') });
+        if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
+        if (!rigaDaCorreggere || !l.testo) {
+          return { executed: false, kept: false, output: { corrette: 0, trovate: (action._righe || []).length } };
+        }
+        const ok = await FiloMem.editLine(rigaDaCorreggere.via, l.testo);
+        return { executed: ok, kept: false, output: ok ? { corretta: l.testo, prima: rigaDaCorreggere.testo } : { corrette: 0, trovate: 0 } };
       }
       case 'DIMENTICA': {
         if (!righeDaDimenticare.length) {
@@ -4239,6 +4268,7 @@ const CAMPI_SALVATI = {
   SVEGLIA: ['label', 'etichetta'],
   SALVA_LEZIONE: ['testo', 'text', 'lezione'],
   DIMENTICA: ['_righe'],
+  CORREGGI_MEMORIA: ['_righe', 'nuovo'],
   ANNULLA_CAMBIO: ['_fraseCambio'],
   BLUETOOTH: ['_nomeSistema'],
   WIFI: ['_nomeSistema'],
@@ -4438,6 +4468,13 @@ function toolResultText({ action, res, rendered }, giro = null) {
   });
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
     return res.output.removed.length ? `Tolte:\n${nomiSalvati(res.output.removed)}` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
+  }
+  if (type === 'CORREGGI_MEMORIA' && res.output) {
+    if (res.output.corretta) return `Corretta (vale dal prossimo messaggio; l'utente la rilegge nel quaderno delle memorie):\n${nomiSalvati([res.output.corretta])}`;
+    if (res.output.rifiuto) return `Non corretta: ${res.output.error}`;
+    return res.output.trovate > 1
+      ? 'Più righe della memoria corrispondono: non ne ho corretta nessuna. Copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.'
+      : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa SALVA_LEZIONE.';
   }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
     return res.output.dimenticate.length

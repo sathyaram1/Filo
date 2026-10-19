@@ -630,6 +630,23 @@
       },
       describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
+    CORREGGI_MEMORIA: {
+      // Cambia una riga che entra in ogni prompt, come una lezione (#872): il popup mostra prima e dopo. La riga la
+      // trova il main (`_righe`); nessuna, più d'una o una correzione che il tetto rifiuta → 1, il dispatch lo dice.
+      costo: (a) => {
+        const r = Array.isArray(a && a._righe) ? a._righe : [];
+        const l = lezione({ testo: a && a.nuovo });
+        return r.length === 1 && l.testo && !l.rifiuto ? 2 : 1;
+      },
+      campo: null,
+      describe: (a) => {
+        const r = Array.isArray(a && a._righe) ? a._righe : [];
+        const l = lezione({ testo: a && a.nuovo });
+        if (r.length !== 1 || !l.testo || l.rifiuto) return 'Correggere una cosa che Filo ricorda';
+        return `Filo vuole correggere una riga della sua memoria.\n\nPrima:\n«${r[0]}»\n\nDopo:\n«${l.testo}»\n\n${RISCHIO_LEZIONE}`;
+      },
+      describeDone: (a) => `Corretto: «${lezione({ testo: a && a.nuovo }).testo}»`,
+    },
     IMPOSTA_PREFERENZA: {
       // Costo, difesa abbassata ed elenco fisso li dichiara il setter in preferences.js. Preferenza sconosciuta,
       // valore non valido o `rifiuto` → 1: il dispatch la respinge col perché, niente OK a vuoto. Un elenco che
