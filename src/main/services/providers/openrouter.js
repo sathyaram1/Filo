@@ -507,6 +507,7 @@
       const err = new Error('OpenRouter 502: il fornitore si è fermato a metà flusso');
       err.status = 502;
       err.provider = 'openrouter';
+      if (servedBy) err.hostFallito = servedBy;
       throw err;
     }
     return {
@@ -580,11 +581,22 @@
     return utili.every((h) => h.maxOut < maxTokens) ? true : (tools ? null : false);
   }
 
+  // L'host che ha dato l'errore, quando il router lo dice (`error.metadata.provider_name`): lo contano i contatori (#969).
+  function hostDelGuasto(errText) {
+    try {
+      const j = JSON.parse(String(errText || ''));
+      const n = j && j.error && j.error.metadata && j.error.metadata.provider_name;
+      return typeof n === 'string' ? n.trim().slice(0, 60) : '';
+    } catch (_) { return ''; }
+  }
+
   async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    const host = hostDelGuasto(errText);
+    if (host) err.hostFallito = host;
     const attesa = attesaChiesta(res);
     if (attesa != null) err.retryAfterMs = attesa;
     if (res.keySource) err.keySource = res.keySource;

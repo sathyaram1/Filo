@@ -1623,6 +1623,10 @@
     // il contesto è cambiato. In entrambi i casi potremmo finire per mostrare una
     // correzione che inizialmente non era visibile.
     const refireInBackground = !cached || contextChanged;
+    // La correzione preparata mentre si scriveva, mostrata adesso: è qui che la persona usa il correttore (#969).
+    if (!refireInBackground) {
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action: ACTIONS.SPELLCHECK_WORD, attesaMs: 0 })).catch(() => {}); } catch (_) {}
+    }
 
     let updateCorrection = null;
 

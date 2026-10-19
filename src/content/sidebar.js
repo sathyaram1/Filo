@@ -1479,6 +1479,8 @@
         action: ACTIONS.HELP,
         payload,
         diceRipiego: true,
+        // Un passo che l'Aiuto fa da solo è un giro della stessa richiesta, come i giri di strumenti della chat (#969).
+        ...(userMessage ? {} : { parteDiUnUso: true }),
       });
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).

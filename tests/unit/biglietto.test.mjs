@@ -3,11 +3,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import * as B from '../../scripts/lib/biglietto-locale.mjs';
 import { leggiArgomenti } from '../../scripts/biglietto.mjs';
 import { envFiglio } from '../../scripts/orchestratore-locale.mjs';
@@ -75,7 +76,10 @@ test('la riga di comando: prendi, sporca col motivo, stato, chiudi; niente per t
   assert.deepEqual(leggiArgomenti(['sporca', 'letto', 'una', 'pagina']), { cmd: 'sporca', motivo: 'letto una pagina' });
   assert.deepEqual(leggiArgomenti(['stato']), { cmd: 'stato' });
   assert.deepEqual(leggiArgomenti(['chiudi']), { cmd: 'chiudi' });
-  for (const a of [[], ['sporca'], ['sporca', '  '], ['prendi', '--sporco'], ['prendi', '--pulito'], ['pulisci'], ['segna-fidato', 'x'], ['stato', 'x']]) {
+  assert.deepEqual(leggiArgomenti(['fine']), { cmd: 'fine' });
+  assert.deepEqual(leggiArgomenti(['scadenze']), { cmd: 'scadenze' });
+  assert.deepEqual(leggiArgomenti(['chiusura', 'sess-1']), { cmd: 'chiusura', sessione: 'sess-1' });
+  for (const a of [[], ['sporca'], ['sporca', '  '], ['prendi', '--sporco'], ['prendi', '--pulito'], ['pulisci'], ['segna-fidato', 'x'], ['stato', 'x'], ['chiusura'], ['chiusura', ' '], ['fine', 'x']]) {
     assert.ok(leggiArgomenti(a).errore, JSON.stringify(a));
   }
 });
@@ -499,5 +503,209 @@ test('chiudi: consegna prima lo sporco annotato; chiuso sul server toglie anche 
     const [d] = B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: 'd' }, cwd: dir });
     await B.chiudi({ env: { CLAUDE_CODE_SESSION_ID: 'd' }, cwd: dir, deps: server({}, { rompi: true }).deps });
     assert.equal(B.sporchiInAttesa(d).length, 1, 'aperto sul server, la copia di un figlio lo può ancora usare');
+  } finally { togliCartella(dir); }
+});
+
+// ── La fine dei biglietti (#1208): a fine sessione se sporchi, per età tutti ──
+
+const VECCHIO_MS = B.SCADENZA_MS + 24 * 60 * 60 * 1000;
+function vecchio(p) {
+  const t = new Date(Date.now() - VECCHIO_MS);
+  utimesSync(p, t, t);
+  return p;
+}
+
+test('fine della sessione: lo sporco si chiude sul server e il file sparisce; il pulito resta, e la ripresa lo ritrova pulito', async () => {
+  const dir = repo();
+  try {
+    const s = server();
+    const tr = join(dir, 'pulita.jsonl');
+    writeFileSync(tr, '{}\n');
+    const nasce = (sessione, extra = {}) => B.avvio({ input: { session_id: sessione, source: 'startup', ...extra }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    const fine = (sessione, { deps = s.deps, env = {}, haCredenziale = conCredenziale } = {}) => B.fineSessione({ input: { session_id: sessione }, env, cwd: dir, deps, haCredenziale });
+    const pulita = await nasce('pulita', { transcript_path: tr });
+    const sporca = await nasce('sporca');
+    await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'sporca' }, cwd: dir, deps: s.deps });
+    const ticketSporco = B.leggiFile(sporca.path).ticket;
+    assert.deepEqual(await fine('sporca'), { esito: 'chiuso' });
+    assert.equal(existsSync(sporca.path), false);
+    assert.equal(s.biglietti[ticketSporco].chiuso, true);
+    assert.deepEqual(await fine('pulita'), { esito: 'pulito' });
+    assert.equal(existsSync(pulita.path), true, 'una sessione pulita si può riprendere: il suo biglietto resta');
+    assert.deepEqual(s.chiamate.filter((c) => c.op === 'chiudi').map((c) => c.ticket), [ticketSporco]);
+    assert.match((await B.avvio({ input: { session_id: 'pulita', source: 'resume', transcript_path: tr }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale })).riga, /: pulito/);
+    assert.match((await B.avvio({ input: { session_id: 'sporca', source: 'resume' }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale })).riga, /: sporco/, 'da sporco non si torna');
+    // Niente biglietto, niente credenziale, una routine, un nome storto: nessuna chiamata.
+    const prima = s.chiamate.length;
+    assert.equal((await fine('mai-vista')).esito, 'senza biglietto');
+    assert.equal((await fine('pulita', { env: { FILO_ROUTINE: '1' } })).esito, 'routine');
+    assert.equal((await fine('pulita', { haCredenziale: async () => false })).esito, 'senza credenziale');
+    assert.equal((await fine('../pulita')).esito, 'senza sessione');
+    assert.equal(s.chiamate.length, prima);
+    // Server giù, o sporco annotato che non parte: resta tutto, e alla prossima occasione prima lo sporco poi la chiusura.
+    const giu = await nasce('giu');
+    const ticketGiu = B.leggiFile(giu.path).ticket;
+    await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'giu' }, cwd: dir, deps: senzaSporca(s) });
+    assert.equal((await fine('giu', { deps: senzaSporca(s) })).esito, 'resta');
+    assert.equal((await fine('giu', { deps: server({}, { rompi: true }).deps })).esito, 'resta');
+    assert.equal(existsSync(giu.path), true);
+    assert.deepEqual(await fine('giu'), { esito: 'chiuso' });
+    assert.deepEqual(s.chiamate.filter((c) => c.ticket === ticketGiu).map((c) => c.op).slice(-3), ['sporca', 'stato', 'chiudi']);
+    assert.equal(existsSync(join(B.cartellaBiglietti(dir), 'sporchi', B.leggiFile(pulita.path).fp)), false);
+  } finally { togliCartella(dir); }
+});
+
+test('fine della sessione: un biglietto che vive anche in un altro file resta aperto, e sparisce solo il file della sessione', async () => {
+  const dir = repo();
+  const altro = repo();
+  try {
+    const s = server();
+    const avvia = (sessione, env, cwd = dir) => B.avvio({ input: { session_id: sessione, source: 'startup' }, env, cwd, deps: s.deps, haCredenziale: conCredenziale });
+    const fine = (sessione, env, cwd = dir) => B.fineSessione({ input: { session_id: sessione }, env, cwd, deps: s.deps, haCredenziale: conCredenziale });
+    const chiusure = () => s.chiamate.filter((c) => c.op === 'chiudi').length;
+    const padre = await avvia('padre', {});
+    await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'padre' }, cwd: dir, deps: s.deps });
+    // Il figlio dell'orchestratore finisce per primo: il padre è ancora al lavoro.
+    const daPadre = { FILO_BIGLIETTO_FILE: padre.path };
+    await avvia('figlio', daPadre);
+    const copia = join(B.cartellaBiglietti(dir), 'figlio.json');
+    assert.equal(existsSync(copia), true);
+    assert.deepEqual(await fine('figlio', daPadre), { esito: 'file tolto' });
+    assert.deepEqual([existsSync(copia), existsSync(padre.path), chiusure()], [false, true, 0]);
+    // Il padre finisce con ancora viva un'istanza lanciata a mano da PowerShell: il biglietto lo chiude l'ultima.
+    await avvia('a-mano', { CLAUDE_CODE_SESSION_ID: 'padre' });
+    assert.deepEqual(await fine('padre', {}), { esito: 'file tolto' });
+    assert.equal(chiusure(), 0);
+    assert.deepEqual(await fine('a-mano', { CLAUDE_CODE_SESSION_ID: 'padre' }), { esito: 'chiuso' });
+    assert.equal(chiusure(), 1);
+    // Un figlio in un altro repo: la copia sta là, il padre qui, e il figlio che finisce non lo chiude.
+    const padre2 = await avvia('padre2', {});
+    await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'padre2' }, cwd: dir, deps: s.deps });
+    await avvia('figlio2', { FILO_BIGLIETTO_FILE: padre2.path }, altro);
+    assert.deepEqual(await fine('figlio2', { FILO_BIGLIETTO_FILE: padre2.path }, altro), { esito: 'file tolto' });
+    assert.deepEqual([existsSync(padre2.path), chiusure()], [true, 1]);
+  } finally {
+    togliCartella(dir);
+    togliCartella(altro);
+  }
+});
+
+test('avvio: il file porta la trascrizione della sua sessione; la ripresa ne rinnova il segno di vita; la sessione biforcata nasce sporca', async () => {
+  const dir = repo();
+  try {
+    const s = server();
+    const tr = (n) => { const p = join(dir, `${n}.jsonl`); writeFileSync(p, '{}\n'); return p; };
+    const padre = await B.avvio({ input: { session_id: 'padre', source: 'startup', transcript_path: tr('padre') }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.equal(B.leggiFile(padre.path).trascrizione, tr('padre'));
+    await B.avvio({ input: { session_id: 'figlio', source: 'startup', transcript_path: tr('figlio') }, env: { FILO_BIGLIETTO_FILE: padre.path }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.equal(B.leggiFile(join(B.cartellaBiglietti(dir), 'figlio.json')).trascrizione, tr('figlio'), 'la copia vive quanto il figlio');
+    assert.equal(B.leggiFile(padre.path).trascrizione, tr('padre'), 'il file del padre non cambia');
+    // Ferma da più della scadenza e ripresa: torna viva, anche se la trascrizione è sparita.
+    const ferma = await B.avvio({ input: { session_id: 'ferma', source: 'startup' }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    vecchio(ferma.path);
+    assert.ok(Date.now() - B.ultimaAttivita(B.leggiFile(ferma.path)) > B.SCADENZA_MS);
+    await B.avvio({ input: { session_id: 'ferma', source: 'resume', transcript_path: join(dir, 'sparita.jsonl') }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.ok(Date.now() - B.ultimaAttivita(B.leggiFile(ferma.path)) < 60000);
+    vecchio(ferma.path);
+    await B.avvio({ input: { session_id: 'ferma', source: 'resume', transcript_path: join(dir, 'sparita.jsonl') }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.ok(Date.now() - B.ultimaAttivita(B.leggiFile(ferma.path)) < 60000, 'anche con la stessa trascrizione');
+    const biforcata = await B.avvio({ input: { session_id: 'biforcata', source: 'fork' }, env: { CLAUDE_CODE_SESSION_ID: 'biforcata' }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.match(biforcata.riga, /: sporco/, 'porta la conversazione di un’altra sessione');
+  } finally { togliCartella(dir); }
+});
+
+test('scadenza: i biglietti fermi da più di 30 giorni si chiudono e i file spariscono; restano i vivi, quello della sessione e di chi l’ha lanciata', async () => {
+  const dir = repo();
+  try {
+    assert.equal(B.SCADENZA_MS, 30 * 24 * 60 * 60 * 1000);
+    const s = server({
+      [SEGRETO('v')]: { fiducia: 'non_fidato' }, [SEGRETO('w')]: { fiducia: 'fidato' }, [SEGRETO('t')]: { fiducia: 'fidato' },
+      [SEGRETO('p')]: { fiducia: 'fidato' }, [SEGRETO('c')]: { fiducia: 'fidato' }, [SEGRETO('l')]: { fiducia: 'fidato' },
+    });
+    const cartella = B.cartellaBiglietti(dir);
+    const sporca = vecchio(scriviBiglietto(dir, 'vecchia-sporca', SEGRETO('v'), FP('1')));
+    const pulita = scriviBiglietto(dir, 'vecchia-pulita', SEGRETO('w'), FP('2'));
+    const [bPulita] = B.trovaBiglietti({ env: { FILO_BIGLIETTO_FILE: pulita }, cwd: dir });
+    B.annotaSporco(bPulita, 'pagina web');
+    vecchio(pulita);
+    const tr = join(dir, 'viva.jsonl');
+    writeFileSync(tr, '{}\n');
+    const viva = join(cartella, 'trascrizione-viva.json');
+    B.scriviFile(viva, { ticket: SEGRETO('t'), fp: FP('3'), natoIl: 1, trascrizione: tr });
+    vecchio(viva);
+    const padre = scriviBiglietto(dir, 'padre', SEGRETO('p'), FP('4'));
+    const copia = vecchio(scriviBiglietto(dir, 'figlio-finito', SEGRETO('p'), FP('4')));
+    const corrente = vecchio(scriviBiglietto(dir, 'corrente', SEGRETO('c'), FP('5')));
+    const lancia = vecchio(scriviBiglietto(dir, 'chi-lancia', SEGRETO('l'), FP('6')));
+    const storto = join(cartella, 'storto.json');
+    writeFileSync(storto, '{"ticket":"corto"}');
+    vecchio(storto);
+    const stortoNuovo = join(cartella, 'storto-nuovo.json');
+    writeFileSync(stortoNuovo, '{');
+    const orfano = join(cartella, 'sporchi', FP('9'));
+    mkdirSync(orfano, { recursive: true });
+    vecchio(orfano);
+    const r = await B.chiudiScaduti({ env: { CLAUDE_CODE_SESSION_ID: 'corrente', FILO_BIGLIETTO_FILE: lancia }, cwd: dir, deps: s.deps });
+    assert.deepEqual([r.chiusi, r.errori], [2, []]);
+    assert.deepEqual(s.chiamate.filter((c) => c.op === 'chiudi').map((c) => c.ticket).sort(), [SEGRETO('v'), SEGRETO('w')]);
+    assert.deepEqual(s.chiamate.filter((c) => c.ticket === SEGRETO('w')).map((c) => c.op), ['sporca', 'chiudi'], 'lo sporco annotato parte prima della chiusura');
+    const restano = { sporca, pulita, viva, padre, copia, corrente, lancia, storto, stortoNuovo, orfano };
+    assert.deepEqual(Object.fromEntries(Object.entries(restano).map(([k, p]) => [k, existsSync(p)])), {
+      sporca: false, pulita: false, viva: true, padre: true, copia: false, corrente: true, lancia: true, storto: false, stortoNuovo: true, orfano: false,
+    });
+    assert.equal(existsSync(B.cartellaSporchi(bPulita)), false);
+    assert.ok(!s.biglietti[SEGRETO('p')].chiuso, 'la copia scaduta di un figlio non chiude il biglietto del padre vivo');
+    // Server giù: non toglie niente e si ferma al primo guasto; un biglietto che il server non conosce più se ne va.
+    const giu1 = vecchio(scriviBiglietto(dir, 'giu-1', SEGRETO('x'), FP('7')));
+    const giu2 = vecchio(scriviBiglietto(dir, 'giu-2', SEGRETO('y'), FP('8')));
+    const giu = server({}, { rompi: true });
+    const r2 = await B.chiudiScaduti({ env: {}, cwd: dir, deps: giu.deps });
+    assert.deepEqual([r2.chiusi, r2.errori.length, giu.chiamate.filter((c) => c.op === 'chiudi').length], [0, 1, 1]);
+    assert.deepEqual([existsSync(giu1), existsSync(giu2)], [true, true]);
+    await B.chiudiScaduti({ env: {}, cwd: dir, deps: server({}).deps });
+    assert.deepEqual([existsSync(giu1), existsSync(giu2)], [false, false]);
+    assert.deepEqual(await B.chiudiScaduti({ env: {}, cwd: join(dir, 'non-esiste'), deps: s.deps }), { chiusi: 0, tolti: 0, errori: [] });
+  } finally { togliCartella(dir); }
+});
+
+test('il gancio di fine: in sottofondo, solo fuori dalle routine, dal progetto anche se la cartella della sessione non c’è più', () => {
+  const lanciati = [];
+  const avvia = (argomenti, opz) => lanciati.push([argomenti, opz.cwd]);
+  assert.equal(B.avviaFine({ input: { session_id: 'sess', cwd: '/non/esiste' }, env: { CLAUDE_PROJECT_DIR: ROOT }, avvia }), true);
+  assert.equal(B.avviaFine({ input: { session_id: 'sess', cwd: ROOT }, env: { CLAUDE_PROJECT_DIR: '/non/esiste' }, avvia }), true);
+  assert.equal(B.avviaFine({ input: { session_id: 'sess' }, env: { FILO_ROUTINE: '1', CLAUDE_PROJECT_DIR: ROOT }, avvia }), false);
+  assert.equal(B.avviaFine({ input: { session_id: '../sess' }, env: { CLAUDE_PROJECT_DIR: ROOT }, avvia }), false);
+  assert.equal(B.avviaFine({ input: {}, env: { CLAUDE_PROJECT_DIR: ROOT }, avvia }), false);
+  assert.deepEqual(lanciati, [[['chiusura', 'sess'], ROOT], [['chiusura', 'sess'], ROOT]]);
+});
+
+test('il gancio di fine è cablato in SessionEnd, esce sempre 0, e i processi in sottofondo escono 0 anche col server irraggiungibile', () => {
+  const impostazioni = JSON.parse(readFileSync(join(ROOT, '.claude', 'settings.local.json'), 'utf8'));
+  const voci = (impostazioni.hooks.SessionEnd || []).flatMap((g) => g.hooks || []).filter((h) => /\.claude\/hooks\/session-end\.sh/.test(h.command));
+  assert.equal(voci.length, 1);
+  // Senza un suo tempo, Claude Code dà al gancio di fine un secondo e mezzo: bash e node su Windows ci stanno stretti.
+  assert.ok(voci[0].timeout >= 5, 'il gancio di fine ha un suo tempo');
+  const src = readFileSync(join(ROOT, '.claude', 'hooks', 'session-end.sh'), 'utf8');
+  assert.doesNotMatch(src, /\r\n/, 'fine riga LF');
+  assert.match(src, /\[ -n "\$FILO_ROUTINE" \] && exit 0/);
+  assert.match(src, /node "\$SCRIPT" fine/);
+  assert.match(src, /exit 0\s*$/);
+  assert.doesNotMatch(src, /exit [1-9]/);
+  const base = { ...process.env };
+  for (const k of ['FILO_ROUTINE', 'CLAUDE_CODE_SESSION_ID', 'FILO_BIGLIETTO_FILE']) delete base[k];
+  // La prova vieta a chiama() il server vero; l'indirizzo finto è per chi la lancia senza.
+  const env = { ...base, NODE_TEST_CONTEXT: 'child', FILO_FUNCTIONS_BASE: 'http://127.0.0.1:9' };
+  const gancio = spawnSync('bash', [join(ROOT, '.claude', 'hooks', 'session-end.sh')], {
+    input: JSON.stringify({ session_id: '../non-valida', cwd: ROOT, reason: 'prompt_input_exit' }), env: { ...env, CLAUDE_PROJECT_DIR: ROOT }, encoding: 'utf8', timeout: TETTO_ATTESA_MS,
+  });
+  assert.equal(gancio.status, 0, gancio.stderr);
+  const dir = repo();
+  try {
+    const p = vecchio(scriviBiglietto(dir, 'sess', SEGRETO('s'), FP('1')));
+    for (const argomenti of [['chiusura', 'sess'], ['scadenze']]) {
+      const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'biglietto.mjs'), ...argomenti], { cwd: dir, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+      assert.equal(r.status, 0, `${argomenti[0]}: ${r.stderr}`);
+      assert.equal(existsSync(p), true, `${argomenti[0]}: senza server il biglietto resta`);
+    }
   } finally { togliCartella(dir); }
 });

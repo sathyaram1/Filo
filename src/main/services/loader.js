@@ -39,6 +39,7 @@ require(path.join(SHARED, 'modelCaps.js'));
 // dell'elenco di funzioni impostabili, quindi va caricato PRIMA dell'editor
 // delle catene (che da lì prende l'elenco).
 require(path.join(SHARED, 'modelUsage.js'));
+require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori giornalieri: elenchi chiusi e forma del documento
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
 // Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM
@@ -101,6 +102,7 @@ require(path.join(SHARED, 'creditiAvviso.js')); // #818 — proiezione dei credi
 require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
+require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'owner sui crediti: stesse regole in pagina e nel main
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.

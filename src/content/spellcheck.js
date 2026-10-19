@@ -1406,7 +1406,8 @@
         type: MSG.AI_REQUEST,
         action: ACTIONS.SPELLCHECK_WORD,
         payload: { word, sentence, prev, next },
-        ...(suRichiesta ? { suRichiesta: true } : {}),
+        // Senza il tasto destro è un anticipo: l'uso lo conta il menu che mostra la correzione già pronta (#969).
+        ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
       });
       if (!res?.ok) {
         console.error('[SN] word check — provider error:', res?.code, res?.error);

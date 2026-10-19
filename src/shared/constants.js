@@ -2889,6 +2889,9 @@
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
+    // #969 — i contatori giornalieri anonimi (decisione dell'owner D52: accesi di serie). Spenti, non si conta niente
+    // e non parte niente: src/main/services/contatori.js.
+    contatori: { attivi: true },
     // #842 — i tasti di Spiega, Traduci, Salva per dopo e Aiuto scelti dall'utente, per id dell'azione; '' o assente
     // vale il tasto di serie (SN_TASTI.AZIONI_FILO).
     scorciatoie: {},

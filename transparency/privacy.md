@@ -8,11 +8,11 @@ order: 2
 
 Filo legge molto: le pagine che visiti, quello che scrivi, le tue memorie, i file che gli chiedi di aprire, quello che stampa il terminale. Un programma così deve dire con precisione dove va a finire tutto questo. Questo documento lo fa, per intero, e descrive Filo com'è oggi: dove la realtà è peggio di come la vorrei, lo trovi scritto in fondo, fra i punti deboli. Se qui manca qualcosa che Filo fa, è un errore del documento, e puoi segnalarlo come qualunque altro difetto.
 
-**In breve.** Quasi tutto resta sul tuo computer. Esce quello che serve a un modello per rispondere, quello che scegli di mandare tu (i feedback, cifrati) e i dati di servizio dei crediti, che non contengono testi. Se fai il login con Google, al server arrivano anche la tua email, il tuo nome e quanto usi ogni funzione. Quando usi l'Aiuto, il server riceve il nome del sito su cui sei. Alcuni servizi esterni ricevono pezzi della tua navigazione: il più noto è Google Safe Browsing, che riceve un frammento dell'impronta degli indirizzi che apri, non gli indirizzi. Non uso servizi di analisi o di pubblicità. Il resto del documento è il dettaglio.
+**In breve.** Quasi tutto resta sul tuo computer. Esce quello che serve a un modello per rispondere, quello che scegli di mandare tu (i feedback, cifrati), i dati di servizio dei crediti, che non contengono testi, e una volta al giorno dei contatori fatti solo di numeri, con uno pseudonimo che cambia ogni mese. I contatori si spengono dalle Preferenze. Se fai il login con Google, al server arrivano anche la tua email, il tuo nome e quanto usi ogni funzione. Quando usi l'Aiuto, il server riceve il nome del sito su cui sei. Alcuni servizi esterni ricevono pezzi della tua navigazione: il più noto è Google Safe Browsing, che riceve un frammento dell'impronta degli indirizzi che apri, non gli indirizzi. Non uso servizi di analisi o di pubblicità. Il resto del documento è il dettaglio.
 
 ## Due regole
 
-La prima: **per capire cosa non funziona non guardo quello che fai, leggo quello che mi scrivi.** Al server di Filo arriva quello che decidi di mandare tu, cioè i feedback (più le segnalazioni generiche che Filo manda da solo, descritte sotto), e quello che serve ai servizi che usi, cioè i crediti e il red team. Le tue chat e i tuoi file non ci arrivano, e della tua navigazione solo il nome del sito su cui apri l'Aiuto, descritto sotto.
+La prima: **per capire cosa non funziona non guardo quello che fai, leggo quello che mi scrivi; per misurare quanto spesso succede mi bastano dei conteggi.** Al server di Filo arriva quello che decidi di mandare tu, cioè i feedback (più le segnalazioni generiche che Filo manda da solo, descritte sotto), quello che serve ai servizi che usi, cioè i crediti e il red team, e una volta al giorno dei contatori senza contenuto, che puoi spegnere. Le tue chat e i tuoi file non ci arrivano, e della tua navigazione solo il nome del sito su cui apri l'Aiuto, descritto sotto.
 
 La seconda: **se qualcosa può stare sul tuo computer, sta sul tuo computer.** Le conversazioni, le memorie, gli appunti, le pagine salvate non hanno una copia da nessun'altra parte. Se cambi computer, te li porti con l'esportazione.
 
@@ -69,7 +69,7 @@ A ogni risposta Filo registra chi l'ha servita davvero, e lo vedi nella Cronolog
 
 ## Il server di Filo
 
-Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Per chi usa l'app fa cinque cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback, gestisce i crediti, ospita il red team e conserva i percorsi dell'Aiuto, cioè i passi che hanno funzionato su un sito.
+Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Per chi usa l'app fa cinque cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback e i contatori, gestisce i crediti, ospita il red team e conserva i percorsi dell'Aiuto, cioè i passi che hanno funzionato su un sito.
 
 All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; il primo giorno chiede anche se c'è un invito che lo aspetta. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
 
@@ -107,7 +107,13 @@ Per i crediti non serve il login: l'identità è quella dell'installazione, un a
 
 ## Contatori e percorsi
 
-Senza login Filo non manda al server contatori d'uso: quante volte usi una funzione, quanto aspetti una risposta, cosa rispondi alle conferme non escono dal tuo computer. Con il login Google escono i totali per funzione del documento descritto fra i crediti, legati alla tua email; i tempi di attesa e le risposte alle conferme no. La raccolta che vorrei fare è un'altra: numeri senza contenuto e uno pseudonimo diverso da quello dei crediti, che cambia ogni mese: servirebbe a distinguere un utente che rifiuta tutto quello che Filo propone da cento utenti che rifiutano ogni tanto. Prima che parta, questo documento cambierà.
+**I contatori.** Una volta al giorno, al primo avvio, Filo manda al server i numeri del giorno prima, e solo numeri. Per ogni funzione che usa un modello: quante volte l'hai usata e quanto hai aspettato la prima risposta, in fasce (entro mezzo secondo, entro un secondo, entro due, e così via). Quante chiamate ai modelli sono fallite, per funzione, modello e host che le ha servite, con il tipo di guasto preso da un elenco fisso: rete, tempo scaduto, crediti finiti, chiave rifiutata, nessun host ammesso, errore del fornitore. La versione di Filo e la famiglia del sistema operativo (Windows, Mac o Linux). Un giorno in cui hai aperto Filo senza usare nessuna funzione parte lo stesso, vuoto: serve a sapere quante copie di Filo sono in uso. Testi, indirizzi, titoli e nomi di file non ci sono.
+
+Il documento di un giorno porta uno pseudonimo. È un codice casuale che Filo genera da solo, diverso dal codice dei feedback e dallo pseudonimo dei crediti, e cambia ogni mese. Serve a distinguere il problema di una persona sola da un problema di tutti. Lo chiamo pseudonimo e non anonimo perché dentro un mese i giorni della stessa copia di Filo stanno insieme. In incognito non si conta niente. Un giorno che non riesce a partire si riprova il giorno dopo; se Filo resta chiuso per qualche giorno, quelli rimasti partono al primo avvio. I contatori li legge solo chi amministra il server.
+
+**Si spengono** in Preferenze, fra le impostazioni avanzate («Manda i contatori anonimi»), o chiedendolo a Filo («spegni i contatori»). Da spenti non si conta niente e non parte niente, e quello che non era ancora partito si butta.
+
+Con il login Google, poi, escono i totali per funzione del documento descritto fra i crediti, legati alla tua email. Quelli non sono i contatori, e non si spengono con loro. Cosa rispondi alle conferme di Filo non esce dal tuo computer.
 
 Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i passi di una guida riuscita su un sito, perché chi lo visita dopo ne approfitti, ma la raccolta è spenta. I tuoi percorsi non escono dal tuo computer, e Filo non te lo chiede nemmeno.
 
@@ -145,7 +151,7 @@ Detto in negativo, perché in negativo si controlla meglio. Sul mio server non a
 - gli indirizzi delle pagine che visiti e i titoli delle schede, salvo quelli che metti in un feedback e il nome del sito su cui apri l'Aiuto;
 - il contenuto delle pagine, delle chat, delle memorie, degli appunti;
 - screenshot, salvo quelli che alleghi a un feedback;
-- dati sul dispositivo oltre a browser e sistema operativo, che arrivano solo dentro un feedback;
+- dati sul dispositivo oltre a browser e sistema operativo, che arrivano dentro un feedback; coi contatori arriva solo la famiglia del sistema;
 - niente da servizi di analisi o di pubblicità: Filo ne blocca, non ne usa.
 
 Il tuo indirizzo IP il server lo vede passare, come ogni server, e il mio codice non lo conserva, salvo l'impronta degli inviti descritta sopra. I registri tecnici di Google Cloud, su cui il server gira, annotano le richieste e con loro l'indirizzo, per un tempo limitato. Se un giorno servisse conservarlo per fermare abusi, verrebbe conservato per un tempo dichiarato qui, e questo documento cambierebbe prima del codice.
@@ -162,7 +168,7 @@ Sono due cose diverse. La politica sui modelli riguarda chi finanzio con l'infer
 
 ## Conservazione
 
-Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'impronta degli inviti aperti dal sito, che sparisce entro due giorni. I feedback, l'elenco dei mittenti del filtro all'ingresso, i documenti dei crediti (compreso quello dei consumi, con email e nome), il registro d'uso e il red team restano finché esiste il servizio. Non lo nascondo dietro parole come «per il tempo necessario»: è per sempre, a meno che tu non chieda. Se chiedi, cancello a mano quello che è tuo: i feedback che hai mandato con la tua voce nell'elenco dei mittenti, i tuoi documenti dei crediti con il loro registro, il tuo account del red team.
+Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'impronta degli inviti aperti dal sito, che sparisce entro due giorni. I feedback, l'elenco dei mittenti del filtro all'ingresso, i documenti dei crediti (compreso quello dei consumi, con email e nome), il registro d'uso, i contatori e il red team restano finché esiste il servizio. Non lo nascondo dietro parole come «per il tempo necessario»: è per sempre, a meno che tu non chieda. Se chiedi, cancello a mano quello che è tuo: i feedback che hai mandato con la tua voce nell'elenco dei mittenti, i tuoi documenti dei crediti con il loro registro, il tuo account del red team. I contatori invece non posso cancellarli per persona, perché non so quali sono tuoi. È la conseguenza dello pseudonimo che cambia, ed è voluta.
 
 ## I punti deboli
 
@@ -177,7 +183,8 @@ Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'im
 9. **Con il login Google, email e nome finiscono accanto ai tuoi consumi.** Il documento del vecchio conteggio dei crediti tiene insieme chi sei, quanto usi ogni funzione e quali tue segnalazioni sono state premiate. Togliere email e nome da quel documento è una correzione già decisa, non ancora fatta. Fino ad allora l'unico modo di evitarlo è non fare il login.
 10. **Il codice del server non è pubblico.** Il codice dell'app è aperto e quello che dico di lei lo puoi controllare. Il server contiene anche le difese contro gli attacchi e per ora resta chiuso: quello che dico del server va preso sulla parola.
 11. **I file sul tuo computer sono in chiaro.** Chi ha accesso al tuo computer legge le tue conversazioni con Filo come legge i tuoi documenti. La cifratura del disco è compito del sistema operativo, non di Filo.
-12. **Una pagina in http basta a far partire i controlli sul sito.** Senza cifratura una pagina conta già come sospetta. Il nome del sito va a rdap.org e crt.sh, anche in incognito. Fuori dall'incognito va anche a un modello, con l'età del dominio, e consuma crediti. Filo però non riapre la pagina. La finestra nascosta non torna mai su una pagina che hai già aperto e in incognito non parte. È pensata per provare un link prima che tu lo apra, e oggi nessuna funzione di Filo la usa.
+12. **Lo pseudonimo dei contatori non è anonimato.** Dentro un mese i giorni della stessa copia di Filo si mettono in fila. Con pochi utenti, chi sa in quali giorni hai usato Filo potrebbe riconoscerti. È il prezzo di poter distinguere il problema di uno dal problema di tutti; chi non lo vuole spegne i contatori.
+13. **Una pagina in http basta a far partire i controlli sul sito.** Senza cifratura una pagina conta già come sospetta. Il nome del sito va a rdap.org e crt.sh, anche in incognito. Fuori dall'incognito va anche a un modello, con l'età del dominio, e consuma crediti. Filo però non riapre la pagina. La finestra nascosta non torna mai su una pagina che hai già aperto e in incognito non parte. È pensata per provare un link prima che tu lo apra, e oggi nessuna funzione di Filo la usa.
 
 ## Se stai forkando Filo
 
