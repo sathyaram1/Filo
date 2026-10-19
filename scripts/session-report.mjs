@@ -101,11 +101,11 @@ export function scrittureCache(u) {
 }
 
 /** Il moltiplicatore della modalità veloce per le versioni che il listino conosce; le altre: `VELOCE_RIPIEGO`, con la nota. */
-const VELOCE = Object.freeze({ opus: Object.freeze({ '5-5': 2, 5: 2, '4-8': 2 }) });
-const VELOCE_RIPIEGO = 2;
+export const VELOCE = Object.freeze({ opus: Object.freeze({ '5-5': 2, 5: 2, '4-8': 2 }) });
+export const VELOCE_RIPIEGO = 2;
 
 /**
- * La versione del listino (PREZZI e VERSIONI), scritta in ogni rapporto: chi confronta costi di prima e di dopo
+ * La versione del listino (PREZZI, VERSIONI, VELOCE), scritta in ogni rapporto: chi confronta costi di prima e di dopo
  * un cambio di prezzi vede dove sta il salto (#882). I rapporti senza il campo non si ricalcolano: fino al 02/10/2026
  * contavano Opus 5.5 al listino di Opus 5. Si cambia insieme ai prezzi: sentinella in sessionReport.test.
  */
