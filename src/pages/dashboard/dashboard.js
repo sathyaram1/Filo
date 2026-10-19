@@ -383,16 +383,13 @@
 
   // La coda del filo all'apertura: la conversazione che una scheda nuova continua la riprende anche lo storico, così il
   // turno dopo è nella stessa chat (#869).
-  let caricandoFilo = null;
-  function caricaFilo() {
-    const p = (async () => {
-      const corrente = await Coda.carica();
-      if (corrente && !chatId && !Accoglienza.isActive()) await adotta(corrente).catch(() => false);
-      return corrente;
-    })();
-    const fatto = p.then(() => {}, () => {}).then(() => { if (caricandoFilo === fatto) caricandoFilo = null; });
-    caricandoFilo = fatto;
-    return p;
+  async function caricaFilo() {
+    const corrente = await Coda.carica();
+    // Una conversazione presa solo dall'annuncio di Filo (arrivato prima della coda) si adotta lo stesso: lo storico che
+    // il turno dopo manda deve avere anche i messaggi di prima.
+    const soloAnnunci = chatId === corrente && threadHistory.every((m) => m.spontaneo);
+    if (corrente && (!chatId || soloAnnunci) && !Accoglienza.isActive()) await adotta(corrente).catch(() => false);
+    return corrente;
   }
 
   // #525 — riapertura di una chat archiviata (Cronologia, un link con ?chat=<id>, una carta della home): il filo va a
@@ -1733,14 +1730,13 @@
 
   // Filo ha scritto di sua iniziativa (#869): il suo turno in fondo al filo, o al posto del suo messaggio di prima.
   function filoParla(msg) {
-    // Annunciato mentre la coda e la conversazione si leggono: prima la lettura, che può già portarlo.
-    if (caricandoFilo) { caricandoFilo.then(() => filoParla(msg)); return; }
     if (Accoglienza.isActive()) return;
     const voce = { k: 'msg', key: `m:${msg.chat}:${msg.i}`, chat: msg.chat, role: 'filo', text: String(msg.testo || ''), ts: msg.ts, spontaneo: true };
     Coda.metti(voce);
     if (!chatId && !sending) chatId = msg.chat;
     if (msg.chat !== chatId) return;
     const ultimo = threadHistory[threadHistory.length - 1];
+    // La conversazione adottata dal disco lo porta già, se l'ha letta dopo che il main l'ha scritto.
     if (ultimo && ultimo.role === 'filo' && ultimo.text === voce.text) return;
     if (msg.fuso && ultimo && ultimo.spontaneo) ultimo.text = voce.text;
     else threadHistory.push({ role: 'filo', text: voce.text, actions: [], spontaneo: true });

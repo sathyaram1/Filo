@@ -269,15 +269,7 @@
 
   // ── I pezzi ───────────────────────────────────────────────────────────────
 
-  // Un messaggio annunciato mentre la coda si legge aspetta la coda: se lei lo porta già, non si disegna due volte.
-  let leggendo = null;
-  function carica() {
-    const p = caricaOra();
-    const fatto = p.then(() => {}, () => {}).then(() => { if (leggendo === fatto) leggendo = null; });
-    leggendo = fatto;
-    return p;
-  }
-  async function caricaOra() {
+  async function carica() {
     primo = null;
     finito = false;
     const res = await d.send({ type: MSG.FILO_CODA });
@@ -285,7 +277,11 @@
     // A filo vuoto quello che arriva dopo è tutto: si parte dall'inizio dei tempi.
     ultimo = res.ultimo || new Date(0).toISOString();
     const lista = Array.isArray(res.elementi) ? res.elementi : [];
-    d.bubblesEl.insertBefore(frammento(lista), d.bubblesEl.firstChild);
+    // Un messaggio di Filo annunciato prima che la coda arrivasse è già posato: la coda non lo rimette, lo sposta al suo ora.
+    const gia = [];
+    const nuove = lista.filter((v) => { const c = conChiave(v.key); if (c) gia.push(c); return !c; });
+    d.bubblesEl.insertBefore(frammento(nuove), d.bubblesEl.firstChild);
+    for (const n of gia) posa(n);
     if (lista.length) primo = lista[0].ts;
     finito = !!res.inizio;
     bottoneRisali();
@@ -372,7 +368,6 @@
   // Una riga sola al suo posto: un messaggio di Filo scritto di sua iniziativa, quello che è arrivato da altrove.
   function metti(v, { scorri = true } = {}) {
     if (!d) return;
-    if (leggendo) { leggendo.then(() => metti(v, { scorri }), () => metti(v, { scorri })); return; }
     const c = conChiave(v.key);
     if (c) { aggiorna(c, v); return; }
     const giu = inFondo();
