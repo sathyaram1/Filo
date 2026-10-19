@@ -6651,7 +6651,7 @@
   // scheda non seguiva quel giro, chi la lasciava aperta guardava i numeri di
   // quando l'aveva aperta: proprio mentre le routine lavorano, che è quando li
   // si guarda. I documenti freschi li ha già letti il giro della pagina, quindi
-  // qui non si ricarica niente dalla rete: si applicano.
+  // si applicano; dalla rete si legge solo una segnalazione nuova, intera.
   async function fsSegueLive(fresh, removed) {
     if (!fsCaricato || !Array.isArray(fsFeedbacks)) return;
     const via = new Set(Array.isArray(removed) ? removed : []);
