@@ -182,8 +182,9 @@ test('il prompt del messaggio dice perché Filo scrive, e quando sostituisce il 
   assert.match(P.filoDashboard({}), /message resta vuoto/);
 });
 
-// Misurato a meno di un'unità (2.000 chat e 20.000 pagine); il tetto lascia largo margine.
-const TETTO = 4;
+// Misurato a 2,5 unità da solo (2.000 chat e 20.000 pagine), quasi 5 con la suite unit in parallelo: alloca molto, e il
+// riferimento no. Un costo quadratico costerebbe centinaia di volte tanto: il tetto prende quello, non il carico.
+const TETTO = 12;
 test('con migliaia di eventi le righe e il pezzo da mostrare si fanno senza attesa', () => {
   const chats = [];
   for (let i = 0; i < 2000; i++) {
