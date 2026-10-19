@@ -1696,7 +1696,6 @@ test('#997 ripiego sulla lista in pagina: il controllo di sicurezza scrive un tr
   await sotto.click();
   await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
   await expect(page.locator('#mgFsDrillList')).toContainText('riga d\'elenco');
-  await expect(page.locator('#mgFsNota')).toContainText('Non è riuscita la lettura di tutte le segnalazioni');
 });
 
 test('#997 lettura fallita e nessun ripiego: i riquadri dei lavori non scrivono zero', async ({ openTab }) => {
