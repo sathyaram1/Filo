@@ -122,6 +122,14 @@ function candidate(testo) {
   return [...new Set(out)];
 }
 
+// Su Windows `>` di PowerShell 5.1 e il Blocco note in «Unicode» scrivono UTF-16: letto come UTF-8, la chiave
+// sparirebbe fra i NUL.
+function comeTesto(buf) {
+  if (buf[0] === 0xFF && buf[1] === 0xFE) return buf.subarray(2).toString('utf16le');
+  if (buf[0] === 0xFE && buf[1] === 0xFF) return Buffer.from(buf.subarray(2)).swap16().toString('utf16le');
+  return buf.toString('utf8').replace(/^﻿/, '');
+}
+
 async function apreIFeedback(chiave) {
   const C = globalThis.SN_FEEDBACK_CRYPTO;
   if (!C || !C.hasPublicKey()) return false;
