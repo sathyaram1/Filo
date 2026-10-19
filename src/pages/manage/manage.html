@@ -31,6 +31,7 @@
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/domande.js"></script>
   <script src="filo://shared/manageReview.js"></script>
+  <script src="filo://shared/avvisoChiaveFeedback.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
        normalizzato, e se mancano si ferma dicendolo. -->
@@ -2189,6 +2190,20 @@
                   <span class="mg-action-msg" id="mgRoleModelsMsg" role="status"></span>
                 </p>
                 <div class="mg-role-models" id="mgRoleModels" role="group" aria-labelledby="mgRoleModelsLabel"></div>
+              </section>
+
+              <!-- La chiave privata dei feedback su questo computer (#1042): il main la custodisce cifrata, qui arriva solo
+                 da dove viene. Dimenticarla toglie la copia di Filo, non il file da cui è stata caricata. -->
+              <section class="mg-auto-block" id="mgChiaveBlock">
+                <span class="mg-auto-field-label">Chiave dei feedback</span>
+                <p class="mg-auto-block-desc" id="mgChiaveStato"></p>
+                <div class="mg-auto-field-row">
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgChiaveCarica" hidden
+                    title="Scegli il file con la chiave privata dei feedback: Filo la custodisce cifrata su questo computer">Carica…</button>
+                  <button type="button" class="sn-btn sn-btn-secondary" id="mgChiaveDimentica" hidden
+                    title="Toglie la chiave da questo computer. Il file da cui l’hai caricata resta dov’è.">Dimentica</button>
+                  <span class="mg-action-msg" id="mgChiaveMsg" role="status"></span>
+                </div>
               </section>
             </div>
             <div class="mg-auto-col">

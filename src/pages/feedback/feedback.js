@@ -56,6 +56,14 @@
   // e ogni scrittura passa comunque dal main process che rifiuta i non-admin.
   let isAdmin = false;
 
+  // L'avviso al posto delle sezioni, con l'azione che carica la chiave (#1042): parole e azione sono le stesse
+  // della Gestione. Con la chiave cambiata si rilegge da capo, e le risposte sugli allegati si buttano.
+  const avvisoChiave = window.SN_AVVISO_CHIAVE.monta(noSectionsEl, {
+    invia: sendToMain,
+    admin: () => isAdmin,
+    onCambiata: () => { fbImgCache.clear(); fbFileWhyCache.clear(); return load(); },
+  });
+
   // Chi guarda cambia: l'unica porta per dirlo, e l'unico posto dove si buttano
   // via le risposte tenute da parte.
   //
@@ -1799,10 +1807,7 @@
     if (tabsEl) tabsEl.hidden = !ok;
     if (noSectionsEl) {
       noSectionsEl.hidden = ok;
-      if (!ok) {
-        noSectionsEl.textContent = 'Questo computer non può leggere lo stato delle segnalazioni. '
-          + 'Le trovi tutte qui sotto, in un elenco solo.';
-      }
+      if (!ok) avvisoChiave.aggiorna();
     }
     return ok;
   }
