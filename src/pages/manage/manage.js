@@ -1316,6 +1316,86 @@
     mgJudgeTimeoutMsg.classList.toggle('mg-ok', kind === 'ok');
     mgJudgeTimeoutMsg.classList.toggle('mg-err', kind === 'err');
   }
+  // ── Chiave dei feedback (#1042) ─────────────────────────────────────────────
+  // Da dove arriva la chiave su questo computer, e i due gesti per cambiarla. La chiave non arriva mai qui.
+  const mgChiaveStato = document.getElementById('mgChiaveStato');
+  const mgChiaveCarica = document.getElementById('mgChiaveCarica');
+  const mgChiaveDimentica = document.getElementById('mgChiaveDimentica');
+  const mgChiaveMsg = document.getElementById('mgChiaveMsg');
+  const CHIAVE_FONTE = {
+    custodita: 'Custodita su questo computer, cifrata col portachiavi del sistema.',
+    ambiente: 'Arriva dalla variabile FILO_FEEDBACK_PRIVKEY con cui è partito Filo, che vince sulle altre.',
+    sviluppo: 'Arriva dal file di sviluppo del repo (tests/agent/.env).',
+    '': 'Non caricata: lo stato delle segnalazioni non si legge.',
+  };
+  function setChiaveMsg(text, kind) {
+    if (!mgChiaveMsg) return;
+    mgChiaveMsg.textContent = text || '';
+    mgChiaveMsg.classList.toggle('mg-ok', kind === 'ok');
+    mgChiaveMsg.classList.toggle('mg-err', kind === 'err');
+  }
+  function disegnaChiave(s) {
+    if (!mgChiaveStato) return;
+    if (!s || s.ok === false) {
+      mgChiaveStato.textContent = (s && s.error) || 'Filo non ha risposto: riapri la scheda per riprovare.';
+      mgChiaveCarica.hidden = true;
+      mgChiaveDimentica.hidden = true;
+      return;
+    }
+    const parti = [CHIAVE_FONTE[s.fonte] || CHIAVE_FONTE['']];
+    if (s.fonte === 'ambiente' && s.custodita) parti.push('Su questo computer ne è custodita anche una.');
+    if (!s.custodibile && s.motivo) parti.push(s.motivo);
+    mgChiaveStato.textContent = parti.join(' ');
+    // Senza portachiavi il tasto fallirebbe sempre: niente tasto, il motivo è scritto sopra.
+    mgChiaveCarica.hidden = !s.custodibile;
+    mgChiaveCarica.textContent = s.custodita ? 'Sostituisci…' : 'Carica…';
+    mgChiaveDimentica.hidden = !s.custodita;
+  }
+  async function loadChiave() {
+    if (!mgChiaveStato || !isAdmin) return;
+    disegnaChiave(await window.SN_AVVISO_CHIAVE.stato(sendToMain));
+  }
+  if (mgChiaveCarica) {
+    mgChiaveCarica.addEventListener('click', async () => {
+      mgChiaveCarica.disabled = true;
+      setChiaveMsg('');
+      const r = await window.SN_AVVISO_CHIAVE.carica(sendToMain);
+      mgChiaveCarica.disabled = false;
+      if (r && r.canceled) return;
+      if (!r || !r.ok) { setChiaveMsg((r && r.error) || 'Non riuscito.', 'err'); return; }
+      disegnaChiave(r);
+      setChiaveMsg('Chiave caricata.', 'ok');
+    });
+  }
+  if (mgChiaveDimentica) {
+    // Un secondo clic per confermare: senza il file di prima la chiave non si ricarica.
+    let armato = false;
+    let timer = null;
+    const disarma = () => {
+      armato = false;
+      mgChiaveDimentica.textContent = 'Dimentica';
+      mgChiaveDimentica.style.minWidth = '';
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    mgChiaveDimentica.addEventListener('click', async (e) => {
+      if (armato && e && e.detail > 1) return;
+      if (!armato) {
+        armato = true;
+        mgChiaveDimentica.style.minWidth = mgChiaveDimentica.getBoundingClientRect().width + 'px';
+        mgChiaveDimentica.textContent = 'Confermi?';
+        timer = setTimeout(disarma, 5000);
+        return;
+      }
+      disarma();
+      mgChiaveDimentica.disabled = true;
+      const r = await window.SN_AVVISO_CHIAVE.dimentica(sendToMain);
+      mgChiaveDimentica.disabled = false;
+      if (!r || !r.ok) { setChiaveMsg((r && r.error) || 'Non riuscito.', 'err'); return; }
+      disegnaChiave(r);
+      setChiaveMsg('Chiave tolta da questo computer.', 'ok');
+    });
+  }
+
   async function loadJudgeTimeout() {
     if (!mgJudgeTimeout) return;
     let seconds = JT_DEF;
