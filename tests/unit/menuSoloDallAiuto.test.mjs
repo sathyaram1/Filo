@@ -1,7 +1,6 @@
 // Sentinella (#1052): le prove trovano il menu del tasto destro solo da tests/helpers/menuContestuale.mjs, l'unico punto
-// che sa dove è disegnato. Un selettore del menu (`sn-menu…`, `data-sn-icon-id`, le classi che il menu solo assegna)
-// cercato sulla pagina è rosso; lo script
-// di un sito finto che cerca il menu da sé porta il marcatore `menu-dal-sito` in un commento, sulla riga o su quella prima.
+// che sa dove è disegnato. Un selettore del menu (`sn-menu…`, `data-sn-icon-id`, le classi che solo il menu assegna) cercato
+// sulla pagina è rosso; lo script di un sito finto che cerca il menu da sé porta `menu-dal-sito` in un commento vicino.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
