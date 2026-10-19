@@ -1,4 +1,5 @@
-// Verifica #1057 giro 2: altre strade per un riquadro vuoto di fabbrica, prese prima che Filo lo sistemi.
+// Verifica #1057 giro 2, rilievo 1: la funzione presa dal riquadro vuoto mentre nasce, prima che Filo lo sistemi, fa
+// ancora morire la scheda con la richiesta vecchia dell'audio del computer.
 import { test, expect, _electron as electron } from '@playwright/test';
 import { rmSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -29,7 +30,6 @@ test.beforeAll(async () => {
     if (u.pathname === '/esito') { esiti.push(u.searchParams.get('m')); res.end('ok'); return; }
     if (u.pathname === '/lento') { const t = setTimeout(() => { try { res.end('x'); } catch (_) {} }, 20_000); t.unref?.(); return; }
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    if (u.pathname === '/statico') { res.end(PAGINA + '<iframe></iframe>'); return; }
     res.end(PAGINA);
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
@@ -53,8 +53,8 @@ test.afterEach(async () => { await chiudiApp(app); try { rmSync(userData, { recu
 
 const paginaDi = (base) => app.windows().find((w) => w.url().startsWith(base));
 const barra = () => shell.locator('#permesso-bar');
-async function apri(percorso = '/modulo') {
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + percorso);
+async function apri() {
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), origine + '/modulo');
   await expect.poll(() => Boolean(paginaDi(origine)), { timeout: 10_000 }).toBe(true);
   const p = paginaDi(origine);
   await p.waitForLoadState('load');
@@ -62,30 +62,28 @@ async function apri(percorso = '/modulo') {
 }
 
 const SOLO_AUDIO = `{ audio: { mandatory: { chromeMediaSource: 'desktop' } }, video: false }`;
-const CHIEDI = `w.MediaDevices.prototype.getUserMedia.call(navigator.mediaDevices, ${SOLO_AUDIO})`;
+// La funzione presa dal riquadro durante l'inserimento stesso, mentre aspetta il suo indirizzo: prima che Filo lo sistemi.
+const PRESA = `window[window.length - 1].MediaDevices.prototype.getUserMedia`;
 const STRADE = {
-  'elemento personalizzato inserito insieme a un riquadro che aspetta il suo indirizzo': ['/modulo', `
-    let w; customElements.define('x-spia', class extends HTMLElement { connectedCallback() { w = window[window.length - 1]; } });
+  'elemento personalizzato inserito insieme al riquadro': `
+    let g; customElements.define('x-spia', class extends HTMLElement { connectedCallback() { g = ${PRESA}; } });
     const fr = document.createDocumentFragment(); const f = document.createElement('iframe'); f.src = '/lento';
     fr.append(f, document.createElement('x-spia')); document.body.append(fr);
-    return await ${CHIEDI};`],
-  'script inserito insieme a un riquadro che aspetta il suo indirizzo': ['/modulo', `
+    return await g.call(navigator.mediaDevices, ${SOLO_AUDIO});`,
+  'script inserito insieme al riquadro': `
     const fr = document.createDocumentFragment(); const f = document.createElement('iframe'); f.src = '/lento';
-    const s = document.createElement('script'); s.textContent = 'window.__w = window[window.length - 1];';
-    fr.append(f, s); document.body.append(fr); const w = window.__w;
-    return await ${CHIEDI};`],
-  'riquadro scritto nella pagina fin dall inizio': ['/statico', `const w = window[0]; return await ${CHIEDI};`],
-  'riquadro srcdoc': ['/modulo', `const f = document.createElement('iframe'); f.srcdoc = '<p>x</p>'; document.body.append(f);
-    await new Promise((ok) => f.addEventListener('load', ok, { once: true })); const w = window[window.length - 1]; return await ${CHIEDI};`],
-  'riquadro blob': ['/modulo', `const f = document.createElement('iframe'); f.src = URL.createObjectURL(new Blob(['<p>x</p>'], { type: 'text/html' })); document.body.append(f);
-    await new Promise((ok) => f.addEventListener('load', ok, { once: true })); const w = window[window.length - 1]; return await ${CHIEDI};`],
-  'riquadro javascript:': ['/modulo', `const f = document.createElement('iframe'); document.body.append(f); f.src = "javascript:'<p>x</p>'";
-    await new Promise((ok) => f.addEventListener('load', ok, { once: true })); const w = window[window.length - 1]; return await ${CHIEDI};`],
+    const s = document.createElement('script'); s.textContent = 'window.__g = ${PRESA};';
+    fr.append(f, s); document.body.append(fr);
+    return await window.__g.call(navigator.mediaDevices, ${SOLO_AUDIO});`,
+  'riquadro e script scritti con document.write in un riquadro vuoto': `
+    document.body.appendChild(document.createElement('iframe')); const w = window[window.length - 1];
+    w.document.write('<iframe src="' + location.origin + '/lento"></iframe><script>parent.__g = ${PRESA};<\\/script>');
+    return await window.__g.call(navigator.mediaDevices, ${SOLO_AUDIO});`,
 };
-for (const [nome, [percorso, codice]] of Object.entries(STRADE)) {
-  test(`sonda ${nome}: la scheda resta, il testo pure, e al sito arriva un no`, async () => {
+for (const [nome, codice] of Object.entries(STRADE)) {
+  test(`r1 ${nome}: la scheda resta, il testo pure, e al sito arriva un no`, async () => {
     test.setTimeout(60_000);
-    const p = await apri(percorso);
+    const p = await apri();
     await p.locator('#nota').fill('appunti da non perdere');
     await p.evaluate((c) => { window.__azione = new Function(`return (async () => { const s = await (async () => { ${c} })(); return 'OK:' + s.getTracks().map((t) => t.kind).join(','); })()`); }, codice);
     await p.locator('#vai').click({ timeout: 10_000 }).catch(() => {});
