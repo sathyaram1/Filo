@@ -244,6 +244,7 @@
   }
 
   global.SN_FILO_CODA = {
-    PAUSA_MS, PEZZO, ORA_GIORNATA, elementi, nomeDelGruppo, sito, pezzo, chatCorrente, serveGiornata, termini, cerca,
+    PAUSA_MS, PEZZO, ORA_GIORNATA, FUSIONE_MS, elementi, nomeDelGruppo, sito, pezzo, chatCorrente, siFonde, serveGiornata,
+    termini, cerca,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
