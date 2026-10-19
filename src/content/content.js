@@ -817,6 +817,8 @@
 
     // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un rifiuto e un invio
     // via script si somigliano: lì decide la risposta del sito alla richiesta che porta il testo (partito).
+    // Il testo si smette di seguire solo quando il documento se ne va (lo azzera il main): un modulo
+    // mandato in un'altra scheda, in un riquadro o senza cambiare pagina lo lascia nella casella.
     function onSubmit(e) {
       const form = e.target;
       if (!form || !aree.size) return;
