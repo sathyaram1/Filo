@@ -328,6 +328,7 @@
     const buf = await getLessonsBuffer();
     const resta = buf.filter((l) => !via.has(`${l && l.ts}|${l && l.text}`));
     if (resta.length !== buf.length) await setRaw(KEYS.FILO_LESSONS_BUFFER, resta);
+    return true;
   }
 
   async function lessonsBufferShouldCompact() {
