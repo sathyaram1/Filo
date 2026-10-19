@@ -114,7 +114,8 @@
     if (!P || !P.paroleDellaVoce) return false;
     const valore = a.valore ?? a.value ?? a.valoreNuovo ?? a.val;
     const v = P.paroleDellaVoce(a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza, valore);
-    const valori = v.valori.filter((w) => /^\d+$/.test(w) || (w.length >= 4 && !PAROLE_COMUNI.has(pianoTesto(w))));
+    const intero = typeof valore === 'string' || typeof valore === 'number' ? [String(valore)] : [];
+    const valori = [...intero, ...v.valori].filter((w) => /^\d+$/.test(w) || (pianoTesto(w).length >= 4 && !PAROLE_COMUNI.has(pianoTesto(w))));
     const unico = typeof valore === 'string' && valore.trim().length >= 16 && /\d/.test(valore) && /[a-z]/i.test(valore) ? [valore.trim()] : [];
     return nominata(richiestaDi(ctx), { frasi: unico, verbi: VERBI_CAMBIO, oggetti: [...v.frasi, ...valori] });
   }
