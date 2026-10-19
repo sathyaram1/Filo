@@ -713,7 +713,7 @@
     CANCELLA_ARCHIVIO: {
       costo: 4,
       campo: null,
-      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { proprie: ['archivio', 'archiviate', 'schede', 'scheda', 'tab'] }),
+      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { verbi: VERBI_CANCELLA, oggetti: ['archivio', 'archiviate', 'archiviata', 'archiviati'] }),
       describe: (a) => ["Eliminare dall'archivio le schede su ", cit(a.query || a.testo || ''),
         '.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare.'],
       describeDone: (a) => {
