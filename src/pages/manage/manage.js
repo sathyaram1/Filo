@@ -1326,7 +1326,7 @@
     custodita: 'Custodita su questo computer, cifrata col portachiavi del sistema.',
     ambiente: 'Arriva dalla variabile FILO_FEEDBACK_PRIVKEY con cui è partito Filo, che vince sulle altre.',
     sviluppo: 'Arriva dal file di sviluppo del repo (tests/agent/.env).',
-    '': 'Non caricata: lo stato delle segnalazioni non si legge.',
+    '': 'Non caricata, quindi lo stato delle segnalazioni non si legge.',
   };
   function setChiaveMsg(text, kind) {
     if (!mgChiaveMsg) return;
@@ -1337,7 +1337,7 @@
   function disegnaChiave(s) {
     if (!mgChiaveStato) return;
     if (!s || s.ok === false) {
-      mgChiaveStato.textContent = (s && s.error) || 'Filo non ha risposto: riapri la scheda per riprovare.';
+      mgChiaveStato.textContent = (s && s.error) || 'Filo non ha risposto. Riapri la scheda per riprovare.';
       mgChiaveCarica.hidden = true;
       mgChiaveDimentica.hidden = true;
       return;

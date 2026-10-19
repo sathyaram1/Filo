@@ -605,7 +605,7 @@ module.exports = function register(on, ctx) {
       if (C && C.isEncryptedBytes && C.isEncryptedBytes(raw)) {
         const priv = await getPrivateKey();
         if (!priv) {
-          return { ok: false, error: 'Immagine cifrata, e su questo computer manca la chiave dei feedback: caricala da Gestione → Routine → Automazioni.' };
+          return { ok: false, error: 'Immagine cifrata, e su questo computer manca la chiave dei feedback. Caricala da Gestione → Routine → Automazioni.' };
         }
         try {
           bytes = await C.decryptBytes(raw, priv);
@@ -647,7 +647,7 @@ module.exports = function register(on, ctx) {
       });
     } catch (e) {
       console.warn('[chiave feedback] finestra di scelta non aperta:', e?.message || e);
-      return { ok: false, error: 'La finestra per scegliere il file non si è aperta: riprova.' };
+      return { ok: false, error: 'La finestra per scegliere il file non si è aperta. Riprova.' };
     }
     if (!scelta || scelta.canceled || !Array.isArray(scelta.filePaths) || !scelta.filePaths[0]) {
       return { ok: false, canceled: true };

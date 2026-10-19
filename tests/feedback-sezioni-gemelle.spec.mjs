@@ -367,6 +367,10 @@ const MISTA = [
   { _id: 'x2', seq: 82, status: 'archived', name: 'archiviata leggibile', text: 'b', createdAt: '2026-08-02T10:00:00Z' },
   { _id: 'x3', seq: 83, status: 'FENC1:dddddddddddddddd', statusPublic: 'closed',
     name: 'cifrata chiusa', text: 'c', createdAt: '2026-08-03T10:00:00Z' },
+  // «Tante leggibili» davvero: con una cifrata su tre le sezioni non si disegnano più (#1042).
+  ...Array.from({ length: 8 }, (_, i) => ({
+    _id: `x${10 + i}`, seq: 90 + i, status: 'todo', name: `in coda ${i}`, text: 'd', createdAt: `2026-07-1${i}T10:00:00Z`,
+  })),
 ];
 
 test('#509 — coda mista: la cifrata dice le stesse cose sulle due pagine', async ({ openTab }) => {

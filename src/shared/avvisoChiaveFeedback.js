@@ -12,19 +12,19 @@
     CAMBIATA: 'feedback_chiave_cambiata',
   };
 
-  const IN_ELENCO = 'le trovi tutte qui sotto, in un elenco solo.';
+  const IN_ELENCO = 'Le trovi tutte qui sotto, in un elenco solo.';
   const TESTI = {
     // Chi non gestisce i feedback la chiave non ce l'ha e non la può caricare: gli si dice solo cosa vede.
     generico: 'Questo computer non può leggere lo stato delle segnalazioni. Le trovi tutte qui sotto, in un elenco solo.',
-    senzaChiave: `Manca la chiave dei feedback, quindi lo stato delle segnalazioni non si legge: ${IN_ELENCO}`,
-    nonApre: `La chiave dei feedback di questo computer non apre lo stato delle segnalazioni: ${IN_ELENCO}`,
+    senzaChiave: `Manca la chiave dei feedback, quindi lo stato delle segnalazioni non si legge. ${IN_ELENCO}`,
+    nonApre: `La chiave dei feedback di questo computer non apre lo stato delle segnalazioni. ${IN_ELENCO}`,
     nonApreAmbiente: 'La chiave dei feedback data a Filo all’avvio (FILO_FEEDBACK_PRIVKEY) non apre lo stato delle '
-      + `segnalazioni, e vince sulle altre: ${IN_ELENCO}`,
+      + `segnalazioni, e vince sulle altre. ${IN_ELENCO}`,
     carica: 'Carica la chiave…',
     caricaAltra: 'Carica un’altra chiave…',
-    caricaHover: 'Scegli il file con la chiave privata dei feedback: Filo la custodisce cifrata su questo computer.',
-    caricata: 'Chiave caricata: rileggo le segnalazioni…',
-    nessunaRisposta: 'Filo non ha risposto: riprova.',
+    caricaHover: 'Scegli il file con la chiave privata dei feedback. Filo la custodisce cifrata su questo computer.',
+    caricata: 'Chiave caricata, rileggo le segnalazioni…',
+    nessunaRisposta: 'Filo non ha risposto. Riprova.',
   };
 
   function chiedi(invia, type) {

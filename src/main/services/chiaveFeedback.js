@@ -137,9 +137,9 @@ async function caricaDaFile(percorso) {
   let testo;
   try {
     const st = fs.statSync(percorso);
-    if (!st.isFile()) return { ok: false, error: 'Quello scelto non è un file: scegli il file con la chiave.' };
+    if (!st.isFile()) return { ok: false, error: 'Quello scelto non è un file. Scegli il file con la chiave.' };
     if (st.size > TETTO_FILE) {
-      return { ok: false, error: `Il file scelto pesa ${Math.round(st.size / 1024)} KB, quello di una chiave meno di uno: scegli il file con la chiave.` };
+      return { ok: false, error: `Il file scelto pesa ${Math.round(st.size / 1024)} KB, quello di una chiave meno di uno. Scegli il file con la chiave.` };
     }
     testo = fs.readFileSync(percorso, 'utf8');
   } catch (e) {
@@ -153,13 +153,13 @@ async function caricaDaFile(percorso) {
     if (await apreIFeedback(c)) { buona = c; break; }
   }
   if (!buona) {
-    return { ok: false, error: 'La chiave di questo file non apre i feedback di Filo: forse è di un\'altra coppia, o una vecchia.' };
+    return { ok: false, error: 'La chiave di questo file non apre i feedback di Filo. Forse è di un\'altra coppia, o è una vecchia.' };
   }
   try {
     Disco.scriviSync(fileCustodito(), ss.encryptString(buona), { mode: 0o600 });
   } catch (e) {
     console.error('[chiave feedback] salvataggio fallito:', e?.message || e);
-    return { ok: false, error: 'Non riesco a scrivere la chiave nella cartella dati di Filo: riprova.' };
+    return { ok: false, error: 'Non riesco a scrivere la chiave nella cartella dati di Filo. Riprova.' };
   }
   memoria = buona;
   return { ok: true };
