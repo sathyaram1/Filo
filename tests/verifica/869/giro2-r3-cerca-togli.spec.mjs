@@ -15,6 +15,7 @@ test('r3 tasto destro su una pagina trovata cercando: «Togli dal filo» c’è 
   const voce = page.locator('#cercaRisultati .dash-cerca-pagina', { hasText: 'YouTube: orche' });
   await expect(voce).toBeVisible();
   await voce.click({ button: 'right' });
-  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect(page.locator('.sn-menu').getByText('Riapri la pagina', { exact: true })).toBeVisible();
+  await page.locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click({ timeout: 5000 });
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(0);
 });
