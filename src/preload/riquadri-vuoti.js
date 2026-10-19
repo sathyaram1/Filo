@@ -2,9 +2,8 @@
 // nella pagina valgono anche nei riquadri vuoti che lei si crea, che un preload loro non l'hanno (#1057). Non concede
 // niente; cosa copre e cosa resta fuori: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
 
-// `corpi`: espressioni che valgono ciascuna una funzione (finestra) da applicare alla pagina e a ogni riquadro vuoto.
-// Un riquadro vuoto si raggiunge per indice (window[i]) senza passare da niente che si possa intercettare: va sistemato
-// appena nasce, cioè subito dopo ogni via che lo crea, e al suo load, che per un riquadro vuoto arriva dentro l'inserimento.
+// `corpi`: espressioni che valgono ciascuna una funzione (finestra). Per indice (window[i]) un riquadro si prende senza
+// passare da niente di intercettabile: va sistemato appena nasce, dopo ogni via che lo crea e al suo load.
 function buildRiquadriVuotiSource(corpi) {
   return `(function(){
   'use strict';
