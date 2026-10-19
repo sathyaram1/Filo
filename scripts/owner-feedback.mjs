@@ -507,7 +507,6 @@ export function rifiutoPratica(id, r) {
   } else if (r && r.nonFidato) {
     righe.push(SOLO_DA_GESTIONE_MIO);
   } else if (r && r.senzaProva) {
-    // #912: il ripasso non dà più la prova al solo nome.
     righe.push(SOLO_DA_GESTIONE_MIO);
     righe.push('Altrimenti vale come un utente.');
   }
