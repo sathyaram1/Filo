@@ -1608,7 +1608,7 @@ class TabManager {
     const NE = globalThis.SN_NET_ERROR;
     const paginaErrore = !!(NE && NE.isErrorPageUrl && NE.isErrorPageUrl(url));
     if (tab._invioPagina && Date.now() - tab._invioPagina < INVIO_PAGINA_MS) {
-      tab._invioRespinto = { codice: Number(httpResponseCode) || 0, fallito: !!tab._invioFallito, accesso: null, caricata: false };
+      tab._invioRespinto = { codice: Number(httpResponseCode) || 0, fallito: !!tab._invioFallito, accesso: null, caricata: false, pwPrima: !!tab._invioPwPrima };
     } else if (paginaErrore && tab._invioRespinto && tab._invioFallito) {
       // La pagina d'errore di Filo arriva con una navigazione sua, dopo quella fallita.
       tab._invioRespinto.fallito = true;
