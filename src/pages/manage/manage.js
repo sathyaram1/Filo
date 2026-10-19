@@ -7041,9 +7041,7 @@
     // che ha contato: erano gli ultimi rimasti muti, e il caso più comune —
     // il registro conserva solo le ultime esecuzioni — finisce proprio qui.
     const coda = [];
-    const numeroApribile = (chiave, n) =>
-      `<button type="button" class="mg-fs-quanti" data-fs-esito="${esc(chiave)}"`
-      + ` title="${esc(`Mostra ${n === 1 ? 'la segnalazione contata' : 'le segnalazioni contate'}`)}">${esc(fsNum(n))}</button>`;
+    const numeroApribile = (chiave, n) => fsContoInFrase(chiave, n, fsNum(n));
     if (aperti) coda.push(`${numeroApribile('aperti', aperti)} ${aperti === 1 ? 'lavoro è ancora in mezzo al giro e non entra' : 'lavori sono ancora in mezzo al giro e non entrano'} nel conto.`);
     // Senza la chiave dell'owner lo stato non si legge, e dove sia arrivato
     // quel lavoro è proprio la domanda a cui la torta risponde: si dichiara,
