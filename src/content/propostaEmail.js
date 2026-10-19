@@ -120,7 +120,109 @@
   }
 
   function tenue(el, r) {
-    return r.width < LARGO_MIN || r.height < ALTO_MIN || opacita(el) < OPACITA_MIN;
+    return r.width < LARGO_MIN || r.height < ALTO_MIN || opacita(el) < OPACITA_MIN || spoglio(el);
+  }
+
+  // L'alfa di un colore calcolato (rgb(), rgba(), color(… / a), transparent); una forma ignota vale opaca.
+  function alfa(c) {
+    const s = String(c || '').trim();
+    if (!s || s === 'transparent') return 0;
+    const m = s.match(/^rgba?\(([^)]*)\)$/);
+    if (m) {
+      const p = m[1].split(/[\s,/]+/).filter(Boolean);
+      return p.length >= 4 ? parsePct(p[3]) : 1;
+    }
+    const b = s.match(/\/\s*([\d.]+%?)\s*\)$/);
+    return b ? parsePct(b[1]) : 1;
+  }
+  function parsePct(v) {
+    const f = parseFloat(v);
+    if (!Number.isFinite(f)) return 1;
+    return /%$/.test(v) ? f / 100 : f;
+  }
+  const visto = (c) => alfa(c) > 0.1;
+
+  // Un campo che non disegna niente di suo (fondo, bordo, contorno, ombra, testo, segnaposto, cursore) non si vede,
+  // qualunque cosa ci stia sotto: la pagina lo posa sopra il suo «Accetta».
+  function spoglio(el) {
+    let cs = null;
+    try { cs = el.ownerDocument.defaultView.getComputedStyle(el); } catch (_) { return false; }
+    if (!cs) return false;
+    if (visto(cs.backgroundColor) || (cs.backgroundImage && cs.backgroundImage !== 'none')) return false;
+    for (const lato of ['Top', 'Right', 'Bottom', 'Left']) {
+      const st = cs[`border${lato}Style`];
+      if (st !== 'none' && st !== 'hidden' && parseFloat(cs[`border${lato}Width`]) > 0 && visto(cs[`border${lato}Color`])) return false;
+    }
+    if (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && visto(cs.outlineColor)) return false;
+    if (cs.boxShadow && cs.boxShadow !== 'none' && (cs.boxShadow.match(/[a-z-]+\([^)]*\)/g) || ['rgb(0,0,0)']).some(visto)) return false;
+    const testo = visto(cs.color) && visto(cs.webkitTextFillColor || cs.color);
+    if (el.value && testo) return false;
+    if (!el.value && el.placeholder) {
+      let ph = null;
+      try { ph = el.ownerDocument.defaultView.getComputedStyle(el, '::placeholder'); } catch (_) { ph = null; }
+      if (!ph || visto(ph.color)) return false;
+    }
+    const cursore = !cs.caretColor || cs.caretColor === 'auto' ? cs.color : cs.caretColor;
+    return !visto(cursore);
+  }
+
+  // Un velo che lascia passare i clic (pointer-events: none) non risponde ai punti: la ricerca per punti non lo vede,
+  // eppure copre il campo. Si cercano, fra i nodi del documento, quelli opachi sopra ogni punto del campo.
+  const NODI_MAX = 20000;
+  const VELO_MS = 1000;
+  const veli = new WeakMap();
+  function velato(el, r, win, xs, ys, { dubbio = true } = {}) {
+    const ora = performance.now();
+    const prima = veli.get(el);
+    if (prima && ora - prima.t < VELO_MS && prima.k === `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`) return prima.v;
+    const v = cercaVelo(el, r, win, xs, ys, dubbio);
+    veli.set(el, { t: ora, v, k: `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}` });
+    return v;
+  }
+
+  function cercaVelo(el, r, win, xs, ys, dubbio) {
+    const punti = [];
+    for (const fy of ys) for (const fx of xs) {
+      const x = r.left + r.width * fx; const y = r.top + r.height * fy;
+      if (x >= 0 && y >= 0 && x < win.innerWidth && y < win.innerHeight) punti.push({ x, y, coperto: false });
+    }
+    if (!punti.length) return false;
+    const doc = el.ownerDocument;
+    // Il campo dentro uno shadow root sta, per il documento, al posto del suo host.
+    let cima = el;
+    for (let i = 0; i < 32; i++) { const h = cima.getRootNode && cima.getRootNode().host; if (!h) break; cima = h; }
+    let csCima = null;
+    try { csCima = win.getComputedStyle(cima); } catch (_) { csCima = null; }
+    const posCima = !!csCima && csCima.position !== 'static';
+    const zCima = csCima ? (parseInt(csCima.zIndex, 10) || 0) : 0;
+    let walker;
+    try { walker = doc.createTreeWalker(doc.documentElement, 1); } catch (_) { return false; }
+    let n = walker.currentNode; let contati = 0; let liberi = punti.length;
+    for (; n; n = walker.nextNode()) {
+      if (++contati > NODI_MAX) return dubbio;
+      if (n === cima || n.contains(cima)) continue;
+      let b;
+      try { b = n.getBoundingClientRect(); } catch (_) { continue; }
+      if (b.width <= 0 || b.height <= 0) continue;
+      const sotto = punti.filter((p) => !p.coperto && p.x >= b.left && p.x < b.right && p.y >= b.top && p.y < b.bottom);
+      if (!sotto.length) continue;
+      let cs;
+      try { cs = win.getComputedStyle(n); } catch (_) { continue; }
+      if (cs.pointerEvents !== 'none' || cs.visibility !== 'visible') continue;
+      const pieno = visto(cs.backgroundColor) && alfa(cs.backgroundColor) >= 0.5
+        || (cs.backgroundImage && cs.backgroundImage !== 'none')
+        || /^(img|canvas|video|svg|picture|iframe|object|embed)$/i.test(n.tagName || '');
+      if (!pieno || opacita(n) < 0.5) continue;
+      const pos = cs.position !== 'static';
+      const z = parseInt(cs.zIndex, 10) || 0;
+      if (pos && z < 0) continue;
+      const dopo = !!(cima.compareDocumentPosition(n) & 4);
+      const sopra = dopo ? !(posCima && zCima > z) : (pos && (!posCima || z > zCima));
+      if (!sopra) continue;
+      for (const p of sotto) { p.coperto = true; liberi--; }
+      if (!liberi) return true;
+    }
+    return false;
   }
 
   // Un nodo coperto da un altro (o tagliato via) non risponde ai punti dove sta: basta un punto che risponda.
