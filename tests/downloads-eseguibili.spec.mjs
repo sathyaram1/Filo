@@ -84,7 +84,9 @@ const statoDi = async (shell, nome) => (await voce(shell, nome))?.state ?? null;
 // La domanda è la riga del pannello scaricamenti, che la barra apre da sola
 // sopra la pagina: un avviso della barra nell'area pagina resterebbe sotto la
 // vista nativa, presente nel DOM ma invisibile a schermo.
-const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: `«${nome}»` });
+// Il nome sta nel riquadro della domanda (#592.7): si cerca lì, intero.
+const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]')
+  .filter({ has: shell.locator('.dl-row-ask-nome', { hasText: new RegExp(`^${nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }) });
 const risposta = (riga, testo) => riga.locator('.dl-row-btn', { hasText: testo });
 async function apriPannello(shell) {
   if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
