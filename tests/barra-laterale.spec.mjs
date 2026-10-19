@@ -436,13 +436,13 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
     await barra2.mouse.down();
     await barra2.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
     await barra2.mouse.move(dst.x + dst.width - 20, dst.y + dst.height / 2 - alto, { steps: 10 });
-    await expect(page.locator('.sn-drag-preview')).toHaveCount(1);
+    await expect(menuDi(page).trascinamento).toHaveCount(1);
     await barra2.mouse.up();
     await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('screenshot');
     const dopo = await statoBarra(app);
     expect([...dopo.primary, ...dopo.secondary]).toContain('screenshot');
     await expect(barra2.locator('#nav .ico[data-id="screenshot"]')).toHaveCount(0);
-    await expect(page.locator('.sn-drag-preview')).toHaveCount(0);
+    await expect(menuDi(page).trascinamento).toHaveCount(0);
     await chiudiApp(app);
   } finally {
     try { server.close(); } catch (_) {}
