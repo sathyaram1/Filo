@@ -1549,6 +1549,11 @@
     return { close, el: t };
   }
 
+  // Un errore dell'AI detto con un avviso (le strade senza un riquadro dove scriverlo): frase e tasto insieme.
+  function avvisoErrore(res, opts = {}) {
+    return showToast(frasePerLUtente(res), { duration: 9000, ...opts, rimedio: res });
+  }
+
   // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
   function close() { closeTopmost(); }
 
