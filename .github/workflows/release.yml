@@ -301,11 +301,11 @@ jobs:
       # creare tag: a loro basta il GITHUB_TOKEN.
       - name: Token dell'app di pubblicazione (se configurata)
         id: app
-        if: steps.check.outputs.should_release == 'true' && vars.FILO_RILASCIO_APP_ID != ''
+        if: steps.check.outputs.should_release == 'true' && vars.FILO_PUBLISH_APP_ID != ''
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ vars.FILO_RILASCIO_APP_ID }}
-          private-key: ${{ secrets.FILO_RILASCIO_APP_KEY }}
+          app-id: ${{ vars.FILO_PUBLISH_APP_ID }}
+          private-key: ${{ secrets.FILO_PUBLISH_APP_KEY }}
           permission-contents: write
 
       # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────
