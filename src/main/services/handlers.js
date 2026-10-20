@@ -6011,8 +6011,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (onboardingClosed) {
     finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
   } else {
+    // I seguiti letti sono parte della domanda a cui la risposta risponde.
+    const domandaIntera = [String(userMessage || ''), ...seguitiLetti.map((id) => testiSeguiti.get(id) || '')].filter(Boolean).join('\n');
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
-      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
+      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage: domandaIntera, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
       .catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
