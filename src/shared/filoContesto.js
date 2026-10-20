@@ -490,6 +490,55 @@
     return Math.max(0, Math.floor(Math.max(0, restano) / CARATTERI_PER_TOKEN));
   }
 
+  // ── La rilettura di una conversazione (CERCA_CHAT con l'id) ───────────────
+  // Al più il tetto in token della chat, e dove la finestra del modello è nota quello che ci sta ancora: la richiesta
+  // ne prende al più QUOTA_FINESTRA, il resto è per la risposta e per l'errore della stima (#1301: una rilettura grande
+  // quanto il tetto faceva rifiutare il messaggio a un modello da 32.000 token, e riprovando di nuovo). Mai sotto il minimo,
+  // che era la rilettura di prima del filo: il resto si legge a pezzi.
+  const RILETTURA_MINIMA = 8000;
+  const QUOTA_FINESTRA = 0.6;
+  function spazioInFinestra({ finestra = null, occupati = 0 } = {}) {
+    const f = Number(finestra);
+    if (!Number.isFinite(f) || f <= 0) return null;
+    return Math.floor(f * QUOTA_FINESTRA * CARATTERI_PER_TOKEN - Math.max(0, Number(occupati) || 0));
+  }
+  function tettoRilettura({ token = TETTI_DI_SERIE.token, libero = null } = {}) {
+    const daTetto = Math.floor(Math.max(0, Number(token) || 0) * CARATTERI_PER_TOKEN);
+    const l = Number(libero);
+    return Math.max(RILETTURA_MINIMA, Math.min(daTetto, Number.isFinite(l) && libero != null ? l : Infinity));
+  }
+
+  // Le riletture di questo turno da accorciare dopo un rifiuto per finestra: con le misure quanto serve a stare un po'
+  // sotto la finestra, senza a metà di quello che si può togliere. Null se sono già tutte al minimo.
+  function riletturePiuCorte({ max = null, chiesti = null, caratteri = 0, lunghezze = [] } = {}) {
+    const l = (Array.isArray(lunghezze) ? lunghezze : []).map((n) => Math.max(0, Number(n) || 0));
+    const togliibile = l.reduce((s, n) => s + Math.max(0, n - RILETTURA_MINIMA), 0);
+    if (!togliibile) return null;
+    let togliere = togliibile / 2;
+    if (max && chiesti && chiesti > max && caratteri > 0) togliere = caratteri - (caratteri * (max / chiesti) * MARGINE_FINESTRA);
+    const quota = Math.min(1, Math.max(0.1, togliere / togliibile));
+    return l.map((n) => (n > RILETTURA_MINIMA ? Math.floor(n - ((n - RILETTURA_MINIMA) * quota)) : null));
+  }
+
+  // La finestra di ogni modello secondo il catalogo di OpenRouter (le voci di `/api/v1/models`), in token.
+  function finestreDaCatalogo(voci) {
+    const out = Object.create(null);
+    for (const m of Array.isArray(voci) ? voci : []) {
+      const id = m && typeof m.id === 'string' ? m.id : '';
+      const n = Number(m && (m.context_length ?? (m.top_provider && m.top_provider.context_length)));
+      if (id && Number.isFinite(n) && n > 0) out[id] = Math.floor(n);
+    }
+    return out;
+  }
+  // `:nitro`, `:floor`, `:online` sono scorciatoie di smistamento che il catalogo non elenca: vale il modello base.
+  function finestraDi(finestre, model) {
+    if (!finestre || !model) return null;
+    const id = String(model).trim();
+    if (Object.prototype.hasOwnProperty.call(finestre, id)) return finestre[id];
+    const base = id.replace(/:(nitro|floor|online)$/i, '');
+    return base !== id && Object.prototype.hasOwnProperty.call(finestre, base) ? finestre[base] : null;
+  }
+
   function testoRicordo(t) {
     const s = String(t.testo || '');
     if (s.length <= CARATTERI_RICORDO) return s;
