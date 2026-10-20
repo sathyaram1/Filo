@@ -60,9 +60,17 @@ function privKeyFromEnvFile(envFile) {
   return null;
 }
 
+// Il ripiego sul disco si cerca una volta per corsa, anche quando non trova niente:
+// cercato a ogni feedback costava un git per feedback, minuti su una lista (#1175).
+let chiaveSulDisco;
+
 function readPrivKey() {
   if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
+  if (chiaveSulDisco === undefined) chiaveSulDisco = privKeyFromDisk();
+  return chiaveSulDisco;
+}
 
+function privKeyFromDisk() {
   const local = privKeyFromEnvFile(join(REPO_ROOT, 'tests', 'agent', '.env'));
   if (local) return local;
 
