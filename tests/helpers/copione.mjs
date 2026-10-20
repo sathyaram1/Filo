@@ -101,5 +101,8 @@ export async function ricercaPartita(app) {
 
 // Il quadrato ignora i clic per una frazione di secondo da quando compare (#1296): chi ferma apposta aspetta che sia pronto.
 export async function quadratoPronto(page) {
-  await expect(page.locator('#stopBtn')).toHaveAttribute('data-pronto', '1', { timeout: 5_000 });
+  await page.waitForFunction(() => {
+    const b = document.getElementById('stopBtn');
+    return !!b && !b.hidden && !b.disabled && Date.now() - Number(b.dataset.comparso || 0) >= 520;
+  }, null, { timeout: 5_000 });
 }
