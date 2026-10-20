@@ -5087,6 +5087,8 @@ async function segnaStopAccoglienza(turno) {
   if (turno.chiuso) return;
   await saveOnboarding(Onboarding.segnaFermato(stato));
 }
+// Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
+// finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
 async function fermaFiloChat(reqId, wc) {
   if (!reqId) return false;
   const t = turniInCorso.get(String(reqId));
@@ -5336,6 +5338,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (turno.fermato) onbBefore = await saveOnboarding(Onboarding.segnaFermato(onbBefore));
   }
   if (onbActive && !internal && Onboarding.isExitRequest(onbBefore, userMessage)) {
+    turno.chiuso = true;
     // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
     // testo fisso — l'unica risposta che si può garantire anche senza modello.
     // Un «no grazie» invece NON passa di qui: rifiuta la proposta che Filo ha
@@ -5569,8 +5572,6 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let exhausted = true;
   // I giri con azioni: i «passi» della frase che dice che Filo si è fermato senza risposta.
   let passi = 0;
-  // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
-  // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
   // I seguiti (#1296) entrano prima di ogni chiamata al modello, dopo gli esiti del passo prima: sono parole
   // dell'utente come la domanda, e lo sanno le uscite (#810, #530, #868.6), l'archivio e la scheda.
   const seguitiLetti = [];

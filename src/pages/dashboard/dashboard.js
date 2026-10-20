@@ -1452,8 +1452,13 @@
     seguiti.push(s);
     bubblesEl.appendChild(s.bolla);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
-    // Nel turno entrano solo parole battute qui: un allegato, un testo incollato o un comando con la barra partono a
-    // turno finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la aspetta.
+    affidaAlTurno(s, t);
+  }
+  // Nel turno entrano solo parole battute qui: un allegato, un testo incollato o un comando con la barra partono a turno
+  // finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la aspetta. Un seguito che il
+  // turno di prima non ha preso lo offre anche il turno dopo, appena parte.
+  function affidaAlTurno(s, t) {
+    const { c } = s;
     if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.text.startsWith('/') || Accoglienza.isActive()) return;
     s.turno = t;
     send({ type: MSG.FILO_CHAT_SEGUITO, reqId: t.reqId, id: s.id, testo: c.text })
