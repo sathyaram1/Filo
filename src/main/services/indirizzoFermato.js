@@ -40,4 +40,19 @@ function avvisoIndirizzoFermato(rawUrl) {
   return { testo, chiave: `indirizzo-fermato:${testo}` };
 }
 
-module.exports = { avvisoIndirizzoFermato };
+// Un file: o un data: che una pagina web apre (collegamento, script, finestra nuova) Chromium lo rifiuta prima che Filo
+// lo veda, e resta solo la sua riga in console (#1318): l'indirizzo rifiutato, o ''. Testi di Chromium, non nostri.
+const RIFIUTI_DI_CHROMIUM = [
+  /^Not allowed to load local resource: (file:[\s\S]+)$/,
+  /^Not allowed to navigate top frame to data URL: (data:[\s\S]+)$/,
+];
+function indirizzoRifiutatoDaChromium(messaggio) {
+  const s = String(messaggio || '');
+  for (const re of RIFIUTI_DI_CHROMIUM) {
+    const m = re.exec(s);
+    if (m) return m[1].trim();
+  }
+  return '';
+}
+
+module.exports = { avvisoIndirizzoFermato, indirizzoRifiutatoDaChromium };
