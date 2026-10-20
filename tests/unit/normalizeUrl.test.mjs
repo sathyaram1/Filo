@@ -127,7 +127,57 @@ test('#482 un percorso del computer scritto com\'è diventa un file, non una ric
 });
 
 test('#482 una barra davanti a una parola qualunque non è un file', () => {
-  for (const s of ['/wiki/Roma', '/homepage', 'Users/x', '~mario']) {
+  for (const s of ['/wiki/Roma', '/homepage', 'Users/x', '~mario', '/r/italy']) {
     assert.ok(normalizeUrl(s).startsWith('https://www.google.com/search?q='), s);
   }
+});
+
+// #1318 — un percorso privato non diventa mai una ricerca su Google: fra virgolette («Copia come percorso» di Windows),
+// fra apici inversi, sotto /run/media (la chiavetta su Linux) o sotto una radice qualunque se finisce in un file.
+test('#1318 un percorso fra virgolette, sotto /run/media o sotto una radice qualunque è un file', () => {
+  const casi = [
+    ['/run/media/mario/CHIAVETTA/tesi.docx', 'file:///run/media/mario/CHIAVETTA/tesi.docx'],
+    ['"/run/media/mario/CHIAVETTA/tesi.docx"', 'file:///run/media/mario/CHIAVETTA/tesi.docx'],
+    ['"C:\\Users\\agenti AI\\Desktop\\nota.txt"', 'file:///C:/Users/agenti%20AI/Desktop/nota.txt'],
+    ['\'C:\\Users\\x.pdf\'', 'file:///C:/Users/x.pdf'],
+    ['`/home/mario/a b.pdf`', 'file:///home/mario/a%20b.pdf'],
+    ['“/media/mario/USB/foto.jpg”', 'file:///media/mario/USB/foto.jpg'],
+    ['"\\\\nas\\condivisa\\bilancio.xlsx"', 'file://nas/condivisa/bilancio.xlsx'],
+    ['/data/archivio/fattura 2026.pdf', 'file:///data/archivio/fattura%202026.pdf'],
+    ['/mnt/c/Users/mario/x.txt', 'file:///mnt/c/Users/mario/x.txt'],
+    ['"file:///etc/hosts"', 'file:///etc/hosts'],
+  ];
+  for (const [scritto, atteso] of casi) assert.equal(normalizeUrl(scritto), atteso, scritto);
+  for (const [scritto] of casi) assert.ok(!/google\./.test(globalThis.SN_URL_NAV.indirizzoDaCaricare(scritto)), scritto);
+});
+
+test('#1318 le virgolette attorno a una ricerca restano: cercano la frase esatta', () => {
+  assert.equal(normalizeUrl('"ricetta carbonara"'), 'https://www.google.com/search?q=%22ricetta%20carbonara%22');
+});
+
+// #1318 — chi apre per conto di Filo o del modello legge «localhost:3000» come la barra: un server, non lo schema «localhost:».
+test('#1318 indirizzoDaCaricare: un host con la porta è un server, uno schema vero resta com\'è', () => {
+  const { indirizzoDaCaricare } = globalThis.SN_URL_NAV;
+  assert.equal(indirizzoDaCaricare('localhost:3000'), 'http://localhost:3000');
+  assert.equal(indirizzoDaCaricare('nas.lan:5000'), 'http://nas.lan:5000');
+  assert.equal(indirizzoDaCaricare('nas.lan:5000/admin?x=1'), 'http://nas.lan:5000/admin?x=1');
+  assert.equal(indirizzoDaCaricare('  example.com:8443/x '), 'https://example.com:8443/x');
+  assert.equal(indirizzoDaCaricare('sito.it/pagina'), 'https://sito.it/pagina');
+  for (const u of ['about:blank', 'blob:https://a.it/1', 'zoommtg://zoom.us/join', 'spotify:track:1', 'mailto:a@b.it', 'tel:112', 'sms:12345', 'javascript:1', 'data:text/plain,1', 'file:///tmp/x', 'https://a.it', 'C:\\x.txt']) {
+    assert.equal(indirizzoDaCaricare(u), u, u);
+  }
+  assert.equal(indirizzoDaCaricare('"C:\\Users\\x.txt"'), 'C:\\Users\\x.txt', 'fra virgolette lo stesso percorso');
+});
+
+test('#1318 percorsoPulito: virgolette, apici inversi e file:// tolti, una sola pulizia', () => {
+  const { percorsoPulito } = globalThis.SN_URL_NAV;
+  assert.equal(percorsoPulito(' "C:\\Users\\agenti AI\\nota.txt" '), 'C:\\Users\\agenti AI\\nota.txt');
+  assert.equal(percorsoPulito('`~/Documenti/a.pdf`'), '~/Documenti/a.pdf');
+  assert.equal(percorsoPulito('"`/tmp/x`"'), '/tmp/x');
+  assert.equal(percorsoPulito('file:///C:/Users/agenti%20AI/a.pdf'), 'C:/Users/agenti AI/a.pdf');
+  assert.equal(percorsoPulito('file:///home/mario/a%20b.pdf'), '/home/mario/a b.pdf');
+  assert.equal(percorsoPulito('file://localhost/tmp/x'), '/tmp/x');
+  assert.equal(percorsoPulito('file://nas/condivisa/b.xlsx'), '\\\\nas\\condivisa\\b.xlsx');
+  assert.equal(percorsoPulito('""'), '');
+  assert.equal(percorsoPulito('"'), '"');
 });
