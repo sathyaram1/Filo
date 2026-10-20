@@ -208,9 +208,9 @@ export function descriviEsitoServer(esito) {
     case 'rifiutato':
       return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata. Va ricopiata ${DOVE_VA_LA_PAROLA}.`;
     case 'http':
-      return `Il server ha risposto HTTP ${e.status}.`;
+      return `Il server ha risposto HTTP ${e.status}${aTutti}.`;
     case 'rete':
-      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'}).`;
+      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'})${aTutti}.`;
     case 'illeggibile':
       return 'Il server ha risposto qualcosa che non è JSON: non è detto che sia il server giusto.';
     case 'senza-chiavi':
