@@ -1432,6 +1432,103 @@
     riga.appendChild(tasto);
     ripresa = { nota: null, blocco, tasto, messaggio: interrotta ? CONTINUA_RISPOSTA : CONTINUA };
   }
+
+  // ===== Il seguito scritto mentre Filo lavora (#1296) =====
+  // Con qualcosa nella casella Invio vuol dire «manda», anche mentre Filo lavora: il lavoro continua, il seguito compare
+  // subito in attesa e il turno lo legge al suo passo dopo; se non ne ha, parte appena il turno finisce. A casella vuota
+  // Invio resta lo stop. Racconto: patterns/il-filo-dell-attesa.md.
+  function accodaSeguito() {
+    const c = prendiComposizione(inputEl.value.trim());
+    const t = turnoVivo;
+    const s = { id: `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, c, bolla: bollaUtente(c), turno: null };
+    s.bolla.classList.add('dash-bubble-attesa');
+    s.bolla.title = 'In attesa';
+    scrittoQui = true;
+    seguiti.push(s);
+    bubblesEl.appendChild(s.bolla);
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    // Nel turno entrano solo parole battute qui: un allegato, un testo incollato o un comando con la barra partono a
+    // turno finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la aspetta.
+    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.text.startsWith('/') || Accoglienza.isActive()) return;
+    s.turno = t;
+    send({ type: MSG.FILO_CHAT_SEGUITO, reqId: t.reqId, id: s.id, testo: c.text })
+      .then((r) => { if (!(r && r.accolto) && s.turno === t) s.turno = null; })
+      .catch(() => { if (s.turno === t) s.turno = null; });
+  }
+  // Il turno l'ha letto: da qui è un messaggio come gli altri, nello storico prima della risposta che lo legge.
+  function seguitoLetto(id) {
+    const i = seguiti.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    const [s] = seguiti.splice(i, 1);
+    s.bolla.classList.remove('dash-bubble-attesa');
+    s.bolla.removeAttribute('title');
+    const voce = { role: 'user', text: s.c.text };
+    const k = s.turno && s.turno.voce ? threadHistory.indexOf(s.turno.voce) : -1;
+    if (k >= 0) threadHistory.splice(k, 0, voce);
+    else threadHistory.push(voce);
+  }
+  // A turno finito il primo seguito parte dalla strada di sempre; un comando con la barra fa la sua cosa e basta.
+  async function partiSeguito() {
+    const s = seguiti.shift();
+    if (!s) return;
+    s.bolla.classList.remove('dash-bubble-attesa');
+    s.bolla.removeAttribute('title');
+    let bolla = s.bolla.isConnected ? s.bolla : null;
+    if (!s.c.immagini.length && !s.c.file.length && s.c.text.startsWith('/')) {
+      if (bolla) bolla.remove();
+      bolla = null;
+      // Il comando svuota la casella: quello che l'utente sta scrivendo intanto resta suo.
+      const bozza = inputEl.value;
+      const fatto = await comandoLocale(s.c.text);
+      if (bozza && !inputEl.value) { inputEl.value = bozza; autoGrowInput(); Comandi.updateInputClass(); }
+      if (fatto) { if (seguiti.length && !sending) await partiSeguito(); return; }
+    }
+    await inviaComposto(s.c, { bolla });
+  }
+  // Un seguito che non parte torna nella casella com'era, prima di quello che l'utente sta scrivendo. Quello affidato al
+  // turno si ritira dal main; se il modello l'ha già letto resta un messaggio della conversazione.
+  async function rimettiSeguiti(lista = seguiti.slice()) {
+    const tornati = [];
+    for (const s of lista) {
+      if (s.turno) {
+        const r = await send({ type: MSG.FILO_CHAT_SEGUITO, reqId: s.turno.reqId, id: s.id, togli: true }).catch(() => null);
+        if (r && r.letto) { seguitoLetto(s.id); continue; }
+      }
+      const i = seguiti.indexOf(s);
+      if (i < 0) continue;
+      seguiti.splice(i, 1);
+      s.bolla.remove();
+      tornati.push(s.c);
+    }
+    if (!tornati.length) return;
+    const testi = tornati.map((c) => c.scritto.trim()).filter(Boolean);
+    const bozza = inputEl.value.trim() ? [inputEl.value] : [];
+    inputEl.value = [...testi, ...bozza].join('\n');
+    if (tornati.some((c) => c.incollato)) testoDaFuori = true;
+    for (const c of tornati) {
+      for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
+      for (const f of c.file) addPendingFile(f.percorso);
+    }
+    autoGrowInput();
+    Comandi.updateInputClass();
+    aggiornaTasto();
+    inputEl.focus();
+  }
+  // Un seguito in attesa resta in fondo: quello che il turno aggiunge intanto (la risposta, una riga) gli va sopra.
+  new MutationObserver((mutazioni) => {
+    if (!seguiti.length) return;
+    const altro = mutazioni.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && !n.classList.contains('dash-bubble-attesa')));
+    if (!altro) return;
+    for (const s of seguiti) if (s.bolla.parentNode === bubblesEl) bubblesEl.appendChild(s.bolla);
+  }).observe(bubblesEl, { childList: true });
+  // Il tasto destro sul seguito in attesa: riprenderlo prima che parta.
+  function vociSeguito(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const bolla = el && el.closest('.dash-bubble-attesa');
+    const s = bolla && seguiti.find((x) => x.bolla === bolla);
+    return s ? [{ type: 'item', label: 'Rimetti nella casella', onClick: () => { rimettiSeguiti([s]).catch(() => {}); } }] : [];
+  }
+  if (!self.SN_VOCI_PAGINA.includes(vociSeguito)) self.SN_VOCI_PAGINA.push(vociSeguito);
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
   function apriTurnoFermato({ pending, streamBubble, streamedText }) {
