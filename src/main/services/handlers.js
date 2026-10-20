@@ -5858,13 +5858,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
   }
   if (fermato) {
-    // Lo stop resta scritto nell'intervista: una scheda nuova o una pagina ricaricata non rifà il turno fermato.
+    // Già scritto al clic (segnaStopAccoglienza); riscritto qui per uno stop che il turno ha visto da sé.
     if (onbActive) await saveOnboarding(Onboarding.segnaFermato(await FiloMem.getOnboarding()));
     if (onbActive && !internal) releaseOnboardingResume();
     await archiviaGiaFatto();
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
-      model: r && r.model, provider: r && r.provider,
+      model: r && r.model, provider: r && r.provider, seguitiLetti,
     };
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
