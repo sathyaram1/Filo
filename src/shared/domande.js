@@ -255,6 +255,8 @@
       }
       domanda.origine = { tipo: o.tipo, id };
     }
+    const sporco = controllaTestoOwner(domanda);
+    if (sporco) return sporco;
     return { ok: true, domanda };
   }
 
