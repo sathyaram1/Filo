@@ -44,7 +44,7 @@ test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è 
   });
   expect(linkBloccato).toBe(true);
 
-  const voce = page.locator('.sn-menu .sn-menu-item', { hasText: 'Invia attacco' }).first();
+  const voce = menuDi(page).locator('.sn-menu .sn-menu-item', { hasText: 'Invia attacco' }).first();
   await expect.poll(async () => {
     await page.keyboard.press('Escape');
     await page.locator('#p').click({ button: 'right', position: { x: 200, y: 120 } });
