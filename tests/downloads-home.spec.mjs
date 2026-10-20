@@ -122,7 +122,8 @@ test('nella home una domanda su un programma apre il pannello, che si chiude con
     await expect(chiudi).toBeVisible();
     await chiudi.hover();
     await shell.screenshot({ path: join(SHOTS, 'download-941-pannello.png') });
-    await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+    await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
+      { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
     await expect.poll(() => shell.evaluate(() => {
       const [r, g, b] = getComputedStyle(document.querySelector('#dl-panel')).backgroundColor.match(/\d+/g).map(Number);
       return r + g + b < 384;
