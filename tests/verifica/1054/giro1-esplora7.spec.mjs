@@ -68,7 +68,51 @@ test('cronologia in un riquadro di un altro sito: si vede nello strato e la scel
   await pausa(600);
   const st = await statoCronologia(app, page);
   console.log('RIQUADRO cron', JSON.stringify(st && st.voci.map((v) => v.testo)));
-  await menu.locator('.sn-menu-history-paste', { hasText: 'uno-1054' }).first().click().catch((e) => console.log('noclick', String(e).slice(0, 80)));
+  const voce = st.voci.find((v) => v.testo.includes('uno-1054'));
+  await menu.superficie.mouse.click(voce.incolla.x, voce.incolla.y);
   await pausa(800);
   console.log('RIQUADRO valore', await fr.locator('#f').inputValue(), await fr.evaluate(() => document.activeElement && document.activeElement.id));
+});
+
+for (const [nome, script] of [
+  ['window-cattura', "window.addEventListener('contextmenu', (e) => e.preventDefault(), true);"],
+  ['documento', "document.addEventListener('contextmenu', (e) => e.preventDefault());"],
+  ['attributo', "document.body.setAttribute('oncontextmenu', 'return false');"],
+  ['elemento-stop', "document.getElementById('z').addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopImmediatePropagation(); });"],
+]) {
+  test(`sito che annulla il tasto destro (${nome}): il menu si apre nello strato`, async ({ app, openTab, testServer }) => {
+    await pronto(app);
+    const page = await testServer.openReady(openTab, `<!doctype html><body style="margin:0;height:100vh"><div id="z" style="position:absolute;left:100px;top:100px;width:300px;height:200px;background:#eee">zona</div><script>${script}</script></body>`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await page.mouse.click(200, 200, { button: 'right' });
+    await pausa(1500);
+    console.log('ANNULLA', nome, JSON.stringify({ aperto: (await statoDelloStrato(app)).aperto, voci: await menuDi(page).principale.count() }));
+  });
+}
+
+test('icona trascinata dal menu dello strato alla barra laterale', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const { barraPage, statoBarra } = await import('../../helpers/barra.mjs');
+  await pronto(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:12px 16px;font:16px sans-serif;height:1400px">
+    <p id="p">Un paragrafo che comincia vicino al bordo sinistro.</p></body></html>`);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await barraPage(app);
+  await page.mouse.click(20, 24, { button: 'right' });
+  const menu = menuDi(page);
+  const strato = menu.superficie;
+  const icona = menu.locator('.sn-menu [data-sn-icon-id="share"]').first();
+  await expect(icona).toBeVisible();
+  const box = await icona.boundingBox();
+  await strato.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await strato.mouse.down();
+  await strato.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 2, { steps: 4 });
+  await pausa(400);
+  const sopraMenu = (await statoBarra(app)).aperta;
+  await strato.mouse.move(6, 200, { steps: 8 });
+  await pausa(1200);
+  const alBordo = (await statoBarra(app)).aperta;
+  await strato.mouse.up();
+  await pausa(1200);
+  console.log('BARRA', JSON.stringify({ sopraMenu, alBordo, bar: (await statoBarra(app)).bar }));
 });
