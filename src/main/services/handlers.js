@@ -5200,6 +5200,15 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
     ...(filo ? { filoTratto: filo.messaggi, indiceDomanda, chatCorrente: chatId, chatNuova: filo.nuova } : {}),
   };
+  // Quanto ci sta ancora nella finestra del modello per una rilettura di questo giro, in caratteri; null se non si sa.
+  const spazioRilettura = async () => {
+    const W = settingsChat ? finestraNota(settingsChat, modelloChat) : null;
+    if (!W) return null;
+    const FC = globalThis.SN_FILO_CONTESTO;
+    let inviati = [];
+    try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) { return null; }
+    return FC.spazioInFinestra({ finestra: W, occupati: FC.caratteriDi(inviati) + (tools ? JSON.stringify(tools).length : 0) });
+  };
 
   // IL GIRO. Il modello chiama le azioni come strumenti; il main le esegue,
   // gli rimanda gli esiti, e lo richiama — nello stesso turno, finché risponde
