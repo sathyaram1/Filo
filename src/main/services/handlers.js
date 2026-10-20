@@ -6037,6 +6037,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),
+    seguitiLetti,
   };
 }
 
