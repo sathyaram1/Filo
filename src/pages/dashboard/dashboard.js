@@ -249,7 +249,7 @@
       ripresa = { nota, blocco: null };
       aggiornaTasto();
     },
-    isSending: () => sending || !!chiusuraInCorso,
+    isSending: () => sending || chiusure.size > 0,
     // La conversazione dell'intervista è già quella a schermo: stessi messaggi, nello stesso ordine.
     giaAschermo: (state) => {
       const riga = (m) => `${m.role === 'filo' ? 'filo' : 'user'}\n${String(m.text || '').trim()}`;
