@@ -125,9 +125,13 @@ module.exports = function register(on, ctx) {
   // bottone, un suggerimento della home) si apre solo dopo la porta delle uscite (#810). La frase torna a chi ha cliccato.
   on(MSG.FILO_APRI_PROPOSTA, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    const url = String((msg && msg.url) || '').trim();
+    // Letto come lo legge NAVIGA, che il suggerimento ripete: «localhost:3000» è un server, un percorso è un file (#1318).
+    const url = globalThis.SN_URL_NAV.indirizzoDaCaricare(String((msg && msg.url) || ''));
     const web = /^https?:/i.test(url);
-    if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
+    if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) {
+      const avviso = require('../indirizzoFermato').avvisoIndirizzoFermato(url);
+      return { ok: false, error: 'indirizzo non ammesso', ...(avviso ? { frase: avviso.testo } : {}) };
+    }
     const win = winOf(sender);
     // Il clic sul collegamento vale per la pagina d'arrivo come un clic su un sito: si legge prima della porta, che può attendere.
     const origine = { tipo: 'filo', gesto: require('../permessiPagine').gestoDellUtente(sender?.wc) };
