@@ -142,7 +142,7 @@ test('«Apri in nuova tab» del menu di Filo su un collegamento a un file di una
   const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await menu.getByText('Apri in nuova tab', { exact: false }).click();
-  await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: C:/Condivisa/listino.pdf')).toBeVisible({ timeout: 8000 });
+  await expect(await carta(avvisi, 'File del computer chiesto da 127.0.0.1')).toBeVisible({ timeout: 8000 });
 });
 
 // Giro 2: un percorso scritto com'è (cartella di rete, Mac, Linux) non diventa una ricerca del percorso su Google.
