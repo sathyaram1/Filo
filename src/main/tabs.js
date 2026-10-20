@@ -3476,7 +3476,7 @@ class TabManager {
       // Il clic dell'utente su un indirizzo fermato (zoommtg:, ms-teams:…) lo dice (#482); la pagina da sola resta muta.
       const dalClic = Permessi.perUnaFinestra(wc, url, referrer)
         || (navigazione && (Permessi.gestoPerLaNavigazione(wc) || Permessi.navigazioneDaGesto(wc)));
-      if (dalClic) avvisaIndirizzoFermato(url, this.win);
+      if (dalClic) avvisaIndirizzoFermato(url, this.win, urlDellaPagina(wc));
       return;
     }
     // Per l'invito il clic che ha fatto partire la navigazione lo conta `invitoFermato`, che lo spegne all'arrivo (#664).
