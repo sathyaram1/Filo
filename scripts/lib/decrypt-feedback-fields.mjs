@@ -1,5 +1,5 @@
 // Decifra i campi FENC1: dei feedback e i loro allegati per gli script dell'owner (l'app ha la sua copia in auth.js).
-// La chiave privata la cerca in FILO_FEEDBACK_PRIVKEY e poi in tests/agent/.env (gitignorato); non la scrive mai.
+// La chiave privata la cerca in FILO_FEEDBACK_PRIVKEY e poi in tests/agent/.env (gitignorato, una volta per corsa); non la scrive mai.
 
 import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
