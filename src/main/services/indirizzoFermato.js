@@ -70,4 +70,4 @@ function indirizzoRifiutatoDaChromium(messaggio) {
   return '';
 }
 
-module.exports = { avvisoIndirizzoFermato, indirizzoRifiutatoDaChromium };
+module.exports = { avvisoIndirizzoFermato, avvisoDallaPagina, indirizzoRifiutatoDaChromium };
