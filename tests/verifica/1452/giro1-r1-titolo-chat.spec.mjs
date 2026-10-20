@@ -18,5 +18,5 @@ test('r1 la pagina Privacy dice che la chat va a un modello per darle un nome', 
   const riga = testo.split('\\n').find((r) => /La chat con Filo e la home/.test(r)) || '';
   expect(riga).not.toBe('');
   // La trascrizione di fine conversazione (inizio e fine) va a un modello per titolo e tipo.
-  expect(/\b(nome|titolo)\b[^.]*\bchat\b|\bchat\b[^.]*\b(nome|titolo)\b/i.test(riga.replace(/titoli delle schede/g, ''))).toBe(true);
+  expect(riga).toMatch(/\b(?:nome|titolo)\b[^.]{0,60}\b(?:a ogni|ad ogni|alla|della|a ciascuna|di ogni)\s+(?:chat|conversazione)\b/i);
 });
