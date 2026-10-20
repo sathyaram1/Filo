@@ -142,7 +142,7 @@
       if (!c || eApp(c) || c.onboarding || !Array.isArray(c.messages) || !c.messages.length) continue;
       if (!ultima || (ms(c.updatedAt) || 0) > (ms(ultima.updatedAt) || 0)) ultima = c;
     }
-    if (!ultima) return null;
+    if (!ultima || ultima.finita) return null;
     const m = ultima.messages[ultima.messages.length - 1];
     const t = ms(ultima.updatedAt);
     // Una parola spontanea di Filo si continua (e si fonde) solo nello stesso giorno: quella di ieri resta sotto «ieri»
