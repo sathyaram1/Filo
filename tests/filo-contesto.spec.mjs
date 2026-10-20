@@ -936,7 +936,7 @@ async function finestraPiccola(app, { catalogo }) {
         reasoningDetails: [], finishReason: r.tools ? 'tool_calls' : 'stop',
       };
     };
-  }, catalogo);
+  });
 }
 
 test('con la finestra del modello nota, rileggere una conversazione lunga sta nella finestra fin dal primo tentativo', async ({ app }) => {
