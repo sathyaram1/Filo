@@ -5038,8 +5038,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   };
   let nascostiDellaChat = nascostiDi(filo);
   // I pezzi vecchi si cercano mentre si prepara il resto (memorie, stato, file): arrivano in coda, prima della domanda.
+  // Quelli che una risposta davanti al modello ha già con sé non tornano una seconda volta (#1301).
   const ricordiP = filo && !internal && !onbActive && RicordiFilo
-    ? RicordiFilo.cerca(String(userMessage || ''), { vecchi: filo.vecchi, davanti: filo.visti }).catch(() => [])
+    ? RicordiFilo.cerca(String(userMessage || ''), {
+      vecchi: filo.vecchi, davanti: filo.visti, azioni: [...filo.azioni, ...codaScheda.flatMap((m) => (m && Array.isArray(m.actions) ? m.actions : []))],
+    }).catch(() => [])
     : Promise.resolve([]);
   // #592.2 — nell'intervista di benvenuto lo stile proposto si imposta senza riquadro finché nella conversazione non
   // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
