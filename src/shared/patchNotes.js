@@ -31,6 +31,7 @@
         'In alto a destra, accanto ai tasti della finestra, non c\'è più il tasto dei download. I download li trovi nella home e nella pagina Download, dal menu App. Mentre un file scende, l\'avanzamento lo vedi sull\'icona di Filo nella barra delle applicazioni (nel Dock su Mac). Quando un programma aspetta la tua risposta il pannello si apre da solo sopra la pagina, e lo chiudi con la ×.',
       ],
       fixes: [
+        'Sui siti il microfono dell\'Aiuto e i documenti che ti trova rispondono solo quando li vedi. Se la pagina ci mette sopra qualcosa, il clic non parte e Filo te lo dice. E la pagina non può più scrivere né cancellare nelle caselle di Filo, come quella dell\'Aiuto o della segnalazione.',
         'Il menu del tasto destro aperto su un avviso in basso a destra, o lì accanto, ora sta sopra l\'avviso e lo vedi intero.',
         'Se chiedi a Filo dove finiscono le tue chat, adesso ti dice come stanno le cose: restano salvate sul tuo computer, ma per risponderti e per dare un nome a ogni chat le legge un modello, come tutto quello che gli chiedi. Lo stesso vale per il quaderno delle memorie e per l\'Aiuto. Prima diceva che nessuna chat usciva dal computer.',
         'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il testo e il nome di un documento dell\'Editor e le correzioni del Correttore.',

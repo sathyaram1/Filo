@@ -122,7 +122,20 @@ il clic sul pulsante del sito.
      `<html>` restava sotto, grigio, e non rispondeva. Lì i pezzi entrano in un
      nostro `popover` dentro la finestra: non inerte, perché discendente, e sopra
      di lei, perché aperto dopo. Un velo che il sito porta nello strato più alto
-     dopo il menu copre anche le sonde, e il clic si ferma.
+     dopo il menu copre anche le sonde, e il clic si ferma;
+   - un pannello che **non è un pezzo del menu** ma ha bottoni che danno qualcosa
+     al sito (la barra dell'Aiuto: il microfono, e il documento trovato che,
+     trascinato, arriva alla pagina, #589.17) passa dalla stessa guardia:
+     `sorveglia(pannello, { ancorato: true, voci, bloccato })`. Le sue sonde stanno
+     in un **piano suo**, un host chiuso subito dopo il pannello e alla sua altezza.
+     Al piano del menu lascerebbero passare un velo steso fra l'Aiuto e il menu.
+     L'altezza la cambia la pila dei riquadri a ogni clic: Filo la inchioda in
+     linea con `!important`, insieme alla posizione, e le sonde la seguono prima
+     del disegno. Il trascinamento si giudica come il clic (`dragstart`); un
+     pannello che resta aperto avvisa a ogni pressione fermata, un avviso alla
+     volta. Gli effetti del contenitore restano sospesi finché il pannello è
+     aperto, col fondo sotto il piano più basso: una pagina in grigio resta
+     grigia, e l'Aiuto risponde.
 
    Sulle pagine `filo://` la guardia è spenta: nessuno script può coprire il menu.
 
@@ -170,6 +183,23 @@ faceva spendere una chiamata.
 - **Un evento che fabbrica Filo stesso** verso un campo di un riquadro (l'Incolla
   del menu, la correzione, Sostituisci della Modifica) si segna con `SN_FILO_UI.nostro(ev)`: il cancello lo
   lascia passare, la copia che vede il sito non è nell'elenco.
+- **Una casella cambia solo per un inserimento dell'utente o per mano di Filo**
+  (#1071.1). Un `execCommand` del sito scrive nella casella che ha il fuoco anche
+  dentro lo shadow chiuso; la casella dell'Aiuto sta nel documento, dove il sito
+  ne scrive anche il `value` o fa `reset` al modulo. `SN_FILO_UI.soloScritturaVera`
+  (la chiama `riquadro` per ogni sua casella, l'Aiuto per la sua) annulla ogni
+  cambio che il browser non ha annunciato con un `beforeinput` fidato: tasti,
+  incolla, composizione, correzione del sistema e annulla lo annunciano,
+  l'`execCommand` di uno script no. Un inserimento che arriva **mentre se ne
+  consegna un altro** (lo script che scrive dal suo ascolto di `beforeinput` o di
+  `input`) non vale, a meno che a scrivere sia Filo. Filo scrive dal mondo
+  isolato, dove il setter di `value`, `setRangeText`, i comandi della selezione ed
+  `execCommand` sono avvolti e dicono alla guardia che il cambio è suo (Incolla
+  del menu, correttore, Sostituisci, dettatura); il sito usa i suoi, nel suo
+  mondo. Un `value` cambiato in silenzio torna a ogni fotogramma, e quello che
+  l'Aiuto manda lo legge `SN_FILO_UI.valoreVero`. Insieme al testo torna la
+  selezione che aveva lasciato l'utente: dopo un `selectAll` e un `delete` del
+  sito, il tasto seguente non cancella tutto.
 - **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
   l'origine (`sn_feedback_draft_text@<origine>`, `BOZZE_PER_SITO` in
   `impostazioniPerOrigine.js`), concessa solo al riquadro che ha davvero
@@ -180,7 +210,10 @@ faceva spendere una chiamata.
 
 Il velo, il velo tolto all'ultimo istante, il foglio che abbassa il menu e i
 pezzi di Filo che non contano come velo: `tests/menu-coperto-dal-sito.spec.mjs`;
-la logica dell'attesa in `tests/unit/vistoDavvero.test.mjs`. Prima di cliccare
+la logica dell'attesa in `tests/unit/vistoDavvero.test.mjs`. Il microfono e il
+documento dell'Aiuto sotto il velo, il velo appena sopra l'Aiuto e la pagina in
+grigio: `tests/aiuto-coperto-dal-sito.spec.mjs`. Le caselle scritte dal sito:
+`tests/caselle-solo-utente.spec.mjs`. Prima di cliccare
 una voce della cronologia gli spec aspettano che il browser l'abbia vista
 scoperta (`cronologiaPronta` in `tests/helpers/cronologiaAppunti.mjs`).
 
@@ -204,9 +237,9 @@ sta in `tests/riquadri-solo-utente.spec.mjs`.
 
 ## Limite noto
 
-Un sito controlla lo stile e i nodi del menu che stanno nel suo documento. La
-regola 3 ferma ciò che il sito disegna **sopra** il menu; non ferma ciò che fa
-**al** menu: il suo CSS sulle nostre classi (colori trasparenti, opacità, un
+Un sito controlla lo stile e i nodi del menu (e della barra dell'Aiuto) che stanno
+nel suo documento. La regola 3 ferma ciò che il sito disegna **sopra** il menu; non
+ferma ciò che fa **al** menu: il suo CSS sulle nostre classi (colori trasparenti, opacità, un
 `::after` dentro un nostro nodo) o il suo script sui nostri nodi. La cura vera
 è disegnare il menu fuori dal documento del sito: l'owner l'ha deciso come
 lavoro a parte (D14); fino ad allora questa porta resta aperta e dichiarata, e la
@@ -247,8 +280,12 @@ Lo shadow chiuso non nasconde il **testo**: `window.find` trova anche quello
 scritto in una casella dentro un riquadro chiuso, e `getSelection().modify()`
 allarga la selezione trovata fino alla riga intera, che `toString()` restituisce
 (#1071). Basta indovinare una lettera. Ancora più semplice: gli inserimenti
-(`beforeinput`, `input`) e l'Esc escono dallo shadow verso la finestra del sito, e
-un `execCommand` del sito scrive nella casella che ha il fuoco (#1071.1). Il testo di una voce si può rendere come
+(`beforeinput`, `input`) e l'Esc escono dallo shadow verso la finestra del sito.
+Scrivere nella casella il sito non può più (#1071.1), ma può spostarne la
+selezione (un `selectAll` fra due tasti), e il tasto dopo dell'utente scrive
+sopra quello che il sito ha selezionato. Dalla pagina non lo si distingue dal
+Cmd+A che su Mac prende la barra dei menu (la pagina non vede il tasto) o da un
+lettore di schermo. Il testo di una voce si può rendere come
 contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi

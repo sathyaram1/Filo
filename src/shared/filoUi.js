@@ -184,6 +184,18 @@
       }
       const srt = proto.setRangeText;
       if (typeof srt === 'function') proto.setRangeText = function (...a) { const r = srt.apply(this, a); scrittaDaFilo(this); return r; };
+      for (const m of ['setSelectionRange', 'select']) {
+        const f = proto[m];
+        if (typeof f === 'function') proto[m] = function (...a) { const r = f.apply(this, a); selezioneDaFilo(this); return r; };
+      }
+      for (const k of ['selectionStart', 'selectionEnd', 'selectionDirection']) {
+        const ds = Object.getOwnPropertyDescriptor(proto, k);
+        if (!ds || !ds.set || !ds.configurable) continue;
+        Object.defineProperty(proto, k, {
+          configurable: true, enumerable: ds.enumerable, get: ds.get,
+          set(v) { ds.set.call(this, v); selezioneDaFilo(this); },
+        });
+      }
     }
     const D = global.Document && global.Document.prototype;
     const ex = D && D.execCommand;
@@ -203,6 +215,13 @@
     st.buono = c.value;
     st.sel = selezioneDi(c);
   }
+  function selezioneDaFilo(c) {
+    const st = caselle.get(c);
+    if (st && c.value === st.buono) st.sel = selezioneDi(c);
+  }
+  // La selezione da rimettere con il testo è l'ultima mossa dall'utente (mouse, frecce, Ctrl+A) o da Filo: un `selectAll`
+  // del sito prima del suo inserimento lascerebbe tutto selezionato, e il tasto dopo dell'utente lo cancellerebbe.
+  const TASTI_CHE_MUOVONO = /^(Arrow|Home$|End$|Page)/;
   function ripristina(c, st) {
     const sel = st.sel;
     c.value = st.buono;
@@ -222,7 +241,7 @@
   }
   function guardaCasella(c) {
     if (caselle.has(c)) return;
-    const st = { buono: c.value, sel: selezioneDi(c), annuncio: null, inCorso: [], visto: false };
+    const st = { buono: c.value, sel: selezioneDi(c), annuncio: null, inCorso: [], visto: false, gesto: false };
     caselle.set(c, st);
     c.addEventListener('beforeinput', (e) => {
       if (!e.isTrusted) return;
@@ -246,8 +265,18 @@
       ripristina(c, st);
       e.stopImmediatePropagation();
     }, true);
-    const segnaSelezione = (e) => { if (e.isTrusted && c.value === st.buono) st.sel = selezioneDi(c); };
-    for (const t of ['keyup', 'mouseup', 'select', 'focus']) c.addEventListener(t, segnaSelezione, true);
+    // Nei riquadri il tasto arriva al campo come copia nostra (tastoNelRiquadro): conta come vero.
+    const muove = (e) => {
+      if (!veroONostro(e)) return;
+      if (e.type !== 'keydown' || TASTI_CHE_MUOVONO.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) st.gesto = true;
+    };
+    const fermo = (e) => {
+      if (!veroONostro(e) || !st.gesto) return;
+      st.gesto = false;
+      if (c.value === st.buono) st.sel = selezioneDi(c);
+    };
+    for (const t of ['keydown', 'pointerdown', 'mousedown', 'touchstart']) c.addEventListener(t, muove, true);
+    for (const t of ['keyup', 'pointerup', 'mouseup', 'touchend']) c.addEventListener(t, fermo, true);
     daGuardare.add(c);
     while (daGuardare.size > TETTO_CASELLE) daGuardare.delete(daGuardare.values().next().value);
     if (!giroCaselle) giroCaselle = global.requestAnimationFrame(controllaCaselle);

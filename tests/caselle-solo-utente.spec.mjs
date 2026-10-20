@@ -47,15 +47,19 @@ test('feedback su un sito: il sito non scrive né cancella nella casella, la boz
   await page.keyboard.type(' da ieri', { delay: 30 });
   await page.evaluate(() => clearInterval(window.__m));
   expect(await valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro non va da ieri');
+  // Seleziona tutto e cancella, poi l'utente scrive ancora: il testo torna con il cursore dove l'aveva lasciato lui.
+  await page.evaluate(() => window.cancella());
+  await page.keyboard.type(',', { delay: 30 });
+  expect(await valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro non va da ieri,');
 
   // Incolla dell'utente, dalla tastiera: passa.
   await app.evaluate(({ clipboard }) => clipboard.writeText(' (anche oggi)'));
   await page.keyboard.press('Control+V');
-  await expect.poll(() => valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro non va da ieri (anche oggi)');
-  await expect.poll(() => bozza(app, testServer.origin)).toBe('Il tasto indietro non va da ieri (anche oggi)');
+  await expect.poll(() => valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro non va da ieri, (anche oggi)');
+  await expect.poll(() => bozza(app, testServer.origin)).toBe('Il tasto indietro non va da ieri, (anche oggi)');
 
   await clicca(app, page, '.sn-fb-send');
-  await expect.poll(() => nelMondoDiFilo(app, page, () => window.__inviati.slice())).toEqual(['Il tasto indietro non va da ieri (anche oggi)']);
+  await expect.poll(() => nelMondoDiFilo(app, page, () => window.__inviati.slice())).toEqual(['Il tasto indietro non va da ieri, (anche oggi)']);
 });
 
 test('spiegazione su un sito: il sito non cambia la domanda prima dell\'Invio, quella dell\'utente parte intera', async ({ app, openTab, testServer }) => {
