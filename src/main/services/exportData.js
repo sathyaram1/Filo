@@ -688,7 +688,9 @@ function mergeImportedData(current, imported, opzioni = {}) {
   const imp = senzaSegretiVuoti(require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {}), cur);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
-  const stats = { added: 0, updated: 0, unchanged: 0, restano: 0, pagineFuori: 0, pagineMieFuori: 0 };
+  const stats = {
+    added: 0, updated: 0, unchanged: 0, restano: 0, pagineFuori: 0, pagineMieFuori: 0, appuntiFuori: 0, appuntiMieFuori: 0,
+  };
 
   for (const k of Object.keys(imp)) {
     const regola = regolaImport(k);
