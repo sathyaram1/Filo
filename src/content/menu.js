@@ -106,6 +106,7 @@
       activeMenu = null;
       chiudiStrato();
     }
+    try { global.SN_POPUP?.sottoIlMenu?.(false); } catch (_) {}
     // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
     dropZones.length = 0;
   }
