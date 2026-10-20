@@ -1501,10 +1501,14 @@
   // lunghe: l'avviso "sto lavorando" deve durare quanto il lavoro). Ritorna
   // sempre un handle con close(), così chi mostra un avviso di avanzamento può
   // sostituirlo con l'esito invece di impilarci sopra un secondo riquadro.
+  // `rimedio`: la risposta d'errore dell'IPC (o l'errore ricomposto) di una frase che nomina dove si rimedia; l'avviso
+  // porta il tasto per andarci (#663) e resta abbastanza da arrivarci col puntatore, che lo ferma.
+  const DURATA_CON_RIMEDIO_MS = 15000;
   function showToast(text, opts = {}) {
     const t = document.createElement('div');
     t.className = 'sn-toast';
     t.textContent = text;
+    const pagina = opts.rimedio ? paginaDelRimedio(opts.rimedio) : null;
     let closed = false;
     let tempo = null;
     // Rimozione immediata usata dallo sfratto per tetto: niente animazione, ma
