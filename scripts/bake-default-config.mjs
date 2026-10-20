@@ -45,6 +45,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 // Il tetto del testo che il server accetta vive in un posto solo: là sta anche
 // la regola che un taglio si dichiara invece di mangiare la parte che contava.
 import { testoEntroIlTetto, normalizzaChiavi, parolaDellaCostruzione, DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
+import { descriviErroreDiRete } from './lib/rete.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
