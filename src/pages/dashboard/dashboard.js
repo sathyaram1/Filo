@@ -55,8 +55,13 @@
     }
     ripresa = null;
   };
-  // Un turno fermato la cui azione in volo non è ancora tornata dal main: finché c'è, il turno dopo aspetta lei.
-  let chiusuraInCorso = null;
+  // I turni fermati la cui azione in volo non è ancora tornata dal main, per conversazione: il turno dopo della stessa
+  // conversazione aspetta l'esito, così non rifà l'azione (#578); un'altra conversazione non c'entra (#1296).
+  const chiusure = new Map();
+  const chiusuraDi = (chat) => (chat ? chiusure.get(chat) || null : null);
+  // I seguiti scritti mentre Filo lavora (#1296), in ordine: { id, c: la composizione, bolla, turno }. `turno`: affidato
+  // al turno in corso, che lo legge al suo passo dopo; gli altri partono a turno finito.
+  const seguiti = [];
   // Chi ferma lo fa di fretta e insiste (doppio clic, Invio ripetuto): per un attimo il secondo colpo trova ancora il
   // quadrato spento, non «riprendi».
   const PAUSA_RIPRESA = 700;
