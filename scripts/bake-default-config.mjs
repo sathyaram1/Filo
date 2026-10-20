@@ -349,9 +349,7 @@ async function avvisa(mancanti, righe, esitoServer) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         passphrase,
-        name: nomi
-          ? `Pubblicazione ferma: manca la chiave di default ${nomi}`
-          : 'Pubblicazione ferma: nessuna chiave di default',
+        name: titoloAllarmeBake(nomi, esitoServer),
         text: testo,
         keys: chiaviAllarmeBake(mancanti),
       }),
