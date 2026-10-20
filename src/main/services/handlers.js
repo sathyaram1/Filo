@@ -5254,20 +5254,58 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     ricordaLettoInChat([a]);
     await segnaFonteLetta(chatId, fontiLette, a);
   }
-  // Il modello della chat rifiuta una richiesta più lunga della sua finestra: il tratto si stringe quanto dice il
-  // rifiuto e si rifà lo stesso giro. Il tetto che ha funzionato vale per i turni dopo con quel modello.
+  // Le riletture di una conversazione fatte in questo turno, col posto del loro esito fra i messaggi del giro: dopo un
+  // rifiuto per finestra si accorciano lì (#1301), e il resto la conversazione lo dà a pezzi con `da`.
+  const riletture = [];
+  let accorciate = 0;
+  const lunghezzaRiletture = () => riletture.reduce((n, r) => n + r.x.rendered._output.transcript.length, 0);
+  const accorciaRiletture = async (rifiuto, caratteri) => {
+    const FC = globalThis.SN_FILO_CONTESTO;
+    if (!riletture.length || accorciate >= 3) return false;
+    const nuove = FC.riletturePiuCorte({ ...rifiuto, caratteri, lunghezze: riletture.map((r) => r.x.rendered._output.transcript.length) });
+    if (!nuove) return false;
+    let toccate = 0;
+    for (let k = 0; k < riletture.length; k++) {
+      const r = riletture[k];
+      const o = r.x.rendered._output;
+      if (nuove[k] == null) continue;
+      const chat = await FiloChats.get(o.chatRead).catch(() => null);
+      if (!chat) continue;
+      const t = ChatArchive.transcriptForReading(chat.messages, { da: r.x.action.da, cap: nuove[k], pezzo: Math.min(ChatArchive.PEZZO_RILETTURA, nuove[k]) });
+      if (t.length >= o.transcript.length) continue;
+      o.transcript = t;
+      const esito = toolResultText(r.x, { risposta: r.risposta });
+      threadMessages[r.pos] = Tools.toolMessage(r.x.action._callId, r.coda ? `${esito} ${r.coda}` : esito);
+      toccate++;
+    }
+    if (!toccate) return false;
+    accorciate++;
+    return true;
+  };
+  // Il modello della chat rifiuta una richiesta più lunga della sua finestra: si accorcia la parte più grossa fra il
+  // tratto e le riletture del turno, e si rifà lo stesso giro. Il tetto del tratto che ha funzionato vale per i turni
+  // dopo con quel modello, e la finestra detta dal rifiuto per le riletture.
   let strette = 0;
   let finestraDaRicordare = null;
   const stringiDopoRifiuto = async (e) => {
     const FC = globalThis.SN_FILO_CONTESTO;
     // Un rifiuto dato dal tetto della risposta non si cura stringendo la conversazione, salvo `stringibile`: lì
     // accorciare il tratto basta e non chiede niente all'utente.
-    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 && (e?.code !== 'TETTO_RISPOSTA' || e?.stringibile) ? FC.troppoLungo(e) : null;
+    const rifiuto = e?.code !== 'TETTO_RISPOSTA' || e?.stringibile ? FC.troppoLungo(e) : null;
     if (!rifiuto) return false;
+    if (rifiuto.max && modelloChat) finestreDichiarate.set(modelloChat, rifiuto.max);
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
     const caratteri = FC.caratteriDi(inviati);
-    const caratteriTratto = FC.caratteriDi(payloadBase.filoTratto);
+    const conTratto = !!(filo && tettiChat && Array.isArray(payloadBase.filoTratto));
+    const caratteriTratto = conTratto ? FC.caratteriDi(payloadBase.filoTratto) : 0;
+    if (lunghezzaRiletture() >= caratteriTratto && await accorciaRiletture(rifiuto, caratteri)) return true;
+    if (await stringiTratto(rifiuto, caratteri, caratteriTratto)) return true;
+    return accorciaRiletture(rifiuto, caratteri);
+  };
+  const stringiTratto = async (rifiuto, caratteri, caratteriTratto) => {
+    const FC = globalThis.SN_FILO_CONTESTO;
+    if (!filo || !tettiChat || !Array.isArray(payloadBase.filoTratto) || strette >= 3) return false;
     const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
     if (token == null || token >= tettiChat.token) return false;
     strette++;
