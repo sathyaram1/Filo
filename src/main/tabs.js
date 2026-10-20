@@ -976,7 +976,7 @@ class TabManager {
     // ingresso convergono su un solo URL, qualunque chiamante li apra.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
     // Un indirizzo nudo («sito.com/pagina», «localhost:3000», come a volte lo manda il modello) caricato così resta bianco.
-    else if (typeof url === 'string') url = indirizzoDaCaricare(url) || url;
+    else if (typeof url === 'string') url = indirizzoDaCaricare(url);
 
     // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
     // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
