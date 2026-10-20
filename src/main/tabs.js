@@ -3502,12 +3502,7 @@ class TabManager {
       if (!url || !Permessi.gestoEntro(wc, Permessi.GESTO_MS)) return;
       risorsaDellaPagina(e.frame || wc.mainFrame, url).then((risorsa) => {
         if (risorsa || wc.isDestroyed() || !Permessi.gestoPerUnAvviso(wc)) return;
-        let pagina = '';
-        try { pagina = wc.getURL(); } catch (_) {}
-        const a = avvisoDallaPagina(url, globalThis.SN_NOMI_SITO.sitoDi(pagina));
-        if (a && this.win && !this.win.isDestroyed()) {
-          try { this.win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
-        }
+        avvisaIndirizzoFermato(url, this.win, urlDi(wc));
       });
     });
   }
