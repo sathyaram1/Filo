@@ -5255,7 +5255,8 @@ function ricordoComeAzione(ricordi) {
 }
 
 async function handleFiloChat(richiesta) {
-  const volo = { accoglienza: false };
+  const reqId = richiesta && richiesta.reasoningReqId;
+  const volo = { accoglienza: false, turno: registraTurno(reqId, richiesta && richiesta.sender && richiesta.sender.wc) };
   try {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
