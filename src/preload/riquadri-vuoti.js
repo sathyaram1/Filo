@@ -58,6 +58,25 @@ function buildRiquadriVuotiSource(corpi) {
     return null;
   }
   function aperta(w) { try { return !chiusa.call(w); } catch (e) { return false; } }
+  var OSPITI = 'iframe,frame,object,embed', OSPITE = /^(iframe|frame|object|embed)$/;
+  var nomeDi = (D(Element.prototype, 'localName') || {}).get;
+  var tutti = Document.prototype.querySelectorAll, haAttr = Element.prototype.hasAttribute, attr = Element.prototype.getAttribute;
+  var ORIGINE = String(self.origin);
+  var arrivati = new WeakSet();
+  // Toccato prima del suo load, un riquadro che arriva a un indirizzo dello stesso sito tiene la finestra e perde il
+  // preload: niente accesso, menu, cookie lì dentro. Non si tocca finché non arriva; resta fuori finché è in volo.
+  function inVolo(t) {
+    if (arrivati.has(t)) return false;
+    try {
+      var n = nomeDi.call(t);
+      if (n === 'iframe' && haAttr.call(t, 'srcdoc')) return true;
+      var a = n === 'object' ? 'data' : 'src';
+      if (!haAttr.call(t, a)) return false;
+      var v = String(attr.call(t, a)).trim();
+      if (!v || VUOTO.test(v)) return false;
+      return new URL(v, document.baseURI).origin === ORIGINE;
+    } catch (e) { return false; }
+  }
   var inGiro = false;
   function spazza() {
     if (inGiro) return;
@@ -66,7 +85,15 @@ function buildRiquadriVuotiSource(corpi) {
       var coda = [window];
       sistemate = sistemate.filter(function (r) { var w = r.deref(); if (w && aperta(w)) { coda.push(w); return true; } return false; });
       for (var n = 0; n < coda.length && n < 4096; n++) {
-        var w = coda[n], k = 0;
+        var w = coda[n], k = 0, d = documento(w), ospiti = [], volo = false;
+        try { ospiti = d ? tutti.call(d, OSPITI) : []; } catch (e) {}
+        for (var j = 0; j < ospiti.length && j < 4096; j++) {
+          if (inVolo(ospiti[j])) { volo = true; continue; }
+          var g = delRiquadro(ospiti[j]);
+          if (g && applica(g)) coda.push(g);
+        }
+        // Per indice si vedono anche i riquadri nelle radici ombra, ma non si sa se sono in volo.
+        if (volo) continue;
         try { k = lungo ? lungo.call(w) : w.length; } catch (e) {}
         for (var i = 0; i < k && i < 4096; i++) {
           var f = null;
@@ -76,8 +103,6 @@ function buildRiquadriVuotiSource(corpi) {
       }
     } catch (e) {} finally { inGiro = false; }
   }
-  var OSPITI = 'iframe,frame,object,embed', OSPITE = /^(iframe|frame|object|embed)$/;
-  var nomeDi = (D(Element.prototype, 'localName') || {}).get;
   var connesso = (D(Node.prototype, 'isConnected') || {}).get;
   var cercaIn = [Element.prototype.querySelector, DocumentFragment.prototype.querySelector];
   // Il giro costa: si fa solo se l'inserimento può aver fatto nascere un riquadro.
