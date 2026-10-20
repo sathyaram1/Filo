@@ -2648,7 +2648,15 @@ async function eseguiAzioneFilo(action, {
         // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui.
         // Si giudica e si apre quello che diventa caricandolo, come dalla barra: «localhost:3000» è una pagina, un percorso
         // anche fra virgolette è un file (#482 giro 2, #1318).
-        const url = globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(scritto) || scritto;
+        // Quello che non è un indirizzo non diventa una ricerca data per pagina aperta: un percorso è un file fermato, il
+        // resto lo si dice al modello (#1318 giro 1).
+        const url = globalThis.SN_URL_NAV?.indirizzoChiesto ? globalThis.SN_URL_NAV.indirizzoChiesto(scritto) : scritto;
+        if (!url) {
+          const Fermato = require('./indirizzoFermato');
+          const percorso = globalThis.SN_URL_NAV.sembraPercorso(scritto);
+          const avviso = percorso ? Fermato.avvisoPercorsoScritto(globalThis.SN_URL_NAV.pulisciPercorso(scritto)) : Fermato.avvisoNonIndirizzo(scritto);
+          return { executed: false, kept: true, output: { blocked: percorso ? 'scheme' : 'indirizzo', avviso } };
+        }
         let proto = '';
         try { proto = new URL(url).protocol.toLowerCase(); } catch (_) { /* lo dice openTab */ }
         // Posta, telefono e SMS vanno al loro programma come cliccati su una pagina (#1318): la porta delle uscite
