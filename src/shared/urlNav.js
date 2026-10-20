@@ -170,8 +170,12 @@
   // Le coppie con cui un percorso arriva incartato: «Copia come percorso» di Windows, il Markdown di un modello, le
   // virgolette tipografiche di un testo incollato.
   const INCARTI = [['"', '"'], ['\'', '\''], ['`', '`'], ['«', '»'], ['“', '”'], ['‘', '’'], ['„', '“'], ['<', '>']];
+  const incartato = (t) => INCARTI.some(([a, b]) => t.length > a.length + b.length && t.startsWith(a) && t.endsWith(b));
   function senzaIncarti(s) {
     let t = String(s == null ? '' : s).trim();
+    // Il punto fuori dalle virgolette, come lo scrive un modello in una frase, non è del percorso.
+    const senzaPunto = t.replace(/[.,;:!?]+$/, '');
+    if (senzaPunto !== t && incartato(senzaPunto)) t = senzaPunto;
     for (let giro = 0; giro < 4; giro++) {
       const c = INCARTI.find(([a, b]) => t.length > a.length + b.length && t.startsWith(a) && t.endsWith(b));
       if (!c) break;
