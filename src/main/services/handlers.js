@@ -3817,7 +3817,7 @@ async function salvatePerChat(query) {
   try { categorie = await Categorizer.listCategories(); } catch (_) {}
   const categoria = (p) => (p.categoryId && (categorie.find((c) => c.id === p.categoryId) || {}).name) || p.category || '';
   // «ricetta» deve trovare /ricette/ e «campeggio» i campeggi: le parole che contano si cercano senza la vocale finale.
-  const radici = CA.normalizeForSearch(query).split(/\s+/).filter(Boolean)
+  const radici = CA.paroleDellaRicerca(query)
     .map((w) => (w.length >= 5 && CA.terminiCheDistinguono([w]).length ? w.replace(/[aeiou]$/, '') : w)).join(' ');
   const { results, termini, allargata } = CA.searchWide(pagine, radici, {
     testo: (p) => `${p.title || ''} ${p.url} ${categoria(p)}`,
