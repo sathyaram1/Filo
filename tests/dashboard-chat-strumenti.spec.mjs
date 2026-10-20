@@ -158,7 +158,54 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   await app.evaluate(() => { try { globalThis.__restoreProvider?.(); } catch (_) {} });
 });
 
-test('B — un\'azione che chiede, chiamata come strumento, apre la conferma, e il modello risponde sapendolo', async ({ app, shell }) => {
+// #1321 — Con la scheda occupata, la risposta del turno le arrivava prima degli eventi in diretta ancora in coda: la
+// chat chiudeva la diretta e li buttava, e il blocco perdeva la nota e l'ultimo pensiero. Qui lo si fa succedere apposta.
+test('A2 — la risposta arriva prima degli ultimi eventi in diretta: nota e ultimo pensiero restano nel blocco', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await giroCercaAgisce(app);
+
+  // Dalla fine del primo giro il main trattiene gli eventi in diretta verso la home; la risposta invece parte.
+  await app.evaluate(({ ipcMain, webContents }) => {
+    const home = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://newtab'));
+    const manda = home.send.bind(home);
+    const trattenuti = [];
+    home.send = (canale, ...args) => {
+      if (globalThis.__trattieni && /^filo:(reasoning|answer|action)$/.test(canale)) trattenuti.push([canale, args]);
+      else manda(canale, ...args);
+    };
+    globalThis.__consegna = () => { globalThis.__trattieni = false; for (const [c, a] of trattenuti.splice(0)) manda(c, ...a); };
+    const finto = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    let giri = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
+      const r = await finto(o);
+      if (++giri === 1) globalThis.__trattieni = true;
+      return r;
+    };
+    const gestore = ipcMain._invokeHandlers.get('filo:message');
+    ipcMain.removeHandler('filo:message');
+    ipcMain.handle('filo:message', async (event, msg) => {
+      const r = await gestore(event, msg);
+      if (msg && msg.type === globalThis.SN_MSG.MSG.FILO_CHAT) globalThis.__rispostaPartita = true;
+      return r;
+    });
+  });
+
+  await page.locator('#input').fill('metti un timer per la pasta e dimmi se sai salvare per dopo');
+  await page.locator('#sendBtn').click();
+  await expect.poll(() => app.evaluate(() => !!globalThis.__rispostaPartita), { timeout: 20_000 }).toBe(true);
+  // Le risposte arrivano alla scheda nell'ordine in cui partono: quando torna questa, quella del turno è già arrivata.
+  await page.evaluate(() => new Promise((ok) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_GET_TIMERS }, ok)));
+  await app.evaluate(() => globalThis.__consegna());
+
+  await bloccoDelGiro(page);
+  await page.screenshot({ path: 'tests/.shots/strumenti-diretta-in-ritardo.png' });
+});
+
+test('B —un\'azione che chiede, chiamata come strumento, apre la conferma, e il modello risponde sapendolo', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
