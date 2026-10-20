@@ -435,6 +435,18 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
   }
 });
 
+test('fra le schede non c’è un tasto dei download, e nessuna capacità lo promette (#941)', () => {
+  const html = readFileSync(join(ROOT, 'src', 'renderer', 'shell.html'), 'utf8');
+  const fila = html.slice(html.indexOf('class="tab-row"'), html.indexOf('</header>'));
+  assert.ok(fila.length > 0 && !/download|scaricament/i.test(fila),
+    'la fila delle schede ha di nuovo un tasto dei download: #941 l’ha tolto, i download stanno nella home e nella pagina Download');
+  for (const c of CAP.CAPABILITIES) {
+    const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;
+    const m = text.match(/indicatore (dei download|degli scaricamenti|in alto)|scaricamenti in alto/i);
+    assert.ok(!m, `la capacità "${c.id}" cita "${m && m[0]}", ma fra le schede non c’è più un tasto dei download (#941)`);
+  }
+});
+
 // Etichette che il menu del tasto destro MOSTRA davvero: i valori italiani
 // delle chiavi `menu_*` nominate dai content script (anche dentro un ternario,
 // perché cerchiamo la chiave come stringa) più le etichette scritte a mano lì.
