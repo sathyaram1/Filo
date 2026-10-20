@@ -508,8 +508,10 @@ test('in una chat pulita «aprimi la pagina dei prezzi di OpenAI» apre la sched
     { finale: { cerca: '(x)', testo: 'APERTA.' } },
   ]);
   await chiedi(page, 'aprimi la pagina dei prezzi di OpenAI');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'APERTA.' })).toBeVisible({ timeout: 20_000 });
-  expect(await schedaVerso(app, 'openai.com')).toBe(true);
+  await expect.poll(() => schedaVerso(app, 'openai.com'), { timeout: 20_000 }).toBe(true);
+  await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
+  expect((await chiamate(app)).length).toBe(1);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'APERTA.' })).toHaveCount(0);
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
