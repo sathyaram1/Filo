@@ -2878,17 +2878,18 @@ async function eseguiAzioneFilo(action, {
           if (id) {
             const chat = await FiloChats.get(id);
             if (!chat) return { executed: false, kept: true, output: { chatRead: id, found: false } };
-            // Una rilettura vale al più quanto tutto il contesto della chat, finestra del modello compresa: oltre, testa,
-            // coda e il resto a pezzi.
-            let cap = 8000;
+            // Una rilettura vale al più quanto tutto il contesto della chat, e quello che ci sta ancora nella finestra
+            // del modello quando è nota (regola in src/shared/filoContesto.js): oltre, testa, coda e il resto a pezzi.
+            const FC = globalThis.SN_FILO_CONTESTO;
+            let cap = FC.RILETTURA_MINIMA;
             try {
-              const FC = globalThis.SN_FILO_CONTESTO;
               const s = await getEffectiveSettings();
               const finestra = finestreDeiModelli.get(String(modelForAction(s, ACTIONS.FILO_CHAT) || ''));
               const token = Math.min(FC.tetti(s.contestoFilo, Defaults.get().contestoFilo).token, finestra ?? Infinity);
-              cap = Math.max(cap, Math.floor(token * FC.CARATTERI_PER_TOKEN));
+              const libero = typeof spazioRilettura === 'function' ? await spazioRilettura() : null;
+              cap = FC.tettoRilettura({ token, libero });
             } catch (_) {}
-            const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
+            const daFuori = FC.daFuoriDi(chat.messages).map((x) => ({ ...x, chat: id }));
             return {
               executed: true,
               kept: true,
@@ -2899,7 +2900,7 @@ async function eseguiAzioneFilo(action, {
                 date: chat.closedAt || chat.updatedAt || chat.startedAt || null,
                 // La trascrizione arriva già nella forma "Utente: … / Filo: …",
                 // con testa e coda se è lunghissima (mai un taglio muto): il mezzo si chiede con `da`.
-                transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da, cap }),
+                transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da, cap, pezzo: Math.min(ChatArchive.PEZZO_RILETTURA, cap) }),
                 ...(daFuori.length ? { daFuori } : {}),
               },
             };
