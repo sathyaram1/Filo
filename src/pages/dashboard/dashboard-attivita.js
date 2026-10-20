@@ -1048,7 +1048,10 @@
       if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
       if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
     }
-    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.blocked === 'scheme') {
+      const cosa = pulito(o.cosa);
+      return cosa ? cosa.charAt(0).toLowerCase() + cosa.slice(1) : 'indirizzo non ammesso';
+    }
     if (o.blocked === 'site') {
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
       return `${o.host || 'il sito'} è fra i siti ${quali}`;
