@@ -1562,8 +1562,11 @@ html, body {
 /* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
 .dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform calc(160ms * var(--sn-motion, 1)) ease, opacity calc(160ms * var(--sn-motion, 1)) ease; }
 .dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
-/* Appena comparso sotto il dito che ha mandato, il quadrato ignora i clic per mezzo secondo: si accende quando li prende. */
-.dash-send.dash-stop:not([data-pronto]):not([disabled]) { opacity: 0.55; transform: none; cursor: default; }
+/* Appena comparso sotto il dito che ha mandato, il quadrato ignora i clic per mezzo secondo (PAUSA_QUADRATO): si accende
+   in quel tempo. La durata è la pausa, non un token estetico. */
+.dash-send.dash-stop:not([disabled]) { animation: dash-stop-arma 500ms ease-in; }
+@keyframes dash-stop-arma { from { opacity: 0.45; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dash-send.dash-stop:not([disabled]) { animation-timing-function: step-end; } }
 
 .dash-img-preview {
   position: relative;
