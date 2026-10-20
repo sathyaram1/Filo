@@ -25,21 +25,40 @@
 
   // Il tasto che toglie l'ostacolo, sotto la frase che lo nomina. Su una pagina
   // web «riscattalo nella pagina Crediti» è un'indicazione senza strada: da lì
-  // l'utente a quella pagina non sa arrivare (#663).
-  function mostraRimedio(host, res) {
+  // l'utente a quella pagina non sa arrivare (#663). `dopo`: chi lo ospita si chiude (il menu, l'avviso).
+  function paginaDelRimedio(res) {
     const CE = global.SN_CHAT_ERRORS;
-    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(res) : null;
+    return CE && CE.rimedioPagina ? CE.rimedioPagina(res) : null;
+  }
+  function apriRimedio(pagina) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url })).catch(() => {}); } catch (_) {}
+  }
+  function mostraRimedio(host, res, { dopo = null } = {}) {
+    const pagina = paginaDelRimedio(res);
     if (!host || !pagina) return null;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'sn-msg-rimedio';
     btn.textContent = pagina.label;
     if (pagina.title) btn.title = pagina.title;
-    btn.addEventListener('click', () => {
-      try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
+    btn.addEventListener('click', (e) => {
+      // Il tasto sta nel documento del sito: un clic finto della pagina non apre schede.
+      const vero = global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted;
+      if (!vero) return;
+      e.stopPropagation();
+      apriRimedio(pagina);
+      if (typeof dopo === 'function') dopo();
     });
     host.appendChild(btn);
     return btn;
+  }
+
+  // Un errore dell'AI mostrato in un riquadro: la frase e, sotto, la strada per togliere l'ostacolo. Viaggiano
+  // insieme da qui perché ogni superficie che scriveva solo la frase lasciava l'utente senza strada (#663).
+  function scriviErrore(host, res, opts) {
+    if (!host) return null;
+    host.textContent = frasePerLUtente(res);
+    return mostraRimedio(host, res, opts);
   }
 
   // z-index iniziale e step per stacking deterministico
