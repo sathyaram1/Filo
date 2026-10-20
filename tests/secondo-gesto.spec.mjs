@@ -119,13 +119,9 @@ test('B — Invio con del testo mentre Filo lavora: il lavoro va in fondo e il s
   ]);
   await page.screenshot({ path: 'tests/.shots/secondo-gesto-seguito-letto.png' });
   // L'archivio racconta lo stesso, nello stesso ordine: riaperta, la chat è uguale.
-  const archivio = await page.evaluate(async () => {
-    const chats = await new Promise((ok) => chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_CHAT_LIST }, ok));
-    const id = (chats.chats || chats.list || [])[0]?.id;
-    const r = await new Promise((ok) => chrome.runtime.sendMessage({ type: self.SN_MSG.MSG.FILO_CHAT_GET, id }, ok));
-    return (r.chat.messages || []).map((m) => `${m.role}: ${m.text}`);
-  });
-  expect(archivio).toEqual([
+  const archivio = () => app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list())
+    .filter((c) => !c.app).flatMap((c) => c.messages.map((m) => `${m.role}: ${m.text}`)));
+  await expect.poll(archivio, { timeout: 5_000 }).toEqual([
     'user: metti un timer di due minuti',
     'user: e poi dimmi anche che ore sono',
     'filo: Timer messo, e ho letto anche il seguito.',
