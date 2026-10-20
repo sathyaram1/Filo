@@ -86,12 +86,10 @@ const KNOWN_BINARY = {
  * terminale parte, mai sulla cartella del programma.
  */
 function normalizePath(input, base) {
-  let p = String(input == null ? '' : input).trim();
+  // Virgolette, apici inversi e «file://» li toglie la stessa pulizia di chi apre i percorsi in una scheda (#1318).
+  if (!globalThis.SN_URL_NAV) require('../../shared/urlNav.js');
+  let p = globalThis.SN_URL_NAV.percorsoPulito(input);
   if (!p) return '';
-  // Gli LLM incartano volentieri i percorsi tra virgolette o apici.
-  if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith('\'') && p.endsWith('\''))) {
-    p = p.slice(1, -1).trim();
-  }
   if (p === '~') p = os.homedir();
   else if (p.startsWith('~/') || p.startsWith('~\\')) p = path.join(os.homedir(), p.slice(2));
   if (!p) return '';
