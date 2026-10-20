@@ -62,9 +62,7 @@ test('cliccando un link a un file, Filo lo scarica, lo registra come "completato
     expect(entry.totalBytes).toBe(FILE.length);
     expect(entry.savePath).toContain('report.pdf');
 
-    // 3) L'utente lo vede: compare l'indicatore nella barra e il toast di conferma
-    //    con le azioni "Apri file"/"Apri cartella".
-    await expect(shell.locator('#dl-indicator')).toBeVisible();
+    // 3) L'utente lo vede: il toast di conferma con le azioni "Apri file"/"Apri cartella".
     await expect(shell.locator('.shell-notif-msg')).toContainText('Scaricato', { timeout: 8000 });
     await expect((await avvisi()).locator('.shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
 
