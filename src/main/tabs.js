@@ -3468,11 +3468,29 @@ class TabManager {
     openExternalScheme(url);
   }
 
-  // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che
-  // la pagina non può fingere.
-  indirizzoRifiutatoDallaPagina(wc, url) {
-    if (!/^file:/i.test(String(url || '')) || !Permessi.gestoRecente(wc)) return;
-    avvisaIndirizzoFermato(url, this.win);
+  // Il rifiuto di Chromium a una pagina web si dice solo dopo un input vero su di lei, che la pagina non può fingere: quello
+  // che tenta da sola resta muto (#482).
+  _ascoltaRifiutiDiChromium(wc) {
+    wc.on('console-message', (e) => {
+      const m = RIFIUTO_DI_CHROMIUM.exec(String((e && e.message) || ''));
+      if (!m || !Permessi.gestoRecente(wc)) return;
+      let pagina = '';
+      try { pagina = String(wc.getURL() || ''); } catch (_) {}
+      if (!/^https?:/i.test(pagina)) return;
+      const url = m[2].trim();
+      if (m[1] !== 'load local resource') { avvisaIndirizzoFermato(url, this.win); return; }
+      const frame = e.frame;
+      if (!frame || typeof frame.executeJavaScript !== 'function') return;
+      Promise.resolve()
+        .then(() => frame.executeJavaScript(`(${eUnaRisorsa})(${JSON.stringify(url)})`, false))
+        .then((risorsa) => { if (risorsa === false) avvisaIndirizzoFermato(url, this.win); })
+        .catch(() => {});
+    });
+  }
+
+  // La posta, il telefono e gli SMS che chiede il modello vanno al programma del computer come da una scheda (#1318).
+  consegnaAlSistema(url) {
+    return openExternalScheme(url);
   }
 
   // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.
