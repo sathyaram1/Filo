@@ -17,7 +17,7 @@ const C = globalThis.SN_CONST;
 const FM = globalThis.SN_FILO_MEMORY;
 const K = C.STORAGE_KEYS;
 
-const REGOLE = new Set(['contenuto', 'stato', 'spesa', 'pagine', 'sveglie']);
+const REGOLE = new Set(['contenuto', 'stato', 'spesa', 'pagine', 'sveglie', 'appunti']);
 
 test('sentinella: ogni chiave di STORAGE_KEYS dice se si importa e come', () => {
   const senza = Object.keys(K).filter((n) => !REGOLE.has(REGOLE_IMPORT[n]));
