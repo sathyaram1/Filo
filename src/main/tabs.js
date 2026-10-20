@@ -3141,8 +3141,10 @@ class TabManager {
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         const gesto = Permessi.gestoRecente(wc);
-        globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
+        // «localhost:3000» scritto da un modello è la pagina, come dalla barra (#1318): la porta giudica quella.
+        const indirizzo = indirizzoDaCaricare(url);
+        globalThis.SN_USCITA_DA_FILO(indirizzo, wc, () => {
+          this.apriDaCollegamento(indirizzo, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
         }).catch(() => {});
         return { action: 'deny' };
       }
