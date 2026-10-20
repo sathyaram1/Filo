@@ -40,6 +40,21 @@ function avvisoIndirizzoFermato(rawUrl) {
   return { testo, chiave: `indirizzo-fermato:${testo}` };
 }
 
+// Quello che una pagina web si è visto rifiutare da Chromium: la riga in console la pagina la può imitare con un testo
+// suo, quindi l'avviso nomina il sito che lo chiedeva e il tipo, mai il percorso (#1318 giro 1).
+function avvisoDallaPagina(rawUrl, sito) {
+  let u;
+  try { u = new URL(String(rawUrl || '').trim()); } catch (_) { return null; }
+  const schema = u.protocol.toLowerCase();
+  let cosa;
+  if (schema === 'file:') cosa = u.hostname ? 'Percorso di rete' : 'File del computer';
+  else if (schema === 'data:') cosa = 'Indirizzo «data:»';
+  else return null;
+  const da = accorciato(sito, MAX_SCHEMA * 2);
+  const testo = `${cosa} chiesto da ${da || 'questa pagina'}: bloccato per sicurezza`;
+  return { testo, chiave: `indirizzo-fermato:${testo}` };
+}
+
 // Un file: o un data: che una pagina web apre (collegamento, script, finestra nuova) Chromium lo rifiuta prima che Filo
 // lo veda, e resta solo la sua riga in console (#1318): l'indirizzo rifiutato, o ''. Testi di Chromium, non nostri.
 const RIFIUTI_DI_CHROMIUM = [
