@@ -29,8 +29,14 @@ restava rosso e muto).
   Filo (un `file:` o un `data:` che una pagina web apre da collegamento, script o
   finestra nuova) resta solo la sua riga in console: la legge il main
   (`_seguiRifiutiDiChromium` in `tabs.js`), solo dopo un input vero e una volta per
-  gesto; quello che la pagina tenta da sola resta muto (#1318).
-  Prova `tests/indirizzo-fermato-avvisa.spec.mjs`.
+  gesto; quello che la pagina tenta da sola resta muto (#1318). Quella riga la
+  pagina la può imitare, e lo stesso vale per l'indirizzo di un suo collegamento:
+  l'avviso di un indirizzo scritto da una pagina web nomina il sito e il tipo, mai
+  il percorso; un'immagine o un riquadro della pagina che Chromium rifiuta non è
+  un'apertura e tace. Prova `tests/indirizzo-fermato-avvisa.spec.mjs`.
+- **Quello che l'assistente chiede di aprire non diventa mai una ricerca**: un
+  percorso è un file fermato e detto, la posta senza `mailto:` va al programma di
+  posta, il resto torna al modello come «non è un indirizzo» (`indirizzoChiesto`).
 - **Prima di rifiutare un indirizzo, leggilo come la barra** (#1318): un indirizzo
   scritto da un modello o da Filo (`localhost:3000`, un percorso fra virgolette) si
   giudica per quello che diventa caricandolo, con `indirizzoDaCaricare` di
