@@ -192,7 +192,8 @@ async function pagineCheCiSono(incognito) {
   const url = new Set();
   const siti = new Set();
   try {
-    const tutte = [...await F().pagine(null, { incognito }), ...await globalThis.SN_ARCHIVED_TABS.list()];
+    const A = globalThis.SN_ARCHIVED_TABS;
+    const tutte = [...await F().pagine(null, { incognito }), ...((A && await A.list()) || [])];
     for (const p of tutte) if (p && p.url) { url.add(senzaAncora(p.url)); siti.add(sitoDi(p.url)); }
   } catch (_) { return () => true; }
   return (p) => (p.delicata ? siti.has(sitoDi(p.url)) : url.has(senzaAncora(p.url)));
