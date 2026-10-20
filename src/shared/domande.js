@@ -181,9 +181,9 @@
     }
     if (!problemi.length) return null;
     const rimedi = [];
-    if (tipi.has('file')) rimedi.push('togli i nomi di file: con gli altri dettagli tecnici vanno in notePerAgenti, che resta libero');
+    if (tipi.has('file')) rimedi.push('sposta i nomi di file in notePerAgenti, con gli altri dettagli tecnici (lì il testo è libero)');
     if (tipi.has('lineette')) rimedi.push('al posto delle lineette metti un punto o una virgola');
-    if (tipi.has('pro')) rimedi.push('un\'opzione senza un pro vero si toglie, altrimenti scrivi il pro');
+    if (tipi.has('pro')) rimedi.push('un\'opzione senza un pro vero si toglie, o si scrive il pro vero');
     return no('testo_non_per_owner', `nel testo per l'owner ${problemi.map((p) => p.testo).join('; ')}. Cosa fare: ${rimedi.join('; ')}`,
       { campo: problemi[0].campo, campi: problemi.map((p) => p.campo) });
   }
