@@ -545,6 +545,19 @@
     return `${s.slice(0, Math.floor(CARATTERI_RICORDO * 0.7))}\n…(il resto si rilegge con CERCA_CHAT e l'id ${t.chat})…\n${s.slice(-Math.floor(CARATTERI_RICORDO * 0.3))}`;
   }
 
+  // I pezzi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le uscite li
+  // contano fra le cose lette (#587), e il turno dopo sa che il modello li ha già davanti (daRipescare). Il testo è
+  // quello che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
+  function ricordoComeAzione(ricordi, { ora = Date.now() } = {}) {
+    const lista = Array.isArray(ricordi) ? ricordi.filter((r) => r && r.tratto) : [];
+    const results = lista.map((r) => ({ id: r.tratto.chat, title: r.tratto.titolo || '', date: r.tratto.ts, snippet: testoRicordo(r.tratto) }));
+    const daFuori = lista.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori.map((x) => ({ ...x, chat: r.tratto.chat })) : []));
+    return {
+      type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Number(ora).toString(36)}`, _executed: true,
+      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
+    };
+  }
+
   // I pezzi vecchi vengono dall'archivio: dentro la busta, come i risultati di CERCA_CHAT.
   function rendiRicordi(ricordi) {
     const lista = Array.isArray(ricordi) ? ricordi : [];
