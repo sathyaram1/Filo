@@ -445,6 +445,35 @@ test('salto dal browser su una versione già decisa, rifiutato o con GitHub giù
   }
 });
 
+// Un lavoro anche server passa dal cancello del server (#1230): esiti diversi da «bloccato», ma il salto è fatto lo stesso.
+test('salto dal browser di un lavoro anche server: l’esito resta in cima e la card se ne va, senza un secondo salto', async () => {
+  const finto = serverFinto({ bocciature: [bocciatura('fid-8'), bocciatura('fid-9')] });
+  const { page, chiudi } = await apri(`${sito.origin}/`, finto);
+  const salta = async (id) => {
+    const btn = page.locator(`.sn-mac-card-skip[data-feedback-id="${id}"] .sn-mac-btn-go`);
+    await btn.click();
+    await btn.click();
+  };
+  try {
+    await page.locator('.ap-accedi').click();
+    await expect(page.locator('.sn-mac-card-skip')).toHaveCount(2);
+
+    finto.rispostaSalto = { ok: true, esito: 'attesa_server', sha: 'a'.repeat(40) };
+    await salta('fid-8');
+    await expect(page.locator('.ap-stato')).toHaveText('feedback #8: Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.');
+    await expect(page.locator('.sn-mac-card-skip[data-feedback-id="fid-8"]')).toHaveCount(0);
+
+    // Anche un esito che rimanda la pratica chiude la card: il salto è registrato, ripremerlo non salta niente.
+    finto.rispostaSalto = { ok: true, esito: 'all_owner' };
+    await salta('fid-9');
+    await expect(page.locator('.ap-stato')).toHaveText('feedback #9: Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.');
+    await expect(page.locator('.sn-mac-card-skip')).toHaveCount(0);
+    expect(finto.salti.filter((c) => c.feedbackId).map((c) => c.feedbackId)).toEqual(['fid-8', 'fid-9']);
+  } finally {
+    await chiudi();
+  }
+});
+
 test('se l’elenco delle bocciature non risponde le fusioni restano, e lo si dice', async () => {
   const finto = serverFinto({ pending: [richiesta('r1', 'claude/fix-avvio')], bocciature: [bocciatura('fid-7')] });
   finto.saltiGiu = true;
