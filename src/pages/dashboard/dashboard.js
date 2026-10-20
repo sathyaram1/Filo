@@ -1040,7 +1040,9 @@
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
       msg.images = images;
     }
-    const inviato = turno.fermato ? Promise.resolve({ ok: true, stopped: true, actions: [] }) : send(msg);
+    const inviato = turno.fermato
+      ? Promise.resolve({ ok: true, stopped: true, actions: [] })
+      : send(msg).then((r) => (r && r.diretta && offAction ? direttaFinita.then(() => r) : r));
     const fineDiretta = (r) => {
       if (turnoVivo === turno) turnoVivo = null;
       pending.fineDiretta();
