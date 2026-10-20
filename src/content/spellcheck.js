@@ -46,8 +46,8 @@
   const CACHE_OCRA_MAX = 40;
   const Coerenza = () => global.SN_COERENZA;
 
-  // Stato per ogni editabile attualmente "agganciato" (focus). WeakMap per non
-  // tenere riferimenti che impediscano GC se il sito rimuove l'elemento.
+  // Stato per ogni editabile agganciato. WeakMap per non trattenere riferimenti che
+  // impedirebbero la GC se il sito rimuove l'elemento.
   const monitored = new WeakMap();
   const ascoltate = new WeakSet(); // caselle con gli ascoltatori già messi
   // «Ignora» dell'ocra, per casella: sopravvive al fuoco che esce e rientra, si svuota quando la casella si svuota.
@@ -56,36 +56,28 @@
   let personalDict = new Set();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
   let settings = null;
-  // Guard contro la ricorsione: l'applyFix dell'autocorrect dispatcha un input
-  // event che rientrerebbe nel listener; questa flag salta una sola passata.
+  // Guardia contro la ricorsione: l'applyFix dell'autocorrect emette un input event che
+  // rientrerebbe nel listener; la flag salta una passata sola.
   let suppressAutocorrect = false;
 
-  // Suggerimenti del correttore NATIVO (Electron) per l'ultima parola su cui è
-  // stato richiesto il menu contestuale. Il main li spinge via broadcast
-  // `_spell:native` sull'evento context-menu (vedi tabs.js). Sono immediati e
-  // non dipendono dall'LLM: il menu di correzione li usa come base affidabile.
+  // Suggerimenti del correttore nativo, spinti dal main al tasto destro: immediati e
+  // indipendenti dall'LLM, il menu li usa come base affidabile.
   let lastNative = { word: '', suggestions: [], ts: 0 };
   const nativeWaiters = new Set();
 
-  // ============================================================================
-  // Init
-  // ============================================================================
   function init(s) {
     settings = s;
     loadDictionary();
     loadAutocorrect();
 
-    // Aggancia/sgancia in base al focus. Usiamo capture per intercettare anche
-    // focus su elementi dentro custom elements / shadow root (per quanto possibile).
+    // capture per intercettare anche il focus su elementi dentro custom element e shadow root.
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', onFocusOut, true);
 
-    // Riallinea overlay attivo a scroll/resize della finestra.
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
     document.addEventListener('visibilitychange', riprendiScanRimandato);
 
-    // Riceve i suggerimenti del correttore nativo spinti dal main al click destro.
     try {
       chrome.runtime.onMessage.addListener((m) => {
         if (m?.type !== '_spell:native') return;
@@ -94,10 +86,8 @@
           suggestions: Array.isArray(m.suggestions) ? m.suggestions : [],
           ts: Date.now(),
         };
-        // Marker DOM per i test: espone l'ultima parola con suggerimenti nativi
-        // ricevuta, così un test può attendere che il broadcast sia stato
-        // EFFETTIVAMENTE registrato prima di simulare il click destro, invece di
-        // affidarsi a un timeout fisso (causa di flakiness). Innocuo a runtime.
+        // Marker DOM per i test: espone l'ultima parola nativa, così un test aspetta il broadcast
+        // invece di un timeout fisso. Innocuo a runtime.
         try { document.documentElement.dataset.filoNativeWord = lastNative.word; } catch (_) {}
         for (const fn of [...nativeWaiters]) { try { fn(lastNative); } catch (_) {} }
       });
@@ -160,12 +150,10 @@
     const w = String(word || '').trim();
     if (!w) return;
     const wLower = w.toLowerCase();
-    // Match case-insensitive: se la parola (in qualsiasi casing) è già presente, non aggiungerla.
+    // Se la parola è già presente in un altro casing non si riaggiunge.
     if (personalDict.has(wLower)) return;
     personalDict.add(wLower); // Il set interno resta lowercase per isInDictionary
     try {
-      // Legge l'array esistente dallo storage (che preserva il casing originale) e aggiunge
-      // la nuova parola mantenendo il casing, con dedup case-insensitive.
       const d = await chrome.storage.local.get(STORAGE_KEYS.PERSONAL_DICT);
       const existing = d?.[STORAGE_KEYS.PERSONAL_DICT] || [];
       const alreadyExists = existing.some((x) => String(x).toLowerCase() === wLower);
@@ -180,9 +168,6 @@
     return personalDict.has(String(word || '').trim().toLowerCase());
   }
 
-  // ============================================================================
-  // Autocorrect
-  // ============================================================================
   async function loadAutocorrect() {
     try {
       const d = await chrome.storage.local.get(STORAGE_KEYS.AUTOCORRECT);
@@ -207,10 +192,7 @@
     return !!c && /[\s.,!?;:)\]…"'»“”]/u.test(c);
   }
 
-  // Applica al testo della correzione la stessa "case" della parola digitata:
-  // - "PAROLA" -> tutta maiuscola
-  // - "Parola" -> prima lettera maiuscola
-  // - altrimenti invariata
+  // La correzione prende il case della parola digitata.
   function matchCase(originalWord, correction) {
     if (!originalWord || !correction) return correction;
     if (originalWord.length > 1 && originalWord === originalWord.toUpperCase()) {
@@ -245,7 +227,6 @@
     // Serve almeno un carattere di parola prima del confine.
     if (end <= 0 || !isWordCharLocal(text[end - 1])) return;
 
-    // Cerca la chiave (anche multi-parola, es. "x es") che termina a `end`.
     const match = findAutocorrectMatch(text, end);
     if (!match) return;
     const { start } = match;
@@ -263,12 +244,8 @@
     }
   }
 
-  // Trova la chiave di autocorrect che termina ESATTAMENTE all'offset `end` nel
-  // testo, delimitata a sinistra da un confine di parola. Le chiavi possono
-  // contenere spazi ("x es" → "per esempio"): non basta più risalire al singolo
-  // token prima del confine. A parità di posizione finale vince la chiave più
-  // lunga, così "x es" batte "es" se entrambe esistono. Ritorna { start, key }
-  // (con `key` la chiave lowercased nella mappa) oppure null.
+  // Le chiavi possono contenere spazi («x es» → «per esempio»): a parità di posizione finale
+  // vince la più lunga, così «x es» batte «es». Torna { start, key }, o null.
   function findAutocorrectMatch(text, end) {
     const lowerRegion = text.slice(0, end).toLowerCase();
     let best = null;
@@ -276,22 +253,17 @@
       if (!key) continue;
       const start = end - key.length;
       if (start < 0) continue;
-      // Il testo che precede il confine deve coincidere con la chiave.
       if (lowerRegion.slice(start) !== key) continue;
-      // Confine di parola a sinistra: il carattere prima del match non dev'essere
-      // un carattere di parola, così "es" non scatta dentro "mese".
+      // Confine di parola a sinistra, così "es" non scatta dentro "mese".
       if (start > 0 && isWordCharLocal(text[start - 1])) continue;
-      // La chiave deve iniziare con un carattere di parola (le chiavi sono
-      // trim()+lowercase, quindi lo sono sempre): esclude match che partono da
-      // uno spazio interno spurio.
+      // La chiave deve iniziare con un carattere di parola: esclude i match da spazio spurio.
       if (!isWordCharLocal(text[start])) continue;
       if (!best || key.length > best.key.length) best = { start, key };
     }
     return best;
   }
 
-  // Posiziona il caret all'offset di carattere `target` nell'elemento contenteditable,
-  // popolando il Range passato (non lo aggiunge al selection: lascia farlo al chiamante).
+  // Popola il Range passato e NON lo aggiunge alla selection: quello lo fa il chiamante.
   function placeCaretAtOffset(el, target, range) {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let cur = 0, n;
@@ -304,7 +276,6 @@
       }
       cur += len;
     }
-    // Fallback: a fine elemento
     range.selectNodeContents(el);
     range.collapse(false);
   }
@@ -325,14 +296,8 @@
     return -1;
   }
 
-  // ============================================================================
-  // Detection editabili
-  // ============================================================================
-  // Editabili supportati: textarea e contenteditable. Niente <input>.
-  // Per il contenteditable consideriamo SOLO il "root" — l'elemento che porta
-  // l'attributo contenteditable. I discendenti ereditano isContentEditable,
-  // ma agganciare l'overlay a un figlio invece che al root (es. uno <span>
-  // dentro un editor di Slack/Twitter) sballa allineamento e dimensioni.
+  // Solo textarea e contenteditable, mai <input>. Del contenteditable si aggancia SOLO il
+  // root con l'attributo: un overlay su un figlio sballa allineamento e dimensioni.
   function isSupportedEditable(el) {
     if (!el || el.nodeType !== 1) return false;
     if (el.tagName === 'TEXTAREA') return !el.disabled && !el.readOnly;
@@ -381,8 +346,8 @@
   function onFocusOut(e) {
     const el = editabileDellEvento(e);
     if (!el) return;
-    // Mantieni l'overlay finché l'utente sta interagendo col popup correzione,
-    // altrimenti il click destro su un range blu lo nasconde subito.
+    // L'overlay resta finché l'utente interagisce col popup correzione: senza, il tasto destro
+    // su un range blu lo farebbe sparire subito.
     setTimeout(() => {
       if ((radiceDi(el) || document).activeElement === el) return;
       detach(el);
@@ -428,8 +393,8 @@
         lastScannedText: '',
         timer: null,
         ro: null,
-        // Cache delle correzioni per-parola (popolata sia dal prefetch dopo lo scan
-        // blu sia dalle richieste on-demand al click destro). Le chiavi sono lowercased.
+        // Cache delle correzioni per parola, riempita dal prefetch e dalle richieste al tasto
+        // destro. Chiavi lowercased.
         wordCache: new Map(),
         // I segni ocra, sugli stessi offset (`testoIssues`) dei blu.
         ocra: [],
@@ -479,9 +444,6 @@
     if (activeEl) detach(activeEl);
   }
 
-  // ============================================================================
-  // Overlay rendering
-  // ============================================================================
   // Stili copiati dall'editabile per allineare il testo invisibile dell'overlay.
   const COPIED_STYLE_PROPS = [
     'font-family', 'font-size', 'font-weight', 'font-style',
@@ -892,7 +854,6 @@
     state.rimandato = false;
     const text = getEditableText(state.el);
 
-    // Reset se il testo è troppo corto o invariato
     if (!text || text.length < MIN_TEXT_LENGTH) {
       seguiIlTesto(state);
       state.issues = [];
@@ -1174,15 +1135,12 @@
     state.wordCache.set(String(word || '').toLowerCase(), sugg);
   }
 
-  // Set globale di chiavi "in volo" per evitare richieste duplicate per la
-  // stessa parola/frase mentre la precedente è in corso.
+  // Chiavi «in volo» per non chiedere due volte la stessa parola mentre la prima è in corso.
   function makeWordKey(word, sentence) {
     return String(word || '').toLowerCase() + '|' + String(sentence || '').trim().slice(0, 200);
   }
 
-  // Lancia un check ortografico in background per la parola che l'utente ha
-  // appena chiuso (ultimo carattere = boundary), così quando fa click destro
-  // sulla parola la correzione è già pronta in cache.
+  // Check in background sulla parola appena chiusa: al tasto destro è già in cache.
   async function prefetchJustCompletedWord(state) {
     if (!isEnabled() || document.hidden) return;
     const el = state.el;
@@ -1197,7 +1155,6 @@
     if (pos <= 1) return;
     const lastChar = text[pos - 1];
     if (!isBoundaryChar(lastChar)) return;
-    // Risali alla parola che precede il boundary.
     let end = pos - 1;
     while (end > 0 && /\s/.test(text[end - 1])) end--;
     let s = end;
@@ -1253,15 +1210,13 @@
       const sugg = await requestWordSuggestion({
         word: c.seg, sentence, prev: ctx.prev, next: ctx.next,
       });
-      // Cache con la frase usata, per poter rilevare cambio di contesto al
-      // momento del click destro. Anche risposte null/negative entrano in
-      // cache per evitare fire ripetuti.
+      // In cache anche la frase, per accorgersi del cambio di contesto al tasto destro; entrano
+      // anche le risposte negative, per non rifare la chiamata.
       state.wordCache.set(c.key, sugg ? { ...sugg, sentence } : { misspelled: false, correction: '', sentence });
     }));
   }
 
-  // Cerca di estrarre frase precedente e successiva al campo editabile.
-  // Best-effort: se non riusciamo, ritorniamo stringhe vuote.
+  // Frase precedente e successiva al campo: se non ci riusciamo tornano stringhe vuote.
   function extractContext(el) {
     let prev = '';
     let next = '';
@@ -1305,10 +1260,8 @@
     }
   }
 
-  // Estrae le porzioni avvolte in **...** da `annotated` IN ORDINE, e per ognuna
-  // trova la posizione della prossima occorrenza nel testo originale a partire
-  // da dopo l'ultima trovata. Così i refusi ripetuti (es. "oggi … oggi") vengono
-  // localizzati correttamente quando solo una delle due è marcata.
+  // Le porzioni fra ** si cercano IN ORDINE, ognuna dopo l'ultima trovata: così un refuso
+  // ripetuto («oggi … oggi») finisce sull'occorrenza giusta quando solo una è marcata.
   function locateAnnotatedRanges(text, annotated) {
     if (!annotated) return [];
     const out = [];
@@ -1350,9 +1303,8 @@
         end: r.end,
         explanation: String(meta.explanation || '').slice(0, 100),
         correction: String(meta.correction || ''),
-        // Segmento "originale" del testo. Usato in applyFix per validare che il
-        // testo non sia cambiato fra scan e click su Risolvi: se è cambiato, niente
-        // fix (evita di cancellare/sostituire la frase sbagliata).
+        // Segmento originale: applyFix lo confronta e rinuncia se il testo è cambiato dopo lo
+        // scan, per non sostituire la frase sbagliata.
         segment: text.slice(r.start, r.end),
       });
     }
@@ -1367,10 +1319,7 @@
     return merged;
   }
 
-  // ============================================================================
-  // API per il content script (right-click)
-  // ============================================================================
-  // Restituisce il range "blu" sotto il punto, se c'è. Altrimenti null.
+  // Ritorna il range blu sotto il punto, se c'è; altrimenti null.
   function getSemanticIssueAt(el, clientX, clientY) {
     const state = monitored.get(el);
     if (!state || !state.issues?.length) return null;
@@ -1382,8 +1331,7 @@
     return null;
   }
 
-  // Trova la parola sotto al click in un editabile, restituisce
-  // { word, start, end, sentence, prev, next } o null.
+  // Parola sotto al click: { word, start, end, sentence, prev, next } oppure null.
   function getWordAt(el, clientX, clientY) {
     const text = getEditableText(el);
     if (!text) return null;
@@ -1399,12 +1347,8 @@
     return { word, start, end, sentence, prev: ctx.prev, next: ctx.next };
   }
 
-  // Variante per <input type=text/search> (single-line, non "supportati"
-  // dall'overlay blu ma che meritano comunque il suggerimento di correzione nel
-  // menu tasto destro — feedback alpha: la vecchia estensione lo mostrava anche
-  // qui, la nuova app no perché si affidava ai soli suggerimenti nativi che non
-  // sempre arrivano). Estrae la parola sotto il punto e ritorna lo stesso shape
-  // di getWordAt, così openSpellWordMenu la gestisce identica a textarea/CE.
+  // Anche su <input>: niente overlay blu, ma il suggerimento nel menu ci deve essere, perché
+  // i soli nativi non arrivano sempre. Stesso shape di getWordAt.
   function getInputWordAt(el, clientX) {
     if (!el || el.tagName !== 'INPUT') return null;
     const text = el.value || '';
@@ -1421,8 +1365,8 @@
     return { word, start, end, sentence, prev: ctx.prev, next: ctx.next };
   }
 
-  // Offset di carattere nel valore di un <input> single-line a partire da una
-  // coordinata X viewport. Misura col canvas imitando il font dell'elemento.
+  // Offset di carattere in un <input> da una X del viewport, misurato col canvas imitando
+  // il font dell'elemento.
   function inputCharOffset(el, clientX) {
     const text = el.value || '';
     if (!text) return 0;
@@ -1468,7 +1412,7 @@
   // a partire da coordinate viewport. Funziona sia per textarea che per contenteditable.
   function caretCharOffsetFromPoint(el, clientX, clientY) {
     if (el.tagName === 'TEXTAREA') {
-      // Per la textarea il caretPositionFromPoint non torna utile (offsetNode non è il textarea).
+      // Per la textarea caretPositionFromPoint non serve: offsetNode non è la textarea.
       return textareaCharOffset(el, clientX, clientY);
     }
     const doc = el.ownerDocument || document;
@@ -1489,24 +1433,18 @@
         total += n.nodeValue.length;
       }
     }
-    // La domanda "che carattere c'è in questo punto" si ferma al confine dei
-    // componenti web (shadow root): dentro un blocco isolato la risposta cade
-    // nel light DOM — fuori dall'editabile — o non arriva affatto. Lì (e in
-    // qualunque altro caso in cui la risposta non è utilizzabile) misuriamo noi
-    // l'elemento che abbiamo già in mano. Vedi #438.
+    // «Che carattere c'è in questo punto» si ferma al confine dei componenti web: dentro uno
+    // shadow root la risposta è inutilizzabile, e lì misuriamo noi l'elemento (#438).
     return caretCharOffsetByRects(el, clientX, clientY);
   }
 
-  // Quanti caratteri misurare uno per uno prima di passare alla ricerca binaria:
-  // in un editabile lungo (una mail, un documento) il nodo di testo sotto al
-  // cursore può essere enorme e un rettangolo per carattere costerebbe troppo.
+  // Quanti caratteri misurare uno per uno prima della ricerca binaria: su un nodo di testo
+  // enorme un rettangolo per carattere costerebbe troppo.
   const RECT_SCAN_MAX = 400;
   const RECT_SCAN_WINDOW = 64;
 
-  // Offset di carattere ricavato dalla sola geometria: confronta i rettangoli
-  // dei caratteri dell'editabile col punto cliccato. Non chiede nulla al
-  // documento, quindi funziona ovunque viva l'editabile (componenti web
-  // compresi). Ritorna -1 se il punto non cade su nessun testo.
+  // Offset ricavato dalla sola geometria, confrontando i rettangoli dei caratteri col punto:
+  // non chiede niente al documento, quindi vale anche nei componenti web. -1 se non cade lì.
   function caretCharOffsetByRects(el, clientX, clientY) {
     const doc = el.ownerDocument || document;
     let range;
@@ -1518,8 +1456,8 @@
       if (!len) continue;
       let box = null;
       try { range.selectNodeContents(n); box = range.getBoundingClientRect(); } catch (_) {}
-      // Considera solo i nodi la cui banda verticale contiene il punto: senza
-      // questo filtro misureremmo tutto il testo dell'editabile.
+      // Solo i nodi la cui banda verticale contiene il punto: senza il filtro misureremmo tutto
+      // il testo dell'editabile.
       if (box && (box.width || box.height)
           && clientY >= box.top - 2 && clientY <= box.bottom + 2) {
         const hit = charOffsetInTextNode(range, n, clientX, clientY);
@@ -1531,7 +1469,6 @@
     return best;
   }
 
-  // Carattere di un singolo nodo di testo sotto al punto (o il più vicino).
   function charOffsetInTextNode(range, node, clientX, clientY) {
     const len = node.nodeValue.length;
     const rectOf = (i) => {
@@ -1585,8 +1522,8 @@
     return { exact: false, index: best, dist: bestDist };
   }
 
-  // Misura la posizione di carattere in una textarea ricostruendo il word-wrap
-  // con un canvas che imita lo stile dell'elemento. Costoso ma corretto.
+  // Posizione di carattere in una textarea, ricostruendo il word-wrap con un canvas che
+  // imita lo stile dell'elemento: costoso ma corretto.
   function textareaCharOffset(el, clientX, clientY) {
     const text = el.value;
     if (!text) return 0;
@@ -1602,7 +1539,6 @@
     const ctx = canvas.getContext('2d');
     ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
 
-    // Suddivisione del testo in righe rispettando i \n e il word-wrap.
     const wrap = cs.whiteSpace !== 'pre' && cs.whiteSpace !== 'nowrap';
     const lines = [];
     const paragraphs = text.split('\n');
@@ -1649,7 +1585,6 @@
     const line = lines[lineIdx];
     if (!line) return 0;
 
-    // Ricerca binaria del char nella riga
     let lo = 0, hi = line.text.length;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
@@ -1690,14 +1625,11 @@
 
   function applyFix(el, range, replacement, opts = {}) {
     const safeReplacement = String(replacement == null ? '' : replacement);
-    // 'end' = caret a fine inserzione (popup correttore manuale).
-    // 'preserve' = caret resta dove era (autocorrect: l'utente ha appena digitato
-    // lo spazio, vogliamo che il caret resti dopo lo spazio, non dentro la parola).
+    // 'end' = caret a fine inserzione (popup del correttore). 'preserve' = caret dov'era:
+    // nell'autocorrect si è appena digitato lo spazio e il caret deve restare dopo di esso.
     const cursorMode = opts.cursor || 'end';
-    // Validazione "segment": se il chiamante passa il testo originale che ci aspettiamo
-    // di trovare a [start, end), aborta se non corrisponde più (testo cambiato dopo lo
-    // scan). Questo previene il bug "Risolvi cancella tutta la frase" causato da issue
-    // con offset stale.
+    // Se il testo atteso a [start, end) non corrisponde più si abortisce: è la guardia contro
+    // «Risolvi cancella tutta la frase» con offset vecchi.
     const expected = typeof opts.expectedSegment === 'string' ? opts.expectedSegment : null;
     const currentText = getEditableText(el);
     if (expected !== null) {
@@ -1709,9 +1641,8 @@
     }
     if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
       const v = el.value;
-      // Validazione: se il range è fuori bounds o l'inizio è >= fine, usciamo.
-      // Senza questo, v.slice(range.end) con range.end > v.length restituisce ""
-      // e il salvataggio cancella tutto il testo dopo range.start.
+      // Range fuori dai limiti o inizio ≥ fine: si esce. Senza, lo slice oltre la lunghezza
+      // torna vuoto e il salvataggio cancella tutto il testo dopo range.start.
       if (typeof range.start !== 'number' || typeof range.end !== 'number' ||
           range.start < 0 || range.end > v.length || range.end <= range.start) {
         console.warn('[SN] applyFix: range fuori bounds, skip', { range, length: v.length });
@@ -1738,7 +1669,6 @@
       }
       // Salva l'offset originale del caret, per ripristinarlo in modalità 'preserve'.
       const caretBefore = cursorMode === 'preserve' ? contenteditableCaretOffset(el) : -1;
-      // Trova i text node di start e end via walker.
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       let cur = 0, startNode = null, startOff = 0, endNode = null, endOff = 0, n;
       while ((n = walker.nextNode())) {
@@ -1754,7 +1684,6 @@
       }
       if (!startNode || !endNode) return;
 
-      // Posiziona la selezione sul range da rimpiazzare.
       const sel = window.getSelection();
       const r = document.createRange();
       try {
@@ -1767,11 +1696,8 @@
       sel.removeAllRanges();
       sel.addRange(r);
 
-      // Tentativo 1: execCommand('insertText'). Passa per il pipeline di
-      // beforeinput/input nativo del browser, così editor "controllati"
-      // (Slate/Lexical/Discord, ecc.) aggiornano il loro modello interno
-      // invece di resettare la mutazione DOM. Solo se fallisce ricadiamo
-      // sul fallback DOM-mutation diretto (per editor "uncontrolled").
+      // Prima execCommand('insertText'): passa dal pipeline beforeinput/input nativo, così gli
+      // editor controllati (Slate, Lexical) aggiornano il modello invece di resettare il DOM.
       let ok = false;
       try {
         if (safeReplacement.length > 0) {
@@ -1876,12 +1802,8 @@
     } catch (_) { return null; }
   }
 
-  // ============================================================================
-  // Suggerimenti correttore nativo (Electron)
-  // ============================================================================
-  // Ritorna i suggerimenti nativi per `word` se sono recenti e riferiti a quella
-  // parola; altrimenti []. Usato dal menu di correzione (content.js) come fonte
-  // immediata e affidabile, in parallelo al suggerimento contestuale dell'LLM.
+  // Suggerimenti nativi solo se recenti e riferiti a quella parola, altrimenti []: il menu
+  // li usa come fonte immediata, in parallelo al suggerimento contestuale dell'LLM.
   function getNativeSuggestions(word) {
     if (!word || !lastNative.word) return [];
     if (lastNative.word.toLowerCase() !== String(word).toLowerCase()) return [];
@@ -1889,16 +1811,8 @@
     return lastNative.suggestions.slice();
   }
 
-  // Registra un callback chiamato (una volta) per la prossima notifica nativa
-  // di spellcheck, qualunque sia la parola. Utile su `<input>` dove non
-  // conosciamo a priori la parola sotto il cursore: aspettiamo che Electron
-  // ce la dica via `wc.on('context-menu')`. Ritorna una funzione per annullare.
-  //
-  // `opts.since` (timestamp ms): se passato, e se `lastNative` è arrivato dopo
-  // quell'istante, serviamo subito il dato già in cache invece di aspettare un
-  // nuovo broadcast. Serve perché `openNormalMenuAt` ha un `await` su
-  // getClipboardHistory() PRIMA di registrare il waiter: il broadcast nativo
-  // può quindi arrivare in mezzo, e senza questa scorciatoia andava perso.
+  // Callback una-tantum per la prossima notifica nativa, qualunque sia la parola: su un
+  // <input> quale sia lo dice Electron. `opts.since` recupera il broadcast arrivato in mezzo.
   function onNextNativeSuggestion(cb, opts = {}) {
     const timeoutMs = typeof opts === 'number' ? opts : (opts.timeoutMs || 600);
     const since = (typeof opts === 'object' && opts.since) || 0;
@@ -1922,10 +1836,8 @@
     return finish;
   }
 
-  // Registra un callback chiamato (una volta) quando arrivano i suggerimenti
-  // nativi per `word`, se non sono già disponibili al momento dell'apertura del
-  // menu (il broadcast dal main può arrivare con qualche ms di ritardo). Ritorna
-  // una funzione per annullare l'attesa.
+  // Callback una-tantum per i suggerimenti nativi di `word` quando non ci sono già: il
+  // broadcast dal main può ritardare di qualche ms. Ritorna la funzione per annullare.
   function onNativeSuggestions(word, cb, timeoutMs = 800) {
     const have = getNativeSuggestions(word);
     if (have.length) { setTimeout(() => cb(have), 0); return () => {}; }
@@ -1943,9 +1855,6 @@
     return finish;
   }
 
-  // ============================================================================
-  // API pubblica
-  // ============================================================================
   global.SN_SPELLCHECK = {
     init,
     updateSettings,

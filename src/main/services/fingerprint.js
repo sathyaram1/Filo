@@ -47,10 +47,8 @@ function levelNum(mode) {
   return mode === MODES.PRIVACY ? 2 : mode === MODES.DEFAULT ? 1 : 0;
 }
 
-// Carica (o genera) il master secret persistente e fissa la modalità corrente.
-// Chiamato una volta all'avvio. Best-effort: in caso di errore di storage usa
-// un secret effimero (il rumore funziona comunque, solo non sopravvive al
-// riavvio — accettabile).
+// Best-effort: se lo storage non risponde si usa un secret effimero, il rumore funziona
+// comunque e solo non sopravvive al riavvio.
 async function init(settings) {
   _mode = getMode(settings);
   try {
@@ -144,26 +142,12 @@ function isIdentityProviderHref(href) {
   }
 }
 
-// Superfici "prodotto" di Google in cui l'utente è AUTENTICATO col proprio
-// account (Documenti/Fogli/Presentazioni, Drive, Gmail, Calendar, Meet…). Qui
-// il rumore anti-fingerprint non offre ALCUNA protezione privacy — sei comunque
-// identificato dal cookie del tuo account Google, che ti segue su tutte le sue
-// app — ma altera gli stessi segnali canvas/WebGL/audio che i controlli di
-// sicurezza antifrode di Google campionano lungo il flusso di accesso, facendo
-// scattare il blocco "questo browser o questa app potrebbero non essere sicuri"
-// (feedback #299: accesso a Google Documenti). È lo stesso ragionamento
-// dell'esenzione del login (accounts.google.com, via isIdentityProviderHref),
-// esteso alle app in cui quel login sfocia: costo privacy nullo, elimina un
-// possibile attrito reale.
-//
-// Lista CURATA (come AUTH_HOSTS), NON l'eTLD+1 google.com: esentare tutto
-// "google.com" spegnerebbe la protezione anche sulla ricerca (www.google.com),
-// dove l'utente può NON essere loggato e il rumore ha un valore reale. Match su
-// host esatto o suo sottodominio.
+// App Google dove l'utente è già autenticato (#299): lì il rumore non protegge — il cookie
+// identifica comunque — e fa scattare gli avvisi. Lista CURATA, non l'eTLD+1 google.com.
 const GOOGLE_APP_HOSTS = [
-  'docs.google.com',        // Documenti, Fogli, Presentazioni, Moduli
+  'docs.google.com',
   'drive.google.com',
-  'mail.google.com',        // Gmail
+  'mail.google.com',
   'calendar.google.com',
   'keep.google.com',
   'meet.google.com',
@@ -171,10 +155,10 @@ const GOOGLE_APP_HOSTS = [
   'contacts.google.com',
   'photos.google.com',
   'sites.google.com',
-  'script.google.com',      // Apps Script
+  'script.google.com',
   'classroom.google.com',
   'myaccount.google.com',
-  'admin.google.com',       // Workspace admin
+  'admin.google.com',
 ];
 
 function isGoogleAppSurface(href) {

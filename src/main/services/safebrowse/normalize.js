@@ -1,24 +1,13 @@
-// Stage 0 della pipeline: normalizzazione del dominio.
-//
-// Prima di QUALSIASI confronto serve una forma canonica del dominio. Un sito
-// camuffato va confrontato per ciò che è davvero, non per come appare nella
-// barra degli indirizzi. Qui:
-//   - estraiamo l'hostname dall'URL (senza porta, userinfo, path)
-//   - decodifichiamo punycode/IDNA in entrambe le direzioni (ascii ⇄ unicode)
-//   - applichiamo Unicode NFC + case-folding
-//   - estraiamo il dominio registrabile (eTLD+1) con la Public Suffix List
-//
-// Usiamo `domainToASCII`/`domainToUnicode` di `node:url` (basati su ICU, NON
-// deprecati) invece del modulo `punycode` (DEP0040). domainToASCII applica già
-// l'IDNA UTS-46 e ritorna stringa vuota su input non valido.
+// Forma canonica del dominio: un sito camuffato va confrontato per ciò che è, non per come
+// appare nella barra. Host senza porta, IDNA nei due sensi, NFC, eTLD+1 dalla PSL.
+// Si usano domainToASCII/Unicode di node:url (ICU) invece del modulo punycode, deprecato.
 
 'use strict';
 
 const { domainToASCII, domainToUnicode } = require('node:url');
 const { getDomainInfo, isIpAddress } = require('./psl');
 
-// Estrae l'hostname da una stringa che può essere un URL completo o un bare
-// host. Ritorna { host, protocol, port } oppure null se non parsabile.
+// Accetta un URL completo o un host nudo; { host, protocol, port } o null se non parsabile.
 function parseHost(input) {
   if (!input || typeof input !== 'string') return null;
   let s = input.trim();
@@ -30,10 +19,10 @@ function parseHost(input) {
     // Niente schema: prova come host nudo dietro http://.
     try { u = new URL('http://' + s); } catch (_) { return null; }
   }
-  // Solo schemi "navigabili" hanno un dominio sensato da analizzare.
+  // Solo gli schemi "navigabili" hanno un dominio sensato da analizzare.
   const proto = u.protocol.replace(/:$/, '');
   let host = u.hostname || '';
-  // URL.hostname per IPv6 arriva fra parentesi quadre: toglile.
+  // URL.hostname per IPv6 arriva fra parentesi quadre: si tolgono.
   host = host.replace(/^\[|\]$/g, '');
   if (!host) return null;
   return { host: host.toLowerCase(), protocol: proto, port: u.port || '' };
@@ -66,11 +55,10 @@ function normalize(input, { soloPsl = false } = {}) {
     };
   }
 
-  // Forma ASCII (punycode) canonica: domainToASCII applica IDNA UTS-46. Se
-  // fallisce (input degenere) ricadiamo sull'host così com'è.
+  // Se domainToASCII fallisce (input degenere) si ricade sull'host così com'è.
   const ascii = (domainToASCII(host) || host).toLowerCase();
-  // Forma Unicode leggibile: NFC + lowercase, così "Е" (cirillico) e simili
-  // restano distinti dai latini ma le varianti di compatibilità collassano.
+  // NFC più minuscole: le varianti di compatibilità collassano, ma la «Е» cirillica resta
+  // distinta dalla latina.
   let unicode = domainToUnicode(ascii) || host;
   unicode = unicode.normalize('NFC').toLowerCase();
 

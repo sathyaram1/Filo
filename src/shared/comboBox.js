@@ -1,16 +1,6 @@
-// Combobox custom in stile Filo: input editabile + dropdown tematizzato, al
-// posto del popup NATIVO della <datalist> (che usa i colori di sistema, fuori
-// palette). Riusa le classi .sn-select-pop / .sn-select-option (theme.css) così
-// ogni menu a tendina di Filo si vede e si comporta allo stesso modo.
-//
-// PERCHÉ ESISTE
-//   Nasce estraendo la logica che viveva in modelChainEditor.js (dropdown dei
-//   nickname per-azione): lo stesso comportamento serviva anche al campo
-//   "stringa modello" del registry (Opzioni), che invece usava ancora la
-//   <datalist> nativa — incoerente con il resto. Un'unica sorgente evita due
-//   dropdown che divergono.
-//
-// Convenzione IIFE su globalThis come gli altri moduli shared/*.
+// Combobox in stile Filo al posto del popup nativo della <datalist>, che usa i colori di
+// sistema e cade fuori palette.
+// Riusa .sn-select-pop di theme.css: una sorgente sola invece di due tendine che divergono.
 
 (function (global) {
   'use strict';
@@ -47,8 +37,7 @@
 
     let optionEls = [];
     let hoverEl = null;
-    // Filtro applicato alla lista: vuoto = mostra tutto. Si popola solo quando
-    // l'utente DIGITA (non al semplice focus), così aprendo un campo già
+    // Il filtro si popola solo quando l'utente DIGITA, non al focus: aprendo un campo già
     // compilato si vedono comunque tutte le opzioni per cambiarlo.
     let filterText = '';
 

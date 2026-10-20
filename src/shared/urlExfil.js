@@ -24,14 +24,14 @@
 (function (global) {
   'use strict';
 
-  // Soglie (tarate per il caso realistico: il modello, istruito a "metti i dati
-  // nell'URL", li mette in chiaro o base64; non in forme cifrate sofisticate).
+  // Soglie tarate sul caso realistico: il modello istruito a mettere i dati nell'URL li
+  // mette in chiaro o base64, non in forme cifrate sofisticate.
   const MIN_TOKEN = 5;      // lunghezza minima di un token del corpus per contare
   const STRONG_TOKEN = 12;  // un solo token così lungo che combacia → già sospetto
   const STRUCT_BLOB = 24;   // singolo blocco opaco (sottodominio/segmento) → sospetto
 
-  // Parole comuni (it/en) abbastanza lunghe da superare STRONG_TOKEN ma innocue:
-  // evitano che un URL legittimo che le contiene scateni il match a token singolo.
+  // Parole comuni (it/en) lunghe ma innocue: evitano che un URL legittimo che le contiene
+  // scateni il match a token singolo.
   const STOPWORDS = new Set([
     'preferenze', 'preferences', 'informazioni', 'information', 'impostazioni',
     'settings', 'configurazione', 'configuration', 'utente', 'browser',
@@ -39,8 +39,7 @@
     'applicazione', 'navigazione', 'navigation', 'messaggio', 'message',
   ]);
 
-  // Decodifica "best effort" un blob base64/base64url se sembra tale e produce
-  // testo stampabile; altrimenti ''. Serve a smascherare ?d=<base64 dei segreti>.
+  // Smaschera ?d=<base64 dei segreti>; '' se non sembra base64 o non dà testo stampabile.
   function tryBase64(tok) {
     if (tok.length < 8 || tok.length % 4 === 1) return '';
     if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(tok)) return '';
@@ -122,12 +121,11 @@
     return varianti(url).join(' ').toLowerCase().replace(/[^a-z0-9]+/g, '');
   }
 
-  // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) + indirizzi
-  // email (interi e parte locale). Normalizzate in minuscolo alfanumerico.
+  // Token sensibili del corpus: parole alfanumeriche (≥ MIN_TOKEN) ed email, intere e
+  // come parte locale.
   function corpusTokens(corpus) {
     const text = String(corpus || '');
     const out = new Set();
-    // email: forti, le aggiungiamo intere e come parte locale.
     const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
     let m;
     while ((m = emailRe.exec(text))) {
@@ -142,8 +140,8 @@
     return out;
   }
 
-  // Un token combacia "forte" da solo? (lungo, NON stopword) oppure contiene una
-  // cifra (nomi+numeri, token, id) → segnale specifico, non parola comune.
+  // Combacia «forte» se lungo e non stopword, oppure se contiene una cifra (nomi+numeri,
+  // token, id): segnale specifico, non parola comune.
   function isStrong(tok) {
     if (/[0-9]/.test(tok) && tok.length >= MIN_TOKEN) return true;
     return tok.length >= STRONG_TOKEN && !STOPWORDS.has(tok);

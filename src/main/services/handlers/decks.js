@@ -1,7 +1,5 @@
-// Handler di dominio: deck builder Commander (DECK-BUILDER-SPEC.md).
-// CRUD dei mazzi su storage locale (deckStore). La logica di modello (versione
-// che incrementa a ogni edit, invarianti) è in SN_DECKS: la pagina applica le
-// funzioni di modello e manda qui il mazzo intero da persistere (DECKS_UPDATE).
+// Deck builder Commander: CRUD dei mazzi su storage locale.
+// La logica di modello (versione, invarianti) sta in SN_DECKS: qui arriva il mazzo intero.
 
 module.exports = function register(on, ctx) {
   const { MSG, handleAIRequest, broadcastToFiloPages } = ctx;
@@ -80,14 +78,8 @@ module.exports = function register(on, ctx) {
     return copy ? { ok: true, deck: copy } : { ok: false, error: 'not_found' };
   });
 
-  // ── Parere LLM carta-vs-mazzo (§6) ─────────────────────────────────────────
-  // { deckId, cardIds, compute?, refresh? } →
-  // { ok, opinions: { cardId → { text, versione, stale } } }.
-  // compute=false: solo cache, MAI una chiamata LLM (per mostrare lo stato).
-  // compute=true: calcola i mancanti/stantii in UN batch; refresh=true ricalcola
-  // anche i freschi (il refresh on-demand di §6.2). Le carte possono anche NON
-  // essere nel mazzo (candidati dai risultati di ricerca: il parere è proprio
-  // "questa carta serve a questo mazzo?").
+  // compute=false: solo cache, MAI una chiamata LLM; compute=true calcola i mancanti in un
+  // batch; refresh=true rifà anche i freschi. Le carte possono non essere nel mazzo.
   on(MSG.DECKS_OPINION, async (msg) => {
     try {
       const deck = await Store.get(String(msg?.deckId || ''));

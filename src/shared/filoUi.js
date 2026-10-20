@@ -41,26 +41,20 @@
 (function (global) {
   'use strict';
 
-  // `data-sn-ui`: un attributo, non una classe. Le classi le tocca anche il
-  // sito (un framework che rifà la lista delle classi cancellerebbe il
-  // marchio), e un attributo `data-` non entra in nessun foglio di stile.
+  // Un attributo, non una classe: le classi le tocca anche il sito e un framework
+  // che rifà l'elenco cancellerebbe il marchio.
   const ATTR = 'data-sn-ui';
   const SELECTOR = '[' + ATTR + ']';
 
-  // Le radici che abbiamo disegnato noi, in ordine di nascita. Non è una WeakSet
-  // perché va PERCORSA: la domanda è «quali di queste sono ancora attaccate?».
+  // L'attributo risponde a «questo pezzo lo salto?» e se lo può scrivere anche il sito;
+  // a «l'ho disegnato IO?» risponde solo questo elenco, nel mondo isolato (#514).
   const nostre = new Set();
-  // Tetto di sicurezza: `mark()` arriva anche prima che l'elemento sia
-  // attaccato, quindi la potatura non può guardare `isConnected` qui. Si tiene
-  // il numero sotto controllo buttando le più vecchie, che è la direzione
-  // sicura: una radice dimenticata vale «non è successo niente», mai «è
-  // successo qualcosa».
+  // `mark()` arriva anche prima che l'elemento sia attaccato: qui `isConnected` non si guarda.
+  // Si buttano le più vecchie: una radice dimenticata vale «non è successo niente».
   const TETTO = 256;
 
-  // Chi vuole sapere che è appena nato un pezzo nostro. Serve a chi deve
-  // preparare qualcosa PRIMA che l'utente prema un tasto: sopra lo schermo
-  // pieno di un sito l'Esc va chiesto al browser mentre un nostro riquadro è
-  // aperto, o quel tasto non arriva mai al documento (#514, giro 10).
+  // Serve a chi deve preparare qualcosa PRIMA che l'utente prema un tasto: sopra lo schermo
+  // pieno di un sito l'Esc va chiesto al browser, o non arriva mai al documento (#514).
   const osservatori = new Set();
   function onMark(fn) {
     if (typeof fn !== 'function') return () => {};
@@ -80,10 +74,8 @@
     return el;
   }
 
-  // Quelle attaccate al documento adesso. Non si pota qui: `mark()` arriva anche
-  // un istante prima dell'inserimento, e una potatura fatta in mezzo butterebbe
-  // via un riquadro che stava per nascere. A tenere corto l'elenco pensa il
-  // tetto di `mark()`.
+  // Non si pota qui: una potatura in mezzo butterebbe un riquadro che stava per nascere.
+  // L'elenco lo tiene corto `mark()`.
   function aperti() {
     const vive = [];
     try {
@@ -96,10 +88,8 @@
     try { return !!(el && el.getAttribute && el.getAttribute(ATTR) !== null); } catch (_) { return false; }
   }
 
-  // Anche gli antenati: un nodo che compare in fondo a un nostro popup è
-  // nostro quanto il popup. `closest` si ferma al confine di un componente
-  // isolato, che è esattamente ciò che vogliamo — dentro lo shadow di un
-  // riquadro di Filo la radice marcata è l'host, e chi cammina non ci entra.
+  // Anche gli antenati: un nodo in fondo a un nostro popup è nostro quanto il popup.
+  // `closest` si ferma al confine dello shadow, dove la radice marcata è l'host.
   function inside(el) {
     try {
       if (is(el)) return true;

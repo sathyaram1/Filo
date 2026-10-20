@@ -1,5 +1,6 @@
-// Shell renderer: tab bar + barra indirizzi.
-// Sottoscrive a `filoShell.tabs.onUpdate` per il rerender.
+// La barra in alto di Filo: fila delle schede, icone, notifiche, pannello degli
+// scaricamenti. Vive fuori dalle WebContentsView, quindi è l'unica superficie
+// che resta visibile sopra qualunque pagina.
 
 (() => {
   const api = window.filoShell;
@@ -8,9 +9,7 @@
     return;
   }
 
-  // Come si chiamano i tasti sul sistema di chi guarda: su Mac la scheda nuova
-  // si apre con Cmd+T, e il suggerimento deve dire quello. L'HTML è uno solo
-  // per tutti i sistemi, quindi la scritta si compone qui.
+  // Il nome del tasto si compone qui, non nell'HTML: regola in CLAUDE.md § Mac.
   const TASTI = window.SN_TASTI;
   const tasto = (accel) => (TASTI ? TASTI.etichetta(accel) : accel);
 
@@ -44,9 +43,8 @@
   const winMaxBtn = document.getElementById('win-max');
   const winCloseBtn = document.getElementById('win-close');
 
-  // Popola i bottoni del chrome con le SVG della libreria condivisa
-  // (`src/shared/icons.js`) così la barra in alto ha la stessa famiglia
-  // visiva del menu tasto destro.
+  // Icone da src/shared/icons.js: la barra deve stare nella stessa famiglia
+  // visiva del menu del tasto destro.
   const ICONS = window.SN_ICONS || {};
   function setIcon(el, name, size) {
     if (!el || typeof ICONS[name] !== 'function') return;
@@ -61,9 +59,8 @@
   setIcon(accountBtn, 'user', 16);
   setIcon(newBtn, 'plus', 16);
 
-  // Token estetici (#146.1): applica gli override dell'utente alle variabili
-  // della shell (--accent, --fg, …) al boot e live a ogni cambio impostazioni
-  // (stesso canale SETTINGS_UPDATED usato dalle pagine).
+  // #146.1 — i token estetici dell'utente valgono anche qui, e si riapplicano
+  // dal vivo a ogni cambio: la barra non può restare indietro sulle pagine.
   const ThemeTokens = window.SN_THEME_TOKENS;
   function applyShellTokens(tokens) {
     if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
@@ -141,10 +138,7 @@
     });
   }
 
-  // ── Modalità incognito ────────────────────────────────────────────────────
-  // La finestra incognito carica shell.html?incognito=1. Applichiamo un tema
-  // scuro dedicato (via data-incognito sul <html>, vedi shell.css) e mostriamo
-  // un badge "Incognito" nella barra così la finestra è inconfondibile.
+  // Tema dedicato e badge: una finestra incognito dev'essere inconfondibile.
   const isIncognito = new URLSearchParams(location.search).get('incognito') === '1';
   if (isIncognito) {
     document.documentElement.dataset.incognito = '1';
@@ -273,17 +267,14 @@
     }
     return entries;
   }
-  // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
-  // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
-  // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
-  // la lista ad ogni apertura del menu, così riflette lo stato auth corrente.
+  // "Modelli predefiniti" appare SOLO agli admin. La lista si ricostruisce a
+  // ogni apertura del menu, o resterebbe ferma allo stato di accesso di prima.
   function buildSettings() {
     const entries = [
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
       { label: 'Altro', icon: 'options', url: 'filo://options/altro.html' },
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
-      // Sta con "Modelli" e "Sicurezza" perché risponde alle stesse domande —
-      // quali modelli, che fine fanno i dati — ma dal lato del PERCHÉ.
+      // Con "Modelli" e "Sicurezza": stesse domande, dal lato del perché.
       { label: 'Trasparenza', icon: 'transparency', url: 'filo://transparency/transparency.html' },
       { type: 'separator' },
       { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
@@ -320,25 +311,17 @@
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
   appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, buildApps()));
 
-  // "Nuova finestra incognito" vive ora nel menu dell'account (icona profilo),
-  // non più nel menu Impostazioni → apre la finestra incognito nel main.
-  // Registrazione separata così funziona anche se il bottone account non è
-  // presente. L'altro ingresso resta l'icona nel menu del tasto destro.
+  // Registrata a parte perché deve funzionare anche senza il bottone account.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
       if (action === 'open-incognito' && api.openIncognito) api.openIncognito();
     });
   }
 
-  // ── Account "Accedi con Google" ───────────────────────────────────────────
-  // Lo stato vive nel main; qui mostriamo solo il profilo pubblico. Quando
-  // loggato, l'icona diventa l'avatar (foto Google) e il click apre un menu
-  // con "Esci"; quando non loggato, il click avvia il login.
+  // I token vivono nel main: qui arriva solo il profilo pubblico.
   let authProfile = null;
   let authBusy = false;
-  // Gate UX della voce admin "Modelli predefiniti". La garanzia forte resta nel
-  // main (handler DEFAULTS_*) e nelle regole Firestore: qui decidiamo solo se
-  // mostrare la voce di menu.
+  // Solo estetica: la garanzia vera sta nel main e nelle regole Firestore.
   let isAdmin = false;
   // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
   let authRemembered = true;
@@ -364,8 +347,7 @@
       accountBtn.setAttribute('aria-label', `Account: ${label}`);
       accountBtn.classList.add('signed-in');
       if (authProfile.picture) {
-        // Costruisco l'<img> via DOM così posso ripiegare sull'icona utente
-        // se la foto Google non si carica (CSP/rete).
+        // Via DOM per poter ripiegare sull'icona se la foto non si carica.
         const img = document.createElement('img');
         img.className = 'account-avatar';
         img.alt = '';
@@ -456,7 +438,6 @@
         ]);
       }
     });
-    // Il menu account usa azioni custom invece di url: ascolta la scelta.
     if (api.onMenuAction) {
       api.onMenuAction((action) => {
         if (action === 'auth-signout') doSignOut();
@@ -464,7 +445,6 @@
         else if (action === 'collega-google') collegaGoogle();
       });
     }
-    // Aggiorna l'icona quando il main segnala un cambio sessione.
     if (api.auth && api.auth.onChanged) {
       api.auth.onChanged((m) => {
         authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
@@ -496,10 +476,8 @@
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
 
-  // Comandi shell pilotati dall'agente "Aiuto": l'AI aziona i comandi rapidi
-  // della barra cliccando il bottone REALE (così riusa menu, navigazione e
-  // toggle finestra senza duplicare logica). "close" è escluso di proposito:
-  // non è mappato qui, quindi l'AI non può chiudere la finestra.
+  // L'agente "Aiuto" clicca il bottone VERO, così non si duplica niente.
+  // "close" non è mappato apposta: l'agente non deve chiudere la finestra.
   if (api.onTriggerButton) {
     const triggerMap = {
       home: homeBtn,
@@ -547,8 +525,7 @@
       if (!text) return;
       showTimer = setTimeout(() => {
         const r = t.getBoundingClientRect();
-        // Punto di ancoraggio: sotto il bottone, centrato. Il main rifinisce la
-        // posizione una volta misurato il testo (e potrà flipparlo se necessario).
+        // Ancora provvisoria: il main la rifinisce dopo aver misurato il testo.
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
@@ -688,17 +665,11 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
-  // ── Drag & drop per riordinare le tab ─────────────────────────────────────
-  // Implementazione a pointer (mousedown/mousemove/mouseup) invece di HTML5
-  // draggable: il drag nativo è inaffidabile in Electron sopra le
-  // WebContentsView ed è praticamente non testabile da Playwright. Con i mouse
-  // event il riordino è deterministico e si lascia esercitare dai test.
-  // `drag` resta non-null per tutta la trascinata; `moved` diventa true solo
-  // oltre la soglia, così un semplice click non viene scambiato per drag.
+  // Riordino a mouse event, non col drag HTML5: quello è inaffidabile sopra le WebContentsView
+  // e Playwright non lo prova. `moved` scatta oltre la soglia, o un clic sarebbe un drag.
   let drag = null; // { id, el, startX, moved }
   let suppressClickId = null; // id della tab il cui prossimo click va ignorato
 
-  // Elemento .tab (escluso quello trascinato) dopo cui inserire, in base alla X.
   function tabDragAfter(x) {
     const els = [...tabsEl.querySelectorAll('.tab:not(.dragging)')];
     let best = null;
@@ -715,12 +686,8 @@
     if (!drag) return;
     if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
     drag.moved = true;
-    // Difesa in profondità: se per qualsiasi motivo il nodo trascinato non è più
-    // attaccato al DOM (un ridisegno l'ha rigenerato), NON reinserire l'orfano —
-    // creerebbe un duplicato con lo stesso id. Riaggancia il nodo vivo per questo
-    // id prima di manipolarlo. Con la sospensione del render in drag questo non
-    // dovrebbe mai scattare, ma tiene l'invariante "mai due .tab con lo stesso id"
-    // vera comunque cambi la logica di render.
+    // Invariante: mai due .tab con lo stesso id. Se il nodo trascinato è stato orfanato da un
+    // ridisegno, reinserirlo ne creerebbe un doppione: si riaggancia quello vivo.
     if (!drag.el.isConnected) {
       const live = tabsEl.querySelector(`.tab[data-id="${drag.id}"]`);
       if (live) drag.el = live;
@@ -743,11 +710,8 @@
     ridisegnoRimandato = false;
     // Il click che segue il mouseup non deve riattivare/spostare la tab.
     suppressClickId = d.id;
-    // La posizione di rilascio è quella del NODO effettivamente trascinato, non
-    // la prima occorrenza dell'id: usare l'identità del nodo (indexOf(d.el)) è
-    // robusto anche se in barra esistesse un secondo .tab con lo stesso id, dove
-    // indexOf(id) prenderebbe la posizione sbagliata. Se il nodo non è in barra
-    // (non dovrebbe capitare), ripiego sull'id.
+    // La posizione si prende dall'IDENTITÀ del nodo, non dall'id: con un
+    // doppione in barra, cercare per id darebbe la posizione sbagliata.
     const nodes = [...tabsEl.querySelectorAll('.tab')];
     let toIndex = nodes.indexOf(d.el);
     if (toIndex < 0) toIndex = nodes.map((x) => x.dataset.id).indexOf(d.id);
@@ -890,17 +854,15 @@
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6"/><path d="M21 9l-4 6"/></svg>';
 
-  // Indicatore "audio in riproduzione": altoparlante con onde, così si
-  // riconoscono a colpo d'occhio le tab che stanno suonando — anche quelle in
-  // background. Cliccabile per silenziare al volo (parità col menu "Muta").
+  // Le schede che suonano si riconoscono a colpo d'occhio anche in secondo
+  // piano, e l'icona muta al clic: stessa cosa della voce "Muta" nel menu.
   const AUDIO_IND_SVG =
     '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
     '<path d="M18.5 6a9 9 0 0 1 0 12"/></svg>';
 
-  // Indicatore "aperta da un altro paese": globo + codice paese, discreto e
-  // caldo (accento Filo, niente lucchetti da security tool).
+  // Globo e codice paese: il tono è viaggio, non un lucchetto da antivirus.
   const PROXY_IND_SVG =
     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -919,8 +881,7 @@
 
   let ctxTabId = null;
   let ctxMenuPos = { x: 0, y: 0 };
-  // Stato proxy per il menu (lazy, richiesto a ogni apertura: la config può
-  // cambiare dalle impostazioni mentre l'app è aperta).
+  // Richiesto a ogni apertura: la configurazione può cambiare a Filo acceso.
   let ctxProxyStatus = null;
   let ctxGiro = 0;
   const senzaErrore = (fn) => { try { return Promise.resolve(fn()).catch(() => null); } catch (_) { return Promise.resolve(null); } };
@@ -952,9 +913,8 @@
     // la freccia apre la lista paesi. Su tab già proxata: "Torna in Italia".
     if (ctxProxyStatus && ctxProxyStatus.configured) {
       if (t.proxy) {
-        // Tab già instradata: si può cambiare paese (apre la lista) o tornare
-        // diretti. Senza "Cambia paese" l'utente dovrebbe prima tornare in
-        // Italia e poi riproxare — un'asimmetria inutile.
+        // "Cambia paese" c'è perché senza si dovrebbe prima tornare in Italia
+        // e poi ripartire: un giro in più per niente.
         entries.push({ label: 'Cambia paese', icon: 'globe', action: 'tab-proxy-pick' });
         entries.push({ label: 'Torna in Italia', icon: 'globe', action: 'tab-proxy-clear' });
       } else {
@@ -1046,8 +1006,7 @@
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
   }
 
-  // Le azioni del menu tornano qui (canale globale onMenuAction): filtriamo solo
-  // quelle `tab-…` e le applichiamo alla tab memorizzata in ctxTabId.
+  // Il canale è globale: qui si prendono solo le azioni `tab-…`.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
       const id = ctxTabId;
@@ -1414,15 +1373,12 @@
       try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
     }
 
-    // Barra di navigazione (icone). Il campo URL è stato rimosso: l'indirizzo
-    // si digita dalla home di Filo. Qui aggiorniamo solo lo stato dei tasti.
+    // Non c'è un campo URL: l'indirizzo si scrive dalla home.
     const a = activeTab();
     backBtn.disabled = !(a && a.canBack);
     fwdBtn.disabled = !(a && a.canFwd);
     reloadBtn.disabled = !a;
 
-    // Chrome compatto: la barra indirizzi (icone + URL) si vede SOLO sulla home
-    // di Filo. Sui siti resta solo la fila di tab + i controlli finestra.
     applyChrome(isHomeUrl(a ? a.url : null));
   }
 
@@ -1466,9 +1422,8 @@
     return url;
   }
 
-  // Etichette pulite per le schede delle pagine interne di Filo: niente prefisso
-  // "Filo —", e il nome è quello del tasto che apre la pagina (es. "Modelli" per
-  // le Opzioni). La newtab è "Home". Le pagine web esterne tengono il loro title.
+  // Il nome sulla scheda di una pagina interna è quello del TASTO che la apre, senza prefisso:
+  // due nomi per la stessa cosa sono un modo di non farla trovare.
   const FILO_TAB_LABELS = {
     'newtab': 'Home',
     'options/options.html': 'Modelli',
@@ -1484,33 +1439,28 @@
     'spellcheck/spellcheck.html': 'Correttore',
   };
 
-  // Toglie un eventuale prefisso "Filo — " / "Filo -" da un titolo di pagina.
   function stripFiloPrefix(title) {
     return String(title || '').replace(/^\s*Filo\s*[—–-]\s*/i, '').trim();
   }
 
-  // Nome da mostrare sulla scheda. Le pagine filo:// interne usano l'etichetta
-  // pulita; tutto il resto usa il title della pagina (o l'URL come ripiego).
   function tabLabel(t) {
     const url = t.url || '';
     if (url.startsWith('filo://')) {
-      // Chiave = host + path, senza lo slash iniziale del path. La newtab è
-      // "filo://newtab/" → chiave "newtab".
+      // Chiave = host + path senza slash iniziale: "filo://newtab/" → "newtab".
       const rest = url.slice('filo://'.length);
       const noQuery = rest.split(/[?#]/)[0];
       const key = noQuery.replace(/\/+$/, '');
       if (FILO_TAB_LABELS[key]) return FILO_TAB_LABELS[key];
       const host = key.split('/')[0];
       if (FILO_TAB_LABELS[host]) return FILO_TAB_LABELS[host];
-      // Pagina interna non mappata: almeno togli il prefisso "Filo —".
+      // Pagina interna non mappata: almeno via il prefisso.
       const clean = stripFiloPrefix(t.title);
       if (clean) return clean;
     }
     return t.title || displayUrl(t.url) || 'Nuova scheda';
   }
 
-  // La "home" di Filo è la newtab (mappata sulla dashboard). Senza tab attiva
-  // trattiamo lo stato come home così la barra resta accessibile.
+  // Senza scheda attiva vale "home", o la barra diventa irraggiungibile.
   function isHomeUrl(url) {
     return !url || url.startsWith('filo://newtab/');
   }
@@ -1527,9 +1477,8 @@
     try { api.tabs.setChromeCompact?.(compact); } catch (_) {}
   }
 
-  // §6 — la rotellina verticale del mouse scrolla la striscia delle tab in
-  // orizzontale (la tab bar non ha scroll verticale). Solo quando c'è davvero
-  // overflow, così non intercettiamo gesti inutili.
+  // §6 — la rotella verticale scorre la striscia in orizzontale, ma solo se
+  // c'è davvero overflow: altrimenti si ruberebbe un gesto per niente.
   tabsEl.addEventListener('wheel', (e) => {
     if (tabsEl.scrollWidth <= tabsEl.clientWidth) return;
     const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
@@ -1538,18 +1487,12 @@
     e.preventDefault();
   }, { passive: false });
 
-  // Notifiche/toast in basso a destra (spec #170.1). Sistema riutilizzabile:
-  // ogni notifica è una card impilata nell'angolo, con durata configurabile
-  // (0 = infinita → resta finché l'utente non preme la X) e suono opzionale.
-  // È la base che i blocchi (#170.2/#170.3) usano per segnalare gli eventi.
+  // #170.1 — notifiche impilate in basso a destra; durata 0 = resta finché non
+  // la si chiude. È la base su cui passano tutti gli avvisi della shell.
   const NOTIFS = (() => {
     let host = null;
-    // Tetto al numero di card impilate insieme. Senza limite una raffica di
-    // eventi (es. tempesta di popup bloccati, o ripristino con molte schede su
-    // siti in blacklist) fa crescere lo stack oltre l'altezza della finestra e
-    // spinge le più vecchie fuori schermo, dove non si possono più chiudere.
-    // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
-    // vengono rimosse subito, senza attendere il timeout.
+    // Senza tetto una raffica di eventi (una tempesta di popup bloccati) spinge
+    // le più vecchie fuori schermo, dove non si possono più chiudere.
     const MAX_STACK = 5;
     // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
     const tempi = window.SN_AVVISI.orologio();
@@ -1695,14 +1638,12 @@
       azioni(card, opts.actions);
 
       hostEl().appendChild(card);
-      // Applica subito il tetto: se questa card sfora, la più vecchia sparisce.
       enforceCap();
       // forza reflow così la transizione di entrata parte
       // eslint-disable-next-line no-unused-expressions
       card.offsetHeight;
       card.classList.add('show');
 
-      // Suono opzionale alla comparsa.
       const wantSound = opts.sound !== undefined
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
@@ -1725,8 +1666,7 @@
     return { show, dismiss, dismissKey, rispecchia };
   })();
 
-  // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
-  // passa per il sistema di notifiche, così rispetta la durata configurata.
+  // Anche il toast semplice passa di qui, o non rispetterebbe la durata scelta.
   function showToast(text) { return NOTIFS.show(text); }
 
   // ── Aprire uno scaricamento: se il file non c'è più, DILLO ──────────────
@@ -1756,8 +1696,6 @@
     return api.downloads.openFolder(id).then((res) => {
       if (!res) return;
       if (res.ok === false) { NOTIFS.show(res.error || 'Non è stato possibile aprire la cartella'); return; }
-      // Cartella aperta, ma il file dentro non c'è più: meglio dirlo che
-      // lasciare l'utente a cercarlo.
       if (res.missing) NOTIFS.show('Il file non c’è più: ho aperto la cartella dov’era');
     }).catch(() => {});
   }
@@ -1784,7 +1722,6 @@
             const sito = a.restaConnesso;
             return { label: a.label, onClick: () => restaConnesso(null, true, sito) };
           }
-          // F4 — undo auto-feedback: azione dichiarativa cancelAutoFeedback.
           if (a && a.cancelAutoFeedback && !a.onClick) {
             const fbId = a.cancelAutoFeedback;
             return {
@@ -1845,7 +1782,6 @@
     }
     NOTIFS.show(info.text, opts);
   });
-  // Esposta per test e per usi programmatici dalla shell stessa.
   window.filoNotify = (text, opts) => NOTIFS.show(text, opts);
 
   // Il sì di una domanda che la pagina fa comparire sotto il cursore si arma dopo ARMA_MS (scaricamenti, permessi):
@@ -1873,7 +1809,6 @@
     const dlFill = document.getElementById('dl-ind-fill');
     setIcon(dlIcon, 'download', 15);
 
-    // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
     let panelOpen = false;
     let panel = null;
@@ -2244,9 +2179,8 @@
       dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
-      // I file possono essere spariti dal disco mentre il pannello era chiuso
-      // (nessun evento lo annuncia): ri-leggendo la lista all'apertura le voci
-      // ormai vuote si mostrano già attenuate, senza aspettare un clic a vuoto.
+      // Un file può sparire dal disco a pannello chiuso e nessun evento lo
+      // annuncia: la lista si rilegge all'apertura, non dopo un clic a vuoto.
       api.downloads.list().then((r) => { syncFromList(r && r.items); }).catch(() => {});
     }
     function closePanel() {
@@ -2360,7 +2294,6 @@
     winCloseBtn?.addEventListener('click', () => api.window.close());
   }
 
-  // Scorciatoie globali a livello shell.
   window.addEventListener('keydown', (e) => {
     const meta = e.ctrlKey || e.metaKey;
     if (meta && e.key.toLowerCase() === 't') {
@@ -2370,7 +2303,7 @@
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.close(a.id);
     } else if (meta && e.key.toLowerCase() === 'l') {
-      // L'indirizzo si digita dalla home: Ctrl+L apre la home di Filo.
+      // L'indirizzo si scrive dalla home, quindi Ctrl+L apre la home.
       e.preventDefault();
       const a = activeTab();
       if (a) api.tabs.navigate(a.id, 'filo://newtab/');
@@ -2379,11 +2312,8 @@
       e.preventDefault();
       const a = activeTab(); if (a) api.tabs.reload(a.id);
     } else {
-      // Salto alla N-esima scheda (quando il focus è sulla barra di Filo; per
-      // le pagine ci pensa before-input-event nel main). Quale combinazione
-      // sia lo decide src/shared/tasti.js: Alt+cifra qui, Cmd+cifra su Mac.
-      // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
-      // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
+      // Salto alla N-esima scheda col fuoco sulla barra (per le pagine ci pensa il main). La
+      // combinazione la decide src/shared/tasti.js: regola in CLAUDE.md § Mac.
       const idx = TASTI ? TASTI.indiceSaltoScheda(e, undefined, (state.tabs || []).length) : null;
       if (idx != null) {
         e.preventDefault();
@@ -2400,20 +2330,13 @@
   });
   api.tabs.snapshot().then((snap) => { state = conIcone(snap); render(); });
 
-  // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
-  // Il box feedback vive in un content script sulla pagina e da lì oscura solo
-  // l'area pagina. Quando si apre, il main ci avvisa via `shell:feedback-dim`
-  // così copriamo ANCHE la barra in alto di Filo con lo stesso velo: tutta la
-  // app entra in penombra, segnalando che si è in modalità annotazione. Il velo
-  // intercetta i click (cursore a mirino) per evitare interazioni accidentali
-  // con tab/indirizzo mentre si sta dando un feedback.
+  // Il box feedback vive sulla pagina e da lì oscura solo la pagina: la barra la deve oscurare
+  // la shell, o l'app resta a metà in penombra. Il velo intercetta anche i clic.
   if (api.onFeedbackDim) {
     let dimTabId = null;
 
-    // ── Disegno annotazione sulla barra in alto ──────────────────────────
-    // Permette di disegnare a mano libera su tab+barra indirizzi (la parte di
-    // Filo non coperta dalla WebContentsView), così l'annotazione copre TUTTA
-    // l'app. I tratti sono identici a quelli della pagina (rosso, spessore 3).
+    // Si disegna anche sulla barra, o l'annotazione coprirebbe solo mezza app.
+    // Tratti identici a quelli della pagina: è lo stesso disegno.
     const drawCanvas = document.getElementById('feedback-draw');
     const STROKE_COLOR = '#ff3b30';
     const STROKE_WIDTH = 3;
@@ -2485,7 +2408,7 @@
       drawCanvas.addEventListener('pointerup', endStroke);
       drawCanvas.addEventListener('pointercancel', endStroke);
       window.addEventListener('resize', () => { if (!drawCanvas.hidden) sizeDrawCanvas(); });
-      // Il box (pagina) ha premuto "Cancella disegno": ripuliamo anche la barra.
+      // "Cancella disegno" sulla pagina deve cancellare anche qui.
       api.onFeedbackClearDraw?.(() => { clearDraw(); reportState(); });
     }
 
@@ -2510,9 +2433,8 @@
       }
     }
     api.onFeedbackDim(setDim);
-    // Rete di sicurezza: se l'utente cambia tab mentre il box è aperto, il
-    // content script di quella pagina non riceve più eventi e non potrà
-    // togliere la penombra → la togliamo qui appena la tab attiva cambia.
+    // Cambiando scheda a box aperto, il content script di quella pagina non
+    // riceve più eventi e la penombra resterebbe: la togliamo noi.
     api.tabs.onUpdate((snap) => {
       if (document.documentElement.dataset.feedbackDim && snap && snap.activeId !== dimTabId) {
         setDim(false);
