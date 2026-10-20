@@ -1,5 +1,6 @@
-// #482 — Un indirizzo che Filo ferma per sicurezza (file del computer, cartelle di rete, data:, javascript:) lo dice con
-// una notifica di solo testo, da ogni porta che lo ferma; e la posta va al programma di posta anche rinavigando una scheda.
+// #482, #1318 — Un indirizzo che Filo ferma per sicurezza (file del computer, cartelle di rete, data:, javascript:) lo dice
+// con una notifica di solo testo, da ogni porta che lo ferma; la posta va al programma di posta da ogni porta, anche
+// dall'assistente; un percorso non diventa mai una ricerca, e «localhost:3000» si apre come dalla barra.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
@@ -17,6 +18,16 @@ const intercettaEsterni = (app) => app.evaluate(({ shell }) => {
 const nelModello = (shell, testo) => shell.evaluate((t) => [...document.querySelectorAll('#shell-notifs > .shell-notif')]
   .filter((c) => c.dataset.closing !== '1' && c.textContent.includes(t)).length, testo);
 const carta = async (avvisi, testo) => (await avvisi()).locator('.shell-notif.show', { hasText: testo });
+// L'assistente della home: chiede le azioni come le chiede il modello.
+async function laHome(app, shell) {
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  let home = null;
+  await expect.poll(() => { home = app.windows().find((w) => w.url().startsWith('filo://newtab')); return Boolean(home); }).toBe(true);
+  await home.waitForFunction(() => typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
+  return home;
+}
+const naviga = (home, url) => home.evaluate((u) => chrome.runtime.sendMessage({ type: 'filo_run_action', action: { type: 'NAVIGA', url: u } }), url);
+const ricerche = async (app) => (await schede(app)).filter((u) => /google\.[a-z]+\/search/.test(decodeURIComponent(u)));
 
 test('aperto da Filo in una scheda nuova, un file del computer viene fermato e lo dice, senza «Apri comunque»', async ({ app, shell, avvisi }) => {
   const prima = await schede(app);
@@ -141,18 +152,21 @@ test('«Apri in nuova tab» del menu di Filo su un collegamento a un file di una
 });
 
 // Giro 2: un percorso scritto com'è (cartella di rete, Mac, Linux) non diventa una ricerca del percorso su Google.
+// #1318: nemmeno sotto /run/media (la chiavetta su Linux), fra le virgolette di «Copia come percorso» o fra apici inversi.
 for (const [percorso, testo] of [
   ['\\\\nas\\condivisa\\bilancio.xlsx', 'Percorso di rete bloccato per sicurezza: //nas/condivisa/bilancio.xlsx'],
   ['/home/utente/Documenti/conto.pdf', 'File del computer bloccato per sicurezza: /home/utente/Documenti/conto.pdf'],
   ['~/Scaricati/foto.jpg', 'File del computer bloccato per sicurezza: ~/Scaricati/foto.jpg'],
+  ['/run/media/mario/CHIAVETTA/tesi.docx', 'File del computer bloccato per sicurezza: /run/media/mario/CHIAVETTA/tesi.docx'],
+  ['"C:\\Users\\agenti AI\\Desktop\\nota.txt"', 'File del computer bloccato per sicurezza: C:\\Users\\agenti AI\\Desktop\\nota.txt'],
+  ['`/home/mario/Documenti/conto 2026.pdf`', 'File del computer bloccato per sicurezza: /home/mario/Documenti/conto 2026.pdf'],
 ]) {
   test(`un percorso scritto com'è (${percorso}) è fermato e detto, dall'assistente e da una scheda nuova`, async ({ app, shell, avvisi }) => {
-    await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
-    let home = null;
-    await expect.poll(() => { home = app.windows().find((w) => w.url().startsWith('filo://newtab')); return Boolean(home); }).toBe(true);
-    await home.waitForFunction(() => typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
-    const r = await home.evaluate((u) => chrome.runtime.sendMessage({ type: 'filo_run_action', action: { type: 'NAVIGA', url: u } }), percorso);
+    const home = await laHome(app, shell);
+    const r = await naviga(home, percorso);
     expect(r && r.output && r.output.blocked, 'l\'assistente non sa che il file è stato fermato').toBe('scheme');
+    expect(r.executed, 'l\'assistente lo riporterebbe come pagina aperta').toBe(false);
+    expect(r.output.avviso, 'l\'assistente non sa cosa è stato fermato').toBe(testo);
 
     const prima = await schede(app);
     await shell.evaluate((u) => window.filoShell.tabs.open(u), percorso);
@@ -161,3 +175,91 @@ for (const [percorso, testo] of [
     expect((await schede(app)).some((u) => /google\.[a-z]+\/search/.test(decodeURIComponent(u))), 'il percorso non diventa una ricerca').toBe(false);
   });
 }
+
+// #1318 — un file o un data: che la pagina apre da sé dopo il clic dell'utente, ma non da un collegamento, lo rifiuta
+// Chromium prima di Filo: lo dice come il clic su un collegamento. Un'immagine o uno sfondo con un file: dentro no.
+test('su una pagina web il pulsante che porta a un file, la finestra a parte su un file e il collegamento data: lo dicono', async ({ shell, openTab, testServer, avvisi }) => {
+  const page = await openTab(testServer.html(`<title>Intranet</title>
+    <button style="position:fixed;left:0;top:0;width:300px;height:50px" onclick="location.href='file:///C:/Intranet/Documenti/circolare.pdf'">Apri documento</button>
+    <button style="position:fixed;left:0;top:60px;width:300px;height:50px" onclick="window.open('file:///srv/condivisa/listino.pdf', 'doc', 'width=600,height=400')">Apri in una finestra</button>
+    <a href="data:text/html,<h1>anteprima</h1>" style="position:fixed;left:0;top:120px;width:300px;height:50px;display:block">Anteprima</a>
+    <button style="position:fixed;left:0;top:180px;width:300px;height:50px" onclick="var i=new Image();i.src='file:///C:/Users/mario/AppData/Local/Temp/clip_image001.png';document.body.appendChild(i);var d=document.createElement('div');d.style.cssText='width:9px;height:9px;background:url(file:///tmp/sfondo.png)';document.body.appendChild(d)">Apri la mail</button>
+    <a href="data:text/plain,ciao" download="saluto.txt" style="position:fixed;left:0;top:240px;width:300px;height:50px;display:block">Scarica</a>
+    <script>setTimeout(function () { location.href = 'file:///tmp/da-sola.pdf'; }, 300)</script>`));
+  await page.waitForTimeout(1000);
+  expect(await nelModello(shell, 'da-sola'), 'la pagina da sola resta muta').toBe(0);
+
+  await page.mouse.click(40, 205);
+  await page.mouse.click(40, 265);
+  await page.waitForTimeout(1200);
+  expect(await nelModello(shell, 'clip_image001'), 'un\'immagine con un file dentro non l\'ha aperta nessuno').toBe(0);
+  expect(await nelModello(shell, 'sfondo.png'), 'uno sfondo con un file dentro non l\'ha aperto nessuno').toBe(0);
+  expect(await nelModello(shell, 'data:'), 'un data: col «download» si scarica, non è fermato').toBe(0);
+
+  await page.mouse.click(40, 25);
+  const c = await carta(avvisi, 'File del computer bloccato per sicurezza: C:/Intranet/Documenti/circolare.pdf');
+  await expect(c).toBeVisible({ timeout: 8000 });
+  await expect(c.locator('.shell-notif-action')).toHaveCount(0);
+  await page.mouse.click(40, 85);
+  await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: /srv/condivisa/listino.pdf')).toBeVisible({ timeout: 8000 });
+  await page.mouse.click(40, 145);
+  await expect(await carta(avvisi, 'Indirizzo «data:» bloccato per sicurezza')).toBeVisible({ timeout: 8000 });
+  expect(page.url()).toContain('127.0.0.1');
+});
+
+// #1318 — chiesto all'assistente o aperto da Filo, un server della rete di casa scritto senza http si apre come dalla barra.
+test.describe('un indirizzo locale con la porta, senza http', () => {
+  test.use({ hostInPiu: ['nas.lan'] });
+
+  test('localhost:porta e nas.lan:porta si aprono dall\'assistente e da una scheda nuova, senza avvisi', async ({ app, shell, testServer }) => {
+    const porta = new URL(testServer.origin).port;
+    const pagina = (titolo) => testServer.html(`<title>${titolo}</title><h1>${titolo}</h1>`).split('/').pop();
+    const contenuto = async (url) => {
+      let w = null;
+      await expect.poll(() => { w = app.windows().find((x) => x.url() === url); return Boolean(w); }, { message: `nessuna scheda su ${url}`, timeout: 10000 }).toBe(true);
+      await w.waitForLoadState('domcontentloaded');
+      return w.textContent('h1');
+    };
+    const home = await laHome(app, shell);
+
+    const sviluppo = pagina('Server di sviluppo');
+    const r = await naviga(home, `localhost:${porta}/${sviluppo}`);
+    expect(r && r.output && r.output.blocked, 'localhost con la porta non è uno schema sconosciuto').toBeFalsy();
+    expect(r.executed).toBe(true);
+    expect(await contenuto(`http://localhost:${porta}/${sviluppo}`)).toBe('Server di sviluppo');
+
+    const nas = pagina('Il NAS di casa');
+    const r2 = await naviga(home, `nas.lan:${porta}/${nas}`);
+    expect(r2 && r2.output && r2.output.blocked).toBeFalsy();
+    expect(r2.executed).toBe(true);
+    expect(await contenuto(`http://nas.lan:${porta}/${nas}`)).toBe('Il NAS di casa');
+
+    const daFilo = pagina('Aperto da Filo');
+    const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), `localhost:${porta}/${daFilo}`);
+    expect(aperta && aperta.id, 'da Filo localhost con la porta è fermato').toBeTruthy();
+    expect(await contenuto(`http://localhost:${porta}/${daFilo}`)).toBe('Aperto da Filo');
+
+    expect(await nelModello(shell, 'bloccat'), 'nessun «bloccato per sicurezza» per un server di casa').toBe(0);
+    expect(await ricerche(app)).toEqual([]);
+  });
+});
+
+// #1318 — «scrivi una mail a Mario»: dall'assistente come da un clic su una pagina o da una scheda, al programma di posta.
+test('l\'indirizzo di posta (e il telefono) chiesto all\'assistente va al programma del computer, non è fermato', async ({ app, shell }) => {
+  await intercettaEsterni(app);
+  const home = await laHome(app, shell);
+  const posta = 'mailto:mario.rossi@example.com?subject=Cena%20di%20sabato&body=Ciao%20Mario';
+  const r = await naviga(home, posta);
+  expect(r && r.output && r.output.blocked, 'la posta non è un indirizzo da fermare').toBeFalsy();
+  expect(r.executed).toBe(true);
+  expect(r.output.esterno).toBe('mailto');
+  await expect.poll(() => esterni(app), { timeout: 6000 }).toEqual([posta]);
+
+  const r2 = await naviga(home, 'tel:+390612345678');
+  expect(r2.executed).toBe(true);
+  await expect.poll(() => esterni(app), { timeout: 6000 }).toEqual([posta, 'tel:+390612345678']);
+
+  await shell.waitForTimeout(400);
+  expect(await nelModello(shell, 'bloccat')).toBe(0);
+  expect(await ricerche(app)).toEqual([]);
+});
