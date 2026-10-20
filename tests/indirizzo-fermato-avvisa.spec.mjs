@@ -185,6 +185,7 @@ test('su una pagina web il pulsante che porta a un file, la finestra a parte su 
     <a href="data:text/html,<h1>anteprima</h1>" style="position:fixed;left:0;top:120px;width:300px;height:50px;display:block">Anteprima</a>
     <button style="position:fixed;left:0;top:180px;width:300px;height:50px" onclick="var i=new Image();i.src='file:///C:/Users/mario/AppData/Local/Temp/clip_image001.png';document.body.appendChild(i);var d=document.createElement('div');d.style.cssText='width:9px;height:9px;background:url(file:///tmp/sfondo.png)';document.body.appendChild(d)">Apri la mail</button>
     <a href="data:text/plain,ciao" download="saluto.txt" style="position:fixed;left:0;top:240px;width:300px;height:50px;display:block">Scarica</a>
+    <button style="position:fixed;left:0;top:300px;width:300px;height:50px" onclick="for (var i = 0; i < 6; i++) window.open('file:///tmp/raffica-' + i + '.pdf')">Raffica</button>
     <script>setTimeout(function () { location.href = 'file:///tmp/da-sola.pdf'; }, 300)</script>`));
   await page.waitForTimeout(1000);
   expect(await nelModello(shell, 'da-sola'), 'la pagina da sola resta muta').toBe(0);
