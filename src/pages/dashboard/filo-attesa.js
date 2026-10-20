@@ -276,7 +276,9 @@
         if (t >= 1) avv.m = avv.a;
       }
 
-      const fondo = fondoVivo();
+      // Fermo (tagliato o chiuso) il filo resta dentro il blocco: senza righe sotto, la sua lunghezza d'attesa lo portava
+      // sopra la riga che segue (#1296).
+      const fondo = finito ? Math.max(0, Math.min(fondoVivo(), wrap.clientHeight - onda.coda)) : fondoVivo();
       const alto = Math.max(fondo + onda.coda + 6, 30);
       piano.setAttribute('height', String(alto));
       piano.style.height = `${alto}px`;
@@ -340,7 +342,8 @@
       requestAnimationFrame(disegna);
     }
     let osserva = null;
-    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); } catch (_) {}
+    // Anche il blocco: la riga in testa che si apre sposta le righe senza cambiarne la misura.
+    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); osserva.observe(wrap); } catch (_) {}
     sveglia();
 
     return {

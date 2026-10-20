@@ -1,5 +1,6 @@
 // #948 — Il tasto microfono delle chat: si preme, si parla, il testo compare nella casella e la richiesta parte
 // da sola dopo un attimo per annullare; con «Lascia il testo da correggere» resta nella casella. Home, Aiuto, Editor.
+// Nella home, mentre Filo lavora, il dettato parte come seguito (#1296).
 // Microfono finto (un tono: per il segmentatore è voce, spento è silenzio), trascrizione e chat finte nel main:
 // tutto il resto (ascolto, fine del parlato, WAV, inserimento, invio) è il codice di produzione.
 
@@ -122,6 +123,40 @@ test('home: il microfono si vede accanto all\'invio, si parla e la richiesta par
   await expect(mic).toHaveAttribute('data-stato', 'pronto');
   const richieste = await app.evaluate(() => globalThis.__richieste);
   expect(richieste.some((r) => r.includes(DETTO))).toBe(true);
+});
+
+// #1296 — dettato mentre Filo lavora è un seguito, come Invio con del testo: non ferma e non aspetta la fine per partire.
+test('home: dettato mentre Filo lavora, parte come seguito senza fermarlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await prepara(app);
+  await app.evaluate(() => {
+    let n = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+      const ultimo = [...messages].reverse().find((m) => m.role === 'user');
+      globalThis.__richieste.push(typeof ultimo?.content === 'string' ? ultimo.content : JSON.stringify(ultimo?.content));
+      const primo = n++ === 0;
+      if (primo) await new Promise((r) => setTimeout(r, 12_000));
+      const testo = primo ? 'Prima risposta.' : 'Domani c\'è il sole.';
+      try { onDelta && onDelta(testo); } catch (_) {}
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: testo, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+  const page = await home(app);
+  await page.locator('#input').fill('prima domanda');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('#stopBtn')).toBeVisible();
+  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  await mic.click();
+  await parla(page);
+  await expect(page.locator('.dash-bubble-attesa', { hasText: DETTO })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#input')).toHaveValue('');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Prima risposta.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Domani c\'è il sole.' })).toBeVisible({ timeout: 10_000 });
+  const richieste = await app.evaluate(() => globalThis.__richieste);
+  expect(richieste.length).toBe(2);
+  expect(richieste[1]).toContain(DETTO);
 });
 
 test('home: nell\'attimo per annullare, la croce ferma l\'invio e il testo resta da correggere', async ({ app, shell }) => {

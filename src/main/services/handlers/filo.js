@@ -3,7 +3,7 @@
 
 module.exports = function register(on, ctx) {
   const {
-    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
+    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, autoFeedbackAnnullabili,
@@ -84,7 +84,9 @@ module.exports = function register(on, ctx) {
   }
 
   // Il quadrato al posto dell'invio (#578): ferma il turno di questa scheda, non quello di un'altra.
-  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
+  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: await fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
+  // Il seguito scritto mentre Filo lavora (#1296): entra nel turno di questa scheda, o lo manda lei a turno finito.
+  on(MSG.FILO_CHAT_SEGUITO, soloFilo(async (msg, sender) => ({ ok: true, ...seguitoFiloChat(msg || {}, sender && sender.wc) })));
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
   // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello

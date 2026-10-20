@@ -414,7 +414,7 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
   }
   // Le lezioni che Filo si scrive da solo dopo la chat passano dalla stessa regola di SALVA_LEZIONE.
   const chat = h.slice(h.indexOf('async function handleFiloChat('));
-  const chiamata = chat.indexOf('maybeRunLessonAgent({ userMessage, filoReply: textReply');
+  const chiamata = chat.indexOf('maybeRunLessonAgent({ userMessage');
   assert.ok(chiamata > 0 && chat.lastIndexOf('lezioniAutomaticheConsentite(', chiamata) > 0, 'le lezioni automatiche chiedono al modulo');
   assert.match(h, /async function lezioniAutomaticheConsentite[\s\S]*?decisioneAutonomia\(/);
 });

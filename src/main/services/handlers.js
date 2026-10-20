@@ -5060,13 +5060,36 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-// I turni di chat in corso, per chi li vuole fermare (#578): reqId → { wcId, ctrl, fermato }. Solo in memoria.
+// I turni di chat in corso, per chi li vuole fermare o aggiungere un seguito (#578, #1296): reqId → turno. Solo in
+// memoria. Un turno si registra appena il messaggio arriva, prima di preparare la richiesta, e `chiuso` vuol dire che ha
+// già la sua risposta: da lì uno stop non scrive più niente.
 const turniInCorso = new Map();
-// Uno stop arrivato mentre il turno prepara ancora la richiesta (saldo, batteria, rete: anche mezzo secondo) vale lo
-// stesso: lo si tiene da parte e il turno lo trova quando si registra. Scadono, per i turni che non arrivano mai.
+// Uno stop arrivato prima che il turno si registri vale lo stesso: lo si tiene da parte e il turno lo trova quando si
+// registra. Scadono, per i turni che non arrivano mai.
 const stopPrimaDelTurno = new Map();
 const STOP_PRIMA_TTL_MS = 10 * 60 * 1000;
-function fermaFiloChat(reqId, wc) {
+function registraTurno(reqId, wc) {
+  const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false, chiuso: false, accoglienza: false, seguiti: [], letti: new Set() };
+  if (!reqId) return turno;
+  turniInCorso.set(String(reqId), turno);
+  const prima = stopPrimaDelTurno.get(String(reqId));
+  stopPrimaDelTurno.delete(String(reqId));
+  if (prima && prima.wcId === turno.wcId) turno.fermato = true;
+  return turno;
+}
+function togliTurno(reqId, turno) {
+  if (reqId && turniInCorso.get(String(reqId)) === turno) turniInCorso.delete(String(reqId));
+}
+// L'accoglienza riparte da sola su un messaggio dell'utente senza risposta: lo stop si scrive quando si preme, non
+// quando l'azione fermata finisce, o una pagina ricaricata in quei secondi rifà il turno (#1296).
+async function segnaStopAccoglienza(turno) {
+  const stato = await FiloMem.getOnboarding();
+  if (turno.chiuso) return;
+  await saveOnboarding(Onboarding.segnaFermato(stato));
+}
+// Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
+// finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
+async function fermaFiloChat(reqId, wc) {
   if (!reqId) return false;
   const t = turniInCorso.get(String(reqId));
   if (!t) {
@@ -5079,8 +5102,29 @@ function fermaFiloChat(reqId, wc) {
   if (t.wcId !== (wc && wc.id)) return false;
   t.fermato = true;
   try { t.ctrl.abort(); } catch (_) {}
+  if (t.accoglienza && !t.chiuso) {
+    try { await segnaStopAccoglienza(t); } catch (e) { console.warn('[Filo] stop dell\'accoglienza non scritto', e?.message || e); }
+  }
   return true;
 }
+// Un seguito scritto mentre il turno lavora (#1296) entra al suo passo dopo; se il turno non ne ha, lo manda la scheda a
+// turno finito. Lo prende solo il turno della scheda che lo scrive, non fermato, non chiuso, non dell'accoglienza (lei
+// tiene la conversazione nel suo stato, e il seguito la aspetta). `togli`: ritirato prima che il modello lo legga.
+function seguitoFiloChat({ reqId, id, testo, togli = false } = {}, wc) {
+  const t = reqId ? turniInCorso.get(String(reqId)) : null;
+  const chiave = String(id || '');
+  if (!t || t.wcId !== (wc && wc.id) || !chiave) return { accolto: false, tolto: !!togli };
+  if (togli) {
+    const i = t.seguiti.findIndex((s) => s.id === chiave);
+    if (i >= 0) t.seguiti.splice(i, 1);
+    return t.letti.has(chiave) ? { letto: true, tolto: false } : { tolto: true };
+  }
+  const parole = String(testo || '').trim();
+  if (!parole || t.fermato || t.chiuso || t.accoglienza || t.letti.has(chiave)) return { accolto: false };
+  if (!t.seguiti.some((s) => s.id === chiave)) t.seguiti.push({ id: chiave, testo: parole });
+  return { accolto: true };
+}
+const NOTA_SEGUITO = '[L\'utente ha scritto questo mentre lavoravi alla sua richiesta di prima.]';
 
 // I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
 // modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
@@ -5213,7 +5257,8 @@ function ricordoComeAzione(ricordi) {
 }
 
 async function handleFiloChat(richiesta) {
-  const volo = { accoglienza: false };
+  const reqId = richiesta && richiesta.reasoningReqId;
+  const volo = { accoglienza: false, turno: registraTurno(reqId, richiesta && richiesta.sender && richiesta.sender.wc) };
   try {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
@@ -5221,6 +5266,7 @@ async function handleFiloChat(richiesta) {
     return await unUsoContato(ACTIONS.FILO_CHAT, () => (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno()));
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
+    togliTurno(reqId, volo.turno);
   }
 }
 
@@ -5285,7 +5331,14 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   // «Riprendi» toglie il segno dello stop: da qui il turno è di nuovo in corso, e se la scheda muore riparte come gli altri.
   if (onbActive && internal && onbBefore && onbBefore.fermato) onbBefore = await saveOnboarding(Onboarding.togliFermato(onbBefore));
+  // Da qui lo stop si scrive nell'intervista quando si preme; uno arrivato mentre il messaggio entrava si scrive adesso.
+  const turno = volo.turno;
+  if (onbActive) {
+    turno.accoglienza = true;
+    if (turno.fermato) onbBefore = await saveOnboarding(Onboarding.segnaFermato(onbBefore));
+  }
   if (onbActive && !internal && Onboarding.isExitRequest(onbBefore, userMessage)) {
+    turno.chiuso = true;
     // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
     // testo fisso — l'unica risposta che si può garantire anche senza modello.
     // Un «no grazie» invece NON passa di qui: rifiuta la proposta che Filo ha
@@ -5373,7 +5426,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
   // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
-  const paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
     .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
   // Gli indirizzi che il modello ha davanti, per la regola dell'indirizzo scritto (#553, src/main/services/pageRead.js).
   const provenienza = PageRead.contestoChat();
@@ -5391,11 +5444,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
   // Il compito è la conversazione di questa scheda come la vede il modello: nel filo, più la coda.
   const conversazioneScheda = filo && chatId ? [...vistiDalFilo.filter((m) => m && m.chat === chatId), ...codaScheda] : codaScheda;
-  const richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
+  let richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
   // Le parole di adesso: un indirizzo può portarle fuori, quelle dette prima no senza un OK (#868.6). Un turno che riprende
   // rifà l'ultima richiesta della scheda; il testo di un suggerimento l'ha scritto un modello.
   const ultimaDellaScheda = conversazioneScheda.filter((m) => m && m.role !== 'filo' && !m.daModello).pop();
-  const domandaDiAdesso = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
+  let domandaDiAdesso = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
   for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     const fuori = FCx.letturaDaFuori(m);
@@ -5519,15 +5572,28 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let exhausted = true;
   // I giri con azioni: i «passi» della frase che dice che Filo si è fermato senza risposta.
   let passi = 0;
-  // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
-  // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
-  const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false };
-  if (reasoningReqId) {
-    turniInCorso.set(String(reasoningReqId), turno);
-    const prima = stopPrimaDelTurno.get(String(reasoningReqId));
-    stopPrimaDelTurno.delete(String(reasoningReqId));
-    if (prima && prima.wcId === turno.wcId) turno.fermato = true;
-  }
+  // I seguiti (#1296) entrano prima di ogni chiamata al modello, dopo gli esiti del passo prima: sono parole
+  // dell'utente come la domanda, e lo sanno le uscite (#810, #530, #868.6), l'archivio e la scheda.
+  const seguitiLetti = [];
+  const testiDeiSeguiti = [];
+  const leggiSeguiti = async () => {
+    for (const s of turno.seguiti.splice(0)) {
+      turno.letti.add(s.id);
+      seguitiLetti.push(s.id);
+      testiDeiSeguiti.push(s.testo);
+      threadMessages.push({ role: 'user', content: `${s.testo}\n\n${NOTA_SEGUITO}` });
+      paroleUtente = `${paroleUtente}\n${s.testo}`;
+      richiesta = `${richiesta}\n${s.testo}`;
+      domandaDiAdesso = domandaDiAdesso ? `${domandaDiAdesso}\n${s.testo}` : s.testo;
+      push('filo:action', { kind: 'seguito', id: s.id });
+      if (!chatId) continue;
+      try {
+        const dopo = await appendToChatArchive(chatId, { role: 'user', text: s.testo });
+        const eid = dopo && Array.isArray(dopo.eids) ? dopo.eids[dopo.eids.length - 1] : '';
+        if (eid) fontiTurno.push(eid);
+      } catch (e) { console.warn('[Filo] seguito non archiviato', e?.message || e); }
+    }
+  };
   // I pezzi vecchi ripescati entrano in coda al contesto, e il blocco di attività lo dice come una ricerca (#868).
   const ricordi = await entroIl(ricordiP, ATTESA_RICORDI_MS, []);
   if (ricordi.length) {
@@ -5599,6 +5665,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       if (turno.fermato) { fermato = true; break; }
+      if (turno.seguiti.length) await leggiSeguiti();
       // La scheda scrive la riga del ripiego sotto la risposta: niente avviso in più (#662).
       const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
@@ -5772,7 +5839,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     throw e;
   } finally {
-    if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
+    turno.chiuso = !fermato;
+    togliTurno(reasoningReqId, turno);
   }
   if (!fermato && lasciati.size) {
     for (const a of lasciati.values()) {
@@ -5793,13 +5861,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
   }
   if (fermato) {
-    // Lo stop resta scritto nell'intervista: una scheda nuova o una pagina ricaricata non rifà il turno fermato.
+    // Già scritto al clic (segnaStopAccoglienza); riscritto qui per uno stop che il turno ha visto da sé.
     if (onbActive) await saveOnboarding(Onboarding.segnaFermato(await FiloMem.getOnboarding()));
     if (onbActive && !internal) releaseOnboardingResume();
     await archiviaGiaFatto();
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
-      model: r && r.model, provider: r && r.provider,
+      model: r && r.model, provider: r && r.provider, seguitiLetti,
     };
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
@@ -5946,8 +6014,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (onboardingClosed) {
     finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
   } else {
+    // I seguiti letti sono parte della domanda a cui la risposta risponde.
+    const domandaIntera = [String(userMessage || ''), ...testiDeiSeguiti].filter(Boolean).join('\n');
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
-      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
+      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage: domandaIntera, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
       .catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
@@ -5970,6 +6040,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),
+    seguitiLetti,
   };
 }
 
@@ -6398,6 +6469,7 @@ const handlerCtx = {
   archivioDaCancellare,
   handleFiloChat,
   fermaFiloChat,
+  seguitoFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
   controllaUscita,
