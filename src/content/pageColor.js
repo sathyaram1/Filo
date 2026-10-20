@@ -218,8 +218,8 @@
           } catch (_) { finish(null); }
         };
         img.src = href;
-        // Failsafe: se l'immagine non carica entro 3s, rinuncia.
-        setTimeout(() => finish(null), 3000);
+        // Failsafe: se l'immagine non carica entro 3s, rinuncia e chiude la richiesta, che appesa resterebbe aperta.
+        setTimeout(() => { if (!done) { finish(null); img.removeAttribute('src'); } }, 3000);
       });
     }
 
