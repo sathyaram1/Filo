@@ -144,9 +144,9 @@ test('nessun testo dell’app promette che i passi aiutano altri utenti', SPENTA
   }
 });
 
-test('il manifesto e le note di versione dicono che i passi restano sul computer', SPENTA, () => {
+test('il manifesto e le note di versione dicono che i passi non vanno al server', SPENTA, () => {
   const aiuto = globalThis.SN_CAPABILITIES.get('help-sidebar');
-  assert.match(`${aiuto.desc} ${aiuto.doesNot}`, /non escono dal tuo computer/);
+  assert.match(`${aiuto.desc} ${aiuto.doesNot}`, /non vanno né al server di Filo né ad altri utenti/);
   // In un blocco qualunque: uscita la versione che la porta, la riga resta lì e sopra se ne apre un altro.
   const righe = globalThis.SN_PATCH_NOTES.NOTES.flatMap((n) => [...(n.features || []), ...(n.fixes || [])]);
   assert.ok(righe.some((r) => /Ha funzionato/.test(r) && /non escono dal computer/.test(r)),
