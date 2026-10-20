@@ -2024,7 +2024,11 @@
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (lezioneAccoglienza(a)) return rigaLezioneAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
-    if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
+    if (type === 'APRI_FILE') {
+      // Fra virgolette («Copia come percorso» di Windows), fra apici inversi o come file:// è lo stesso file (#1318).
+      const pulito = self.SN_URL_NAV ? self.SN_URL_NAV.pulisciPercorso(a.percorso || a.path) : String(a.percorso || a.path || '');
+      if (percorsoLocale(pulito)) { a.percorso = pulito; return bottoneFile(a); }
+    }
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';

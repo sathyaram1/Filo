@@ -138,7 +138,7 @@
     NAVIGA: {
       description: 'APRE SUBITO un sito in una nuova scheda. Usalo quando l\'utente chiede di aprire qualcosa. Con `background: true` la scheda si apre in SECONDO PIANO (l\'utente resta dov\'è, la musica parte lo stesso): usalo per ciò che si ascolta e basta, o quando l\'utente chiede di non cambiare scheda. Se stai solo PROPONENDO dei siti tra cui scegliere, non usarlo: elenca i link nel testo. ' + REGOLA_INDIRIZZI + '',
       properties: {
-        url: S('Indirizzo completo (https://…).'),
+        url: S('Indirizzo completo (https://…). Per scrivere una mail mailto:indirizzo?subject=…&body=…: si apre il programma di posta con la bozza.'),
         etichetta: S('Nome leggibile del sito o della pagina.'),
         background: B('true per aprire in secondo piano senza cambiare scheda.'),
         cerca_nel_sito: CERCA_NEL_SITO,

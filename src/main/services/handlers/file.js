@@ -41,7 +41,7 @@ module.exports = function register(on, ctx) {
   // Un percorso relativo non ha una cartella a cui riferirsi: si accetta intero, o con ~ per la cartella personale.
   function percorsoDi(msg, sender) {
     if (msg && msg.downloadId) return DL().percorsoDi(msg.downloadId, ambito(sender));
-    const p = msg && typeof msg.percorso === 'string' ? msg.percorso.trim() : '';
+    const p = msg && typeof msg.percorso === 'string' ? globalThis.SN_URL_NAV.pulisciPercorso(msg.percorso) : '';
     if (!p || (!path.isAbsolute(p) && !/^~([\\/]|$)/.test(p))) return '';
     return require('../documentRead').normalizePath(p);
   }

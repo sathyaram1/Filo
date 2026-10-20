@@ -3408,7 +3408,7 @@ async function eseguiAzioneFilo(action, {
       }
       case 'APRI_FILE': {
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
-        const p = String(action.percorso ?? action.path ?? '').trim();
+        const p = globalThis.SN_URL_NAV?.pulisciPercorso?.(action.percorso ?? action.path) ?? String(action.percorso ?? action.path ?? '').trim();
         let dove = '';
         if (/^(~([\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(p)) {
           try { dove = await require('./documentiIndice').doveSta(require('./documentRead').normalizePath(p)); } catch (_) {}
