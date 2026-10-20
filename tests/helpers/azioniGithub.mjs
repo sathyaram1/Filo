@@ -161,9 +161,9 @@ export const haBash = spawnSync('bash', ['-c', 'true']).status === 0;
 /**
  * Esegue lo script di un passo come lo esegue Actions (`bash --noprofile --norc -eo pipefail`),
  * con `sleep` finto e i file di `GITHUB_OUTPUT` e `GITHUB_STEP_SUMMARY`. `file` mette script nella cartella del
- * passo (percorso relativo → contenuto); in `env` `{{dir}}` diventa quella cartella. Restituisce esito, uscite e riepilogo.
+ * passo (percorso relativo → contenuto); in `env` `{{dir}}` diventa quella cartella; `leggi` sono i file da rileggere alla fine.
  */
-export function eseguiPasso(script, { env = {}, file = {} } = {}) {
+export function eseguiPasso(script, { env = {}, file = {}, leggi = [] } = {}) {
   const dir = cartellaTemporanea('filo-passo-');
   try {
     const bin = join(dir, 'bin');
