@@ -180,6 +180,10 @@ test('«Traduci la pagina» coi crediti finiti: l’avviso porta ai Crediti, col
   const tasto = avviso.locator('.sn-msg-rimedio');
   await expect(tasto).toHaveText('Apri Crediti');
   await page.screenshot({ path: `${SHOTS}/663-avviso-traduzione.png` }).catch(() => {});
+  // Anche l'avviso dei crediti finiti che il main manda a ogni scheda: nessun avviso nomina Crediti senza il tasto.
+  const nominano = page.locator('.sn-toast', { hasText: 'pagina Crediti' });
+  await expect.poll(() => nominano.count()).toBeGreaterThan(1);
+  for (const a of await nominano.all()) await expect(a.locator('.sn-msg-rimedio')).toHaveText('Apri Crediti');
 
   // Il tasto destro sull'avviso offre la stessa strada.
   await avviso.click({ button: 'right', position: { x: 10, y: 10 } });
