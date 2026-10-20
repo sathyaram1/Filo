@@ -22,7 +22,7 @@
 //  (E) un comando con la modalità terminale spenta dice perché non è partito, e
 //      porta all'interruttore;
 //  (F) «portami alla home» chiesto dalla home non ricarica la pagina: il lavoro
-//      e la risposta restano da leggere;
+//      e la risposta restano da leggere, e la conversazione la chiude il bottone;
 //  (G) l'evento proposto si aggiunge davvero al calendario, e finché non lo si
 //      aggiunge il diario lo chiama proposta.
 //  (H) l'azione confermata nel popup lascia la sua riga anche quando non è
