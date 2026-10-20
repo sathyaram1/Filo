@@ -56,6 +56,7 @@
         'Fra i siti fidati per i programmi scaricati non entra più un servizio che ospita i siti di chiunque, come github.io o vercel.app. Filo ti dice perché e ti propone il sito preciso, per esempio quello da cui hai appena scaricato. Anche se ti fidi di google.com o di Discord, un programma che chiunque condivide su Google Drive o negli allegati di Discord ti viene chiesto. E un programma che arriva da un riquadro dello stesso sito non viene più detto «da una pagina con parti di altri siti».',
         'Fra i siti dove resti connesso puoi scrivere il nome che vedi o incollare l\'indirizzo dalla barra, come mail.google.com: l\'elenco mostra il sito che resta connesso, qui google.com. E se avevi aggiunto gmail.com, adesso ti tiene davvero connesso a Gmail.',
         'Su Windows, se un programma lanciato dal terminale esce con un errore, il comando risulta fallito anche quando dopo c\'è altro che riesce, come una compilazione fallita seguita da un messaggio di fine o uno script che termina con quella compilazione. Prima risultava riuscito, sia a Filo sia nel terminale che usi tu.',
+        'Con il computer sotto sforzo il blocco del lavoro di Filo poteva perdere la nota scritta a metà turno o l\'ultimo ragionamento prima della risposta. Adesso li tiene tutti.',
       ],
     },
     {

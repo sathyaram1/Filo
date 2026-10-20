@@ -987,11 +987,17 @@
         streamBubble = null;
       }
     };
+    // La risposta del main può arrivare prima degli ultimi eventi in diretta (viaggiano su code diverse): la diretta si
+    // chiude sul segno di fine, che il main manda dietro all'ultimo evento (#1321).
+    let fineDellaDiretta = () => {};
+    const direttaFinita = new Promise((ok) => { fineDellaDiretta = ok; });
     let offAction = null;
     if (window.filo?.onAction) {
       offAction = window.filo.onAction((data) => {
         if (!data || data.reqId !== reasoningReqId) return;
-        if (data.kind === 'start') {
+        if (data.kind === 'fine') {
+          fineDellaDiretta();
+        } else if (data.kind === 'start') {
           pending.working(startLabelFor(data.type), String(data.callId || ''));
         } else if (data.kind === 'progress') {
           pending.working(progressLabelFor(data.type, data.fatti, data.totali, data.dettaglio));
@@ -1034,7 +1040,9 @@
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
       msg.images = images;
     }
-    const inviato = turno.fermato ? Promise.resolve({ ok: true, stopped: true, actions: [] }) : send(msg);
+    const inviato = turno.fermato
+      ? Promise.resolve({ ok: true, stopped: true, actions: [] })
+      : send(msg).then((r) => (r && r.diretta && offAction ? direttaFinita.then(() => r) : r));
     const fineDiretta = (r) => {
       if (turnoVivo === turno) turnoVivo = null;
       pending.fineDiretta();
