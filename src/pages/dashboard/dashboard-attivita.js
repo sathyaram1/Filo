@@ -1070,7 +1070,7 @@
       if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
       if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
     }
-    if (o.blocked === 'scheme') return 'indirizzo non ammesso';
+    if (o.blocked === 'scheme') return o.avviso ? pulito(o.avviso) : 'indirizzo non ammesso';
     if (o.blocked === 'site') {
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
       return `${o.host || 'il sito'} è fra i siti ${quali}`;
@@ -2015,7 +2015,7 @@
       }
       btn.className = 'dash-action-btn dash-action-link-chip';
       if (a._callId) btn.dataset.callId = String(a._callId);
-      btn.appendChild(iconaSitoEl(a.url));
+      btn.appendChild(iconaSitoEl(url));
       btn.appendChild(document.createTextNode(bgTabId ? `▸ ${label}` : `↗ ${label}`));
       return btn;
     }
