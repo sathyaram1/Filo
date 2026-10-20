@@ -931,6 +931,7 @@ class TabManager {
     } catch (_) {}
     installaPermessi(view.webContents.session);
     Permessi.seguiGesti(view.webContents);
+    this._ascoltaRifiutiDiChromium(view.webContents);
     require('./services/homeNetwork').attach(view.webContents.session);
     return view;
   }
