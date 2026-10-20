@@ -256,6 +256,7 @@ test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la sce
   const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Chiudi']);
   await expect.poll(() => vociCoperte(page), { message: 'l’avviso copre il menu nato su di lui' }).toEqual([]);
+  await page.waitForTimeout(300);
   await shot(page, 'avviso-1453-menu-sopra-l-avviso');
   await voci.first().click();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
