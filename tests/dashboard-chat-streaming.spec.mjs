@@ -125,8 +125,8 @@ test('risposta di sola azione (text vuoto): niente bolla di testo vuota', async 
   await page.locator('#input').fill('apri la home');
   await page.locator('#sendBtn').click();
 
-  // L'azione compare…
-  await expect(page.locator('.dash-bubble-actions .dash-action-btn').first()).toBeVisible({ timeout: 8_000 });
+  // L'azione compare a turno finito, e il turno aspetta fino a 5 s che la scheda aperta arrivi (esitoApertura)…
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn').first()).toBeVisible({ timeout: 20_000 });
   // …e non è mai rimasta a schermo una bolla di testo in streaming vuota.
   await expect(page.locator('.dash-bubble-streaming')).toHaveCount(0, { timeout: 3_000 });
   // La bolla di Filo non porta testo visibile (è "solo azioni").
