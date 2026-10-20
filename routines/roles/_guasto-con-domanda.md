@@ -26,3 +26,5 @@ Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
    <biglietto> --role <il tuo ruolo> --guasto "<gruppo>, D-<n>: <messaggio>"`.
 
 <!-- includi: _dopo-un-guasto.md -->
+
+<!-- includi: _domanda-per-owner.md -->
