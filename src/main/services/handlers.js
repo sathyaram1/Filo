@@ -5264,6 +5264,7 @@ async function handleFiloChat(richiesta) {
     return await unUsoContato(ACTIONS.FILO_CHAT, () => (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno()));
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
+    togliTurno(reqId, volo.turno);
   }
 }
 
