@@ -1453,7 +1453,16 @@
     seguiti.push(s);
     bubblesEl.appendChild(s.bolla);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    riarmaQuadrato();
     affidaAlTurno(s, t);
+  }
+  // Mandare un seguito è un invio come il primo: la stessa pausa del quadrato, o il secondo Invio di un doppio colpo
+  // trova la casella vuota e ferma il lavoro che il seguito doveva solo affiancare.
+  function riarmaQuadrato() {
+    stopBtn.dataset.comparso = String(Date.now());
+    stopBtn.style.animation = 'none';
+    void stopBtn.offsetWidth;
+    stopBtn.style.animation = '';
   }
   // Nel turno entrano solo parole battute qui: un allegato, un testo incollato o un comando con la barra partono a turno
   // finito, dalla strada di sempre. L'accoglienza tiene la sua conversazione e il seguito la aspetta. Un seguito che il
