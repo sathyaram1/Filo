@@ -353,7 +353,7 @@
       // Il tetto di spesa del backup, più largo, si offre e lo mette solo il suo bottone (#1050).
       const tetto = prev.tettoSpesa && typeof prev.tettoSpesa.backup === 'number' ? prev.tettoSpesa : null;
       const euro = (n) => (Number(n) > 0
-        ? `${Number(n).toLocaleString('it-IT', { minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2, maximumFractionDigits: 2 })} €`
+        ? `${Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2, maximumFractionDigits: 2 })} €`
         : 'senza limite');
       const bottoneTetto = tetto ? I18n.t(tetto.backup > 0 ? 'security_import_tetto_btn' : 'security_import_tetto_btn_senza') : '';
       const manca = [

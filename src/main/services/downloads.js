@@ -208,10 +208,13 @@ function uniquePath(dir, filename) {
 // Cartella di quarantena: dentro i dati dell'app, MAI dentro Download. Un
 // programma in attesa di risposta sta qui, dove nessun gestore file lo mostra e
 // nessun doppio clic lo trova.
-function quarantineDir() {
+function percorsoQuarantena() {
   let base = '';
   try { base = electron().app.getPath('userData'); } catch (_) { base = downloadsDir(); }
-  const dir = path.join(base, 'quarantena');
+  return path.join(base, 'quarantena');
+}
+function quarantineDir() {
+  const dir = percorsoQuarantena();
   try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
   return dir;
 }
@@ -232,7 +235,7 @@ function spostaFile(src, dst) {
 function rimuoviQuarantena(rec) {
   const p = rec && rec._quarantena && rec.savePath;
   if (!p) return;
-  const dentro = path.relative(quarantineDir(), path.resolve(String(p)));
+  const dentro = path.relative(percorsoQuarantena(), path.resolve(String(p)));
   if (dentro && !dentro.startsWith('..') && !path.isAbsolute(dentro)) { try { fs.unlinkSync(p); } catch (_) {} }
   forgetExists(p);
   rec._quarantena = false;
