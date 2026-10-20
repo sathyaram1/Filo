@@ -15,7 +15,7 @@
   // Una voce appena scoperta aspetta mezzo secondo: un velo tolto mentre la mano parte non lascia il tempo di
   // vedere cosa c'è sotto (la stessa misura del popup di conferma).
   const RITARDO_MS = 500;
-  // Scoperta da un pezzo nostro che se ne va (avviso, conferma): niente attesa, se il browser lo dice entro questo
+  // Scoperta da un pezzo nostro che se ne va (una conferma): niente attesa, se il browser lo dice entro questo
   // tempo; oltre, a coprire era qualcun altro.
   const SCARTO_NOSTRO_MS = 300;
   // Sonde allo stesso piano del menu e DOPO di lui: le copre tutto ciò che copre il menu, mai i pezzi del menu.
@@ -447,7 +447,7 @@
     s.left = l + 'px'; s.top = t + 'px'; s.width = (d - l) + 'px'; s.height = (b - t) + 'px';
   }
 
-  // Un nostro pezzo sopra il menu (avviso, conferma): copre anche lui, ma non è il sito.
+  // Un nostro pezzo sopra il menu (una conferma; la pila degli avvisi scende sotto): copre anche lui, ma non è il sito.
   function coperturaNostra(r) {
     const Ui = global.SN_FILO_UI;
     if (!r || !Ui || typeof Ui.aperti !== 'function') return false;

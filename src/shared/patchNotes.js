@@ -29,6 +29,7 @@
         'Filo ti avvisa quando una pagina fa partire da sola lo scaricamento di un programma, quando ti fa scaricare, o apri tu, un programma col nome di un documento (per esempio fattura.pdf.exe) e quando il suo modulo manda la password o la carta senza cifratura. L\'avviso compare anche sui siti noti. Se il programma parte dopo il tuo clic su «Scarica», come sulle pagine di ringraziamento di Firefox o VLC, o dopo che l\'hai chiesto a Filo, l\'avviso non compare.',
       ],
       fixes: [
+        'Il menu del tasto destro aperto su un avviso in basso a destra, o lì accanto, ora sta sopra l\'avviso e lo vedi intero.',
         'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il testo e il nome di un documento dell\'Editor e le correzioni del Correttore.',
         'In Preferenze, Opzioni, Altro e Sicurezza la scritta «Salvato» compare per l\'ultima cosa che hai toccato, non per una modifica di prima.',
         'Quando l\'Aiuto fa dei passi da solo, come aprire una sezione dopo l\'altra, dopo 20 di fila si ferma e ti chiede se continuare. Così una pagina non può fargli spendere i tuoi crediti mentre non tocchi niente.',
