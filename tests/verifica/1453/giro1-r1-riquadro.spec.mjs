@@ -42,7 +42,7 @@ test('r1 menu dentro un riquadro in basso a destra: la voce sotto l’avviso del
   await page.waitForTimeout(150);
   await page.mouse.click(x, y);
 
-  const frame = page.frames().find((f) => f.url().includes('blocked.test'));
-  await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text', frame))?.visibile ?? false,
+  // Il riquadro della segnalazione si apre nella pagina, non nel riquadro.
+  await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false,
     { message: 'la voce «Invia feedback» sotto l’avviso non è partita' }).toBe(true);
 });
