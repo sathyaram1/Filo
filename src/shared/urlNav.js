@@ -177,8 +177,8 @@
   const FILE_IN_UNA_CARTELLA = /^\/[^/\s][^/]*\/(?:[^/]+\/)*[^/]*\.[a-z0-9]{1,10}$/i;
   const pezzi = (s) => s.replace(/\\/g, '/').split('/').map((p) => encodeURIComponent(p)).join('/');
   function percorsoDelComputer(input) {
-    if (/^file:/i.test(senzaVirgolette(input))) return senzaVirgolette(input);
-    const raw = percorsoPulito(input);
+    const raw = senzaVirgolette(input);
+    if (/^file:/i.test(raw)) return raw;
     let m = /^\\\\([^\\/\s?#]+)(?:[\\/](.*))?$/.exec(raw);
     if (m) return `file://${m[1]}/${pezzi(m[2] || '')}`;
     m = /^([a-z]):[\\/](.*)$/i.exec(raw);
