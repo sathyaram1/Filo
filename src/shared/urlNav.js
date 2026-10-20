@@ -345,6 +345,6 @@
   global.SN_URL_NAV = {
     isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, indirizzoDaCaricare, pulisciPercorso, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
+    normalizeUrl, indirizzoDaCaricare, indirizzoChiesto, sembraPercorso, pulisciPercorso, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
