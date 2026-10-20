@@ -1652,8 +1652,7 @@ function testoDiSconosciuti(azioni) {
 
 function indirizzoCaricato(tipo, indirizzo) {
   if (tipo === 'LEGGI_PAGINA') return PageRead.normalizzaUrl(indirizzo).url || '';
-  if (/^[a-z][a-z0-9+.-]*:/i.test(indirizzo)) return indirizzo;
-  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.normalizeUrl && globalThis.SN_URL_NAV.normalizeUrl(indirizzo)) || '';
+  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.indirizzoDaCaricare && globalThis.SN_URL_NAV.indirizzoDaCaricare(indirizzo)) || '';
 }
 
 function urlDellaScheda(s) {
@@ -2641,22 +2640,29 @@ async function eseguiAzioneFilo(action, {
         // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
         // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
         // cliccabile per riaprirlo (kept:true).
-        const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
-        if (!url) return { executed: false, kept: false };
+        const scritto = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+        if (!scritto) return { executed: false, kept: false };
         // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
         // iniettare istruzioni nel modello (prompt injection) per fargli aprire
         // un file://attacker (leak hash NTLM su Windows) o data:/javascript:.
-        // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
-        // "nudo" (es. "example.com") non parsa e prosegue: openTab → normalizeUrl
-        // gli antepone https://.
-        // Si giudica quello che diventerà caricandolo: un percorso del computer scritto com'è è un file (#482 giro 2).
-        const caricato = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : (globalThis.SN_URL_NAV?.normalizeUrl?.(url) || url);
-        try {
-          const proto = new URL(caricato).protocol.toLowerCase();
-          if (!['http:', 'https:', 'filo:'].includes(proto)) {
-            return { executed: false, kept: true, output: { blocked: 'scheme' } };
-          }
-        } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
+        // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui.
+        // Si giudica e si apre quello che diventa caricandolo, come dalla barra: «localhost:3000» è una pagina, un percorso
+        // anche fra virgolette è un file (#482 giro 2, #1318).
+        const url = globalThis.SN_URL_NAV.indirizzoDaCaricare(scritto);
+        let proto = '';
+        try { proto = new URL(url).protocol.toLowerCase(); } catch (_) { /* lo dice openTab */ }
+        // Posta, telefono e SMS vanno al loro programma come cliccati su una pagina (#1318): la porta delle uscite
+        // l'hanno già passata qui sopra, come ogni indirizzo di NAVIGA.
+        if (['mailto:', 'tel:', 'sms:'].includes(proto)) {
+          const tm = winOf(sender)?._filoTabs;
+          if (!tm || typeof tm.apriDaCollegamento !== 'function') return { executed: false, kept: false };
+          const consegnato = tm.apriDaCollegamento(url) === true;
+          return { executed: consegnato, kept: consegnato, output: { esterno: proto, indirizzo: url } };
+        }
+        if (proto && !['http:', 'https:', 'filo:'].includes(proto)) {
+          const avviso = require('./indirizzoFermato').avvisoIndirizzoFermato(url);
+          return { executed: false, kept: true, output: { blocked: 'scheme', ...(avviso ? { avviso: avviso.testo } : {}) } };
+        }
         // #376 — apertura in SECONDO PIANO: quando ciò che Filo apre non va
         // GUARDATO adesso (un brano da ascoltare, una radio, una pagina messa
         // da parte), la scheda nasce senza rubare il primo piano. Il flag
