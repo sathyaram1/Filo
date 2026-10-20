@@ -528,6 +528,7 @@
     }
 
     monta(root);
+    try { global.SN_POPUP?.sottoIlMenu?.(true); } catch (_) {}
 
     // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
     // il riquadro o fuori, e i clic non attraversano quel confine: chi ha un
