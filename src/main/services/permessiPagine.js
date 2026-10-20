@@ -99,6 +99,12 @@ function urlDi(wc) {
 function origineDi(wc, altro) {
   const cima = urlDi(wc);
   const c = classifica(cima || altro);
+  // La finestra vuota che il sito apre (window.open) è del sito: l'indirizzo non lo dice, l'origine del suo frame sì.
+  if (!c.filo && !c.origine && (!cima || /^about:/i.test(cima))) {
+    let ereditata = null;
+    try { ereditata = origineWeb(wc.mainFrame.origin); } catch (_) {}
+    if (ereditata) return { origine: ereditata };
+  }
   if (!c.filo || !cima) return c;
   const r = classifica(altro);
   return r.origine ? r : c;
@@ -526,7 +532,8 @@ function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
     });
   } catch (_) {}
   try {
-    // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena chiedere.
+    // «Posso?» risponde sì finché l'utente non ha detto no: un «negato» qui farebbe credere al sito che non valga la pena
+    // chiedere. Nella pagina quel sì senza risposta si legge «da chiedere» (`siDato`).
     ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
       const chi = origineDi(wc, (details && details.requestingUrl) || requestingOrigin);
       if (chi.filo) return true;
@@ -549,7 +556,8 @@ function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
 // Prima si sceglie, poi si dice sì: Chromium chiama il gestore dello schermo DENTRO il sì a getDisplayMedia, e lì
 // consegna la scelta. La strada vecchia (getUserMedia con chromeMediaSource) arriva con gli stessi dati ma non passa
 // dal gestore e prenderebbe schermo intero e audio senza scelta. Di solito la pagina la gira su getDisplayMedia e avvisa
-// (preload/schermo-vecchio.js, `schermoVecchio`): dopo la scelta riceve no. Chi lo aggira si ferma prima di riceverli.
+// (preload/schermo-vecchio.js, anche nei riquadri vuoti: riquadri-vuoti.js): dopo la scelta riceve no. Chi lo aggira si
+// ferma prima di riceverli.
 const ANTEPRIMA_SCHERMO = { width: 240, height: 135 };
 
 // Il frame avvisa che la sua prossima domanda dello schermo viene dalla strada vecchia: dopo la scelta la risposta è no.
@@ -824,8 +832,16 @@ function statoNotifiche(ses, url) {
   return scelta === true ? 'granted' : scelta === false ? 'denied' : 'default';
 }
 
+// Il controllo di Chromium dice concessi fotocamera, microfono e posizione anche a chi nessuno ha risposto: la pagina li
+// legge «da chiedere» finché qui non c'è un sì (preload/stato-permessi.js, #1057).
+const PARTI_CON_SI = new Set(['audio', 'video', 'posizione']);
+function siDato(ses, url, parte) {
+  const origine = origineWeb(url);
+  return Boolean(origine && ses && PARTI_CON_SI.has(parte) && sceltePer(ses).get(`${origine}|${parte}`) === true);
+}
+
 module.exports = {
-  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, aperturaScelta, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,

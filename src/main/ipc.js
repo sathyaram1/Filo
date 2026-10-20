@@ -187,6 +187,16 @@ function registerIpcHandlers() {
     }
   });
 
+  // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
+  ipcMain.on('filo:permessi-si', (event, parte) => {
+    try {
+      const url = (event.senderFrame && event.senderFrame.url) || event.sender.getURL();
+      event.returnValue = require('./services/permessiPagine').siDato(event.sender.session, url, parte);
+    } catch (_) {
+      event.returnValue = false;
+    }
+  });
+
   // Scrivere su un file o una cartella che la pagina ha già (#1069): la domanda, regole in services/permessiPagine.js.
   ipcMain.handle('filo:permessi-scrittura', (event) => {
     const wc = event.sender;
