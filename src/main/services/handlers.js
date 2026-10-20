@@ -5060,13 +5060,34 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-// I turni di chat in corso, per chi li vuole fermare (#578): reqId → { wcId, ctrl, fermato }. Solo in memoria.
+// I turni di chat in corso, per chi li vuole fermare o aggiungere un seguito (#578, #1296): reqId → turno. Solo in
+// memoria. Un turno si registra appena il messaggio arriva, prima di preparare la richiesta, e `chiuso` vuol dire che ha
+// già la sua risposta: da lì uno stop non scrive più niente.
 const turniInCorso = new Map();
-// Uno stop arrivato mentre il turno prepara ancora la richiesta (saldo, batteria, rete: anche mezzo secondo) vale lo
-// stesso: lo si tiene da parte e il turno lo trova quando si registra. Scadono, per i turni che non arrivano mai.
+// Uno stop arrivato prima che il turno si registri vale lo stesso: lo si tiene da parte e il turno lo trova quando si
+// registra. Scadono, per i turni che non arrivano mai.
 const stopPrimaDelTurno = new Map();
 const STOP_PRIMA_TTL_MS = 10 * 60 * 1000;
-function fermaFiloChat(reqId, wc) {
+function registraTurno(reqId, wc) {
+  const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false, chiuso: false, accoglienza: false, seguiti: [], letti: new Set() };
+  if (!reqId) return turno;
+  turniInCorso.set(String(reqId), turno);
+  const prima = stopPrimaDelTurno.get(String(reqId));
+  stopPrimaDelTurno.delete(String(reqId));
+  if (prima && prima.wcId === turno.wcId) turno.fermato = true;
+  return turno;
+}
+function togliTurno(reqId, turno) {
+  if (reqId && turniInCorso.get(String(reqId)) === turno) turniInCorso.delete(String(reqId));
+}
+// L'accoglienza riparte da sola su un messaggio dell'utente senza risposta: lo stop si scrive quando si preme, non
+// quando l'azione fermata finisce, o una pagina ricaricata in quei secondi rifà il turno (#1296).
+async function segnaStopAccoglienza(turno) {
+  const stato = await FiloMem.getOnboarding();
+  if (turno.chiuso) return;
+  await saveOnboarding(Onboarding.segnaFermato(stato));
+}
+async function fermaFiloChat(reqId, wc) {
   if (!reqId) return false;
   const t = turniInCorso.get(String(reqId));
   if (!t) {
@@ -5079,8 +5100,29 @@ function fermaFiloChat(reqId, wc) {
   if (t.wcId !== (wc && wc.id)) return false;
   t.fermato = true;
   try { t.ctrl.abort(); } catch (_) {}
+  if (t.accoglienza && !t.chiuso) {
+    try { await segnaStopAccoglienza(t); } catch (e) { console.warn('[Filo] stop dell\'accoglienza non scritto', e?.message || e); }
+  }
   return true;
 }
+// Un seguito scritto mentre il turno lavora (#1296) entra al suo passo dopo; se il turno non ne ha, lo manda la scheda a
+// turno finito. Lo prende solo il turno della scheda che lo scrive, non fermato, non chiuso, non dell'accoglienza (lei
+// tiene la conversazione nel suo stato, e il seguito la aspetta). `togli`: ritirato prima che il modello lo legga.
+function seguitoFiloChat({ reqId, id, testo, togli = false } = {}, wc) {
+  const t = reqId ? turniInCorso.get(String(reqId)) : null;
+  const chiave = String(id || '');
+  if (!t || t.wcId !== (wc && wc.id) || !chiave) return { accolto: false, tolto: !!togli };
+  if (togli) {
+    const i = t.seguiti.findIndex((s) => s.id === chiave);
+    if (i >= 0) t.seguiti.splice(i, 1);
+    return t.letti.has(chiave) ? { letto: true, tolto: false } : { tolto: true };
+  }
+  const parole = String(testo || '').trim();
+  if (!parole || t.fermato || t.chiuso || t.accoglienza || t.letti.has(chiave)) return { accolto: false };
+  if (!t.seguiti.some((s) => s.id === chiave)) t.seguiti.push({ id: chiave, testo: parole });
+  return { accolto: true };
+}
+const NOTA_SEGUITO = '[L\'utente ha scritto questo mentre lavoravi alla sua richiesta di prima.]';
 
 // I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
 // modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
