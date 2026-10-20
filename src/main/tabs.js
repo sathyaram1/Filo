@@ -3502,7 +3502,7 @@ class TabManager {
       if (!url || !Permessi.gestoEntro(wc, Permessi.GESTO_MS)) return;
       risorsaDellaPagina(e.frame || wc.mainFrame, url).then((risorsa) => {
         if (risorsa || wc.isDestroyed() || !Permessi.gestoPerUnAvviso(wc)) return;
-        avvisaIndirizzoFermato(url, this.win, urlDi(wc));
+        avvisaIndirizzoFermato(url, this.win, urlDellaPagina(wc));
       });
     });
   }
