@@ -4794,6 +4794,9 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const cosa = typeof res.output.avviso === 'string' && res.output.avviso ? ` (${res.output.avviso})` : '';
     return `Pagina NON aperta${cosa}: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo e non cercarlo sul web.`;
   }
+  if (type === 'NAVIGA' && res.output && res.output.blocked === 'indirizzo') {
+    return `Pagina NON aperta: ${res.output.avviso || 'non è un indirizzo'}. Per cercarlo sul web usa CERCA_WEB; per aprire una pagina serve il suo indirizzo. Non dire che è aperta.`;
+  }
   if (type === 'NAVIGA' && res.output && res.output.esterno) {
     const programma = { 'mailto:': 'di posta', 'tel:': 'delle chiamate', 'sms:': 'degli SMS' }[res.output.esterno] || 'del sistema';
     if (!res.executed) return `NON aperto: il programma ${programma} non è partito. Dillo all'utente in una riga.`;
