@@ -2936,7 +2936,7 @@ async function eseguiAzioneFilo(action, {
             const pezzo = String(results[i].snippet || '').replace(/^…|…$/g, '').trim();
             if (!pezzo) return;
             for (const x of globalThis.SN_FILO_CONTESTO.daFuoriDi(c.messages)) {
-              if (x.testo.replace(/\s+/g, ' ').includes(pezzo)) { daFuori.push({ testo: pezzo, fonte: x.fonte }); break; }
+              if (x.testo.replace(/\s+/g, ' ').includes(pezzo)) { daFuori.push({ testo: pezzo, fonte: x.fonte, chat: c.id }); break; }
             }
           });
           return {
@@ -2950,6 +2950,7 @@ async function eseguiAzioneFilo(action, {
               ...(daFuori.length ? { daFuori } : {}),
               ...(pagine.length ? { pagine } : {}),
               ...(cambiTrovati.length ? { cambi: cambiTrovati } : {}),
+              ...(cambiTrovati.length && cambi.allargata ? { cambiCercatiCon: cambi.termini } : {}),
             },
           };
         } catch (e) {
