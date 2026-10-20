@@ -1,4 +1,4 @@
-// Verifica #1362, giro 4, rilievo 1: la copia che spinge conta come suo un commit di altri quando ne perde la traccia
+// Verifica #1362, giro 4, rilievo 4: la copia che spinge conta come suo un commit di altri quando ne perde la traccia
 // (uno squash nella stessa cartella, un ref remoto potato). Git vero, pre-push e post-commit veri, nessun server.
 import { test, expect } from './../../fixtures/electron.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -51,7 +51,7 @@ const dichiaratiDa = (dir, ticket) => S.vociInCoda(S.cartellaCoda(dir)).filter((
   .flatMap((v) => [...(v.commits || []), ...(v.riscritti || []).map((r) => r.sha)]);
 const filesDi = (dir, sha) => g(dir, ['show', '--format=', '--name-only', sha]).split('\n').filter(Boolean);
 
-test('r1 due sessioni nella stessa cartella: lo squash della pulita sopra un commit mai partito della sporca non parte col biglietto pulito', () => {
+test('r4 due sessioni nella stessa cartella: lo squash della pulita sopra un commit mai partito della sporca non parte col biglietto pulito', () => {
   const d = deposito('filo-1362-squash-');
   const biglietto = (nome, lettera) => {
     const file = join(d.base, `${nome}.json`);
@@ -77,7 +77,7 @@ test('r1 due sessioni nella stessa cartella: lo squash della pulita sopra un com
     .not.toContain(unito);
 });
 
-test('r1 routine: un commit della sporca preso dalla pulita non diventa suo se il ref remoto viene potato mentre il ramo non c’è', () => {
+test('r4 routine: un commit della sporca preso dalla pulita non diventa suo se il ref remoto viene potato mentre il ramo non c’è', () => {
   const d = deposito('filo-1362-potato-');
   const BIGLIETTO = `biglietto-pulito-${'x'.repeat(40)}`;
   const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
