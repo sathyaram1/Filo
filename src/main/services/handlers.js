@@ -5297,8 +5297,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
     const caratteri = FC.caratteriDi(inviati);
-    const conTratto = !!(filo && tettiChat && Array.isArray(payloadBase.filoTratto));
-    const caratteriTratto = conTratto ? FC.caratteriDi(payloadBase.filoTratto) : 0;
+    const caratteriTratto = filo && Array.isArray(payloadBase.filoTratto) ? FC.caratteriDi(payloadBase.filoTratto) : 0;
     if (lunghezzaRiletture() >= caratteriTratto && await accorciaRiletture(rifiuto, caratteri)) return true;
     if (await stringiTratto(rifiuto, caratteri, caratteriTratto)) return true;
     return accorciaRiletture(rifiuto, caratteri);
