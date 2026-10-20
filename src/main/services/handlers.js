@@ -2648,7 +2648,7 @@ async function eseguiAzioneFilo(action, {
         // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui.
         // Si giudica e si apre quello che diventa caricandolo, come dalla barra: «localhost:3000» è una pagina, un percorso
         // anche fra virgolette è un file (#482 giro 2, #1318).
-        const url = globalThis.SN_URL_NAV.indirizzoDaCaricare(scritto);
+        const url = globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(scritto) || scritto;
         let proto = '';
         try { proto = new URL(url).protocol.toLowerCase(); } catch (_) { /* lo dice openTab */ }
         // Posta, telefono e SMS vanno al loro programma come cliccati su una pagina (#1318): la porta delle uscite

@@ -76,7 +76,8 @@ module.exports = function register(on, ctx) {
   on(MSG.OPEN_URL, async (msg, sender, origin) => {
     const win = winOf(sender);
     if (!win?._filoTabs || !msg.url) return { ok: true };
-    const url = String(msg.url);
+    // Si giudica quello che diventa caricandolo: «localhost:3000» è una pagina e passa dalla porta come le altre (#1318).
+    const url = globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(String(msg.url)) || String(msg.url);
     // Da una pagina di Filo un indirizzo web o di posta passa dalla porta delle uscite (#810); `parole` = scritto dall'utente.
     if (isFilo(origin) && SCHEMI_USCITA.test(url)) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
