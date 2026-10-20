@@ -397,7 +397,7 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const id = msg.id;
     if (!id) return { ok: false, error: 'id mancante' };
-    closeAndTriageChat(id)
+    closeAndTriageChat(id, { fine: msg.fine === true })
       // La Cronologia può essere aperta in un'altra scheda mentre qui si
       // finisce di chattare: l'annuncio la fa riallineare da sola, invece di
       // lasciarla ferma a com'era e far credere che la chat non si sia

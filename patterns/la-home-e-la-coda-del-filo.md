@@ -32,8 +32,9 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   tolta quella la riga prende il nome nuovo invece di doppiarsi.
 - **I cambi**: quelli chiesti in chat hanno il segno sulla bolla; tutti gli altri sono una riga col loro «annulla».
 - **La conversazione che una scheda continua** (`chatCorrente`): l'ultima della home se non è passata un'ora di
-  silenzio, o se l'ultima parola è di Filo che ha scritto da sé. L'accoglienza e le chat delle altre app non si
-  continuano da qui. La scheda la adotta (storico per il turno dopo), ma le bolle le ha già disegnate la coda.
+  silenzio, o se l'ultima parola è di Filo che ha scritto da sé. L'accoglienza, le chat delle altre app e quella che
+  l'utente ha chiuso apposta (il bottone sotto la risposta, `/clear`: il segno `fine` sulla chiusura) non si
+  continuano da qui; una scheda che si chiude o si ricarica non è una chiusura voluta. La scheda la adotta (storico per il turno dopo), ma le bolle le ha già disegnate la coda.
 - **Le righe che arrivano dopo** (`allinea`): i messaggi della conversazione di questa scheda li ha già disegnati il
   turno; tornano solo quando la scheda era nascosta e li ha scritti un'altra. Il resto entra al suo posto nel tempo.
 - **Filo parla per primo** (`src/main/services/filoParla.js`): timer e sveglie che suonano, download finiti, avvisi,

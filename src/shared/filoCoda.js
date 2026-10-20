@@ -135,14 +135,14 @@
   }
 
   // La conversazione della home che una scheda nuova continua: l'ultima, se non è passata un'ora di silenzio o se
-  // l'ultima parola è di Filo che ha scritto da sé. L'accoglienza ha una fine sua e non si continua.
+  // l'ultima parola è di Filo che ha scritto da sé. L'accoglienza ha una fine sua e non si continua, né una chiusa apposta.
   function chatCorrente(chats, { ora = Date.now() } = {}) {
     let ultima = null;
     for (const c of Array.isArray(chats) ? chats : []) {
       if (!c || eApp(c) || c.onboarding || !Array.isArray(c.messages) || !c.messages.length) continue;
       if (!ultima || (ms(c.updatedAt) || 0) > (ms(ultima.updatedAt) || 0)) ultima = c;
     }
-    if (!ultima) return null;
+    if (!ultima || ultima.finita) return null;
     const m = ultima.messages[ultima.messages.length - 1];
     const t = ms(ultima.updatedAt);
     // Una parola spontanea di Filo si continua (e si fonde) solo nello stesso giorno: quella di ieri resta sotto «ieri»

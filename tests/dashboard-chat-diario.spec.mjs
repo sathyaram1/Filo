@@ -22,7 +22,8 @@
 //  (E) un comando con la modalità terminale spenta dice perché non è partito, e
 //      porta all'interruttore;
 //  (F) «portami alla home» chiesto dalla home non ricarica la pagina: il lavoro
-//      e la risposta restano da leggere;
+//      e la risposta restano da leggere, e la conversazione la chiude il bottone
+//      (anche la spunta dell'appunto), per tutte le schede;
 //  (G) l'evento proposto si aggiunge davvero al calendario, e finché non lo si
 //      aggiunge il diario lo chiama proposta.
 //  (H) l'azione confermata nel popup lascia la sua riga anche quando non è
@@ -373,14 +374,102 @@ test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro
   // E il titolo del blocco non conta un comando che non ha fatto niente.
   await expect(activity.locator('.dash-activity-label')).not.toContainText('azionato un comando della finestra');
 
-  // E la home vuota resta a un click, quando l'utente ha finito di leggere.
-  const torna = page.locator('.dash-action-btn', { hasText: 'Torna alla home' });
+  // E chiudere la conversazione resta a un click, quando l'utente ha finito di leggere: lo scambio resta nel filo
+  // (#869), il messaggio dopo ne comincia un'altra.
+  const torna = page.locator('.dash-action-btn', { hasText: 'Chiudi e torna alla home' });
   await expect(torna).toHaveCount(1);
   await torna.click();
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 5_000 });
-  await expect(page.locator('.dash-bubble-user')).toHaveCount(0);
+  await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
+  await expect(page.locator('#input')).toBeFocused();
+  await expect(page.locator('.dash-bubble-user', { hasText: 'portami alla home' })).toHaveCount(1);
+  await page.screenshot({ path: 'tests/agent/.out/diario-home-gia-qui.png' });
 
   await restore(app, '__fakeF');
+  await fakeProvider(app, [{ text: 'Di niente.' }], '__fakeF2');
+  await page.locator('#input').fill('grazie');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });
+  const chatDi = (testo) => app.evaluate(async (_electron, t) => (await globalThis.SN_IL_FILO.chats())
+    .filter((c) => c.messages.some((m) => m.text === t)).map((c) => c.id), testo);
+  await expect.poll(() => chatDi('grazie')).toHaveLength(1);
+  const [prima] = await chatDi('portami alla home');
+  expect(prima, 'la conversazione del comando è archiviata').toBeTruthy();
+  expect(await chatDi('grazie'), 'il messaggio dopo il bottone è ancora nella conversazione chiusa').not.toContain(prima);
+
+  await restore(app, '__fakeF2');
+});
+
+const chatDi = (app, testo) => app.evaluate(async (_electron, t) => (await globalThis.SN_IL_FILO.chats())
+  .filter((c) => c.messages.some((m) => m.text === t)).map((c) => c.id), testo);
+
+// Chiusa apposta, una conversazione non la riprende né una scheda nuova né la home ricaricata (prima la riprendevano
+// entro un'ora, perché la scheda nuova guardava solo l'ultima e l'ora).
+test('F2 — la conversazione chiusa col bottone resta chiusa nella scheda nuova e nella home ricaricata', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'f1', name: 'COMANDO_FINESTRA', arguments: '{"comando":"home"}' }] },
+    { text: 'Sei già qui, nella home.' },
+    { text: 'Di niente.' },
+    { text: 'Prego.' },
+  ], '__fakeF2b');
+  await page.locator('#input').fill('portami alla home');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Sei già qui' })).toBeVisible({ timeout: 10_000 });
+  await page.locator('.dash-action-btn', { hasText: 'Chiudi e torna alla home' }).click();
+  await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
+  const [chiusa] = await chatDi(app, 'portami alla home');
+  await expect.poll(() => app.evaluate(async (_electron, id) => (await globalThis.SN_IL_FILO.chats()).find((c) => c.id === id)?.finita, chiusa)).toBe(true);
+
+  const nuova = await openTab('filo://newtab/');
+  await expect(nuova.locator('#input')).toBeVisible();
+  await nuova.locator('#input').fill('grazie');
+  await nuova.locator('#sendBtn').click();
+  await expect(nuova.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => chatDi(app, 'grazie')).toHaveLength(1);
+  expect(await chatDi(app, 'grazie'), 'la scheda nuova continua la conversazione chiusa').not.toContain(chiusa);
+
+  // La conversazione della scheda nuova non è chiusa apposta: la home ricaricata la continua, quella chiusa no.
+  const [seconda] = await chatDi(app, 'grazie');
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+  await page.locator('#input').fill('ancora grazie');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Prego.' })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => chatDi(app, 'ancora grazie')).toEqual([seconda]);
+
+  await restore(app, '__fakeF2b');
+});
+
+// La spunta sotto un appunto salvato chiude la conversazione come il bottone della home, e lo dice.
+test('F3 — la spunta dopo un appunto salvato chiude la conversazione', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await fakeProvider(app, [
+    { toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"comprare il latte","contesto":"spesa"}' }] },
+    { text: 'Segnato.' },
+    { text: 'Di niente.' },
+  ], '__fakeF3');
+  await page.locator('#input').fill('ricordami di comprare il latte');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 10_000 });
+  await page.locator('.dash-action-btn-primary', { hasText: '✓' }).click();
+  await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
+  await expect(page.locator('#input')).toBeFocused();
+  await page.locator('#input').fill('grazie');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => chatDi(app, 'grazie')).toHaveLength(1);
+  const [prima] = await chatDi(app, 'ricordami di comprare il latte');
+  expect(await chatDi(app, 'grazie'), 'dopo la spunta il messaggio continua la conversazione dell’appunto').not.toContain(prima);
+
+  await restore(app, '__fakeF3');
 });
 
 test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app, shell }) => {

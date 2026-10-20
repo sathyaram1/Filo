@@ -103,6 +103,10 @@ test('la conversazione che una scheda nuova continua: entro un’ora, o se l’u
   const acc = chat('o', [m('user', 'mi chiamo Ada', fa(5))], { onboarding: true });
   const app = chat('e', [m('user', 'x', fa(2))], { app: 'editor', rif: 'f' });
   assert.equal(C.chatCorrente([acc, app], { ora: ORA }), null, 'l’accoglienza e le chat delle app non si continuano dalla home');
+  const finita = chat('f', [m('user', 'portami alla home', fa(3))], { finita: true });
+  assert.equal(C.chatCorrente([recente, finita], { ora: ORA }), null, 'chiusa apposta dall’utente, l’ultima non si continua');
+  const finitaSpontanea = chat('g', [m('filo', 'Il timer è suonato.', fa(3), { spontaneo: true })], { finita: true });
+  assert.equal(C.chatCorrente([finitaSpontanea], { ora: ORA }), null);
 });
 
 test('il saluto della giornata: dopo le cinque, se nella home oggi non si è detto niente', () => {

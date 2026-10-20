@@ -6483,10 +6483,10 @@ async function triageChat(chat) {
 // la conversazione completa; sovrapposte, pagavano due volte il modello per
 // scrivere lo stesso titolo.
 const codeDiChiusura = new Map();      // chatId → chiusura in corso
-function closeAndTriageChat(chatId) {
+function closeAndTriageChat(chatId, opz = {}) {
   if (!chatId || !FiloChats) return Promise.resolve(null);
   const prima = codeDiChiusura.get(chatId) || Promise.resolve();
-  const ora = prima.then(() => chiudiEClassifica(chatId), () => chiudiEClassifica(chatId));
+  const ora = prima.then(() => chiudiEClassifica(chatId, opz), () => chiudiEClassifica(chatId, opz));
   const muta = ora.then(() => {}, () => {});
   codeDiChiusura.set(chatId, muta);
   muta.then(() => {
@@ -6497,11 +6497,11 @@ function closeAndTriageChat(chatId) {
   return ora;
 }
 
-async function chiudiEClassifica(chatId) {
+async function chiudiEClassifica(chatId, { fine = false } = {}) {
   if (!chatId || !FiloChats) return null;
   // La chat è finita: nessuna pagina la sta più vivendo.
   proprietariDiChat.delete(chatId);
-  const chat = await FiloChats.close(chatId);
+  const chat = await FiloChats.close(chatId, { fine });
   if (!chat) return null;                        // chat vuota o inesistente
   // Già classificata e da allora non è successo niente: non si ripaga.
   if (!FiloChats.needsTriage(chat)) return chat;

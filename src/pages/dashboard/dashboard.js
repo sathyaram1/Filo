@@ -340,11 +340,12 @@
   // classificazione (titolo breve + conversazione/comando). Non si aspetta la
   // risposta — chi è appena tornato alla home non deve stare fermo mentre un
   // modello legge la chat di prima.
-  function closeCurrentChat() {
+  // `fine`: la chiude l'utente apposta, e le schede nuove non la continuano; una scheda che se ne va no.
+  function closeCurrentChat({ fine = false } = {}) {
     if (!chatId) return;
     const id = chatId;
     chatId = null;
-    try { send({ type: MSG.FILO_CHAT_CLOSE, id }); } catch (_) {}
+    try { send({ type: MSG.FILO_CHAT_CLOSE, id, fine: fine || undefined }); } catch (_) {}
   }
 
   // ===== Stato UI =====
@@ -352,7 +353,7 @@
   // ridisegnata da altri (l'accoglienza che finisce) e il filo si rilegge da capo.
   function goHome({ ricarica = false, nuova = false } = {}) {
     if (nuova && !ricarica) {
-      closeCurrentChat();
+      closeCurrentChat({ fine: true });
       Term.nuovaChat(false);
       threadHistory = [];
       chiudiRipresa();
@@ -374,6 +375,10 @@
     autoGrowInput();
     inputEl.focus();
   }
+
+  // I bottoni sotto una risposta che chiudono la conversazione (spunta dell'appunto, «Chiudi la conversazione»): tornare
+  // alla home da solo non la chiude più (#869).
+  function chiudiConversazione() { goHome({ nuova: true }); }
 
   // `thread`: in questa scheda c'è una conversazione in corso (un messaggio, l'accoglienza, una chat riaperta); `home`:
   // c'è solo il filo. Il centro è lo stesso.
@@ -1058,7 +1063,7 @@
       if (rispostaPrima && streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         setBubbleText(streamBubble, rispostaPrima, true);
-        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: goHome, activity: pending, shown });
+        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: chiudiConversazione, activity: pending, shown });
         streamBubble = null;
       }
       pending.endTurn();
@@ -1152,7 +1157,7 @@
       // #159 — risposta fresca: le impostazioni a livello 2 aprono il loro popup
       // di conferma da sole (autoConfirm). Solo qui (nuova risposta), mai in
       // replay storico.
-      Att.renderActions(filoBubble, r.actions || [], { onAck: goHome, autoConfirm: true, activity: pending, shown });
+      Att.renderActions(filoBubble, r.actions || [], { onAck: chiudiConversazione, autoConfirm: true, activity: pending, shown });
       // Un turno di sole azioni raccontate nel blocco (un timer avviato, e
       // niente da dire) non lascia una bolla vuota sotto.
       if (!(r.text || '').trim() && !filoBubble.querySelector('.dash-bubble-actions') && !(filoBubble.textContent || '').trim()) {
@@ -1418,7 +1423,7 @@
       if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
     }
     // Nessun popup di conferma che si apre da solo: l'utente ha appena detto di smettere.
-    Att.renderActions(host, azioni, { onAck: goHome, autoConfirm: false, activity: pending, shown });
+    Att.renderActions(host, azioni, { onAck: chiudiConversazione, autoConfirm: false, activity: pending, shown });
     if (host.querySelector('.dash-bubble-actions')) host.hidden = false;
     else if (!parziale && host.hidden) host.remove();
     Term.applyCommandCwd(azioni);
