@@ -1536,8 +1536,16 @@
       if (sel && !sel.isCollapsed && t.contains(sel.anchorNode)) return;
       close();
     });
-    global.SN_AVVISI.chiudibile(t, close);
-    tempo = tempoAvviso(opts.duration === 0 ? 0 : (opts.duration || 2200), close);
+    let azioni;
+    let durata = opts.duration === 0 ? 0 : (opts.duration || 2200);
+    if (pagina) {
+      mostraRimedio(t, opts.rimedio, { dopo: close });
+      // Dal tasto destro sull'avviso la stessa strada: il clic che il menu girerebbe al tasto non è vero.
+      azioni = [{ label: pagina.label, fn: () => { apriRimedio(pagina); close(); } }];
+      if (durata) durata = Math.max(durata, DURATA_CON_RIMEDIO_MS);
+    }
+    global.SN_AVVISI.chiudibile(t, close, azioni);
+    tempo = tempoAvviso(durata, close);
     return { close, el: t };
   }
 
