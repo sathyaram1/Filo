@@ -181,6 +181,7 @@ test('B — senza ragionamento del modello: nessuna scritta, solo il filo che pe
   await page.waitForTimeout(1_100);
   await expect(activity).toHaveText('');
   await page.screenshot({ path: 'tests/agent/.out/attivita-attesa.png' });
+  await app.evaluate(() => globalThis.__rispondi2());
 
   // Risposta arrivata senza ragionamento né azioni: il blocco non lascia niente.
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta senza reasoning.' })).toBeVisible({ timeout: 6_000 });
