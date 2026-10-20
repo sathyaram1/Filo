@@ -4472,8 +4472,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return `Pagina NON aperta${cosa}: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga, senza dire che l'hai aperta. Non riprovare con lo stesso indirizzo e non cercarlo sul web.`;
   }
   if (type === 'NAVIGA' && res.executed && res.output && res.output.esterno) {
-    const programma = { mailto: 'di posta', tel: 'per le chiamate', sms: 'dei messaggi' }[res.output.esterno] || 'del computer';
-    return `Indirizzo passato al programma ${programma} del computer, che si apre con quello che c'era nell'indirizzo già scritto: il resto (mandare, chiamare) lo fa l'utente da lì. Diglielo in una riga, senza dire che è già partito.`;
+    const fatto = {
+      mailto: 'Aperto il programma di posta del computer con la mail già impostata: la manda l\'utente da lì',
+      tel: 'Aperto il programma del computer per le chiamate con il numero: la chiamata la fa partire l\'utente da lì',
+      sms: 'Aperto il programma dei messaggi del computer con il numero: il messaggio lo manda l\'utente da lì',
+    }[res.output.esterno] || 'Indirizzo passato al programma del computer che lo apre';
+    return `${fatto}. Diglielo in una riga, senza dire che è già partito niente.`;
   }
   if (type === 'PULISCI_TAB' && res.executed && res.output) {
     const n = Number(res.output.archived) || 0;
