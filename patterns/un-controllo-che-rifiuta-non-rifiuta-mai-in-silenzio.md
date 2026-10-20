@@ -26,9 +26,19 @@ restava rosso e muto).
   notifica di solo testo (cosa e perché), mai «Apri comunque». La dice chi ferma
   (`fermaNavigazione` in `src/main/tabs.js`, testo in
   `src/main/services/indirizzoFermato.js`); dove a rifiutare è Chromium prima di
-  Filo (un `file:` cliccato su una pagina web) il clic lo riferisce
-  `page-preload.js`. Da una pagina, solo dopo un input vero: quello che tenta da
-  sola resta muto. Prova `tests/indirizzo-fermato-avvisa.spec.mjs`.
+  Filo (un `file:` o un `data:` che una pagina web apre, da un collegamento o da
+  script) lo si legge dove Chromium lo scrive, nella console della pagina
+  (`_ascoltaRifiutiDiChromium`, #1318): un'immagine o uno sfondo con un `file:`
+  dentro scrivono lo stesso messaggio e non si dicono. Da una pagina, solo dopo
+  un input vero: quello che tenta da sola resta muto. Il modello che chiede un
+  indirizzo fermato riceve lo stesso testo, e la posta va al programma di posta
+  anche da lui. Prova `tests/indirizzo-fermato-avvisa.spec.mjs`.
+- **Prima di fermare, leggi l'indirizzo come lo legge la barra** (#1318):
+  `localhost:3000` preso per lo schema «localhost:» era fermato «per sicurezza»,
+  e un percorso fra virgolette finiva in una ricerca su Google. Chi apre per
+  conto di Filo o del modello passa da `indirizzoDaCaricare` in
+  `src/shared/urlNav.js`; la pulizia dei percorsi (`percorsoPulito`) è la stessa
+  per chi apre e per chi legge i documenti.
 - **Dove:** `showUnresolvedSite()` in `src/pages/dashboard/dashboard-comandi.js`,
   esenzioni in `src/shared/urlNav.js` (`isLocalHost`/`isLocalNetworkName`) usate
   da `src/main/services/hostResolve.js`. Test
