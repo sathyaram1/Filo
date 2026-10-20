@@ -629,11 +629,12 @@
     }).then(
       (res) => {
         if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
-          : { error: Popup.frasePerLUtente(res) };
+          : { errore: res || {} };
       },
-      (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
+      (e) => ({ errore: { message: e?.message } }),
     );
     return entry;
   }
