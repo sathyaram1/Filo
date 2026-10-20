@@ -119,8 +119,8 @@
     if (corrente) chiudi();
     const m = { id: nuovoId(), funzioni: [], pulizie: [], inline: new Map(), montaggi: [], sezioni: 0 };
     corrente = m;
-    // La pagina che scorre sotto un menu normale lo chiude, come quando stava nel documento: lo strato non scorre con
-    // lei, e resterebbe sopra un punto che non è più quello cliccato. Quello di una selezione resta.
+    // La pagina che scorre chiude il menu normale, come nel documento: lo strato non scorre con lei e resterebbe sopra un
+    // punto che non è più quello cliccato.
     if (!(opzioni && opzioni.keepOnScroll)) {
       const scorre = () => { if (corrente === m) chiudi(); };
       window.addEventListener('scroll', scorre, true);
