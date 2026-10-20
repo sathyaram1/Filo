@@ -361,9 +361,8 @@ class StratoDelMenu {
     if (m) this._alContent(m, { type: msg().STRATO_MENU_CHIUSO, id: m.id });
   }
 
-  // Dal layout delle schede: un'altra scheda davanti, o nessuna, chiude. La stessa scheda con l'area cambiata
-  // (finestra accorciata, barra compatta) no: chi la rimpicciolisce non annulla il menu (#500), lo strato la segue e il
-  // menu rientra da sé al resize della sua pagina.
+  // Un'altra scheda davanti, o nessuna, chiude. La stessa con l'area cambiata no: chi accorcia la finestra non annulla il
+  // menu (#500), lo strato prende la nuova area e il menu rientra da sé.
   posa() {
     if (!this.aperto) return;
     let davanti = null;
