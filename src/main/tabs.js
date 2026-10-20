@@ -3364,6 +3364,7 @@ class TabManager {
     registraFinestraDelSito(win, this.win);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
+    this._ascoltaRifiutiDiChromium(pwc);
     MenuDiRiserva.segui(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
