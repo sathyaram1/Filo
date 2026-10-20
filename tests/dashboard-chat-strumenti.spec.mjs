@@ -78,10 +78,10 @@ async function giroCercaAgisce(app) {
       return { ...base, text: finale, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
     };
   });
+}
 
-  await page.locator('#input').fill('metti un timer per la pasta e dimmi se sai salvare per dopo');
-  await page.locator('#sendBtn').click();
-
+// Il turno di (A) finito, col blocco srotolato.
+async function bloccoDelGiro(page) {
   // La risposta finale è l'unica bolla di Filo: la nota a metà lavoro non è
   // rimasta in chat.
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto: timer di 5 minuti avviato.' })).toBeVisible({ timeout: 10_000 });
