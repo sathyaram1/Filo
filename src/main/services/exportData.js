@@ -475,18 +475,49 @@ function mergeLists(local, imported) {
 // La cronologia appunti ha un'identità sua (testo a spazi compattati, dato
 // dell'immagine): la stessa cosa copiata in due momenti è una voce sola, come
 // quando la si copia. Con l'identità generica il backup lasciava due gemelle.
+function chiaveAppunto(item) {
+  if (!globalThis.SN_CLIPBOARD) require('../../shared/clipboardHistory.js');
+  return globalThis.SN_CLIPBOARD.chiave(item) || itemKey(item);
+}
 function mergeClipboardHistory(local, imported) {
-  require('../../shared/clipboardHistory.js');
-  const chiave = globalThis.SN_CLIPBOARD.chiave;
   const seen = new Set();
   const out = [];
   for (const item of [...local, ...imported]) {
-    const k = chiave(item) || itemKey(item);
+    const k = chiaveAppunto(item);
     if (seen.has(k)) continue;
     seen.add(k);
     out.push(item);
   }
   return out;
+}
+
+// Una lista col suo tetto lo rispetta già nell'unione, le più recenti prima: il primo salvataggio dopo l'importazione
+// taglierebbe in fondo, proprio dove arriva il backup (#1256). Chi resta fuori, anche di qui, lo conta la conferma.
+function entroIlTetto(tutte, local, { quando, chiave, tetto }) {
+  const ordinate = tutte.slice().sort((a, b) => quando(b) - quando(a));
+  const fuori = tetto > 0 && ordinate.length > tetto ? ordinate.length - tetto : 0;
+  const lista = fuori ? ordinate.slice(0, tetto) : ordinate;
+  const restano = fuori ? new Set(lista.map(chiave)) : null;
+  const mieFuori = fuori ? local.filter((x) => !restano.has(chiave(x))).length : 0;
+  return { lista, fuori, mieFuori };
+}
+
+const istante = (v) => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+};
+
+function unisciAppunti(local, imported, tetto) {
+  const qui = Array.isArray(local) ? local : [];
+  const tutte = mergeClipboardHistory(qui, Array.isArray(imported) ? imported : []);
+  return entroIlTetto(tutte, qui, { quando: (x) => istante(x && x.ts), chiave: chiaveAppunto, tetto });
+}
+
+function unisciDownload(local, imported, tetto) {
+  const qui = Array.isArray(local) ? local : [];
+  const tutte = mergeLists(qui, Array.isArray(imported) ? imported : []);
+  return entroIlTetto(tutte, qui, { quando: (r) => istante(r && r.startedAt), chiave: itemKey, tetto });
 }
 
 function mergeValue(local, imported) {
