@@ -18,26 +18,30 @@ function decodificato(s) {
   try { return decodeURIComponent(s); } catch (_) { return s; }
 }
 
-// { testo, chiave } della notifica, o null se l'indirizzo non si legge. La chiave tiene una notifica per indirizzo.
+// { testo, cosa, chiave } della notifica, o null se l'indirizzo non si legge. `cosa` è il testo senza l'indirizzo, per
+// chi l'ha già accanto (la riga della chat). La chiave tiene una notifica per indirizzo.
 function avvisoIndirizzoFermato(rawUrl) {
   let u;
   try { u = new URL(String(rawUrl || '').trim()); } catch (_) { return null; }
   const schema = u.protocol.toLowerCase();
-  let testo;
+  let cosa;
+  let dove = '';
   if (schema === 'file:') {
     // file:///C:/x arriva come «/C:/x»: la barra davanti alla lettera del disco non è del percorso.
     // Così anche «~/x», che arriva come «/~/x».
     const percorso = decodificato(u.pathname).replace(/^\/(?=[a-z]:|~(?:\/|$))/i, '') || '/';
-    if (u.hostname) testo = `Percorso di rete bloccato per sicurezza: ${accorciato(`//${u.hostname}${percorso}`)}`;
-    else if (/\/$/.test(percorso)) testo = `Cartella del computer bloccata per sicurezza: ${accorciato(percorso)}`;
-    else testo = `File del computer bloccato per sicurezza: ${accorciato(percorso)}`;
+    if (u.hostname) { cosa = 'Percorso di rete bloccato per sicurezza'; dove = `//${u.hostname}${percorso}`; }
+    else if (/\/$/.test(percorso)) { cosa = 'Cartella del computer bloccata per sicurezza'; dove = percorso; }
+    else { cosa = 'File del computer bloccato per sicurezza'; dove = percorso; }
   } else if (/^[a-z]:$/.test(schema)) {
     // «C:\Users\…» scritto così si legge come lo schema «c:»: è un percorso di Windows, e si mostra com'è.
-    testo = `File del computer bloccato per sicurezza: ${accorciato(String(rawUrl).trim())}`;
+    cosa = 'File del computer bloccato per sicurezza';
+    dove = String(rawUrl).trim();
   } else {
-    testo = `Indirizzo «${accorciato(schema, MAX_SCHEMA)}» bloccato per sicurezza`;
+    cosa = `Indirizzo «${accorciato(schema, MAX_SCHEMA)}» bloccato per sicurezza`;
   }
-  return { testo, chiave: `indirizzo-fermato:${testo}` };
+  const testo = dove ? `${cosa}: ${accorciato(dove)}` : cosa;
+  return { testo, cosa, chiave: `indirizzo-fermato:${testo}` };
 }
 
 module.exports = { avvisoIndirizzoFermato };
