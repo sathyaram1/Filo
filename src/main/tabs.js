@@ -301,6 +301,9 @@ function risorsaDellaPagina(frame, url) {
   })(${JSON.stringify(u)})`;
   try { return Promise.resolve(frame.executeJavaScript(codice)).then((v) => v === true, () => false); } catch (_) { return Promise.resolve(false); }
 }
+function urlDellaPagina(wc) {
+  try { return wc && !wc.isDestroyed() ? String(wc.getURL() || '') : ''; } catch (_) { return ''; }
+}
 // Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
   if (invitoFermato(rawUrl, ctx) || openExternalScheme(rawUrl)) return true;
