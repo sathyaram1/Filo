@@ -90,9 +90,18 @@ test('dopo aver letto cose scritte da altri: il costo 2 chiede, il 3 vuole «con
   expect(lezione.describe).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
   expect(await lezioni(app)).not.toContain('link in grassetto');
 
+  // Il costo 3 di «dimentica» è il «per sempre», che butta anche il testo (#872).
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Uno.\nDue.\nTre.\nQuattro.', PREFERENZE: '' }));
-  const dimentica = await execAction(app, { type: 'DIMENTICA', testo: '.' }, { contesto: [ricercaFatta] });
-  expect(dimentica.needsConfirm === 3 || dimentica.executed === false).toBe(true);
+  const perSempre = await execAction(app, { type: 'DIMENTICA', testo: '.', per_sempre: true }, { contesto: [ricercaFatta] });
+  expect(perSempre.executed).toBe(false);
+  expect(perSempre.needsConfirm).toBe(3);
+  expect(perSempre.describe).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
+  expect(await lezioni(app)).toContain('Quattro.');
+
+  // Senza «per sempre» la riga si nasconde e dal quaderno si rimette: costo 1, parte anche dopo una lettura.
+  const nasconde = await execAction(app, { type: 'DIMENTICA', testo: 'Quattro' }, { contesto: [ricercaFatta] });
+  expect(nasconde.executed).toBe(true);
+  expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.quaderno()).nascoste.map((n) => n.testo))).toEqual(['Quattro.']);
 });
 
 test('un link coi tuoi dati: chiesto da te in un compito pulito si apre; dall\'assistente su una pagina web chiede, e dice perché', async ({ app, testServer }) => {
