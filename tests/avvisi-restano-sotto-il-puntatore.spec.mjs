@@ -8,6 +8,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { statoDi } from './helpers/riquadri.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
   <h1>Pagina con un collegamento</h1>
