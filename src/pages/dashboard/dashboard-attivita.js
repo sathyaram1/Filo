@@ -743,7 +743,11 @@
       if (a._auto) {
         const r = (a._output && Array.isArray(a._output.results)) ? a._output.results : [];
         const viste = new Set();
-        const una = r.filter((x) => x && !(x.id && viste.has(x.id)) && (viste.add(x.id), true));
+        const una = r.filter((x) => {
+          if (!x || (x.id && viste.has(x.id))) return false;
+          viste.add(x.id);
+          return true;
+        });
         const quali = una.map((x) => pulito(x.title) || quandoBreve(x.date)).filter(Boolean);
         return { icon: '💬', text: `Ricordato dal filo${quali.length ? ` · ${quali.join('; ')}` : ''}`, tipo: 'RICORDO_FILO' };
       }
