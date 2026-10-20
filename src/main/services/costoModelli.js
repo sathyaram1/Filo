@@ -9,7 +9,7 @@ const FRESCO_MS = 6 * 60 * 60 * 1000;
 const RIPROVA_MS = 60 * 1000;
 const ATTESA_MS = 15 * 1000;
 
-let ultimo = null; // { listino, at }
+let ultimo = null; // { listino, finestre, at }
 let fallitoAt = 0;
 let inVolo = null;
 
@@ -24,7 +24,7 @@ async function scarica() {
   // Senza la lista principale (quella dei modelli di testo) il listino non c'è: le altre da sole sarebbero un buco.
   if (liste[0].status !== 'fulfilled') throw liste[0].reason;
   const voci = liste.flatMap((l) => (l.status === 'fulfilled' ? l.value : []));
-  return S.listinoDaCatalogo(voci);
+  return { listino: S.listinoDaCatalogo(voci), finestre: globalThis.SN_FILO_CONTESTO.finestreDaCatalogo(voci) };
 }
 
 // Il listino in memoria, rifatto ogni sei ore. OpenRouter muto: vale l'ultimo letto, se c'è; altrimenti null, e si
