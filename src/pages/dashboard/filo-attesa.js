@@ -342,7 +342,8 @@
       requestAnimationFrame(disegna);
     }
     let osserva = null;
-    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); } catch (_) {}
+    // Anche il blocco: la riga in testa che si apre sposta le righe senza cambiarne la misura.
+    try { osserva = new ResizeObserver(() => sveglia()); osserva.observe(body); osserva.observe(wrap); } catch (_) {}
     sveglia();
 
     return {
