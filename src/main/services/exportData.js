@@ -237,17 +237,33 @@ function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } =
 const zlib = require('node:zlib');
 
 // --- ZIP reader (STORE + DEFLATE) -------------------------------------------
+const FIRMA_FINE = 0x06054b50;
+const FIRMA_INDICE = 0x02014b50;
+
+// Il record finale: quello la cui posizione torna con l'indice che dichiara (inizio + dimensione), con o senza la sua
+// firma, perché una firma rovinata non fa di un archivio intatto «non è di Filo» (#1088); se nessuno torna, la firma.
+function recordFinale(buf) {
+  const minStart = Math.max(0, buf.length - 22 - 0xFFFF);
+  let firmato = -1;
+  for (let i = buf.length - 22; i >= minStart; i--) {
+    const inizio = buf.readUInt32LE(i + 16);
+    const dimensione = buf.readUInt32LE(i + 12);
+    const torna = inizio + dimensione === i
+      && (dimensione === 0 || (inizio + 4 <= buf.length && buf.readUInt32LE(inizio) === FIRMA_INDICE));
+    if (torna) return i;
+    if (firmato < 0 && buf.readUInt32LE(i) === FIRMA_FINE) firmato = i;
+  }
+  return firmato;
+}
+
 // Ritorna { voci: Map nome → Buffer, saltate: [{ nome, motivo }], mancanti }: una voce che non si legge si dice, perché chi
 // importa deve sapere cosa manca (#1088). Legge la central directory: i local header possono avere size a 0.
+// L'indice si legge per tutta la sua lunghezza, non per il numero di voci che dichiara: un numero rovinato non nasconde
+// voci, e una riga rovinata si salta e si conta. Sentinella: tests/unit/importData.test.mjs.
 function unzip(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 22) throw new Error('not_a_zip');
 
-  // EOCD: cerca la firma dalla fine (il commento finale può essere fino a 64KB).
-  let eocd = -1;
-  const minStart = Math.max(0, buf.length - 22 - 0xFFFF);
-  for (let i = buf.length - 22; i >= minStart; i--) {
-    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  }
+  const eocd = recordFinale(buf);
   if (eocd < 0) throw new Error('not_a_zip');
 
   const count = buf.readUInt16LE(eocd + 10);
@@ -255,12 +271,24 @@ function unzip(buf) {
   const cdOffset = buf.readUInt32LE(eocd + 16);
   if (cdOffset === 0xFFFFFFFF || cdSize === 0xFFFFFFFF) throw new Error('zip64_unsupported');
 
+  const firmaIndice = (q) => q >= 0 && q + 46 <= eocd && buf.readUInt32LE(q) === FIRMA_INDICE;
+  // L'indice finisce dove comincia il record finale; se l'inizio dichiarato è rovinato, lo dice la dimensione.
+  const inizio = firmaIndice(cdOffset) ? cdOffset : (firmaIndice(eocd - cdSize) ? eocd - cdSize : eocd);
   const voci = new Map();
   const saltate = [];
-  let p = cdOffset;
+  let p = inizio;
   let lette = 0;
-  for (; lette < count; lette++) {
-    if (p + 46 > buf.length || buf.readUInt32LE(p) !== 0x02014b50) break;
+  let buchi = 0;
+  for (; p + 46 <= eocd; lette++) {
+    if (buf.readUInt32LE(p) !== FIRMA_INDICE) {
+      // Una riga rovinata: si conta e si riprende dalla prossima, che comincia con la sua firma.
+      buchi++;
+      lette--;
+      let q = p + 1;
+      while (q + 46 <= eocd && buf.readUInt32LE(q) !== FIRMA_INDICE) q++;
+      p = q;
+      continue;
+    }
     const flags = buf.readUInt16LE(p + 8);
     const method = buf.readUInt16LE(p + 10);
     const crc = buf.readUInt32LE(p + 16);
