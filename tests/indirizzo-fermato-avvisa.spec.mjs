@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { home as laChat, modelloFinto, chiamateAlModello, chiedi, ripristina } from './helpers/chatFinta.mjs';
 
 const schede = (app) => app.evaluate(({ BrowserWindow }) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
@@ -268,4 +269,38 @@ test('l\'indirizzo di posta (e il telefono) chiesto all\'assistente va al progra
   await shell.waitForTimeout(400);
   expect(await nelModello(shell, 'bloccat')).toBe(0);
   expect(await ricerche(app)).toEqual([]);
+});
+
+// #1318 — nella chat la risposta parte da quello che è successo davvero: il modello riceve cosa è stato fermato e perché,
+// la riga del lavoro lo dice, e la mail è andata al programma di posta.
+test('nella chat il percorso della chiavetta è detto fermato e la mail va al programma di posta', async ({ app, shell }) => {
+  await intercettaEsterni(app);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8000 });
+  const page = await laChat(app);
+  const posta = 'mailto:mario@example.com?subject=Ciao';
+  await modelloFinto(app, [
+    { toolCalls: [
+      { id: 'p1', name: 'NAVIGA', arguments: JSON.stringify({ url: '/run/media/mario/CHIAVETTA/tesi.docx', etichetta: 'tesi' }) },
+      { id: 'm1', name: 'NAVIGA', arguments: JSON.stringify({ url: posta, etichetta: 'Mail a Mario' }) },
+    ] },
+    { text: 'La tesi non la apro, la mail è pronta.' },
+  ]);
+  await chiedi(page, 'apri la tesi sulla chiavetta e scrivi una mail a Mario');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'la mail è pronta' })).toBeVisible({ timeout: 10000 });
+
+  const giri = await chiamateAlModello(app);
+  const risultati = JSON.stringify(giri[giri.length - 1]);
+  expect(risultati).toContain('Pagina NON aperta (File del computer bloccato per sicurezza: /run/media/mario/CHIAVETTA/tesi.docx)');
+  expect(risultati).toContain('Aperto il programma di posta del computer');
+  await expect.poll(() => esterni(app), { timeout: 6000 }).toEqual([posta]);
+  expect(await ricerche(app), 'il percorso non diventa una ricerca').toEqual([]);
+
+  const lavoro = page.locator('.dash-activity');
+  await lavoro.locator('.dash-activity-head').click();
+  const riga = lavoro.locator('.dash-activity-row', { hasText: 'Link non aperto · file del computer bloccato per sicurezza' });
+  await expect(riga).toHaveCount(1);
+  await lavoro.getByRole('button', { name: /2 azioni/ }).click();
+  await expect(riga).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/1318-chat-percorso-fermato.png' });
+  await ripristina(app);
 });

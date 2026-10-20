@@ -22,6 +22,10 @@
     LEGGI_IMPOSTAZIONI: ['Lette le impostazioni', (k) => `Lette le impostazioni ${n(k)} volte`, 'impostazioni'],
     CAPACITA_DETTAGLIO: ['Verificato cosa so fare', (k) => `Verificato cosa so fare ${n(k)} volte`, 'capacità'],
     NAVIGA: ['Aperta una pagina', (k) => `Aperte ${n(k)} pagine`, 'pagina'],
+    // Un NAVIGA di posta, telefono o SMS non apre una pagina: va al programma del computer (#1318).
+    POSTA: ['Aperto il programma di posta', (k) => `Aperto il programma di posta ${n(k)} volte`, 'posta'],
+    TELEFONO: ['Aperto il programma per le chiamate', (k) => `Aperto il programma per le chiamate ${n(k)} volte`, 'telefono'],
+    SMS: ['Aperto il programma dei messaggi', (k) => `Aperto il programma dei messaggi ${n(k)} volte`, 'messaggi'],
     APRI_FILE: ['Mostrato un file', (k) => `Mostrati ${n(k)} file`, 'file'],
     RINOMINA_FILE: ['Dato un nome ai file', (k) => `Dato un nome ai file ${n(k)} volte`, 'nomi dei file'],
     TIMER: ['Avviato un timer', (k) => `Avviati ${n(k)} timer`, 'timer'],
