@@ -40,6 +40,14 @@ function avvisoIndirizzoFermato(rawUrl) {
   return { testo, chiave: `indirizzo-fermato:${testo}` };
 }
 
+// Un percorso che l'assistente chiede di aprire e che Filo non sa dove porta (relativo, con una variabile): com'è scritto.
+function avvisoPercorsoScritto(percorso) {
+  return `File del computer bloccato per sicurezza: ${accorciato(String(percorso || '').replace(/\\/g, '/'))}`;
+}
+function avvisoNonIndirizzo(scritto) {
+  return `«${accorciato(scritto, MAX_SCHEMA * 2)}» non è un indirizzo`;
+}
+
 // Quello che una pagina web si è visto rifiutare da Chromium: la riga in console la pagina la può imitare con un testo
 // suo, quindi l'avviso nomina il sito che lo chiedeva e il tipo, mai il percorso (#1318 giro 1).
 function avvisoDallaPagina(rawUrl, sito) {
