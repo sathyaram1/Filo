@@ -2514,10 +2514,9 @@ async function eseguiAzioneFilo(action, {
               return { executed: false, kept: true, output: { blocked: 'site', host: host || '', reason: reason || '', url: target } };
             };
             if (!tabId) {
-              const assoluto = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
               let d = null;
-              try { d = require('./siteBlock').shouldBlockNavigation(assoluto); } catch (_) {}
-              return fermata(d && d.host, d && d.reason, assoluto);
+              try { d = require('./siteBlock').shouldBlockNavigation(caricato); } catch (_) {}
+              return fermata(d && d.host, d && d.reason, caricato);
             }
             // Un blocco che la pagina provoca dopo l'attesa qui sotto arriva lo stesso a chi l'ha chiesta:
             // la chat della home o l'assistente sulla pagina.
