@@ -33,6 +33,7 @@
   let beginSending = null;
   let runTurnAndContinue = null;
   let nienteInCorso = null;
+  let chatInCorso = null;
   let allApertura = null;
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
@@ -354,7 +355,13 @@
   let closingShownAt = 0;
   let closingDwellTimer = null;
 
+  // L'annuncio arriva a tutte le schede, ma torna alla home solo quella che mostrava l'intervista: nelle altre c'è la
+  // conversazione dell'utente, e rilanciare l'accoglienza non la tocca (#1297).
   function onboardingDone(msg) {
+    if (!onboardingActive && !closingShownAt) {
+      refreshOnboardingNotice().catch(() => {});
+      return;
+    }
     onboardingActive = false;
     clearTimeout(onboardingHomeFallback);
     const atteso = closingShownAt ? Date.now() - closingShownAt : CLOSING_DWELL_MS;
@@ -419,8 +426,8 @@
     redo.type = 'button';
     redo.id = 'onbNoticeRedo';
     redo.textContent = 'Riprendiamola';
-    redo.title = 'Riapre l’intervista di benvenuto qui, da capo. La trovi anche in Preferenze.';
-    redo.addEventListener('click', restartOnboardingHere);
+    redo.title = 'Riapre l’intervista da dove l’avevamo lasciata. Per rifarla da capo c’è Preferenze.';
+    redo.addEventListener('click', riprendiQui);
     const ok = document.createElement('button');
     ok.type = 'button';
     ok.id = 'onbNoticeDismiss';
@@ -438,13 +445,17 @@
     try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
   }
 
-  // Rifarla da qui: la stessa cosa del pulsante in Preferenze, ma senza mandare
-  // l'utente a cercarlo — l'intervista riparte nella scheda che ha davanti.
-  async function restartOnboardingHere() {
+  // Riprenderla da qui, nella scheda che l'utente ha davanti: la stessa intervista, dalla domanda rimasta in sospeso e
+  // con quello che Filo ha già imparato (#1297). Da capo la si rifà da Preferenze. Una scheda con una conversazione
+  // sua la tiene: l'intervista riparte in una scheda nuova, come da Preferenze, e il turno in sospeso lo prende lei.
+  async function riprendiQui() {
     hideOnboardingNotice();
+    const altrove = !!(chatInCorso && chatInCorso());
     try {
-      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING });
-      if (r?.ok && r.onboarding) await openOnboarding({ ...r.onboarding, resume: false });
+      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING, riprendi: true, ...(altrove ? { altrove: true } : {}) });
+      if (!r?.ok || !r.onboarding || r.onboarding.done) return;
+      if (altrove) await send({ type: MSG.OPEN_URL, url: 'filo://newtab/' });
+      else await openOnboarding({ ...r.onboarding, resume: !!r.resume });
     } catch (_) {}
   }
 
@@ -466,6 +477,7 @@
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
     nienteInCorso = deps.nienteInCorso;
+    chatInCorso = deps.chatInCorso || null;
     allApertura = deps.allApertura;
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;

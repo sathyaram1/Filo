@@ -624,14 +624,26 @@ module.exports = function register(on, ctx) {
   // Rilancio dell'intervista dalle Preferenze, anche dopo settimane: si
   // riparte dal benvenuto, con l'elenco di nuovo tutto da spuntare. Quella di
   // prima finisce nell'archivio (`past`) — rifarla non è cancellarla.
+  // `riprendi` (#1297) è il «Riprendiamola» della home: la stessa intervista, da dove si era fermata. Se l'ultima parola
+  // resta all'utente il turno riparte, preso da una scheda sola come all'apertura.
   on(MSG.FILO_RESTART_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
     const prev = await FiloMem.getOnboarding();
-    const state = await saveOnboarding(
-      Onboarding.appendTurn(Onboarding.restart(prev), { role: 'filo', text: Onboarding.WELCOME_MESSAGE }),
-    );
-    return { ok: true, onboarding: state };
+    const base = msg?.riprendi === true ? Onboarding.riprendi(prev) : Onboarding.restart(prev);
+    const state = await saveOnboarding(base.thread.length
+      ? base
+      : Onboarding.appendTurn(base, { role: 'filo', text: Onboarding.WELCOME_MESSAGE }));
+    // `altrove`: la riprende una scheda nuova, che il turno in sospeso lo prenota da sé all'apertura.
+    const resume = msg?.riprendi === true && msg?.altrove !== true && Onboarding.hasPendingTurn(state) && claimOnboardingResume();
+    return { ok: true, onboarding: state, ...(msg?.riprendi === true ? { resume } : {}) };
+  });
+
+  on(MSG.FILO_ONBOARDING_TOGLI, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
+    if (!Onboarding) return { ok: false, error: 'onboarding non disponibile' };
+    const { state, tolta } = Onboarding.togliConversazione(await FiloMem.getOnboarding(), msg?.chiave);
+    return { ok: true, tolta, onboarding: tolta ? await saveOnboarding(state) : state };
   });
 
   // «Salta l'accoglienza»: la via d'uscita che NON passa dal modello. È il
@@ -646,7 +658,7 @@ module.exports = function register(on, ctx) {
     if (cur.done) return { ok: true, onboarding: cur, already: true };
     const bye = Onboarding.CLOSING_MESSAGE;
     const state = await saveOnboarding(
-      Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye })),
+      Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye, congedo: true })),
     );
     // #525 — il congedo lo legge l'utente, quindi lo deve ritrovare rileggendo
     // l'intervista. La targa della chat la calcola il modulo dell'intervista,

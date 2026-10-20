@@ -354,6 +354,21 @@
         : `${cifre(scambi)} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
       sum.appendChild(when);
       sum.appendChild(meta);
+      // Quello che Filo conserva si toglie da qui, una per una (#1297); quella ancora aperta si chiude dalla home.
+      if (!(conv.current && !state.done)) {
+        const via = document.createElement('button');
+        via.type = 'button';
+        via.className = 'mem-via onb-via';
+        via.textContent = '×';
+        via.title = 'Togli';
+        via.setAttribute('aria-label', `Togli l’intervista del ${onboardingWhen(conv)}`);
+        via.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          togliIntervista(via, O.chiaveConversazione(conv));
+        });
+        sum.appendChild(via);
+      }
       det.appendChild(sum);
       const lines = document.createElement('div');
       lines.className = 'onb-lines';
@@ -374,6 +389,14 @@
       if (i === 0) det.open = true;
       box.appendChild(det);
     });
+  }
+
+  async function togliIntervista(btn, chiave) {
+    btn.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_ONBOARDING_TOGLI, chiave }); } catch (_) { r = null; }
+    if (r && r.ok && r.onboarding) renderOnboardingArchive(r.onboarding);
+    else btn.disabled = false;
   }
 
   async function loadOnboardingArchive() {
@@ -1755,6 +1778,8 @@
     try {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) riallinea(msg.settings);
+        // L'archivio delle interviste cambia anche da fuori: un «dimentica tutto» in chat, un'intervista che avanza.
+        if (msg && msg.type === MSG.FILO_ONBOARDING_UPDATED && msg.onboarding) renderOnboardingArchive(msg.onboarding);
       });
     } catch (_) {}
     load();

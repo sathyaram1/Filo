@@ -482,3 +482,89 @@ test('con la scelta dell’autonomia a schermo l’intervista non si chiude da s
   assert.equal(O.shouldForceClose(lunga), true);
   assert.equal(O.autonomiaInSospeso(O.restart(mostrata)), false, 'rifarla riparte senza scelte in sospeso');
 });
+
+// #1297 — «Riprendiamola» riprende dalla domanda in sospeso, non dalla prima.
+function chiusaAMeta({ conParola = true } = {}) {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna, insegno lettere alle medie; scrivimi breve' });
+  s = O.tick(s, ['profilo', 'stile']).state;
+  s = O.appendTurn(s, { role: 'filo', text: 'Quanto vuoi che faccia da solo?' });
+  if (conParola) s = O.appendTurn(s, { role: 'user', text: 'basta così' });
+  return O.close(O.appendTurn(s, { role: 'filo', text: O.CLOSING_MESSAGE, congedo: true }));
+}
+
+test('riprendi(): l’intervista chiusa dall’app riparte dalla domanda in sospeso, con le spunte di prima (#1297)', () => {
+  for (const conParola of [true, false]) {
+    const chiusa = chiusaAMeta({ conParola });
+    assert.equal(chiusa.notice, 'early');
+    const r = O.riprendi(chiusa);
+    assert.equal(r.done, false);
+    assert.equal(r.notice, '');
+    assert.equal(r.closedAt, null);
+    assert.equal(r.startedAt, chiusa.startedAt, 'stessa intervista, stessa targa');
+    assert.deepEqual(r.ticked, ['profilo', 'stile']);
+    const ultimo = r.thread[r.thread.length - 1];
+    assert.equal(ultimo.role, 'filo');
+    assert.equal(ultimo.text, 'Quanto vuoi che faccia da solo?');
+    assert.ok(!r.thread.some((m) => m.text === O.CLOSING_MESSAGE || m.text === 'basta così'));
+    assert.equal(O.hasPendingTurn(r), false, 'niente da chiedere al modello: la domanda è già lì');
+  }
+});
+
+test('riprendi(): chiusa dal modello, il clic diventa la risposta e il turno riparte (#1297)', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna' });
+  s = O.close(O.appendTurn(O.tick(s, 'profilo').state, { role: 'filo', text: 'Va bene, ci fermiamo qui. A presto!' }));
+  const r = O.riprendi(s);
+  assert.equal(r.thread[r.thread.length - 1].text, O.RESUME_REPLY);
+  assert.equal(r.thread[r.thread.length - 2].text, 'Va bene, ci fermiamo qui. A presto!', 'il congedo del modello resta');
+  assert.equal(O.hasPendingTurn(r), true);
+});
+
+test('riprendi(): il tetto degli scambi riparte dalla ripresa, e su un’intervista aperta non cambia niente (#1297)', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  for (let i = 0; i < O.HARD_MAX_EXCHANGES; i++) {
+    s = O.appendTurn(s, { role: 'user', text: `risposta ${i}` });
+    s = O.appendTurn(s, { role: 'filo', text: `domanda ${i}` });
+  }
+  assert.equal(O.shouldForceClose(s), true);
+  const r = O.riprendi(O.close(s));
+  assert.equal(O.userTurns(r), 1, 'il clic su «Riprendiamola»');
+  assert.equal(O.shouldForceClose(r), false);
+  assert.equal(O.userTurns(O.normalize(JSON.parse(JSON.stringify(r)))), 1, 'il conto sopravvive al salvataggio');
+  const aperta = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  assert.deepEqual(O.riprendi(aperta), O.normalize(aperta));
+});
+
+test('togliConversazione(): la × toglie solo quella scelta, mai quella in corso (#1297)', () => {
+  let s = chiusaAMeta();
+  s = O.appendTurn(O.restart(s), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.close(O.appendTurn(s, { role: 'user', text: 'sono Bruno' }));
+  s = O.appendTurn(O.restart(s), { role: 'filo', text: O.WELCOME_MESSAGE });
+  s = O.appendTurn(s, { role: 'user', text: 'sono Carla' });
+  const lista = O.conversations(s);
+  assert.equal(lista.length, 3);
+  const inCorso = O.togliConversazione(s, O.chiaveConversazione(lista[0]));
+  assert.equal(inCorso.tolta, false, 'quella aperta non si toglie da Preferenze');
+  const { state, tolta } = O.togliConversazione(s, O.chiaveConversazione(lista[2]));
+  assert.equal(tolta, true);
+  const testi = O.conversations(state).flatMap((c) => c.thread.map((m) => m.text));
+  assert.ok(!testi.some((t) => t.includes('Anna')));
+  assert.ok(testi.some((t) => t.includes('Bruno')) && testi.some((t) => t.includes('Carla')));
+  const chiusa = O.close(state);
+  const via = O.togliConversazione(chiusa, O.chiaveConversazione(O.conversations(chiusa)[0]));
+  assert.equal(via.tolta, true);
+  assert.equal(via.state.thread.length, 0);
+  assert.equal(via.state.notice, '', 'senza conversazione la riga «chiusa a metà» non ha più niente da riprendere');
+  assert.equal(via.state.done, true);
+});
+
+test('dimentica(): via ogni intervista conservata, resta solo il segno «già accolto» (#1297)', () => {
+  let s = chiusaAMeta();
+  s = O.close(O.appendTurn(O.appendTurn(O.restart(s), { role: 'filo', text: O.WELCOME_MESSAGE }), { role: 'user', text: 'sono Bruno' }));
+  const d = O.dimentica(s);
+  assert.equal(d.done, true);
+  assert.equal(O.conversations(d).length, 0);
+  assert.equal(d.notice, '');
+  assert.equal(O.dimentica(O.emptyState()).done, false);
+});

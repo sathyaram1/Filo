@@ -59,6 +59,14 @@
     return built && !built.rifiuto && built.testo && built.partial && 'agentStyle' in built.partial ? built.testo : '';
   }
 
+  // Stessa regola per quello che Filo impara su chi è l'utente nel benvenuto (#1297): riga corta e Annulla, senza
+  // riquadro, finché nel contesto non c'è testo di altri. Torna il testo, o ''.
+  function lezioneDellAccoglienza(action) {
+    if (!action || action._accoglienza !== true) return '';
+    const l = lezione(action);
+    return l.testo && !l.rifiuto ? l.testo : '';
+  }
+
   // Token + valore di un'azione estetica (più sinonimi che un LLM può produrre).
   function estTok(action) {
     return action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
@@ -329,7 +337,7 @@
       // Una lezione entra in ogni conversazione e ci resta, come lo stile: se la
       // propone il modello, l'utente ne conferma il testo esatto (#592). Vuota
       // o oltre il tetto → 1: niente da confermare, il dispatch la respinge.
-      costo: (a) => { const l = lezione(a); return l.testo && !l.rifiuto ? 2 : 1; },
+      costo: (a) => { const l = lezione(a); return l.testo && !l.rifiuto && !lezioneDellAccoglienza(a) ? 2 : 1; },
       campo: null,
       describe: (a) => {
         const l = lezione(a);
@@ -680,12 +688,13 @@
       costo: 3,
       campo: null,
       elenco: () => 'cancella-definitivo',
-      dove: 'Le righe della memoria le può togliere l\'utente, una per una, nel quaderno delle memorie (filo://quaderno/quaderno.html).',
+      dove: 'Le righe della memoria le può togliere l\'utente, una per una, nel quaderno delle memorie (filo://quaderno/quaderno.html); '
+        + 'le interviste di benvenuto conservate, con la × accanto a ciascuna in Preferenze (filo://preferences/preferences.html).',
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
-        + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
+        + 'profilo utente, preferenze apprese, lezioni non ancora salvate e interviste di benvenuto conservate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
       // A cosa fatta, la ricevuta: senza, il bottone confermato ripeteva la domanda («Eliminare…»).
-      describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese e lezioni',
+      describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese, lezioni e interviste di benvenuto',
     },
     DIMENTICA: {
       // Le righe indicate a voce le risolve il main in `_righe` prima del gate, mai l'LLM. Toglierle le nasconde nel
@@ -1242,5 +1251,5 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, indirizzoDi, costoIndirizzo };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

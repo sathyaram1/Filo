@@ -83,6 +83,7 @@
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
         DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei tetti della chat e delle risposte per mostrarli accanto ai campi: non salva niente',
         FILO_RESTART_ONBOARDING: 'pulsante che fa un’azione (rifà l’intervista di benvenuto): resta nella pagina',
+        FILO_ONBOARDING_TOGLI: 'toglie un’intervista conservata dall’elenco qui sotto: dalla chat si cancellano tutte insieme chiedendo di dimenticare tutto',
         RESET_SETTINGS: 'pulsante che fa un’azione (ripristina tutte le impostazioni): resta nella pagina',
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',

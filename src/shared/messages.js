@@ -1046,7 +1046,12 @@
     // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte,
     // conversazione e il segno "già accolto". Solo pagine filo://.
     // L'intervista precedente NON si perde: viene archiviata in `past`.
+    // Con { riprendi: true } («Riprendiamola» della home) riapre invece quella
+    // chiusa a metà, dov'era. Risposta: { ok, onboarding, resume? }
     FILO_RESTART_ONBOARDING: 'filo_restart_onboarding',
+    // Toglie un'intervista conservata { chiave } (la × in Preferenze). Solo
+    // pagine filo://. Risposta: { ok, onboarding, tolta }
+    FILO_ONBOARDING_TOGLI: 'filo_onboarding_togli',
     // Chiude l'intervista SENZA passare dal modello: è il pulsante "Salta
     // l'accoglienza" della chat, la via d'uscita che funziona anche quando il
     // modello non risponde (rete assente, provider giù, crediti finiti). Solo

@@ -258,14 +258,20 @@
       const nostri = threadHistory.filter((m) => !m.interno && (m.role !== 'filo' || String(m.text || '').trim())).map(riga);
       // Un annuncio più vecchio di quello che è a schermo (l'intervista salvata a metà turno, consegnato dopo la
       // risposta) è già superato: ridisegnare butterebbe via le righe e i bottoni delle azioni (#592.2).
-      // Un'intervista rifatta da capo ha un'altra targa: quella si ridisegna anche se comincia uguale.
-      if (loro.length < nostri.length && chatIdOnboarding(state) !== chatId) return false;
+      // Un'intervista rifatta da capo ha un'altra targa: si ridisegna anche se comincia uguale, così la scheda rimasta
+      // aperta su quella di prima si lega alla nuova e le sue risposte contano (#1297).
+      if (chatIdOnboarding(state) !== chatId) return false;
       return loro.length <= nostri.length && loro.every((x, i) => x === nostri[i]);
     },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
-    // Niente da interrompere: in questa scheda l'utente non ha ancora scritto.
-    nienteInCorso: () => !scrittoQui && !sending,
+    // Niente da interrompere: in questa scheda l'utente non ha scritto e non ha davanti una conversazione (riaperta,
+    // o continuata da un'altra scheda), che l'intervista cancellerebbe dallo schermo (#1297).
+    nienteInCorso: () => !scrittoQui && !sending && body.dataset.state !== 'thread'
+      && threadHistory.every((m) => m.spontaneo),
+    // La scheda ha davanti una conversazione aperta: «Riprendiamola» non la sostituisce con l'intervista (#1297). La
+    // home no: è il filo, che si rilegge intero quando l'intervista finisce.
+    chatInCorso: () => sending || body.dataset.state === 'thread',
     // Filo può rispondere: la frase su perché non poteva se ne va, e coi suggerimenti la carta dei Crediti (#869: senza
     // modello chiamato, la home li rilegge e basta).
     allApertura: () => { mostraSenzaModello(''); loadDashboard().catch(() => {}); },
