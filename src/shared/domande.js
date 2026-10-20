@@ -140,7 +140,7 @@
   // Spezzare prima e controllare ogni pezzo con un'ancora tiene il costo lineare anche su 6000 caratteri ostili.
   function fileNominati(testo) {
     const visti = [];
-    for (const parola of String(testo).split(/[\s«»"'‘’“”`()[\]{}<>,;!?|*]+/)) {
+    for (const parola of String(testo).split(/[\s«»"'‘’“”`()[\]{}<>,;!?|*…]+/)) {
       const senzaSito = parola.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i, '');
       for (const pezzo of senzaSito.split(/[/\\:#?=&@]+/)) {
         const nome = pezzo.replace(/\.+$/, '');
