@@ -279,16 +279,14 @@ function unzip(buf) {
   let p = inizio;
   let lette = 0;
   let buchi = 0;
-  for (; p + 46 <= eocd; lette++) {
+  while (p + 46 <= eocd) {
     if (buf.readUInt32LE(p) !== FIRMA_INDICE) {
       // Una riga rovinata: si conta e si riprende dalla prossima, che comincia con la sua firma.
       buchi++;
-      lette--;
-      let q = p + 1;
-      while (q + 46 <= eocd && buf.readUInt32LE(q) !== FIRMA_INDICE) q++;
-      p = q;
+      do p++; while (p + 46 <= eocd && buf.readUInt32LE(p) !== FIRMA_INDICE);
       continue;
     }
+    lette++;
     const flags = buf.readUInt16LE(p + 8);
     const method = buf.readUInt16LE(p + 10);
     const crc = buf.readUInt32LE(p + 16);
