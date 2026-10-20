@@ -169,9 +169,11 @@
     makeDraggable(root.querySelector('.sn-sidebar-header'));
     const form = root.querySelector('.sn-sidebar-input');
     const ta = form.querySelector('textarea');
+    // La casella sta nel documento del sito: cambia solo per l'utente, e si manda quello che ha scritto lui (#1071.1).
+    global.SN_FILO_UI?.soloScritturaVera?.(ta);
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
-      const text = ta.value.trim();
+      const text = (global.SN_FILO_UI?.valoreVero ? global.SN_FILO_UI.valoreVero(ta) : ta.value).trim();
       if (!text) return;
       ta.value = '';
       submit({ userMessage: text });
