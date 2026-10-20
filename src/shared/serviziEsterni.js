@@ -28,7 +28,7 @@
       id: 'modelli-openrouter', nome: 'OpenRouter, per i modelli',
       base: ['https://openrouter.ai/api/v1/', 'https://openrouter.ai/api/alpha/'],
       quando: 'funzione',
-      occasione: 'a ogni funzione che usa un modello (chat, spiegazioni, traduzione, correttore, voce, immagini), e quando scegli un modello o guardi il saldo della chiave; il listino dei prezzi per stimare il costo accanto ai modelli, senza chiave, al più ogni sei ore',
+      occasione: 'a ogni funzione che usa un modello (chat, spiegazioni, traduzione, correttore, voce, immagini), e quando scegli un modello o guardi il saldo della chiave; il listino dei modelli, per stimare il costo accanto a ognuno e quanto testo regge il modello della chat, senza chiave, al più ogni sei ore',
       riceve: 'quello che serve alla funzione per rispondere: testo, immagini o audio, con la chiave dei crediti di Filo o la tua',
       frase: 'passa da OpenRouter',
       dove: ['src/main/services/providers/openrouter.js', 'src/main/services/handlers/ai.js', 'src/pages/options/options.js', 'src/main/services/costoModelli.js'],
