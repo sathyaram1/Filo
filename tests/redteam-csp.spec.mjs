@@ -5,7 +5,6 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
 import { nelMondoDiFilo, statoDi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
