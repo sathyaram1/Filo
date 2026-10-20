@@ -1,6 +1,6 @@
-// Le stime di costo dei modelli (#819): listino di OpenRouter, saldo e tariffa dei crediti, registro d'uso. Solo main.
-// Non inventa prezzi: senza listino la stima dice che non c'è. Il listino non porta chiavi (il catalogo è pubblico).
-// Le regole della stima stanno in src/shared/stimaCosto.js.
+// Le stime di costo dei modelli (#819): listino di OpenRouter, saldo e tariffa dei crediti, registro d'uso; dallo stesso
+// catalogo la finestra di ogni modello (#1301). Solo main. Non inventa prezzi: senza listino la stima dice che non c'è.
+// Il listino non porta chiavi (il catalogo è pubblico). Le regole della stima stanno in src/shared/stimaCosto.js.
 
 const CATALOGO = 'https://openrouter.ai/api/v1/models';
 // Il catalogo semplice elenca solo i modelli di testo: voce, dettatura e vettori stanno in liste a parte.
