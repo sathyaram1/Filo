@@ -33,6 +33,7 @@
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
+require('../../shared/urlNav.js');
 
 // Tetto sul TESTO restituito. Allineato al documento di trasparenza (16k):
 // abbastanza per un estratto conto o un contratto intero, poco abbastanza da non
