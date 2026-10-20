@@ -194,7 +194,7 @@
         c.updatedAt = ev.ts;
         c._pos = stato.pos;
         // Riapre solo l'utente: una risposta arrivata a chat chiusa è la coda di quella di prima.
-        if (ev.msg.role === 'user') c.closedAt = null;
+        if (ev.msg.role === 'user') { c.closedAt = null; delete c.finita; }
         if (ev.onboarding) c.onboarding = true;
         break;
       }
