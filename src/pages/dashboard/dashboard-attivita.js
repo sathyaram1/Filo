@@ -427,8 +427,10 @@
         const o = a._output || {};
         let dettaglio = '';
         try { if (tipo === 'NAVIGA') dettaglio = new URL(String(a.url || o.url || '')).hostname.replace(/^www\./, ''); } catch (_) {}
-        if (tipo === 'APRI_FILE') dettaglio = String(a.percorso || a.path || '').split(/[\\/]/).pop();
-        const testo = fallita ? (FAILED_LABELS[tipo] || 'Azione non riuscita') : '';
+        if (tipo === 'APRI_FILE') dettaglio = String((self.SN_URL_NAV ? self.SN_URL_NAV.pulisciPercorso(a.percorso || a.path) : (a.percorso || a.path)) || '').split(/[\\/]/).pop();
+        // Un indirizzo fermato per sicurezza dice quale, come lo dice al modello (#1318).
+        const fermato = tipo === 'NAVIGA' && typeof o.avviso === 'string' ? pulito(o.avviso) : '';
+        const testo = fallita ? `${FAILED_LABELS[tipo] || 'Azione non riuscita'}${fermato ? ` · ${fermato}` : ''}` : '';
         registra({ tipo, testo, dettaglio, esito: a._confirm ? 'chiesta' : (fallita ? 'fallita' : 'ok') }, a);
       },
       // La bolla di un giro che NON era l'ultimo («Provo subito tutti e tre…») diventa una nota del suo nodo.

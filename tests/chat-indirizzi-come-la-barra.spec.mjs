@@ -62,6 +62,7 @@ test('«scrivi una mail a Mario»: si apre il programma di posta e il modello sa
   expect(await schede(app), 'la posta non apre schede').toEqual(prima);
   expect(await avvisiBloccati(shell)).toBe(0);
   await expect(page.locator('.dash-bubble-filo').last()).toContainText('Ti ho aperto la mail per Mario.');
+  await page.screenshot({ path: 'tests/.shots/chat-indirizzi-posta.png' });
 });
 
 test('un percorso fra virgolette o sulla chiavetta non diventa una ricerca: è fermato, e il modello sa quale file', async ({ app }) => {
@@ -92,4 +93,11 @@ test('un percorso fra virgolette o sulla chiavetta non diventa una ricerca: è f
   await expect(bottone).toHaveCount(1, { timeout: 15_000 });
   await expect(bottone.locator('.dash-file-btn-nome')).toHaveText('conto marzo.pdf');
   await expect(bottone).toHaveAttribute('data-percorso', file);
+  await page.locator('.dash-activity-head').first().click();
+  await page.waitForTimeout(400);
+  await page.locator('.dash-activity-seg-head').first().click({ force: true });
+  await page.waitForTimeout(600);
+  // Anche il diario della risposta dice quale file è stato fermato.
+  await expect(page.locator('.dash-activity').first()).toContainText('Link non aperto · File del computer bloccato per sicurezza: /run/media/utente/CHIAVETTA/conto.pdf');
+  await page.screenshot({ path: 'tests/.shots/chat-indirizzi-percorsi.png' });
 });

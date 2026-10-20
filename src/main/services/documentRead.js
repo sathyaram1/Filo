@@ -74,7 +74,7 @@ const KNOWN_BINARY = {
 };
 
 /**
- * Normalizza il percorso che arriva dall'LLM: toglie virgolette e spazi, espande
+ * Normalizza il percorso che arriva dall'LLM: toglie incarti e spazi, espande
  * `~` nella home dell'utente, e restituisce un assoluto. PURA.
  *
  * `base` è la cartella in cui Filo sta guardando col terminale, e serve ai nomi
