@@ -325,8 +325,10 @@ function unzip(buf) {
     if (crc32(data) !== crc) { salta('crc'); continue; }
     voci.set(name, data);
   }
-  // L'indice che si interrompe prima del numero di voci che dichiara: quelle dopo non hanno nome, ma si contano (#1088).
-  const mancanti = count - lette;
+  // Un indice letto fino in fondo senza buchi è intero, qualunque numero dichiari; altrimenti le righe che non si
+  // raggiungono non hanno nome, ma si contano (#1088).
+  const intero = buchi === 0 && p === eocd && inizio !== eocd - (cdSize ? 0 : 0);
+  const mancanti = intero ? 0 : Math.max(count - lette, buchi, 0);
   return { voci, saltate, mancanti };
 }
 
