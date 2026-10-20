@@ -315,6 +315,7 @@ test('B3 — fermare con un seguito in attesa lo rimette nella casella; dal tast
   await menuDi(page).locator('.sn-menu').getByText('Rimetti nella casella').click();
   await expect(page.locator('.dash-bubble-attesa')).toHaveCount(0);
   await expect(page.locator('#input')).toHaveValue('zebra viola quaranta');
+  await quadratoPronto(page);
   await page.locator('#stopBtn').click();
   await expect(page.locator('.dash-bubble-fermato')).toHaveCount(2, { timeout: 5_000 });
   await expect(page.locator('#input')).toHaveValue('zebra viola quaranta');
