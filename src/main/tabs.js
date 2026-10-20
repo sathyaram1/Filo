@@ -3630,7 +3630,7 @@ class TabManager {
     if (this._siteAllowedIn(tab, url)) return null;
     // Un indirizzo nudo («sito.com», come lo manda a volte il modello) si
     // giudica per quello che diventerà caricandolo.
-    const target = indirizzoDaCaricare(url) || url;
+    const target = indirizzoDaCaricare(url);
     let decision;
     try {
       decision = require('./services/siteBlock').shouldBlockNavigation(target);
