@@ -703,8 +703,11 @@ function mergeImportedData(current, imported, opzioni = {}) {
       next = r.lista;
       stats.pagineFuori = r.fuori;
       stats.pagineMieFuori = r.mieFuori;
-    } else if (k === 'clipboardHistory' && Array.isArray(cur[k]) && Array.isArray(imp[k])) {
-      next = mergeClipboardHistory(cur[k], imp[k]);
+    } else if (regola === 'appunti') {
+      const r = mergeClipboardHistory(cur[k], imp[k], opzioni.tettoAppunti);
+      next = r.lista;
+      stats.appuntiFuori = r.fuori;
+      stats.appuntiMieFuori = r.mieFuori;
     } else next = k in cur ? mergeValue(cur[k], imp[k]) : imp[k];
 
     if (!(k in cur)) {
