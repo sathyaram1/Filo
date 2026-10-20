@@ -1,0 +1,167 @@
+{
+  "claude/aspetta-n": {
+    "request": "ora dovresti poter bloccare un feedback finché un altro non è fuso: un feedback aspetta uno o più altri numeri e rientra in coda da solo quando sono tutti fusi, così non devo mettere in coda a mano ogni ondata",
+    "verdict": "pass",
+    "sha": "66f40a96893d9c05697913b9d85fd9d220467b1a",
+    "server": {
+      "ramo": "claude/aspetta-n",
+      "sha": "911917a864ab05a48adfaf9c4ea967fa50e88dc3"
+    },
+    "requestedServer": {
+      "ramo": "claude/aspetta-n",
+      "sha": "911917a864ab05a48adfaf9c4ea967fa50e88dc3"
+    },
+    "critique": "Rilanciate le prove dei giri passati: undici verdi al primo colpo. Il ramo ha ripreso main dopo il giro 7, insieme al registro delle parti azzerato alla riapertura: le attese e la riapertura convivono, una riapertura toglie solo il registro delle parti e lascia le attese. Da riga di comando a vuoto sui dati veri: aggiunta in più grafie, rimozione, sé stesso, un numero inesistente, le attese insieme alla priorità rifiutate col motivo, e un feedback nuovo che nasce aspettando. Test del server col repo dell'app puntato a questo ramo: 1671, nessun rosso. Controlli automatici: dei controlli di logica un caso a tempo caduto sotto carico è verde rilanciato da solo e alla seconda corsa intera; dei 531 casi delle aree toccate 530 verdi e uno saltato. Il rilievo del giro 7, un'attesa messa da un'altra strada a pagina aperta che sparisce al gesto successivo, è stato messo da parte e non l'ho ri-provato."
+  },
+  "claude/esclusione-alibaba": {
+    "request": "Le richieste ai modelli Qwen non devono mai passare da Alibaba Cloud. La politica sui modelli esclude i servizi di Alibaba/Qwen, ma la lista di esclusione mandata a OpenRouter conteneva solo Qwen, mentre su OpenRouter l'host di Alibaba Cloud si chiama Alibaba. Stesso buco nel server. Lavoro: nell'ap",
+    "verdict": "pass",
+    "sha": "9aa2908a7746c4b05cb9440508a7b81bc8335c82",
+    "server": {
+      "ramo": "claude/esclusione-alibaba",
+      "sha": "4b600a3868355a03c5d4d33049c72ce101a57d42"
+    },
+    "requestedServer": {
+      "ramo": "claude/esclusione-alibaba",
+      "sha": "4b600a3868355a03c5d4d33049c72ce101a57d42"
+    },
+    "critique": "Giro dopo il riallineamento del ramo a main. Ho rilanciato le prove dei due giri passati e sono tutte verdi. La chat della home con un Qwen, spiega coi modelli scelti e spiega con «solo pesi aperti» portano Alibaba fra gli esclusi. Se il router serve Alibaba lo stesso, la cronologia lo marca «via Alibaba». Il controllo prima della chiamata riconosce l'host per nome e per sigla. Un Qwen servito solo da Alibaba fallisce in chiaro senza ripiegare, e chi ha servito scritto «Alibaba Cloud Int.», «alibaba/us-east-1» o «ALIBABA» viene riconosciuto.\nProvato in più nella pagina Modelli predefiniti. Con una lista di esclusi salvata dall'owner prima di questo lavoro, quindi senza Alibaba, la pagina avvisa che Alibaba manca, la rimette come produttore con un clic e il salvataggio la porta. Una lista che scrive «Alibaba Cloud» non copre l'host vero, e la pagina lo segnala. Senza lista dell'owner vale quella del codice, che ha Alibaba, e un salvataggio che non tocca gli esclusi non la congela.\nCatalogo vero di OpenRouter stasera, 112 host. Alibaba compare solo come «Alibaba», sigla alibaba, e la lista copre ogni host dei laboratori esclusi. GLM 5.3 Flash, Kimi K3 e la voce Deepgram della config condivisa hanno ancora host ammessi; a Kimi K3 si toglie Alibaba, uno di 25 host. Le voci Qwen per la lettura ad alta voce le serve solo Alibaba, quindi chi le sceglie riceve l'errore «nessun host ammesso», come vuole la politica.\nServer. La lista è identica a quella dell'app. Con un router finto il menu del sito e i giudici mandano Alibaba fra gli esclusi e scartano una risposta servita da Alibaba in ogni forma provata. Grafie con parentesi, trattino basso o attaccate non le riconosce nessuno dei due, come per ogni altro host escluso, e nel catalogo vero non esistono. Suite del server verde, 1488 casi.\nControlli di logica verdi, 5337 casi; nessuno spec mirato per le aree toccate. Non ho provato una richiesta vera a OpenRouter."
+  },
+  "claude/orch-costo": {
+    "request": "Si allega al rapporto delle routine il costo dell'orchestratore (finora non contato da nessun biglietto) e si aggiungono gli strumenti di misura che mancano per capire da dove viene il costo: contesto che cresce, cache scaduta dopo attese lunghe, cache dei worker riscritta.",
+    "verdict": "pass",
+    "sha": "80a3fe541c6a617b3fd7c81f9f29f623fb0dd323",
+    "server": {
+      "ramo": "claude/orch-costo",
+      "sha": "45022a6042cad182dd07aaa773a614bf0da9fcaa"
+    },
+    "requestedServer": {
+      "ramo": "claude/orch-costo",
+      "sha": "45022a6042cad182dd07aaa773a614bf0da9fcaa"
+    },
+    "critique": "Riprovate sulla sessione vera di questa macchina e su transcript costruiti le porte dei giri passati: lancio in sottofondo, evento di Monitor, richiesta fallita per errore di rete, rilascio per un worker morto scritto in tutte le forme, lancio in primo piano, e il turno che rilascia per un worker morto chiamando insieme un altro strumento, che ora conta una volta sola. Restano chiuse. Prove di giri passati rilanciate: le due del giro cinque, verdi. I controlli automatici sono tutti verdi. Non ho aperto Filo: il lavoro è uno script delle routine, provato sui transcript. Il confine della finestra dell'orchestratore rientra per l'ottava volta: stavolta perché la fine di un worker in sottofondo si prende dalla prima notifica che lo nomina, mentre Claude Code può mandarne più d'una per lo stesso worker. Non ho potuto provare se nelle routine in cloud arriva la stessa notifica provvisoria.\n[1i] Quando un worker in sottofondo si ferma ad aspettare un suo comando lanciato in sottofondo, come chiede la ricetta della verifica per i controlli automatici, Claude Code manda una notifica di fine provvisoria e il rapporto dà il worker per finito lì: i turni dell'orchestratore fra il worker di prima e il suo lancio, compreso quello che riscrive la cache dopo l'attesa, spariscono da ogni rapporto, e il rapporto del worker dopo riconta il turno con cui l'orchestratore ha risposto alla notifica provvisoria, con l'attesa misurata da lì.\n    Frequenza: su questa macchina 54 sotto-agenti su 615 hanno ricevuto la notifica provvisoria; in questa sessione 2 verificatori su 8.\n    Passi sulla sessione vera: il verificatore del giro sette è partito alle 20.40 del 10 ottobre, la notifica provvisoria è arrivata alle 20.58, la consegna alle 21.24. Il suo rapporto conta un turno dell'orchestratore da 9 centesimi e nessuno da riscaldare; i turni veri partono dalla fine del worker di prima alle 20.31, e il primo riscrive 337 mila token. Il rapporto di questo verificatore conta quattro turni con un "
+  },
+  "claude/crediti-battito": {
+    "request": "Crediti, prima parte (SPEC-DOMANDE.md 8.1 e la sola riserva della 8.2): il battito, che è un processo e non il modello, allega il consumo progressivo letto dalla parte nuova del registro della sessione, anche per l'orchestratore e per i biglietti morti; la percentuale vera del piano la dà solo lo sc",
+    "verdict": "pass",
+    "sha": "a00e6a79ebb50a3fba198c6cb557bcdce758f0b3",
+    "server": {
+      "ramo": "claude/crediti-battito",
+      "sha": "bbde9e784c8c74043770b678eea862f7d4b4280c"
+    },
+    "requestedServer": {
+      "ramo": "claude/crediti-battito",
+      "sha": "bbde9e784c8c74043770b678eea862f7d4b4280c"
+    },
+    "critique": "Provato senza aprire Filo, perché il lavoro non ha schermate. Rifatte da fuori le porte dei giri passati, tutte chiuse. Il cambio dell'ora del 25 ottobre: col rinnovo vero di A fermo alle 17 UTC la lettura di martedì 27 alle 17:30 viene accettata, la settimana riparte alle 17 e i dollari spesi fra le 17 e le 18 restano nella settimana nuova; anche il martedì dopo, senza lettura fresca, la settimana gira alle 17; col rinnovo che segue l'ora di Roma gira alle 18. Un account nuovo al posto di B che rinnova il venerdì: la sua lettura viene rifiutata finché l'owner non dà il numero del rinnovo, poi va a B e la settimana parte dal venerdì; un numero dato in secondi viene rifiutato col motivo; un rinnovo di A spostato di cinque ore, col numero dell'owner, toglie la lettura vecchia e tiene la nuova. Sul server con un Firestore in memoria: senza numeri nessuna riserva e lo stato lo dice, anche dopo averli tolti; senza lettura la stima parte da 2.150 dollari e col tetto di B a 80 B si ferma a 2.000 dollari; una lettura vera di A a 60 dopo 2.050 dollari stimati la fa ripartire, i dollari spesi dopo si aggiungono e la stessa lettura rimandata non li cancella; una lettura di una sessione locale su B va a B; il battito ripetuto vale zero e una parola d'ordine senza account conta appena l'account c'è. Lato app: il consumo progressivo coincide col rapporto di fine sessione sugli otto registri più grandi di questa macchina, fino a 33 MB, anche letto a pezzi con righe tagliate a metà, e riletto costa pochi millisecondi; la barra con l'ingresso di Claude Code stampa sempre una riga, anche con testo rotto, vuoto, senza limiti o con lo stdin che non si chiude; un invio che non arriva lo dice la riga, che torna pulita al primo invio riuscito, e la lettura arriva al codice vero del server; le chiamate portano consumo e lettura della sessione giusta, e fuori da una routine nessuna sessione altrui. Il cablaggio della barra nelle impostazioni non c'è, come chiesto. Controlli di logica verdi,"
+  },
+  "claude/fiducia": {
+    "request": "Fiducia a due livelli e biglietti che si sporcano (SPEC-DOMANDE.md sezione 1). Campo fiducia (fidato/non_fidato) su feedback, domande e biglietti, scritto solo dal server; biglietti che nascono puliti o sporchi e si sporcano quando il server consegna qualcosa di non fidato (testo decifrato, posta, r",
+    "verdict": "pass",
+    "sha": "f3149dc471f4ced64264b7a9c1b13977a77fd180",
+    "server": {
+      "ramo": "claude/fiducia",
+      "sha": "5e1e00e9698763bc127a497445424fd7da5228c9"
+    },
+    "requestedServer": {
+      "ramo": "claude/fiducia",
+      "sha": "5e1e00e9698763bc127a497445424fd7da5228c9"
+    },
+    "critique": "Provato dopo la fusione della parte dell'app su main: sul ramo dell'app restano solo gli strumenti della fusione del server, e il ramo del server non si è mosso. Le prove dei giri passati: quella del giro 1 è verde, le consegne delle routine entrano nel registro del ramo con l'impronta del commit; quella del giro 3 sul registro per finestra di tempo resta rossa ed è il limite accettato dall'owner l'11 ottobre; quella del giro 6 in Gestione è verde, cinque casi su cinque. Prove del server verdi, 1544. Controlli dell'app passati: unit tutti verdi, 5922; nessuno spec delle aree, perché il ramo tocca solo strumenti da riga di comando. L'aggiunta del 13 ottobre è applicata, provata sulla fusione del server con un database finto, senza rete e senza fondere niente: una pratica locale senza il campo fiducia, dell'owner o di una sua sessione col mittente provato, passa, anche a prova a vuoto, e allo strumento del server arriva solo lo sha verificato; un non fidato scritto, un campo vuoto, nullo, di un altro tipo o scritto in maiuscolo vengono rifiutati senza toccare niente, come un nome riservato senza prova e una routine; un fidato passa. Letta in sola lettura la pratica di questo lavoro: oggi supera il controllo con la regola di prima, quindi la parte del server si può fondere prima della migrazione. Non provati il server vero e una fusione vera del server, che a chi verifica è vietata. Nessuna famiglia dei giri passati rientra in questo giro.\n[0i?] Prima della migrazione la fusione del server lascia passare anche il feedback di un utente che l'owner ha approvato come lavoro locale, non solo quello col mittente provato che la richiesta nomina; la fusione dell'app fa lo stesso e salta il blocco.\n    Passi: un utente manda un feedback prima del deploy del server; l'owner lo approva come lavoro locale; una sessione lo lavora e tocca anche il server. La fusione del server lo porta su main senza che nessuno l'abbia segnato fidato, e la fusione dell'app salta il blocco. Dopo la "
+  },
+  "claude/domande-server": {
+    "request": "Domande all'owner, parte server (SPEC-DOMANDE.md, feedback #1149). Una collezione di domande sul server: ognuna con contesto, problema in pratica, opzioni con pro e contro, scelta consigliata e priorità; operazioni per crearle, leggerle, rispondere con una scelta o a parole, e rispondere in blocco c",
+    "verdict": "pass",
+    "sha": "66f3a0de459eec005f9870af67d0d8206672d14d",
+    "server": {
+      "ramo": "claude/domande-server",
+      "sha": "c3f9dc36ac2a9230e1d84a9ef4004f771a1c57ee"
+    },
+    "requestedServer": {
+      "ramo": "claude/domande-server",
+      "sha": "c3f9dc36ac2a9230e1d84a9ef4004f771a1c57ee"
+    },
+    "critique": "Ho riprovato le porte dei tre giri passati col codice vero del server su un archivio in memoria, con lo strumento da riga di comando collegato a quel server e col fascicolo che il canale consegna a chi lavora: restano chiuse. Una sessione sporca, chiusa, sconosciuta o senza biglietto che risponde con una scelta, a parole o col consiglio rende la domanda non fidata, e il feedback ripreso fa diventare sporco chi lo prende; una sessione pulita e la finestra restano fidate. Con un guasto al segno o al cambio di stato la domanda torna aperta, il feedback resta dov'era e la seconda prova scrive la domanda una volta sola. Chi riprende riceve contesto, pro e contro, consiglio, risposta e note per gli agenti; chi verifica e il controllo di sicurezza non ricevono le note. Una risposta che con la domanda supera il tetto della conversazione viene rifiutata col numero prima di toccare niente. La sentinella sulle prove dei moduli che misurano la sessione, rossa al giro scorso, ora è verde, e le prove del ramo che leggono la sessione sono verdi anche con un'identità di sessione finta accesa.\nFunzionano anche la creazione dal canale con la fiducia del biglietto e il tetto di venti aperte, il rifiuto dal controllo di sicurezza, il consiglio in blocco che lascia da fare una per una approvazioni e automazioni, il loro rifiuto da una sessione dichiarata, e i caratteri di controllo resi visibili nel terminale. Ho provato anche gli argomenti insoliti dello strumento: identificativi scritti male, scelta zero, fuori misura o non numerica, testo vuoto o di soli spazi, lo stesso consiglio chiesto due volte, che si applica una volta sola. Ogni rifiuto arriva col motivo e senza toccare niente. La copia delle regole condivise incorporata nel server è allineata a quella dell'app.\nBatteria del server verde. Verdi gli spec dei canali dei feedback, della conversazione dei feedback, del pannello delle risposte e dell'approvazione dei lavori locali. Negli unit dell'app due rossi da macchina carica ch"
+  },
+  "claude/lavori-server": {
+    "request": "Le routine lavorano anche sul server (feedback #1159, fase 1; guida Desktop/Filo/report/2026-10-11-lavori-server-passi.html, mappa ondata2/map-1159.md). A una routine pulita che lavora un feedback fidato il server dà una chiave da un'ora dell'App GitHub filo-lavori, che apre solo filo-security; la r",
+    "verdict": "pass",
+    "sha": "730eed1a4f9b7dc01c41bdfff32b8b56d63debd6",
+    "server": {
+      "ramo": "claude/lavori-server",
+      "sha": "afdad1d5a95d8b1ea344a0aac9d52d983f947ed8"
+    },
+    "requestedServer": {
+      "ramo": "claude/lavori-server",
+      "sha": "afdad1d5a95d8b1ea344a0aac9d52d983f947ed8"
+    },
+    "critique": "Provato sui due rami fusi con main. Dall'ultimo giro main ha portato solo cambi alla navigazione protetta, alla ricerca nell'archivio e al salvataggio su disco, con prove nuove che non toccano i lavori server: la famiglia delle prove arrivate da main che il ramo non segue, rientrata due volte, qui non si ripete.\nLe porte dei giri passati, ri-provate, restano chiuse. Il token esce solo a un biglietto vivo, pulito e con l'ambito server su un feedback fidato, chiesto a GitHub solo per filo-security con scrittura sui file e lettura dei metadati; con margine si ridà lo stesso, sotto i dieci minuti si cambia revocando il vecchio; rilascio, sporcatura e parola d'ordine revocata lo revocano, e una revoca fallita la riprova il pacemaker; biglietto sporco o senza fiducia, senza ambito, feedback non fidato o scritto da uno sporco, semaforo scaduto o di altri e ogni repo diverso da server rifiutati senza coniare niente; il token non compare nei log. L'aiutante di credenziali, con git vero, risponde solo per filo-security su github.com in https e tace per ogni altro host, repo o percorso, sul rifiuto, sul guasto e senza biglietto. Un lavoro server fidato in mano a una sessione locale non torna in coda, mentre un giro di routine morto si recupera ancora. Un lavoro server fatto tutto nell'app torna alle routine dal giro del PC solo col registro del server vuoto. Il giro del PC con git vero: due lavori nati dallo stesso main vanno su main tutti e due, uno nato prima che main si muovesse ci va insieme a main, un commit spinto dopo la verifica resta fuori, un conflitto rimanda la pratica alle routine senza deploy, prove rosse lasciano main fermo.\nIn Gestione l'interruttore dei lavori server alle routine nasce spento, si accende e si spegne, torna indietro se il salvataggio fallisce ed è bloccato a chi non è owner; la scheda di un lavoro passato dice che aspetta il PC; il pannello del rombo azzurro di chi chiede lavoro locale nomina il pulsante che c'è sulla scheda. Le altre prove di "
+  },
+  "claude/server-fase2": {
+    "request": "Genitore: #1159 (fase 1 fusa e pubblicata il 14/10). Fase 2: il server fonde e pubblica filo-security da solo, senza il PC dell'owner. Disegno: Desktop/Filo/report/ruoli-invertiti-stato/ondata2/map-1159.md § 2.2 (cancello su filo-security con token per repo, suite su Actions dei rami e di main, fusi",
+    "verdict": "pass",
+    "sha": "7b2d835b5a726b2b7b30973ac0f3497724629018",
+    "server": {
+      "ramo": "claude/server-fase2",
+      "sha": "ca3f919a2b947f5d666972d022b3332e6504e493"
+    },
+    "requestedServer": {
+      "ramo": "claude/server-fase2",
+      "sha": "ca3f919a2b947f5d666972d022b3332e6504e493"
+    },
+    "critique": "Provato sul ramo dell'app, che adesso contiene la fusione di main fatta dopo il giro 4, e su quello del server, fermo dal giro 3. Gli unit dell'app sono verdi salvo il rosso di carico già noto e la prova del lanciatore degli unit qui sotto, che viene da main; la suite del server è verde; gli spec di Gestione sui lavori server e sui lavori locali sono verdi; la prova del giro 2 sui lavori a cavallo dei due repo è verde.\nLa fusione di main non ha rotto niente di questo lavoro e le porte dei giri passati restano chiuse. Il cancello del server rifiuta un ramo con la sicurezza bocciata, mai fatta o azzerata, e lo fonde col salto registrato; un commit del server spinto dopo il pass azzera la verifica; dal PC il server si fonde dopo l'app e non partono due pubblicazioni insieme; l'avviso delle regole dice che le pubblica GitHub. I generati del server rifatti dal ramo dell'app di adesso sono identici a quelli del ramo del server, quindi la suite di GitHub non li trova cambiati, e l'impronta delle regole si calcola sul ramo fuso.\nIl punto della fusione, il controllo di sicurezza che riceve insieme il diff del server e la spiegazione del diff vuoto, l'ho provato: un lavoro misto riceve i due diff, un lavoro solo server riceve il diff dell'app vuoto con la sua spiegazione e accanto il diff del server. In una prova con un controllo vero, sul testo esatto che riceverebbe, il controllo ha letto il diff del server e ha fermato un'eccezione al cancello nascosta in un ritocco di testo.\nRestano come erano i rimasti già nei loro feedback: la parte dell'app che va su main col salto dell'owner fuori dal cancello del server, e gli allarmi della pubblicazione da GitHub che tornano dopo la chiusura.\nNon provato davvero: le corse su GitHub, l'identità federata, la cache delle regole e i deploy. Le catture di Gestione non le ho rifatte: la fusione di main non tocca quelle schede.\n[0i] Il controllo di sicurezza di un lavoro solo server riceve due indicazioni che gli dicono di non giudicare ni"
+  },
+  "claude/routine-server": {
+    "request": "dalla cloud il server non si raggiunge: una routine separata, che ha il repo del server ed è accesa solo per i lavori fidati sul server; le routine normali non lo toccano",
+    "verdict": "pass",
+    "sha": "44a1c1f8d7d7538eeaa4554685eeb5e0e5cbf1a8",
+    "server": {
+      "ramo": "claude/routine-server",
+      "sha": "e618b5a77c30a3c4cc29c597d4490f46eccabe90"
+    },
+    "requestedServer": {
+      "ramo": "claude/routine-server",
+      "sha": "e618b5a77c30a3c4cc29c597d4490f46eccabe90"
+    },
+    "critique": "Provato sul codice del server di questo ramo, con pacemaker e canale veri su un database finto, a giornate intere di giri ogni dieci minuti. Le porte dei giri passati restano chiuse: un lavoro server da fare col contenuto scritto da un biglietto sporco, uno in verifica col ramo dell'app sporco e la chiave server a rete aperta non accendono la routine server; senza id della routine server il pacemaker scrive perché; un lavoro server pulito accende solo la routine server e lei lo prende, la routine normale no; il controllo di sicurezza di un lavoro server va alla routine normale, e quando chiede il permesso sul repo del server se lo vede negare. Prove del server verdi. Controlli dell'app: un solo rosso d'ambiente, un file fermo per il carico su un file che il ramo non tocca, verde rilanciato da solo. La famiglia dei giri 1 e 2, il conto che decide l'accensione e presume quello che il biglietto controlla, rientra per la terza volta con una porta rara: stavolta il conto presume quale chiave usa la routine server. Non provata una routine vera accesa in cloud: niente deploy né accensioni vere.\n[1i] La routine server gira su un account claude.ai, A o B, ma il pacemaker la tratta come un account a parte: le sue accensioni non contano nel tetto giornaliero di quell'account e non si fermano quando l'owner lo esclude. La riserva dei crediti invece segue già l'account giusto.\n    Passi: routine server su B, e B ha già acceso dodici volte oggi, il tetto per account; arrivano lavori server: la routine server si accende ancora, fino ad altre dodici volte, e B arriva a ventiquattro accensioni in un giorno, sopra le circa quindici del piano. Le accensioni oltre il piano possono essere respinte, e una POST respinta mette in pausa per ore l'account che accende in quel momento, la routine server o quella normale.\n    Con B escluso in Gestione, Automazioni, perché i suoi crediti servono ad altro, la routine server che gira su B si accende lo stesso e li consuma.\n[0i] Con due chiavi serv"
+  },
+  "claude/routine-server-2": {
+    "request": "Feedback #1253 «Routine separata per i lavori server». PERCHÉ: dalla cloud il clone di filo-security non passa, nemmeno col token nell'indirizzo: il proxy della sessione mette la sua credenziale, che vede solo i repo collegati alla routine. Decisione dell'owner del 16/10: una routine separata, con F",
+    "verdict": "pass",
+    "sha": "1f52f9a73185b0bb9f2fd47642cc6b8f6bd55a83",
+    "server": {
+      "ramo": "claude/routine-server-2",
+      "sha": "8451c5b977207608636702d4bd56453ad77d25ca"
+    },
+    "requestedServer": {
+      "ramo": "claude/routine-server-2",
+      "sha": "8451c5b977207608636702d4bd56453ad77d25ca"
+    },
+    "critique": "Provato con prove mie sul server, su un Firestore finto e con accensioni finte. La chiave normale a rete limitata non riceve mai un lavoro server, nemmeno con l'interruttore acceso e nemmeno col filtro su un solo feedback; la chiave server riceve solo il lavoro server fidato, col permesso sul repo del server, e a coda vuota, con solo lavoro normale, a rete aperta, a interruttore spento o con un lavoro non fidato risponde che non c'è lavoro server, mai l'esplorazione.\nIl pacemaker col solo lavoro server in coda non accende più A o B e accende la routine server col suo segreto; non accende senza id, senza segreto, con la chiave server revocata o a rete aperta, con l'account escluso, al tetto giornaliero o con un lavoro che nascerebbe sporco, e ogni volta lo scrive nel registro. Le sue accensioni contano nel tetto di B, non toccano l'alternanza e dividono con A e B il tetto delle sessioni; dopo un'accensione aspetta il sondaggio della sua chiave, che non tocca quello di A e B; il controllo di sicurezza di un lavoro server resta alla voce normale.\nI comandi rete e lavori dello strumento delle parole d'ordine, provati con risposte finte: argomenti sbagliati rifiutati senza chiamare il server, l'elenco mostra la chiave server.\nTest del server tutti verdi. Negli unit dell'app cinque rossi, tutti per disco pieno, sul controllo dell'ultima suite verde che il ramo non tocca. La prova dal vivo resta al 1221, dopo i passi dell'owner."
+  },
+  "claude/routine-server-3": {
+    "request": "dalla cloud il server non si raggiunge: una routine separata, che ha il repo del server ed è accesa solo per i lavori fidati sul server; le routine normali non lo toccano",
+    "verdict": "",
+    "sha": "",
+    "server": null,
+    "requestedServer": {
+      "ramo": "claude/routine-server-3",
+      "sha": "a74c63e7ddb365a56ed8851e5348d741a2008959"
+    },
+    "critique": ""
+  },
+  "claude/routine-server-4": {
+    "request": "dalla cloud il server non si raggiunge: una routine separata, che ha il repo del server ed è accesa solo per i lavori fidati sul server; le routine normali non lo toccano",
+    "verdict": "pass",
+    "sha": "11ae9abb97553ef856a7c6a35f54ca9c7c9afbff",
+    "server": {
+      "ramo": "claude/routine-server-4",
+      "sha": "acc0cbe693474dc3f8ed11690d9429c01da12e2a"
+    },
+    "requestedServer": {
+      "ramo": "claude/routine-server-4",
+      "sha": "acc0cbe693474dc3f8ed11690d9429c01da12e2a"
+    },
+    "critique": "Provato sul codice vero dei due rami, col pacemaker e il canale dei biglietti su un database finto. Le porte dei due giri passati restano chiuse (rilanciate tutte e sei le prove, verdi): con l'esplorazione accesa e una sessione sola il lavoro server fidato accende la routine server; un lavoro server di priorità 3 passa davanti a uno normale di priorità 0; un lavoro normale di priorità 3 passa davanti a un lavoro server di priorità 0, con una e con due sessioni; la routine server non si accende se l'account della sua parola d'ordine è nella riserva dei crediti. Prove del server verdi (1686, nessun rosso). Controlli dell'app: un solo rosso, del controllore dei tempi degli unit, che il ramo non tocca (secondo rilievo). Non provato: la routine vera dalla cloud col repo del server collegato. La famiglia dell'ordine fra lavoro server e lavoro normale torna per la terza volta: nei giri passati il pacemaker metteva sempre prima una delle due voci; adesso le confronta, ma solo per priorità e solo all'accensione.\n[1i] Il lavoro server e il lavoro di A e B non seguono lo stesso ordine della coda: la scelta fra i due la fa solo il pacemaker quando accende, e guarda solo la priorità, mentre la coda serve prima i lavori già in corso (verifica, correzione) e una sessione già viva tiene il posto col biglietto dopo.\n    Passi: una sessione, esplorazione spenta, in coda la verifica in corso di un lavoro server di priorità 0 e un lavoro normale nuovo di priorità 2: si accende A o B e la verifica del lavoro server aspetta, mentre nella coda di A e B un lavoro in verifica passa sempre davanti a uno nuovo.\n    Al contrario: un lavoro server nuovo di priorità 2 e la verifica in corso di un lavoro normale di priorità 0: si accende la routine server e la verifica del lavoro normale aspetta.\n    Una sessione di A già viva, finito un lavoro, chiede il biglietto dopo: con in coda solo un lavoro server di priorità 3 e l'esplorazione accesa (com'è di serie) riceve un'esplorazione, e il posto res"
+  }
+}
