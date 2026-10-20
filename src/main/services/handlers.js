@@ -5574,10 +5574,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // I seguiti (#1296) entrano prima di ogni chiamata al modello, dopo gli esiti del passo prima: sono parole
   // dell'utente come la domanda, e lo sanno le uscite (#810, #530, #868.6), l'archivio e la scheda.
   const seguitiLetti = [];
+  const testiDeiSeguiti = [];
   const leggiSeguiti = async () => {
     for (const s of turno.seguiti.splice(0)) {
       turno.letti.add(s.id);
       seguitiLetti.push(s.id);
+      testiDeiSeguiti.push(s.testo);
       threadMessages.push({ role: 'user', content: `${s.testo}\n\n${NOTA_SEGUITO}` });
       paroleUtente = `${paroleUtente}\n${s.testo}`;
       richiesta = `${richiesta}\n${s.testo}`;
@@ -6012,7 +6014,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
   } else {
     // I seguiti letti sono parte della domanda a cui la risposta risponde.
-    const domandaIntera = [String(userMessage || ''), ...seguitiLetti.map((id) => testiSeguiti.get(id) || '')].filter(Boolean).join('\n');
+    const domandaIntera = [String(userMessage || ''), ...testiDeiSeguiti].filter(Boolean).join('\n');
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
       .then((ok) => (ok ? maybeRunLessonAgent({ userMessage: domandaIntera, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
       .catch(() => {});
@@ -6466,6 +6468,7 @@ const handlerCtx = {
   archivioDaCancellare,
   handleFiloChat,
   fermaFiloChat,
+  seguitoFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
   controllaUscita,

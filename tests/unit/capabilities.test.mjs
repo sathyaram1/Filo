@@ -148,6 +148,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   const FILO_MSG_TO_CAP = {
     FILO_CHAT: 'filo-assistant',
     FILO_CHAT_STOP: 'filo-assistant',
+    // #1296 — il seguito scritto mentre Filo lavora.
+    FILO_CHAT_SEGUITO: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
