@@ -26,9 +26,9 @@ function contaRicerche() {
   const conto = { env: 0, git: 0 };
   const origExists = fs.existsSync;
   const origExec = cp.execFileSync;
-  const coda = join('tests', 'agent', '.env');
+  const coda = sep + join('tests', 'agent', '.env');
   fs.existsSync = function (p, ...r) {
-    if (String(p).endsWith(sep + coda) || String(p).endsWith('/tests/agent/.env')) conto.env++;
+    if (String(p).endsWith(coda)) conto.env++;
     return origExists.call(this, p, ...r);
   };
   cp.execFileSync = function (cmd, ...r) {
