@@ -131,7 +131,8 @@ test('con l’interruttore acceso la stessa coda riparte: è lui che decide, e b
 });
 
 // Finché è spenta, nessun testo promette che i passi aiutano altri utenti, e
-// dove se ne parla si dice che non escono dal computer.
+// dove se ne parla si dice che non vanno al server. Il manifesto non dice che non escono dal computer:
+// il modello dell'Aiuto li vede (#1452, tests/unit/promesseNonEsce.test.mjs).
 const leggi = (p) => readFileSync(join(ROOT, p), 'utf8');
 const PROMESSE = /chi user[àa]|aiutano chi|aiuti anche gli altri|avvantaggiat|con le altre installazioni|Serve a tutte le installazioni|Quelle che mandi tu partono|percorso che Filo condivide/i;
 const SPENTA = { skip: RACCOLTA_ACCESA ? 'raccolta accesa: i testi tornano a descriverla' : false };
