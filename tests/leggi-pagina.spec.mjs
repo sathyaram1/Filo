@@ -267,8 +267,12 @@ test('in una chat pulita la pagina che l\'utente chiede si apre anche se il suo 
     { finale: { cerca: '(x)', testo: 'FATTO.' } },
   ]);
   await chiedi(page, 'aprimi la pagina del quartiere Navile sul sito del comune di Bologna');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'FATTO.' })).toBeVisible({ timeout: 20_000 });
-  expect(await schedaVerso(app, 'comune.bologna.it')).toBe(true);
+  await expect.poll(() => schedaVerso(app, 'comune.bologna.it'), { timeout: 20_000 }).toBe(true);
+  await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
+  // Un'apertura riuscita parla da sé (#1130): il turno si chiude senza richiamare il modello.
+  expect((await chiamate(app)).length).toBe(1);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'FATTO.' })).toHaveCount(0);
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
 // Il canale dei messaggi arriva anche ai content script dei siti: se quello strato cedesse, un sito non deve poter
