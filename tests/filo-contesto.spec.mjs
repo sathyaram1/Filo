@@ -591,6 +591,7 @@ test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge inte
     { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga', da: 90_000 } }] },
     { text: 'Fatto.' },
   ]);
+  await catalogoDeiModelli(app, 1_000_000);
   await app.evaluate((_e, lungo) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: lungo, threadHistory: [], chatId: 'scheda-lunga' }), lungo);
   await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era in mezzo al testo che ti ho incollato?', threadHistory: [], chatId: 'scheda-altra' }));
   let tutte = await chiamate(app);
