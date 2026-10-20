@@ -333,6 +333,8 @@
 /* Con `pointer-events: none` la scrollbar non si potrebbe afferrare: li
    riattiviamo solo quando lo stack scorre davvero. */
 .sn-toasts.scrolling { pointer-events: auto; padding-right: 4px; }
+/* Col menu del tasto destro aperto la pila scende sotto il suo piano (2147483646). */
+.sn-toasts.sn-toasts-sotto-menu { z-index: 2147483645; }
 .sn-toasts::-webkit-scrollbar { width: 6px; }
 .sn-toasts::-webkit-scrollbar-track { background: transparent; }
 .sn-toasts::-webkit-scrollbar-thumb { background: var(--sn-border); border-radius: 3px; }
