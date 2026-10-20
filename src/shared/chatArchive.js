@@ -212,6 +212,13 @@
     return out;
   }
 
+  // Le parole di una ricerca: la punteggiatura che apre o chiude una parola non ne fa parte («Lisbona?» cerca
+  // «lisbona», #1301), quella in mezzo sì («example.com», «c++»).
+  const BORDI = /^[«»"“”‘’'`([{¿¡]+|[«»"“”‘’'`)\]}?!.,;:…]+$/gu;
+  function paroleDellaRicerca(s) {
+    return normalizeForSearch(s).split(/\s+/).map((w) => w.replace(BORDI, '')).filter(Boolean);
+  }
+
   function haystackOf(chat) {
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
     return normalizeForSearch([
