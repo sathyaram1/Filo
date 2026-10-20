@@ -242,7 +242,7 @@ async function main() {
     console.warn('[bake] FILO_BUILD_PASSPHRASE assente: uso solo i secret d\'ambiente FILO_DEFAULT_*.');
   }
 
-  const { apiKeys: remote, esito: esitoServer } = await fetchRemoteKeys(passphrase);
+  const { apiKeys: remote, esito: esitoServer } = await chiaviDalServer(passphrase);
 
   const pick = (remoteKey, envName) => {
     const r = typeof remote[remoteKey] === 'string' ? remote[remoteKey].trim() : '';
