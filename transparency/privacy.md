@@ -115,7 +115,7 @@ Il documento di un giorno porta uno pseudonimo. È un codice casuale che Filo ge
 
 Con il login Google, poi, escono i totali per funzione del documento descritto fra i crediti, legati alla tua email. Quelli non sono i contatori, e non si spengono con loro. Cosa rispondi alle conferme di Filo non arriva al server.
 
-Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i passi di una guida riuscita su un sito, perché chi lo visita dopo ne approfitti, ma la raccolta è spenta. I tuoi percorsi non escono dal tuo computer, e Filo non te lo chiede nemmeno.
+Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i passi di una guida riuscita su un sito, perché chi lo visita dopo ne approfitti, ma la raccolta è spenta. I tuoi percorsi non arrivano al server, e Filo non te lo chiede nemmeno.
 
 Leggerli invece sì. Quando apri l'Aiuto su una pagina, o gli fai una domanda, Filo chiede al server i percorsi già noti per quel sito, e la richiesta porta il nome del sito, per esempio posta.esempio.it, senza il resto dell'indirizzo e senza il tuo account. Gli indirizzi numerici e le pagine della rete di casa restano fuori. La richiesta legge e basta: nel database non resta niente.
 
