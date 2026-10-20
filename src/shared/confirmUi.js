@@ -246,11 +246,13 @@
       if (e.key === 'Escape' && !copre) { e.preventDefault(); e.stopPropagation(); done(false); }
     }
     doc.addEventListener('keydown', onKey, true);
-    // Un clic sul velo di un avviso non toglie il fuoco al campo della parola.
+    // Un clic sul velo di un avviso non toglie il fuoco al campo della parola. Il clic fuori di un gesto già partito
+    // (il secondo di un doppio clic sul pulsante, un clic mentre il riquadro compare da solo) non annulla: vale la stessa
+    // pausa del sì (#449, #1296). Esc e Annulla restano immediati.
     overlay.addEventListener('mousedown', (e) => {
       if (e.target !== overlay) return;
       if (copre) e.preventDefault();
-      else done(false);
+      else if (!troppoPresto(e)) done(false);
     });
     const segnale = opzioni && opzioni.segnale;
     if (segnale && typeof segnale.addEventListener === 'function') segnale.addEventListener('abort', () => done(false), { once: true });
