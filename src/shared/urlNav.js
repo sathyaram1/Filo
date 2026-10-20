@@ -235,7 +235,24 @@
         return scheme + raw;
       }
     }
-    return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
+    return RICERCA + encodeURIComponent(raw);
+  }
+  const RICERCA = 'https://www.google.com/search?q=';
+
+  // Quello che l'assistente chiede di aprire non diventa mai una ricerca (per cercare ha la sua azione, #1318 giro 1):
+  // un indirizzo di posta senza «mailto:» va al programma di posta, il resto è '' e l'assistente lo sa.
+  const POSTA_NUDA = /^[^\s@<>()"'`,;:\\/]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
+  function indirizzoChiesto(input) {
+    const s = String(input == null ? '' : input).trim();
+    const url = indirizzoDaCaricare(s);
+    if (url !== RICERCA + encodeURIComponent(s)) return url;
+    const posta = senzaIncarti(s);
+    return POSTA_NUDA.test(posta) ? `mailto:${posta}` : '';
+  }
+  // Ha la forma di un percorso anche dove Filo non sa dove porta: relativo, con una variabile, con le barre di Windows.
+  function sembraPercorso(input) {
+    const s = pulisciPercorso(input);
+    return /\\/.test(s) || /^(?:\.{1,2}[\\/]|[/~]|%[^%\s]+%|\$[a-z_]+)/i.test(s);
   }
 
   // Quello che diventa un indirizzo scritto da un modello o dall'interfaccia di Filo: con uno schema vero si carica com'è,
