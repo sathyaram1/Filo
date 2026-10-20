@@ -278,6 +278,26 @@ test('chat dell’Editor senza invito: la risposta mancata è segnata come error
   await siApre(app, 'filo://credits');
 });
 
+test('chat dei mazzi senza invito: «Apri Crediti» viene prima di «Riprova» e porta lì', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await senzaChiave(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  await page.fill('#chatInput', 'modi per dare haste alle creature');
+  await page.press('#chatInput', 'Enter');
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla.locator('.dk-msg-error')).toContainText(/invito|Crediti/, { timeout: 30_000 });
+  const tasti = bolla.locator('button.dk-retry');
+  await expect(tasti.first()).toHaveText('Apri Crediti');
+  await expect(tasti.nth(1)).toContainText('Riprova');
+  await page.screenshot({ path: `${SHOTS}/663-mazzi-chat.png` }).catch(() => {});
+  await tasti.first().click();
+  await siApre(app, 'filo://credits');
+});
+
 // Il router finto nel main: il catalogo dice che il modello scelto per la chat lo servono solo host esclusi.
 async function soloHostEsclusi(app) {
   await app.evaluate(async () => {
