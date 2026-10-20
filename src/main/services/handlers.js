@@ -5029,15 +5029,18 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let filo = null;
   let tettiChat = null;
   let modelloChat = '';
+  let settingsChat = null;
   let fotoNelTratto = true;
   const componiFilo = (tetti) => ContestoFilo.componi({
     chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
     immagini: fotoNelTratto && !modelliSenzaFoto.has(modelloChat),
   });
   try {
-    const settingsChat = await getEffectiveSettings();
+    settingsChat = await getEffectiveSettings();
     tettiChat = globalThis.SN_FILO_CONTESTO.tetti(settingsChat.contestoFilo, Defaults.get().contestoFilo);
     try { modelloChat = String(modelForAction(settingsChat, ACTIONS.FILO_CHAT) || ''); } catch (_) {}
+    // Chiesta adesso, la finestra del modello c'è quando una rilettura di questo turno ne avrà bisogno.
+    finestraNota(settingsChat, modelloChat);
     const finestra = finestreDeiModelli.get(modelloChat);
     if (finestra != null && finestra < tettiChat.token) tettiChat = { ...tettiChat, token: finestra };
     filo = await componiFilo(tettiChat);
