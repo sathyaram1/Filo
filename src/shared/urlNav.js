@@ -310,6 +310,6 @@
   global.SN_URL_NAV = {
     isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
-    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
+    normalizeUrl, indirizzoDaCaricare, percorsoPulito, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
