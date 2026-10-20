@@ -465,13 +465,14 @@ test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima 
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreProvider3 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     let n = 0;
+    const vista = new Promise((r) => { globalThis.__argomenti = r; });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta, onToolCall }) => {
       n += 1;
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (n === 1) {
         try { onToolCall && onToolCall({ id: 't1', name: 'TIMER' }); } catch (_) {}
-        // Gli argomenti «arrivano» dopo: nel frattempo la riga deve già dirlo.
-        await new Promise((r) => setTimeout(r, 2500));
+        // Gli argomenti «arrivano» quando la prova ha visto la riga: nel frattempo la riga deve già dirlo.
+        await vista;
         return { ...base, text: '', toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":60,"etichetta":"Uovo"}' }], reasoningDetails: [], finishReason: 'tool_calls' };
       }
       try { onDelta && onDelta('Un minuto, via.'); } catch (_) {}
