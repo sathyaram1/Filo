@@ -86,15 +86,17 @@ function domandaDelModello() {
   assert.ok(m, 'il pezzo ha il modello JSON della domanda');
   const d = JSON.parse(m[1].split('<payload.id>').join(FEEDBACK_ID));
   d.gruppo = 'guasto: filo-security';
-  d.contesto = 'Clonavo il server per il lavoro. Il messaggio: «fatal: unable to access: 403».';
+  d.contesto = 'Clonavo il server per il lavoro: GitHub ha risposto che a questa sessione manca il permesso di leggerlo.';
+  d.notePerAgenti = 'git-server clone: «fatal: unable to access: 403». Respinto da GitHub, non dal proxy.';
   return d;
 }
 
-test('il modello della domanda passa i controlli del server, con le tre strade e il feedback legato', () => {
+test('il modello della domanda passa i controlli del server, con le strade, la riparazione e il feedback legato', () => {
   const v = D.validaDomanda(domandaDelModello(), { conOrigine: false });
   assert.ok(v.ok, `${v.errore}: ${v.dettaglio}`);
   assert.deepEqual(v.domanda.opzioni.map((o) => o.azione), [
     { tipo: 'riprendi', feedbackId: FEEDBACK_ID },
+    { tipo: 'compito' },
     { tipo: 'approva_locale', feedbackId: FEEDBACK_ID },
     { tipo: 'archivia', feedbackId: FEEDBACK_ID },
   ]);
