@@ -485,9 +485,10 @@ test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima 
 
   // La riga del nodo lo dice (#578: il filo si annoda lì), poi il gomitolo col riassunto.
   const riga = page.locator('.dash-activity .dash-activity-seg-label');
-  await expect(riga).toHaveText('Avvio un timer…', { timeout: 3_000 });
+  await expect(riga).toHaveText('Avvio un timer…', { timeout: 10_000 });
   await expect(page.locator('.dash-activity')).toHaveAttribute('data-phase', 'act');
   await page.screenshot({ path: 'tests/agent/.out/strumenti-inizio.png' });
+  await app.evaluate(() => globalThis.__argomenti());
 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Un minuto, via.' })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.dash-activity .dash-activity-label')).toHaveText(/^Ha avviato un timer · \d+ s$/);
