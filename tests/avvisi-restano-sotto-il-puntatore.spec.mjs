@@ -274,7 +274,13 @@ test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avvi
   await page.locator('#basso').click({ button: 'right' });
   const voce = menuDi(page).voce('Invia feedback');
   await expect(voce).toBeVisible();
-  const v = await voce.boundingBox();
+  // La spiegazione del collegamento cambia l'altezza del menu appena arriva: si misura a menu fermo.
+  let v = null;
+  await expect.poll(async () => {
+    const prima = JSON.stringify(v);
+    v = await voce.boundingBox();
+    return prima === JSON.stringify(v);
+  }, { intervals: [300] }).toBe(true);
   const x = Math.max(a.x, v.x) + 6;
   const y = (Math.max(a.y, v.y) + Math.min(a.y + a.height, v.y + v.height)) / 2;
   expect(x < Math.min(a.x + a.width, v.x + v.width) && y > a.y && y < a.y + a.height, 'la voce non cade sull’avviso').toBe(true);
