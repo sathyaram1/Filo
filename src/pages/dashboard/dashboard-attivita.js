@@ -2005,10 +2005,10 @@
           const r = await send({ type: MSG.FOCUS_TAB, id: bgTabId });
           // Se quella scheda nel frattempo è stata chiusa, il riferimento deve
           // comunque funzionare: riapre il link invece di non fare nulla.
-          if (!r || !r.ok) apriProposta(a.url || '', btn);
+          if (!r || !r.ok) apriProposta(url, btn);
         });
       } else {
-        btn.href = a.url || '#';
+        btn.href = url || '#';
         btn.target = '_blank';
         btn.rel = 'noopener';
         btn.title = `Riapri ${label}`;
