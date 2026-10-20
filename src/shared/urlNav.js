@@ -232,6 +232,17 @@
     return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
   }
 
+  // Quello che diventa un indirizzo scritto da un modello o dall'interfaccia di Filo: con uno schema vero si carica com'è,
+  // il resto come lo legge la barra. «localhost:3000» e «nas.lan:5000» sembrano uno schema ma sono host e porta, e un
+  // percorso fra virgolette è un file: presi per schemi venivano fermati come indirizzi ignoti (#1318).
+  const HOST_E_PORTA = /^[a-z0-9.-]+:\d{1,5}(?:[/?#]|$)/i;
+  function indirizzoDaCaricare(input) {
+    const s = String(input == null ? '' : input).trim();
+    if (!s) return '';
+    if (/^[a-z][a-z0-9+.-]*:/i.test(s) && !/^[a-z]:[\\/]/i.test(s) && !HOST_E_PORTA.test(s)) return s;
+    return normalizeUrl(s);
+  }
+
   // Il token digitato (SENZA la "/" iniziale) è un indirizzo da aprire?
   // Stretta di proposito: deve distinguere un indirizzo da un comando shell.
   //   - niente spazi;
