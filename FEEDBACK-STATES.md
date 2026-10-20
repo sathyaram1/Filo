@@ -134,10 +134,12 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   con quello che ha fermato, anche gli altri rilievi interni della stessa critica
   (`sospesi`): chi riprende li chiude, il giro dopo non li riscopre.
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
-  (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
-  (riallineamento: main è avanzato e il merge non passa più da solo — non è una
-  bocciatura di qualità, il contatore M non si muove; il ramo viene ribasato e
-  ripassa verifica e sicurezza sul contenuto nuovo).
+  (`statusReason: loop`); —conflitto di fusione, o unit rossi sul risultato
+  della fusione→ `revision_capability` (riallineamento: main è avanzato e il
+  merge non passa più da solo — non è una bocciatura di qualità, il contatore M
+  non si muove; il ramo viene ribasato e ripassa verifica e sicurezza sul
+  contenuto nuovo). Chi ribasa non corregge gli unit rossi: li elenca, e chi
+  verifica ne fa rilievi interni (#1204).
 - `design` —fusione bloccata da L5, approvata dall'owner e finita in conflitto→
   `revision_capability` in DUE passi: la riapertura `design → todo` a nome
   dell'owner (il click di approvazione è la sua decisione) e il rientro

@@ -207,7 +207,7 @@ diventa un **muro**.
 | Ruolo | Riceve | NON riceve |
 |---|---|---|
 | `new-work` | il testo del suo feedback | — |
-| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni conflitto di fusione (dispatch a chi lavora consegna solo il feedback) | i rilievi di una verifica: li corregge chi li ha scritti |
+| `fixer` | il feedback e la critica di riallineamento che il server scrive a ogni fusione fermata (un conflitto, o gli unit rossi sul risultato della fusione con il loro elenco: chi riallinea li elenca nel report e non li corregge, #1204) | i rilievi di una verifica: li corregge chi li ha scritti |
 | `verifier` | il **sintomo** (il feedback), il ramo, la serie delle critiche passate coi livelli; **dopo** aver registrato la critica, la risposta del server (feedback #561) | il diff, il report di chi ha risolto, la risposta del server prima della critica |
 | `secaudit` | **solo ramo e diff** | qualunque campo del feedback |
 
@@ -220,7 +220,9 @@ server:
   (Gestione → Automazioni, spento di serie). `rilievi` sono i rilievi corretti
   in quel giro, `shaPrima` il commit su cui era stata scritta la critica;
 - `riallineamento`, con `perimetro: { shaVerificato?, reportRebase? }`: il
-  lavoro era verificato e un conflitto di fusione è stato risolto a mano.
+  lavoro era verificato e la base è stata rifatta su main, dopo un conflitto
+  di fusione o dopo unit rossi sul risultato della fusione. Chi verifica
+  rilancia gli unit: ogni rosso è un rilievo interno.
 
 dispatch sceglie il testo del ruolo dall'ambito (`verifier-chiusura.md`,
 `verifier-riallineamento.md`) e scrive il perimetro in coda al compito, come

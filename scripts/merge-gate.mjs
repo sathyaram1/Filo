@@ -357,6 +357,13 @@ export function testoEsitoServer(esito) {
   return `${testi[esito] || `esito «${String(esito || '?')}»`}. Niente da fare qui: rilascia il biglietto.`;
 }
 
+/** Il fermo per unit rossi sulla fusione. Chi riallinea non li corregge: li giudica la verifica (#1204). PURA. */
+export function testoUnitRossi() {
+  return '[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con '
+    + 'l\'elenco dei test rotti: chi riallinea rifà solo la base, e quei test li giudica come rilievi la verifica che '
+    + 'segue. Da qui non c\'è altro da fare.';
+}
+
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 const USO = [
@@ -503,9 +510,7 @@ async function main() {
     // chi legge il registro creda che il ramo sia perduto.
     if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
   }
-  else if (code === 20 && reply.result === 'unit_rossi') {
-    console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
-  }
+  else if (code === 20 && reply.result === 'unit_rossi') console.error(testoUnitRossi());
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
   else if (code === 30) console.error(`[merge-gate] SERVER: ${testoEsitoServer(reply.esito)}`);
   else console.error(testoRifiutoServer(reply.reason) || `[merge-gate] ERROR: ${reply.reason || 'guasto'}`);

@@ -20,8 +20,8 @@
 //     `fixer` è il riallineamento del ramo dopo un conflitto di fusione. I
 //     rilievi di una verifica NON passano più di qui: li corregge chi li ha
 //     scritti, con le istruzioni che il server gli stampa dopo la critica.
-//     Il server accompagna OGNI riallineamento con una critica sua (dice che è
-//     un conflitto): non è un rilievo, e qui non si consegna a chi riallinea.
+//     Il server accompagna OGNI riallineamento con una critica sua (conflitto,
+//     o unit rossi sulla fusione): non è un rilievo, è il perché del rebase.
 //   - A ogni ruolo LAVORANTE viene ACCODATO il contratto comune
 //     (routines/roles/_contratto-worker.md): il testo di ritorno del worker
 //     non è un canale, tutto va registrato via script.
@@ -843,7 +843,8 @@ export function buildPayload(bucket, ctx = {}) {
         };
       }
       // Riallineamento del ramo: il lavoro era già verificato, quindi niente serie. Il perché lo scrive il server
-      // (conflitto, o unit rossi sulla fusione con l'elenco dei test, #929): senza, chi riallinea non sa cosa far tornare verde.
+      // (conflitto, o unit rossi sulla fusione con l'elenco dei test, #929): senza, chi riallinea non sa perché la fusione
+      // si è fermata. Quei test non li corregge lui (#1204).
       return {
         case: 'riallineamento',
         branch: bucket.branch,
