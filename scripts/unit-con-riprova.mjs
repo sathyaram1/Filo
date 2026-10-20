@@ -24,8 +24,9 @@ export function fileRossi(registro, radice) {
  */
 export function corsaIncompleta(registro) {
   const testo = String(registro || '');
-  // Solo sulle righe del lanciatore: il titolo di un test che le cita toglieva la riprova a tutta la corsa (#1457).
-  const dice = (frase) => new RegExp(`^\\[test:unit\\] .*${frase}`, 'm').test(testo);
+  // Solo nei messaggi del lanciatore: il titolo di un test che cita la frase toglieva la riprova a tutta la corsa
+  // (#1457). Niente ancora a inizio riga: stdout e stderr arrivano mischiati, e un messaggio può cadere a metà riga.
+  const dice = (frase) => new RegExp(`\\[test:unit\\] [^\\n]*${frase}`).test(testo);
   if (dice('la corsa è stata chiusa')) return 'un file non è andato avanti e la corsa è stata chiusa';
   if (dice('interrotto al gruppo')) return 'la corsa è stata interrotta a metà';
   if (dice('ross[oi] senza un test rosso registrato')) return 'un gruppo è uscito rosso senza un test rosso registrato';
