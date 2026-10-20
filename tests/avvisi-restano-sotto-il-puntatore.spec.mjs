@@ -288,7 +288,7 @@ test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avvi
   await page.mouse.move(x, y, { steps: 3 });
   await page.waitForTimeout(150);
   await page.mouse.click(x, y);
-  await expect(page.locator('.sn-fb-overlay')).toBeVisible();
+  await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false).toBe(true);
   await expect(page.locator('.sn-toast', { hasText: 'Il menu era coperto' })).toHaveCount(0);
 });
 
