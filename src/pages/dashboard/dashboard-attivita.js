@@ -1982,9 +1982,15 @@
       // apre la scheda). Questo chip resta come riferimento per RIAPRIRLO, ma deve
       // SEMPRE avere un'etichetta leggibile: il favicon da solo, senza testo, era
       // il bottone "misterioso" del feedback. Mostriamo favicon + nome del sito.
+      // L'indirizzo che il main ha aperto, non quello scritto: «localhost:3000» o «sito.it/x» come href non riaprono niente (#1318).
+      const url = (self.SN_URL_NAV && a.url && self.SN_URL_NAV.indirizzoDaCaricare(a.url)) || a.url || '';
       let label = String(a.label || a.etichetta || '').trim();
       if (!label) {
-        try { label = new URL(a.url).hostname.replace(/^www\./, ''); } catch (_) { label = a.url || 'Apri'; }
+        try {
+          const u = new URL(url);
+          label = u.protocol === 'mailto:' ? decodeURIComponent(u.pathname) : u.hostname.replace(/^www\./, '');
+        } catch (_) { label = ''; }
+        label = label || url || 'Apri';
       }
       // #376 — aperto in SECONDO PIANO: la scheda esiste già e sta suonando
       // dietro. Il chip allora non è più "riapri" ma "portami lì": attiva
