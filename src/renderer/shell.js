@@ -2203,8 +2203,6 @@
       ensurePanel();
       panelOpen = true;
       panel.hidden = false;
-      dlBtn.hidden = indicatoreNascosto();
-      dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
       // I file possono essere spariti dal disco mentre il pannello era chiuso
@@ -2214,29 +2212,15 @@
     }
     function closePanel() {
       panelOpen = false;
-      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre
-      // un programma in attesa resta in attesa (l'indicatore lo conta).
+      // Chiudere il pannello è non rispondere: «aprirlo?» si ritira, mentre un programma in attesa resta in
+      // attesa, e la risposta si dà dalla pagina Download o dalla carta della home.
       domandeApri.clear();
       avvisiRiga.clear();
       firmaElenco = '';
       if (panel) panel.hidden = true;
-      dlBtn.classList.remove('open');
-      dlBtn.hidden = indicatoreNascosto();
       riservaSopra('scaricamenti', 0);
     }
-    function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
-    dlBtn.addEventListener('click', togglePanel);
-
-    function seguiScheda(snap) {
-      const a = snap && Array.isArray(snap.tabs) ? snap.tabs.find((t) => t.id === snap.activeId) : null;
-      const home = isHomeUrl(a ? a.url : null);
-      if (home === suHome) return;
-      suHome = home;
-      aggiornaPannello();
-    }
-    api.tabs.onUpdate(seguiScheda);
-    api.tabs.snapshot().then(seguiScheda).catch(() => {});
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
