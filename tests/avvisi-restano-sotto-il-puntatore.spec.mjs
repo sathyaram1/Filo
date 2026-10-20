@@ -231,11 +231,13 @@ test('tema scuro: l’avviso col puntatore sopra si schiarisce appena e il testo
   expect(luce(testo) - luce(sopra)).toBeGreaterThan(100);
 });
 
-// Le voci del menu con un punto (centro o angoli) che non è del menu: qualcosa le copre.
+// Le voci del menu con un punto (su una griglia fitta) che non è del menu: qualcosa le copre.
 const vociCoperte = (page) => menuDi(page).valuta(() => [...document.querySelectorAll('.sn-menu .sn-menu-item')].filter((v) => {
   const r = v.getBoundingClientRect();
-  const punti = [[r.left + 2, r.top + 2], [r.right - 2, r.top + 2], [r.left + 2, r.bottom - 2], [r.right - 2, r.bottom - 2],
-    [(r.left + r.right) / 2, (r.top + r.bottom) / 2]];
+  const punti = [];
+  for (let i = 0; i <= 10; i++) {
+    for (const y of [r.top + 2, (r.top + r.bottom) / 2, r.bottom - 2]) punti.push([r.left + 2 + (r.width - 4) * i / 10, y]);
+  }
   return punti.some(([x, y]) => !document.elementFromPoint(x, y)?.closest('.sn-menu'));
 }).map((v) => v.textContent.trim()));
 
