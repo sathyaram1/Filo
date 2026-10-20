@@ -71,11 +71,15 @@ test('A — mentre ragiona scorre la trama e un clic la apre; a fine lavoro il r
       'Quindi soppeso le possibili risposte una per una.',
       'Infine scelgo la formulazione più chiara e utile.',
     ];
+    // La risposta parte quando la prova ha finito di guardare il ragionamento in corso: sotto carico 3,6 s non
+    // bastavano ai suoi clic (#1321).
+    const guardato = new Promise((r) => { globalThis.__rispondi = r; });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onReasoning, onDelta }) => {
       for (const t of thoughts) {
         try { onReasoning && onReasoning(t + ' '); } catch (_) {}
-        await new Promise((r) => setTimeout(r, 900));
+        await new Promise((r) => setTimeout(r, 300));
       }
+      await guardato;
       const text = JSON.stringify({
         text: 'Ecco la risposta finale.',
         actions: [{ type: 'TIMER', seconds: 300, label: 'Pasta' }],
