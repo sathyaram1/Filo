@@ -112,5 +112,21 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   cappio e dell'avvolgimento sono token estetici (`filo.trama.opacity`,
   `filo.nodo.durata`, `filo.gomitolo.durata`): nelle impostazioni avanzate e
   chiedendolo a Filo.
+- **La diretta si chiude sul segno di fine, non sulla risposta (#1321).** Il
+  main racconta il turno con `webContents.send` e alla fine risponde
+  all'invoke; nella scheda i due arrivano su code diverse, e con la scheda
+  occupata la risposta passa davanti agli eventi rimasti in coda (bloccata due
+  secondi, tre volte su tre). La chat chiudeva la diretta alla risposta e il
+  blocco perdeva la nota a metà turno o l'ultimo pensiero, mentre la bolla
+  della nota diventava la risposta e nient'altro lo tradiva. Il main manda
+  `filo:action` `{ kind: 'fine' }` dietro all'ultimo evento e scrive
+  `diretta: true` nella risposta (`chiudiDiretta`, handlers/filo.js); la scheda
+  aspetta quel segno prima di chiudere (`direttaFinita`, `runFiloTurn`). Senza
+  la promessa nella risposta non aspetta, così un turno caduto prima di
+  cominciare non appende la chat. Una pagina che riceve eventi in diretta
+  durante un invoke fa così, o si fa portare tutto dalla risposta (la chat dei
+  mazzi rimanda il ragionamento intero). Prova: «A2» in
+  `tests/dashboard-chat-strumenti.spec.mjs`, che trattiene gli eventi nel main
+  finché la risposta è arrivata; senza la correzione la nota manca.
 - Test: `tests/filo-attesa.spec.mjs` (filo, nodi, gomitolo, fermare e
   riprendere, con screenshot), `tests/dashboard-chat-attivita.spec.mjs`.
