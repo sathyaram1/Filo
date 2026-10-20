@@ -238,7 +238,6 @@
   const HOST_E_PORTA = /^[a-z0-9.-]+:\d{1,5}(?:[/?#]|$)/i;
   function indirizzoDaCaricare(input) {
     const s = String(input == null ? '' : input).trim();
-    if (!s) return '';
     if (/^[a-z][a-z0-9+.-]*:/i.test(s) && !/^[a-z]:[\\/]/i.test(s) && !HOST_E_PORTA.test(s)) return s;
     return normalizeUrl(s);
   }
