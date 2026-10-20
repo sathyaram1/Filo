@@ -184,6 +184,21 @@ function esitiDellaScheda(storia, chatMsgs) {
   return out;
 }
 
+// Le pagine che il filo ha ancora (visitate o schede chiuse): una pagina trovata da una ricerca e poi cancellata dalla
+// Sicurezza non torna al modello (#1301). Una pagina delicata dice solo il sito, e vale finché il sito ha una pagina.
+const senzaAncora = (u) => String(u || '').replace(/#.*$/, '');
+const sitoDi = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return ''; } };
+async function pagineCheCiSono(incognito) {
+  const url = new Set();
+  const siti = new Set();
+  try {
+    const tutte = [...await F().pagine(null, { incognito }), ...await globalThis.SN_ARCHIVED_TABS.list()];
+    for (const p of tutte) if (p && p.url) { url.add(senzaAncora(p.url)); siti.add(sitoDi(p.url)); }
+  } catch (_) { return () => true; }
+  return (p) => (p.delicata ? siti.has(sitoDi(p.url)) : url.has(senzaAncora(p.url)));
+}
+const conPagine = (azioni) => Array.isArray(azioni) && azioni.some((a) => a && a._output && Array.isArray(a._output.pagine) && a._output.pagine.length);
+
 const ancore = { normale: null, incognito: null };
 
 // `osserva(azioni)` scrive gli esiti per il modello (handlers.js). Ritorna il tratto da mandare e quello che serve alle
