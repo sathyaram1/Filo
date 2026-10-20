@@ -1297,9 +1297,8 @@
         // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
         // {…}») non dice niente a chi ha finito i crediti (#663).
         scrollaConservando(popup, () => {
-          bubble.text.textContent = frasePerLUtente(m);
+          scriviErrore(bubble.text, m);
           bubble.wrap.classList.add('sn-msg-error');
-          mostraRimedio(bubble.text, m);
         }, true);
         popup.activePort = null;
       }
