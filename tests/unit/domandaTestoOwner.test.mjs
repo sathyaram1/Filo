@@ -88,7 +88,7 @@ test('un pro vuoto come «Nessuno» si rifiuta; un pro assente resta ammesso', (
     'il contro non è il pro');
 });
 
-test('più campi sporchi: un rifiuto solo li elenca tutti, così si corregge in un giro', () => {
+test('più campi sporchi: un rifiuto solo li elenca tutti, così si correggono insieme', () => {
   const r = D.validaDomanda(pulita({ titolo: 'Guasto — clone', contesto: 'Vedi dispatch.mjs.' }), { conOrigine: false });
   assert.equal(r.campo, 'titolo');
   assert.deepEqual(r.campi, ['titolo', 'contesto']);
