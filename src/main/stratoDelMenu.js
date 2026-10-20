@@ -361,13 +361,21 @@ class StratoDelMenu {
     if (m) this._alContent(m, { type: msg().STRATO_MENU_CHIUSO, id: m.id });
   }
 
-  // Dal layout delle schede: un'altra scheda davanti, o la sua area cambiata (schermo intero, barra compatta,
-  // finestra ridimensionata), e il punto non indica più quello che l'utente aveva cliccato.
+  // Dal layout delle schede: un'altra scheda davanti, o nessuna, chiude. La stessa scheda con l'area cambiata
+  // (finestra accorciata, barra compatta) no: chi la rimpicciolisce non annulla il menu (#500), lo strato la segue e il
+  // menu rientra da sé al resize della sua pagina.
   posa() {
     if (!this.aperto) return;
     let davanti = null;
     try { davanti = this.schedaAttiva(); } catch (_) { davanti = null; }
-    if (davanti !== this.aperto.wc || !stessaArea(this._area(), this.aperto.area)) { this.nascondi(); return; }
+    const area = this._area();
+    if (davanti !== this.aperto.wc || !area) { this.nascondi(); return; }
+    if (!stessaArea(area, this.aperto.area)) {
+      this.aperto.area = area;
+      this.aperto.punto = puntoNellArea(this.aperto.punto, area);
+      const vista = this.vista;
+      if (vista && !vista.webContents.isDestroyed()) vista.setBounds(area);
+    }
     this.inCima();
   }
 
