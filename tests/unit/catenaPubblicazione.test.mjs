@@ -108,13 +108,19 @@ describe('il tag v* lo crea l\'app di pubblicazione, quando c\'è', () => {
   const iBuild = ps.findIndex((p) => /run:\s*npm run release\s*$/m.test(p));
   const iNumero = ps.findIndex((p) => /scripts\/release-bump\.mjs/.test(p));
   const COL_FALLBACK = /GH_TOKEN:\s*\$\{\{\s*steps\.app\.outputs\.token\s*\|\|\s*secrets\.GITHUB_TOKEN\s*\}\}/;
+  // I nomi che la guida fa creare all'owner nell'ambiente: con un altro nome il passo si salta muto e il tag
+  // lo crea il GITHUB_TOKEN (#1406). Si cambia il codice, non la sua configurazione.
+  const APP_ID = 'FILO_PUBLISH_APP_ID';
+  const APP_KEY = 'FILO_PUBLISH_APP_KEY';
+  const NOMI_GUIDA = `l'app si legge da vars.${APP_ID} e secrets.${APP_KEY}, i nomi configurati nell'ambiente`;
 
   test('il token dell\'app si conia solo se la variabile c\'è, prima del numero di versione', () => {
     assert.ok(iApp >= 0, 'manca il passo che conia il token dell\'app: con la regola sui tag accesa la versione non uscirebbe');
     assert.match(ps[iApp], /^\s*id:\s*app\s*$/m);
-    assert.match(ps[iApp], /if:[^\n]*vars\.FILO_RILASCIO_APP_ID != ''/,
+    assert.match(ps[iApp], new RegExp(`if:[^\\n]*vars\\.${APP_ID} != ''`),
       'senza la condizione sulla variabile il passo fallisce finché l\'app non esiste, e non esce più niente');
-    assert.match(ps[iApp], /private-key:\s*\$\{\{\s*secrets\.FILO_RILASCIO_APP_KEY\s*\}\}/);
+    assert.match(ps[iApp], new RegExp(`app-id:\\s*\\$\\{\\{\\s*vars\\.${APP_ID}\\s*\\}\\}`), NOMI_GUIDA);
+    assert.match(ps[iApp], new RegExp(`private-key:\\s*\\$\\{\\{\\s*secrets\\.${APP_KEY}\\s*\\}\\}`), NOMI_GUIDA);
     assert.ok(iNumero > iApp && iBuild > iNumero,
       'il token va coniato prima del numero di versione: un\'app configurata male non deve consumarne uno');
   });
