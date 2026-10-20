@@ -578,6 +578,7 @@
     search,
     searchWide,
     paroleDellaRicerca,
+    PEZZO_RILETTURA,
     terminiCheDistinguono,
     snippetFor,
     toStoredMessage,
