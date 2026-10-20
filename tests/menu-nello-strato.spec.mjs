@@ -461,7 +461,12 @@ test.describe('il menu nello strato', () => {
     await strato.keyboard.press('Escape');
     await chiusoLoStrato(app);
 
-    await page.evaluate(() => { getSelection().removeAllRanges(); window.scrollTo(0, 0); });
+    // La pagina ferma in cima prima del tasto destro: uno scorrimento ancora in arrivo chiude il menu normale appena aperto.
+    await expect.poll(() => page.evaluate(() => new Promise((ok) => {
+      getSelection().removeAllRanges();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      setTimeout(() => ok(window.scrollY), 250);
+    }))).toBe(0);
     await page.mouse.click(300, 300, { button: 'right' });
     await apertoNelloStrato(app, page);
     await strato.mouse.move(900, 500);
@@ -474,8 +479,8 @@ test.describe('il menu nello strato', () => {
     const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;font:16px sans-serif;height:4000px">
       <div style="height:55vh"></div><a id="link" href="https://example.com/a">un collegamento</a></body>`);
     await page.locator('#link').click({ button: 'right' });
-    await apertoNelloStrato(app, page);
     const menu = menuDi(page);
+    await expect(menu.principale).toBeVisible();
     const prima = await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
       const b = w.getBounds();
@@ -498,6 +503,10 @@ test.describe('il menu nello strato', () => {
   });
 
   test('la pagina che scorre da tastiera o da sola chiude il menu normale, quello di una selezione resta', async ({ app, openTab, testServer }) => {
+    const inCima = (page) => expect.poll(() => page.evaluate(() => new Promise((ok) => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      setTimeout(() => ok(window.scrollY), 250);
+    }))).toBe(0);
     await pronto(app);
     const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;font:16px sans-serif;height:4000px">
       <p id="testo" style="margin:40px">Una frase da selezionare qui.</p>
@@ -507,20 +516,23 @@ test.describe('il menu nello strato', () => {
     await page.keyboard.press('PageDown');
     await chiusoLoStrato(app);
 
-    await page.evaluate(() => window.scrollTo(0, 0));
+    // Lo scorrimento morbido di Pagina giù va lasciato finire: un suo evento ancora in arrivo chiuderebbe il menu nuovo.
+    await inCima(page);
     await page.locator('#link').click({ button: 'right' });
     await apertoNelloStrato(app, page);
     await page.evaluate(() => window.scrollBy(0, 200));
     await chiusoLoStrato(app);
 
-    await page.evaluate(() => {
-      window.scrollTo(0, 0);
+    await inCima(page);
+    const p = await page.evaluate(() => {
       const r = document.createRange();
       r.selectNodeContents(document.getElementById('testo'));
       getSelection().removeAllRanges();
       getSelection().addRange(r);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
     });
-    await page.locator('#testo').click({ button: 'right' });
+    await page.mouse.click(p.x, p.y, { button: 'right' });
     await apertoNelloStrato(app, page);
     await page.evaluate(() => window.scrollBy(0, 200));
     await page.waitForTimeout(500);

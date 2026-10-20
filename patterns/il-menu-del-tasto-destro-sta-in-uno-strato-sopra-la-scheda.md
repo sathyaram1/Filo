@@ -25,11 +25,14 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   riquadri incorporati (Chromium li riporta alla vista principale), uguali con lo schermo al 125%. Mai
   dalla posizione del cursore sullo schermo: su Linux con Wayland non è affidabile. La pagina dello strato
   ha zoom 1, così i suoi px sono quelli del punto.
-- **Si chiude da solo** quando cambia la scheda davanti o la sua area (layout), quando la scheda naviga a un
+- **Si chiude da solo** quando cambia la scheda davanti, quando la scheda naviga a un
   documento nuovo, si chiude o il suo renderer muore, entrando o uscendo dallo schermo intero, quando la
   finestra perde il fuoco, con Esc
   (dalla scheda, dallo strato o dalla barra: prima di ogni altro uso del tasto) e con un clic fuori, anche
   sulla barra. Se aveva la tastiera, la restituisce alla scheda.
+- **Segue la scheda sotto come il menu nella pagina.** La stessa scheda con l'area cambiata (finestra accorciata,
+  barra compatta) non lo chiude: lo strato prende la nuova area e il menu rientra da sé (#500). La pagina che scorre
+  chiude il menu normale e lascia quello di una selezione: lo strato non scorre con lei.
 - **Il menu ci entra come dati (#1054).** Il content script capisce il contesto come sempre e, a strato acceso,
   `src/content/menuNelloStrato.js` manda al main una descrizione delle voci (`src/shared/menuDescritto.js`): le
   funzioni restano lì, tenute per numero, e il clic torna come numero. Lo strato disegna con `src/content/menu.js` e
