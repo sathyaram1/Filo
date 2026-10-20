@@ -1698,7 +1698,7 @@
       // Invio tenuto premuto è un colpo solo: la ripetizione non ferma e poi riprende, né rimanda.
       if (e.repeat) return;
       // Mentre Filo lavora Invio è il quadrato: stesso posto per «fai» e per «smetti».
-      if (sending) { fermaTurno(); return; }
+      if (sending) { if (!quadratoAppena()) fermaTurno(); return; }
       inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'));
     }
   });
