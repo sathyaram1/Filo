@@ -588,6 +588,8 @@
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
+    giaDavanti, daRipescare, senzaCancellati,
     coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini,
+    RILETTURA_MINIMA, QUOTA_FINESTRA, spazioInFinestra, tettoRilettura, riletturePiuCorte, finestreDaCatalogo, finestraDi,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
