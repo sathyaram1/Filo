@@ -4,8 +4,7 @@
 (function (global) {
   'use strict';
 
-  // Sequenze [frequenzaHz, durataMs]; freq 0 = pausa. Gli stessi quattro
-  // motivi della suoneria del timer, riusati per le notifiche.
+  // Sequenze [frequenzaHz, durataMs]; freq 0 = pausa.
   const TONES = {
     default: [[880, 150], [0, 80], [880, 150], [0, 80], [880, 150], [0, 400]],
     gentle:  [[523, 200], [0, 100], [659, 200], [0, 100], [784, 300], [0, 600]],
@@ -16,7 +15,6 @@
   };
   const TONE_IDS = Object.keys(TONES);
 
-  // Etichette leggibili (per i <select> delle Preferenze).
   const TONE_LABELS = {
     default: 'Standard',
     gentle: 'Delicata',

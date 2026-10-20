@@ -1,17 +1,6 @@
-// Shim chrome.* per il processo main.
-//
-// Il codice background dell'estensione legacy chiama chrome.storage.local,
-// chrome.runtime.sendMessage, chrome.tabs.*, chrome.action.*, chrome.commands.*,
-// chrome.scripting.*, chrome.contextMenus.*. Ricreiamo queste API in Node
-// usando i nostri storage adapter + IPC + finestre Electron, così i moduli
-// shared/* e background/* girano invariati.
-//
-// Il fatto che molti file usino `chrome.storage.local.get/set` direttamente
-// e altri usino i wrapper shared/storage.js significa che il shim deve essere
-// completo (non basta esporre il wrapper).
-//
-// I content script vedranno un `chrome` diverso (più snello), iniettato dal
-// preload del singolo tab — vedi src/preload/page-preload.js.
+// Shim chrome.* per il processo main: storage, runtime, tabs, action, commands ricreati su
+// storage adapter, IPC e finestre Electron, così i moduli portati girano invariati.
+// I content script vedono un `chrome` diverso, iniettato da src/preload/page-preload.js.
 
 const storage = require('./storage');
 
@@ -24,7 +13,6 @@ function finestraConSchede() {
 
 // `globalThis.chrome` ci dà un namespace simile a quello di MV3.
 const chromeShim = {
-  // ─── storage ─────────────────────────────────────────────────────────────
   storage: {
     local: {
       get: (keys) => storage.get(keys ?? null),
@@ -44,13 +32,9 @@ const chromeShim = {
     },
   },
 
-  // ─── runtime ─────────────────────────────────────────────────────────────
   runtime: {
     id: 'filo-desktop',
     lastError: null,
-    // sendMessage diventa: dispatch sull'event bus interno. Le pagine interne
-    // useranno IPC vero (preload + contextBridge), i moduli main importano
-    // direttamente l'handler.
     sendMessage: async () => { /* no-op nel main: i moduli si chiamano diretti */ },
     onMessage: {
       addListener: () => { /* gestito da src/main/ipc.js */ },
@@ -60,8 +44,7 @@ const chromeShim = {
     },
     onInstalled: {
       addListener: (fn) => {
-        // Lo invochiamo una volta al boot del main process, simulando "install".
-        // L'app Electron ha una nozione diversa di "install" che non interessa qui.
+        // Chiamato una volta al boot: «install» per Electron vuol dire un'altra cosa.
         setTimeout(() => {
           try { fn({ reason: 'startup' }); } catch (e) { console.warn('[shim] onInstalled fn err', e); }
         }, 0);
@@ -74,9 +57,7 @@ const chromeShim = {
     },
   },
 
-  // ─── tabs ───────────────────────────────────────────────────────────────
-  // Il main process possiede il TabManager. Esponiamo qui un'interfaccia
-  // sottile pensata per i moduli background portati.
+  // Interfaccia sottile sul TabManager, per i soli moduli background portati.
   tabs: {
     async create({ url } = {}) {
       const win = finestraConSchede();
@@ -144,21 +125,19 @@ const chromeShim = {
     },
   },
 
-  // ─── action (toolbar icon) ──────────────────────────────────────────────
   action: {
     onClicked: {
       addListener: () => { /* riservato: icona in shell renderer */ },
     },
   },
 
-  // ─── commands (hotkey) ──────────────────────────────────────────────────
   commands: {
     onCommand: {
       addListener: () => { /* registrate da src/main/shortcuts.js */ },
     },
   },
 
-  // ─── scripting / contextMenus: no-op nel main (non servono) ─────────────
+  // scripting e contextMenus: no-op nel main, non servono.
   scripting: {
     executeScript: async () => ({}),
   },

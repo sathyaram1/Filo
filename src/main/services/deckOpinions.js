@@ -1,17 +1,6 @@
-// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7) —
-// parte I/O, main process. La logica pura (staleness, parsing, piano di
-// tagging con cache) è in SN_DECK_OPINIONS (src/shared/deckOpinions.js).
-//
-// Cache (§6.2, §13.3):
-//   - pareri:   STORAGE_KEYS.DECK_OPINIONS  { deckId → { cardId → { text, versione, at } } }
-//               un parere per (carta, mazzo); si SOSTITUISCE al ricalcolo, non
-//               si cancella quando diventa stantio (resta visibile marcato).
-//   - tag:      STORAGE_KEYS.DECK_TAG_CACHE { cardId → { tag → bool } }
-//               SOLO tag context-free: permanente e condivisa fra i mazzi.
-//
-// Economia (§6.3): mai chiamate spontanee — si calcola solo ciò che il
-// chiamante chiede (hover col modulo attivo, aggiunta al mazzo, batch
-// esplicito). Il batch è UNA chiamata LLM per tutte le carte richieste.
+// Pareri LLM e auto-tag del deck builder (DECK-BUILDER-SPEC.md §6-§7), parte I/O.
+// La logica pura (staleness, parsing, piano di tagging) sta in SN_DECK_OPINIONS.
+// Economia §6.3: mai chiamate spontanee, e un batch è UNA sola chiamata LLM.
 
 (function (global) {
   'use strict';
@@ -22,8 +11,7 @@
   const P = global.SN_DECK_OPINIONS;
   const Q = global.SN_SCRYFALL_Q;
 
-  // Tetto di carte per batch: un mazzo Commander è ≤100; oltre è un errore del
-  // chiamante, non un caso d'uso.
+  // Un mazzo Commander è ≤100 carte: oltre il tetto è un errore del chiamante.
   const MAX_BATCH = 120;
   // Candidati per chiamata del giudice: i lotti partono insieme, e uno corto risponde prima e sbaglia meno.
   const FILTER_BATCH = 50;
@@ -83,7 +71,7 @@
     return { text: entry.text, versione: entry.versione, stale: P.isStale(entry, deck) };
   }
 
-  // Pareri già in cache per gli id dati (mai LLM). { cardId → {text, versione, stale} }.
+  // Solo cache, mai LLM.
   async function getOpinions(deck, cardIds) {
     const all = await readOpinions();
     const byDeck = all[deck.id] || {};
@@ -126,14 +114,8 @@
     }).join('\n');
   }
 
-  // Calcola (o ricalcola) i pareri per gli id dati. UNA chiamata LLM per i
-  // soli id da (ri)fare secondo `mode`:
-  //   'missing' (default) — solo i pareri ASSENTI: uno stantio resta com'è,
-  //                         visibile e marcato (§6.2: refresh mai automatico);
-  //   'stale'             — assenti + stantii (il "batch completo su
-  //                         richiesta": "valuta il mazzo");
-  //   'force'             — tutti (refresh esplicito della singola carta).
-  // Ritorna { opinions: { cardId → {text, versione, stale} }, sintesi, computed }.
+  // mode: 'missing' solo i pareri assenti (uno stantio resta com'è, §6.2: il refresh non è mai
+  // automatico); 'stale' assenti e stantii; 'force' tutti, refresh esplicito di una carta.
   async function computeOpinions({ deck, cards, cardIds, mode = 'missing', wantSintesi = false, handleAIRequest }) {
     const ids = [...new Set((cardIds || []).map(String).filter((id) => cards[id]))].slice(0, MAX_BATCH);
     const all = await readOpinions();
@@ -178,8 +160,7 @@
     return { opinions: out, sintesi, computed: need.length };
   }
 
-  // Il mazzo è stato eliminato: via anche i suoi pareri (la cache tag resta:
-  // è per carta, cross-mazzo).
+  // Mazzo eliminato: via anche i suoi pareri. La cache tag resta, è per carta e cross-mazzo.
   async function dropDeck(deckId) {
     const all = await readOpinions();
     if (!all[deckId]) return;
@@ -187,9 +168,7 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.DECK_OPINIONS]: all });
   }
 
-  // Auto-tag (§7): giudica carta-per-tag col modello economico, riusando la
-  // cache (carta, tag) per i tag context-free. Ritorna il mazzo con i tag
-  // applicati (NON salvato: il chiamante persiste) + conteggi per la reply.
+  // Auto-tag (§7): ritorna il mazzo coi tag applicati ma NON salvato, persiste il chiamante.
   async function autoTag({ deck, cards, tags, handleAIRequest }) {
     const norm = (tags || []).map(P.normTag).filter(Boolean);
     if (!norm.length || !deck.carte.length) {
@@ -214,7 +193,6 @@
         intera: true,
       });
       const raw = P.parseTagBatch(r.text);
-      // Solo id davvero richiesti e solo tag davvero richiesti.
       for (const [id, ts] of Object.entries(raw)) {
         if (!plan.judgeIds.includes(id)) continue;
         judged[id] = ts.filter((t) => norm.includes(t));

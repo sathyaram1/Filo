@@ -6,10 +6,7 @@
 // vive in userData/auth.bin. Se la cifratura OS non è disponibile, NON
 // scriviamo in chiaro: rinunciamo alla persistenza fra un avvio e l'altro.
 
-// Niente require('electron') a livello di modulo: questo file viene richiesto
-// (transitivamente, via google-auth → defaultsStore/supportModelsStore) anche
-// dagli unit test node:test che girano fuori da Electron. `app`/`safeStorage`
-// servono solo dentro le funzioni, quindi si richiedono lazy lì.
+// electron si richiede dentro le funzioni: gli unit test girano fuori da Electron.
 const fs = require('node:fs');
 const path = require('node:path');
 const guasti = require('./guastiAccesso');

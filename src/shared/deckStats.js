@@ -1,9 +1,5 @@
-// Statistiche del mazzo Commander (DECK-BUILDER-SPEC.md §9) — SOLO logica
-// pura: curva dei costi, pip richiesti/prodotti per colore, CMC medio,
-// composizione per tipo, budget e motore Monte Carlo del calcolatore di
-// probabilità (§9.3). Niente DOM, niente rete: tutto calcolato da
-// (deck, cardsById) — unit test in tests/unit/deckStats.test.mjs, con casi
-// ipergeometrici noti come oracolo per il Monte Carlo.
+// Statistiche del mazzo Commander, logica pura su (deck, cardsById): curva, pip, budget.
+// Più il Monte Carlo del calcolatore di probabilità (DECK-BUILDER-SPEC.md §9.3).
 
 (function (global) {
   'use strict';
@@ -18,8 +14,7 @@
     return /\bLand\b/i.test(t);
   }
 
-  // ── Curva dei costi (§9.1): istogramma per CMC, terre ESCLUSE (la curva
-  //    misura gli incantesimi da lanciare, le terre non si "lanciano"). ──────
+  // Terre ESCLUSE: la curva misura gli incantesimi da lanciare, e le terre non si lanciano.
   function manaCurve(deck, cardsById) {
     const counts = Object.fromEntries(CMC_BUCKETS.map((b) => [b, 0]));
     for (const e of deck.carte) {
@@ -31,7 +26,7 @@
     return CMC_BUCKETS.map((label) => ({ label, n: counts[label] }));
   }
 
-  // CMC medio sulle carte non-terra (pesato per quantità). Null se non ce ne sono.
+  // Sulle non-terra, pesato per quantità. Null se non ce ne sono.
   function avgCmc(deck, cardsById) {
     let sum = 0; let n = 0;
     for (const e of deck.carte) {
@@ -43,9 +38,8 @@
     return n ? sum / n : null;
   }
 
-  // ── Mana RICHIESTO per colore (§9.1): conteggio dei pip colorati nei costi.
-  //    Un simbolo ibrido ({W/U}, {2/W}, {G/P}) conta per OGNI colore che
-  //    contiene (è un requisito potenziale di quel colore). Generici/X/C no. ──
+  // Un simbolo ibrido conta per OGNI colore che contiene: è un requisito potenziale.
+  // Generici, X e incolore non contano.
   function pipCounts(deck, cardsById) {
     const out = Object.fromEntries(WUBRG.map((c) => [c, 0]));
     const re = /\{([^}]+)\}/g;
@@ -68,10 +62,8 @@
     return out;
   }
 
-  // ── Mana PRODOTTO per colore (§9.1): fonti (terre + rock + dork) che
-  //    producono quel colore, dai dati carta (`producedMana` di Scryfall).
-  //    Conta le FONTI, non i pip: una terra che produce U e R conta 1 in U
-  //    e 1 in R. 'C' = fonti di solo incolore. ─────────────────────────────
+  // Conta le FONTI, non i pip: una terra che produce U e R vale 1 in U e 1 in R.
+  // 'C' sono le fonti di solo incolore.
   function producedCounts(deck, cardsById) {
     const out = Object.fromEntries([...WUBRG, 'C'].map((c) => [c, 0]));
     for (const e of deck.carte) {
@@ -87,8 +79,7 @@
     return out;
   }
 
-  // Composizione per tipo (§9.1): [{ name, n }] nell'ordine canonico dei tipi.
-  // Delega la classificazione a SN_DECKS.tipoOf (stessa dei gruppi del mazzo).
+  // La classificazione la fa SN_DECKS.tipoOf, la stessa dei gruppi del mazzo.
   function typeCounts(deck, cardsById) {
     const D = global.SN_DECKS;
     const counts = new Map();
@@ -108,8 +99,8 @@
       .map(([name, n]) => ({ name, n }));
   }
 
-  // ── Budget (§9.2): totale EUR del mazzo (commander incluso: si compra anche
-  //    lui) + residuo rispetto al tetto. `missing` = carte senza prezzo noto. ─
+  // Totale EUR col commander incluso: si compra anche lui.
+  // `missing` sono le carte senza prezzo noto.
   function budgetInfo(deck, cardsById) {
     let total = 0; let missing = 0;
     const addPrice = (id, qty) => {
@@ -128,20 +119,14 @@
     };
   }
 
-  // ── Calcolatore di probabilità (§9.3): Monte Carlo locale ─────────────────
-  //
-  // La libreria è l'elenco del mazzo espanso per quantità (commander ESCLUSO:
-  // sta in zona di comando), ogni carta = insieme di categorie (i tag utente,
-  // minuscoli, + la categoria implicita "terre" per le terre). Le categorie
-  // sovrapposte sono il motivo per cui si simula invece di usare la formula
-  // ipergeometrica chiusa: una carta taggata sia "ramp" che "draw" può coprire
-  // UNA sola richiesta per pescata — lo decide un matching, non un conteggio.
+  // Libreria = mazzo espanso per quantità, commander escluso: sta in zona di comando.
+  // Si simula invece della formula chiusa: una carta con due tag copre UNA sola richiesta.
 
   const LAND_TAG = 'terre';
 
   function normTag(t) { return String(t || '').trim().toLowerCase(); }
 
-  // deck + dati carta → array di array di tag (una entry per COPIA di carta).
+  // Una entry per COPIA di carta.
   function buildLibrary(deck, cardsById) {
     const lib = [];
     for (const e of deck.carte) {
@@ -154,8 +139,7 @@
     return lib;
   }
 
-  // Elenco categorie disponibili per la UI: tag del mazzo (in ordine di prima
-  // apparizione) + "terre" se il mazzo ha terre.
+  // Tag del mazzo in ordine di prima apparizione, più «terre» se ce ne sono.
   function categoriesOf(deck, cardsById) {
     const seen = [];
     for (const e of deck.carte) {
@@ -169,8 +153,7 @@
     return seen;
   }
 
-  // RNG deterministico (mulberry32): stesse pescate a parità di seed — i test
-  // confrontano il risultato con l'oracolo ipergeometrico senza flakiness.
+  // RNG deterministico: stesse pescate a parità di seed, così i test non sono flaky.
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {

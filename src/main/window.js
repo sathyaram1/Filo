@@ -1,6 +1,5 @@
-// Finestra principale: BrowserWindow che ospita la "shell" del browser
-// (tab bar + barra indirizzi + pulsanti) e una serie di WebContentsView,
-// una per ogni tab aperto.
+// Finestra principale e finestra incognito: la BrowserWindow che ospita la
+// shell (barra in alto) e una WebContentsView per ogni scheda.
 
 const { BrowserWindow, session } = require('electron');
 const path = require('node:path');
@@ -11,15 +10,11 @@ const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
 
-// Finestre invisibili durante i test automatici: perché e come, in
-// `test-window-mode.js` (vale anche per menu e tooltip, che sono finestre a sé).
+// Finestre invisibili nei test: il perché sta in `test-window-mode.js`.
 const { HIDDEN, posizioneFuoriSchermo, hideForTests } = require('./test-window-mode');
 
-// Porta la finestra davanti a tutto: serve al primo disegno, perché in alcune
-// configurazioni la WebContentsView appena creata non ha un display surface
-// valido e resta un quadrato vuoto finché la finestra non riceve attenzione
-// esplicita dal compositor. Nei test la si mostra comunque (altrimenti i menu
-// nativi, che sono finestre figlie, non si aprono) ma invisibile e senza fuoco.
+// Serve al primo disegno: in certe configurazioni la WebContentsView resta un quadrato
+// vuoto finché non riceve attenzione. Nei test si mostra invisibile e senza fuoco.
 function revealWindow(win) {
   try {
     if (HIDDEN) {
@@ -58,9 +53,8 @@ function assicuraFinestraNormale() {
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
-  // Carica le impostazioni di sicurezza correnti e applicale prima che si apra
-  // il primo tab — così la policy WebRTC è già attiva e il popup blocker
-  // funziona sul newtab e su qualunque pagina successiva.
+  // Le impostazioni di sicurezza vanno applicate PRIMA del primo tab: policy
+  // WebRTC e blocco dei popup devono valere già sul newtab.
   try {
     const Storage = globalThis.SN_STORAGE;
     if (Storage && typeof Storage.getSettings === 'function') {
@@ -98,21 +92,13 @@ function wireWindowCommon(win, tabs) {
     if (!tabs.contentFullscreen) tabs.setContentFullscreen(true);
     else tabs.layout();
   });
-  // Se l'utente esce dal fullscreen OS con un gesto/scorciatoia di sistema,
-  // ripristina anche la barra (esce dalla modalità contenuto a tutto schermo).
   win.on('leave-full-screen', () => {
     if (tabs.contentFullscreen) tabs.setContentFullscreen(false);
     else tabs.layout();
   });
 
-  // Esc esce dallo schermo intero anche quando il fuoco è sulla barra di Filo
-  // (#514). A tutto schermo la barra è nascosta sotto la pagina, ma tiene il
-  // fuoco se l'ultimo clic era lì — barra indirizzi, un pulsante, il menu su
-  // Mac: da lì il tasto non passa da nessun before-input-event delle schede, e
-  // prima moriva nel nulla. La regola sta in un posto solo (tabs.js); qui non si
-  // decide niente, si porta il tasto dove si decide. Quando la barra è visibile
-  // handleFullscreenEscape risponde false e l'Esc resta a chi lo usa nella barra
-  // (il pannello degli scaricamenti si chiude ancora con Esc).
+  // #514 — a tutto schermo la barra è nascosta ma può tenere il fuoco, e da lì l'Esc non passa
+  // dal before-input-event di nessuna scheda. La regola sta in tabs.js, qui non si decide.
   win.webContents.on('before-input-event', (event, input) => {
     // La barra laterale prima: il suo tasto, e l'Esc che la chiude prima di uscire dalla modalità.
     if (tabs.barra && tabs.barra.tasto(input)) { event.preventDefault(); return; }
@@ -156,14 +142,12 @@ function createMainWindow() {
     height: 840,
     minWidth: 720,
     minHeight: 500,
-    // Background diverso dal cream della shell così se la WebContentsView
-    // non rende vediamo subito un'area di colore diverso (debugging visivo).
+    // Diverso dal cream della shell: se la WebContentsView non rende si vede.
     backgroundColor: '#222222',
     title: 'Filo',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
     ...(HIDDEN ? { ...posizioneFuoriSchermo(), show: false, skipTaskbar: true } : {}),
-    // Chrome-like: la title bar nativa è rimossa, i controlli minimize/maximize/
-    // close vivono nella tab-row della shell (vedi src/renderer/shell.html).
+    // Niente title bar nativa: i pulsanti della finestra stanno nella shell.
     frame: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'shell-preload.js'),
@@ -175,8 +159,8 @@ function createMainWindow() {
     autoHideMenuBar: true,
   });
 
-  // Invisibile fin dalla nascita, non dal primo disegno: fra i due momenti
-  // passano centinaia di millisecondi in cui la finestra esiste già.
+  // Invisibile dalla nascita: fra questa e il primo disegno passano centinaia
+  // di millisecondi in cui la finestra esiste già.
   hideForTests(win, { main: true });
 
   win.loadURL('filo://shell/shell.html');
@@ -187,8 +171,6 @@ function createMainWindow() {
   wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
-    // Riapre i tab della sessione precedente; se non c'è nulla da ripristinare
-    // apre un newtab vuoto come sempre.
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
@@ -198,17 +180,12 @@ function createMainWindow() {
   return win;
 }
 
-// Finestra incognito: sessione web effimera (cookie/cache/localStorage in RAM,
-// svaniscono alla chiusura) + storage filo:// instradato sull'overlay in memoria
-// dello shim (vedi src/main/shim/storage.js). La finestra è marcata con
-// win._filoIncognito così l'IPC avvolge i suoi messaggi in runIncognito().
+// Incognito: niente deve sopravvivere alla chiusura. Sessione web effimera più storage
+// filo:// sull'overlay in RAM; `_filoIncognito` fa avvolgere i messaggi in runIncognito().
 function createIncognitoWindow() {
-  // Partizione unica e SENZA prefisso 'persist:' → sessione in memoria, isolata
-  // da quella normale e da eventuali altre finestre incognito.
+  // SENZA prefisso 'persist:': è quello che la rende una sessione in memoria.
   const partition = 'filo-incognito-' + randomUUID();
   const ses = session.fromPartition(partition);
-  // filo:// è registrato globalmente solo sulla sessione di default: i tab di
-  // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);
   try { require('./services/cookies').coverAdblock(ses); } catch (_) {}
 
@@ -217,7 +194,6 @@ function createIncognitoWindow() {
     height: 800,
     minWidth: 720,
     minHeight: 500,
-    // Sfondo viola scuro: distinzione visiva immediata dalla finestra normale.
     backgroundColor: '#1f1b2e',
     title: 'Filo — Incognito',
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon-128.png'),
@@ -235,7 +211,6 @@ function createIncognitoWindow() {
   win._filoIncognito = true;
   hideForTests(win, { main: true });
 
-  // La shell legge ?incognito=1 e applica il badge + tema scuro dedicato.
   win.loadURL('filo://shell/shell.html?incognito=1');
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT, incognito: true, partition });
@@ -249,8 +224,8 @@ function createIncognitoWindow() {
     revealWindow(win);
   });
 
-  // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla
-  // di ciò che è stato scritto durante la sessione sopravvive.
+  // Solo alla chiusura dell'ULTIMA incognito: le altre stanno ancora leggendo
+  // lo stesso overlay in RAM.
   win.on('closed', () => {
     try { require('./services/downloads').forgetScope(partition); } catch (_) {}
     const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);

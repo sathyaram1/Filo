@@ -27,7 +27,7 @@
 (function (global) {
   'use strict';
 
-  // Categorie: l'indice compatto (vedi index()) le usa per il raggruppamento.
+  // L'indice compatto (index()) le usa per il raggruppamento.
   const CATEGORIES = {
     navigation: 'Navigazione e schede',
     selection: 'Azioni sul testo selezionato',
@@ -44,7 +44,6 @@
   };
 
   const CAPABILITIES = [
-    // ─────────────────────────── Navigazione e schede ───────────────────────
     {
       id: 'new-tab', title: 'Apri una nuova scheda', category: 'navigation',
       desc: 'Apre una nuova scheda sulla home di Filo. Ogni finestra ne tiene una già caricata, quindi compare subito.',
@@ -144,7 +143,6 @@
       doesNot: 'Se chiedi di guardare o leggere qualcosa, la scheda si apre davanti come sempre.',
     },
 
-    // ─────────────────────── Azioni sul testo selezionato ────────────────────
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello. Nel riquadro della spiegazione estesa, sotto ogni risposta, «Copia» mette il testo negli appunti senza segni di formattazione.',
@@ -180,7 +178,6 @@
       invoke: 'Seleziona il testo e usa la voce di ricerca nel menu del tasto destro.',
     },
 
-    // ─────────────────────── Scrittura e correzione ──────────────────────────
     {
       id: 'spellcheck', title: 'Correttore mentre scrivi', category: 'writing',
       desc: 'Mentre scrivi in un campo di testo, segnala gli errori: zigzag rosso per l’ortografia (suggerimenti del sistema), zigzag blu per gli errori di lingua rilevati dall’AI (parola giusta nel posto sbagliato, grammatica, ripetizioni) e puntini ocra per quello che non torna col contenuto: un giorno, un nome o un numero diverso da quello già detto nella pagina (in una chat, la conversazione), una data col giorno della settimana sbagliato, una frase rotta o che si legge in due modi.',
@@ -211,7 +208,6 @@
       doesNot: 'Non gioca partite. L\'import non gestisce sideboard/maybeboard (vengono ignorati) né commander in coppia (partner): solo la prima carta della sezione "Commander" diventa il commander del mazzo, le altre entrano come carte normali.',
     },
 
-    // ─────────────────────── Lettura e traduzione ───────────────────────────
     {
       id: 'translate-page', title: 'Traduci l’intera pagina', category: 'reading',
       desc: 'Traduce tutto il testo visibile della pagina — titolo, sommario, didascalie, riquadri laterali, voci di menu e testo dei link, non solo i paragrafi, compreso il testo dentro i componenti con cui sono costruiti i siti moderni — mantenendo impaginazione, link, immagini e illustrazioni; mentre lavora mostra a che punto è arrivata, e puoi tornare all’originale quando vuoi. Cambia lingua anche il nome della scheda in alto. Traduce anche le scritte che non stanno nel testo: il grigio dentro i campi di ricerca, i suggerimenti che compaiono fermando il mouse, le descrizioni delle immagini, le voci dei menu a tendina e le scritte sui bottoni dei moduli. Entra anche nei riquadri incorporati, che sono pagine dentro la pagina: i post di altri siti, i blocchi commenti, i moduli di iscrizione. Il testo che il sito carica mentre la traduzione sta ancora lavorando entra nello stesso giro. Quello che arriva dopo — scorrendo, cambiando schermata senza ricaricare — e quello che scopri aprendo una sezione ripiegata si traducono dal menu, senza rifare il resto. Se si interrompe a metà (rete che salta, credito finito) te lo dice, con il motivo e il punto in cui si è fermata, e puoi riprenderla: completa solo i pezzi mancanti senza rifare quelli già tradotti. Le pagine lunghissime le traduce a tratti: te lo dice, e la ripresa arriva in fondo.',
@@ -219,7 +215,6 @@
       doesNot: 'Non traduce il testo dentro le immagini, i video, i riquadri di codice, le illustrazioni (grafici, loghi, icone disegnate nella pagina) e le formule, che restano intatte con i loro colori; non tocca quello che scrivi tu nei campi né i valori che il sito rimanda indietro quando invii un modulo (per questo la scritta su un bottone di invio che porta con sé un valore resta com\'è); non traduce quello che al momento è ripiegato o nascosto — lo offre quando lo apri; non traduce le pagine dove non trova testo (in quel caso te lo dice). Se un sito tiene chiusi certi suoi componenti, o chiude a chiave un riquadro incorporato, quel testo non è leggibile da nessuno script e resta nella lingua originale: in quel caso l’avviso dice che una parte è rimasta fuori, invece di dichiarare la pagina tradotta. I componenti chiusi e i riquadri incorporati che il sito tiene fuori dalla vista, come gli spazi pubblicitari e i banner già chiusi, non fanno comparire nessun avviso, e un riquadro nascosto non si traduce finché non lo apri.',
     },
 
-    // ─────────────────── Immagini e cattura schermo ──────────────────────────
     {
       id: 'explain-image', title: 'Spiega un’immagine', category: 'media',
       desc: 'Descrive un’immagine della pagina, direttamente lì sotto. Se il file dichiara la propria origine, in cima al riquadro compare una riga che dice cosa dichiara (generata o modificata con l’AI, oppure scattata con una fotocamera) e chi lo dichiara. Filo legge tre cose: le credenziali firmate (Content Credentials, lo standard C2PA), l’etichetta «Digital Source Type» dei metadati IPTC/XMP e i parametri di generazione che alcuni programmi scrivono dentro i PNG. Delle credenziali controlla la firma, se il file è stato cambiato dopo e se chi ha firmato è nell’elenco ufficiale dei firmatari riconosciuti, che Filo scarica da solo una volta al giorno da chi gestisce lo standard. Se il certificato di chi ha firmato è scaduto, la firma vale solo se una marca temporale di un’autorità riconosciuta dice che è stata fatta quando il certificato valeva. Se l’immagine è stata generata e poi ritoccata, l’origine la trova nella storia che le credenziali si portano dietro. Un’etichetta senza firma la presenta come dichiarazione del file, non come prova. Se il file non dichiara niente, Filo cerca nei pixel i marchi invisibili aperti che Stable Diffusion 1, Stable Diffusion XL e FLUX.1 scrivono nelle loro immagini, anche dentro un JPEG; se ne trova uno lo presenta come dichiarazione di chi ha generato l’immagine, per esempio «Generata con l’AI: porta il marchio invisibile che Stable Diffusion XL mette nelle sue immagini». La lettura avviene sul tuo computer, senza crediti, sugli stessi byte che servono alla descrizione. Vale anche se lo chiedi a Filo («questa foto è fatta con l’AI?»): nella chat della Home sulle immagini allegate, anche se la domanda arriva nei messaggi dopo (anche quelle copiate con «Copia immagine» e incollate, che negli appunti perdono le etichette: Filo ricorda cosa diceva l’originale), nell’Aiuto della pagina sulle immagini che hai davanti.',
@@ -283,7 +278,6 @@
       invoke: 'Menu del tasto destro → "QR code della pagina".',
     },
 
-    // ─────────────────────────────── Link ────────────────────────────────────
     {
       id: 'explain-link', title: 'Spiega un link', category: 'links',
       desc: 'Spiega dove porta un link senza aprirlo, e segnala se sembra sospetto (phishing).',
@@ -302,7 +296,6 @@
       doesNot: 'Se il link non porta davvero da nessuna parte (al posto dell’indirizzo il sito ci ha messo un frammento di codice) Filo te lo dice invece di copiare una stringa che non apre niente.',
     },
 
-    // ────────────────────────────── Appunti ──────────────────────────────────
     {
       id: 'paste-clipboard', title: 'Incolla con cronologia', category: 'clipboard',
       desc: 'Incolla testo o immagini dagli appunti; puoi scegliere da una cronologia ricercabile di ciò che hai copiato di recente, rimuovere una singola voce (es. una password copiata per sbaglio) o svuotare tutta la cronologia.',
@@ -314,7 +307,6 @@
       invoke: 'Menu del tasto destro → "Copia" / "Taglia".',
     },
 
-    // ──────────────────────── Salva per dopo e archivio ──────────────────────
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
@@ -381,7 +373,6 @@
       doesNot: 'Non ti fa scegliere dove salvare ogni file (finiscono nella cartella Download di sistema) e non riguarda «Salva immagine/video come…» dal tasto destro. Togliere una voce dall’elenco non cancella il file dal disco, e Filo non va a cercare dove è finito un file che hai spostato: ti dice che lì non c’è più e ti apre la cartella dov’era.',
     },
 
-    // ──────────────────── Assistente e agente di pagina ──────────────────────
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Se gli chiedi «salvala per dopo» mette la pagina in «Aperti per dopo» come il menu e chiude la scheda. Sa quando hai aperto la scheda e quando ci è arrivata la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo. I passi che fai con lui, per ora, non escono dal tuo computer. Ogni conversazione resta sul tuo computer come una riga nel filo della home, e Filo la ritrova quando gliene chiedi.',
@@ -513,7 +504,6 @@
       doesNot: 'Non abbina dispositivi nuovi e non entra in reti mai usate (quelle che vogliono la password): quelle si aggiungono dalle impostazioni del sistema. Su Windows collega da qui cuffie, casse e auricolari; gli altri dispositivi Windows li collega da sé quando li accendi. Non cambia il volume di un video dentro un sito. Dopo aver spento il Wi-Fi, senza un cavo, la chat non può riaccenderlo (non ha più la rete): si riaccende dalla voce della rete nella home.',
     },
 
-    // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
       desc: 'La pagina della nuova scheda: al centro il filo, cioè la coda della tua linea del tempo con Filo, e sotto il campo per chiedergli qualsiasi cosa; ai lati le carte. A sinistra quello che sta accadendo (timer, sveglie, scaricamenti, avvisi), a destra quello che tieni tu (Editor, Mazzi, «Filo ti suggerisce», Impostazioni rapide) e sotto «altro», con le app che una carta non ce l’hanno. In alto a destra ci sono Impostazioni e Profilo; Memorie, App, Impostazioni e Profilo stanno anche in fondo alla barra laterale, su ogni pagina.',
@@ -555,7 +545,6 @@
       doesNot: 'Non mostra segnalazioni in lavorazione né dettagli tecnici o di sicurezza: solo i miglioramenti già usciti. Ogni miglioramento si può segnalare come "ancora rotto" una volta sola.',
     },
 
-    // ───────────────────────────── Impostazioni ──────────────────────────────
     {
       id: 'auto-update', title: 'Aggiornamenti di Filo', category: 'settings',
       desc: 'A ogni avvio Filo controlla se c’è una versione nuova e la scarica. Quando è pronta lo dice con un avviso in basso a destra e con una carta nella home, che resta finché la versione non è installata, tutti e due con «Riavvia e aggiorna»: Filo si chiude, installa la versione nuova (su Windows con la barra di avanzamento) e si riapre con le schede di prima. Se non lo premi, su Windows la versione nuova si installa la prossima volta che apri Filo, in una decina di secondi, sempre con la barra visibile; su Linux quando lo chiudi. Se l’installazione su Windows non riesce Filo si apre lo stesso; al secondo tentativo fallito lo trovi scritto fra gli avvisi della home, con «Scarica Filo» per prenderlo a mano. Puoi impedirgli di installare da solo: in quel caso controlla lo stesso, ma non scarica niente e mette nella home una carta «C’è la versione …» con «Installa». Premuto «Installa», la carta mostra lo scaricamento e poi la versione si installa come sopra; «Chiudi» la toglie per quella versione. Chi la spegne resta senza le correzioni di sicurezza delle versioni nuove finché non installa. Filo non scarica e non installa una versione il cui numero non coincide con quello della sua pubblicazione, e se gli scrivi «aggiornati» te lo dice.',
@@ -740,7 +729,6 @@
       doesNot: 'Non è un modulo a passi e non ha campi da compilare. È una conversazione, al massimo sei scambi, e non è obbligatoria: se la chiudi Filo usa i valori predefiniti e impara di te strada facendo. Rifarla non cancella quella di prima.',
     },
 
-    // ────────────────────────────── Crediti ──────────────────────────────────
     {
       id: 'credits', title: 'Crediti e consumi', category: 'credits',
       desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Sotto ci sono i movimenti, cioè da dove arrivano i crediti che hai: l’invito riscattato, la quota di ogni giorno, i regali e i premi per le segnalazioni che mandi e per quelle che Filo risolve. Se hai un portafoglio, sotto il saldo c’è il tuo pseudonimo, il nome con cui compari sul server di Filo. Lo copi con un clic o dal tasto destro, e basta quello per ricevere un regalo di crediti senza dare email o nome. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
