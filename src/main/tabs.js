@@ -279,8 +279,10 @@ function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
   return true;
 }
 // Un indirizzo fermato non resta muto (#482): il silenzio sembra un'app rotta. Solo testo, niente «Apri comunque».
-function avvisaIndirizzoFermato(rawUrl, win) {
-  const a = avvisoIndirizzoFermato(rawUrl);
+// `pagina`: la pagina web che l'ha scritto; allora l'avviso nomina il sito, non il percorso scelto da lei.
+function avvisaIndirizzoFermato(rawUrl, win, pagina = '') {
+  const daPagina = /^https?:/i.test(String(pagina || ''));
+  const a = (daPagina && avvisoDallaPagina(rawUrl, globalThis.SN_NOMI_SITO.sitoDi(pagina))) || avvisoIndirizzoFermato(rawUrl);
   if (!a || !win || win.isDestroyed?.()) return;
   try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
 }
