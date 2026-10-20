@@ -113,7 +113,7 @@ Il documento di un giorno porta uno pseudonimo. È un codice casuale che Filo ge
 
 **Si spengono** in Preferenze, fra le impostazioni avanzate («Manda i contatori anonimi»), o chiedendolo a Filo («spegni i contatori»). Da spenti non si conta niente e non parte niente, e quello che non era ancora partito si butta.
 
-Con il login Google, poi, escono i totali per funzione del documento descritto fra i crediti, legati alla tua email. Quelli non sono i contatori, e non si spengono con loro. Cosa rispondi alle conferme di Filo non esce dal tuo computer.
+Con il login Google, poi, escono i totali per funzione del documento descritto fra i crediti, legati alla tua email. Quelli non sono i contatori, e non si spengono con loro. Cosa rispondi alle conferme di Filo non arriva al server.
 
 Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i passi di una guida riuscita su un sito, perché chi lo visita dopo ne approfitti, ma la raccolta è spenta. I tuoi percorsi non escono dal tuo computer, e Filo non te lo chiede nemmeno.
 
