@@ -221,7 +221,15 @@ module.exports = function register(on, ctx) {
 
   on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
+    if (!win?._filoTabs) return { ok: true };
+    let pagina = '';
+    try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+    // Un file scelto su una pagina web (il suo «Apri in nuova tab»): il percorso l'ha scritto lei, l'avviso nomina il sito.
+    if (/^https?:/i.test(pagina) && msg.url && require('../../tabs').isWebUnsafeNav(String(msg.url))) {
+      win._filoTabs.apriDaCollegamento(String(msg.url), { fromUrl: pagina });
+      return { ok: true };
+    }
+    win._filoTabs.openTab(msg.url || 'filo://newtab/');
     return { ok: true };
   });
 

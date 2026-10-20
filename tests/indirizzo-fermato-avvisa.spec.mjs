@@ -198,15 +198,15 @@ test('su una pagina web un file o un data: aperto da script dopo un clic lo dice
   expect(await nelModello(shell, 'bloccat'), 'la pagina da sola non fa nascere avvisi').toBe(0);
 
   await page.mouse.click(40, 20);
-  const c = await carta(avvisi, 'File del computer bloccato per sicurezza: /srv/intranet/circolare.pdf');
+  const c = await carta(avvisi, 'File del computer chiesto da 127.0.0.1');
   await expect(c).toBeVisible({ timeout: 8000 });
   await expect(c.locator('.shell-notif-action'), 'un blocco di sicurezza non si scavalca').toHaveCount(0);
   await page.mouse.click(40, 80);
-  await expect(await carta(avvisi, 'Percorso di rete bloccato per sicurezza: //nas/condivisa/listino.xlsx')).toBeVisible({ timeout: 8000 });
+  await expect(await carta(avvisi, 'Percorso di rete chiesto da 127.0.0.1')).toBeVisible({ timeout: 8000 });
   await page.mouse.click(40, 140);
-  await expect(await carta(avvisi, 'Indirizzo «data:» bloccato per sicurezza')).toBeVisible({ timeout: 8000 });
+  await expect(await carta(avvisi, 'Indirizzo «data:» chiesto da 127.0.0.1')).toBeVisible({ timeout: 8000 });
   expect(page.url()).toContain('127.0.0.1');
-  expect(await nelModello(shell, 'da-sola')).toBe(0);
+  expect(await nelModello(shell, 'circolare.pdf'), 'il percorso scelto dalla pagina non entra nell\'avviso').toBe(0);
 });
 
 test('un clic che fa rifiutare più file dice un avviso solo', async ({ shell, openTab, testServer, avvisi }) => {
@@ -220,7 +220,7 @@ test('un clic che fa rifiutare più file dice un avviso solo', async ({ shell, o
     </script>`));
   await page.waitForTimeout(500);
   await page.mouse.click(40, 20);
-  await expect(await carta(avvisi, '/tmp/primo.pdf')).toBeVisible({ timeout: 8000 });
+  await expect(await carta(avvisi, 'File del computer chiesto da 127.0.0.1')).toBeVisible({ timeout: 8000 });
   await page.waitForTimeout(600);
   expect(await nelModello(shell, 'bloccat')).toBe(1);
 });
@@ -260,4 +260,59 @@ test('la posta chiesta all\'assistente va al programma di posta, come cliccata i
   await shell.waitForTimeout(400);
   expect(await schede(app), 'nessuna scheda in più').toEqual(prima);
   expect(await nelModello(shell, 'bloccat')).toBe(0);
+});
+
+// #1318 giro 1 — l'avviso nasce da un'apertura, non da un'immagine della pagina; e il testo della pagina non ci entra.
+test('un\'immagine incollata da Word che compare dopo un clic non fa dire a Filo che ha fermato un file', async ({ shell, openTab, testServer }) => {
+  const page = await openTab(testServer.html(`<title>Notizie</title>
+    <button style="position:fixed;left:0;top:0;width:300px;height:40px" onclick="document.getElementById('n').innerHTML='<p>Circolare</p><img src=&quot;file:///C:/Users/mario/AppData/Local/Temp/msohtmlclip1/01/clip_image001.png&quot;>'">Leggi la notizia</button>
+    <button style="position:fixed;left:0;top:50px;width:300px;height:40px" onclick="location.href='file:///C:/Intranet/circolare.pdf'">Apri documento</button>
+    <div id="n" style="margin-top:100px"></div>`));
+  await page.waitForTimeout(800);
+  await page.mouse.click(40, 20);
+  await expect(page.locator('#n p')).toHaveText('Circolare');
+  await page.waitForTimeout(1500);
+  expect(await nelModello(shell, 'bloccat'), 'l\'immagine non è un\'apertura dell\'utente').toBe(0);
+  // Il clic dopo, su un'apertura vera, lo dice ancora.
+  await page.mouse.click(40, 70);
+  await expect.poll(() => nelModello(shell, 'File del computer chiesto da 127.0.0.1'), { timeout: 8000 }).toBe(1);
+});
+
+test('una pagina che scrive da sé la riga di Chromium non mette il suo testo in un avviso di Filo', async ({ shell, openTab, testServer }) => {
+  const page = await openTab(testServer.html(`<title>Truffa</title>
+    <button style="position:fixed;left:0;top:0;width:300px;height:40px" onclick="console.error('Not allowed to load local resource: file:///home/Chiama il 02 1234 5678 per sbloccare')">Continua</button>`));
+  await page.waitForTimeout(800);
+  await page.mouse.click(40, 20);
+  await page.waitForTimeout(1500);
+  expect(await nelModello(shell, 'Chiama il 02')).toBe(0);
+});
+
+// #1318 giro 1 — quello che l'assistente chiede di aprire non diventa mai una ricerca data per pagina aperta.
+for (const [scritto, avviso] of [
+  ['/data/progetti/conto.pdf', 'File del computer bloccato per sicurezza: /data/progetti/conto.pdf'],
+  ['Documenti\\conto.pdf', 'File del computer bloccato per sicurezza: Documenti/conto.pdf'],
+  ['%USERPROFILE%\\Desktop\\conto.pdf', 'File del computer bloccato per sicurezza: %USERPROFILE%/Desktop/conto.pdf'],
+  ['"C:\\Users\\agenti AI\\Documenti\\conto.pdf".', 'File del computer bloccato per sicurezza: C:/Users/agenti AI/Documenti/conto.pdf'],
+  ['ricetta carbonara', '«ricetta carbonara» non è un indirizzo'],
+]) {
+  test(`l'assistente non trasforma «${scritto}» in una ricerca: lo ferma e sa perché`, async ({ app, shell }) => {
+    const home = await homeDiFilo(app, shell);
+    const prima = await schede(app);
+    const r = await naviga(home, scritto);
+    expect(r && r.executed, 'non è una pagina aperta').toBeFalsy();
+    expect(r.output && r.output.avviso).toBe(avviso);
+    await shell.waitForTimeout(500);
+    expect(await schede(app)).toEqual(prima);
+    expect(await cercheGoogle(app)).toEqual([]);
+  });
+}
+
+test('un indirizzo di posta senza «mailto:» chiesto all\'assistente va al programma di posta, non su Google', async ({ app, shell }) => {
+  await intercettaEsterni(app);
+  const home = await homeDiFilo(app, shell);
+  const r = await naviga(home, 'mario.rossi@esempio.it');
+  expect(r && r.executed).toBe(true);
+  expect(r.output && r.output.esterno).toBe('mailto:');
+  await expect.poll(() => esterni(app), { timeout: 6000 }).toEqual(['mailto:mario.rossi@esempio.it']);
+  expect(await cercheGoogle(app)).toEqual([]);
 });
