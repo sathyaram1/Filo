@@ -283,13 +283,14 @@ test('Conservativo, dopo una lettura: nel diario un comando e un «dimentica» r
       { text: 'Letto.' },
       { toolCalls: [
         { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'rm prova-530.txt' }) },
-        { id: 'f1', name: 'DIMENTICA', arguments: JSON.stringify({ testo: '.' }) },
+        // Il «per sempre» è il costo 3 di «dimentica» (#872): a Conservativo, dopo una lettura, è un no.
+        { id: 'f1', name: 'DIMENTICA', arguments: JSON.stringify({ testo: '.', per_sempre: true }) },
       ] },
       { text: 'Fine.' },
     ]);
     await chiedi(page, 'leggimi note.txt');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Letto.' })).toBeVisible({ timeout: 15000 });
-    await chiedi(page, 'cancella prova-530.txt e dimentica tutto');
+    await chiedi(page, 'cancella prova-530.txt e dimentica per sempre tutto');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Fine.' })).toBeVisible({ timeout: 15000 });
     // Il motivo si legge senza aprire niente: il blocco del lavoro si apre da solo su un rifiuto.
     const blocco = page.locator('.dash-activity').last();
