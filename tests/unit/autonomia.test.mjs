@@ -537,7 +537,7 @@ test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, an
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }, ['confronta i modelli di auto elettriche', 'usa i modelli di Word per la lettera']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-0123456789abcdef0123456789abcdef' }, ['ricordami di chiamare Marco']],
     [{ type: 'CANCELLA_MEMORIA' }, ['ricordami domani di chiamare Marco', 'che memoria ha questo telefono?', 'cancella la sveglia\nricorda che sono vegetariano']],
-    [{ type: 'CANCELLA_PAGINE', periodo: 'oggi' }, ['riassumi questa pagina', 'raccontami la storia di Roma', 'cancella questa pagina dai preferiti']],
+    [{ type: 'CANCELLA_PAGINE', periodo: 'oggi' }, ['riassumi questa pagina', 'raccontami la storia di Roma', 'quante pagine ha il libro?']],
     [{ type: 'CANCELLA_ARCHIVIO', query: 'x' }, ['fai uno screenshot dello schermo', 'fammi una tabella dei prezzi', 'chiudi le schede sulle ricette']],
     [{ type: 'DIMENTICA', testo: 'Bologna', per_sempre: true }, ['elimina la sveglia delle 7', 'dimentica che vivo a Bologna']],
     [{ type: 'ANNULLA_CAMBIO', _livelloCambio: 2 }, ['torna indietro alla pagina prima']],
