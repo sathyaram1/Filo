@@ -529,8 +529,7 @@ function mergeValue(local, imported) {
     }
     return out;
   }
-  // Tipi diversi o valori semplici: vince il backup — è ciò che l'utente ha
-  // chiesto di ripristinare.
+  // Valori semplici: vince il backup, salvo le regole per chiave di REGOLE_IMPORT e il tetto di spesa (tettoSpesa).
   return imported;
 }
 
