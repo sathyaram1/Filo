@@ -276,8 +276,9 @@ insieme a un riquadro con un indirizzo, ancora sul suo `about:blank`, o scritti 
 sito che chiude la propria scheda apposta, come potrebbe fare con un ciclo infinito. Resta fuori anche un riquadro
 **in volo verso un indirizzo dello stesso sito** (o con `srcdoc`): toccato prima del suo load tiene la finestra
 all'arrivo e perde il preload (niente accesso, cookie, menu lì dentro), quindi non si tocca, né lui né, finché c'è,
-nessun riquadro alla cieca per indice; vale anche per chi lo inserisce vuoto e gli dà l'indirizzo dopo, che però Filo
-ha già toccato all'inserimento. Quelli di un altro sito in volo si sistemano: all'arrivo hanno una finestra nuova. I vincoli si guardano su una
+nessun riquadro alla cieca per indice. Il riquadro inserito vuoto che riceve l'indirizzo dello stesso sito solo dopo
+Filo l'ha già toccato all'inserimento, e lì il preload si perde ancora. Quelli di un altro sito in volo si sistemano:
+all'arrivo hanno una finestra nuova. I vincoli si guardano su una
 copia di soli dati, ed è la copia che va a Chromium: un getter o un Proxy che alla seconda lettura dice desktop
 chiuderebbe la scheda anche dalla pagina. La finestra vuota aperta con `window.open` ha `about:blank` come indirizzo:
 il sito che chiede lo dice l'origine del suo frame, non l'indirizzo. Prova:
