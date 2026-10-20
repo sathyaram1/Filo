@@ -45,6 +45,13 @@ async function listino({ forza = false } = {}) {
   return inVolo;
 }
 
+// La finestra di un modello di OpenRouter secondo il catalogo, in token, senza aspettare la rete: null se il catalogo non
+// c'è ancora (lo si chiede, e vale appena arriva) o non conosce il modello.
+function finestraDi(model) {
+  if (!ultimo || Date.now() - ultimo.at >= FRESCO_MS) listino().catch(() => {});
+  return ultimo ? globalThis.SN_FILO_CONTESTO.finestraDi(ultimo.finestre, model) : null;
+}
+
 // I crediti di chi usa Filo: quelli del portafoglio sul server, o il conteggio locale senza portafoglio. Con la
 // chiave scritta dall'utente paga lui a OpenRouter: dollari, e niente avviso.
 async function moneta() {
