@@ -1062,6 +1062,7 @@
     const inviato = turno.fermato
       ? Promise.resolve({ ok: true, stopped: true, actions: [] })
       : send(msg).then((r) => (r && r.diretta && offAction ? direttaFinita.then(() => r) : r));
+    if (!turno.fermato) for (const s of seguiti) if (s.turno !== turno) affidaAlTurno(s, turno);
     const fineDiretta = (r) => {
       if (turnoVivo === turno) turnoVivo = null;
       // Il main dice quali seguiti ha letto anche a fine turno: vale se l'annuncio in diretta non è arrivato.
