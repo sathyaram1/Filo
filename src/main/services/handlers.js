@@ -2918,9 +2918,11 @@ async function eseguiAzioneFilo(action, {
           // Se la ricerca stretta non trova niente si allarga alle parole che
           // distinguono, e l'esito dice con quali ha cercato davvero.
           const { results: found, termini, allargata } = ChatArchive.searchWide(altre, query, { limit: 8 });
-          const [pagine, cambiTrovati] = query
-            ? await Promise.all([paginePerChat(query).catch(() => []), cambiPerChat(query).catch(() => [])])
-            : [[], []];
+          const nessunCambio = { results: [], termini: [], allargata: false };
+          const [pagine, cambi] = query
+            ? await Promise.all([paginePerChat(query).catch(() => []), cambiPerChat(query).catch(() => nessunCambio)])
+            : [[], nessunCambio];
+          const cambiTrovati = cambi.results;
           const results = found.map((c) => ({
             id: c.id,
             title: c.title || ChatArchive.fallbackTitle(c.messages),
