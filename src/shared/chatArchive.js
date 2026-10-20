@@ -307,7 +307,7 @@
     const limit = Number(o.limit) > 0 ? Number(o.limit) : 0;
     const taglia = (list) => (limit ? list.slice(0, limit) : list);
     const candidate = filtraPerTipo(chats, o);
-    const tutte = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const tutte = paroleDellaRicerca(query);
     if (!tutte.length) return { results: taglia(candidate), termini: [], allargata: false };
 
     // `o.testo(c)`: dove cercare quando i candidati non sono chat (le pagine del filo), con gli stessi tre passi.
