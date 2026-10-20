@@ -381,6 +381,7 @@ test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro
   await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
   await expect(page.locator('#input')).toBeFocused();
   await expect(page.locator('.dash-bubble-user', { hasText: 'portami alla home' })).toHaveCount(1);
+  await page.screenshot({ path: 'tests/agent/.out/diario-home-gia-qui.png' });
 
   await restore(app, '__fakeF');
   await fakeProvider(app, [{ text: 'Di niente.' }], '__fakeF2');
