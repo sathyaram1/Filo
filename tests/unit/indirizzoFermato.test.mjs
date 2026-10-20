@@ -69,3 +69,18 @@ test('dalla riga di Chromium che rifiuta si ricava l\'indirizzo; da ogni altra r
     assert.equal(indirizzoRifiutatoDaChromium(riga), '', riga);
   }
 });
+
+// #1318 giro 1 — la riga di Chromium la può scrivere anche la pagina: l'avviso nomina il sito e il tipo, mai il percorso.
+test('quello che una pagina web si vede rifiutare nomina il sito, non il percorso scelto dalla pagina', () => {
+  const { avvisoDallaPagina } = require('../../src/main/services/indirizzoFermato.js');
+  assert.equal(avvisoDallaPagina('file:///Chiama il 02 1234 5678 per sbloccare', 'intranet.it').testo, 'File del computer chiesto da intranet.it: bloccato per sicurezza');
+  assert.equal(avvisoDallaPagina('file://nas/condivisa/x.xlsx', 'intranet.it').testo, 'Percorso di rete chiesto da intranet.it: bloccato per sicurezza');
+  assert.equal(avvisoDallaPagina('data:text/html,<b>finta banca</b>', '').testo, 'Indirizzo «data:» chiesto da questa pagina: bloccato per sicurezza');
+  assert.equal(avvisoDallaPagina('zoommtg://x', 'intranet.it'), null);
+});
+
+test('un percorso che Filo non sa dove porta si dice com\'è scritto; un testo qualunque non è un indirizzo', () => {
+  const { avvisoPercorsoScritto, avvisoNonIndirizzo } = require('../../src/main/services/indirizzoFermato.js');
+  assert.equal(avvisoPercorsoScritto('%USERPROFILE%\\Desktop\\conto.pdf'), 'File del computer bloccato per sicurezza: %USERPROFILE%/Desktop/conto.pdf');
+  assert.equal(avvisoNonIndirizzo('ricetta carbonara'), '«ricetta carbonara» non è un indirizzo');
+});

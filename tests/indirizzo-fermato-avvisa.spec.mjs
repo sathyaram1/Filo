@@ -123,14 +123,15 @@ test('su una pagina web il clic su un collegamento a una cartella di rete lo dic
   await page.waitForTimeout(1200);
   await page.mouse.click(40, 130);
   await page.waitForTimeout(600);
-  expect(await nelModello(shell, 'da-sola'), 'un clic finto della pagina non fa nascere avvisi').toBe(0);
-  expect(await nelModello(shell, 'tenuto'), 'un clic che la pagina si tiene non è un indirizzo fermato').toBe(0);
+  expect(await nelModello(shell, 'bloccat'), 'un clic finto della pagina, o uno che la pagina si tiene, non fa nascere avvisi').toBe(0);
 
   await page.mouse.click(40, 30);
-  await expect(await carta(avvisi, 'Percorso di rete bloccato per sicurezza: //nas/condivisa/bilancio.xlsx')).toBeVisible({ timeout: 8000 });
+  // Il percorso lo sceglie la pagina, e lo può imitare: l'avviso nomina il sito (#1318 giro 1).
+  await expect(await carta(avvisi, 'Percorso di rete chiesto da 127.0.0.1')).toBeVisible({ timeout: 8000 });
   await page.mouse.click(40, 30, { button: 'middle' });
   await page.waitForTimeout(400);
-  expect(await nelModello(shell, 'bilancio.xlsx'), 'cliccato di nuovo, l\'avviso resta uno').toBe(1);
+  expect(await nelModello(shell, 'Percorso di rete chiesto'), 'cliccato di nuovo, l\'avviso resta uno').toBe(1);
+  expect(await nelModello(shell, 'bilancio.xlsx')).toBe(0);
   expect(page.url()).toContain('127.0.0.1');
 });
 

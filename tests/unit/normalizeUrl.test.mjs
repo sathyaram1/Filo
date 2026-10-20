@@ -187,3 +187,26 @@ test('#1318 indirizzoDaCaricare: localhost e la rete di casa con la porta sono p
   assert.equal(indirizzoDaCaricare('  https://x.it  '), 'https://x.it');
   assert.equal(indirizzoDaCaricare(''), 'filo://newtab/');
 });
+
+// #1318 giro 1 — un percorso fuori dalle radici conosciute, o fra virgolette chiuse da un punto, resta un file.
+test('#1318 un percorso per forma (secondo disco in /data) o col punto dopo le virgolette è un file', () => {
+  assert.equal(normalizeUrl('/data/progetti/conto.pdf'), 'file:///data/progetti/conto.pdf');
+  assert.equal(normalizeUrl('/dati/conto marzo.pdf'), 'file:///dati/conto%20marzo.pdf');
+  assert.equal(normalizeUrl('"C:\\Users\\agenti AI\\conto.pdf".'), 'file:///C:/Users/agenti%20AI/conto.pdf');
+  assert.ok(normalizeUrl('"ricetta carbonara".').startsWith('https://www.google.com/search?q='));
+});
+
+// #1318 giro 1 — quello che l'assistente chiede di aprire non diventa mai una ricerca su Google.
+test('#1318 indirizzoChiesto: la posta senza mailto va al programma di posta, il resto non diventa una ricerca', () => {
+  const { indirizzoChiesto, sembraPercorso } = globalThis.SN_URL_NAV;
+  assert.equal(indirizzoChiesto('mario.rossi@esempio.it'), 'mailto:mario.rossi@esempio.it');
+  assert.equal(indirizzoChiesto('"mario.rossi@esempio.it"'), 'mailto:mario.rossi@esempio.it');
+  assert.equal(indirizzoChiesto('localhost:3000'), 'http://localhost:3000');
+  assert.equal(indirizzoChiesto('https://www.google.com/search?q=gatti'), 'https://www.google.com/search?q=gatti');
+  assert.equal(indirizzoChiesto('sito.it'), 'https://sito.it');
+  for (const s of ['ricetta carbonara', 'Documenti\\conto.pdf', '%USERPROFILE%\\Desktop\\x.pdf', '$HOME/x.pdf', 'mario@', '']) {
+    assert.equal(indirizzoChiesto(s), s ? '' : 'filo://newtab/', s);
+  }
+  for (const s of ['Documenti\\conto.pdf', '%USERPROFILE%\\Desktop\\x.pdf', '$HOME/x.pdf', './a.txt', '/wiki/Roma']) assert.ok(sembraPercorso(s), s);
+  for (const s of ['ricetta carbonara', 'mario.rossi@esempio.it', 'gatti buffi']) assert.ok(!sembraPercorso(s), s);
+});
