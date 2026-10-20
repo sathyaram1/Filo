@@ -3949,10 +3949,18 @@ function chatSearchesForPrompt(actions) {
     }
     if (cambiTrovati.length) {
       const righe = cambiTrovati.map((c) => `- [${c.id}] ${c.frase}${c.date ? ` · ${new Date(c.date).toLocaleString('it-IT')}` : ''}`);
-      blocks.push(`[I cambi del filo che combaciano con "${cercato}": si rimettono com'erano con ANNULLA_CAMBIO e l'id.]\n`
+      const conMeno = Array.isArray(out.cambiCercatiCon) && out.cambiCercatiCon.length
+        ? ` (nessuno aveva tutte le parole: trovati cercando "${E.perCanaleSistema(out.cambiCercatiCon.join(' '))}", controlla che siano quelli giusti)`
+        : '';
+      blocks.push(`[I cambi del filo che combaciano con "${cercato}"${conMeno}: si rimettono com'erano con ANNULLA_CAMBIO e l'id.]\n`
         + E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.join('\n'), conIntestazione: true }));
     }
     if (!results.length && (pagine.length || cambiTrovati.length)) continue;
+    // Quello che la ricerca aveva trovato l'utente l'ha cancellato dopo: non c'è più, e non è un «riprova».
+    if (!results.length && out.cancellate) {
+      blocks.push(`[Quello che la ricerca di "${cercato}" aveva trovato è stato cancellato dall'utente: non c'è più.]`);
+      continue;
+    }
     if (!results.length) {
       // Zero risultati non vuol dire «quella conversazione non c'è»: vuol dire
       // che nessuna chat contiene tutte quelle parole. Chi legge deve saperlo,
