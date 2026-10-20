@@ -116,6 +116,19 @@ async function bloccoDelGiro(page) {
   expect(order).toEqual(['dash-activity-reasoning', 'dash-activity-note', 'dash-activity-esiti']);
   expect(await nodo.locator('.dash-activity-esiti > .dash-activity-row').count()).toBe(2);
   await expect(body.locator('.dash-activity-seg[data-stato="coda"]')).toContainText('Ora rispondo.');
+}
+
+test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco, una bolla sola', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await giroCercaAgisce(app);
+
+  await page.locator('#input').fill('metti un timer per la pasta e dimmi se sai salvare per dopo');
+  await page.locator('#sendBtn').click();
+  await bloccoDelGiro(page);
   await page.screenshot({ path: 'tests/agent/.out/strumenti-aperto.png' });
 
   // Al modello sono tornati gli esiti nello stesso turno, nella forma del
