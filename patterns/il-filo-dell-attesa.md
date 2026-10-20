@@ -131,7 +131,8 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   quadrato spento e Invio a vuoto non riprende; la ripetizione del tasto non
   conta mai. Al contrario, il quadrato compare sotto il dito che ha appena
   mandato o ripreso: per mezzo secondo (`PAUSA_QUADRATO`) ignora clic e Invio a
-  vuoto, e si accende in quel tempo (#1296, prova A). «Ferma» e «Riprendi» del
+  vuoto, e si accende in quel tempo (#1296, prova A); un seguito appena mandato
+  riarma la stessa pausa (prova B6). «Ferma» e «Riprendi» del
   tasto destro sono scelte deliberate e valgono subito. Lo stesso per i
   riquadri di conferma: il clic fuori nel primo mezzo secondo non annulla, Esc
   e Annulla sì (prova C).
