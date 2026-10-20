@@ -44,6 +44,15 @@ test('una azione: il nome dell\'azione e il suo dettaglio', () => {
     'Aperta una pagina · trenitalia.com');
 });
 
+// #1318 — la mail chiesta all'assistente va al programma di posta: il nodo non dice di una pagina aperta.
+test('una mail, una chiamata o un SMS chiesti all\'assistente non sono una pagina aperta', () => {
+  assert.equal(F.titoloNodo([{ tipo: 'POSTA', testo: '', esito: 'ok' }]), 'Aperto il programma di posta');
+  assert.equal(F.titoloNodo([{ tipo: 'TELEFONO', testo: '', esito: 'ok' }]), 'Aperto il programma per le chiamate');
+  assert.equal(F.titoloNodo([{ tipo: 'SMS', testo: '', esito: 'ok' }]), 'Aperto il programma dei messaggi');
+  assert.equal(F.titoloNodo([{ tipo: 'NAVIGA', testo: 'Link non aperto', esito: 'fallita' }, { tipo: 'POSTA', testo: '', esito: 'ok' }]),
+    '2 azioni · pagina, posta');
+});
+
 test('più azioni dello stesso tipo: il plurale dal verbo e dal conto, al massimo tre dettagli', () => {
   const pagine = ['trenitalia.com', 'italotreno.it', 'omio.it'].map((d) => ({ tipo: 'NAVIGA', testo: '', dettaglio: d, esito: 'ok' }));
   assert.equal(F.titoloNodo(pagine), 'Aperte tre pagine · trenitalia.com, italotreno.it, omio.it');
