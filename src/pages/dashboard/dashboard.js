@@ -1299,8 +1299,9 @@
     const r = await runFiloTurn({ ...args, activity });
     if (r && r._chiusura) {
       const propria = r._chiusura.catch(() => {}).then(() => { activity.finish(); refreshLive().catch(() => {}); });
-      const fine = Promise.all([chiusuraInCorso, propria]).then(() => { if (chiusuraInCorso === fine) chiusuraInCorso = null; });
-      chiusuraInCorso = fine;
+      const chat = r._chat;
+      const fine = Promise.all([chiusuraDi(chat), propria]).then(() => { if (chiusure.get(chat) === fine) chiusure.delete(chat); });
+      chiusure.set(chat, fine);
     } else {
       activity.finish({ failed: !r?.ok });
     }
