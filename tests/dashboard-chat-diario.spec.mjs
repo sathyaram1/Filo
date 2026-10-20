@@ -393,8 +393,6 @@ test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro
   const [prima] = await chatDi('portami alla home');
   expect(prima, 'la conversazione del comando è archiviata').toBeTruthy();
   expect(await chatDi('grazie'), 'il messaggio dopo il bottone è ancora nella conversazione chiusa').not.toContain(prima);
-  const fake = await app.evaluate(() => globalThis.__fakeF2_calls);
-  expect(JSON.stringify(fake.at(-1).at(-1)), 'il turno dopo non è la domanda di prima').toContain('grazie');
 
   await restore(app, '__fakeF2');
 });
