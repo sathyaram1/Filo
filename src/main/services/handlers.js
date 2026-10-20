@@ -2467,14 +2467,12 @@ async function eseguiAzioneFilo(action, {
         // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
         // iniettare istruzioni nel modello (prompt injection) per fargli aprire
         // un file://attacker (leak hash NTLM su Windows) o data:/javascript:.
-        // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
-        // "nudo" (es. "example.com") non parsa e prosegue: openTab → normalizeUrl
-        // gli antepone https://.
+        // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui.
         // Si giudica quello che diventerà caricandolo, con la regola di chi apre le schede: un percorso del computer,
         // anche fra virgolette, è un file (#482 giro 2, #1318); «localhost:3000» è un server, non uno schema.
         const caricato = globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(url) || url;
         let proto = '';
-        try { proto = new URL(caricato).protocol.toLowerCase(); } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
+        try { proto = new URL(caricato).protocol.toLowerCase(); } catch (_) {}
         if (proto && !['http:', 'https:', 'filo:'].includes(proto)) {
           // La posta, il telefono e gli SMS vanno al programma del computer, come cliccati in una pagina (#1318).
           const tm = winOf(sender)?._filoTabs;
