@@ -503,6 +503,20 @@ test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non 
   }
 });
 
+// Fra le schede non c'è un tasto che apra il pannello (#941): lo apre una domanda su un programma, con l'elenco sotto.
+async function domandaSuUnProgramma(nome, { shell, openTab, testServer }) {
+  const exe = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': exe.length, 'Content-Disposition': `attachment; filename="${nome}"` });
+    res.end(exe);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px"><a id="exe" href="http://127.0.0.1:${srv.address().port}/${nome}">Programma</a></body></html>`);
+  await page.locator('#exe').click();
+  await expect(shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: nome })).toBeVisible({ timeout: 20000 });
+  return async () => { try { srv.closeAllConnections?.(); } catch (_) {} await new Promise((r) => srv.close(r)); };
+}
+
 async function sceltaDalPannello(shell, riga, testo) {
   await riga.click({ button: 'right' });
   const voce = shell.locator('#dl-panel .dl-row-menu .dl-row-menu-voce', { hasText: testo });
@@ -515,9 +529,9 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
   test.setTimeout(120_000);
   await modelloDeiNomi(app);
   const { rec, chiudi } = await scarica('scan_00231.pdf', BOLLETTA, { shell, openTab, testServer });
+  const chiusure = [chiudi];
   try {
-    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
-    await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
+    chiusure.push(await domandaSuUnProgramma('setup.exe', { shell, openTab, testServer }));
     const riga = shell.locator('#dl-panel .dl-row', { hasText: 'scan_00231.pdf' });
     await expect(riga).toBeVisible();
     // Esc chiude il menu della riga, non il pannello.
@@ -536,13 +550,13 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
     const nuovo = join(rec.savePath, '..', NOME_NUOVO);
     expect(existsSync(nuovo)).toBe(true);
 
-    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
+    chiusure.push(await domandaSuUnProgramma('installa.exe', { shell, openTab, testServer }));
     const rinominata = shell.locator('#dl-panel .dl-row', { hasText: NOME_NUOVO });
     await expect(rinominata).toBeVisible({ timeout: 10000 });
     await sceltaDalPannello(shell, rinominata, 'Rimetti il nome di prima');
     await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
     await expect(shell.locator('#dl-panel .dl-row', { hasText: 'Nome di prima rimesso: scan_00231.pdf' })).toBeVisible({ timeout: 10000 });
-  } finally { await chiudi(); }
+  } finally { for (const c of chiusure) await c(); }
 });
 
 test('in chat, mentre Filo legge un lotto di file: la riga d\'attesa dice che legge i file e quanti ne ha letti', async ({ app }) => {

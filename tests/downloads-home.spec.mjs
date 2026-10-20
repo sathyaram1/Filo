@@ -122,6 +122,10 @@ test('nella home una domanda su un programma apre il pannello, che si chiude con
     await expect(chiudi).toBeVisible();
     await chiudi.hover();
     await shell.screenshot({ path: join(SHOTS, 'download-941-pannello.png') });
+    await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+    await expect.poll(() => shell.evaluate(() => getComputedStyle(document.querySelector('#dl-panel')).backgroundColor)).not.toBe('rgb(255, 255, 255)');
+    await shell.waitForTimeout(400);
+    await shell.screenshot({ path: join(SHOTS, 'download-941-pannello-scuro.png') });
 
     await chiudi.click();
     await expect(shell.locator('#dl-panel')).toBeHidden();

@@ -10,17 +10,17 @@
 //
 // Entrambe hanno la stessa causa e la stessa cura: scrivere il file su disco
 // mentre arriva invece che alla fine. Da lì il tetto sparisce e i byte ricevuti
-// diventano un dato di avanzamento mostrabile — e l'unico posto sensato dove
-// mostrarlo è la barra degli scaricamenti che Filo ha già (#410.1), la stessa
-// che segue i download partiti da un link.
+// diventano un dato di avanzamento mostrabile, nei posti dove Filo segue già i
+// download partiti da un link (#410.1): la pagina Download e le carte della home
+// (fra le schede non c'è più un tasto dei download, #941).
 //
 // Gli assert sono di SUCCESSO:
 //  - il file cresce su disco MENTRE il trasferimento è ancora in corso (prima
 //    non esisteva niente fino all'ultimo byte);
-//  - la barra mostra il filmato in arrivo con una percentuale intermedia;
+//  - la pagina Download mostra il filmato in arrivo con barra e percentuale intermedia;
 //  - un file più grande del vecchio tetto arriva integro;
 //  - "Annulla" ferma davvero il trasferimento.
-// Senza il fix: nessuna voce nella barra, nessun file parziale, e il file oltre
+// Senza il fix: nessuna voce fra i download, nessun file parziale, e il file oltre
 // il tetto non arriva mai → rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -77,6 +77,13 @@ async function saveVideo(page) {
   await item.click();
 }
 
+const attiva = (shell, prefisso) => shell.evaluate(async (pre) => {
+  const s = await window.filoShell.tabs.snapshot();
+  const t = (s.tabs || []).find((x) => String(x.url || '').startsWith(pre));
+  if (t) await window.filoShell.tabs.activate(t.id);
+  return !!t;
+}, prefisso);
+
 const partsIn = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.filo-part')) : []);
 
 const entryNamed = async (shell, name) => {
@@ -84,11 +91,13 @@ const entryNamed = async (shell, name) => {
   return ((r && r.items) || []).find((it) => it.filename === name) || null;
 };
 
-test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanzamento', async ({ app, shell, openTab, testServer }) => {
+test('salvando un filmato il file cresce su disco e la pagina Download ne mostra l\'avanzamento', async ({ app, shell, openTab, testServer }) => {
   // ~7,5MB in 30 blocchi da 200ms: ~6 secondi di trasferimento, abbastanza per
   // osservarlo senza che il test debba correre.
   const media = await slowServer({ chunk: 256 * 1024, chunks: 30, gapMs: 200, contentType: 'video/mp4' });
   try {
+    // La pagina Download aperta in un'altra scheda: è lì che l'utente segue il filmato mentre scende.
+    const dl = await openTab('filo://downloads/downloads.html');
     const page = await testServer.openReady(openTab, pageWithVideo(media.url('filmato.mp4')));
     const pageUrl = page.url();
     const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
@@ -107,28 +116,25 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
     const firstSize = existsSync(part) ? statSync(part).size : 0;
     expect(firstSize).toBeLessThan(media.total); // il file c'è ed è ancora parziale
 
-    // 2) L'AVANZAMENTO È MOSTRATO, e la barra in alto lo sta dicendo all'utente.
-    //    Il primo istante utile viene "agganciato": il trasferimento prosegue
-    //    mentre il test guarda, quindi ciò che conta è averlo visto in corso.
+    // 2) L'AVANZAMENTO È MOSTRATO all'utente: nella pagina Download la voce del
+    //    filmato ha barra e percentuale mentre scende. Il primo istante utile
+    //    viene "agganciato": ciò che conta è averlo visto in corso.
+    expect(await attiva(shell, 'filo://downloads/')).toBe(true);
+    const voceDl = dl.locator('.dl-item[data-state="progressing"]', { has: dl.locator('.dl-name', { hasText: 'filmato.mp4' }) });
     let live = null;
     let bar = null;
     await expect.poll(async () => {
       const e = await entryNamed(shell, 'filmato.mp4');
       if (e && e.state === 'progressing' && e.receivedBytes > 0 && !live) {
-        live = e;
-        bar = await shell.evaluate(() => {
-          const btn = document.getElementById('dl-indicator');
-          const fill = document.getElementById('dl-ind-fill');
-          if (!btn || !fill) return { missing: true };
-          return {
-            hidden: !!btn.hidden,
-            active: btn.classList.contains('active'),
-            width: fill.style.width,
-          };
-        });
+        const vista = await voceDl.evaluate((el) => ({
+          meta: (el.querySelector('.dl-meta') || {}).textContent || '',
+          width: (el.querySelector('.dl-fill') || { style: {} }).style.width || '',
+        }), null, { timeout: 500 }).catch(() => null);
+        if (vista && /\d+%/.test(vista.meta)) { live = e; bar = vista; }
       }
       return live ? 'in corso' : (e ? e.state : 'assente');
     }, { timeout: 20000 }).toBe('in corso');
+    expect(await attiva(shell, pageUrl)).toBe(true);
 
     // Il peso dichiarato dal server è noto ⇒ l'avanzamento è una percentuale
     // vera, non una rotella: è ciò che il feedback chiedeva.
@@ -136,9 +142,6 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
     const percent = Math.round((live.receivedBytes / live.totalBytes) * 100);
     expect(percent).toBeGreaterThan(0);
     expect(percent).toBeLessThan(100);
-    expect(bar.missing, 'l\'indicatore degli scaricamenti non esiste nella shell').toBeFalsy();
-    expect(bar.hidden).toBe(false);
-    expect(bar.active).toBe(true);
     expect(bar.width).not.toBe('');
     expect(bar.width).not.toBe('0%');
 
@@ -194,7 +197,7 @@ test('"Annulla" ferma davvero il trasferimento e non lascia file a metà', async
 
     await saveVideo(page);
 
-    // Aspetta che sia davvero partito, poi annulla dalla barra.
+    // Aspetta che sia davvero partito, poi annulla come fanno la home e i Download.
     let id = null;
     await expect.poll(async () => {
       const e = await entryNamed(shell, 'lungo.mp4');

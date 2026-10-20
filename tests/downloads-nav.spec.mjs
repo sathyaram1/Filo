@@ -1,10 +1,10 @@
 // #410.1 — Scaricamenti "nativi" della navigazione: cliccando un link a un file
 // (che il server serve come allegato) Filo deve intercettare il download,
-// mostrarne l'avanzamento nella barra in alto, scrivere il file su disco,
-// avvisare a fine scaricamento e registrarlo in una cronologia persistente.
+// scrivere il file su disco, avvisare a fine scaricamento e registrarlo in una
+// cronologia persistente.
 //
 // I test asseriscono il SUCCESSO (il file arriva + la cronologia segna
-// "completato" + compare l'indicatore e il toast di conferma), non l'assenza di
+// "completato" + compare il toast di conferma), non l'assenza di
 // un errore. Senza l'intercettazione (il fix): nessun file gestito, nessuna voce
 // di cronologia → rosso.
 //
