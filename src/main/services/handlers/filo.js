@@ -81,7 +81,7 @@ module.exports = function register(on, ctx) {
     } finally {
       fineLavoro();
     }
-  }));
+  }
 
   // Il quadrato al posto dell'invio (#578): ferma il turno di questa scheda, non quello di un'altra.
   on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
