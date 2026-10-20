@@ -447,7 +447,7 @@
     s.left = l + 'px'; s.top = t + 'px'; s.width = (d - l) + 'px'; s.height = (b - t) + 'px';
   }
 
-  // Un nostro pezzo sopra il menu (avviso, conferma): copre anche lui, ma non è il sito.
+  // Un nostro pezzo sopra il menu (una conferma; la pila degli avvisi scende sotto): copre anche lui, ma non è il sito.
   function coperturaNostra(r) {
     const Ui = global.SN_FILO_UI;
     if (!r || !Ui || typeof Ui.aperti !== 'function') return false;
