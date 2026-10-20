@@ -79,3 +79,17 @@ export function tutteCon(zip, come) {
   }
   return out;
 }
+
+// Il record finale rovinato (#1088.5): `conContoVoci` gli cambia il numero di voci, `conFirmaFinaleRotta` la firma.
+export function conContoVoci(zip, n) {
+  const out = Buffer.from(zip);
+  out.writeUInt16LE(n, out.length - 22 + 8);
+  out.writeUInt16LE(n, out.length - 22 + 10);
+  return out;
+}
+
+export function conFirmaFinaleRotta(zip) {
+  const out = Buffer.from(zip);
+  out[out.length - 22] ^= 0xff;
+  return out;
+}

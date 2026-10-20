@@ -301,3 +301,34 @@ test('con l\'indice in fondo rotto le voci che non si raggiungono si contano: ni
   const senza = buildExportZip({ clip: [{ d: RED_PNG_URL }] });
   assert.equal(readExportZip(conIndiceRotto(senza, 'images/img-1.png')).filoPerso, false);
 });
+
+// #1088.5 — il record finale dice dove finisce l'indice e quante voci ha: se il numero si rovina verso il basso le
+// voci dopo arrivano lo stesso, e una firma rovinata con l'indice intatto non fa dire «non è di Filo».
+test('record finale rovinato: il conto delle voci o la firma sbagliati non perdono immagini e chat', async () => {
+  const { conContoVoci, conFirmaFinaleRotta, conIndiceRotto } = await import('../helpers/zipRovinato.mjs');
+  const jpeg = `data:image/jpeg;base64,${Buffer.from('finta-jpeg').toString('base64')}`;
+  const original = { savedPages: [{ id: 'p1', thumbnail: RED_PNG_URL }, { id: 'p2', thumbnail: jpeg }] };
+  const zip = buildExportZip(original, { filo: '{"tipo":"chat"}\n' });
+  assert.equal(unzip(zip).voci.size, 5, 'dati, manifesto, filo e due immagini');
+
+  for (const [nome, rovinato] of [['conto da 5 a 1', conContoVoci(zip, 1)], ['firma', conFirmaFinaleRotta(zip)],
+    ['conto e firma', conFirmaFinaleRotta(conContoVoci(zip, 1))]]) {
+    const back = readExportZip(rovinato);
+    assert.deepEqual(back.data, original, `${nome}: le anteprime tornano immagini`);
+    assert.equal(back.imageCount, 2, nome);
+    assert.equal(back.immaginiPerse, 0, nome);
+    assert.equal(String(back.filo), '{"tipo":"chat"}\n', `${nome}: le chat arrivano`);
+    assert.equal(back.filoPerso, false, nome);
+    assert.equal(unzip(rovinato).mancanti, 0, nome);
+  }
+
+  // Il conto rovinato verso l'alto non inventa voci perse: l'indice finisce dove dice la sua dimensione.
+  assert.equal(unzip(conContoVoci(zip, 9)).mancanti, 0);
+
+  // Conto rovinato e indice interrotto insieme: le voci che non si raggiungono si contano dalle righe rimaste.
+  const due = conContoVoci(conIndiceRotto(zip, 'filo/eventi.jsonl'), 1);
+  assert.equal(unzip(due).mancanti, 3, 'il filo e le due immagini dopo di lui');
+  const back = readExportZip(due);
+  assert.equal(back.filoPerso, true);
+  assert.equal(back.immaginiPerse, 2);
+});
