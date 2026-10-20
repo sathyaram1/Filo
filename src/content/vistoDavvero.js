@@ -15,7 +15,7 @@
   // Una voce appena scoperta aspetta mezzo secondo: un velo tolto mentre la mano parte non lascia il tempo di
   // vedere cosa c'è sotto (la stessa misura del popup di conferma).
   const RITARDO_MS = 500;
-  // Scoperta da un pezzo nostro che se ne va (avviso, conferma): niente attesa, se il browser lo dice entro questo
+  // Scoperta da un pezzo nostro che se ne va (una conferma): niente attesa, se il browser lo dice entro questo
   // tempo; oltre, a coprire era qualcun altro.
   const SCARTO_NOSTRO_MS = 300;
   // Sonde allo stesso piano del menu e DOPO di lui: le copre tutto ciò che copre il menu, mai i pezzi del menu.
