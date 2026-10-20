@@ -9,18 +9,32 @@
 //  (F) dopo uno stop durante un'azione lenta, una conversazione nuova risponde senza aspettare quell'azione.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, aspettaConfermaPronta } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, aspettaConfermaPronta, pointWhenConfirmAppears } from './helpers/confirm.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 import {
   newtabPage, configureModel, copione, ripristina, testoDellaChiamata, ricercaLenta, lasciaLaRicerca, ricercaPartita,
   quadratoPronto,
 } from './helpers/copione.mjs';
 
+// Come le Preferenze: il cambio passa dal main e arriva a tutte le pagine aperte.
+async function impostazioni(app, settings) {
+  await app.evaluate(async (_, st) => globalThis.__filoHandlers.handleMessage(
+    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: st },
+    { url: 'filo://preferences/preferences.html' },
+  ), settings);
+}
 const chiamate = (app) => app.evaluate(() => globalThis.__messaggi.length);
 const ultimaChiamata = (app) => app.evaluate(() => globalThis.__messaggi[globalThis.__messaggi.length - 1]);
+// Il testo delle bolle senza il segno dei cambi (#867), che ha le sue parole.
 const ordineDelFilo = (page) => page.evaluate(() => [...document.querySelectorAll('#bubbles .dash-bubble, #bubbles .dash-bubble-fermato')]
   .filter((b) => !b.hidden && (b.textContent || '').trim())
-  .map((b) => `${b.classList.contains('dash-bubble-user') ? 'utente' : b.classList.contains('dash-bubble-fermato') ? 'fermo' : 'filo'}: ${(b.textContent || '').trim()}`));
+  .map((b) => {
+    const copia = b.cloneNode(true);
+    copia.querySelectorAll('.dash-cambi-segno, .dash-cambi-pop').forEach((x) => x.remove());
+    const chi = b.classList.contains('dash-bubble-user') ? 'utente' : b.classList.contains('dash-bubble-fermato') ? 'fermo' : 'filo';
+    return `${chi}: ${(copia.textContent || '').trim()}`;
+  }));
 
 test('A — doppio clic sul tasto d\'invio: la risposta arriva, il quadrato appena comparso non ferma', async ({ app, shell }) => {
   test.setTimeout(60_000);
@@ -184,19 +198,20 @@ test('B3 — fermare con un seguito in attesa lo rimette nella casella; dal tast
   // Dal tasto destro sul seguito in attesa: «Rimetti nella casella», e non parte più.
   await page.locator('#input').press('Enter');
   await quadratoPronto(page);
-  await page.locator('#input').fill('questo no');
+  await page.locator('#input').fill('zebra viola quaranta');
   await page.locator('#input').press('Enter');
-  const attesa = page.locator('.dash-bubble-attesa', { hasText: 'questo no' });
+  const attesa = page.locator('.dash-bubble-attesa', { hasText: 'zebra viola quaranta' });
   await expect(attesa).toBeVisible({ timeout: 1_000 });
   await attesa.click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Rimetti nella casella').click();
   await expect(page.locator('.dash-bubble-attesa')).toHaveCount(0);
-  await expect(page.locator('#input')).toHaveValue('questo no');
+  await expect(page.locator('#input')).toHaveValue('zebra viola quaranta');
   await page.locator('#stopBtn').click();
-  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(1, { timeout: 5_000 });
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(2, { timeout: 5_000 });
+  await expect(page.locator('#input')).toHaveValue('zebra viola quaranta');
   await page.waitForTimeout(800);
   expect(await chiamate(app)).toBe(2);
-  expect(testoDellaChiamata(await ultimaChiamata(app))).not.toContain('questo no');
+  expect(testoDellaChiamata(await ultimaChiamata(app))).not.toContain('zebra viola quaranta');
   await ripristina(app);
 });
 
@@ -205,6 +220,8 @@ test('C — la conferma che si apre da sola non si chiude per un clic fuori ment
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  // A Conservativo un cambio di impostazione chiede l'OK: il riquadro si apre da solo.
+  await livelloAutonomia(app, 'conservativo');
   await copione(app, [
     { pensa: ['Imposto lo stile. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'c1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'stile_agente', valore: 'Rispondi in breve.' }) }] },
     { pensa: ['Chiedo conferma. '], ogni: 100, testo: 'Ti chiedo conferma.' },
@@ -212,7 +229,7 @@ test('C — la conferma che si apre da sola non si chiude per un clic fuori ment
   await page.locator('#input').fill('rispondimi in breve da ora in poi');
   await page.locator('#input').press('Enter');
   // Il clic che l'utente aveva già in corso cade sullo sfondo nell'istante in cui il riquadro compare.
-  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect(await pointWhenConfirmAppears(page, 'cancel')).toBeTruthy();
   await page.mouse.click(8, 8);
   await page.waitForTimeout(150);
   await page.mouse.click(8, 8);
@@ -247,6 +264,10 @@ test('D — fermato prima del primo pensiero: la punta del filo tagliato non cop
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  // Senza movimento il blocco si apre subito e il filo si disegna una volta sola: la geometria finale, senza dipendere
+  // da quanti fotogrammi la finestra delle prove disegna mentre la riga in testa si apre.
+  await impostazioni(app, { themeTokens: { motion: '0' } });
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sn-motion').trim()), { timeout: 5_000 }).toBe('0');
   // Un modello che non mostra il ragionamento: niente trama, solo l'attesa.
   await copione(app, [{ prima: 30_000, testo: 'Mai.' }]);
   await page.locator('#input').fill('una domanda');
@@ -255,18 +276,18 @@ test('D — fermato prima del primo pensiero: la punta del filo tagliato non cop
   await page.locator('#stopBtn').click();
   const nota = page.locator('.dash-bubble-fermato');
   await expect(nota).toHaveText('Fermato prima della risposta.', { timeout: 5_000 });
-  await page.waitForTimeout(800);
+  for (let i = 0; i < 4; i++) { await page.screenshot(); await page.waitForTimeout(150); }
   const misure = await page.evaluate(() => {
     const blocco = document.querySelector('.dash-activity[data-fermato="1"]');
     const tratto = blocco.querySelector('.dash-activity-filo-tratto');
     const svg = tratto.ownerSVGElement.getBoundingClientRect();
     const bb = tratto.getBBox();
-    const r = document.querySelector('.dash-bubble-fermato').getBoundingClientRect();
-    return { punta: svg.top + bb.y + bb.height, sinistraPunta: svg.left + bb.x, destraPunta: svg.left + bb.x + bb.width, nota: r.top, notaSinistra: r.left, fondoBlocco: blocco.getBoundingClientRect().bottom };
+    return { punta: svg.top + bb.y + bb.height, fondoBlocco: blocco.getBoundingClientRect().bottom, nota: document.querySelector('.dash-bubble-fermato').getBoundingClientRect().top };
   });
   await page.screenshot({ path: 'tests/.shots/secondo-gesto-fermato-senza-pensiero.png' });
   expect(misure.punta, JSON.stringify(misure)).toBeLessThanOrEqual(misure.fondoBlocco + 0.5);
-  expect(misure.punta, JSON.stringify(misure)).toBeLessThanOrEqual(misure.nota);
+  expect(misure.punta, JSON.stringify(misure)).toBeLessThan(misure.nota);
+  await impostazioni(app, { themeTokens: {} });
   await ripristina(app);
 });
 
