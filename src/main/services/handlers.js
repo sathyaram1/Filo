@@ -5836,7 +5836,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     throw e;
   } finally {
-    if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
+    turno.chiuso = !fermato;
+    togliTurno(reasoningReqId, turno);
   }
   if (!fermato && lasciati.size) {
     for (const a of lasciati.values()) {
