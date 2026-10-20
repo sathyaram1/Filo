@@ -1,4 +1,4 @@
-// La riga che dice all'utente quale indirizzo Filo ha fermato per sicurezza e perché (#482). PURA, senza electron.
+// La riga che dice all'utente quale indirizzo è stato fermato per sicurezza e perché (#482). PURA, senza electron.
 // Non decide cosa fermare (lo fa isWebUnsafeNav in tabs.js) e non offre «Apri comunque»: qui non c'è niente da scavalcare.
 // Prova: tests/unit/indirizzoFermato.test.mjs.
 
