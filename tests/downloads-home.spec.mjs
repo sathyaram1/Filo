@@ -123,8 +123,10 @@ test('nella home una domanda su un programma apre il pannello, che si chiude con
     await chiudi.hover();
     await shell.screenshot({ path: join(SHOTS, 'download-941-pannello.png') });
     await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
-    await expect.poll(() => shell.evaluate(() => getComputedStyle(document.querySelector('#dl-panel')).backgroundColor)).not.toBe('rgb(255, 255, 255)');
-    await shell.waitForTimeout(400);
+    await expect.poll(() => shell.evaluate(() => {
+      const [r, g, b] = getComputedStyle(document.querySelector('#dl-panel')).backgroundColor.match(/\d+/g).map(Number);
+      return r + g + b < 384;
+    }), { timeout: 10_000 }).toBe(true);
     await shell.screenshot({ path: join(SHOTS, 'download-941-pannello-scuro.png') });
 
     await chiudi.click();
