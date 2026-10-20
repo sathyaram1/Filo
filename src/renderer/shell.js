@@ -2200,8 +2200,6 @@
       ensurePanel();
       panelOpen = true;
       panel.hidden = false;
-      dlBtn.hidden = indicatoreNascosto();
-      dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
       // I file possono essere spariti dal disco mentre il pannello era chiuso
