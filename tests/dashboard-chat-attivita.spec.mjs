@@ -160,8 +160,10 @@ test('B — senza ragionamento del modello: nessuna scritta, solo il filo che pe
   await app.evaluate(async () => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreProvider2 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    // L'attesa dura finché la prova l'ha guardata, non 2,5 s che sotto carico finivano prima dei suoi controlli.
+    const guardata = new Promise((r) => { globalThis.__rispondi2 = r; });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
-      await new Promise((r) => setTimeout(r, 2500));
+      await guardata;
       const text = JSON.stringify({ text: 'Risposta senza reasoning.', actions: [] });
       try { onDelta && onDelta(text); } catch (_) {}
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
