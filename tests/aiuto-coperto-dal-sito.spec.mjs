@@ -38,10 +38,12 @@ const contaAscolti = (app, page) => nelMondoDiFilo(app, page, () => {
   return true;
 });
 const ascolti = (app, page) => nelMondoDiFilo(app, page, () => globalThis.__ascolti);
-// La guardia conterebbe un clic adesso (il browser l'ha visto scoperto, e non da poco).
+// La guardia conterebbe un clic adesso (il browser l'ha visto scoperto, e non da poco). Un bottone che la guardia non
+// guarda è sempre pronto: senza la cura le prove cadono sul clic sotto il velo, non qui.
 const pronto = (app, page, sel) => nelMondoDiFilo(app, page, (s) => {
   const el = document.querySelector(s);
-  return !!el && globalThis.SN_VISTO._test.pronta(el);
+  const V = globalThis.SN_VISTO;
+  return !!el && (V._test.stato(el) === null || V._test.pronta(el));
 }, sel);
 
 async function centro(locator) {
@@ -83,6 +85,8 @@ test('il microfono dell\'Aiuto sotto il velo del sito non si accende e lo dice; 
   await expect.poll(() => ascolti(app, page)).toBe(2);
 
   // Un velo più basso del menu ma più alto dell'Aiuto lo copre lo stesso: le sonde stanno all'altezza dell'Aiuto.
+  await expect(avvisoCoperto(page), 'sotto un velo che resta, un avviso solo').toHaveCount(1);
+  await expect(avvisoCoperto(page)).toHaveCount(0, { timeout: 8_000 });
   const z = Number(await page.locator('.sn-sidebar').evaluate((el) => getComputedStyle(el).zIndex));
   await page.evaluate((zz) => window.stendi(zz), z + 3);
   await page.waitForTimeout(700);
