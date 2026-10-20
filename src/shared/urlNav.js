@@ -150,16 +150,40 @@
   // posta, e un data:/javascript: sfuggiva all'avviso di chi lo ferma. Un altro «parola:» resta testo («ricetta: pasta»).
   const SCHEMI_SENZA_BARRE = /^(?:mailto|tel|sms|data|javascript|file):/i;
 
-  // Un percorso del computer scritto com'è (\\nas\cartella, C:\…, /home/…, ~/…) è un file, non una ricerca (#482 giro 2):
-  // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file.
-  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|Volumes|root|srv|usr|Library|Applications|System)(?:\/|$)/;
+  // La pulizia dei percorsi, una sola per chi apre e per chi legge i documenti (#1318): un percorso arriva fra virgolette
+  // («Copia come percorso» di Windows), fra apici inversi (un modello) o come indirizzo file:.
+  const VIRGOLETTE = { '"': '"', '\'': '\'', '`': '`', '“': '”', '‘': '’', '«': '»', '„': '“' };
+  function senzaVirgolette(input) {
+    let s = String(input == null ? '' : input).trim();
+    while (s.length >= 2 && VIRGOLETTE[s[0]] === s[s.length - 1]) s = s.slice(1, -1).trim();
+    return s;
+  }
+  // Il percorso sul disco: file:///C:/x → C:/x, file://nas/x → \\nas\x, file:///home/x → /home/x.
+  function percorsoPulito(input) {
+    const s = senzaVirgolette(input);
+    if (!/^file:/i.test(s)) return s;
+    let u;
+    try { u = new URL(s); } catch (_) { return s; }
+    let p = u.pathname;
+    try { p = decodeURIComponent(p); } catch (_) {}
+    if (/^\/(?:[a-z]:|~)(?:\/|$)/i.test(p)) p = p.slice(1);
+    const host = u.hostname && u.hostname.toLowerCase() !== 'localhost' ? u.hostname : '';
+    return host ? `\\\\${host}${p.replace(/\//g, '\\')}` : p;
+  }
+
+  // Un percorso del computer è un file, non una ricerca (#482 giro 2, #1318): diventato ricerca, il percorso privato
+  // finiva su Google invece di essere fermato e detto come ogni file. Una radice fuori elenco conta se finisce in un file.
+  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|run|Volumes|root|srv|usr|Library|Applications|System|Network|dev|proc|sys|boot|snap|nix|gnu|cdrom|bin|sbin|lib|lib32|lib64|cygdrive|sdcard|storage)(?:\/|$)/;
+  const FILE_IN_UNA_CARTELLA = /^\/[^/\s][^/]*\/(?:[^/]+\/)*[^/]*\.[a-z0-9]{1,10}$/i;
   const pezzi = (s) => s.replace(/\\/g, '/').split('/').map((p) => encodeURIComponent(p)).join('/');
-  function percorsoDelComputer(raw) {
+  function percorsoDelComputer(input) {
+    if (/^file:/i.test(senzaVirgolette(input))) return senzaVirgolette(input);
+    const raw = percorsoPulito(input);
     let m = /^\\\\([^\\/\s?#]+)(?:[\\/](.*))?$/.exec(raw);
     if (m) return `file://${m[1]}/${pezzi(m[2] || '')}`;
     m = /^([a-z]):[\\/](.*)$/i.exec(raw);
     if (m) return `file:///${m[1]}:/${pezzi(m[2])}`;
-    if (RADICI_DEL_COMPUTER.test(raw)) return `file://${pezzi(raw)}`;
+    if (RADICI_DEL_COMPUTER.test(raw) || FILE_IN_UNA_CARTELLA.test(raw)) return `file://${pezzi(raw)}`;
     if (/^~(?:[\\/]|$)/.test(raw)) return `file:///${pezzi(raw)}`;
     return null;
   }
