@@ -166,6 +166,30 @@ test('B — Invio con del testo mentre Filo lavora: il lavoro va in fondo e il s
   await ripristina(app);
 });
 
+test('B6 — un seguito mandato con un doppio Invio: il secondo colpo trova la casella vuota e non ferma il lavoro', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await copione(app, [
+    { pensa: ['Ci penso a lungo. ', 'Ancora. ', 'Ancora un po\'. ', 'Quasi. '], ogni: 700, testo: 'Ecco il primo lavoro.' },
+    { pensa: ['Il seguito. '], ogni: 100, testo: 'Ecco anche il seguito.' },
+  ]);
+  await page.locator('#input').fill('fammi un lavoro lungo');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-activity-trama').last()).toContainText('a lungo', { timeout: 6_000 });
+  await quadratoPronto(page);
+  await page.locator('#input').fill('e poi fai anche questo');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(80);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco il primo lavoro.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco anche il seguito.' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
+  await expect(page.locator('#input')).toHaveValue('');
+  await ripristina(app);
+});
+
 test('B2 — il seguito arrivato all\'ultimo passo parte appena il turno finisce, e ha la sua risposta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
