@@ -126,10 +126,12 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_APRI_PROPOSTA, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     // Letto come lo legge NAVIGA, che il suggerimento ripete: «localhost:3000» è un server, un percorso è un file (#1318).
-    const url = globalThis.SN_URL_NAV.indirizzoDaCaricare(String((msg && msg.url) || ''));
+    const scritto = String((msg && msg.url) || '').trim();
+    if (!scritto) return { ok: false, error: 'indirizzo non ammesso' };
+    const url = globalThis.SN_URL_NAV.indirizzoDaCaricare(scritto);
     const web = /^https?:/i.test(url);
     if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) {
-      const avviso = require('../indirizzoFermato').avvisoIndirizzoFermato(url);
+      const avviso = /^filo:/i.test(url) ? null : require('../indirizzoFermato').avvisoIndirizzoFermato(url);
       return { ok: false, error: 'indirizzo non ammesso', ...(avviso ? { frase: avviso.testo } : {}) };
     }
     const win = winOf(sender);
