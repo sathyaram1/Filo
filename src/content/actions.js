@@ -580,7 +580,7 @@
   // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
   // - Parte solo dietro un gesto vero che seleziona (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
-  let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
+  let prefetchedExplain = null; // { key, sentence, promise<{text}|{errore: risposta dell'IPC}> }
   let prefetchTimer = null;
   // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
   const PREFETCH_MAX_CHARS = 2000;
@@ -663,6 +663,11 @@
       return pre.promise.then((res) => (pre.fermata ? chiedi() : { ...res, giaChiesta: true }));
     }
     return chiedi();
+  }
+
+  // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
+  function chiudiMenu() {
+    try { global.SN_MENU?.close?.(); } catch (_) {}
   }
 
   function buildInlineExplain(selInfo, opts = {}) {
