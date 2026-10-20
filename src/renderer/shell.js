@@ -1886,11 +1886,6 @@
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
 
-    // #1112 — nella home i download si vedono già (carte a sinistra, «Download» in «Altro»): lì l'indicatore
-    // c'è solo a pannello aperto, che una domanda sui programmi apre da sé (#588).
-    let suHome = true;
-    const indicatoreNascosto = () => dls.size === 0 || (suHome && !panelOpen);
-
     function fmtBytes(n) {
       n = Number(n) || 0;
       if (n < 1024) return `${n} B`;
