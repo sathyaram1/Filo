@@ -1804,7 +1804,11 @@
 
   inputForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (sending) return;
+    // Mentre Filo lavora l'invio non ha tasto (c'è il quadrato): arriva qui solo dal microfono, e fa quello di Invio.
+    if (sending) {
+      if (inputEl.value.trim() || pendingImages.length || pendingFiles.length) accodaSeguito();
+      return;
+    }
     const text = inputEl.value.trim();
     // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
     if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
