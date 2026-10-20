@@ -1,5 +1,6 @@
-// #1112 — nella home i download si vedono già (carte a sinistra, «Download» in «altro»): lì l'indicatore in alto
-// non c'è, nelle altre schede sì, e compare solo col suo pannello aperto. La pagina si chiama «Download» ovunque.
+// #941 — fra le schede, accanto ai tasti della finestra, non c'è un tasto dei download: i download stanno nella
+// home (carte a sinistra, «Download» in «altro») e nella pagina «Download» (#1112). Il pannello in alto si apre
+// solo per una domanda su un programma e si chiude con la sua ×.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
@@ -52,56 +53,57 @@ const paginaConLink = (srv, { openTab, testServer }) => testServer.openReady(ope
   <a id="pdf" href="${srv.base}/report.pdf">Scarica il report</a>
   <a id="exe" href="${srv.base}/setup.exe">Scarica il programma</a></body></html>`);
 
-test('nella home l’indicatore dei download non c’è, nelle altre schede sì, e la pagina si chiama «Download»', async ({ app, shell, openTab, testServer }) => {
+// Ogni elemento della fila delle schede, fuori dalle schede stesse (una si può chiamare «Download»), che parli di
+// download: nascosto o no, con il tasto tolto non ne resta nessuno.
+const tastiDownload = (shell) => shell.evaluate(() => Array.from(document.querySelectorAll('.tab-row *'))
+  .filter((el) => !el.closest('#tabs'))
+  .filter((el) => /download|scaricament/i.test([el.id, el.getAttribute('class'), el.getAttribute('data-tip'),
+    el.getAttribute('aria-label'), el.children.length ? '' : el.textContent].join(' ')))
+  .map((el) => el.id || el.getAttribute('class')));
+
+test('fra le schede non c’è un tasto dei download, e i download si trovano nella home e nella pagina «Download»', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
   try {
     const page = await paginaConLink(srv, { openTab, testServer });
     await page.locator('#pdf').click();
     await expect.poll(() => statoDi(shell, 'report.pdf'), { timeout: 20_000 }).toBe('completed');
-    const indicatore = shell.locator('#dl-indicator');
-    await expect(indicatore).toBeVisible();
-    await expect(indicatore).toHaveAttribute('data-tip', 'Download');
+    // Il clic ha avuto la sua risposta: l'avviso di fine scaricamento.
+    await expect(shell.locator('.shell-notif-msg', { hasText: 'Scaricato: report.pdf' })).not.toHaveCount(0, { timeout: 8_000 });
+    expect(await tastiDownload(shell)).toEqual([]);
+    await expect(shell.locator('#dl-panel')).toHaveCount(0);
+    // Accanto ai tasti della finestra resta solo la fila: l'ultimo elemento visibile prima di loro non è un tasto.
+    const primaDeiTasti = await shell.evaluate(() => {
+      const fila = document.querySelector('.tab-row');
+      const tasti = fila.querySelector('.window-controls');
+      const prima = Array.from(fila.children).filter((el) => el !== tasti && el.offsetParent !== null).pop();
+      return prima ? prima.className : null;
+    });
+    expect(primaDeiTasti).toBe('tab-drag-spacer');
+    await shell.screenshot({ path: join(SHOTS, 'download-941-fila.png') });
 
     await shell.locator('#tabs .tab', { hasText: 'Home' }).click();
     const home = await finestraCon(app, 'filo://newtab');
-    await expect(indicatore).toBeHidden();
     await expect(home.locator('.dash-carta[data-tipo="download"]', { hasText: 'report.pdf' })).toBeVisible({ timeout: 15_000 });
+    expect(await tastiDownload(shell)).toEqual([]);
     const tessera = home.locator('#altro .dash-altro-app[data-id="scaricamenti"]');
     await expect(tessera).toHaveText('Download');
     await expect(home.getByText('Scaricamenti')).toHaveCount(0);
-    await shell.screenshot({ path: join(SHOTS, 'download-1112-barra-home.png') });
-    await home.screenshot({ path: join(SHOTS, 'download-1112-home.png') });
+    await home.screenshot({ path: join(SHOTS, 'download-941-home.png') });
 
-    // Tornando alla pagina l'indicatore torna: fuori dalla home è l'unico posto che mostra i download.
-    await shell.locator('#tabs .tab', { hasText: 'Pagina con link' }).click();
-    await expect(indicatore).toBeVisible();
-
-    await shell.locator('#tabs .tab', { hasText: 'Home' }).click();
-    await expect(indicatore).toBeHidden();
     await tessera.click();
     const dl = await finestraCon(app, 'filo://downloads');
     await expect(dl.locator('h1')).toHaveText('Download');
     await expect(dl.locator('#search')).toHaveAttribute('placeholder', 'Cerca tra i download…');
     await expect(shell.locator('#tabs .tab.active')).toContainText('Download');
-    await expect(indicatore).toBeVisible();
-    await indicatore.click();
-    await expect(shell.locator('#dl-panel .dl-panel-title')).toHaveText('Download');
-
-    // Il pannello aperto a mano non si perde passando alla home: l'indicatore resta finché lo chiudi.
-    await shell.locator('#tabs .tab', { hasText: 'Home' }).click();
-    await expect(shell.locator('#tabs .tab.active')).toContainText('Home');
-    await expect(shell.locator('#dl-panel')).toBeVisible();
-    await expect(indicatore).toBeVisible();
-    await indicatore.click();
-    await expect(shell.locator('#dl-panel')).toBeHidden();
-    await expect(indicatore).toBeHidden();
+    await expect(dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'report.pdf' }) })).toBeVisible({ timeout: 15_000 });
+    expect(await tastiDownload(shell)).toEqual([]);
   } finally {
     await srv.close();
   }
 });
 
-test('nella home una domanda su un programma apre il pannello con l’indicatore, che se ne va quando lo chiudi', async ({ app, shell, openTab, testServer }) => {
+test('nella home una domanda su un programma apre il pannello, che si chiude con la sua × e lascia la domanda alla carta', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
   try {
@@ -115,13 +117,14 @@ test('nella home una domanda su un programma apre il pannello con l’indicatore
     await expect.poll(() => statoDi(shell, 'setup.exe'), { timeout: 20_000 }).toBe('pending');
     const domanda = shell.locator('#dl-panel .dl-row[data-chiede="1"]').filter({ has: shell.locator('.dl-row-ask-nome', { hasText: /^setup\.exe$/ }) });
     await expect(domanda).toBeVisible({ timeout: 10_000 });
-    const indicatore = shell.locator('#dl-indicator');
-    await expect(indicatore).toBeVisible();
-    await expect(indicatore.locator('#dl-ind-count')).toHaveText('1');
+    expect(await tastiDownload(shell)).toEqual([]);
+    const chiudi = shell.locator('#dl-panel .dl-panel-chiudi');
+    await expect(chiudi).toBeVisible();
+    await chiudi.hover();
+    await shell.screenshot({ path: join(SHOTS, 'download-941-pannello.png') });
 
-    await indicatore.click();
+    await chiudi.click();
     await expect(shell.locator('#dl-panel')).toBeHidden();
-    await expect(indicatore).toBeHidden();
     // La domanda resta in sospeso, e nella home la dice la sua carta.
     expect(await statoDi(shell, 'setup.exe')).toBe('pending');
     await expect(home.locator('.dash-carta[data-tipo="download"]', { hasText: 'setup.exe' })).toContainText('aspetta il tuo sì', { timeout: 15_000 });
