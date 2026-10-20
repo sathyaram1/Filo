@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
 import { nelMondoDiFilo, statoDi } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;font:16px sans-serif">
   <div style="height:100vh;padding:40px" id="p">Chat del sito, tasto destro qui.</div>
