@@ -39,4 +39,7 @@ test('gli avvisi che compongono la frase da sé passano la risposta d\'errore pe
   assert.match(tp, /toast_page_translate_failed[^\n]*rimedio:\s*result\.errore/);
   assert.match(tp, /toast_page_translate_stopped[\s\S]{0,200}rimedio:\s*result\.errore/);
   assert.match(leggi('src/shared/ascolto.js'), /avvisa\(fraseTrascrizione\(res\),\s*res\)/);
+  // L'avviso dei crediti finiti che il main manda a ogni scheda, e la porta che lo mostra.
+  assert.match(leggi('src/main/services/handlers/wallet.js'), /type: MSG\.SHOW_TOAST, text: text\.charAt[^\n]*rimedio:/);
+  assert.match(leggi('src/content/content.js'), /rimedio: msg\.rimedio/);
 });
