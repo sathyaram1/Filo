@@ -78,4 +78,4 @@ function indirizzoRifiutatoDaChromium(messaggio) {
   return '';
 }
 
-module.exports = { avvisoIndirizzoFermato, avvisoDallaPagina, indirizzoRifiutatoDaChromium };
+module.exports = { avvisoIndirizzoFermato, avvisoDallaPagina, avvisoPercorsoScritto, avvisoNonIndirizzo, indirizzoRifiutatoDaChromium };
