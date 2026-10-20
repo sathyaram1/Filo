@@ -3469,21 +3469,27 @@ class TabManager {
   }
 
   // Il rifiuto di Chromium a una pagina web si dice solo dopo un input vero su di lei, che la pagina non può fingere: quello
-  // che tenta da sola resta muto (#482).
+  // che tenta da sola resta muto (#482). Un avviso per input: dopo un clic la pagina non ne fa nascere una raffica.
   _ascoltaRifiutiDiChromium(wc) {
     wc.on('console-message', (e) => {
       const m = RIFIUTO_DI_CHROMIUM.exec(String((e && e.message) || ''));
-      if (!m || !Permessi.gestoRecente(wc)) return;
+      const gesto = m ? Permessi.ultimoGesto(wc) : 0;
+      if (!gesto || wc._filoRifiutoDetto === gesto) return;
       let pagina = '';
       try { pagina = String(wc.getURL() || ''); } catch (_) {}
       if (!/^https?:/i.test(pagina)) return;
       const url = m[2].trim();
-      if (m[1] !== 'load local resource') { avvisaIndirizzoFermato(url, this.win); return; }
+      const di = () => {
+        if (wc._filoRifiutoDetto === gesto) return;
+        wc._filoRifiutoDetto = gesto;
+        avvisaIndirizzoFermato(url, this.win);
+      };
+      if (m[1] !== 'load local resource') { di(); return; }
       const frame = e.frame;
       if (!frame || typeof frame.executeJavaScript !== 'function') return;
       Promise.resolve()
         .then(() => frame.executeJavaScript(`(${eUnaRisorsa})(${JSON.stringify(url)})`, false))
-        .then((risorsa) => { if (risorsa === false) avvisaIndirizzoFermato(url, this.win); })
+        .then((risorsa) => { if (risorsa === false) di(); })
         .catch(() => {});
     });
   }
