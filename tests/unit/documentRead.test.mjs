@@ -203,7 +203,7 @@ test('il percorso arriva dall\'LLM: virgolette e ~ vengono sciolti', async () =>
 test('un documento indicato fra apici inversi o come indirizzo file:// si legge lo stesso', async () => {
   const p = join(TMP, 'pulizia 1318.txt');
   writeFileSync(p, 'contenuto pulito', 'utf8');
-  const comeIndirizzo = `file://${process.platform === 'win32' ? '/' : ''}${p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/').replace(/^\/?([A-Za-z])%3A/, '/$1:')}`;
+  const comeIndirizzo = pathToFileURL(p).href;
   for (const forma of [`\`${p}\``, `“${p}”`, `«${p}»`, `"\`${p}\`"`, comeIndirizzo, `"${comeIndirizzo}"`]) {
     assert.equal(DR.normalizePath(forma), p, forma);
     const r = await DR.readDocument(forma);
