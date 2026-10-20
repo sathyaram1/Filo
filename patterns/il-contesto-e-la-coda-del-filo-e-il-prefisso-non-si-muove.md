@@ -41,7 +41,9 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   ritrattava letture giuste. Un modello che rifiuta le immagini dei turni passati (solo testo, una per richiesta)
   rifà lo stesso giro con la nota, e da lì quel modello riceve solo la nota.
 - **Un messaggio tagliato si rilegge davvero**: oltre un quarto del tetto restano testa e coda, con l'id intero della
-  chat; CERCA_CHAT con l'id rilegge la conversazione intera fino al tetto in token, oltre dà testa, coda e il
+  chat; CERCA_CHAT con l'id rilegge la conversazione intera fino al tetto in token e a quello che ci sta ancora nella
+  finestra del modello quando è nota (il catalogo di OpenRouter, o la misura di un rifiuto: la richiesta ne prende al
+  più il 60%, mai sotto gli 8.000 caratteri di prima del filo), oltre dà testa, coda e il
   numero da cui leggere il mezzo, e con `da` lo dà a pezzi. Nessun secondo taglio nella busta.
 - **Ogni azione il cui esito arriva al modello conta per le uscite** (#587): `azioniViste` nasce dagli stessi esiti
   che finiscono nel prompt, quindi un documento letto in una scheda fa chiedere conferma a un link con un suo pezzo
