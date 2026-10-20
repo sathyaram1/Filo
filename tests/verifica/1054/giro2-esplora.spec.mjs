@@ -89,12 +89,12 @@ test.describe('strato acceso', () => {
     await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://example.com/dentro');
   });
 
-  test('cambio scheda e nuova scheda chiudono', async ({ app, openTab, testServer }) => {
+  test('cambio scheda e nuova scheda chiudono', async ({ app, openTab, testServer, shell }) => {
     await pronto(app);
     const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0"><a id="link" href="https://example.com/a" style="position:absolute;left:300px;top:200px">un collegamento</a></body>`);
     await page.locator('#link').click({ button: 'right' });
     await expect(menuDi(page).principale).toBeVisible();
-    await page.keyboard.press('Control+t');
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://home/'));
     await chiuso(app);
   });
 });

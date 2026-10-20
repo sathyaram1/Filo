@@ -74,8 +74,8 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
     expect(lista.scrollHeight > lista.clientHeight + 4, 'la lista deve essere scorrevole').toBe(true);
 
     // Rotella sopra la lista: deve scorrere, non chiudere.
-    await page.mouse.move(lista.centro.x, lista.centro.y);
-    await page.mouse.wheel(0, 200);
+    const sup = menuDi(page).superficie; await sup.mouse.move(lista.centro.x, lista.centro.y);
+    await sup.mouse.wheel(0, 200);
     await page.waitForTimeout(150);
 
     // Il menu è ANCORA aperto (prima del fix qui veniva chiuso).

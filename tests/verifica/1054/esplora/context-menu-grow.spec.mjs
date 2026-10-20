@@ -202,8 +202,8 @@ async function rotellaSulMenu(page, giri, passo = 200) {
     const m = document.querySelector('.sn-menu').getBoundingClientRect();
     return { x: Math.round(m.left + m.width / 2), y: Math.round(m.top + m.height / 2) };
   });
-  await page.mouse.move(c.x, c.y);
-  for (let i = 0; i < giri; i++) await page.mouse.wheel(0, passo);
+  await menuDi(page).superficie.mouse.move(c.x, c.y);
+  for (let i = 0; i < giri; i++) await menuDi(page).superficie.mouse.wheel(0, passo);
 }
 
 async function statoScorrimento(page) {
@@ -452,7 +452,7 @@ async function mostraEtichetta(page, menu) {
   const icona = menu.locator('.sn-menu-row-btn:not(.sn-menu-row-overflow):not(.sn-menu-row-empty)').first();
   await expect(icona).toBeVisible();
   const box = await icona.boundingBox();
-  await page.mouse.move(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2));
+  await menuDi(page).superficie.mouse.move(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2));
   const etichetta = menuDi(page).etichetta;
   await expect(etichetta).toBeVisible({ timeout: 3000 });
   return { icona, etichetta };
