@@ -1909,44 +1909,9 @@
       }
     }
 
-    function renderIndicator() {
-      const all = Array.from(dls.values());
-      if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
-      dlBtn.hidden = indicatoreNascosto();
-      const active = all.filter(isActive);
-      // #588 — un programma che aspetta una risposta conta quanto uno in corso:
-      // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
-      // segno che la domanda è ancora lì sparirebbe con lui.
-      const attesa = all.filter((r) => r && r.state === 'pending');
-      dlBtn.classList.toggle('attesa', attesa.length > 0);
-      dlBtn.dataset.tip = attesa.length
-        ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
-        : 'Download';
-      if (active.length || attesa.length) {
-        dlCount.hidden = false;
-        dlCount.textContent = String(active.length + attesa.length);
-        // Avanzamento aggregato: byte ricevuti / totali sui download con totale
-        // noto. Se nessuno ha un totale, barra indeterminata (animata via CSS).
-        let recv = 0; let total = 0; let known = 0;
-        for (const r of active) { if (r.totalBytes > 0) { recv += r.receivedBytes; total += r.totalBytes; known++; } }
-        if (!active.length) {
-          // Solo attese: niente barra, che direbbe «sto scaricando» a un file
-          // che aspetta l'utente e non si muove.
-          dlBtn.classList.remove('indeterminate', 'active');
-          dlFill.style.width = '0%';
-        } else if (known && total > 0) {
-          dlBtn.classList.remove('indeterminate');
-          dlFill.style.width = `${Math.min(100, Math.round((recv / total) * 100))}%`;
-          dlBtn.classList.add('active');
-        } else {
-          dlBtn.classList.add('indeterminate', 'active');
-          dlFill.style.width = '40%';
-        }
-      } else {
-        dlBtn.classList.remove('active', 'indeterminate');
-        dlCount.hidden = true;
-        dlFill.style.width = '0%';
-      }
+    // Un elenco svuotato non lascia aperto un pannello che direbbe solo «Nessun download».
+    function aggiornaPannello() {
+      if (!dls.size) { if (panelOpen) closePanel(); return; }
       if (panelOpen) renderPanel();
     }
 
@@ -1983,9 +1948,19 @@
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
+      // Senza un tasto nella fila di tab (#941) questa è la strada per chiuderlo col mouse; chiudere non risponde.
+      const closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'dl-panel-close';
+      closeBtn.id = 'dl-panel-close';
+      closeBtn.dataset.tip = 'Chiudi';
+      closeBtn.setAttribute('aria-label', 'Chiudi');
+      setIcon(closeBtn, 'close', 13);
+      closeBtn.addEventListener('click', () => closePanel());
       head.appendChild(title);
       head.appendChild(allBtn);
       head.appendChild(clearBtn);
+      head.appendChild(closeBtn);
       panel.appendChild(head);
       const list = document.createElement('div');
       list.className = 'dl-panel-list';
@@ -2258,7 +2233,7 @@
       const home = isHomeUrl(a ? a.url : null);
       if (home === suHome) return;
       suHome = home;
-      renderIndicator();
+      aggiornaPannello();
     }
     api.tabs.onUpdate(seguiScheda);
     api.tabs.snapshot().then(seguiScheda).catch(() => {});
@@ -2271,7 +2246,7 @@
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
-      renderIndicator();
+      aggiornaPannello();
       if (panelOpen) renderPanel();
     }
 
@@ -2281,7 +2256,7 @@
       if (info.kind === 'removed') dls.delete(info.item.id);
       else dls.set(info.item.id, info.item);
       if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
-      renderIndicator();
+      aggiornaPannello();
       // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
       if (info.kind === 'ask') mostraRiga(info.item.id);
       else if (panelOpen) renderPanel();
