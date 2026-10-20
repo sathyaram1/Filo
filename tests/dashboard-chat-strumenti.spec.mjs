@@ -45,13 +45,8 @@ async function configureModel(app) {
   });
 }
 
-test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco, una bolla sola', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  await expect(page.locator('#input')).toBeVisible();
-  await configureModel(app);
-
+// Il turno di (A): un primo giro che ragiona, scrive una nota e chiama due azioni, un secondo che ragiona e risponde.
+async function giroCercaAgisce(app) {
   await app.evaluate(async () => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreProvider = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
@@ -83,10 +78,10 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
       return { ...base, text: finale, toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
     };
   });
+}
 
-  await page.locator('#input').fill('metti un timer per la pasta e dimmi se sai salvare per dopo');
-  await page.locator('#sendBtn').click();
-
+// Il turno di (A) finito, col blocco srotolato.
+async function bloccoDelGiro(page) {
   // La risposta finale è l'unica bolla di Filo: la nota a metà lavoro non è
   // rimasta in chat.
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto: timer di 5 minuti avviato.' })).toBeVisible({ timeout: 10_000 });
@@ -121,6 +116,19 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   expect(order).toEqual(['dash-activity-reasoning', 'dash-activity-note', 'dash-activity-esiti']);
   expect(await nodo.locator('.dash-activity-esiti > .dash-activity-row').count()).toBe(2);
   await expect(body.locator('.dash-activity-seg[data-stato="coda"]')).toContainText('Ora rispondo.');
+}
+
+test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco, una bolla sola', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await giroCercaAgisce(app);
+
+  await page.locator('#input').fill('metti un timer per la pasta e dimmi se sai salvare per dopo');
+  await page.locator('#sendBtn').click();
+  await bloccoDelGiro(page);
   await page.screenshot({ path: 'tests/agent/.out/strumenti-aperto.png' });
 
   // Al modello sono tornati gli esiti nello stesso turno, nella forma del
@@ -150,7 +158,54 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   await app.evaluate(() => { try { globalThis.__restoreProvider?.(); } catch (_) {} });
 });
 
-test('B — un\'azione che chiede, chiamata come strumento, apre la conferma, e il modello risponde sapendolo', async ({ app, shell }) => {
+// #1321 — Con la scheda occupata, la risposta del turno le arrivava prima degli eventi in diretta ancora in coda: la
+// chat chiudeva la diretta e li buttava, e il blocco perdeva la nota e l'ultimo pensiero. Qui lo si fa succedere apposta.
+test('A2 — la risposta arriva prima degli ultimi eventi in diretta: nota e ultimo pensiero restano nel blocco', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+  await giroCercaAgisce(app);
+
+  // Dalla fine del primo giro il main trattiene gli eventi in diretta verso la home; la risposta invece parte.
+  await app.evaluate(({ ipcMain, webContents }) => {
+    const home = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://newtab'));
+    const manda = home.send.bind(home);
+    const trattenuti = [];
+    home.send = (canale, ...args) => {
+      if (globalThis.__trattieni && /^filo:(reasoning|answer|action)$/.test(canale)) trattenuti.push([canale, args]);
+      else manda(canale, ...args);
+    };
+    globalThis.__consegna = () => { globalThis.__trattieni = false; for (const [c, a] of trattenuti.splice(0)) manda(c, ...a); };
+    const finto = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    let giri = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
+      const r = await finto(o);
+      if (++giri === 1) globalThis.__trattieni = true;
+      return r;
+    };
+    const gestore = ipcMain._invokeHandlers.get('filo:message');
+    ipcMain.removeHandler('filo:message');
+    ipcMain.handle('filo:message', async (event, msg) => {
+      const r = await gestore(event, msg);
+      if (msg && msg.type === globalThis.SN_MSG.MSG.FILO_CHAT) globalThis.__rispostaPartita = true;
+      return r;
+    });
+  });
+
+  await page.locator('#input').fill('metti un timer per la pasta e dimmi se sai salvare per dopo');
+  await page.locator('#sendBtn').click();
+  await expect.poll(() => app.evaluate(() => !!globalThis.__rispostaPartita), { timeout: 20_000 }).toBe(true);
+  // Le risposte arrivano alla scheda nell'ordine in cui partono: quando torna questa, quella del turno è già arrivata.
+  await page.evaluate(() => new Promise((ok) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_GET_TIMERS }, ok)));
+  await app.evaluate(() => globalThis.__consegna());
+
+  await bloccoDelGiro(page);
+  await page.screenshot({ path: 'tests/.shots/strumenti-diretta-in-ritardo.png' });
+});
+
+test('B —un\'azione che chiede, chiamata come strumento, apre la conferma, e il modello risponde sapendolo', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -410,13 +465,14 @@ test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima 
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreProvider3 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     let n = 0;
+    const vista = new Promise((r) => { globalThis.__argomenti = r; });
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta, onToolCall }) => {
       n += 1;
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (n === 1) {
         try { onToolCall && onToolCall({ id: 't1', name: 'TIMER' }); } catch (_) {}
-        // Gli argomenti «arrivano» dopo: nel frattempo la riga deve già dirlo.
-        await new Promise((r) => setTimeout(r, 2500));
+        // Gli argomenti «arrivano» quando la prova ha visto la riga: nel frattempo la riga deve già dirlo.
+        await vista;
         return { ...base, text: '', toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":60,"etichetta":"Uovo"}' }], reasoningDetails: [], finishReason: 'tool_calls' };
       }
       try { onDelta && onDelta('Un minuto, via.'); } catch (_) {}
@@ -429,9 +485,10 @@ test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima 
 
   // La riga del nodo lo dice (#578: il filo si annoda lì), poi il gomitolo col riassunto.
   const riga = page.locator('.dash-activity .dash-activity-seg-label');
-  await expect(riga).toHaveText('Avvio un timer…', { timeout: 3_000 });
+  await expect(riga).toHaveText('Avvio un timer…', { timeout: 10_000 });
   await expect(page.locator('.dash-activity')).toHaveAttribute('data-phase', 'act');
   await page.screenshot({ path: 'tests/agent/.out/strumenti-inizio.png' });
+  await app.evaluate(() => globalThis.__argomenti());
 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Un minuto, via.' })).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.dash-activity .dash-activity-label')).toHaveText(/^Ha avviato un timer · \d+ s$/);

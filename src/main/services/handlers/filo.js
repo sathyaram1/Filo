@@ -35,7 +35,18 @@ module.exports = function register(on, ctx) {
     try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
   };
 
+  // La risposta di un invoke può arrivare alla scheda prima degli ultimi eventi in diretta, che viaggiano su un'altra
+  // coda: il segno di fine li segue, e la scheda chiude la diretta solo quando lo vede (#1321).
+  const chiudiDiretta = (msg, sender) => {
+    const wc = sender && sender.wc;
+    if (!msg || !msg.reasoningReqId || !wc || (wc.isDestroyed && wc.isDestroyed())) return false;
+    try { wc.send('filo:action', { reqId: msg.reasoningReqId, kind: 'fine' }); return true; } catch (_) { return false; }
+  };
   on(MSG.FILO_CHAT, soloFilo(async (msg, sender) => {
+    const r = await turnoDellaChat(msg, sender);
+    return chiudiDiretta(msg, sender) ? { ...r, diretta: true } : r;
+  }));
+  async function turnoDellaChat(msg, sender) {
     let fineLavoro = () => {};
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
@@ -64,7 +75,7 @@ module.exports = function register(on, ctx) {
     } finally {
       fineLavoro();
     }
-  }));
+  }
 
   // Il quadrato al posto dell'invio (#578): ferma il turno di questa scheda, non quello di un'altra.
   on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
