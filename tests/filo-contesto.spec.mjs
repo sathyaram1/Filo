@@ -892,19 +892,27 @@ async function seminaTrasloco(app) {
   await semina(app, { chat: [{ id: 'trasloco-lungo', oreFa: 4 * 24, titolo: 'Trasloco', scambi }] });
 }
 
-async function finestraPiccola(app, { catalogo }) {
-  await app.evaluate(async (_e, catalogo) => {
+// Il catalogo di OpenRouter con la finestra del modello della chat delle prove (null: il catalogo non risponde). Senza,
+// una prova dipenderebbe dalla finestra vera del modello, letta dalla rete di chi la lancia.
+async function catalogoDeiModelli(app, finestra) {
+  await app.evaluate(async (_e, finestra) => {
     const vero = globalThis.fetch;
     globalThis.fetch = async (input, init) => {
       const url = String((input && input.url) || input);
       if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
-        if (!catalogo) return new Response('giù', { status: 503 });
-        const data = url.includes('output_modalities') ? [] : [{ id: 'deepseek/deepseek-v4-flash', context_length: 32768, pricing: { prompt: '0.00000009', completion: '0.00000018' } }];
+        if (!finestra) return new Response('giù', { status: 503 });
+        const data = url.includes('output_modalities') ? [] : [{ id: 'deepseek/deepseek-v4-flash', context_length: finestra, pricing: { prompt: '0.00000009', completion: '0.00000018' } }];
         return new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       return vero(input, init);
     };
     await globalThis.__filoHandlers.handleMessage({ type: globalThis.SN_MSG.MSG.STIMA_COSTO_MODELLI, forzaListino: true }, { url: 'filo://options/options.html' });
+  }, finestra);
+}
+
+async function finestraPiccola(app, { catalogo }) {
+  await catalogoDeiModelli(app, catalogo ? 32768 : null);
+  await app.evaluate(async () => {
     globalThis.__rifiutate = 0;
     globalThis.__accettate = [];
     const copione = globalThis.__copione;
