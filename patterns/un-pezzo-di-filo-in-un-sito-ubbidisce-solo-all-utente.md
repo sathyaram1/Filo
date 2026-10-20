@@ -105,8 +105,10 @@ il clic sul pulsante del sito.
    - una voce **scoperta da poco aspetta mezzo secondo**: un velo tolto mentre
      la mano arriva non lascia il tempo di vedere. Non aspetta chi compare
      (menu appena aperto, voce rivelata da un filtro) e chi era coperto da un
-     pezzo di Filo sopra al menu (un avviso, la conferma di «Svuota»), se il
-     browser lo dice appena quel pezzo se ne va;
+     pezzo di Filo sopra al menu (la conferma di «Svuota»), se il browser lo
+     dice appena quel pezzo se ne va. La pila degli avvisi invece, finché il
+     menu è aperto, scende sotto il suo piano: un avviso sopra copriva le voci
+     del menu aperto su di lui e «Chiudi» veniva fermato (#1453);
    - si giudica alla **pressione**; un clic da tastiera, che non ha pressione, si
      giudica lì. Un clic fermato chiude il menu e lo dice con un avviso;
    - lo **zoom del foglio di stile** sul contenitore (`html { zoom: 2 }`)
