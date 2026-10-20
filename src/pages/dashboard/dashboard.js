@@ -1027,11 +1027,14 @@
           streamedText = '';
           giroIniziato = false;
           pending.fineGiro();
+        } else if (data.kind === 'seguito') {
+          seguitoLetto(String(data.id || ''));
         }
       });
     }
-    // Un turno fermato può avere ancora un'azione in volo: il seguito parte quando è finita, così ne conosce l'esito.
-    while (chiusuraInCorso && !turno.fermato) await Promise.race([chiusuraInCorso, turno.fermata]);
+    // Un turno fermato può avere ancora un'azione in volo: il seguito della stessa conversazione parte quando è finita,
+    // così ne conosce l'esito. Una conversazione nuova, o un'altra riaperta, non aspetta.
+    while (chiusuraDi(chatId) && !turno.fermato) await Promise.race([chiusuraDi(chatId), turno.fermata]);
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
