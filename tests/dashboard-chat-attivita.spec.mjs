@@ -115,6 +115,7 @@ test('A — mentre ragiona scorre la trama e un clic la apre; a fine lavoro il r
   await page.screenshot({ path: 'tests/agent/.out/attivita-ragiona-aperto.png' });
   await trama.click();
   await expect(corpo).toBeHidden();
+  await app.evaluate(() => globalThis.__rispondi());
 
   // Lavoro finito: il filo è avvolto nel riassunto con la durata; il blocco resta.
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco la risposta finale.' })).toBeVisible({ timeout: 8_000 });
