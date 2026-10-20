@@ -344,7 +344,7 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi,
+    validaAzione, validaDomanda, controllaTestoOwner, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
