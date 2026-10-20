@@ -112,9 +112,10 @@ describe('il tag v* lo crea l\'app di pubblicazione, quando c\'è', () => {
   test('il token dell\'app si conia solo se la variabile c\'è, prima del numero di versione', () => {
     assert.ok(iApp >= 0, 'manca il passo che conia il token dell\'app: con la regola sui tag accesa la versione non uscirebbe');
     assert.match(ps[iApp], /^\s*id:\s*app\s*$/m);
-    assert.match(ps[iApp], /if:[^\n]*vars\.FILO_RILASCIO_APP_ID != ''/,
+    assert.match(ps[iApp], new RegExp(`if:[^\\n]*vars\\.${APP_ID} != ''`),
       'senza la condizione sulla variabile il passo fallisce finché l\'app non esiste, e non esce più niente');
-    assert.match(ps[iApp], /private-key:\s*\$\{\{\s*secrets\.FILO_RILASCIO_APP_KEY\s*\}\}/);
+    assert.match(ps[iApp], new RegExp(`app-id:\\s*\\$\\{\\{\\s*vars\\.${APP_ID}\\s*\\}\\}`), NOMI_GUIDA);
+    assert.match(ps[iApp], new RegExp(`private-key:\\s*\\$\\{\\{\\s*secrets\\.${APP_KEY}\\s*\\}\\}`), NOMI_GUIDA);
     assert.ok(iNumero > iApp && iBuild > iNumero,
       'il token va coniato prima del numero di versione: un\'app configurata male non deve consumarne uno');
   });
