@@ -539,7 +539,7 @@ const REGOLE_IMPORT = {
   // Dice cosa ricordano i cookie di QUESTO profilo, e i cookie non sono nel backup.
   COOKIE_SITES: 'stato',
   AI_CACHE: 'contenuto',
-  CLIPBOARD_HISTORY: 'contenuto',
+  CLIPBOARD_HISTORY: 'appunti',
   PERSONAL_DICT: 'contenuto',
   AUTOCORRECT: 'contenuto',
   ICON_LAYOUT: 'contenuto',
