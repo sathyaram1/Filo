@@ -53,6 +53,12 @@ Essere una riga la lega allo stato della voce: la domanda c'è finché la voce
 aspetta, e sparisce da sola quando qualcuno risponde altrove. Mai dentro la
 pagina stessa: il sito potrebbe toccarla o imitarla.
 
+Nella fila delle schede non c'è un tasto che apre il pannello (#941): si apre
+da solo per una domanda e si chiude con la sua ×, perché il fuoco resta nella
+pagina e lì Esc non arriva alla shell. Chiuderlo non risponde: il programma
+resta in attesa, e la domanda si ritrova nella carta della home e nella pagina
+Download.
+
 ## Il sì non lo dà il clic che ha fatto comparire la domanda
 
 La riga nasce in alto a destra, al posto della pagina, un attimo dopo il clic

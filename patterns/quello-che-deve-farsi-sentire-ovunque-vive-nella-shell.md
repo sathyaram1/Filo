@@ -33,8 +33,7 @@ sempre, finché c'è la finestra.
   della shell **mai coperta** dalla WebContentsView della pagina (vedi
   [Animazioni che coprono la pagina](animazioni-che-coprono-la-pagina-vivono-nel-content-overlay.md)):
   un pulsante disegnato dalla shell nell'area pagina non si vede e non si
-  clicca. Il chip `#ring-indicator` sta accanto a quello degli scaricamenti,
-  per lo stesso motivo.
+  clicca: per questo il chip `#ring-indicator` sta lì.
 - **«Mai coperta» ha un'eccezione: il tutto schermo.** Lì la view della pagina
   parte da y=0 e prende anche la fila di tab, quindi il pulsante c'è ma nessuno
   lo vede né lo clicca, e nessun tasto zittisce. Il main fa rientrare la finestra
