@@ -135,7 +135,7 @@
   }
 
   // La conversazione della home che una scheda nuova continua: l'ultima, se non è passata un'ora di silenzio o se
-  // l'ultima parola è di Filo che ha scritto da sé. L'accoglienza ha una fine sua e non si continua.
+  // l'ultima parola è di Filo che ha scritto da sé. L'accoglienza ha una fine sua e non si continua, né una chiusa apposta.
   function chatCorrente(chats, { ora = Date.now() } = {}) {
     let ultima = null;
     for (const c of Array.isArray(chats) ? chats : []) {
