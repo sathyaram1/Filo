@@ -2,6 +2,7 @@
 // Lo controlla la validazione comune (script e server); le note per gli agenti restano libere. I ruoli che scrivono
 // domande ricevono la regola una volta sola, dal pezzo condiviso.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
