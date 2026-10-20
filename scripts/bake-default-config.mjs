@@ -284,7 +284,7 @@ async function main() {
     // d'ordine mancante del tutto) l'allarme non può suonare, perché si apre con
     // quella stessa parola d'ordine. È il motivo per cui serve fermarsi: una
     // pubblicazione che fallisce si vede, una riga rossa in un registro no.
-    await avvisa(mancanti, righe);
+    await avvisa(mancanti, righe, esitoServer);
     process.exit(1);
   }
 
