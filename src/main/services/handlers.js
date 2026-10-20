@@ -11,6 +11,7 @@
 const { BrowserWindow } = require('electron');
 const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
+const PageRead = require('./pageRead');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
@@ -87,6 +88,25 @@ function filoWin() {
 function winOf(sender) {
   const w = sender && sender.win;
   return (w && w._filoTabs) ? w : filoWin();
+}
+
+// Le schede web in cui LEGGI_PAGINA cerca la pagina prima di scaricarla: prima la finestra di chi chiede, poi le
+// altre dello stesso tipo. Una finestra in incognito non presta le sue schede a una normale, e viceversa.
+function schedeLeggibili(sender) {
+  const prima = winOf(sender);
+  const incognito = !!(prima && prima._filoTabs && prima._filoTabs.incognito);
+  let finestre = [];
+  try { finestre = BrowserWindow.getAllWindows(); } catch (_) {}
+  const out = [];
+  for (const w of [prima, ...finestre.filter((x) => x !== prima)]) {
+    const tm = w && !(w.isDestroyed && w.isDestroyed()) && w._filoTabs;
+    if (!tm || !!tm.incognito !== incognito) continue;
+    for (const t of tm.tabs || []) {
+      const wc = t && t.view && t.view.webContents;
+      if (wc && /^https?:/i.test(String(t.url || ''))) out.push({ wc, url: t.url });
+    }
+  }
+  return out;
 }
 
 // ─── helpers (identici al background.js originale) ──────────────────────────
@@ -1578,22 +1598,147 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-async function controllaUscita(action, { sender = null, contesto = null, parole = '', domanda = '' } = {}) {
+async function controllaUscita(action, { sender = null, contesto = null, provenienza = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
   const origine = sender?.tab?.url || sender?.url || '';
   const daPagina = /^https?:/i.test(origine);
-  return Exfil.valutaUscita(action, {
+  const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
+  let memoria = '';
+  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'LEGGI_PAGINA') {
+    memoria = [await navExfilCorpus(), indirizzo ? PageRead.materialeRiservato(indirizzo) : ''].filter(Boolean).join('\n');
+  }
+  const azioni = Array.isArray(contesto) ? contesto : [];
+  const testoParole = typeof parole === 'string' ? parole : '';
+  const v = Exfil.valutaUscita(action, {
     segreti: await segretiCustoditi(),
-    azioni: Array.isArray(contesto) ? contesto : [],
+    azioni,
     pagina: daPagina ? await testoDellaPagina(sender) : null,
     letti: (daPagina ? lettiDallAiuto(sender) : []).concat(SegretiLetti.tutti()),
-    parole: typeof parole === 'string' ? parole : '',
+    parole: testoParole,
     domanda: typeof domanda === 'string' ? domanda : '',
-    memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
+    memoria,
     daPagina,
   });
+  if (v.blocca || !indirizzo || !provenienza) return v;
+  // Si giudica l'indirizzo che partirà: senza «https://», fra virgolette o con due barre, lettura e apertura lo completano.
+  const web = indirizzoCaricato(tipo, indirizzo);
+  if (!/^https?:/i.test(web)) return v;
+  // La regola dell'indirizzo scritto (#553, decisione su D-20) vale solo dopo che nella chat è entrato testo di
+  // sconosciuti: prima nessuno può aver dettato al modello dove portare i dati. Compare → costo 1; dall'elenco dei siti
+  // o dal modulo di ricerca di un sito → le parole come una ricerca sul web; scritto dal modello → costo 3, con un OK.
+  if (!testoDiSconosciuti(azioni)) return v;
+  const schede = schedeLeggibili(sender);
+  // Una pagina che la lettura trova aperta in una scheda si legge da lì: niente esce.
+  if (tipo === 'LEGGI_PAGINA' && PageRead.trovaScheda(web, schede)) return { ...v, exfil: false, reason: '' };
+  if (!provenienza.cronologia) provenienza.cronologia = PageRead.chiaviCronologia(await indirizziDellaCronologia());
+  const ver = PageRead.verificaIndirizzo(provenienza, web, {
+    schede: schede.flatMap((x) => [x.url, urlDellaScheda(x)]), cronologia: provenienza.cronologia, parole: testoParole,
+    scaricata: tipo === 'LEGGI_PAGINA',
+  });
+  if (ver.compare) return { ...v, exfil: false, reason: '' };
+  if (ver.sito) {
+    const r = Exfil.valutaRicerca(ver.sito.parole, { memoria, azioni });
+    return { ...v, exfil: r.exfil, reason: r.reason };
+  }
+  // Se il controllo di prima ci vede dei dati, il pannello lo dice.
+  return { ...v, exfil: false, reason: '', nonCompare: true, insiste: ver.insiste, datiReason: v.exfil ? v.reason : '' };
+}
+
+function testoDiSconosciuti(azioni) {
+  try { return !!globalThis.SN_URL_EXFIL.contestoDaAzioni(Array.isArray(azioni) ? azioni : []).nonFidato; } catch (_) { return true; }
+}
+
+function indirizzoCaricato(tipo, indirizzo) {
+  if (tipo === 'LEGGI_PAGINA') return PageRead.normalizzaUrl(indirizzo).url || '';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(indirizzo)) return indirizzo;
+  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.normalizeUrl && globalThis.SN_URL_NAV.normalizeUrl(indirizzo)) || '';
+}
+
+function urlDellaScheda(s) {
+  try { return String(s.wc.getURL() || ''); } catch (_) { return ''; }
+}
+
+// Le pagine della cronologia (il filo delle visite): un indirizzo già visitato non è scritto dal modello (#553).
+async function indirizziDellaCronologia() {
+  try {
+    const F = globalThis.SN_IL_FILO;
+    const pagine = F && F.pagine ? await F.pagine({ da: null, a: null }) : [];
+    return pagine.map((p) => p && p.url).filter(Boolean);
+  } catch (_) { return []; }
+}
+
+// Il rilevatore dei siti pericolosi per una lettura: la porta della finestra di chi chiede, che sa dell'incognito.
+function analizzaPer(sender) {
+  const tm = winOf(sender)?._filoTabs;
+  return tm && typeof tm._sbAnalizza === 'function' ? (u, ctx) => tm._sbAnalizza(u, ctx) : null;
+}
+
+// Cosa sente il modello quando l'indirizzo che ha scritto non compare da nessuna parte (#553).
+function rifiutoNonCompare(type) {
+  const verbo = type === 'LEGGI_PAGINA' ? 'letto' : 'aperto';
+  return `Azione ${type} NON fatta: l'indirizzo l'hai scritto tu e non compare da nessuna parte (nelle parole dell'utente, `
+    + 'nei risultati, nelle pagine lette o nei loro link, nelle schede, nella cronologia). Non l\'ho ' + verbo + '. Trovalo: '
+    + 'cercalo con CERCA_WEB o segui un link di una pagina letta, e usa l\'indirizzo esatto. Per un sito comune puoi '
+    + 'usare la sua home o la sua ricerca (vedi la descrizione di LEGGI_PAGINA), oppure cerca_nel_sito con la home del sito '
+    + 'che l\'utente ha nominato. Se richiami lo stesso indirizzo, lo chiedo all\'utente. Se non lo trovi, diglielo: '
+    + 'sotto la risposta resta il bottone per aprirlo lui, se vuole.';
+}
+
+// «Cerca X sul sito Y» (#553): dall'elenco dei siti comuni, o dal modulo di ricerca della home del sito. L'indirizzo
+// che ne esce lo costruisce Filo, e le parole passano dal controllo della ricerca sul web. Senza modulo, o con un sito
+// che dopo testo di sconosciuti l'utente non ha nominato, il modello può scrivere lui l'indirizzo: arriva il pannello.
+async function ricercaNelSito(action, { provenienza, contesto = null, parole = '', sender = null } = {}) {
+  const q = String(action.cerca_nel_sito ?? action.cercaNelSito ?? '').replace(/\s+/g, ' ').trim();
+  if (!q) return null;
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const home = Levels.indirizzoDi(action);
+  const type = String(action.type || '').toUpperCase();
+  if (!/^https?:\/\//i.test(home)) {
+    return { executed: false, kept: false, rejected: true, error: 'per cerca_nel_sito metti in url la home del sito (https://…)' };
+  }
+  const dallElenco = globalThis.SN_SITI_COMUNI.costruisci(home, q);
+  if (dallElenco) {
+    for (const k of ['url', 'href', 'link', 'indirizzo']) delete action[k];
+    action.url = dallElenco;
+    return null;
+  }
+  // Le parole vanno a chi possiede il sito. Dopo testo di sconosciuti il sito deve averlo nominato l'utente: uno che
+  // compare solo in una pagina letta o nei risultati può averlo scelto chi ha scritto quella pagina.
+  if (testoDiSconosciuti(contesto)) {
+    const sue = PageRead.contestoChat();
+    PageRead.annotaLink(sue, parole);
+    if (!PageRead.verificaIndirizzo(sue, home, { parole }).compare) {
+      return {
+        executed: false,
+        kept: false,
+        rejected: true,
+        senzaModulo: true,
+        error: `Azione ${type} NON fatta: cerca_nel_sito vale per i siti comuni e per i siti che l'utente ha nominato, e ${home} `
+          + 'non è fra questi. Se serve, scrivi tu l\'indirizzo della ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. '
+          + 'Oppure cerca la pagina con CERCA_WEB.',
+        output: { senzaModulo: true, url: home },
+      };
+    }
+  }
+  const modulo = await PageRead.moduloDellaHome(home, { analizza: analizzaPer(sender) });
+  if (!modulo) {
+    return {
+      executed: false,
+      kept: false,
+      rejected: true,
+      senzaModulo: true,
+      error: `Azione ${type} NON fatta: nella home ${home} non trovo un modulo di ricerca. Se serve, scrivi tu l'indirizzo della `
+        + 'ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. Oppure cerca la pagina con CERCA_WEB.',
+      output: { senzaModulo: true, url: home },
+    };
+  }
+  const url = PageRead.urlConParole(modulo, q);
+  PageRead.annotaRicerca(provenienza, url, q);
+  for (const k of ['url', 'href', 'link', 'indirizzo']) delete action[k];
+  action.url = url;
+  return null;
 }
 
 // Un indirizzo che una pagina di Filo apre o passa al sistema l'ha scelto quasi sempre un modello (#810): passa dalla
@@ -1608,6 +1753,12 @@ const chiaveLinkUscita = (url) => {
   const raw = String(url || '').trim();
   try { const u = new URL(raw); return `${u.protocol}//${u.username}:${u.password}@${u.host.toLowerCase()}${u.pathname}${u.search}`; } catch (_) { return raw; }
 };
+function indirizzoWebAperto(grezzo) {
+  try {
+    const u = new URL(String(typeof grezzo === 'string' ? grezzo : '').trim());
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
+  } catch (_) { return ''; }
+}
 function segnaLinkDaConfermare(url, motivo) {
   const k = chiaveLinkUscita(url);
   LINK_DA_CONFERMARE.delete(k);
@@ -1643,24 +1794,27 @@ function indirizziCliccabili(testo) {
 }
 // I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
 // `indirizzi` = quelli dei bottoni che il modello ha messo sotto la risposta, cliccabili come i collegamenti.
-async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
+async function linkCheChiedonoOk(testo, { sender = null, contesto = null, provenienza = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
   const out = [];
   const visti = new Set();
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
   for (const grezzo of [...indirizzi, ...indirizziCliccabili(testo)]) {
-    const url = typeof grezzo === 'string' ? grezzo.trim() : '';
-    if (!/^https?:\/\//i.test(url)) continue;
+    // Si giudica l'indirizzo che il browser aprirà: «https:sito/…» o con le barre rovesciate è lo stesso indirizzo web.
+    const url = indirizzoWebAperto(grezzo);
+    if (!url) continue;
     const k = chiaveLinkUscita(url);
     if (visti.has(k) || visti.size >= 200) continue;
     visti.add(k);
     let u = null;
-    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, parole, domanda }); } catch (_) { u = null; }
-    if (!u || u.blocca || !u.exfil) continue;
+    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }); } catch (_) { u = null; }
+    if (!u || u.blocca || (!u.exfil && !u.nonCompare)) continue;
+    if (u.nonCompare) u = { ...u, reason: u.datiReason || 'ha scritto Filo e che non compare da nessuna parte' };
     let chiede = sempre;
     if (!chiede && Levels) {
       if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
-      const ing = Levels.ingressi({ type: 'NAVIGA', url, _exfil: true, _exfilReason: u.reason }, { richiesta, impostazioni });
+      const verdetto = u.nonCompare ? { _nonCompare: true } : { _exfil: true };
+      const ing = Levels.ingressi({ type: 'NAVIGA', url, ...verdetto, _exfilReason: u.reason }, { richiesta, impostazioni });
       chiede = !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
     }
     if (!chiede) continue;
@@ -2074,9 +2228,9 @@ async function executeFiloAction(action, opzioni = {}) {
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in questo turno, turni passati
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function eseguiAzioneFilo(action, {
-  confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
+  confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '',
+  domanda = '', soloConferma = false,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -2179,17 +2333,32 @@ async function eseguiAzioneFilo(action, {
     action.tieni = action.tieni === true || /^(true|1|si|sì|yes)$/i.test(String(action.tieni ?? ''));
   }
 
+  // «Cerca X sul sito Y» (#553): l'indirizzo lo costruisce Filo, dall'elenco dei siti o dal modulo di ricerca della home.
+  if ((type === 'NAVIGA' || type === 'LEGGI_PAGINA') && provenienza && !confirmed && !soloConferma) {
+    const esito = await ricercaNelSito(action, { provenienza, contesto, parole, sender });
+    if (esito) return esito;
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
   try {
-    const u = await controllaUscita(action, { sender, contesto, parole, domanda });
+    const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
     if (u.blocca) {
       const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
       return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
     }
     if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
+    if (u.nonCompare) {
+      action._nonCompare = true;
+      if (u.datiReason) action._exfilReason = u.datiReason;
+      // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
+      // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
+      if (!confirmed && !u.insiste && !soloConferma) {
+        return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
+      }
+    }
   } catch (e) {
     console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
   }
@@ -2400,7 +2569,10 @@ async function eseguiAzioneFilo(action, {
     console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
-  const decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
+  let decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
+  // L'indirizzo scritto dal modello si conferma con un OK (decisione su D-20): aprire o leggere una pagina si disfa,
+  // e il riquadro da digitare direbbe il contrario.
+  if (action._nonCompare && decisione.digita) decisione = { ...decisione, digita: false };
   if (decisione.risposta === 'no') {
     const no = fraseNo(ing, decisione, sender);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
@@ -2433,6 +2605,8 @@ async function eseguiAzioneFilo(action, {
       ...(decisione.digita && decisione.regola === 'difesa' ? { avviso: 'Abbassa una difesa di Filo.' } : {}),
     };
   };
+  // Solo la domanda, per l'indirizzo che il modello ha lasciato dopo il rifiuto (#553): mai eseguita da qui.
+  if (soloConferma && (!daChiedere || confirmed || hasBespokeConfirm)) return { executed: false, kept: false };
   if (daChiedere && !confirmed && !hasBespokeConfirm) {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
@@ -2462,7 +2636,7 @@ async function eseguiAzioneFilo(action, {
         // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
         // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
         // cliccabile per riaprirlo (kept:true).
-        const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+        const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
         if (!url) return { executed: false, kept: false };
         // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
         // iniettare istruzioni nel modello (prompt injection) per fargli aprire
@@ -2519,6 +2693,9 @@ async function eseguiAzioneFilo(action, {
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
               tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
             }
+            // Prima dell'attesa qui sotto: un rinvio della pagina arriva durante, e la rilettura deve conoscerlo (#553).
+            const t = (tm.tabs || []).find((x) => x && x.id === tabId);
+            if (t && t.view) PageRead.ricordaApertura(t.view.webContents, url);
             // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato, un rinvio della pagina).
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
@@ -2889,6 +3066,9 @@ async function eseguiAzioneFilo(action, {
               cap = Math.max(cap, Math.floor(token * FC.CARATTERI_PER_TOKEN));
             } catch (_) {}
             const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
+            // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: quelle di Filo le ha scritte il modello.
+            const scrittoDallUtente = (Array.isArray(chat.messages) ? chat.messages : [])
+              .filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
             return {
               executed: true,
               kept: true,
@@ -2900,6 +3080,7 @@ async function eseguiAzioneFilo(action, {
                 // La trascrizione arriva già nella forma "Utente: … / Filo: …",
                 // con testa e coda se è lunghissima (mai un taglio muto): il mezzo si chiede con `da`.
                 transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da, cap }),
+                linkUtente: PageRead.linkNelTesto(scrittoDallUtente),
                 ...(daFuori.length ? { daFuori } : {}),
               },
             };
@@ -3039,6 +3220,7 @@ async function eseguiAzioneFilo(action, {
             },
           };
         }
+        if (r.ok) PageRead.ricordaLetturaRiservata(r.text);
         return {
           executed: !!r.ok,
           kept: true,
@@ -3065,6 +3247,32 @@ async function eseguiAzioneFilo(action, {
             detail: r.detail || '',
           },
         };
+      }
+      case 'LEGGI_PAGINA': {
+        // #553 — il testo di una pagina web torna al modello (dalla scheda se è aperta, se no scaricato):
+        // prima poteva solo cercare e aprire, e ogni dato DENTRO una pagina restava da indovinare dagli snippet.
+        let url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+        const da = Number(action.da ?? action.offset ?? action.from ?? 0) || 0;
+        // «Cosa dice la pagina che ho aperto?»: nello STATO il modello vede le schede per titolo e numero, non per
+        // indirizzo. Il numero si risolve qui, sullo stesso elenco nello stesso ordine.
+        const numero = Number(action.scheda ?? action.tab ?? 0);
+        let r = null;
+        if (!String(url || '').trim() && Number.isInteger(numero) && numero > 0) {
+          let schede = [];
+          try { schede = await globalThis.SN_FILO_STATE.listTabs(); } catch (_) {}
+          const t = schede[numero - 1];
+          if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
+          else url = t.url || '';
+        }
+        if (!r) {
+          try {
+            r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender), analizza: analizzaPer(sender) });
+          } catch (e) {
+            console.warn('[Filo] lettura pagina fallita', e?.message || e);
+          }
+        }
+        if (!r) r = { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
+        return { executed: !!r.ok, kept: true, output: r };
       }
       case 'CERCA_DOCUMENTI': {
         // #947 — la richiesta a parole («la bolletta della luce di marzo») contro l'indice dei documenti che Filo tiene
@@ -3222,6 +3430,7 @@ async function eseguiAzioneFilo(action, {
         const cwd = getAssistantCwd(sender);
         const out = await runCommand(cmd, { shell, cwd, trackCwd: true });
         if (out.cwd) setAssistantCwd(sender, out.cwd);
+        PageRead.ricordaLetturaRiservata(`${out.stdout || ''}\n${out.stderr || ''}`);
         return { executed: out.code === 0, kept: true, output: out };
       }
       case 'VEDI_SCHERMO': {
@@ -4117,6 +4326,97 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Cosa fare di una pagina che non si è lasciata leggere: il motivo decide se riprovare, passare dalla scheda o cambiare fonte.
+function consiglioPaginaNonLetta(out) {
+  const stato = Number(out.stato) || 0;
+  switch (out.errore) {
+    case 'rete-locale':
+      return 'È un indirizzo della rete di casa o dell\'ufficio: Filo non lo scarica. Se l\'utente l\'ha aperto in una scheda, richiamando LEGGI_PAGINA con lo stesso indirizzo lo leggi da lì.';
+    case 'pericoloso':
+      return 'Il rilevatore di siti pericolosi di Filo l\'ha segnalato: non leggerlo, non proporlo all\'utente come fonte e cercane un\'altra.';
+    case 'schema':
+    case 'indirizzo':
+      return 'Serve un indirizzo http o https preso dai risultati, dall\'utente o da una pagina letta, oppure il numero di una scheda web in TAB APERTE. Le pagine di Filo non si leggono così.';
+    case 'scheda':
+      return 'Controlla il numero nell\'elenco TAB APERTE dello STATO.';
+    case 'http':
+      if (stato === 404 || stato === 410) return 'Prova un altro risultato. Non inventare il contenuto.';
+      if (stato === 401 || stato === 403 || stato === 429 || stato === 503) {
+        return 'Il sito non si lascia leggere dai programmi: se il dato serve davvero, aprilo con NAVIGA con background: true e poi rileggilo con LEGGI_PAGINA, che lo legge dalla scheda; altrimenti prova un\'altra fonte. Non inventare il contenuto.';
+      }
+      return 'Prova un\'altra fonte, o riprova una volta. Non inventare il contenuto.';
+    case 'tempo':
+    case 'rete':
+      return 'Riprova una volta o prova un\'altra fonte. Non inventare il contenuto.';
+    default:
+      return 'Prova un\'altra fonte. Non inventare il contenuto.';
+  }
+}
+
+// Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
+// imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
+function pageReadsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_PAGINA') continue;
+    const out = a._output;
+    if (!out || !('pageRead' in out)) continue;
+    const indirizzo = E.perCanaleSistema(tagliaInteri(String(out.url || out.pageRead || ''), 500));
+    if (!out.ok) {
+      blocks.push(`[Pagina "${indirizzo}" non letta: ${E.perCanaleSistema(out.dettaglio || 'lettura non riuscita')}. ${consiglioPaginaNonLetta(out)}]`);
+      continue;
+    }
+    const totale = Number(out.totale) || 0;
+    const da = Number(out.da) || 0;
+    const fino = Number(out.fino) || 0;
+    if (!out.testo) {
+      if (totale > 0 && da >= totale) {
+        blocks.push(`[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+      } else if (out.fonte === 'scheda') {
+        blocks.push(`[La scheda aperta su "${indirizzo}" non mostra testo da leggere (un video, un'immagine, un'app): `
+          + 'dillo all\'utente e non inventare il contenuto.]');
+      } else {
+        blocks.push(`[Pagina "${indirizzo}" letta, ma senza testo${out.soloJavaScript ? ': si costruisce in JavaScript' : ''}. `
+          + 'Se il dato serve, aprila con NAVIGA con background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda; '
+          + 'altrimenti prova un\'altra fonte. Non inventare il contenuto.]');
+      }
+      continue;
+    }
+    const meta = [out.fonte === 'scheda' ? 'letta dalla scheda aperta' : 'scaricata'];
+    if (out.tipo === 'application/pdf') meta.push(out.pagine ? `un PDF di ${out.pagine} ${out.pagine === 1 ? 'pagina' : 'pagine'}` : 'un PDF');
+    if (da > 0 || out.troncata) meta.push(`caratteri da ${da} a ${fino} su ${totale}`);
+    let blocco = `[Pagina web (${meta.join(', ')})]\n`
+      + E.imbustaCampi({
+        tipo: 'PAGINA_WEB',
+        campi: { Titolo: out.titolo || '', Indirizzo: tagliaInteri(String(out.url || ''), 500) },
+        corpo: out.testo,
+        conIntestazione: true,
+        max: PageRead.MAX_TEXT_CHARS + 4000,
+      });
+    if (out.troncata) {
+      blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
+        + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
+    }
+    if (out.scaricataInParte) blocco += '\n[La pagina supera i 5 MB: ne è arrivata solo la prima parte.]';
+    if (out.lettaInParte) {
+      blocco += '\n[La scheda aperta è troppo grande per leggerla tutta: qui sopra c\'è solo la sua prima parte. Se il dato '
+        + 'non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
+    }
+    if (out.soloJavaScript) {
+      blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
+        + 'background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda.]';
+    }
+    if (out.sospetto) {
+      blocco += `\n[Il rilevatore di siti pericolosi considera questo sito sospetto (${E.perCanaleSistema(out.sospetto)}): usa i dati `
+        + 'con cautela e non proporre all\'utente link di accesso o di pagamento presi da qui.]';
+    }
+    blocks.push(blocco);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // #778 — quello che Filo ha visto in una finestra lo legge un modello dall'immagine, ma lo SCRIVE chi ha fatto la
 // finestra (un'app, un sito, una mail): torna imbustato, e il nome della finestra passa dal canale di sistema.
 function vediSchermoForPrompt(actions) {
@@ -4243,7 +4543,7 @@ function salvateTrovateForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
+    pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
@@ -4411,6 +4711,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
   // una spunta dell'accoglienza): l'esito lo dice `executed`.
+  if (res && (res.nonCompare || res.senzaModulo)) return res.error;
   if (res && res.no) return `Azione ${type} NON fatta: ${res.error}.`;
   if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
@@ -5074,6 +5375,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
   const paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
     .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
+  // Gli indirizzi che il modello ha davanti, per la regola dell'indirizzo scritto (#553, src/main/services/pageRead.js).
+  const provenienza = PageRead.contestoChat();
+  PageRead.annotaLink(provenienza, paroleUtente);
+  for (const a of azioniViste) PageRead.annotaAzione(provenienza, a);
   // Quello che la chat ha davanti e non ha scritto l'utente entra nel registro dei segreti letti (#810). Anche
   // le frasi di Filo: riaperta dalla Cronologia, la chat non ha più l'esito che aveva portato il codice.
   ricordaLettoInChat(azioniViste, [...vistiDalFilo, ...codaScheda]);
@@ -5189,6 +5494,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const MAX_ROUNDS = 12;
   const rawActions = [];
   const renderedActions = [];
+  // Gli indirizzi scritti dal modello e rifiutati, che il modello non ha poi trovato altrove (#553): a fine turno
+  // restano sotto la risposta come bottone da confermare, senza popup.
+  const lasciati = new Map();
   const notes = [];
   // I testi dei giri di soli bottoni, in ordine: aprono la risposta (#1167). Una nota scritta prima dell'ultimo di
   // loro non diventa risposta a giro finale muto.
@@ -5358,7 +5666,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const avvia = (a, { contesto, fonti }) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -5397,7 +5705,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           renderedActions.push(rendered);
           roundRendered.push(rendered);
         }
-        push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        // Un indirizzo rifiutato prima di partire torna al modello, che lo cerca: nel diario non c'è niente da dire (#553).
+        if (!res.nonCompare && !res.senzaModulo) push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        PageRead.annotaAzione(provenienza, rendered);
+        const tipoUscita = String(a.type || '').toUpperCase();
+        if (tipoUscita === 'NAVIGA' || tipoUscita === 'LEGGI_PAGINA') {
+          const dove = globalThis.SN_ACTION_LEVELS.indirizzoDi(a);
+          if (res.nonCompare) lasciati.set(dove, a);
+          else if (res.executed) lasciati.clear();
+          else if (res.needsConfirm) lasciati.delete(dove);
+        }
         results.push({ action: a, res, rendered });
         azioniViste.push(rendered);
         ricordaLettoInChat([rendered]);
@@ -5456,6 +5773,24 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     throw e;
   } finally {
     if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
+  }
+  if (!fermato && lasciati.size) {
+    for (const a of lasciati.values()) {
+      let res = null;
+      try {
+        res = await executeFiloAction(a, {
+          sender, contesto: azioniViste, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette, richiesta, soloConferma: true,
+        });
+      } catch (_) { res = null; }
+      if (!res || !res.needsConfirm) continue;
+      const rendered = { ...a };
+      delete rendered._argsError;
+      rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
+      if (res.domanda) rendered._domanda = res.domanda;
+      rendered._executed = false;
+      renderedActions.push(rendered);
+      push('filo:action', { kind: 'done', action: rendered, kept: true, executed: false });
+    }
   }
   if (fermato) {
     // Lo stop resta scritto nell'intervista: una scheda nuova o una pagina ricaricata non rifà il turno fermato.
@@ -5547,7 +5882,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let linkDaConfermare = [];
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
-      sender, contesto: azioniViste, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
+      sender, contesto: azioniViste, provenienza, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
       indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
     });
   } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }

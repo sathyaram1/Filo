@@ -840,6 +840,7 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    LEGGI_PAGINA: 'Leggo una pagina…',
     VEDI_SCHERMO: 'Guardo lo schermo…',
     CERCA_DOCUMENTI: 'Cerco fra i tuoi documenti…',
     CERCA_SALVATE: 'Cerco fra le pagine salvate…',

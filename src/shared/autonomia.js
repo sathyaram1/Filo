@@ -281,6 +281,7 @@
     password: 'una password',
     codice: 'un codice usa e getta o di recupero',
     banca: 'delle coordinate bancarie che non mi hai chiesto di mandare',
+    dati: 'dati tuoi dentro un indirizzo che ho scritto io e che non compare da nessuna parte',
   });
 
   // La frase che il popup aggiunge quando a farlo chiedere è ciò che il compito ha letto.

@@ -14,6 +14,7 @@
     RICORDO_FILO: ['Ricordato dal filo', (k) => `Ricordati ${n(k)} pezzi del filo`, 'ricordo'],
     LEGGI_FILE: ['Letto un file', (k) => `Letti ${n(k)} file`, 'file'],
     LEGGI_DOCUMENTO: ['Letto un documento', (k) => `Letti ${n(k)} documenti`, 'documento'],
+    LEGGI_PAGINA: ['Letta una pagina', (k) => `Lette ${n(k)} pagine`, 'pagina web'],
     VEDI_SCHERMO: ['Guardato lo schermo', (k) => `Guardato lo schermo ${n(k)} volte`, 'schermo'],
     CERCA_DOCUMENTI: ['Cercato fra i documenti', (k) => `Fatte ${n(k)} ricerche fra i documenti`, 'documenti'],
     CERCA_SALVATE: ['Cercato fra le pagine salvate', (k) => `Fatte ${n(k)} ricerche fra le pagine salvate`, 'pagine salvate'],

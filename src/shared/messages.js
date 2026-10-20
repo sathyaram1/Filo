@@ -900,6 +900,7 @@
     // Filo Chat: invio messaggio utente all'agente conversazionale
     // { userMessage, threadHistory: [{role, text, actions?}] }
     // Risposta: { ok, text, actions: [...], model, costEur }
+    // Solo dalle pagine di Filo: la risposta porta quello che Filo ha letto (pagine, documenti, comandi).
     FILO_CHAT: 'filo_chat',
     // Ferma il turno di chat in corso (#578): { reqId } è il `reasoningReqId` del turno. Solo pagine di Filo, e solo
     // la scheda che l'ha avviato. Le azioni già partite finiscono, nessuna nuova parte. → { ok, fermato }
@@ -1089,6 +1090,7 @@
     // livelli di sicurezza della chat dashboard. Torna { executed, kept,
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
+    // Da un sito visitato (con FILO_CONFIRM_ACTION) torna senza `output`: quello che l'azione ha letto resta a Filo.
     FILO_RUN_ACTION: 'filo_run_action',
     // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
     // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche, no? }.

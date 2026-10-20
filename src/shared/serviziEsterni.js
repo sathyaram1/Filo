@@ -206,6 +206,15 @@
       dove: ['src/main/services/handlers/misc.js', 'src/main/services/safe-fetch.js'], prova: 'safeFetch(url',
     },
     {
+      id: 'pagine-lette', nome: 'Le pagine che l’agente legge per risponderti',
+      base: [], indirizzo: 'la pagina che l’agente legge, e la home del sito in cui cerca',
+      quando: 'funzione',
+      occasione: 'quando all’agente della chat serve un dato dentro una pagina che non è già aperta in una scheda',
+      riceve: 'una richiesta della pagina, senza i tuoi cookie',
+      frase: 'Filo la scarica senza i tuoi cookie',
+      dove: ['src/main/services/pageRead.js'], prova: 'dip.scarica(',
+    },
+    {
       id: 'file-della-pagina', nome: 'Il sito di un’immagine o di un video',
       base: [], indirizzo: 'il sito che ospita il file',
       quando: 'funzione',
