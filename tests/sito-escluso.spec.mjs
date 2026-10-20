@@ -131,8 +131,9 @@ test('dalla home: «spegni Filo su …» lo aggiunge senza togliere gli altri e 
   const casella = altro.locator('#blocklist');
   await expect(casella).toHaveValue('banca-843.test', { timeout: 8000 });
 
-  const imposta = (valore, id) => ({ toolCalls: [{ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'siti_filo_spento', valore }) }] });
-  await modelloFinto(app, [imposta(`aggiungi ${DOCS}`, 'i1'), { text: 'Spento.' }]);
+  // Un'impostazione riuscita chiude il turno (#1130): la frase va scritta insieme.
+  const imposta = (valore, id, text) => ({ text, toolCalls: [{ id, name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'siti_filo_spento', valore }) }] });
+  await modelloFinto(app, [imposta(`aggiungi ${DOCS}`, 'i1', 'Spento.')]);
   await chiedi(chat, `spegni Filo su ${DOCS}`);
   await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test', DOCS]);
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Spento.' })).toBeVisible({ timeout: 10_000 });
@@ -144,7 +145,7 @@ test('dalla home: «spegni Filo su …» lo aggiunge senza togliere gli altri e 
   await altro.keyboard.type(`\n${ALTRO}`);
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual(['banca-843.test', DOCS, ALTRO]);
 
-  await modelloFinto(app, [imposta(`togli ${DOCS}`, 'i2'), { text: 'Riacceso.' }]);
+  await modelloFinto(app, [imposta(`togli ${DOCS}`, 'i2', 'Riacceso.')]);
   await chiedi(chat, `riaccendi Filo su ${DOCS}`);
   await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test', ALTRO]);
   await expect(casella).toHaveValue(`banca-843.test\n${ALTRO}`, { timeout: 5000 });

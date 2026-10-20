@@ -210,7 +210,9 @@ test('Chat: «usa opus per la chat» chiede l\'OK con il costo e l\'avviso, salv
   await configura(app, { chiave: 'k-test', models: { filo_chat: 'deepseek-flash' } });
   await app.evaluate(() => { globalThis.SN_WALLET_MAIN.keySource = async () => 'factory'; });
 
-  await modelloFinto(app, [cambia('Chat con Filo: opus'), { text: 'Ti chiedo conferma.' }, { text: 'Fatto.' }]);
+  // Una lettura nel giro rimanda l'esito al modello: il cambio fermo sulla conferma da solo chiuderebbe il turno (#1130).
+  const leggi = { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' };
+  await modelloFinto(app, [{ toolCalls: [leggi, ...cambia('Chat con Filo: opus').toolCalls] }, { text: 'Ti chiedo conferma.' }, { text: 'Fatto.' }]);
   await scrivi(chat, 'usa opus per la chat');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
   const saldo = await saldoLocale(app);

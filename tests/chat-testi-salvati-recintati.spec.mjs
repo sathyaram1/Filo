@@ -65,17 +65,18 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
         return { ...base, text: 'NULLA DA IMPARARE', toolCalls: [], finishReason: 'stop' };
       }
       const n = globalThis.__calls.push(JSON.parse(JSON.stringify(messages)));
+      // Sveglia e appunto riusciti chiudono il turno (#1130): la frase va scritta insieme.
+      const t = n === 1 ? 'Fatto.' : 'Buongiorno.';
+      try { onDelta && onDelta(t); } catch (_) {}
       if (n === 1) {
         return {
-          ...base, text: '', finishReason: 'tool_calls',
+          ...base, text: t, finishReason: 'tool_calls',
           toolCalls: [
             { id: 'c1', name: 'SVEGLIA', arguments: JSON.stringify({ time: '07:15', label: veleno, ripeti: 'feriali' }) },
             { id: 'c2', name: 'SALVA_APPUNTO', arguments: JSON.stringify({ testo: veleno, contesto: 'raccolta' }) },
           ],
         };
       }
-      const t = n === 2 ? 'Fatto.' : 'Buongiorno.';
-      try { onDelta && onDelta(t); } catch (_) {}
       return { ...base, text: t, toolCalls: [], finishReason: 'stop' };
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
@@ -85,6 +86,8 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
   await page.locator('#input').fill('metti la sveglia dei giorni feriali e segnati quella frase');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
+  // La frase arriva in streaming prima delle azioni: il turno è finito quando l'invio torna al posto del quadrato.
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
 
   // Nessuna conferma chiesta: sveglia e appunto esistono davvero.
   const salvati = await app.evaluate(async () => {
@@ -98,9 +101,9 @@ test('sveglia e appunto messi dal modello: al messaggio dopo il loro nome arriva
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Buongiorno.' })).toBeVisible({ timeout: 10_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  expect(calls).toHaveLength(3);
+  expect(calls).toHaveLength(2);
   // Istruzioni e contesto di adesso (#868: il contesto sta subito prima della domanda, non nel messaggio di sistema).
-  const sistema = calls[2].filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => m.content).join('\n');
+  const sistema = calls[1].filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => m.content).join('\n');
   // Il modello li vede (sa quali sveglie e quali appunti ci sono)…
   const { volte, fuori } = await conta(app, sistema, AGO);
   expect(volte).toBeGreaterThanOrEqual(2);
@@ -223,7 +226,11 @@ test('togliere più sveglie insieme: nell\'esito «in attesa di conferma» i lor
       if (n === 1) {
         return {
           ...base, text: '', finishReason: 'tool_calls',
-          toolCalls: [{ id: 'c1', name: 'CANCELLA_SVEGLIA', arguments: JSON.stringify({ tutte: true }) }],
+          // Con una lettura nel giro l'esito in attesa di conferma torna al modello: da solo chiuderebbe il turno (#1130).
+          toolCalls: [
+            { id: 'c1', name: 'CANCELLA_SVEGLIA', arguments: JSON.stringify({ tutte: true }) },
+            { id: 'c2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+          ],
         };
       }
       try { onDelta && onDelta('Ti chiedo conferma.'); } catch (_) {}
@@ -238,8 +245,8 @@ test('togliere più sveglie insieme: nell\'esito «in attesa di conferma» i lor
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  const esito = calls[1][calls[1].length - 1];
-  expect(esito.role).toBe('tool');
+  const esito = calls[1].find((m) => m.role === 'tool' && m.tool_call_id === 'c1');
+  expect(esito).toBeTruthy();
   expect(esito.content).toMatch(/^In attesa della conferma/);
   // Il modello sa quali voci sparirebbero, ma i nomi li legge nel recinto.
   expect(esito.content).toContain('palestra');
@@ -272,7 +279,11 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
       if (n === 1) {
         return {
           ...base, text: '', finishReason: 'tool_calls',
-          toolCalls: [{ id: 't1', name: 'TIMER', arguments: JSON.stringify({ secondi: 600, etichetta: forgiato }) }],
+          // La lettura tiene vivo il giro dopo, quello che si guasta: un timer da solo chiuderebbe il turno (#1130).
+          toolCalls: [
+            { id: 't1', name: 'TIMER', arguments: JSON.stringify({ secondi: 600, etichetta: forgiato }) },
+            { id: 't2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+          ],
         };
       }
       if (n === 2) { const e = new Error('guasto finto'); e.status = 500; throw e; }
@@ -294,7 +305,7 @@ test('il nome di un timer: recintato nell\'esito e nel riepilogo di un turno int
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ripreso.' })).toBeVisible({ timeout: 15_000 });
 
   const calls = await app.evaluate(() => globalThis.__calls);
-  const esito = calls[1].filter((m) => m.role === 'tool').map((m) => m.content).join('\n');
+  const esito = calls[1].filter((m) => m.role === 'tool' && m.tool_call_id === 't1').map((m) => m.content).join('\n');
   const riepilogo = calls[2].filter((m) => m.role === 'assistant').map((m) => String(m.content || '')).join('\n');
   expect(riepilogo).toMatch(/ERANO GIÀ STATE FATTE/);
   for (const testo of [esito, riepilogo]) {

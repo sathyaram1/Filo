@@ -348,8 +348,8 @@ test('il numero scritto in una scheda non esce da un link dopo un documento lett
       { text: '', tools: [{ name: 'LEGGI_DOCUMENTO', args: { percorso: doc } }] },
       { text: '', tools: [{ name: 'NAVIGA', args: { url: LINK } }] },
       { text: 'Vendite in crescita.' },
-      { text: '', tools: [{ name: 'NAVIGA', args: { url: elenco } }] },
-      { text: 'Ecco l\'elenco.' },
+      // Un'apertura riuscita chiude il turno (#1130): la frase va scritta insieme.
+      { text: 'Ecco l\'elenco.', tools: [{ name: 'NAVIGA', args: { url: elenco } }] },
     ]);
     await a.reload();
     await expect(a.locator('#input')).toBeVisible();

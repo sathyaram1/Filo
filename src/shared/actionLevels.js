@@ -1165,6 +1165,40 @@
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
+  // Azioni secche che, riuscite, parlano da sé (#1130): un giro fatto solo di loro chiude il turno senza richiamare il
+  // modello. Per ognuna, quando l'esito è riuscito e non lascia niente da dire: un tetto toccato, un costo o un avviso li
+  // dice il modello, e lì il giro riparte.
+  const fatta = (r) => r.executed === true;
+  const senza = (...campi) => (r) => fatta(r) && !campi.some((c) => r.output && r.output[c]);
+  const accesaOSpenta = (r) => fatta(r) && !!r.output && typeof r.output.acceso === 'boolean' && !Array.isArray(r.output.elenco);
+  const TERMINALI = Object.freeze({
+    NAVIGA: fatta,
+    TIMER: fatta,
+    SVEGLIA: fatta,
+    CANCELLA_SVEGLIA: fatta,
+    MODIFICA_SVEGLIA: fatta,
+    ZOOM_PAGINA: senza('limitato'),
+    VOLUME: senza('limitato'),
+    WIFI: accesaOSpenta,
+    BLUETOOTH: accesaOSpenta,
+    IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),
+    IMPOSTA_ESTETICA: fatta,
+    COMANDO_FINESTRA: senza('already'),
+    TIENI_APERTA: fatta,
+    NON_TENERE_APERTA: fatta,
+    STILE_PAGINA: fatta,
+    RIPRISTINA_STILE_PAGINA: fatta,
+    SALVA_APPUNTO: fatta,
+    ANNULLA_CAMBIO: (r) => fatta(r) && !(r.output && Array.isArray(r.output.saltati) && r.output.saltati.length),
+    APRI_FILE: fatta,
+    // Il bottone dell'evento lo aziona l'utente: riuscita vuol dire proposto.
+    EVENTO_CALENDARIO: (r) => r.kept === true && !!(r.output && r.output.proposta),
+  });
+  const parlaDaSe = (type, esito) => {
+    const t = String(type || '').toUpperCase();
+    return !!esito && Object.prototype.hasOwnProperty.call(TERMINALI, t) && TERMINALI[t](esito);
+  };
+
   function fonteDi(action) {
     const entry = voce(action);
     const out = action && action._output;
@@ -1251,5 +1285,5 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

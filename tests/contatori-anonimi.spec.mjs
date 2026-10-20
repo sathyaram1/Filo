@@ -165,9 +165,9 @@ test('«spegni i contatori» in chat li spegne, butta quello che aspettava, e le
       useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
+    // Un'impostazione riuscita chiude il turno (#1130): la frase va scritta insieme.
     const giri = [
-      { toolCalls: [{ id: 'c1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'contatori', valore: false }) }] },
-      { text: 'Spenti.' },
+      { text: 'Spenti.', toolCalls: [{ id: 'c1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'contatori', valore: false }) }] },
     ];
     let n = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta, onToolCall }) => {

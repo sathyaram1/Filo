@@ -72,9 +72,9 @@ async function modelloFinto(app, risposte, ritardoMs = 0) {
 test('il timer chiesto in chat ha la sua carta a sinistra: conta, scade e il clic riapre lo scambio', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
+  // Un timer riuscito chiude il turno (#1130): la frase va scritta insieme.
   await modelloFinto(app, [
-    { strumenti: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":4,"etichetta":"Pasta"}' }] },
-    { testo: 'Fatto, timer della pasta avviato.' },
+    { testo: 'Fatto, timer della pasta avviato.', strumenti: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":4,"etichetta":"Pasta"}' }] },
   ]);
   await page.locator('#input').fill('metti un timer di 4 secondi per la pasta');
   await page.locator('#sendBtn').click();

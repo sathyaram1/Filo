@@ -15,8 +15,9 @@
 //      timer esiste davvero. Prima: con `toolCalls` nella risposta del
 //      provider il main non eseguiva niente (leggeva solo il testo).
 //  (B) un'azione di livello 2 chiamata come strumento apre il popup di
-//      conferma e l'esito «in attesa di conferma» torna al modello, che
-//      risponde con quello in mano.
+//      conferma; se il giro ha anche un esito da leggere, quello «in attesa
+//      di conferma» torna al modello, che risponde con quello in mano (da
+//      sola chiude il turno col pulsante: chat-comandi-secchi.spec.mjs).
 //  (C) il modello nomina un'azione: la riga in testa lo dice PRIMA che gli
 //      argomenti siano arrivati.
 
@@ -223,9 +224,13 @@ test('B —un\'azione che chiede, chiamata come strumento, apre la conferma, e i
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (n === 1) {
         try { onToolCall && onToolCall({ id: 'f1', name: 'INVIA_FEEDBACK' }); } catch (_) {}
+        try { onToolCall && onToolCall({ id: 'f2', name: 'CAPACITA_DETTAGLIO' }); } catch (_) {}
         return {
           ...base, text: '',
-          toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: '{"testo":"Il timer non suona.","titolo":"Timer muto"}' }],
+          toolCalls: [
+            { id: 'f1', name: 'INVIA_FEEDBACK', arguments: '{"testo":"Il timer non suona.","titolo":"Timer muto"}' },
+            { id: 'f2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+          ],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
       }
@@ -248,9 +253,9 @@ test('B —un\'azione che chiede, chiamata come strumento, apre la conferma, e i
   const calls = await app.evaluate(() => globalThis.__calls2);
   expect(calls.length).toBe(2);
   const m = calls[1].messages;
-  expect(m[m.length - 1].role).toBe('tool');
-  expect(m[m.length - 1].content).toMatch(/In attesa della conferma/);
-  expect(m[m.length - 1].content).toMatch(/NON richiamare/);
+  expect(m[m.length - 2]).toMatchObject({ role: 'tool', tool_call_id: 'f1' });
+  expect(m[m.length - 2].content).toMatch(/In attesa della conferma/);
+  expect(m[m.length - 2].content).toMatch(/NON richiamare/);
 
   await app.evaluate(() => { try { globalThis.__restoreProvider2?.(); } catch (_) {} });
 });
@@ -274,11 +279,14 @@ test('D — un\'azione eseguita senza bottone in chat torna al modello come eseg
         // Il fornitore non manda gli id delle chiamate.
         try { onToolCall && onToolCall({ id: '', name: 'IMPOSTA_PREFERENZA' }); } catch (_) {}
         try { onToolCall && onToolCall({ id: '', name: 'CANCELLA_SVEGLIA' }); } catch (_) {}
+        // Una lettura nel giro: senza, due comandi secchi riusciti chiuderebbero il turno (#1130).
+        try { onToolCall && onToolCall({ id: '', name: 'CAPACITA_DETTAGLIO' }); } catch (_) {}
         return {
           ...base, text: '',
           toolCalls: [
             { id: '', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' },
             { id: '', name: 'CANCELLA_SVEGLIA', arguments: '{"etichetta":"Uovo"}' },
+            { id: '', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
           ],
           reasoningDetails: [], finishReason: 'tool_calls',
         };
@@ -299,14 +307,15 @@ test('D — un\'azione eseguita senza bottone in chat torna al modello come eseg
   const calls = await app.evaluate(() => globalThis.__calls4);
   expect(calls.length).toBe(2);
   const m = calls[1].messages;
-  const assistant = m[m.length - 3];
+  const assistant = m[m.length - 4];
   const ids = assistant.tool_calls.map((c) => c.id);
   expect(ids.every((id) => id)).toBe(true);
-  expect(m[m.length - 2].tool_call_id).toBe(ids[0]);
-  expect(m[m.length - 1].tool_call_id).toBe(ids[1]);
-  expect(m[m.length - 2].content).toMatch(/^Eseguita/);
-  expect(m[m.length - 2].content).not.toMatch(/NON eseguita/);
-  expect(m[m.length - 1].content).toMatch(/^Tolte:\n<<<TESTO_SALVATO>>>\n.*Uovo/);
+  expect(m[m.length - 3].tool_call_id).toBe(ids[0]);
+  expect(m[m.length - 2].tool_call_id).toBe(ids[1]);
+  expect(m[m.length - 1].tool_call_id).toBe(ids[2]);
+  expect(m[m.length - 3].content).toMatch(/^Eseguita/);
+  expect(m[m.length - 3].content).not.toMatch(/NON eseguita/);
+  expect(m[m.length - 2].content).toMatch(/^Tolte:\n<<<TESTO_SALVATO>>>\n.*Uovo/);
 
   // La riga della sveglia tolta c'è, una volta sola; il timer non c'è più.
   const activity = page.locator('.dash-activity');
@@ -473,7 +482,9 @@ test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima 
         try { onToolCall && onToolCall({ id: 't1', name: 'TIMER' }); } catch (_) {}
         // Gli argomenti «arrivano» quando la prova ha visto la riga: nel frattempo la riga deve già dirlo.
         await vista;
-        return { ...base, text: '', toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":60,"etichetta":"Uovo"}' }], reasoningDetails: [], finishReason: 'tool_calls' };
+        // Un timer solo chiude il turno (#1130): la frase va scritta insieme.
+        try { onDelta && onDelta('Un minuto, via.'); } catch (_) {}
+        return { ...base, text: 'Un minuto, via.', toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":60,"etichetta":"Uovo"}' }], reasoningDetails: [], finishReason: 'tool_calls' };
       }
       try { onDelta && onDelta('Un minuto, via.'); } catch (_) {}
       return { ...base, text: 'Un minuto, via.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };

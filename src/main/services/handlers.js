@@ -5890,10 +5890,14 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         lettura: (a) => !!a && !a._argsError && globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type),
       });
       if (partite.fermato) { fermato = true; break; }
+      // Un comando secco riuscito o fermo sulla conferma parla da sé (#1130): niente secondo giro. Solo al primo giro con
+      // azioni: dopo una lettura il modello ha ancora da dire cosa ha trovato. L'intervista finisce ogni turno con una battuta.
+      const chiude = passi === 1 && !onbActive
+        && GiroAzioni.chiudeIlTurno(results, { testo: text, daLeggere: (x) => !!observationsForPrompt([x.rendered]) });
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
-      // Quello di un giro di soli bottoni invece resta nella bolla.
-      const diRisposta = !!text.trim() && giroDiSoliBottoni(results);
+      // Quello di un giro di soli bottoni, o dell'ultimo, invece resta nella bolla.
+      const diRisposta = !!text.trim() && (chiude || giroDiSoliBottoni(results));
       const fraLeNote = !!text.trim() && !diRisposta;
       if (diRisposta) {
         risposta.push(text.trim());
@@ -5905,6 +5909,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       push('filo:action', { kind: 'round', text, ...(diRisposta ? { risposta: true } : {}) });
       textReply = diRisposta ? '' : text;
       reasoningDetails = r.reasoningDetails || [];
+      if (chiude) {
+        exhausted = false;
+        interrotta = globalThis.SN_CHAT_ERRORS.troncata(r.finishReason) ? r.finishReason : false;
+        break;
+      }
       if (legacy) {
         // Formato vecchio: si prosegue solo se un esito deve tornare al modello
         // e niente è in attesa di conferma, come faceva prima la scheda.

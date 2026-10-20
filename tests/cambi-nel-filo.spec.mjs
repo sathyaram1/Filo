@@ -39,6 +39,7 @@ async function configura(app, extra = {}) {
 
 // Il modello finto: un giro per elemento di `giri`. `annullaTema: true` cerca nel prompt l'id del
 // cambio del tema e lo annulla, come farebbe il modello leggendo i CAMBI RECENTI.
+// Un comando secco chiude il turno al primo giro (#1130): la frase va scritta insieme alle azioni.
 async function modelloFinto(app, giri) {
   await app.evaluate(async (_e, g) => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
@@ -85,8 +86,7 @@ test('A — «tema scuro» in chat: segno sulla bolla, «tema: chiaro → scuro 
   const page = await homeDi(app);
   await configura(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
-    { text: 'Fatto.' },
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
   ]);
   await scrivi(page, 'tema scuro', 'Fatto.');
   expect((await impostazioni(app)).theme).toBe('dark');
@@ -146,7 +146,7 @@ test('B — tema cambiato dalle Preferenze, poi «rimetti come prima» in chat: 
 
   const page = await homeDi(app);
   await shell.locator('.tab').first().click();
-  await modelloFinto(app, [{ annullaTema: true }, { text: 'Rimesso.' }]);
+  await modelloFinto(app, [{ annullaTema: true, text: 'Rimesso.' }]);
   await scrivi(page, 'rimetti come prima', 'Rimesso.');
   // Il modello l'ha visto nello STATO, con la sua provenienza, ed è tornato il chiaro.
   const prompt = await app.evaluate(() => globalThis.__finto_prompt[0]);
@@ -204,8 +204,7 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
   }, { timeout: 10_000 }).toBe(true);
   await expect(incog.locator('#input')).toBeVisible();
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'i1', name: 'TIMER', arguments: '{"secondi":600,"etichetta":"segreto incognito"}' }] },
-    { text: 'Avviato.' },
+    { text: 'Avviato.', toolCalls: [{ id: 'i1', name: 'TIMER', arguments: '{"secondi":600,"etichetta":"segreto incognito"}' }] },
   ]);
   await scrivi(incog, 'timer 10 minuti per il segreto incognito', 'Avviato.');
   const bolla = incog.locator('.dash-bubble-user', { hasText: 'segreto incognito' });
@@ -254,8 +253,7 @@ test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il s
   const page = await homeDi(app);
   await configura(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'p1', name: 'TIMER', arguments: '{"secondi":600,"etichetta":"pasta"}' }] },
-    { text: 'Avviato.' },
+    { text: 'Avviato.', toolCalls: [{ id: 'p1', name: 'TIMER', arguments: '{"secondi":600,"etichetta":"pasta"}' }] },
   ]);
   await scrivi(page, 'timer 10 minuti per la pasta', 'Avviato.');
   const timer = () => app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.listTimers()).map((t) => t.label));
@@ -325,8 +323,7 @@ test('H — annulla quando lo stato era già tornato com\'era: l\'annullo resta,
   const page = await homeDi(app);
   await configura(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'h1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
-    { text: 'Fatto.' },
+    { text: 'Fatto.', toolCalls: [{ id: 'h1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
   ]);
   await scrivi(page, 'tema scuro', 'Fatto.');
   // Nel frattempo l'utente lo rimette a mano.
@@ -374,8 +371,7 @@ test('J — il tasto destro sulla bolla col segno offre l\'annullo e il rifai, c
   const page = await homeDi(app);
   await configura(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
-    { text: 'Fatto.' },
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
   ]);
   await scrivi(page, 'tema scuro', 'Fatto.');
   const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
@@ -411,8 +407,7 @@ test('K — due annulli dello stesso cambio arrivati insieme ne fanno uno: «rif
   const page = await homeDi(app);
   await configura(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
-    { text: 'Fatto.' },
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
   ]);
   await scrivi(page, 'tema scuro', 'Fatto.');
   const id = (await registro(app)).find((e) => e.via === 'chat' && e.cambi.some((c) => c.chiave === 'theme')).id;
@@ -441,8 +436,7 @@ test('L — tasto destro sulla riga del blocco che nomina il cambio: annulla da 
   const page = await homeDi(app);
   await configura(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
-    { text: 'Fatto.' },
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
   ]);
   await scrivi(page, 'tema scuro', 'Fatto.');
   const menu = menuDi(page).locator('.sn-menu');
@@ -475,8 +469,7 @@ test('M — passare sul testo della bolla non apre la pastiglia sopra la rispost
   await configura(app);
   await modelloFinto(app, [
     { text: 'Ciao.' },
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
-    { text: 'Fatto.' },
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
   ]);
   await scrivi(page, 'ciao', 'Ciao.');
   await scrivi(page, 'tema scuro', 'Fatto.');
@@ -502,8 +495,7 @@ test('N — il clic sul segno apre e richiude la pastiglia; da tastiera il fuoco
   const page = await homeDi(app);
   await configura(app);
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
-    { text: 'Fatto.' },
+    { text: 'Fatto.', toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
   ]);
   await scrivi(page, 'tema scuro', 'Fatto.');
   const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
@@ -543,12 +535,12 @@ test('O — tema e accento chiesti com\'erano già: le righe lo dicono coi nomi 
   await configura(app, { theme: 'dark', themeTokens: { accent: '#3a7d44' } });
   await modelloFinto(app, [
     {
+      text: 'Era già così.',
       toolCalls: [
         { id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' },
         { id: 't2', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"accent","valore":"#3a7d44"}' },
       ],
     },
-    { text: 'Era già così.' },
   ]);
   await scrivi(page, 'tema scuro e accento verde', 'Era già così.');
   await page.locator('.dash-activity-head').click();

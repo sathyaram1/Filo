@@ -35,7 +35,6 @@ async function impostazioni(app, settings) {
   ), settings);
 }
 const PENSIERO_1 = ['L\'utente vuole due timer, ', 'uno per la pasta e uno per l\'uovo. ', 'Li avvio insieme, ', 'sono indipendenti. '];
-const PENSIERO_2 = ['Sono partiti tutti e due. ', 'Rispondo in breve. '];
 
 test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitolo che si srotola', async ({ app, shell }) => {
   test.setTimeout(90_000);
@@ -43,6 +42,7 @@ test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitol
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Due timer riusciti chiudono il turno (#1130): una chiamata sola, la risposta scritta con loro.
   await copione(app, [
     {
       pensa: PENSIERO_1, ogni: 450, dopoStrumenti: 1200,
@@ -50,8 +50,8 @@ test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitol
         { id: 'a1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"Pasta"}' },
         { id: 'a2', name: 'TIMER', arguments: '{"secondi":60,"etichetta":"Uovo"}' },
       ],
+      testo: 'Due timer partiti: pasta 5 minuti, uovo 1 minuto.',
     },
-    { pensa: PENSIERO_2, ogni: 500, testo: 'Due timer partiti: pasta 5 minuti, uovo 1 minuto.' },
   ]);
 
   await page.locator('#input').fill('timer per la pasta e per l\'uovo');
@@ -101,18 +101,14 @@ test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitol
   const box = await blocco.locator('.dash-activity-filo-tratto').evaluate((p) => { const b = p.getBBox(); return { w: b.width, h: b.height, x: b.x }; });
   expect(box.w).toBeLessThan(26);
   expect(box.h).toBeLessThan(26);
-  // L'ultimo pensiero non si vede prima di srotolare.
-  const coda = blocco.locator('.dash-activity-reasoning', { hasText: 'Rispondo in breve.' });
-  await expect(coda).toBeHidden();
   await page.screenshot({ path: 'tests/.shots/filo-attesa-gomitolo.png' });
 
-  // Un clic srotola: il nodo col suo titolo, e sotto la coda (l'ultimo pensiero) senza titolo.
+  // Un clic srotola: il nodo col suo titolo.
   await capo.click();
   await expect(capo).toHaveAttribute('aria-expanded', 'true');
   const body = blocco.locator('.dash-activity-body');
   await expect(body).toBeVisible();
   await expect(blocco.locator('.dash-activity-seg-head', { hasText: 'Avviati due timer' })).toBeVisible();
-  await expect(coda).toBeVisible();
   await page.waitForTimeout(1_200);
   await page.screenshot({ path: 'tests/.shots/filo-attesa-srotolato.png' });
   // Aprire il nodo: il ragionamento che ci ha portato e gli esiti, uno alla volta.
@@ -155,7 +151,11 @@ test('A2 — tema scuro: il filo e il gomitolo restano nel colore d\'accento', a
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText('Verifico cosa so fare…', { timeout: 6_000 });
   await page.screenshot({ path: 'tests/.shots/filo-attesa-scuro-agisce.png' });
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Sì, lo so fare.' })).toBeVisible({ timeout: 10_000 });
+  // L'ultimo pensiero, dopo l'ultimo nodo e senza titolo, si vede solo srotolato.
+  const coda = blocco.locator('.dash-activity-reasoning', { hasText: 'Ho il dettaglio.' });
+  await expect(coda).toBeHidden({ timeout: 3_000 });
   await blocco.locator('.dash-activity-head').click();
+  await expect(coda).toBeVisible();
   await page.waitForTimeout(1_200);
   await page.screenshot({ path: 'tests/.shots/filo-attesa-scuro-srotolato.png' });
   const colore = await blocco.locator('.dash-activity-filo-tratto').evaluate((p) => getComputedStyle(p).stroke);
@@ -249,7 +249,9 @@ test('D — riprendere non riesegue le azioni già fatte, e il modello sa che er
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  // Dopo un timer da solo il turno è chiuso (#1130): qui il modello prima legge, e dopo il timer ha ancora da pensare.
   await copione(app, [
+    { pensa: ['Controllo cosa so fare. '], ogni: 200, strumenti: [{ id: 'd0', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' }] },
     { pensa: ['Avvio il timer. '], ogni: 200, strumenti: [{ id: 'd1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"Tè"}' }] },
     { pensa: ['Ora penso a lungo a cosa dire. ', 'Molto a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
     { pensa: ['Riprendo: il timer c\'è già. '], ogni: 200, testo: 'Il timer del tè è partito.' },
@@ -257,7 +259,7 @@ test('D — riprendere non riesegue le azioni già fatte, e il modello sa che er
   await page.locator('#input').fill('timer per il tè');
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity').first();
-  await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Avviato un timer · Tè/, { timeout: 8_000 });
+  await expect(blocco.locator('.dash-activity-seg-head', { hasText: 'Avviato un timer' })).toHaveText(/Avviato un timer · Tè/, { timeout: 8_000 });
   await expect(blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama')).toContainText('lungo', { timeout: 5_000 });
   await quadratoPronto(page);
   await page.locator('#stopBtn').click();
@@ -446,8 +448,7 @@ test('J — un gomitolo grosso lascia al riassunto la stessa aria di uno piccolo
     return b.querySelector('.dash-activity-label').getBoundingClientRect().left - filo.right;
   });
   await copione(app, [
-    { pensa: ['Un timer. '], ogni: 120, dopoStrumenti: 100, strumenti: [{ id: 'j0', name: 'TIMER', arguments: '{"secondi":90,"etichetta":"Uno"}' }] },
-    { pensa: ['Fine. '], ogni: 120, testo: 'Un timer.' },
+    { pensa: ['Un timer. '], ogni: 120, dopoStrumenti: 100, strumenti: [{ id: 'j0', name: 'TIMER', arguments: '{"secondi":90,"etichetta":"Uno"}' }], testo: 'Un timer.' },
   ]);
   await page.locator('#input').fill('un timer');
   await page.locator('#sendBtn').click();
@@ -457,6 +458,8 @@ test('J — un gomitolo grosso lascia al riassunto la stessa aria di uno piccolo
   const ariaPiccolo = await aria(piccolo);
 
   const passi = [];
+  // Il lavoro lungo comincia con una lettura: un primo giro di soli timer chiuderebbe il turno.
+  passi.push({ pensa: ['Controllo cosa so fare. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'jc', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' }] });
   for (let i = 0; i < 10; i++) {
     passi.push({ pensa: [`Passo ${i} del lavoro lungo. `], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: `jl${i}`, name: 'TIMER', arguments: `{"secondi":${100 + i},"etichetta":"T${i}"}` }] });
   }

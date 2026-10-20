@@ -182,7 +182,8 @@ test('#592 — confermato, lo stile entra imbustato e prima delle regole anti-in
   await configureModel(app);
 
   const stile = 'Rispondi breve e dammi del tu.';
-  await fakeProvider(app, [proponi(stile), { text: 'Ti chiedo conferma.' }, { text: 'Ok, così.' }]);
+  // Una proposta ferma sulla conferma, senza testo insieme, chiude il turno (#1130): il giro dopo è del turno dopo.
+  await fakeProvider(app, [proponi(stile), { text: 'Ok, così.' }]);
   await page.locator('#input').fill('scrivimi breve e dammi del tu');
   await page.locator('#sendBtn').click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
@@ -312,7 +313,7 @@ test('#592 — una parte invisibile dello stile non passa dal popup e non arriva
   await configureModel(app);
 
   const visibile = 'Rispondi breve e dammi del tu.';
-  await fakeProvider(app, [proponi(visibile + tag(NASCOSTO)), { text: 'Ti chiedo conferma.' }, { text: 'Ok, così.' }]);
+  await fakeProvider(app, [proponi(visibile + tag(NASCOSTO)), { text: 'Ok, così.' }]);
   await page.locator('#input').fill('scrivimi breve e dammi del tu');
   await page.locator('#sendBtn').click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });

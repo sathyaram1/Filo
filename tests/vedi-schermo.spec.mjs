@@ -259,8 +259,9 @@ test('due finestre nella stessa risposta: un popup per ciascuna, in fila, e una 
   test.setTimeout(120_000);
   await finestreFinte(app);
   await occhioFinto(app);
+  // Due azioni ferme sulla conferma col testo insieme: il modello riparte una volta e risponde (#1130).
   await chatFinta(app, [
-    { toolCalls: [
+    { text: 'Aspetto i tuoi OK.', toolCalls: [
       { id: 'a1', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: ESTERNA }) },
       { id: 'a2', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: 'Note - Blocco note' }) },
     ] },

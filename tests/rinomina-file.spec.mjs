@@ -610,11 +610,10 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
   writeFileSync(join(dir, 'scan_00900.pdf'), pdfGrande(['Manuale lavatrice Bosch', 'Serie 6']));
   writeFileSync(join(dir, 'scan_00901.pdf'), scansioneBiancoNero());
   try {
+    // Un file mostrato o un'azione ferma sulla conferma chiudono il turno (#1130): la frase va scritta insieme.
     await modelloFinto(app, [
-      { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: join(dir, 'scan_00901.pdf'), etichetta: 'scan_00901.pdf' }) }] },
-      { text: 'Eccolo.' },
-      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: dir }) }] },
-      { text: 'Ti ho preparato i nomi nuovi.' },
+      { text: 'Eccolo.', toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: join(dir, 'scan_00901.pdf'), etichetta: 'scan_00901.pdf' }) }] },
+      { text: 'Ti ho preparato i nomi nuovi.', toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: dir }) }] },
     ]);
     await modelloDeiNomi(app);
     // La scansione arriva al modello come immagine: lì il nome lo legge dalla pagina.
