@@ -154,13 +154,15 @@
   // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file. Le radici sono
   // quelle dove sta un file dell'utente, anche la chiavetta di Linux sotto /run/media (#1318); «/wiki/Roma» resta testo.
   const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|run|Volumes|Network|root|srv|usr|bin|sbin|lib|lib64|boot|dev|proc|sys|snap|nix|net|afs|cygdrive|sdcard|storage|Library|Applications|System)(?:\/|$)/;
+  // Fuori da quelle radici (un secondo disco montato in /data) vale la forma: tre pezzi, o due col nome di un file.
+  const PERCORSO_PER_FORMA = /^\/[^/\s][^/]*(?:\/[^/\s][^/]*){2,}\/?$|^\/[^/\s][^/]*\/[^/\s][^/]*\.[a-z0-9]{1,8}$/i;
   const pezzi = (s) => s.replace(/\\/g, '/').split('/').map((p) => encodeURIComponent(p)).join('/');
   function percorsoDelComputer(raw) {
     let m = /^\\\\([^\\/\s?#]+)(?:[\\/](.*))?$/.exec(raw);
     if (m) return `file://${m[1]}/${pezzi(m[2] || '')}`;
     m = /^([a-z]):[\\/](.*)$/i.exec(raw);
     if (m) return `file:///${m[1]}:/${pezzi(m[2])}`;
-    if (RADICI_DEL_COMPUTER.test(raw)) return `file://${pezzi(raw)}`;
+    if (RADICI_DEL_COMPUTER.test(raw) || PERCORSO_PER_FORMA.test(raw)) return `file://${pezzi(raw)}`;
     if (/^~(?:[\\/]|$)/.test(raw)) return `file:///${pezzi(raw)}`;
     return null;
   }
