@@ -294,7 +294,8 @@ test('B3 — fermare con un seguito in attesa lo rimette nella casella; dal tast
   await page.locator('#input').fill('anzi, aggiungi questo');
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-bubble-attesa')).toBeVisible({ timeout: 1_000 });
-  // Invio a casella vuota resta lo stop.
+  // Invio a casella vuota resta lo stop, passata la pausa che il seguito appena mandato riarma (B6).
+  await quadratoPronto(page);
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 5_000 });
   // Il seguito non è partito né perso: è di nuovo nella casella, e Invio lo manda.
