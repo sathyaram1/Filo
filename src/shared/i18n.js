@@ -38,7 +38,7 @@
     menu_paste_removed: 'Rimossa',
     // #589.11 — il clic su una voce che il sito copriva non parte.
     menu_click_covered: 'Il menu era coperto: clic ignorato',
-    aiuto_click_covered: 'L’Aiuto era coperto: clic ignorato',
+    aiuto_click_covered: 'L\'Aiuto era coperto: clic ignorato',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
