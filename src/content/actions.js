@@ -828,7 +828,7 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(res);
+              Popup.scriviErrore(body, res, { dopo: chiudiMenu });
               return;
             }
             testoChiuso(body, res.text);
