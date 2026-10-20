@@ -25,3 +25,20 @@ test('r1 chi ha stretto un freno, o ha detto la parola per altro, non ha chiesto
   }
   expect(aperti, aperti.join('\n')).toEqual([]);
 });
+
+test('r1 chi chiede a parole sue di togliere un freno arriva al riquadro con «conferma», non al no', async ({ app }) => {
+  await home(app);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' }, monthlyLimitEur: 5, openWeightsOnly: true }));
+  const casi = [
+    ['resta connesso su whatsapp.com', { type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: 'aggiungi whatsapp.com' }],
+    ['tienimi connesso su gmail.com', { type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: 'aggiungi gmail.com' }],
+    ['voglio spendere fino a 20 euro al mese', { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '20' }],
+    ['usa anche i modelli chiusi', { type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }],
+  ];
+  const fermati = [];
+  for (const [richiesta, azione] of casi) {
+    const r = await execAction(app, azione, { richiesta });
+    if (!r.needsConfirm) fermati.push(`«${richiesta}» → ${azione.type} ${azione.chiave}: ${r.no ? 'no' : JSON.stringify(r).slice(0, 120)}`);
+  }
+  expect(fermati, fermati.join('\n')).toEqual([]);
+});
