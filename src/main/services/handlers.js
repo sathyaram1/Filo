@@ -4909,24 +4909,6 @@ function entroIl(p, ms, ripiego) {
     .finally(() => clearTimeout(timer));
 }
 
-// I pezzi vecchi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le
-// uscite li contano fra le cose lette (#587), la chat riaperta li ritrova.
-function ricordoComeAzione(ricordi) {
-  const FC = globalThis.SN_FILO_CONTESTO;
-  // Lo stesso testo che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
-  const results = ricordi.map((r) => ({
-    id: r.tratto.chat,
-    title: r.tratto.titolo || '',
-    date: r.tratto.ts,
-    snippet: FC.testoRicordo(r.tratto),
-  }));
-  const daFuori = ricordi.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori.map((x) => ({ ...x, chat: r.tratto.chat })) : []));
-  return {
-    type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Date.now().toString(36)}`, _executed: true,
-    _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
-  };
-}
-
 async function handleFiloChat(richiesta) {
   const volo = { accoglienza: false };
   try {
