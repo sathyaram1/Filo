@@ -577,6 +577,7 @@
     matches,
     search,
     searchWide,
+    paroleDellaRicerca,
     terminiCheDistinguono,
     snippetFor,
     toStoredMessage,
