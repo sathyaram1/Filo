@@ -98,13 +98,14 @@
     for (let i = 0; i + pz.length <= scritte.length; i++) if (pz.every((p, k) => simile(scritte[i + k], p))) return true;
     return false;
   }
-  // `risposte`: nomi che bastano in una riga di tre parole al massimo, la risposta secca a una domanda di Filo («Automatico»).
+  // `risposte`: nomi che bastano in un pezzo di frase di tre parole al massimo, la risposta secca («Automatico», «…, manuale»).
   function nominata(testo, { frasi = [], verbi = [], oggetti = [], risposte = [] } = {}) {
     for (const riga of String(testo == null ? '' : testo).split(/\n+/)) {
       const scritte = pianoTesto(riga).split(' ').filter(Boolean);
       if (!scritte.length) continue;
       if (frasi.some((f) => contiene(scritte, f))) return true;
-      if (scritte.length <= 3 && risposte.some((r) => contiene(scritte, r))) return true;
+      const secche = riga.split(/[,.;:!?]+/).map((p) => pianoTesto(p).split(' ').filter(Boolean)).filter((p) => p.length && p.length <= 3);
+      if (secche.some((p) => risposte.some((r) => contiene(p, r)))) return true;
       if (verbi.length && scritte.some((w) => verbi.some((v) => verbo(w, v))) && oggetti.some((o) => contiene(scritte, o))) return true;
     }
     return false;
