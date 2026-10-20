@@ -205,6 +205,11 @@ test('su una pagina web il pulsante che porta a un file, la finestra a parte su 
   await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: /srv/condivisa/listino.pdf')).toBeVisible({ timeout: 8000 });
   await page.mouse.click(40, 145);
   await expect(await carta(avvisi, 'Indirizzo «data:» bloccato per sicurezza')).toBeVisible({ timeout: 8000 });
+
+  await page.mouse.click(40, 325);
+  await expect(await carta(avvisi, 'raffica-')).toBeVisible({ timeout: 8000 });
+  await page.waitForTimeout(800);
+  expect(await nelModello(shell, 'raffica-'), 'un clic, un avviso: la pagina non ne fa nascere una raffica').toBe(1);
   expect(page.url()).toContain('127.0.0.1');
 });
 
