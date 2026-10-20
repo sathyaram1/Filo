@@ -239,15 +239,36 @@ const zlib = require('node:zlib');
 // --- ZIP reader (STORE + DEFLATE) -------------------------------------------
 // Ritorna { voci: Map nome → Buffer, saltate: [{ nome, motivo }], mancanti }: una voce che non si legge si dice, perché chi
 // importa deve sapere cosa manca (#1088). Legge la central directory: i local header possono avere size a 0.
+const FIRMA_INDICE = 0x02014b50;
+const FIRMA_FINE = 0x06054b50;
+
+// Il record finale (EOCD), cercato dalla fine: il commento può arrivare a 64KB. Una firma che punta a un indice che
+// non c'è è un byte a caso dentro una voce; con la firma rovinata il record si riconosce dai suoi numeri (#1088.5).
+function recordFinale(buf) {
+  const minStart = Math.max(0, buf.length - 22 - 0xFFFF);
+  const indiceA = (i) => {
+    const size = buf.readUInt32LE(i + 12), off = buf.readUInt32LE(i + 16);
+    if (off === 0xFFFFFFFF || size === 0xFFFFFFFF) return true;
+    return off + size <= i && (size === 0 || buf.readUInt32LE(off) === FIRMA_INDICE);
+  };
+  let primaFirma = -1;
+  for (let i = buf.length - 22; i >= minStart; i--) {
+    if (buf.readUInt32LE(i) !== FIRMA_FINE) continue;
+    if (indiceA(i)) return i;
+    if (primaFirma < 0) primaFirma = i;
+  }
+  for (let i = buf.length - 22; i >= minStart; i--) {
+    const size = buf.readUInt32LE(i + 12), off = buf.readUInt32LE(i + 16);
+    if (size >= 46 && off + size === i && buf.readUInt16LE(i + 20) === buf.length - i - 22
+      && buf.readUInt32LE(off) === FIRMA_INDICE) return i;
+  }
+  return primaFirma;
+}
+
 function unzip(buf) {
   if (!Buffer.isBuffer(buf) || buf.length < 22) throw new Error('not_a_zip');
 
-  // EOCD: cerca la firma dalla fine (il commento finale può essere fino a 64KB).
-  let eocd = -1;
-  const minStart = Math.max(0, buf.length - 22 - 0xFFFF);
-  for (let i = buf.length - 22; i >= minStart; i--) {
-    if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  }
+  const eocd = recordFinale(buf);
   if (eocd < 0) throw new Error('not_a_zip');
 
   const count = buf.readUInt16LE(eocd + 10);
@@ -255,12 +276,13 @@ function unzip(buf) {
   const cdOffset = buf.readUInt32LE(eocd + 16);
   if (cdOffset === 0xFFFFFFFF || cdSize === 0xFFFFFFFF) throw new Error('zip64_unsupported');
 
+  // L'indice si legge fino a dove finisce, non fino al numero di voci che dichiara: un conto rovinato verso il basso
+  // non fa saltare le voci dopo (#1088.5).
   const voci = new Map();
   const saltate = [];
   let p = cdOffset;
   let lette = 0;
-  for (; lette < count; lette++) {
-    if (p + 46 > buf.length || buf.readUInt32LE(p) !== 0x02014b50) break;
+  for (; p + 46 <= eocd && buf.readUInt32LE(p) === FIRMA_INDICE; lette++) {
     const flags = buf.readUInt16LE(p + 8);
     const method = buf.readUInt16LE(p + 10);
     const crc = buf.readUInt32LE(p + 16);
