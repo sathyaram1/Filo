@@ -3859,20 +3859,10 @@ async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = tru
 
 // I cambi di impostazioni, aspetto, sveglie e zoom (#867) che combaciano: si annullano con ANNULLA_CAMBIO e l'id.
 async function cambiPerChat(query) {
-  const CA = ChatArchive;
   const K = globalThis.SN_CAMBI;
-  const parole = CA.terminiCheDistinguono(CA.normalizeForSearch(query).split(/\s+/).filter(Boolean));
-  if (!K || !parole.length) return [];
+  if (!K) return { results: [], termini: [], allargata: false };
   const { eventi } = await Registro.ultimi({ max: 1 });
-  const out = [];
-  for (let i = (eventi || []).length - 1; i >= 0 && out.length < 6; i--) {
-    const e = eventi[i];
-    const frase = K.frase(e);
-    if (!frase) continue;
-    const h = CA.normalizeForSearch(`${frase} ${(K.frasi(e) || []).join(' ')}`);
-    if (parole.every((p) => h.includes(p))) out.push({ id: e.id, frase, date: e.agg || e.ts });
-  }
-  return out;
+  return K.cerca(eventi, query);
 }
 
 // #525 — re-immissione di quello che CERCA_CHAT ha trovato nell'archivio delle
