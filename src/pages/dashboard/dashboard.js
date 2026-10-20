@@ -1075,8 +1075,9 @@
     const r = await Promise.race([inviato, turno.fermata]);
     if (turno.fermato) {
       const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, streamedText) });
+      turno.voce = chiusa.entry;
       const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown }); });
-      return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura };
+      return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura, _chat: msg.chatId };
     }
     fineDiretta(r);
     if (!r?.ok) {
