@@ -284,6 +284,21 @@ function avvisaIndirizzoFermato(rawUrl, win) {
   if (!a || !win || win.isDestroyed?.()) return;
   try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
 }
+// L'indirizzo rifiutato è la sorgente di un elemento della pagina (un'immagine incollata da Word, un riquadro)? Gira
+// nel mondo della pagina: barando può solo tacere il proprio avviso o farne nascere uno senza testo suo.
+const TAG_CON_SORGENTE = 'img,source,video,audio,track,iframe,frame,embed,object,link,script,input';
+function risorsaDellaPagina(frame, url) {
+  let u = '';
+  try { u = new URL(url).href; } catch (_) { return Promise.resolve(false); }
+  const codice = `(function (u) {
+    var stesso = function (v) { try { return !!v && new URL(v, document.baseURI).href === u; } catch (_) { return false; } };
+    return Array.prototype.some.call(document.querySelectorAll(${JSON.stringify(TAG_CON_SORGENTE)}), function (el) {
+      return stesso(el.currentSrc) || stesso(el.getAttribute('src')) || stesso(el.getAttribute('data'))
+        || (el.tagName === 'LINK' && stesso(el.getAttribute('href'))) || String(el.getAttribute('srcset') || '').indexOf(u) >= 0;
+    });
+  })(${JSON.stringify(u)})`;
+  try { return Promise.resolve(frame.executeJavaScript(codice)).then((v) => v === true, () => false); } catch (_) { return Promise.resolve(false); }
+}
 // Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
   if (invitoFermato(rawUrl, ctx) || openExternalScheme(rawUrl)) return true;
