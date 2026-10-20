@@ -1,3 +1,5 @@
+// Logica pagina opzioni.
+
 (function () {
   'use strict';
 
