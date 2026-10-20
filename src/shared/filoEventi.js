@@ -200,6 +200,8 @@
       }
       case TIPI.CHAT_CHIUSA:
         if (c && !c.closedAt) c.closedAt = ev.ts;
+        // `fine`: l'ha chiusa l'utente apposta (bottone, /clear), non una scheda che se ne va: una scheda nuova non la continua.
+        if (c && ev.fine === true) c.finita = true;
         break;
       case TIPI.CHAT_TITOLO:
         if (!c) break;
