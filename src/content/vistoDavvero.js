@@ -1,6 +1,6 @@
-// Un clic vero su una voce del menu conta solo se l'utente la vedeva: un velo del sito che lascia passare il mouse
-// non ferma un gesto vero (#589.11). Lo dice il browser (IntersectionObserver v2), interrogato su una sonda
-// trasparente sopra ogni voce. Regole: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md
+// Un clic vero su una voce del menu, o su un bottone dell'Aiuto che conta, vale solo se l'utente la vedeva: un velo
+// del sito che lascia passare il mouse non ferma un gesto vero (#589.11, #589.17). Lo dice il browser (IntersectionObserver
+// v2), interrogato su una sonda trasparente sopra ogni voce. Regole: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md
 
 (function (global) {
   'use strict';
@@ -22,8 +22,8 @@
   const Z = '2147483646';
   // Lo zoom del foglio di stile sul contenitore (html { zoom: 2 }) moltiplica le misure: le sonde, posate con quelle
   // dello schermo, guarderebbero altrove. L'host lo annulla.
-  const stileOspiteCon = (zoom) => 'all:initial!important;display:block!important;position:fixed!important;top:0!important;'
-    + 'left:0!important;width:0!important;height:0!important;z-index:' + Z + '!important;pointer-events:none!important;'
+  const stileOspiteCon = (zoom, z) => 'all:initial!important;display:block!important;position:fixed!important;top:0!important;'
+    + 'left:0!important;width:0!important;height:0!important;z-index:' + z + '!important;pointer-events:none!important;'
     + (zoom === 1 ? '' : 'zoom:' + (1 / zoom) + '!important;');
   const zoomDi = (el) => { const z = Number(el && el.currentCSSZoom); return z > 0 && Number.isFinite(z) ? z : 1; };
   const STILE_SONDA = 'position:fixed;display:block;margin:0;padding:0;border:0;background:transparent;pointer-events:none;';
@@ -65,15 +65,13 @@
   const voci = new Map();
   const perSonda = new WeakMap();
   const pannelli = new Map();
-  // I nostri pezzi montati prima delle sonde (menu, sotto-menu, etichette, anteprima del trascinamento).
-  const sotto = new WeakSet();
-  let ospite = null;
-  let ombra = null;
-  let metronomo = null;
-  let stileOspite = '';
-  let zoomOspite = 1;
-  let genitore = null;
-  let moGenitore = null;
+  // Un piano: le sonde dei pezzi che stanno a una stessa altezza, in un host chiuso subito dopo di loro. Quello del menu
+  // raccoglie menu, sotto-menu, etichette e anteprima del trascinamento (`sotto`); un pannello che vive fuori dal menu
+  // (la barra dell'Aiuto) ha il suo, attaccato a lui e alla sua altezza (`ancora`).
+  let pianoMenu = null;
+  const piani = new Set();
+  // Tutto ciò che è nostro fra i figli di un contenitore: un fondo o una copertura non lo contano come sito.
+  const nostriPezzi = new WeakSet();
   let io = null;
   let raf = 0;
   let battito = 0;
@@ -83,41 +81,57 @@
     return io;
   }
 
-  function creaOspite() {
-    ospite = DOC.createElement('div');
-    ospite.setAttribute('aria-hidden', 'true');
-    fissaOspite();
-    ombra = ospite.attachShadow({ mode: 'closed' });
+  function nuovoPiano(z, ancora) {
+    const pi = {
+      z: String(z), ancora: ancora || null, sotto: new WeakSet(), n: 0, genitore: null, moGenitore: null, moAncora: null,
+      zoom: 1, stile: '', ospite: DOC.createElement('div'), ombra: null, metronomo: null,
+    };
+    const o = pi.ospite;
+    o.setAttribute('aria-hidden', 'true');
+    nostriPezzi.add(o);
+    fissaOspite(pi);
+    pi.ombra = o.attachShadow({ mode: 'closed' });
     // Il browser ricalcola le coperture solo se qualcosa cambia forma: uno z-index alzato da solo passerebbe
     // inosservato. Un pixel che va e viene a ogni fotogramma lo costringe a guardare.
-    metronomo = DOC.createElement('div');
-    metronomo.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;';
-    ombra.appendChild(metronomo);
+    pi.metronomo = DOC.createElement('div');
+    pi.metronomo.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;';
+    pi.ombra.appendChild(pi.metronomo);
     // Uno script del sito che alza le sonde sopra il suo velo (stile, o il livello più alto con popover) le
     // rende cieche: si rimettono a posto prima del disegno.
     new MutationObserver(() => {
-      if (ospite.hasAttribute('popover')) ospite.removeAttribute('popover');
-      if (ospite.getAttribute('style') !== stileOspite) fissaOspite();
-    }).observe(ospite, { attributes: true, attributeFilter: ['style', 'popover'] });
+      if (o.hasAttribute('popover')) o.removeAttribute('popover');
+      if (o.getAttribute('style') !== pi.stile) fissaOspite(pi);
+    }).observe(o, { attributes: true, attributeFilter: ['style', 'popover'] });
+    piani.add(pi);
+    return pi;
   }
-  function fissaOspite() {
-    ospite.style.cssText = stileOspiteCon(zoomOspite);
-    stileOspite = ospite.getAttribute('style');
+  function fissaOspite(pi) {
+    pi.ospite.style.cssText = stileOspiteCon(pi.zoom, pi.z);
+    pi.stile = pi.ospite.getAttribute('style');
   }
   // A ogni fotogramma: uno zoom cambiato dal sito a menu aperto sposterebbe le sonde.
-  function seguiZoom() {
-    const z = genitore ? zoomDi(genitore) : 1;
-    if (z !== zoomOspite) { zoomOspite = z; fissaOspite(); }
+  function seguiZoom(pi) {
+    const z = pi.genitore ? zoomDi(pi.genitore) : 1;
+    if (z !== pi.zoom) { pi.zoom = z; fissaOspite(pi); }
   }
 
   // Un filtro sul contenitore del menu (la pagina in scala di grigi) per il browser nasconde anche le sonde: vale per
   // menu e velo insieme, quindi non nasconde il menu più del sito, e si sospende finché il menu è aperto. Il filtro
-  // torna sulla pagina da un nostro fondo sotto il menu (backdrop-filter): la pagina non cambia aspetto.
+  // torna sulla pagina da un nostro fondo sotto il piano più basso (backdrop-filter): la pagina non cambia aspetto.
   const EFFETTI = [['filter', 'none'], ['opacity', '1'], ['transform', 'none'], ['mix-blend-mode', 'normal']];
-  let sospesi = null;
-  function sospendiEffetti(el) {
-    if (sospesi?.el === el) return;
-    rimettiEffetti();
+  // Contenitore → { vecchi, fondo, z }: uno per contenitore di un piano con pannelli aperti.
+  const sospesi = new Map();
+  function aggiornaEffetti() {
+    const voluti = new Map();
+    for (const pi of piani) {
+      if (!pi.n || !pi.genitore) continue;
+      const z = Number(pi.z);
+      if (!voluti.has(pi.genitore) || z < voluti.get(pi.genitore)) voluti.set(pi.genitore, z);
+    }
+    for (const [el, s] of [...sospesi]) if (!voluti.has(el) || (s.fondo && s.z !== voluti.get(el))) rimettiEffetti(el);
+    for (const [el, z] of voluti) if (!sospesi.has(el)) sospendiEffetti(el, z);
+  }
+  function sospendiEffetti(el, z) {
     let cs;
     try { cs = global.getComputedStyle(el); } catch (_) { return; }
     const vecchi = [];
@@ -126,41 +140,50 @@
       const v = cs.getPropertyValue(p);
       if (!v || v === neutro || (p === 'transform' && /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/.test(v))) continue;
       if (p === 'filter') filtro = v;
-      vecchi.push([p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+      vecchi.push([el, p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
       el.style.setProperty(p, neutro, 'important');
     }
-    sospesi = { el, vecchi, fondo: null };
-    if (filtro && el === genitore) sospesi.fondo = fondoFiltrato(filtro);
+    const s = { vecchi, fondo: null, z };
+    sospesi.set(el, s);
+    if (filtro) s.fondo = fondoFiltrato(el, filtro, z, s);
   }
-  function fondoFiltrato(filtro) {
+  function fondoFiltrato(g, filtro, z, s) {
     const f = DOC.createElement('div');
     f.setAttribute('aria-hidden', 'true');
     f.style.cssText = 'all:initial!important;display:block!important;position:fixed!important;inset:0!important;'
-      + 'z-index:' + Z + '!important;pointer-events:none!important;backdrop-filter:' + filtro + '!important;';
+      + 'z-index:' + z + '!important;pointer-events:none!important;backdrop-filter:' + filtro + '!important;';
     let primo = null;
-    for (const n of genitore.children) if (sotto.has(n)) { primo = n; break; }
-    sotto.add(f);
-    genitore.insertBefore(f, primo || ospite);
-    // Ciò che il sito tiene sopra il menu sta anche sopra il fondo: il filtro lo riceve da sé, dopo il suo.
-    for (const el of sopraIlMenu(genitore)) {
+    for (const n of g.children) if (inizioDelPiano(n, z)) { primo = n; break; }
+    nostriPezzi.add(f);
+    g.insertBefore(f, primo);
+    // Ciò che il sito tiene sopra il piano sta anche sopra il fondo: il filtro lo riceve da sé, dopo il suo.
+    for (const el of sopraIlPiano(g, z)) {
       let proprio = 'none';
       try { proprio = global.getComputedStyle(el).filter; } catch (_) {}
-      sospesi.vecchi.push([el, 'filter', el.style.getPropertyValue('filter'), el.style.getPropertyPriority('filter')]);
+      s.vecchi.push([el, 'filter', el.style.getPropertyValue('filter'), el.style.getPropertyPriority('filter')]);
       el.style.setProperty('filter', (proprio && proprio !== 'none' ? proprio + ' ' : '') + filtro, 'important');
     }
     return f;
   }
-  // Gli elementi del sito al piano del menu o più su: solo quelli il cui piano conta per la radice, cioè senza un
-  // antenato che faccia da contesto di sovrapposizione (lì dentro nessun piano supera quello dell'antenato).
-  function sopraIlMenu(radice) {
+  // Il primo figlio del contenitore che appartiene al piano più basso: il fondo va subito prima.
+  function inizioDelPiano(n, z) {
+    for (const pi of piani) {
+      if (pi.n && Number(pi.z) === z && (pi.sotto.has(n) || n === pi.ancora || n === pi.ospite)) return true;
+    }
+    return false;
+  }
+  // Gli elementi del sito al piano o più su: solo quelli il cui piano conta per la radice, cioè senza un antenato che
+  // faccia da contesto di sovrapposizione (lì dentro nessun piano supera quello dell'antenato). I nostri no.
+  function sopraIlPiano(radice, zMin) {
     const out = [];
+    const nostriAperti = new Set(global.SN_FILO_UI?.aperti?.() || []);
     const visita = (padre) => {
       for (const c of padre.children) {
-        if (sotto.has(c) || c === ospite) continue;
+        if (nostriPezzi.has(c) || nostriAperti.has(c)) continue;
         let cs;
         try { cs = global.getComputedStyle(c); } catch (_) { continue; }
         const z = cs.zIndex === 'auto' ? null : Number(cs.zIndex);
-        if (z !== null && z >= Number(Z) && cs.position !== 'static') { out.push(c); continue; }
+        if (z !== null && z >= zMin && cs.position !== 'static') { out.push(c); continue; }
         const contesto = z !== null || cs.position === 'fixed' || cs.position === 'sticky' || cs.opacity !== '1'
           || cs.transform !== 'none' || cs.filter !== 'none' || cs.isolation === 'isolate' || cs.mixBlendMode !== 'normal';
         if (!contesto) visita(c);
@@ -169,12 +192,12 @@
     visita(radice);
     return out;
   }
-  function rimettiEffetti() {
-    if (!sospesi) return;
-    const { el, vecchi, fondo } = sospesi;
-    sospesi = null;
-    try { fondo?.remove(); } catch (_) {}
-    for (const v of vecchi) rimetti(v.length === 4 ? v : [el, ...v]);
+  function rimettiEffetti(el) {
+    const s = sospesi.get(el);
+    if (!s) return;
+    sospesi.delete(el);
+    try { s.fondo?.remove(); } catch (_) {}
+    for (const v of s.vecchi) rimetti(v);
   }
   function rimetti([el, p, v, pr]) {
     try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
@@ -313,34 +336,76 @@
   // Il nodo prima del quale montare un pezzo del menu in `parent` (null se la guardia è spenta).
   function prima(parent, el) {
     if (!ATTIVO || !parent) return null;
-    if (!ospite) creaOspite();
-    if (genitore !== parent) {
-      genitore = parent;
-      try { moGenitore?.disconnect(); } catch (_) {}
-      moGenitore = new MutationObserver(riordina);
-      moGenitore.observe(parent, { childList: true });
+    if (!pianoMenu) pianoMenu = nuovoPiano(Z, null);
+    const pi = pianoMenu;
+    if (pi.genitore !== parent) {
+      pi.genitore = parent;
+      try { pi.moGenitore?.disconnect(); } catch (_) {}
+      pi.moGenitore = new MutationObserver(() => riordina(pi));
+      pi.moGenitore.observe(parent, { childList: true });
     }
-    if (ospite.parentNode !== parent) parent.appendChild(ospite);
-    seguiZoom();
-    if (el) sotto.add(el);
-    return ospite;
+    if (pi.ospite.parentNode !== parent) parent.appendChild(pi.ospite);
+    seguiZoom(pi);
+    if (el) { pi.sotto.add(el); nostriPezzi.add(el); }
+    return pi.ospite;
   }
 
   // Fra il primo pezzo nostro e le sonde non sta niente del sito: un suo velo infilato lì coprirebbe il menu
   // restando sotto le sonde. I nostri pezzi tornano contigui, subito prima delle sonde.
-  function riordina() {
-    if (!ospite || !genitore || !pannelli.size) return;
-    if (ospite.parentNode !== genitore) genitore.appendChild(ospite);
+  function riordina(pi) {
+    if (!pi || !pi.genitore || !pi.n) return;
+    const g = pi.genitore;
+    const o = pi.ospite;
+    if (o.parentNode !== g) g.appendChild(o);
     let primo = null;
-    for (const n of genitore.children) if (sotto.has(n)) { primo = n; break; }
+    for (const n of g.children) if (pi.sotto.has(n)) { primo = n; break; }
     if (!primo) return;
     let fuoriPosto = false;
-    for (let n = primo.nextElementSibling; n && n !== ospite; n = n.nextElementSibling) {
-      if (!sotto.has(n)) { fuoriPosto = true; break; }
+    for (let n = primo.nextElementSibling; n && n !== o; n = n.nextElementSibling) {
+      if (!pi.sotto.has(n)) { fuoriPosto = true; break; }
     }
-    for (let n = ospite.nextElementSibling; n && !fuoriPosto; n = n.nextElementSibling) if (sotto.has(n)) fuoriPosto = true;
+    for (let n = o.nextElementSibling; n && !fuoriPosto; n = n.nextElementSibling) if (pi.sotto.has(n)) fuoriPosto = true;
     if (!fuoriPosto) return;
-    for (const n of [...genitore.children]) if (sotto.has(n)) genitore.insertBefore(n, ospite);
+    for (const n of [...g.children]) if (pi.sotto.has(n)) g.insertBefore(n, o);
+  }
+
+  // Un pannello che vive fuori dal menu ha le sonde subito dopo di sé e alla sua altezza. Altezza e posizione le
+  // inchioda Filo: un foglio del sito che lo abbassa sotto il suo velo lascerebbe le sonde sopra. L'altezza scritta in
+  // linea (la pila dei riquadri, ma anche il sito) diventa quella di pannello e sonde insieme.
+  const NUMERO = /^-?\d+$/;
+  function zIniziale(el) {
+    const scritto = el.style.getPropertyValue('z-index');
+    if (NUMERO.test(scritto)) return scritto;
+    let z = '';
+    try { z = global.getComputedStyle(el).zIndex; } catch (_) {}
+    return NUMERO.test(z) ? z : '0';
+  }
+  function ancora(pi) {
+    const el = pi.ancora;
+    const fissa = () => {
+      const scritto = el.style.getPropertyValue('z-index');
+      if (NUMERO.test(scritto) && scritto !== pi.z) { pi.z = scritto; fissaOspite(pi); aggiornaEffetti(); }
+      for (const [p, v] of [['position', 'fixed'], ['z-index', pi.z]]) {
+        if (el.style.getPropertyValue(p) !== v || el.style.getPropertyPriority(p) !== 'important') el.style.setProperty(p, v, 'important');
+      }
+    };
+    fissa();
+    pi.moAncora = new MutationObserver(fissa);
+    pi.moAncora.observe(el, { attributes: true, attributeFilter: ['style'] });
+    metti(pi);
+  }
+  function metti(pi) {
+    const el = pi.ancora;
+    const g = el.parentNode;
+    if (!g) return;
+    if (pi.genitore !== g) {
+      pi.genitore = g;
+      try { pi.moGenitore?.disconnect(); } catch (_) {}
+      pi.moGenitore = new MutationObserver(() => metti(pi));
+      pi.moGenitore.observe(g, { childList: true });
+      seguiZoom(pi);
+    }
+    if (el.nextSibling !== pi.ospite) g.insertBefore(pi.ospite, el.nextSibling);
   }
 
   // Posizione e piano del pannello li decide Filo: un foglio del sito che lo abbassa sotto un suo velo, o lo
@@ -364,26 +429,38 @@
   }
 
   // `radice`: il nodo del pannello che sta nel documento del sito, quando il pannello vive in uno shadow root.
+  // `ancorato`: il pannello non è un pezzo del menu e ha un piano suo; `voci`: quali bottoni guardare (di serie tutti);
+  // `bloccato(esito)`: cosa dire all'utente quando un clic si ferma.
   function sorveglia(pannello, opts = {}) {
-    if (!ATTIVO || !pannello || pannelli.has(pannello) || !ospite) return;
-    const reg = { bloccato: opts.bloccato, premuta: null, detto: false, mo: null, moPiano: null };
+    if (!ATTIVO || !pannello || pannelli.has(pannello)) return;
+    let pi = pianoMenu;
+    if (opts.ancorato) {
+      pi = nuovoPiano(zIniziale(pannello), pannello);
+      nostriPezzi.add(pannello);
+      ancora(pi);
+    } else if (!pi || !pi.genitore) {
+      return;
+    }
+    const reg = { piano: pi, voci: opts.voci || VOCI, bloccato: opts.bloccato, premuta: null, detto: false, mo: null, moPiano: null };
     pannelli.set(pannello, reg);
-    if (genitore) sospendiEffetti(genitore);
+    pi.n++;
+    aggiornaEffetti();
     chiediAlGenitore(true);
-    for (const tipo of ['pointerdown', 'mousedown', 'click', 'auxclick']) {
+    for (const tipo of ['pointerdown', 'mousedown', 'click', 'auxclick', 'dragstart']) {
       pannello.addEventListener(tipo, (e) => filtra(e, pannello, reg), true);
     }
     reg.mo = new MutationObserver(() => rileggi(pannello));
     reg.mo.observe(pannello, { childList: true, subtree: true });
-    if (!opts.radice) reg.moPiano = blindaPiano(pannello);
+    if (!opts.radice && !opts.ancorato) reg.moPiano = blindaPiano(pannello);
     rileggi(pannello);
-    riordina();
+    riordina(pi);
     avvia();
   }
 
   function rileggi(pannello) {
-    if (!pannelli.has(pannello)) return;
-    const presenti = new Set(pannello.querySelectorAll(VOCI));
+    const reg = pannelli.get(pannello);
+    if (!reg) return;
+    const presenti = new Set(pannello.querySelectorAll(reg.voci));
     const morte = [];
     for (const [v, rec] of voci) {
       if (rec.pannello === pannello && !presenti.has(v)) { voci.delete(v); morte.push(rec); }
@@ -392,7 +469,7 @@
     for (const v of presenti) {
       if (voci.has(v)) continue;
       const rec = Object.assign(nuovoStato(), {
-        voce: v, pannello, sonda: DOC.createElement('div'), clip: ritagli(v, pannello), chiave: null, r: null,
+        voce: v, pannello, piano: reg.piano, sonda: DOC.createElement('div'), clip: ritagli(v, pannello), chiave: null, r: null,
       });
       rec.sonda.style.cssText = STILE_SONDA + FUORI;
       voci.set(v, rec);
@@ -408,12 +485,13 @@
   }
 
   // Le sonde si sovrappongono dove i pannelli si toccano, e una sonda sopra l'altra la farebbe sembrare coperta.
-  // In catena, ognuna dentro la precedente, nessuna copre l'altra: il browser non conta i discendenti.
+  // In catena, ognuna dentro la precedente del suo piano, nessuna copre l'altra: il browser non conta i discendenti.
   function incatena() {
-    let padre = ombra;
+    const ultima = new Map();
     for (const rec of voci.values()) {
+      const padre = ultima.get(rec.piano) || rec.piano.ombra;
       if (rec.sonda.parentNode !== padre) padre.appendChild(rec.sonda);
-      padre = rec.sonda;
+      ultima.set(rec.piano, rec.sonda);
     }
   }
 
@@ -447,15 +525,16 @@
     s.left = l + 'px'; s.top = t + 'px'; s.width = (d - l) + 'px'; s.height = (b - t) + 'px';
   }
 
-  // Un nostro pezzo sopra il menu (una conferma; la pila degli avvisi scende sotto): copre anche lui, ma non è il sito.
-  function coperturaNostra(r) {
+  // Un nostro pezzo sopra il piano della voce (una conferma, il menu sopra l'Aiuto; la pila degli avvisi scende sotto
+  // il menu): copre anche lui, ma non è il sito.
+  function coperturaNostra(r, pi) {
     const Ui = global.SN_FILO_UI;
-    if (!r || !Ui || typeof Ui.aperti !== 'function') return false;
+    if (!r || !pi || !Ui || typeof Ui.aperti !== 'function') return false;
     for (const el of Ui.aperti()) {
-      if (sotto.has(el)) continue;
+      if (pi.sotto.has(el) || el === pi.ancora) continue;
       let q, z;
       try { q = el.getBoundingClientRect(); z = Number(global.getComputedStyle(el).zIndex); } catch (_) { continue; }
-      if (!(z > Number(Z)) || !q.width || !q.height) continue;
+      if (!(z > Number(pi.z)) || !q.width || !q.height) continue;
       if (q.left < r.right && r.left < q.right && q.top < r.bottom && r.top < q.bottom) return true;
     }
     return false;
@@ -468,7 +547,7 @@
       const coperta = en.isIntersecting && !en.isVisible;
       aggiorna(rec, {
         interseca: en.isIntersecting, visibile: en.isVisible, tempo: en.time,
-        nostra: coperta && coperturaNostra(en.boundingClientRect),
+        nostra: coperta && coperturaNostra(en.boundingClientRect, rec.piano),
       });
     }
   }
@@ -481,16 +560,21 @@
     raf = 0;
     for (const p of [...pannelli.keys()]) if (!p.isConnected) congeda(p);
     if (!pannelli.size) { smonta(); return; }
-    if (ospite.parentNode !== genitore) genitore.appendChild(ospite);
-    riordina();
-    seguiZoom();
+    battito ^= 1;
+    for (const pi of piani) {
+      if (!pi.n) { if (pi.genitore) smontaPiano(pi); continue; }
+      if (pi.ancora) metti(pi);
+      else if (pi.ospite.parentNode !== pi.genitore) pi.genitore.appendChild(pi.ospite);
+      riordina(pi);
+      seguiZoom(pi);
+      pi.metronomo.style.width = battito + 'px';
+    }
+    aggiornaEffetti();
     const ora = global.performance.now();
     for (const rec of voci.values()) {
       posa(rec);
-      if (rec.stato === 'coperta' && rec.nostra && coperturaNostra(rec.r)) rec.ultimaNostra = ora;
+      if (rec.stato === 'coperta' && rec.nostra && coperturaNostra(rec.r, rec.piano)) rec.ultimaNostra = ora;
     }
-    battito ^= 1;
-    metronomo.style.width = battito + 'px';
     chiediAlGenitore(true);
     raf = global.requestAnimationFrame(giro);
   }
@@ -506,32 +590,45 @@
       try { io?.unobserve(rec.sonda); } catch (_) {}
       rec.sonda.remove();
     }
+    if (reg && --reg.piano.n <= 0) {
+      reg.piano.n = 0;
+      if (reg.piano.ancora) smontaPiano(reg.piano);
+    }
+  }
+
+  // Un piano senza pannelli: via le sue sonde. Quello del menu resta pronto per il prossimo menu; quello di un pannello
+  // ancorato se ne va col pannello.
+  function smontaPiano(pi) {
+    try { pi.moGenitore?.disconnect(); pi.moAncora?.disconnect(); } catch (_) {}
+    pi.moGenitore = null;
+    pi.moAncora = null;
+    pi.genitore = null;
+    try { pi.ospite.remove(); } catch (_) {}
+    if (pi.ancora) piani.delete(pi);
   }
 
   function smonta() {
-    try { moGenitore?.disconnect(); } catch (_) {}
-    moGenitore = null;
-    genitore = null;
-    rimettiEffetti();
+    for (const pi of [...piani]) smontaPiano(pi);
+    for (const el of [...sospesi.keys()]) rimettiEffetti(el);
     clearTimeout(rinvio);
     rinvio = 0;
     inCoda = [];
     chiediAlGenitore(false);
-    try { ospite?.remove(); } catch (_) {}
   }
 
-  function vocePer(target, pannello) {
+  function vocePer(target, pannello, sel) {
     let el = target;
     if (el && el.nodeType !== 1) el = el.parentElement;
-    const v = el && el.closest ? el.closest(VOCI) : null;
+    const v = el && el.closest ? el.closest(sel) : null;
     return v && pannello.contains(v) ? v : null;
   }
 
-  // Si giudica alla pressione, quando l'utente decide; il rilascio passa solo se la voce è rimasta scoperta.
-  // Un clic da tastiera (Invio, Spazio) non ha pressione e si giudica lì.
+  // Si giudica alla pressione, quando l'utente decide; il rilascio (o il trascinamento) passa solo se la voce è rimasta
+  // scoperta. Un clic da tastiera (Invio, Spazio) non ha pressione e si giudica lì. Un pannello che resta aperto lo
+  // dice a ogni pressione fermata, il menu una volta e si chiude.
   function filtra(e, pannello, reg) {
     if (!e.isTrusted) return;
-    const voce = vocePer(e.target, pannello);
+    const voce = vocePer(e.target, pannello, reg.voci);
     if (!voce) return;
     const rec = voci.get(voce);
     const ora = global.performance.now();
@@ -541,13 +638,14 @@
     if (e.type === 'pointerdown') {
       esito = giudica(rec, ora);
       reg.premuta = { voce, esito, t: ora };
+      reg.detto = false;
     } else if (e.type === 'mousedown') {
       esito = stessa ? p.esito : giudica(rec, ora);
     } else {
-      if (!stessa) esito = giudica(rec, ora);
+      if (!stessa) { esito = giudica(rec, ora); reg.detto = false; }
       else if (p.esito !== 'ok') esito = p.esito;
       else esito = rec && rec.stato === 'visibile' ? 'ok' : 'coperta';
-      if (e.type === 'click') reg.premuta = null;
+      if (e.type === 'click' || e.type === 'dragstart') reg.premuta = null;
     }
     if (esito === 'ok') return;
     e.preventDefault();

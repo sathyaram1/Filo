@@ -193,6 +193,13 @@
       campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
       invia,
     });
+    // Il microfono e il documento trovato danno qualcosa al sito: il clic (o il trascinamento) vale solo se l'utente
+    // li vedeva, con la guardia delle voci del menu (#589.17).
+    global.SN_VISTO?.sorveglia(root, {
+      ancorato: true,
+      voci: '.sn-voce-btn, .sn-sidebar-file',
+      bloccato: () => { try { Popup?.showToast?.(I18n.t('aiuto_click_covered'), { duration: 4000 }); } catch (_) {} },
+    });
     // Focus o tasto sull'input → riapri la chat
     ta.addEventListener('focus', () => expand({ ai: false }));
     ta.addEventListener('input', () => { if (collapsed) expand({ ai: false }); });

@@ -3,7 +3,7 @@
 // che nella pagina restano, vanno avanti solo per un gesto vero dell'utente (giro 3).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
+import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, aspettaConfermaPronta, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 test.setTimeout(60_000);
@@ -404,6 +404,54 @@ test('con la domanda a schermo la barra laterale resta raggiungibile, e aprirla 
   // Chiusa la barra, la domanda ha ancora la tastiera: Esc la annulla.
   await vista.keyboard.press('Escape');
   await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(false);
+});
+
+// #589.17: a domanda aperta il sito stende sopra tutto un velo bianco che lascia passare il mouse, col quadrato da
+// cliccare dove sta OK. Il velo è nel documento, la domanda sopra la scheda: l'utente vede quello che preme.
+const VELO = `<!doctype html><html><body style="margin:0;font:16px sans-serif"><h1>Pagina qualunque</h1>
+<script>
+  window.stendiVelo = (p) => {
+    const v = document.createElement('div');
+    v.id = 'velo';
+    v.style.cssText = 'position:fixed;inset:0;background:#fff;pointer-events:none;z-index:2147483647;font:22px sans-serif;padding:40px';
+    v.textContent = 'clicca il quadrato per continuare';
+    const q = document.createElement('div');
+    q.id = 'quadrato';
+    q.style.cssText = 'position:fixed;width:60px;height:40px;background:#c33;left:' + (p.x - 30) + 'px;top:' + (p.y - 20) + 'px';
+    v.appendChild(q);
+    document.documentElement.appendChild(v);
+  };
+</script>
+</body></html>`;
+
+test('velo del sito che lascia passare il mouse, col quadrato sopra OK: la domanda resta sopra e il sì è quello letto', async ({ app, openTab, testServer }) => {
+  await stubFeedback(app);
+  const page = await testServer.openReady(openTab, VELO);
+  const host = new URL(page.url()).hostname;
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+
+  await chiediDallAiuto(app, host, FEEDBACK);
+  const sopra = await confermaSopraPagina(app);
+  await aspettaConfermaPronta(sopra);
+  // Il caso peggiore: il sito sa dove sta OK e ci posa il quadrato quando il mezzo secondo è passato.
+  const ok = await sopra.evaluate(() => window.SN_CONFIRM_UI._test.point('ok'));
+  await page.evaluate((p) => window.stendiVelo(p), ok);
+  const quadrato = await page.locator('#quadrato').boundingBox();
+
+  const g = await geometria(app);
+  expect(g.inCima, 'il velo della pagina non porta niente sopra la domanda').toBe(true);
+  expect(g.visibile).toBe(true);
+  expect(g.vista).toEqual(g.scheda);
+  const x = Math.round(g.scheda.x + quadrato.x + quadrato.width / 2);
+  const y = Math.round(g.scheda.y + quadrato.y + quadrato.height / 2);
+  expect(await chiPrende(app, x, y), 'dove il sito mette il quadrato il puntatore va alla domanda').toBe('conferma');
+  expect((await confirmState(sopra)).text).toContain('Testo esatto che parte agli sviluppatori');
+  await sopra.screenshot({ path: 'tests/.shots/conferme-sopra-velo.png' });
+
+  await mouseClickConfirm(sopra, 'ok');
+  await expect.poll(() => esitoAiuto(app, host)).toBe(true);
+  await expect.poll(() => app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
+  expect((await app.evaluate(() => globalThis.__fbCalls[0])).text).toContain('Testo esatto che parte agli sviluppatori');
 });
 
 // Giro 7: una finestra aperta dal sito (un finto popup di accesso, senza gesto) si posava sul testo del popup vero.
