@@ -1652,7 +1652,7 @@ function testoDiSconosciuti(azioni) {
 
 function indirizzoCaricato(tipo, indirizzo) {
   if (tipo === 'LEGGI_PAGINA') return PageRead.normalizzaUrl(indirizzo).url || '';
-  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.indirizzoDaCaricare && globalThis.SN_URL_NAV.indirizzoDaCaricare(indirizzo)) || '';
+  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.indirizzoChiesto && globalThis.SN_URL_NAV.indirizzoChiesto(indirizzo)) || '';
 }
 
 function urlDellaScheda(s) {
