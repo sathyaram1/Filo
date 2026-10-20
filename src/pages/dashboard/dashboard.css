@@ -630,9 +630,8 @@ html, body {
 .dash-bubble-user.dash-bubble-attesa {
   background: transparent;
   color: var(--dash-ink-soft);
-  box-shadow: inset 0 0 0 1.5px var(--dash-ink-mute);
-  outline: 1.5px dashed transparent;
-  background-image: none;
+  outline: 1.5px dashed var(--dash-ink-mute);
+  outline-offset: -1.5px;
 }
 /* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
    (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
