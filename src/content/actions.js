@@ -908,7 +908,7 @@
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(m);
+              Popup.scriviErrore(body, m, { dopo: chiudiMenu });
             }
           });
           port.postMessage({
