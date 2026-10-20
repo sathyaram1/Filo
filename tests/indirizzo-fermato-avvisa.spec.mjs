@@ -299,7 +299,9 @@ test('nella chat il percorso della chiavetta è detto fermato e la mail va al pr
   await lavoro.locator('.dash-activity-head').click();
   const riga = lavoro.locator('.dash-activity-row', { hasText: 'Link non aperto · file del computer bloccato per sicurezza' });
   await expect(riga).toHaveCount(1);
-  await lavoro.getByRole('button', { name: /2 azioni/ }).click();
+  const nodo = lavoro.getByRole('button', { name: /2 azioni/ });
+  await expect(nodo, 'la mail non è una pagina aperta').toHaveText('2 azioni · pagina, posta');
+  await nodo.click();
   await expect(riga).toBeVisible();
   await page.screenshot({ path: 'tests/.shots/1318-chat-percorso-fermato.png' });
   await ripristina(app);
