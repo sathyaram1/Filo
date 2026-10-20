@@ -29,7 +29,7 @@ const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
 const { isAuthPopup } = globalThis.SN_AUTH_POPUP;
 require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalHost (condivisa con la dashboard)
-const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
+const { normalizeUrl, indirizzoDaCaricare, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tabColor');
@@ -283,6 +283,24 @@ function avvisaIndirizzoFermato(rawUrl, win) {
   const a = avvisoIndirizzoFermato(rawUrl);
   if (!a || !win || win.isDestroyed?.()) return;
   try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
+}
+// Un file: o un data: che una pagina web apre da sé (un pulsante, una finestra a parte, un collegamento data:) Chromium
+// lo rifiuta prima di Filo, e lo scrive solo nella console della pagina (#1318).
+const RIFIUTO_DI_CHROMIUM = /^Not allowed to (load local resource|navigate top frame to data URL): (.+)$/;
+// Gira nella pagina. Lo stesso «local resource» lo scrive un'immagine o un riquadro con un file: dentro (una mail
+// incollata da Outlook): quello non l'ha aperto nessuno, e non si dice.
+function eUnaRisorsa(u) {
+  const pari = (v) => { try { return !!v && new URL(String(v).trim(), document.baseURI).href === u; } catch (_) { return false; } };
+  const nelloStile = (t) => [...String(t || '').matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)/g)].some((m) => pari(m[2]));
+  try {
+    for (const el of document.querySelectorAll('[src],[srcset],[data],[poster],[background],link[href],image,use,[style],style')) {
+      if (el.localName === 'a' || el.localName === 'area') continue;
+      if (pari(el.currentSrc) || ['src', 'data', 'poster', 'background', 'href', 'xlink:href'].some((a) => pari(el.getAttribute(a)))) return true;
+      if (String(el.getAttribute('srcset') || '').split(',').some((p) => pari(p.trim().split(/\s+/)[0]))) return true;
+      if (nelloStile(el.getAttribute('style')) || (el.localName === 'style' && nelloStile(el.textContent))) return true;
+    }
+  } catch (_) {}
+  return false;
 }
 // Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
@@ -973,8 +991,8 @@ class TabManager {
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
     // ingresso convergono su un solo URL, qualunque chiamante li apra.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
-    // Un indirizzo nudo («sito.com/pagina», come a volte lo manda il modello) caricato così resta bianco.
-    else if (typeof url === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(url.trim())) url = normalizeUrl(url);
+    // Un indirizzo nudo («sito.com/pagina», «localhost:3000», come a volte lo manda il modello) caricato così resta bianco.
+    else if (typeof url === 'string') url = indirizzoDaCaricare(url);
 
     // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
     // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
@@ -3609,7 +3627,7 @@ class TabManager {
     if (this._siteAllowedIn(tab, url)) return null;
     // Un indirizzo nudo («sito.com», come lo manda a volte il modello) si
     // giudica per quello che diventerà caricandolo.
-    const target = /^[a-z][a-z0-9+.-]*:/i.test(String(url || '')) ? url : normalizeUrl(url);
+    const target = indirizzoDaCaricare(url);
     let decision;
     try {
       decision = require('./services/siteBlock').shouldBlockNavigation(target);
