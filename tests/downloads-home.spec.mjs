@@ -122,8 +122,9 @@ test('nella home una domanda su un programma apre il pannello, che si chiude con
     await expect(chiudi).toBeVisible();
     await chiudi.hover();
     await shell.screenshot({ path: join(SHOTS, 'download-941-pannello.png') });
-    await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
-      { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
+    await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }, { sender: null }));
+    await shell.waitForTimeout(2000);
+    console.log('DEBUG', await shell.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.querySelector('#dl-panel')).backgroundColor, matchMedia('(prefers-color-scheme: dark)').matches, getComputedStyle(document.documentElement).getPropertyValue('--bg')]));
     await expect.poll(() => shell.evaluate(() => {
       const [r, g, b] = getComputedStyle(document.querySelector('#dl-panel')).backgroundColor.match(/\d+/g).map(Number);
       return r + g + b < 384;
