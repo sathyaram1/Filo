@@ -236,13 +236,6 @@ function registerIpcHandlers() {
     } catch (_) {}
     event.returnValue = fermo;
   });
-  ipcMain.on('filo:indirizzo-rifiutato', (event, url) => {
-    try {
-      const wc = event.sender;
-      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
-      if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
-    } catch (_) {}
-  });
 
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
