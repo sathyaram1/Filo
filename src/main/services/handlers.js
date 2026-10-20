@@ -2470,14 +2470,20 @@ async function eseguiAzioneFilo(action, {
         // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
         // "nudo" (es. "example.com") non parsa e prosegue: openTab → normalizeUrl
         // gli antepone https://.
-        // Si giudica quello che diventerà caricandolo: un percorso del computer scritto com'è è un file (#482 giro 2).
-        const caricato = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : (globalThis.SN_URL_NAV?.normalizeUrl?.(url) || url);
-        try {
-          const proto = new URL(caricato).protocol.toLowerCase();
-          if (!['http:', 'https:', 'filo:'].includes(proto)) {
-            return { executed: false, kept: true, output: { blocked: 'scheme' } };
+        // Si giudica quello che diventerà caricandolo, con la regola di chi apre le schede: un percorso del computer,
+        // anche fra virgolette, è un file (#482 giro 2, #1318); «localhost:3000» è un server, non uno schema.
+        const caricato = globalThis.SN_URL_NAV?.indirizzoDaCaricare?.(url) || url;
+        let proto = '';
+        try { proto = new URL(caricato).protocol.toLowerCase(); } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
+        if (proto && !['http:', 'https:', 'filo:'].includes(proto)) {
+          // La posta, il telefono e gli SMS vanno al programma del computer, come cliccati in una pagina (#1318).
+          const tm = winOf(sender)?._filoTabs;
+          if (tm && typeof tm.consegnaAlSistema === 'function' && tm.consegnaAlSistema(caricato)) {
+            return { executed: true, kept: true, output: { esterno: proto.slice(0, -1) } };
           }
-        } catch (_) { /* URL non assoluto: lo normalizza openTab */ }
+          const avviso = require('./indirizzoFermato').avvisoIndirizzoFermato(caricato);
+          return { executed: false, kept: true, output: { blocked: 'scheme', cosa: avviso ? avviso.cosa : '', avviso: avviso ? avviso.testo : '' } };
+        }
         // #376 — apertura in SECONDO PIANO: quando ciò che Filo apre non va
         // GUARDATO adesso (un brano da ascoltare, una radio, una pagina messa
         // da parte), la scheda nasce senza rubare il primo piano. Il flag
