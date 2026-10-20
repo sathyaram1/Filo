@@ -928,10 +928,10 @@
       if (r.ok === false) return { kind: 'err', text: String(r.error || 'Non è riuscito.') };
       return skipOutcomeMessage(r, { doveSiApprova: o.doveSiApprova });
     }
-    // Il salto ha cambiato la pratica (fusa, ferma al cancello, in riallineamento): la rilettura toglie la card.
+    // Ogni esito con ok vuol dire salto registrato e pratica uscita dalle bocciature, anche quelli del cancello
+    // del server: un elenco chiuso qui lasciava la card premibile e l'esito perso alla rilettura.
     function definitivo(reply) {
-      var e = reply && reply.ok !== false ? String(reply.esito || '') : '';
-      return e === 'fuso' || e === 'bloccato' || e === 'conflitto';
+      return !!(reply && reply.ok !== false && reply.esito);
     }
 
     btn.addEventListener('click', function (e) {
