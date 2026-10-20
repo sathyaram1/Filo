@@ -220,6 +220,16 @@
     return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
   }
 
+  // Quello che diventa, caricandolo, un indirizzo che apre Filo o il modello: uno schema vero (about:, blob:, zoommtg:…)
+  // resta com'è, il resto lo legge normalizeUrl come la barra. «localhost:3000» si legge come lo schema «localhost:» ma è
+  // un host con la porta: preso per schema era fermato «per sicurezza» (#1318).
+  function indirizzoDaCaricare(input) {
+    const raw = percorsoDelComputer(input) ? senzaVirgolette(input) : String(input || '').trim();
+    const schema = /^[a-z][a-z0-9+.-]*:/i.test(raw)
+      && (SCHEMI_SENZA_BARRE.test(raw) || !/^[a-z0-9.-]+:\d+(?:[/?#]|$)/i.test(raw));
+    return schema ? raw : normalizeUrl(raw);
+  }
+
   // Il token digitato (SENZA la "/" iniziale) è un indirizzo da aprire?
   // Stretta di proposito: deve distinguere un indirizzo da un comando shell.
   //   - niente spazi;
