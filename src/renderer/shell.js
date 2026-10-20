@@ -1862,17 +1862,10 @@
   }
 
   // ─── Scaricamenti della navigazione (#410.1) ───────────────────────────
-  // Indicatore nella fila di tab (sempre visibile, non coperto dalla view
-  // nativa della pagina) + pannello espandibile con i singoli download. Il
-  // pannello sfrutta reserveTop per rivelarsi SOPRA l'area pagina (che è una
-  // WebContentsView nativa e altrimenti lo occulterebbe).
+  // Pannello dei singoli download, che si apre da solo quando c'è una domanda (#588): nella fila di tab non
+  // c'è un tasto (#941), l'elenco sta nella home e nella pagina Download. reserveTop lo porta SOPRA la view
+  // nativa della pagina, che altrimenti lo coprirebbe.
   if (api.downloads) {
-    const dlBtn = document.getElementById('dl-indicator');
-    const dlIcon = document.getElementById('dl-ind-icon');
-    const dlCount = document.getElementById('dl-ind-count');
-    const dlFill = document.getElementById('dl-ind-fill');
-    setIcon(dlIcon, 'download', 15);
-
     // id → record (lo schema pubblico definito nel main).
     const dls = new Map();
     let panelOpen = false;
