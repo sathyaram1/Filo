@@ -166,4 +166,4 @@ function fraseCosto(action, refs, registry, ctx) {
   return [cifre, ...avvisi].join(' ');
 }
 
-module.exports = { contesto, listino, verificaCambio, fraseCosto };
+module.exports = { contesto, listino, finestraDi, verificaCambio, fraseCosto };
