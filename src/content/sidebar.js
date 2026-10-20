@@ -195,10 +195,15 @@
     });
     // Il microfono e il documento trovato danno qualcosa al sito: il clic (o il trascinamento) vale solo se l'utente
     // li vedeva, con la guardia delle voci del menu (#589.17).
+    let avvisoCoperto = null;
     global.SN_VISTO?.sorveglia(root, {
       ancorato: true,
       voci: '.sn-voce-btn, .sn-sidebar-file',
-      bloccato: () => { try { Popup?.showToast?.(I18n.t('aiuto_click_covered'), { duration: 4000 }); } catch (_) {} },
+      bloccato: () => {
+        // Sotto un velo che resta, un clic dopo l'altro: un avviso solo.
+        if (avvisoCoperto?.el?.isConnected && !avvisoCoperto.el.dataset.snClosing) return;
+        try { avvisoCoperto = Popup?.showToast?.(I18n.t('aiuto_click_covered'), { duration: 4000 }) || null; } catch (_) {}
+      },
     });
     // Focus o tasto sull'input → riapri la chat
     ta.addEventListener('focus', () => expand({ ai: false }));
