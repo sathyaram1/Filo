@@ -253,9 +253,14 @@
       } catch (_) {}
     }
 
-    send();
-    setTimeout(send, 800);
-    setTimeout(send, 2000);
+    // A pagina caricata: un'immagine chiesta prima trattiene il «load» della pagina finché il sito non la manda, e un
+    // favicon che non arriva lascerebbe la scheda in caricamento. Una pagina che il suo «load» non lo dà mai aspetta 5 s.
+    const parti = () => { send(); setTimeout(send, 800); setTimeout(send, 2000); };
+    if (document.readyState === 'complete') { parti(); return; }
+    let partito = false;
+    const una = () => { if (!partito) { partito = true; parti(); } };
+    global.addEventListener('load', una, { once: true });
+    setTimeout(una, 5000);
   }
 
   global.SN_PAGE_COLOR = { startTabColorSampler, reportTabIdentityColor };
