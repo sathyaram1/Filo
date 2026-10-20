@@ -129,10 +129,17 @@
         // Una riscrittura tagliata al posto del testo intero ne perderebbe la coda: si copia, non si sostituisce.
         $replace.disabled = !!global.SN_CHAT_ERRORS?.troncata?.(res.finishReason);
       } catch (e) {
-        $prop.textContent = Popup.frasePerLUtente({ message: e?.message });
+        mostraErrore({ message: e?.message });
       } finally {
         inFlight = false;
       }
+    }
+    // Il motivo prende il posto della proposta, ma non il suo aspetto né quello dell'attesa: chi legge di sfuggita
+    // non lo deve scambiare per la riscrittura (#663).
+    function mostraErrore(res) {
+      $prop.classList.remove('sn-editbox-empty');
+      $prop.classList.add('sn-editbox-errore');
+      Popup.scriviErrore($prop, res);
     }
 
     $instr.addEventListener('keydown', (e) => {
