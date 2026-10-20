@@ -20,6 +20,8 @@ const nelModello = (shell, testo) => shell.evaluate((t) => [...document.querySel
 const carta = async (avvisi, testo) => (await avvisi()).locator('.shell-notif.show', { hasText: testo });
 
 test('aperto da Filo in una scheda nuova, un file del computer viene fermato e lo dice, senza «Apri comunque»', async ({ app, shell, avvisi }) => {
+  // La scheda d'avvio nasce quando vuole: contata prima che ci sia, sembrava una scheda aperta dal file.
+  await expect.poll(async () => (await schede(app)).length, { timeout: 10_000 }).toBeGreaterThan(0);
   const prima = await schede(app);
   const r = await shell.evaluate(() => window.filoShell.tabs.open('file:///C:/Users/agenti%20AI/Documenti/conto.pdf'));
   expect(r && r.id, 'nessuna scheda per un file del computer').toBeFalsy();
