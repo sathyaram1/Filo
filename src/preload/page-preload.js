@@ -670,7 +670,6 @@ try {
     for (const ev of ['click', 'auxclick']) {
       win.addEventListener(ev, scelto, { capture: true, passive: true });
       win.addEventListener(ev, scelto, { passive: true });
-      win.addEventListener(ev, rifiutato, { passive: true });
     }
     win.addEventListener('click', scaricaScelto);
     win.addEventListener('pointerover', confine, { capture: true, passive: true });
