@@ -10,7 +10,7 @@
 //     Livello 3: box con attrito maggiore — il bottone resta disabilitato
 //     finché l'utente non digita espressamente la parola ("conferma").
 //
-// Esc o click fuori dal box = annulla. Una sola conferma alla volta.
+// Esc o click fuori dal box = annulla (il click fuori solo dopo il primo mezzo secondo). Una sola conferma alla volta.
 // `coprePagina`: la domanda è sulla pagina stessa (sito pericoloso) — la
 // copre, rispondono solo i bottoni, e i tasti non tornano alla pagina.
 // `segnale` (AbortSignal) ritira la domanda: risolve false.
