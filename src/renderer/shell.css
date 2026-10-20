@@ -559,68 +559,6 @@ html[data-feedback-dim="1"] .shell {
 }
 #feedback-draw[hidden] { display: none; }
 
-/* L'indicatore sta nella fila di tab perché quella non è mai coperta dalla view nativa della pagina. */
-.dl-indicator {
-  position: relative;
-  align-self: center;
-  flex: 0 0 auto;
-  margin: -8px 6px 0 0;
-  height: 26px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 999px;
-  background: var(--tab-bg);
-  border: 1px solid var(--border);
-  color: var(--fg-soft);
-  cursor: default;
-  overflow: hidden;
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-.dl-indicator[hidden] { display: none; }
-.dl-indicator:hover,
-.dl-indicator.open { background: var(--tab-active); color: var(--fg); }
-.dl-ind-icon { display: inline-flex; }
-.dl-ind-icon svg { display: block; }
-.dl-ind-count {
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font: 600 10px/15px system-ui, sans-serif;
-  text-align: center;
-}
-.dl-ind-count[hidden] { display: none; }
-/* #588 — un programma fermo in attesa di risposta: il bordo d'accento dice che
-   qui c'è una domanda aperta, non uno scaricamento che sta andando avanti. */
-.dl-indicator.attesa {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  color: var(--fg);
-}
-.dl-ind-bar {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 2px;
-  background: transparent;
-  overflow: hidden;
-}
-.dl-indicator.active .dl-ind-bar {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-.dl-ind-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--accent);
-  transition: width calc(0.2s * var(--sn-motion, 1)) ease;
-}
-.dl-indicator.indeterminate .dl-ind-fill {
-  width: 40% !important;
-  animation: dlIndet calc(1.1s * var(--sn-motion, 1)) ease-in-out infinite;
-}
 @keyframes dlIndet {
   0%   { transform: translateX(-110%); }
   100% { transform: translateX(320%); }
@@ -648,15 +586,16 @@ html[data-feedback-dim="1"] .shell {
 .dl-panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
+  gap: 2px;
+  padding: 9px 8px 9px 12px;
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   background: var(--bg);
 }
-.dl-panel-title { font: 600 13px/1 system-ui, sans-serif; }
-.dl-panel-clear {
+.dl-panel-title { font: 600 13px/1 system-ui, sans-serif; margin-right: auto; }
+.dl-panel-clear,
+.dl-panel-chiudi {
   background: transparent;
   border: none;
   color: var(--fg-soft);
@@ -665,7 +604,10 @@ html[data-feedback-dim="1"] .shell {
   padding: 4px 6px;
   border-radius: 6px;
 }
-.dl-panel-clear:hover { background: var(--border); color: var(--fg); }
+.dl-panel-chiudi { display: inline-flex; align-items: center; justify-content: center; padding: 4px; }
+.dl-panel-chiudi svg { display: block; }
+.dl-panel-clear:hover,
+.dl-panel-chiudi:hover { background: var(--border); color: var(--fg); }
 .dl-panel-list { display: flex; flex-direction: column; }
 .dl-empty { padding: 18px 12px; text-align: center; color: var(--fg-soft); font: 12px/1.4 system-ui; }
 .dl-row {
