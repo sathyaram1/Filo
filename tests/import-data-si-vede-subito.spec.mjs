@@ -17,6 +17,8 @@ import { primaFinestra } from './helpers/primaFinestra.mjs';
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const { buildExportZip } = require('../src/main/services/exportData.js');
+require('../src/shared/filoEventi.js');
+const E = globalThis.SN_FILO_EVENTI;
 
 const RED_PNG_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
@@ -182,6 +184,7 @@ test('tetto di spesa a 5 €, backup senza tetto: resta 5 € e la conferma offr
     page = await paginaInterna(app, 'security');
     await page.waitForLoadState('domcontentloaded');
     await apriConferma(app, page, zipPath, 'senza-tetto.zip');
+    await page.screenshot({ path: 'tests/.shots/import-tetto-offerto-scuro.png' });
     await clickConfirm(page, 'altro');
     await expect.poll(() => disco(userData).settings?.monthlyLimitEur, { timeout: 10000 }).toBe(0);
   } finally {
@@ -199,7 +202,9 @@ test('record finale dello zip rovinato: col numero di voci da 5 a 1 arrivano ant
       { id: 'p2', url: 'https://due.example/', title: 'Due', savedAt: '2026-10-03T10:00:00.000Z', thumbnail: RED_PNG_URL },
     ],
   };
-  const filo = `${JSON.stringify({ t: '2026-10-02T10:00:00.000Z', tipo: 'chat', chat: 'c-backup', titolo: 'Chat del backup' })}\n`;
+  const come = { dispositivo: 'pc-vecchio', ts: '2026-10-02T10:00:00.000Z' };
+  const filo = E.riga(E.crea(E.TIPI.CHAT_APERTA, { chat: 'c-backup' }, come))
+    + E.riga(E.crea(E.TIPI.MESSAGGIO, { chat: 'c-backup', msg: { role: 'user', text: 'ciao dal backup' } }, come));
   const zip = buildExportZip(backup, { filo });
   const numero = join(userData, 'numero-rovinato.zip');
   const firma = join(userData, 'firma-rovinata.zip');
@@ -211,10 +216,13 @@ test('record finale dello zip rovinato: col numero di voci da 5 a 1 arrivano ant
     const page = await apri(app, shell, 'filo://security/security.html');
     const testo = await apriConferma(app, page, numero, 'numero-rovinato.zip');
     expect(testo).toContain('2 immagini');
+    expect(testo).toContain('1 chat con Filo');
     expect(testo).not.toMatch(/non si leggono/);
     await clickConfirm(page, 'ok');
     await expect.poll(() => (disco(userData).savedPages || []).map((p) => String(p.thumbnail).slice(0, 11)), { timeout: 10000 })
       .toEqual(['data:image/', 'data:image/']);
+    const eventi = join(userData, 'filo', 'eventi.jsonl');
+    await expect.poll(() => (existsSync(eventi) ? readFileSync(eventi, 'utf8') : ''), { timeout: 10000 }).toContain('ciao dal backup');
 
     await page.waitForEvent('load', { timeout: 10000 }).catch(() => {});
     const dopo = await paginaInterna(app, 'security');

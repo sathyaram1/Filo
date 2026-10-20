@@ -326,6 +326,8 @@ function listRecords(scope = '') {
 // Una voce letta dal disco, che può venire anche da un backup importato: niente di vivo sopravvive al riavvio.
 function daDisco(raw) {
   const rec = { ...raw };
+  // I campi col trattino basso sono stato vivo di questa sessione: dal disco non arrivano, da un backup non si prendono.
+  for (const k of Object.keys(rec)) if (k.startsWith('_')) delete rec[k];
   // Una conferma non sopravvive al riavvio: chi l'avrebbe data non è più
   // davanti a quell'avviso. Il programma resta fuori dalla cartella e la
   // voce dice che non è stato scaricato (#588).
