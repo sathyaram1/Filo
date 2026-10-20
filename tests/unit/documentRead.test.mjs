@@ -199,6 +199,15 @@ test('il percorso arriva dall\'LLM: virgolette e ~ vengono sciolti', async () =>
   assert.equal(DR.normalizePath('   '), '');
 });
 
+// #1318 — la pulizia è quella della barra: apici inversi del Markdown, virgolette tipografiche, file:// incollato.
+test('un percorso fra apici inversi, fra caporali o come file:// si scioglie come quello fra virgolette', () => {
+  const p = join(TMP, 'cartella con spazi', 'conto.pdf');
+  const url = `file://${p.startsWith('/') ? '' : '/'}${p.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')}`;
+  for (const scritto of [`\`${p}\``, `«${p}»`, `“${p}”`, url, `"${url}"`, `\`\`\`${p}\`\`\``]) {
+    assert.equal(DR.normalizePath(scritto), p, scritto);
+  }
+});
+
 test('un documento indicato con le virgolette si legge lo stesso', async () => {
   const p = join(TMP, 'virgolette.txt');
   writeFileSync(p, 'contenuto', 'utf8');

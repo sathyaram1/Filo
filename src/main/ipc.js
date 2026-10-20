@@ -246,13 +246,6 @@ function registerIpcHandlers() {
     } catch (_) {}
     event.returnValue = fermo;
   });
-  ipcMain.on('filo:indirizzo-rifiutato', (event, url) => {
-    try {
-      const wc = event.sender;
-      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
-      if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
-    } catch (_) {}
-  });
 
   // #1054 — il menu del tasto destro di questa scheda, o della finestrella di accesso, si disegna nello strato sopra?
   ipcMain.on('filo:strato-menu', (event) => {

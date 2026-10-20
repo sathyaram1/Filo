@@ -20,7 +20,7 @@ const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const { installRestaConnesso } = require('./tabs/tabRestaConnesso');
 const Permessi = require('./services/permessiPagine');
-const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
+const { avvisoIndirizzoFermato, indirizzoRifiutatoDaChromium } = require('./services/indirizzoFermato');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
@@ -915,6 +915,7 @@ class TabManager {
     } catch (_) {}
     installaPermessi(view.webContents.session);
     Permessi.seguiGesti(view.webContents);
+    this._seguiRifiutiDiChromium(view.webContents);
     require('./services/homeNetwork').attach(view.webContents.session);
     return view;
   }
@@ -3349,6 +3350,7 @@ class TabManager {
     registraFinestraDelSito(win, this.win);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
+    this._seguiRifiutiDiChromium(pwc);
     MenuDiRiserva.segui(pwc);
     this._stratoNellaFinestrella(win, pwc);
     try {
@@ -3471,11 +3473,16 @@ class TabManager {
     openExternalScheme(url);
   }
 
-  // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che
-  // la pagina non può fingere.
-  indirizzoRifiutatoDallaPagina(wc, url) {
-    if (!/^file:/i.test(String(url || '')) || !Permessi.gestoRecente(wc)) return;
-    avvisaIndirizzoFermato(url, this.win);
+  // Un file: o un data: che Chromium rifiuta alla pagina prima che Filo lo veda (collegamento, script, finestra nuova):
+  // dopo un clic o un tasto veri dell'utente si dice, uno per gesto; quello che la pagina tenta da sola resta muto (#1318).
+  _seguiRifiutiDiChromium(wc) {
+    if (!wc || wc._filoRifiutiSeguiti) return;
+    wc._filoRifiutiSeguiti = true;
+    wc.on('console-message', (e) => {
+      if (!e || e.level !== 'error') return;
+      const url = indirizzoRifiutatoDaChromium(e.message);
+      if (url && Permessi.gestoPerUnAvviso(wc)) avvisaIndirizzoFermato(url, this.win);
+    });
   }
 
   // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.

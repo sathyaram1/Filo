@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { avvisoIndirizzoFermato } = require('../../src/main/services/indirizzoFermato.js');
+const { avvisoIndirizzoFermato, indirizzoRifiutatoDaChromium } = require('../../src/main/services/indirizzoFermato.js');
 const testo = (u) => avvisoIndirizzoFermato(u)?.testo;
 
 test('un file del computer nomina il percorso, col disco di Windows senza la barra davanti', () => {
@@ -56,4 +56,16 @@ test('un indirizzo illeggibile non produce un avviso; uno uguale ha la stessa ch
 
 test('un percorso nella cartella di casa si mostra con la tilde, come è stato scritto', () => {
   assert.equal(testo('file:///~/Scaricati/x.pdf'), 'File del computer bloccato per sicurezza: ~/Scaricati/x.pdf');
+});
+
+// #1318 — un file: o un data: aperto da script dopo un clic Chromium lo rifiuta prima di Filo: resta la sua riga in console.
+test('dalla riga di Chromium che rifiuta si ricava l\'indirizzo; da ogni altra riga niente', () => {
+  assert.equal(indirizzoRifiutatoDaChromium('Not allowed to load local resource: file:///tmp/conto.pdf'), 'file:///tmp/conto.pdf');
+  assert.equal(indirizzoRifiutatoDaChromium('Not allowed to load local resource: file://nas/c/x.xlsx'), 'file://nas/c/x.xlsx');
+  assert.equal(indirizzoRifiutatoDaChromium('Not allowed to navigate top frame to data URL: data:text/html,ciao'), 'data:text/html,ciao');
+  assert.equal(testo(indirizzoRifiutatoDaChromium('Not allowed to navigate top frame to data URL: data:text/html,<b>x</b>')), 'Indirizzo «data:» bloccato per sicurezza');
+  for (const riga of ['', 'Uncaught TypeError: x is undefined', 'Not allowed to load local resource: ', 'prima Not allowed to load local resource: file:///x',
+    'Not allowed to load local resource: https://esempio.it/x', 'Refused to frame data:text/html,x']) {
+    assert.equal(indirizzoRifiutatoDaChromium(riga), '', riga);
+  }
 });
