@@ -104,5 +104,5 @@ export async function quadratoPronto(page) {
   await page.waitForFunction(() => {
     const b = document.getElementById('stopBtn');
     return !!b && !b.hidden && !b.disabled && Date.now() - Number(b.dataset.comparso || 0) >= 520;
-  }, null, { timeout: 5_000 });
+  }, null, { timeout: 5_000, polling: 100 });
 }
