@@ -324,7 +324,7 @@ function unzip(buf) {
   // L'indice che si interrompe prima della fine che dichiara: le voci dopo non hanno nome, ma si contano (#1088).
   const fine = Math.min(cdOffset + cdSize, eocd);
   let mancanti = 0;
-  if (p < fine) {
+  if (p < fine || cdOffset > eocd) {
     let restanti = 1;
     for (let q = p + 4; q + 4 <= fine; q++) if (buf.readUInt32LE(q) === FIRMA_INDICE) restanti++;
     mancanti = Math.max(count - lette, restanti);
