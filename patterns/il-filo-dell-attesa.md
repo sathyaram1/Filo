@@ -76,9 +76,10 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   gli torna. Nel main (`MSG.FILO_CHAT_STOP`, solo la scheda che ha avviato il
   turno) la chiamata in volo si interrompe e nessuna azione nuova parte; quelle
   già partite finiscono e restano raccontate. Una risposta già finita invece
-  arriva: fermare riguarda il lavoro che resta. Uno stop arrivato mentre il
-  turno prepara ancora la richiesta (saldo, batteria, rete) si tiene da parte
-  e vale quando il turno si registra: il modello non parte (prova K).
+  arriva: fermare riguarda il lavoro che resta. Il turno si registra appena il
+  messaggio arriva: uno stop dato mentre prepara ancora la richiesta (saldo,
+  batteria, rete) lo trova già lì, uno arrivato prima ancora si tiene da parte
+  e vale quando si registra. Il modello non parte (prova K).
 - **Fermato vuol dire finito, per la scheda.** Al clic il turno chiude subito
   la sua parte a schermo (voce nello storico, riga «fermato», posto per le
   azioni ancora in volo) e la chat torna dell'utente: riprendi e seguito si
@@ -100,7 +101,9 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   l'accoglienza aspettano sempre la fine e partono dalla strada di sempre.
   Fermato, fallito o con l'accoglienza chiusa, il seguito non parte da solo:
   torna nella casella (il main lo ritira, se il modello non l'ha già letto).
-  Dal tasto destro: «Rimetti nella casella» (prove B, B2, B3).
+  Dal tasto destro: «Rimetti nella casella». Il microfono fa quello di Invio:
+  dettato mentre Filo lavora, parte come seguito (prove B, B2, B3, B4, B5 e
+  la prova del seguito in `tests/voce-chat.spec.mjs`).
 - **Riprendere non riesegue niente.** Finché l'utente non scrive altro, il
   tasto d'invio offre «riprendi»: il turno fermato sta nello storico con le
   azioni fatte (`interrotto`, `fermato`), il modello le vede come già fatte e
