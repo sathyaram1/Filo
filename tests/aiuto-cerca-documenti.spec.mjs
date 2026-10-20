@@ -68,6 +68,11 @@ async function chiediAllAiuto(page, testo) {
   await page.press('.sn-sidebar-input textarea', 'Enter');
 }
 
+// Il bottone del documento conta un clic solo quando il browser l'ha visto scoperto (#589.17): appena comparso, o appena
+// chiuso il menu che gli stava sopra, si aspetta che lo dica.
+const filePronto = (app, page) => nelMondoDiFilo(app, new URL(page.url()).hostname,
+  `(() => { const el = document.querySelector('.sn-sidebar .sn-sidebar-file'); return !!el && globalThis.SN_VISTO._test.pronta(el); })()`);
+
 const testoDi = (messaggi) => (messaggi || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
 
 const RISPOSTE = [
@@ -118,6 +123,7 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
     expect(html).not.toContain(dir);
 
     // Un clic lo apre col programma del sistema; dal tasto destro si apre la sua cartella.
+    await expect.poll(() => filePronto(app, page)).toBe(true);
     await file.click();
     await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([bolletta]);
     // Il tasto destro apre il menu di Filo con le azioni del file, non quello della pagina.
@@ -133,6 +139,7 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
       for (const wc of webContents.getAllWebContents()) wc.startDrag = (item) => { globalThis.__trascinati.push(item.file); };
     });
     const box = await file.boundingBox();
+    await expect.poll(() => filePronto(app, page)).toBe(true);
     await page.mouse.move(box.x + 20, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + 60, box.y + box.height / 2 + 30, { steps: 6 });

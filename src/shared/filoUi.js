@@ -25,6 +25,7 @@
 //   SN_FILO_UI.aperti()     → le radici NOSTRE attaccate al documento adesso
 //   SN_FILO_UI.gestoVero(e) → l'evento viene dall'utente, non dal codice del sito?
 //   SN_FILO_UI.soloGestiVeri(el) → i gesti fabbricati dallo script del sito non lo toccano
+//   SN_FILO_UI.soloScritturaVera(el) → le sue caselle cambiano solo per l'utente o per Filo; valoreVero(c) le legge
 //   SN_FILO_UI.ombra(host)  → shadow root chiuso di un riquadro; bersaglio(e) ci scende dentro
 //
 // L'attributo e l'elenco rispondono a due domande diverse, e la differenza è
@@ -153,6 +154,145 @@
     return el;
   }
 
+  // Una casella di Filo in un sito cambia solo per un inserimento dell'utente o per mano di Filo (#1071.1): un
+  // `execCommand` del sito scrive nella casella che ha il fuoco anche dentro un riquadro chiuso, e la casella dell'Aiuto
+  // sta nel suo documento. Il browser annuncia ogni inserimento dell'utente (tasti, incolla, dettatura, correttore del
+  // sistema) con un `beforeinput` fidato, quello da script no; Filo scrive dal mondo isolato, dove setter ed
+  // `execCommand` sono suoi. Ogni altro cambio si annulla. Prova: tests/caselle-solo-utente.spec.mjs.
+  const SCRITTURA_GUARDATA = (() => {
+    try { return !!global.document && typeof global.HTMLTextAreaElement === 'function' && global.location.protocol !== 'filo:'; } catch (_) { return false; }
+  })();
+  const CASELLE = 'textarea, input:not([type]), input[type="text"], input[type="search"], input[type="email"], input[type="url"], input[type="tel"], input[type="password"], input[type="number"]';
+  const caselle = new WeakMap();
+  const daGuardare = new Set();
+  const TETTO_CASELLE = 64;
+  let nostraScrittura = 0;
+  let patchate = false;
+  let giroCaselle = 0;
+  function patchaScritture() {
+    if (patchate) return;
+    patchate = true;
+    for (const C of [global.HTMLTextAreaElement, global.HTMLInputElement]) {
+      const proto = C && C.prototype;
+      if (!proto) continue;
+      const d = Object.getOwnPropertyDescriptor(proto, 'value');
+      if (d && d.set && d.configurable) {
+        Object.defineProperty(proto, 'value', {
+          configurable: true, enumerable: d.enumerable, get: d.get,
+          set(v) { d.set.call(this, v); scrittaDaFilo(this); },
+        });
+      }
+      const srt = proto.setRangeText;
+      if (typeof srt === 'function') proto.setRangeText = function (...a) { const r = srt.apply(this, a); scrittaDaFilo(this); return r; };
+    }
+    const D = global.Document && global.Document.prototype;
+    const ex = D && D.execCommand;
+    if (typeof ex === 'function') {
+      D.execCommand = function (...a) {
+        nostraScrittura++;
+        try { return ex.apply(this, a); } finally { nostraScrittura--; }
+      };
+    }
+  }
+  function selezioneDi(c) {
+    try { return [c.selectionStart, c.selectionEnd]; } catch (_) { return null; }
+  }
+  function scrittaDaFilo(c) {
+    const st = caselle.get(c);
+    if (!st) return;
+    st.buono = c.value;
+    st.sel = selezioneDi(c);
+  }
+  function ripristina(c, st) {
+    const sel = st.sel;
+    c.value = st.buono;
+    try {
+      if (sel && typeof sel[0] === 'number') {
+        const n = c.value.length;
+        c.setSelectionRange(Math.min(sel[0], n), Math.min(sel[1], n));
+      }
+    } catch (_) {}
+    st.sel = sel;
+  }
+  // L'inserimento accettato più interno ancora in consegna: chi arriva mentre lo si consegna viene da un suo
+  // ascoltatore, e vale solo se è Filo che ha appena scritto (il correttore che corregge mentre l'utente batte).
+  function inConsegna(st) {
+    while (st.inCorso.length && st.inCorso[st.inCorso.length - 1].e.eventPhase === 0) st.inCorso.pop();
+    return st.inCorso[st.inCorso.length - 1] || null;
+  }
+  function guardaCasella(c) {
+    if (caselle.has(c)) return;
+    const st = { buono: c.value, sel: selezioneDi(c), annuncio: null, inCorso: [], visto: false };
+    caselle.set(c, st);
+    c.addEventListener('beforeinput', (e) => {
+      if (!e.isTrusted) return;
+      if (c.value !== st.buono && !inConsegna(st)) ripristina(c, st);
+      st.annuncio = e;
+      setTimeout(() => { if (st.annuncio === e) st.annuncio = null; }, 0);
+    }, true);
+    c.addEventListener('input', (e) => {
+      const madre = inConsegna(st);
+      const a = st.annuncio;
+      const dellUtente = !madre && e.isTrusted && !!a && a.eventPhase === 0 && !a.defaultPrevented;
+      const diFilo = madre ? nostraScrittura > madre.livello : nostraScrittura > 0;
+      if (dellUtente || diFilo) {
+        if (dellUtente) st.annuncio = null;
+        st.inCorso.push({ e, livello: nostraScrittura });
+        st.buono = c.value;
+        st.sel = selezioneDi(c);
+        return;
+      }
+      if (c.value === st.buono) return;
+      ripristina(c, st);
+      e.stopImmediatePropagation();
+    }, true);
+    const segnaSelezione = (e) => { if (e.isTrusted && c.value === st.buono) st.sel = selezioneDi(c); };
+    for (const t of ['keyup', 'mouseup', 'select', 'focus']) c.addEventListener(t, segnaSelezione, true);
+    daGuardare.add(c);
+    while (daGuardare.size > TETTO_CASELLE) daGuardare.delete(daGuardare.values().next().value);
+    if (!giroCaselle) giroCaselle = global.requestAnimationFrame(controllaCaselle);
+  }
+  // Un `value` scritto dal sito non manda eventi (l'Aiuto sta nel suo documento): si rimette a ogni fotogramma.
+  function controllaCaselle() {
+    giroCaselle = 0;
+    for (const c of daGuardare) {
+      const st = caselle.get(c);
+      if (!c.isConnected) { if (st.visto) daGuardare.delete(c); continue; }
+      st.visto = true;
+      if (c.value !== st.buono && !inConsegna(st)) ripristina(c, st);
+    }
+    if (daGuardare.size) giroCaselle = global.requestAnimationFrame(controllaCaselle);
+  }
+  // Le caselle di `el` (o `el` stesso), anche quelle che entrano dopo.
+  const osservateScrittura = new WeakSet();
+  function soloScritturaVera(el) {
+    if (!SCRITTURA_GUARDATA || !el || el.nodeType !== 1) return el;
+    try {
+      patchaScritture();
+      if (el.matches(CASELLE)) guardaCasella(el);
+      for (const c of el.querySelectorAll(CASELLE)) guardaCasella(c);
+      if (!osservateScrittura.has(el) && typeof MutationObserver === 'function') {
+        osservateScrittura.add(el);
+        new MutationObserver((ms) => {
+          for (const m of ms) {
+            for (const n of m.addedNodes) {
+              if (n.nodeType !== 1) continue;
+              if (n.matches(CASELLE)) guardaCasella(n);
+              for (const c of n.querySelectorAll(CASELLE)) guardaCasella(c);
+            }
+          }
+        }).observe(el, { childList: true, subtree: true });
+      }
+    } catch (_) {}
+    return el;
+  }
+  // Il testo da mandare: quello che ha scritto l'utente, anche se il sito l'ha appena cambiato senza eventi.
+  function valoreVero(c) {
+    const st = c && caselle.get(c);
+    if (st && c.value !== st.buono && !inConsegna(st)) ripristina(c, st);
+    return c ? c.value : '';
+  }
+
   // Un riquadro che porta parole dell'utente o di un modello sta in uno shadow root chiuso (#1071): l'host è l'unico
   // nodo che il documento vede. L'attributo dice a chi chiede «si sta scrivendo?» da fuori (anche dal main, che
   // non vede dentro) che il fuoco lì dentro è in un campo nostro; la radice resta raggiungibile solo da qui.
@@ -248,6 +388,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
-    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
+    soloScritturaVera, valoreVero, ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
