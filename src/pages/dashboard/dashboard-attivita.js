@@ -2065,14 +2065,20 @@
       return btn;
     }
     if (type === 'COMANDO_FINESTRA' && a._output && a._output.already && onAck) {
-      // La home era già questa pagina: ricaricarla porterebbe via lavoro e
-      // risposta, quindi quando tornarci lo decide l'utente, dopo aver letto.
+      // La home era già questa pagina: ricaricarla porterebbe via lavoro e risposta, quindi la conversazione la chiude
+      // l'utente, dopo aver letto. Tornare alla home non la chiude più (#869): il bottone lo chiede apposta, una volta.
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
       btn.type = 'button';
       btn.textContent = '🏠 Torna alla home';
       btn.title = 'Chiude questa conversazione';
-      btn.addEventListener('click', onAck);
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        onAck({ nuova: true });
+        btn.textContent = '✓ Conversazione chiusa';
+        btn.title = 'Il prossimo messaggio ne comincia una nuova';
+      });
       return btn;
     }
     return null;
