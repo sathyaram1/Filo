@@ -1562,6 +1562,8 @@ html, body {
 /* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
 .dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform calc(160ms * var(--sn-motion, 1)) ease, opacity calc(160ms * var(--sn-motion, 1)) ease; }
 .dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
+/* Appena comparso sotto il dito che ha mandato, il quadrato ignora i clic per mezzo secondo: si accende quando li prende. */
+.dash-send.dash-stop:not([data-pronto]):not([disabled]) { opacity: 0.55; transform: none; cursor: default; }
 
 .dash-img-preview {
   position: relative;
