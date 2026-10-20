@@ -5329,6 +5329,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   // «Riprendi» toglie il segno dello stop: da qui il turno è di nuovo in corso, e se la scheda muore riparte come gli altri.
   if (onbActive && internal && onbBefore && onbBefore.fermato) onbBefore = await saveOnboarding(Onboarding.togliFermato(onbBefore));
+  // Da qui lo stop si scrive nell'intervista quando si preme; uno arrivato mentre il messaggio entrava si scrive adesso.
+  const turno = volo.turno;
+  if (onbActive) {
+    turno.accoglienza = true;
+    if (turno.fermato) onbBefore = await saveOnboarding(Onboarding.segnaFermato(onbBefore));
+  }
   if (onbActive && !internal && Onboarding.isExitRequest(onbBefore, userMessage)) {
     // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
     // testo fisso — l'unica risposta che si può garantire anche senza modello.
