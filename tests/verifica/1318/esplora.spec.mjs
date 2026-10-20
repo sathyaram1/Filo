@@ -32,11 +32,17 @@ test('pagina: varianti da script', async ({ shell, openTab, testServer }) => {
   const html = `<title>Varianti</title>${bottoni.map(([id, js], n) => `<button id="${id}" style="position:fixed;left:0;top:${n * 45}px;width:300px;height:40px" onclick="${js.replace(/"/g, '&quot;')}">${id}</button>`).join('')}`;
   const page = await openTab(testServer.html(html));
   await page.waitForTimeout(800);
+  await shell.evaluate(() => {
+    window.__visti = [];
+    const visti = new WeakSet(); const vedi = () => { for (const c of document.querySelectorAll('#shell-notifs > .shell-notif')) { if (visti.has(c)) continue; visti.add(c); window.__visti.push(c.textContent.trim()); } };
+    new MutationObserver(vedi).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  const testi = (s) => s.evaluate(() => window.__visti.slice());
   const esiti = {};
   for (let n = 0; n < bottoni.length; n++) {
     const prima = (await testi(shell)).length;
     await page.mouse.click(40, n * 45 + 20);
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2500);
     const dopo = await testi(shell);
     esiti[bottoni[n][0]] = { nuovi: dopo.slice(prima), url: page.url() };
   }
@@ -62,4 +68,33 @@ test('assistente: forme di percorso e indirizzi', async ({ app, shell }) => {
   console.log(JSON.stringify(out, null, 2));
   console.log(JSON.stringify(await schede(app), null, 2));
   console.log(JSON.stringify(await testi(shell), null, 2));
+});
+
+for (const [nome, js] of [
+  ['dataopen', "window.open('data:text/html,<b>e-open</b>')"],
+  ['datapdf', "location.href='data:application/pdf;base64,JVBERi0xLjQK'"],
+  ['dataopenblank', "window.open('data:text/html,ciao','_blank','width=300,height=300')"],
+  ['datalinkblank', "var a=document.createElement('a');a.href='data:text/html,x';a.target='_blank';document.body.appendChild(a);a.click()"],
+]) {
+  test(`isolato ${nome}`, async ({ shell, openTab, testServer, app }) => {
+    const page = await openTab(testServer.html(`<title>Iso</title><button style="position:fixed;left:0;top:0;width:300px;height:40px" onclick="${js.replace(/"/g, '&quot;')}">b</button>`));
+    await page.waitForTimeout(800);
+    await page.mouse.click(40, 20);
+    await page.waitForTimeout(2500);
+    console.log(nome, JSON.stringify(await shell.evaluate(() => [...document.querySelectorAll('.shell-notif')].map((c) => c.textContent.trim()))), JSON.stringify(await schede(app)), app.windows().map((w) => w.url().slice(0, 60)).join(' | '));
+  });
+}
+
+test('sorgente dei messaggi', async ({ openTab, testServer, app }) => {
+  const page = await openTab(testServer.html(`<title>Src</title><button id="a" style="position:fixed;left:0;top:0;width:300px;height:40px" onclick="location.href='file:///tmp/vero.pdf'">a</button><button id="b" style="position:fixed;left:0;top:50px;width:300px;height:40px" onclick="console.error('Not allowed to load local resource: file:///tmp/finto.pdf')">b</button>`));
+  await app.evaluate(({ webContents }) => {
+    globalThis.__msg = [];
+    for (const wc of webContents.getAllWebContents()) {
+      if (!/127\.0\.0\.1/.test(wc.getURL())) continue;
+      wc.on('console-message', (e) => { globalThis.__msg.push({ level: e.level, message: e.message, lineNumber: e.lineNumber, sourceId: e.sourceId, frame: !!e.frame }); });
+    }
+  });
+  await page.mouse.click(40, 20); await page.waitForTimeout(800);
+  await page.mouse.click(40, 70); await page.waitForTimeout(800);
+  console.log(JSON.stringify(await app.evaluate(() => globalThis.__msg), null, 1));
 });
