@@ -936,7 +936,7 @@
     FILO_CHAT_GET: 'filo_chat_get',
     // Chiusura di una chat (ritorno alla home, chat nuova, chiusura dell'app):
     // fissa la data di chiusura e fa partire la classificazione (titolo +
-    // conversazione/comando). { id } → { ok }
+    // conversazione/comando). `fine`: chiusa apposta dall'utente, una scheda nuova non la continua. { id, fine? } → { ok }
     FILO_CHAT_CLOSE: 'filo_chat_close',
     // Cancellazione manuale di una chat, dopo la conferma. { id } → { ok, chats }
     FILO_CHAT_DELETE: 'filo_chat_delete',
