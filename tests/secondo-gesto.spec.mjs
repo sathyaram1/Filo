@@ -238,7 +238,7 @@ test('C — la conferma che si apre da sola non si chiude per un clic fuori ment
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
   expect(await page.evaluate(() => window.SN_CONFIRM_UI._test.click('cancel'))).toBe(true);
   await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
-  expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getMemory())?.stileAgente || '')).not.toContain('Rispondi in breve.');
+  expect(await app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => s.agentStyle || ''))).toBe('');
   await ripristina(app);
 });
 
