@@ -31,7 +31,9 @@ const VUOTO = `(() => { document.body.appendChild(document.createElement('iframe
 const STRADE = {
   innerHTML: `(() => { const d = document.createElement('div'); document.body.appendChild(d); d.innerHTML = '<iframe></iframe>'; return window[window.length - 1]; })()`,
   insertAdjacentHTML: `(() => { document.body.insertAdjacentHTML('beforeend', '<iframe></iframe>'); return window[window.length - 1]; })()`,
-  'con un indirizzo, prima che arrivi': `(() => { const f = document.createElement('iframe'); f.src = '/lento'; document.body.append(f); return window[window.length - 1]; })()`,
+  // Uno dello stesso sito in volo non si tocca (riquadri-vuoti.js, `inVolo`): perderebbe il preload all'arrivo.
+  'con un indirizzo di un altro sito, prima che arrivi': `(() => { const f = document.createElement('iframe'); f.src = 'http://localhost:' + location.port + '/lento'; document.body.append(f); return window[window.length - 1]; })()`,
+  'accanto a un riquadro dello stesso sito ancora in volo': `(() => { const l = document.createElement('iframe'); l.src = '/lento'; document.body.append(l); return ${VUOTO}; })()`,
   'nella radice ombra chiusa': `(() => { const h = document.createElement('div'); document.body.appendChild(h); const f = document.createElement('iframe'); h.attachShadow({ mode: 'closed' }).appendChild(f); return f.contentWindow; })()`,
   'dentro un altro riquadro vuoto': `(() => { const w = ${VUOTO}; w.document.body.appendChild(w.document.createElement('iframe')); return w[0]; })()`,
   'riscritto da capo': `(() => { const w = ${VUOTO}; w.document.open(); w.document.write('<iframe></iframe>'); w.document.close(); return w[0]; })()`,

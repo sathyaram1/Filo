@@ -60,12 +60,20 @@ function buildRiquadriVuotiSource(corpi) {
   function aperta(w) { try { return !chiusa.call(w); } catch (e) { return false; } }
   var OSPITI = 'iframe,frame,object,embed', OSPITE = /^(iframe|frame|object|embed)$/;
   var nomeDi = (D(Element.prototype, 'localName') || {}).get;
-  var tutti = Document.prototype.querySelectorAll, haAttr = Element.prototype.hasAttribute, attr = Element.prototype.getAttribute;
+  var perNome = Document.prototype.getElementsByTagName, haAttr = Element.prototype.hasAttribute, attr = Element.prototype.getAttribute;
+  var baseDi = (D(Node.prototype, 'baseURI') || {}).get, Indirizzo = URL;
   var ORIGINE = String(self.origin);
   var arrivati = new WeakSet();
+  // Le raccolte vive costano poco a ogni giro: il giro parte a ogni cambio del documento.
+  var raccolte = new WeakMap();
+  function ospitiDi(d) {
+    var r = raccolte.get(d);
+    if (!r) { r = ['iframe', 'frame', 'object', 'embed'].map(function (n) { return perNome.call(d, n); }); raccolte.set(d, r); }
+    return r;
+  }
   // Toccato prima del suo load, un riquadro che arriva a un indirizzo dello stesso sito tiene la finestra e perde il
   // preload: niente accesso, menu, cookie lì dentro. Non si tocca finché non arriva; resta fuori finché è in volo.
-  function inVolo(t) {
+  function inVolo(t, d) {
     if (arrivati.has(t)) return false;
     try {
       var n = nomeDi.call(t);
@@ -74,7 +82,7 @@ function buildRiquadriVuotiSource(corpi) {
       if (!haAttr.call(t, a)) return false;
       var v = String(attr.call(t, a)).trim();
       if (!v || VUOTO.test(v)) return false;
-      return new URL(v, document.baseURI).origin === ORIGINE;
+      return new Indirizzo(v, baseDi.call(d)).origin === ORIGINE;
     } catch (e) { return false; }
   }
   var inGiro = false;
@@ -82,15 +90,18 @@ function buildRiquadriVuotiSource(corpi) {
     if (inGiro) return;
     inGiro = true;
     try {
-      var coda = [window];
-      sistemate = sistemate.filter(function (r) { var w = r.deref(); if (w && aperta(w)) { coda.push(w); return true; } return false; });
+      var coda = [window], presi = new Set(coda);
+      var metti = function (f) { if (!presi.has(f)) { presi.add(f); coda.push(f); } };
+      sistemate = sistemate.filter(function (r) { var w = r.deref(); if (w && aperta(w)) { metti(w); return true; } return false; });
       for (var n = 0; n < coda.length && n < 4096; n++) {
-        var w = coda[n], k = 0, d = documento(w), ospiti = [], volo = false;
-        try { ospiti = d ? tutti.call(d, OSPITI) : []; } catch (e) {}
-        for (var j = 0; j < ospiti.length && j < 4096; j++) {
-          if (inVolo(ospiti[j])) { volo = true; continue; }
-          var g = delRiquadro(ospiti[j]);
-          if (g && applica(g)) coda.push(g);
+        var w = coda[n], k = 0, d = documento(w), gruppi = [], volo = false;
+        try { if (d) gruppi = ospitiDi(d); } catch (e) {}
+        for (var q = 0; q < gruppi.length; q++) {
+          for (var j = 0, o = gruppi[q]; j < o.length && j < 4096; j++) {
+            if (inVolo(o[j], d)) { volo = true; continue; }
+            var g = delRiquadro(o[j]);
+            if (g && applica(g)) metti(g);
+          }
         }
         // Per indice si vedono anche i riquadri nelle radici ombra, ma non si sa se sono in volo.
         if (volo) continue;
@@ -98,7 +109,7 @@ function buildRiquadriVuotiSource(corpi) {
         for (var i = 0; i < k && i < 4096; i++) {
           var f = null;
           try { f = w[i]; } catch (e) {}
-          if (f && applica(f)) coda.push(f);
+          if (f && applica(f)) metti(f);
         }
       }
     } catch (e) {} finally { inGiro = false; }
@@ -132,6 +143,7 @@ function buildRiquadriVuotiSource(corpi) {
   function alLoad(e) {
     var t = e && e.target;
     if (!ospite(t)) return;
+    arrivati.add(t);
     fuori = new WeakSet();
     var w = delRiquadro(t);
     if (w) applica(w);
