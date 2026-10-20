@@ -1324,6 +1324,11 @@
     refreshLive().catch(() => {});
     // Le pagine che il turno ha aperto e i cambi fatti altrove entrano nel filo a schermo; i messaggi del turno ci sono già.
     Coda.allinea().catch(() => {});
+    // Un turno fermato, fallito o che ha chiuso l'accoglienza non manda da solo i seguiti: tornano nella casella.
+    if (seguiti.length) {
+      if (r?.ok && !r.stopped && !r.onboardingClosed) partiSeguito().catch(() => {});
+      else rimettiSeguiti().catch(() => {});
+    }
     return r;
   }
 
