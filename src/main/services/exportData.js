@@ -491,9 +491,9 @@ function mergeClipboardHistory(local, imported, tetto) {
   const istante = (x) => (x && Number.isFinite(x.ts) ? x.ts : 0);
   out.sort((a, b) => istante(b) - istante(a));
   const fuori = tetto > 0 && out.length > tetto ? out.length - tetto : 0;
-  const lista = fuori ? out.slice(0, tetto) : out;
-  const restano = new Set(lista);
-  return { lista, fuori, mieFuori: fuori ? qui.filter((x) => !restano.has(x)).length : 0 };
+  if (!fuori) return { lista: out, fuori: 0, mieFuori: 0 };
+  const mie = new Set(qui);
+  return { lista: out.slice(0, tetto), fuori, mieFuori: out.slice(tetto).filter((x) => mie.has(x)).length };
 }
 
 function mergeValue(local, imported) {
