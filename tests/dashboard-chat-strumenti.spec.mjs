@@ -45,13 +45,8 @@ async function configureModel(app) {
   });
 }
 
-test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco, una bolla sola', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
-  await expect(page.locator('#input')).toBeVisible();
-  await configureModel(app);
-
+// Il turno di (A): un primo giro che ragiona, scrive una nota e chiama due azioni, un secondo che ragiona e risponde.
+async function giroCercaAgisce(app) {
   await app.evaluate(async () => {
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
     globalThis.__restoreProvider = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
