@@ -2227,8 +2227,7 @@
       for (const id of Array.from(domandeApri.keys())) {
         if (dls.get(id)?.state !== 'completed') domandeApri.delete(id);
       }
-      renderIndicator();
-      if (panelOpen) renderPanel();
+      aggiorna();
     }
 
     // Aggiornamenti live dal main (start/progress/done/error/removed).
