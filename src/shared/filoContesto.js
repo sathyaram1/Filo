@@ -372,6 +372,8 @@
     'ahahah', 'haha', 'hahaha', 'thanks', 'thank', 'great', 'cool', 'sure',
   ]);
   const diCortesia = (p) => PAROLE_DI_CORTESIA.has(String(p).replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, ''));
+  // Una parola che non compare in nessuna conversazione vecchia («chiamava») non distingue niente e non si pretende
+  // (#1301): pretesa, faceva sparire lo scambio giusto davanti a una domanda scritta normalmente.
   function ricordiPerParole(domanda, tratti) {
     const CA = global.SN_CHAT_ARCHIVE;
     const lista = Array.isArray(tratti) ? tratti : [];
@@ -380,8 +382,8 @@
     const chat = new Set(lista.map((t) => t.chat)).size;
     const comune = Math.max(1, Math.floor(chat * QUOTA_PAROLA_COMUNE));
     const inQuante = (p) => new Set(lista.filter((_t, i) => pagliai[i].includes(p)).map((t) => t.chat)).size;
-    const parole = [...new Set(CA.terminiCheDistinguono(CA.normalizeForSearch(domanda).split(/\s+/).filter(Boolean)))]
-      .filter((p) => !diCortesia(p) && inQuante(p) <= comune);
+    const parole = [...new Set(CA.terminiCheDistinguono(CA.paroleDellaRicerca(domanda)))]
+      .filter((p) => { if (diCortesia(p)) return false; const n = inQuante(p); return n >= 1 && n <= comune; });
     if (parole.length < MIN_PAROLE_RICORDO) return [];
     const presi = lista.filter((_t, i) => parole.every((p) => pagliai[i].includes(p)));
     return scegliRicordi(presi.slice(-MAX_RICORDI).map((t) => ({ tratto: t, score: 1 })));
