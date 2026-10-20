@@ -4782,8 +4782,15 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso, sotto la tua risposta c'è «Apri comunque». Non riprovare e non cercare un altro indirizzo per arrivarci.`;
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
-    // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché.
-    return 'Pagina NON aperta: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo.';
+    // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché e con la cosa vera che è (#1318).
+    const cosa = typeof res.output.avviso === 'string' && res.output.avviso ? ` (${res.output.avviso})` : '';
+    return `Pagina NON aperta${cosa}: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo e non cercarlo sul web.`;
+  }
+  if (type === 'NAVIGA' && res.output && res.output.esterno) {
+    const programma = { 'mailto:': 'di posta', 'tel:': 'delle chiamate', 'sms:': 'degli SMS' }[res.output.esterno] || 'del sistema';
+    if (!res.executed) return `NON aperto: il programma ${programma} non è partito. Dillo all'utente in una riga.`;
+    // Una bozza aperta non è un messaggio mandato: lo manda l'utente da lì.
+    return `Passato al programma ${programma} del computer, che si apre col messaggio da completare: lo manda o lo chiama l'utente da lì. Non dire che è già stato inviato.`;
   }
   if (type === 'PULISCI_TAB' && res.executed && res.output) {
     const n = Number(res.output.archived) || 0;
