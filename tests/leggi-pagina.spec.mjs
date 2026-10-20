@@ -653,10 +653,12 @@ test('dopo aver letto una pagina, «aprimi la pagina ufficiale dei prezzi» apre
   await chiedi(page, 'leggi notizie.example/listino-modelli: quanto costa gemini 2.5 pro?');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'PRIMA: 1,25 dollari' })).toBeVisible({ timeout: 20_000 });
   await chiedi(page, 'aprimi la pagina ufficiale dei prezzi');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'SECONDA:' })).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
   await expect.poll(() => app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
-    .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => String(t.url || '').startsWith(u))), url), { timeout: 10_000 }).toBe(true);
+    .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => String(t.url || '').startsWith(u))), url), { timeout: 20_000 }).toBe(true);
+  await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
+  expect((await chiamate(app)).length, 'due giri per la lettura, uno per l\'apertura').toBe(3);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'SECONDA:' })).toHaveCount(0);
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
 test('una lettura confermata dall\'utente torna al modello da sola, e la risposta arriva senza riscrivere', async ({ app, openTab }) => {
