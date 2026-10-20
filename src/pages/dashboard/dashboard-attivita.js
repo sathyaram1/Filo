@@ -429,7 +429,8 @@
         try { if (tipo === 'NAVIGA') dettaglio = new URL(String(a.url || o.url || '')).hostname.replace(/^www\./, ''); } catch (_) {}
         if (tipo === 'APRI_FILE') dettaglio = String(a.percorso || a.path || '').split(/[\\/]/).pop();
         const testo = fallita ? (FAILED_LABELS[tipo] || 'Azione non riuscita') : '';
-        registra({ tipo, testo, dettaglio, esito: a._confirm ? 'chiesta' : (fallita ? 'fallita' : 'ok') }, a);
+        const esterno = tipo === 'NAVIGA' && !fallita && { mailto: 'POSTA', tel: 'TELEFONO', sms: 'SMS' }[o.esterno];
+        registra({ tipo: esterno || tipo, testo, dettaglio, esito: a._confirm ? 'chiesta' : (fallita ? 'fallita' : 'ok') }, a);
       },
       // La bolla di un giro che NON era l'ultimo («Provo subito tutti e tre…») diventa una nota del suo nodo.
       absorbBubble(bubble) {
