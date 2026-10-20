@@ -102,6 +102,7 @@
       inFlight = true;
       if ($nota) { $nota.remove(); $nota = null; }
       if ($interrotta) { $interrotta.remove(); $interrotta = null; }
+      $prop.classList.remove('sn-editbox-errore');
       $prop.classList.add('sn-editbox-empty');
       $prop.textContent = I18n.t('edit_box_loading');
       $copy.disabled = true;
