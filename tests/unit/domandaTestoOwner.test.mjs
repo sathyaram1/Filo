@@ -105,7 +105,7 @@ test('ogni ruolo che lavora riceve la regola una volta sola, dal pezzo condiviso
     assert.equal(t.split(SEZIONE).length - 1, 1, `${ruolo} ${JSON.stringify(opts)}: la regola una volta sola`);
     const regola = piatto(t.slice(t.indexOf(SEZIONE)));
     assert.match(regola, /unslop\/SKILL\.md` a titolo, contesto, problema, opzioni \(testo, pro, contro\) e consiglio/);
-    assert.match(regola, /niente|non ci siano nomi di file, funzioni, rami, commit o comandi/);
+    assert.match(regola, /non ci siano nomi di file, funzioni, rami, commit o comandi/);
     assert.match(regola, /I dettagli tecnici e i messaggi esatti vanno in `notePerAgenti`/);
   }
   const dove = readdirSync(RUOLI).filter((f) => f.endsWith('.md') && /unslop/.test(readFileSync(join(RUOLI, f), 'utf8')));
