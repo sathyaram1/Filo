@@ -2,7 +2,8 @@
 // patterns/il-filo-dell-attesa.md. Ogni prova asserisce il successo visto dall'utente, e senza il lavoro è rossa:
 //  (A) doppio clic sul tasto d'invio o su «Riprendi»: il secondo clic cade sul quadrato appena comparso, che non ferma;
 //  (B) Invio con del testo mentre Filo lavora manda un seguito: il lavoro arriva in fondo e il seguito ha risposta,
-//      letto al passo dopo del turno o, se il turno non ne ha, appena finisce; fermare lo rimette nella casella;
+//      letto al passo dopo del turno o, se il turno non ne ha, appena finisce (due seguiti insieme, un comando con la
+//      barra dalla sua strada); fermare lo rimette nella casella; nell'accoglienza aspetta la fine (E3);
 //  (C) un riquadro di conferma appena comparso non si chiude per un clic fuori; Esc resta immediato;
 //  (D) fermato prima del primo pensiero, la punta del filo tagliato non copre la riga sotto;
 //  (E) nell'accoglienza lo stop si scrive quando si preme: ricaricare subito non rifà il turno fermato;
@@ -199,6 +200,63 @@ test('B2 — il seguito arrivato all\'ultimo passo parte appena il turno finisce
   await ripristina(app);
 });
 
+test('B4 — due seguiti scritti all\'ultimo passo: partono insieme appena il turno finisce, in ordine', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await copione(app, [
+    { pensa: ['Rispondo alla prima. ', 'Ci vuole un po\'. ', 'Ecco. '], ogni: 600, testo: 'Prima risposta.' },
+    { pensa: ['Due seguiti. '], ogni: 200, testo: 'Risposta a tutti e due.' },
+  ]);
+  await page.locator('#input').fill('prima domanda');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-activity-trama').first()).toContainText('prima', { timeout: 5_000 });
+  await page.locator('#input').fill('seconda domanda');
+  await page.locator('#input').press('Enter');
+  await page.locator('#input').fill('terza domanda');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-attesa')).toHaveCount(2, { timeout: 1_000 });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta a tutti e due.' })).toBeVisible({ timeout: 15_000 });
+  // Il turno dopo parte col primo e legge il secondo prima di chiamare il modello: una chiamata sola per tutti e due.
+  expect(await chiamate(app)).toBe(2);
+  const seconda = await ultimaChiamata(app);
+  const testo = testoDellaChiamata(seconda);
+  expect(testo.indexOf('seconda domanda')).toBeGreaterThan(testo.indexOf('Prima risposta.'));
+  expect(testo.indexOf('terza domanda')).toBeGreaterThan(testo.indexOf('seconda domanda'));
+  await expect(page.locator('.dash-bubble-attesa')).toHaveCount(0);
+  const ordine = await ordineDelFilo(page);
+  expect(ordine.slice(-5)).toEqual([
+    'utente: prima domanda', 'filo: Prima risposta.', 'utente: seconda domanda', 'utente: terza domanda', 'filo: Risposta a tutti e due.',
+  ]);
+  await page.waitForTimeout(800);
+  expect(await chiamate(app)).toBe(2);
+  await ripristina(app);
+});
+
+test('B5 — un comando con la barra scritto mentre Filo lavora aspetta la fine e fa la sua cosa, senza il modello', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await copione(app, [{ pensa: ['Rispondo. ', 'Ancora. ', 'Ecco. '], ogni: 600, testo: 'Prima risposta.' }]);
+  await page.locator('#input').fill('prima domanda');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-activity-trama').first()).toContainText('Rispondo', { timeout: 5_000 });
+  await page.locator('#input').fill('/help');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-attesa', { hasText: '/help' })).toBeVisible({ timeout: 1_000 });
+  // Quello che l'utente scrive intanto resta suo, anche quando il comando parte.
+  await page.locator('#input').fill('una bozza');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Prima risposta.' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('/home — torna in fondo al filo')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('.dash-bubble-attesa')).toHaveCount(0);
+  await expect(page.locator('#input')).toHaveValue('una bozza');
+  await page.waitForTimeout(500);
+  expect(await chiamate(app)).toBe(1);
+  await ripristina(app);
+});
+
 test('B3 — fermare con un seguito in attesa lo rimette nella casella; dal tasto destro lo si riprende prima', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -383,6 +441,35 @@ test.describe(() => {
     expect(await chiamate(app)).toBe(1);
     await expect(page.locator('.dash-bubble-filo', { hasText: 'non dovevi leggermi' })).toHaveCount(0);
     await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+    await ripristina(app);
+  });
+
+  test('E3 — nell\'accoglienza il seguito aspetta la fine del turno e parte come risposta dell\'intervista', async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await configureModel(app);
+    await copione(app, [
+      { pensa: ['Mi presento con calma. ', 'Ancora. ', 'Ecco. '], ogni: 600, testo: 'Piacere Luca, di cosa ti occupi?' },
+      { pensa: ['Ha aggiunto il lavoro. '], ogni: 200, testo: 'Bello, il cuoco!' },
+    ]);
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await page.locator('#input').fill('mi chiamo Luca');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-activity-trama').last()).toContainText('calma', { timeout: 6_000 });
+    await page.locator('#input').fill('e faccio il cuoco');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-bubble-attesa', { hasText: 'e faccio il cuoco' })).toBeVisible({ timeout: 1_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Bello, il cuoco!' })).toBeVisible({ timeout: 15_000 });
+    expect(await chiamate(app)).toBe(2);
+    const seconda = await ultimaChiamata(app);
+    expect(testoDellaChiamata([seconda[seconda.length - 1]])).toContain('e faccio il cuoco');
+    const thread = await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getOnboarding()).thread.map((m) => `${m.role}: ${m.text}`));
+    expect(thread.slice(-4)).toEqual([
+      'user: mi chiamo Luca', 'filo: Piacere Luca, di cosa ti occupi?', 'user: e faccio il cuoco', 'filo: Bello, il cuoco!',
+    ]);
+    await expect(page.locator('.dash-bubble-attesa')).toHaveCount(0);
     await ripristina(app);
   });
 
