@@ -66,9 +66,12 @@ test('A — doppio clic sul tasto d\'invio: la risposta arriva, il quadrato appe
   await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
 
   // Dopo la frazione di secondo il quadrato ferma come sempre, e Invio a vuoto anche.
+  await copione(app, [{ pensa: ['Penso a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' }]);
   await page.locator('#input').fill('e poi');
   await page.locator('#sendBtn').click();
   await quadratoPronto(page);
+  for (let i = 0; i < 3; i++) { await page.screenshot(); await page.waitForTimeout(100); }
+  await page.screenshot({ path: 'tests/.shots/secondo-gesto-quadrato-pronto.png' });
   await page.locator('#stopBtn').click();
   await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 5_000 });
   await page.locator('#input').fill('ultima');
@@ -152,6 +155,13 @@ test('B — Invio con del testo mentre Filo lavora: il lavoro va in fondo e il s
     'user: e poi dimmi anche che ore sono',
     'filo: Timer messo, e ho letto anche il seguito.',
   ]);
+  // Il turno dopo lo ha davanti una volta sola, al suo posto.
+  await page.locator('#input').fill('grazie');
+  await page.locator('#input').press('Enter');
+  await expect.poll(() => chiamate(app), { timeout: 10_000 }).toBe(3);
+  const terza = testoDellaChiamata(await ultimaChiamata(app));
+  expect(terza.split('e poi dimmi anche che ore sono').length - 1).toBe(1);
+  expect(terza.indexOf('metti un timer di due minuti')).toBeLessThan(terza.indexOf('e poi dimmi anche che ore sono'));
   await ripristina(app);
 });
 
@@ -160,6 +170,8 @@ test('B2 — il seguito arrivato all\'ultimo passo parte appena il turno finisce
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  await impostazioni(app, { theme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
   await copione(app, [
     { pensa: ['Rispondo alla prima. ', 'Ci vuole un po\'. ', 'Ecco. '], ogni: 600, testo: 'Prima risposta.' },
     { pensa: ['Il seguito. '], ogni: 200, testo: 'Risposta al seguito.' },
@@ -170,6 +182,7 @@ test('B2 — il seguito arrivato all\'ultimo passo parte appena il turno finisce
   await page.locator('#input').fill('seconda domanda');
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-bubble-attesa', { hasText: 'seconda domanda' })).toBeVisible({ timeout: 1_000 });
+  await page.screenshot({ path: 'tests/.shots/secondo-gesto-seguito-in-attesa-scuro.png' });
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta al seguito.' })).toBeVisible({ timeout: 15_000 });
   expect(await chiamate(app)).toBe(2);
   const seconda = await ultimaChiamata(app);
@@ -182,6 +195,7 @@ test('B2 — il seguito arrivato all\'ultimo passo parte appena il turno finisce
     'utente: prima domanda', 'filo: Prima risposta.', 'utente: seconda domanda', 'filo: Risposta al seguito.',
   ]);
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Invia');
+  await impostazioni(app, { theme: 'system' });
   await ripristina(app);
 });
 

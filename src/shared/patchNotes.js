@@ -11,6 +11,7 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Mentre Filo lavora puoi già scrivergli il seguito e premere Invio. Il lavoro non si ferma, il messaggio compare in attesa e Filo lo legge al passo dopo, o appena ha finito di rispondere. Se lo fermi, il messaggio torna nella casella. Per fermarlo restano il quadrato e Invio con la casella vuota.',
         'Nelle Opzioni, sotto «Host dei modelli», scegli se i modelli rispondono dagli host più veloci, da quelli che cominciano a rispondere prima o dai più economici. Lo puoi chiedere anche a Filo, per esempio «voglio la chat più veloce». I fornitori esclusi restano esclusi.',
         'Il pulsante «Prova» dei modelli predefiniti misura il modello come lo useresti davvero e la misura resta: riapri la pagina e ritrovi latenza e velocità. Se cambi modello o host la misura sparisce, e se non è di oggi porta la sua data.',
         'C\'è il quaderno delle memorie, dove leggi quello che Filo ha capito di te, riga per riga, col giorno in cui l\'ha imparato. Un clic sulla data ti porta al messaggio da cui è nato. Se una riga è sbagliata la correggi, e Filo usa la tua versione dal messaggio dopo. Se la togli non torna più da quella conversazione, e la ritrovi fra le nascoste se cambi idea. Lo apri da «Memorie» nella barra laterale, oppure chiedi a Filo «cosa sai di me?». Prende il posto della Cronologia: chat e schede chiuse, anche quelle di mesi fa, le trovi nel filo della home cercandole dal campo in cima.',
@@ -31,6 +32,7 @@
         'In alto a destra, accanto ai tasti della finestra, non c\'è più il tasto dei download. I download li trovi nella home e nella pagina Download, dal menu App. Mentre un file scende, l\'avanzamento lo vedi sull\'icona di Filo nella barra delle applicazioni (nel Dock su Mac). Quando un programma aspetta la tua risposta il pannello si apre da solo sopra la pagina, e lo chiudi con la ×.',
       ],
       fixes: [
+        'Un doppio clic sul tasto d\'invio, o su «riprendi», non ferma più il lavoro appena partito, e un doppio clic sul pulsante di una conferma non la chiude più. Quando fermi Filo nella prima conversazione, ricaricare la pagina non lo fa ripartire, e una conversazione nuova risponde subito anche se l\'azione fermata prima non è ancora finita.',
         'Il menu del tasto destro aperto su un avviso in basso a destra, o lì accanto, ora sta sopra l\'avviso e lo vedi intero.',
         'Se chiedi a Filo dove finiscono le tue chat, adesso ti dice come stanno le cose: restano salvate sul tuo computer, ma per risponderti e per dare un nome a ogni chat le legge un modello, come tutto quello che gli chiedi. Lo stesso vale per il quaderno delle memorie e per l\'Aiuto. Prima diceva che nessuna chat usciva dal computer.',
         'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il testo e il nome di un documento dell\'Editor e le correzioni del Correttore.',

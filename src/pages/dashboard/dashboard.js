@@ -382,8 +382,12 @@
       bubblesEl.scrollTop = bubblesEl.scrollHeight;
     }
     body.dataset.state = 'home';
-    inputEl.value = '';
-    autoGrowInput();
+    // Ridisegnata da altri (l'accoglienza che finisce) la vista cambia, la casella no: dentro può esserci un seguito
+    // tornato lì perché il turno ha chiuso l'accoglienza (#1296), o quello che l'utente scriveva intanto.
+    if (!ricarica) {
+      inputEl.value = '';
+      autoGrowInput();
+    }
     inputEl.focus();
   }
 
