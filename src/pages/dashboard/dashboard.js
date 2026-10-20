@@ -1871,11 +1871,10 @@
   });
 
   // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
-  // La scorciatoia vale in tutta la home, che è la sua chat.
+  // La scorciatoia vale in tutta la home, che è la sua chat. Mentre Filo lavora parte come seguito (#1296): non aspetta.
   window.SN_VOCE_CHAT?.collega({
     campo: inputEl, contenitore: inputForm, prima: sendBtn, ambito: document,
     invia: () => (inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'))),
-    occupato: () => sending,
   });
 
   // ===== Bridge cambio stato live dal background =====
