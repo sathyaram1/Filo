@@ -2236,10 +2236,9 @@
       if (info.kind === 'removed') dls.delete(info.item.id);
       else dls.set(info.item.id, info.item);
       if (info.item.state !== 'completed' || info.kind === 'removed') domandeApri.delete(info.item.id);
-      renderIndicator();
       // Il main manda 'ask' solo alla finestra da cui parte lo scaricamento.
       if (info.kind === 'ask') mostraRiga(info.item.id);
-      else if (panelOpen) renderPanel();
+      else aggiorna();
     });
 
     function provenienza(r) {
