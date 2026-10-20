@@ -1,5 +1,5 @@
 // Il manifesto e i documenti di trasparenza non promettono che qualcosa «non esce dal computer»: quasi ogni
-// funzione fa leggere quello che le dai a un modello (#1452). Si dice dove un dato è SALVATO, e verso chi NON va.
+// funzione fa leggere quello che le dai a un modello (#1452). Si dice dove un dato è SALVATO e verso chi NON va.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
