@@ -150,8 +150,34 @@ test('col biglietto della routine la domanda arriva al canale col gruppo del gua
   assert.equal(a.body.ticket, BIGLIETTO);
   assert.equal(a.body.data.domanda.gruppo, 'guasto: filo-security');
   assert.deepEqual(a.body.data.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);
-  assert.ok(a.body.data.domanda.opzioni.every((o) => o.azione.feedbackId === FEEDBACK_ID));
+  assert.ok(a.body.data.domanda.opzioni.every((o) => o.azione.tipo === 'compito' || o.azione.feedbackId === FEEDBACK_ID));
   assert.ok(!('origine' in a.body.data.domanda), 'l’origine la mette il server dal biglietto');
+});
+
+// #1455: com'era D-89, col nome di file e la lineetta nel contesto. Si ferma prima del canale, e chi chiede sa dove.
+test('un nome di file o una lineetta nel testo per l’owner: rifiutata prima del canale, col campo; la pulita parte', async () => {
+  for (const [contesto, segno] of [
+    ['Il clone fallisce in scripts/routine-channel.mjs.', /«contesto» nomina routine-channel\.mjs/],
+    ['Il clone fallisce — GitHub risponde di no.', /«contesto» ha una lineetta/],
+  ]) {
+    arrivate = [];
+    const file = join(CARTELLA, 'guasto-sporca.json');
+    writeFileSync(file, JSON.stringify({ ...domandaDelModello(), contesto }), 'utf8');
+    const r = await chiedi(file);
+    assert.equal(r.code, 1, r.stdout);
+    assert.match(r.stderr, /RIFIUTATO: testo_non_per_owner: /);
+    assert.match(r.stderr, segno);
+    assert.match(r.stderr, /Non ho mandato niente/);
+    assert.equal(arrivate.length, 0, 'il canale non è stato chiamato');
+  }
+  arrivate = [];
+  risposta = { status: 200, body: { ok: true, id: 'D-10', num: 'D-10', numero: 10 } };
+  const file = join(CARTELLA, 'guasto-pulita.json');
+  writeFileSync(file, JSON.stringify(domandaDelModello()), 'utf8');
+  const r = await chiedi(file);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /OK: domanda D-10 aperta\./);
+  assert.match(arrivate[0].body.data.domanda.notePerAgenti, /fatal: unable to access: 403/, 'il messaggio esatto arriva nelle note');
 });
 
 test('se il server rifiuta la domanda, chi chiede legge il motivo esatto: è quello che le istruzioni fanno ricopiare', async () => {
