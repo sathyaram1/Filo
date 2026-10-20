@@ -701,10 +701,9 @@
           if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
-          if (!res || res.error || !res.text) {
+          if (!res || res.errore || !res.text) {
             el.classList.add('sn-menu-inline-error');
-            // Già tradotto da startExplainRequest: qui si mostra, non si ritraduce.
-            body.textContent = (res && res.error) || I18n.t('err_provider_failed');
+            Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });
             return;
           }
           const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
