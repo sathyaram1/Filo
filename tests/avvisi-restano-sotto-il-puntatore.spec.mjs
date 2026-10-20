@@ -260,7 +260,7 @@ test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la sce
 
 // Stessa causa, altra porta: un menu aperto dalla pagina accanto alla pila le sta sopra, e la voce che cade
 // sull'avviso parte.
-test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avviso parte', async ({ shell, openTab, testServer }) => {
+test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avviso parte', async ({ app, shell, openTab, testServer }) => {
   await impostaDurata(shell, 0);
   const page = await testServer.openReady(openTab, PAGE.replace('</body>',
     '<a id="basso" href="https://example.com/basso" style="position:fixed;right:40px;bottom:3px;font-size:12px;line-height:14px">in fondo</a></body>'));
