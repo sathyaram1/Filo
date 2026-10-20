@@ -1284,12 +1284,8 @@
     // che torna alla dashboard (spec). Timer e sveglie non lo hanno più: la
     // loro riga nel blocco di attività dice già tutto.
     if (hasAck && onAck) {
-      const ok = document.createElement('button');
-      ok.type = 'button';
-      ok.className = 'dash-action-btn dash-action-btn-primary';
-      ok.textContent = '✓';
-      ok.title = 'Chiudi e torna alla dashboard';
-      ok.addEventListener('click', onAck);
+      const ok = bottoneChiudi(onAck, '✓', 'Chiudi e torna alla dashboard');
+      ok.classList.add('dash-action-btn-primary');
       wrap.appendChild(ok);
     }
     container.appendChild(wrap);
@@ -1741,6 +1737,23 @@
     segnaConfermata(a, { ...(a._output || {}), ...esito, proposta: false, fatto: true }, activity);
   }
 
+  // Chiude la conversazione una volta sola, e lo dice: il filo resta a schermo, quindi senza il segno il clic non si vede.
+  function bottoneChiudi(onAck, etichetta, titolo) {
+    const btn = document.createElement('button');
+    btn.className = 'dash-action-btn';
+    btn.type = 'button';
+    btn.textContent = etichetta;
+    btn.title = titolo;
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      onAck();
+      btn.textContent = '✓ Conversazione chiusa';
+      btn.title = 'Il prossimo messaggio comincia una conversazione nuova';
+    });
+    return btn;
+  }
+
   function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
@@ -2066,20 +2079,8 @@
     }
     if (type === 'COMANDO_FINESTRA' && a._output && a._output.already && onAck) {
       // La home era già questa pagina: ricaricarla porterebbe via lavoro e risposta, quindi la conversazione la chiude
-      // l'utente, dopo aver letto. Tornare alla home non la chiude più (#869): il bottone lo chiede apposta, una volta.
-      const btn = document.createElement('button');
-      btn.className = 'dash-action-btn';
-      btn.type = 'button';
-      btn.textContent = '🏠 Torna alla home';
-      btn.title = 'Chiude questa conversazione';
-      btn.addEventListener('click', () => {
-        if (btn.disabled) return;
-        btn.disabled = true;
-        onAck({ nuova: true });
-        btn.textContent = '✓ Conversazione chiusa';
-        btn.title = 'Il prossimo messaggio ne comincia una nuova';
-      });
-      return btn;
+      // l'utente, dopo aver letto.
+      return bottoneChiudi(onAck, 'Chiudi e torna alla home', 'Chiude questa conversazione');
     }
     return null;
   }
