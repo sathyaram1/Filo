@@ -431,6 +431,23 @@
     return `${f.slice(0, max).join('; ')} e altri ${f.length - max} cambi`;
   }
 
+  // I cambi che combaciano con una ricerca nel filo, dal più recente: coi tre passi delle conversazioni e delle pagine,
+  // così una parola in più («cambio tema scuro») non fa sparire il cambio mentre la chat si trova (#1301).
+  function cerca(eventi, query, { max = 6 } = {}) {
+    const CA = global.SN_CHAT_ARCHIVE;
+    const vuoto = { results: [], termini: [], allargata: false };
+    if (!CA || !CA.paroleDellaRicerca(query).length) return vuoto;
+    const candidati = [];
+    const lista = Array.isArray(eventi) ? eventi : [];
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const e = lista[i];
+      const f = e && e.id ? frase(e) : '';
+      if (f) candidati.push({ id: e.id, frase: f, date: e.agg || e.ts, testo: `${f} ${frasi(e).join(' ')}` });
+    }
+    const r = CA.searchWide(candidati, query, { testo: (c) => c.testo, limit: max });
+    return { results: r.results.map(({ id, frase: fr, date }) => ({ id, frase: fr, date })), termini: r.termini, allargata: r.allargata };
+  }
+
   const DOVE = {
     preferences: 'dalle Preferenze',
     options: 'dalla pagina Modelli',
