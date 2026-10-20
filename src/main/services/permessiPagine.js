@@ -261,6 +261,12 @@ function gestoRecente(wc) {
   return gestoEntro(wc, GESTO_MS);
 }
 
+// L'istante dell'ultimo input vero sulla pagina, se recente, o 0: chi concede una cosa sola per input lo usa come nome.
+function ultimoGesto(wc) {
+  const t = (wc && wc._filoGestoAlle) || 0;
+  return t && Date.now() - t < GESTO_MS ? t : 0;
+}
+
 // Un clic o un tasto vero sulla pagina negli ultimi `ms`: il conto riparte a ogni navigazione della pagina intera.
 function gestoEntro(wc, ms) {
   const t = wc && wc._filoGestoAlle;
