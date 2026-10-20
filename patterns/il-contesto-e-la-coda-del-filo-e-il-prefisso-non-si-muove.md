@@ -51,17 +51,27 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
 - **I pezzi vecchi si ripescano da soli**: ogni scambio più vecchio della finestra ha un vettore (modello della
   Cronologia, una volta sola, file accanto al filo, via con la sua chat, mai in incognito). La domanda ne porta al
   massimo tre sopra la soglia nel CONTESTO DI ADESSO, imbustati come archivio, e il blocco di attività lo dice come
-  una ricerca («Ricordato dal filo · titolo»). Senza modello d'indicizzazione vale per parole, ed è una prova
-  debole: almeno due parole rare (in poche conversazioni vecchie), tutte nello stesso scambio, e mai di cortesia
-  (rare finché dette una volta sola); un «ok grazie» o un «perfetto, grazie mille» non ripescano niente. L'attesa ha un tetto: oltre, il turno parte senza.
+  una ricerca («Ricordato dal filo · titolo», ogni conversazione una volta). Il ricordo resta attaccato alla sua
+  risposta con la vita delle letture, e finché è lì non si ripesca (#1301: a ogni messaggio sullo stesso argomento
+  tornava, e le copie si sommavano); nemmeno da una conversazione che il modello ha riletto con l'id. Senza modello
+  d'indicizzazione vale per parole, ed è una prova debole: almeno due parole rare (in poche conversazioni vecchie,
+  ma in almeno una: una parola che non c'è da nessuna parte non si pretende), tutte nello stesso scambio, senza la
+  punteggiatura attaccata, e mai di cortesia (rare finché dette una volta sola); un «ok grazie» o un «perfetto,
+  grazie mille» non ripescano niente. L'attesa ha un tetto: oltre, il turno parte senza.
+- **Cancellare toglie anche le copie**: quello che un ricordo, una ricerca o una rilettura avevano portato davanti al
+  modello da una conversazione o da una pagina poi cancellata non ci arriva più dal messaggio dopo, in ogni scheda.
+  Ogni esito di CERCA_CHAT si rilegge al momento del contesto contro le chat e le pagine che il filo ha ancora,
+  qualunque sia la copia (la memoria degli esiti, la storia della scheda): una regola sola, non una pulizia per strada.
 - **Il tetto in token cede alla finestra del modello**: se il fornitore rifiuta la richiesta perché supera la finestra
-  del modello della chat, il tratto si stringe quanto dicono le misure del rifiuto (senza misure, a metà) e lo stesso
-  giro riparte; il tetto che ha retto vale per i turni dopo con quel modello (in memoria). L'utente non vede il rifiuto.
+  del modello della chat, si accorcia la parte più grossa fra il tratto e le riletture di questo turno, quanto
+  dicono le misure del rifiuto (senza misure, a metà), e lo stesso giro riparte; il tetto del tratto che ha retto
+  vale per i turni dopo con quel modello, la finestra detta dal rifiuto per le riletture (in memoria). L'utente non
+  vede il rifiuto.
 - **CERCA_CHAT cerca in tutto il filo**: chat di ogni scheda (di quella di adesso solo i messaggi che il modello non ha
   davanti: una conversazione ripresa o lunga ha un inizio che si cerca), pagine visitate (e il contenuto
-  delle schede chiuse, coi vettori della Cronologia), cambi annullabili. Pagine e chat si cercano per parole con
-  gli stessi tre passi (tutte, quelle che distinguono, almeno una): una parola in più nella domanda non fa sparire
-  la pagina mentre la chat si trova. Le pagine non entrano mai da sole nel
+  delle schede chiuse, coi vettori della Cronologia), cambi annullabili. Chat, pagine e cambi si cercano per parole
+  con gli stessi tre passi (tutte, quelle che distinguono, almeno una): una parola in più nella domanda non fa sparire
+  la pagina o il cambio mentre la chat si trova. Le pagine non entrano mai da sole nel
   contesto: solo cercate (decisione dell'owner, D56 la cambierà con un interruttore). Una pagina delicata dice solo
   il sito; gli indirizzi trovati si riaprono senza conferma, come i link di una ricerca.
 
