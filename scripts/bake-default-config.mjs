@@ -87,35 +87,38 @@ function primaStringa(...valori) {
   return '';
 }
 
-// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
-// che serve a chi legge il guasto — degradare in silenzio non è degradare.
-// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
-// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
-async function fetchRemoteKeys(passphrase) {
-  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
+// Un solo «fetch failed» su un runner bastava a togliere Linux a una versione uscita (#1240): si copre un disservizio di minuti.
+export const ATTESE_S = [5, 15, 30, 60];
+// Senza tetto una richiesta appesa terrebbe fermo il lavoro fino al limite di sei ore di GitHub.
+export const TETTO_RICHIESTA_MS = 45_000;
+
+/** La rete e il server sovraccarico guariscono aspettando; un rifiuto o un documento senza chiavi no. PURA. */
+export function esitoDaRitentare(esito) {
+  if (!esito) return false;
+  if (esito.stato === 'rete') return true;
+  return esito.stato === 'http' && (esito.status >= 500 || esito.status === 429 || esito.status === 408);
+}
+
+function descriviErrore(e, tetto) {
+  if (e && e.name === 'TimeoutError') return `nessuna risposta in ${Math.round(tetto / 1000)} s`;
+  return descriviErroreDiRete(e);
+}
+
+async function unaRichiesta(passphrase, canale, tetto) {
   try {
-    const res = await fetch(`${CANALE}/buildKeys`, {
+    const res = await fetch(`${canale}/buildKeys`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ passphrase }),
+      signal: AbortSignal.timeout(tetto),
     });
-    if (!res.ok) {
-      const esito = { stato: 'http', status: res.status };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
-    }
+    if (!res.ok) return { apiKeys: {}, esito: { stato: 'http', status: res.status } };
     const j = await res.json().catch(() => null);
-    if (!j || typeof j !== 'object') {
-      const esito = { stato: 'illeggibile' };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
-    }
+    if (!j || typeof j !== 'object') return { apiKeys: {}, esito: { stato: 'illeggibile' } };
     // Il rifiuto arriva con HTTP 200 e `ok:false`: finiva in un `{}`
     // indistinguibile da «il documento non ha quella chiave», e non diceva niente.
     if (j.ok === false) {
-      const esito = { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
+      return { apiKeys: {}, esito: { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) } };
     }
     const apiKeys = (j && j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
     const sb = pickSafeBrowsing(j);
@@ -123,14 +126,37 @@ async function fetchRemoteKeys(passphrase) {
     const esito = Object.values(apiKeys).some((v) => typeof v === 'string' && v.trim())
       ? { stato: 'ok' }
       : { stato: 'senza-chiavi' };
-    if (esito.stato === 'senza-chiavi') {
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-    }
     return { apiKeys, esito };
   } catch (e) {
-    const esito = { stato: 'rete', messaggio: e.message };
-    console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-    return { apiKeys: {}, esito };
+    return { apiKeys: {}, esito: { stato: 'rete', messaggio: descriviErrore(e, tetto) } };
+  }
+}
+
+const attesaVera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
+// che serve a chi legge il guasto — degradare in silenzio non è degradare.
+// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
+// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
+export async function chiaviDalServer(passphrase, {
+  canale = CANALE, attese = ATTESE_S, tetto = TETTO_RICHIESTA_MS, aspetta = attesaVera, log = console.warn,
+} = {}) {
+  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
+  const tentativi = attese.length + 1;
+  for (let i = 0; ; i++) {
+    const r = await unaRichiesta(passphrase, canale, tetto);
+    if (esitoDaRitentare(r.esito) && i < attese.length) {
+      log(`[bake] ${descriviEsitoServer(r.esito)} Riprovo fra ${attese[i]} s (tentativo ${i + 1} di ${tentativi}).`);
+      await aspetta(attese[i] * 1000);
+      continue;
+    }
+    if (esitoDaRitentare(r.esito)) r.esito.tentativi = tentativi;
+    if (r.esito.stato === 'ok') {
+      if (i > 0) log(`[bake] chiavi dal server al tentativo ${i + 1} di ${tentativi}.`);
+    } else {
+      log(`[bake] ${descriviEsitoServer(r.esito)} Uso i secret d'ambiente.`);
+    }
+    return r;
   }
 }
 
