@@ -30,6 +30,7 @@
       ],
       fixes: [
         'Il menu del tasto destro aperto su un avviso in basso a destra, o lì accanto, ora sta sopra l\'avviso e lo vedi intero.',
+        'Se chiedi a Filo dove finiscono le tue chat, adesso ti dice come stanno le cose: restano salvate sul tuo computer, ma per risponderti e per dare un nome a ogni chat le legge un modello, come tutto quello che gli chiedi. Lo stesso vale per il quaderno delle memorie e per l\'Aiuto. Prima diceva che nessuna chat usciva dal computer.',
         'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il testo e il nome di un documento dell\'Editor e le correzioni del Correttore.',
         'In Preferenze, Opzioni, Altro e Sicurezza la scritta «Salvato» compare per l\'ultima cosa che hai toccato, non per una modifica di prima.',
         'Quando l\'Aiuto fa dei passi da solo, come aprire una sezione dopo l\'altra, dopo 20 di fila si ferma e ti chiede se continuare. Così una pagina non può fargli spendere i tuoi crediti mentre non tocchi niente.',
