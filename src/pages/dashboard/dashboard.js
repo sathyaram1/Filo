@@ -1332,15 +1332,7 @@
     }
     sendBtn.disabled = quadrato;
     sendBtn.hidden = quadrato;
-    if (quadrato && stopBtn.hidden) {
-      quadratoDa = Date.now();
-      delete stopBtn.dataset.pronto;
-      clearTimeout(timerQuadrato);
-      timerQuadrato = setTimeout(() => { if (!stopBtn.hidden) stopBtn.dataset.pronto = '1'; }, PAUSA_QUADRATO);
-    } else if (!quadrato) {
-      clearTimeout(timerQuadrato);
-      delete stopBtn.dataset.pronto;
-    }
+    if (quadrato && stopBtn.hidden) stopBtn.dataset.comparso = String(Date.now());
     stopBtn.hidden = !quadrato;
     stopBtn.disabled = !turnoVivo || turnoVivo.fermato;
   }
