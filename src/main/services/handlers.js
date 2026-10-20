@@ -4467,8 +4467,13 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso, sotto la tua risposta c'è «Apri comunque». Non riprovare e non cercare un altro indirizzo per arrivarci.`;
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
-    // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché.
-    return 'Pagina NON aperta: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo.';
+    // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché e con cosa era (#1318).
+    const cosa = res.output.avviso ? ` (${res.output.avviso})` : '';
+    return `Pagina NON aperta${cosa}: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga, senza dire che l'hai aperta. Non riprovare con lo stesso indirizzo e non cercarlo sul web.`;
+  }
+  if (type === 'NAVIGA' && res.executed && res.output && res.output.esterno) {
+    const programma = { mailto: 'di posta', tel: 'per le chiamate', sms: 'dei messaggi' }[res.output.esterno] || 'del computer';
+    return `Indirizzo passato al programma ${programma} del computer, che si apre con quello che c'era nell'indirizzo già scritto: il resto (mandare, chiamare) lo fa l'utente da lì. Diglielo in una riga, senza dire che è già partito.`;
   }
   if (type === 'PULISCI_TAB' && res.executed && res.output) {
     const n = Number(res.output.archived) || 0;
