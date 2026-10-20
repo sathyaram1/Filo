@@ -1070,6 +1070,11 @@ test('dopo un riavvio vero, una chat nuova non porta fuori il codice che Filo av
     await page.locator('#sendBtn').click();
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Non l’ho aperto' })).toBeVisible({ timeout: 20_000 });
     expect(JSON.stringify(await app.evaluate(() => globalThis.__visti)), 'la chat nuova non ritrova il codice').toContain(CODICE);
+    const chatDi = (testo) => app.evaluate(async (_electron, t) => (await globalThis.SN_IL_FILO.chats())
+      .filter((c) => c.messages.some((m) => m.text === t)).map((c) => c.id), testo);
+    await expect.poll(() => chatDi('completa l’accesso alla banca')).toHaveLength(1);
+    expect(await chatDi('completa l’accesso alla banca'), 'la domanda dopo il riavvio non è in una chat nuova')
+      .not.toEqual(await chatDi('leggi la notifica della banca'));
     const activity = page.locator('.dash-activity').last();
     await activity.locator('.dash-activity-head').click();
     await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Non ho aperto' }))
