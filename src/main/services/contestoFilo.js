@@ -207,10 +207,18 @@ const ancore = { normale: null, incognito: null };
 async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now(), immagini = true } = {}) {
   // Deciso alla richiesta, come fa il filo: dall'incognito si legge il filo in memoria, mai quello sul disco.
   if (incognito == null) incognito = require('../shim/storage').inIncognito();
-  const tutti = senzaDomanda(await messaggiDelFilo({ incognito }), chatId, userMessage);
+  const chats = await F().chats({ incognito });
+  const tutti = senzaDomanda(messaggiDi(chats), chatId, userMessage);
   potaFoto(tutti);
   const chatMsgs = chatId ? tutti.filter((m) => m.chat === chatId) : [];
   const dallaScheda = esitiDellaScheda(storia, chatMsgs);
+  const coda = codaDellaScheda(storia, chatMsgs);
+  // Ogni copia di una lettura dell'archivio si rilegge contro quello che c'è ancora (regola in src/shared/filoContesto.js).
+  const esistono = new Set(chats.map((c) => c.id));
+  if (chatId) esistono.add(chatId);
+  const leggePagine = [...esiti.values(), ...dallaScheda.values()].some((e) => conPagine(e.azioni)) || coda.some((m) => conPagine(m && m.actions));
+  const paginaEsiste = leggePagine ? await pagineCheCiSono(incognito) : null;
+  const pulite = (azioni) => FC().senzaCancellati(azioni, { chatEsiste: (id) => esistono.has(id), paginaEsiste });
   const lato = incognito ? 'incognito' : 'normale';
   const f = FC().finestra(tutti, {
     ora,
@@ -222,8 +230,8 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
       const k = FC().chiave(m);
       const s = dallaScheda.get(k);
       const e = esiti.get(k) || null;
-      if (!s) return e;
-      return { azioni: s.azioni.length ? s.azioni : ((e && e.azioni) || []), reasoningDetails: (e && e.reasoningDetails) || s.reasoningDetails };
+      const unito = s ? { azioni: s.azioni.length ? s.azioni : ((e && e.azioni) || []), reasoningDetails: (e && e.reasoningDetails) || s.reasoningDetails } : e;
+      return unito && Array.isArray(unito.azioni) ? { ...unito, azioni: pulite(unito.azioni) } : unito;
     },
     osserva,
     immagini: immagini ? (m) => foto.get(FC().chiave(m)) || null : null,
@@ -234,7 +242,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     visti: f.visti,
     azioni: f.azioni,
     vecchi: f.vecchi,
-    coda: codaDellaScheda(storia, chatMsgs),
+    coda: coda.map((m) => (m && Array.isArray(m.actions) ? { ...m, actions: pulite(m.actions) } : m)),
     nuova: !chatMsgs.length,
     tutti,
     token: f.token,
