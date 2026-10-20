@@ -14,6 +14,15 @@ test('un file del computer nomina il percorso, col disco di Windows senza la bar
   assert.equal(testo('file:///C:/Users/'), 'Cartella del computer bloccata per sicurezza: C:/Users/');
 });
 
+// #1318 — la riga della chat ha già l'indirizzo accanto: le serve il «cosa», senza il percorso.
+test('cosa: il testo senza l\'indirizzo', () => {
+  assert.equal(avvisoIndirizzoFermato('file:///run/media/mario/USB/tesi.docx').cosa, 'File del computer bloccato per sicurezza');
+  assert.equal(avvisoIndirizzoFermato('file:///C:/Users/').cosa, 'Cartella del computer bloccata per sicurezza');
+  assert.equal(avvisoIndirizzoFermato('file://nas/x').cosa, 'Percorso di rete bloccato per sicurezza');
+  assert.equal(avvisoIndirizzoFermato('C:\\Users\\x.txt').cosa, 'File del computer bloccato per sicurezza');
+  assert.equal(avvisoIndirizzoFermato('zoommtg://zoom.us/j').cosa, 'Indirizzo «zoommtg:» bloccato per sicurezza');
+});
+
 test('una cartella di rete nomina il server', () => {
   assert.equal(testo('file://nas/condivisa/bilancio.xlsx'), 'Percorso di rete bloccato per sicurezza: //nas/condivisa/bilancio.xlsx');
   assert.equal(testo('file://server-ostile/x'), 'Percorso di rete bloccato per sicurezza: //server-ostile/x');
