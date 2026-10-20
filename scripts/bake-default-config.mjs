@@ -329,6 +329,14 @@ export function chiaviAllarmeBake(mancanti) {
   return chiavi.length ? chiavi : ['bake'];
 }
 
+/** Col server muto la chiave sul server c'è: «manca la chiave» mandava l'owner a cercarla dove non mancava (#1240). PURA. */
+export function titoloAllarmeBake(nomi, esitoServer) {
+  if (esitoDaRitentare(esitoServer)) {
+    return `Pubblicazione ferma: il server delle chiavi non ha risposto${nomi ? ` e il job non ha la chiave di riserva ${nomi}` : ''}`;
+  }
+  return nomi ? `Pubblicazione ferma: manca la chiave di default ${nomi}` : 'Pubblicazione ferma: nessuna chiave di default';
+}
+
 // Apre un feedback quando la costruzione sta per produrre una versione monca,
 // con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
 async function avvisa(mancanti, righe, esitoServer) {
