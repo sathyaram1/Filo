@@ -23,6 +23,12 @@ test('un sito che non manda mai il favicon finisce di caricarsi lo stesso, e la 
     await pagina.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
     // Il codice del sito che aspetta il caricamento parte, e la scheda non resta in caricamento.
     await expect(pagina).toHaveTitle('Caricata', { timeout: 5_000 });
+    // Nemmeno per il tetto di attesa del favicon (3 s): il caricamento non lo aspetta.
+    const attesa = await pagina.evaluate(() => {
+      const n = performance.getEntriesByType('navigation')[0];
+      return n.loadEventStart - n.domContentLoadedEventEnd;
+    });
+    expect(attesa).toBeLessThan(1500);
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
       return w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.isLoading();
