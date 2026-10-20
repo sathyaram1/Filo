@@ -503,6 +503,16 @@ test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non 
   }
 });
 
+// Il pannello si apre solo quando il main chiede qualcosa su una voce (#941): si rigioca quel messaggio.
+async function apriPannelloSu(app, shell, item) {
+  if (await shell.locator('#dl-panel').isVisible()) return;
+  await app.evaluate(({ BrowserWindow }, it) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.webContents.send('shell:download', { kind: 'ask', item: it });
+  }, item);
+  await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
+}
+
 async function sceltaDalPannello(shell, riga, testo) {
   await riga.click({ button: 'right' });
   const voce = shell.locator('#dl-panel .dl-row-menu .dl-row-menu-voce', { hasText: testo });
@@ -511,13 +521,12 @@ async function sceltaDalPannello(shell, riga, testo) {
   await expect(shell.locator('#dl-panel .dl-row-menu')).toHaveCount(0);
 }
 
-test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensato» porta al riquadro, poi «Rimetti il nome di prima»', async ({ app, shell, openTab, testServer }) => {
+test('pannello degli scaricamenti: tasto destro → «Dai un nome sensato» porta al riquadro, poi «Rimetti il nome di prima»', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   await modelloDeiNomi(app);
   const { rec, chiudi } = await scarica('scan_00231.pdf', BOLLETTA, { shell, openTab, testServer });
   try {
-    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
-    await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
+    await apriPannelloSu(app, shell, rec);
     const riga = shell.locator('#dl-panel .dl-row', { hasText: 'scan_00231.pdf' });
     await expect(riga).toBeVisible();
     // Esc chiude il menu della riga, non il pannello.
@@ -536,7 +545,7 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
     const nuovo = join(rec.savePath, '..', NOME_NUOVO);
     expect(existsSync(nuovo)).toBe(true);
 
-    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
+    await apriPannelloSu(app, shell, rec);
     const rinominata = shell.locator('#dl-panel .dl-row', { hasText: NOME_NUOVO });
     await expect(rinominata).toBeVisible({ timeout: 10000 });
     await sceltaDalPannello(shell, rinominata, 'Rimetti il nome di prima');

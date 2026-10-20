@@ -5,7 +5,7 @@
 // Electron emette `will-download` sulla sessione che ha originato la richiesta:
 // qui ascoltiamo la sessione di navigazione predefinita e quelle per-scheda
 // (privacy, proxy, incognito) e SEGUIAMO ogni download —
-// nome, dimensione, byte ricevuti, stato — così la barra in alto di Filo può
+// nome, dimensione, byte ricevuti, stato — così le superfici di Filo possono
 // mostrarne l'avanzamento fedele invece di lasciarlo "al buio".
 //
 // Intercetta il download che il browser fa partire da solo. "Salva
@@ -364,12 +364,43 @@ function persist() {
   } catch (_) { /* best-effort */ }
 }
 
+// ─── avanzamento sull'icona di Filo nella barra delle applicazioni ─────────
+// Nella fila di tab non c'è un tasto dei download (#941): fuori dalla home l'avanzamento lo dice l'icona, come
+// nei browser. Un programma in attesa di risposta non sta scaricando (#588); solo pause = barra ferma.
+function avanzamentoBarra(voci) {
+  let inCorso = 0; let inPausa = 0; let ricevuti = 0; let totali = 0;
+  for (const r of voci) {
+    if (!r || (r.state !== 'progressing' && r.state !== 'paused')) continue;
+    if (r.state === 'progressing') inCorso++; else inPausa++;
+    if (r.totalBytes > 0) { ricevuti += Math.min(r.receivedBytes || 0, r.totalBytes); totali += r.totalBytes; }
+  }
+  if (!inCorso && !inPausa) return { value: -1, mode: 'none' };
+  const frazione = totali > 0 ? ricevuti / totali : null;
+  if (!inCorso) return { value: frazione ?? 0, mode: 'paused' };
+  if (frazione === null) return { value: 2, mode: 'indeterminate' };
+  return { value: frazione, mode: 'normal' };
+}
+
+function aggiornaBarra(scope = '') {
+  try {
+    const voci = [];
+    for (const r of records.values()) if (scopeOf(r) === scope) voci.push(r);
+    const { value, mode } = avanzamentoBarra(voci);
+    const firma = `${mode}:${value.toFixed(3)}`;
+    for (const win of windowsOf(scope)) {
+      if (!win._filoTabs || win._filoBarraDownload === firma) continue;
+      try { win.setProgressBar(value, { mode }); win._filoBarraDownload = firma; } catch (_) {}
+    }
+  } catch (_) {}
+}
+
 // ─── broadcast verso la shell ───────────────────────────────────────────
 function broadcast(kind, rec) {
   // Una voce tolta dall'elenco non torna nella barra con l'esito tardivo del
   // suo annullamento.
-  if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); return; }
+  if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); aggiornaBarra(scopeOf(rec)); return; }
   const scope = scopeOf(rec);
+  aggiornaBarra(scope);
   try {
     const payload = { kind, item: publicRecord(rec) };
     // Solo le finestre di Filo: un popup di accesso è la pagina di un sito, e il
@@ -1098,6 +1129,7 @@ module.exports = {
   // per i test
   _records: records,
   _isMissing: isMissing,
+  _avanzamentoBarra: avanzamentoBarra,
   _forgetExists: forgetExists,
   MISSING_TEXT,
   _shortName: shortName,
