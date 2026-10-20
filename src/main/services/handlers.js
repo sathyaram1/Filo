@@ -2076,7 +2076,7 @@ async function executeFiloAction(action, opzioni = {}) {
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '',
+  domanda = '', spazioRilettura = null,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
