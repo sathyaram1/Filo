@@ -1530,6 +1530,7 @@
     showToast,
     mountToast,
     unmountToast,
+    sottoIlMenu,
     tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,
