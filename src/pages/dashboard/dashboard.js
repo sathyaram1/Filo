@@ -1230,45 +1230,61 @@
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
   async function submitMessage(text, { daModello = false } = {}) {
     if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
-    sending = true;
-    scrittoQui = true;
-    // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
-    chiudiRipresa();
-    aggiornaTasto();
-    const imagesToSend = pendingImages.slice();
-    const daFuori = testoDaFuori || imagesToSend.length > 0 || pendingFiles.length > 0;
+    await inviaComposto(prendiComposizione(text), { daModello });
+  }
+  // Quello che parte col messaggio, preso dalla barra che si svuota. `scritto`, `file` e `percorsi` servono a
+  // rimetterlo nella barra com'era (un seguito che non parte, #1296).
+  function prendiComposizione(text) {
+    const scritto = inputEl.value;
+    const incollato = testoDaFuori;
+    const immagini = pendingImages.slice();
+    const file = pendingFiles.slice();
+    const percorsi = new Map(immagini.filter((d) => percorsiImmagini.has(d)).map((d) => [d, percorsiImmagini.get(d)]));
+    const daFuori = incollato || immagini.length > 0 || file.length > 0;
     testoDaFuori = false;
-    const righeFile = [...pendingFiles.map((f) => f.percorso), ...imagesToSend.map((d) => percorsiImmagini.get(d))]
+    const righeFile = [...file.map((f) => f.percorso), ...immagini.map((d) => percorsi.get(d))]
       .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
-    if (righeFile.length) text = [text || (imagesToSend.length ? 'Descrivi questa immagine.' : ''), ...righeFile].filter(Boolean).join('\n');
+    if (righeFile.length) text = [text || (immagini.length ? 'Descrivi questa immagine.' : ''), ...righeFile].filter(Boolean).join('\n');
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
-    // Prima query dalla home → entra in stato thread.
-    if (body.dataset.state !== 'thread') goThread();
-
-    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
-    const domanda = text || 'Descrivi questa immagine.';
-    threadHistory.push({
-      role: 'user', text: domanda,
-      ...(imagesToSend.length ? { images: imagesToSend.length } : {}),
-      ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}),
-    });
-    const userBubble = makeBubble({ role: 'user', text: text || '' });
+    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi };
+  }
+  function bollaUtente(c) {
+    const userBubble = makeBubble({ role: 'user', text: c.text });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
-    imagesToSend.forEach((src, i) => {
+    c.immagini.forEach((src, i) => {
       const img = document.createElement('img');
       img.src = src;
       img.className = 'dash-bubble-img';
       attachImageLightbox(img, src);
       userBubble.insertBefore(img, userBubble.childNodes[i] || null);
     });
-    bubblesEl.appendChild(userBubble);
+    return userBubble;
+  }
+  // `bolla`: quella del seguito che era in attesa, che diventa la bolla del messaggio.
+  async function inviaComposto(c, { daModello = false, bolla = null } = {}) {
+    sending = true;
+    scrittoQui = true;
+    // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
+    chiudiRipresa();
+    aggiornaTasto();
+    // Prima query dalla home → entra in stato thread.
+    if (body.dataset.state !== 'thread') goThread();
+
+    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
+    const domanda = c.text || 'Descrivi questa immagine.';
+    threadHistory.push({
+      role: 'user', text: domanda,
+      ...(c.immagini.length ? { images: c.immagini.length } : {}),
+      ...(daModello ? { daModello: true } : {}), ...(c.daFuori ? { daFuori: true } : {}),
+    });
+    if (!bolla) bubblesEl.appendChild(bollaUtente(c));
     Coda.segnaGiorni();
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    await runTurnAndContinue({ userMessage: domanda, images: imagesToSend, daModello, daFuori });
+    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
