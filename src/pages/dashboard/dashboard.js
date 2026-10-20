@@ -1357,7 +1357,7 @@
     aggiornaTasto();
     send({ type: MSG.FILO_CHAT_STOP, reqId: t.reqId }).catch(() => {});
   }
-  stopBtn.addEventListener('click', () => { fermaTurno(); inputEl.focus(); });
+  stopBtn.addEventListener('click', () => { if (!quadratoAppena()) fermaTurno(); inputEl.focus(); });
   aggiornaTasto();
   // Il tasto destro sul blocco che lavora e sul tasto d'invio (letto da src/content/content.js): le stesse cose dei
   // tasti, negli stessi momenti. Su un blocco finito, srotolare e riavvolgere come col clic sul gomitolo.
