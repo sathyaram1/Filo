@@ -246,7 +246,9 @@ dall'owner e dal server. Campi:
 Il formato per l'owner è quello del report delle 102 domande: contesto,
 problema in pratica, opzioni con pro e contro, scelta consigliata. Nessun nome
 di file o di funzione nel testo per l'owner. Prima di scriverla si applica
-`.claude/skills/unslop/SKILL.md`.
+`.claude/skills/unslop/SKILL.md`. La validazione comune, quella dello script e
+del server, rifiuta nei campi per l'owner un nome di file di codice, una
+lineetta o un pro vuoto, e dice quale campo; `notePerAgenti` resta libero.
 
 ### 3.2 Note per gli agenti
 

@@ -86,15 +86,17 @@ function domandaDelModello() {
   assert.ok(m, 'il pezzo ha il modello JSON della domanda');
   const d = JSON.parse(m[1].split('<payload.id>').join(FEEDBACK_ID));
   d.gruppo = 'guasto: filo-security';
-  d.contesto = 'Clonavo il server per il lavoro. Il messaggio: «fatal: unable to access: 403».';
+  d.contesto = 'Clonavo il server per il lavoro: GitHub ha risposto che a questa sessione manca il permesso di leggerlo.';
+  d.notePerAgenti = 'git-server clone: «fatal: unable to access: 403». Respinto da GitHub, non dal proxy.';
   return d;
 }
 
-test('il modello della domanda passa i controlli del server, con le tre strade e il feedback legato', () => {
+test('il modello della domanda passa i controlli del server, con le strade, la riparazione e il feedback legato', () => {
   const v = D.validaDomanda(domandaDelModello(), { conOrigine: false });
   assert.ok(v.ok, `${v.errore}: ${v.dettaglio}`);
   assert.deepEqual(v.domanda.opzioni.map((o) => o.azione), [
     { tipo: 'riprendi', feedbackId: FEEDBACK_ID },
+    { tipo: 'compito' },
     { tipo: 'approva_locale', feedbackId: FEEDBACK_ID },
     { tipo: 'archivia', feedbackId: FEEDBACK_ID },
   ]);
@@ -148,8 +150,34 @@ test('col biglietto della routine la domanda arriva al canale col gruppo del gua
   assert.equal(a.body.ticket, BIGLIETTO);
   assert.equal(a.body.data.domanda.gruppo, 'guasto: filo-security');
   assert.deepEqual(a.body.data.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);
-  assert.ok(a.body.data.domanda.opzioni.every((o) => o.azione.feedbackId === FEEDBACK_ID));
+  assert.ok(a.body.data.domanda.opzioni.every((o) => o.azione.tipo === 'compito' || o.azione.feedbackId === FEEDBACK_ID));
   assert.ok(!('origine' in a.body.data.domanda), 'l’origine la mette il server dal biglietto');
+});
+
+// #1455: com'era D-89, col nome di file e la lineetta nel contesto. Si ferma prima del canale, e chi chiede sa dove.
+test('un nome di file o una lineetta nel testo per l’owner: rifiutata prima del canale, col campo; la pulita parte', async () => {
+  for (const [contesto, segno] of [
+    ['Il clone fallisce in scripts/routine-channel.mjs.', /«contesto» nomina routine-channel\.mjs/],
+    ['Il clone fallisce — GitHub risponde di no.', /«contesto» ha una lineetta/],
+  ]) {
+    arrivate = [];
+    const file = join(CARTELLA, 'guasto-sporca.json');
+    writeFileSync(file, JSON.stringify({ ...domandaDelModello(), contesto }), 'utf8');
+    const r = await chiedi(file);
+    assert.equal(r.code, 1, r.stdout);
+    assert.match(r.stderr, /RIFIUTATO: testo_non_per_owner: /);
+    assert.match(r.stderr, segno);
+    assert.match(r.stderr, /Non ho mandato niente/);
+    assert.equal(arrivate.length, 0, 'il canale non è stato chiamato');
+  }
+  arrivate = [];
+  risposta = { status: 200, body: { ok: true, id: 'D-10', num: 'D-10', numero: 10 } };
+  const file = join(CARTELLA, 'guasto-pulita.json');
+  writeFileSync(file, JSON.stringify(domandaDelModello()), 'utf8');
+  const r = await chiedi(file);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /OK: domanda D-10 aperta\./);
+  assert.match(arrivate[0].body.data.domanda.notePerAgenti, /fatal: unable to access: 403/, 'il messaggio esatto arriva nelle note');
 });
 
 test('se il server rifiuta la domanda, chi chiede legge il motivo esatto: è quello che le istruzioni fanno ricopiare', async () => {
