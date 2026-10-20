@@ -230,9 +230,21 @@ test('tema scuro: l’avviso col puntatore sopra si schiarisce appena e il testo
   expect(luce(testo) - luce(sopra)).toBeGreaterThan(100);
 });
 
+// Le voci del menu con un punto (centro o angoli) che non è del menu: qualcosa le copre.
+const vociCoperte = (page) => menuDi(page).valuta(() => [...document.querySelectorAll('.sn-menu .sn-menu-item')].filter((v) => {
+  const r = v.getBoundingClientRect();
+  const punti = [[r.left + 2, r.top + 2], [r.right - 2, r.top + 2], [r.left + 2, r.bottom - 2], [r.right - 2, r.bottom - 2],
+    [(r.left + r.right) / 2, (r.top + r.bottom) / 2]];
+  return punti.some(([x, y]) => !document.elementFromPoint(x, y)?.closest('.sn-menu'));
+}).map((v) => v.textContent.trim()));
+
 // Prendendo il puntatore l'avviso prende anche il tasto destro: il menu deve essere il suo, come nella barra.
-test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la scelta lo chiude', async ({ openTab, testServer }) => {
+// #1453: il menu nasceva sotto l'avviso, che ne copriva «Chiudi», e la guardia dei clic coperti lo fermava.
+test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la scelta lo chiude', async ({ shell, openTab, testServer }) => {
+  // Durata 0: l'avviso se ne va solo se «Chiudi» funziona.
+  await impostaDurata(shell, 0);
   const page = await testServer.openReady(openTab, PAGE);
+  await page.waitForTimeout(300);
   await copiaUrl(page);
   const avviso = page.locator('.sn-toast');
   await puntatoreSopra(page, avviso);
@@ -240,8 +252,38 @@ test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la sce
   await page.mouse.up({ button: 'right' });
   const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Chiudi']);
+  await expect.poll(() => vociCoperte(page), { message: 'l’avviso copre il menu nato su di lui' }).toEqual([]);
+  await shot(page, 'avviso-1453-menu-sopra-l-avviso');
   await voci.first().click();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});
+
+// Stessa causa, altra porta: un menu aperto dalla pagina accanto alla pila le sta sopra, e la voce che cade
+// sull'avviso parte.
+test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avviso parte', async ({ shell, openTab, testServer }) => {
+  await impostaDurata(shell, 0);
+  const page = await testServer.openReady(openTab, PAGE.replace('</body>',
+    '<a id="basso" href="https://example.com/basso" style="position:fixed;right:40px;bottom:3px;font-size:12px;line-height:14px">in fondo</a></body>'));
+  await page.waitForTimeout(300);
+  await copiaUrl(page);
+  const avviso = page.locator('.sn-toast');
+  await expect(avviso).toHaveClass(/sn-toast-visible/);
+  await page.waitForTimeout(250);
+  const a = await avviso.boundingBox();
+  // Il collegamento sta sotto l'avviso: il menu si apre verso l'alto e la sua ultima voce cade sull'avviso.
+  await page.locator('#basso').click({ button: 'right' });
+  const voce = menuDi(page).voce('Invia feedback');
+  await expect(voce).toBeVisible();
+  const v = await voce.boundingBox();
+  const x = Math.max(a.x, v.x) + 6;
+  const y = (Math.max(a.y, v.y) + Math.min(a.y + a.height, v.y + v.height)) / 2;
+  expect(x < Math.min(a.x + a.width, v.x + v.width) && y > a.y && y < a.y + a.height, 'la voce non cade sull’avviso').toBe(true);
+  await expect.poll(() => vociCoperte(page), { message: 'l’avviso copre il menu' }).toEqual([]);
+  await page.mouse.move(x, y, { steps: 3 });
+  await page.waitForTimeout(150);
+  await page.mouse.click(x, y);
+  await expect(page.locator('.sn-fb-overlay')).toBeVisible();
+  await expect(page.locator('.sn-toast', { hasText: 'Il menu era coperto' })).toHaveCount(0);
 });
 
 test('editor: tasto destro sull’avviso con «Annulla» offre «Annulla» e «Chiudi», e «Annulla» fa quello che fa il pulsante', async ({ openTab }) => {
