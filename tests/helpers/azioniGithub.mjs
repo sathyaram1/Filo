@@ -187,7 +187,11 @@ export function eseguiPasso(script, { env = {}, file = {} } = {}) {
       const i = riga.indexOf('=');
       if (i > 0) valori[riga.slice(0, i)] = riga.slice(i + 1);
     }
-    return { stato: r.status, registro: `${r.stdout || ''}${r.stderr || ''}`, uscite: valori, riepilogo: readFileSync(riepilogo, 'utf8'), dir };
+    const letti = {};
+    for (const rel of leggi) {
+      try { letti[rel] = readFileSync(join(dir, rel), 'utf8'); } catch { letti[rel] = ''; }
+    }
+    return { stato: r.status, registro: `${r.stdout || ''}${r.stderr || ''}`, uscite: valori, riepilogo: readFileSync(riepilogo, 'utf8'), letti };
   } finally {
     togliCartella(dir);
   }
