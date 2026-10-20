@@ -289,6 +289,7 @@ test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avvi
   const y = (Math.max(a.y, v.y) + Math.min(a.y + a.height, v.y + v.height)) / 2;
   expect(x < Math.min(a.x + a.width, v.x + v.width) && y > a.y && y < a.y + a.height, 'la voce non cade sull’avviso').toBe(true);
   await expect.poll(() => vociCoperte(page), { message: 'l’avviso copre il menu' }).toEqual([]);
+  await shot(page, 'avviso-1453-menu-accanto-all-avviso');
   await page.mouse.move(x, y, { steps: 3 });
   await page.waitForTimeout(150);
   await page.mouse.click(x, y);
