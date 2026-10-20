@@ -3644,7 +3644,10 @@ class TabManager {
   // `daScheda`: la pagina dove l'utente ha scelto il link (menu di riserva, una pagina di Filo, l'assistente sopra una
   // pagina), dove compare l'avviso che lo precede (#965).
   apriDaCollegamento(url, { sfondo = false, daScheda = null, gesto = false, fromUrl = '' } = {}) {
-    if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
+    if (isWebUnsafeNav(url)) {
+      const pagina = fromUrl || (daScheda && !daScheda.isInternal ? urlDellaPagina(daScheda.view && daScheda.view.webContents) : '');
+      return fermaNavigazione(url, { win: this.win, pagina });
+    }
     if (this._maybeBlockNavigation(null, url)) return false;
     const origine = /^https?:/i.test(String(fromUrl || '')) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
     const apri = (segna) => {
