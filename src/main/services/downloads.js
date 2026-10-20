@@ -228,10 +228,12 @@ function spostaFile(src, dst) {
 }
 
 // Il file in quarantena non serve più (rifiutato, rimosso, o app riavviata).
+// Solo dentro la quarantena: un percorso letto dal disco può venire da un backup, e non si cancella niente fuori.
 function rimuoviQuarantena(rec) {
   const p = rec && rec._quarantena && rec.savePath;
   if (!p) return;
-  try { fs.unlinkSync(p); } catch (_) {}
+  const dentro = path.relative(quarantineDir(), path.resolve(String(p)));
+  if (dentro && !dentro.startsWith('..') && !path.isAbsolute(dentro)) { try { fs.unlinkSync(p); } catch (_) {} }
   forgetExists(p);
   rec._quarantena = false;
 }
@@ -321,39 +323,57 @@ function listRecords(scope = '') {
 }
 
 // ─── persistenza ─────────────────────────────────────────────────────────
+// Una voce letta dal disco, che può venire anche da un backup importato: niente di vivo sopravvive al riavvio.
+function daDisco(raw) {
+  const rec = { ...raw };
+  // Una conferma non sopravvive al riavvio: chi l'avrebbe data non è più
+  // davanti a quell'avviso. Il programma resta fuori dalla cartella e la
+  // voce dice che non è stato scaricato (#588).
+  // La marca si ricalcola a ogni lettura perché l'elenco dei tipi cresce:
+  // un .iso scaricato prima che ci entrasse si aprirebbe senza conferma
+  // (#588.1). Solo in aggiunta: una marca già data non si toglie. Conta anche il
+  // file su disco, che in una voce di un backup può chiamarsi altrimenti.
+  if (rec.exe !== true) {
+    try { rec.exe = ESE().eEseguibile(rec.filename) || (!!rec.savePath && ESE().eEseguibile(path.basename(String(rec.savePath)))); } catch (_) { rec.exe = false; }
+    if (!rec.site) { try { rec.site = ESE().sito(rec.url); } catch (_) {} }
+  }
+  if (rec.state === 'pending') {
+    rec._quarantena = true;
+    rimuoviQuarantena(rec);
+    rec.state = 'cancelled'; rec.savePath = ''; rec.paused = false; rec.canResume = false;
+  } else if (NON_TERMINAL.has(rec.state)) {
+    // Un download che risultava "in corso" alla chiusura non può più
+    // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
+    rec.state = 'interrupted'; rec.paused = false; rec.canResume = false;
+  }
+  return rec;
+}
+
 async function loadHistory() {
   if (loaded) return;
   loaded = true;
   try {
     const res = await chrome.storage.local.get(storageKey());
     const arr = res[storageKey()];
-    if (Array.isArray(arr)) {
-      for (const raw of arr) {
-        if (!raw || !raw.id) continue;
-        const rec = { ...raw };
-        // Una conferma non sopravvive al riavvio: chi l'avrebbe data non è più
-        // davanti a quell'avviso. Il programma resta fuori dalla cartella e la
-        // voce dice che non è stato scaricato (#588).
-        // La marca si ricalcola a ogni avvio perché l'elenco dei tipi cresce:
-        // un .iso scaricato prima che ci entrasse si aprirebbe senza conferma
-        // (#588.1). Solo in aggiunta: una marca già data non si toglie.
-        if (rec.exe !== true) {
-          try { rec.exe = ESE().eEseguibile(rec.filename); } catch (_) { rec.exe = false; }
-          if (!rec.site) { try { rec.site = ESE().sito(rec.url); } catch (_) {} }
-        }
-        if (rec.state === 'pending') {
-          rec._quarantena = true;
-          rimuoviQuarantena(rec);
-          rec.state = 'cancelled'; rec.savePath = ''; rec.paused = false; rec.canResume = false;
-        } else if (NON_TERMINAL.has(rec.state)) {
-          // Un download che risultava "in corso" alla chiusura non può più
-          // proseguire: il suo DownloadItem è morto. Lo marchiamo interrotto.
-          rec.state = 'interrupted'; rec.paused = false; rec.canResume = false;
-        }
-        records.set(rec.id, rec);
-      }
-    }
+    for (const raw of Array.isArray(arr) ? arr : []) if (raw && raw.id) records.set(raw.id, daDisco(raw));
   } catch (_) { /* best-effort: senza cronologia si riparte da zero */ }
+}
+
+// L'elenco unito dall'importazione (#1256) entra da qui, non dal disco: questa mappa è la fonte di verità, e un
+// salvataggio da qui avrebbe cancellato le voci del backup. Quelle di qui restano com'erano; oltre il tetto escono le
+// più vecchie, come la conferma ha già detto.
+function importa(lista) {
+  if (!Array.isArray(lista)) return 0;
+  let nuove = 0;
+  for (const raw of lista) {
+    if (!raw || !raw.id || records.has(raw.id)) continue;
+    records.set(raw.id, daDisco(raw));
+    nuove++;
+  }
+  const oltre = listRecords('').filter((r) => !NON_TERMINAL.has(r.state) && r.state !== 'pending').slice(HISTORY_LIMIT);
+  for (const r of oltre) records.delete(r.id);
+  if (nuove || oltre.length) { persist(); notifyTabs(); }
+  return nuove;
 }
 
 function persist() {
@@ -1143,6 +1163,8 @@ function resume(id, scope = '') {
 
 module.exports = {
   init,
+  importa,
+  HISTORY_LIMIT,
   rinominato,
   percorsoDi,
   rimettiNome,

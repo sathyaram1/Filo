@@ -345,20 +345,42 @@
         prev.chats ? conta(prev.chats, 'chat con Filo', 'chat con Filo') : '',
         prev.pagine ? conta(prev.pagine, 'pagina visitata', 'pagine visitate') : '',
       ].filter(Boolean).join(' e ');
-      // Quello che del file non entra si dice prima del sì, col numero (#1088).
+      // Quello che del file non entra si dice prima del sì, col numero (#1088), lista per lista col suo tetto (#1256).
+      const fuori = (n, tetto, mie, chiave) => (n ? I18n.t(`security_import_${chiave}_out`)
+        .replace('%1', String(n))
+        .replace('%2', String(tetto || ''))
+        + (mie ? ' ' + I18n.t(`security_import_${chiave}_out_mine`).replace('%1', String(mie)) : '') : '');
+      // Il tetto di spesa del backup, più largo, si offre e lo mette solo il suo bottone (#1050).
+      const tetto = prev.tettoSpesa && typeof prev.tettoSpesa.backup === 'number' ? prev.tettoSpesa : null;
+      const euro = (n) => (Number(n) > 0
+        ? `${Number(n).toLocaleString('it-IT', { minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2, maximumFractionDigits: 2 })} €`
+        : 'senza limite');
+      const bottoneTetto = tetto ? I18n.t(tetto.backup > 0 ? 'security_import_tetto_btn' : 'security_import_tetto_btn_senza') : '';
       const manca = [
+        prev.vociPerse ? I18n.t('security_import_voci_perse').replace('%1', String(prev.vociPerse)) : '',
         prev.immaginiPerse ? I18n.t('security_import_images_lost').replace('%1', String(prev.immaginiPerse)) : '',
         prev.filoPerso ? I18n.t('security_import_filo_lost') : '',
-        prev.pagineFuori ? I18n.t('security_import_pages_out')
-          .replace('%1', String(prev.pagineFuori))
-          .replace('%2', String(prev.tettoPagine || ''))
-          + (prev.pagineMieFuori ? ' ' + I18n.t('security_import_pages_out_mine').replace('%1', String(prev.pagineMieFuori)) : '') : '',
+        fuori(prev.pagineFuori, prev.tettoPagine, prev.pagineMieFuori, 'pages'),
+        fuori(prev.appuntiFuori, prev.tettoAppunti, prev.appuntiMieFuori, 'appunti'),
+        fuori(prev.downloadFuori, prev.tettoDownload, prev.downloadMieFuori, 'download'),
+        tetto ? I18n.t(tetto.backup > 0 ? 'security_import_tetto_backup' : 'security_import_tetto_senza')
+          .replace('%1', () => euro(tetto.tenuto))
+          .replace('%2', () => euro(tetto.backup))
+          .replace('%3', () => bottoneTetto) : '',
         prev.chiavi === false ? I18n.t('security_import_senza_chiavi') : '',
         prev.proxySenzaCredenziali ? I18n.t('security_import_proxy_senza_credenziali') : '',
       ].filter(Boolean);
+      const escono = [
+        prev.pagineMieFuori ? I18n.t('security_import_escono_pagine') : '',
+        prev.appuntiMieFuori ? I18n.t('security_import_escono_appunti') : '',
+        prev.downloadMieFuori ? I18n.t('security_import_escono_download') : '',
+      ].filter(Boolean);
+      const elencoEscono = escono.length > 1 ? `${escono.slice(0, -1).join(', ')} e ${escono[escono.length - 1]}` : escono[0] || '';
       // Sostituzioni a funzione: un `$&` o un `%2` nel nome del file non pescano nella frase di Filo.
       const testo = I18n.t('security_import_confirm_text')
-        .replace('%6', () => I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
+        .replace('%6', () => (elencoEscono
+          ? I18n.t('security_import_escono_mie').replace('%1', () => elencoEscono)
+          : I18n.t('security_import_nulla_perso')))
         .replace('%2', () => when)
         .replace('%3', () => sezioni)
         .replace('%4', () => immagini)
@@ -376,6 +398,7 @@
           text,
           parti,
           okLabel: I18n.t('security_import_confirm_ok'),
+          altroLabel: bottoneTetto,
         })
         : true;
       if (!ok) return;
@@ -383,6 +406,7 @@
       const res = await chrome.runtime.sendMessage({
         type: MSG.IMPORT_DATA_APPLY,
         token: prev.token,
+        tettoDelBackup: ok === 'altro',
       });
       if (res && res.ok) {
         showImportHint(I18n.t('security_import_done'), false);

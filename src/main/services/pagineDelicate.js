@@ -108,6 +108,12 @@ async function elencoCampi() {
   return [...salvati].sort();
 }
 
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, dimentica, elencoCampi };
+// Dopo un'importazione (#1256): i siti del backup si aggiungono a quelli in memoria, così la prossima scrittura li tiene.
+function rileggi() {
+  caricati = null;
+  return carica();
+}
+
+globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, rileggi, dimentica, elencoCampi };
 
 module.exports = globalThis.SN_DELICATE;

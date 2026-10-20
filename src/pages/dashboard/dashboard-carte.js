@@ -1008,6 +1008,7 @@
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
       else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
+      else if (msg.type === MSG.DATI_IMPORTATI) caricaMazzi().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
       else if (msg.type === MSG.TAB_IN_VISTA && msg.inVista) {
         caricaEditor().catch(() => {});
