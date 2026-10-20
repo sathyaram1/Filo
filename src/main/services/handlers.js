@@ -5495,7 +5495,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       threadMessages.push(Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }));
       results.forEach((x, i) => {
         const esito = toolResultText(x, { risposta: diRisposta });
-        threadMessages.push(Tools.toolMessage(x.action._callId, fraLeNote && i === results.length - 1 ? `${esito} ${RISPOSTA_FRA_LE_NOTE}` : esito));
+        const coda = fraLeNote && i === results.length - 1 ? RISPOSTA_FRA_LE_NOTE : '';
+        threadMessages.push(Tools.toolMessage(x.action._callId, coda ? `${esito} ${coda}` : esito));
+        const o = x.rendered && x.rendered._output;
+        if (o && o.chatRead != null && o.found && typeof o.transcript === 'string') {
+          riletture.push({ pos: threadMessages.length - 1, x, coda, risposta: diRisposta });
+        }
       });
       if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; break; }
     }
