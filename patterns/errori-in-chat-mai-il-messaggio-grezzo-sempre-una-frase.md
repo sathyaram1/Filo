@@ -42,7 +42,9 @@ ha funzionato e cosa fare**.
   «Modifica») e `SN_POPUP.avvisoErrore` o `showToast(…, { rimedio })` (avvisi, che
   col tasto durano di più e lo offrono anche dal tasto destro). Il tasto in
   evidenza è quello che toglie l'ostacolo; «Riprova» resta, secondario, per
-  dopo (#663, #828.1). Sentinella: `tests/unit/rimedioOvunque.test.mjs`.
+  dopo (#663, #828.1); le chat delle pagine di Filo (home, Editor, mazzi) fanno
+  lo stesso coi loro tasti. Sentinella: `tests/unit/rimedioOvunque.test.mjs`,
+  prove per superficie in `tests/rimedio-ovunque.spec.mjs`.
 - **Dove:** chat della home (`src/pages/dashboard/dashboard.js` +
   `src/main/services/handlers/filo.js`), chat dei mazzi
   (`src/main/services/handlers/scryfall.js`), assistente laterale
