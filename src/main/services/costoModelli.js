@@ -34,8 +34,8 @@ async function listino({ forza = false } = {}) {
   if (!forza && !ultimo && Date.now() - fallitoAt < RIPROVA_MS) return null;
   if (!inVolo) {
     inVolo = scarica().then((l) => {
-      ultimo = { listino: l, at: Date.now() };
-      return l;
+      ultimo = { ...l, at: Date.now() };
+      return l.listino;
     }, (e) => {
       fallitoAt = Date.now();
       console.warn('[Filo] listino dei modelli non letto:', (e && e.message) || e);
