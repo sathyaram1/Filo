@@ -5571,13 +5571,26 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let passi = 0;
   // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
   // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
-  const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false };
-  if (reasoningReqId) {
-    turniInCorso.set(String(reasoningReqId), turno);
-    const prima = stopPrimaDelTurno.get(String(reasoningReqId));
-    stopPrimaDelTurno.delete(String(reasoningReqId));
-    if (prima && prima.wcId === turno.wcId) turno.fermato = true;
-  }
+  // I seguiti (#1296) entrano prima di ogni chiamata al modello, dopo gli esiti del passo prima: sono parole
+  // dell'utente come la domanda, e lo sanno le uscite (#810, #530, #868.6), l'archivio e la scheda.
+  const seguitiLetti = [];
+  const leggiSeguiti = async () => {
+    for (const s of turno.seguiti.splice(0)) {
+      turno.letti.add(s.id);
+      seguitiLetti.push(s.id);
+      threadMessages.push({ role: 'user', content: `${s.testo}\n\n${NOTA_SEGUITO}` });
+      paroleUtente = `${paroleUtente}\n${s.testo}`;
+      richiesta = `${richiesta}\n${s.testo}`;
+      domandaDiAdesso = domandaDiAdesso ? `${domandaDiAdesso}\n${s.testo}` : s.testo;
+      push('filo:action', { kind: 'seguito', id: s.id });
+      if (!chatId) continue;
+      try {
+        const dopo = await appendToChatArchive(chatId, { role: 'user', text: s.testo });
+        const eid = dopo && Array.isArray(dopo.eids) ? dopo.eids[dopo.eids.length - 1] : '';
+        if (eid) fontiTurno.push(eid);
+      } catch (e) { console.warn('[Filo] seguito non archiviato', e?.message || e); }
+    }
+  };
   // I pezzi vecchi ripescati entrano in coda al contesto, e il blocco di attività lo dice come una ricerca (#868).
   const ricordi = await entroIl(ricordiP, ATTESA_RICORDI_MS, []);
   if (ricordi.length) {
