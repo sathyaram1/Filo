@@ -468,4 +468,62 @@ test.describe('il menu nello strato', () => {
     await strato.mouse.wheel(0, 400);
     await chiusoLoStrato(app);
   });
+
+  test('la finestra che si accorcia lascia il menu aperto e lo fa rientrare, come il menu di oggi (#500)', async ({ app, openTab, testServer }) => {
+    await pronto(app);
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;font:16px sans-serif;height:4000px">
+      <div style="height:55vh"></div><a id="link" href="https://example.com/a">un collegamento</a></body>`);
+    await page.locator('#link').click({ button: 'right' });
+    await apertoNelloStrato(app, page);
+    const menu = menuDi(page);
+    const prima = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const b = w.getBounds();
+      w.setBounds({ ...b, height: b.height - 340 });
+      return b;
+    });
+    try {
+      // Lo strato segue la scheda: stessa area, ancora in cima, e il menu dentro la finestra con l'ultima voce a portata.
+      await expect.poll(async () => { const s = await statoDelloStrato(app); return !!s && s.aperto && s.visibile && s.inCima && s.bounds.height === s.area.height && s.area.height < prima.height - 300; }).toBe(true);
+      await expect.poll(async () => {
+        const r = await menu.principale.boundingBox();
+        return !!r && r.y >= 0 && r.y + r.height <= await menu.valuta(() => innerHeight) + 1;
+      }).toBe(true);
+      await menu.voce('Copia URL').click();
+      await chiusoLoStrato(app);
+      await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://example.com/a');
+    } finally {
+      await app.evaluate(({ BrowserWindow }, b) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setBounds(b), prima);
+    }
+  });
+
+  test('la pagina che scorre da tastiera o da sola chiude il menu normale, quello di una selezione resta', async ({ app, openTab, testServer }) => {
+    await pronto(app);
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;font:16px sans-serif;height:4000px">
+      <p id="testo" style="margin:40px">Una frase da selezionare qui.</p>
+      <div style="height:30vh"></div><a id="link" href="https://example.com/a">un collegamento</a></body>`);
+    await page.locator('#link').click({ button: 'right' });
+    await apertoNelloStrato(app, page);
+    await page.keyboard.press('PageDown');
+    await chiusoLoStrato(app);
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator('#link').click({ button: 'right' });
+    await apertoNelloStrato(app, page);
+    await page.evaluate(() => window.scrollBy(0, 200));
+    await chiusoLoStrato(app);
+
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      const r = document.createRange();
+      r.selectNodeContents(document.getElementById('testo'));
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+    });
+    await page.locator('#testo').click({ button: 'right' });
+    await apertoNelloStrato(app, page);
+    await page.evaluate(() => window.scrollBy(0, 200));
+    await page.waitForTimeout(500);
+    expect((await statoDelloStrato(app)).aperto, 'il menu della selezione resta aperto').toBe(true);
+  });
 });
