@@ -29,7 +29,8 @@ async function contaLaRete(app, pagine = {}) {
       const u = new URL(req.url);
       const html = pg[u.hostname + u.pathname];
       if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.hostname === '127.0.0.1') return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      return Response.error();
     };
     for (const s of ['http', 'https']) {
       try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
