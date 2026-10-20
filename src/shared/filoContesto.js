@@ -337,6 +337,63 @@
     return out.filter((t) => t.righe.length).map((t) => ({ ...t, testo: t.righe.join('\n') }));
   }
 
+  // I tratti vecchi che una risposta davanti al modello ha già con sé: ripescati da soli, o la conversazione riletta.
+  const diCercaChat = (a) => !!a && String(a.type || '').toUpperCase() === 'CERCA_CHAT' && !!a._output && typeof a._output === 'object';
+  function giaDavanti(azioni) {
+    const out = { tratti: new Set(), chat: new Set() };
+    for (const a of Array.isArray(azioni) ? azioni : []) {
+      if (!diCercaChat(a)) continue;
+      const o = a._output;
+      if (o.automatica) for (const r of Array.isArray(o.results) ? o.results : []) if (r && r.id && r.date) out.tratti.add(`${r.id}|${r.date}`);
+      if (o.chatRead != null && o.found) out.chat.add(String(o.chatRead));
+    }
+    return out;
+  }
+
+  // Si ripesca solo quello che il modello non ha davanti, nel tratto o con una risposta (#1301: ripescato di nuovo a ogni
+  // messaggio sullo stesso argomento, lo stesso scambio arrivava tante volte quanti i messaggi). `azioni`: quelle i cui
+  // esiti il modello ha davanti in questo turno.
+  function daRipescare(vecchi, { davanti = [], azioni = [] } = {}) {
+    const nellaFinestra = new Set((Array.isArray(davanti) ? davanti : []).filter(Boolean).map(chiave));
+    const gia = giaDavanti(azioni);
+    return tratti(vecchi).filter((t) => !nellaFinestra.has(t.chiave) && !gia.tratti.has(t.chiave) && !gia.chat.has(t.chat));
+  }
+
+  // Quello che una ricerca, un ricordo o una rilettura avevano copiato da una conversazione o da una pagina poi
+  // cancellata non torna più al modello (#1301): ogni esito si rilegge contro quello che c'è ancora, qualunque sia la
+  // copia (la memoria di Filo, la storia di una scheda). `paginaEsiste(p)`: p è una pagina come la dà CERCA_CHAT.
+  function senzaCancellati(azioni, { chatEsiste = null, paginaEsiste = null } = {}) {
+    if (!Array.isArray(azioni)) return azioni;
+    const c = typeof chatEsiste === 'function' ? chatEsiste : () => true;
+    const p = typeof paginaEsiste === 'function' ? paginaEsiste : () => true;
+    let toccate = false;
+    const out = azioni.map((a) => {
+      if (!diCercaChat(a)) return a;
+      const o = a._output;
+      if (o.chatRead != null) {
+        if (!o.found || c(String(o.chatRead))) return a;
+        toccate = true;
+        return { ...a, _output: { chatRead: o.chatRead, found: false } };
+      }
+      const results = Array.isArray(o.results) ? o.results.filter((r) => !r || r.id == null || c(String(r.id))) : null;
+      const pagine = Array.isArray(o.pagine) ? o.pagine.filter((x) => !x || p(x)) : null;
+      const tolte = (results ? o.results.length - results.length : 0) + (pagine ? o.pagine.length - pagine.length : 0);
+      if (!tolte) return a;
+      toccate = true;
+      const resta = (results && results.length) || (pagine && pagine.length) || (Array.isArray(o.cambi) && o.cambi.length);
+      const n = { ...o, cancellate: (Number(o.cancellate) || 0) + tolte };
+      if (results) n.results = results;
+      if (pagine) { if (pagine.length) n.pagine = pagine; else delete n.pagine; }
+      // Un pezzo venuto da fuori segue la sua conversazione; uno senza (esiti di prima) resta finché resta qualcosa.
+      if (Array.isArray(o.daFuori)) {
+        const df = o.daFuori.filter((x) => x && (x.chat != null ? c(String(x.chat)) : resta));
+        if (df.length) n.daFuori = df; else delete n.daFuori;
+      }
+      return { ...a, _output: n };
+    });
+    return toccate ? out : azioni;
+  }
+
   // Quel che si manda all'indice: abbastanza per riconoscere l'argomento, mai un messaggio enorme intero.
   function testoPerIndice(t) {
     const s = `${t.titolo ? `${t.titolo}\n` : ''}${t.testo}`;
