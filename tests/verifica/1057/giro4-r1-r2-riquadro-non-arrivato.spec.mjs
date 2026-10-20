@@ -1,4 +1,5 @@
-// Verifica #1057 giro 4: sonde sui riquadri dello stesso sito che non arrivano o che non si toccano.
+// Verifica #1057 giro 4. r1: un riquadro dello stesso sito non ancora arrivato (o che non arriva mai) resta senza
+// protezione; r2: nei riquadri arrivati della pagina i permessi mai decisi non si leggono «da chiedere».
 import { test, expect, _electron as electron } from '@playwright/test';
 import { rmSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -69,11 +70,13 @@ const PRESA = {
   'stesso sito che risponde 204': `(async () => { const f = document.createElement('iframe'); f.src = '/niente'; document.body.append(f); await new Promise((r) => setTimeout(r, 1500)); return window[window.length - 1]; })()`,
   'stesso sito che scarica un file': `(async () => { const f = document.createElement('iframe'); f.src = '/scarica'; document.body.append(f); await new Promise((r) => setTimeout(r, 1500)); return window[window.length - 1]; })()`,
   'srcdoc, preso subito': `(() => { const f = document.createElement('iframe'); f.srcdoc = '<p>ciao</p>'; document.body.append(f); return window[window.length - 1]; })()`,
+  'stesso sito arrivato': `(async () => { const f = document.createElement('iframe'); f.src = '/modulo'; await new Promise((ok) => { f.onload = ok; document.body.append(f); }); return window[window.length - 1]; })()`,
   'srcdoc, dopo il load': `(async () => { const f = document.createElement('iframe'); f.srcdoc = '<p>ciao</p>'; await new Promise((ok) => { f.onload = ok; document.body.append(f); }); return window[window.length - 1]; })()`,
   'radice ombra per indice accanto a uno in volo': `(async () => { const l = document.createElement('iframe'); l.src = '/niente'; document.body.append(l); await new Promise((r) => setTimeout(r, 1500)); const h = document.createElement('div'); document.body.appendChild(h); h.attachShadow({ mode: 'closed' }).appendChild(document.createElement('iframe')); return window[window.length - 1]; })()`,
 };
 for (const [nome, presa] of Object.entries(PRESA)) {
-  test(`schermo vecchio: ${nome}`, async () => {
+  if (/arrivato|dopo il load/.test(nome)) continue;
+  test(`r1 schermo vecchio, ${nome}: la scheda resta, il testo pure, e al sito arriva un no`, async () => {
     test.setTimeout(90_000);
     const p = await apri();
     await p.locator('#nota').fill('appunti da non perdere');
@@ -83,15 +86,15 @@ for (const [nome, presa] of Object.entries(PRESA)) {
     const fonte = barra().locator('.permesso-fonte[data-tipo="schermo"]');
     await expect.poll(async () => esiti.length > 0 || !paginaDi(origine) || await fonte.isVisible().catch(() => false), { timeout: 15_000 }).toBe(true);
     if (await fonte.isVisible().catch(() => false)) await fonte.click();
+    await new Promise((r) => setTimeout(r, 3000));
+    expect(app.windows().map((w) => w.url()).filter((u) => !u.startsWith('filo://shell')), 'la scheda è ancora il sito, non la pagina d\'errore').toContain(origine + '/modulo');
     await expect.poll(() => esiti.slice(), { timeout: 10_000, message: 'la pagina riceve un no' }).toEqual(['ERR:NotAllowedError']);
-    await new Promise((r) => setTimeout(r, 1500));
-    expect(paginaDi(origine), 'la scheda è ancora il sito').toBeTruthy();
     expect(await paginaDi(origine).evaluate(() => document.querySelector('#nota').value)).toBe('appunti da non perdere');
   });
 }
 
-for (const nome of ['stesso sito in volo, preso subito', 'srcdoc, dopo il load', 'stesso sito che risponde 204']) {
-  test(`stato: ${nome}`, async () => {
+for (const [r, nome] of [['r1', 'stesso sito in volo, preso subito'], ['r1', 'stesso sito che risponde 204'], ['r2', 'stesso sito arrivato'], ['r2', 'srcdoc, dopo il load']]) {
+  test(`${r} permessi mai decisi, ${nome}: si leggono «da chiedere»`, async () => {
     test.setTimeout(60_000);
     const p = await apri();
     const r = await p.evaluate(async (presa) => {
@@ -101,7 +104,6 @@ for (const nome of ['stesso sito in volo, preso subito', 'srcdoc, dopo il load',
         try { out[n] = (await w.navigator.permissions.query({ name: n })).state; } catch (e) { out[n] = 'ERR'; }
       }
       out.notifica = w.Notification && w.Notification.permission;
-      out.url = w.location.href;
       return out;
     }, PRESA[nome]);
     expect(r).toMatchObject({ camera: 'prompt', microphone: 'prompt', geolocation: 'prompt', notifications: 'prompt', notifica: 'default' });
