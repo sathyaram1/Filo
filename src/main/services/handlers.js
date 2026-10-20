@@ -4887,6 +4887,20 @@ function segnaSalvateNominate(textReply, azioni) {
 const ATTESA_RICORDI_MS = 2500;
 // Il tetto in token che il modello della chat ha retto dopo un rifiuto per finestra troppo piccola, per modello.
 const finestreDeiModelli = new Map();
+// La finestra che un rifiuto del modello della chat ha detto con le sue misure, in token, per modello.
+const finestreDichiarate = new Map();
+// La finestra del modello della chat quando si sa: dal catalogo di OpenRouter o da un rifiuto che l'ha detta. Non aspetta
+// la rete: il catalogo che manca lo si chiede, e vale appena arriva.
+function finestraNota(settings, modello) {
+  const note = [finestreDichiarate.get(modello)];
+  try {
+    const primo = SN_CONST.parseModelRefs(modello)[0];
+    const voce = primo ? globalThis.SN_STIMA_COSTO.voceDi(primo, (settings && settings.modelRegistry) || {}) : null;
+    if (voce && voce.provider === 'openrouter') note.push(require('./costoModelli').finestraDi(voce.model));
+  } catch (_) {}
+  const n = note.filter((x) => Number.isFinite(x) && x > 0);
+  return n.length ? Math.min(...n) : null;
+}
 // I modelli della chat che hanno rifiutato le immagini dei turni passati: da lì in avanti ricevono la nota (#1166).
 const modelliSenzaFoto = new Set();
 function entroIl(p, ms, ripiego) {
