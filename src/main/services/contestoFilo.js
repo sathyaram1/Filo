@@ -92,7 +92,9 @@ function dimentica(chat) {
 
 // Tutto il filo in messaggi, in ordine di tempo. A parità d'ora decide la conversazione: lo stesso ordine a ogni turno.
 async function messaggiDelFilo(opts) {
-  const chats = await F().chats(opts);
+  return messaggiDi(await F().chats(opts));
+}
+function messaggiDi(chats) {
   const out = [];
   for (const c of chats) {
     // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) entra come una riga all'ora in cui è cominciata:
