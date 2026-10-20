@@ -62,26 +62,17 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
-  // Il costo 4 parte solo se l'utente l'ha chiesto con parole sue (#1312): in una stessa riga di quello che ha scritto
-  // nel compito un verbo dell'azione e un nome di ciò che tocca, parole intere con un errore di battitura ammesso.
-  // Una parola sola detta per altro («la lista della spesa», «riassumi questa pagina») non è una richiesta. `frasi`
-  // bastano da sole: sono già l'azione («annulla», «dimentica tutto»). Mai il testo del modello: lo decide `ctx.richiesta`.
-  // Radici di verbi: valgono solo con una desinenza da verbo («cambia», «mettiti», «cancellare»), così «cambio» o
-  // «impostazioni» non sono una richiesta.
-  const VERBI_CAMBIO = ['alz', 'aument', 'abbass', 'mett', 'impost', 'cambi', 'togl', 'togli', 'spegn', 'disattiv', 'attiv',
-    'accend', 'aggiung', 'rimuov', 'disabilit', 'abilit', 'sblocc', 'lev', 'port', 'pass', 'us', 'fid', 'consent', 'permett',
-    'scegl', 'torn', 'riport', 'inser', 'salv'];
+  // Il costo 4 parte solo se l'utente l'ha chiesto con parole sue (#1312). Mai il testo del modello: lo decide
+  // `ctx.richiesta`. Per una cancellazione basta, in una riga, un verbo che cancella e il nome di ciò che tocca (`frasi`
+  // da sole: «dimentica tutto»); una parola detta per altro («riassumi questa pagina») non è una richiesta.
+  // Radici di verbi: valgono solo con una desinenza da verbo («togli», «mettiti»), così «cambio» non è un verbo.
   const VERBI_CANCELLA = ['cancell', 'elimin', 'svuot', 'azzer', 'reset', 'resett', 'pulisc', 'pul', 'togl', 'togli', 'butt',
     'rimuov', 'dimentic', 'scord', 'distrugg'];
   const DESINENZE = new Set(['', 'a', 'i', 'e', 'are', 'ere', 'ire', 'iamo', 'ate', 'ete', 'ite', 'isci', 'isca', 'ando', 'endo']);
   const ENCLITICHE = ['', 'mi', 'ti', 'lo', 'la', 'li', 'le', 'ci', 'vi', 'ne', 'gli', 'glielo', 'gliela', 'melo', 'mela', 'telo'];
   const verbo = (w, radice) => w.startsWith(radice)
     && ENCLITICHE.some((e) => { const r = w.slice(radice.length); return r.endsWith(e) && DESINENZE.has(r.slice(0, r.length - e.length)); });
-  const PAROLE_COMUNI = new Set(['della', 'delle', 'degli', 'dello', 'nella', 'nelle', 'sulla', 'quanto', 'solo', 'sempre',
-    'tutto', 'tutti', 'tutte', 'filo', 'fare', 'cosa', 'cose', 'anche', 'come', 'questo', 'questa', 'quello', 'quella',
-    'imposta', 'attiva', 'disattiva', 'accendi', 'spegni', 'aggiungi', 'togli', 'alza', 'abbassa', 'nuovo', 'nuova', 'true',
-    'false', 'mettere', 'metti', 'dove', 'quando', 'sito', 'siti', 'pagina', 'pagine', 'altri', 'altre', 'acceso', 'spento']);
-  const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, ' ').trim();
   function unoDiDistanza(a, b) {
     if (a === b) return true;
@@ -98,32 +89,79 @@
     for (let i = 0; i + pz.length <= scritte.length; i++) if (pz.every((p, k) => simile(scritte[i + k], p))) return true;
     return false;
   }
-  // `risposte`: nomi che bastano in un pezzo di frase di tre parole al massimo, la risposta secca («Automatico», «…, manuale»).
-  function nominata(testo, { frasi = [], verbi = [], oggetti = [], risposte = [] } = {}) {
-    for (const riga of String(testo == null ? '' : testo).split(/\n+/)) {
-      const scritte = pianoTesto(riga).split(' ').filter(Boolean);
-      if (!scritte.length) continue;
-      if (frasi.some((f) => contiene(scritte, f))) return true;
-      const secche = riga.split(/[,.;:!?]+/).map((p) => pianoTesto(p).split(' ').filter(Boolean)).filter((p) => p.length && p.length <= 3);
-      if (secche.some((p) => risposte.some((r) => contiene(p, r)))) return true;
-      if (verbi.length && scritte.some((w) => verbi.some((v) => verbo(w, v))) && oggetti.some((o) => contiene(scritte, o))) return true;
-    }
-    return false;
+  const righeScritte = (testo) => String(testo == null ? '' : testo).split(/\n+/)
+    .map((riga) => ({ riga, scritte: pianoTesto(riga).split(' ').filter(Boolean) })).filter((x) => x.scritte.length);
+  const nominaUna = (scritte, nomi) => nomi.some((n) => contiene(scritte, n));
+  const haVerbo = (scritte, verbi) => scritte.some((w) => verbi.some((v) => verbo(w, v)));
+  function nominata(testo, { frasi = [], verbi = [], oggetti = [] } = {}) {
+    return righeScritte(testo).some(({ scritte }) => nominaUna(scritte, frasi) || (haVerbo(scritte, verbi) && nominaUna(scritte, oggetti)));
   }
-  // I nomi di un'impostazione che l'utente può aver detto: le sue chiavi e il suo nome intero, e i valori che non sono
-  // parole comuni. Un valore lungo e unico (una chiave di un servizio) scritto dall'utente basta da solo; un valore che
-  // non è un numero basta come risposta secca.
+
+  // Un freno tolto è chiesto se l'utente ha chiesto QUEL cambio, nel suo verso: il valore che ha scritto, letto dal setter
+  // stesso, dà la stessa impostazione dell'azione («tetto a 20» non chiede 500, «Conservativo» non chiede Automatico);
+  // senza un valore, un verbo che dice il verso sul nome della voce («spegni», «aumenta»). Le `contrarie` nominano la voce
+  // al rovescio («usa i modelli proprietari» spegne «solo modelli aperti»). Mai la sola parola: «cambio automatico» no.
+  const VERBI_ACCENDE = ['attiv', 'riattiv', 'accend', 'riaccend', 'abilit', 'us', 'consent', 'permett'];
+  const VERBI_SPEGNE = ['spegn', 'disattiv', 'disabilit', 'togl', 'togli', 'lev', 'rimuov'];
+  const VERBI_ALZA = ['alz', 'rialz', 'aument', 'raddopp', 'triplic'];
+  const VERBI_AGGIUNGE = ['aggiung', 'mett', 'inser', 'fid', 'consent', 'permett'];
+  const VERBI_TOGLIE = ['togl', 'togli', 'lev', 'rimuov', 'elimin', 'cancell', 'escl', 'sblocc'];
+  const SITO_DETTO = /(?:[a-z0-9-]+\.)+[a-z]{2,}/gi;
+  const NUMERO_DETTO = /\d+(?:[.,]\d+)?/g;
   function chiestaPreferenza(a, ctx) {
     const P = global.SN_PREF;
-    if (!P || !P.paroleDellaVoce) return false;
+    if (!P || !P.paroleDellaVoce || !P.buildPreferencePartial) return false;
+    const chiave = a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza;
     const valore = a.valore ?? a.value ?? a.valoreNuovo ?? a.val;
-    const v = P.paroleDellaVoce(a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza, valore);
-    const intero = typeof valore === 'string' || typeof valore === 'number' ? [String(valore)] : [];
-    const valori = [...intero, ...v.valori].filter((w) => /^\d+$/.test(w) || (pianoTesto(w).length >= 4 && !PAROLE_COMUNI.has(pianoTesto(w))));
-    const unico = typeof valore === 'string' && valore.trim().length >= 16 && /\d/.test(valore) && /[a-z]/i.test(valore) ? [valore.trim()] : [];
-    return nominata(richiestaDi(ctx), {
-      frasi: unico, verbi: VERBI_CAMBIO, oggetti: [...v.frasi, ...valori], risposte: valori.filter((w) => !/^\d+$/.test(w)),
-    });
+    const attuali = (ctx && ctx.impostazioni) || null;
+    // Un elenco porta il verso in `elenco.op`: «togli X» e «aggiungi X» hanno lo stesso `partial`.
+    const letto = (c) => {
+      const b = P.buildPreferencePartial(chiave, c, { attuali });
+      return b && !b.rifiuto && b.partial ? JSON.stringify([b.partial, b.elenco ? b.elenco.op : '']) : '';
+    };
+    const voluto = letto(valore);
+    if (!voluto) return false;
+    const stesso = (c) => letto(c) === voluto;
+    const altro = (c) => { const l = letto(c); return !!l && l !== voluto; };
+    const testo = richiestaDi(ctx);
+    // Un valore unico (una chiave di un servizio) scritto intero dall'utente basta da solo.
+    const unico = typeof valore === 'string' ? valore.trim() : '';
+    if (unico.length >= 8 && /\d/.test(unico) && /[a-z]/i.test(unico)
+      && new RegExp(`(?<![\\w-])${unico.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'i').test(testo)) return true;
+    const v = P.paroleDellaVoce(chiave, valore);
+    const righe = righeScritte(testo);
+    const tema = righe.some(({ scritte }) => nominaUna(scritte, v.frasi));
+    const siNo = (w) => (P.parsePrefBool ? P.parsePrefBool(w) !== null : false);
+    for (const { riga, scritte } of righe) {
+      const numeri = riga.match(NUMERO_DETTO) || [];
+      const nega = scritte.includes('non');
+      const toglie = nega || haVerbo(scritte, VERBI_TOGLIE);
+      const siti = (riga.match(SITO_DETTO) || []).map((s) => `${toglie ? 'togli' : 'aggiungi'} ${s}`);
+      if (nominaUna(scritte, v.contrarie)) {
+        if (!nega && !haVerbo(scritte, VERBI_SPEGNE) && haVerbo(scritte, VERBI_ACCENDE) && stesso('false')) return true;
+        continue;
+      }
+      if (nominaUna(scritte, v.allenta)) return true;
+      if (nominaUna(scritte, v.frasi)) {
+        if ([...numeri, ...siti].some(stesso)) return true;
+        // «non aggiornarti da solo»: il no sul nome della voce la spegne; con un altro verbo il verso non è sicuro.
+        if (nega) {
+          if (!haVerbo(scritte, [...VERBI_ACCENDE, ...VERBI_SPEGNE]) && !scritte.some(siNo) && (stesso('false') || stesso('0'))) return true;
+          continue;
+        }
+        if (scritte.some(stesso)) return true;
+        if ([...numeri, ...scritte].some(altro)) continue;
+        if (haVerbo(scritte, VERBI_SPEGNE) && (stesso('false') || stesso('0'))) return true;
+        if (haVerbo(scritte, VERBI_ACCENDE) && stesso('true')) return true;
+        if (v.alza && haVerbo(scritte, VERBI_ALZA)) return true;
+        continue;
+      }
+      // Senza il nome della voce: il sito scritto da lui con un verbo che aggiunge o toglie, o la risposta secca a una
+      // domanda («Automatico.»; un numero solo se la conversazione ha nominato la voce, un sì o un no mai).
+      if (siti.length && haVerbo(scritte, toglie ? VERBI_TOGLIE : VERBI_AGGIUNGE) && siti.some(stesso)) return true;
+      if (scritte.length <= 3 && scritte.some((w) => (/^\d/.test(w) ? tema : w.length >= 4 && !siNo(w)) && stesso(w))) return true;
+    }
+    return false;
   }
   const richiestaDi = (ctx) => String((ctx && ctx.richiesta) || '');
 
@@ -739,7 +777,11 @@
     CANCELLA_PAGINE: {
       costo: 4,
       campo: null,
-      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { verbi: VERBI_CANCELLA, oggetti: ['cronologia', 'storico', 'history', 'pagine', 'siti visitati', 'ho visitato'] }),
+      // «Togli le pagine dai preferiti» cancella da un altro posto: non è la cronologia di Filo.
+      chiesta: (a, ctx) => righeScritte(richiestaDi(ctx)).some(({ scritte }) => haVerbo(scritte, VERBI_CANCELLA)
+        && nominaUna(scritte, ['cronologia', 'storico', 'history', 'pagine', 'siti visitati', 'ho visitato'])
+        && !nominaUna(scritte, ['preferiti', 'preferito', 'segnalibri', 'segnalibro', 'lista', 'elenco', 'cartella', 'desktop',
+          'scrivania', 'documento', 'note', 'appunti', 'barra', 'stampa', 'pdf'])),
       describe: (a) => {
         const n = Number(a && a._n);
         const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';

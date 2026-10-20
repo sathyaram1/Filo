@@ -514,8 +514,15 @@ test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, an
   const casi = [
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['mettiti ad automatico', 'alza la tua autnomia', 'Scelgo Automatico.']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['alza il tetto a 500', 'aumenta il budget', 'alza il limite di spesa']],
-    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }, ['usa anche i modelli proprietari']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }, ['usa anche i modelli proprietari', 'usa anche i modelli chiusi', 'spegni solo modelli aperti']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'siti_fidati_programmi', valore: 'aggiungi programmi.example' }, ['fidati di programmi.example']],
+    // Le parole con cui l'utente chiede davvero, anche senza un verbo dell'elenco: «resta connesso su X» è aggiungi X.
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: 'aggiungi whatsapp.com' }, ['resta connesso su whatsapp.com', 'tienimi connesso su whatsapp.com']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '20' }, ['voglio spendere fino a 20 euro al mese', 'alza il tetto di spesa\n20']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'blocco_popup', valore: 'no' }, ['lascia aprire i popup', 'togli il blocco dei popup', 'blocco popup: no']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'siti_bloccati', valore: 'togli example.org' }, ['sblocca example.org']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'aggiornamenti_automatici', valore: false }, ['non aggiornarti da solo']],
+    [{ type: 'CANCELLA_PAGINE', periodo: 'oggi' }, ['cancella le pagine di YouTube']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-0123456789abcdef0123456789abcdef' }, ['usa sk-or-v1-0123456789abcdef0123456789abcdef']],
     [{ type: 'CANCELLA_MEMORIA' }, ['cancella tutto quello che sai di me', 'svuota la tua memoria']],
     [{ type: 'CANCELLA_ARCHIVIO', query: 'ricette' }, ['elimina dall\'archivio le schede sulle ricette']],
@@ -530,7 +537,7 @@ test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, an
       for (const richiesta of frasi) assert.equal(risposta(azione, { impostazioni: att, azioni, richiesta }), 'conferma', `${JSON.stringify(azione)} con «${richiesta}»`);
     }
   }
-  // Una parola vicina all'azione detta per altro non è una richiesta: serve il verbo dell'azione nella stessa riga.
+  // Una parola vicina all'azione detta per altro non è una richiesta, e nemmeno il cambio nel verso opposto.
   const diPassaggio = [
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['fammi la lista della spesa per una carbonara', 'metti le uova nella lista della spesa', '500 grammi']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['la batteria di questo telefono che autonomia ha?', 'cosa vuol dire automatico nel cambio di una macchina?']],
@@ -541,6 +548,13 @@ test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, an
     [{ type: 'CANCELLA_ARCHIVIO', query: 'x' }, ['fai uno screenshot dello schermo', 'fammi una tabella dei prezzi', 'chiudi le schede sulle ricette']],
     [{ type: 'DIMENTICA', testo: 'Bologna', per_sempre: true }, ['elimina la sveglia delle 7', 'dimentica che vivo a Bologna']],
     [{ type: 'ANNULLA_CAMBIO', _livelloCambio: 2 }, ['torna indietro alla pagina prima']],
+    // Chi ha stretto un freno non ha chiesto di toglierlo: conta il verso del cambio, non l'argomento.
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['abbassa il tetto di spesa a 5 euro', 'alza il tetto a 20']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['metti il livello di autonomia a conservativo', 'cerco un\'auto usata: benzina, cambio automatico, 5 porte']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'solo modelli a pesi aperti', valore: 'no' }, ['attiva solo modelli a pesi aperti', 'spegni i modelli proprietari', 'no']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: 'aggiungi whatsapp.com' }, ['togli whatsapp.com dai siti connessi', 'resta connesso su gmail.com']],
+    [{ type: 'CANCELLA_PAGINE', periodo: 'oggi' }, ['togli le pagine di ricette dai preferiti']],
+    [{ type: 'IMPOSTA_PREFERENZA', chiave: 'blocco_popup', valore: 'no' }, ['non spegnere il blocco dei popup']],
   ];
   for (const [azione, frasi] of diPassaggio) {
     for (const richiesta of frasi) assert.equal(risposta(azione, { impostazioni: att, azioni: [ricercaFatta], richiesta }), 'no', `${JSON.stringify(azione)} con «${richiesta}»`);

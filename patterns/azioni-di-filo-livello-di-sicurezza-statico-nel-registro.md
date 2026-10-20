@@ -21,12 +21,15 @@ il perimetro e l'origine. La tabella è quella decisa dall'owner il 30/09 (#1312
 non dice mai «no», e ogni «sì» da costo 2 in su passa dal guardiano di uscita,
 che finché non c'è lo trasforma in «chiede». Il **costo 4** vuole «conferma» a
 ogni livello, yolo compreso, e parte solo se l'utente l'ha chiesto con parole
-sue (`chiesta`): mai su proposta di Filo né da un'automazione. Chiesto vuol dire che in una stessa riga di
-quello che l'utente ha scritto nel compito c'è un verbo dell'azione (con desinenza da verbo: «cambio» non è
-«cambia») e un nome intero di ciò che tocca (una chiave della preferenza, il suo nome, il valore detto): una
-parola sola detta per altro («la lista della spesa», «riassumi questa pagina») no. Ogni voce che può arrivare
-al 4 dichiara la sua regola `chiesta`, e senza non parte (sentinella in `tests/unit/autonomia.test.mjs`).
-Riconoscerne meno è il verso sicuro: il «no» dice all'utente dove farlo da sé. Sono costo 4 la
+sue (`chiesta`): mai su proposta di Filo né da un'automazione. Per una preferenza chiesto vuol dire QUEL
+cambio, nel suo verso: il valore che l'utente ha scritto, letto dallo stesso setter, dà la stessa impostazione
+dell'azione («abbassa il tetto a 5» non chiede 500); senza valore, un verbo che dice il verso sul nome della
+voce («spegni», «aumenta»). I nomi che solo l'utente usa («tienimi connesso su X», «spendere») stanno nel setter
+(`detto`, `contrarie`, `allentaDetto`), non nella regola. Una cancellazione vuole in una riga un verbo che
+cancella e il nome intero di ciò che tocca. Una parola detta per altro («cambio automatico», «riassumi questa
+pagina») non è una richiesta, ma nemmeno si allunga un elenco di verbi a ogni frase rifiutata: il «no» a una
+richiesta vera è un difetto quanto il sì a una non fatta. Ogni voce che può arrivare al 4 dichiara la sua
+regola `chiesta`, e senza non parte (sentinella in `tests/unit/autonomia.test.mjs`). Sono costo 4 la
 **regola del freno** (una preferenza con `allenta` che lo toglie; stringerla è
 costo 1), le credenziali di un servizio, il cancellare per sempre (cancellare
 dentro Filo è nascondere, costo normale) e un segreto in un'uscita: se l'ha

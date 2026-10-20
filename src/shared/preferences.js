@@ -381,9 +381,10 @@
   }
   // `allentaSe` (#530): il verso che abbassa una difesa. 'togli' per un elenco che protegge (un sito tolto
   // torna libero), 'aggiungi' per un elenco di eccezioni; senza l'elenco di adesso «solo …» vale come abbassare.
-  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null, sotto = '' }) {
+  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null, sotto = '', detto = [] }) {
     return {
       keys,
+      detto,
       scrive: [percorso],
       aiuto: `"aggiungi <siti>" | "togli <siti>" | "solo <siti>" | "svuota" (${aiuto}; più siti separati da virgole)`,
       costo: 2,
@@ -1129,6 +1130,8 @@
       scrive: ['security.blockPopups'],
       aiuto: 'true | false',
       keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
+      allentaDetto: ['lascia aprire i popup', 'lascia aprire le finestre popup', 'lascia passare i popup', 'permetti i popup',
+        'consenti i popup', 'sblocca i popup', 'apri i popup'],
       costo: 2,
       allenta: (r) => r.partial.security.blockPopups === false,
       risk: 'Controlla il blocco delle finestre popup. Disattivarlo permette ai siti di aprire '
@@ -1273,6 +1276,7 @@
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
         'solo modelli aperti', 'modelli aperti', 'modelli proprietari', 'niente modelli proprietari',
         'disattiva modelli proprietari', 'open weights'],
+      contrarie: ['modelli proprietari', 'modelli chiusi', 'modelli a pesi chiusi', 'modelli non aperti'],
       costo: 2,
       allenta: (r) => r.partial.openWeightsOnly === false,
       risk: 'Spegne tutti i modelli proprietari (Anthropic compresa) e lascia lavorare solo modelli '
@@ -1375,6 +1379,8 @@
       scrive: ['monthlyLimitEur'],
       aiuto: 'numero in euro (limite di spesa mensile)',
       keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget', 'tetto di spesa', 'tetto spesa'],
+      detto: ['limite', 'tetto', 'spendere', 'spendo', 'spesa mensile', 'spesa al mese', 'spese mensili', 'euro al mese', 'crediti al mese'],
+      alzaAllenta: true,
       costo: 2,
       allenta: (r, at) => {
         const tetto = (v) => (Number(v) > 0 ? Number(v) : Infinity);
@@ -1670,6 +1676,8 @@
     elenco({
       keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso',
         'siti connessi', 'resta connesso su', 'resta connesso qui', 'non restare connesso'],
+      detto: ['tienimi connesso', 'restare connesso', 'rimanere connesso', 'rimani connesso', 'resto connesso', 'resta collegato',
+        'tienimi collegato', 'restare collegato'],
       percorso: 'security.cookies.trustedSites',
       allentaSe: 'aggiungi',
       nome: 'Siti fidati dove resti connesso',
@@ -1911,6 +1919,7 @@
         return `${nomi} (quanto Filo fa da solo; abbassarlo vale subito, alzarlo vuole che l'utente scriva «conferma»)`;
       },
       keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo', 'autonomia di filo'],
+      alzaAllenta: true,
       costo: 2,
       allenta: (r, at) => {
         const A = global.SN_AUTONOMIA;
@@ -2051,14 +2060,18 @@
     };
   }
 
-  // I nomi con cui l'utente indica una voce, per sapere se un freno tolto l'ha chiesto lui (#1312): le sue chiavi e il
-  // nome in pagina, interi (una parola sola di un nome, «spesa», «modelli», nomina altro), e il valore detto.
+  // Come l'utente nomina una voce, per sapere se un freno tolto l'ha chiesto lui (#1312): chiavi, nome in pagina e `detto`
+  // (nomi che solo l'utente usa), interi; `contrarie` la nominano al rovescio, `allentaDetto` sono già la richiesta di
+  // allentarla; `alzaAllenta`: alzarla è allentarla. Le regole che li usano stanno in actionLevels.js.
   function paroleDellaVoce(rawKey, rawVal) {
     const r = risolviChiave(rawKey);
-    if (!r || !r.setter) return { frasi: [], valori: [] };
-    const frasi = [...new Set([...r.setter.keys, nomeVoce(r.setter)].map((t) => pianoChiave(t)).filter(Boolean))];
+    if (!r || !r.setter) return { frasi: [], valori: [], contrarie: [], allenta: [], alza: false };
+    const s = r.setter;
+    const piane = (l) => [...new Set((l || []).map((t) => pianoChiave(t)).filter(Boolean))];
+    const contrarie = piane(s.contrarie);
+    const frasi = piane([...s.keys, nomeVoce(s), ...(s.detto || [])]).filter((f) => !contrarie.some((c) => f.includes(c)));
     const valori = typeof rawVal === 'string' || typeof rawVal === 'number' ? pianoChiave(String(rawVal)).split(' ').filter(Boolean) : [];
-    return { frasi, valori };
+    return { frasi, valori, contrarie, allenta: piane(s.allentaDetto), alza: s.alzaAllenta === true };
   }
 
   // Perché una chiave o un valore non si applicano (buildPreferencePartial ha reso null): { rifiuto, perModello }.
