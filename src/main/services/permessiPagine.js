@@ -267,6 +267,14 @@ function gestoRecente(wc) {
   return gestoEntro(wc, GESTO_MS);
 }
 
+// Un avviso per gesto vero: il clic che fa rifiutare tre file ne dice uno, e la pagina da sola nessuno (#1318).
+function gestoPerUnAvviso(wc) {
+  const t = wc && wc._filoGestoAlle;
+  if (!t || Date.now() - t >= GESTO_MS || (wc._filoAvvisoDopo || 0) >= t) return false;
+  wc._filoAvvisoDopo = Date.now();
+  return true;
+}
+
 // Un clic o un tasto vero sulla pagina negli ultimi `ms`: il conto riparte a ogni navigazione della pagina intera.
 function gestoEntro(wc, ms) {
   const t = wc && wc._filoGestoAlle;
