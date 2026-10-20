@@ -1946,9 +1946,18 @@
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
+      // Il pannello si apre da solo e il fuoco resta nella pagina, dove Esc non arriva: si chiude da qui.
+      const chiudiBtn = document.createElement('button');
+      chiudiBtn.type = 'button';
+      chiudiBtn.className = 'dl-panel-chiudi';
+      chiudiBtn.dataset.tip = 'Chiudi';
+      chiudiBtn.setAttribute('aria-label', 'Chiudi');
+      setIcon(chiudiBtn, 'close', 13);
+      chiudiBtn.addEventListener('click', () => closePanel());
       head.appendChild(title);
       head.appendChild(allBtn);
       head.appendChild(clearBtn);
+      head.appendChild(chiudiBtn);
       panel.appendChild(head);
       const list = document.createElement('div');
       list.className = 'dl-panel-list';
