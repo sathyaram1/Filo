@@ -304,7 +304,7 @@ function risorsaDellaPagina(frame, url) {
 // Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
   if (invitoFermato(rawUrl, ctx) || openExternalScheme(rawUrl)) return true;
-  avvisaIndirizzoFermato(rawUrl, ctx && ctx.win);
+  avvisaIndirizzoFermato(rawUrl, ctx && ctx.win, ctx && ctx.pagina);
   return false;
 }
 // La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
