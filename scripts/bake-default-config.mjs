@@ -331,7 +331,7 @@ export function chiaviAllarmeBake(mancanti) {
 
 // Apre un feedback quando la costruzione sta per produrre una versione monca,
 // con le STESSE righe del registro: da lì si deve poter agire senza cercare i log.
-async function avvisa(mancanti, righe) {
+async function avvisa(mancanti, righe, esitoServer) {
   const passphrase = parolaDellaCostruzione();
   if (!passphrase) {
     console.warn('::warning::Nessun feedback aperto per questa pubblicazione ferma: l\'allarme si apre con FILO_BUILD_PASSPHRASE, che qui manca. Resta solo il guasto qui sopra.');
