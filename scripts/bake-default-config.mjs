@@ -100,7 +100,7 @@ export function esitoDaRitentare(esito) {
 }
 
 function descriviErrore(e, tetto) {
-  if (e && e.name === 'TimeoutError') return `nessuna risposta in ${Math.round(tetto / 1000)} s`;
+  if (e && e.name === 'TimeoutError') return `nessuna risposta in ${Math.ceil(tetto / 1000)} s`;
   return descriviErroreDiRete(e);
 }
 

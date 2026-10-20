@@ -68,7 +68,7 @@ test('un server sovraccarico o giù per un momento si aspetta', async () => {
 test('una richiesta appesa ha un tetto, poi si riprova', async () => {
   const r = await chiedi(['muto', CHIAVI], { tetto: 200 });
   assert.equal(r.esito.stato, 'ok', r.registro);
-  assert.match(r.registro, /nessuna risposta in 0 s|nessuna risposta in/);
+  assert.match(r.registro, /nessuna risposta in \d+ s/);
 });
 
 test('rifiuto, parola d’ordine sbagliata e documento senza chiavi non si ritentano: aspettare non li cura', async () => {
