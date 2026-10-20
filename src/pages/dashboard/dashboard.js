@@ -72,6 +72,7 @@
   // L'istante della comparsa sta sul tasto (`data-comparso`): lì lo leggono le prove, e il CSS lo accende in quel tempo.
   const PAUSA_QUADRATO = 500;
   const quadratoAppena = () => Date.now() - Number(stopBtn.dataset.comparso || 0) < PAUSA_QUADRATO;
+  stopBtn.style.setProperty('--dash-pausa-quadrato', `${PAUSA_QUADRATO}ms`);
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
