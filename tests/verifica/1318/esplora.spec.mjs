@@ -44,6 +44,7 @@ test('pagina: varianti da script', async ({ shell, openTab, testServer }) => {
 });
 
 test('assistente: forme di percorso e indirizzi', async ({ app, shell }) => {
+  await app.evaluate(({ shell: s }) => { globalThis.__esterni = []; s.openExternal = async (u) => { globalThis.__esterni.push(String(u)); }; });
   const home = await homeDiFilo(app, shell);
   const casi = [
     '/data/progetti/conto.pdf', '/workspace/x.pdf', 'Documenti\\conto.pdf', "'C:\\Users\\x\\conto.pdf'",
