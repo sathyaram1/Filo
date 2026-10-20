@@ -115,9 +115,9 @@
           diceRipiego: true,
         });
         if (!res?.ok || !res.text) {
-          // Perché la riscrittura non è partita, in italiano: la regola sta in
+          // Perché la riscrittura non è partita, con la strada per rimediare: la regola sta in
           // SN_CHAT_ERRORS, non un elenco di casi per riquadro (#663).
-          $prop.textContent = Popup.frasePerLUtente(res);
+          mostraErrore(res);
           return;
         }
         currentResult = res.text.trim();
