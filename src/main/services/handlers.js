@@ -5236,7 +5236,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // I pezzi vecchi ripescati entrano in coda al contesto, e il blocco di attività lo dice come una ricerca (#868).
   const ricordi = await entroIl(ricordiP, ATTESA_RICORDI_MS, []);
   if (ricordi.length) {
-    const a = ricordoComeAzione(ricordi);
+    const a = globalThis.SN_FILO_CONTESTO.ricordoComeAzione(ricordi);
     payloadBase.ricordi = globalThis.SN_FILO_CONTESTO.rendiRicordi(ricordi);
     if (onToolCall) onToolCall({ name: a.type, id: a._callId });
     push('filo:action', { kind: 'done', action: a, kept: true, executed: true });
