@@ -4906,7 +4906,7 @@ function ricordoComeAzione(ricordi) {
     date: r.tratto.ts,
     snippet: FC.testoRicordo(r.tratto),
   }));
-  const daFuori = ricordi.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori : []));
+  const daFuori = ricordi.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori.map((x) => ({ ...x, chat: r.tratto.chat })) : []));
   return {
     type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Date.now().toString(36)}`, _executed: true,
     _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
