@@ -834,12 +834,33 @@ describe('le date del contenitore', () => {
     rmSync(base.contenitore, { force: true });
   });
 
+  // La grana non è un numero fisso: al microsecondo su Linux, su Windows la griglia che lascia la conversione in FILETIME
+  // (#1457). Si chiede alle operazioni: rimesse davvero le date, quelle di un contenitore appena nato non si spostano.
   test('un contenitore nuovo nasce con le date alla stessa grana con cui le operazioni le rimettono', async () => {
+    const fsp = require('node:fs/promises');
     const base = await contenitore(1 * MB);
-    const st = statSync(base.contenitore, { bigint: true });
-    assert.equal(st.mtimeNs % 1000n, 0n);
-    await (await crea(base, 'Grana')).chiudi();
-    assert.equal(statSync(base.contenitore, { bigint: true }).mtimeNs, st.mtimeNs);
+    const date = () => {
+      const st = statSync(base.contenitore, { bigint: true });
+      return [st.atimeNs, st.mtimeNs];
+    };
+    const nate = date();
+    let rimesse = 0;
+    const open0 = fsp.open;
+    fsp.open = async (...a) => {
+      const fh = await open0(...a);
+      const u0 = fh.utimes.bind(fh);
+      fh.utimes = (...t) => { rimesse++; return u0(...t); };
+      return fh;
+    };
+    try {
+      const s = await crea(base, 'Grana');
+      await s.scriviFile('nota', 'x');
+      await s.chiudi();
+    } finally {
+      fsp.open = open0;
+    }
+    assert.ok(rimesse > 0, 'nessuna operazione ha rimesso le date: la prova non direbbe niente');
+    assert.deepEqual(date(), nate);
     rmSync(base.contenitore, { force: true });
   });
 });
