@@ -151,8 +151,9 @@
   const SCHEMI_SENZA_BARRE = /^(?:mailto|tel|sms|data|javascript|file):/i;
 
   // Un percorso del computer scritto com'è (\\nas\cartella, C:\…, /home/…, ~/…) è un file, non una ricerca (#482 giro 2):
-  // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file.
-  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|Volumes|root|srv|usr|Library|Applications|System)(?:\/|$)/;
+  // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file. Le radici sono
+  // quelle dove sta un file dell'utente, anche la chiavetta di Linux sotto /run/media (#1318); «/wiki/Roma» resta testo.
+  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|run|Volumes|Network|root|srv|usr|bin|sbin|lib|lib64|boot|dev|proc|sys|snap|nix|net|afs|cygdrive|sdcard|storage|Library|Applications|System)(?:\/|$)/;
   const pezzi = (s) => s.replace(/\\/g, '/').split('/').map((p) => encodeURIComponent(p)).join('/');
   function percorsoDelComputer(raw) {
     let m = /^\\\\([^\\/\s?#]+)(?:[\\/](.*))?$/.exec(raw);
@@ -164,10 +165,45 @@
     return null;
   }
 
+  // Le coppie con cui un percorso arriva incartato: «Copia come percorso» di Windows, il Markdown di un modello, le
+  // virgolette tipografiche di un testo incollato.
+  const INCARTI = [['"', '"'], ['\'', '\''], ['`', '`'], ['«', '»'], ['“', '”'], ['‘', '’'], ['„', '“'], ['<', '>']];
+  function senzaIncarti(s) {
+    let t = String(s == null ? '' : s).trim();
+    for (let giro = 0; giro < 4; giro++) {
+      const c = INCARTI.find(([a, b]) => t.length > a.length + b.length && t.startsWith(a) && t.endsWith(b));
+      if (!c) break;
+      t = t.slice(c[0].length, t.length - c[1].length).trim();
+    }
+    return t;
+  }
+
+  function percorsoDiFile(indirizzo) {
+    let u;
+    try { u = new URL(indirizzo); } catch (_) { return indirizzo; }
+    if (u.protocol !== 'file:') return indirizzo;
+    let p = u.pathname;
+    try { p = decodeURIComponent(p); } catch (_) {}
+    // file:///C:/x arriva come «/C:/x», e normalizeUrl scrive ~/x come file:///~/x.
+    if (/^\/(?:[a-z]:|~(?:\/|$))/i.test(p)) p = p.slice(1);
+    return u.hostname && u.hostname !== 'localhost' ? `\\\\${u.hostname}${p.replace(/\//g, '\\')}` : p;
+  }
+
+  // Il percorso nudo, comunque sia stato incollato: fra virgolette o apici inversi, come indirizzo file://, col prefisso
+  // \\?\ dei percorsi lunghi di Windows. Una funzione sola per la barra e per la lettura dei documenti (#1318).
+  function pulisciPercorso(input) {
+    let s = senzaIncarti(input);
+    if (/^file:/i.test(s)) s = percorsoDiFile(s);
+    return s.replace(/^\\\\[?.]\\UNC\\/i, '\\\\').replace(/^\\\\[?.]\\(?=[a-z]:)/i, '');
+  }
+
   function normalizeUrl(input) {
     const raw = String(input || '').trim();
     if (!raw) return 'filo://newtab/';
-    const file = percorsoDelComputer(raw);
+    // Un file:// fra virgolette resta l'indirizzo che è; un percorso incartato è il file che c'è dentro.
+    const nudo = senzaIncarti(raw);
+    if (/^file:/i.test(nudo)) return nudo;
+    const file = percorsoDelComputer(pulisciPercorso(nudo));
     if (file) return file;
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://') || SCHEMI_SENZA_BARRE.test(raw)) return raw;
 
