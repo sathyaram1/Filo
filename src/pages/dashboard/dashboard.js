@@ -1797,6 +1797,11 @@
     const text = inputEl.value.trim();
     // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
     if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
+    if (await comandoLocale(text)) return;
+    submitMessage(text);
+  });
+  // Quello che la barra fa da sé, senza il modello: vero se l'ha fatto.
+  async function comandoLocale(text) {
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1804,11 +1809,10 @@
     if (text.startsWith('/') && Comandi.isSiteToken(text)) {
       const host = Comandi.siteHostOf(text);
       const resolves = host ? await Comandi.ensureSiteResolved(host) : true;
-      if (resolves === false) { Comandi.updateInputClass(); Comandi.showUnresolvedSite(text, host); return; }
+      if (resolves === false) { Comandi.updateInputClass(); Comandi.showUnresolvedSite(text, host); return true; }
     }
-    if (Comandi.handleSlashCommand(text)) return;
-    submitMessage(text);
-  });
+    return Comandi.handleSlashCommand(text);
+  }
 
   // Invio = manda il messaggio; Shift+Invio = a capo. Il campo è una textarea
   // (non più un <input>), quindi Invio di suo andrebbe a capo: lo intercettiamo.
