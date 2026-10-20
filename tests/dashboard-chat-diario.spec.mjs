@@ -373,14 +373,30 @@ test('F — «portami alla home» chiesto dalla home non ricarica niente: lavoro
   // E il titolo del blocco non conta un comando che non ha fatto niente.
   await expect(activity.locator('.dash-activity-label')).not.toContainText('azionato un comando della finestra');
 
-  // E la home vuota resta a un click, quando l'utente ha finito di leggere.
+  // E chiudere la conversazione resta a un click, quando l'utente ha finito di leggere: lo scambio resta nel filo
+  // (#869), il messaggio dopo ne comincia un'altra.
   const torna = page.locator('.dash-action-btn', { hasText: 'Torna alla home' });
   await expect(torna).toHaveCount(1);
   await torna.click();
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 5_000 });
-  await expect(page.locator('.dash-bubble-user')).toHaveCount(0);
+  await expect(page.locator('.dash-action-btn', { hasText: 'Conversazione chiusa' })).toBeDisabled();
+  await expect(page.locator('#input')).toBeFocused();
+  await expect(page.locator('.dash-bubble-user', { hasText: 'portami alla home' })).toHaveCount(1);
 
   await restore(app, '__fakeF');
+  await fakeProvider(app, [{ text: 'Di niente.' }], '__fakeF2');
+  await page.locator('#input').fill('grazie');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });
+  const chatDi = (testo) => app.evaluate(async (_electron, t) => (await globalThis.SN_IL_FILO.chats())
+    .filter((c) => c.messages.some((m) => m.text === t)).map((c) => c.id), testo);
+  await expect.poll(() => chatDi('grazie')).toHaveLength(1);
+  const [prima] = await chatDi('portami alla home');
+  expect(prima, 'la conversazione del comando è archiviata').toBeTruthy();
+  expect(await chatDi('grazie'), 'il messaggio dopo il bottone è ancora nella conversazione chiusa').not.toContain(prima);
+  const fake = await app.evaluate(() => globalThis.__fakeF2_calls);
+  expect(JSON.stringify(fake.at(-1).at(-1)), 'il turno dopo non è la domanda di prima').toContain('grazie');
+
+  await restore(app, '__fakeF2');
 });
 
 test('G — l\'evento proposto si aggiunge davvero al calendario', async ({ app, shell }) => {
