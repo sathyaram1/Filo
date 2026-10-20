@@ -1059,6 +1059,8 @@
       : send(msg).then((r) => (r && r.diretta && offAction ? direttaFinita.then(() => r) : r));
     const fineDiretta = (r) => {
       if (turnoVivo === turno) turnoVivo = null;
+      // Il main dice quali seguiti ha letto anche a fine turno: vale se l'annuncio in diretta non è arrivato.
+      for (const id of (Array.isArray(r?.seguitiLetti) ? r.seguitiLetti : [])) seguitoLetto(String(id));
       pending.fineDiretta();
       // Anche quelle arrivate senza evento in diretta (o con un guasto dopo): il segno non dipende dalla diretta.
       for (const a of (Array.isArray(r?.actions) ? r.actions : [])) {
