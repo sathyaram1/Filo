@@ -64,10 +64,9 @@
   const appenaFermato = () => Date.now() - fermatoAlle < PAUSA_RIPRESA;
   // Lo stesso al contrario (#1296): il quadrato compare sotto il dito che ha appena mandato o ripreso, e il secondo
   // clic di un doppio clic, o il secondo Invio, non ferma quello che è appena partito. Il «Ferma» del menu vale subito.
+  // L'istante della comparsa sta sul tasto (`data-comparso`): lì lo leggono le prove, e il CSS lo accende in quel tempo.
   const PAUSA_QUADRATO = 500;
-  let quadratoDa = 0;
-  let timerQuadrato = null;
-  const quadratoAppena = () => Date.now() - quadratoDa < PAUSA_QUADRATO;
+  const quadratoAppena = () => Date.now() - Number(stopBtn.dataset.comparso || 0) < PAUSA_QUADRATO;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
