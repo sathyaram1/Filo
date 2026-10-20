@@ -23,67 +23,10 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import {
+  newtabPage, configureModel, copione, ripristina, ricercaLenta, lasciaLaRicerca, ricercaPartita, quadratoPronto,
+} from './helpers/copione.mjs';
 
-async function newtabPage(app) {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-    if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error('newtab non trovata');
-}
-
-async function configureModel(app) {
-  await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
-  });
-}
-
-// Un modello finto a copione. Ogni passo: { pensa: [pezzi], ogni: ms, strumenti: [{id,name,arguments}],
-// dopoStrumenti: ms, finoAlFermo, testo, sordo }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti
-// e gli stop. `finoAlFermo`: la chiamata degli strumenti resta a metà finché lo stop non la interrompe.
-async function copione(app, passi) {
-  await app.evaluate(async (_, passiJson) => {
-    const passi = JSON.parse(passiJson);
-    const P = globalThis.SN_PROVIDERS;
-    if (!globalThis.__origStream) globalThis.__origStream = P.streamCompleteWithFallback;
-    globalThis.__messaggi = [];
-    globalThis.__interrotte = 0;
-    let n = 0;
-    P.streamCompleteWithFallback = async ({ attempts, messages, signal, onReasoning, onDelta, onToolCall }) => {
-      globalThis.__messaggi.push(messages);
-      const p = passi[Math.min(n, passi.length - 1)];
-      n += 1;
-      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
-      const aspetta = (ms) => new Promise((ok, ko) => {
-        const t = setTimeout(ok, ms);
-        if (signal && !p.sordo) {
-          if (signal.aborted) { clearTimeout(t); globalThis.__interrotte += 1; const e = new Error('aborted'); e.name = 'AbortError'; ko(e); return; }
-          signal.addEventListener('abort', () => { clearTimeout(t); globalThis.__interrotte += 1; const e = new Error('aborted'); e.name = 'AbortError'; ko(e); }, { once: true });
-        }
-      });
-      for (const pezzo of p.pensa || []) {
-        try { onReasoning && onReasoning(pezzo); } catch (_) {}
-        await aspetta(p.ogni || 120);
-      }
-      if (p.strumenti && p.strumenti.length) {
-        for (const s of p.strumenti) { try { onToolCall && onToolCall({ id: s.id, name: s.name }); } catch (_) {} }
-        await aspetta(p.finoAlFermo ? 2 ** 31 - 1 : (p.dopoStrumenti || 200));
-        return { ...base, text: '', toolCalls: p.strumenti, finishReason: 'tool_calls' };
-      }
-      const testo = p.testo || 'Fatto.';
-      try { onDelta && onDelta(testo); } catch (_) {}
-      return { ...base, text: testo, toolCalls: [], finishReason: 'stop' };
-    };
-  }, JSON.stringify(passi));
-}
 // Come le Preferenze: il cambio passa dal main e arriva a tutte le pagine aperte.
 async function impostazioni(app, settings) {
   await app.evaluate(async (_, s) => globalThis.__filoHandlers.handleMessage(
@@ -91,12 +34,6 @@ async function impostazioni(app, settings) {
     { url: 'filo://preferences/preferences.html' },
   ), settings);
 }
-async function ripristina(app) {
-  await app.evaluate(() => {
-    if (globalThis.__origStream) globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.__origStream;
-  });
-}
-
 const PENSIERO_1 = ['L\'utente vuole due timer, ', 'uno per la pasta e uno per l\'uovo. ', 'Li avvio insieme, ', 'sono indipendenti. '];
 const PENSIERO_2 = ['Sono partiti tutti e due. ', 'Rispondo in breve. '];
 
@@ -273,6 +210,7 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
   await page.screenshot({ path: 'tests/.shots/filo-attesa-quadrato.png' });
   await expect(blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama')).toContainText('elenco', { timeout: 4_000 });
 
+  await quadratoPronto(page);
   await ferma.click();
   // Subito, senza aspettare il main: il filo si taglia e la riga in corso resta col ragionamento a metà, aperta.
   await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
@@ -321,6 +259,7 @@ test('D — riprendere non riesegue le azioni già fatte, e il modello sa che er
   const blocco = page.locator('.dash-activity').first();
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Avviato un timer · Tè/, { timeout: 8_000 });
   await expect(blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama')).toContainText('lungo', { timeout: 5_000 });
+  await quadratoPronto(page);
   await page.locator('#stopBtn').click();
   await expect(page.locator('.dash-bubble-fermato')).toBeVisible({ timeout: 5_000 });
   // Il nodo dell'azione fatta resta, col suo esito.
@@ -360,6 +299,7 @@ test('E — Invio ferma come il quadrato, e un\'azione nominata dopo lo stop non
   await page.locator('#input').press('Enter');
   const blocco = page.locator('.dash-activity');
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText('Avvio un timer…', { timeout: 5_000 });
+  await quadratoPronto(page);
   await page.locator('#input').press('Enter');
   await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
   await expect(page.locator('.dash-bubble-fermato')).toBeVisible({ timeout: 6_000 });
@@ -451,6 +391,7 @@ test('I — chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) ferma e 
   await page.locator('#input').fill('pensa');
   await invio.click();
   await expect(trama).toContainText('lungo', { timeout: 5_000 });
+  await quadratoPronto(page);
   const b = await page.locator('#stopBtn').boundingBox();
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
   await page.waitForTimeout(200);
@@ -463,6 +404,7 @@ test('I — chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) ferma e 
   await page.locator('#input').fill('pensa ancora');
   await page.locator('#input').press('Enter');
   await expect(trama).toContainText('lungo', { timeout: 5_000 });
+  await quadratoPronto(page);
   await page.locator('#input').press('Enter');
   await page.waitForTimeout(250);
   await page.locator('#input').press('Enter');
@@ -474,6 +416,7 @@ test('I — chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) ferma e 
   await page.locator('#input').fill('e ancora');
   await page.locator('#input').press('Enter');
   await expect(trama).toContainText('lungo', { timeout: 5_000 });
+  await quadratoPronto(page);
   await page.keyboard.down('Enter');
   for (let i = 0; i < 30; i++) {
     await page.locator('#input').dispatchEvent('keydown', { key: 'Enter', code: 'Enter', repeat: true, bubbles: true, cancelable: true });
@@ -557,6 +500,7 @@ test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo 
   await page.locator('#input').fill('metti un timer');
   await page.locator('#sendBtn').click();
   await page.waitForTimeout(300);
+  await quadratoPronto(page);
   await page.locator('#stopBtn').click();
   await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 6_000 });
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 3_000 });
@@ -567,31 +511,6 @@ test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Timer avviato.' })).toHaveCount(0);
   await ripristina(app);
 });
-
-// Una ricerca sul web lenta (una rete che tarda): conta le chiamate partite e finite. Senza durata resta in volo finché
-// la prova non la lascia andare: un «ancora in volo» misurato a orologio diventa rosso su una macchina carica (#814.6).
-async function ricercaLenta(app, ms = null) {
-  await app.evaluate((_, durata) => {
-    globalThis.__ricerche = 0;
-    globalThis.__ricercheFinite = 0;
-    const trattenuta = durata == null ? new Promise((ok) => { globalThis.__lasciaRicerca = ok; }) : null;
-    globalThis.SN_WEB_SEARCH = { search: async () => {
-      globalThis.__ricerche += 1;
-      await (trattenuta || new Promise((r) => setTimeout(r, durata)));
-      globalThis.__ricercheFinite += 1;
-      return { results: [{ title: 'Orari', url: 'https://example.com/orari', content: 'treni' }], provider: 'finto' };
-    } };
-  }, ms);
-}
-async function lasciaLaRicerca(app) {
-  await app.evaluate(() => globalThis.__lasciaRicerca());
-}
-
-// «In volo» si aspetta, non si presume: il titolo «Cerco sul web» compare quando il modello chiama lo strumento, prima
-// che la sua risposta finisca; un fermo in quel momento ferma il modello e la ricerca non parte affatto.
-async function ricercaPartita(app) {
-  await expect.poll(() => app.evaluate(() => globalThis.__ricerche), { timeout: 5_000 }).toBe(1);
-}
 
 test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il seguito parte sapendo cosa è stato fatto', async ({ app, shell }) => {
   test.setTimeout(60_000);
@@ -608,6 +527,7 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   const blocco = page.locator('.dash-activity');
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
   await ricercaPartita(app);
+  await quadratoPronto(page);
   await page.locator('#stopBtn').click();
   // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita: la ricerca è trattenuta, quindi
   // «prima della fine» lo garantisce lei e non serve un tetto di un secondo, che su una macchina carica scade.
@@ -649,6 +569,7 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
   await ricercaPartita(app);
+  await quadratoPronto(page);
   await page.locator('#stopBtn').click();
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#sendBtn').click();
@@ -683,6 +604,7 @@ test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «ripr
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity').first();
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await quadratoPronto(page);
   await page.locator('#stopBtn').click();
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   // Lo schermo non dice più che sta cercando, e la ricerca non parte nemmeno in ritardo.
@@ -719,6 +641,7 @@ test.describe(() => {
     await page.locator('#input').fill('mi chiamo Luca');
     await page.locator('#input').press('Enter');
     await expect(page.locator('.dash-activity-trama').last()).toContainText('lungo', { timeout: 6_000 });
+    await quadratoPronto(page);
     await page.locator('#stopBtn').click();
     await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 3_000 });
 

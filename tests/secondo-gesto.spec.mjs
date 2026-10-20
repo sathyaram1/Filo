@@ -58,12 +58,24 @@ test('A — doppio clic sul tasto d\'invio: la risposta arriva, il quadrato appe
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta arrivata.' })).toHaveCount(2, { timeout: 10_000 });
   await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
 
+  // Invio due volte di fila: il secondo trova la casella vuota e il quadrato appena comparso, e non ferma.
+  await page.locator('#input').fill('con la tastiera');
+  await page.locator('#input').press('Enter');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta arrivata.' })).toHaveCount(3, { timeout: 10_000 });
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
+
   // Dopo la frazione di secondo il quadrato ferma come sempre, e Invio a vuoto anche.
   await page.locator('#input').fill('e poi');
   await page.locator('#sendBtn').click();
   await quadratoPronto(page);
   await page.locator('#stopBtn').click();
   await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 5_000 });
+  await page.locator('#input').fill('ultima');
+  await page.locator('#input').press('Enter');
+  await quadratoPronto(page);
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(2, { timeout: 5_000 });
   await ripristina(app);
 });
 
