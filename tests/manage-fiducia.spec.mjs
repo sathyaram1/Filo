@@ -325,3 +325,37 @@ test('Domande: le righe portano lo stesso segno, la pastiglia aperta gli stessi 
   await expect(page.locator('#mgDomandeFiduciaFiltro')).toHaveAttribute('aria-pressed', 'false');
   await expect(d('D-31')).toHaveClass(/mg-domanda--aperta/);
 });
+
+// Il testo vero del titolo, non la sua scatola: un nome che non va a capo esce dalla scatola e passa sotto il tasto.
+const testaDomande = (page) => page.evaluate(() => {
+  const r = document.createRange();
+  r.selectNodeContents(document.getElementById('mgDomandeTitolo'));
+  const testo = [...r.getClientRects()];
+  const p = document.getElementById('mgDomandeFiduciaFiltro').getBoundingClientRect();
+  const btn = document.getElementById('mgDomandeConsiglioSel').getBoundingClientRect();
+  const col = document.getElementById('mgDomandeCol').getBoundingClientRect();
+  return {
+    sotto: testo.some((x) => x.right > p.left + 1 && x.left < p.right - 1 && x.bottom > p.top + 1 && x.top < p.bottom - 1),
+    fuori: btn.right > col.right + 0.5,
+  };
+});
+
+for (const w of [1280, 1000]) {
+  test(`Domande a ${w} px: il titolo della scheda, «Solo non fidate» e «Applica il consiglio» stanno tutti nella testa`, async ({ openTab }) => {
+    const page = await openTab(MANAGE);
+    await apri(page, []);
+    await page.evaluate((l) => window.__mgTest.setDomande(l), [
+      domanda(31, { fiducia: 'fidato' }), domanda(32, { fiducia: 'non_fidato' }),
+      domanda(33, { fiducia: 'non_fidato', stato: 'in_lavorazione' }),
+    ]);
+    await page.setViewportSize({ width: w, height: 700 });
+    await apriScheda(page, 'domande-lavoro');
+    await expect(page.locator('#mgDomandeFiduciaFiltro')).toBeVisible();
+    expect(await testaDomande(page), 'In lavorazione').toEqual({ sotto: false, fuori: false });
+    await apriScheda(page, 'domande');
+    await page.locator('#mgDomandeTutte').check();
+    await expect(page.locator('#mgDomandeConsiglioSel')).toBeVisible();
+    expect(await testaDomande(page), 'Da rispondere, con le domande scelte').toEqual({ sotto: false, fuori: false });
+    await page.locator('#mgDomandeCol').screenshot({ path: `tests/.shots/fiducia-domande-testa-${w}.png` });
+  });
+}
