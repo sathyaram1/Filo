@@ -13,8 +13,12 @@ const FRASI_PAUSA = Object.freeze({
 });
 const NOMI = Object.freeze(Object.keys(FRASI_PAUSA));
 
+// Le prove delle due funzioni le trovano aperte (tests/fixtures/electron.mjs); la pausa la prova chi passa
+// `inPausaAperte: false`. Fuori dalle prove l'interruttore lo legge sempre il server.
+const aperteNelleProve = () => process.env.NODE_ENV === 'test' && process.env.FILO_TEST_IN_PAUSA_APERTE === '1';
+
 const cancelli = Object.freeze(Object.fromEntries(NOMI.map((nome) => [nome, creaCancello({
-  leggi: () => Defaults.getApertoATutti(nome),
+  leggi: () => (aperteNelleProve() ? Promise.resolve({ risposto: true, aperto: true }) : Defaults.getApertoATutti(nome)),
   scrivi: (on, idToken) => Defaults.setApertoATutti(nome, on, idToken),
   soloOwner: 'Solo l’owner apre o mette in pausa questa funzione.',
 })])));
