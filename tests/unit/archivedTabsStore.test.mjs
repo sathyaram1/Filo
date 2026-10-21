@@ -207,6 +207,17 @@ test('indirizzi e titolo lunghissimi escono tagliati e segnati, anche fra le sch
   await A.removeMany([t.id, normale.id]);
 });
 
+// #1525 giro 1 — anche l'icona la sceglie il sito: un data: lungo un mega non entra a ogni chiusura, una normale sì.
+test('l’icona di un sito oltre la misura non entra nell’archivio, quella normale resta', async () => {
+  const icona = 'data:image/svg+xml,' + 'a'.repeat(1_000_000);
+  const lunga = await A.archive({ url: 'https://icona-1525.test/', title: 'Icona', favicon: icona });
+  const breve = await A.archive({ url: 'https://icona-breve-1525.test/', title: 'Breve', favicon: 'https://icona-breve-1525.test/favicon.ico' });
+  const lista = await A.list();
+  assert.equal(lista.find((x) => x.id === lunga.id).favicon, '');
+  assert.equal(lista.find((x) => x.id === breve.id).favicon, 'https://icona-breve-1525.test/favicon.ico');
+  await A.removeMany([lunga.id, breve.id]);
+});
+
 test('«cancella tutti i dati» svuota anche l\'archivio, dal disco', async () => {
   await globalThis.chrome.storage.local.clear();
   assert.deepEqual(await A.list(), []);
