@@ -160,6 +160,67 @@
     return out;
   }
 
+  // ── I segnaposti (#1448): le x scritte al posto di un dato che non si ricorda ──────────────────────────────────
+  // Con le cifre bastano due x in coda («14xx», «3,xx»); da sole, minuscole, servono un numero annunciato prima o
+  // un'unità dopo («di soli xx», «xx euro»). Non lo sono «x te», «3x4», «0x1f», i baci («a domani xx»), «XX secolo».
+  const GRUPPO_X = /(?<![\p{L}\p{N}_@#])[0-9xX]+(?:[.,'’][0-9xX]+)*(?![\p{L}\p{N}_])/gu;
+  const ANNUNCIANO = new Set([
+    'di', 'da', 'a', 'al', 'ai', 'alle', 'nel', 'nei', 'negli', 'del', 'dei', 'degli', 'dal', 'dai', 'il', 'i', 'in',
+    'con', 'per', 'su', 'tra', 'fra', 'verso', 'entro', 'è', "e'", 'era', 'erano', 'sono', 'fu', 'furono', 'sarà', 'circa',
+    'quasi', 'oltre', 'sopra', 'sotto', 'almeno', 'solo', 'soli', 'sola', 'sole', 'appena', 'ben', 'ha', 'hanno', 'aveva',
+    'avevano', 'costa', 'costano', 'costava', 'vale', 'valeva', 'pesa', 'pesava', 'misura', 'misurava', 'conta',
+    'contava', 'supera', 'superava', 'raggiunge', 'toccato', 'pari', 'media', 'quota', 'numero', 'anno', 'nr', 'n',
+    'of', 'is', 'was', 'are', 'were', 'about', 'around', 'over', 'under', 'nearly', 'almost', 'only', 'just', 'at',
+    'by', 'to', 'from', 'has', 'had', 'have', 'costs', 'cost', 'weighs', 'roughly', 'approximately', 'than', 'year',
+    'since', 'until', 'reached', 'hit', 'with', 'average',
+  ]);
+  const UNITA = new Set([
+    'euro', 'eur', 'dollari', 'dollaro', 'dollars', 'dollar', 'usd', 'sterline', 'franchi', 'yen', 'anni', 'anno',
+    'years', 'year', 'mesi', 'months', 'giorni', 'days', 'ore', 'hours', 'minuti', 'minutes', 'secondi', 'seconds',
+    'metri', 'metro', 'm', 'km', 'cm', 'mm', 'kg', 'g', 'grammi', 'chili', 'tonnellate', 'litri', 'l', 'gradi', 'mila',
+    'milioni', 'milione', 'miliardi', 'miliardo', 'million', 'millions', 'billion', 'billions', 'thousand', 'k', 'mln',
+    'mld', 'persone', 'abitanti', 'people', 'inhabitants', 'volte', 'times', 'punti', 'points', 'percento', 'kwh', 'gb',
+    'mb', 'tb', 'ghz', 'cv', 'hp', 'mph', 'pagine', 'pages', 'copie', 'voti', 'votes', 'utenti', 'users', 'dipendenti',
+    'employees', 'morti', 'vittime', 'deaths', 'casi', 'cases', 'ettari', 'piedi', 'feet', 'miglia', 'miles', 'pollici',
+    'inches', 'mq', 'kmq', 'gol', 'goals', 'squadre', 'paesi', 'stati', 'specie',
+  ]);
+  const PAROLA_PRIMA = /(?:^|[^\p{L}\p{N}'’])([\p{L}][\p{L}'’]*)\.? +$/u;
+  const VALUTA_PRIMA = /[$€£¥] ?$/u;
+  const SEGNO_DOPO = /^ ?(?:%|‰|°|[$€£¥])/u;
+  const PAROLA_DOPO = /^ +([\p{L}]+)/u;
+
+  function numeroAttorno(testo, start, end) {
+    const prima = testo.slice(Math.max(0, start - 40), start);
+    if (VALUTA_PRIMA.test(prima)) return true;
+    const p = PAROLA_PRIMA.exec(prima);
+    if (p && ANNUNCIANO.has(p[1].replace(/’/g, "'").toLowerCase())) return true;
+    const dopo = testo.slice(end, end + 30);
+    if (SEGNO_DOPO.test(dopo)) return true;
+    const d = PAROLA_DOPO.exec(dopo);
+    return !!d && UNITA.has(d[1].toLowerCase());
+  }
+
+  function segnaposti(testo) {
+    testo = String(testo ?? '');
+    if (!/x/i.test(testo)) return [];
+    const fuori = zoneEscluse(testo);
+    const out = [];
+    for (const m of testo.matchAll(GRUPPO_X)) {
+      const g = m[0];
+      const start = m.index;
+      const end = start + g.length;
+      if ((g.match(/x/gi) || []).length < 2 || /x\d/i.test(g)) continue;
+      if (fuori.some(([a, b]) => start < b && end > a)) continue;
+      if (/\d/.test(g)) {
+        if (!/^[\d.,'’]*\d[\d.,'’]*x+$/i.test(g.split(/[.,'’]/).filter(Boolean).map((p) => p).join('') ? g.replace(/[.,'’]/g, '') : g)) continue;
+      } else if (/X/.test(g) || g.replace(/[.,'’]/g, '').length > 6 || !numeroAttorno(testo, start, end)) continue;
+      out.push(segno(testo, start, end, {
+        segno: 'suggerimento', fonte: 'segnaposto', tipo: 'segnaposto', motivo: t('spell_segnaposto_forse'),
+      }));
+    }
+    return out;
+  }
+
   // I segni che non si sovrappongono, nell'ordine: a parità di inizio vince il primo della lista (i più certi davanti).
   function senzaSovrapposti(lista) {
     const ordinati = lista.map((it, i) => ({ it, i })).sort((a, b) => a.it.start - b.it.start || a.i - b.i);
