@@ -145,6 +145,11 @@ rossi noti torna in correzione con l'elenco degli spec rotti.)
 - **Il lavoro di un worker morto a metà si butta**: rilascia il claim, il ramo
   si abbandona. Niente riprese a freddo — riprendere il codice senza il
   ragionamento che l'ha prodotto è peggio che rifare.
+- **Niente notifiche all'owner** (PushNotification, file mandati come
+  proactive), nemmeno dopo un guasto: un giro chiuso è avanzamento normale, il
+  motivo sta nei log del run e il pacemaker riaccende. Il gancio del preflight
+  le rifiuta anche ai worker; senza gancio non si mandano lo stesso. Quello che
+  chiede un suo intervento gli arriva come domanda in Gestione.
 - **RIFIUTO ≠ GUASTO**: rifiutato dal server (exit 4) = il server ha guardato
   e ha detto no — leggi il motivo, non insistere, non aggirare. Guasto
   (exit 3) = il server non c'è — ci si ferma.

@@ -39,7 +39,10 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
   chiusura o un ridimensionamento il bordo conta solo quando il puntatore si
   muove. Il mouse di Playwright entra dritto in una vista e salta questa
   scelta: la prova è col puntatore vero (`tests/barra-laterale-bordo.spec.mjs`,
-  XTest sotto xvfb).
+  XTest sotto xvfb). Una prova che spinge la striscia col mouse di Playwright
+  prima chiama `puntatoreCheSegue` (`tests/helpers/barra.mjs`): sennò il main
+  legge il puntatore del sistema lontano e, se il pannello tarda a dire
+  «dentro», chiude la barra appena aperta (#1216.2).
 - **Il menu aperto dove si apre la barra** non si copre: trascinando un'icona
   da un menu che comincia nella fascia del pannello, la barra si apre solo al
   bordo, a sinistra del menu, e si richiude se il puntatore torna sul menu.

@@ -3,7 +3,7 @@
 // Regole: patterns/la-shell-non-disegna-sopra-la-pagina.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu, puntatoreCheSegue } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
@@ -197,7 +197,9 @@ test('sopra l\'avviso del sito pericoloso un clic sull\'avviso chiude la barra, 
   await sullAvviso([{ type: 'mouseMove', x: 700, y: 500 }, ...clic(700, 500)]);
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 3000 }).toBe(false);
 
-  await comandaBarra(app, 'spinta');
+  await puntatoreCheSegue(app);
+  await barra.mouse.move(0, 300);
+  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('spinta');
   await pannelloFermo(barra);
   for (let i = 0; i < 10; i++) { await sullAvviso([{ type: 'mouseMove', x: 600 + i * 10, y: 400 }]); await barra.waitForTimeout(150); }
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 4000 }).toBe(false);
