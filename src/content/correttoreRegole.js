@@ -190,7 +190,8 @@
   const PAROLA_DOPO = /^ +([\p{L}]+)/u;
   // Un verbo prima e le cose contate dopo, al plurale: «ha scritto xx sinfonie», «vinse xx scudetti», «released xx albums».
   // Le due condizioni insieme, perché un saluto («bene xx», «a presto xx») non ha né l'uno né l'altro.
-  const VERBO = /(?:[aiu]t[oaie]|(?:scritt|vint|fatt|pres|mess|lett|dett|vist|pers|spes|cors|chius|apert|prodott|condott|tradott|raccolt|scelt|tolt|rott|compost|dipint|raggiunt|uccis|decis|divis|inclus)[oaie]|[^aeiou]s[ei]|ss[ei]|ò|arono|erono|irono|[^e]ed)$/u;
+  const VERBO = /(?:[aiu]t[oaie]|(?:scritt|vint|fatt|pres|mess|lett|dett|vist|pers|spes|cors|chius|apert|prodott|condott|tradott|raccolt|scelt|tolt|rott|compost|dipint|raggiunt|uccis|decis|divis|inclus)[oaie]|[^aeiu]s[ei]|ss[ei]|ò|arono|erono|irono|[^e]ed)$/u;
+  const VERBI_BREVI = new Set(['won', 'wrote', 'sold', 'made', 'built', 'took', 'gave', 'spent', 'lost', 'got', 'fece', 'diede', 'ebbe']);
   const NON_CONTATE = new Set(['che', 'come', 'bene', 'sempre', 'anche', 'dove', 'mentre', 'oppure', 'grazie', 'baci', 'kisses', 'thanks', 'this', 'his', 'yes', 'xoxo']);
   const contate = (w) => w.length >= 3 && w === w.toLowerCase() && !NON_CONTATE.has(w) && /[ies]$/.test(w);
 
