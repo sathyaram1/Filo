@@ -479,10 +479,13 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
       for (const { s, t: inizio } of ordinate) {
         if (legate.has(s.id)) continue;
         const fine = Date.parse(s.closedAt) || inizio;
-        const viste = perUrl.get(s.url) || [];
+        const u = taglia(s.url, MISURA.url);
+        const tt = taglia(s.title && s.title !== s.url ? s.title : '', MISURA.titolo);
+        const viste = perUrl.get(u.testo) || [];
         if (viste.some((x) => x >= inizio - MARGINE_SCHEDA_MS && x <= fine + MARGINE_SCHEDA_MS)) continue;
         eventi.push(t.evento(E().TIPI.NAVIGAZIONE, {
-          url: s.url, titolo: String(s.title && s.title !== s.url ? s.title : ''), archivio: s.id,
+          url: u.testo, titolo: tt.testo, archivio: s.id,
+          urlTagliato: (u.tagliato || s.urlTagliato === true) || undefined, titoloTagliato: (tt.tagliato || s.titleTagliato === true) || undefined,
         }, { autore: 'utente', ts: new Date(inizio).toISOString() }));
       }
       const { scritti } = eventi.length ? await t.scrivi(eventi) : { scritti: [] };
