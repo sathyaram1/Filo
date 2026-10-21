@@ -1837,7 +1837,7 @@
     if (sp.fonteDato && sp.fonteDato.url) {
       righe.push({ type: 'item', label: I18n.t('spell_segnaposto_apri_fonte'), onClick: () => Actions.apriInSchedaNuova(sp.fonteDato.url) });
     }
-    if (sp.ricercaFallita) righe.push({ type: 'item', label: I18n.t('spell_segnaposto_riprova'), onClick: () => SpellCheck.cercaDiNuovo(editableEl, sp) });
+    if (sp.ricercaFallita) righe.push({ type: 'item', label: I18n.t(sp.vocePerCercare || 'spell_segnaposto_riprova'), onClick: () => SpellCheck.cercaDiNuovo(editableEl, sp) });
     righe.push(
       { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sp) },
       { type: 'separator' },

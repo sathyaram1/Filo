@@ -94,3 +94,19 @@ test('la ricerca di un segnaposto è la sua domanda, non la frase: un ritocco de
   assert.notEqual(k('Alphabet P/E ratio'), k('Nasdaq dot-com average P/E'));
   assert.notEqual(C.chiaveRicerca('xx', { domanda: 'q', dove: 'web' }), C.chiaveRicerca('xx', { domanda: 'q', dove: 'wiki:en' }));
 });
+
+test('un segnaposto è la sua frase fino alle x: ciò che segue non lo cambia, il soggetto sì', () => {
+  const id = (testo, quale = 0) => {
+    let i = -1;
+    for (let n = 0; n <= quale; n++) i = testo.indexOf('xx', i + 1);
+    return C.identitaSegnaposto(testo, i, i + 2);
+  };
+  const base = id('Google ha un p/e di soli xx, ');
+  assert.equal(base, 'google ha un p e di soli xx');
+  assert.equal(id('Google ha un p/e di soli xx, davvero basso per una azienda così.'), base);
+  assert.equal(id('Prima frase. Google  ha un P/E di soli xx, davero basso.'), base);
+  assert.notEqual(id('Apple ha un p/e di soli xx, davvero basso.'), base);
+  const due = 'Google ha un p/e di soli xx, mentre il Nasdaq aveva un p/e di xx.';
+  assert.notEqual(id(due, 0), id(due, 1));
+  assert.equal(C.identitaSegnaposto('xx', 1, 1), '');
+});

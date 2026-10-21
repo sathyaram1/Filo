@@ -1810,21 +1810,24 @@
     for (const m of state.modello) if (m.cerca && m.cerca.chiave && !ricerche.has(m.cerca.chiave)) cercaValore(state, m.cerca, m.segment);
   }
 
-  async function cercaValore(state, cerca, pezzo) {
+  // Perché una ricerca non è partita, dal main: non è un dato che non c'è.
+  const NON_PARTITA = { PAGINA_DELICATA: 'delicata', RICERCA_BLOCCATA: 'bloccata' };
+
+  async function cercaValore(state, cerca, pezzo, { suRichiesta = false } = {}) {
     const k = cerca.chiave;
     ricerche.set(k, { stato: 'cerca' });
     while (ricerche.size > RICERCHE_MAX) ricerche.delete(ricerche.keys().next().value);
     let res = null;
     try {
       res = await chiedi(ACTIONS.SPELLCHECK_CONTEXT, {
-        segnaposto: { pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove },
+        segnaposto: { pezzo, frase: cerca.frase, domanda: cerca.domanda, dove: cerca.dove, ...(suRichiesta ? { suRichiesta: true } : {}) },
       }, { giorno: new Date().toDateString() });
     } catch (err) {
       console.warn('[SN] correttore, segnaposto:', err);
     }
     const ok = !!(res && res.ok && typeof res.text === 'string');
     const v = ok ? R().valoreTrovato(res.text) : null;
-    ricerche.set(k, v ? { stato: 'trovato', ...v } : { stato: ok ? 'nessuno' : 'errore' });
+    ricerche.set(k, v ? { stato: 'trovato', ...v } : { stato: ok ? 'nessuno' : (NON_PARTITA[res && res.code] || 'errore') });
     if (res && !res.ok) console.warn('[SN] correttore, segnaposto:', res.code, res.error);
     if (state.attivo) renderOverlayContent(state);
     avvisaAscoltatori(state);
@@ -1838,14 +1841,20 @@
     if (r.stato === 'trovato') {
       return { ...m, correzioni: [r.valore], motivo: r.motivo, fonteDato: { nome: r.fonte, data: r.data, url: r.url } };
     }
-    return { ...m, motivo: t(r.stato === 'errore' ? 'spell_segnaposto_errore' : 'spell_segnaposto_nessuno'), ricercaFallita: r.stato === 'errore' };
+    const motivo = { errore: 'spell_segnaposto_errore', delicata: 'spell_segnaposto_delicata', bloccata: 'spell_segnaposto_bloccata' }[r.stato];
+    return {
+      ...m, motivo: t(motivo || 'spell_segnaposto_nessuno'),
+      ricercaFallita: r.stato === 'errore' || r.stato === 'delicata',
+      vocePerCercare: r.stato === 'delicata' ? 'spell_segnaposto_cerca' : 'spell_segnaposto_riprova',
+    };
   }
 
+  // Col clic di chi scrive: è una richiesta, quindi parte anche da una pagina delicata.
   function cercaDiNuovo(el, segno) {
     const state = el && monitored.get(el);
-    if (!state || !segno || !segno.cerca) return;
+    if (!state || !segno || !segno.cerca || !segnapostiAttivi()) return;
     ricerche.delete(segno.cerca.chiave);
-    avviaRicerche(state);
+    cercaValore(state, segno.cerca, segno.segment, { suRichiesta: true });
     renderOverlayContent(state);
   }
 
