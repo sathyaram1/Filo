@@ -372,7 +372,12 @@ function riquadriFigli() {
     try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
     for (const f of lista) {
       out.push(f);
-      try { if (f.contentWindow.location.protocol === 'about:' && f.contentDocument) docs.push(f.contentDocument); } catch (_) {}
+      const R = globalThis.SN_RIQUADRI_IN_ARRIVO;
+      try {
+        const w = R && R.finestra(f);
+        const d = w && w.location.protocol === 'about:' ? R.documento(f) : null;
+        if (d) docs.push(d);
+      } catch (_) {}
     }
   }
   return out;
