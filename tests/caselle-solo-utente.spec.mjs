@@ -123,7 +123,9 @@ test('feedback su un sito: il sito che seleziona tutto dentro il tasto dell\'ute
   for (const cattura of [false, true]) {
     const page = await testServer.openReady(openTab, pagina(`<p>Un sito</p>${DENTRO}`));
     await apriFeedback(app, page);
-    await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro non va');
+    // La bozza del primo giro torna nella casella del secondo, sullo stesso sito.
+    await scrivi(app, page, '.sn-fb-text', cattura ? '' : 'Il tasto indietro non va');
+    await expect.poll(() => valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro non va');
     await page.evaluate((c) => window.selezionaDentro(c), cattura);
     await page.keyboard.type('!', { delay: 30 });
     expect(await valore(app, page, '.sn-fb-text'), cattura ? 'in cattura' : 'dopo Filo').toBe('Il tasto indietro non va!');
