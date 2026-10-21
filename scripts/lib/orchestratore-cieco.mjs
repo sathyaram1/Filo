@@ -25,6 +25,10 @@ export const MOTIVO_DUE_BIGLIETTI = 'Lancio rifiutato: nel prompt ci sono biglie
 export const MOTIVO_REGISTRO = 'Lancio rifiutato: non leggo il registro delle decisioni del server, che scrive il comando ticket. Rilascia il biglietto (release <biglietto> --role orchestrator) e chiudi il giro.';
 export const MOTIVO_SCONOSCIUTO = 'Lancio rifiutato: il biglietto non risulta fra quelli chiesti al server nelle ultime 24 ore, quindi non so modello e sforzo decisi. Il biglietto si chiede col comando ticket; se lo hai, rilascialo e chiudi il giro.';
 export const MOTIVO_IGNOTO = 'Lancio rifiutato: il server ha deciso un modello o uno sforzo che questo gancio non conosce. Rilascia il biglietto (release <biglietto> --role orchestrator) e chiudi il giro.';
+// Un giro chiuso per guasto è avanzamento normale e l'owner non si chiama (#1496): ciò che gli chiede un intervento è una
+// domanda in Gestione. SendUserFile conta solo con status proactive, l'unico che arriva al telefono.
+export const MOTIVO_NOTIFICA = 'Notifica rifiutata: le routine non mandano notifiche. Un giro chiuso per un guasto è avanzamento normale: lo riaccende il pacemaker, e il motivo sta nei log del run. Una decisione che serve davvero si chiede con una domanda in Gestione, se il tuo ruolo la prevede.';
+export const MATCHER_PRIMA = 'Agent|Task|PushNotification|SendUserFile';
 // Il server sceglie il modello e il gancio lo mette; opus resta il default di chi lancia senza dirlo, perché senza un
 // sotto-agente girerebbe sul modello della sessione principale. Profondità fissata: Claude Code l'ha già cambiata tre volte.
 export const AMBIENTE = Object.freeze({
