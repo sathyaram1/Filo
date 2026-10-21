@@ -437,11 +437,12 @@ module.exports = function register(on, ctx) {
           const via = entry.permesso(name);
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
-          askDest = () => via.then((si) => (si ? pickDestination(name) : { cancelled: true })).then((d) => {
+          // Un no l'ha già chiuso la voce; un trasferimento caduto durante la domanda resta un errore, non un annullamento.
+          askDest = () => via.then((si) => (si ? pickDestination(name).then((d) => {
             // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
             if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
             return d;
-          });
+          }) : null));
           askTimer = setTimeout(ensureDest, ASK_AFTER_MS);
           // Il file parziale cresce nella cartella dove atterrerebbe un download
           // nativo: se la destinazione è lì (quasi sempre) la consegna finale è
