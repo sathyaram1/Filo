@@ -500,6 +500,7 @@ test('chiesta a Filo in chat la barra si apre e resta aperta mentre il mouse gir
 test('aperta col mouse, il puntatore che torna sulla pagina la chiude', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(() => aperta(app)).toBe(true);
   await pannelloFermo(barra);
