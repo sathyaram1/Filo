@@ -318,6 +318,7 @@ test('le istruzioni: modello e sforzo li mette il gancio; i worker scelgono quel
   assert.doesNotMatch(orch, /model: "opus"/);
   assert.match(orch, /ripiega su `general-purpose`\./);
   assert.match(orch, /il gancio che il preflight ha installato li mette al lancio come li ha decisi il server/);
+  assert.match(orch, /Niente notifiche all'owner\*\* \(PushNotification/, 'l\'orchestratore sa che non deve provarci, anche senza gancio');
   const contratto = readFileSync(join(RADICE, 'routines', 'roles', '_contratto-worker.md'), 'utf8');
   const sezione = (/^## Sotto-agenti\n([\s\S]*?)(?=^## )/m.exec(contratto) || [])[1] || '';
   assert.match(sezione, /parametro `model`/);
