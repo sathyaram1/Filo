@@ -228,6 +228,19 @@
     .mg-livello-btn svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
     .mg-livello-count { opacity: 0.8; }
     .mg-livello-count:empty { display: none; }
+    /* «Solo non fidate» sta nelle teste delle colonne, che scrivono in maiuscolo: la pasticca resta come le altre. Lo
+       scudo è quello vuoto delle righe non fidate, nel loro colore. */
+    .mg-fiducia-filtro[hidden] { display: none; }
+    .mg-fiducia-filtro { text-transform: none; letter-spacing: 0; font-weight: 400; flex: 0 0 auto; }
+    .mg-fiducia-filtro svg path { stroke: var(--mg-nonfidata-color); stroke-dasharray: 3 2; }
+    .mg-fiducia-filtro[aria-pressed="true"] {
+      border-color: var(--mg-nonfidata-color);
+      background: color-mix(in srgb, var(--mg-nonfidata-color) 14%, transparent);
+    }
+    .mg-head-tasti { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+    /* In una colonna stretta va a capo la pasticca, non il nome della scheda col suo numero. */
+    .mg-list-head-row { flex-wrap: wrap; row-gap: 4px; }
+    #mgListHead { white-space: nowrap; }
 
     /* Domande: elenco a sinistra, la domanda (o il gruppo intero) a destra; tutta l'altezza come la lista dei feedback. */
     #panel-domande.mg-panel--active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
