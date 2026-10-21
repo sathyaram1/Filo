@@ -143,6 +143,24 @@ function sinteticiRefusi(etichetta) {
   return out;
 }
 
+// I nomi che servizi cloud e anteprime generano a caso: un marchio corto ci cade dentro per caso (dh1, n26, bunq), uno
+// su duemila, e non imita nessuno. Restano solo quelli che portano un candidato.
+function sinteticiCasuali(quanti = 4000) {
+  const caso = rng(23);
+  const segni = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const pezzo = (k) => Array.from({ length: k }, () => segni[Math.floor(caso() * segni.length)]).join('');
+  const forme = [
+    (a) => a + '.cloudfront.net', (a) => a + '.a-caso.example.com', (a) => pezzo(8) + '-' + a + '.vercel.app',
+    (a) => a + '.netlify.app', (a) => a + '-' + pezzo(4) + '.herokuapp.com', (a) => 'x' + a + '.cdn.example.net', (a) => a + '.trycloudflare.com',
+  ];
+  const out = [];
+  for (let i = 0; out.length < quanti && i < quanti * 1000; i++) {
+    const h = forme[i % forme.length](pezzo(6 + Math.floor(caso() * 10)));
+    if (IM.esempi(normalize('https://' + h + '/')).length) out.push({ h, url: 'https://' + h + '/', marchio: null });
+  }
+  return out;
+}
+
 function displayDi(token) {
   const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
   return (BRANDS.find((b) => b.token === token) || {}).display;
