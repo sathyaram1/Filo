@@ -3415,6 +3415,24 @@ class TabManager {
     this._sbGuardaFinestrella(win, origine);
   }
 
+  // La finestrella è una pagina del sito come una scheda: il suo menu del tasto destro sta nel suo strato (#1054), mai
+  // nel documento, che è proprio quello dove si incollano le password.
+  _stratoNellaFinestrella(win, pwc) {
+    const strato = new StratoDelMenu(win, {
+      schedaAttiva: () => (pwc.isDestroyed() ? null : pwc),
+      area: () => {
+        if (win.isDestroyed()) return null;
+        const [width, height] = win.getContentSize();
+        return { x: 0, y: 0, width, height };
+      },
+      scheda: (wc) => (wc === pwc && !pwc.isDestroyed() ? { id: `finestrella-${pwc.id}`, url: pwc.getURL() } : null),
+    });
+    if (!strato.acceso) return;
+    win._filoStrato = strato;
+    pwc.on('context-menu', (_e, params) => strato.segnaClic(pwc, params));
+    win.on('resize', () => strato.posa());
+  }
+
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
   // mostra l'avviso "Bloccato popup da <host>" con «Apri» per aprirlo.
   // `pagina`: l'avviso chiuso dall'utente tace finché la scheda resta su quella pagina.
