@@ -9,9 +9,17 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GRUPPI_DI_CARTA = /(?<![\p{L}\p{N}])\d{4}(?: \d{4})+(?![\p{L}\p{N}])/gu;
 
 // Chi risponde a chi chiede una password o un codice non lo annuncia («certo, Gatto2024»): lo annuncia la domanda, o la
-// richiesta senza punto di domanda («mandami il pin», «dimmela», «mi serve la password», «send me the code»).
-const RICHIESTA = new RegExp('(?<!\\p{L})(?:(?:(?:mand|invi|pass|gir|ricord)a|scriv[ei])r?|d[ai][rm])m(?:i|el[ao])(?!\\p{L})'
-  + '|(?<!\\p{L})(?:(?:mi|ci) serv(?:e|irebbe)|ho bisogno|send|give|tell|share)(?!\\p{L})', 'iu');
+// richiesta senza punto di domanda, che in chat è la forma comune («mi mandi la password», «mandami il pin», «hai la
+// password del wifi», «qual è il codice», «send me the code»). Prove: tests/unit/correttoreRiservati.test.mjs.
+const RICHIESTA = new RegExp([
+  '(?:(?:(?:mand|invi|pass|gir|ricord)a|scriv[ei])r?|d[ai][rm])m(?:i|el[ao])',
+  '(?:mi|ci|me\\s*l[aoe\'’]?|ce\\s*l[aoe\'’]?)\\s*(?:(?:mand|invi|scriv|gir|pass|ricord|prest|condivid|mostr|dett|incoll|cop)(?:i|ate|ete|eresti|ereste)|dic?i|dite|da[it]?e?|daresti|diresti)',
+  '(?:puoi|può|potresti|potete|potreste|riesci|riusciresti|sai|sapete|sapresti|hai|avete|conosci|ce\\s*l[\'’]?hai|qual[e\'’]?|com[\'’]|cos[\'’])',
+  '(?:(?:mi|ci) serv(?:e|irebbe)|ho bisogno|per\\s*favore|perfavore|x\\s*favore|pls|plz|please)',
+  '(?:send|give|tell|share|what|need|can\\s+you|could\\s+you|do\\s+you)',
+].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
+// In chat la password si chiede anche così: parole che le funzioni automatiche non trattano come annuncio di un dato.
+const CHIESTA_IN_CHAT = '(?<![\\p{L}\\p{N}])(?:pw|pass|credenziali|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
 const FINE_FRASE = /[.!?]+(?=\s|$)|\n/g;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
