@@ -866,6 +866,9 @@
     // %1 = il limite di adesso, %2 = quello del backup, %3 = il bottone che lo mette
     security_import_tetto_backup: 'Il limite di spesa mensile resta %1. Nel backup era %2. Per usare quello, scegli «%3».',
     security_import_tetto_senza: 'Il limite di spesa mensile resta %1. Nel backup non c’era un limite. Per toglierlo, scegli «%3».',
+    // %1 = il limite di adesso, %2 = quello del backup, più stretto, che entra
+    security_import_tetto_sceso: 'Il limite di spesa mensile scende da %1 a %2, quello del backup.',
+    security_import_tetto_sceso_senza: 'Il limite di spesa mensile diventa %2, quello del backup: adesso non hai un limite.',
     security_import_tetto_btn: 'Importa col limite del backup',
     security_import_tetto_btn_senza: 'Importa e togli il limite',
     security_import_senza_chiavi: 'Le chiavi API non sono nell’archivio. Quelle salvate qui restano come sono.',
