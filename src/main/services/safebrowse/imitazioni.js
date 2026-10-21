@@ -266,7 +266,8 @@ function caratteristiche(c, zone, info) {
   const lun = fascia(t.length, [4, 5, 6, 7, 9]);
   const parola = c.mc.parola ? 1 : 0;
   f.push('k=' + k, 'z=' + c.zona, 'kz=' + k + c.zona, 'ko=' + k + (info.ospitato ? 1 : 0), 'zo=' + c.zona + (info.ospitato ? 1 : 0));
-  f.push('b=' + t, 'bk=' + t + '|' + k, 'bz=' + t + '|' + c.zona);
+  // Il marchio col tipo E la zona: mail.qualcosa.com, a una lettera da gmail davanti a un altro sito, è innocuo, gmal.com no.
+  f.push('b=' + t, 'bk=' + t + '|' + k, 'bz=' + t + '|' + c.zona, 'bkz=' + t + '|' + k + c.zona);
   f.push('l=' + lun + k, 'd=' + c.d + k + lun, 'm=' + c.mut + k, 'pz=' + pezzo + k, 'pzz=' + pezzo + c.zona);
   f.push('pa=' + parola + k, 'pal=' + parola + lun + pezzo);
   f.push('tld=' + tld, 'ps=' + suff, 'kt=' + k + '|' + tld, 'kps=' + k + '|' + suff, 'bt=' + t + '|' + tld);
