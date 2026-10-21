@@ -1083,16 +1083,16 @@
   //                sotto, il resto per priorità DESC (Claude affronta prima le
   //                alte), poi severità del blocco, poi recenza.
   //   altre      → createdAt DESC.
-  // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
+  // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti"; `opts.soloNonFidate` è il filtro
+  // della fiducia, `opts.livelli` quello dei Ricevuti.
   function listForManageTab(feedbacks, tab, opts) {
-    const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
+    const items = filtraFiducia((feedbacks || []).filter((f) => manageTabFor(f, opts) === tab), opts && opts.soloNonFidate);
     if (tab === 'inbox') return sortReview(filtraLivelli(items, opts && opts.livelli, opts));
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
-    // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
-    // stessa coda, lavorata da un'altra parte; chi aspetta (#903) la stessa coda, più tardi.
-    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
+    // volta l'ordine per priorità dentro ogni gruppo. Chi aspetta (#903) è la stessa coda, più tardi.
+    if (tab === 'queue' || tab === 'waiting') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in
       // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
