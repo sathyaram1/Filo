@@ -364,6 +364,16 @@ test('l\'icona si toglie dalla barra e nel menu del tasto destro fa lo stesso; l
   await menuDi(page).voce('Aiuto').first().click();
   await expect(aiuto).not.toHaveClass(/sn-sidebar-collapsed/);
 
+  // Spento in Preferenze: nella riga è spenta e dice perché, come nella barra.
+  await imposta(app, { featureFlags: { help: false } });
+  await expect(aiuto).toHaveCount(0, { timeout: 8_000 });
+  await page.locator('h1').click({ button: 'right' });
+  const spenta = menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]');
+  await expect(spenta).toHaveClass(/sn-menu-btn-disabled/, { timeout: 8_000 });
+  await expect(spenta).toHaveAttribute('aria-label', 'Aiuto spento in Preferenze');
+  await page.keyboard.press('Escape');
+  await imposta(app, { featureFlags: { help: true } });
+
   // E si rimette nella barra.
   await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'bar', beforeId: 'back' }, {}));
   await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['help', 'back']);
