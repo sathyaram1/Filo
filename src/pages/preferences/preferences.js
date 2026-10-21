@@ -314,7 +314,8 @@
     if (!r || !r.ok) return;
     flashSaved('onboardingHint');
     renderOnboardingArchive(r.onboarding);
-    chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://newtab/' });
+    // Il segno lega l'intervista a questa scheda: le altre home restano il filo (#1297).
+    chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://newtab/?accoglienza=1' });
   }
 
   function onboardingWhen(conv) {
