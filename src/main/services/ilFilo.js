@@ -6,6 +6,8 @@
 
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { perRiga } = require('./leggiARighe');
+const { MISURA, taglia } = require('./misurePagine');
 
 const E = () => globalThis.SN_FILO_EVENTI;
 const FILE_EVENTI = 'eventi.jsonl';
@@ -14,6 +16,28 @@ const FILE_DISPOSITIVO = 'dispositivo';
 const FILE_SCHEDE_ENTRATE = 'schede-chiuse-entrate';
 // Una visita già nel filo per la stessa scheda chiusa: stesso indirizzo, aperta fra l'apertura e la chiusura (più un margine).
 const MARGINE_SCHEDA_MS = 2 * 60 * 1000;
+// Oltre questa misura il file si fa notare una volta per avvio, con la strada per alleggerirlo (#1525): non è un tetto.
+const SOGLIA_AVVISO = 256 * 1024 * 1024;
+// Il filo che non si legge lo dice; ogni richiesta riprova, ma l'avviso non torna a ogni pagina aperta.
+const RIPETI_ILLEGGIBILE_MS = 10 * 60 * 1000;
+const CANCELLA_PAGINE_URL = 'filo://security/security.html#cancella-pagine';
+
+function avvisoDiFinestra(testo, opts) {
+  try { require('./avvisoFinestra').avvisoQuandoPronta(testo, opts); } catch (_) {}
+}
+
+// La causa come la capisce chi usa Filo: il codice di sistema resta nel log.
+function causaDi(e) {
+  const c = e && e.code;
+  if (c === 'EACCES' || c === 'EPERM') return 'il sistema non dà il permesso di leggerle';
+  if (c === 'EBUSY') return 'un altro programma tiene occupato il file';
+  if (c === 'EIO') return 'il disco ha dato un errore di lettura';
+  if (c === 'EMFILE' || c === 'ENFILE') return 'il sistema ha troppi file aperti in questo momento';
+  if (c === 'EISDIR') return 'al posto del file c’è una cartella';
+  if (c === 'ENOMEM' || e instanceof RangeError) return 'non c’è abbastanza memoria per leggerle';
+  const m = String((e && e.message) || '').trim();
+  return m ? `errore «${m.slice(0, 200)}»` : 'un errore sconosciuto';
+}
 
 function disco() {
   try { return require('../shim/storage'); } catch (_) { return null; }
