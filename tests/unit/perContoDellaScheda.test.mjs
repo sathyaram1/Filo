@@ -1,6 +1,6 @@
 // #1272 — le richieste che il main fa per conto di una scheda: Referer al massimo l'origine della pagina (mai da https a
 // http, mai contro la sua politica), mai verso la rete di casa, il nome risolto dal proxy quando la scheda ne ha uno.
-// Rete finta: DNS e il singolo passo della richiesta sostituiti; la richiesta vera la provano gli spec proxy-tab.
+// Rete finta: DNS e il singolo passo della richiesta sostituiti; la richiesta vera la prova tests/proxy-tab.spec.mjs.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -127,6 +127,10 @@ test('dietro il proxy della scheda il nome non si chiede al DNS di casa; gli ind
   for (const verso of ['http://127.0.0.1/x', 'http://localhost/x', 'http://10.0.0.1/x', 'http://stampante.local/x']) {
     await assert.rejects(() => P.perContoDellaScheda(s, verso), /blocked-private-address/, verso);
   }
+  // Un proxy che può ripiegare sul collegamento diretto non vale come proxy: il nome si controlla qui.
+  const conRipiego = scheda('https://pagina.example/', { resolveProxy: async () => 'PROXY proxy.azienda.example:8080; DIRECT' });
+  await assert.rejects(() => P.perContoDellaScheda(conRipiego, 'http://interno.example/x'), /blocked-private-address/);
+  assert.deepEqual(chiestiAlDns, ['interno.example']);
 });
 
 test('senza una scheda viva non parte niente', async () => {
