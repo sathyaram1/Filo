@@ -689,10 +689,8 @@
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
-    if (tab === 'inbox' && aspettaDomanda(fb)) return isLocalOnly(fb) ? 'local' : 'queue';
-    // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
-    // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
-    if (tab === 'queue' && isLocalOnly(fb)) return 'local';
+    if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
+    // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
     // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
     if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
