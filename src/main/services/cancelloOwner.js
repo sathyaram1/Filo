@@ -82,6 +82,8 @@ function creaCancello({ leggi, scrivi, soloOwner }) {
 
   /** Per chi deve decidere adesso (pagina, handler): alla prima lettura aspetta un poco, poi risponde. */
   async function assicura() {
+    // L'owner la vede comunque: la lettura parte, ma lui non la aspetta.
+    if (!lettoAlle && owner()) return aggiorna();
     if (!lettoAlle) {
       const lettura = scaduto() || inCorso ? rileggi() : null;
       if (lettura) {
