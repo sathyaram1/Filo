@@ -1846,7 +1846,8 @@
       // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
       // Per i "fill" il riquadro è comunque mostrato (contiene valore + bottone Accetta).
       Highlight.clear();
-      if (parsed.highlight) {
+      // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
+      if (parsed.highlight && !nascosto) {
         const act = parsed.highlight.action;
         if (act === 'reveal' || act === 'hover') {
           // Auto-action: la eseguiamo noi senza coinvolgere l'utente.
