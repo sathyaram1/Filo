@@ -127,10 +127,9 @@ function creaDeposito({ cartella, meseDi }) {
       if (!nome.endsWith(EST)) continue;
       const mese = nome.slice(0, -EST.length);
       if (!MESE.test(mese)) continue;
-      const testo = await fsp.readFile(fileDi(mese), 'utf8');
-      leggiMese(mese, testo);
+      const { aCapo } = await leggiMese(mese);
       // Una riga troncata da un arresto non deve incollarsi alla prossima aggiunta.
-      if (testo && !testo.endsWith('\n')) fs.appendFileSync(fileDi(mese), '\n', 'utf8');
+      if (!aCapo) fs.appendFileSync(fileDi(mese), '\n', 'utf8');
     }
     for (const mese of [...mesi.keys()]) compattaSeServe(mese);
     elenco = null;
