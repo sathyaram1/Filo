@@ -310,6 +310,7 @@
     clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
+    clipboard_image_senza_descrizione: 'Immagine',
 
     // Categorie default
     category_default: 'Da vedere',
