@@ -253,7 +253,10 @@
     else if (d.cosa === 'riga') Menu.refreshIconRow(costruisci(d.items, []));
     else if (d.cosa === 'griglia') Menu.refreshIconGrid(costruisci(d.items, []));
     else if (d.cosa === 'fuori') {
-      Menu.trascinaDaFuori({ fase: String(d.fase || ''), id: String(d.icona || ''), x: Number(d.x) || 0, y: Number(d.y) || 0, icon: pulisciIcona(String(d.svg || '')) });
+      // L'anteprima finisce in innerHTML: passa solo un SVG ripulito, il resto come testo.
+      const ic = pulisciIcona(String(d.svg || ''));
+      const icon = /^<svg[\s>]/.test(ic) ? ic : ic.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+      Menu.trascinaDaFuori({ fase: String(d.fase || ''), id: String(d.icona || ''), x: Number(d.x) || 0, y: Number(d.y) || 0, icon });
     }
     else if (d.cosa === 'griglia-apri') {
       m.inVolo.clear();
