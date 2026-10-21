@@ -124,7 +124,8 @@ function resolve(country, { tier, settings, env } = {}) {
 // (authInfo.isProxy). Mappiamo la session della partition proxata alle sue
 // credenziali; l'handler globale risponde solo per le session registrate.
 
-const authBySession = new Map(); // partition → { ses, auth }
+// Accanto alle credenziali, le regole: chi esce per conto della scheda (la finestra nascosta dei link) le ripete uguali.
+const authBySession = new Map(); // partition → { ses, auth, rete: { proxyRules, proxyBypassRules } | null }
 let loginWired = false;
 
 function wireLoginHandler() {
@@ -135,28 +136,46 @@ function wireLoginHandler() {
   loginWired = true;
   app.on('login', (event, webContents, _request, authInfo, callback) => {
     if (!authInfo || !authInfo.isProxy || !webContents) return;
-    for (const { ses, auth } of authBySession.values()) {
-      if (webContents.session === ses) {
-        event.preventDefault();
-        try { callback(auth.username, auth.password); } catch (_) {}
-        return;
-      }
-    }
+    const auth = credenzialiDellaSessione(webContents.session);
+    if (!auth) return;
+    event.preventDefault();
+    try { callback(auth.username, auth.password); } catch (_) {}
   });
 }
 
 // Registra (o rimuove, con auth=null) le credenziali per una partition proxata.
 function setPartitionAuth(partition, ses, auth) {
-  if (auth && auth.username) {
-    authBySession.set(partition, { ses, auth });
-    wireLoginHandler();
-  } else {
-    authBySession.delete(partition);
-  }
+  registraRete(partition, ses, { auth });
+}
+
+// La partition proxata con regole e credenziali di `resolved` (quello di resolve()).
+function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null } = {}) {
+  const conAuth = auth && auth.username ? auth : null;
+  const rete = proxyRules ? { proxyRules, ...(bypassRules ? { proxyBypassRules: bypassRules } : {}) } : null;
+  if (!conAuth && !rete) { authBySession.delete(partition); return; }
+  authBySession.set(partition, { ses, auth: conAuth, rete });
+  if (conAuth) wireLoginHandler();
 }
 
 function clearPartitionAuth(partition) {
   authBySession.delete(partition);
+}
+
+function voceDellaSessione(ses) {
+  if (!ses) return null;
+  for (const v of authBySession.values()) if (v.ses === ses) return v;
+  return null;
+}
+
+function credenzialiDellaSessione(ses) {
+  const v = voceDellaSessione(ses);
+  return v && v.auth ? v.auth : null;
+}
+
+// { proxyRules, proxyBypassRules?, auth } della sessione proxata, o null per una sessione che esce come il sistema.
+function reteDellaSessione(ses) {
+  const v = voceDellaSessione(ses);
+  return v && v.rete ? { ...v.rete, auth: v.auth } : null;
 }
 
 module.exports = {
