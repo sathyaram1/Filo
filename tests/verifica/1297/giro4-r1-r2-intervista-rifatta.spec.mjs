@@ -62,7 +62,7 @@ async function rifaiDaPreferenze(app, shell, openTab) {
   return intervista;
 }
 
-test('ricaricata, la scheda della carbonara resta la carbonara anche con l’intervista rifatta aperta', async ({ app, shell, openTab }) => {
+test('r1 ricaricata, la scheda della carbonara resta la carbonara anche con l’intervista rifatta aperta', async ({ app, shell, openTab }) => {
   test.setTimeout(150_000);
   const carb = await carbonara(app, shell);
   await rifaiDaPreferenze(app, shell, openTab);
