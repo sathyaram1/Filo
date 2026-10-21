@@ -1889,7 +1889,7 @@
   inputEl.addEventListener('input', (e) => {
     if (!inputEl.value) testoDaFuori = false;
     else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
-    Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto();
+    Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); preparaSaldo(); aggiornaTasto();
     // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
     if (e.inputType === 'insertFromPaste') {
       const incollato = typeof e.data === 'string' ? e.data : testoIncollato;
