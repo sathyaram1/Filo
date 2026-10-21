@@ -20,7 +20,19 @@ const PAGINA = (corpo) => `<!doctype html><meta charset="utf-8">
 <h1>Pagina con un riquadro</h1>
 ${corpo}`;
 
+const TOCCA = (azione) => PAGINA(`<iframe id="riquadro" src="/riquadro"></iframe>
+<script>
+  const f = document.getElementById('riquadro');
+  const fine = Date.now() + 2500;
+  (function giro() { try { ${azione} } catch (e) {}
+    if (Date.now() < fine) setTimeout(giro, 50); })();
+</script>`);
+
 const PAGINE = {
+  '/tocca-cw': TOCCA('void f.contentWindow;'),
+  '/tocca-cd': TOCCA('void f.contentDocument;'),
+  '/tocca-pm': TOCCA("f.contentWindow.postMessage('ciao', '*');"),
+  '/tocca-una': TOCCA('if (!window.__fatto) { window.__fatto = 1; void f.contentWindow.document; }'),
   '/statico': PAGINA('<iframe id="riquadro" src="/riquadro"></iframe>'),
   '/vuoto': PAGINA('<p>niente</p>'),
   '/tocca': PAGINA(`<iframe id="riquadro" src="/riquadro"></iframe>
@@ -129,3 +141,15 @@ test('riquadro in arrivo quando la pagina è pronta: il tasto destro lì dentro 
     await expect(menuDi(riquadro).locator('.sn-menu')).toBeVisible({ timeout: 8000 });
   } finally { await s.chiudi(); }
 });
+
+for (const v of ['tocca-cw', 'tocca-cd', 'tocca-pm', 'tocca-una']) {
+  test(`variante ${v}: dentro c'è Filo e Alt+E spiega`, async ({ app, openTab }) => {
+    test.setTimeout(60_000);
+    const s = await server();
+    try {
+      await preparaProvider(app);
+      const page = await openTab(`${s.origine}/${v}`);
+      await spiegazioneDentro(app, page, `${s.origine}/riquadro`);
+    } finally { await s.chiudi(); }
+  });
+}
