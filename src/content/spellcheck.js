@@ -1818,14 +1818,26 @@
     renderOverlayContent(state);
   }
 
-  // Il valore al posto delle x, col lampo che dice dove il testo è cambiato. Vero se l'ha messo.
+  // Il valore al posto delle x, col lampo che dice dove il testo è cambiato; il cursore resta dove si stava scrivendo,
+  // perché il clic è caduto sul valore, non nel testo. Vero se l'ha messo.
   function riempi(el, segno) {
     const state = el && monitored.get(el);
     const valore = segno && segno.tipo === 'segnaposto' && !segno.cercando && segno.correzioni && segno.correzioni[0];
     if (!state || !valore) return false;
     const prima = getEditableText(el);
-    correggi(el, segno, valore);
+    const cursore = cursoreNelCampo(el);
+    applyFix(el, { start: segno.start, end: segno.end }, valore, { expectedSegment: segno.segment, cursor: 'preserve' });
     if (getEditableText(el) === prima) return false;
+    if (cursore >= 0 && !campoDiTesto(el)) {
+      const dove = cursore >= segno.end ? cursore + valore.length - (segno.end - segno.start) : cursore;
+      try {
+        const r = document.createRange();
+        placeCaretAtOffset(el, dove, r);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      } catch (_) {}
+    }
     seguiIlTesto(state);
     state.lampi.push({ start: segno.start, end: segno.start + valore.length, lampo: Date.now() });
     renderOverlayContent(state);
