@@ -370,6 +370,23 @@ test.describe('utente già accolto', () => {
     await expect(prefs.locator('.onb-conv')).toHaveCount(2, { timeout: 10_000 });
   });
 
+  test('tolta con la × l’intervista chiusa a metà, la home già aperta smette di offrire «Riprendiamola»', async ({ app, shell, openTab }) => {
+    test.setTimeout(120_000);
+    const home = await pronta(app, shell);
+    await app.evaluate(async () => {
+      const O = globalThis.SN_ONBOARDING;
+      const s = O.appendTurn(O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE }), { role: 'user', text: 'sono Anna' });
+      await globalThis.SN_FILO_MEMORY.setOnboarding(O.close(s));
+    });
+    await home.reload();
+    await home.waitForLoadState('domcontentloaded');
+    await expect(home.locator('#onbNoticeRedo')).toBeVisible({ timeout: 15_000 });
+    const prefs = await openTab('filo://preferences/preferences.html');
+    await prefs.locator('.onb-conv', { hasText: 'Anna' }).locator('.onb-via').click();
+    await expect(prefs.locator('.onb-conv')).toHaveCount(0);
+    await expect(home.locator('#onbNotice')).toBeHidden({ timeout: 10_000 });
+  });
+
   test('la × la può chiedere solo una pagina di Filo', async ({ app, shell }) => {
     await pronta(app, shell);
     await treInterviste(app);
