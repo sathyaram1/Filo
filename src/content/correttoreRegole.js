@@ -481,9 +481,9 @@
     return [String(segment || '').toLowerCase(), domanda, cerca?.dove || ''].join('\u0000');
   }
 
-  // Il dato di un segnaposto è quello di tutta la frase in cui è stato chiesto: resta finché quella frase c'è ancora
-  // intera, a meno di parole aggiunte e refusi corretti; una parola tolta o sostituita, prima o dopo le x, lo rimette al
-  // modello (#1448). Un numero vale solo uguale: «nel 2020» e «nel 2021» sono due dati.
+  // Quando la rilettura tace su un segnaposto già deciso, il dato resta se la frase è ancora quella, a meno di parole
+  // aggiunte e refusi corretti anche corti («a» → «ha»); se la rilettura chiede, decide la domanda (#1448). Un numero
+  // vale solo uguale: «nel 2020» e «nel 2021» sono due dati.
   const lontane = (a, b, max) => {
     if (Math.abs(a.length - b.length) > max) return true;
     let pp = null;
