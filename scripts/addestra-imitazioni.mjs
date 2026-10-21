@@ -41,6 +41,8 @@ const PESO_MANO = Number(arg('--peso-mano', 6));
 // I refusi scritti in automatico pesano meno di un'etichetta a mano: a peso pieno spostavano il modello sui refusi e
 // perdeva le imitazioni con altre parole.
 const PESO_SINTETICI = Number(arg('--peso-sintetici', 2));
+// Quanti sosia «marchio più parola» per marchio e per forma (secure-x, x-secure, securex, xsecure).
+const PER_FORMA = Number(arg('--per-forma', 6));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
