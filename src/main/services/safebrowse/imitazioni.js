@@ -22,27 +22,33 @@ const MARCHI = BRANDS.map((b) => ({
   token: b.token,
   soglia: tolleranza(b.token.length),
   parola: MARCHI_PAROLA.has(b.token),
+  forme: (MARCHI_PAROLA.get(b.token) || []).filter((x) => x !== b.token),
+  omonimi: new Set(b.omonimi || []),
 }));
 
 // Lo scheletro di un'etichetta (come si legge a schermo, confusables.js) con, per ogni lettera, da dove viene: serve a
 // dire cosa resta intorno al marchio e se il marchio occupa un pezzo intero fra due trattini.
 function scheletroDi(etichetta) {
-  let testo = '';
+  const pezzi = [''];
   let straniere = false;
   let cifre = false;
-  const tagli = [0];
   for (const ch of etichetta.normalize('NFC').toLowerCase()) {
-    if (ch === '-' || ch === '_') { if (tagli[tagli.length - 1] !== testo.length) tagli.push(testo.length); continue; }
+    if (ch === '-' || ch === '_') { if (pezzi[pezzi.length - 1]) pezzi.push(''); continue; }
     const m = CONFONDIBILI.get(ch);
     if (m !== undefined) {
       if (ch.charCodeAt(0) >= 0x80) straniere = true;
       else if (m !== ch) cifre = true;
-      testo += m;
-    } else if (/[a-z0-9]/.test(ch)) testo += ch;
-    else if (ch.charCodeAt(0) >= 0x80) { straniere = true; testo += ch; }
+      pezzi[pezzi.length - 1] += m;
+    } else if (/[a-z0-9]/.test(ch)) pezzi[pezzi.length - 1] += ch;
+    else if (ch.charCodeAt(0) >= 0x80) { straniere = true; pezzi[pezzi.length - 1] += ch; }
   }
-  if (tagli[tagli.length - 1] !== testo.length) tagli.push(testo.length);
-  return { testo, tagli, straniere, cifre };
+  return { ...unisci(pezzi.filter(Boolean)), pezzi: pezzi.filter(Boolean), straniere, cifre };
+}
+
+function unisci(pezzi) {
+  const tagli = [0];
+  for (const p of pezzi) tagli.push(tagli[tagli.length - 1] + p.length);
+  return { testo: pezzi.join(''), tagli };
 }
 
 // Distanza di Damerau-Levenshtein ristretta (lo scambio di due vicine vale uno: amzaon è a uno da amazon).
@@ -103,22 +109,25 @@ function zoneDi(norm, esca) {
   const sotto = etichette.slice(0, Math.max(0, etichette.length - n)).filter((e) => !/^www\d*$/.test(e));
   const zone = [];
   const sld = norm.sldUnicode || norm.sld || '';
-  if (sld) zone.push({ zona: 'sld', etichetta: sld });
-  for (const e of sotto) zone.push({ zona: 'sotto', etichetta: e });
-  for (const e of (esca || [])) if (e) zone.push({ zona: 'esca', etichetta: String(e).toLowerCase() });
+  // `segue`: l'etichetta subito dopo, che in paypal.com.altro.net è il finto dominio di primo livello.
+  if (sld) zone.push({ zona: 'sld', etichetta: sld, segue: '' });
+  sotto.forEach((e, i) => zone.push({ zona: 'sotto', etichetta: e, segue: i + 1 < sotto.length ? sotto[i + 1] : sld }));
+  const parole = (esca || []).map((e) => String(e || '').toLowerCase()).filter(Boolean);
+  parole.forEach((e, i) => zone.push({ zona: 'esca', etichetta: e, segue: parole[i + 1] || '' }));
   return zone;
 }
 
 // Ogni marchio che il nome può portare addosso, intero, travestito o con qualche lettera sbagliata.
-function candidati(zone) {
+function candidati(zone, registrable) {
   const out = [];
   for (const z of zone) {
     const sk = scheletroDi(z.etichetta);
     if (!sk.testo) continue;
-    const letture = [{ testo: sk.testo, vista: false }];
-    const vista = sk.testo.replace(/rn/g, 'm').replace(/vv/g, 'w');
-    if (vista !== sk.testo) letture.push({ testo: vista, vista: true });
+    const letture = [{ testo: sk.testo, tagli: sk.tagli, vista: false }];
+    const vista = unisci(sk.pezzi.map((p) => p.replace(/rn/g, 'm').replace(/vv/g, 'w')));
+    if (vista.testo !== sk.testo) letture.push({ ...vista, vista: true });
     for (const mc of MARCHI) {
+      if (mc.omonimi.has(registrable)) continue;
       const t = mc.token;
       // Fra le due letture vale quella più vicina al marchio: rnicrosoft a occhio è microsoft, non un refuso.
       let meglio = null;
@@ -137,7 +146,8 @@ function candidati(zone) {
         const tutto = Math.abs(l.testo.length - t.length) <= mc.soglia ? distanza(l.testo, t) : Infinity;
         if (tutto <= mc.soglia) { tipo = 'typo'; d = tutto; } else tipo = 'typodentro';
       }
-      out.push({ mc, zona: z.zona, etichetta: z.etichetta, indice: z.indice, tipo, d, inizio: r.inizio, fine: r.fine, sk: { ...sk, testo: l.testo }, vista: l.vista });
+      const [inizio, fine] = tipo === 'typo' ? [0, l.testo.length] : [r.inizio, r.fine];
+      out.push({ mc, zona: z.zona, etichetta: z.etichetta, segue: z.segue, tipo, d, inizio, fine, sk: { ...sk, testo: l.testo, tagli: l.tagli }, vista: l.vista });
     }
   }
   return out;
@@ -176,8 +186,11 @@ function caratteristiche(c, zone, info) {
   f.push('nh=' + Math.min(4, c.sk.tagli.length - 2) + c.zona);
   f.push('nd=' + fascia((testo.match(/[0-9]/g) || []).length, [0, 1, 3]));
   f.push('ns=' + Math.min(4, info.nSotto) + c.zona);
-  // Il contesto del marchio: quello che gli sta intorno, con i bordi, a pezzi di tre e quattro lettere.
-  const marcato = '^' + sx + '#' + dx + '$';
+  if (c.segue) f.push('sg=' + (c.segue.length <= 4 ? c.segue : '*'), 'sgk=' + k + (c.segue.length <= 3 ? 'corta' : 'lunga'));
+  if (c.mc.forme.some((x) => testo.includes(x))) f.push('fo=' + k);
+  if (c.sk.tagli.some((x) => x > c.inizio && x < c.fine)) f.push('sp=' + k);
+  // Il contesto del marchio: quello che gli sta intorno, coi bordi e i trattini, a pezzi di due, tre e quattro lettere.
+  const marcato = '^' + conTrattini(c.sk, 0, c.inizio) + '#' + conTrattini(c.sk, c.fine, testo.length) + '$';
   for (let n = 2; n <= 4; n++) for (let i = 0; i + n <= marcato.length; i++) f.push('g' + n + '=' + marcato.slice(i, i + n));
   if (resto.length <= 16) f.push('r=' + marcato, 'rb=' + t + '|' + marcato);
   f.push('sx=' + sx.slice(-5), 'dx=' + dx.slice(0, 5));
@@ -188,6 +201,18 @@ function caratteristiche(c, zone, info) {
     for (let i = 0; i + 3 <= s.length; i++) f.push('a' + z.zona[0] + '=' + s.slice(i, i + 3));
   }
   return f;
+}
+
+// Il pezzo [da, a) del testo coi trattini dove l'etichetta li aveva, compresi quelli che lo toccano dentro l'etichetta.
+function conTrattini(sk, da, a) {
+  let out = '';
+  for (let i = da; i < a; i++) {
+    if (i > 0 && sk.tagli.includes(i)) out += '-';
+    out += sk.testo[i];
+  }
+  if (a > da && a < sk.testo.length && sk.tagli.includes(a)) out += '-';
+  else if (a === da && a > 0 && a < sk.testo.length && sk.tagli.includes(a)) out += '-';
+  return out;
 }
 
 // FNV-1a a 32 bit: l'impronta che dice dove sta il peso di una caratteristica, e col bit alto il suo segno.
@@ -235,7 +260,7 @@ function esempi(norm, esca) {
   if (LEGIT_DOMAINS.has(norm.registrable)) return [];
   const zone = zoneDi(norm, esca);
   const info = infoDi(norm, zone);
-  return candidati(zone).map((c) => ({ c, feats: caratteristiche(c, zone, info) }));
+  return candidati(zone, norm.registrable).map((c) => ({ c, feats: caratteristiche(c, zone, info) }));
 }
 
 const TIPO_VERDETTO = { omografo: 'omografo', sosia: 'sosia', sosiadentro: 'sosia', typo: 'typo', typodentro: 'typo', esatto: 'nome', dentro: 'nome' };
