@@ -222,6 +222,8 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     if (D && D.fuoriDaIncognito) await D.fuoriDaIncognito(togli); else await togli();
   }
 
+  // Rifiuta se il file non si legge: chi scrive non deve lavorare su un filo vuoto (le sue righe finirebbero in coda a
+  // un file che nessuno ha riletto). La richiesta dopo riprova da capo.
   function carica() {
     if (normale.caricato) return Promise.resolve();
     if (!normale.caricando) {
@@ -233,13 +235,23 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
           // Senza leggere il filo non si migra né si compatta: una migrazione su un elenco vuoto farebbe doppioni.
           console.warn('[Filo] filo non leggibile, riprovo alla prossima richiesta:', e?.message || e);
           normale.caricando = null;
-          return;
+          avvisaIlleggibile(e);
+          const err = new Error(`il filo non si legge: ${e?.message || e}`);
+          err.code = 'FILO_ILLEGGIBILE';
+          err.cause = e;
+          throw err;
         }
         try { await migraDaStorage(); } catch (e) { console.warn('[Filo] migrazione delle chat:', e?.message || e); }
         normale.caricato = true;
+        avvisaSePesa().catch(() => {});
       })();
     }
     return normale.caricando;
+  }
+
+  // Chi legge soltanto vede il filo vuoto (l'avviso dice perché); chi scrive passa da `transazione`, che rifiuta.
+  async function caricaPerLeggere() {
+    try { await carica(); } catch (_) {}
   }
 
   function evento(tipo, campi, { autore, ts, id } = {}) {
