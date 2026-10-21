@@ -214,6 +214,34 @@ test('anche le pagine intere caricate senza gesto si fermano a 30 visite, e la p
   assert.ok(scritte.length >= 30, `${scritte.length} visite`);
 }));
 
+// #1525 giro 1 — in privacy ogni salto fra siti ricrea la vista della scheda: il conto è della scheda, non della vista.
+test('una scheda che salta da sola fra siti, con una vista nuova a ogni salto, si ferma a 30 visite; un gesto riapre il conto', () => conOrologioFinto(async () => {
+  const { v, scritte } = preparaTitoli();
+  const scheda = { id: 1 };
+  let wc = schedaFinta();
+  wc.push('https://salto-a.test/0');
+  v.navigata(wc, 1, 'https://salto-a.test/0', { ...gesto(), chiave: scheda });
+  v.caricata(wc);
+  for (let i = 1; i <= 100; i++) {
+    await attendi(300);
+    v.chiusa(wc);
+    wc = schedaFinta();
+    const url = `https://salto-${i % 2 ? 'b' : 'a'}.test/${i}`;
+    wc.push(url);
+    v.navigata(wc, 1, url, { chiave: scheda });
+    v.caricata(wc);
+  }
+  await attendi(6_000);
+  assert.equal(scritte.length, 31);
+  v.chiusa(wc);
+  wc = schedaFinta();
+  wc.push('https://salto-a.test/scelta');
+  v.navigata(wc, 1, 'https://salto-a.test/scelta', { ...gesto(), chiave: scheda });
+  v.caricata(wc);
+  await attendi(10);
+  assert.equal(scritte.at(-1).url, 'https://salto-a.test/scelta');
+}));
+
 test('un gesto vale per la pagina che segue, non per i cambi che la pagina fa dopo da sola', () => conOrologioFinto(async () => {
   const { v, scritte } = preparaTitoli();
   const wc = schedaFinta();
