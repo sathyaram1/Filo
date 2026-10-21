@@ -1686,10 +1686,21 @@
   const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta, quindi non c’è un via libera da dare.';
   const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
   const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
+  // La nota è del cancello solo se è nata dopo l'audit, che viene subito prima: un report o una domanda di un giro
+  // passato non passa per il motivo della fermata. Al minuto, perché i marcatori portano solo i minuti.
+  function notaDelCancello(fb) {
+    const nota = ultimaDomanda(fb);
+    const l4 = livelliOf(fb).l4;
+    const audit = Date.parse(String((l4 && l4.at) || ''));
+    const scritta = nota && Date.parse(istanteDelTurno(nota.ts) || '');
+    if (!nota || !Number.isFinite(audit) || !Number.isFinite(scritta)) return null;
+    const minuto = (t) => Math.floor(t / 60000);
+    return minuto(scritta) >= minuto(audit) ? nota : null;
+  }
   function l5SenzaRichiesta(fb, opts) {
     const letto = !(opts && opts.dettaglioLetto === false);
     const cifrata = letto && valueUnreadable(fb && fb.notes);
-    const nota = letto && !cifrata ? ultimaDomanda(fb) : null;
+    const nota = letto && !cifrata ? notaDelCancello(fb) : null;
     // Senza gli elenchi letti «nessuna richiesta» sarebbe un'ipotesi: la frase lo dice, e la lista resta generica.
     const lette = !!(opts && opts.fusioniLette);
     const righe = nota && nota.ts ? [riga('Quando', istanteDelTurno(nota.ts))] : [];
