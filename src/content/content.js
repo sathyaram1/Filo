@@ -1081,7 +1081,7 @@
     // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
     // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
     try {
-      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi())) {
+      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi() || SpellCheck.segnapostiAttivi())) {
         const rt = realTarget(e);
         // Il valore sopra un segnaposto (#1448) ha il menu del suo segnaposto.
         const valore = SpellCheck.valoreSotto(rt);
