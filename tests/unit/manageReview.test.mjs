@@ -1597,6 +1597,29 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   assert.equal(conRichiesta.richiesta.id, 'r');
 });
 
+test('livelli L5 senza richiesta (#1556): la nota del server, con l’ora in UTC, letta in Italia resta il motivo', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+  const tzPrima = process.env.TZ;
+  process.env.TZ = 'Europe/Rome';
+  try {
+    const nota = 'Il cancello non fonde il ramo del server. Decidi tu: archiviarlo, o farlo rifare.';
+    const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
+    const fb = (marcatore) => ({
+      status: 'design', statusReason: 'l5',
+      notes: `Report.\n\n--- Aggiornamento dell'agente del ${marcatore} ---\n${nota}`,
+      livelli: { l4: { esito: 'pass', at: '2026-10-21T15:40:00.000Z' } },
+    });
+    // Il server scrive «15:55» per le 15:55 UTC: un quarto d'ora dopo l'audit, anche se in Italia sono le 17:55.
+    assert.equal(MR.livelloL5(fb('21/10/26, 15:55'), lette).pannello.testo, nota);
+    // Uno strumento dell'owner scrive nella sua ora: le 17:55 italiane sono sempre dopo l'audit.
+    assert.equal(MR.livelloL5(fb('21/10/26, 17:55'), lette).pannello.testo, nota);
+    // Scritta dal server un'ora prima dell'audit: non è il motivo della fermata.
+    assert.match(MR.livelloL5(fb('21/10/26, 14:40'), lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  } finally {
+    if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima;
+  }
+});
+
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
   const fb = { status: 'design', statusReason: 'l5' };
   assert.equal(MR.classifyBlock(fb).reason, 'l5');
