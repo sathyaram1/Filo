@@ -34,7 +34,7 @@ async function preparaRouter(app, sorgente, modello = VOCE) {
         return json({ data: { endpoints: [{ provider_name: 'DeepInfra', tag: 'deepinfra' }] } });
       }
       // Il catalogo dei pesi: la voce chiusa non porta `hugging_face_id`.
-      if (/openrouter\.ai\/api\/v1\/models(\?|$)/.test(u)) return json({ data: [{ id: VOCE_CHIUSA_ID }] });
+      if (/openrouter\.ai\/api\/v1\/models(\?|$)/.test(u)) return json({ data: [{ id: chiusa }] });
       if (u.includes('openrouter.ai/api/v1/audio/speech')) {
         globalThis.__voci++;
         return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'content-type': 'audio/pcm;rate=24000' } });
