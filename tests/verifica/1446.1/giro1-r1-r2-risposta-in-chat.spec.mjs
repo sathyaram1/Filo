@@ -1,5 +1,5 @@
 // Verifica #1446.1, giro 1: la password data in chat a chi la chiede non parte verso il modello del correttore, anche
-// quando la domanda non ha il punto interrogativo o usa un'abbreviazione; il resto della risposta resta controllabile.
+// quando la domanda non ha il punto interrogativo o usa un'abbreviazione.
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
 
