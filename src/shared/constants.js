@@ -3303,6 +3303,8 @@
   // apprese e lezioni le scrive Filo, ma da conversazioni che possono aver letto
   // una pagina ostile. Il tetto è largo: la memoria intera deve arrivare.
   const MEMORIA_MAX = 200 * 1024;
+  // Il testo di un campo che «Valuta» manda (#1449): un saggio intero ci sta; oltre, l'Aiuto dice all'utente dove si ferma.
+  const VALUTA_MAX_CARATTERI = 100000;
   function memoriaImbustata({ profilo, preferenze, espansioni, lezioni } = {}, etichettaProfilo = 'PROFILO UTENTE') {
     const corpo = `${etichettaProfilo}:\n${profilo || '(vuoto)'}\n\n`
       + `PREFERENZE:\n${preferenze || '(vuoto)'}`
