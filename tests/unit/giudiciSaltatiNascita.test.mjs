@@ -85,12 +85,12 @@ test('«richiede lavoro locale» dice il vero secondo la fiducia del feedback', 
   const primaDellaMigrazione = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin' })).text;
   const approvato = MR.judgesNote(rimandato({ clientId: 'utente-2', localApproval: { by: 'owner', at: 1 } })).text;
   for (const t of [owner, sessione, approvato, primaDellaMigrazione]) {
-    assert.match(t, /con «💻 Lavoro server» passa nei Lavori server/);
+    assert.match(t, /con «💻 Lavoro server» torna In coda come lavoro server/);
     assert.doesNotMatch(t, /decidi tu/);
   }
   // Routine e utenti (#913): la frase porta al sì dell'owner, che è anche il tasto principale nei Ricevuti.
   for (const t of [routine, utente, senzaProva, mioNonFidato]) {
-    assert.match(t, /decidi tu. Con «💻 Lavoro server» passa nei Lavori server/);
+    assert.match(t, /decidi tu. Con «💻 Lavoro server» torna In coda come lavoro server/);
     assert.doesNotMatch(t, /non si lavorano/);
   }
   const tasto = MR.ownerActions(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).find((a) => a.key === 'accept_local');

@@ -21,8 +21,7 @@
 //   (`bigliettoLocale`, #1148): la fiducia la decide il server da lì, e senza biglietto nasce non fidato. Chi lo
 //   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
 //   lavoro di questa sessione: nessuna routine lo prende), `--non-locale` lo apre per le routine. Fidati,
-//   tutti e due saltano i giudici: il primo va nei Lavori locali, il
-//   secondo In coda. Una routine non lo usa. Senza scelta
+//   tutti e due saltano i giudici e vanno In coda, il primo con l'etichetta «server». Una routine non lo usa. Senza scelta
 //   non parte niente. Senza token (o col token rifiutato) non parte niente:
 //   da anonimo sarebbe un feedback d'utente. `--priorita` nasce col documento.
 //
