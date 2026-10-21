@@ -46,6 +46,7 @@ test('i falsi allarmi delle segnalazioni di prima non tornano, né all’apertur
     'https://www.pineapple.com/', 'https://www.otherwise.com/', 'https://www.imposte.it/', 'https://www.posterlounge.it/',
     'https://bnl.gov/', 'https://www.arubanetworks.com/', 'https://telegramma.it/', 'https://www.telegrafo.it/',
     'https://team.com/', 'https://email.com/', 'https://photon.com/', 'https://apply.com/', 'https://revolution.com/',
+    'https://www.ilpost.it/',
   ]) {
     assert.equal(livello(u), 'safe', u);
     assert.deepEqual(menu(u).filter((c) => c.includes(':')), [], u);
