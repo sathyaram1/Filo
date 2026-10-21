@@ -657,9 +657,9 @@ module.exports = function register(on, ctx) {
     const cur = await FiloMem.getOnboarding();
     if (cur.done) return { ok: true, onboarding: cur, already: true };
     const bye = Onboarding.CLOSING_MESSAGE;
-    const state = await saveOnboarding(
-      Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye, congedo: true })),
-    );
+    const chiusa = Onboarding.close(Onboarding.appendTurn(cur, { role: 'filo', text: bye, congedo: true }));
+    // `senzaRiga`: la chiude «No, va bene così» da una home, che non vuole la riga «abbiamo chiuso a metà» (#1297).
+    const state = await saveOnboarding(msg?.senzaRiga === true ? Onboarding.dismissNotice(chiusa) : chiusa);
     // #525 — il congedo lo legge l'utente, quindi lo deve ritrovare rileggendo
     // l'intervista. La targa della chat la calcola il modulo dell'intervista,
     // lo stesso che usa la home per mandare i turni.
