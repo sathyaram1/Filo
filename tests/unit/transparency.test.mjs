@@ -229,35 +229,79 @@ test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da s
   togliCartella(tmp);
 });
 
-// #515 — Terza copia dello stesso elenco: il manifesto che l'assistente
-// consulta quando gli si chiede cosa sa fare. Scritto a mano, comincerebbe a
-// mentire il giorno in cui una di quelle sezioni viene scritta.
-test('il manifesto delle capacità dice in arrivo esattamente le aree che mancano', () => {
-  const { T } = loadModules();
+// #515 — Terza copia dello stesso elenco: il manifesto che l'assistente consulta quando gli si chiede
+// cosa sa fare è scritto a mano, quindi si confronta coi documenti scritti e con le aree annunciate.
+function voceManifesto() {
   delete globalThis.SN_CAPABILITIES;
   // eslint-disable-next-line no-new-func
   new Function(readFileSync(join(ROOT, 'src', 'shared', 'capabilities.js'), 'utf8')).call(globalThis);
   const voce = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'transparency-docs');
   assert.ok(voce, 'il manifesto non parla più dei documenti di trasparenza: aggiorna questo test');
-  const frase = /([^.]*\bin arrivo\b[^.]*)\./.exec(voce.desc);
-  const scritti = T.ids();
-  const mancanti = T.NAV.filter((n) => !scritti.includes(n.id));
-  if (!mancanti.length) {
-    assert.equal(frase, null, 'tutte le aree sono scritte, ma il manifesto ne annuncia ancora di "in arrivo"');
-    return;
+  return voce;
+}
+
+// La parola più lunga dell'etichetta riconosce l'area senza imporre come è scritta la frase.
+const parolaDi = (label) => label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
+
+// Vuoto se il manifesto dice il vero: dopo l'indirizzo della pagina le sezioni scritte, nell'ordine
+// della barra; la frase «in arrivo» nomina tutte e sole le mancanti; le citazioni sono le note di oggi.
+function divergenzeManifesto(T, voce) {
+  const problemi = [];
+  const scritte = T.NAV.filter((n) => T.ids().includes(n.id));
+  const mancanti = T.NAV.filter((n) => !T.ids().includes(n.id));
+  const elenco = /transparency\.html \(([^)]*)\)/.exec(voce.invoke);
+  const dichiarate = elenco ? elenco[1].split(/,\s*|\s+e\s+/).map((s) => s.trim()).filter(Boolean) : [];
+  const attese = scritte.map((n) => n.label);
+  if (dichiarate.join('|') !== attese.join('|')) {
+    problemi.push(`«invoke» elenca le sezioni (${dichiarate.join(', ')}), quelle scritte sono (${attese.join(', ')})`);
   }
-  assert.ok(frase, 'ci sono aree non ancora scritte e il manifesto non le dichiara');
-  // Una parola sola per area, la più caratteristica dell'etichetta: basta a
-  // beccare la divergenza senza imporre come è scritta la frase.
+  const frase = ((/([^.]*\bin arrivo\b[^.]*)\./.exec(voce.desc) || [])[1] || '').toLowerCase();
   for (const n of mancanti) {
-    const parola = n.label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
-    assert.ok(frase[1].toLowerCase().includes(parola),
-      `il manifesto non dice che "${n.label}" è ancora da scrivere`);
+    if (!frase.includes(parolaDi(n.label))) problemi.push(`«desc» non dice che "${n.label}" è in arrivo`);
   }
-  for (const n of T.NAV.filter((v) => scritti.includes(v.id))) {
-    const parola = n.label.split(/\s+/).sort((a, b) => b.length - a.length)[0].toLowerCase();
-    assert.ok(!frase[1].toLowerCase().includes(parola),
-      `il manifesto annuncia come "in arrivo" la sezione "${n.label}", che è scritta`);
+  for (const n of scritte) {
+    if (frase.includes(parolaDi(n.label))) problemi.push(`«desc» annuncia in arrivo "${n.label}", che è scritta`);
+  }
+  if (frase && !mancanti.length) problemi.push('«desc» annuncia sezioni in arrivo, e sono tutte scritte');
+  const note = T.conNota().map((n) => n.nota);
+  for (const nota of note) {
+    if (!voce.desc.includes(`«${nota}»`)) problemi.push(`«desc» non riporta la nota com'è: «${nota}»`);
+  }
+  for (const [, c] of voce.desc.matchAll(/«([^»]+)»/g)) {
+    if (!note.includes(c)) problemi.push(`«desc» cita «${c}», che non è più la nota di nessuna sezione`);
+  }
+  return problemi;
+}
+
+test('il manifesto delle capacità nomina le sezioni scritte e annuncia le mancanti', () => {
+  const { T } = loadModules();
+  const problemi = divergenzeManifesto(T, voceManifesto());
+  assert.deepEqual(problemi, [], 'la voce transparency-docs del manifesto non segue i documenti: '
+    + 'aggiorna l\'elenco delle sezioni e il racconto di cosa c\'è in ognuna');
+});
+
+// Il manifesto fermo e i documenti che cambiano: il confronto deve accorgersene in ogni verso.
+test('il confronto col manifesto si accorge di un documento scritto o tolto', () => {
+  const voce = voceManifesto();
+  const casi = [
+    { cosa: 'scritta «Come si sostiene»', etichetta: 'Come si sostiene', extra: {
+      'business.md': ['---', 'id: business', 'title: Come si sostiene Filo', 'updated: 2026-12-01', '---',
+        '', 'Filo costa tanto così.', '', '## Dove vanno i soldi', '', 'Qui.', ''],
+    } },
+    { cosa: 'scritto un documento che nessuno aveva annunciato', etichetta: 'Dati', extra: {
+      'dati.md': ['---', 'id: dati', 'title: I tuoi dati', 'nav: Dati', 'updated: 2026-12-01', 'order: 5', '---',
+        '', 'Filo tiene i tuoi dati sul tuo computer.', '', '## Cosa esce da qui', '', 'Solo quello che chiedi tu.', ''],
+    } },
+    { cosa: 'tolto il documento sulla sicurezza', etichetta: 'Sicurezza', togli: ['security.md'] },
+  ];
+  for (const c of casi) {
+    const { tmp, leggi } = generaCopia(c.extra || {}, c.togli);
+    const ctx = {};
+    vm.runInNewContext(leggi('src', 'shared', 'transparency.js'), ctx);
+    togliCartella(tmp);
+    const problemi = divergenzeManifesto(ctx.SN_TRANSPARENCY, voce);
+    assert.ok(problemi.some((p) => p.includes(c.etichetta)),
+      `${c.cosa} e il manifesto è rimasto com'era, ma il confronto non se ne accorge: ${problemi.join('; ') || 'nessuna divergenza'}`);
   }
 });
 
