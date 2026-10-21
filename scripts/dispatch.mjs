@@ -1086,7 +1086,7 @@ function sealTransition(state, by) {
  */
 async function recordVerifier(id, critiqueText, segnalazione = '') {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
   // non è un rilievo, e mandarlo così faceva passare un [2] in silenzio: si
   // ferma qui, prima del server, con la riga da sistemare.
@@ -1362,7 +1362,7 @@ export function fixedReplyText(id, reply, conSegnalazione = false) {
 }
 async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
   // fonte: lib/dirty-tree.mjs). Con modifiche non salvate il server segnerebbe
   // «corretto» su una correzione che non sta in nessun commit, e la verifica
@@ -1455,7 +1455,7 @@ async function recordPulizia(id) {
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // Un pass senza nota si ferma QUI, prima del server (che comunque lo
   // respingerebbe): la riga di comando lo controlla già, questa è la guardia
   // per chi chiama la funzione da un altro strumento.
@@ -1585,6 +1585,14 @@ export function rebaseRejectionText(message) {
     `[dispatch] NON REGISTRATO: ${message}`,
     'Sei sul ramo giusto, a metà del rebase: finiscilo (risolvi i file in conflitto, `git add`,',
     '`git rebase --continue`), controlla che la cartella sia tornata sul ramo, poi rilancia lo stesso comando.',
+  ].join('\n');
+}
+
+/** Il lavoro committato in un altro worktree (#772.1) si porta qui e si rilancia: non è un guasto. PURA. */
+export function lavoroAltroveText(message) {
+  return [
+    `[dispatch] NON REGISTRATO: ${message}.`,
+    'Non è un guasto: fai come dice il motivo, poi rilancia lo stesso comando.',
   ].join('\n');
 }
 
@@ -1736,6 +1744,40 @@ export function usageText() {
 function emitHalt(kind, message) {
   process.stderr.write(`[dispatch] GUASTO (${kind}): ${message}\n`);
   emit({ role: 'halt', kind, message }, {});
+  return { exit: 3 };
+}
+
+/** Il motivo di un errore imprevisto, da ricopiare dentro `--guasto "…"`: una riga, senza virgolette né `$`. PURA. */
+export function motivoFatale(e) {
+  const testo = unaRiga((e && e.message) || e || 'errore senza messaggio').replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300);
+  return `errore imprevisto di dispatch: ${testo}`;
+}
+
+/** Il testo del guasto quando nemmeno quello di halt si compone (il pezzo condiviso che manca può mancare anche lì). PURA. */
+export function istruzioniGuastoDiRiserva(motivo, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs')) {
+  const c = String(canale).split('\\').join('/');
+  return [
+    '# Ruolo: halt, guasto: non si può lavorare',
+    '',
+    'Dispatch si è fermato per un errore che non aveva previsto (`message` nel payload) e non è riuscito a comporre il testo del guasto. Non c\'è niente da eseguire. Registra due cose, in quest\'ordine, col biglietto con cui sei partito:',
+    '',
+    `- la domanda di fine sessione dell'owner: \`node "${c}" domanda --biglietto <biglietto>\` la stampa insieme al comando per rispondere, col testo da stdin fra due righe \`FINE\`; se non arriva (exit diverso da 0), vai avanti;`,
+    `- il guasto, nel rilascio: \`node "${c}" release <biglietto> --role halt --guasto "${motivo}"\`.`,
+    '',
+    'Poi termina la sessione senza ritentare: con una causa fissa i tentativi morirebbero in fila.',
+  ].join('\n');
+}
+
+/** Un errore imprevisto esce come il guasto dichiarato, con domanda di fine sessione e rilascio (#1205.1). */
+function emitFatale(e) {
+  process.stderr.write(`[dispatch] errore fatale: ${(e && e.message) || e}\n`);
+  const motivo = motivoFatale(e);
+  try { return emitHalt('transient', motivo); } catch (e2) {
+    process.stderr.write(`[dispatch] nemmeno il testo del guasto si compone (${(e2 && e2.message) || e2}): stampo quello di riserva\n`);
+  }
+  try { clearRole(ROOT); } catch (_) { /* il marcatore resta: conta di più che il guasto arrivi */ }
+  const out = { role: 'halt', payload: { kind: 'transient', message: motivo }, claim: null, instructions: istruzioniGuastoDiRiserva(motivo) };
+  process.stdout.write(JSON.stringify(out, null, 2) + '\n');
   return { exit: 3 };
 }
 
@@ -2176,11 +2218,14 @@ if (isMainModule) {
     // errore d'uso). Il server non è stato chiamato e niente è stato scritto.
     if (s.formatRejected) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: sistema le righe e rilancia lo stesso comando.`); process.exit(1); }
     if (s.rebase) { console.error(rebaseRejectionText(s.message)); process.exit(1); }
+    if (s.altrove) { console.error(lavoroAltroveText(s.message)); process.exit(1); }
     if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
     console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
     process.exit(s.fromChannel ? 4 : 3);
   };
 
+  // Da quando il giro ha preso il biglietto, un errore imprevisto esce come guasto (emitFatale).
+  let giroDelBiglietto = false;
   try {
     if (flag === '--record-verifier') {
       const [, id, ...rest] = conBiglietto(argv);
@@ -2410,6 +2455,7 @@ if (isMainModule) {
       // il lavoratore se lo ricordi ogni volta è la scommessa già persa sulla
       // provenienza dei feedback. Un giro DICHIARATO senza biglietto cancella
       // il marcatore, o quello del giro prima sopravvivrebbe a questo.
+      giroDelBiglietto = true;
       if (ticket) writeRoutineTicket(ROOT, ticket); else clearRoutineTicket(ROOT);
       // E col biglietto parte il BATTITO, qui e non nelle ricette: il semaforo
       // cade dopo un'ora di silenzio (era mezz'ora quando è nato il battito) e
@@ -2432,11 +2478,11 @@ if (isMainModule) {
       run().then((r) => {
         process.exit(r?.exit ?? 0);
       }).catch((e) => {
-        process.stderr.write(`[dispatch] errore fatale: ${e.message}\n`);
-        process.exit(1);
+        process.exit(emitFatale(e).exit);
       });
     }
   } catch (e) {
+    if (giroDelBiglietto) process.exit(emitFatale(e).exit);
     console.error('[dispatch] errore:', e.message);
     process.exit(1);
   }

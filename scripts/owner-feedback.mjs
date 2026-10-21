@@ -868,7 +868,8 @@ if (isMain) {
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a.startsWith('--')) { if (CON_VALORE.has(a)) i += 1; continue; }
+    // Per nome esatto: «-- vedi sotto» passa il controllo come testo, e qui non deve sparire (#878).
+    if (OPZ.opzioni.includes(a)) { if (CON_VALORE.has(a)) i += 1; continue; }
     posizionali.push(a);
   }
   const [riferimento, status, ...nota] = posizionali;

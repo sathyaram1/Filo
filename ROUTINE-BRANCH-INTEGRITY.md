@@ -117,6 +117,10 @@ una correzione, verdetto del verifier, verdetto del secaudit.
   (`routine-channel.mjs`).
 - Ogni transizione **accettata** lascia un **punto fermo**: l'identità del
   contenuto in quel momento, salvata nello stato del branch.
+- Conta dove sta il lavoro, non da dove parte il comando: commit nati dopo
+  l'inizio del lavoro in un altro worktree dello stesso deposito, e assenti dal
+  branch assegnato, fermano la consegna (#772.1; sentinella in
+  `tests/unit/consegnaDalRamoAssegnato.test.mjs`).
 
 **Perché su tutte e non solo sui verdetti**: se una consegna può essere registrata
 con l'albero sbagliato, il punto fermo che registra è fasullo — e D tornerebbe a

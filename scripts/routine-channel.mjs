@@ -123,7 +123,8 @@ import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
-import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
+import { haFormaDiBigliettoVero, leggiBigliettoAMano, looksLikeTicket } from './lib/routine-ticket.mjs';
+import { apreUnElenco } from './lib/argomenti.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
@@ -990,6 +991,14 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
     if (x.escalated) return sospeso(testa);
     return `${testa}Porta lì i commit del lavoro (\`git -C "${x.radice}" cherry-pick <i tuoi commit>\`), poi rilancia lo stesso comando da "${x.radice}".${conta()}`;
   }
+  if (x.motivo === 'altrove') {
+    const a = x.altrove || {};
+    const n = (a.commit || []).length;
+    const ramo = a.ramo ? ` (ramo "${a.ramo}")` : '';
+    const testa = `${quale}: la cartella "${a.cartella}"${ramo} ha ${n === 1 ? 'un commit fatto' : `${n} commit fatti`} dopo l'inizio di questo lavoro che il ramo assegnato "${x.assigned}" non contiene: il lavoro sta lì, e la verifica non lo troverebbe. ${nulla}\n`;
+    if (x.escalated) return sospeso(testa);
+    return `${testa}Portali sul ramo assegnato (\`git -C "${a.radice}" cherry-pick ${(a.commit || []).map((c) => c.slice(0, 12)).join(' ')}\`), poi rilancia lo stesso comando. Se quei commit non sono di questo lavoro, togli quella cartella (\`git worktree remove "${a.cartella}"\`: il suo ramo resta) e rilancia.${conta()}`;
+  }
   if (x.motivo === 'dichiarato') {
     return `${quale}: hai dichiarato il ramo "${x.declared}", ma la cartella è sul ramo "${x.current}". ${nulla} Il ramo lo legge lo strumento dalla cartella: uno dichiarato può solo confermarlo.\n`
       + (x.assigned && x.assigned === x.current
@@ -1030,6 +1039,8 @@ export function testoIntentoNonCapito(parola) {
 export function bigliettoAMano(cmd, args, dato) {
   const b = String(dato || '').trim();
   const lista = Array.isArray(args) ? [...args] : [];
+  // Il biglietto davanti si ripulisce come quello a mano: uno spazio o un a capo copiati col codice il server li rifiuterebbe (#878).
+  if (POSIZIONALI_DOPO_BIGLIETTO[cmd] !== undefined && typeof lista[0] === 'string') lista[0] = lista[0].trim();
   if (!b) return { args: lista };
   if (cmd === 'probe' || cmd === 'ticket') {
     return { errore: `--ticket non vale con «${cmd}»: lì serve la parola d'ordine. Non ho fatto niente.` };
@@ -1087,7 +1098,7 @@ if (isMain) {
     // una parola libera e buttato via, e il giro si chiudeva senza dichiarare
     // il guasto, rispondendo «OK» (feedback #565). Un numero negativo resta un
     // valore.
-    if (TRATTINI.includes(t[0])) return !/^[0-9]/.test(t.replace(/^[-‐‑‒–—−]+/, ''));
+    if (TRATTINI.includes(t[0])) return !apreUnElenco(t) && !/^[0-9]/.test(t.replace(/^[-‐‑‒–—−]+/, ''));
     // La conchiglia di Git riscrive `/guasto` come percorso: si guarda l'ultimo
     // pezzo, e solo per i nomi che conosciamo — un percorso vero è un valore.
     if (t.includes('/')) return CAMPI.has(t.split('/').pop().split('=')[0]);
@@ -1112,7 +1123,7 @@ if (isMain) {
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     // Un biglietto vero davanti è un posizionale anche col trattino (o due): nessuna opzione ha la sua forma.
-    if (haFormaDiBigliettoVero(a)) { args.push(a); continue; }
+    if (haFormaDiBigliettoVero(a.trim())) { args.push(a.trim()); continue; }
     // Un'opzione scritta storta non è un posizionale: presa per tale, il
     // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
     // che diceva «OK» (feedback #565).
@@ -1148,7 +1159,8 @@ if (isMain) {
     // parola d'ordine se la prendeva per valore, e restavano zero posizionali.
     if (CAMPI_BANDIERA.has(key)) { data[key] = true; continue; }
     const next = rest[i + 1];
-    if (next === undefined || next.startsWith('--')) {
+    // «-- vedi sotto» è testo: un campo che segue è scritto attaccato ai suoi trattini (#878).
+    if (next === undefined || (next.startsWith('--') && !apreUnElenco(next))) {
       // Un campo di TESTO senza il suo testo non è un sì: è un report che
       // parte vuoto mentre la risposta dice OK (feedback #565).
       if (CAMPI_TESTO.has(key)) {
@@ -1667,6 +1679,11 @@ if (isMain) {
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
+    // Senza biglietto il ruolo scalava al suo posto e partiva verso il server come biglietto (#878).
+    if (!looksLikeTicket(args[0])) {
+      console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Uso: compare <biglietto> <ruolo> <numero>, oppure aggiungi --ticket <codice> (il codice è nelle istruzioni con cui sei partito).');
+      process.exit(1);
+    }
     const r = await compare(args[0], { role: args[1] || '', num: args[2] || '' });
     if (!r.ok) { console.error('confronto non registrato'); process.exit(0); }
     console.log(r.same ? 'confronto: stessa scelta' : 'confronto: scelte diverse (registrato per l\'owner)');
