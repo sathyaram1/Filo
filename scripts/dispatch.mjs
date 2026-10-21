@@ -1086,7 +1086,7 @@ function sealTransition(state, by) {
  */
 async function recordVerifier(id, critiqueText, segnalazione = '') {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
   // non è un rilievo, e mandarlo così faceva passare un [2] in silenzio: si
   // ferma qui, prima del server, con la riga da sistemare.
@@ -1362,7 +1362,7 @@ export function fixedReplyText(id, reply, conSegnalazione = false) {
 }
 async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
   // fonte: lib/dirty-tree.mjs). Con modifiche non salvate il server segnerebbe
   // «corretto» su una correzione che non sta in nessun commit, e la verifica
@@ -1455,7 +1455,7 @@ async function recordPulizia(id) {
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
-  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
+  if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, altrove: !!guard.altrove && !guard.escalated, message: guard.message };
   // Un pass senza nota si ferma QUI, prima del server (che comunque lo
   // respingerebbe): la riga di comando lo controlla già, questa è la guardia
   // per chi chiama la funzione da un altro strumento.
@@ -1585,6 +1585,14 @@ export function rebaseRejectionText(message) {
     `[dispatch] NON REGISTRATO: ${message}`,
     'Sei sul ramo giusto, a metà del rebase: finiscilo (risolvi i file in conflitto, `git add`,',
     '`git rebase --continue`), controlla che la cartella sia tornata sul ramo, poi rilancia lo stesso comando.',
+  ].join('\n');
+}
+
+/** Il lavoro committato in un altro worktree (#772.1) si porta qui e si rilancia: non è un guasto. PURA. */
+export function lavoroAltroveText(message) {
+  return [
+    `[dispatch] NON REGISTRATO: ${message}.`,
+    'Non è un guasto: fai come dice il motivo, poi rilancia lo stesso comando.',
   ].join('\n');
 }
 
@@ -2210,6 +2218,7 @@ if (isMainModule) {
     // errore d'uso). Il server non è stato chiamato e niente è stato scritto.
     if (s.formatRejected) { console.error(`[dispatch] ${s.message}\nNiente è stato registrato: sistema le righe e rilancia lo stesso comando.`); process.exit(1); }
     if (s.rebase) { console.error(rebaseRejectionText(s.message)); process.exit(1); }
+    if (s.altrove) { console.error(lavoroAltroveText(s.message)); process.exit(1); }
     if (s.serverDown) { console.error(serverDownText(s.message)); process.exit(3); }
     console.error(s.fromChannel ? channelRejectionText(s.message) : rejectionText(s.message));
     process.exit(s.fromChannel ? 4 : 3);

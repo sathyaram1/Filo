@@ -245,6 +245,31 @@ test('lavoro committato in un worktree, consegna dalla cartella posizionata o da
   } finally { srv.close(); togliCartella(base); }
 });
 
+test('la correzione registrata da dispatch col lavoro in un worktree: non registrata, col rimedio e senza «fermati»', async () => {
+  const { srv, ricevuti, port } = await fintoServer();
+  const { base, work, g } = deposito();
+  try {
+    writeFileSync(resolve(work, '.git', 'info', 'exclude'), '.claude/worktrees/\n', { flag: 'a' });
+    const wt = resolve(work, '.claude', 'worktrees', 'altro');
+    g(['worktree', 'add', '-q', wt, '-b', 'claude/altro']);
+    writeFileSync(resolve(wt, 'lavoro.txt'), 'fatto\n', 'utf8');
+    g(['add', '-A'], wt); g(['commit', '-qm', 'lavoro'], wt);
+    const env = {
+      ...process.env, FILO_REPO_ROOT: work, FILO_TOOLS_ROOT: work, FILO_NO_BEAT: '1',
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_ROUTINE_TICKET: 'biglietto-finto',
+    };
+    delete env.FILO_DISPATCH_STATE_DIR;
+    const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
+    const r = await new Promise((ok) => execFile(process.execPath, [DISPATCH, '--record-fixed', ID, REPORT], { env, cwd: work },
+      (err, so, se) => ok({ code: err ? (err.code ?? 1) : 0, se: String(se || '') })));
+    assert.equal(r.code, 1, r.se);
+    assert.match(r.se, /NON REGISTRATO: .*non contiene un commit fatto dopo l'inizio di questo lavoro/);
+    assert.match(r.se, /cherry-pick/);
+    assert.doesNotMatch(r.se, /fermati/);
+    assert.equal(consegne(ricevuti).length, 0);
+  } finally { srv.close(); togliCartella(base); }
+});
+
 test('commit in un worktree che non sono di questo lavoro: tolta quella cartella, la consegna parte', async () => {
   const { srv, ricevuti, port } = await fintoServer();
   const { base, work, g, committa } = deposito();
