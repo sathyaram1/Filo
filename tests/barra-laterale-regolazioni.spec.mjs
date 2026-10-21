@@ -33,11 +33,14 @@ test('da Preferenze: l\'attesa sul bordo, la chiusura, la striscia e l\'apertura
   const sito = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await expect(barra.locator('html.senza-striscia')).toHaveCount(1);
-  // Con 900 ms di attesa, dopo mezzo secondo sul bordo è ancora chiusa; poco dopo si apre.
+  // Con 900 ms di attesa, dopo mezzo secondo sul bordo è ancora chiusa; poco dopo si apre, e resta aperta.
+  await puntatoreCheSegue(app);
   await barra.mouse.move(1, 300);
   await pausa(500);
   expect((await statoBarra(app)).aperta).toBe(false);
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 3000 }).toBe(true);
+  await pausa(400);
+  expect(await statoBarra(app)).toMatchObject({ aperta: true, motivo: 'spinta' });
   // Con 100 ms di chiusura, uscito sulla pagina si chiude subito.
   await barra.mouse.move(40, 300);
   await sito.mouse.move(600, 300);
