@@ -876,6 +876,7 @@ module.exports = function register(on, ctx) {
                             pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
       return { ok: true, ogTitle, ogDescription };
     } catch (e) {
+      if (rinvio) return { ok: false, ...rinvio };
       return { ok: false, error: e.message || String(e) };
     }
   });
