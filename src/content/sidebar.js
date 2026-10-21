@@ -37,6 +37,15 @@
   // Se true, click fuori dal pannello NON lo collassa (es. AI ha richiesto chat aperta)
   let aiPrefersOpen = false;
   let docClickHandler = null;
+  // Chiuso mentre Filo risponde (#1432): il pannello si nasconde invece di sparire, e la risposta resta da aprire.
+  let nascosto = false;
+  // Ridotto dall'utente (▾, clic fuori): la risposta che arriva non lo riapre da sé, la annuncia la barra laterale.
+  let ridottoDallUtente = false;
+  let nonLetta = false;
+  let inVolo = 0;
+  let voce = null;
+  let statoVoce = 'pronto';
+  let ascoltaCambi = null;
 
   // Telemetria sessione per la raccolta dei percorsi (pathsCollector.js), che
   // oggi è spenta: il riquadro con pollice su/giù non compare e niente esce.
@@ -75,8 +84,10 @@
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
   function isOpen() { return !!(root && root.isConnected); }
 
-  function close() {
+  // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
+  function close({ davvero = false } = {}) {
     if (!root) return;
+    if (!davvero && inVolo > 0) { if (!nascosto) nascondi(); return; }
     Highlight.clear();
     try { Highlight.clearForceHover?.(); } catch (_) {}
     if (docClickHandler) {
@@ -93,11 +104,35 @@
     collapsed = false;
     aiPrefersOpen = false;
     session = null;
+    nascosto = false;
+    ridottoDallUtente = false;
+    nonLetta = false;
+    voce = null;
+    statoVoce = 'pronto';
+    cambiato();
+  }
+
+  function nascondi() {
+    nascosto = true;
+    Highlight.clear();
+    try { Highlight.clearForceHover?.(); } catch (_) {}
+    try { voce?.ferma(); } catch (_) {}
+    root.classList.add('sn-sidebar-nascosta');
+    cambiato();
+  }
+
+  // Già lì, ridotto o nascosto: «Aiuto» lo mostra intero, con la risposta arrivata nel frattempo.
+  function mostra() {
+    nascosto = false;
+    root.classList.remove('sn-sidebar-nascosta');
+    expand({ ai: false });
+    try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+    cambiato();
   }
 
   function open(context) {
-    if (isOpen()) return;
-    if (root) close();
+    if (isOpen()) { mostra(); return; }
+    if (root) close({ davvero: true });
     history = [];
     documenti = null;
     ripiegoDetto = false;
@@ -189,17 +224,19 @@
     });
     // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere). Diretta, non dal
     // modulo: il suo invio non manda più niente (#592.6), e il microfono si accende già solo con un gesto vero.
-    global.SN_VOCE_CHAT?.collega({
+    voce = global.SN_VOCE_CHAT?.collega({
       campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
-      invia,
-    });
-    // Focus o tasto sull'input → riapri la chat
-    ta.addEventListener('focus', () => expand({ ai: false }));
-    ta.addEventListener('input', () => { if (collapsed) expand({ ai: false }); });
+      invia, suStato: (s) => { if (!ta.isConnected) return; statoVoce = s; cambiato(); },
+    }) || null;
+    // Focus o tasto sull'input → riapri la chat. Ridotto dall'utente lo riapre solo un suo gesto sulla casella: il
+    // microfono che ci scrive e ci rimette il cursore no, da qualunque icona l'abbia fermato (#1432).
+    ta.addEventListener('focus', () => { if (!ridottoDallUtente) expand({ ai: false }); });
+    ta.addEventListener('pointerdown', (e) => { if (e.isTrusted && collapsed) expand({ ai: false }); });
+    ta.addEventListener('input', (e) => { if (collapsed && (e.isTrusted || !ridottoDallUtente)) expand({ ai: false }); });
 
     // Click fuori dal pannello → collassa (se l'AI non ha richiesto chat aperta)
     docClickHandler = (e) => {
-      if (!root || collapsed) return;
+      if (!root || collapsed || nascosto) return;
       if (root.contains(e.target)) return;
       if (aiPrefersOpen) return;
       collapse({ ai: false });
@@ -207,22 +244,54 @@
     document.addEventListener('mousedown', docClickHandler, true);
 
     ta.focus();
+    cambiato();
   }
 
   // ---------- Espandi/collassa ----------
 
   function expand({ ai = false } = {}) {
     if (!root) return;
+    // La scelta dell'utente vince su quella del modello: la risposta resta da aprire, e la barra la annuncia.
+    if (ai && (ridottoDallUtente || nascosto)) { aiPrefersOpen = true; return; }
     collapsed = false;
+    ridottoDallUtente = false;
     root.classList.remove('sn-sidebar-collapsed');
     if (ai) aiPrefersOpen = true;
+    if (!nascosto) nonLetta = false;
+    cambiato();
   }
 
   function collapse({ ai = false } = {}) {
     if (!root) return;
     collapsed = true;
+    if (!ai) ridottoDallUtente = true;
     root.classList.add('sn-sidebar-collapsed');
     if (ai) aiPrefersOpen = false;
+    cambiato();
+  }
+
+  // ---------- Lo stato per la barra laterale (#1432) ----------
+
+  function stato() {
+    const visibile = isOpen() && !nascosto;
+    return {
+      pannello: !visibile ? 'chiuso' : collapsed ? 'ridotto' : 'aperto',
+      voce: visibile ? statoVoce : 'pronto',
+      nonLetta: isOpen() && nonLetta,
+    };
+  }
+
+  function cambiato() {
+    if (typeof ascoltaCambi !== 'function') return;
+    try { ascoltaCambi(stato()); } catch (_) {}
+  }
+
+  // L'icona Aiuto (barra, riga del tasto destro): il clic fa quello che l'icona mostra, decisi dalla stessa regola.
+  function passo(context) {
+    const aspetto = global.SN_DISPOSIZIONE_ICONE?.aspettoAiuto?.(stato());
+    const detta = aspetto ? aspetto.icona === 'mic' : (isOpen() && !nascosto && !collapsed);
+    if (detta && voce) { voce.premi(); return; }
+    open(context);
   }
 
   // ---------- Drag header ----------
@@ -315,10 +384,18 @@
     } catch (_) {}
   }
 
+  // Filo ha detto qualcosa che l'utente, che ha ridotto o chiuso il pannello, non vede: la barra lo annuncia (#1432).
+  function rispostaArrivata() {
+    if (nonLetta || !(nascosto || (collapsed && ridottoDallUtente))) return;
+    nonLetta = true;
+    cambiato();
+  }
+
   function appendChatMessage(role, text, { nelFilo = true } = {}) {
     if (nelFilo) nelFiloAiuto(role, text);
     const conv = convEl();
     if (!conv) return null;
+    if (role === 'assistant') rispostaArrivata();
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
     // #418 — le risposte di Filo (assistant) vanno rese con la stessa
@@ -650,21 +727,13 @@
     } catch (_) { /* fail silently — è telemetria best-effort */ }
   }
 
-  // Etichetta breve (≤4 parole) per descrivere un'azione utente.
-  // Preferenza: testo dell'elemento → aria-label → tag.
+  // Etichetta breve (≤4 parole) per descrivere un'azione utente: va al modello, quindi passa da
+  // `nomeElemento`, che non legge mai il valore di un campo segreto (#810.7).
   function describeElementBriefly(el) {
     if (!el) return '';
-    const raw = (
-      el.getAttribute?.('aria-label')
-      || (el.innerText || el.textContent || '').trim()
-      || el.getAttribute?.('alt')
-      || el.getAttribute?.('placeholder')
-      || el.value
-      || el.tagName.toLowerCase()
-    ).replace(/\s+/g, ' ').trim();
+    const raw = (() => { try { return Extract?.nomeElemento?.(el) || ''; } catch (_) { return ''; } })();
     if (!raw) return el.tagName.toLowerCase();
-    const words = raw.split(' ');
-    return words.slice(0, 4).join(' ');
+    return raw.split(' ').slice(0, 4).join(' ');
   }
 
   // ---------- Parsing risposta AI ----------
@@ -1166,7 +1235,10 @@
   function resolveActionText(page) {
     const provided = String(page.text ?? page.testo ?? page.query ?? page.selection ?? '').trim();
     if (provided) return provided;
-    try { return (window.getSelection?.()?.toString() || '').trim(); } catch (_) { return ''; }
+    try {
+      if (Extract?.selezioneSegreta?.()) return '';
+      return (window.getSelection?.()?.toString() || '').trim();
+    } catch (_) { return ''; }
   }
 
   // Immagine bersaglio: per selettore, per src, altrimenti la più grande visibile.
@@ -1391,10 +1463,21 @@
     return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
   }
 
+  // I campi segreti leggibili a schermo arrivano al modello coperti dai puntini (#810.7): misurati prima e dopo lo
+  // scatto, se la pagina scorre nel frattempo; quelli dei riquadri e dei componenti chiusi li misura il main, che
+  // con campi da coprire manda la foto piena: coperta prima di diventare leggera, il JPEG non sparge le cifre attorno.
+  // Se coprirli non riesce, l'immagine non parte.
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, leggera: true });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      const prima = Extract.campiSegretiInVista();
+      const r = await chrome.runtime.sendMessage({
+        type: MSG.CAPTURE_VISIBLE_TAB, leggera: true, campiSegreti: true, campiNellaPagina: prima.length,
+      });
+      if (!r?.ok || !r.dataUrl) return null;
+      const campi = prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista());
+      if (!campi.length && !r.fattore) return r.dataUrl;
+      // `fattore` e `qualita` dal main quando la foto è arrivata piena: si rimpicciolisce come farebbe lui.
+      return await Extract.fotoCoperta(r.dataUrl, campi, r);
     } catch (_) {}
     return null;
   }
@@ -1467,6 +1550,7 @@
     });
     riga.append(`mi sono fermato dopo ${MAX_PASSI_DA_SOLO} passi fatti da solo `, btn);
     continuaAperto = btn;
+    rispostaArrivata();
     expand({ ai: true });
   }
 
@@ -1476,7 +1560,19 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
+  // Chiudere a metà di un turno nasconde il pannello invece di buttare la risposta; i passi che l'Aiuto farebbe da
+  // solo, chiuso, non partono.
+  async function submit(op = {}) {
+    if (!root || (nascosto && !op.userMessage)) return;
+    inVolo += 1;
+    try { await turno(op); } finally {
+      inVolo -= 1;
+      // Chiuso mentre pensava e niente da leggere: allora era chiuso davvero.
+      if (nascosto && !inVolo && !nonLetta) close({ davvero: true });
+    }
+  }
+
+  async function turno({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
     if (!root) return;
     // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
     if (userMessage || daGesto) {
@@ -1765,7 +1861,8 @@
       // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
       // Per i "fill" il riquadro è comunque mostrato (contiene valore + bottone Accetta).
       Highlight.clear();
-      if (parsed.highlight) {
+      // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
+      if (parsed.highlight && !nascosto) {
         const act = parsed.highlight.action;
         if (act === 'reveal' || act === 'hover') {
           // Auto-action: la eseguiamo noi senza coinvolgere l'utente.
@@ -1930,7 +2027,10 @@
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto };
+  global.SN_SIDEBAR = {
+    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato,
+    suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
+  };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {

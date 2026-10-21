@@ -228,7 +228,13 @@
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
     err_blocked_domain: 'Filo è spento su questo sito.',
     err_no_selection: 'Nessuna selezione di testo.',
+    err_secret_selection: 'Filo non manda al modello password e dati della carta.',
     help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
+    // L'icona Aiuto della barra laterale (#1432): la risposta da leggere, e perché è spenta.
+    aiuto_leggi_risposta: 'Leggi la risposta',
+    aiuto_spento_barra: 'Aiuto spento in Preferenze',
+    aiuto_spento_sito: 'Filo è spento su questo sito',
+    aiuto_spento_pagina: 'Qui l\'Aiuto non c\'è',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.

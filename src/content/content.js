@@ -35,6 +35,9 @@
   });
   MenuIcons.init({
     isContentFullscreen: () => contentFullscreen,
+    aiutoPasso: () => aiutoPasso(),
+    aiutoStato: () => Sidebar.stato(),
+    aiutoAcceso: () => aiutoAcceso(),
   });
   TTS.init({
     getSettings: () => settings,
@@ -1006,23 +1009,27 @@
     const spento = isBlocked();
     if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
     self.__snFiloSpento = spento;
+    riferisciAiuto();
   }
 
-  function isBlocked() {
+  function isBlocked() { return !!motivoBlocco(); }
+
+  // 'pagina' dove Filo non c'è mai, 'sito' dove l'utente l'ha spento; '' altrimenti.
+  function motivoBlocco() {
     const url = location.href;
     // #405 — dentro un riquadro incorporato "about:blank" e "about:srcdoc" NON
     // sono pagine di sistema: sono contenuto scritto dalla pagina che ospita il
     // riquadro (moduli, anteprime, blocchi commenti). Lì il menu deve esserci
     // come ovunque; l'esclusione vale per le pagine di sistema vere.
     const embeddedAbout = IS_SUBFRAME && /^about:(blank|srcdoc)/i.test(url);
-    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return true;
+    if (!embeddedAbout && PAGES_WITHOUT_MENU_PREFIXES.some((p) => url.startsWith(p))) return 'pagina';
     const blocklist = settings?.blocklist || [];
     const matches = (host) => !!host && blocklist.some((d) => host === d || host.endsWith('.' + d));
     // Se l'utente ha spento Filo su un sito, deve restare spento anche nei
     // riquadri che quel sito incorpora: il riquadro ha un'altra origine e da
     // solo non lo saprebbe, quindi guarda l'indirizzo della pagina ospite.
-    if (matches(hostOfUrl(pageUrl))) return true;
-    return matches(location.hostname);
+    if (matches(hostOfUrl(pageUrl))) return 'sito';
+    return matches(location.hostname) ? 'sito' : '';
   }
 
   function hostOfUrl(url) {
@@ -1293,6 +1300,8 @@
     if (el.disabled || el.readOnly) return false;
     const t = (el.getAttribute('type') || 'text').toLowerCase();
     if (!['text', 'search', ''].includes(t)) return false;
+    // La correzione manda al modello la parola e tutto il campo: in una password resa visibile, no (#810.7).
+    if (Extract?.campoSegreto?.(el)) return false;
     // Rispetta la disabilitazione esplicita.
     const sc = el.getAttribute('spellcheck');
     if (sc === 'false') return false;
@@ -1946,6 +1955,7 @@
     const value = el.value || '';
     const selection = value.slice(start, end).trim();
     if (!selection) return null;
+    if (Extract.campoSegreto?.(el)) return { selection, sentence: selection, segreto: true };
     return { selection, sentence: value.trim() || selection };
   }
 
@@ -2468,6 +2478,7 @@
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
+      if (selInfo.segreto) return items;
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
@@ -2482,6 +2493,7 @@
     if (selInfo) {
       // Testo selezionato nella pagina (non editabile)
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      if (selInfo.segreto) return items;
       items.push({
         type: 'item',
         label: I18n.t('menu_search_text'),
@@ -2673,6 +2685,41 @@
     Sidebar.open(context);
   }
 
+  // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
+  function aiutoPasso() {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+    Sidebar.passo();
+  }
+
+  // Alla barra laterale: cosa farà il clic sulla sua icona Aiuto, perché è spenta, e la risposta ancora da leggere.
+  // Solo dal frame principale: il pannello vive lì.
+  let aiutoRiferito = '';
+  let rispostaRiferita = null;
+  function riferisciAiuto() {
+    if (IS_SUBFRAME || !Sidebar?.stato) return;
+    const s = Sidebar.stato();
+    const spento = motivoBlocco() || (aiutoAcceso() ? '' : 'aiuto');
+    const firma = `${s.pannello}|${s.voce}|${spento}`;
+    try {
+      if (firma !== aiutoRiferito) {
+        aiutoRiferito = firma;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AIUTO_STATO, pannello: s.pannello, voce: s.voce, spento })).catch(() => {});
+      }
+      if (s.nonLetta !== rispostaRiferita) {
+        rispostaRiferita = s.nonLetta;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.RISPOSTA_IN_ATTESA, fonte: 'aiuto', attesa: s.nonLetta })).catch(() => {});
+      }
+    } catch (_) {}
+  }
+  try { Sidebar?.suCambio?.(riferisciAiuto); } catch (_) {}
+  // Tornata dalla cache di navigazione: per il main è un documento nuovo, e il suo Aiuto va ridetto.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    aiutoRiferito = '';
+    rispostaRiferita = null;
+    riferisciAiuto();
+  });
+
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
@@ -2778,7 +2825,7 @@
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(impostazioniDelCorrettore());
       // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
-      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
+      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close({ davvero: true });
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
@@ -2833,6 +2880,8 @@
       else Popup.showToast(I18n.t('err_no_selection'));
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
+    } else if (command === 'aiuto-dalla-barra') {
+      aiutoPasso();
     }
   }
 

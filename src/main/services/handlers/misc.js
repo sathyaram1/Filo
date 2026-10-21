@@ -3,6 +3,7 @@
 
 const { safeFetch } = require('../safe-fetch');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
@@ -326,6 +327,21 @@ module.exports = function register(on, ctx) {
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
     const wc = Foto.paginaDaFotografare(sender);
     if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
+    // Per un modello (#810.7): i campi segreti che il content script non vede (riquadri di altri siti, componenti
+    // chiusi), e con campi da coprire la foto piena, che diventa leggera dopo la copertura.
+    if (msg && msg.campiSegreti) {
+      const [img, fuori] = await Promise.all([wc.capturePage(), campiSegretiFuoriPagina(wc)]);
+      if (fuori.nonCoperti) return { ok: false, code: 'segreti', error: 'campi segreti che non si riescono a coprire' };
+      if (img.isEmpty()) return { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
+      if (fuori.campi.length || Number(msg.campiNellaPagina) > 0) {
+        const leggera = msg.leggera === true
+          ? { fattore: Foto.fattoreDiScala(sender, require('electron').screen), qualita: Foto.QUALITA_LEGGERA } : {};
+        return { ok: true, dataUrl: img.toDataURL(), campi: fuori.campi, ...leggera };
+      }
+      if (msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL(), campi: [] };
+      const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
+      return dataUrl ? { ok: true, dataUrl, campi: [] } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
+    }
     const img = await wc.capturePage();
     if (!msg || msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL() };
     const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));

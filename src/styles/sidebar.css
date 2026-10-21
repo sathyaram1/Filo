@@ -257,6 +257,10 @@ html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts {
 .sn-sidebar.sn-sidebar-collapsed .sn-sidebar-input {
   border-top: 0;
 }
+/* Chiuso mentre Filo risponde: la conversazione aspetta di essere riaperta (#1432). */
+.sn-sidebar.sn-sidebar-nascosta {
+  display: none !important;
+}
 
 .sn-sidebar-meta {
   padding: 4px 12px;
