@@ -259,6 +259,7 @@
   // un feedback non passa di qui: passa dal menu del tasto destro.
   // Bacheca e Deck builder in pausa (#1592): li vede l'owner, o tutti se l'owner li ha aperti. Con la Bacheca in
   // pausa le segnalazioni mandate restano raggiungibili: la voce porta alla sola parte che è dell'utente.
+  let inPausaVisibili = { bacheca: false, mazzi: false };
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
