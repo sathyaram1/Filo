@@ -40,16 +40,25 @@ class VisiteSchede {
     this.scritte = new WeakMap();
     this.ultime = new WeakMap();
     this.voci = new WeakMap();
+    this.freni = new WeakMap();
   }
 
-  // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova.
-  navigata(wc, scheda, url, { inPagina = false } = {}) {
+  // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova. `gesto`: l'ultimo input vero sulla
+  // scheda o l'ultima navigazione chiesta a Filo (barra, indietro, preferiti), in ms.
+  navigata(wc, scheda, url, { inPagina = false, gesto = 0 } = {}) {
     const voce = voceAttiva(wc);
     const vocePrima = this.voci.get(wc);
     if (voce) this.voci.set(wc, voce); else this.voci.delete(wc);
     // La pagina che riscrive la propria voce (una mappa spostata, un filtro) resta la stessa visita, come nei browser.
     if (inPagina && voce && vocePrima && voce.i === vocePrima.i && voce.n === vocePrima.n
       && voce.dietro === vocePrima.dietro) {
+      if (!registrabile(url)) return;
+      this.ultime.set(wc, url);
+      const v = this.inAttesa.get(wc);
+      if (v) v.url = url;
+      return;
+    }
+    if (this.frenata(wc, gesto)) {
       if (!registrabile(url)) return;
       this.ultime.set(wc, url);
       const v = this.inAttesa.get(wc);
