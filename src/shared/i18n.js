@@ -511,6 +511,10 @@
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    admin_defaults_contesto_cache: 'Durata della cache',
+    admin_defaults_contesto_cache_5m: '5 minuti',
+    admin_defaults_contesto_cache_1h: 'un\'ora',
+    admin_defaults_contesto_cache_serie: 'Come il codice (%s)',
     // Quanto può essere lunga una risposta dei modelli (#1097.3)
     admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
     admin_defaults_lunghezza_desc:

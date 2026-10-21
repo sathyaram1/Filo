@@ -262,6 +262,46 @@ test('col tetto a un giorno in Preferenze avanzate il contesto si accorcia al tu
   expect(prima(secondo)).toContain('che giorno è oggi?');
 });
 
+// SPEC-CONTESTO § Le costanti: la durata della cache della parte fissa si sceglie in Preferenze e a parole, come i tetti.
+test('la durata della cache scelta in Preferenze o chiesta a Filo arriva nella richiesta della chat', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await preparaModello(app, [{ text: 'Uno.' }, { text: 'Due.' }, { text: 'Tre.' }]);
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDERS;
+    const finto = P.streamCompleteWithFallback;
+    globalThis.__piani = [];
+    P.streamCompleteWithFallback = P.completeWithFallback = async (o) => {
+      if (o.cache) globalThis.__piani.push(JSON.parse(JSON.stringify(o.cache)));
+      return finto(o);
+    };
+  });
+  const durataParteFissa = () => app.evaluate(() => {
+    const p = globalThis.__piani[globalThis.__piani.length - 1];
+    return p && p.punti[0] && p.punti[0].indice === 0 ? (p.punti[0].durata || '5m') : null;
+  });
+  const chiedi = (t) => app.evaluate((_e, t) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: t, threadHistory: [], chatId: 'scheda-cache' }), t);
+
+  await chiedi('ciao');
+  expect(await durataParteFissa()).toBe('1h');
+
+  const pref = await openTab('filo://preferences/preferences.html');
+  await expect(pref.locator('#contestoCachePredefinita')).toHaveText(/un'ora/);
+  await pref.locator('#contestoCache').selectOption('5m');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.cache)).toBe('5m');
+  await pref.reload();
+  await expect(pref.locator('#contestoCache')).toHaveValue('5m');
+  await chiedi('come va?');
+  expect(await durataParteFissa()).toBe('5m');
+
+  const r = globalThis.SN_PREF_TEST;
+  void r;
+  const cambio = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('durata della cache', 'un\'ora'));
+  expect(cambio && cambio.partial).toEqual({ contestoFilo: { cache: '1h' } });
+  await app.evaluate(async (_e, p) => globalThis.SN_STORAGE.updateSettings(p), cambio.partial);
+  await chiedi('e adesso?');
+  expect(await durataParteFissa()).toBe('1h');
+});
+
 test('documento letto in una scheda: in un\'altra un link con un suo pezzo chiede conferma', async ({ app }) => {
   test.setTimeout(90_000);
   await primaScheda(app);

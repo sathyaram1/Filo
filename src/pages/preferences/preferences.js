@@ -876,6 +876,7 @@
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', $('contestoGiorni').value);
       case 'contestoFilo.token': return tettoContesto('token', $('contestoToken').value);
+      case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn($('contestoCache').value);
       case 'lunghezzaRisposte.conversazioni': return tettoRisposte($('lunghezzaConversazioni').value);
       case 'lunghezzaRisposte.testi': return tettoRisposte($('lunghezzaTesti').value);
       case 'lunghezzaRisposte.brevi': return tettoRisposte($('lunghezzaBrevi').value);
@@ -947,6 +948,7 @@
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', s.contestoFilo && s.contestoFilo.giorni);
       case 'contestoFilo.token': return tettoContesto('token', s.contestoFilo && s.contestoFilo.token);
+      case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn(s.contestoFilo && s.contestoFilo.cache);
       case 'lunghezzaRisposte.conversazioni':
       case 'lunghezzaRisposte.testi':
       case 'lunghezzaRisposte.brevi': return tettoRisposte(s.lunghezzaRisposte && s.lunghezzaRisposte[k.split('.')[1]]);
@@ -1001,6 +1003,7 @@
       const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
       if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
       if (d.token != null) $('contestoToken').placeholder = String(d.token);
+      if (d.cache) $('contestoCachePredefinita').textContent = `Come i predefiniti (${d.cache === '1h' ? 'un\'ora' : '5 minuti'})`;
       const l = { ...((r && r.lunghezzaRisposteDiSerie) || {}), ...((r && r.lunghezzaRisposte) || {}) };
       for (const [f, id] of CAMPI_LUNGHEZZA) if (l[f] != null) $(id).placeholder = String(l[f]);
     } catch (_) {}
@@ -1140,6 +1143,7 @@
     const cf = settings.contestoFilo || {};
     if (vuole('contestoFilo.giorni')) $('contestoGiorni').value = cf.giorni == null ? '' : String(cf.giorni);
     if (vuole('contestoFilo.token')) $('contestoToken').value = cf.token == null ? '' : String(cf.token);
+    if (vuole('contestoFilo.cache')) $('contestoCache').value = window.SN_FILO_CONTESTO.durataIn(cf.cache) || '';
     const lr = settings.lunghezzaRisposte || {};
     for (const [f, id] of CAMPI_LUNGHEZZA) {
       if (vuole(`lunghezzaRisposte.${f}`)) $(id).value = lr[f] == null ? '' : String(lr[f]);
@@ -1815,6 +1819,7 @@
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
       $(id).addEventListener('blur', canonContesto);
     }
+    $('contestoCache').addEventListener('change', persist);
     for (const [, id] of CAMPI_LUNGHEZZA) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
