@@ -8,6 +8,9 @@ const MEDIA = 'img,video,canvas,svg,iframe,frame,embed,object';
 const MAX_BLOCCATI = 500;
 const RIQUADRO_FERMATO = 'filo:adblock-riquadro-fermato';
 
+// Un riquadro ancora in arrivo non si tocca: perderebbe Filo (la regola sta nel preload della pagina).
+const inVolo = (f) => !!globalThis.SN_RIQUADRO_IN_VOLO?.(f);
+
 const area = (r) => (r.width > 0 && r.height > 0 ? r.width * r.height : 0);
 
 // Un riquadro che mostra solo l'annuncio fermato è un rettangolo bianco. Senza testo né immagini visibili lo è.
