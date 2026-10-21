@@ -2,6 +2,8 @@
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const siteBlock = require('../siteBlock');
+require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
