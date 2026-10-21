@@ -879,7 +879,8 @@
     }
     scegliSeServe();
     const n = inOrdine(scheda).length;
-    const vuoto = n ? '' : (VUOTO[scheda] || '');
+    const nascoste = !n && soloNonFidate() && tutteDiScheda(scheda).length > 0;
+    const vuoto = n ? '' : (nascoste ? 'Qui sono tutte fidate.' : (VUOTO[scheda] || ''));
     if (stato.aggiornamento) {
       el0.textContent = `Non riesco ad aggiornare le domande: ${stato.aggiornamento}. Restano quelle dell’ultima lettura.${vuoto ? ` ${vuoto}` : ''}`;
       if (riprova) riprova.hidden = false;
