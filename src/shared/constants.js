@@ -2538,7 +2538,7 @@
         + `${onboarding}\n\n`),
 
     filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
-      `═══ CONTESTO (cambia a ogni messaggio) ═══\n` +
+      `${INIZIO_CONTESTO_CHAT}\n` +
       PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
       rigaNomeModello(modelName) +
       `${memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n\n` +
