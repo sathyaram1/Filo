@@ -19,7 +19,9 @@ const RICHIESTA = new RegExp([
   '(?:send|give|tell|share|what|need|can\\s+you|could\\s+you|do\\s+you)',
 ].map((s) => `(?<!\\p{L})${s}(?!\\p{L})`).join('|'), 'iu');
 // In chat la password si chiede anche così: parole che le funzioni automatiche non trattano come annuncio di un dato.
-const CHIESTA_IN_CHAT = '(?<![\\p{L}\\p{N}])(?:pw|pass|credenziali|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
+// «pass» solo con l'articolo o col wifi: da solo è anche l'inglese «to pass».
+const CHIESTA_IN_CHAT = '(?<![\\p{L}\\p{N}])(?:pw|credenziali|(?:l[ae]|mia|tua|sua)\\s+pass|pass\\s+(?:del(?:la)?\\s+)?wi-?fi'
+  + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
 const FINE_FRASE = /[.!?]+(?=\s|$)|\n/g;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
