@@ -166,8 +166,12 @@ feedback nuovo per una chiave già in un feedback aperto o parcheggiato. Con la 
 feedback vecchio e la corsa restava verde (#752). La chiave porta l'ultima versione uscita
 per quella piattaforma, cioè con tutti i suoi file (`piattaforma:mac:dopo-v0.2.302`): finché
 resta rotta non cambia e non nascono doppioni, tornata a uscire un guasto dopo ne ha una
-nuova. Senza release lette la chiave è della versione (`in-v…`): un doppione è meglio di un
-guasto inghiottito.
+nuova. Se i file nella pagina ci sono tutti, è rotto il resto del lavoro (le impronte):
+la chiave è `piattaforma:mac:impronte:dopo-v…` e conta uscita solo una versione che ha
+anche le impronte, lette nella sua pagina dallo strumento che le scrive. Contando i soli
+file, ogni versione rotta alle impronte era «uscita» e apriva un feedback suo (#1348,
+verifica). Senza release lette, o senza quello strumento, la chiave è della versione
+(`in-v…`): un doppione è meglio di un guasto inghiottito.
 
 **L'allarme deve poter parlare prima di tutto il resto.** Lo strumento che apre il
 feedback vive nel repo, e la copia di lavoro del lavoro di piattaforma diventa quella del
