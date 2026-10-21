@@ -1,11 +1,13 @@
-// La guardia delle regole e della pagina delle approvazioni: si pubblica solo da main uguale a origin/main coi file
-// intatti, ed è l'unica strada (firebase.json la richiama a ogni deploy, e nessuno script la scavalca). Puro.
+// La guardia delle regole e della pagina delle approvazioni: si pubblica solo da main, coi file pubblicati intatti e
+// uguali a origin/main, ed è l'unica strada (firebase.json la richiama a ogni deploy, e nessuno script la scavalca).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'regole-pubblica.mjs')).href);
