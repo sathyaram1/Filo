@@ -41,8 +41,7 @@ async function preparaRouter(app, sorgente, modello = VOCE) {
       }
       return globalThis.__fetchVero(url, init);
     };
-    var VOCE_CHIUSA_ID = 'deepgram/aura-2';
-  }, { modello, sorgente });
+  }, { modello, sorgente, chiusa: VOCE_CHIUSA });
 }
 
 const leggi = (app) => app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE(
