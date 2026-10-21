@@ -2398,21 +2398,6 @@
     if (domandaId) {
       voci.push({ testo: `Rispondi alla domanda ${domandaId}`, titolo: 'Si risponde in un posto solo: la domanda, con le sue opzioni.', azione: () => apriDomandaDelFeedback(domandaId, fb._id) });
     }
-    const segnabile = isAdmin && !MR.isLocalOnly(fb) ? MR.localSignCheck(fb, true) : { ok: false };
-    if (isAdmin && MR.isLocalOnly(fb)) {
-      const chiusa = MR.praticaChiusa(fb, { releasedVersion, fusioni });
-      voci.push({
-        testo: chiusa ? '💻 Non era un lavoro server' : '💻 Non è un lavoro server',
-        titolo: chiusa ? `${localSignText(fb)} ${titoloTogliChiusa(fb)}` : localSignText(fb),
-        azione: () => segnoDalMenu(fb, false),
-      });
-    } else if (segnabile.ok) {
-      voci.push({
-        testo: segnabile.chiusa ? '💻 Era un lavoro server' : '💻 Lavoro server',
-        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.',
-        azione: () => segnoDalMenu(fb, true),
-      });
-    }
     if (isAdmin && ATT) {
       if (!MR.praticaChiusa(fb, opzSezioni())) {
         voci.push({ testo: '⏳ Aspetta un altro feedback…', titolo: 'Nessuna routine lo prende finché quello non è fuso.', azione: () => apriCasellaAttese(fb._id) });
