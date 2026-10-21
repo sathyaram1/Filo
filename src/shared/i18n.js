@@ -215,7 +215,7 @@
     popup_estimated_cost: 'Costo stimato',
     popup_calc_local: 'Calcolatrice locale (nessun costo)',
     popup_calc_result: 'Risultato',
-    popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
+    popup_followup_placeholder: 'Chiedi altro…',
     popup_send: 'Invia',
     popup_copy: 'Copia',
     popup_copied: 'Copiato',
