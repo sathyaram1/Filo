@@ -158,7 +158,7 @@ module.exports = function register(on, ctx) {
     const R = require('../correttoreRiservati');
     const testo = (v, max) => R.oscura(typeof v === 'string' ? v : '').slice(0, max);
     const dove = typeof s.dove === 'string' && /^(?:web|wiki:[a-z]{2,3})$/.test(s.dove) ? s.dove : 'wiki:en';
-    return { pezzo: testo(s.pezzo, 40), frase: testo(s.frase, 2000), domanda: testo(s.domanda, 200), dove };
+    return { pezzo: testo(s.pezzo, 40), frase: testo(s.frase, 2000), domanda: testo(s.domanda, 200), dove, suRichiesta: s.suRichiesta === true };
   }
   async function cercaSegnaposto(sp, { sender, origin, delicata }) {
     const settings = await getEffectiveSettings();
