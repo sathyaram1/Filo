@@ -52,7 +52,7 @@ test('finestra bassa: sotto l\'orologio la colonna sfuma finché c\'è altro, e 
   expect(inFondo.copertaInFondo, 'in fondo alla colonna nessuna voce di «altro» resta sotto l\'orologio').toBe(false);
   await page.screenshot({ path: join(SHOTS, 'home-colonna-bassa-fondo.png') });
 
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
   await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark');
   await page.locator('#right').evaluate((c) => { c.scrollTop = 0; });
   await expect.poll(async () => (await misura(page)).opacita).toBeGreaterThan(0.9);
