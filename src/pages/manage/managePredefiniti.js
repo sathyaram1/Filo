@@ -1,10 +1,6 @@
-// Gestione → Impostazioni predefinite → «Modelli predefiniti» (#1414: era la pagina admin-defaults, spostata intera).
-//
-// Editor della config condivisa (registry modelli, modelli per azione, chiavi
-// API predefinite) che si propaga a TUTTI gli utenti via
-// Firestore. Riservata agli admin: il main (handler DEFAULTS_GET/UPDATE) rifiuta
-// i non-admin e le regole Firestore sono la garanzia forte. Le chiavi vere non
-// arrivano mai qui: il main manda solo `apiKeysPresent` (booleani).
+// Gestione → Impostazioni predefinite → «Modelli predefiniti» (pagina admin-defaults fino a #1414): la config condivisa
+// (registry, modelli per azione, chiavi predefinite) che arriva a TUTTI. Il main rifiuta i non admin (DEFAULTS_GET/UPDATE)
+// e le regole Firestore sono la garanzia forte; le chiavi vere non arrivano qui, solo `apiKeysPresent`.
 
 (function () {
   'use strict';
