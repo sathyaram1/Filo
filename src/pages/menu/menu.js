@@ -150,14 +150,18 @@
           type: 'inline', subject: it.subject || '', content: it.content || '',
           onMount: (el) => {
             m.inline.set(n, el);
-            el.addEventListener('click', (e) => {
+            // La rotella e Ctrl (Cmd) su un collegamento della spiegazione lo aprono dietro, come nella pagina.
+            const premuto = (e) => {
+              if (e.type === 'auxclick' && e.button !== 1) return;
               const b = e.target.closest && e.target.closest('button, a, [role="button"]');
               const cammino = b && el.contains(b) ? D.cammino(el, b) : null;
               if (!cammino) return;
               e.preventDefault();
               e.stopPropagation();
-              chiedi('esegui', { inline: n, cammino });
-            });
+              chiedi('esegui', { inline: n, cammino, sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
+            };
+            el.addEventListener('click', premuto);
+            el.addEventListener('auxclick', premuto);
             const d = m.attese.get(`i${n}`);
             if (d) { m.attese.delete(`i${n}`); applicaInline(n, d); }
           },
