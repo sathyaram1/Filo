@@ -88,6 +88,40 @@ describe('la chiave dell\'allarme: la piattaforma e l\'ultima versione uscita pe
     assert.match(k, /^piattaforma:linux:inesistente-[A-Za-z0-9._-]+$/);
     assert.ok(k.length < 120);
   });
+
+  // Verifica #1348, giro 1: con i file sempre al loro posto ogni versione era «uscita», e un guasto
+  // che si ripeteva alle sole impronte apriva un feedback a ogni pubblicazione.
+  describe('i file ci sono e si rompono le impronte: conta uscita solo una versione con le impronte', () => {
+    const I = (tag, impronte, extra = {}) => R(tag, [...WIN, ...TUTTI_MAC, ...TUTTI_LINUX], { impronte, ...extra });
+    const SI = { Mac: true, Linux: true };
+    const NO = { Mac: false, Linux: false };
+    const chiave = (P, versione, rilasci, opz = {}) => chiaviAllarme(P, { versione, rilasci, ...opz })[0];
+
+    test('rotte a ogni versione: la chiave non cambia', () => {
+      const storia = [I('v0.2.300', SI), I('v0.2.301', NO), I('v0.2.302', NO), I('v0.2.303', NO)];
+      const chiavi = ['v0.2.301', 'v0.2.302', 'v0.2.303'].map((v) => chiave('Mac', v, storia));
+      assert.deepEqual(new Set(chiavi), new Set(['piattaforma:mac:impronte:dopo-v0.2.300']));
+      // Una release vecchia, di prima della sezione, non le ha: non è mai uscita «con le impronte».
+      assert.equal(chiave('Linux', 'v0.2.301', [R('v0.2.300', TUTTI_LINUX), I('v0.2.301', NO)]), 'piattaforma:linux:impronte:dopo-nessuna');
+    });
+
+    test('tornate a uscire, un guasto dopo ha una chiave nuova; e ogni piattaforma conta le sue', () => {
+      const storia = [I('v0.2.300', SI), I('v0.2.301', NO), I('v0.2.302', { Mac: true, Linux: false }), I('v0.2.303', NO)];
+      assert.equal(chiave('Mac', 'v0.2.303', storia), 'piattaforma:mac:impronte:dopo-v0.2.302');
+      assert.equal(chiave('Linux', 'v0.2.303', storia), 'piattaforma:linux:impronte:dopo-v0.2.300');
+    });
+
+    test('un file che manca dopo un guasto alle impronte non finisce nel feedback delle impronte', () => {
+      const storia = [I('v0.2.300', SI), I('v0.2.301', NO), I('v0.2.302', NO), R('v0.2.303', WIN)];
+      assert.equal(chiave('Mac', 'v0.2.302', storia), 'piattaforma:mac:impronte:dopo-v0.2.300');
+      assert.equal(chiave('Mac', 'v0.2.303', storia), 'piattaforma:mac:dopo-v0.2.302');
+    });
+
+    test('se le impronte delle pagine non si sono potute leggere, la chiave è della versione', () => {
+      const storia = [I('v0.2.300', SI), I('v0.2.301', NO)];
+      assert.equal(chiave('Mac', 'v0.2.301', storia, { impronteLette: false }), 'piattaforma:mac:impronte:in-v0.2.301');
+    });
+  });
 });
 
 describe('le release, lette da GitHub', () => {
