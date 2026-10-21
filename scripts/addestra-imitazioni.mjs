@@ -42,6 +42,7 @@ const PESO_MANO = Number(arg('--peso-mano', 6));
 // perdeva le imitazioni con altre parole.
 const PESO_SINTETICI = Number(arg('--peso-sintetici', 2));
 const PESO_PAROLE = Number(arg('--peso-parole', 2));
+const PESO_NOMI = Number(arg('--peso-nomi', 4));
 // Il seme che sceglie forme e suffissi: il modello scritto è quello di questo seme, sugli elenchi del 21/10/2026.
 const SEME_PAROLE = Number(arg('--seme-parole', 42));
 
@@ -144,6 +145,10 @@ function sinteticiRefusi(etichetta) {
     const ultima = t[t.length - 1];
     varianti.push(t + ultima, t + 's', t + (ACCANTO[ultima] || 'e')[0], t.slice(0, -1));
     if (ACCANTO[t[m]]) varianti.push(t.slice(0, m) + ACCANTO[t[m]][1] + t[m] + t.slice(m + 1));
+    // Ogni lettera tolta e una vocale in fondo, come le prendevano le regole di prima: senza, sui marchi corti (gmal,
+    // iclud, pste, googlea) il modello ne lasciava passare uno su sei.
+    for (let i = 1; i < t.length - 1; i++) varianti.push(t.slice(0, i) + t.slice(i + 1));
+    varianti.push(t + 'a', t + 'e', t + 'o');
     const nomi = [...new Set(varianti)].filter((v) => v !== t).map((v) => v + suff);
     // E il suffisso sbagliato di una lettera (github.co, paypal.cm), dove il marchio non l'ha preso per sé.
     if (suff === '.com') nomi.push(...['.co', '.cm', '.om'].map((x) => t + x).filter((h) => !b.domains.includes(h)));
@@ -224,7 +229,7 @@ function sinteticiNomi(etichetta) {
     for (const h of nomi) {
       const reg = normalize('https://' + h + '/').registrable;
       if (LEGIT_DOMAINS.has(h) || LEGIT_DOMAINS.has(reg) || (b.omonimi || []).includes(reg) || etichetta.has(h)) continue;
-      out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
+      out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_NOMI });
     }
   }
   return out;
