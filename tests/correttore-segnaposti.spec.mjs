@@ -222,6 +222,54 @@ test('lo stesso dato non si ricerca quando la frase cambia altrove: una pausa a 
   expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
 });
 
+// Un modello vero, rileggendo la frase finita, scrive la ricerca con altre parole o nel dubbio tace: il valore resta.
+for (const [come, riga] of [['con altre parole', '[di soli xx][][Google P/E ratio][cerca][web]'], ['tacendo', '[][][][nessuno]']]) {
+  test(`la frase finita riletta ${come}: il dato trovato resta e non si ricerca`, async ({ app, openTab, testServer }) => {
+    const page = await apri(app, openTab, testServer, P_E);
+    await webLento(app);
+    await app.evaluate((_e, riga) => {
+      globalThis.__riletture = 0;
+      const prima = globalThis.SN_PROVIDERS.completeWithFallback;
+      const f = async (a) => {
+        const t = String(a.messages[a.messages.length - 1].content);
+        if (!t.includes('proponi SUGGERIMENTI') || !t.includes('davvero basso')) return prima(a);
+        globalThis.__riletture++;
+        return { text: riga, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      };
+      globalThis.SN_PROVIDERS.completeWithFallback = f;
+      globalThis.SN_PROVIDERS.streamCompleteWithFallback = f;
+    }, riga);
+    await page.locator('#ta').click();
+    await page.keyboard.type('Google ha un p/e di soli xx, ');
+    await expect(valore(page, '27')).toBeVisible({ timeout: 10000 });
+    await page.keyboard.type('davvero basso per una azienda così. ');
+    await expect.poll(() => globale(app, '__riletture'), { timeout: 8000 }).toBeGreaterThan(0);
+    await restaIlValore(page, '27', 3000);
+    expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+    // Cambiato il soggetto prima delle x, il dato è un altro: il valore vecchio non resta.
+    const i = (await page.locator('#ta').inputValue()).indexOf('Google');
+    await page.locator('#ta').evaluate((e, i) => e.setSelectionRange(i, i + 6), i);
+    await page.keyboard.type('Apple');
+    await expect(valore(page, '27')).toHaveCount(0, { timeout: 5000 });
+  });
+}
+
+test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice, e «Cerca il dato» lo trova', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, P_E);
+  await app.evaluate(async (_e, u) => { await globalThis.SN_DELICATE.segnaCampi(u); }, page.url());
+  await page.locator('#ta').click();
+  await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
+  await expect.poll(async () => (await globale(app, '__ragionate')).length, { timeout: 8000 }).toBeGreaterThan(0);
+  await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 5000 });
+  await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
+  expect(await globale(app, '__webChieste')).toEqual([]);
+  const menu = await tastoDestroSu(page, ocra(page, 'xx'));
+  await expect(menu.locator('.sn-menu-segno')).toHaveText('Su questa pagina non cerco da solo.', { timeout: 3000 });
+  await menu.voce('Cerca il dato').click();
+  await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
+  expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+});
+
 test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuovo», che tornata la rete trova il valore', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, P_E);
   await app.evaluate(() => {
