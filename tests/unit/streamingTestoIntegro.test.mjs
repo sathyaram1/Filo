@@ -28,11 +28,14 @@ function eventi({ fineRiga = '\n', ultimaSenzaACapo = false } = {}) {
   const ev = (obj) => `data: ${JSON.stringify(obj)}${fineRiga}${fineRiga}`;
   const parti = [`: OPENROUTER PROCESSING${fineRiga}${fineRiga}`];
   parti.push(ev({ id: 'gen-1', choices: [{ delta: { role: 'assistant', content: '' } }] }));
-  for (const d of aPezzi(RISPOSTA, 3)) parti.push(ev({ id: 'gen-1', choices: [{ delta: { content: d } }] }));
   const args = aPezzi(ARGOMENTI, 4);
   parti.push(ev({ id: 'gen-1', choices: [{ delta: { tool_calls: [{ index: 0, id: 'call_1', function: { name: 'INVIA_FEEDBACK', arguments: args[0] } }] } }] }));
   for (const a of args.slice(1)) parti.push(ev({ id: 'gen-1', choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: a } }] } }] }));
-  const ultimo = { id: 'gen-1', choices: [{ delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 10, completion_tokens: 50 } };
+  // Senza a capo finale l'ultimo evento porta anche l'ultimo pezzo di testo: è quello che si perderebbe.
+  const testo = aPezzi(RISPOSTA, 3);
+  const coda = ultimaSenzaACapo ? testo.pop() : '';
+  for (const d of testo) parti.push(ev({ id: 'gen-1', choices: [{ delta: { content: d } }] }));
+  const ultimo = { id: 'gen-1', choices: [{ delta: coda ? { content: coda } : {}, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 50 } };
   if (ultimaSenzaACapo) parti.push(`data: ${JSON.stringify(ultimo)}`);
   else parti.push(ev(ultimo), `data: [DONE]${fineRiga}${fineRiga}`);
   return new TextEncoder().encode(parti.join(''));
