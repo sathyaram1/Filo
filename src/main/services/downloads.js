@@ -858,10 +858,40 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
     _scope: scope || '',
   };
   records.set(id, rec);
+  const attese = [];
+  rec._sblocca = (si) => { for (const r of attese.splice(0)) r(si); };
   const requestCancel = () => { rec._cancelled = true; finalizeManual(rec, 'cancelled'); };
-  liveManual.set(id, { cancel: requestCancel });
+  // La risposta alla domanda «scaricarlo?», da confirmDownload: un no chiude la voce come «Annulla».
+  const rispondi = (si) => {
+    if (!si) { requestCancel(); return; }
+    rec._consenso = true;
+    rec.state = 'progressing';
+    persist();
+    broadcast('progress', rec);
+    rec._sblocca(true);
+  };
+  liveManual.set(id, { cancel: requestCancel, rispondi });
   persist();
   broadcast('start', rec);
+
+  // #1311 — un programma non arriva dove l'ha scelto l'utente senza la domanda dei download da link: la regola è
+  // quella di chiedeConferma, sul nome FINALE; un sì vale per la voce intera, anche se nel dialogo il nome cambia.
+  const permesso = (nome) => {
+    if (rec._final) return Promise.resolve(false);
+    const n = safeName(nome || rec.filename);
+    const exe = marca(() => ESE().eEseguibile(n), true);
+    if (!exe || rec._consenso || !chiedeConferma(rec.site, false, servedFrom)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      attese.push(resolve);
+      if (rec.state === 'pending') return;
+      rec.filename = n;
+      rec.exe = true;
+      rec.state = 'pending';
+      persist();
+      broadcast('progress', rec);
+      chiediNellaFinestra(webContents, rec);
+    });
+  };
 
   // Su rete veloce l'evento 'data' arriva migliaia di volte al secondo e ogni
   // broadcast attraversa l'IPC verso ogni finestra: senza freno l'avanzamento
