@@ -481,13 +481,32 @@
     return [String(segment || '').toLowerCase(), domanda, cerca?.dove || ''].join('\u0000');
   }
 
-  // Chi è un segnaposto nel testo: la sua frase fino alle x, senza maiuscole né punteggiatura. Un valore trovato resta suo
-  // finché questa non cambia, qualunque parole usi il modello rileggendo la frase, o se quella volta tace (#1448).
-  function identitaSegnaposto(testo, start, end) {
-    testo = String(testo ?? '');
-    if (!(end > start) || end > testo.length) return '';
-    const f = aFrasiIntere(testo, start, end);
-    return testo.slice(f.start, end).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  // Il dato di un segnaposto è quello di tutta la frase in cui è stato chiesto: resta finché quella frase c'è ancora
+  // intera, a meno di parole aggiunte e refusi corretti; una parola tolta o sostituita, prima o dopo le x, lo rimette al
+  // modello (#1448). Un numero vale solo uguale: «nel 2020» e «nel 2021» sono due dati.
+  const lontane = (a, b, max) => {
+    if (Math.abs(a.length - b.length) > max) return true;
+    let pp = null;
+    let p = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      const c = [i];
+      for (let j = 1; j <= b.length; j++) {
+        c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        if (pp && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) c[j] = Math.min(c[j], pp[j - 2] + 1);
+      }
+      pp = p;
+      p = c;
+    }
+    return p[b.length] > max;
+  };
+  const paroleDi = (s) => String(s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  function stessaFrase(allora, adesso) {
+    const prima = paroleDi(allora);
+    const ora = paroleDi(adesso);
+    if (!prima.length) return false;
+    return prima.every((w, i) => ora.some((u) => u === w
+      || (i === prima.length - 1 && u.startsWith(w))
+      || (!/\d/.test(w) && w.length >= 4 && !lontane(w, u, w.length >= 8 ? 2 : 1))));
   }
 
   // La risposta della ricerca di un segnaposto, una riga [valore][motivo][fonte][data][indirizzo] che il main ha
