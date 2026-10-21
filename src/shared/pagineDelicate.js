@@ -1,6 +1,6 @@
-// Le pagine delicate (#1004): posta, banche, sanità, pubblica amministrazione, i siti che aggiunge l'utente e quelli che
-// hanno mostrato un campo password o carta. Di queste i lavori automatici non mandano niente a un modello. Logica pura: la memoria dei
-// campi visti la tiene src/main/services/pagineDelicate.js; prove in tests/unit/pagineDelicate.test.mjs.
+// Le pagine delicate (#1004): posta, banche, sanità, pubblica amministrazione, i siti dell'utente e quelli che hanno
+// mostrato un campo password o carta. Di queste i lavori automatici non mandano niente a un modello. Logica pura: i campi
+// visti li ricorda src/main/services/pagineDelicate.js; prove in tests/unit/pagineDelicate.test.mjs.
 
 (function (global) {
   'use strict';
