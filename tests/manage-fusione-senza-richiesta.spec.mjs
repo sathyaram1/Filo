@@ -144,3 +144,20 @@ test('con una richiesta aperta il quadrato resta quello di prima: Approva e Scar
   await expect(page.locator('#mgL5RimandaBtn')).toHaveCount(0);
   await expect(page.locator('#mgL5ArchiviaBtn')).toHaveCount(0);
 });
+
+// Il server scrive l'ora della nota in UTC senza fuso, l'owner la legge in Italia: la nota del cancello resta il motivo.
+test.describe('letta in ora italiana', () => {
+  let tzPrima;
+  test.beforeAll(() => { tzPrima = process.env.TZ; process.env.TZ = 'Europe/Rome'; });
+  test.afterAll(() => { if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima; });
+
+  test('ferma senza richiesta: la nota del server, scritta un quarto d’ora dopo l’audit, è il motivo', async ({ openTab }) => {
+    const page = await openTab(MANAGE);
+    const notes = `Report di chi ha risolto: fatto.\n\n--- Aggiornamento dell'agente del 21/10/26, 15:55 ---\n${NOTA}`;
+    await apri(page, [pratica({ notes, livelli: { l4: { esito: 'pass', at: '2026-10-21T15:40:00.000Z' } } })]);
+    expect(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)).toBe('Europe/Rome');
+    await apriQuadrato(page, 'fb-1556');
+    await expect(page.locator('#mgSideBody')).toContainText('Il cancello non fonde il ramo del server');
+    await expect(page.locator('#mgSideBody')).not.toContainText('Nessuna richiesta di fusione è aperta');
+  });
+});
