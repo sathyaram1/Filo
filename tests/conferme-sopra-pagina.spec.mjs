@@ -393,6 +393,7 @@ test('con la domanda a schermo la barra laterale resta raggiungibile, e aprirla 
   await expect.poll(async () => (await geometria(app)).visibile).toBe(true);
   expect(await chiPrende(app, 1, y), 'la striscia sul bordo sinistro').toBe('barra');
   expect(await chiPrende(app, 640, y), 'il resto della scheda').toBe('conferma');
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
   await pannelloFermo(barra);
