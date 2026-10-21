@@ -110,11 +110,13 @@ async function filtro(settingsIn) {
   await carica();
   const m = modo(settings);
   const regola = Defaults.regolaTitoli() || T().REGOLA;
+  // Un titolo con l'ordine dentro resta fuori anche quando il box non si apre (un ordine fra virgolette, una notizia).
   const sospetto = (titolo, k) => {
     const m2 = `${regola.versione || ''}\n${k}`;
     if (!memo.has(m2)) {
       if (memo.size > 2000) memo.clear();
-      memo.set(m2, T().controlla(titolo, regola).sospetto);
+      const e = T().controlla(titolo, regola);
+      memo.set(m2, e.sospetto ? 'sospetto' : e.fuori ? 'citato' : null);
     }
     return memo.get(m2);
   };
