@@ -22,12 +22,8 @@ test('preferenze: tendina chiusa, scelta, ritorno al predefinito, temi', async (
   // Cambio fatto altrove (la chat) con la pagina aperta e il campo non toccato: la tendina lo segue.
   await pref.reload();
   await expect(vis).toHaveText(/un'ora/, { timeout: 10_000 });
-  await app.evaluate(async () => {
-    const s = await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { cache: '5m' } });
-    const t = globalThis.SN_CONST.MSG.SETTINGS_UPDATED;
-    if (globalThis.broadcastToTabs) globalThis.broadcastToTabs({ type: t, settings: await globalThis.SN_STORAGE.getSettings() });
-    return !!s;
-  });
+  const altra = await openTab('filo://history/history.html');
+  await altra.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { contestoFilo: { cache: '5m' } } }));
   await pref.waitForTimeout(1500);
   console.log('dopo cambio esterno:', await vis.textContent(), await sel.inputValue());
   await pref.reload();
