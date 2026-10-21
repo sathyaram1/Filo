@@ -375,20 +375,20 @@
       const madre = inConsegna(st);
       const a = st.annuncio;
       const annunciato = !madre && e.isTrusted && !!a && a.e.eventPhase === 0 && !a.e.defaultPrevented && a.tipo === e.inputType;
-      const dellUtente = annunciato && combacia(a, c.value, st);
       const diFilo = madre ? nostraScrittura > madre.livello : nostraScrittura > 0;
-      if (dellUtente || diFilo) {
-        if (dellUtente) st.annuncio = null;
+      const voluto = diFilo ? st.filo : (annunciato ? a : null);
+      if (voluto ? combacia(voluto, c.value, st) : diFilo) {
+        if (voluto === a) st.annuncio = null;
         st.inCorso.push({ e, livello: nostraScrittura });
         vale(st, c.value);
         st.sel = st.dopo && st.dopo.e === e ? st.dopo.sel : selezioneDi(c);
         return;
       }
-      // L'annuncio vero con un cambio del sito dentro: resta quello che l'utente ha scritto, applicato al suo testo.
-      const x = annunciato ? atteso(a) : null;
+      // L'annuncio vero, o la scrittura di Filo, con un cambio del sito dentro: resta quello annunciato, applicato al testo.
+      const x = voluto ? atteso(voluto) : null;
       if (annunciato) st.annuncio = null;
       if (x !== null) {
-        const fine = a.tipo === 'deleteContentForward' ? a.sel[0] : x.length - (a.valore.length - a.sel[1]);
+        const fine = voluto.tipo === 'deleteContentForward' ? voluto.sel[0] : x.length - (voluto.valore.length - voluto.sel[1]);
         c.value = x;
         try { c.setSelectionRange(fine, fine); } catch (_) {}
         st.inCorso.push({ e, livello: nostraScrittura });
