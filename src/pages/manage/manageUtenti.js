@@ -1,4 +1,4 @@
-// Pagina «Inviti e utenti», solo owner (#598): codici d'invito da dare,
+// Gestione → Utenti → «Inviti e utenti» (#1414: era la pagina credits/owner.html, spostata intera). Solo owner (#598): codici d'invito da dare,
 // regali di crediti per pseudonimo, tabella degli utenti con saldo, consumo,
 // registro e dettaglio d'uso, esiti di giornaliera e riconciliazione. È una
 // pagina a parte dalla pagina Crediti dell'utente: due lavori diversi, due
