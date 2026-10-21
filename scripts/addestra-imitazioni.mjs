@@ -164,9 +164,8 @@ const PIATTAFORME = ['vercel.app', 'netlify.app', 'pages.dev', 'web.app', 'fireb
 function sinteticiParole(etichetta) {
   const { BRANDS, PAROLE_TRUFFA, LEGIT_DOMAINS } = require('./src/main/services/safebrowse/brands.js');
   const parole = PAROLE_TRUFFA.map((w) => w + (FINALI[w] || ''));
-  const caso = rng(1375);
+  const caso = rng(SEME_PAROLE);
   const pesca = (l) => l[Math.floor(caso() * l.length)];
-  const casoPezzo = rng(26);
   const out = [];
   const visti = new Set();
   for (const b of BRANDS) {
