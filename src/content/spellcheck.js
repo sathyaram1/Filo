@@ -2739,6 +2739,7 @@
     updateSettings,
     erroriAttivi,
     suggerimentiAttivi,
+    segnapostiAttivi,
     modelloErrori,
     isSupportedEditable,
     findSupportedEditable,
