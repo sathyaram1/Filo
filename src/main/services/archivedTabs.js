@@ -145,7 +145,11 @@
     for (const t of d.tutti()) if (!via.has(t.id) && urlVia.has(t.url)) urlVia.delete(t.url);
     return d.togli([...via], (t) => {
       if (!urlVia.size || !Array.isArray(t.coOpenUrls) || !t.coOpenUrls.some((u) => urlVia.has(u))) return t;
-      return { ...t, coOpenUrls: t.coOpenUrls.filter((u) => !urlVia.has(u)) };
+      const tagliati = new Set(Array.isArray(t.coOpenUrlsTagliati) ? t.coOpenUrlsTagliati : []);
+      const resta = t.coOpenUrls.map((u, i) => ({ u, tagliato: tagliati.has(i) })).filter((x) => !urlVia.has(x.u));
+      const { coOpenUrlsTagliati: _prima, ...senza } = t;
+      const segni = resta.map((x, i) => (x.tagliato ? i : -1)).filter((i) => i >= 0);
+      return { ...senza, coOpenUrls: resta.map((x) => x.u), ...(segni.length ? { coOpenUrlsTagliati: segni } : {}) };
     });
   }
 
