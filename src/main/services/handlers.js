@@ -783,14 +783,16 @@ async function handleAIRequest({ intera = false, ...opts }) {
   return r;
 }
 
-async function chiamaIlModello({ action, payload, origin, sender = null, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
+async function chiamaIlModello({ action, payload, origin, sender = null, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null, modelloDi = null }) {
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
   // poteva imporre un modello scritto nel codice, scavalcando la configurazione
   // (era esattamente ciò che faceva la descrizione delle immagini). Il modello di
-  // una funzione viene SOLO dalla configurazione effettiva.
-  const model = modelForAction(settings, action);
+  // una funzione viene SOLO dalla configurazione effettiva. `modelloDi` nomina un'altra funzione di cui prendere il
+  // modello configurato («Valuta» dell'Aiuto usa quello della chat, #1449): lo decide il main, mai il payload.
+  const configurata = modelloDi || action;
+  const model = modelForAction(settings, configurata);
   // Nome CONCRETO del modello primario (es. 'gemini-3.1-flash-lite'), non il
   // nickname: è il nome con cui il codice lo invoca. Lo passiamo al prompt così
   // l'assistente può dire correttamente che modello è (#158). Chiave mancante o
@@ -800,7 +802,7 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
   // vecchia in cache — per una funzione che non ha un modello.
   let modelName = model;
   try {
-    const ch = buildAttemptChain(settings, model, action);
+    const ch = buildAttemptChain(settings, model, configurata);
     if (ch[0] && ch[0].model) modelName = ch[0].model;
   } catch (e) {
     if (e && e.code === 'NO_MODEL_FOR_ACTION') throw e;
@@ -823,7 +825,7 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
 
-  const attempts = buildAttemptChain(settings, model, action);
+  const attempts = buildAttemptChain(settings, model, configurata);
 
   // Se il caller vuole il RAGIONAMENTO in diretta (es. la chat della home, #priorità1)
   // o la RISPOSTA in diretta (#420) usiamo il cammino in streaming, che espone i

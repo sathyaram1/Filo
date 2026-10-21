@@ -187,9 +187,11 @@ module.exports = function register(on, ctx) {
     // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
     const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
     const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    const valuta = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.valuta === true;
     const chiedi = daSola
       ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))
-      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender });
+      : valuta ? () => chiediValuta(msg.payload, origin, sender)
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
