@@ -415,6 +415,7 @@ function riquadriFigli() {
     let lista = [];
     try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
     for (const f of lista) {
+      if (riquadroInVolo(f)) continue;
       out.push(f);
       const R = globalThis.SN_RIQUADRI_IN_ARRIVO;
       try {
