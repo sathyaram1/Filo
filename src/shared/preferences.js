@@ -1852,6 +1852,19 @@
       },
     },
     {
+      scrive: ['descriviImmagini.enabled'],
+      aiuto: 'true | false (ogni screenshot, intero o di una parte, e ogni immagine copiata da una pagina va intera al modello delle immagini, che ne scrive il nome del file e la riga della cronologia appunti; spenta, l\'immagine non parte e il file si chiama con data e ora. Da una pagina delicata non parte mai)',
+      costo: 1,
+      keys: ['descrizione_immagini', 'descrizione automatica delle immagini', 'descrivi le immagini', 'descrivi gli screenshot',
+        'nome degli screenshot', 'nomi degli screenshot', 'descrizione degli screenshot', 'descrizione delle immagini copiate',
+        'descriviimmagini', 'descriviimmagini.enabled'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { descriviImmagini: { enabled: b } }, label: `Descrizione di screenshot e immagini copiate → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
       scrive: ['security.riquadriRotti.modello'],
       aiuto: 'true | false (un contenuto incorporato di un altro sito rimasto vuoto, che Filo non riconosce da solo, va in foto a un modello per capire se sono i cookie rifiutati; spento, nessuna foto parte e quel riquadro si riattiva col tasto destro)',
       costo: 1,
