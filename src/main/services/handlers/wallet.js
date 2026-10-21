@@ -281,7 +281,7 @@ module.exports = function register(on, ctx) {
     }
     try {
       out.server = await callable('walletState');
-      if (out.server && out.server.hasWallet) {
+      if (out.server && out.server.hasWallet && piuNuova()) {
         lastServer = out.server;
         if (!out.pseudonym && out.server.pseudonym && out.hasPersonalKey) {
           walletStore.save({ ...walletStore.load(), pseudonym: out.server.pseudonym });
