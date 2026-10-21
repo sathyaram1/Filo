@@ -3039,7 +3039,7 @@ class TabManager {
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this._misuraStoria(tab, wc);
       update({ url: userUrl(url), canBack: this.puoTornare(tab, 'indietro', wc), canFwd: this.puoTornare(tab, 'avanti', wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
-      if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
+      if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true, gesto: gestoPerIlFilo(tab) });
       if (isMainFrame === true) this._accessoDopoCarico(tab);
       if (isMainFrame === true) segnaPagina(tab, url);
     });
