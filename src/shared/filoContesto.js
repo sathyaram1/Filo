@@ -380,8 +380,9 @@
   }
 
   // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare nelle conversazioni
-  // vecchie, tutte nello stesso scambio. Una parola che compare in molte conversazioni («grazie», «perfetto») non
-  // distingue niente; una che torna in tutta una conversazione sola (il suo argomento) sì.
+  // vecchie nello stesso scambio, e vincono gli scambi che ne hanno di più. Una parola che compare in molte
+  // conversazioni («grazie», «perfetto») non distingue niente; una che torna in tutta una conversazione sola (il suo
+  // argomento) sì. Pretenderle tutte no (#868.8): «chiamava», detta una volta in un'altra chat, bloccava il ricordo.
   // Le parole di cortesia non sono mai l'argomento: rare finché sono state dette una volta sola, ripescherebbero quello
   // scambio a ogni «grazie mille». Fuori le parole che possono esserlo («chiaro» del tema, «accordo», «fine»).
   const MIN_PAROLE_RICORDO = 2;
@@ -403,10 +404,14 @@
     const chat = new Set(lista.map((t) => t.chat)).size;
     const comune = Math.max(1, Math.floor(chat * QUOTA_PAROLA_COMUNE));
     const inQuante = (p) => new Set(lista.filter((_t, i) => pagliai[i].includes(p)).map((t) => t.chat)).size;
-    const parole = [...new Set(CA.terminiCheDistinguono(CA.normalizeForSearch(domanda).split(/\s+/).filter(Boolean)))]
-      .filter((p) => !diCortesia(p) && inQuante(p) <= comune);
+    const parole = [...new Set(CA.terminiCheDistinguono(CA.paroleDi(domanda)))]
+      .filter((p) => !diCortesia(p))
+      .filter((p) => { const n = inQuante(p); return n >= 1 && n <= comune; });
     if (parole.length < MIN_PAROLE_RICORDO) return [];
-    const presi = lista.filter((_t, i) => parole.every((p) => pagliai[i].includes(p)));
+    const quante = pagliai.map((s) => parole.filter((p) => s.includes(p)).length);
+    const migliore = quante.reduce((m, n) => Math.max(m, n), 0);
+    if (migliore < MIN_PAROLE_RICORDO) return [];
+    const presi = lista.filter((_t, i) => quante[i] === migliore);
     return scegliRicordi(presi.slice(-MAX_RICORDI).map((t) => ({ tratto: t, score: 1 })));
   }
 
@@ -454,10 +459,94 @@
     return Math.max(0, Math.floor(Math.max(0, restano) / CARATTERI_PER_TOKEN));
   }
 
+  // Una rilettura (CERCA_CHAT con l'id) sta nella finestra fin dal primo tentativo (#868.7), con la richiesta già fatta
+  // (`occupati`) e il tetto della risposta, che il fornitore conta dentro. Mai sotto il minimo: il resto si legge a pezzi.
+  const RILETTURA_MIN = 8000;
+  function capRilettura({ tetto = TETTI_DI_SERIE.token, finestra = null, occupati = 0, risposta = 0 } = {}) {
+    let token = Number(tetto) > 0 ? Number(tetto) : TETTI_DI_SERIE.token;
+    const f = Number(finestra);
+    if (Number.isFinite(f) && f > 0) {
+      const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
+      token = Math.min(token, f * MARGINE_FINESTRA - Math.max(0, Number(occupati) || 0) - riserva);
+    }
+    return Math.max(RILETTURA_MIN, Math.floor(token * CARATTERI_PER_TOKEN));
+  }
+
+  // Dopo un rifiuto per finestra, i caratteri che restano alle riletture del turno (null se già al minimo). Con la finestra
+  // detta dal rifiuto vale la misura del primo tentativo: il turno dopo, che se le ritrova davanti, ci sta ancora.
+  function rilettureDopoRifiuto({ max = null, chiesti = null, caratteri = 0, caratteriRiletture = 0, n = 1, risposta = 0, fuori = 0 } = {}) {
+    const minimo = RILETTURA_MIN * Math.max(1, n);
+    const cr = Math.max(0, Number(caratteriRiletture) || 0);
+    if (cr <= minimo) return null;
+    let resta = Math.floor((tettoDopoRifiuto({ max, chiesti, caratteri, caratteriTratto: cr }) || 0) * CARATTERI_PER_TOKEN);
+    if (max) {
+      const occupati = Math.ceil((Math.max(0, caratteri - cr) + Math.max(0, Number(fuori) || 0)) / CARATTERI_PER_TOKEN);
+      resta = Math.min(resta, capRilettura({ tetto: Infinity, finestra: max, occupati, risposta }));
+    }
+    return Math.max(minimo, resta);
+  }
+
+  // Quello che il modello ha già davanti dall'archivio: i pezzi ripescati nei turni prima e le conversazioni rilette
+  // per intero. Non si ripescano di nuovo (#868.1): le copie si accumulavano a ogni messaggio sullo stesso argomento.
+  function giaDavanti(azioni) {
+    const chiavi = new Set();
+    const intere = new Set();
+    for (const a of Array.isArray(azioni) ? azioni : []) {
+      const o = a && String(a.type || '').toUpperCase() === 'CERCA_CHAT' ? a._output : null;
+      if (!o || typeof o !== 'object') continue;
+      if (o.automatica) {
+        for (const r of Array.isArray(o.results) ? o.results : []) if (r && r.id && r.date) chiavi.add(`${r.id}|${r.date}`);
+      }
+      if (o.chatRead && o.found && o.intera) intere.add(String(o.chatRead));
+    }
+    return { chiavi, chat: intere };
+  }
+
+  // Ciò che l'utente ha cancellato non torna al modello dalle copie che ricerche e ricordi avevano messo nelle risposte
+  // di altre conversazioni (#868.1): `chat(id)` e `pagina(p)` dicono se esiste ancora. Il resto dell'azione resta.
+  function senzaCancellati(azioni, { chat = null, pagina = null } = {}) {
+    if (!Array.isArray(azioni)) return azioni;
+    let cambiate = 0;
+    const out = azioni.map((a) => {
+      const o = a && String(a.type || '').toUpperCase() === 'CERCA_CHAT' ? a._output : null;
+      if (!o || typeof o !== 'object') return a;
+      if ('chatRead' in o) {
+        if (!o.found || typeof chat !== 'function' || chat(String(o.chatRead))) return a;
+        cambiate++;
+        return { ...a, _output: { chatRead: o.chatRead, found: false, cancellata: true } };
+      }
+      const results = Array.isArray(o.results) ? o.results : [];
+      const pagine = Array.isArray(o.pagine) ? o.pagine : [];
+      const restano = typeof chat === 'function' ? results.filter((r) => !r || !r.id || chat(String(r.id))) : results;
+      const pagineRestano = typeof pagina === 'function' ? pagine.filter((p) => !p || pagina(p)) : pagine;
+      const tolti = (results.length - restano.length) + (pagine.length - pagineRestano.length);
+      if (!tolti) return a;
+      cambiate++;
+      return {
+        ...a,
+        _output: { ...o, results: restano, ...('pagine' in o ? { pagine: pagineRestano } : {}), cancellati: (Number(o.cancellati) || 0) + tolti },
+      };
+    });
+    return cambiate ? out : azioni;
+  }
+
   function testoRicordo(t) {
     const s = String(t.testo || '');
     if (s.length <= CARATTERI_RICORDO) return s;
     return `${s.slice(0, Math.floor(CARATTERI_RICORDO * 0.7))}\n…(il resto si rilegge con CERCA_CHAT e l'id ${t.chat})…\n${s.slice(-Math.floor(CARATTERI_RICORDO * 0.3))}`;
+  }
+
+  // I pezzi vecchi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le
+  // uscite li contano fra le cose lette (#587), la chat riaperta li ritrova, e `giaDavanti` li riconosce al turno dopo.
+  function ricordoComeAzione(ricordi, ora = Date.now()) {
+    const lista = Array.isArray(ricordi) ? ricordi : [];
+    // Lo stesso testo che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
+    const results = lista.map((r) => ({ id: r.tratto.chat, title: r.tratto.titolo || '', date: r.tratto.ts, snippet: testoRicordo(r.tratto) }));
+    const daFuori = lista.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori : []));
+    return {
+      type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Number(ora).toString(36)}`, _executed: true,
+      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
+    };
   }
 
   // I pezzi vecchi vengono dall'archivio: dentro la busta, come i risultati di CERCA_CHAT.
@@ -542,5 +631,6 @@
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
     coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini, INTESTAZIONE_CODA, pianoDellaCache,
+    RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

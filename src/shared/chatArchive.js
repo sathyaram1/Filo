@@ -212,6 +212,13 @@
     return out;
   }
 
+  // Le parole di una richiesta senza la punteggiatura ai bordi: «Lisbona?» cerca «lisbona» (#868.8). Quella dentro la
+  // parola resta («node.js», «dell'albergo»), e così i segni che fanno il nome («c++», «c#»).
+  const PUNTEGGIATURA_AI_BORDI = /^[.,;:!?¿¡…"'`“”‘’«»()[\]{}<>*_]+|[.,;:!?¿¡…"'`“”‘’«»()[\]{}<>*_]+$/g;
+  function paroleDi(s) {
+    return normalizeForSearch(s).split(/\s+/).map((w) => w.replace(PUNTEGGIATURA_AI_BORDI, '')).filter(Boolean);
+  }
+
   function haystackOf(chat) {
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
     return normalizeForSearch([
@@ -224,7 +231,7 @@
   // «coscienza filosofia» trova la chat che parla di entrambe, non quella che
   // nomina solo la prima.
   function matches(chat, query) {
-    const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const terms = paroleDi(query);
     if (!terms.length) return true;
     const hay = haystackOf(chat);
     return terms.every((t) => hay.includes(t));
@@ -300,7 +307,7 @@
     const limit = Number(o.limit) > 0 ? Number(o.limit) : 0;
     const taglia = (list) => (limit ? list.slice(0, limit) : list);
     const candidate = filtraPerTipo(chats, o);
-    const tutte = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const tutte = paroleDi(query);
     if (!tutte.length) return { results: taglia(candidate), termini: [], allargata: false };
 
     // `o.testo(c)`: dove cercare quando i candidati non sono chat (le pagine del filo), con gli stessi tre passi.
@@ -336,7 +343,7 @@
   function snippetFor(chat, query, radius) {
     const r = Number(radius) > 0 ? Number(radius) : 90;
     const messages = Array.isArray(chat && chat.messages) ? chat.messages : [];
-    const terms = normalizeForSearch(query).split(/\s+/).filter(Boolean);
+    const terms = paroleDi(query);
     if (!terms.length) return excerptOf(messages);
     // La parola da mostrare è la prima della richiesta che COMPARE davvero, non
     // la prima scritta: cercando «la coscienza», un frammento costruito attorno
@@ -373,9 +380,14 @@
     const out = { role, text, ts: turn.ts || new Date().toISOString() };
     if (Array.isArray(turn.actions) && turn.actions.length) {
       // Un'azione fermata perché portava fuori un segreto resta fermata (#810): riaperta, la chat non la dà per fatta.
-      out.actions = turn.actions
-        .map((a) => (a && a.type ? (a._output && a._output.blocked === 'segreto' ? 'FERMATA' : String(a.type)) : ''))
-        .filter(Boolean);
+      // Un ricordo ripescato da Filo resta un ricordo, non una ricerca chiesta (#1301); i titoli no: una chat cancellata
+      // non deve sopravvivere nel nome dentro le altre.
+      const nome = (a) => {
+        if (a._output && a._output.blocked === 'segreto') return 'FERMATA';
+        if (a._auto && String(a.type).toUpperCase() === 'CERCA_CHAT') return 'RICORDO_FILO';
+        return String(a.type);
+      };
+      out.actions = turn.actions.map((a) => (a && a.type ? nome(a) : '')).filter(Boolean);
     }
     if (turn.images) out.images = Number(turn.images) || 0;
     // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
@@ -563,10 +575,12 @@
     parseTriage,
     transcriptForTriage,
     transcriptForReading,
+    PEZZO_RILETTURA,
     toIndexEntry,
     excerptOf,
     isVisibleByDefault,
     normalizeForSearch,
+    paroleDi,
     matches,
     search,
     searchWide,
