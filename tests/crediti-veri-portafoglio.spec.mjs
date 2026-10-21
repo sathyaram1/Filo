@@ -39,13 +39,17 @@ test.beforeAll(async () => {
       if (serverDown) { res.destroy(); return; }
       if ((req.headers.authorization || '') !== 'Bearer anon-id-token') return json(res, 401, { error: { message: 'no auth' } });
       if (url === '/walletState') {
-        return json(res, 200, {
+        lettureSaldo += 1;
+        // Le cifre sono quelle di quando la domanda è arrivata, come sul server vero.
+        const risposta = {
           result: {
             hasWallet: true, pseudonym: 'abcdef0123456789',
             balance: { credits: saldo, creditsGranted: 5000, eurUsd: 1.2, eurPerCredit: 0.0007 },
             stale: false, dailyCredits: quota, sentRewardsPerDay: tetto, grants, invites: [],
           },
-        });
+        };
+        setTimeout(() => json(res, 200, risposta), ritardoMs);
+        return;
       }
       if (url === '/walletRedeem') {
         return json(res, 200, {
