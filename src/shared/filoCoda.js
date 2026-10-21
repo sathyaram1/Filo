@@ -168,7 +168,7 @@
       if (x.messages.some((y) => haContenuto(y) && dopo(y.ts))) return false;
     }
     if ((Array.isArray(pagine) ? pagine : []).some((p) => p && dopo(p.ts))) return false;
-    return !(Array.isArray(cambi) ? cambi : []).some((e) => e && !VIE_COL_SEGNO.has(e.via) && dopo(e.ts));
+    return !(Array.isArray(cambi) ? cambi : []).some((e) => e && !VIE_COL_SEGNO.has(e.via) && (dopo(e.ts) || dopo(e.agg)));
   }
 
   // La giornata comincia alla prima apertura dopo le cinque, se nella home non si è ancora detto niente oggi.
