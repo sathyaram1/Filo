@@ -112,10 +112,14 @@ test('server muto: la chat ha l\'ultimo saldo noto e sa che deve dirlo', async (
 });
 
 test('portafoglio senza nessuna lettura: niente cifra inventata, né quella locale', async () => {
-  const { stateText } = await assembleCon({ wallet: { balance: null, dailyCredits: null }, locale: 777 });
+  const { stateText } = await assembleCon({ wallet: { balance: null, dailyCredits: null, nonRisponde: true }, locale: 777 });
   assert.match(stateText, /CREDITI/);
   assert.match(stateText, /non riesco a leggerlo/);
   assert.doesNotMatch(stateText, /777/);
+  // #1353 — nessuna lettura ancora finita non è un server muto.
+  const attesa = await assembleCon({ wallet: { balance: null, dailyCredits: null, nonRisponde: false }, locale: 777 });
+  assert.match(attesa.stateText, /Non dare una cifra/);
+  assert.doesNotMatch(attesa.stateText, /non risponde|777/);
 });
 
 test('senza portafoglio resta il conteggio locale, com\'era', async () => {
