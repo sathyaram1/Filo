@@ -892,8 +892,7 @@
       yield doc;
       if (n >= 4) return;
       for (const r of radici(doc)) for (const f of r.querySelectorAll('iframe, frame')) {
-        let d = null;
-        try { d = f.contentDocument; } catch (_) {}
+        const d = globalThis.SN_RIQUADRI_IN_ARRIVO?.documento(f);
         if (d) yield* documenti(d, n + 1);
       }
     }
@@ -937,9 +936,10 @@
         for (const f of win.document.querySelectorAll('iframe, frame')) riquadro(f);
       } catch (_) {}
     }
+    // Uno che carica ancora il suo indirizzo non si tocca (perderebbe il suo Filo, #1560): lo riprende onCaricato.
     function riquadro(f) {
-      let w = null;
-      try { w = f.contentWindow; if (!w || !w.document) return; } catch (_) { return; }
+      const w = globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f);
+      try { if (!w || !w.document) return; } catch (_) { return; }
       osserva(w);
     }
     const eRiquadro = (t) => !!(t && t.tagName && /^i?frame$/i.test(t.tagName));

@@ -532,10 +532,12 @@
     // sente.
     const tag = el && el.tagName;
     if (tag !== 'IFRAME' && tag !== 'FRAME' && tag !== 'iframe' && tag !== 'frame') return null;
+    // Uno in arrivo è vuoto per ora, e toccato perderebbe il Filo che lo leggerà da dentro (#1560).
+    const R = global.SN_RIQUADRI_IN_ARRIVO;
     try {
-      const win = el.contentWindow;
+      const win = R && R.finestra(el);
       if (!win || win.location.protocol !== 'about:') return null;
-      const doc = el.contentDocument;
+      const doc = R.documento(el);
       return (doc && doc.body) || null;
     } catch (_) { return null; }   // altra origine: da qui non si legge
   }

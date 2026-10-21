@@ -116,10 +116,12 @@ function vegliaRiquadri(elenco, webFrame) {
     } catch (_) {}
     try { for (const f of doc.querySelectorAll('iframe, frame')) guarda(f); } catch (_) {}
   }
+  // Un riquadro che carica il suo indirizzo non si tocca, né per nome né alla cieca: perderebbe il preload (#1560).
+  const finestra = (el) => globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(el) || null;
   function guarda(el) {
     try {
-      el.addEventListener('load', () => aggancia(el.contentWindow));
-      aggancia(el.contentWindow);
+      el.addEventListener('load', () => aggancia(finestra(el)));
+      aggancia(finestra(el));
     } catch (_) {}
   }
   let ultimaRicerca = 0;
@@ -127,6 +129,7 @@ function vegliaRiquadri(elenco, webFrame) {
     if (!webFrame) return;
     const ora = Date.now();
     if (ora - ultimaRicerca < 200) return;
+    if (globalThis.SN_RIQUADRI_IN_ARRIVO?.qualcunoInArrivo() !== false) return;
     ultimaRicerca = ora;
     const visita = (f) => {
       let c = null;
@@ -151,7 +154,7 @@ function vegliaRiquadri(elenco, webFrame) {
   function sopra(e) {
     let t = e && e.target;
     if (!riquadro(t)) { try { t = e.composedPath()[0]; } catch (_) {} }
-    if (riquadro(t)) { aggancia(t.contentWindow); return; }
+    if (riquadro(t)) { aggancia(finestra(t)); return; }
     cercaNascosti();
   }
   return sopra;

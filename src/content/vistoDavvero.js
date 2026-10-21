@@ -293,8 +293,7 @@
       if (!d || typeof d !== 'object' || !e.source) return;
       if (CHIAVE_PRONTO in d) { if (e.source === global.parent && rinvio) guardaLeSonde(); return; }
       if (!(CHIAVE_RIQUADRO in d)) return;
-      let fr = null;
-      try { for (const f of DOC.querySelectorAll('iframe, frame')) if (f.contentWindow === e.source) { fr = f; break; } } catch (_) {}
+      const fr = global.SN_RIQUADRI_IN_ARRIVO?.riquadroDi(e.source, DOC);
       if (!fr) return;
       if (!d[CHIAVE_RIQUADRO]) {
         rimettiPerRiquadro(fr);

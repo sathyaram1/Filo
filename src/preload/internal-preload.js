@@ -29,6 +29,9 @@ const IS_FILO_ORIGIN = (() => {
 // Quel marcatore vale solo se il documento è davvero filo://: se un documento
 // non nostro finisse a girare qui (il caso che teme il gate qui sopra) se lo
 // scriverebbe da sé per rendersi impossibile da ingrandire (#686).
+// Chi tocca un riquadro passa da qui (#1560). Nelle pagine interne i riquadri non hanno un preload da perdere: il conto
+// dei load non serve, e nessuno risulta in arrivo.
+try { require('../shared/riquadriInArrivo.js'); } catch (e) { console.error('[Filo internal] riquadri in arrivo', e); }
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
 
