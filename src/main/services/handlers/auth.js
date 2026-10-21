@@ -1544,6 +1544,8 @@ module.exports = function register(on, ctx) {
     const data = { op: 'elenco' };
     if (Number.isInteger(msg?.storico) && msg.storico > 0) data.storico = msg.storico;
     if (Number.isFinite(msg?.prima) && msg.prima > 0) data.prima = msg.prima;
+    // Gli ultimi già visti allo stesso istante del cursore: senza, una pagina che si chiude lì ne salterebbe.
+    if (data.prima && Array.isArray(msg?.visti)) data.visti = msg.visti.filter((x) => /^C-\d{1,9}$/.test(String(x))).slice(0, 500);
     const r = await chiamaCompiti(data);
     if (!r.ok) return r;
     return {

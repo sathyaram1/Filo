@@ -1689,7 +1689,7 @@
 
   // Un feedback nominato da un'altra scheda (Domande, Compiti) si apre nella sua.
   function apriFeedback(fb) {
-    if (!fb) return;
+    if (!fb) return false;
     // Aprire una pratica precisa spegne il filtro dei livelli se la nasconderebbe.
     mostraNelFiltro(fb);
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
@@ -1698,6 +1698,7 @@
     // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
     else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
+    return true;
   }
 
   // `already` è l'elenco già pronto quando ad avvisare è il main: una pagina aperta deve

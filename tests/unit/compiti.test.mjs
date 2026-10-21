@@ -32,6 +32,18 @@ test('costo: la somma delle chiamate che ne dichiarano uno; nessuna = non si sa,
   assert.equal(K.costoTotale(fase({ biglietti: [{ costo: 0 }] })), 0);
   assert.equal(K.costoTesto(1.5), '1,50 $');
   assert.equal(K.costoTesto(null), '');
+  assert.equal(K.costoTesto(0.004), 'meno di 0,01 $', 'un costo vero non si scrive zero');
+  assert.equal(K.costoTesto(1.5, true), 'almeno 1,50 $');
+  assert.equal(K.costoParziale(fase({ biglietti: [{ costo: 1 }, { costo: null }] })), true);
+  assert.equal(K.costoParziale(fase({ biglietti: [{ costo: 1 }], bigliettiTolti: 3 })), true, 'le chiamate non tenute non hanno un costo qui');
+  assert.equal(K.costoParziale(fase({ biglietti: [{ costo: 1 }] })), false);
+});
+
+test('modelli e sforzi sono quelli di Automazioni: una scelta nuova arriva anche qui', () => {
+  require(join(ROOT, 'src', 'shared', 'routineModelli.js'));
+  const RM = globalThis.SN_ROUTINE_MODELLI;
+  assert.deepEqual([...K.MODELLI], RM.SCELTE.model.map((s) => s.id));
+  assert.deepEqual([...K.SFORZI], RM.SCELTE.effort.map((s) => s.id));
 });
 
 test('durate, modello e urgenza detti per l\'owner', () => {
@@ -169,7 +181,7 @@ test('le porte dei compiti rispondono solo alle pagine di Filo', async () => {
 
 test('compito.mjs: la sessione si dichiara col suo biglietto, rifiuta prima di chiamare, e si sporca leggendo titoli non fidati', async () => {
   const { esegui, leggiArgomenti } = await import('../../scripts/compito.mjs');
-  assert.deepEqual(leggiArgomenti(['crea', '--titolo', 'Esplora', '--urgenza=30']), { cmd: 'crea', compito: { urgenza: '30', titolo: 'Esplora' } });
+  assert.deepEqual(leggiArgomenti(['crea', '--titolo', 'Esplora', '--urgenza=30', '--ambito', 'server']), { cmd: 'crea', compito: { urgenza: '30', titolo: 'Esplora', ambito: 'server' } });
   assert.ok(leggiArgomenti(['crea']).errore, 'senza titolo');
   assert.ok(leggiArgomenti(['annulla', 'D-3']).errore);
   const chiamate = [];
