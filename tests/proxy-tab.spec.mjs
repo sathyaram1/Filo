@@ -20,7 +20,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer as createNetServer, connect as netConnect } from 'node:net';
-import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { nelMondoDiFilo } from './helpers/confirm.mjs';
 
@@ -448,5 +448,120 @@ test('il Referer dei byte di un\'immagine tace se la pagina lo chiede o se da ht
   } finally {
     await sito.close();
     await socks.close();
+  }
+});
+
+// ── #1272: un fornitore col paese nel nome utente ha lo stesso indirizzo per ogni paese ─────────────────────────────
+// Chromium ricorda la password del proxy per indirizzo: cambiato paese, le richieste devono uscire col nome nuovo.
+
+const PASSWORD_PROXY = 'segreta';
+
+// Proxy HTTP di prova: chiede la password (407) e annota con quale utente, cioè da quale paese, è uscita ogni richiesta.
+async function proxyColPaeseNelNome() {
+  const uscite = [];
+  const live = new Set();
+  const server = createHttpServer((req, res) => {
+    const a = String(req.headers['proxy-authorization'] || '');
+    const [utente, password] = a.startsWith('Basic ') ? Buffer.from(a.slice(6), 'base64').toString().split(':') : ['', ''];
+    if (password !== PASSWORD_PROXY) { res.writeHead(407, { 'Proxy-Authenticate': 'Basic realm="prova"' }); res.end(); return; }
+    let u;
+    try { u = new URL(req.url); } catch (_) { res.writeHead(400); res.end(); return; }
+    uscite.push({ utente, percorso: u.pathname });
+    const h = { ...req.headers };
+    delete h['proxy-authorization'];
+    delete h['proxy-connection'];
+    const up = httpRequest({ host: '127.0.0.1', port: Number(u.port), path: u.pathname + u.search, method: req.method, headers: h }, (r) => {
+      res.writeHead(r.statusCode, r.headers);
+      r.pipe(res);
+    });
+    up.on('error', () => { try { res.writeHead(502); res.end(); } catch (_) {} });
+    req.pipe(up);
+  });
+  server.on('connection', (s) => { live.add(s); s.on('close', () => live.delete(s)); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return {
+    port: server.address().port,
+    utentiPer: (percorso) => uscite.filter((x) => x.percorso === percorso).map((x) => x.utente),
+    async close() { for (const s of live) { try { s.destroy(); } catch (_) {} } await new Promise((r) => server.close(r)); },
+  };
+}
+
+// Pagine /pagina-<n> con un link accorciato /corto-<n>; l'accorciatore risponde una pagina qualunque.
+async function sitoConLinkAccorciati() {
+  const server = createHttpServer((req, res) => {
+    const percorso = req.url.split('?')[0];
+    const P = server.address().port;
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    if (!percorso.startsWith('/pagina-')) { res.end('<html><body>accorciatore</body></html>'); return; }
+    const n = percorso.slice('/pagina-'.length);
+    res.end(`<!doctype html><html><head><title>Pagina ${n}</title></head><body style="padding:24px">
+      <p id="pronta">pagina ${n}</p>
+      <p><a id="corto" href="http://bit.ly:${P}/corto-${n}" style="display:inline-block;padding:20px">link accorciato</a></p></body></html>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return { port: server.address().port, async close() { try { server.closeAllConnections(); } catch (_) {} await new Promise((r) => server.close(r)); } };
+}
+
+async function conProxyColPaeseNelNome(app, openTab, testServer, proxy) {
+  const avvio = await openTab(testServer.html('<title>avvio</title><p id="avvio">x</p>'));
+  await avvio.waitForSelector('#avvio');
+  await app.evaluate(async (_e, endpoint) => {
+    await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: endpoint, bypass: '<-loopback>' } });
+  }, `http://utente-{country}:${PASSWORD_PROXY}@127.0.0.1:${proxy.port}`);
+  return (await webTabInfo(app)).id;
+}
+
+async function inPaese(app, tabId, paese, url) {
+  const r = await app.evaluate(({ BrowserWindow }, a) =>
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.setTabProxy(a.tabId, a.paese), { tabId, paese });
+  expect(r.ok).toBe(true);
+  await app.evaluate(({ BrowserWindow }, a) => {
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.navigate(a.tabId, a.url);
+  }, { tabId, url });
+  return waitPageWith(app, (u) => u === url, '#pronta');
+}
+
+async function fermaSulLinkAccorciato(page) {
+  const box = await page.locator('#corto').boundingBox();
+  await page.mouse.move(box.x + 5, box.y + 5);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
+}
+
+test('la finestra nascosta di una scheda tedesca esce dalla Germania anche dopo un link visto da una scheda americana (#1272)', async ({ app, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  const sito = await sitoConLinkAccorciati();
+  const proxy = await proxyColPaeseNelNome();
+  try {
+    const primaId = await conProxyColPaeseNelNome(app, openTab, testServer, proxy);
+    const americana = await inPaese(app, primaId, 'US', `http://pagina.filo.invalid:${sito.port}/pagina-us`);
+    await fermaSulLinkAccorciato(americana);
+    await expect.poll(() => proxy.utentiPer('/corto-us'), { timeout: 20_000 }).toContain('utente-us');
+
+    const seconda = await openTab(testServer.html('<title>seconda</title><p id="seconda">x</p>'));
+    await seconda.waitForSelector('#seconda');
+    const secondaId = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
+    const tedesca = await inPaese(app, secondaId, 'DE', `http://pagina.filo.invalid:${sito.port}/pagina-de`);
+    await fermaSulLinkAccorciato(tedesca);
+    await expect.poll(() => proxy.utentiPer('/corto-de').length, { timeout: 20_000 }).toBeGreaterThan(0);
+    expect(proxy.utentiPer('/corto-de'), 'il link accorciato visto da una scheda tedesca esce dalla Germania').toEqual(['utente-de']);
+  } finally {
+    await sito.close();
+    await proxy.close();
+  }
+});
+
+test('una scheda americana portata in Germania carica dalla Germania (#1272)', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConLinkAccorciati();
+  const proxy = await proxyColPaeseNelNome();
+  try {
+    const id = await conProxyColPaeseNelNome(app, openTab, testServer, proxy);
+    await inPaese(app, id, 'US', `http://pagina.filo.invalid:${sito.port}/pagina-us`);
+    expect(proxy.utentiPer('/pagina-us')).toEqual(['utente-us']);
+    await inPaese(app, id, 'DE', `http://pagina.filo.invalid:${sito.port}/pagina-de`);
+    expect(proxy.utentiPer('/pagina-de'), 'cambiato paese, la pagina arriva dalla Germania').toEqual(['utente-de']);
+  } finally {
+    await sito.close();
+    await proxy.close();
   }
 });

@@ -23,6 +23,7 @@ function electronFinto({ proxyRotto = false } = {}) {
           clearStorageData: async () => {},
           setProxy: async (c) => { fatti.push(['setProxy', c]); if (proxyRotto) throw new Error('proxy rotto'); },
           closeAllConnections: async () => { fatti.push(['chiudi']); },
+          clearAuthCache: async () => { fatti.push(['dimentica']); },
         });
       }
       return sessioni.get(nome);
@@ -87,4 +88,43 @@ test('se il proxy della scheda non si applica la finestra non apre il link', asy
   const s = await D.detonate('http://sospetto.example/', null, { rete: RETE });
   assert.equal(s, null);
   assert.equal(f.fatti.some((x) => x[0] === 'carica'), false);
+});
+
+// #1272 — un fornitore col paese nel nome utente ha lo stesso indirizzo per ogni paese: Chromium ricorderebbe la password
+// del paese di prima, quindi passando a un altro paese le credenziali vecchie si dimenticano prima di caricare.
+test('passando da una scheda americana a una tedesca sullo stesso proxy la finestra dimentica le credenziali americane prima di caricare', async () => {
+  const f = electronFinto();
+  const D = createDetonator({ electron: f.electron, ...opzioni });
+  const reteDi = (paese) => ({ ...RETE, auth: { username: `utente-${paese}`, password: 'p' } });
+  await D.destinazione('https://bit.ly/a', () => false, { rete: reteDi('us') });
+  assert.equal(f.fatti.some((x) => x[0] === 'dimentica'), false, 'la prima volta non c\'è niente da dimenticare');
+
+  f.fatti.length = 0;
+  await D.destinazione('https://bit.ly/b', () => false, { rete: reteDi('de') });
+  const dimentica = f.fatti.findIndex((x) => x[0] === 'dimentica');
+  const carica = f.fatti.findIndex((x) => x[0] === 'carica');
+  assert.ok(dimentica >= 0 && dimentica < carica, 'le credenziali americane si dimenticano prima di caricare');
+  assert.deepEqual(f.fatti[carica][2], reteDi('de').auth);
+
+  // Di nuovo la Germania: niente da dimenticare.
+  f.fatti.length = 0;
+  await D.destinazione('https://bit.ly/c', () => false, { rete: reteDi('de') });
+  assert.equal(f.fatti.some((x) => x[0] === 'dimentica'), false);
+});
+
+test('una scheda che cambia paese sullo stesso proxy dimentica le credenziali di prima, anche dopo essere tornata senza proxy', async () => {
+  const fatti = [];
+  const ses = { clearAuthCache: async () => { fatti.push('dimentica'); }, closeAllConnections: async () => { fatti.push('chiudi'); } };
+  const regole = { proxyRules: 'http://gate.fornitore.example:7000', bypassRules: '' };
+  assert.equal(ProxyTab.registraRete('proxy:t1', ses, { ...regole, auth: { username: 'utente-us', password: 'p' } }), null);
+  assert.equal(ProxyTab.registraRete('proxy:t1', ses, { ...regole, auth: { username: 'utente-us', password: 'p' } }), null);
+  await ProxyTab.registraRete('proxy:t1', ses, { ...regole, auth: { username: 'utente-de', password: 'p' } });
+  assert.deepEqual(fatti, ['dimentica', 'chiudi']);
+  assert.deepEqual(ProxyTab.credenzialiDellaSessione(ses), { username: 'utente-de', password: 'p' });
+
+  fatti.length = 0;
+  ProxyTab.clearPartitionAuth('proxy:t1');
+  await ProxyTab.registraRete('proxy:t1', ses, { ...regole, auth: { username: 'utente-fr', password: 'p' } });
+  assert.deepEqual(fatti, ['dimentica', 'chiudi']);
+  ProxyTab.clearPartitionAuth('proxy:t1');
 });
