@@ -10,9 +10,11 @@
   // Della finestra e del sistema, non dell'elemento: stanno nella barra, non in «Altro…».
   const GLOBALI = Object.freeze(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
 
-  // `tipo`: chi esegue. 'finestra' la fa il main, 'pagina' il content script della scheda.
+  // `tipo`: chi esegue. 'finestra' la fa il main, 'pagina' il content script della scheda, 'aiuto' il pannello
+  // Aiuto della scheda, con l'aspetto che dice cosa farà il clic (aspettoAiuto).
   // Le etichette sono quelle del menu (menuIcons.js): la sentinella le tiene uguali.
   const ICONE = Object.freeze({
+    help: { icona: 'help', etichetta: 'menu_help', tipo: 'aiuto' },
     translate: { icona: 'translate', etichetta: 'menu_global_translate', tipo: 'pagina' },
     screenshot: { icona: 'screenshot', etichetta: 'menu_screenshot', tipo: 'pagina' },
     screenshotCrop: { icona: 'screenshotCrop', etichetta: 'menu_screenshot_crop', tipo: 'pagina' },
@@ -37,7 +39,7 @@
   const DEFAULT = Object.freeze({
     primary: Object.freeze(['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
     secondary: Object.freeze(['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']),
-    bar: Object.freeze(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']),
+    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']),
   });
 
   const MAX_PRIMARY = 6;
@@ -52,7 +54,9 @@
   });
 
   // Nate dopo che qualcuno si era già salvato la disposizione: senza, non le vedrebbe mai.
-  const AGGIUNTE = Object.freeze(['incognito', 'qrCode', 'colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab', 'openOptions', 'home', 'editorApp', 'feedbackApp']);
+  const AGGIUNTE = Object.freeze(['incognito', 'qrCode', 'colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab', 'openOptions', 'home', 'editorApp', 'feedbackApp', 'help']);
+  // Fra le aggiunte, quelle che arrivano in cima alla barra invece che in fondo.
+  const IN_CIMA = Object.freeze(['help']);
 
   const copia = (l) => ({ primary: [...l.primary], secondary: [...l.secondary], bar: [...l.bar] });
   const uguali = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
@@ -100,7 +104,8 @@
     for (const id of AGGIUNTE) {
       if (visti.has(id)) continue;
       visti.add(id);
-      if (GLOBALI.includes(id)) barra.push(id);
+      if (IN_CIMA.includes(id)) barra.unshift(id);
+      else if (GLOBALI.includes(id)) barra.push(id);
       else secondary.unshift(id);
     }
     const layout = { primary, secondary, bar: barra };
@@ -131,8 +136,18 @@
     return out;
   }
 
+  // L'icona Aiuto dice cosa farà il clic (#1432): chiuso o ridotto apre, aperto detta, mentre detta ferma (anche
+  // ridotto). Il clic lo decide la stessa funzione (Sidebar.passo). Le etichette sono chiavi i18n.
+  const VOCE_IN_CORSO = Object.freeze({ avvio: 'voce_ferma', ascolta: 'voce_ferma', trascrive: 'voce_trascrivo', attesa: 'voce_annulla_invio' });
+  function aspettoAiuto({ pannello = 'chiuso', voce = 'pronto', risposta = false } = {}) {
+    const inCorso = Object.prototype.hasOwnProperty.call(VOCE_IN_CORSO, voce) ? VOCE_IN_CORSO[voce] : '';
+    if (pannello !== 'chiuso' && inCorso) return { icona: 'mic', etichetta: inCorso, ascolta: voce !== 'attesa' };
+    if (pannello === 'aperto') return { icona: 'mic', etichetta: 'voce_parla', ascolta: false };
+    return { icona: 'help', etichetta: risposta ? 'aiuto_leggi_risposta' : 'menu_help', ascolta: false };
+  }
+
   global.SN_DISPOSIZIONE_ICONE = {
-    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, DOVE,
-    noto, nome, valida, migra, applicaPosa,
+    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
+    noto, nome, valida, migra, applicaPosa, aspettoAiuto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

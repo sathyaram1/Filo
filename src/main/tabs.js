@@ -40,6 +40,7 @@ const { collegaScorciatoie, staRegistrandoTasti } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
+const RisposteInAttesa = require('./risposteInAttesa');
 const { AnteprimeSchede } = require('./tabs/anteprime');
 const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
 const { VisiteSchede } = require('./tabs/visite');
@@ -2776,6 +2777,12 @@ class TabManager {
       if (process.env.NODE_ENV !== 'production') {
         console.error(`[tab:${tab.id.slice(0, 6)}] render-process-gone`, details);
       }
+      // Il pannello Aiuto è morto con la pagina (#1432).
+      if (tab.view && tab.view.webContents === wc) {
+        tab.aiuto = null;
+        RisposteInAttesa.dimentica(tab);
+        try { this.barra.aggiornaNav(); } catch (_) {}
+      }
       const NE = globalThis.SN_NET_ERROR;
       const reason = (details && details.reason) || '';
       // clean-exit = chiusura ordinata (nostre close/_recreateView): non è un crash.
@@ -2923,6 +2930,8 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Documento nuovo: il pannello Aiuto e le risposte da leggere erano di quello vecchio (#1432).
+      if (tab.view && tab.view.webContents === wc) { tab.aiuto = null; RisposteInAttesa.dimentica(tab); }
       segnaPagina(tab, url);
       // L'icona in volo era del documento di prima; quella mostrata vale ancora solo sullo stesso sito.
       tab._giroIcona = (tab._giroIcona || 0) + 1;

@@ -10,7 +10,9 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.244', date: '2026-10-21',
-      features: [],
+      features: [
+        'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
+      ],
       fixes: [
         'Nell\'Editor, con la finestra piccola o quando la domanda accanto a microfono e invio non si leggerebbe tutta, la casella della chat prende tutta la riga e i due tasti vanno sotto. Prima poteva restare larga due o tre parole. Mentre scrivi resta in vista la fine dell\'ultima risposta di Filo. In una chat molto bassa una domanda lunga scorre dentro la casella, e per leggerla tutta basta allargare il riquadro della chat.',
         'Nella home il microfono e il tasto per inviare stanno al centro del campo dove scrivi, alla stessa distanza dal bordo sopra, sotto e a destra. Quando vai a capo restano sull\'ultima riga.',
