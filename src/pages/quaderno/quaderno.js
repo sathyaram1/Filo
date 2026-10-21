@@ -366,6 +366,7 @@
     r.smonta = smonta;
     r.el.addEventListener('mousedown', tieni);
     r.el.addEventListener('focusout', fuori);
+    document.addEventListener('mousedown', clicFuori, true);
     campo.addEventListener('input', () => { adatta(); r.errore.hidden = true; });
     campo.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chiudi(true); }
