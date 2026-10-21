@@ -315,6 +315,43 @@ test('Conservativo, dopo una lettura: nel diario un comando e un «dimentica» r
   }
 });
 
+test('chat a Normale, dopo una ricerca: «dimentica per sempre» vuole la parola «conferma», e solo con quella la riga se ne va', async ({ app }) => {
+  await app.evaluate(() => {
+    globalThis.SN_WEB_SEARCH.search = async () => ({ provider: 'finto', results: [
+      { title: 'Meteo', url: 'https://meteo.test/', content: 'sole' },
+    ] });
+  });
+  const page = await home(app);
+  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Vive a Bologna.\nHa un gatto.', PREFERENZE: '' }));
+  const nascoste = () => app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.quaderno()).nascoste.map((n) => n.testo || ''));
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: 'meteo' }) }] },
+      { text: 'Sole.' },
+      { toolCalls: [{ id: 'f1', name: 'DIMENTICA', arguments: JSON.stringify({ testo: 'Bologna', per_sempre: true }) }] },
+      { text: 'Fatto.' },
+    ]);
+    await chiedi(page, 'cerca il meteo');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Sole.' })).toBeVisible({ timeout: 15000 });
+    await chiedi(page, 'dimentica per sempre che vivo a Bologna');
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
+    expect((await confirmState(page)).hasInput, 'dopo una lettura il «per sempre» vuole la parola, non un OK').toBe(true);
+    const testo = await confirmText(page);
+    expect(testo).toContain('Vive a Bologna.');
+    expect(testo).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
+    expect(await lezioni(app)).toContain('Vive a Bologna.');
+
+    await fillConfirmInput(page, 'conferma');
+    await scrollConfirmToEnd(page);
+    await clickConfirm(page, 'danger');
+    await expect.poll(() => lezioni(app), { timeout: 8000 }).not.toContain('Bologna');
+    expect(await lezioni(app)).toContain('Ha un gatto.');
+    expect((await nascoste()).join('\n'), 'il «per sempre» butta il testo anche dal quaderno').not.toContain('Bologna');
+  } finally {
+    await ripristina(app);
+  }
+});
+
 test('riordinare le schede e svuotare l\'archivio chiedono come dice la regola, non il loro pannello', async ({ app }) => {
   await home(app);
   const subito = await execAction(app, { type: 'PULISCI_TAB' });
