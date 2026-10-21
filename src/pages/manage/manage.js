@@ -3737,48 +3737,17 @@
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
-    reflectLocal(fb);
     reflectAttese(fb);
     reflectFiducia(fb);
   }
 
-  // ── «Solo in locale» (#908) ───────────────────────────────────────────────
-  // Il tasto c'è dove il segno si può mettere (feedback fidato; su una pratica chiusa
-  // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti solo col sì dell'owner (#913).
-  function localToggleOffered(fb) {
-    return MR.isLocalOnly(fb) || MR.isFidato(fb) || MR.isLocalApproved(fb);
-  }
-  // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
-  // Stesso avviso di «Segna fidato»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
+  // ── «💻 Lavoro server» sul rombo azzurro (#913, #1575) ────────────────────
+  // Il segno a mano non c'è più: lo mette il server quando chi lavora lo chiede (#1358). Resta l'uscita dei rombi
+  // azzurri nati prima, dove il sì dell'owner vale anche alla fusione: un segnalato si guarda prima.
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server e torna In coda. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   function titoloLavoroLocale(fb) {
     const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
     return c.segnalato ? `${TITOLO_LAVORO_LOCALE} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_LAVORO_LOCALE;
-  }
-  const TITOLO_LOCALE_CHIUSA = 'Era un lavoro server: la segna così, e la sua scheda esce dalla bacheca pubblica.';
-  // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
-  const TITOLO_TOGLI_CHIUSA = 'Un clic toglie il segno, e la sua scheda torna nella bacheca pubblica.';
-  // Il feedback di un utente approvato la scheda la tiene (#913): è da lì che chi l'ha mandato vede la risoluzione.
-  function titoloLocaleChiusa(fb) {
-    return MR.isLocalApproved(fb) ? 'Era un lavoro server: la segna così, e la sua scheda resta nella bacheca pubblica.' : TITOLO_LOCALE_CHIUSA;
-  }
-  function titoloTogliChiusa(fb) {
-    return MR.isPrivateLocalWork(fb) ? TITOLO_TOGLI_CHIUSA : 'Un clic toglie il segno.';
-  }
-  function reflectLocal(fb) {
-    if (!mgLocalBtn) return;
-    const on = MR.isLocalOnly(fb);
-    mgLocalBtn.hidden = !isAdmin || !localToggleOffered(fb);
-    mgLocalBtn.disabled = false;
-    mgLocalBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    mgLocalBtn.textContent = on ? '💻 Lavoro server' : '💻 Server';
-    const perche = on ? null : MR.localSignCheck(fb, true);
-    const chiusa = on && MR.praticaChiusa(fb, { releasedVersion, fusioni });
-    mgLocalBtn.title = on
-      ? `${localSignText(fb)} ${chiusa ? titoloTogliChiusa(fb) : 'Un clic la toglie dai lavori server.'}`
-      : (perche.ok
-        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.')
-        : `Adesso non si può: ${perche.motivo}.`);
   }
 
   // ── «Segna fidato» (#1148) ────────────────────────────────────────────────
