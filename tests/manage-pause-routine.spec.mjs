@@ -86,7 +86,7 @@ test('le pause si rileggono a ogni apertura di Automazioni', async ({ openTab })
 });
 
 test('stato non letto: lo dice invece di tacere; il messaggio del server resta testo', async ({ openTab }) => {
-  const page = await apri(openTab, { ok: false, error: 'callable routineStateAdmin 400: Operazione sconosciuta.' });
+  const page = await apri(openTab, { ok: false, error: 'callable routineLog 400: Operazione sconosciuta.' });
   await expect(page.locator('#mgAccountsPausa')).toHaveText('Non ho potuto leggere dal server se un account è in pausa.');
   await expect(page.locator('#mgAccountsPausa .mg-auto-warn')).toHaveCount(0);
   await expect(page.locator('#mgServerPausa')).toBeHidden();

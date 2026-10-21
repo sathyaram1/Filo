@@ -858,10 +858,10 @@ module.exports = function register(on, ctx) {
   }));
 
   // Le pause in corso degli account e della routine server, col motivo (#996). Lo stato del pacemaker non lo legge
-  // nessun client: passa dalla callable, con le credenziali dell'owner.
+  // nessun client: passa dal registro delle routine, con le credenziali dell'owner (mai dalla callable dello storico).
   on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
     try {
-      const r = await callSecurityFunction('routineStateAdmin', { op: 'pause' });
+      const r = await callSecurityFunction('routineLog', { op: 'pause' });
       const pause = r && r.pause && typeof r.pause === 'object' ? r.pause : {};
       return { ok: true, pause, oraMs: Number(r && r.oraMs) || Date.now() };
     } catch (e) {
