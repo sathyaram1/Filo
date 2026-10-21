@@ -4,9 +4,10 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
-const VOCE = 'deepgram/aura-2';
+// A pesi aperti: una voce che i crediti non pagano si ferma prima, con la frase sua (#830, crediti-solo-politica.spec.mjs).
+const VOCE = 'hexgrad/kokoro-82m';
 
-// Il router finto nel main: Deepgram è l'unico host della voce e il catalogo a ritenzione zero non lo elenca.
+// Il router finto nel main: DeepInfra è l'unico host della voce e il catalogo a ritenzione zero non lo elenca.
 async function preparaRouter(app, sorgente) {
   await app.evaluate(async (_e, { VOCE, sorgente }) => {
     const C = globalThis.SN_CONST;
