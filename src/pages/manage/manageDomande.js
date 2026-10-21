@@ -55,7 +55,7 @@
   const inCorso = new Set();
   let conferma = null;
   const ascoltatori = [];
-  const dip = { apriFeedback: null, apriScheda: null };
+  const dip = { apriFeedback: null, apriScheda: null, soloNonFidate: null, impostaSoloNonFidate: null };
   let firmaLista = '';
   let firmaDettaglio = '';
 
