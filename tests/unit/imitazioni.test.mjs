@@ -84,6 +84,24 @@ test('i refusi di una lettera sul nome di un marchio, anche in fondo, danno l’
   assert.deepEqual(persi, []);
 });
 
+// La forma più comune dei sosia: il marchio attaccato a una parola da truffa, anche quando il marchio è una parola
+// (poste, apple) e su una piattaforma dove chiunque pubblica.
+test('il marchio attaccato a una parola da truffa dà l’avviso, all’apertura e nel menu', () => {
+  const nomi = [
+    'posteonline.it', 'poste-id.it', 'postesecure.it', 'check-poste.it', 'poste-sicurezza.com', 'apple-id.it',
+    'supportapple.com', 'secure-google.com', 'googlehelp.com', 'unicredit-online.it', 'microsoft-online.com',
+    'accountamazon.com', 'outlookaccount.com', 'accountamazon.wixsite.com', 'appleaccount.github.io', 'posteonline.web.app',
+  ];
+  const persi = nomi.filter((h) => livello('https://' + h + '/') === 'safe' || !imitazioneNelMenu('https://' + h + '/'));
+  assert.deepEqual(persi, []);
+  const marchi = ['poste', 'google', 'apple', 'microsoft', 'unicredit', 'amazon', 'outlook', 'icloud', 'paypal', 'netflix'];
+  const parole = ['secure', 'login', 'verify', 'account', 'support', 'update', 'accesso', 'sicurezza', 'help', 'online'];
+  const tutti = [];
+  for (const m of marchi) for (const p of parole) for (const s of ['com', 'it']) tutti.push(`${p}-${m}.${s}`, `${m}-${p}.${s}`, `${p}${m}.${s}`, `${m}${p}.${s}`);
+  const senza = tutti.filter((h) => livello('https://' + h + '/') === 'safe');
+  assert.ok(senza.length / tutti.length < 0.04, `${senza.length}/${tutti.length} senza avviso: ${senza.slice(0, 20).join(', ')}`);
+});
+
 test('un marchio corto caduto per caso in un nome generato (cloud, anteprime) non è un’imitazione', () => {
   const fissi = [
     'x1tuyb9bunqa2.esempio-ostile.com', 'xg2bukfvpsdh10.esempio-ostile.com', 'xr7in9n26zv16.esempio-ostile.com',
