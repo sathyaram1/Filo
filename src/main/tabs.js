@@ -1485,7 +1485,7 @@ class TabManager {
     } catch (e) {
       return { ok: false, error: 'proxy_failed' };
     }
-    ProxyTab.setPartitionAuth(partition, ses, resolved.auth);
+    ProxyTab.registraRete(partition, ses, resolved);
     tab.proxy = { country: code, tier: resolved.tier };
     // Ricrea la view nella partition proxata sullo stesso URL (la ricreazione
     // applica anche l'anti-leak WebRTC via _applySecurity). Vale anche per il
