@@ -739,15 +739,21 @@
     };
   }
 
-  // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
-  // resta anche se la spiegazione non arriva mai (#725).
+  // L'avviso sull'indirizzo lo calcola Filo, non il modello: i segni dell'indirizzo si mostrano SUBITO, l'imitazione di
+  // un marchio appena il main la giudica (#725, #1375), e restano anche se la spiegazione non arriva mai. Ritorna i
+  // codici completi, per chi li passa al modello.
   function mostraAvvisoLink(el, url) {
-    const avviso = LinkSospetto.avviso(LinkSospetto.analizza(url));
-    if (!avviso) return;
+    const locali = LinkSospetto.analizza(url);
     const w = document.createElement('div');
     w.className = 'sn-menu-link-warn';
-    w.textContent = avviso;
+    const scrivi = (codici) => { const a = LinkSospetto.avviso(codici); w.textContent = a; w.hidden = !a; };
+    scrivi(locali);
     el.appendChild(w);
+    if (locali.includes('url_invalido')) return Promise.resolve(locali);
+    return chrome.runtime.sendMessage({ type: MSG.LINK_IMITAZIONE, url })
+      .then((r) => LinkSospetto.conImitazione(locali, r && r.codice))
+      .catch(() => locali)
+      .then((tutti) => { scrivi(tutti); return tutti; });
   }
 
   // Quello che Filo dice di un'immagine viene da byte che il sito non può leggere (altro dominio,
@@ -870,9 +876,9 @@
         (async () => {
           const url = linkEl.href;
           const anchorText = (linkEl.textContent || '').trim().slice(0, 200);
-          const flags = LinkSospetto.analizza(url);
           el.textContent = '';
-          mostraAvvisoLink(el, url);
+          const segni = mostraAvvisoLink(el, url);
+          const flags = LinkSospetto.analizza(url);
           const body = document.createElement('div');
           body.className = 'sn-menu-link-body';
           body.textContent = I18n.t('menu_link_loading');
@@ -926,7 +932,7 @@
           port.postMessage({
             type: 'start',
             action: ACTIONS.EXPLAIN_LINK,
-            payload: { url, anchorText, ogTitle, ogDescription, suspiciousFlags: flags },
+            payload: { url, anchorText, ogTitle, ogDescription, suspiciousFlags: await segni },
             origin: location.href,
           });
         })();

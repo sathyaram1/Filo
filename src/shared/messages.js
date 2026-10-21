@@ -783,6 +783,9 @@
     // siti di proposito (lo manda il content script della pagina); la pagina non ne riceve i verdetti, solo il conto.
     // Oltre LOTTO_MAX link → { ok:false, error:'troppi', max }; un esame già in coda → { ok:false, error:'occupato' }.
     SAFEBROWSE_LINKS: 'safebrowse_links',          // { urls: string[] } → { ok, esaminati }
+    // #1375 — l'imitazione di un marchio che l'apertura vedrebbe in un link, per l'avviso del tasto destro: il
+    // classificatore sta nel main, così menu e apertura danno un verdetto solo. Funzione pura dell'indirizzo.
+    LINK_IMITAZIONE: 'link_imitazione',            // { url } → { ok, codice } (codice: '' o come in linkSospetto.js)
     // #1004 — la pagina, o un suo riquadro (il modulo di pagamento di un altro sito), mostra un campo password o carta:
     // il sito della scheda diventa delicato. Il sito lo dà il main, dalla scheda.
     CAMPI_DELICATI: 'campi_delicati', // { hasPassword, hasPayment } (campi a schermo) → { ok }

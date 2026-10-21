@@ -38,6 +38,14 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.safebrowseLinks(tabId, urls.filter((u) => typeof u === 'string' && u.length <= 16384));
   });
 
+  // #1375 — la pagina chiede del link sotto il tasto destro: solo l'indirizzo, nessuno stato della scheda né dell'utente.
+  on(MSG.LINK_IMITAZIONE, async (msg) => {
+    const url = msg && typeof msg.url === 'string' ? msg.url : '';
+    if (!url || url.length > 16384) return { ok: false, codice: '' };
+    const E = globalThis.SN_SAFEBROWSE?.engine;
+    try { return { ok: true, codice: E ? E.codiceImitazione(url) : '' }; } catch (_) { return { ok: false, codice: '' }; }
+  });
+
   // Un campo password o carta a schermo, nella pagina o in un suo riquadro: vale per la pagina della scheda, che dà il
   // main (sender.url), mai il riquadro. Chi si dichiara delicato può solo mandare meno ai modelli (#1004).
   on(MSG.CAMPI_DELICATI, async (msg, sender) => {

@@ -37,6 +37,7 @@ const EPOCHE = Number(arg('--epoche', 8));
 const L2 = Number(arg('--l2', 1e-6));
 // Il tetto dei falsi allarmi sui siti noti con cui si sceglie la soglia: uno su duecento.
 const FALSI_AMMESSI = Number(arg('--falsi', 0.005));
+const PESO_MANO = Number(arg('--peso-mano', 3));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
@@ -62,17 +63,30 @@ function host(riga) {
   return s.toLowerCase().replace(/\.$/, '');
 }
 
-// Le righe dei file tsv: host, marchio imitato ('-' se nessuno), nota.
+// Le righe dei file tsv: host (o indirizzo intero, quando conta quello che sta prima della chiocciola), marchio imitato
+// ('-' se nessuno).
 function leggiTsv(file) {
   if (!fs.existsSync(file)) return [];
   return fs.readFileSync(file, 'utf8').split('\n').filter((r) => r && !r.startsWith('#')).map((r) => {
     const [h, marchio] = r.split('\t');
-    return { h: host(h.includes('/') ? 'https://' + h : h), marchio: marchio && marchio !== '-' ? marchio : null };
+    const url = /^[a-z]+:\/\//i.test(h) ? h : 'https://' + h + '/';
+    return { h: /^[a-z]+:\/\//i.test(h) ? h : host(h), url, marchio: marchio && marchio !== '-' ? marchio : null };
   });
 }
 
+// Le parole prima della chiocciola non stanno negli elenchi: le imitazioni di quel tipo si scrivono dall'elenco dei
+// marchi, col loro dominio vero davanti a uno qualunque.
+function sinteticiEsca() {
+  const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
+  const dove = ['accesso-sicuro.net', 'verifica-conto.com', 'servizi-online.net', 'example.org', 'login-area.info', '203.0.113.7'];
+  return BRANDS.flatMap((b, i) => [
+    { h: `https://www.${b.domains[0]}@${dove[i % dove.length]}/login`, marchio: b.token },
+    { h: `https://${b.domains[0]}:accesso@${dove[(i + 3) % dove.length]}/`, marchio: b.token },
+  ]).map((r) => ({ ...r, url: r.h }));
+}
+
 // Fra i candidati di una truffa, quello che la truffa imita: il marchio scritto a mano se c'è, se no il più evidente.
-const ORDINE = ['omografo', 'sosia', 'esatto', 'dentro', 'sosiadentro', 'typo', 'typodentro'];
+const ORDINE = ['omografo', 'sosia', 'esatto', 'omografodentro', 'sosiadentro', 'esattodentro', 'typo', 'typodentro'];
 function principale(es, marchio) {
   if (marchio) return es.find((e) => e.c.mc.token === marchio) || es.find((e) => e.c.mc.brand.display === displayDi(marchio)) || null;
   return [...es].sort((a, b) => ORDINE.indexOf(a.c.tipo) - ORDINE.indexOf(b.c.tipo)
@@ -82,6 +96,11 @@ function principale(es, marchio) {
 function displayDi(token) {
   const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
   return (BRANDS.find((b) => b.token === token) || {}).display;
+}
+
+function evidente(c) {
+  if (c.tipo.startsWith('typo')) return false;
+  return !(c.tipo.endsWith('dentro') && (c.mc.parola || c.mc.token.length <= 4));
 }
 
 function rng(seme) {
@@ -180,7 +199,7 @@ function misura(punti, soglia) {
 // dall'elenco dei marchi.
 function conCandidati(etichetta) {
   const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
-  const chiave = IM.impronta(JSON.stringify(BRANDS) + fs.readFileSync(require.resolve('./src/main/services/safebrowse/imitazioni.js'), 'utf8').length).toString(16);
+  const chiave = IM.impronta(JSON.stringify(BRANDS) + IM.FIRMA_CANDIDATI).toString(16);
   const cache = path.join(DATI, `con-candidati-${chiave}.txt`);
   if (fs.existsSync(cache)) return new Set(fs.readFileSync(cache, 'utf8').split('\n').filter(Boolean));
   const out = new Set();
@@ -191,23 +210,15 @@ function conCandidati(etichetta) {
 
 function costruisci() {
   const prova = new Set(leggiTsv(PROVA).map((r) => r.h));
-  const scritte = new Map(leggiTsv(ETICHETTE).map((r) => [r.h, r]));
+  const scritte = new Map([...leggiTsv(ETICHETTE), ...sinteticiEsca()].map((r) => [r.h, r]));
   const etichetta = new Map();
   const conflitto = new Set();
   for (const f of FONTI) {
     const file = path.join(DATI, f.file);
     if (!fs.existsSync(file)) throw new Error(`manca ${file}: lancia prima con --scarica`);
-    const visti = new Map();
     for (const riga of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
       const h = host(riga);
       if (!h) continue;
-      if (f.etichetta === 0) {
-        // Dei siti noti bastano pochi nomi per dominio: i mille server di un CDN non sono mille siti.
-        const reg = h.split('.').slice(-2).join('.');
-        const k = visti.get(reg) || 0;
-        if (k >= 4) continue;
-        visti.set(reg, k + 1);
-      }
       const prima = etichetta.get(h);
       if (prima !== undefined && prima !== f.etichetta) conflitto.add(h);
       etichetta.set(h, f.etichetta);
@@ -215,21 +226,32 @@ function costruisci() {
   }
   for (const h of conflitto) etichetta.delete(h);
   const gruppi = [];
-  const aggiungi = (h, y, marchio, fonte) => {
+  const perSito = new Map();
+  const aggiungi = (h, y, marchio, fonte, url = 'https://' + h + '/') => {
     if (prova.has(h)) return;
-    const norm = normalize('https://' + h + '/');
-    const es = IM.esempi(norm);
+    const norm = normalize(url);
+    if (fonte === 'elenco' && y === 0) {
+      // Dei siti noti bastano pochi nomi per sito: i mille server di un sito non sono mille siti.
+      const k = perSito.get(norm.registrable) || 0;
+      if (k >= 4) return;
+      perSito.set(norm.registrable, k + 1);
+    }
+    const es = IM.esempi(norm, IM.escaDi(url));
     if (!es.length) return;
     const mask = (1 << BIT) - 1;
     if (y === 1) {
       const e = principale(es, marchio);
-      if (!e) return;
+      // Da un elenco di truffe si impara solo l'imitazione evidente: un refuso o una parola dentro un'altra lì è spesso
+      // un caso (mail.dominio-di-truffa non imita Gmail), e lo decide solo un'etichetta scritta.
+      if (!e || (!marchio && !evidente(e.c))) return;
       gruppi.push({ h, y, fonte, ix: [indici(e.feats, mask)], marchio: e.c.mc.token });
     } else gruppi.push({ h, y, fonte, ix: es.map((e) => indici(e.feats, mask)) });
+    // Un'etichetta scritta vale più di una riga di un elenco, che può sbagliare.
+    if (fonte === 'mano') gruppi[gruppi.length - 1].peso = PESO_MANO;
   };
   const utili = conCandidati(etichetta);
   for (const [h, y] of etichetta) if (utili.has(h) && !scritte.has(h)) aggiungi(h, y, null, 'elenco');
-  for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, 'mano');
+  for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, 'mano', r.url);
   return gruppi;
 }
 
@@ -237,7 +259,7 @@ function provaModello() {
   const righe = leggiTsv(PROVA);
   const m = { ok: 0, presi: 0, truffe: 0, falsi: [], noti: 0, marchioSbagliato: [] , persi: [] };
   for (const r of righe) {
-    const v = IM.giudica(normalize('https://' + r.h + '/'));
+    const v = IM.giudica(normalize(r.url), { esca: IM.escaDi(r.url) });
     if (r.marchio) {
       m.truffe++;
       if (v) { m.presi++; if (v.brand.token !== r.marchio && v.brand.display !== displayDi(r.marchio)) m.marchioSbagliato.push(`${r.h} ${r.marchio}→${v.brand.token}`); } else m.persi.push(r.h);
@@ -264,7 +286,7 @@ async function principale_() {
   // Un decimo da parte per scegliere la soglia su nomi che il modello non ha visto.
   const caso = rng(11);
   const parte = gruppi.map(() => caso() < 0.1);
-  const esempiDi = (gg) => gg.flatMap((g) => (g.y === 1 ? [{ ix: g.ix[0], y: 1 }] : g.ix.map((ix) => ({ ix, y: 0 }))));
+  const esempiDi = (gg) => gg.flatMap((g) => (g.y === 1 ? [{ ix: g.ix[0], y: 1, peso: g.peso }] : g.ix.map((ix) => ({ ix, y: 0, peso: g.peso }))));
   const allena = gruppi.filter((_, i) => !parte[i]);
   const valida = gruppi.filter((_, i) => parte[i]);
   const mq0 = quantizza(addestra(esempiDi(allena)));

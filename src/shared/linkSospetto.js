@@ -1,18 +1,12 @@
-// Link sospetti: euristica sull'indirizzo e le frasi con cui si dicono a chi legge.
-// Non apre il link e non interroga nessun servizio: guarda solo l'indirizzo.
-// Regole e frasi: tests/unit/linkSospetto.test.mjs.
+// Link sospetti: i segni che si leggono dall'indirizzo senza aprirlo, e le frasi con cui si dicono a chi legge.
+// L'imitazione di un marchio la giudica il controllo di navigazione nel main (imitazioni.js) e arriva qui come codice:
+// un verdetto solo per menu e apertura (#1375). Regole e frasi: tests/unit/linkSospetto.test.mjs.
 
 (function (global) {
   'use strict';
 
-  const POPULAR = [
-    'google.com', 'amazon.com', 'amazon.it', 'apple.com', 'microsoft.com',
-    'facebook.com', 'youtube.com', 'paypal.com', 'netflix.com', 'instagram.com',
-    'twitter.com', 'x.com', 'linkedin.com', 'github.com',
-  ];
-
-  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'alfabeto_ingannevole'
-  // | 'typosquatting:<dominio>' | 'omografo:<dominio>' | 'nome_altrui:<dominio>|<dove porta>'.
+  // Codici: 'url_invalido' | 'side_effect' | 'token_in_url' | 'alfabeto_ingannevole', più quelli del main per
+  // l'imitazione di un marchio: 'typosquatting:<dominio>' | 'omografo:<dominio>' | 'nome_altrui:<dominio>|<dove porta>'.
   function analizza(rawUrl) {
     const flags = [];
     let u;
@@ -23,134 +17,18 @@
     // un'azione è minuscolo, «/wiki/Delete» è il titolo di una voce.
     if (AZIONI.test(u.pathname) || AZIONI.test(query)) flags.push('side_effect');
     if (haCredenziale(query)) flags.push('token_in_url');
-
     // #725.2 — si guarda il nome come lo vede chi legge (unicode), non come
     // viaggia (punycode): «xn--pypal-4ve» a schermo è «раypal».
     const host = daPunycode(u.hostname.toLowerCase().replace(/\.$/, '')).replace(/^www\./, '');
-    const norm = SAFEBROWSE ? SAFEBROWSE.normalize(u.href) : null;
-    const esca = etichetteUtente(u);
-    // Chi comanda si legge in due modi, e basta uno: il sito secondo l'elenco dei
-    // suffissi (paypal-login.vercel.app) o la piattaforma che lo ospita (paypal.wordpress.com).
-    const imitato = sitoFidato(norm, u) ? '' : (imitazione(host, esca, sitoVero(norm, host)) || imitazione(host, esca, sitoDi(host)));
-    if (imitato) flags.push(imitato);
-    else if (alfabetoIngannevole(host)) flags.push('alfabeto_ingannevole');
+    if (alfabetoIngannevole(host)) flags.push('alfabeto_ingannevole');
     return flags;
   }
 
-  // #725.2 — chi è davvero il sito lo dice l'elenco del controllo di
-  // navigazione (domini dei marchi, CDN, piattaforme che ospitano altri): uno
-  // solo per i due controlli, così media-amazon.com o fbcdn.net non gridano al lupo.
-  const SAFEBROWSE = (() => {
-    try {
-      // eslint-disable-next-line no-undef
-      if (typeof require === 'function') {
-        return { ...require('../main/services/safebrowse/whitelist.js'), ...require('../main/services/safebrowse/normalize.js') };
-      }
-    } catch (_) {}
-    return null;
-  })();
-  function sitoFidato(norm, u) {
-    if (!norm || !norm.ok) return false;
-    return !SAFEBROWSE.hostedPlatform(norm.host, u.pathname) && SAFEBROWSE.isWhitelisted(norm.registrable);
-  }
-
-  // Il nome famoso che l'indirizzo porta addosso senza essere lui a comandare.
-  function imitazione(host, esca, sito) {
-    for (const p of POPULAR) {
-      if (host === p || host.endsWith('.' + p)) return '';
-    }
-    // Stesso nome, altro dominio di primo livello (amazon.de, google.co): è il
-    // sito, e i suoi sottodomini (facebook.github.io) sono affar suo.
-    if (POPULAR.some((p) => sitoDi(p).nome === sito.nome)) return '';
-
-    const scritto = scheletro(sito.nome);
-    const straniero = /[^\x00-\x7f]/.test(sito.nome);
-    for (const p of POPULAR) {
-      const suo = sitoDi(p).nome;
-      // Il nome di un sito ospitato è una parola scelta da chi l'ha aperto
-      // (apply.vercel.app non imita apple): lì conta solo la stessa grafia.
-      if (scritto === suo || (!sito.ospitato && levenshteinSmall(scritto, suo, tolleranza(suo)))) {
-        return (straniero ? 'omografo:' : 'typosquatting:') + p;
-      }
-    }
-
-    // #725.2 — il nome vero c'è tutto ma non comanda: una regola sola per ogni
-    // pezzo, davanti al sito o nel suo nome, spezzato ai punti e ai trattini
-    // (paypal.com.altro.net, login-paypal.com.altro.net, paypal-login.wixsite.com).
-    const catena = '.' + esca.concat(sito.sotto, [sito.nome]).map(scheletro).join('.') + '.';
-    const pezzi = catena.split(/[.-]/).filter(Boolean);
-    for (const p of POPULAR) {
-      const suo = sitoDi(p).nome;
-      const intero = new RegExp('[.-]' + p.replace(/\./g, '[.-]') + '[.-]').test(catena);
-      // Un nome corto o di tutti i giorni (x, apple) da solo non prova niente:
-      // apple.stackexchange.com e apple-pie.it non imitano nessuno.
-      const nudo = suo.length >= NOME_DISTINTIVO && pezzi.includes(suo);
-      if (intero || nudo) return 'nome_altrui:' + p + '|' + sito.dominio;
-    }
-    return '';
-  }
-  const NOME_DISTINTIVO = 6;
-
-  // Suffissi di secondo livello: in 'amazon.co.uk' il nome del sito è 'amazon'.
-  const SUFFISSI_2L = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);
-
-  // #725 — si confronta il nome, non l'indirizzo intero: col primo livello
-  // dentro, ogni cambio di Paese era un'imitazione (amazon.de contro amazon.it).
-  // `sotto` sono le etichette davanti al dominio, `dominio` è dove porta.
-  function sitoDi(host) {
-    const parti = host.split('.').filter(Boolean);
-    if (parti.length < 2) return { nome: host, dominio: host, sotto: [] };
-    let i = parti.length - 2;
-    if (i >= 1 && SUFFISSI_2L.has(parti[i])) i--;
-    return { nome: parti[i], dominio: parti.slice(i).join('.'), sotto: parti.slice(0, i) };
-  }
-
-  // #725.2 — dove finisce il sito lo dice l'elenco dei suffissi del controllo di
-  // navigazione: paypal-login.vercel.app è di chi l'ha aperto, non di Vercel.
-  // Dove l'elenco ricade sulla regola generica (amazon.com.co) vale la regola corta.
-  function sitoVero(norm, host) {
-    if (!norm || !norm.ok || !norm.registrable) return sitoDi(host);
-    if (norm.isIp) return { nome: host, dominio: host, sotto: [] };
-    const parti = host.split('.').filter(Boolean);
-    const n = norm.registrable.split('.').length;
-    if (parti.length < n) return sitoDi(host);
-    let i = parti.length - n;
-    if (n === 2 && i >= 1 && SUFFISSI_2L.has(parti[i])) i--;
-    return { nome: parti[i], dominio: parti.slice(i).join('.'), sotto: parti.slice(0, i), ospitato: !!norm.ospitato };
-  }
-
-  // Le parole prima della «@» (https://paypal.com@altro.net): a schermo
-  // aprono l'indirizzo, ma il browser le scarta e va dopo la chiocciola.
-  function etichetteUtente(u) {
-    let s = u.username + (u.password ? '.' + u.password : '');
-    try { s = decodeURIComponent(s); } catch (_) {}
-    return s.toLowerCase().split(/[.:]/).filter(Boolean);
-  }
-
-  // #725 — una soglia fissa grida al lupo: due lettere su un nome corto sono
-  // un altro sito (gitlab non imita github), e su un nome di una non si indovina.
-  function tolleranza(nome) {
-    if (nome.length <= 4) return 0;
-    return nome.length <= 7 ? 1 : 2;
-  }
-
-  // Le lettere che a occhio ne valgono un'altra: recuperano i sosia (paypa1,
-  // micros0ft, arnazon) che la tolleranza più stretta lascerebbe passare.
-  function normalizzaSosia(nome) {
-    return nome
-      .replace(/rn/g, 'm').replace(/vv/g, 'w')
-      .replace(/0/g, 'o').replace(/1/g, 'l')
-      .replace(/3/g, 'e').replace(/5/g, 's');
-  }
-
-  // Come il nome si legge a schermo: accenti via, lettere cirilliche, greche
-  // e armene che sembrano latine al loro posto, poi i sosia ASCII di sopra.
-  function scheletro(nome) {
-    let out = '';
-    for (const ch of nome.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')) {
-      out += ch.charCodeAt(0) < 0x80 ? ch : (CONFONDIBILI.get(ch) || ch);
-    }
-    return normalizzaSosia(out);
+  // Il codice dell'imitazione che il main ha visto nel link: dice di più dell'alfabeto ingannevole, e ne prende il posto.
+  function conImitazione(flags, codice) {
+    const base = Array.isArray(flags) ? flags : [];
+    if (typeof codice !== 'string' || !/^(typosquatting|omografo|nome_altrui):./.test(codice)) return base;
+    return base.filter((f) => f !== 'alfabeto_ingannevole').concat(codice);
   }
 
   const STRANIERE = /[\u0370-\u03ff\u0400-\u04ff\u0500-\u052f\u0530-\u058f]/;
@@ -246,30 +124,6 @@
     return false;
   }
 
-  // Levenshtein limitata a `max` (early-exit). True se distance ≤ max e ≥ 1.
-  function levenshteinSmall(a, b, max) {
-    if (a === b) return false;
-    if (Math.abs(a.length - b.length) > max) return false;
-    const m = a.length, n = b.length;
-    if (m === 0 || n === 0) return false;
-    const prev = new Array(n + 1);
-    const cur = new Array(n + 1);
-    for (let j = 0; j <= n; j++) prev[j] = j;
-    for (let i = 1; i <= m; i++) {
-      cur[0] = i;
-      let rowMin = cur[0];
-      for (let j = 1; j <= n; j++) {
-        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
-        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-        if (cur[j] < rowMin) rowMin = cur[j];
-      }
-      if (rowMin > max) return false;
-      for (let j = 0; j <= n; j++) prev[j] = cur[j];
-    }
-    const d = prev[n];
-    return d >= 1 && d <= max;
-  }
-
   // #725 — il codice interno («typosquatting:paypal.com») finiva davanti
   // all'utente così com'era. Chi legge un avviso di sicurezza deve capire, in
   // una frase, cosa c'è che non va e cosa rischia.
@@ -315,5 +169,5 @@
     return f.length ? '⚠️ ' + f.join(' ') : '';
   }
 
-  global.SN_LINK_SOSPETTO = { analizza, frasi, avviso, POPULAR };
+  global.SN_LINK_SOSPETTO = { analizza, conImitazione, frasi, avviso };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

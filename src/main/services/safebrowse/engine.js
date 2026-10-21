@@ -16,6 +16,7 @@
 const { normalize } = require('./normalize');
 const { isWhitelisted, hostedPlatform, pagePath } = require('./whitelist');
 const { localSignals } = require('./signals');
+const { escaDi } = require('./imitazioni');
 
 const ESE = globalThis.SN_ESEGUIBILI || (require('../../../shared/eseguibili.js'), globalThis.SN_ESEGUIBILI);
 
@@ -189,7 +190,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // links.js passa il percorso già composto coi parametri che nominano un file; una navigazione no.
   let urlPath = ctx.urlPath || '';
   if (!urlPath) try { urlPath = new URL(String(url)).pathname; } catch (_) {}
-  const sigs = localSignals(norm, { ...ctx, urlPath });
+  const sigs = localSignals(norm, { ...ctx, urlPath, esca: escaDi(url) });
   const reasons = sigs.map((s) => s.kind).concat(hosted ? ['hosted_content'] : []);
 
   // Blacklist: prevale su tutto, anche sulla whitelist.
@@ -284,4 +285,20 @@ function checkSync(url, ctx = {}) {
   return evaluate(url, ctx, {});
 }
 
-module.exports = { evaluate, checkSync, buildMessage, agePhrase, gsbText, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };
+// L'imitazione che l'apertura vedrebbe in un link, col codice dell'avviso del tasto destro (src/shared/linkSospetto.js):
+// '' se non ce n'è. È lo stesso verdetto di evaluate(), non un secondo giudizio.
+function codiceImitazione(url) {
+  const v = evaluate(url);
+  const imp = v && v.imp;
+  if (!imp) return '';
+  const norm = v.norm;
+  // Il dominio del marchio che il nome fa credere: quello scritto (paypal.com.altro.net), o col suffisso del link
+  // (arnazon.it è amazon.it), o il principale.
+  const forme = [imp.segue && imp.zona !== 'sld' ? imp.brand.token + '.' + imp.segue : '', imp.brand.token + '.' + norm.publicSuffix];
+  const dominio = forme.find((d) => d && imp.brand.domains.includes(d)) || imp.brand.domains[0];
+  if (imp.reason === 'omografo') return 'omografo:' + dominio;
+  if (imp.reason === 'sosia' || imp.reason === 'typo') return 'typosquatting:' + dominio;
+  return 'nome_altrui:' + dominio + '|' + (norm.registrableUnicode || norm.host);
+}
+
+module.exports = { evaluate, checkSync, codiceImitazione, buildMessage, agePhrase, gsbText, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };

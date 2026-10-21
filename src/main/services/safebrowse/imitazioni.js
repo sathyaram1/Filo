@@ -20,35 +20,97 @@ function tolleranza(lunghezza) {
 const MARCHI = BRANDS.map((b) => ({
   brand: b,
   token: b.token,
+  // Come il marchio si legge a schermo: office365 lì è officee6s, come ogni etichetta che lo porta.
+  lettura: null,
   soglia: tolleranza(b.token.length),
   parola: MARCHI_PAROLA.has(b.token),
   forme: (MARCHI_PAROLA.get(b.token) || []).filter((x) => x !== b.token),
   omonimi: new Set(b.omonimi || []),
 }));
 
-// Lo scheletro di un'etichetta (come si legge a schermo, confusables.js) con, per ogni lettera, da dove viene: serve a
-// dire cosa resta intorno al marchio e se il marchio occupa un pezzo intero fra due trattini.
+// Un'etichetta letta come a schermo (confusables.js), a pezzi fra i trattini. Per ogni lettera: `testo` è come si
+// legge, `crudo` tiene le cifre (2024 resta 2024 attorno al marchio), `mut` dice se la lettera vera era un'altra
+// (1 una cifra o rn/vv, 2 una lettera di un altro alfabeto).
 function scheletroDi(etichetta) {
-  const pezzi = [''];
+  const pezzi = [];
+  let cur = null;
   let straniere = false;
-  let cifre = false;
   for (const ch of etichetta.normalize('NFC').toLowerCase()) {
-    if (ch === '-' || ch === '_') { if (pezzi[pezzi.length - 1]) pezzi.push(''); continue; }
+    if (ch === '-' || ch === '_') { cur = null; continue; }
+    if (!cur) { cur = { testo: [], crudo: [], mut: [] }; pezzi.push(cur); }
     const m = CONFONDIBILI.get(ch);
+    const fuori = ch.charCodeAt(0) >= 0x80;
+    if (fuori) straniere = true;
     if (m !== undefined) {
-      if (ch.charCodeAt(0) >= 0x80) straniere = true;
-      else if (m !== ch) cifre = true;
-      pezzi[pezzi.length - 1] += m;
-    } else if (/[a-z0-9]/.test(ch)) pezzi[pezzi.length - 1] += ch;
-    else if (ch.charCodeAt(0) >= 0x80) { straniere = true; pezzi[pezzi.length - 1] += ch; }
+      cur.testo.push(m);
+      cur.crudo.push(fuori ? m : ch);
+      cur.mut.push(m === ch ? 0 : fuori ? 2 : 1);
+    } else if (/[a-z0-9]/.test(ch) || fuori) {
+      cur.testo.push(ch); cur.crudo.push(ch); cur.mut.push(0);
+    }
   }
-  return { ...unisci(pezzi.filter(Boolean)), pezzi: pezzi.filter(Boolean), straniere, cifre };
+  const buoni = pezzi.filter((p) => p.testo.length);
+  return { ...unisci(buoni), pezzi: buoni, straniere };
+}
+
+// rn e vv a schermo sono m e w (rnicrosoft, vvhatsapp): una lettera sola, presa per travestita.
+function vista(p) {
+  const out = { testo: [], crudo: [], mut: [] };
+  for (let i = 0; i < p.testo.length; i++) {
+    const due = p.testo[i] + (p.testo[i + 1] || '');
+    if (due === 'rn' || due === 'vv') {
+      const l = due === 'rn' ? 'm' : 'w';
+      out.testo.push(l); out.crudo.push(l); out.mut.push(Math.max(1, p.mut[i], p.mut[i + 1]));
+      i++;
+    } else { out.testo.push(p.testo[i]); out.crudo.push(p.crudo[i]); out.mut.push(p.mut[i]); }
+  }
+  return out;
 }
 
 function unisci(pezzi) {
   const tagli = [0];
-  for (const p of pezzi) tagli.push(tagli[tagli.length - 1] + p.length);
-  return { testo: pezzi.join(''), tagli };
+  for (const p of pezzi) tagli.push(tagli[tagli.length - 1] + p.testo.length);
+  return {
+    testo: pezzi.map((p) => p.testo.join('')).join(''),
+    crudo: pezzi.map((p) => p.crudo.join('')).join(''),
+    mut: pezzi.flatMap((p) => p.mut),
+    tagli,
+  };
+}
+
+for (const mc of MARCHI) mc.lettura = scheletroDi(mc.token).testo;
+
+// Le coppie di lettere che a schermo si scambiano: un refuso fra queste è un travestimento (lcloud, appie, gooqle).
+const SOMIGLIANTI = new Set(['il', 'li', 'lj', 'jl', 'ij', 'ji', 'iy', 'yi', 'vw', 'wv', 'uv', 'vu', 'mn', 'nm', 'gq', 'qg', 'ao', 'oa', 'ce', 'ec', 'rn', 'nr']);
+function scambioSimile(a, b) {
+  if (a.length !== b.length) return false;
+  let diversi = 0, simile = false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) continue;
+    diversi++;
+    simile = SOMIGLIANTI.has(a[i] + b[i]);
+  }
+  return diversi === 1 && simile;
+}
+
+// Che errore separa a una lettera il pezzo dal marchio: la lettera raddoppiata (gooogle) e quella saltata da una
+// doppia (faceboook, facebok) sono i refusi di chi imita; le altre sono più spesso un'altra parola.
+function tipoErrore(p, t) {
+  if (p.length === t.length + 1) {
+    for (let i = 0; i < p.length; i++) {
+      if (p.slice(0, i) + p.slice(i + 1) === t) return (p[i] === p[i - 1] || p[i] === p[i + 1]) ? 'doppia' : 'aggiunta';
+    }
+  } else if (p.length === t.length - 1) {
+    for (let i = 0; i < t.length; i++) {
+      if (t.slice(0, i) + t.slice(i + 1) === p) return (t[i] === t[i - 1] || t[i] === t[i + 1]) ? 'scempia' : 'tolta';
+    }
+  } else if (p.length === t.length) {
+    for (let i = 0; i + 1 < p.length; i++) {
+      if (p[i] !== t[i]) return p[i] === t[i + 1] && p[i + 1] === t[i] ? 'scambio' : 'cambiata';
+    }
+    return 'cambiata';
+  }
+  return 'altro';
 }
 
 // Distanza di Damerau-Levenshtein ristretta (lo scambio di due vicine vale uno: amzaon è a uno da amazon).
@@ -131,12 +193,12 @@ function candidati(zone, registrable) {
   for (const z of zone) {
     const sk = scheletroDi(z.etichetta);
     if (!sk.testo) continue;
-    const letture = [{ testo: sk.testo, tagli: sk.tagli, vista: false }];
-    const vista = unisci(sk.pezzi.map((p) => p.replace(/rn/g, 'm').replace(/vv/g, 'w')));
-    if (vista.testo !== sk.testo) letture.push({ ...vista, vista: true });
+    const letture = [{ ...sk, vista: false }];
+    const v = unisci(sk.pezzi.map(vista));
+    if (v.testo !== sk.testo) letture.push({ ...v, vista: true });
     for (const mc of MARCHI) {
       if (mc.omonimi.has(registrable)) continue;
-      const t = mc.token;
+      const t = mc.lettura;
       // Fra le due letture vale quella più vicina al marchio: rnicrosoft a occhio è microsoft, non un refuso.
       let meglio = null;
       for (const l of letture) {
@@ -145,17 +207,27 @@ function candidati(zone, registrable) {
       }
       if (!meglio) continue;
       const { r, l } = meglio;
-      const intero = r.inizio === 0 && r.fine === l.testo.length;
       let tipo;
       let d = r.d;
-      if (r.d === 0 && intero) tipo = (sk.straniere ? 'omografo' : (sk.cifre || l.vista) ? 'sosia' : 'esatto');
-      else if (r.d === 0) tipo = (sk.straniere ? 'omografo' : (sk.cifre || l.vista) ? 'sosiadentro' : 'dentro');
-      else {
+      let [inizio, fine] = [r.inizio, r.fine];
+      if (r.d > 0) {
         const tutto = Math.abs(l.testo.length - t.length) <= mc.soglia ? distanza(l.testo, t) : Infinity;
-        if (tutto <= mc.soglia) { tipo = 'typo'; d = tutto; } else tipo = 'typodentro';
+        if (tutto <= mc.soglia) { tipo = 'typo'; d = tutto; [inizio, fine] = [0, l.testo.length]; } else tipo = 'typodentro';
       }
-      const [inizio, fine] = tipo === 'typo' ? [0, l.testo.length] : [r.inizio, r.fine];
-      out.push({ mc, zona: z.zona, etichetta: z.etichetta, segue: z.segue, tipo, d, inizio, fine, sk: { ...sk, testo: l.testo, tagli: l.tagli }, vista: l.vista });
+      // Il travestimento conta solo dentro il marchio (in facebook-form23 le cifre sono altrove), e una cifra che il
+      // marchio ha davvero non lo traveste (office365).
+      let mut = 0;
+      for (let i = inizio; i < fine; i++) {
+        const cifraSua = /[0-9]/.test(l.crudo[i]) && (r.d === 0 ? mc.token[i - inizio] === l.crudo[i] : mc.token.includes(l.crudo[i]));
+        if (!cifraSua) mut = Math.max(mut, l.mut[i]);
+      }
+      if (!tipo) {
+        const intero = inizio === 0 && fine === l.testo.length;
+        tipo = (mut === 2 ? 'omografo' : mut === 1 ? 'sosia' : 'esatto') + (intero ? '' : 'dentro');
+      }
+      const simile = d === 1 && scambioSimile(l.testo.slice(inizio, fine), t);
+      const errore = d === 1 ? tipoErrore(l.testo.slice(inizio, fine), t) : '';
+      out.push({ mc, zona: z.zona, etichetta: z.etichetta, segue: z.segue, tipo, d, mut, simile, errore, inizio, fine, sk: l, straniere: sk.straniere });
     }
   }
   return out;
@@ -172,32 +244,36 @@ function caratteristiche(c, zone, info) {
   const f = [];
   const k = c.tipo;
   const t = c.mc.token;
-  const testo = c.sk.testo;
+  const { testo, crudo } = c.sk;
   const sx = testo.slice(0, c.inizio);
   const dx = testo.slice(c.fine);
   const resto = sx + dx;
   const suff = info.suffisso || '';
   const tld = suff.slice(suff.lastIndexOf('.') + 1);
-  const pezzoInizio = c.sk.tagli.includes(c.inizio);
-  const pezzoFine = c.sk.tagli.includes(c.fine);
-  const pezzo = (pezzoInizio ? 'i' : '') + (pezzoFine ? 'f' : '');
+  const pezzo = (c.sk.tagli.includes(c.inizio) ? 'i' : '') + (c.sk.tagli.includes(c.fine) ? 'f' : '');
   const lun = fascia(t.length, [4, 5, 6, 7, 9]);
+  const parola = c.mc.parola ? 1 : 0;
   f.push('k=' + k, 'z=' + c.zona, 'kz=' + k + c.zona, 'ko=' + k + (info.ospitato ? 1 : 0), 'zo=' + c.zona + (info.ospitato ? 1 : 0));
   f.push('b=' + t, 'bk=' + t + '|' + k, 'bz=' + t + '|' + c.zona);
-  f.push('l=' + lun + k, 'd=' + c.d + k + lun, 'pz=' + pezzo + k, 'pzz=' + pezzo + c.zona);
-  f.push('pa=' + (c.mc.parola ? 1 : 0) + k, 'pal=' + (c.mc.parola ? 1 : 0) + lun + pezzo);
+  f.push('l=' + lun + k, 'd=' + c.d + k + lun, 'm=' + c.mut + k, 'pz=' + pezzo + k, 'pzz=' + pezzo + c.zona);
+  f.push('pa=' + parola + k, 'pal=' + parola + lun + pezzo);
   f.push('tld=' + tld, 'ps=' + suff, 'kt=' + k + '|' + tld, 'kps=' + k + '|' + suff, 'bt=' + t + '|' + tld);
   const truffa = !!resto && soloTruffa(sx) && soloTruffa(dx);
-  f.push('tr=' + (resto ? (truffa ? 1 : 0) : 'v') + k, 'trl=' + (truffa ? 1 : 0) + lun + (c.mc.parola ? 1 : 0));
-  if (c.vista) f.push('vista');
+  f.push('tr=' + (resto ? (truffa ? 1 : 0) : 'v') + k, 'trl=' + (truffa ? 1 : 0) + lun + parola);
+  if (c.straniere) f.push('st=' + k);
+  if (c.simile) f.push('si=' + k, 'sil=' + k + lun);
+  if (c.errore) f.push('er=' + c.errore + k, 'erl=' + c.errore + lun);
+  // Lo stesso suffisso di un indirizzo vero del marchio (gooogle.com accanto a google.com): l'errore di chi digita.
+  if (c.zona === 'sld' && c.mc.brand.domains.includes(t + '.' + suff)) f.push('uf=' + k);
   f.push('rl=' + fascia(resto.length, [0, 2, 4, 6, 9, 13, 20]) + k);
   f.push('nh=' + Math.min(4, c.sk.tagli.length - 2) + c.zona);
-  f.push('nd=' + fascia((testo.match(/[0-9]/g) || []).length, [0, 1, 3]));
+  f.push('nd=' + fascia((crudo.match(/[0-9]/g) || []).length, [0, 1, 3, 6]));
   f.push('ns=' + Math.min(4, info.nSotto) + c.zona);
   if (c.segue) f.push('sg=' + (c.segue.length <= 4 ? c.segue : '*'), 'sgk=' + k + (c.segue.length <= 3 ? 'corta' : 'lunga'));
   if (c.mc.forme.some((x) => testo.includes(x))) f.push('fo=' + k);
   if (c.sk.tagli.some((x) => x > c.inizio && x < c.fine)) f.push('sp=' + k);
-  // Il contesto del marchio: quello che gli sta intorno, coi bordi e i trattini, a pezzi di due, tre e quattro lettere.
+  // Il contesto del marchio: quello che gli sta intorno, com'è scritto, coi bordi e i trattini, a pezzi di due, tre e
+  // quattro lettere.
   const marcato = '^' + conTrattini(c.sk, 0, c.inizio) + '#' + conTrattini(c.sk, c.fine, testo.length) + '$';
   for (let n = 2; n <= 4; n++) for (let i = 0; i + n <= marcato.length; i++) f.push('g' + n + '=' + marcato.slice(i, i + n));
   if (resto.length <= 16) f.push('r=' + marcato, 'rb=' + t + '|' + marcato);
@@ -205,21 +281,20 @@ function caratteristiche(c, zone, info) {
   // Le altre etichette del nome, a pezzi di tre lettere: chi comanda davvero e cosa c'è davanti.
   for (const z of zone) {
     if (z.etichetta === c.etichetta && z.zona === c.zona) continue;
-    const s = '^' + scheletroDi(z.etichetta).testo + '$';
+    const s = '^' + scheletroDi(z.etichetta).crudo + '$';
     for (let i = 0; i + 3 <= s.length; i++) f.push('a' + z.zona[0] + '=' + s.slice(i, i + 3));
   }
   return f;
 }
 
-// Il pezzo [da, a) del testo coi trattini dove l'etichetta li aveva, compresi quelli che lo toccano dentro l'etichetta.
+// Il pezzo [da, a) com'è scritto, coi trattini dove l'etichetta li aveva, compresi quelli che lo toccano.
 function conTrattini(sk, da, a) {
   let out = '';
   for (let i = da; i < a; i++) {
     if (i > 0 && sk.tagli.includes(i)) out += '-';
-    out += sk.testo[i];
+    out += sk.crudo[i];
   }
   if (a > da && a < sk.testo.length && sk.tagli.includes(a)) out += '-';
-  else if (a === da && a > 0 && a < sk.testo.length && sk.tagli.includes(a)) out += '-';
   return out;
 }
 
@@ -262,16 +337,31 @@ function infoDi(norm, zone) {
   };
 }
 
-// Tutti i candidati del nome con le loro caratteristiche: lo script di addestramento parte da qui.
+// Le parole prima della «@» (https://paypal.com@altro.net, anche scritta %40 o con la password): a schermo aprono
+// l'indirizzo, ma il browser le scarta e va dopo la chiocciola.
+function escaDi(url) {
+  let u;
+  try { u = new URL(String(url)); } catch (_) { return []; }
+  let s = u.username + (u.password ? '.' + u.password : '');
+  try { s = decodeURIComponent(s); } catch (_) {}
+  return s.toLowerCase().split(/[.:/@%]/).filter(Boolean);
+}
+
+// Tutti i candidati del nome con le loro caratteristiche: lo script di addestramento parte da qui. Su un indirizzo
+// IP contano solo le parole prima della chiocciola.
 function esempi(norm, esca) {
-  if (!norm || !norm.ok || norm.isIp || norm.single || norm.suffixOnly) return [];
+  if (!norm || !norm.ok || norm.single || norm.suffixOnly) return [];
   if (LEGIT_DOMAINS.has(norm.registrable)) return [];
-  const zone = zoneDi(norm, esca);
+  if (norm.isIp && !(esca && esca.length)) return [];
+  const zone = norm.isIp ? zoneDi({}, esca) : zoneDi(norm, esca);
   const info = infoDi(norm, zone);
   return candidati(zone, norm.registrable).map((c) => ({ c, feats: caratteristiche(c, zone, info) }));
 }
 
-const TIPO_VERDETTO = { omografo: 'omografo', sosia: 'sosia', sosiadentro: 'sosia', typo: 'typo', typodentro: 'typo', esatto: 'nome', dentro: 'nome' };
+const TIPO_VERDETTO = {
+  omografo: 'omografo', omografodentro: 'omografo', sosia: 'sosia', sosiadentro: 'sosia', typo: 'typo', typodentro: 'typo',
+  esatto: 'nome', esattodentro: 'nome',
+};
 
 // Il verdetto sul nome: null, o il marchio imitato con { tipo: 'omografo'|'sosia'|'typo'|'nome', zona, punteggio,
 // forte }. `forte`: travestimento o refuso a una lettera di un marchio lungo, che da solo basta per «Pericoloso».
@@ -294,10 +384,14 @@ function giudica(norm, { esca } = {}) {
     tipo,
     zona: c.zona,
     nome: c.etichetta,
+    segue: c.segue,
     distanza: c.d,
     punteggio: meglio.punteggio,
     forte: (travestito || refusoForte) && meglio.punteggio >= m.sogliaForte,
   };
 }
 
-module.exports = { giudica, esempi, impronta, distanza, dentroConErrori, scheletroDi, FILE_MODELLO };
+// Le funzioni da cui dipende chi porta un marchio: lo script di addestramento ne tiene i risultati finché non cambiano.
+const FIRMA_CANDIDATI = [tolleranza, scheletroDi, vista, unisci, dentroConErrori, zoneDi, candidati, esempi].map(String).join('\n');
+
+module.exports = { giudica, esempi, escaDi, impronta, distanza, dentroConErrori, scheletroDi, FILE_MODELLO, FIRMA_CANDIDATI };

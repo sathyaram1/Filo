@@ -16,6 +16,9 @@ const ROOT = join(__dirname, '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'linkSospetto.js'));
 const LS = globalThis.SN_LINK_SOSPETTO;
+const { codiceImitazione, evaluate } = require(join(ROOT, 'src', 'main', 'services', 'safebrowse', 'engine.js'));
+// Quello che il menu mostra: i segni dell'indirizzo letti nella pagina più l'imitazione che il main vede (#1375).
+const completo = (u) => LS.conImitazione(LS.analizza(u), codiceImitazione(u));
 
 test('si registra su globalThis con la sua API', () => {
   assert.ok(LS, 'SN_LINK_SOSPETTO assente');
@@ -25,17 +28,17 @@ test('si registra su globalThis con la sua API', () => {
 });
 
 test('riconosce il dominio-imitazione, l’azione a effetto e il codice nell’indirizzo', () => {
-  assert.deepEqual(LS.analizza('https://paypa1.com/login'), ['typosquatting:paypal.com']);
-  assert.ok(LS.analizza('https://esempio.it/unsubscribe').includes('side_effect'));
-  assert.ok(LS.analizza('https://esempio.it/a?token=9f2ba71c4de80a13').includes('token_in_url'));
-  assert.deepEqual(LS.analizza('non-un-indirizzo'), ['url_invalido']);
+  assert.deepEqual(completo('https://paypa1.com/login'), ['typosquatting:paypal.com']);
+  assert.ok(completo('https://esempio.it/unsubscribe').includes('side_effect'));
+  assert.ok(completo('https://esempio.it/a?token=9f2ba71c4de80a13').includes('token_in_url'));
+  assert.deepEqual(completo('non-un-indirizzo'), ['url_invalido']);
   // Il dominio vero, e un suo sottodominio, non sono sospetti.
-  assert.deepEqual(LS.analizza('https://www.paypal.com/it'), []);
-  assert.deepEqual(LS.analizza('https://pagamenti.paypal.com/'), []);
+  assert.deepEqual(completo('https://www.paypal.com/it'), []);
+  assert.deepEqual(completo('https://pagamenti.paypal.com/'), []);
 });
 
 test('l’avviso è una frase, non un codice interno', () => {
-  const avviso = LS.avviso(LS.analizza('https://paypa1.com/'));
+  const avviso = LS.avviso(completo('https://paypa1.com/'));
   // Il successo per chi legge: capisce cosa non va senza sapere cos'è il
   // typosquatting, e vede il dominio che il link sta imitando.
   assert.ok(avviso.includes('paypal.com'), `l’avviso non nomina il dominio imitato: ${avviso}`);
@@ -63,7 +66,7 @@ test('ogni codice prodotto dall’euristica ha la sua frase', () => {
 });
 
 test('più avvisi insieme restano leggibili, e i casi vuoti non mostrano niente', () => {
-  const codici = LS.analizza('https://paypa1.com/unsubscribe?token=9f2ba71c4de80a13');
+  const codici = completo('https://paypa1.com/unsubscribe?token=9f2ba71c4de80a13');
   assert.ok(codici.length >= 3, `mi aspetto tre avvisi insieme, trovati ${codici.join(', ')}`);
   const avviso = LS.avviso(codici);
   assert.equal(avviso.split('⚠️').length, 2, 'un solo simbolo di avviso, in testa');
@@ -103,15 +106,15 @@ test('un parametro che si chiama come una chiave ma non lo è non fa scattare l�
     'https://esempio.it/lista?hash=1234567890123',
   ];
   for (const u of normali) {
-    assert.ok(!LS.analizza(u).includes('token_in_url'), `avviso a sproposito su ${u}`);
-    assert.ok(!/chiave/.test(LS.avviso(LS.analizza(u))), `l’avviso parla di chiavi su ${u}`);
+    assert.ok(!completo(u).includes('token_in_url'), `avviso a sproposito su ${u}`);
+    assert.ok(!/chiave/.test(LS.avviso(completo(u))), `l’avviso parla di chiavi su ${u}`);
   }
   // E il caso vero continua a scattare.
   for (const u of [
     'https://esempio.it/entra?sig=Ab3kZ9qX1p7LmN4r',
     'https://esempio.it/a?access_token=eyJhbGciOiJIUzI1NiJ9',
   ]) {
-    assert.ok(LS.analizza(u).includes('token_in_url'), `nessun avviso su ${u}`);
+    assert.ok(completo(u).includes('token_in_url'), `nessun avviso su ${u}`);
   }
 });
 
@@ -145,7 +148,7 @@ test('gli indirizzi di tutti i giorni non vengono accusati di imitarne un altro'
     'https://utente.github.io/blog/',
   ];
   for (const u of innocenti) {
-    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+    assert.deepEqual(completo(u), [], `avviso a sproposito su ${u}`);
   }
 });
 
@@ -153,7 +156,7 @@ test('un titolo che si chiama come un’azione non è un pulsante', () => {
   // #725 — bastava la parola isolata nell'indirizzo: la voce di enciclopedia
   // «Delete» diventava «aprirlo può bastare a eseguire qualcosa».
   for (const u of ['https://it.wikipedia.org/wiki/Delete', 'https://esempio.it/blog/Cancel']) {
-    assert.ok(!LS.analizza(u).includes('side_effect'), `avviso a sproposito su ${u}`);
+    assert.ok(!completo(u).includes('side_effect'), `avviso a sproposito su ${u}`);
   }
   // L'azione vera continua a scattare, nel percorso e nella parte dopo il «?».
   for (const u of [
@@ -161,7 +164,7 @@ test('un titolo che si chiama come un’azione non è un pulsante', () => {
     'https://esempio.it/logout',
     'https://esempio.it/azione?do=Confirm',
   ]) {
-    assert.ok(LS.analizza(u).includes('side_effect'), `nessun avviso su ${u}`);
+    assert.ok(completo(u).includes('side_effect'), `nessun avviso su ${u}`);
   }
 });
 
@@ -179,7 +182,7 @@ test('le imitazioni vere continuano a farsi riconoscere', () => {
     'https://facebok.com/': 'facebook.com',
   };
   for (const [u, atteso] of Object.entries(sosia)) {
-    assert.deepEqual(LS.analizza(u), ['typosquatting:' + atteso], `nessun avviso su ${u}`);
+    assert.deepEqual(completo(u), ['typosquatting:' + atteso], `nessun avviso su ${u}`);
   }
 });
 
@@ -199,7 +202,7 @@ test('il nome vero c’è tutto, ma a comandare è un altro dominio', () => {
     'https://login-microsoft.com/': ['microsoft.com', 'login-microsoft.com'],
   };
   for (const [u, [nome, dove]] of Object.entries(casi)) {
-    const avviso = LS.avviso(LS.analizza(u));
+    const avviso = LS.avviso(completo(u));
     assert.ok(avviso.includes(nome) && avviso.includes(dove), `su ${u} l’avviso non nomina ${nome} e ${dove}: «${avviso}»`);
     assert.match(avviso, /potrebbe/, `su ${u} l’avviso afferma invece di ipotizzare: ${avviso}`);
   }
@@ -218,14 +221,14 @@ test('un nome scritto con lettere di un altro alfabeto si fa riconoscere', () =>
     'https://paypàl.com/': 'paypal.com',
   };
   for (const [u, atteso] of Object.entries(casi)) {
-    assert.deepEqual(LS.analizza(u), ['omografo:' + atteso], `nessun avviso su ${u}`);
-    const avviso = LS.avviso(LS.analizza(u));
+    assert.deepEqual(completo(u), ['omografo:' + atteso], `nessun avviso su ${u}`);
+    const avviso = LS.avviso(completo(u));
     assert.ok(avviso.includes(atteso) && /lettere/.test(avviso), `l’avviso su ${u} non spiega il trucco: ${avviso}`);
   }
   // Un nome che mescola gli alfabeti senza imitare un sito noto resta sospetto.
-  assert.deepEqual(LS.analizza('https://exаmple.com/'), ['alfabeto_ingannevole']);
+  assert.deepEqual(completo('https://exаmple.com/'), ['alfabeto_ingannevole']);
   // E così un nome fatto solo di lettere che sembrano latine, sotto un dominio latino.
-  assert.deepEqual(LS.analizza('https://сосо.com/'), ['alfabeto_ingannevole']);
+  assert.deepEqual(completo('https://сосо.com/'), ['alfabeto_ingannevole']);
   assert.ok(LS.frasi(['alfabeto_ingannevole'])[0].includes('alfabeto'));
 });
 
@@ -244,7 +247,7 @@ test('i nomi scritti per intero in un’altra lingua, e i siti che usano un nome
     'https://paypal.com.co/', 'https://utente:segreto@esempio.it/',
   ];
   for (const u of innocenti) {
-    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+    assert.deepEqual(completo(u), [], `avviso a sproposito su ${u}`);
   }
 });
 
@@ -266,11 +269,11 @@ test('la decodifica del punycode dà il nome che si legge a schermo', async () =
     // Il nome decodificato è quello che il controllo vede: una delle lettere
     // cirilliche lo fa sospettare, una tedesca no.
     const attesoSospetto = ['раураl', 'аррӏе'].includes(nome);
-    assert.equal(LS.analizza(u).length > 0, attesoSospetto, `decodifica sbagliata per ${nome} (${u})`);
+    assert.equal(completo(u).length > 0, attesoSospetto, `decodifica sbagliata per ${nome} (${u})`);
   }
   // Un'etichetta punycode rotta non fa esplodere niente.
   for (const u of ['https://xn--zz-zzz.com/', 'https://xn--.com/', 'https://xn--99999999999.com/']) {
-    assert.ok(Array.isArray(LS.analizza(u)));
+    assert.ok(Array.isArray(completo(u)));
   }
 });
 
@@ -289,7 +292,7 @@ test('gli indirizzi che le aziende usano davvero non si prendono l’avviso, i l
     'https://www.youtube-nocookie.com/embed/x',
     'https://c.amazon-adsystem.com/x.js',
   ]) {
-    assert.deepEqual(LS.analizza(u), [], `falso allarme su ${u}`);
+    assert.deepEqual(completo(u), [], `falso allarme su ${u}`);
   }
   // Sulle piattaforme dove ognuno si prende il suo sottodominio il nome resta
   // di chi l'ha scritto, non dell'azienda.
@@ -300,7 +303,7 @@ test('gli indirizzi che le aziende usano davvero non si prendono l’avviso, i l
     'https://paypal.wordpress.com/',
     'https://paypal.com@wikipedia.evil.net/',
   ]) {
-    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:paypal.com')), `nessun avviso su ${u}`);
+    assert.ok(completo(u).some((c) => c.startsWith('nome_altrui:paypal.com')), `nessun avviso su ${u}`);
   }
 });
 
@@ -316,14 +319,14 @@ test('sui servizi dove ognuno apre il suo sito, il sito è di chi l’ha aperto'
     ['https://netflix-account.herokuapp.com/', 'netflix-account.herokuapp.com'],
     ['http://paypal.com@192.168.1.1/login', '192.168.1.1'],
   ]) {
-    const codici = LS.analizza(u);
+    const codici = completo(u);
     assert.ok(codici.some((c) => c.startsWith('nome_altrui:') && c.endsWith('|' + dove)), `su ${u}: ${codici}`);
     assert.ok(LS.avviso(codici).includes(dove), `l’avviso su ${u} non dice dove porta: ${LS.avviso(codici)}`);
   }
-  assert.deepEqual(LS.analizza('https://paypa1.vercel.app/'), ['typosquatting:paypal.com']);
+  assert.deepEqual(completo('https://paypa1.vercel.app/'), ['typosquatting:paypal.com']);
   // Lì il nome è una parola scelta da chi l'ha aperto: somigliare non basta.
   for (const u of ['https://apply.vercel.app/', 'https://ample.netlify.app/', 'https://googly.github.io/', 'https://amazon.com.co/', 'https://amazon.com.mx/']) {
-    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+    assert.deepEqual(completo(u), [], `avviso a sproposito su ${u}`);
   }
 });
 
@@ -342,11 +345,11 @@ test('il nome vero col trattino si vede in ogni pezzo, non solo nel nome del sit
     ['https://paypal-login.ngrok.io/', 'paypal.com'],
     ['https://secure-paypal:x@evil.net/', 'paypal.com'],
   ]) {
-    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}`);
+    assert.ok(completo(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}`);
   }
   // Le pagine ufficiali dei marchi sui servizi di pagine stanno nell'elenco dei loro domini.
   for (const u of ['https://google-research.github.io/', 'https://amazon-science.github.io/', 'https://google-developers.appspot.com/', 'https://instagram-engineering.com/', 'https://pineapple-com.net/']) {
-    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+    assert.deepEqual(completo(u), [], `avviso a sproposito su ${u}`);
   }
-  assert.ok(LS.analizza('https://paypal-login.appspot.com/').some((c) => c.startsWith('nome_altrui:paypal.com')));
+  assert.ok(completo('https://paypal-login.appspot.com/').some((c) => c.startsWith('nome_altrui:paypal.com')));
 });
