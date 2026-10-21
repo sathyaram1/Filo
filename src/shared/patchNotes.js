@@ -64,6 +64,7 @@
         'Con il computer sotto sforzo il blocco del lavoro di Filo poteva perdere la nota scritta a metà turno o l\'ultimo ragionamento prima della risposta. Adesso li tiene tutti.',
         'Un sito che non manda mai la sua icona finisce di caricarsi lo stesso. Prima Filo aspettava l\'icona per dare il colore alla scheda, e la pagina poteva restare in caricamento a lungo.',
         'Se rifai l\'intervista di benvenuto, resta nella sua scheda: le altre chat restano come sono, anche ricaricate o riaperte dalla Cronologia, e quello che ci scrivi nel frattempo resta lì. Se la lasci a metà, la home te lo ricorda. «Riprendiamola» sulla home riparte dalla domanda a cui eri arrivato, non dall\'inizio. In Preferenze togli con la × ogni intervista conservata, e alla prima risposta quello che Filo ricorderà di te compare in una riga con «Annulla», senza riquadri da confermare.',
+        'Nel riquadro delle risposte di Approfondisci e Traduci la riga per la domanda successiva è alta quanto il tasto d\'invio. Il suggerimento si legge intero e le frecce di scorrimento compaiono solo quando la domanda supera il riquadro.',
       ],
     },
     {
