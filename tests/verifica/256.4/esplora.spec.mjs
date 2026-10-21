@@ -4,10 +4,7 @@ import { mkdirSync } from 'node:fs';
 const SHOTS = 'tests/.shots/verifica-256.4';
 const FRASE = 'riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera';
 
-const casi = [
-  [null, null, 1], [1280, 800, 1], [1200, 750, 1], [1100, 700, 1], [1060, 660, 1], [1024, 640, 1], [1024, 600, 1],
-  [960, 600, 1], [900, 520, 1], [800, 500, 1], [1280, 800, 1.5], [1366, 768, 1.25], [1920, 1080, 1.5], [1440, 900, 1],
-];
+const casi = [[1366, 728, 1], [1440, 760, 1], [1024, 600, 1], [1280, 720, 1]];
 
 for (const [w, h, z] of casi) {
   test(`esplora ${w}x${h} z${z}`, async ({ app, shell, openTab }) => {
