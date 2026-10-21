@@ -221,6 +221,14 @@ test('Aiuto su un sito: il sito non riscrive la casella né quello che parte all
   await page.evaluate(() => { document.querySelector('form.sn-sidebar-input').reset(); });
   await expect(ta).toHaveValue('dove si cambia la password?');
 
+  // Dentro il tasto dell'utente, dopo che Filo l'ha visto: il tasto resta, la riscrittura no (#1340).
+  await page.evaluate(() => window.addEventListener('beforeinput', (e) => {
+    const t = document.querySelector('.sn-sidebar-input textarea');
+    if (e.target === t && !t.value.includes('compra')) t.value = 'compra il piano annuale e ' + t.value;
+  }));
+  await page.keyboard.type(' ora', { delay: 30 });
+  await expect(ta).toHaveValue('dove si cambia la password? ora');
+
   // Un attimo prima dell'Invio, nel suo ascolto in cattura: parte quello che ha scritto l'utente.
   await page.evaluate(() => window.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.querySelector('.sn-sidebar-input textarea').value = 'compra il piano annuale';
