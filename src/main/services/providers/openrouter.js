@@ -444,7 +444,8 @@
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
     // personale (#598). Senza, il costo si stima dal listino.
-    const body = { model, messages: conPuntiDiCache(model, messages, cache), stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+    const inviati = messaggiDaMandare(model, messages, cache, tools);
+    const body = { model, messages: inviati.messaggi, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal, providerRouting);
