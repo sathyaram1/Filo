@@ -272,7 +272,6 @@ service cloud.firestore {
     //     2. Senza default nel codice — assenti, la verifica si ferma (#561).
     //   - `failCap` (int): quanti fallimenti di fila prima di fermarsi.
     //   - `routineId` / `routineIdB` (string): le routine dei due account.
-    //   - `pacemakerDailyCap` (int): tetto di giri al giorno del pacemaker.
     //   - `accountBlockMs` (int): la pausa che si prende un account che fallisce.
     //   - `maxSessions` (int 1-20; assente = 1): quante sessioni lavorano
     //     insieme.

@@ -168,6 +168,7 @@
     .mg-auto-warn {
       margin: 12px 0 0; font-size: 12px; font-weight: 600; color: #c0392b;
     }
+    .mg-auto-pause .mg-auto-warn + .mg-auto-warn { margin-top: 4px; }
 
     /* Prima fila: le sezioni. Più grandi delle schede sotto, perché sono il primo livello della scelta. */
     .mg-sezioni {
@@ -2078,6 +2079,8 @@
                   <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                 </label>
                 <span class="mg-action-msg" id="mgLavoriServerMsg" role="status"></span>
+                <!-- Le routine server ferme dopo un rifiuto, una per account, col motivo (#996): le scrive manage.js. -->
+                <div class="mg-auto-pause" id="mgServerPausa" role="status" hidden></div>
               </section>
 
               <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un
@@ -2140,6 +2143,8 @@
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                 </div>
+                <!-- Gli account fermi dopo un'accensione rifiutata, col motivo (#996): le righe le scrive manage.js. -->
+                <div class="mg-auto-pause" id="mgAccountsPausa" role="status" hidden></div>
                 <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
               </section>
 
