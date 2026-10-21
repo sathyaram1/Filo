@@ -387,15 +387,19 @@
 
   // ── La domanda: il titolo contiene istruzioni per un assistente AI, o cerca di cambiarne il comportamento? ──
 
+  // `sospetto`: resta fuori dal riepilogo e apre il box. `fuori` senza `sospetto`: l'ordine c'è ma il titolo ha l'aria di
+  // una notizia o lo cita fra virgolette. Quella parola la può scrivere chi attacca («… - Reddit»), quindi toglie il box,
+  // mai l'ordine dal riepilogo (#927 giro 7).
   function controlla(titolo, regola) {
     const c = compila(regola);
-    const esito = { sospetto: false, famiglia: '', versione: c.versione };
+    const esito = { sospetto: false, fuori: false, famiglia: '', versione: c.versione };
     const { letture, attaccate } = scheletri(titolo);
     if (!letture.length && !attaccate.length) return esito;
+    const fuori = (famiglia, sospetto) => Object.assign(esito, { sospetto, fuori: true, famiglia });
     let trovata = '';
     for (const e of c.espressioni) {
       if (!e.forte) continue;
-      if (letture.some((l) => e.re.test(l))) { esito.sospetto = true; esito.famiglia = e.famiglia; return esito; }
+      if (letture.some((l) => e.re.test(l))) return fuori(e.famiglia, true);
     }
     const citate = letture.map(senzaCitazioni).filter(Boolean);
     for (const e of c.espressioni) {
@@ -403,13 +407,13 @@
       if (citate.some((l) => e.re.test(l))) { trovata = e.famiglia; break; }
     }
     if (!trovata && attaccate.length && c.ricomposte.some((re) => attaccate.some((p) => re.test(p)))) trovata = 'rivolto';
-    if (!trovata) return esito;
+    if (!trovata) {
+      const citata = c.espressioni.find((e) => !e.forte && letture.some((l) => e.re.test(l)));
+      return citata ? fuori(citata.famiglia, false) : esito;
+    }
     // Un indirizzo lo sceglie chi attacca: «attacker@…» o «example.com» non fanno del titolo una notizia.
     const senzaIndirizzi = letture.map((l) => l.replace(INDIRIZZI, ' '));
-    if (c.innocui.some((re) => senzaIndirizzi.some((l) => re.test(l)))) return esito;
-    esito.sospetto = true;
-    esito.famiglia = trovata;
-    return esito;
+    return fuori(trovata, !c.innocui.some((re) => senzaIndirizzi.some((l) => re.test(l))));
   }
 
   // La lingua del titolo, a occhio, per i titoli condivisi: le parole più frequenti di ciascuna.
