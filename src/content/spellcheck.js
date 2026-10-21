@@ -1351,6 +1351,9 @@
     const d = testoDaControllare(state.el);
     const Rg = R();
     if (!Rg) { state.codice = []; return false; }
+    // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
+    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(d.testo) : [];
+    const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
     const pareri = erroriAttivi() ? pareriDelTesto(d.testo) : null;
     const errori = pareri ? Rg.senzaSovrapposti([
       ...Rg.erroriFissi(d.testo),
