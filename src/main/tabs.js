@@ -58,6 +58,9 @@ const HOVER_INPUT_TYPES = new Set([
   'mouseMove', 'mouseEnter', 'mouseLeave', 'pointerMove', 'pointerRawUpdate',
 ]);
 
+// Per le pagine visitate (#1525) vale come gesto un input vero sulla scheda o una navigazione chiesta a Filo.
+const gestoPerIlFilo = (tab) => Math.max(tab._userInputAt || 0, tab._gestoFiloAt || 0);
+
 // #514 — quanto aspettiamo la pagina prima di uscire dallo schermo intero per
 // conto nostro. L'attesa serve a una cosa sola: dare alla pagina il tempo di
 // dire "quell'Esc me lo sono preso io".
