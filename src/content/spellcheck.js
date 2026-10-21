@@ -1280,17 +1280,8 @@
       state.ultimaAutomatica = null;
     }
     if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
-    if (state.automatiche.length) state.automatiche = riallineaIssues(state.automatiche, prima, ora).issues;
-    if (state.rifiutateQui.length) state.rifiutateQui = riallineaIssues(state.rifiutateQui, prima, ora).issues;
-    // Una parola contata che cambia è stata corretta: il suo conto torna indietro.
-    if (state.contate.length) {
-      const restano = riallineaIssues(state.contate, prima, ora).issues;
-      const vive = new Set(restano.map((x) => x.id));
-      for (const x of state.contate) if (!vive.has(x.id)) impara({ passo: 'corretta', parola: x.segment });
-      state.contate = restano;
-    }
-    // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo. Anche
-    // il suo testo nuovo, se è più stretto del pezzo (il ragionato rilegge tutto).
+    if (state.lampi.length) state.lampi = riallineaIssues(state.lampi, prima, ora).issues;
+    // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo.
     if (state.inViaggio.length) {
       const vivi = new Map(riallineaIssues(state.inViaggio, prima, ora).issues.map((v) => [v.id, v]));
       for (const v of state.inViaggio) {
