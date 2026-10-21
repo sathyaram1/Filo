@@ -602,11 +602,21 @@ quando c'è una versione nuova, che si installa solo quando premi «Installa».
 
 ## Come segnalare un problema di sicurezza
 
-Se pensi di aver trovato una vulnerabilità, **non aprirla come feedback
-pubblico**. Scrivi direttamente al maintainer del progetto. Trattiamo le
-segnalazioni di sicurezza con priorità.
+Se pensi di aver trovato una vulnerabilità, **non scriverla in pubblico**, per
+esempio in una issue o in un commento su GitHub. Questi canali restano privati:
+
+- la **segnalazione privata di GitHub**, dalla scheda Security del repository
+  («Report a vulnerability»):
+  [github.com/sathyaram1/Filo/security/advisories/new](https://github.com/sathyaram1/Filo/security/advisories/new);
+- l'**email** a [hello@filo.red](mailto:hello@filo.red);
+- dall'app, il **canale dei feedback**: il testo parte cifrato (§6).
+
+Scrivi cosa hai trovato, come si riproduce e su quale versione di Filo.
+Trattiamo le segnalazioni di sicurezza con priorità. La correzione però si
+scrive sul repository pubblico, e lì si legge qualche ora prima che arrivi a
+chi usa Filo: è uno dei punti deboli descritti in `transparency/security.md`.
 
 ---
 
-*Ultimo aggiornamento: 2026-10-12. Questo documento evolve insieme all'app;
+*Ultimo aggiornamento: 2026-10-21. Questo documento evolve insieme all'app;
 le voci 🔜 e 💭 verranno aggiornate a ✅ quando le misure entrano in funzione.*
