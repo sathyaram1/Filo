@@ -3077,7 +3077,7 @@
       idleHours: 6,
       onClose: true,
     },
-    // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
+    // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nel filo della home per significato. Spento, di una
     // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
     riassuntoSchede: { enabled: true },
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
