@@ -196,6 +196,75 @@ test('da un worktree dello stesso deposito non si consegna: ramo e commit lì no
   }
 });
 
+// #772.1: la shell dei sotto-agenti torna da sola alla cartella principale, quindi chi ha lavorato in un worktree
+// consegna proprio da lì (o da fuori del deposito). Il controllo guarda dove sta il lavoro, non da dove parte il comando.
+test('lavoro committato in un worktree, consegna dalla cartella posizionata o da fuori: si ferma e dice come portarlo qui', async () => {
+  const { srv, ricevuti, port } = await fintoServer();
+  const { base, work, g } = deposito();
+  try {
+    writeFileSync(resolve(work, '.git', 'info', 'exclude'), '.claude/worktrees/\n', { flag: 'a' });
+    // Un worktree di prima dell'inizio del lavoro, coi suoi commit vecchi: non è questo lavoro e non ferma niente.
+    const vecchio = resolve(work, '.claude', 'worktrees', 'vecchio');
+    g(['worktree', 'add', '-q', vecchio, '-b', 'claude/vecchio']);
+    writeFileSync(resolve(vecchio, 'vecchio.txt'), 'prima\n', 'utf8');
+    execFileSync('git', ['add', '-A'], { cwd: vecchio });
+    execFileSync('git', ['commit', '-qm', 'vecchio'], { cwd: vecchio, env: { ...process.env, GIT_COMMITTER_DATE: '2020-01-01T00:00:00Z' } });
+    // Il lavoro di adesso, in un worktree su un ramo suo; la cartella posizionata resta pulita sul ramo assegnato.
+    const wt = resolve(work, '.claude', 'worktrees', 'altro');
+    g(['worktree', 'add', '-q', wt, '-b', 'claude/altro']);
+    writeFileSync(resolve(wt, 'lavoro.txt'), 'fatto\n', 'utf8');
+    g(['add', '-A'], wt); g(['commit', '-qm', 'lavoro'], wt);
+    writeFileSync(resolve(wt, 'altro.txt'), 'ancora\n', 'utf8');
+    g(['add', '-A'], wt); g(['commit', '-qm', 'lavoro 2'], wt);
+    const [primo, secondo] = g(['rev-list', '--reverse', 'HEAD~2..HEAD'], wt).split('\n');
+    for (const da of [work, base]) {
+      azzera(work);
+      const r = await lanciatore(work, port, da)(CONSEGNE.revisione);
+      assert.equal(r.code, 1, `da ${da}: doveva fermarsi (${r.so})`);
+      assert.match(r.se, /la cartella ".*altro" \(ramo "claude\/altro"\) ha 2 commit fatti dopo l'inizio di questo lavoro/);
+      assert.match(r.se, new RegExp(`che il ramo assegnato "${ASSEGNATO}" non contiene`));
+      assert.ok(r.se.includes(`cherry-pick ${primo.slice(0, 12)} ${secondo.slice(0, 12)}`), `il comando coi commit in ordine: ${r.se}`);
+      assert.match(r.se, /git worktree remove ".*altro"/, 'e la strada se quei commit non sono di questo lavoro');
+      assert.doesNotMatch(r.se, /vecchio/, 'il worktree di prima non conta');
+    }
+    assert.equal(ricevuti.length, 0, 'al server non parte niente');
+    // Le registrazioni di dispatch passano dalla stessa regola, col loro contatore.
+    azzera(work);
+    assert.match(checkDelivery(work, ASSEGNATO).reason, /non contiene 2 commit fatti dopo l'inizio di questo lavoro/);
+    // Uno solo portato qui non basta; tutti e due sì, e la consegna parte col ramo assegnato.
+    g(['cherry-pick', primo]);
+    azzera(work);
+    const mezzo = await lanciatore(work, port)(CONSEGNE.correzione);
+    assert.equal(mezzo.code, 1, mezzo.so);
+    assert.match(mezzo.se, /ha un commit fatto dopo l'inizio/);
+    g(['cherry-pick', secondo]);
+    azzera(work);
+    const ok = await lanciatore(work, port)(CONSEGNE.correzione);
+    assert.equal(ok.code, 0, ok.se);
+    assert.equal(consegne(ricevuti).at(-1).body.data.branch, ASSEGNATO);
+  } finally { srv.close(); togliCartella(base); }
+});
+
+test('commit in un worktree che non sono di questo lavoro: tolta quella cartella, la consegna parte', async () => {
+  const { srv, ricevuti, port } = await fintoServer();
+  const { base, work, g, committa } = deposito();
+  try {
+    writeFileSync(resolve(work, '.git', 'info', 'exclude'), '.claude/worktrees/\n', { flag: 'a' });
+    committa('lavoro.txt', 'fatto\n');
+    const wt = resolve(work, '.claude', 'worktrees', 'prova');
+    g(['worktree', 'add', '-q', wt, '-b', 'claude/prova', 'main']);
+    writeFileSync(resolve(wt, 'prova.txt'), 'una prova\n', 'utf8');
+    g(['add', '-A'], wt); g(['commit', '-qm', 'prova'], wt);
+    const ferma = await lanciatore(work, port)(CONSEGNE.critica);
+    assert.equal(ferma.code, 1, ferma.so);
+    g(['worktree', 'remove', '--force', wt]);
+    azzera(work);
+    const r = await lanciatore(work, port)(CONSEGNE.critica);
+    assert.equal(r.code, 0, r.se);
+    assert.equal(consegne(ricevuti).length, 1);
+  } finally { srv.close(); togliCartella(base); }
+});
+
 test('senza identità attesa, da un ramo di lavoro la consegna parte col ramo vero: il confronto col biglietto lo fa il server', async () => {
   const { srv, ricevuti, port } = await fintoServer();
   const { base, work, committa } = deposito({ attesa: false });
