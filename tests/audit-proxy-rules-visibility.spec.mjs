@@ -1,6 +1,5 @@
 // Una regola «questo sito sempre da <paese>» salvata si vede: nel filo della home è un cambio col dominio e il paese,
-// e da lì si toglie. Prima questa prova asseriva il difetto (la regola invisibile ovunque) e la riga del cambio,
-// arrivata dopo, la faceva cadere a caso (#1569). Frasi dei cambi: src/shared/cambi.js.
+// e da lì si toglie. Si asserisce la regola vista, mai la sua assenza (#1569). Frasi dei cambi: src/shared/cambi.js.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home } from './helpers/chatFinta.mjs';
