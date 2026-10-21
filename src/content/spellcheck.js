@@ -1727,28 +1727,33 @@
         citazione: s.citazione,
       });
     }
-    // Il rapido tace sui candidati giusti (prompt del banco, #1580): uno mandato e non confermato è scartato, se la
-    // risposta è leggibile.
-    if (rapido && viaggio && Array.isArray(viaggio.candidati) && !Rg.senzaRighe(raw)) {
-      for (const k of viaggio.candidati) {
-        const v = state.verdetti.get(k);
-        if (!confermati.has(k) && !(v && v.stato === 'confermato')) state.verdetti.set(k, { stato: 'scartato', alle: ora, da: fonte });
-      }
-    }
-    const delCampo = d.riporta(nuovi);
-    const giustiCampo = d.riporta(giusti);
     const giudicato = viaggio && !viaggio.perso ? viaggio : null;
-    const rinnovato = (m) => delCampo.some((n) => tocca(m, n)) || giustiCampo.some((n) => tocca(m, n));
-    // Un segnaposto che la rilettura non nomina resta, se la sua frase fino alle x è quella di prima: il modello che
-    // nel dubbio tace non toglie un valore già dato. Un «giusto» o un segno nuovo sulle stesse x lo sostituiscono.
-    const restaSegnaposto = (m) => {
-      if (m.tipo !== 'segnaposto' || !m.identita) return false;
+    // Un segnaposto già deciso resta suo finché la frase in cui è stato deciso c'è ancora: che la rilettura taccia o lo
+    // scriva con altre parole. Tolta o cambiata una parola, decide la rilettura; un «giusto» lo toglie sempre.
+    const fraseDiAdesso = (m) => {
       const a = d.verso(m.start);
       const b = d.verso(m.end);
-      return a >= 0 && b > a && Rg.identitaSegnaposto(d.testo, a, b) === m.identita;
+      if (!(a >= 0 && b > a) || d.testo.slice(a, b) !== m.segment) return null;
+      const f = Rg.aFrasiIntere(d.testo, a, b);
+      return d.testo.slice(f.start, f.end);
     };
+    const restaSegnaposto = (m) => {
+      if (m.tipo !== 'segnaposto' || !m.frase) return false;
+      const ora = fraseDiAdesso(m);
+      return ora != null && Rg.stessaFrase(m.frase, ora);
+    };
+    const tenuti = new Set();
+    const delCampo = d.riporta(nuovi).filter((n) => {
+      if (n.tipo !== 'segnaposto') return true;
+      const prima = state.modello.find((m) => m.fonte === fonte && m.tipo === 'segnaposto' && tocca(m, n) && restaSegnaposto(m));
+      if (!prima) return true;
+      tenuti.add(prima);
+      return false;
+    });
+    const giustiCampo = d.riporta(giusti);
+    const rinnovato = (m) => giustiCampo.some((n) => tocca(m, n)) || (!tenuti.has(m) && delCampo.some((n) => tocca(m, n)));
     state.modello = state.modello.filter((m) => m.fonte !== fonte
-      || (!rinnovato(m) && (!(giudicato && tocca(m, giudicato)) || restaSegnaposto(m))));
+      || (!rinnovato(m) && (tenuti.has(m) || !(giudicato && tocca(m, giudicato)) || restaSegnaposto(m))));
     state.modello.push(...delCampo);
     avviaRicerche(state);
     const base = rapido ? state.baseRapido : state.baseRagionato;
