@@ -1894,7 +1894,8 @@
     if (annulla) sopra.push(annulla, { type: 'separator' });
     if (errore) sopra.push(...vociErrore(editableEl, errore));
     if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
-    const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
+    const correggibile = (s) => s && !s.dubbio && (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && s.correzioni?.length));
+    const tutti = voceCorreggiTutti(editableEl, 1 + [errore, suggerimento].filter(correggibile).length);
     if (tutti) sopra.push(tutti, { type: 'separator' });
     items.unshift(...sopra);
     conMenuDelSito(items, sito);
