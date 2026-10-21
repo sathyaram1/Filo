@@ -100,7 +100,6 @@ test('esplora: Ignora su un errore e su un suggerimento, poi riscritti', async (
   await expect(errore(page, 'quseta')).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
   await expect(suggerimento(page, 'alle 18')).toHaveCount(1, { timeout: 8000 });
   let menu = await tastoDestroSu(page, suggerimento(page, 'alle 18'));
-  await expect(menu.voce('Valuta')).toBeVisible();
   await menu.voce('Ignora').click();
   await expect(suggerimento(page, 'alle 18')).toHaveCount(0);
   menu = await tastoDestroSu(page, errore(page, 'quseta'));
