@@ -168,10 +168,13 @@ export function ultimaPubblicata(rilasci) {
  * La chiave dice al server QUALE guasto è (#752): la piattaforma e l'ultima
  * versione uscita per lei. Finché resta rotta la chiave non cambia; tornata a
  * uscire, un guasto dopo ha una chiave nuova e non finisce dentro un feedback
- * vecchio. Senza release lette la chiave è della versione: un doppione è
+ * vecchio. Con tutti i file già nella pagina è rotto il resto del lavoro (le
+ * impronte), e conta come uscita solo una versione che ha anche quelle: se no
+ * ogni versione rotta così sarebbe «uscita» e aprirebbe un feedback suo.
+ * Senza release, o impronte, lette la chiave è della versione: un doppione è
  * meglio di un guasto inghiottito. PURA.
  */
-export function chiaviAllarme(piattaforma, { versione, rilasci } = {}) {
+export function chiaviAllarme(piattaforma, { versione, rilasci, impronteLette = true } = {}) {
   const nome = String(piattaforma || '').trim().toLowerCase();
   if (!nome) return ['piattaforma'];
   const base = `piattaforma:${nome}`;
@@ -181,6 +184,11 @@ export function chiaviAllarme(piattaforma, { versione, rilasci } = {}) {
   const pagina = paginaDellaVersione(rilasci, v);
   if (!pagina) return [`${base}:in-${pezzo}`];
   if (!pagina.esiste) return [`${base}:inesistente-${pezzo}`];
+  const conf = PIATTAFORME[String(piattaforma).trim()];
+  if (conf && conf.attesi.every((f) => pagina.allegati.includes(f))) {
+    if (!impronteLette) return [`${base}:impronte:in-${pezzo}`];
+    return [`${base}:impronte:dopo-${ultimaUscita(rilasci, piattaforma, v, { conImpronte: true }) || 'nessuna'}`];
+  }
   return [`${base}:dopo-${ultimaUscita(rilasci, piattaforma, v) || 'nessuna'}`];
 }
 
