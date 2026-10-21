@@ -1,7 +1,6 @@
 // Handler di dominio: cattura schermo, salvataggio immagini su disco, box
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
-const { safeFetch } = require('../safe-fetch');
 const siteBlock = require('../siteBlock');
 require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l'avviso sui link, lo stesso del menu
 const { perContoDellaScheda } = require('../perContoDellaScheda');
@@ -295,34 +294,9 @@ module.exports = function register(on, ctx) {
     return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
   });
 
-  // "Salva immagine come…" (#274). Il vecchio cammino era un <a download>
-  // creato dal content script: Chromium onora l'attributo `download` SOLO per
-  // URL same-origin/blob:/data: — per un'immagine su un ALTRO dominio (la
-  // stragrande maggioranza) lo ignorava e la scheda navigava sull'immagine
-  // senza scaricare nulla.
-  //
-  // Scarichiamo i byte QUI nel main con net.request, poi li scriviamo su disco.
-  // Perché non webContents.downloadURL: molti CDN con protezione hotlink
-  // rispondono 403 alle richieste "anonime" (senza Referer) anche per immagini
-  // che nella pagina si vedono benissimo — e NON c'è modo di presentare il
-  // Referer a un download di Electron 33: né l'opzione { headers } di
-  // downloadURL né una riscrittura in onBeforeSendHeaders vengono onorate per
-  // la richiesta di download (verificato: la richiesta arriva sempre senza
-  // Referer). net.request invece lascia impostare qualsiasi header e usa i
-  // cookie/auth della session del tab, così il salvataggio riesce a prescindere
-  // dall'origine E sui siti con hotlink protection. Un fetch che si interrompe
-  // a metà diventa naturalmente un errore (niente più silenzio), e l'utente
-  // sceglie dove salvare col dialogo nativo "Salva come…".
-  // Un solo cammino per immagini, video e audio: cambia solo `kind` (nome di
-  // ripiego e header Accept). Registrato su DUE messaggi perché il chiamante
-  // dichiara cosa sta salvando (#400: prima del fix il menu su un <video> non
-  // offriva alcun salvataggio).
-  //
-  // #436 — I byte scendono su disco mentre arrivano, e il trasferimento si
-  // iscrive alla barra degli scaricamenti come un download qualsiasi. Prima il
-  // file veniva accumulato in memoria e consegnato tutto in fondo: salvare un
-  // filmato voleva dire fissare uno schermo immobile per minuti, e oltre mezzo
-  // giga il salvataggio si rifiutava proprio.
+  // "Salva immagine/video/audio come…" (#274, #400): i byte li scarica il main per conto della scheda (fetchToFile),
+  // perché Chromium ignora `download` su un'altra origine e un download di Electron perde il Referer. Il trasferimento
+  // sta nella barra degli scaricamenti come gli altri (#436) e l'utente sceglie dove salvare col dialogo nativo.
   const handleDownload = async (msg, sender) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
@@ -809,28 +783,32 @@ module.exports = function register(on, ctx) {
       // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
       const porta = await controllaUscita({ type: 'NAVIGA', url }, { sender });
       if (porta.blocca) return { ok: false, error: 'segreto' };
+      // Il tempo copre anche il corpo: un sito che lo manda a gocce non tiene aperto il menu in attesa.
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
-      // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando
-      // ogni redirect. Evita che una pagina usi questa fetch del main per
-      // sondare/leggere servizi locali o interni (SSRF).
-      const r = await safeFetch(url, { signal: controller.signal, redirectAmmesso: (_da, prossimo) => !(rinvio = anteprimaFerma(prossimo.href)) });
-      clearTimeout(t);
       let html = '';
-      const reader = r.body?.getReader?.();
-      if (reader) {
-        const dec = new TextDecoder('utf-8', { fatal: false });
-        let total = 0;
-        while (total < 65536) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          total += value.byteLength;
-          html += dec.decode(value, { stream: true });
-          if (html.includes('</head>')) break;
+      try {
+        // Esce come uscirebbe dalla scheda (proxy compreso) e mai verso la rete interna; senza cookie né Referer:
+        // chi passa sopra un link non l'ha ancora aperto.
+        const r = await perContoDellaScheda(sender, String(url), {
+          signal: controller.signal, accetta: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+          redirectAmmesso: (_da, prossimo) => !(rinvio = anteprimaFerma(prossimo.href)),
+        });
+        const reader = r.body?.getReader?.();
+        if (reader) {
+          const dec = new TextDecoder('utf-8', { fatal: false });
+          let total = 0;
+          while (total < 65536) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            html += dec.decode(value, { stream: true });
+            if (html.includes('</head>')) break;
+          }
+          try { reader.cancel(); } catch (_) {}
         }
-        try { reader.cancel(); } catch (_) {}
-      } else {
-        html = await r.text();
+      } finally {
+        clearTimeout(t);
       }
       const pick = (re) => { const m = html.match(re); return m ? m[1].trim() : ''; };
       const ogTitle = pick(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
