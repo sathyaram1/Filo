@@ -2554,7 +2554,7 @@
     updateLivelliFiltro();
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly, livelli: livelliScelti }))
+      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly, livelli: livelliScelti, soloNonFidate }))
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
