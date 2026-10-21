@@ -1897,7 +1897,7 @@
       percorso: 'security.pagineDelicate.siti',
       allentaSe: 'togli',
       nome: 'Siti delicati aggiunti da te',
-      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche e sanità: il loro testo non va ai modelli nei lavori automatici. '
+      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche, sanità e pubblica amministrazione: niente di loro va ai modelli nei lavori automatici. '
         + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
       risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine il riassunto e la '
         + 'pulizia automatica delle schede non mandano il testo ai modelli. Un sito tolto torna a mandarlo.',
