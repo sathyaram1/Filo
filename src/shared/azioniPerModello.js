@@ -23,7 +23,8 @@
   // che non ha mai visto (#1396).
   function notaSegnaposti(numeri) {
     const nomi = numeri.map((n) => `«voce ${n}»`);
-    const elenco = nomi.length > 1 ? `${nomi.slice(0, -1).join(', ')} e ${nomi[nomi.length - 1]}` : nomi[0];
+    const elenco = nomi.length > 3 ? `Le etichette da ${nomi[0]} a ${nomi[nomi.length - 1]}`
+      : nomi.length > 1 ? `${nomi.slice(0, -1).join(', ')} e ${nomi[nomi.length - 1]}` : nomi[0];
     return nomi.length > 1
       ? `(${elenco} sono segnaposti tuoi per i testi qui sotto: l'utente non li vede da nessuna parte, dove gli si mostra la cosa compare il testo vero. Con lui non scriverli mai: nomina le cose col loro contenuto o con parole tue.)`
       : `(${elenco} è un segnaposto tuo per il testo qui sotto: l'utente non lo vede da nessuna parte, dove gli si mostra la cosa compare il testo vero. Con lui non scriverlo mai: nomina la cosa col suo contenuto o con parole tue.)`;
