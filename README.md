@@ -154,8 +154,9 @@ npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 
 La suite completa non la lancia più nessuno a mano (decisione owner
 2026-09-15): gira in GitHub a ogni fusione su main, in
-`.github/workflows/suite.yml` (Linux senza schermo; `scripts/suite-verdict.mjs`
-toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`), insieme
+`.github/workflows/suite.yml` (Linux senza schermo, divisa in quattro parti che
+girano insieme su macchine diverse; `scripts/suite-verdict.mjs` ne unisce gli
+esiti e toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`), insieme
 agli unit test su Windows che rifà anche il cancello di pubblicazione, e un
 rosso nuovo diventa un feedback. Ogni sei ore `release.yml` pubblica il commit
 più nuovo di main con la suite verde. Per provare la suite su un ramo:
