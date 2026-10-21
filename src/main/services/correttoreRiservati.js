@@ -39,8 +39,8 @@ function richieste(l) {
       fine.lastIndex = m.index + m[0].length;
       const f = fine.exec(l);
       const a = f ? f.index + f[0].length : l.length;
-      const frase = l.slice(Math.max(0, m.index - 300), m.index).split(/[.!?]+\s|\n/).pop() + l.slice(m.index, a);
-      if ((f && f[0].includes('?')) || RICHIESTA.test(frase)) out.push({ fine: a, tipo });
+      const frase = () => l.slice(Math.max(0, m.index - 300), m.index).split(/[.!?]+\s|\n/).pop() + l.slice(m.index, a);
+      if ((f && f[0].includes('?')) || RICHIESTA.test(frase())) out.push({ fine: a, tipo });
     }
   }
   return out;
@@ -93,7 +93,15 @@ function riservati(testo) {
   const l = testo.toLowerCase();
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
   try { if (X && X.segretiDetti) out.push(...X.segretiDetti(l)); } catch (_) {}
-  try { for (const r of richieste(l)) out.push(...valoriRisposta(l.slice(r.fine, r.fine + RISPOSTA_MAX), r.tipo)); } catch (_) {}
+  try {
+    // Un testo lungo che ripete la stessa domanda e la stessa risposta si legge una volta sola.
+    const viste = new Set();
+    for (const r of richieste(l)) {
+      const risposta = l.slice(r.fine, r.fine + RISPOSTA_MAX);
+      const k = `${r.tipo}:${risposta}`;
+      if (!viste.has(k)) { viste.add(k); out.push(...valoriRisposta(risposta, r.tipo)); }
+    }
+  } catch (_) {}
   // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
   for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   return lunghi(out);
