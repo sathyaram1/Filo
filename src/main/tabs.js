@@ -2967,7 +2967,7 @@ class TabManager {
         return;
       }
       this._assestaEsito(tab);
-      this.visite.navigata(wc, tab.id, url, { gesto: gestoPerIlFilo(tab) });
+      this.visite.navigata(wc, tab.id, url, { gesto: gestoPerIlFilo(tab), chiave: tab });
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;

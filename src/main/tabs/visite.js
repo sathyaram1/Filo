@@ -44,8 +44,9 @@ class VisiteSchede {
   }
 
   // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova. `gesto`: l'ultimo input vero sulla
-  // scheda o l'ultima navigazione chiesta a Filo (barra, indietro, preferiti), in ms.
-  navigata(wc, scheda, url, { inPagina = false, gesto = 0 } = {}) {
+  // scheda o l'ultima navigazione chiesta a Filo (barra, indietro, preferiti), in ms. `chiave`: l'oggetto della scheda,
+  // che resta quando la sua vista si ricrea (privacy fra siti): il freno vale per la scheda, non per la vista.
+  navigata(wc, scheda, url, { inPagina = false, gesto = 0, chiave = null } = {}) {
     const voce = voceAttiva(wc);
     const vocePrima = this.voci.get(wc);
     if (voce) this.voci.set(wc, voce); else this.voci.delete(wc);
@@ -58,7 +59,7 @@ class VisiteSchede {
       if (v) v.url = url;
       return;
     }
-    const freno = this.freno(wc, gesto, inPagina);
+    const freno = this.freno(wc, gesto, inPagina, chiave);
     // Frenata, la pagina resta quella della visita aperta: in attesa segue l'indirizzo, già scritta lo assorbe.
     if (freno.frena) {
       if (!registrabile(url)) return;
@@ -68,11 +69,12 @@ class VisiteSchede {
       return;
     }
     this.scrivi(wc, { titoloAttuale: false });
-    if (!registrabile(url)) { this.lascia(wc); return; }
+    if (!registrabile(url)) { this.lascia(wc); freno.f.aperta = false; return; }
     const prima = this.ultime.get(wc);
     if (prima && senzaFrammento(prima) === senzaFrammento(url)) return;
     this.lascia(wc);
     this.ultime.set(wc, url);
+    freno.f.aperta = true;
     if (!freno.conGesto) freno.f.fila += 1;
     const v = { wc, url, scheda, ts: new Date().toISOString(), titolo: '', inPagina };
     v.timer = setTimeout(() => this.scrivi(wc), inPagina ? ATTESA_TITOLO_IN_PAGINA : TETTO_CARICAMENTO);
@@ -85,17 +87,19 @@ class VisiteSchede {
   // sola; un gesto nuovo (anche senza navigazione dietro) rimette la fila a zero. Una pagina intera a ridosso di una
   // visita già scritta (un rinvio fatto dal sito, un accesso che passa da tre indirizzi) è una visita sua, dentro la fila:
   // assorbita, il filo perderebbe l'indirizzo dove l'utente è arrivato.
-  freno(wc, gesto, inPagina) {
+  freno(wc, gesto, inPagina, chiave) {
     const ora = Date.now();
-    let f = this.freni.get(wc);
-    if (!f) { f = { ultima: -Infinity, fila: 0, gesto: 0 }; this.freni.set(wc, f); }
+    const k = chiave && typeof chiave === 'object' ? chiave : wc;
+    let f = this.freni.get(k);
+    if (!f) { f = { ultima: -Infinity, fila: 0, gesto: 0, aperta: false }; this.freni.set(k, f); }
     const g = Number(gesto) || 0;
     if (g > f.gesto) { f.gesto = g; f.fila = 0; }
     const conGesto = g > 0 && ora - g <= FRENO.gesto && g >= f.ultima;
     const prima = f.ultima;
     f.ultima = ora;
     const inAttesa = this.inAttesa.has(wc);
-    const aperta = inAttesa || this.scritte.has(wc);
+    // La visita della vista di prima resta aperta per la scheda: una vista ricreata non riapre il conto.
+    const aperta = inAttesa || this.scritte.has(wc) || f.aperta;
     const raffica = ora - prima < FRENO.raffica && (inPagina || inAttesa);
     const frena = !conGesto && aperta && (raffica || f.fila >= FRENO.fila);
     return { frena, conGesto, f };
