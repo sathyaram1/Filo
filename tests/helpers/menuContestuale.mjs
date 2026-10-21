@@ -49,6 +49,14 @@ export function menuDi(scheda) {
   };
 }
 
+// Con più finestre ci sono più strati (la finestrella di accesso ha il suo): il menu di quello che ne ha uno aperto.
+export async function menuDelloStratoAperto(app) {
+  for (const w of app.windows().filter((x) => x.url().startsWith('filo://menu/'))) {
+    if (await w.locator('.sn-menu').count()) return menuDi(w);
+  }
+  return null;
+}
+
 /** Il menu è aperto (almeno un pannello a schermo). */
 export async function menuAperto(scheda) {
   return (await menuDi(scheda).pannelli.count()) > 0;

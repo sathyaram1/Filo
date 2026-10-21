@@ -4,8 +4,9 @@
 // Regole: patterns/il-menu-del-tasto-destro-sta-in-uno-strato-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi, paginaDelloStrato, statoDelloStrato, statoCronologia } from './helpers/menuContestuale.mjs';
+import { menuDi, menuDelloStratoAperto, paginaDelloStrato, statoDelloStrato, statoCronologia } from './helpers/menuContestuale.mjs';
 import { cronologiaPronta } from './helpers/cronologiaAppunti.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 test.use({ stratoDelMenu: true });
 
@@ -537,5 +538,114 @@ test.describe('il menu nello strato', () => {
     await page.evaluate(() => window.scrollBy(0, 200));
     await page.waitForTimeout(500);
     expect((await statoDelloStrato(app)).aperto, 'il menu della selezione resta aperto').toBe(true);
+  });
+
+  test('un collegamento scritto nella spiegazione si apre in una scheda nuova, come nel menu di oggi', async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    const dest = testServer.html('<!doctype html><title>Destinazione</title><p>ok</p>');
+    await fornitoreFinto(app);
+    await app.evaluate((_, d) => {
+      const finto = async ({ messages }) => {
+        const t = JSON.stringify(messages);
+        return { text: t.includes('ha selezionato un testo') ? `Vedi [la fonte](${d}) per saperne di più.` : 'ok', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      };
+      globalThis.SN_PROVIDERS.completeWithFallback = finto;
+      globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+    }, dest);
+    const page = await testServer.openReady(openTab, `<!doctype html><body style="font:18px sans-serif;padding:40px">
+      <p id="testo">Il fotone è la particella elementare della luce.</p></body>`, { pubblico: true });
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    const p = await page.evaluate(() => {
+      const t = document.getElementById('testo').firstChild;
+      const r = document.createRange();
+      r.setStart(t, 3);
+      r.setEnd(t, 9);
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    });
+    await page.mouse.click(p.x, p.y, { button: 'right' });
+    await apertoNelloStrato(app, page);
+    const link = menuDi(page).locator('.sn-menu-inline-explain a.filo-md-link', { hasText: 'la fonte' });
+    await expect(link).toBeVisible({ timeout: 8000 });
+    // Si vede che è un collegamento, come nella pagina.
+    expect(await link.evaluate((a) => getComputedStyle(a).textDecorationLine)).toContain('underline');
+    const urlSchede = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.map((t) => t.url));
+    await link.click();
+    await expect.poll(urlSchede, { timeout: 8000 }).toContain(dest);
+  });
+
+  test('un\'icona trascinata dalla barra laterale entra nel menu aperto, che resta aperto mentre la barra si usa', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;padding:40px;height:1400px">
+      <p id="p">Clic destro qui.</p></body>`);
+    const barra = await barraPage(app);
+    const mossa = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'screenshot', target: 'bar' }, {}));
+    expect(mossa && mossa.ok).toBe(true);
+    await expect.poll(async () => (await statoBarra(app)).bar).toContain('screenshot');
+    await page.locator('#p').click({ button: 'right' });
+    await apertoNelloStrato(app, page);
+    const riga = menuDi(page).locator('.sn-menu .sn-menu-row[data-sn-drop-target="primary"]').first();
+    await expect(riga).toBeVisible();
+    await comandaBarra(app, 'clic');
+    await pannelloFermo(barra);
+    // La barra aperta sta sopra lo strato: il puntatore la raggiunge.
+    expect((await statoDelloStrato(app)).inCima).toBe(true);
+    expect(await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const figli = w.contentView.children;
+      return figli[figli.length - 1] === w._filoTabs.barra.vista;
+    })).toBe(true);
+    const src = await barra.locator('#nav .ico[data-id="screenshot"]').boundingBox();
+    const dst = await riga.boundingBox();
+    const s = await statoBarra(app);
+    const alto = s.bounds.y - s.alto;
+    // Più di cinque secondi dopo il tasto destro: vale il gesto fatto nella barra.
+    await pausa(5500);
+    await barra.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+    await barra.mouse.down();
+    await barra.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
+    await barra.mouse.move(dst.x + dst.width - 20, dst.y + dst.height / 2 - alto, { steps: 10 });
+    await expect(menuDi(page).trascinamento).toHaveCount(1);
+    await barra.mouse.up();
+    await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('screenshot');
+    const dopo = await statoBarra(app);
+    expect([...dopo.primary, ...dopo.secondary]).toContain('screenshot');
+    await expect(menuDi(page).trascinamento).toHaveCount(0);
+    await expect(menuDi(page).principale.locator('[data-sn-icon-id="screenshot"]')).toHaveCount(1);
+  });
+
+  test('nella finestrella di accesso aperta da un sito il menu sta nel suo strato, e Incolla scrive nel campo', async ({ app, openTab, testServer }) => {
+    test.setTimeout(60_000);
+    await pronto(app);
+    const FINTA = 'https://login.sito-finto.it/login';
+    await app.evaluate(({ session, net }, html) => {
+      try { session.defaultSession.protocol.unhandle('https'); } catch (_) {}
+      session.defaultSession.protocol.handle('https', (req) => {
+        const u = new URL(req.url);
+        if (u.hostname + u.pathname === 'login.sito-finto.it/login') return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+        return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      });
+      globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
+    }, '<title>Accedi</title><body style="margin:20px"><input id="pw" type="password" style="width:200px"></body>');
+    await appunti(app, 'segreto-1054');
+    const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:40px">
+      <button id="b" style="width:200px;height:50px" onclick="window.open('${FINTA}', 'acc', 'width=500,height=400')">Accedi con</button></body>`);
+    await page.locator('#b').click();
+    let pop = null;
+    await expect.poll(() => Boolean(pop = app.windows().find((w) => { try { return w.url() === FINTA; } catch (_) { return false; } })), { timeout: 8000 }).toBe(true);
+    await pop.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await pop.locator('#pw').click({ button: 'right' });
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoStrato && w._filoStrato.stato().aperto)), { timeout: 5000 }).toBe(true);
+    // menu-dal-sito: lo script della finestrella non trova il menu nel suo documento.
+    expect(await pop.evaluate(() => document.documentElement.innerText)).not.toContain('Incolla');
+    let menu = null;
+    await expect.poll(async () => Boolean(menu = await menuDelloStratoAperto(app)), { timeout: 5000 }).toBe(true);
+    await menu.locator('.sn-menu-paste-main').click();
+    await expect(pop.locator('#pw')).toHaveValue('segreto-1054');
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoStrato && w._filoStrato.stato().aperto))).toBe(false);
   });
 });
