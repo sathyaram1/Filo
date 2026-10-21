@@ -1797,6 +1797,13 @@
   // testo tornato indietro, non ricerca. Una ricerca fallita non resta: «Cerca di nuovo» la rifà.
   const RICERCHE_MAX = 200;
   const ricerche = new Map();
+  const cerchePerIdentita = new Map();
+
+  function ricordaCerca(identita, cerca) {
+    cerchePerIdentita.delete(identita);
+    cerchePerIdentita.set(identita, cerca);
+    while (cerchePerIdentita.size > RICERCHE_MAX) cerchePerIdentita.delete(cerchePerIdentita.keys().next().value);
+  }
 
   function avviaRicerche(state) {
     if (!segnapostiAttivi()) return;
