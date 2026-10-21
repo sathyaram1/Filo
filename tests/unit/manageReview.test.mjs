@@ -1573,7 +1573,7 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   assert.deepEqual(MR.livelloL5(vecchia, lette).pannello.righe, []);
   // Senza l'ora dell'audit nessuna nota si può dire del cancello.
   assert.match(MR.livelloL5({ ...fb, livelli: {} }, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
-  assert.deepEqual(l5.pannello.azioni, ['rimanda', 'archivia']);
+  assert.deepEqual(l5.pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
   assert.equal(l5.fusione, 'senza');
   assert.ok(l5.pannello.righe.some((r) => r.etichetta === 'Quando'));
   assert.doesNotMatch(MR.segnoFermata(fb, lette).testo, /via libera/);
@@ -1582,7 +1582,7 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   const muta = MR.livelloL5({ status: 'design', statusReason: 'l5' }, lette);
   assert.match(muta.pannello.testo, /Nessuna richiesta di fusione è aperta/);
   assert.doesNotMatch(muta.pannello.testo, /ancora/);
-  assert.deepEqual(muta.pannello.azioni, ['rimanda', 'archivia']);
+  assert.deepEqual(muta.pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
   // Elenchi non letti: «nessuna richiesta» sarebbe un'ipotesi, e la lista non lo afferma.
   const presto = MR.livelloL5({ status: 'design', statusReason: 'l5' }, { fusioni: {} });
   assert.match(presto.pannello.testo, /non sono ancora arrivate/);
@@ -1618,6 +1618,30 @@ test('livelli L5 senza richiesta (#1556): la nota del server, con l’ora in UTC
   } finally {
     if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima;
   }
+});
+
+test('livelli L5: ferma al cancello senza richiesta viva, a elenchi letti, offre di riaprirla (#1040)', () => {
+  const fb = { _id: 'f1040', seq: 1040, status: 'design', statusReason: 'l5' };
+  const senza = MR.livelloL5(fb, { fusioniLette: true, fusioni: { pending: [], failed: [], recent: [] } });
+  assert.equal(senza.esito, 'bloccato');
+  assert.deepEqual(senza.pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  assert.match(senza.pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  // Elenchi non ancora arrivati (o computer non dell'owner): la riapertura non si offre.
+  assert.deepEqual(MR.livelloL5(fb, { fusioni: {} }).pannello.azioni, ['rimanda', 'archivia']);
+  // Scaduta o scartata è come mancante; approvata e fusa aspetta solo lo stato nuovo.
+  const scaduta = { id: 'r1', feedbackId: 'f1040', expired: true, used: false };
+  assert.deepEqual(MR.livelloL5(fb, { fusioniLette: true, fusioni: { recent: [scaduta] } }).pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  const fusa = { id: 'r2', feedbackId: 'f1040', used: true, outcome: 'merged' };
+  const dopo = MR.livelloL5(fb, { fusioniLette: true, fusioni: { recent: [fusa] } });
+  assert.deepEqual(dopo.pannello.azioni, []);
+  assert.match(dopo.pannello.testo, /Approvata e fusa/);
+  // Un lavoro anche sul server non si riapre da qui: lo ferma anche il cancello del server, che non apre richieste.
+  const server = MR.livelloL5({ ...fb, localOnly: { by: 'routine', at: 1 } }, { fusioniLette: true, fusioni: {} });
+  assert.deepEqual(server.pannello.azioni, ['rimanda', 'archivia']);
+  assert.match(server.pannello.testo, /un lavoro anche sul server/);
+  // Con la richiesta in attesa il pannello è quello di sempre.
+  const viva = { id: 'r3', feedbackId: 'f1040' };
+  assert.deepEqual(MR.livelloL5(fb, { fusioniLette: true, fusioni: { pending: [viva] } }).pannello.azioni, []);
 });
 
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {

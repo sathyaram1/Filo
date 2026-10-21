@@ -425,7 +425,13 @@ scritto approvando conta come risposta solo se è arrivato dopo lo stop; (4) fix
 dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
-stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
+stato il cancello, e c'è una richiesta di fusione in attesa (#1040: un blocco la
+cui richiesta non si registra è un guasto, non un `l5`, e una consegna di `l5`
+senza richiesta viva è respinta; se la richiesta poi scade o viene scartata, il
+quadrato offre «Chiedi di nuovo il via libera», che la riapre solo se la punta
+del ramo è ancora la versione esaminata dal cancello, altrimenti propone la
+coda; fa eccezione il lavoro server fermato dal cancello del server, che una
+richiesta non ce l'ha e si rimanda in lavorazione o si archivia); (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
 corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
 aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è

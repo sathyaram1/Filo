@@ -1491,6 +1491,7 @@
   const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
+  const MERGE_APPROVAL_RIAPRI = (window.SN_MSG?.MSG?.MERGE_APPROVAL_RIAPRI) || 'merge_approval_riapri';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
   const FEEDBACK_SENDER_FLAG = (window.SN_MSG?.MSG?.FEEDBACK_SENDER_FLAG) || 'feedback_sender_flag';
@@ -5526,6 +5527,7 @@
   // stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
   function pannelloFusione(fb, liv) {
     const UI = window.SN_MERGE_APPROVALS;
+    if (isAdmin && liv.pannello.azioni.includes('riapri_fusione')) return pannelloRiapriFusione(fb);
     const host = document.createElement('div');
     const ferme = Array.isArray(liv.richieste) ? liv.richieste : [];
     if (!UI || !ferme.length || !isAdmin) return host;
@@ -5574,6 +5576,74 @@
     esito.id = 'mgL5StradeEsito';
     esito.setAttribute('role', 'status');
     box.append(fila, esito);
+    return box;
+  }
+
+  // L'esito resta per pratica: la rilettura delle fusioni ridisegna il pannello, e la frase non deve sparire.
+  const RIAPRI_ESITI = {
+    aperta: { kind: 'ok', text: 'Richiesta riaperta. La approvi da qui.' },
+    conflitto: { kind: 'err', text: 'Il ramo non si fonde più con main. Rimettila in coda e le routine lo riallineano.', inCoda: true },
+    senza_ramo: { kind: 'err', text: 'Il ramo di questa pratica non c’è più. Rimettila in coda per rifare il lavoro.', inCoda: true },
+    non_ferma: { kind: 'ok', text: 'La pratica non è più ferma al cancello. Aggiorno la pagina.' },
+    usata: { kind: 'err', text: 'Per questa versione del ramo il sì l’hai già dato. Rimettila in coda per un giro nuovo.', inCoda: true },
+    lavoro_server: { kind: 'err', text: 'È un lavoro anche sul server, e da qui non si riapre. Rimandala in lavorazione o archiviala.', inCoda: true },
+    // Il sì vale solo per la versione che i controlli hanno letto: un ramo cambiato dopo rifà il giro.
+    mosso: { kind: 'err', text: 'Il ramo ha commit nuovi, arrivati dopo i controlli. Rimettila in coda così li rileggono.', inCoda: true },
+    senza_controllo: { kind: 'err', text: 'Non trovo la versione che i controlli hanno letto. Rimettila in coda per un giro nuovo.', inCoda: true },
+  };
+  const esitiRiapertura = new Map();
+  const riaperturaInVolo = new Set();
+
+  function pannelloRiapriFusione(fb) {
+    const id = fb._id;
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn';
+    btn.id = 'mgRiapriFusioneBtn';
+    btn.textContent = 'Chiedi di nuovo il via libera';
+    btn.title = 'Il server rifà i controlli sul ramo di questa pratica e riapre la richiesta, che poi approvi da qui.';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+    box.appendChild(btn);
+    box.appendChild(esito);
+
+    const mostra = () => {
+      const m = riaperturaInVolo.has(id) ? { kind: 'wait', text: 'Chiedo al server…' } : esitiRiapertura.get(id);
+      btn.disabled = riaperturaInVolo.has(id);
+      esito.dataset.kind = m ? m.kind : '';
+      esito.textContent = m ? m.text : '';
+      // Dopo un esito che chiede un giro nuovo, rifare la stessa domanda non serve: la strada è «Rimanda in
+      // lavorazione», fra le strade della fusione ferma qui sotto.
+      btn.className = m && m.inCoda ? 'sn-btn sn-btn-secondary' : 'sn-btn';
+    };
+    mostra();
+
+    btn.addEventListener('click', async () => {
+      if (riaperturaInVolo.has(id)) return;
+      riaperturaInVolo.add(id);
+      esitiRiapertura.delete(id);
+      mostra();
+      let m;
+      try {
+        const r = await sendToMain({ type: MERGE_APPROVAL_RIAPRI, feedbackId: id });
+        if (!r || r.ok === false) throw new Error((r && r.error) || 'Il server non ha riaperto la richiesta.');
+        m = RIAPRI_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+      } catch (e) {
+        m = { kind: 'err', text: e.message || 'Non riuscito.' };
+      } finally {
+        riaperturaInVolo.delete(id);
+      }
+      esitiRiapertura.set(id, m);
+      mostra();
+      toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+      // La richiesta nuova sta negli elenchi, una pratica che ha cambiato stato nel documento: si rilegge tutto.
+      // Riaperta, la frase serve finché la richiesta non è nel pannello: una scadenza futura non deve ritrovarla lì.
+      Promise.resolve(loadMergeApprovals()).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
+      if (m === RIAPRI_ESITI.non_ferma) refreshFromRemote({ force: true }).catch(() => {});
+    });
     return box;
   }
 
@@ -5652,7 +5722,10 @@
       try {
         const r = await sendToMain({ type: LIVELLO4_SALTA, feedbackId: fb._id });
         if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
-        const m = SALTA_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+        // Bloccata senza richiesta: la pratica resta sul controllo di sicurezza, e il via libera sul quadrato non c'è (#1040).
+        const m = (r.esito === 'bloccato' && !r.requestId)
+          ? { kind: 'err', text: 'Saltato, ma la richiesta per il tuo via libera non c’è. Il motivo è nella conversazione. Rilancia «Salta il controllo».' }
+          : SALTA_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
         esito.dataset.kind = m.kind;
         esito.textContent = m.text;
         toast(m.text, m.kind === 'ok' ? 'ok' : 'err');

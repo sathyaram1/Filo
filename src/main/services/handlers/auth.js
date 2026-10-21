@@ -1709,6 +1709,23 @@ module.exports = function register(on, ctx) {
     return { ok: true, result: 'discarded' };
   }));
 
+  on(MSG.MERGE_APPROVAL_RIAPRI, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca la pratica di cui chiedere la fusione.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerMergeApprovals', { op: 'riapri', feedbackId });
+    } catch (e) {
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Il server non ha riaperto la richiesta.' };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || 'Il server non ha riaperto la richiesta.' };
+    // Un esito sconosciuto passa com'è: la pagina lo scrive invece di inventarsi un successo.
+    const out = { ok: true, esito: String(r.esito || r.result || '') };
+    if (r.requestId) out.requestId = String(r.requestId);
+    return out;
+  }));
+
   // All'editor servono anche la catena in uso negli slot spostati mai salvati e
   // i nickname del registro condiviso, che il server dei giudici unisce al loro.
   async function perEditor(models) {

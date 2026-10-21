@@ -1744,6 +1744,7 @@
   // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
   const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta, quindi non c’è un via libera da dare.';
   const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
+  const L5_SERVER = 'È un lavoro anche sul server. Qui non c’è una richiesta da approvare, e da qui non se ne riapre una. Il motivo dello stop è nella conversazione. Rimandala in lavorazione per farla rifare, o archiviala.';
   const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
   // La nota è del cancello solo se è nata dopo l'audit, che viene subito prima: un report o una domanda di un giro
   // passato non passa per il motivo della fermata. Al minuto, perché i marcatori portano solo i minuti. Il marcatore
@@ -1766,12 +1767,15 @@
     // Senza gli elenchi letti «nessuna richiesta» sarebbe un'ipotesi: la frase lo dice, e la lista resta generica.
     const lette = !!(opts && opts.fusioniLette);
     const righe = nota && nota.ts ? [riga('Quando', istanteDelTurno(nota.ts))] : [];
-    const generica = lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI;
+    // Un lavoro anche sul server lo ferma pure il cancello del server, che non apre richieste: da qui non si riapre.
+    const server = lette && isLocalOnly(fb);
+    const generica = server ? L5_SERVER : lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI;
     return forma('l5', 'quadrato', 'Fusione', 'attack', 'bloccato', {
       titolo: 'Fusione',
       righe,
       testo: (nota && nota.body) || (cifrata ? `${generica} ${L5_NOTA_CIFRATA}` : generica),
-      azioni: ['rimanda', 'archivia'],
+      // A elenchi letti, una pratica senza richiesta viva (mai registrata, scaduta, scartata) si può riaprire (#1040).
+      azioni: (lette && !server ? ['riapri_fusione'] : []).concat(['rimanda', 'archivia']),
     }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
   }
 
@@ -1798,7 +1802,19 @@
     // Una fusione approvata che non è avvenuta (conflitto) pesa quanto una
     // richiesta ferma: è un sì già dato che non ha prodotto niente.
     const ferme = failed.concat(pending);
-    if (!ferme.length && fermaDaStato) return l5SenzaRichiesta(fb, opts);
+    if (!ferme.length && fermaDaStato) {
+      // Una richiesta approvata e fusa lascia la pratica qui finché non arriva lo stato nuovo: non è da riaprire.
+      const fusa = lista('recent').some((r) => r.used === true && r.outcome === 'merged');
+      if (fusa) {
+        return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
+          titolo,
+          righe: [],
+          testo: 'Approvata e fusa: la pratica esce da qui appena arriva il suo stato nuovo.',
+          azioni: [],
+        }, { richiesta: null, richieste: [], conflitto: false });
+      }
+      return l5SenzaRichiesta(fb, opts);
+    }
     if (ferme.length) {
       const req = ferme[0];
       const inConflitto = failed.length > 0;

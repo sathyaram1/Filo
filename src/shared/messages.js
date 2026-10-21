@@ -749,6 +749,8 @@
     MERGE_APPROVALS_GET: 'merge_approvals_get',        // → { ok, pending:[…], failed:[…], recent:[…], ttlMs } | { ok:false, error }
     MERGE_APPROVAL_APPROVE: 'merge_approval_approve',  // { id } → { ok, result:'merged'|'conflict'|'stale', sha?, headSha?, realigned?:{from,to,mainSha}, newRequest?, newBlocks?, realignReason?, reason? } | { ok:false, error }
     MERGE_APPROVAL_DISCARD: 'merge_approval_discard',  // { id } → { ok, result:'discarded' } | { ok:false, error }
+    // Una pratica ferma al cancello (design/l5) senza una richiesta viva: se la punta è ancora la versione esaminata, il server rifà L5 e la riapre legata a lei.
+    MERGE_APPROVAL_RIAPRI: 'merge_approval_riapri',    // { feedbackId } → { ok, esito:'aperta'|'conflitto'|'senza_ramo'|'non_ferma'|'usata'|'lavoro_server'|'mosso'|'senza_controllo', requestId? } | { ok:false, error }
     // L'owner ha letto la bocciatura dell'audit di sicurezza (L4) e decide di
     // andare avanti lo stesso. Non è un via libera cieco: il cancello di
     // fusione (L5) resta, e parte subito dopo — l'esito dice se il ramo è
