@@ -131,8 +131,23 @@ test('un link pulito che rimanda a un sito bloccato: Filo si ferma al rinvio e l
   expect(rete.arrivate).toEqual(['/rinvio-pulito.test/vai']);
 });
 
+test('un\'immagine che fa da link verso un sito della lista: nessuna richiesta, e sopra la descrizione il menu dice che è in lista', async ({ app, shell, openTab, testServer }) => {
+  await preparaMain(app, rete.port);
+  await lista(shell, ['sito-bloccato.test']);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px">
+    <a href="https://sito-bloccato.test/offerta"><img id="banner" src="${PX}" width="320" height="160" style="background:#e07b39" alt="Offerta"></a>
+  </body></html>`, { pubblico: true });
+  await page.locator('#banner').click({ button: 'right' });
+  const sezione = menuDi(page).locator('.sn-menu .sn-menu-inline[data-subject="image"]');
+  await expect(sezione.locator('.sn-menu-link-nota')).toHaveText(/sito-bloccato\.test.*nella tua lista dei siti bloccati/, { timeout: 8000 });
+  await expect(menuDi(page).voce('Apri in nuova tab')).toBeVisible();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'tests/.shots/1307-immagine-link-bloccato.png' });
+  expect(rete.arrivate).toEqual([]);
+});
+
 // #725.6 e #725.7 — le altre forme di un collegamento: la zona di una mappa d'immagine e il link di un disegno SVG.
-const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const PX ='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 test('la zona di una mappa d\'immagine verso un sosia: voci del link e dell\'immagine, e l\'avviso d\'imitazione', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:24px">
