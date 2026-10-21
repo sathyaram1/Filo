@@ -392,6 +392,14 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  // I token SCRITTI in cache (i modelli coi punti espliciti): con le letture dicono se la cache scatta davvero.
+  function cacheWriteTokens(usage) {
+    if (!usage || typeof usage !== 'object') return 0;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || {};
+    const n = Number(d.cache_write_tokens != null ? d.cache_write_tokens : d.cacheWriteTokens);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
   // Chi ha DAVVERO servito la risposta (#421). OpenRouter lo riporta a livello di
   // risposta come `provider`; per robustezza guardiamo anche dentro la choice.
   function extractServedBy(obj) {
