@@ -1739,6 +1739,40 @@ function emitHalt(kind, message) {
   return { exit: 3 };
 }
 
+/** Il motivo di un errore imprevisto, da ricopiare dentro `--guasto "…"`: una riga, senza virgolette né `$`. PURA. */
+export function motivoFatale(e) {
+  const testo = unaRiga((e && e.message) || e || 'errore senza messaggio').replace(/["`$\\]/g, "'").slice(0, 300);
+  return `errore imprevisto di dispatch: ${testo}`;
+}
+
+/** Il testo del guasto quando nemmeno quello di halt si compone (il pezzo condiviso che manca può mancare anche lì). PURA. */
+export function istruzioniGuastoDiRiserva(motivo, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs')) {
+  const c = String(canale).split('\\').join('/');
+  return [
+    '# Ruolo: halt, guasto: non si può lavorare',
+    '',
+    'Dispatch si è fermato per un errore che non aveva previsto (`message` nel payload) e non è riuscito a comporre il testo del guasto. Non c\'è niente da eseguire. Registra due cose, in quest\'ordine, col biglietto con cui sei partito:',
+    '',
+    `- la domanda di fine sessione dell'owner: \`node "${c}" domanda --biglietto <biglietto>\` la stampa insieme al comando per rispondere, col testo da stdin fra due righe \`FINE\`; se non arriva (exit diverso da 0), vai avanti;`,
+    `- il guasto, nel rilascio: \`node "${c}" release <biglietto> --role halt --guasto "${motivo}"\`.`,
+    '',
+    'Poi termina la sessione senza ritentare: con una causa fissa i tentativi morirebbero in fila.',
+  ].join('\n');
+}
+
+/** Un errore imprevisto esce come il guasto dichiarato, con domanda di fine sessione e rilascio (#1205.1). */
+function emitFatale(e) {
+  process.stderr.write(`[dispatch] errore fatale: ${(e && e.message) || e}\n`);
+  const motivo = motivoFatale(e);
+  try { return emitHalt('transient', motivo); } catch (e2) {
+    process.stderr.write(`[dispatch] nemmeno il testo del guasto si compone (${(e2 && e2.message) || e2}): stampo quello di riserva\n`);
+  }
+  try { clearRole(ROOT); } catch (_) { /* il marcatore resta: conta di più che il guasto arrivi */ }
+  const out = { role: 'halt', payload: { kind: 'transient', message: motivo }, claim: null, instructions: istruzioniGuastoDiRiserva(motivo) };
+  process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+  return { exit: 3 };
+}
+
 export async function run() {
   // Niente controllo dell'interruttore master qui: lo guarda il preflight
   // (prima del setup) e lo applica il SERVER, che da spento non emette

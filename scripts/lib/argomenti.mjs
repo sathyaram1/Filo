@@ -218,7 +218,7 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], ripetib
       const nome = arg.split('/').pop().toLowerCase();
       return `«${arg}» è la tua opzione /${nome} trasformata in percorso dalla conchiglia — non ho toccato niente. Scrivila --${nome}.`;
     }
-    if (!sembraOpzione(arg)) continue;
+    if (!sembraOpzioneNelReport(arg)) continue;
     // `--opzione=valore` è la forma che regge quando la riga passa da npm:
     // qui vale come opzione col suo valore, non come un nome sconosciuto.
     const uguale = arg.indexOf('=');
@@ -254,7 +254,7 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], ripetib
     }
     if (vuole.has(forma)) {
       const dopo = lista[i + 1];
-      if (dopo === undefined || sembraOpzione(dopo)) {
+      if (dopo === undefined || sembraOpzioneNelReport(dopo)) {
         return `l'opzione ${forma} vuole un valore dopo di sé — non ho toccato niente.`;
       }
       const due = doppia(forma);
@@ -268,7 +268,7 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], ripetib
   if (senzaParoleLibere) {
     for (let i = 0; i < lista.length; i += 1) {
       const arg = lista[i];
-      if (sembraOpzione(arg)) {
+      if (sembraOpzioneNelReport(arg)) {
         if (vuole.has(normalizza(arg)) && !arg.includes('=')) i += 1; // il valore è suo
         continue;
       }
