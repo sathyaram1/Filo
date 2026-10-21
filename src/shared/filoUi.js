@@ -209,10 +209,24 @@
   function selezioneDi(c) {
     try { return [c.selectionStart, c.selectionEnd]; } catch (_) { return null; }
   }
+  // Annulla e rifai riportano la casella a un testo che ha già avuto: si tengono quelli buoni, fino a un tetto di caratteri
+  // largo (l'annulla del browser non va molto più indietro). Un testo che non c'è mai stato l'ha scritto il sito (#1340).
+  const TETTO_STORIA = 2_000_000;
+  function vale(st, v) {
+    st.buono = v;
+    if (st.storia.has(v)) { st.storia.delete(v); st.storia.add(v); return; }
+    st.storia.add(v);
+    st.caratteri += v.length;
+    while (st.caratteri > TETTO_STORIA && st.storia.size > 1) {
+      const vecchio = st.storia.values().next().value;
+      st.storia.delete(vecchio);
+      st.caratteri -= vecchio.length;
+    }
+  }
   function scrittaDaFilo(c) {
     const st = caselle.get(c);
     if (!st) return;
-    st.buono = c.value;
+    vale(st, c.value);
     st.sel = selezioneDi(c);
     fotografa(c, st);
   }
