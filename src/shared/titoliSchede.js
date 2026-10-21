@@ -97,7 +97,7 @@
     FINE_SEGMENTO: R`(?=\s*(?:$|[|•·]|[-–—]\s))`,
     PRECEDENTI: R`(?:precedenti|di prima|anteriores|precedentes|previous|above|earlier|vorherigen|ricevute|originali|originales|bisherigen)`,
     // Senza un indirizzo a cui mandarli, «i file dell'utente» sono una guida per chi amministra: qui solo i segreti.
-    SEGRETI_VERI: R`(?:password|passwords|credenziali|credentials|credenciales|identifiants|zugangsdaten|codici|codes|codigos|cookies?|token|tokens|chiavi|keys|api keys?|pin|iban)`,
+    SEGRETI_VERI: R`(?:password|passwords|passwort|passworter|mot de passe|mots de passe|contrasenas?|credenziali|credentials|credenciales|identifiants|zugangsdaten|codici|codes|codigos|cookies?|token|tokens|chiavi|keys|api keys?|pin|iban)`,
     SEGRETI: R`(?:password|passwords|credenziali|credentials|credenciales|identifiants|zugangsdaten|codici|codes|codigos|cookies?|token|tokens|chiavi|keys|api keys?|e-?mails?|mail|messaggi|messages|mensajes|nachrichten|contatti|contacts|contactos|kontakte|documenti|documents|files?)`,
   });
 
