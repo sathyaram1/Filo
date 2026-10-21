@@ -3,7 +3,7 @@
 // Regole: patterns/la-shell-non-disegna-sopra-la-pagina.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu, puntatoreCheSegue } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
