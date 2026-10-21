@@ -557,7 +557,7 @@
         return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
       }
       if (statusReason === 'l5') {
-        return { text: 'Il ramo è fermo al cancello di fusione: aspetta il tuo via libera.', color: REASONS.l5.color };
+        return { text: 'Il ramo è fermo al cancello di fusione. Decidi tu nel quadrato.', color: REASONS.l5.color };
       }
       if (statusReason === 'origine_bloccata') {
         return { text: `Fermo perché ${origineText(fb)} è stato bloccato: decidi tu.`, color: REASONS.origine_bloccata.color };
@@ -1740,10 +1740,45 @@
     return !!num && num === numeroOf(fb);
   }
 
+  // Fermata al cancello senza una richiesta da approvare (#1556): il motivo è la nota con cui il server l'ha fermata,
+  // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
+  const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta, quindi non c’è un via libera da dare.';
+  const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
+  const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
+  // La nota è del cancello solo se è nata dopo l'audit, che viene subito prima: un report o una domanda di un giro
+  // passato non passa per il motivo della fermata. Al minuto, perché i marcatori portano solo i minuti. Il marcatore
+  // è nell'ora di chi scrive, senza fuso: il server scrive in UTC, gli strumenti dell'owner nella sua ora, e l'audit
+  // ha il fuso. Vale quindi la lettura più tarda delle due, o in Italia la nota del server sembra nata prima.
+  function notaDelCancello(fb) {
+    const nota = ultimaDomanda(fb);
+    const l4 = livelliOf(fb).l4;
+    const audit = Date.parse(String((l4 && l4.at) || ''));
+    const locale = nota && Date.parse(istanteDelTurno(nota.ts) || '');
+    if (!nota || !Number.isFinite(audit) || !Number.isFinite(locale)) return null;
+    const scritta = Math.max(locale, locale - new Date(locale).getTimezoneOffset() * 60000);
+    const minuto = (t) => Math.floor(t / 60000);
+    return minuto(scritta) >= minuto(audit) ? nota : null;
+  }
+  function l5SenzaRichiesta(fb, opts) {
+    const letto = !(opts && opts.dettaglioLetto === false);
+    const cifrata = letto && valueUnreadable(fb && fb.notes);
+    const nota = letto && !cifrata ? notaDelCancello(fb) : null;
+    // Senza gli elenchi letti «nessuna richiesta» sarebbe un'ipotesi: la frase lo dice, e la lista resta generica.
+    const lette = !!(opts && opts.fusioniLette);
+    const righe = nota && nota.ts ? [riga('Quando', istanteDelTurno(nota.ts))] : [];
+    const generica = lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI;
+    return forma('l5', 'quadrato', 'Fusione', 'attack', 'bloccato', {
+      titolo: 'Fusione',
+      righe,
+      testo: (nota && nota.body) || (cifrata ? `${generica} ${L5_NOTA_CIFRATA}` : generica),
+      azioni: ['rimanda', 'archivia'],
+    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
+  }
+
   /**
    * Livello 5: il cancello di fusione. Le richieste arrivano dal server
    * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
-   * `opts.fusioni` = { pending, failed, preapproved, recent }. PURA.
+   * `opts.fusioni` = { pending, failed, preapproved, recent }; `opts.fusioniLette` = l'ultima lettura è riuscita. PURA.
    */
   function livelloL5(fb, opts) {
     const titolo = 'Fusione';
@@ -1763,14 +1798,7 @@
     // Una fusione approvata che non è avvenuta (conflitto) pesa quanto una
     // richiesta ferma: è un sì già dato che non ha prodotto niente.
     const ferme = failed.concat(pending);
-    if (!ferme.length && fermaDaStato) {
-      return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
-        titolo,
-        righe: [],
-        testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
-        azioni: [],
-      }, { richiesta: null, richieste: [], conflitto: false });
-    }
+    if (!ferme.length && fermaDaStato) return l5SenzaRichiesta(fb, opts);
     if (ferme.length) {
       const req = ferme[0];
       const inConflitto = failed.length > 0;
@@ -1893,7 +1921,8 @@
       const l5 = livelloL5(fb, opts);
       return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
         ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
-        : 'Fermo al cancello di fusione: aspetta il tuo via libera');
+        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta aperta. Decidi tu se rifarlo o archiviarlo'
+          : 'Fermo al cancello di fusione: aspetta il tuo via libera');
     }
     // Chi aspetta una domanda sta In coda col suo segno: non è un fermo dei Ricevuti.
     if (aspettaDomanda(fb)) return null;
