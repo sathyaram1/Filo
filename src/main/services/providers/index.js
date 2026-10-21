@@ -176,7 +176,7 @@
         const r = await withNetworkRetry(
           () => Promise.resolve(getProvider(a.provider).streamComplete({
             apiKey: a.apiKey, model: aModel, reasoning: a.reasoning, maxTokens: a.maxTokens,
-            providerRouting: a.providerRouting, messages, tools, toolChoice, signal,
+            providerRouting: a.providerRouting, messages, cache, tools, toolChoice, signal,
             onDelta: onDelta ? (d) => { emitted = true; onDelta(d); } : onDelta,
             onReasoning: onReasoning ? (t) => { emitted = true; onReasoning(t); } : onReasoning,
             onToolCall: onToolCall ? (c) => { emitted = true; onToolCall(c); } : onToolCall,
