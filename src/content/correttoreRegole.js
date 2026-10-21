@@ -558,6 +558,6 @@
     REGIONE_MAX, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
     senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, frasiDaGiudicare,
     leggiRighe, trovaUnaVolta, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, segnaposti, xDelPezzo,
-    valoreTrovato,
+    valoreTrovato, chiaveRicerca,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
