@@ -843,6 +843,8 @@ class BarraLaterale {
     const x = (vb.x + numero(dati.x) - tb.x) / zoom;
     const y = (vb.y + numero(dati.y) - tb.y) / zoom;
     const tipo = globalThis.SN_MSG?.MSG?.BARRA_FUORI || 'barra_fuori';
+    // Col menu nello strato (#1054) la posa è una voce dello strato: vale per il gesto fatto qui.
+    try { this.tabs.strato?.gestoDallaBarra?.(); } catch (_) {}
     try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, fase, id, x, y }); } catch (_) {}
   }
 
