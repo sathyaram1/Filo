@@ -211,9 +211,10 @@
       const end = start + g.length;
       if ((g.match(/x/gi) || []).length < 2 || /x\d/i.test(g)) continue;
       if (fuori.some(([a, b]) => start < b && end > a)) continue;
+      const nudo = g.replace(/[.,'’]/g, '');
       if (/\d/.test(g)) {
-        if (!/^[\d.,'’]*\d[\d.,'’]*x+$/i.test(g.split(/[.,'’]/).filter(Boolean).map((p) => p).join('') ? g.replace(/[.,'’]/g, '') : g)) continue;
-      } else if (/X/.test(g) || g.replace(/[.,'’]/g, '').length > 6 || !numeroAttorno(testo, start, end)) continue;
+        if (!/^\d+x+$/i.test(nudo)) continue;
+      } else if (/X/.test(g) || nudo.length > 6 || !numeroAttorno(testo, start, end)) continue;
       out.push(segno(testo, start, end, {
         segno: 'suggerimento', fonte: 'segnaposto', tipo: 'segnaposto', motivo: t('spell_segnaposto_forse'),
       }));
