@@ -2522,10 +2522,14 @@
     // muovono) e vale solo nei primi minuti di vita di un profilo. Metterlo
     // sopra la frontiera farebbe ripagare l'intero manuale di istruzioni a
     // ogni chat di ogni utente, per sempre.
-    filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax }) =>
+    // Rifatta, «è appena arrivato» era falso: a chi si presentava come il creatore di Filo rispondeva «buona fortuna col test!» (#1398).
+    filoChatOnboarding: ({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) =>
       (!onboarding ? '' :
         `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
-        + `È appena arrivato su Filo e questa è la sua prima conversazione. Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
+        + (onboardingRifatta
+          ? `Ha già usato Filo e ha chiesto di rifare l'intervista di benvenuto: è una conversazione a sé, non il seguito delle altre. `
+          : `È appena arrivato su Filo e questa è la sua prima conversazione. `)
+        + `Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
         + `- UNA cosa per volta. Mai due domande nello stesso messaggio, mai una domanda e un annuncio insieme.\n`
         + `- L'ordine lo decide la conversazione, non l'elenco: aggancia quello che l'utente ha appena detto.\n`
