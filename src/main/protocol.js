@@ -94,6 +94,9 @@ async function filoHandler(request) {
       return new Response('Forbidden', { status: 403 });
     }
 
+    const spostato = indirizzoSpostato(host, rel);
+    if (spostato) return new Response(null, { status: 302, headers: { Location: spostato } });
+
     let fsPath;
     if (host === 'shell') {
       fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
