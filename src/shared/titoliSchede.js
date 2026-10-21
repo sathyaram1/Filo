@@ -287,7 +287,8 @@
     const coppie = pezzi.length ? unito.replace(/(?<![\p{L}\p{N}])([\p{L}\p{N}]) ([\p{L}\p{N}])(?![\p{L}\p{N}])/gu, '$1$2') : unito;
     const spaziato = coppie.replace(/[_*~^+=]+/g, ' ');
     const letture = new Set([pulisci(b), pulisci(unito), pulisci(spaziato), pulisci(sciogliLeet(spaziato, 'i')), pulisci(sciogliLeet(spaziato, 'l')),
-      pulisci(separatoriComeSpazi(spaziato)), pulisci(grezzo.replace(DENTRO_PAROLA, '').replace(VUOTO_RE, ' '))]);
+      pulisci(separatoriComeSpazi(spaziato)), pulisci(grezzo.replace(DENTRO_PAROLA, '').replace(VUOTO_RE, ' ')),
+      pulisci(b.replace(CONFINI, ' | '))]);
     // I tag si leggono come testo, ma il riepilogo li toglie: dentro una parola, per il modello non ci sono.
     if (CON_TAG.test(k)) {
       const senzaTag = base(k.replace(TAG, ''));
