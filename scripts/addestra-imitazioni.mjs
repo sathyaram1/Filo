@@ -176,13 +176,12 @@ function sinteticiParole(etichetta) {
     const forme = t.length <= 4 ? [(w) => `${w}-${t}`, (w) => `${t}-${w}`]
       : [(w) => `${w}-${t}`, (w) => `${t}-${w}`, (w) => w + t, (w) => t + w];
     const propri = b.domains.filter((d) => d.startsWith(t + '.')).map((d) => d.slice(t.length + 1));
-    for (const forma of forme) {
-      // Un marchio che è anche una parola ha contro di sé tutte le parole vere che lo contengono (imposte, pineapple).
-      for (let k = 0, n = MARCHI_PAROLA.has(t) ? 2 * PER_FORMA : PER_FORMA; k < n; k++) {
-        const h = `${forma(pesca(parole))}.${pesca(k === 0 && propri.length ? propri : SUFFISSI_SOSIA)}`;
-        if (LEGIT_DOMAINS.has(h) || etichetta.has(h) || etichetta.has('www.' + h)) continue;
-        out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_PAROLE });
-      }
+    // Ogni parola con ogni marchio: un marchio che è anche una parola ha contro di sé tutte le parole vere che lo
+    // contengono (imposte, pineapple), e con poche parole a caso il modello imparava quelle, non la forma.
+    for (const w of parole) {
+      const h = `${pesca(forme)(w)}.${pesca(propri.length && caso() < 0.3 ? propri : SUFFISSI_SOSIA)}`;
+      if (LEGIT_DOMAINS.has(h) || etichetta.has(h) || etichetta.has('www.' + h)) continue;
+      out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_PAROLE });
     }
   }
   return out;
