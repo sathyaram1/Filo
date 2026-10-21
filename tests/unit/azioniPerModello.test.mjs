@@ -10,7 +10,8 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const SHARED = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared');
 for (const f of ['capabilities.js', 'constants.js', 'contenutoEsterno.js', 'preferences.js', 'themeTokens.js',
-  'cmdClassify.js', 'zoomPagina.js', 'actionLevels.js', 'azioniPerModello.js']) require(join(SHARED, f));
+  'cmdClassify.js', 'zoomPagina.js', 'actionLevels.js', 'azioniPerModello.js', 'filoContesto.js']) require(join(SHARED, f));
+const Contesto = require(join(SHARED, '..', 'main', 'services', 'contestoFilo.js'));
 
 const A = globalThis.SN_AZIONI_PER_MODELLO;
 const E = globalThis.SN_ESTERNO;
@@ -86,4 +87,25 @@ test('un testo salvato che imita la nota resta nel recinto, e la nota vera è un
 test('il prompt della chat dice che dei popup si sa solo quello che dicono gli esiti', () => {
   const statico = globalThis.SN_CONST.PROMPTS.filoChatStatic({ capacita: 'x', sistema: 'linux' });
   assert.match(statico, /Dei popup sai solo quello che ti dicono gli esiti: non dire che uno è doppio, tornato o già chiuso/);
+});
+
+// Nel filo gli esiti di un turno arrivano dalla scheda solo se ne ha: una lezione fissata non ha `_output`, e il sì
+// dato nel popup si perdeva, così al turno dopo il modello non sapeva se l'utente l'aveva confermata.
+test('una conferma senza esito da leggere arriva comunque al modello dal filo', () => {
+  const ts = '2026-10-07T11:00:00.000Z';
+  const chatMsgs = [
+    { role: 'user', chat: 'c1', ts: '2026-10-07T10:59:00.000Z', text: 'ricordati che sviluppo Filo' },
+    { role: 'filo', chat: 'c1', ts, text: 'Me lo segno, se mi dai l\'OK.' },
+  ];
+  const storia = [
+    { role: 'user', text: 'ricordati che sviluppo Filo' },
+    { role: 'filo', text: 'Me lo segno, se mi dai l\'OK.', actions: [{ type: 'SALVA_LEZIONE', testo: LEZIONE, _confirmed: true, _executed: true }] },
+  ];
+  const e = Contesto.esitiDellaScheda(storia, chatMsgs).get(`c1|${ts}`);
+  assert.ok(e, 'la conferma della scheda non arriva al filo');
+  const r = A.confermate(e.azioni);
+  assert.match(r, /ha CONFERMATO/);
+  assert.match(r, NON_SCRIVERLO);
+  storia[1].actions[0] = { type: 'SALVA_LEZIONE', testo: LEZIONE, _confirm: true };
+  assert.equal(Contesto.esitiDellaScheda(storia, chatMsgs).size, 0, 'una lezione ancora in attesa non è un esito');
 });
