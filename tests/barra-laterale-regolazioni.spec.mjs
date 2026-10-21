@@ -33,7 +33,13 @@ test('da Preferenze: l\'attesa sul bordo, la chiusura, la striscia e l\'apertura
   const sito = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await expect(barra.locator('html.senza-striscia')).toHaveCount(1);
-  // Con 900 ms di attesa, dopo mezzo secondo sul bordo è ancora chiusa; poco dopo si apre, e resta aperta.
+  // Con 900 ms di attesa, dopo mezzo secondo sul bordo è ancora chiusa; poco dopo si apre, e resta aperta
+  // anche dove il pannello dice «dentro» in ritardo (una macchina carica: #1216.2).
+  await app.evaluate(({ BrowserWindow }) => {
+    const b = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.barra;
+    const m = b._messaggio.bind(b);
+    b._messaggio = (c, d) => (c === 'barra:dentro' ? setTimeout(() => m(c, d), 300) : m(c, d));
+  });
   await puntatoreCheSegue(app);
   await barra.mouse.move(1, 300);
   await pausa(500);
