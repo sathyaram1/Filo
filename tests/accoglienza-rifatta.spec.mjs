@@ -272,6 +272,27 @@ test.describe('utente già accolto', () => {
     await expect(home.locator('#onbNotice')).toBeHidden();
   });
 
+  test('con l’intervista rifatta a metà, quello che si scrive in una home che non la mostra è una chat nuova, non una risposta all’intervista', async ({ app, shell, openTab }) => {
+    test.setTimeout(150_000);
+    await pronta(app, shell);
+    const prefs = await openTab('filo://preferences/preferences.html');
+    await prefs.locator('#restartOnboarding').click();
+    const intervista = await newtabPage(app, 1);
+    await expect(intervista.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await queueChat(app, { text: 'Piacere Anna. Come vuoi che ti scriva?', actions: [] });
+    await scrivi(intervista, 'sono Anna, insegno lettere');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Come vuoi che ti scriva' })).toBeVisible({ timeout: 30_000 });
+    await intervista.goto('filo://newtab/');
+    await expect(intervista.locator('#onbNotice')).toBeVisible({ timeout: 15_000 });
+    await intervista.waitForTimeout(1_000);
+
+    await queueChat(app, { text: 'Sole e 20 gradi.', actions: [] });
+    await scrivi(intervista, 'che tempo fa domani?');
+    await expect(intervista.locator('.dash-bubble-filo', { hasText: 'Sole e 20 gradi' })).toBeVisible({ timeout: 30_000 });
+    expect(await app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1])).not.toContain('DA SCOPRIRE');
+    expect(JSON.stringify((await onbState(app)).thread)).not.toContain('che tempo fa');
+  });
+
   test('«No, va bene così» su un’intervista rifatta rimasta a metà la chiude, e la riga non torna', async ({ app, shell, openTab }) => {
     test.setTimeout(150_000);
     const home = await pronta(app, shell);
