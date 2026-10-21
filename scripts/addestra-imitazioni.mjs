@@ -348,7 +348,7 @@ function costruisci() {
     } else gruppi.push({ h, y, fonte, ix: es.map((e) => indici(e.feats, mask)) });
     // Un'etichetta scritta vale più di una riga di un elenco, che può sbagliare.
     if (fonte === 'mano') gruppi[gruppi.length - 1].peso = PESO_MANO;
-    if (fonte === 'sintetico') gruppi[gruppi.length - 1].peso = PESO_SINTETICI;
+    if (fonte === 'sintetico') gruppi[gruppi.length - 1].peso = peso || PESO_SINTETICI;
   };
   const utili = conCandidati(etichetta);
   for (const [h, y] of etichetta) if (utili.has(h) && !scritte.has(h)) aggiungi(h, y, null, 'elenco');
