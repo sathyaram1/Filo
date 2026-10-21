@@ -28,6 +28,8 @@ const DIFFERENZE = {
     'src/content/riquadroRotto.js': 'riquadri di altri siti rotti dai cookie: le pagine interne non ne hanno',
     'src/shared/campoAccesso.js': 'campi di accesso dei siti a cui proporre l\'email: le pagine interne sono di Filo',
     'src/content/propostaEmail.js': 'l\'email dell\'account proposta nei campi di accesso: niente proposte sulle pagine di Filo',
+    'src/shared/menuDescritto.js': 'il menu come dati per lo strato sopra la scheda: sulle pagine di Filo resta nella pagina',
+    'src/content/menuNelloStrato.js': 'il menu nello strato sopra la scheda: sulle pagine di Filo resta nella pagina',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',

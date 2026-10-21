@@ -762,6 +762,12 @@ try {
   } catch (_) {}
   try { Object.defineProperty(window, PRELOAD_PROPRIO, { value: true }); } catch (_) {}
   segui(window);
+  // Il menu del tasto destro si disegna nello strato sopra la scheda (#1054)? Lo dice il main, una volta per riquadro.
+  let stratoMenu = null;
+  globalThis.SN_STRATO_MENU_ACCESO = () => {
+    if (stratoMenu === null) { try { stratoMenu = ipcRenderer.sendSync('filo:strato-menu') === true; } catch (_) { stratoMenu = false; } }
+    return stratoMenu;
+  };
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
   globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
 } catch (_) {}
@@ -908,6 +914,8 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
+  try { require(path.join(SHARED_DIR, 'menuDescritto.js')); } catch (e) { console.error('[Filo CS] menuDescritto', e); } // #1054 — il menu come dati per lo strato
+  try { require(path.join(CONTENT_DIR, 'menuNelloStrato.js')); } catch (e) { console.error('[Filo CS] menuNelloStrato', e); } // #1054 — DOPO menu.js, PRIMA di chi lo usa
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js

@@ -464,6 +464,8 @@ class TabManager {
         const t = schedaDavanti();
         return t && t.view && !this._attivaNascosta ? t.view.getBounds() : null;
       },
+      scheda: (wc) => { const t = this.tabs.find((x) => x.view && x.view.webContents === wc); return t ? { id: t.id, url: t.url } : null; },
+      barra: () => this.barra || null,
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
@@ -3114,7 +3116,7 @@ class TabManager {
     // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
     // content script perché li mostri nel menu di correzione custom.
     wc.on('context-menu', (_e, params) => {
-      if (this.strato.acceso) this.strato.mostra(wc, { x: params.x, y: params.y });
+      if (this.strato.acceso) this.strato.segnaClic(wc, params);
       if (params.misspelledWord) {
         // #405 — il click destro può essere avvenuto dentro un riquadro
         // incorporato (iframe): il menu di correzione lo costruisce il content
@@ -3346,6 +3348,7 @@ class TabManager {
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
     MenuDiRiserva.segui(pwc);
+    this._stratoNellaFinestrella(win, pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
@@ -3410,6 +3413,24 @@ class TabManager {
     });
     pwc.on('did-create-window', (child) => this._hardenAuthPopup(child, origine));
     this._sbGuardaFinestrella(win, origine);
+  }
+
+  // La finestrella è una pagina del sito come una scheda: il suo menu del tasto destro sta nel suo strato (#1054), mai
+  // nel documento, che è proprio quello dove si incollano le password.
+  _stratoNellaFinestrella(win, pwc) {
+    const strato = new StratoDelMenu(win, {
+      schedaAttiva: () => (pwc.isDestroyed() ? null : pwc),
+      area: () => {
+        if (win.isDestroyed()) return null;
+        const [width, height] = win.getContentSize();
+        return { x: 0, y: 0, width, height };
+      },
+      scheda: (wc) => (wc === pwc && !pwc.isDestroyed() ? { id: `finestrella-${pwc.id}`, url: pwc.getURL() } : null),
+    });
+    if (!strato.acceso) return;
+    win._filoStrato = strato;
+    pwc.on('context-menu', (_e, params) => strato.segnaClic(pwc, params));
+    win.on('resize', () => strato.posa());
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
