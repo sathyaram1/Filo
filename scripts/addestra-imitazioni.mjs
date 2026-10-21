@@ -42,7 +42,7 @@ const PESO_MANO = Number(arg('--peso-mano', 6));
 // perdeva le imitazioni con altre parole.
 const PESO_SINTETICI = Number(arg('--peso-sintetici', 2));
 // Quanti sosia «marchio più parola» per marchio e per forma (secure-x, x-secure, securex, xsecure).
-const PER_FORMA = Number(arg('--per-forma', 6));
+const PER_FORMA = Number(arg('--per-forma', 3));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
