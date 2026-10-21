@@ -31,7 +31,9 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
      progetto diventa quella del ramo, strumenti e ricette compresi — e un ramo
      aperto giorni fa riporta indietro anche le correzioni già fatte. È già
      costato un'ora di lavoro con la correzione in produzione da un giorno.
-4. `git pull --rebase origin main`. Se fallisce (conflitti, rete): chiudi il
+4. `git fetch origin main`, poi da solo `git rebase origin/main` (un comando
+   per chiamata, mai uniti con `&&`: il controllo dei permessi della sessione
+   ammette solo questa forma). Se fallisce (conflitti, rete): chiudi il
    giro — NON risolvere niente a mano. Il clone è fresco: un conflitto qui è
    il sintomo di una sovrapposizione che deve vedere l'owner, non un intoppo
    da rattoppare. (Vale anche per i worker: nessuno tocca `main`, mai.)
