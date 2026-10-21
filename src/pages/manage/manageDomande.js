@@ -185,8 +185,25 @@
     return c;
   }
 
+  // Lo scudo della fiducia, come sulle righe dei feedback: pieno se fidata, vuoto se no; il bordo destro ne ripete il colore.
+  function scudo(d) {
+    const s = MR.segnoFiducia(d);
+    const span = el('span', `mg-fiducia-segno mg-fiducia-segno--${s.classe}`);
+    span.title = `${s.parola}: ${s.classe === 'fidata' ? TITOLO_FIDATA : TITOLO_NON_FIDATA}`;
+    span.setAttribute('aria-label', s.parola);
+    span.setAttribute('role', 'img');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', MR.FORME_SVG.scudo);
+    svg.appendChild(path);
+    span.appendChild(svg);
+    return span;
+  }
+
   function riga(d, tab, nelGruppo) {
-    const li = el('li', 'mg-domanda');
+    const li = el('li', `mg-domanda mg-fiducia--${MR.segnoFiducia(d).classe}`);
     li.dataset.id = idDi(d);
     li.dataset.priorita = String(d.priorita || '');
     li.tabIndex = 0;
