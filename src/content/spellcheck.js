@@ -1001,18 +1001,20 @@
     state.inVista = segniInVista(state);
     disegnaSpecchio(state);
     allineaScorrimento(state);
+    disegnaValori(state);
     seguiIlCampo();
     passaggiInCorso(state);
     allineaProposte(state);
   }
 
-  // Un segno che si conferma o sparisce è a metà del suo passaggio: alla fine lo strato si ridisegna senza.
+  // Un segno che si conferma o sparisce, o un lampo, è a metà del suo passaggio: alla fine lo strato si ridisegna senza.
   function passaggiInCorso(state) {
     if (state.timerPassaggio) return;
     const ora = Date.now();
-    const resto = state.inVista.reduce((m, s) => {
-      const da = s.svanisce || s.confermatoAlle || 0;
-      return da && ora - da < PASSAGGIO_MS ? Math.max(m, PASSAGGIO_MS - (ora - da)) : m;
+    const resto = [...state.inVista, ...state.lampi].reduce((m, s) => {
+      const durata = s.lampo ? LAMPO_MS : PASSAGGIO_MS;
+      const da = s.svanisce || s.confermatoAlle || s.lampo || 0;
+      return da && ora - da < durata ? Math.max(m, durata - (ora - da)) : m;
     }, 0);
     if (!resto) return;
     state.timerPassaggio = setTimeout(() => {
