@@ -949,14 +949,17 @@
     if (!el) return;
     if (!el.value) { el.style.height = ''; return; }
     el.style.height = 'auto';
-    let pad = 0;
+    // scrollHeight è contenuto più imbottitura: in border-box mancano i bordi, e la riga che usciva di 2px
+    // accendeva la barra (#853.1).
+    let correzione = 0;
     try {
       const cs = getComputedStyle(el);
-      if (cs.boxSizing !== 'border-box') {
-        pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-      }
+      const somma = (a, b) => (parseFloat(cs[a]) || 0) + (parseFloat(cs[b]) || 0);
+      correzione = cs.boxSizing === 'border-box'
+        ? somma('borderTopWidth', 'borderBottomWidth')
+        : -somma('paddingTop', 'paddingBottom');
     } catch (_) {}
-    el.style.height = `${Math.max(0, el.scrollHeight - pad)}px`;
+    el.style.height = `${Math.max(0, el.scrollHeight + correzione)}px`;
   }
 
   // ----------------------------------------------------------------
