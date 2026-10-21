@@ -168,9 +168,11 @@
     if (!conLettere(adesso.slice(a, b))) {
       while (a > 0 && !diParola(adesso[a - 1])) a--;
       while (b < adesso.length && !diParola(adesso[b])) b++;
+      if (a > 0) a--;
+      if (b < adesso.length) b++;
     }
-    while (a > 0 && diParola(adesso[a - 1])) a--;
-    while (b < adesso.length && diParola(adesso[b])) b++;
+    if (diParola(adesso[a])) while (a > 0 && diParola(adesso[a - 1])) a--;
+    if (diParola(adesso[b - 1])) while (b < adesso.length && diParola(adesso[b])) b++;
     if (!conLettere(adesso.slice(a, b))) return null;
     return { start: a, end: b };
   }
