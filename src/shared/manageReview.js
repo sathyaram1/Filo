@@ -1966,6 +1966,13 @@
     return s ? s.schede[0] : null;
   }
 
+  /** La scheda che chiede un indirizzo di Gestione (`#utenti`, `#routine`…): una scheda, o la prima di una sezione. PURA. */
+  function schedaDaIndirizzo(hash) {
+    const chiave = String(hash || '').replace(/^#/, '').trim().toLowerCase();
+    if (!chiave) return null;
+    return sezioneDiScheda(chiave) ? chiave : schedaPredefinita(chiave);
+  }
+
   /**
    * L'ultima sezione ricordata, con la scheda di ogni sezione, validata: una parte storta butta tutto,
    * perché una scelta ricordata a metà torna come un'altra (patterns/una-scelta-ricordata-si-ricorda-intera.md). PURA.
