@@ -3376,7 +3376,7 @@ async function eseguiAzioneFilo(action, {
         }
       }
       case 'CORREGGI_MEMORIA': {
-        const l = global.SN_PREF.lezioneDaAzione({ testo: String(action.nuovo ?? '').replace(/\s*[\r\n]+\s*/g, ' ') });
+        const l = global.SN_PREF.lezioneDaAzione({ testo: String(action.nuovo ?? '').replace(/\s*[\r\n]+\s*/g, ' ') }, { cosa: 'la correzione' });
         if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
         if (!rigaDaCorreggere || !l.testo) {
           return { executed: false, kept: false, output: { corrette: 0, trovate: (action._righe || []).length } };
