@@ -247,7 +247,7 @@
       const x = atteso(a);
       return x !== null ? n === x : (n.length >= s + coda.length && n.startsWith(testa) && n.endsWith(coda));
     }
-    if (!/^delete/.test(a.tipo)) return true;
+    if (!/^delete/.test(a.tipo) || a.tipo === 'deleteByDrag') return true;
     const tolti = v.length - n.length;
     if (tolti < 0) return false;
     if (/^deleteContent(Backward|Forward)$/.test(a.tipo) && s === e && tolti > PASSO_MAX) return false;
