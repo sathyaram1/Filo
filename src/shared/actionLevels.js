@@ -646,7 +646,7 @@
       costo: 2,
       campo: null,
       describe: () => 'Riordinare le schede e archiviare quelle non più utili.\n'
-        + 'Le schede archiviate restano nel filo della home: le ritrovi cercandole lì.',
+        + 'Le schede archiviate restano nel filo della home, e le ritrovi cercandole lì.',
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.archived) || 0;
         return n ? `Schede riordinate: archiviate ${n} non più utili` : 'Schede riordinate: nessuna da archiviare';
