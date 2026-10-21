@@ -165,6 +165,7 @@ function sinteticiParole(etichetta) {
   const parole = PAROLE_TRUFFA.map((w) => w + (FINALI[w] || ''));
   const caso = rng(1375);
   const pesca = (l) => l[Math.floor(caso() * l.length)];
+  const casoPezzo = rng(26);
   const out = [];
   const visti = new Set();
   for (const b of BRANDS) {
