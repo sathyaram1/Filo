@@ -1,5 +1,11 @@
 ## Una domanda per l'owner si scrive per lui
 
+Il file è un JSON coi campi di SPEC-DOMANDE § 3.1: `titolo` e `priorita`
+(`bloccante`, `importante` o `quando_puoi`) sono obbligatori; poi `contesto`,
+`problema`, `opzioni` (ognuna `{ "testo", "pro", "contro", "azione": { "tipo",
+"feedbackId" } }`), `consiglio` (`{ "opzione": <indice da 0>, "perche" }`),
+`collegamenti` (`[{ "tipo": "feedback", "id" }]`), `notePerAgenti`, `gruppo`.
+
 L'owner non legge il codice. Prima di mandare una domanda applica
 `.claude/skills/unslop/SKILL.md` a titolo, contesto, problema, opzioni (testo,
 pro, contro) e consiglio, e controlla che:

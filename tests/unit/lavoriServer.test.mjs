@@ -59,10 +59,13 @@ test('le istruzioni del lavoro server: git verso GitHub solo da git-server, perc
 
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {
   const server = testoLavoroServer({ clone: '/home/user/filo-security' });
-  // Chi verifica non può consegnare uno stato: la sua strada è la critica con la segnalazione all'owner.
+  // Chi verifica consegna uno stato solo per attacco o spam (#1358): ogni altro gli sarebbe rifiutato.
   const verifica = `${readRoleInstructions('verifier', { scope: 'pieno' })}\n\n${server}`;
-  assert.ok(!/deliver status/.test(verifica), 'al verificatore non si indica una consegna che il server gli rifiuta');
-  assert.match(server, /se verifichi, non passare il lavoro[^]*--segnala/);
+  const stati = [...verifica.matchAll(/deliver status --status (\S+)/g)].map((m) => m[1]);
+  assert.ok(stati.length > 0 && stati.every((s) => s === 'attack' || s === 'spam'), `al verificatore solo attacco o spam: ${stati.join(', ')}`);
+  // Un no al token è un guasto per tutti (#1226.1): chi verifica non passa senza il server, e nessuno lo rimanda al PC.
+  assert.match(server, /per qualunque ruolo è un guasto da dichiarare[^]*Chi verifica non passa il lavoro guardando solo l'app/);
+  assert.doesNotMatch(server, /rimanda la pratica in locale|lavorarlo in locale/);
   const sezioni = [...server.matchAll(/sezione «([^»]+)»/g)].map((m) => m[1]);
   assert.ok(sezioni.length > 0);
   for (const role of ['new-work', 'fixer']) {
