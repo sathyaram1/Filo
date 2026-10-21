@@ -184,8 +184,8 @@ function sinteticiParole(etichetta) {
     // E staccato col trattino da un pezzo generato, come lo pubblicano i kit sulle piattaforme (apple-cq72w9i0j.vercel.app).
     for (let k = 0; k < 2; k++) {
       const pezzo = Array.from({ length: 6 + Math.floor(caso() * 6) }, () => pesca('abcdefghijklmnopqrstuvwxyz0123456789')).join('');
-      out.push({ h: `${k ? pezzo + '-' + t : t + '-' + pezzo}.${pesca(PIATTAFORME)}`, marchio: t, sintetico: true, peso: PESO_PAROLE });
-      out[out.length - 1].url = 'https://' + out[out.length - 1].h + '/';
+      const h = `${k ? pezzo + '-' + t : t + '-' + pezzo}.${pesca(PIATTAFORME)}`;
+      out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_PAROLE });
     }
   }
   return out;
