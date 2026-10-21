@@ -32,7 +32,7 @@ resta Unmet il badge non arriva a «passing»: `interact`, `contribution`,
 | documentation_basics | MUST | Met | README (avvio, architettura, prove), SECURITY.md, documenti in `transparency/`. |
 | documentation_interface | MUST | Met | Cosa sa fare Filo, voce per voce: https://github.com/sathyaram1/Filo/blob/main/src/shared/capabilities.js |
 | sites_https | MUST | Met | Il repository (github.com) e il sito (filo.red) si aprono in HTTPS. |
-| discussion | MUST | **Da decidere** | Le issue di GitHub sono aperte, ma nessuno le legge: i feedback arrivano dall'app. O le issue entrano fra i canali letti, o si dichiara Unmet. |
+| discussion | MUST | **Da decidere** | Le issue di GitHub sono aperte, ma i feedback arrivano dall'app e le routine le issue non le leggono. O le issue entrano fra i canali letti, o si dichiara Unmet. |
 | english | SHOULD | Unmet | Documenti e app sono in italiano. |
 | maintained | MUST | Met | Commit ogni giorno, una versione nuova ogni sei ore quando la suite è verde. |
 
