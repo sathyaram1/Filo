@@ -154,7 +154,7 @@ function vegliaRiquadri(elenco, webFrame) {
   function sopra(e) {
     let t = e && e.target;
     if (!riquadro(t)) { try { t = e.composedPath()[0]; } catch (_) {} }
-    if (riquadro(t)) { aggancia(t.contentWindow); return; }
+    if (riquadro(t)) { aggancia(finestra(t)); return; }
     cercaNascosti();
   }
   return sopra;
