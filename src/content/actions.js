@@ -1126,8 +1126,8 @@
   async function saveLink(linkEl) {
     const res = await chrome.runtime.sendMessage({
       type: MSG.SAVE_LINK,
-      url: linkEl.href,
-      title: linkEl.textContent?.trim() || linkEl.href,
+      url: indirizzoDelLink(linkEl),
+      title: nomeDelLink(linkEl) || indirizzoDelLink(linkEl),
     });
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
@@ -1213,8 +1213,7 @@
   ]);
   function isDownloadableLink(linkEl) {
     if (!linkEl) return false;
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) { return false; }
+    const href = indirizzoDelLink(linkEl);
     if (!/^https?:/i.test(href)) return false;
     try { if (linkEl.hasAttribute && linkEl.hasAttribute('download')) return true; } catch (_) {}
     let pathname = '';
@@ -1234,8 +1233,7 @@
   // cammini). Nessun toast qui: la conferma è quella condivisa col clic (barra +
   // toast finale dalla shell); avvisiamo solo se il download non parte proprio.
   async function downloadLink(linkEl) {
-    let href = '';
-    try { href = linkEl.href || ''; } catch (_) {}
+    const href = indirizzoDelLink(linkEl);
     if (!href) return;
     // data:/blob: nascono nella pagina stessa: lì Chromium onora l'attributo
     // `download` di un <a> e il main non saprebbe risolverli — restano sul
@@ -1273,12 +1271,12 @@
   // copia negli appunti: vale lo stesso discorso di "Copia URL" (#437) — un
   // href che non è un indirizzo non si può né mandare a qualcuno né copiare.
   async function shareLink(linkEl) {
-    const href = linkEl?.href || '';
+    const href = indirizzoDelLink(linkEl);
     if (!isAddress(href)) {
       Popup.showToast(I18n.t('toast_not_an_address'));
       return;
     }
-    const data = { title: linkEl.textContent?.trim() || href, url: href };
+    const data = { title: nomeDelLink(linkEl) || href, url: href };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
@@ -2091,6 +2089,8 @@
     leggiOrigine,
     scaricaImmagine,
     buildInlineExplainLink,
+    SELETTORE_COLLEGAMENTO,
+    indirizzoDelLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,
     savePage,
