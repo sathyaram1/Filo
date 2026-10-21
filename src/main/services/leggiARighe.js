@@ -10,15 +10,12 @@ const fs = require('node:fs');
 async function perRiga(file, fn) {
   let resto = '';
   let indice = 0;
-  const chiama = async (riga) => {
-    const esito = fn(riga, indice++);
-    if (esito && typeof esito.then === 'function') await esito;
-  };
   for await (const pezzo of fs.createReadStream(file, { encoding: 'utf8', highWaterMark: 1 << 20 })) {
     let da = 0;
     let a = pezzo.indexOf('\n');
     while (a !== -1) {
-      await chiama(resto + pezzo.slice(da, a));
+      const esito = fn(resto + pezzo.slice(da, a), indice++);
+      if (esito && typeof esito.then === 'function') await esito;
       resto = '';
       da = a + 1;
       a = pezzo.indexOf('\n', da);
@@ -26,7 +23,10 @@ async function perRiga(file, fn) {
     resto += pezzo.slice(da);
   }
   const aCapo = !resto;
-  if (resto) await chiama(resto);
+  if (resto) {
+    const esito = fn(resto, indice++);
+    if (esito && typeof esito.then === 'function') await esito;
+  }
   return { aCapo };
 }
 
