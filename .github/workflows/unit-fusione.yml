@@ -1,0 +1,63 @@
+# Gli unit sul risultato della fusione di un ramo con main, chiesti dal server (#1207): il server legge l'esito di questa
+# corsa per la coppia di commit e solo con quello porta il lavoro a L5 e alla fusione. Esegue il codice di un ramo che
+# può venire da un feedback non fidato: niente segreti, token in sola lettura, nessuna credenziale lasciata nei checkout.
+# Garanzie: tests/unit/unitFusioneAzione.test.mjs.
+
+name: Unit sulla fusione
+
+# repository_dispatch accende solo la versione di questo file che sta su main: un ramo non la cambia per la propria corsa.
+on:
+  repository_dispatch:
+    types: [unit-fusione]
+
+# Il server cerca la corsa da questo titolo; i due sha interi li conferma la riga dell'esito.
+run-name: unit-fusione ${{ github.event.client_payload.corsa }}
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # La coppia arriva solo come variabile: dentro `run:` un'espressione diventerebbe codice della shell.
+    env:
+      GIT_TERMINAL_PROMPT: '0'
+      RAMO: ${{ github.event.client_payload.ramo }}
+      MAIN: ${{ github.event.client_payload.main }}
+    steps:
+      - name: La coppia da provare
+        run: |
+          if [[ ! "$RAMO" =~ ^[0-9a-f]{40}$ || ! "$MAIN" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "coppia non valida: servono due sha interi"
+            exit 2
+          fi
+
+      # Reporter e decisione vengono da main, il commit di questa corsa: il ramo provato non li sceglie.
+      - name: Strumenti di main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: strumenti
+          persist-credentials: false
+
+      - name: Il ramo, con la storia di main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RAMO }}
+          path: prova
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Le dipendenze del ramo, come la macchina che provava prima: un ramo che ne aggiunge una non esce rosso per quello.
+      - name: Dipendenze del ramo
+        working-directory: prova
+        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+
+      - name: Unit sulla fusione
+        run: node strumenti/scripts/unit-fusione-azione.mjs --root prova --ramo "$RAMO" --main "$MAIN"

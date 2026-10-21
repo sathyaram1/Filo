@@ -339,7 +339,7 @@
     // E quando nessun fornitore ammesso serve il modello: la richiesta non è partita.
     const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN', 'NO_ALLOWED_HOST'];
     if (spiegato.includes(res.errorCode) && res.error) {
-      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000 }); } catch (_) {}
+      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000, rimedio: { code: res.errorCode } }); } catch (_) {}
       return;
     }
     const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';

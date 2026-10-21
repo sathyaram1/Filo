@@ -1815,6 +1815,9 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
   const rev = (attesa) => ({ status: 'revision_security', attesa });
   assert.equal(MR.attesaServer(rev('fusione_server')), 'pc');
   assert.equal(MR.attesaServer(rev('suite_server')), 'suite');
+  // Gli unit sulla fusione lanciati da GitHub (#1207): un'attesa che segue il server anche fuori dai lavori server.
+  assert.equal(MR.attesaServer(rev('unit_fusione')), 'unit');
+  assert.equal(MR.attesaServer({ status: 'revision_capability', attesa: 'unit_fusione' }), '');
   // L'app si fonde prima del server: nessuno aspetta più la pubblicazione.
   assert.equal(MR.attesaServer(rev('deploy_server')), '');
   assert.equal(MR.attesaServer(rev('')), '');
@@ -1830,4 +1833,15 @@ test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hove
   for (const vuota of [undefined, null, '', '   ']) {
     assert.deepEqual(MR.tastoFrase(vuota), { piena: false, titolo: 'Scrivi la riga che leggerà chi ha segnalato' });
   }
+});
+
+test('#597: le immagini che i giudici non hanno visto, una frase ciascuna col motivo del server', () => {
+  assert.deepEqual(MR.immaginiNonViste({ pipeline: { immaginiNonAperte: [
+    { n: 2, motivo: 'troppo grande (oltre 8 MB)' }, { n: 0, motivo: 'x' }, null, { n: 3 }, { n: '4', motivo: 'y' },
+  ] } }), [
+    'Immagine 2 non vista dai giudici: troppo grande (oltre 8 MB).',
+    'Immagine 3 non vista dai giudici: motivo non registrato.',
+  ]);
+  assert.deepEqual(MR.immaginiNonViste({}), []);
+  assert.deepEqual(MR.immaginiNonViste({ pipeline: 'FENC1:cifrato' }), []);
 });

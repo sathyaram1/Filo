@@ -3818,6 +3818,9 @@
     // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
     // pagina è aperta: è un fatto di quel momento, non entra nel documento.
     const noteRipiego = new WeakMap();
+    // Una risposta che non è arrivata: segnata come errore e, finché la pagina è aperta, col tasto per la pagina
+    // dove si toglie l'ostacolo (#663). Nel documento resta la frase.
+    const errori = new WeakMap();
     const renderLog = () => {
       log.innerHTML = '';
       for (const msg of m.data.messages) {
@@ -3827,7 +3830,18 @@
         const parti = String(msg.content || '').split('\n\n');
         const interrotta = msg.role !== 'user' && parti.length > 1 && window.SN_CHAT_ERRORS?.eFraseInterrotta?.(parti[parti.length - 1]);
         b.textContent = interrotta ? parti.slice(0, -1).join('\n\n') : msg.content;
+        const errore = errori.get(msg);
+        if (errore) b.classList.add('errore');
         log.appendChild(b);
+        if (errore && errore.pagina) {
+          const tasto = document.createElement('button');
+          tasto.type = 'button';
+          tasto.className = 'ed-chat-continua ed-chat-rimedio';
+          tasto.textContent = errore.pagina.label;
+          if (errore.pagina.title) tasto.title = errore.pagina.title;
+          tasto.addEventListener('click', (e) => { e.stopPropagation(); sendMessage({ type: MSG.OPEN_URL, url: errore.pagina.url }); });
+          log.appendChild(tasto);
+        }
         if (interrotta) {
           const n = document.createElement('div');
           n.className = 'ed-chat-note';
@@ -3881,6 +3895,7 @@
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {
           thinking.content = erroreInChat(r, 'nessuna risposta');
+          errori.set(thinking, { pagina: window.SN_CHAT_ERRORS?.rimedioPagina?.(r) || null });
         } else {
           if (r.keyFallback && r.keyFallback.line) {
             noteRipiego.set(thinking, r.keyFallback.line);
@@ -3906,6 +3921,7 @@
         }
       } catch (e) {
         thinking.content = erroreInChat({ error: e && e.message, code: e && e.code }, 'nessuna risposta');
+        errori.set(thinking, { pagina: window.SN_CHAT_ERRORS?.rimedioPagina?.({ code: e && e.code }) || null });
       }
       renderLog();
       markDirty();

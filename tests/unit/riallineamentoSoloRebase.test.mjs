@@ -6,7 +6,6 @@ import assert from 'node:assert/strict';
 
 const { readRoleInstructions, buildPayload, serverCtx } = await import('../../scripts/dispatch.mjs');
 const { perimetroNote } = await import('../../scripts/lib/verifier-scope.mjs');
-const { testoUnitRossi, exitCodeFor } = await import('../../scripts/merge-gate.mjs');
 
 const CRITICA = 'FAIL tecnico, non di qualità: gli unit test sono ROSSI sul risultato della fusione del ramo con main.\n'
   + '  - tests/unit/somma.test.mjs › somma due numeri';
@@ -43,11 +42,10 @@ test('il perimetro del riallineamento chiede a chi verifica di leggere anche gli
   assert.match(note, /> rossi: tests\/unit\/somma\.test\.mjs/);
 });
 
-test('il cancello, fermo per unit rossi, non chiede di farli tornare verdi', () => {
-  assert.equal(exitCodeFor({ ok: true, result: 'unit_rossi' }), 20);
-  const t = testoUnitRossi();
-  assert.match(t, /^\[merge-gate\] UNIT ROSSI SULLA FUSIONE: niente fusione\./);
-  assert.match(t, /chi riallinea rifà solo la base/);
-  assert.match(t, /li giudica come rilievi la verifica/);
-  assert.doesNotMatch(t, /tornare verd|correggi|sistema/i);
+// Il fermo per unit rossi non passa più da un cancello lanciato da L4 (#1207): lo porta il server al riallineamento.
+test('il controllo di sicurezza lascia gli unit rossi al server, e non chiede di farli tornare verdi', () => {
+  const t = readRoleInstructions('secaudit').replace(/\s+/g, ' ');
+  assert.match(t, /unit rossi li porta lui dove devono andare/);
+  assert.match(t, /al riallineamento/);
+  assert.doesNotMatch(t, /tornare verd|farli passare/i);
 });

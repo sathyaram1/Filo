@@ -218,10 +218,37 @@
     provider_error: 'Il servizio dei modelli non ha risposto: riprova fra poco.',
     internal: 'Qualcosa è andato storto sul server: riprova.',
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
+    // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
+    inviter_not_linked: 'Chi ti ha mandato questo invito non ha ancora collegato il suo account Google a Filo, e finché non lo fa il suo codice non fa entrare nessuno. Diglielo, o fatti mandare un invito da qualcun altro.',
+    network_cap: 'Da questa connessione sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
   });
 
-  function redeemMessage(status) {
+  // `info` è la risposta intera del server: il tetto per rete porta l'ora in cui riaprire.
+  function redeemMessage(status, info) {
+    if (status === 'network_cap' && info && info.reopensAt) return networkCapMessage(info);
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
+  }
+
+  // Il tetto dei riscatti dalla stessa rete (#1120), coi numeri del server e l'ora locale in cui si libera un posto.
+  // Un'ora che non si legge non diventa «adesso»: resta la frase senza ora.
+  function networkCapMessage({ reopensAt, cap, hours } = {}, nowMs = Date.now()) {
+    const t = Date.parse(String(reopensAt || ''));
+    if (!Number.isFinite(t)) return REDEEM_MESSAGES.network_cap;
+    const n = Math.floor(Number(cap) || 0);
+    const h = Number(hours) || 0;
+    const chi = n === 1 ? 'è già entrata una persona' : (n > 1 ? `sono già entrate ${fmtInt(n)} persone` : 'sono già entrate troppe persone');
+    const finestra = h === 1 ? ' nell’ultima ora' : (h > 0 ? ` nelle ultime ${Number.isInteger(h) ? fmtInt(h) : String(h).replace('.', ',')} ore` : ' di recente');
+    return `Da questa connessione ${chi}${finestra}. Il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
+  }
+
+  function quandoRiapre(t, nowMs) {
+    const d = new Date(t);
+    const ora = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const giorno = (x) => { const g = new Date(x); g.setHours(0, 0, 0, 0); return g.getTime(); };
+    const giorni = Math.round((giorno(t) - giorno(nowMs)) / 86400000);
+    if (giorni <= 0) return `dopo le ${ora}`;
+    if (giorni === 1) return `domani dopo le ${ora}`;
+    return `da ${d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${ora}`;
   }
 
   function fmtInt(n) {
@@ -463,7 +490,11 @@
     { chiave: 'invitesRemaining', etichetta: 'Ingressi con invito rimasti', min: 0, max: 10000000, aiuto: 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
+    { chiave: 'rewardSentPerDay', etichetta: 'Feedback inviati premiati al giorno', min: 0, max: 100000, aiuto: 'Quanti feedback inviati ricevono il premio, per persona e per giorno. Gli altri arrivano senza premio.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
+    // Il tetto per rete (#1120): una famiglia che condivide la connessione entra, una persona sola che apre portafogli a catena no.
+    { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa connessione', min: 0, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione, nelle ore scritte sotto. Vale anche per i tuoi codici. A zero nessun limite.' },
+    { chiave: 'redeemsPerNetworkHours', etichetta: 'Ore in cui si contano', min: 1, max: 8760, aiuto: 'La finestra in cui si contano gli ingressi dalla stessa connessione: passata, chi era entrato non conta più.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
   function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
@@ -522,6 +553,33 @@
     const closed = Date.parse(String(c.resolvedAt || c.publishedAt || ''));
     if (!Number.isFinite(closed) || Number(now) - closed > PREMIO_ATTESA_MS) return { announce: true, credits: 0 };
     return { announce: false, credits: 0 };
+  }
+
+  // ── Il tetto giornaliero dei premi d'invio (#1077) ────────────────────────
+  // Il server paga al più `perDay` invii per portafoglio e giorno UTC. Prima di
+  // promettere un premio si contano i premi d'invio già arrivati oggi più gli
+  // invii di oggi il cui premio non è ancora arrivato (`feedback_sent:<id>`
+  // assente). Senza tetto noto (server vecchio, stato mai letto) non si nega.
+  // { grants, perDay, invii: [{ id, at }], now } → { esaurito, perDay }.
+  function premioInvio({ grants, perDay, invii = [], now = Date.now() } = {}) {
+    const tetto = Number.isInteger(perDay) && perDay >= 0 ? perDay : null;
+    if (tetto === null) return { esaurito: false, perDay: null };
+    const giorno = new Date(now).toISOString().slice(0, 10);
+    const diOggi = (iso) => String(iso || '').slice(0, 10) === giorno;
+    const pagati = new Set((Array.isArray(grants) ? grants : [])
+      .filter((g) => g && String(g.why || '').startsWith('feedback_sent:') && diOggi(g.at))
+      .map((g) => String(g.why)));
+    const inAttesa = (Array.isArray(invii) ? invii : []).filter((x) => x && Number.isFinite(x.at)
+      && diOggi(new Date(x.at).toISOString()) && !(x.id && pagati.has(`feedback_sent:${x.id}`))).length;
+    return { esaurito: pagati.size + inAttesa >= tetto, perDay: tetto };
+  }
+
+  // La frase del messaggio d'invio quando il tetto di oggi è pieno.
+  function premioInvioEsauritoTesto(perDay) {
+    const n = Math.max(0, Math.floor(Number(perDay) || 0));
+    if (n === 0) return 'Per ora i feedback inviati non ricevono premi.';
+    const primi = n === 1 ? 'solo per il primo feedback' : `per i primi ${n} feedback`;
+    return `Il premio vale ${primi} del giorno. Questo non ne riceve.`;
   }
 
   // Si è appena entrati con un invito: la frase che lo dice, in home e nella
@@ -766,7 +824,7 @@
   }
 
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
@@ -776,7 +834,7 @@
     // Manopole e movimenti della pagina dell'owner (#652)
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
-    formatCredits, PREMIO_ATTESA_MS, resolutionReward,
+    formatCredits, PREMIO_ATTESA_MS, resolutionReward, premioInvio, premioInvioEsauritoTesto,
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
     // Gli avvisi all'owner nella home (#855)

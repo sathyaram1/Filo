@@ -402,3 +402,16 @@ test('lo stile del benvenuto si imposta senza riquadro solo col segno del main (
   assert.equal(AL.costoFor({ ...stile, _accoglienza: 'true' }), 2);
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-abcdefghijkl', _accoglienza: true }), 2);
 });
+
+test('quello che Filo impara su chi è l’utente nel benvenuto segue la regola dello stile (#1297)', () => {
+  const lezione = { type: 'SALVA_LEZIONE', testo: 'L’utente si chiama Anna e insegna lettere alle medie.' };
+  // Fuori dal benvenuto, o col testo di altri nel contesto: il riquadro intero coi rischi.
+  assert.equal(AL.costoFor(lezione), 2);
+  assert.ok(AL.describe(lezione).includes('Confermala solo se'));
+  // Nel benvenuto pulito: si salva subito, e la riga dice il testo esatto.
+  assert.equal(AL.costoFor({ ...lezione, _accoglienza: true }), 1);
+  assert.equal(AL.lezioneDellAccoglienza({ ...lezione, _accoglienza: true }), lezione.testo);
+  // Il segno lo scrive solo il main, e solo un testo valido lo porta.
+  assert.equal(AL.costoFor({ ...lezione, _accoglienza: 'true' }), 2);
+  assert.equal(AL.lezioneDellAccoglienza({ type: 'SALVA_LEZIONE', testo: '   ', _accoglienza: true }), '');
+});

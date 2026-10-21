@@ -14,6 +14,7 @@ let serverDown = false;
 let saldo = 4321.5;
 let quota = 100;
 let grants = [];
+let tetto = 5;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -39,7 +40,7 @@ test.beforeAll(async () => {
           result: {
             hasWallet: true, pseudonym: 'abcdef0123456789',
             balance: { credits: saldo, creditsGranted: 5000, eurUsd: 1.2, eurPerCredit: 0.0007 },
-            stale: false, dailyCredits: quota, grants, invites: [],
+            stale: false, dailyCredits: quota, sentRewardsPerDay: tetto, grants, invites: [],
           },
         });
       }
@@ -62,6 +63,7 @@ test.beforeEach(() => {
   serverDown = false;
   saldo = 4321.5;
   quota = 100;
+  tetto = 5;
   grants = [{ at: '2026-09-20T10:00:00.000Z', credits: 5000, why: 'entry' }];
 });
 
@@ -171,6 +173,38 @@ test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale 
   const primo = crediti.locator('#moves li').first();
   await expect(primo).toContainText('+10', { timeout: 15_000 });
   await expect(primo).toContainText('Segnalazione inviata');
+});
+
+// #1077 — il server paga al più N premi d'invio al giorno per portafoglio: oltre, il messaggio d'invio non
+// promette un premio che non arriverà. Contano quelli già arrivati oggi e gli invii fatti dopo la lettura.
+test('invio oltre il tetto giornaliero dei premi: il messaggio dice che questo arriva senza premio', async ({ app }) => {
+  const page = await homeDiAvvio(app);
+  tetto = 2;
+  grants = [{ at: new Date().toISOString(), credits: 10, why: 'feedback_sent:fbStamattina' }, ...grants];
+  await riscatta(app);
+  await app.evaluate(async () => {
+    globalThis.SN_FEEDBACK.submit = async () => ({ id: `fb${Date.now()}`, failed: [] });
+    globalThis.SN_FEEDBACK_OUTBOX._setAuto(false);
+    await globalThis.SN_WALLET_MAIN.readState();
+  });
+  const invia = async (testo) => {
+    await page.evaluate(() => window.SN_FEEDBACK_UI.open());
+    await expect(page.locator('.sn-fb-modal')).toBeVisible();
+    await page.locator('.sn-fb-text').fill(testo);
+    await page.locator('.sn-fb-send').click();
+    await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 4_000 });
+    return page.locator('.sn-toast').filter({ hasText: 'Feedback inviato' }).last();
+  };
+
+  // Uno già pagato stamattina, tetto a due: questo ha ancora il premio.
+  let toast = await invia('Il tasto indietro non torna alla pagina di prima');
+  await expect(toast).toContainText('Il premio arriva sul tuo saldo dopo i controlli.');
+  // Il premio di quello appena mandato non è ancora arrivato, ma conta: il tetto è pieno.
+  toast = await invia('La barra delle schede sparisce a schermo intero');
+  await expect(toast).toContainText('Il premio vale per i primi 2 feedback del giorno. Questo non ne riceve.');
+  await expect(toast).not.toContainText('Il premio arriva sul tuo saldo');
+  await expect(toast).not.toContainText('+');
+  await page.screenshot({ path: 'tests/.shots/1077-tetto-premi-invio.png' });
 });
 
 // Le schede pubbliche di QUESTA installazione, senza rete (come in

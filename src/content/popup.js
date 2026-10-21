@@ -25,21 +25,40 @@
 
   // Il tasto che toglie l'ostacolo, sotto la frase che lo nomina. Su una pagina
   // web «riscattalo nella pagina Crediti» è un'indicazione senza strada: da lì
-  // l'utente a quella pagina non sa arrivare (#663).
-  function mostraRimedio(host, res) {
+  // l'utente a quella pagina non sa arrivare (#663). `dopo`: chi lo ospita si chiude (il menu, l'avviso).
+  function paginaDelRimedio(res) {
     const CE = global.SN_CHAT_ERRORS;
-    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(res) : null;
+    return CE && CE.rimedioPagina ? CE.rimedioPagina(res) : null;
+  }
+  function apriRimedio(pagina) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url })).catch(() => {}); } catch (_) {}
+  }
+  function mostraRimedio(host, res, { dopo = null } = {}) {
+    const pagina = paginaDelRimedio(res);
     if (!host || !pagina) return null;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'sn-msg-rimedio';
     btn.textContent = pagina.label;
     if (pagina.title) btn.title = pagina.title;
-    btn.addEventListener('click', () => {
-      try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
+    btn.addEventListener('click', (e) => {
+      // Il tasto sta nel documento del sito: un clic finto della pagina non apre schede.
+      const vero = global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted;
+      if (!vero) return;
+      e.stopPropagation();
+      apriRimedio(pagina);
+      if (typeof dopo === 'function') dopo();
     });
     host.appendChild(btn);
     return btn;
+  }
+
+  // Un errore dell'AI mostrato in un riquadro: la frase e, sotto, la strada per togliere l'ostacolo. Viaggiano
+  // insieme da qui perché ogni superficie che scriveva solo la frase lasciava l'utente senza strada (#663).
+  function scriviErrore(host, res, opts) {
+    if (!host) return null;
+    host.textContent = frasePerLUtente(res);
+    return mostraRimedio(host, res, opts);
   }
 
   // z-index iniziale e step per stacking deterministico
@@ -1278,9 +1297,8 @@
         // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
         // {…}») non dice niente a chi ha finito i crediti (#663).
         scrollaConservando(popup, () => {
-          bubble.text.textContent = frasePerLUtente(m);
+          scriviErrore(bubble.text, m);
           bubble.wrap.classList.add('sn-msg-error');
-          mostraRimedio(bubble.text, m);
         }, true);
         popup.activePort = null;
       }
@@ -1483,10 +1501,14 @@
   // lunghe: l'avviso "sto lavorando" deve durare quanto il lavoro). Ritorna
   // sempre un handle con close(), così chi mostra un avviso di avanzamento può
   // sostituirlo con l'esito invece di impilarci sopra un secondo riquadro.
+  // `rimedio`: la risposta d'errore dell'IPC (o l'errore ricomposto) di una frase che nomina dove si rimedia; l'avviso
+  // porta il tasto per andarci (#663) e resta abbastanza da arrivarci col puntatore, che lo ferma.
+  const DURATA_CON_RIMEDIO_MS = 15000;
   function showToast(text, opts = {}) {
     const t = document.createElement('div');
     t.className = 'sn-toast';
     t.textContent = text;
+    const pagina = opts.rimedio ? paginaDelRimedio(opts.rimedio) : null;
     let closed = false;
     let tempo = null;
     // Rimozione immediata usata dallo sfratto per tetto: niente animazione, ma
@@ -1514,9 +1536,22 @@
       if (sel && !sel.isCollapsed && t.contains(sel.anchorNode)) return;
       close();
     });
-    global.SN_AVVISI.chiudibile(t, close);
-    tempo = tempoAvviso(opts.duration === 0 ? 0 : (opts.duration || 2200), close);
+    let azioni;
+    let durata = opts.duration === 0 ? 0 : (opts.duration || 2200);
+    if (pagina) {
+      mostraRimedio(t, opts.rimedio, { dopo: close });
+      // Dal tasto destro sull'avviso la stessa strada: il clic che il menu girerebbe al tasto non è vero.
+      azioni = [{ label: pagina.label, fn: () => { apriRimedio(pagina); close(); } }];
+      if (durata) durata = Math.max(durata, DURATA_CON_RIMEDIO_MS);
+    }
+    global.SN_AVVISI.chiudibile(t, close, azioni);
+    tempo = tempoAvviso(durata, close);
     return { close, el: t };
+  }
+
+  // Un errore dell'AI detto con un avviso (le strade senza un riquadro dove scriverlo): frase e tasto insieme.
+  function avvisoErrore(res, opts = {}) {
+    return showToast(frasePerLUtente(res), { duration: 9000, ...opts, rimedio: res });
   }
 
   // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
@@ -1542,6 +1577,8 @@
     scaricaCollegamento,
     frasePerLUtente,
     mostraRimedio,
+    scriviErrore,
+    avvisoErrore,
     // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
     // è l'Esc quando si è a tutto schermo (#514).
     hasOpen: () => popups.length > 0,

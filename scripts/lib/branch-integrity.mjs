@@ -96,7 +96,7 @@ export function isProtectedBranch(name, mainBranch = '') {
 
 /**
  * Marcatore di tentativo: `20260807T195800Z`. Sta dentro i caratteri ammessi da
- * merge-gate.isValidBranch e ordina cronologicamente come stringa.
+ * nomi di ramo validi e ordina cronologicamente come stringa.
  */
 export function attemptStamp(nowMs = Date.now()) {
   return new Date(nowMs).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
@@ -225,7 +225,7 @@ export function writeBranchState(root, state) {
 // directory, adesso, deve stare su questo branch". Lo scrive il dispatcher
 // quando consegna il lavoro e lo cancella quando il lavoro è consegnato — dopo
 // la consegna non c'è più niente da proteggere (ed è ciò che permette al
-// merge-gate di cambiare branch legittimamente).
+// lavoro di dopo di cambiare branch legittimamente).
 
 export function expectationFile(root) {
   return resolve(root, '.claude', 'branch-expect.json');

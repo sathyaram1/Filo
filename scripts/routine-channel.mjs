@@ -109,10 +109,9 @@
 //   node scripts/routine-channel.mjs risposta <parola-d-ordine> <id> | risposta --biglietto <biglietto>   (testo da stdin)
 //       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo.
 //
-//   La FUSIONE su main non ha un sottocomando qui: passa da
-//   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
-//   merge lo fa il SERVER (SPEC-RIDISEGNO-MAX.md §10): verdetti registrati,
-//   L5 sul diff che scarica lui, fusione via API con la sua identità.
+//   La FUSIONE su main non ha un sottocomando qui: la porta il SERVER da sé
+//   dopo il pass del controllo di sicurezza (#1207): unit sulla fusione in
+//   un'azione di GitHub, L5 sul diff che scarica lui, fusione con la sua identità.
 
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -906,59 +905,6 @@ export async function eseguiGitServer({
     return 1;
   }
   return 0;
-}
-
-/**
- * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
- *
- * Qui non si decide niente: il server verifica dallo stato VERO (verdetti di
- * verifica e sicurezza REGISTRATI), fa girare L5 sul diff che scarica lui da
- * GitHub, e fonde con la SUA identità. Il ramo passato può solo CONFERMARE
- * quello legato al biglietto: nominarne un altro è un rifiuto registrato, non
- * una correzione silenziosa. Nessun verdetto viaggia nel corpo — il vecchio
- * FILO_L4_VERDICT per il server non esiste.
- *
- * Stessi ritentativi di call(): i guasti transienti (rete, 5xx) si ritentano,
- * un rifiuto no.
- *
- * `approval` c'è solo sui blocchi: è la richiesta che il server ha aperto per
- * l'owner. Va portata fin qui, o chi legge il registro crede che il ramo sia
- * perduto proprio nel caso in cui invece basta un via libera.
- *
- * `opts.sha` è il CONTENUTO su cui i due esiti ragionati erano stati dati:
- * viaggia con la richiesta come già fa il cammino locale (`ownerMerge`), dove
- * il server pretende che combaci con la punta vera e altrimenti risponde
- * `stale`. Senza, l'ultimo passo del giro continua a parlare del nome del ramo
- * mentre tutti i passi prima parlano di un commit, e il via libera resta buono
- * anche dopo che il foglio è stato sostituito (feedback #485). La sicurezza
- * non dipende dal fatto che il chiamante lo dichiari: la punta vera il server
- * se la chiede comunque. Questo è il controllo in più, e il posto dove
- * l'informazione arriva.
- *
- * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
- * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
- *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
- *           | { ok:false, reason }}
- */
-export async function merge(t, branch, opts) {
-  const { sha = '', provaUnit = null, ...rest } = opts && typeof opts === 'object' ? opts : {};
-  const payload = { ticket: t, branch: String(branch || '') };
-  if (String(sha || '')) payload.sha = String(sha);
-  if (provaUnit && typeof provaUnit === 'object') payload.provaUnit = provaUnit;
-  const { status, body } = await call('routineMerge', payload, rest);
-  if (status === 200 && body && body.ok && body.result) {
-    return {
-      ok: true,
-      result: String(body.result),
-      reason: String(body.reason || ''),
-      sha: String(body.sha || ''),
-      approval: String(body.approval || ''),
-      ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
-      ...(body.esito ? { esito: String(body.esito) } : {}),
-    };
-  }
-  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
 }
 
 // ─── L'impronta dichiarata a mano ────────────────────────────────────────────

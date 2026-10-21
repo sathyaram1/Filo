@@ -35,7 +35,7 @@ consumer ricalcola lo stato dai campi grezzi.
 | `todo` | — | In coda | approvato (a mano o auto): aspetta di essere lavorato |
 | `working` | — | In coda | un'istanza lo sta lavorando ORA (lock, §6) |
 | `revision_capability` | — | In coda | fix su branch, aspetta verifica comportamentale (verifier avversariale) |
-| `revision_security` | — | In coda | verifica passata, aspetta audit L4 (secaudit) + merge-gate |
+| `revision_security` | — | In coda | verifica passata, aspetta audit L4 (secaudit), poi gli unit sulla fusione da GitHub e il cancello del server |
 | `done` | — | In coda*/Risolti | fuso su main e deployato; aspetta verifica umana owner |
 | `archived` | — | Archiviati | verificato dall'owner; log |
 | `attack_confirmed` | rosso | Archiviati (filtro "Bloccati confermati") | attacco confermato: terminale |
@@ -473,7 +473,7 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   (che `applyStatus` azzera da sé alla prima consegna vera).
   Alla **3ª volta** il feedback esce dal giro automatico → `design`
   (`statusReason: arenato`) con nota per l'owner, o un guasto che si ripete ogni
-  ora si mangia il tetto giornaliero di accensioni entro sera.
+  ora si mangia le accensioni e i crediti dell'account entro sera.
 
 ### 6b. Storia: la riconciliazione dell'Action (smontata)
 

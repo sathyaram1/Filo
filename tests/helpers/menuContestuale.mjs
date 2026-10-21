@@ -4,10 +4,20 @@
 
 const MONDO_CONTENT_SCRIPT = 999;
 
-// Il solo punto da cambiare quando il menu starà in una vista filo://menu/ sopra la scheda (passo 3 di #1052): oggi è
-// disegnato nel documento della scheda stessa (o del riquadro, se si passa un Frame).
+function paginaDi(scheda) {
+  if (typeof scheda.context === 'function') return scheda;
+  if (typeof scheda.page === 'function') return scheda.page();
+  if (typeof scheda.owner === 'function') return scheda.owner().page();
+  return null;
+}
+
+// Con lo strato acceso (#1054) il menu di una pagina web sta nella vista filo://menu/ sopra la scheda, qualunque
+// riquadro l'abbia aperto; spento, e sulle pagine di Filo, nel documento della scheda (o del riquadro, se è un Frame).
 export function superficieDelMenu(scheda) {
-  return scheda;
+  const url = typeof scheda.url === 'function' ? scheda.url() : '';
+  const pagina = url.startsWith('filo://') ? null : paginaDi(scheda);
+  const strato = pagina && pagina.context().pages().find((p) => p.url().startsWith('filo://menu/'));
+  return strato || scheda;
 }
 
 /**
@@ -37,6 +47,14 @@ export function menuDi(scheda) {
     /** L'icona che segue il puntatore mentre la si trascina nel menu, o dal menu. */
     trascinamento: locator('.sn-drag-preview'),
   };
+}
+
+// Con più finestre ci sono più strati (la finestrella di accesso ha il suo): il menu di quello che ne ha uno aperto.
+export async function menuDelloStratoAperto(app) {
+  for (const w of app.windows().filter((x) => x.url().startsWith('filo://menu/'))) {
+    if (await w.locator('.sn-menu').count()) return menuDi(w);
+  }
+  return null;
 }
 
 /** Il menu è aperto (almeno un pannello a schermo). */
@@ -90,7 +108,8 @@ export function statoDelloStrato(app) {
     return {
       ...s,
       visibile: !!v && v.getVisible(),
-      inCima: !!v && figli[figli.length - 1] === v,
+      // Sopra tutte le viste, barra laterale a parte (#871: la si raggiunge anche a menu aperto).
+      inCima: !!v && figli.indexOf(v) >= 0 && figli.slice(figli.indexOf(v) + 1).every((x) => x === win._filoTabs.barra?.vista),
       bounds: v ? v.getBounds() : null,
       tastiera: !!v && webContents.getFocusedWebContents() === v.webContents,
     };

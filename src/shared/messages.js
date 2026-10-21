@@ -130,7 +130,7 @@
     // ripeterebbe non parte. Da ogni superficie, siti compresi. { } → { ok }.
     KEY_FALLBACK_SHOWN: 'key_fallback_shown',
     // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }.
-    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo }.
+    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo, senzaPremio }.
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
     // Recap aggiornamento (popup all'avvio): confronta la versione vista
     // l'ultima volta con app.getVersion() e ritorna le note delle versioni
@@ -200,11 +200,12 @@
     //   chiave OpenRouter personale meno consumo), pseudonimo, codici d'invito
     //   propri, se c'è la chiave personale, se l'utente usa una chiave sua.
     //   { } → { ok, identity:{ok,error?}, hasPersonalKey, pseudonym, usingOwnKey,
-    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits, … }|null, error? }
+    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits,
+    //   canInvite, invitesLocked:'need_google'|'google_used'|null, … }|null, error? }
     WALLET_STATE: 'wallet_state',
     // WALLET_REDEEM: riscatta un codice d'invito. Il server crea la chiave
     //   personale e la consegna UNA volta: il main la salva cifrata.
-    //   { code } → { ok, status, message, credits?, inviteCodes?, state? }
+    //   { code } → { ok, status, message, credits?, inviteCodes?, invitesLocked?, state? }
     WALLET_REDEEM: 'wallet_redeem',
     // WALLET_REISSUE: il portafoglio c'è sul server ma la chiave personale non
     //   è su questo computer: il server ne emette un'altra (la vecchia si
@@ -515,6 +516,13 @@
     CASELLE_IN_SOSPESO: 'caselle_in_sospeso',        // { inSospeso } → { ok }
     // Incolla di Filo: gli appunti li legge il main, la pagina non riceve il permesso (#586).
     APPUNTI_DI_FILO: 'appunti_di_filo',              // {} → { ok, testo, immagine (data URL png) }
+    // Il menu del tasto destro nello strato sopra la scheda (#1054): il content script lo descrive, lo strato lo disegna.
+    STRATO_MENU_APRI: 'strato_menu_apri',            // { id, menu: { items, keepOnScroll } } → { ok }
+    STRATO_MENU_AGGIORNA: 'strato_menu_aggiorna',    // { id, cosa: riga|griglia|griglia-apri|correzione|inline, … }
+    STRATO_MENU_CHIUDI: 'strato_menu_chiudi',        // { id }
+    STRATO_MENU_ESEGUI: 'strato_menu_esegui',        // main → content script { id, n, args, chiude } | { id, inline, cammino }
+    STRATO_MENU_INCOLLA: 'strato_menu_incolla',      // main → content script { id, testo, immagine } | { id, voce }
+    STRATO_MENU_CHIUSO: 'strato_menu_chiuso',        // main → content script { id }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
@@ -699,6 +707,9 @@
     // `freni`: 'attivi', o 'numeri_assenti' (senza riserva di A né tetto di B i crediti non frenano niente).
     ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
     ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
+    // Le pause in corso di A, B e della routine server, col motivo del rifiuto (#996): sola lettura, dal server
+    // (routineLog op:'pause'). Owner-only, solo pagine di Filo.
+    AUTOMATION_PAUSE_GET: 'automation_pause_get', // → { ok, pause: { A?, B?, serverA?, serverB? }, oraMs } | { ok:false, error }
     // Modello e sforzo del worker per fase (doc config/routines, campo
     // `roleModels` = { ruolo: { model?, effort? } }; regole in
     // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore
@@ -1038,7 +1049,12 @@
     // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte,
     // conversazione e il segno "già accolto". Solo pagine filo://.
     // L'intervista precedente NON si perde: viene archiviata in `past`.
+    // Con { riprendi: true } («Riprendiamola» della home) riapre invece quella
+    // chiusa a metà, dov'era. Risposta: { ok, onboarding, resume? }
     FILO_RESTART_ONBOARDING: 'filo_restart_onboarding',
+    // Toglie un'intervista conservata { chiave } (la × in Preferenze). Solo
+    // pagine filo://. Risposta: { ok, onboarding, tolta }
+    FILO_ONBOARDING_TOGLI: 'filo_onboarding_togli',
     // Chiude l'intervista SENZA passare dal modello: è il pulsante "Salta
     // l'accoglienza" della chat, la via d'uscita che funziona anche quando il
     // modello non risponde (rete assente, provider giù, crediti finiti). Solo

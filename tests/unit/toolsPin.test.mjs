@@ -339,7 +339,7 @@ test('ogni strumento che le ricette nominano passa le sue stampe dal filtro', ()
   for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
     for (const m of readFileSync(resolve(ruoli, f), 'utf8').matchAll(/\bnode\s+scripts\/([A-Za-z0-9._-]+\.mjs)/g)) nomi.add(m[1]);
   }
-  assert.ok(nomi.has('dispatch.mjs') && nomi.has('routine-channel.mjs') && nomi.has('merge-gate.mjs'), [...nomi].join(', '));
+  assert.ok(nomi.has('dispatch.mjs') && nomi.has('routine-channel.mjs'), [...nomi].join(', '));
   for (const n of nomi) {
     assert.match(readFileSync(resolve(REPO_VERO, 'scripts', n), 'utf8'), /\babsolutizeOutput\(/,
       `${n} stampa comandi che dalla cartella di lavoro portano agli strumenti del ramo`);
@@ -355,7 +355,6 @@ test('dalla copia, i testi che gli strumenti stampano portano alla copia', () =>
     const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1', FILO_ROUTINE_TICKET: '' };
     const casi = [
       ['dispatch.mjs', ['--record-secaudit', 'X', 'pass'], 'dispatch.mjs" --record-secaudit'],
-      ['merge-gate.mjs', [], 'merge-gate.mjs" <ramo>'],
       ['routine-channel.mjs', ['deliver', 'b-prova-con-la-forma-vera-di-un-biglietto', 'domanda', '--notes', 'x'], 'domanda.mjs" chiedi'],
       ['lancia-electron.mjs', [], 'lancia-electron.mjs" <comando>'],
     ];

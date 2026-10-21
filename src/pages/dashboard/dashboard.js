@@ -258,14 +258,20 @@
       const nostri = threadHistory.filter((m) => !m.interno && (m.role !== 'filo' || String(m.text || '').trim())).map(riga);
       // Un annuncio più vecchio di quello che è a schermo (l'intervista salvata a metà turno, consegnato dopo la
       // risposta) è già superato: ridisegnare butterebbe via le righe e i bottoni delle azioni (#592.2).
-      // Un'intervista rifatta da capo ha un'altra targa: quella si ridisegna anche se comincia uguale.
-      if (loro.length < nostri.length && chatIdOnboarding(state) !== chatId) return false;
+      // Un'intervista rifatta da capo ha un'altra targa: si ridisegna anche se comincia uguale, così la scheda rimasta
+      // aperta su quella di prima si lega alla nuova e le sue risposte contano (#1297).
+      if (chatIdOnboarding(state) !== chatId) return false;
       return loro.length <= nostri.length && loro.every((x, i) => x === nostri[i]);
     },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
-    // Niente da interrompere: in questa scheda l'utente non ha ancora scritto.
-    nienteInCorso: () => !scrittoQui && !sending,
+    // Niente da interrompere: in questa scheda l'utente non ha scritto e non ha davanti una conversazione (riaperta,
+    // o continuata da un'altra scheda), che l'intervista cancellerebbe dallo schermo (#1297).
+    nienteInCorso: () => !scrittoQui && !sending && body.dataset.state !== 'thread'
+      && threadHistory.every((m) => m.spontaneo),
+    // La scheda ha davanti una conversazione aperta: «Riprendiamola» non la sostituisce con l'intervista (#1297). La
+    // home no: è il filo, che si rilegge intero quando l'intervista finisce.
+    chatInCorso: () => sending || body.dataset.state === 'thread',
     // Filo può rispondere: la frase su perché non poteva se ne va, e coi suggerimenti la carta dei Crediti (#869: senza
     // modello chiamato, la home li rilegge e basta).
     allApertura: () => { mostraSenzaModello(''); loadDashboard().catch(() => {}); },
@@ -1123,11 +1129,10 @@
       row.className = 'dash-bubble-actions';
       const retry = document.createElement('button');
       retry.type = 'button';
-      retry.className = 'dash-action-btn dash-action-btn-primary';
+      retry.className = 'dash-action-btn';
       retry.textContent = '↻ Riprova';
       retry.title = 'Rimanda lo stesso messaggio';
       retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
-      row.appendChild(retry);
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
@@ -1141,15 +1146,20 @@
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
       const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason }) : null;
+      // Il tasto in evidenza è quello che toglie l'ostacolo (#828.1): finché c'è, «Riprova» rimanda lo stesso messaggio
+      // allo stesso muro, e resta accanto per dopo, quando l'ostacolo è tolto.
       if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
-        via.className = 'dash-action-btn';
+        via.className = 'dash-action-btn dash-action-btn-primary';
         via.textContent = pagina.label;
         via.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : pagina.title;
         via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
         row.appendChild(via);
+      } else {
+        retry.classList.add('dash-action-btn-primary');
       }
+      row.appendChild(retry);
       if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
       // modello non risponde (rete assente, provider giù, crediti finiti) alla
@@ -2301,7 +2311,13 @@
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
       title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
-      text: entrato ? `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.` : n.text,
+      text: entrato
+        ? (n.invitesLocked === 'need_google'
+          ? `${n.text} Li trovi nella pagina Crediti, dove colleghi Google per avere anche inviti da dare.`
+          : (n.invitesLocked
+            ? `${n.text} Li trovi nella pagina Crediti.`
+            : `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.`))
+        : n.text,
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
     return true;
