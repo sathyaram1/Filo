@@ -73,10 +73,15 @@ function chiaveConfronto(url) {
 // Gira DENTRO la pagina: serializza solo ciò che si vede, senza script, entrando nelle shadow root aperte.
 // Deve bastare a sé stessa, perché viaggia come testo (`toString`). Le schede in secondo piano sono grandi 0×0:
 // qui si guarda lo stile calcolato, mai le misure a schermo.
-function serializzaVisibile() {
+function serializzaVisibile(opz) {
   const TETTO = 4000000;
   const MAX_ELEMENTI = 150000;
   const MAX_PROFONDITA = 400;
+  // Oltre `scadenza` (ora assoluta) si smette come oltre il tetto, ma solo dopo `minimo` caratteri: in ritardo arriva
+  // almeno il primo pezzo. Senza scadenza la scheda in ritardo la ferma solo chi aspetta fuori, e non arriva niente.
+  const scadenza = opz && Number(opz.scadenza) > 0 ? Number(opz.scadenza) : Infinity;
+  const minimo = opz && Number(opz.minimo) > 0 ? Number(opz.minimo) : 0;
+  let fuoriTempo = false;
   const SALTA = {
     SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEMPLATE: 1, SVG: 1, CANVAS: 1, VIDEO: 1,
     AUDIO: 1, PICTURE: 1, TEXTAREA: 1, LINK: 1, META: 1, DATALIST: 1,
