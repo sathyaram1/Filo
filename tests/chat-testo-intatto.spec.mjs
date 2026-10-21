@@ -148,7 +148,7 @@ for (const [nome, contenuto] of [
 test.describe('intervista di benvenuto', () => {
   test.use({ accoglienzaFatta: false });
 
-  test('la risposta spezzata a metà parola e a metà lettera arriva intera nella bolla e nella conversazione salvata', async ({ app, shell }) => {
+  test('nell’intervista la risposta spezzata a metà parola e a metà lettera arriva intera nella bolla e nella conversazione salvata', async ({ app, shell }) => {
     test.setTimeout(90_000);
     await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
     const page = await newtabPage(app);
