@@ -320,6 +320,7 @@ test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, 
   expect(s.bounds.y).toBe(0);
   await expect(barra.locator('#striscia')).toBeVisible();
   // L'icona dice come uscire.
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(() => aperta(app)).toBe(true);
   await expect(barra.locator('#nav .ico[data-id="fullscreen"]')).toHaveAttribute('aria-label', 'Esci da schermo intero');
