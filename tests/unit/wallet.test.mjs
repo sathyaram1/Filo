@@ -407,9 +407,9 @@ test('tetto per rete: la frase dice quante persone, in quante ore, e l\'ora in c
   const f = W.redeemMessage('network_cap', { status: 'network_cap', reopensAt: domani, cap: 3, hours: 24 });
   assert.equal(f, W.networkCapMessage({ reopensAt: domani, cap: 3, hours: 24 }));
   const g = W.networkCapMessage({ reopensAt: domani, cap: 3, hours: 24 }, ieri);
-  assert.equal(g, `Da questa connessione sono già entrate 3 persone nelle ultime 24 ore: il tuo codice resta valido, riprova domani dopo le ${ora(domani)}.`);
+  assert.equal(g, `Da questa connessione sono già entrate 3 persone nelle ultime 24 ore. Il tuo codice resta valido, riprova domani dopo le ${ora(domani)}.`);
   const oggi = new Date(2026, 9, 21, 17, 5).toISOString();
-  assert.match(W.networkCapMessage({ reopensAt: oggi, cap: 1, hours: 1 }, ieri), new RegExp(`è già entrata una persona nell’ultima ora: .* riprova dopo le ${ora(oggi)}\\.$`));
+  assert.match(W.networkCapMessage({ reopensAt: oggi, cap: 1, hours: 1 }, ieri), new RegExp(`è già entrata una persona nell’ultima ora\\. .* riprova dopo le ${ora(oggi)}\\.$`));
   const fra3 = new Date(2026, 9, 24, 10, 0).toISOString();
   assert.match(W.networkCapMessage({ reopensAt: fra3, cap: 3, hours: 24 }, ieri), /riprova da sabato 24 ottobre alle 10:00\.$/);
   for (const storto of [{}, { reopensAt: 'mai' }, null, undefined]) {

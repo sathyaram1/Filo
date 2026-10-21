@@ -220,7 +220,7 @@
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
     // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
     inviter_not_linked: 'Chi ti ha mandato questo invito non ha ancora collegato il suo account Google a Filo, e finché non lo fa il suo codice non fa entrare nessuno. Diglielo, o fatti mandare un invito da qualcun altro.',
-    network_cap: 'Da questa connessione sono già entrate troppe persone di recente: il tuo codice resta valido, riprova più tardi.',
+    network_cap: 'Da questa connessione sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
   });
 
   // `info` è la risposta intera del server: il tetto per rete porta l'ora in cui riaprire.
@@ -238,7 +238,7 @@
     const h = Number(hours) || 0;
     const chi = n === 1 ? 'è già entrata una persona' : (n > 1 ? `sono già entrate ${fmtInt(n)} persone` : 'sono già entrate troppe persone');
     const finestra = h === 1 ? ' nell’ultima ora' : (h > 0 ? ` nelle ultime ${Number.isInteger(h) ? fmtInt(h) : String(h).replace('.', ',')} ore` : ' di recente');
-    return `Da questa connessione ${chi}${finestra}: il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
+    return `Da questa connessione ${chi}${finestra}. Il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
   }
 
   function quandoRiapre(t, nowMs) {

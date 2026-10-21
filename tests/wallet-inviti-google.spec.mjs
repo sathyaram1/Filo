@@ -194,7 +194,7 @@ test('i rifiuti nuovi del riscatto si spiegano: invito di chi non ha Google, tro
   await expect(msg).toContainText('Da questa connessione sono già entrate 3 persone nelle ultime 24 ore');
   const ora = await page.evaluate((iso) => new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }), riapre.toISOString());
   await expect(msg).toContainText(ora);
-  await expect(msg).toContainText('il tuo codice resta valido');
+  await expect(msg).toContainText('Il tuo codice resta valido');
   await expect(page.locator('#redeemForm')).toBeVisible();
 });
 
@@ -204,7 +204,7 @@ test(T_ATTESA_RETE, async ({ app, openTab }) => {
   await expect(h.locator(CONFIRM_HOST)).toBeVisible({ timeout: 40000 });
   const detto = await confirmText(h);
   expect(detto).toContain('Da questa connessione sono già entrate 3 persone nelle ultime 24 ore');
-  expect(detto).toContain('il tuo codice resta valido');
+  expect(detto).toContain('Il tuo codice resta valido');
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
 });

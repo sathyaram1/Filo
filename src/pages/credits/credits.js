@@ -469,7 +469,7 @@
       ? 'Continua nella scheda di Google…'
       : (accessoGoogle ? 'Riprova a collegare Google' : 'Collega Google per dare i tuoi inviti');
     const frase = esitoCollega || (accessoGoogle && !collegaInCorso
-      ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer: gli inviti si danno da lì.'
+      ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer. Gli inviti si danno da quella.'
       : '');
     note.textContent = frase;
     note.hidden = !frase;
