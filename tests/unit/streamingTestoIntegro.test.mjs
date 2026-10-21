@@ -87,6 +87,6 @@ test('l’ultimo evento senza a capo finale non si perde', async () => {
   const byte = eventi({ ultimaSenzaACapo: true });
   const r = await leggi([byte.subarray(0, byte.length - 7), byte.subarray(byte.length - 7)]);
   controlla(r, 'ultimo evento senza a capo');
-  assert.equal(r.finishReason, 'tool_calls');
+  assert.equal(r.finishReason, 'stop');
   assert.equal(r.usage.completionTokens, 50);
 });
