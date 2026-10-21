@@ -170,7 +170,7 @@ module.exports = function register(on, ctx) {
     if (u.blocca) return { text: SENZA_VALORE };
     const F = globalThis.SN_FONTI_SEGNAPOSTO;
     const web = corr.segnapostiWeb !== false;
-    const giri = sp.dove === 'web' ? [web ? 'web' : sp.dove] : (web ? [sp.dove, 'web'] : [sp.dove]);
+    const giri = sp.dove === 'web' ? [web ? 'web' : 'wiki:en'] : (web ? [sp.dove, 'web'] : [sp.dove]);
     let ultima = null;
     for (const giro of giri) {
       let fonti = [];
