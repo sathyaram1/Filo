@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 async function preparaModelli(app) {
   await app.evaluate(async () => {
@@ -158,7 +159,7 @@ test('il tasto destro sulla password resa visibile non la manda alla correzione'
   await modelloFinto(app, [['', JSON.stringify({ misspelled: false })]]);
 
   await page.locator('#c').click({ button: 'right', position: { x: 12, y: 8 } });
-  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
   await page.locator('#n').click({ button: 'right', position: { x: 12, y: 8 } });
   await expect.poll(() => arrivato(app, page), { timeout: 15_000 }).toContain('consegnaa');
@@ -282,12 +283,13 @@ test('nell’immagine è coperto il numero di carta anche quando il campo si chi
 });
 
 // Selezionare del testo prepara la spiegazione del tasto destro: dentro il campo della carta non deve partire niente,
-// e il menu sulla selezione tiene Taglia e Copia ma non la spiegazione.
+// e il menu sulla selezione tiene Taglia e Copia ma non la spiegazione. Un campo che non dice d'essere della carta: una
+// pagina che lo dice è delicata, e lì le chiamate automatiche si fermano tutte, anche quella del campo di prova.
 test('il numero di carta selezionato nel suo campo non parte verso la spiegazione', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
-  const page = await testServer.openReady(openTab, modulo('<label for="c">Numero della carta</label> '
-    + '<input id="c" autocomplete="cc-number" style="width:280px"> <label for="n">Note</label> <input id="n" style="width:280px">'));
-  await superaAvviso(app);
+  const page = await testServer.openReady(openTab, modulo('<input id="c" name="q" style="width:280px"> '
+    + '<label for="n">Note</label> <input id="n" style="width:280px">'));
+  await superaAvvisoSeCe(app);
   await page.fill('#c', '4111 1111 1111 1111');
   await page.fill('#n', 'consegna al portone verde');
   await preparaModelli(app);
@@ -296,7 +298,7 @@ test('il numero di carta selezionato nel suo campo non parte verso la spiegazion
   await page.locator('#c').click();
   await page.keyboard.press('Control+a');
   await page.locator('#c').click({ button: 'right', position: { x: 12, y: 8 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Copia', { exact: true })).toBeVisible();
   await expect(menu.locator('.sn-menu-inline-explain')).toHaveCount(0);

@@ -12,6 +12,7 @@
       version: '0.2.244', date: '2026-10-21',
       features: [],
       fixes: [
+        'L\'assistente di pagina e la spiegazione del tasto destro non leggono più la password, il numero della carta e i codici che scrivi in un modulo, nemmeno nel riquadro del servizio di pagamento. L\'assistente sa a cosa serve ogni campo, ma al posto di quello che hai scritto vede i puntini.',
         'Dopo «Importa dati» quello che arriva dal backup compare subito anche nelle schede già aperte, come pagine salvate, Cronologia AI e download, e non sparisce più al primo download o alla prima copia. Se un elenco è pieno, la conferma dice prima quante voci restano fuori. Un backup con un limite di spesa più alto, o senza limite, non te lo cambia più da solo, e nella conferma c\'è un pulsante per usarlo. Un archivio rovinato in qualche byte si importa lo stesso, e la conferma dice cosa non si legge.',
       ],
     },
@@ -451,7 +452,6 @@
         'Un clic sulla X di una scheda, o col tasto centrale, la chiude anche mentre un\'altra scheda sta caricando o cambia titolo. Prima a volte non succedeva niente e toccava cliccare di nuovo.',
         'Quando una tua segnalazione viene risolta, Filo torna ad avvisarti della ricompensa. Da fine settembre la domanda al server falliva sempre e l\'avviso non arrivava.',
         'L\'avviso dei siti pericolosi compare appena la pagina si apre, anche se non ha finito di caricarsi. Prima un sito truffa che restava in caricamento ti lasciava scrivere la password senza nessun avviso. E mentre l\'avviso è aperto la pagina sotto non può più prendersi la tastiera né coprirlo con una sua finestra.',
-        'L\'assistente di pagina e la spiegazione del tasto destro non leggono più la password, il numero della carta e i codici che scrivi in un modulo, nemmeno nel riquadro del servizio di pagamento. L\'assistente sa a cosa serve ogni campo, ma al posto di quello che hai scritto vede i puntini.',
       ],
     },
     {

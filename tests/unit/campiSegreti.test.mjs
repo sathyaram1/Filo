@@ -82,3 +82,23 @@ test('la carta e il codice divisi in caselle sono segreti in ogni casella', () =
   assert.deepEqual(data.map((c) => s.campoSegreto(c)), [false, false, false], 'una data divisa in tre resta leggibile');
 });
 
+
+// I componenti chiusi li raggiunge solo il protocollo d'ispezione: ognuno porta la catena dei riquadri dello stesso
+// processo che lo contengono, e ogni riquadro la sua, perché il main ritrovi dove stanno nella pagina.
+test('le radici chiuse si trovano anche dentro i riquadri e i componenti aperti, con la loro catena', () => {
+  const { radiciChiuse, componi } = require('../../src/main/services/campiNeiRiquadri.js');
+  const chiusa = (id, figli = []) => ({ backendNodeId: id, nodeType: 11, shadowRootType: 'closed', children: figli });
+  const albero = { nodeType: 9, backendNodeId: 1, frameId: 'pagina', children: [
+    { nodeType: 1, backendNodeId: 2, shadowRoots: [{ nodeType: 11, backendNodeId: 3, shadowRootType: 'open', children: [
+      { nodeType: 1, backendNodeId: 4, shadowRoots: [chiusa(5)] }] }] },
+    { nodeType: 1, backendNodeId: 6, shadowRoots: [{ nodeType: 11, backendNodeId: 7, shadowRootType: 'user-agent' }] },
+    { nodeType: 1, backendNodeId: 8, frameId: 'stesso', contentDocument: { nodeType: 9, backendNodeId: 9, frameId: 'stesso', children: [
+      { nodeType: 1, backendNodeId: 10, shadowRoots: [chiusa(11, [{ nodeType: 1, backendNodeId: 12, frameId: 'altro' }])] }] } },
+  ] };
+  const { chiuse, riquadri } = radiciChiuse(albero);
+  assert.deepEqual(chiuse.map((c) => [c.id, c.catena]).sort((a, b) => a[0] - b[0]), [[5, []], [11, [8]]]);
+  assert.deepEqual(Object.fromEntries(riquadri), { stesso: [8], altro: [8, 12] }, 'il documento non è un riquadro');
+  const posa = componi([{ left: 10, top: 20, width: 100, height: 50 }, { left: 5, top: 5, width: 300, height: 30 }]);
+  assert.deepEqual(posa, { dx: 15, dy: 25, vista: { left: 15, top: 25, width: 100, height: 10 } });
+  assert.equal(componi([{ left: 0, top: 50, width: 10, height: 10 }, { left: 0, top: 0, width: 10, height: 40 }]), null);
+});
