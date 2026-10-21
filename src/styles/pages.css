@@ -344,7 +344,7 @@ html, body {
   padding: 12px;
   background: var(--sn-bg);
   content-visibility: auto;
-  contain-intrinsic-size: auto 140px;
+  contain-intrinsic-size: auto 160px;
 }
 
 .sn-history-meta {
