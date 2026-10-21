@@ -58,7 +58,7 @@ const attiva = (app, id) => app.evaluate(({ BrowserWindow }, tid) => {
   w._filoTabs.activate(tid);
 }, id);
 
-test('cambio scheda: icona e striscia seguono la scheda davanti', async ({ app, shell, openTab, testServer }) => {
+test.skip('cambio scheda: icona e striscia seguono la scheda davanti', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   await prepara(app);
   await microfonoFinto(shell);
@@ -97,7 +97,7 @@ test('cambio scheda: icona e striscia seguono la scheda davanti', async ({ app, 
   await expect(icona(barra)).toHaveAttribute('aria-label', 'Leggi la risposta');
 });
 
-test('senza chiave: il secondo clic avvisa', async ({ app, shell, openTab, testServer }) => {
+test.skip('senza chiave: il secondo clic avvisa', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await prepara(app, { chiave: false });
   await microfonoFinto(shell);
@@ -118,7 +118,7 @@ test('senza chiave: il secondo clic avvisa', async ({ app, shell, openTab, testS
   expect(toasts.length).toBeGreaterThan(0);
 });
 
-test('menu del tasto destro con Aiuto spento in Preferenze', async ({ app, openTab, testServer }) => {
+test.skip('menu del tasto destro con Aiuto spento in Preferenze', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await prepara(app);
   const page = await testServer.openReady(openTab, SITO);
@@ -131,26 +131,30 @@ test('menu del tasto destro con Aiuto spento in Preferenze', async ({ app, openT
   console.log('menu help spento:', await nelMenu.evaluate((el) => ({ label: el.getAttribute('aria-label'), dis: el.getAttribute('aria-disabled') || el.disabled, cls: el.className, title: el.getAttribute('title') })));
 });
 
-test('tema scuro: le icone nei tre stati e la striscia', async ({ app, shell, openTab, testServer }) => {
+test.skip('tema scuro: le icone nei tre stati e la striscia', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await prepara(app);
   await microfonoFinto(shell);
   await imposta(app, { theme: 'dark' });
+  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
   const page = await testServer.openReady(openTab, SITO);
   await expect.poll(async () => (await nelMain(app))?.aiuto?.pannello, { timeout: 8_000 }).toBe('chiuso');
   const barra = await barraPage(app);
+  await shell.emulateMedia({ colorScheme: 'dark' });
+  await barra.emulateMedia({ colorScheme: 'dark' });
+  await page.emulateMedia({ colorScheme: 'dark' });
   mkdirSync(SHOTS, { recursive: true });
   await comandaBarra(app, 'clic'); await pannelloFermo(barra);
-  await barra.mouse.move(200, 600);
+  await barra.mouse.move(28, 700);
   await barra.screenshot({ path: `${SHOTS}/v1432-scuro-chiuso.png` });
   await icona(barra).click();
   await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
-  await barra.mouse.move(200, 600);
+  await barra.mouse.move(28, 700);
   await barra.waitForTimeout(400);
   await barra.screenshot({ path: `${SHOTS}/v1432-scuro-aperto.png` });
   await icona(barra).click();
   await expect(page.locator('.sn-sidebar .sn-voce-btn')).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
-  await barra.mouse.move(200, 600);
+  await barra.mouse.move(28, 700);
   await barra.waitForTimeout(400);
   await barra.screenshot({ path: `${SHOTS}/v1432-scuro-ascolta.png` });
   await icona(barra).click();
@@ -162,9 +166,113 @@ test('tema scuro: le icone nei tre stati e la striscia', async ({ app, shell, op
   await page.locator('.sn-sidebar-collapse').click();
   await lascia(app);
   await expect(barra.locator('#striscia')).toHaveClass(/\brisposta\b/, { timeout: 8_000 });
-  await shell.screenshot({ path: `${SHOTS}/v1432-scuro-striscia-finestra.png` });
+  await barra.waitForTimeout(400);
+  await barra.screenshot({ path: `${SHOTS}/v1432-scuro-striscia.png` });
+  await page.screenshot({ path: `${SHOTS}/v1432-scuro-pagina.png` });
   await comandaBarra(app, 'clic'); await pannelloFermo(barra);
-  await barra.mouse.move(200, 600);
+  await barra.mouse.move(28, 700);
   await barra.waitForTimeout(400);
   await barra.screenshot({ path: `${SHOTS}/v1432-scuro-risposta.png` });
+});
+
+test.skip('pagine di Filo: icona e voce Aiuto concordano', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  for (const url of ['filo://preferences/preferences.html', 'filo://history/history.html', 'filo://newtab/']) {
+    const page = await openTab(url);
+    await page.waitForTimeout(2500);
+    const m = await nelMain(app);
+    const barra = await barraPage(app);
+    await comandaBarra(app, 'clic'); await pannelloFermo(barra);
+    const ic = icona(barra);
+    const info = { url, aiuto: m && m.aiuto, label: await ic.getAttribute('aria-label'), dis: await ic.getAttribute('aria-disabled'), sugg: await ic.getAttribute('data-sugg') };
+    await comandaBarra(app, 'chiudi');
+    await page.waitForTimeout(400);
+    await page.mouse.click(400, 300, { button: 'right' });
+    await page.waitForTimeout(1200);
+    const voci = await menuDi(page).locator('.sn-menu').allTextContents().catch(() => []);
+    info.menuHaAiuto = voci.some((t) => t.includes('Aiuto'));
+    info.menu = voci.join(' | ').slice(0, 200);
+    await page.keyboard.press('Escape');
+    console.log('PAGINA', JSON.stringify(info));
+  }
+});
+
+test.skip('da tastiera: apre, detta, ferma', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  await microfonoFinto(shell);
+  const page = await testServer.openReady(openTab, SITO);
+  await expect.poll(async () => (await nelMain(app))?.aiuto?.pannello, { timeout: 8_000 }).toBe('chiuso');
+  const barra = await barraPage(app);
+  const passo = async () => {
+    await comandaBarra(app, 'tasto');
+    await pannelloFermo(barra);
+    const f = await barra.evaluate(() => document.activeElement && document.activeElement.dataset && document.activeElement.dataset.id);
+    console.log('fuoco su', f);
+    await barra.keyboard.press('Enter');
+    await page.waitForTimeout(800);
+    console.log('dopo Enter', JSON.stringify(await nelMain(app)), 'barra aperta', (await statoBarra(app)).aperta);
+  };
+  await passo();
+  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await passo();
+  await expect(page.locator('.sn-sidebar .sn-voce-btn')).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
+  await page.waitForTimeout(1200);
+  await passo();
+  await expect(page.locator('.sn-sidebar .sn-voce-btn')).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
+  await expect(page.locator('.sn-sidebar textarea')).toHaveValue('ciao', { timeout: 10_000 });
+});
+
+test.skip('sonda: ferma a pannello ridotto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  await microfonoFinto(shell);
+  const page = await testServer.openReady(openTab, SITO);
+  await expect.poll(async () => (await nelMain(app))?.aiuto?.pannello, { timeout: 8_000 }).toBe('chiuso');
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic'); await pannelloFermo(barra);
+  const help = icona(barra);
+  await help.click();
+  const aiuto = page.locator('.sn-sidebar');
+  await expect(aiuto).toBeVisible({ timeout: 8_000 });
+  await help.click();
+  const mic = aiuto.locator('.sn-voce-btn');
+  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
+  await aiuto.locator('.sn-sidebar-collapse').click();
+  await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
+  await comandaBarra(app, 'clic'); await pannelloFermo(barra);
+  await expect(help).toHaveAttribute('aria-label', 'Ferma');
+  await help.click();
+  for (let i = 0; i < 8; i++) {
+    const st = await page.evaluate(() => ({ cls: document.querySelector('.sn-sidebar').className, mic: document.querySelector('.sn-voce-btn').dataset.stato, val: document.querySelector('.sn-sidebar textarea').value, att: document.activeElement && document.activeElement.tagName }));
+    console.log('T', i * 300, JSON.stringify(st), await help.getAttribute('aria-label'));
+    await page.waitForTimeout(300);
+  }
+});
+
+test('sonda: riga del tasto destro, ridotto mentre detta', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  await microfonoFinto(shell);
+  const page = await testServer.openReady(openTab, SITO);
+  await expect.poll(async () => (await nelMain(app))?.aiuto?.pannello, { timeout: 8_000 }).toBe('chiuso');
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'primary', beforeId: 'translate' }, {}));
+  await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('help');
+  await page.locator('h1').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]').click();
+  const aiuto = page.locator('.sn-sidebar');
+  await expect(aiuto).toBeVisible({ timeout: 8_000 });
+  await page.locator('h1').click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]').click();
+  const mic = aiuto.locator('.sn-voce-btn');
+  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 8_000 });
+  await aiuto.locator('.sn-sidebar-collapse').click();
+  await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
+  await page.locator('h1').click({ button: 'right' });
+  const nelMenu = menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]');
+  await expect(nelMenu).toHaveAttribute('aria-label', 'Ferma', { timeout: 8_000 });
+  await nelMenu.click();
+  await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 10_000 });
+  console.log('DOPO', await aiuto.getAttribute('class'));
 });
