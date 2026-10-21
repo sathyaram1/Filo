@@ -1,6 +1,6 @@
-// Le regole del correttore senza DOM (#1446): i candidati che il codice trova da sé, il pezzo nuovo da far giudicare al
-// modello, la sua risposta riga per riga e il segno ritrovato nel testo di adesso. Il disegno, i tempi e le chiamate
-// stanno in spellcheck.js. Prove: tests/unit/correttoreRegole.test.mjs.
+// Le regole del correttore senza DOM (#1446): i candidati che il codice trova da sé (anche i segnaposti, #1448), il pezzo
+// nuovo da far giudicare al modello, la sua risposta riga per riga e il segno ritrovato nel testo di adesso. Il disegno,
+// i tempi e le chiamate stanno in spellcheck.js. Prove: tests/unit/correttoreRegole.test.mjs, correttoreSegnaposti.test.mjs.
 
 (function (global) {
   'use strict';
