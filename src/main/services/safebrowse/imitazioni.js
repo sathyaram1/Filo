@@ -129,7 +129,6 @@ function candidati(zone) {
         else if (r.d === 0) tipo = (sk.straniere ? 'omografo' : (sk.cifre || l.vista) ? 'sosiadentro' : 'dentro');
         else if (Math.abs(l.testo.length - t.length) <= mc.soglia && distanza(l.testo, t) <= mc.soglia) tipo = 'typo';
         else tipo = 'typodentro';
-        if (tipo === 'esatto' && z.zona === 'sld' && z.etichetta === t) tipo = 'esatto';
         // Le letture di una stessa etichetta danno lo stesso candidato: tiene la prima che lo trova.
         if (out.some((c) => c.mc === mc && c.etichetta === z.etichetta && c.zona === z.zona)) continue;
         out.push({ mc, zona: z.zona, etichetta: z.etichetta, tipo, d: r.d, inizio: r.inizio, fine: r.fine, sk: { ...sk, testo: l.testo }, vista: l.vista });
