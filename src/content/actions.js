@@ -739,6 +739,27 @@
     };
   }
 
+  // Un collegamento è anche la zona di una mappa d'immagine e l'<a> di un disegno SVG, anche con l'xlink:href dei disegni
+  // vecchi (#725.6, #725.7). Lì `href` è un oggetto, non l'indirizzo: chi vuole l'indirizzo lo chiede qui.
+  const SELETTORE_COLLEGAMENTO = 'a[href], a[*|href], area[href]';
+  const XLINK = 'http://www.w3.org/1999/xlink';
+  function indirizzoDelLink(el) {
+    if (!el) return '';
+    let h;
+    try { h = el.href; } catch (_) { return ''; }
+    if (typeof h === 'string') return h;
+    const scritto = String((h && h.animVal) || el.getAttribute?.('href') || el.getAttributeNS?.(XLINK, 'href') || '').trim();
+    if (!scritto) return '';
+    try { return new URL(scritto, el.baseURI || location.href).href; } catch (_) { return scritto; }
+  }
+
+  // Il nome con cui il collegamento si presenta: una zona di mappa non ha testo, solo il suo `alt`.
+  function nomeDelLink(el) {
+    if (!el) return '';
+    const testo = el.tagName === 'AREA' ? '' : (el.textContent || '').trim();
+    return testo || String(el.getAttribute?.('alt') || el.getAttribute?.('aria-label') || el.getAttribute?.('title') || '').trim();
+  }
+
   // L'avviso sull'indirizzo lo calcola Filo, non il modello: si mostra SUBITO e
   // resta anche se la spiegazione non arriva mai (#725).
   function mostraAvvisoLink(el, url) {
