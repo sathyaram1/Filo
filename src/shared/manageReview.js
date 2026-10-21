@@ -582,8 +582,8 @@
       if (statusReason === 'locale') {
         // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
         const text = localSenderCheck(fb).ok
-          ? 'Richiede lavoro locale: con «💻 Lavoro server» passa nei Lavori server.'
-          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro server» passa nei Lavori server.';
+          ? 'Richiede lavoro locale: con «💻 Lavoro server» torna In coda come lavoro server.'
+          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro server» torna In coda come lavoro server.';
         return { text, color: LOCALE.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
