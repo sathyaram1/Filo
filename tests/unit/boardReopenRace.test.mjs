@@ -38,6 +38,8 @@ const auth = require(join(__dirname, '..', '..', 'src', 'main', 'auth', 'google-
 auth.isSignedIn = () => true;
 auth.getUid = async () => UID;
 auth.getIdToken = async () => 'fake-id-token';
+// La Bacheca aperta a tutti (#1592): la pausa la prova boardEsitoGesti.test.mjs.
+require(join(__dirname, '..', '..', 'src', 'main', 'services', 'defaultsStore.js')).getApertoATutti = async () => ({ risposto: true, aperto: true });
 const UID = 'user-abc';
 const ORIGINAL_ID = 'fb-original';
 

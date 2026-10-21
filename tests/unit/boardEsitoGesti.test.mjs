@@ -27,6 +27,12 @@ auth.isSignedIn = () => signedIn;
 auth.getIdToken = async () => { if (tokenGuasto) throw tokenGuasto; return signedIn ? 'tok' : null; };
 auth.getUid = async () => (signedIn ? 'uid-1' : null);
 
+// La Bacheca aperta a tutti (#1592): qui si provano i gesti; la pausa ha la sua prova in fondo.
+const Defaults = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'defaultsStore.js'));
+const InPausa = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'inPausa.js'));
+let bachecaAperta = true;
+Defaults.getApertoATutti = async () => ({ risposto: true, aperto: bachecaAperta });
+
 let scheda;       // la scheda pubblica come la vede il server (null = tolta)
 let schedaGuasto; // Error lanciato dalla lettura della scheda
 let votoGuasto;   // Error lanciato dalla scrittura del voto
@@ -163,4 +169,27 @@ test('voto scritto ma rilettura caduta: niente conteggi vuoti che azzerino la sc
   } finally {
     globalThis.fetch = vero;
   }
+});
+
+test('#1592 — Bacheca in pausa per chi non è owner: voto, ritiro e «Ancora rotto?» non partono, niente crediti', async () => {
+  const castVote = globalThis.SN_FEEDBACK.castVote;
+  let scritture = 0;
+  globalThis.SN_FEEDBACK.castVote = async () => { scritture += 1; return {}; };
+  bachecaAperta = false;
+  try {
+    await InPausa.cancello('bacheca').rileggiOra();
+    for (const r of [await vota(), await ritira(), await riapri()]) {
+      assert.equal(r.ok, false);
+      assert.equal(r.code, 'paused');
+      assert.equal(r.error, InPausa.FRASI_PAUSA.bacheca);
+    }
+    assert.equal(scritture, 0, 'il voto è arrivato al database');
+    assert.equal(spese, 0, 'l’«Ancora rotto?» ha speso crediti');
+  } finally {
+    bachecaAperta = true;
+    globalThis.SN_FEEDBACK.castVote = castVote;
+    await InPausa.cancello('bacheca').rileggiOra();
+  }
+  // Riaperta dall'owner: il voto riparte.
+  assert.equal((await vota()).ok, true);
 });
