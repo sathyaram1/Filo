@@ -480,7 +480,7 @@ test('F3 — la spunta dopo un appunto salvato chiude la conversazione', async (
 });
 
 // La home chiesta insieme ad altro lavoro: il blocco conta il lavoro vero, e il bottone chiude la conversazione senza
-// svuotare la home, che è la coda del filo (#869). La prova del giro #567 voleva la home vuota, ed era rossa (#831.1).
+// svuotare la home, che è la coda del filo (#869): chi preme il bottone ritrova quello che ha appena letto.
 test('F4 — la home chiesta insieme a un timer: lavoro e risposta restano, anche dopo aver chiuso', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
