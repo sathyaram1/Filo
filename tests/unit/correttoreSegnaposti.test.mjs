@@ -100,6 +100,8 @@ test('il dato di un segnaposto è di tutta la sua frase: parole aggiunte e refus
   assert.ok(C.stessaFrase(allora, 'Google ha un p/e di soli xx, davvero basso per una azienda così.'));
   assert.ok(C.stessaFrase('Gogle ha un p/e di soli xx, davero basso.', 'Google ha un P/E di soli xx, davvero basso.'));
   assert.ok(C.stessaFrase('Google ha un p/e di soli xx, dav', 'Google ha un p/e di soli xx, davvero basso.'), 'l\'ultima parola era ancora in scrittura');
+  assert.ok(C.stessaFrase('Google a un p/e di soli xx, davvero basso.', 'Google ha un p/e di soli xx, davvero basso.'), 'un refuso corto');
+  assert.ok(C.stessaFrase('Il bitcoin e a xx dollari.', 'Il bitcoin è a xx dollari.'), 'un accento');
   assert.ok(!C.stessaFrase('Ci sono xx abitanti a Roma.', 'Ci sono xx abitanti a Milano.'), 'il soggetto dopo le x');
   assert.ok(!C.stessaFrase('Google ha un p/e di soli xx.', 'Apple ha un p/e di soli xx.'), 'il soggetto prima delle x');
   assert.ok(!C.stessaFrase('Nel 2020 il PIL era di xx miliardi.', 'Nel 2021 il PIL era di xx miliardi.'), 'un numero vale solo uguale');
