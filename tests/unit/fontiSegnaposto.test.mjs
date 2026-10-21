@@ -81,3 +81,15 @@ test('Wikipedia si chiede solo nelle lingue della lista, e la domanda va nell\'i
     globalThis.fetch = prima;
   }
 });
+
+test('una ricerca web non riuscita è un errore, non «nessun risultato»: chi chiama la lascia rifare', async () => {
+  const prima = globalThis.SN_WEB_SEARCH;
+  try {
+    globalThis.SN_WEB_SEARCH = { search: async () => ({ ok: false, results: [], reason: 'tutti i provider hanno fallito' }) };
+    await assert.rejects(() => F.web('Alphabet P/E ratio', ''), /non riuscita/);
+    globalThis.SN_WEB_SEARCH = { search: async () => ({ ok: true, results: [] }) };
+    assert.deepEqual(await F.web('Alphabet P/E ratio', ''), []);
+  } finally {
+    globalThis.SN_WEB_SEARCH = prima;
+  }
+});

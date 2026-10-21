@@ -87,3 +87,10 @@ test('la risposta della ricerca: valore, motivo, fonte, data e un indirizzo solo
   assert.equal(C.valoreTrovato(''), null);
   assert.equal(C.valoreTrovato('[14xx][m][f][d]'), null, 'un valore con le x non è un valore');
 });
+
+test('la ricerca di un segnaposto è la sua domanda, non la frase: un ritocco della frase non la rifà', () => {
+  const k = (domanda) => C.chiaveRicerca('xx', { domanda, dove: 'web', frase: String(Math.random()) });
+  assert.equal(k('Alphabet P/E ratio'), k('  alphabet  p/e ratio '));
+  assert.notEqual(k('Alphabet P/E ratio'), k('Nasdaq dot-com average P/E'));
+  assert.notEqual(C.chiaveRicerca('xx', { domanda: 'q', dove: 'web' }), C.chiaveRicerca('xx', { domanda: 'q', dove: 'wiki:en' }));
+});
