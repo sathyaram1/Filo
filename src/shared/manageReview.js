@@ -1681,6 +1681,26 @@
     return !!num && num === numeroOf(fb);
   }
 
+  // Fermata al cancello senza una richiesta da approvare (#1556): il motivo è la nota con cui il server l'ha fermata,
+  // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
+  const L5_SENZA_RICHIESTA = 'Il server l’ha fermata al cancello senza aprire una richiesta di fusione: non c’è un via libera da dare.';
+  const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata: le richieste di fusione non sono ancora arrivate a questa pagina.';
+  function l5SenzaRichiesta(fb, opts) {
+    const letto = !(opts && opts.dettaglioLetto === false);
+    const cifrata = letto && valueUnreadable(fb && fb.notes);
+    const nota = letto && !cifrata ? ultimaDomanda(fb) : null;
+    // Senza gli elenchi letti «nessuna richiesta» sarebbe un'ipotesi: la frase lo dice, e la lista resta generica.
+    const lette = !!(opts && opts.fusioniLette);
+    const righe = nota && nota.ts ? [riga('Quando', istanteDelTurno(nota.ts))] : [];
+    return forma('l5', 'quadrato', 'Fusione', 'attack', 'bloccato', {
+      titolo: 'Fusione',
+      righe,
+      testo: (nota && nota.body) || (lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI),
+      illeggibile: cifrata,
+      azioni: ['rimanda', 'archivia'],
+    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
+  }
+
   /**
    * Livello 5: il cancello di fusione. Le richieste arrivano dal server
    * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
