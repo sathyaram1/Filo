@@ -286,7 +286,7 @@
       if (c.value !== st.buono && !inConsegna(st)) ripristina(c, st);
       // Fra il tasto e il suo annuncio nessun gesto dell'utente sposta la selezione: chi l'ha spostata è il sito.
       const t = st.tasto;
-      if (t && t.sel && !e.isComposing && e.inputType !== 'insertCompositionText' && c.value === st.buono) {
+      if (t && t.sel && !st.componendo && !e.isComposing && e.inputType !== 'insertCompositionText' && c.value === st.buono) {
         const ora = selezioneDi(c);
         if (ora && (ora[0] !== t.sel[0] || ora[1] !== t.sel[1])) {
           try { c.setSelectionRange(t.sel[0], t.sel[1]); } catch (_) {}
