@@ -327,9 +327,11 @@
     const muove = (e) => {
       if (!veroONostro(e)) return;
       if (e.type === 'keydown') {
-        const t = { e, sel: selezioneDi(c) };
+        // Un tasto che passa dal metodo di scrittura (229, Process, i tasti morti) sposta la selezione da sé.
+        const ime = e.isComposing || e.keyCode === 229 || e.key === 'Process' || e.key === 'Dead';
+        const t = ime ? null : { e, sel: selezioneDi(c) };
         st.tasto = t;
-        setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
+        if (t) setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
       }
       if (e.type !== 'keydown' || TASTI_CHE_MUOVONO.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) st.gesto = true;
     };
