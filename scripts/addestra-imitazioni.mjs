@@ -184,13 +184,6 @@ function sinteticiParole(etichetta) {
       if (LEGIT_DOMAINS.has(h) || etichetta.has(h) || etichetta.has('www.' + h)) continue;
       out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_PAROLE });
     }
-    // Un marchio corto staccato col trattino da un pezzo generato (dhl-x7k2m9q4.vercel.app) resta un sosia: le parole da
-    // truffa da sole lo insegnavano solo accanto a una parola.
-    if (t.length <= 4) {
-      const pezzo = Array.from({ length: 6 + Math.floor(casoPezzo() * 6) }, () => ALNUM[Math.floor(casoPezzo() * 36)]).join('');
-      const h = `${t}-${pezzo}.${PIATTAFORME[Math.floor(casoPezzo() * PIATTAFORME.length)]}`;
-      out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_PAROLE });
-    }
   }
   return out;
 }
