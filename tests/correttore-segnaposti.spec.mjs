@@ -185,6 +185,64 @@ test('due «xx» da cercare nella stessa frase hanno ciascuno la sua ricerca e i
   await expect(page.locator('#ta')).toHaveValue('Google ha un p/e di soli 27, mentre al picco delle dot-com il Nasdaq aveva in media un p/e di 175. ');
 });
 
+// Una ricerca vera dura qualche secondo: qui due, così i puntini di una seconda ricerca si vedono.
+async function webLento(app) {
+  await app.evaluate(() => {
+    const F = globalThis.SN_FONTI_SEGNAPOSTO;
+    const w = F.web;
+    F.web = async (q) => { const r = await w(q); await new Promise((ok) => setTimeout(ok, 2000)); return r; };
+  });
+}
+async function restaIlValore(page, testo, ms) {
+  for (const fine = Date.now() + ms; Date.now() < fine;) {
+    expect(await page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando').count(), 'il valore è tornato ai puntini').toBe(0);
+    await expect(valore(page, testo)).toHaveCount(1);
+    await page.waitForTimeout(200);
+  }
+}
+const P_E = {
+  ragionato: { 'p/e di soli xx': ['[di soli xx][][Alphabet P/E ratio][cerca][web]'] },
+  fontiWeb: [{ titolo: 'Alphabet PE ratio', sito: 'borsa.example', url: 'https://borsa.example/goog', data: '', testo: 'Alphabet P/E ratio: 27.1' }],
+  estrai: '[27][Rapporto prezzo/utili di Alphabet][1][20 ottobre 2026]',
+};
+
+test('lo stesso dato non si ricerca quando la frase cambia altrove: una pausa a metà frase, un refuso corretto', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, P_E);
+  await webLento(app);
+  await page.locator('#ta').click();
+  await page.keyboard.type('Google ha un p/e di soli xx, ');
+  await expect(valore(page, '27')).toBeVisible({ timeout: 10000 });
+  await page.keyboard.type('davero basso per una azienda così. ');
+  await restaIlValore(page, '27', 4000);
+  const i = (await page.locator('#ta').inputValue()).indexOf('davero') + 3;
+  await page.locator('#ta').evaluate((e, i) => e.setSelectionRange(i, i), i);
+  await page.keyboard.type('v');
+  await page.keyboard.press('End');
+  await restaIlValore(page, '27', 4000);
+  expect(await globale(app, '__webChieste')).toEqual(['Alphabet P/E ratio']);
+});
+
+test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuovo», che tornata la rete trova il valore', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, P_E);
+  await app.evaluate(() => {
+    globalThis.__reteGiu = true;
+    const F = globalThis.SN_FONTI_SEGNAPOSTO;
+    for (const k of ['web', 'wikipedia']) {
+      const f = F[k];
+      F[k] = async (...a) => { if (globalThis.__reteGiu) throw new Error('fetch failed: ENOTFOUND'); return f(...a); };
+    }
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
+  await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 8000 });
+  await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 8000 });
+  const menu = await tastoDestroSu(page, ocra(page, 'xx'));
+  await expect(menu.locator('.sn-menu-segno')).toContainText('La ricerca non è riuscita', { timeout: 3000 });
+  await app.evaluate(() => { globalThis.__reteGiu = false; });
+  await menu.voce('Cerca di nuovo').click();
+  await expect(valore(page, '27')).toBeVisible({ timeout: 8000 });
+});
+
 test('col web spento un dato di adesso si cerca solo su Wikipedia, e se non c\'è lo dice', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, { web: false, ragionato: { 'p/e di soli xx': ['[di soli xx][][Alphabet P/E ratio][cerca][web]'] } });
   await page.locator('#ta').click();
