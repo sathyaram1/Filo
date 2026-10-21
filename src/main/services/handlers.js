@@ -2320,6 +2320,11 @@ async function eseguiAzioneFilo(action, {
       }
     } catch (_) {}
   }
+  // #1297 — quello che Filo impara su chi è l'utente nel benvenuto segue la regola dello stile (#592.2).
+  if (type === 'SALVA_LEZIONE') {
+    delete action._accoglienza;
+    if (accoglienza && !confirmed && !assistente && !testoDiAltriNelleAzioni(contesto)) action._accoglienza = true;
+  }
 
   // #845 — una pagina salvata si apre con l'indirizzo che ha in elenco, mai con uno scritto dal modello: lo mette qui il
   // main, e la porta delle uscite lo guarda come quello di NAVIGA. Un id che non c'è non chiede niente.
@@ -2829,11 +2834,14 @@ async function eseguiAzioneFilo(action, {
         const l = global.SN_PREF.lezioneDaAzione(action);
         if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
         let fissata = false;
+        let nuova = null;
         if (l.testo) {
           try {
             let fonte = '';
             try { fonte = chatId ? await globalThis.SN_IL_FILO.ultimaDomanda(chatId) : ''; } catch (_) {}
-            await FiloMem.appendLesson(l.testo, { fonti: fonte ? [fonte] : [] });
+            const buf = await FiloMem.appendLesson(l.testo, { fonti: fonte ? [fonte] : [] });
+            const ultima = Array.isArray(buf) ? buf[buf.length - 1] : null;
+            if (ultima && ultima.text === l.testo) nuova = { ts: ultima.ts, text: ultima.text };
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -2842,7 +2850,11 @@ async function eseguiAzioneFilo(action, {
             console.warn('[Filo] salvataggio lezione fallito', e?.message || e);
           }
         }
-        return { executed: fissata, kept: false };
+        // Nel benvenuto la chat la dice in una riga col suo Annulla, che la riconosce da data e testo (#1297).
+        const ricordo = fissata && nuova && globalThis.SN_ACTION_LEVELS.lezioneDellAccoglienza(action);
+        return ricordo
+          ? { executed: true, kept: true, output: { ricordo: nuova } }
+          : { executed: fissata, kept: false };
       }
       case 'INVIA_FEEDBACK': {
         // Filo invia un feedback a nome dell'utente (#146.5). Livello 2: a
@@ -3354,6 +3366,8 @@ async function eseguiAzioneFilo(action, {
           await FiloMem.clearLessonsBuffer();
           // Anche le righe nascoste del quaderno: «tutto» comprende quello che l'utente aveva solo tolto (#872).
           await FiloMem.svuotaQuaderno();
+          // E le interviste di benvenuto conservate: sono quello che l'utente gli ha raccontato di sé (#1297).
+          if (Onboarding) await saveOnboarding(Onboarding.dimentica(await FiloMem.getOnboarding()));
           broadcastLiveUpdate();
           return { executed: true, kept: false };
         } catch (e) {
@@ -5282,7 +5296,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let onbBefore = Onboarding ? await FiloMem.getOnboarding() : { done: true };
   // L'intervista comincia col benvenuto di Filo: un messaggio scritto prima (senza crediti) non ne è una risposta, e
   // metterlo nella conversazione la faceva ripartire da lì, senza che Filo si presentasse mai.
-  const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0);
+  // Il turno è dell'intervista solo se arriva dalla sua conversazione: rifatta con altre chat aperte, quello che si
+  // scrive lì resta di quelle chat, «stop» compreso (#1297).
+  const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0)
+    && (!chatId || chatId === Onboarding.chatId(onbBefore));
   if (onbActive) { volo.accoglienza = true; onbTurniInVolo += 1; }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
 
@@ -5344,7 +5361,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Un «no grazie» invece NON passa di qui: rifiuta la proposta che Filo ha
     // appena fatto, e a quella risponde il modello (vedi `isExitRequest`).
     const bye = Onboarding.CLOSING_MESSAGE;
-    const closed = Onboarding.close(Onboarding.appendTurn(onbBefore, { role: 'filo', text: bye }));
+    const closed = Onboarding.close(Onboarding.appendTurn(onbBefore, { role: 'filo', text: bye, congedo: true }));
     await saveOnboarding(closed);
     // Il congedo è l'ultima cosa che l'utente legge dell'accoglienza: finisce
     // in archivio come ogni altra battuta. Questo turno esce di qui e non
@@ -5400,7 +5417,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText, attese: attesePrimaDelModello } = await FiloState.assemble({ creditiFreschi: true });
+  // Nel benvenuto delle schede aperte arriva solo il sito: un titolo scritto da una pagina non detta lo stile (#1297).
+  const { stateText, attese: attesePrimaDelModello } = await FiloState.assemble({ creditiFreschi: true, soloSiti: onbActive });
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.

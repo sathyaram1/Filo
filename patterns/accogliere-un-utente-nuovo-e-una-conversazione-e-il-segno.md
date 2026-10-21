@@ -47,6 +47,26 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   sei volte il pulsante per buttare fuori la prima conversazione vera. Il filtro
   sta in `normalize`, non solo dove si archivia, così ripulisce anche gli
   archivi già sporcati.
+- **Quello che si conserva si toglie** (#1297): ogni intervista conservata ha la
+  sua × in Preferenze (quella ancora aperta no: si chiude dalla home), e la
+  cancellazione di tutta la memoria passa anche di qui (`dimentica`). Le parole
+  dell'intervista sono memoria quanto il profilo; resta solo il segno «già
+  accolto».
+- **Rifarla non tocca le altre schede** (#1297): la fine dell'intervista arriva
+  a tutte, ma torna alla home solo la scheda che la mostrava; e l'intervista non
+  si apre in una scheda che ha davanti una conversazione, nemmeno se lì l'utente
+  non ha scritto (riaperta, o continuata da un'altra scheda). E un turno è
+  dell'intervista solo se arriva dalla sua conversazione (la sua targa): quello
+  che si scrive nelle altre chat mentre è aperta, «stop» compreso, resta loro.
+  Una scheda rimasta su un'intervista rifatta un'altra volta si lega alla nuova
+  targa; «Riprendiamola» cliccato in una scheda con una chat aperta riapre
+  l'intervista in una scheda nuova.
+  La regola che chiude tutte queste porte insieme: solo il primo benvenuto prende
+  ogni home; rifatta o ripresa (`rifatta` nello stato) l'intervista sta solo nelle
+  pagine che l'hanno chiesta (`?accoglienza` nell'indirizzo, messo da Preferenze,
+  da «Riprendiamola» e dall'apertura). Le altre, ricaricate o aperte da un
+  collegamento, restano il filo; se è rimasta a metà, la home lo ricorda con la
+  stessa riga di sotto («La presentazione è rimasta a metà»).
 - **Chiusa a metà, la home lo dice**: il congedo vive in chat e la chat sparisce
   appena la home è pronta — col modello giù, in un istante. Il segno «già
   accolto» però è definitivo, e chi non fa in tempo a leggerlo non ha modo di
@@ -54,6 +74,18 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   della fine, lo stato porta `notice: 'early'` e la home mostra una riga con
   «Riprendiamola» e «No, va bene così», finché l'utente non risponde. Chi arriva
   in fondo non vede niente: non c'è niente da spiegare.
+- **«Riprendiamola» riprende, non ricomincia** (#1297): riapre la stessa
+  intervista (stessa targa, stesse spunte). Il congedo scritto dall'app e la
+  frase che l'ha chiesto escono, così l'ultima battuta torna la domanda in
+  sospeso, senza chiamare il modello; se a chiudere era stato il modello, il clic
+  diventa la risposta dell'utente e Filo prosegue. Il tetto degli scambi riparte
+  dalla ripresa. Da capo la si rifà da Preferenze.
+- **Nel benvenuto pulito niente riquadri** (#592.2, #1297): lo stile proposto e
+  quello che Filo impara su chi è l'utente si applicano subito, con una riga corta
+  col testo esatto e il suo Annulla (la lezione annullata finisce fra le nascoste
+  del quaderno). Col testo di altri nella conversazione torna il riquadro. Delle
+  schede aperte il modello vede solo il sito: un titolo lo scrive la pagina, e
+  potrebbe dettare uno stile.
 - **Una scheda non è l'unica**: l'accoglienza vive nella scheda nuova, e di
   schede nuove se ne aprono quante se ne vuole. Ogni scrittura dello stato viene
   annunciata (`FILO_ONBOARDING_UPDATED`) e le altre schede si riallineano; il
@@ -65,7 +97,8 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   reale, compresa la home finale), `tests/onboarding-uscita.spec.mjs` (le vie
   d'uscita e le strade che si rompono: provider giù, "Riprova", due schede),
   `tests/onboarding-ripresa.spec.mjs` (la riga sulla home dopo una chiusura a
-  metà), `tests/verifica/524/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
+  metà), `tests/accoglienza-rifatta.spec.mjs` (le altre schede, la ×,
+  «Riprendiamola», la riga corta della lezione, i titoli delle schede), `tests/verifica/524/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
   vuoto, testo ostile, tre schede).
 - **Le prove partono da un utente già accolto**: una home aperta in un profilo
   nuovo comincia l'intervista appena Filo ha un modello, anche a metà prova, e

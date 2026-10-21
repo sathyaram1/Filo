@@ -482,6 +482,8 @@ html, body {
   line-height: 1.5;
 }
 .dash-thread > .dash-onb-notice { align-self: center; margin: 6px 0; }
+/* L'intervista rifatta rimasta aperta altrove si ricorda sulla home, non in fondo a un'altra conversazione. */
+body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; }
 
 /* ── La coda del filo (#869) ── */
 /* Cercare nel filo: un campo discreto in cima al centro, i risultati sopra il filo. */

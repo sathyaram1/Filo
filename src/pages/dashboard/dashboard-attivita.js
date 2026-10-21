@@ -1160,6 +1160,45 @@
     return riga;
   }
 
+  // #1297 — quello che Filo impara su chi è l'utente nel benvenuto: la stessa riga dello stile. Annulla la toglie dalla
+  // memoria come «dimentica» (resta fra le nascoste del quaderno, da dove si rimette).
+  function lezioneAccoglienza(a) {
+    const r = a && a._output && a._output.ricordo;
+    return isType(a, 'SALVA_LEZIONE') && a._executed !== false && !!r && typeof r.text === 'string' && !!r.text.trim();
+  }
+
+  function rigaLezioneAccoglienza(a) {
+    const o = a._output;
+    const riga = document.createElement('div');
+    riga.className = 'dash-stile-accoglienza dash-lezione-accoglienza';
+    const testo = document.createElement('span');
+    testo.className = 'dash-stile-accoglienza-testo';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = 'Annulla';
+    btn.title = 'Non ricordarlo';
+    const mostra = () => {
+      testo.textContent = o.dimenticato === 'si' ? 'Non me lo ricordo più.'
+        : (o.dimenticato === 'tardi' ? 'Ormai è nel tuo profilo: lo togli dal quaderno delle memorie.'
+          : `Mi ricorderò: «${o.ricordo.text.trim()}»`);
+      btn.hidden = !!o.dimenticato;
+    };
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      let r = null;
+      try { r = await send({ type: MSG.FILO_MEMORY_FORGET, lezione: { ts: o.ricordo.ts, text: o.ricordo.text } }); } catch (_) { r = null; }
+      btn.disabled = false;
+      if (r && r.ok) { o.dimenticato = r.tolta ? 'si' : 'tardi'; mostra(); return; }
+      btn.textContent = 'Annulla non riuscito: riprova';
+      btn.title = (r && r.error) || '';
+    });
+    mostra();
+    riga.append(testo, btn);
+    return riga;
+  }
+
   // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
   function sceltaAutonomia(a) {
     return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
@@ -1275,7 +1314,7 @@
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
       const anche = aspettaUtente(a) || rigaEBottone(a)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || sceltaAutonomia(a)
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a)
         || salvateDaMostrare(a).length > 0;
       if (activity) {
         if (told) {
@@ -1977,6 +2016,7 @@
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (type === 'CERCA_SALVATE') return bottoniSalvate(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
+    if (lezioneAccoglienza(a)) return rigaLezioneAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
