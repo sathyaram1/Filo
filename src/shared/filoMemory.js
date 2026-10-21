@@ -154,10 +154,13 @@
     if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') {
       const mem = await getMemory();
       const testo = typeof mem[via.modulo] === 'string' ? mem[via.modulo] : null;
-      if (testo == null || !via.riga.trim()) return null;
-      const righe = testo.split(/\r?\n/);
+      if (!via.riga.trim()) return null;
+      const righe = testo == null ? [] : testo.split(/\r?\n/);
       const i = righe.findIndex((r) => r.trim() === via.riga.trim());
-      if (i < 0) return null;
+      if (i < 0) {
+        const e = await erede(via.riga, fonti);
+        return e ? hideLine(e) : null;
+      }
       const [tolta] = righe.splice(i, 1);
       await setMemory({ ...mem, [via.modulo]: righe.join('\n').trim() });
       const meta = await getFonti();
