@@ -1076,12 +1076,14 @@ for (const { nome, nuova } of [{ nome: 'una chat nuova', nuova: true }, { nome: 
     await page.locator('#input').fill('completa l’accesso alla banca');
     await page.locator('#sendBtn').click();
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Non l’ho aperto' })).toBeVisible({ timeout: 20_000 });
-    expect(JSON.stringify(await app.evaluate(() => globalThis.__visti)), 'la chat nuova non ritrova il codice').toContain(CODICE);
+    expect(JSON.stringify(await app.evaluate(() => globalThis.__visti)), 'la chat dopo il riavvio non ritrova il codice').toContain(CODICE);
     const chatDi = (testo) => app.evaluate(async (_electron, t) => (await globalThis.SN_IL_FILO.chats())
       .filter((c) => c.messages.some((m) => m.text === t)).map((c) => c.id), testo);
     await expect.poll(() => chatDi('completa l’accesso alla banca')).toHaveLength(1);
-    expect(await chatDi('completa l’accesso alla banca'), 'la domanda dopo il riavvio non è in una chat nuova')
-      .not.toEqual(await chatDi('leggi la notifica della banca'));
+    const dopo = await chatDi('completa l’accesso alla banca');
+    const prima = await chatDi('leggi la notifica della banca');
+    if (nuova) expect(dopo, 'la domanda dopo «/clear» non è in una chat nuova').not.toEqual(prima);
+    else expect(dopo, 'la domanda dopo il riavvio non continua lo scambio che la home mostra').toEqual(prima);
     const activity = page.locator('.dash-activity').last();
     await activity.locator('.dash-activity-head').click();
     await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Non ho aperto' }))
