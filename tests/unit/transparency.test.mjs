@@ -448,8 +448,8 @@ test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
   }
 });
 
-// Genera su una COPIA del repo, coi markdown in più che la prova vuole.
-function generaCopia(extra) {
+// Genera su una COPIA del repo, coi markdown in più (e senza quelli tolti) che la prova vuole.
+function generaCopia(extra, togli = []) {
   const tmp = cartellaTemporanea('filo-trasparenza-');
   mkdirSync(join(tmp, 'scripts'), { recursive: true });
   cpSync(join(ROOT, 'scripts', 'build-transparency.mjs'), join(tmp, 'scripts', 'build-transparency.mjs'));
