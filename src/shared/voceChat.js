@@ -121,6 +121,7 @@
       b.setAttribute('aria-label', nome);
       b.setAttribute('aria-pressed', stato === 'ascolta' ? 'true' : 'false');
       if (stato !== 'ascolta') b.style.removeProperty('--sn-voce-livello');
+      if (typeof suStato === 'function') { try { suStato(stato); } catch (e) { console.error('[Filo voce]', e); } }
     }
     imposta('pronto');
 
