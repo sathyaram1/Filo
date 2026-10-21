@@ -801,8 +801,8 @@
       statusEl.textContent = I18n.t('options_model_no_id');
       return;
     }
+    // Senza una chiave scritta qui la prova usa quella con cui la funzione pagherebbe, i crediti di Filo (#830).
     const apiKey = providerKey(providerId);
-    if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
     btn.dataset.inCorso = '1';
