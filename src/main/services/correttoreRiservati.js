@@ -35,7 +35,8 @@ function pezziOscurati(pezzi, campo, campoDa) {
     && campo.slice(campoDa, campoDa + unito.length) === unito;
   const base = daCampo ? campo : unito;
   const scarto = daCampo ? campoDa : 0;
-  const valori = valoriDi(base);
+  // Anche pezzo per pezzo: due pezzi incollati possono fondere due numeri in uno che non è più una carta.
+  const valori = [...new Set([base, ...pezzi].flatMap(valoriDi))].sort((x, y) => y.length - x.length);
   const coperti = [];
   for (const valore of valori) for (const m of base.matchAll(formaDi(valore))) coperti.push([m.index - scarto, m.index - scarto + m[0].length]);
   let a = 0;

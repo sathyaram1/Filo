@@ -1041,7 +1041,7 @@
   const esiti = new Map();
   const domandeInViaggio = new Map();
   function chiedi(action, payload, { suRichiesta = false, giorno = '' } = {}) {
-    const chiave = `${action}\u0000${giorno}\u0000${JSON.stringify(payload)}`;
+    const chiave = `${action}\u0000${giorno}\u0000${JSON.stringify({ ...payload, campo: undefined })}`;
     if (esiti.has(chiave)) {
       const r = esiti.get(chiave);
       esiti.delete(chiave);
@@ -1069,11 +1069,18 @@
   }
 
   // Il campo prima del pezzo nuovo, da un inizio che si sposta a scatti di PRIMA_SCATTO caratteri.
-  function primaDel(testo, start) {
+  function inizioPrima(testo, start) {
     let da = Math.max(0, start - PRIMA_MIN);
     da = Math.floor(da / PRIMA_SCATTO) * PRIMA_SCATTO;
     while (da > 0 && da < start && isWordCharLocal(testo[da - 1])) da++;
-    return testo.slice(da, start);
+    return da;
+  }
+
+  // I tre pezzi che partono, col campo intero per il main: i dati riservati si cercano lì, perché la parola che presenta
+  // una password può stare fuori dal pezzo che porta il valore (correttoreRiservati.js). Il campo non parte.
+  function pezziDa(testo, start, end) {
+    const da = inizioPrima(testo, start);
+    return { prima: testo.slice(da, start), nuovo: testo.slice(start, end), dopo: testo.slice(end, end + DOPO_MAX), campo: testo, campoDa: da };
   }
 
   // Dove si scrive: il sito e la coda del testo della pagina prima del campo (in una chat, gli ultimi messaggi). Si
@@ -1110,9 +1117,7 @@
     const candidati = state.codiceT2.filter((c) => c.segno === 'errore' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     for (const c of candidati) state.richiesti.add(Rg.chiaveVerdetto(c));
     const payload = {
-      prima: primaDel(d.testo, g.start),
-      nuovo: d.testo.slice(g.start, g.end),
-      dopo: d.testo.slice(g.end, g.end + DOPO_MAX),
+      ...pezziDa(d.testo, g.start, g.end),
       candidati: candidati.slice(0, 40).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       luogo: luogoDi(state),
     };
@@ -1159,9 +1164,7 @@
     const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
     const contesto = contestoDelCampo(state.el);
     const payload = {
-      prima: primaDel(d.testo, g.start),
-      nuovo: d.testo.slice(g.start, g.end),
-      dopo: d.testo.slice(g.end, g.end + DOPO_MAX),
+      ...pezziDa(d.testo, g.start, g.end),
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       contesto,
       ripetizioni: ripetizioniAttive(),
@@ -1372,9 +1375,7 @@
     let sito = '';
     try { sito = location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) {}
     const payload = {
-      prima: testo.slice(Math.max(0, wordCtx.start - PRIMA_MIN), wordCtx.start),
-      nuovo: testo.slice(wordCtx.start, wordCtx.end),
-      dopo: testo.slice(wordCtx.end, wordCtx.end + DOPO_MAX),
+      ...pezziDa(testo, wordCtx.start, wordCtx.end),
       candidati: [{ pezzo: wordCtx.word, perche: t('spell_perche_chiesta') }],
       luogo: { sito },
     };
