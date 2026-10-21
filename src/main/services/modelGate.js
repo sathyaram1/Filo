@@ -230,8 +230,9 @@
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
+        const daMandare = await senzaSegreti(messages);
         r = await providers().streamCompleteWithFallback({
-          attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare), tools, toolChoice, signal,
           onDelta: vedendo(m, onDelta), onReasoning: vedendo(m, onReasoning), onToolCall: vedendo(m, onToolCall),
           onFallback, onReset, onTentativoFallito: m.errore,
         });
