@@ -316,16 +316,15 @@ service cloud.firestore {
     // config/bacheca e config/mazzi (#1592) → `openToAll`, come config/redteam:
     // la Bacheca e il Deck builder sono aperti a chi non è admin? Spento, assente o
     // illeggibile = in pausa. Lettura pubblica: dentro c'è un interruttore e basta.
-    match /config/{interruttore} {
-      allow read: if interruttore in ['bacheca', 'mazzi'];
-      allow create, update: if interruttore in ['bacheca', 'mazzi'] && isAdmin()
-        && request.resource.data.keys().hasOnly(['openToAll', 'updatedAt'])
-        && request.resource.data.get('openToAll', false) is bool
-        && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp
-            || (request.resource.data.updatedAt is string
-                && request.resource.data.updatedAt.size() <= 40));
-      allow delete: if interruttore in ['bacheca', 'mazzi'] && isAdmin();
+    match /config/bacheca {
+      allow read: if true;
+      allow create, update: if isAdmin() && interruttoreValido(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    match /config/mazzi {
+      allow read: if true;
+      allow create, update: if isAdmin() && interruttoreValido(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     // config/supportModels → modelli per gli slot di supporto (sanitizer,
