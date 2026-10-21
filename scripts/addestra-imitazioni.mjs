@@ -37,7 +37,9 @@ const L2 = Number(arg('--l2', 1e-6));
 // Il tetto dei falsi allarmi sui siti noti con cui si sceglie la soglia: uno su duecento.
 const FALSI_AMMESSI = Number(arg('--falsi', 0.005));
 const PESO_MANO = Number(arg('--peso-mano', 6));
-const PESO_SINTETICI = Number(arg('--peso-sintetici', 6));
+// I refusi scritti in automatico pesano meno di un'etichetta a mano: a peso pieno spostavano il modello sui refusi e
+// perdeva le imitazioni con altre parole.
+const PESO_SINTETICI = Number(arg('--peso-sintetici', 2));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
@@ -102,13 +104,15 @@ function principale(es, marchio) {
     || b.c.mc.token.length - a.c.mc.token.length || (a.c.zona === 'sld' ? -1 : 1))[0];
 }
 
-// I refusi di chi digita il dominio vero di un marchio (gooogle.com, micrsoft.com, linkedln.com), come li registra chi
-// aspetta l'errore: negli elenchi di truffe sono pochi, perché vivono di traffico sbagliato più che di messaggi. Uno per
-// tipo di errore e per marchio; resta fuori un nome che sta fra i siti noti.
+// Il tasto accanto sulla tastiera, per i refusi di chi digita.
 const ACCANTO = {
   q: 'wa', w: 'qe', e: 'wr', r: 'et', t: 'ry', y: 'tu', u: 'yi', i: 'uo', o: 'ip', p: 'ol', a: 'sq', s: 'ad', d: 'sf',
   f: 'dg', g: 'fh', h: 'gj', j: 'hk', k: 'jl', l: 'kp', z: 'xa', x: 'zc', c: 'xv', v: 'cb', b: 'vn', n: 'bm', m: 'nj',
 };
+
+// I refusi di chi digita il dominio vero di un marchio (gooogle.com, micrsoft.com, linkedln.com), come li registra chi
+// aspetta l'errore: negli elenchi di truffe sono pochi, perché vivono di traffico sbagliato più che di messaggi. Uno per
+// tipo di errore e per marchio; resta fuori un nome che sta fra i siti noti.
 function sinteticiRefusi(etichetta) {
   const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
   const SIMILI = [['i', 'l'], ['l', 'i'], ['m', 'rn'], ['w', 'vv'], ['g', 'q'], ['n', 'm'], ['o', 'a']];
@@ -131,33 +135,15 @@ function sinteticiRefusi(etichetta) {
     ];
     const simile = SIMILI.find(([da]) => t.indexOf(da, 1) > 0);
     if (simile) varianti.push(t.replace(new RegExp('(?<=.)' + simile[0]), simile[1]));
-    // I refusi in coda e quelli col tasto accanto: gli elenchi di siti noti contano anche le visite sbagliate
-    // (googlee.com, gmaill.com), e senza questi il modello imparava che una lettera in fondo è un altro sito.
+    // I refusi in coda e col tasto accanto (paypall, microsofts, amazom): senza, il modello lasciava passare una
+    // lettera in più o in meno in fondo al marchio.
     const ultima = t[t.length - 1];
     varianti.push(t + ultima, t + 's', t + (ACCANTO[ultima] || 'e')[0], t.slice(0, -1));
-    if (ACCANTO[t[m]]) varianti.push(t.slice(0, m) + ACCANTO[t[m]][0] + t.slice(m + 1), t.slice(0, m) + ACCANTO[t[m]][1] + t[m] + t.slice(m + 1));
+    if (ACCANTO[t[m]]) varianti.push(t.slice(0, m) + ACCANTO[t[m]][1] + t[m] + t.slice(m + 1));
     const nomi = [...new Set(varianti)].filter((v) => v !== t).map((v) => v + suff);
     // E il suffisso sbagliato di una lettera (github.co, paypal.cm), dove il marchio non l'ha preso per sé.
     if (suff === '.com') nomi.push(...['.co', '.cm', '.om'].map((x) => t + x).filter((h) => !b.domains.includes(h)));
     for (const h of nomi) if (!etichetta.has(h) && !etichetta.has('www.' + h)) out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
-  }
-  return out;
-}
-
-// I nomi che servizi cloud e anteprime generano a caso: un marchio corto ci cade dentro per caso (dh1, n26, bunq), uno
-// su duemila, e non imita nessuno. Restano solo quelli che portano un candidato.
-function sinteticiCasuali(quanti = Number(process.env.CASUALI ?? 4000)) {
-  const caso = rng(23);
-  const segni = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const pezzo = (k) => Array.from({ length: k }, () => segni[Math.floor(caso() * segni.length)]).join('');
-  const forme = [
-    (a) => a + '.cloudfront.net', (a) => a + '.a-caso.example.com', (a) => pezzo(8) + '-' + a + '.vercel.app',
-    (a) => a + '.netlify.app', (a) => a + '-' + pezzo(4) + '.herokuapp.com', (a) => 'x' + a + '.cdn.example.net', (a) => a + '.trycloudflare.com',
-  ];
-  const out = [];
-  for (let i = 0; out.length < quanti && i < quanti * 1000; i++) {
-    const h = forme[i % forme.length](pezzo(6 + Math.floor(caso() * 10)));
-    if (IM.esempi(normalize('https://' + h + '/')).length) out.push({ h, url: 'https://' + h + '/', marchio: null });
   }
   return out;
 }
@@ -308,8 +294,9 @@ function costruisci() {
     }
     const es = IM.esempi(norm, IM.escaDi(url));
     if (!es.length) return;
-    // Un refuso del dominio vero di un marchio sta fra i siti più visitati per le visite sbagliate, non perché sia un
-    // altro sito (googlee.com, gmaill.com): da un elenco non si impara che è innocuo, lo decide solo un'etichetta scritta.
+    // Un refuso del dominio vero di un marchio (micosoft.com) sta fra i siti più visitati per le visite sbagliate, non
+    // perché sia un altro sito: da un elenco non si impara che è innocuo. Un sito vero con quella forma (ilpost.it,
+    // a una lettera da inpost.it) lo dice un'etichetta scritta.
     if (fonte === 'elenco' && y === 0 && es.some(({ c }) => c.zona === 'sld' && c.tipo === 'typo'
       && c.mc.brand.domains.includes(c.mc.token + '.' + norm.publicSuffix))) { refusiTolti++; return; }
     const mask = (1 << BIT) - 1;
@@ -323,12 +310,10 @@ function costruisci() {
     // Un'etichetta scritta vale più di una riga di un elenco, che può sbagliare.
     if (fonte === 'mano') gruppi[gruppi.length - 1].peso = PESO_MANO;
     if (fonte === 'sintetico') gruppi[gruppi.length - 1].peso = PESO_SINTETICI;
-    if (fonte === 'casuale') gruppi[gruppi.length - 1].peso = Number(process.env.PESO_CASUALI || 1);
   };
   const utili = conCandidati(etichetta);
   for (const [h, y] of etichetta) if (utili.has(h) && !scritte.has(h)) aggiungi(h, y, null, 'elenco');
   for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, r.sintetico ? 'sintetico' : 'mano', r.url);
-  for (const r of sinteticiCasuali()) if (!scritte.has(r.h)) aggiungi(r.h, 0, null, 'casuale', r.url);
   return gruppi;
 }
 
@@ -361,16 +346,14 @@ async function avvia() {
   const gruppi = costruisci();
   console.log(`esempi: ${gruppi.filter((g) => g.y === 1).length} imitazioni, ${gruppi.filter((g) => g.y === 0).length} siti noti, ${refusiTolti} refusi di marchi tolti dagli elenchi (${Date.now() - t0} ms)`);
   // Un decimo da parte per scegliere la soglia su nomi che il modello non ha visto.
-  const caso = rng(11);
-  const parte = gruppi.map(() => caso() < 0.1);
+  // Il decimo lo sceglie il nome, non il posto nell'elenco: un'etichetta in più non rimescola la soglia.
+  const parte = gruppi.map((g) => IM.impronta(g.h + '|soglia') % 10 === 0);
   const esempiDi = (gg) => gg.flatMap((g) => (g.y === 1 ? [{ ix: g.ix[0], y: 1, peso: g.peso }] : g.ix.map((ix) => ({ ix, y: 0, peso: g.peso }))));
-  // I nomi casuali si imparano e non si contano per la soglia: facilissimi, la abbasserebbero sui siti veri.
-  const allena = gruppi.filter((g, i) => !parte[i] || g.fonte === 'casuale');
-  const valida = gruppi.filter((g, i) => parte[i] && g.fonte !== 'casuale');
+  const allena = gruppi.filter((_, i) => !parte[i]);
+  const valida = gruppi.filter((_, i) => parte[i]);
   const mq0 = quantizza(addestra(esempiDi(allena)));
   const pv = perHost(valida, mq0);
   const soglia = sogliaPer(pv, FALSI_AMMESSI);
-  if (process.env.DEBUGNEG) console.log(pv.filter((g) => g.y === 0).sort((a, b) => b.p - a.p).slice(0, 40).map((g) => g.h + " " + g.fonte + " " + g.p.toFixed(3)).join("\n"));
   const mv = misura(pv, soglia);
   console.log(`validazione: soglia ${soglia.toFixed(3)}, prese ${mv.presi}/${mv.truffe} (${(100 * mv.richiamo).toFixed(1)}%), falsi ${mv.falsi}/${mv.noti} (${(100 * mv.tassoFalsi).toFixed(2)}%)`);
   const sogliaForte = Math.max(soglia, sogliaPer(pv, FALSI_AMMESSI / 5));

@@ -275,12 +275,6 @@ function caratteristiche(c, zone, info) {
   f.push('ns=' + Math.min(4, info.nSotto) + c.zona);
   if (c.segue) f.push('sg=' + (c.segue.length <= 4 ? c.segue : '*'), 'sgk=' + k + (c.segue.length <= 3 ? 'corta' : 'lunga'));
   if (c.mc.forme.some((x) => testo.includes(x))) f.push('fo=' + k);
-  // I nomi che i servizi cloud generano da soli (x72qhcrn02dh18): lettere e cifre che si alternano, consonanti in fila,
-  // una cifra del marchio che continua in un numero. Lì un marchio corto ci cade per caso.
-  const salti = (crudo.match(/[a-z][0-9]|[0-9][a-z]/g) || []).length;
-  f.push('cs=' + Math.min(4, salti) + (/[bcdfghjklmnpqrstvwxz]{5}/.test(testo) ? 'c' : '') + lun);
-  if ((c.fine < crudo.length && /[0-9]/.test(crudo[c.fine]) && /[0-9]/.test(crudo[c.fine - 1]))
-    || (c.inizio > 0 && /[0-9]/.test(crudo[c.inizio - 1]) && /[0-9]/.test(crudo[c.inizio]))) f.push('nb=' + k);
   if (c.sk.tagli.some((x) => x > c.inizio && x < c.fine)) f.push('sp=' + k);
   // Il contesto del marchio: quello che gli sta intorno, com'è scritto, coi bordi e i trattini, a pezzi di due, tre e
   // quattro lettere.

@@ -71,6 +71,18 @@ test('le imitazioni si fanno riconoscere, col marchio giusto', () => {
   }
 });
 
+// Refusi che lo script di addestramento non scrive da sé: il modello li deve riconoscere, non ricordare.
+test('i refusi di una lettera sul nome di un marchio, anche in fondo, danno l’avviso all’apertura e nel menu', () => {
+  const refusi = [
+    'paypaal.com', 'paypali.com', 'paypak.com', 'paypl.com', 'amazone.com', 'amazonm.com', 'amazoon.com', 'amazn.com',
+    'microsofte.com', 'microsotf.com', 'microsoftx.com', 'linkedim.com', 'linkedinr.com', 'netflixe.com', 'netfliks.com',
+    'instagrem.com', 'whatsappe.com', 'whatsappt.com', 'facebooc.com', 'facebookr.com', 'yahop.com', 'icloude.com',
+    'icluod.com',
+  ];
+  const persi = refusi.filter((h) => livello('https://' + h + '/') === 'safe' || !imitazioneNelMenu('https://' + h + '/'));
+  assert.deepEqual(persi, []);
+});
+
 test('il menu del link e l’apertura della pagina danno lo stesso verdetto', () => {
   const urls = PROVE.map(([h]) => 'https://' + h + '/').concat([
     'https://paypal.com@wikipedia.evil.net/', 'http://paypal.com@192.168.1.1/login', 'https://mario.rossi@example.com/',
