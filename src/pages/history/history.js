@@ -31,6 +31,19 @@
     items = r?.items || [];
     buildFilterOptions();
     render();
+    preparaRicerca();
+  }
+
+  // La prima lettera della ricerca non deve comporre il testo di migliaia di voci: lo si fa mentre la pagina è ferma.
+  function preparaRicerca() {
+    if (typeof requestIdleCallback !== 'function') return;
+    const lista = items;
+    let i = 0;
+    const passo = (scadenza) => {
+      while (i < lista.length && scadenza.timeRemaining() > 1) { if (lista[i]) haystackOf(lista[i]); i++; }
+      if (i < lista.length && lista === items) requestIdleCallback(passo);
+    };
+    requestIdleCallback(passo);
   }
   // Un backup importato in un'altra scheda porta voci sue: compaiono senza riaprire la pagina (#1256).
   try {
