@@ -216,7 +216,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   const tuttoIlFilo = senzaDomanda(messaggiDi(chats), chatId, userMessage);
   const solo = !!(soloChat && chatId);
   const tutti = solo ? tuttoIlFilo.filter((m) => m.chat === chatId) : tuttoIlFilo;
-  potaFoto(tutti);
+  potaFoto(tuttoIlFilo);
   const chatMsgs = chatId ? tutti.filter((m) => m.chat === chatId) : [];
   const dallaScheda = esitiDellaScheda(storia, chatMsgs);
   const lato = incognito ? 'incognito' : 'normale';
