@@ -143,3 +143,73 @@ test('un titolo che cambia di continuo non riempie il filo: dopo la finestra val
   await attendi(5);
   assert.deepEqual(aggiornate.map((a) => a.titolo), ['Indice 39']);
 }));
+
+// #1525 — una pagina lasciata aperta che cambia indirizzo da sola non fa crescere il filo senza fine.
+test('500 cambi d’indirizzo senza gesto lasciano al più 30 visite; un tocco sulla scheda rimette il conto a zero', () => conOrologioFinto(async () => {
+  const { v, scritte } = preparaTitoli();
+  const wc = schedaFinta();
+  wc.push('https://giostra.test/');
+  v.navigata(wc, 1, 'https://giostra.test/');
+  v.caricata(wc);
+  for (let i = 1; i <= 500; i++) {
+    await attendi(6_000);
+    wc.push(`https://giostra.test/${i}`);
+    v.navigata(wc, 1, `https://giostra.test/${i}`, { inPagina: true });
+    v.titolo(wc, `Giro ${i}`);
+  }
+  await attendi(6_000);
+  assert.equal(scritte.length, 30);
+  // Un clic vero, poi un cambio: è una pagina che l'utente ha chiesto.
+  wc.push('https://giostra.test/scelta');
+  v.navigata(wc, 1, 'https://giostra.test/scelta', { inPagina: true, ...gesto() });
+  v.titolo(wc, 'Scelta');
+  await attendi(6_000);
+  wc.push('https://giostra.test/dopo');
+  v.navigata(wc, 1, 'https://giostra.test/dopo', { inPagina: true, gesto: Date.now() - 6_000 });
+  v.titolo(wc, 'Dopo');
+  await attendi(6_000);
+  assert.deepEqual(scritte.slice(30).map((s) => s.url), ['https://giostra.test/scelta', 'https://giostra.test/dopo']);
+}));
+
+test('cambi a raffica senza gesto sono una visita sola, che segue l’indirizzo finché non è scritta', () => conOrologioFinto(async () => {
+  const { v, scritte } = preparaTitoli();
+  const wc = schedaFinta();
+  wc.push('https://giostra.test/');
+  v.navigata(wc, 1, 'https://giostra.test/', gesto());
+  v.caricata(wc);
+  await attendi(6_000);
+  for (let i = 1; i <= 20; i++) {
+    wc.push(`https://giostra.test/${i}`);
+    v.navigata(wc, 1, `https://giostra.test/${i}`, { inPagina: true });
+    await attendi(100);
+  }
+  // La visita in attesa si scrive a 4 s dal primo cambio, con l'indirizzo dell'ultimo.
+  await attendi(2_500);
+  assert.deepEqual(scritte.map((s) => s.url), ['https://giostra.test/', 'https://giostra.test/20']);
+  // Già scritta, la visita assorbe i cambi a ridosso: nessuna riga nuova.
+  for (let i = 21; i <= 300; i++) {
+    wc.push(`https://giostra.test/${i}`);
+    v.navigata(wc, 1, `https://giostra.test/${i}`, { inPagina: true });
+    v.titolo(wc, `Giro ${i}`);
+    await attendi(100);
+  }
+  await attendi(6_000);
+  assert.equal(scritte.length, 2);
+}));
+
+test('anche le pagine intere caricate senza gesto si fermano a 30 visite, e la pagina vuota in mezzo non riapre il conto', () => conOrologioFinto(async () => {
+  const { v, scritte } = preparaTitoli();
+  const wc = schedaFinta();
+  for (let i = 0; i < 100; i++) {
+    // Una pagina che si porta su about:blank e torna: la visita aperta non si chiude per questo.
+    wc.push('about:blank');
+    v.navigata(wc, 1, 'about:blank');
+    await attendi(6_000);
+    wc.push(`https://rimbalzo.test/${i}`);
+    v.navigata(wc, 1, `https://rimbalzo.test/${i}`);
+    v.caricata(wc);
+    await attendi(6_000);
+  }
+  assert.ok(scritte.length <= 31, `${scritte.length} visite`);
+  assert.ok(scritte.length >= 30, `${scritte.length} visite`);
+}));

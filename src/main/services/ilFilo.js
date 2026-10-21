@@ -110,7 +110,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   async function compattaFile() {
     const lette = [];
     // Di un evento servono solo i campi che decidono cosa copre una cancellazione, non il testo dei messaggi.
-    const sottile = (ev) => ({ tipo: ev.tipo, ts: ev.ts, chat: ev.chat, url: ev.url, visita: ev.visita, pagine: ev.pagine });
+    const sottile = (ev) => ({ id: ev.id, tipo: ev.tipo, ts: ev.ts, chat: ev.chat, url: ev.url, visita: ev.visita, pagine: ev.pagine });
     try {
       await perRiga(fileEventi(), (r, i) => {
         if (!r.trim()) return;
