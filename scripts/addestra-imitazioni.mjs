@@ -162,7 +162,7 @@ const SUFFISSI_SOSIA = ['com', 'net', 'info', 'online', 'xyz', 'it', 'co.uk', 'd
 // sosia: un marchio che è anche una parola dagli elenchi non s'impara (evidente()), e senza questi il modello lasciava
 // passare un nome così su tre. Parole e suffissi li sceglie il caso: il modello deve riconoscere la forma, non i nomi.
 function sinteticiParole(etichetta) {
-  const { BRANDS, PAROLE_TRUFFA, LEGIT_DOMAINS } = require('./src/main/services/safebrowse/brands.js');
+  const { BRANDS, PAROLE_TRUFFA, LEGIT_DOMAINS, MARCHI_PAROLA } = require('./src/main/services/safebrowse/brands.js');
   const parole = PAROLE_TRUFFA.filter((w) => w.length >= 3).map((w) => w + (FINALI[w] || ''));
   const caso = rng(1375);
   const pesca = (l) => l[Math.floor(caso() * l.length)];
