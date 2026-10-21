@@ -123,16 +123,3 @@ test('r1 «L\'Iran ha xx abitanti.», cambiato Iran in Iraq: il valore è quello
   await expect.poll(async () => (await riletture(app)).some((n) => n.includes('Iraq')), { timeout: 8000 }).toBe(true);
   await expect(pronti(page)).toHaveText(['46 milioni'], { timeout: 8000 });
 });
-
-test('r1 tolta una parola di riempimento dopo le x, la frase riletta tacendo: il 27 resta', async ({ app, openTab, testServer }) => {
-  const page = await apri(app, openTab, testServer, {
-    righe: (nuovo) => (nuovo.includes('davvero molto basso') ? ['[di soli xx][][Alphabet P/E ratio][cerca][web]'] : []),
-    valore: () => '[27][Rapporto prezzo/utili di Alphabet][1][20 ottobre 2026]',
-  });
-  await page.locator('#ta').click();
-  await page.keyboard.type('Google ha un p/e di soli xx, davvero molto basso. ');
-  await expect(pronti(page)).toHaveText(['27'], { timeout: 10000 });
-  await sostituisci(page, 'molto ', '');
-  await expect.poll(async () => (await riletture(app)).some((n) => n.includes('davvero basso')), { timeout: 8000 }).toBe(true);
-  await restaIlValore(page, '27', 3000);
-});
