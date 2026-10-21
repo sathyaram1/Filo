@@ -289,7 +289,7 @@ test('variabili: niente FORCE, opus solo come default di chi lancia senza dirlo,
 test('cablaggio: il preflight installa prima di consegnare le istruzioni; nel progetto niente gancio, le stesse variabili', () => {
   const s = JSON.parse(readFileSync(join(RADICE, '.claude', 'settings.local.json'), 'utf8'));
   // Si riconosce dal comando, non dal matcher: il gancio delle letture esterne nomina Task* fra gli strumenti puliti.
-  const cieco = (g) => g.matcher === 'Agent|Task' || (g.hooks || []).some((h) => /orchestratore-cieco/.test(String(h.command || '')) || String(h.command || '').includes(ETICHETTA));
+  const cieco = (g) => ['Agent|Task', MATCHER_PRIMA].includes(g.matcher) || (g.hooks || []).some((h) => /orchestratore-cieco/.test(String(h.command || '')) || String(h.command || '').includes(ETICHETTA));
   for (const ev of Object.keys(s.hooks)) {
     assert.ok(!s.hooks[ev].some(cieco), `${ev}: la cecità non sta nella cartella del progetto, che il ramo del worker cambia`);
   }
