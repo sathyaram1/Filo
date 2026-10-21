@@ -493,7 +493,8 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
   }
 
   async function dispositivo() {
-    await carica();
+    await caricaPerLeggere();
+    if (!normale.dispositivo) normale.dispositivo = await leggiDispositivo();
     return normale.dispositivo;
   }
 
