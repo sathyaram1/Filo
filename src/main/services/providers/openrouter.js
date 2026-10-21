@@ -457,6 +457,7 @@
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
+        cacheWriteTokens: cacheWriteTokens(usage),
         costUsd: costUsdOf(usage),
         servedBy: extractServedBy(data),
         keySource, keyFallback,
