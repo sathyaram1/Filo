@@ -154,8 +154,15 @@ class StratoDelMenu {
   aggiornaDa(sender, d) {
     if (!d || !idValido(d.id) || pesa(d) > AGGIORNA_MAX_BYTE) return { ok: false };
     const cosa = String(d.cosa || '');
-    if (!['riga', 'griglia', 'griglia-apri', 'correzione', 'inline'].includes(cosa)) return { ok: false };
+    if (!['riga', 'griglia', 'griglia-apri', 'correzione', 'inline', 'fuori'].includes(cosa)) return { ok: false };
     const { type: _t, ...dati } = d;
+    // L'icona dalla barra arriva in px della pagina: lo strato, a zoom 1, li vuole della vista.
+    if (cosa === 'fuori') {
+      let zoom = 1;
+      try { zoom = (sender && sender.wc && sender.wc.getZoomFactor()) || 1; } catch (_) { zoom = 1; }
+      dati.x = (Number(dati.x) || 0) * zoom;
+      dati.y = (Number(dati.y) || 0) * zoom;
+    }
     const di = (r) => r && r.id === d.id && r.wc === (sender && sender.wc) && r.nodo === nodoDi(sender && sender.frame);
     if (di(this.inArrivo)) { this.inArrivo.coda.push(dati); return { ok: true }; }
     const m = this.menu;
