@@ -843,8 +843,8 @@ export async function scrivi(id, to, nota, opts = {}) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
   }, { fetchImpl: fetchRitentato });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}) };
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}${fiduciaTolta ? '. La fiducia è già stata tolta' : ''}` };
+  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
