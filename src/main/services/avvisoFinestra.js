@@ -2,7 +2,8 @@
 // davanti, e resta finché non lo si chiude (o per `durataSec`); con una `chiave` sostituisce quello uguale.
 // Ritorna false se nessuna finestra era pronta: chi chiama decide se riprovare.
 
-function avvisoNellaFinestra(testo, { chiave, durataSec = 0 } = {}) {
+// `azioni`: i bottoni del toast nella forma che la cornice capisce (src/renderer/shell.js, per esempio { label, openUrl }).
+function avvisoNellaFinestra(testo, { chiave, durataSec = 0, azioni } = {}) {
   let dette = 0;
   try {
     const { BrowserWindow } = require('electron');
@@ -12,7 +13,10 @@ function avvisoNellaFinestra(testo, { chiave, durataSec = 0 } = {}) {
       // Una cornice che sta ancora caricando non ascolta ancora.
       if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
       try {
-        wc.send('shell:toast', { text: testo, opts: chiave ? { durationSec: durataSec, key: chiave } : { durationSec: durataSec } });
+        const opts = { durationSec: durataSec };
+        if (chiave) opts.key = chiave;
+        if (Array.isArray(azioni) && azioni.length) opts.actions = azioni;
+        wc.send('shell:toast', { text: testo, opts });
         dette++;
       } catch (_) {}
     }
