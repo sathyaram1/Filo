@@ -53,6 +53,14 @@
       --mg-search-gap: 8px;
       /* Il minimo delle tre aree: 300 pixel su una finestra normale, meno su una bassa, invece di uscire dal fondo. */
       --mg-aree-min: min(300px, 60vh);
+      /* La fiducia (#1575): muschio fidata, prugna non fidata, lontani dai colori che dicono già una decisione (rosso,
+         arancio, verde, blu, azzurro). Sul chiaro più scuri per stare sulla carta, sullo scuro più accesi. */
+      --mg-fidata-color: #6f8f2e;
+      --mg-nonfidata-color: #a8418a;
+    }
+    :root[data-sn-theme="dark"] {
+      --mg-fidata-color: #a6bb68;
+      --mg-nonfidata-color: #d070b4;
     }
 
     /* La dashboard sfrutta tutta la larghezza e tutta l'altezza: override locale del `.sn-page { max-width: 960px }`
