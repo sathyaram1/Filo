@@ -150,7 +150,10 @@
   function idDi(d) { return d.id || (Number.isInteger(d.numero) ? D.idDi(d.numero) : ''); }
   function chiaveDi(b) { return `${b.priorita}|${String(b.gruppo || '').toLocaleLowerCase('it')}`; }
 
-  function diScheda(tab) { return stato.domande.filter((d) => MR.schedaDomanda(d) === tab); }
+  // «Solo non fidate» è della pagina (#1575): lo stesso filtro dei feedback, chiesto a chi lo possiede.
+  function soloNonFidate() { return !!(dip.soloNonFidate && dip.soloNonFidate()); }
+  function tutteDiScheda(tab) { return stato.domande.filter((d) => MR.schedaDomanda(d) === tab); }
+  function diScheda(tab) { return MR.filtraFiducia(tutteDiScheda(tab), soloNonFidate()); }
 
   // Le schede che aspettano seguono §3.7 (priorità, gruppo, età); l'archivio va dal più recente.
   function blocchi(tab) {
