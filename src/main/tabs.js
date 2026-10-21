@@ -2068,6 +2068,7 @@ class TabManager {
   navigate(id, url) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    tab._gestoFiloAt = Date.now();
     const target = normalizeUrl(url);
     // SICUREZZA (#248) — come openTab: questo è un loadURL() PROGRAMMATICO, non
     // emette will-navigate, quindi quel gate non protegge questo percorso.
