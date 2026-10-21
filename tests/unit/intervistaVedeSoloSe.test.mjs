@@ -70,3 +70,14 @@ test('l’intervista vede solo sé stessa; la chat normale di prima e di dopo ve
   assert.match(dopo, /TIMER-DI-PROVA/, 'dopo un turno dell’intervista la chat normale ha perso il filo di prima');
   assert.match(dopo, /Guanciale/);
 });
+
+test('il prompt dell’intervista dice «prima conversazione» solo al primo incontro', () => {
+  const P = globalThis.SN_CONST.PROMPTS;
+  const base = { onboarding: '- [ ] profilo', onboardingTurns: 1, onboardingMax: 6 };
+  const prima = P.filoChatOnboarding(base);
+  assert.match(prima, /È appena arrivato su Filo e questa è la sua prima conversazione/);
+  const rifatta = P.filoChatOnboarding({ ...base, onboardingRifatta: true });
+  assert.doesNotMatch(rifatta, /appena arrivato|prima conversazione/);
+  assert.match(rifatta, /Ha già usato Filo/);
+  assert.match(P.filoChatContext({ ...base, onboardingRifatta: true }), /Ha già usato Filo/, 'il contesto senza filo perde la variante');
+});
