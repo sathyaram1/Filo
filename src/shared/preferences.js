@@ -1810,7 +1810,7 @@
     // ── #1004: cosa delle pagine va ai modelli senza che l'utente lo chieda ──
     {
       scrive: ['riassuntoSchede.enabled'],
-      aiuto: 'true | false (riassunto e indice delle schede chiuse per ritrovarle nella Cronologia; spento, di una scheda chiusa non va niente ai modelli e la si ritrova per parole)',
+      aiuto: 'true | false (riassunto e indice delle schede chiuse per ritrovarle nel filo della home anche per significato; spento, di una scheda chiusa non va niente ai modelli e la si ritrova per parole)',
       costo: 1,
       keys: ['riassunto_schede_chiuse', 'riassunto delle schede chiuse', 'riassunto schede chiuse', 'riassunti delle schede chiuse',
         'riassunto delle schede', 'riassunto schede', 'riassuntoschede'],
