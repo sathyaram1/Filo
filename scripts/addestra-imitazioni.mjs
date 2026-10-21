@@ -187,6 +187,45 @@ function sinteticiParole(etichetta) {
   return out;
 }
 
+// Il nome intero del marchio dove non è suo, in ogni forma che le regole di prima prendevano: su un altro suffisso, come
+// sito di una piattaforma, davanti a un altro dominio (paypal.com.verifica-x.net), con un numero o «my». Le truffe degli
+// elenchi quasi non lo hanno e i siti noti sì (indirizzi di paese, reti di distribuzione): senza, passava due volte su tre.
+const SUFFISSI_NOME = ['xyz', 'top', 'shop', 'online', 'site', 'info', 'store', 'click', 'live', 'support', 'help', 'app',
+  'vip', 'icu', 'buzz', 'cfd', 'sbs', 'cyou', 'lat', 'world', 'services', 'center', 'digital', 'cloud', 'link', 'work',
+  'wixsite.com', 'netlify.app', 'web.app', 'vercel.app', 'pages.dev', 'firebaseapp.com', 'herokuapp.com', 'weebly.com',
+  'blogspot.com', 'webflow.io', 'glitch.me', '000webhostapp.com', 'godaddysites.com', 'square.site', 'repl.co',
+  'duckdns.org', 'framer.website', 'mystrikingly.com', 'jimdosite.com', 'gitbook.io', 'surge.sh', 'onrender.com'];
+const FINTI_TLD = ['com', 'it', 'net', 'org', 'co.uk', 'de', 'fr', 'es'];
+function sinteticiNomi(etichetta) {
+  const { BRANDS, PAROLE_TRUFFA, LEGIT_DOMAINS } = require('./src/main/services/safebrowse/brands.js');
+  const caso = rng(SEME_PAROLE + 1);
+  const pesca = (l) => l[Math.floor(caso() * l.length)];
+  const lettere = (n) => Array.from({ length: n }, () => 'abcdefghijklmnopqrstuvwxyz'[Math.floor(caso() * 26)]).join('');
+  const parole = PAROLE_TRUFFA.filter((w) => w.length >= 4).map((w) => w + (FINALI[w] || ''));
+  // Il dominio vero di chi ospita l'imitazione: inventato, come lo registra chi truffa.
+  const finto = () => pesca([`${pesca(parole)}-${lettere(5)}`, `${lettere(6)}${pesca(parole)}`, lettere(7) + Math.floor(caso() * 999)])
+    + '.' + pesca(['com', 'net', 'xyz', 'top', 'info', 'ru', 'online', 'it', 'site']);
+  const out = [];
+  const visti = new Set();
+  for (const b of BRANDS) {
+    const t = b.token;
+    if (visti.has(t) || !/^[a-z0-9]+$/.test(t)) continue;
+    visti.add(t);
+    const suoi = b.domains.filter((d) => d.startsWith(t + '.')).map((d) => d.slice(t.length + 1));
+    const nomi = [];
+    for (let i = 0; i < 3; i++) nomi.push(`${t}.${pesca(SUFFISSI_NOME)}`);
+    nomi.push(`${t}.${pesca(suoi.length ? suoi : FINTI_TLD)}.${finto()}`, `${pesca(['login', 'www', 'secure', 'account', 'auth'])}.${t}.${pesca(FINTI_TLD)}.${finto()}`);
+    nomi.push(`${t}${pesca(['24', '365', '1', '2', '247', '360', '7'])}.${pesca(SUFFISSI_NOME)}`,
+      `${t}-${2020 + Math.floor(caso() * 8)}.${pesca(['com', 'it', 'net', 'online'])}`, `my${t}.${pesca(['com', 'it', 'net', 'app'])}`);
+    for (const h of nomi) {
+      const reg = normalize('https://' + h + '/').registrable;
+      if (LEGIT_DOMAINS.has(h) || LEGIT_DOMAINS.has(reg) || (b.omonimi || []).includes(reg) || etichetta.has(h)) continue;
+      out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
+    }
+  }
+  return out;
+}
+
 function displayDi(token) {
   const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
   return (BRANDS.find((b) => b.token === token) || {}).display;
