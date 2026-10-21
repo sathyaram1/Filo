@@ -866,6 +866,7 @@
        nello scudo in fondo alla riga: pieno se fidata, vuoto e tratteggiato se no, così non la dice il solo colore. */
     :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--fidata { border-right: 3px solid var(--mg-fidata-color); }
     :is(.mg-item, .mg-sender-item, .mg-domanda).mg-fiducia--nonfidata { border-right: 3px solid var(--mg-nonfidata-color); }
+    .mg-fiducia-segno[hidden] { display: none; }
     .mg-fiducia-segno {
       flex: 0 0 auto; align-self: center; display: inline-flex; margin-left: auto;
       width: var(--mg-scudo-size, 11px); height: var(--mg-scudo-size, 11px); cursor: help;
