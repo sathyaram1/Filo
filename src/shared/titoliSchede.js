@@ -65,7 +65,13 @@
     UTENTE_DI: R`(?:dell'utente|dell'utilizzatore|user'?s|of the user|del usuario|de l'utilisateur|des nutzers|des benutzers)`,
     // Dopo il nome di un assistente l'ordine conta solo se la sua frase (fino a «|» o « - ») porta un bersaglio.
     GUARDIA: R`(?=(?:(?!\s-\s)[^|•·])*?{{BERSAGLIO}})`,
-    ACQUISTO: R`\b(?:compra|comprate|comprami|acquista|acquistate|buy|purchase|kaufe|kauf|kaufen|bestelle|achete|achetez|compre|ordina|ordinate)`,
+    ACQUISTO: R`\b(?:compra|comprate|comprami|acquista|acquistate|prenota|prenotate|buy|purchase|book|kaufe|kauf|kaufen|bestelle|buche|achete|achetez|reserve|reservez|compre|reserva|ordina|ordinate)`,
+    // Un conto a cui mandare soldi: lo sceglie chi attacca, come un indirizzo.
+    IBAN: R`\b[a-z]{2}\d{2}[a-z0-9]{11,30}\b`,
+    // Chi legge la pagina è il «tu» di uno slogan; dopo un verbo d'invio non è mai il bersaglio di un attacco.
+    NON_TUO: R`(?!(?:your|tuo|tua|tuoi|tue|vostr[oaie]|tu|tus|ton|ta|tes|vos|votre|dein\w*|ihr\w*)\b)`,
+    // Dove inizia la frase di un ordine: il titolo, o dopo un separatore.
+    INIZIO: R`(?:^|[|•·:;!?\-–—]\s*|[.,]\s+)`,
     // Un abbonamento o un piano non lo compra nessuna guida ai comandi vocali: vale anche dopo Siri e Alexa.
     ACQUISTO_VERO: R`{{ACQUISTO}}\s+(?:\S+\s+){0,4}?(?:premium|abbonamento|subscription|abonnement|suscripcion|angebot|offerta|offer|piano|plan|abo)\b`,
     GUARDIA_VOCE: R`(?=(?:(?!\s-\s)[^|•·])*?(?:{{ACQUISTO_VERO}}|{{DOMINIO}}|\b{{SEGRETI_VERI}}\b|\b(?:protezion[ei]|protections?|sicurezza|security)\b))`,
