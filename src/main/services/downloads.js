@@ -811,6 +811,8 @@ function finalizeManual(rec, state, savePath) {
   if (rec._final) return;
   rec._final = true;
   liveManual.delete(rec.id);
+  // Una voce chiusa non aspetta più risposte: chi attendeva la domanda prosegue con un no.
+  if (rec._sblocca) rec._sblocca(false);
   rec.endedAt = new Date().toISOString();
   rec.paused = false;
   rec.canResume = false;
