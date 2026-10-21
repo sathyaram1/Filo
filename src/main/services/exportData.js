@@ -730,7 +730,7 @@ function mergeImportedData(current, imported, opzioni = {}) {
   const stats = {
     added: 0, updated: 0, unchanged: 0, restano: 0,
     pagineFuori: 0, pagineMieFuori: 0, appuntiFuori: 0, appuntiMieFuori: 0, downloadFuori: 0, downloadMieFuori: 0,
-    tettoSpesa: null,
+    tettoSpesa: null, tettoSceso: null,
   };
   const tetti = {
     pagine: opzioni.tettoPagine,
