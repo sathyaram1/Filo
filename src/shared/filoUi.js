@@ -229,9 +229,23 @@
   // del sito fatto dentro l'annuncio (il valore riscritto, la selezione allargata), o dopo uno che non ha scritto
   // niente, non combacia. Le cancellazioni tolgono soltanto, attaccate al cursore; annulla e gli altri non si prevedono.
   const ESATTI = /^(insertText|insertCompositionText|insertFromPaste|insertFromPasteAsQuotation|insertLineBreak|insertParagraph)$/;
-  const PASSO_MAX = 32;
+  // Backspace e Canc tolgono al più un carattere come lo vede l'utente (un'emoji composta, una lettera accentata).
+  function grafema(v, s, indietro) {
+    const pezzo = indietro ? v.slice(Math.max(0, s - 64), s) : v.slice(s, s + 64);
+    try {
+      const g = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(pezzo)];
+      const x = indietro ? g[g.length - 1] : g[0];
+      return x ? x.segment.length : 0;
+    } catch (_) { return Math.min(pezzo.length, 2); }
+  }
+  const UN_PASSO = /^deleteContent(Backward|Forward)$/;
   function atteso(a) {
     const [s, e] = a.sel;
+    if (UN_PASSO.test(a.tipo) && s === e) {
+      const indietro = a.tipo.endsWith('Backward');
+      const g = grafema(a.valore, s, indietro);
+      return indietro ? a.valore.slice(0, s - g) + a.valore.slice(e) : a.valore.slice(0, s) + a.valore.slice(e + g);
+    }
     const d = typeof a.dato === 'string' ? a.dato.replace(/\r\n?/g, '\n') : (/^insert(LineBreak|Paragraph)$/.test(a.tipo) ? '\n' : null);
     // Una casella di una riga toglie gli a capo a modo suo: lì vale solo che testa e coda restino.
     if (d === null || (a.riga && d.includes('\n'))) return null;
