@@ -322,11 +322,11 @@
       // Il segno del giorno subito sopra va su con lei: dice di quando è.
       const prima = ancora.previousElementSibling;
       const testa = prima && prima.classList.contains('dash-giorno') ? prima : ancora;
-      let coda = ancora;
-      for (let n = a.lastElementChild; n && n !== ancora; n = n.previousElementSibling) if (aSchermo(n)) { coda = n; break; }
+      let fondo = ancora;
+      for (let n = a.lastElementChild; n && n !== ancora; n = n.previousElementSibling) if (aSchermo(n)) { fondo = n; break; }
       cima = Math.max(0, y(testa.getBoundingClientRect().top) - (parseFloat(st.paddingTop) || 0));
       const base = (parseFloat(st.paddingBottom) || 0) - vuoto;
-      serve = Math.max(0, Math.ceil(cima + a.clientHeight - y(coda.getBoundingClientRect().bottom) - base));
+      serve = Math.max(0, Math.ceil(cima + a.clientHeight - y(fondo.getBoundingClientRect().bottom) - base));
     }
     if (serve !== vuoto) {
       vuoto = serve;
