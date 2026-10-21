@@ -59,7 +59,7 @@ function richieste(l) {
 function valoriRisposta(risposta, tipo) {
   const X = globalThis.SN_URL_EXFIL;
   if (!X || !X.segretiDetti) return [];
-  const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`));
+  const presentata = presenta().map(([re]) => new RegExp(`^(?:${re.source})$`, 'u'));
   const out = [];
   let lettere = tipo === 'password';
   let saluto = false;
