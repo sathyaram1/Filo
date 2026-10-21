@@ -515,6 +515,7 @@
     admin_defaults_contesto_cache_5m: '5 minuti',
     admin_defaults_contesto_cache_1h: 'un\'ora',
     admin_defaults_contesto_cache_serie: 'Come il codice (%s)',
+    admin_defaults_contesto_cache_codice: 'Come il codice',
     // Quanto può essere lunga una risposta dei modelli (#1097.3)
     admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
     admin_defaults_lunghezza_desc:
