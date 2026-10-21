@@ -155,7 +155,7 @@
   // provider successivo emettiamo `onReset` così il chiamante butta il buffer
   // parziale e riparte pulito (#273). onReset viene chiamato SOLO se l'attempt
   // fallito aveva già emesso qualcosa (delta o reasoning) e c'è un attempt dopo.
-  async function streamCompleteWithFallback({ attempts, model, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onTentativoFallito }) {
+  async function streamCompleteWithFallback({ attempts, model, messages, cache, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onTentativoFallito }) {
     let lastErr = null;
     // I tentativi rotti dopo che il modello aveva già scritto: il fornitore li fa pagare, chi tiene il conto li deve vedere.
     const broken = [];
