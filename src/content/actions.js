@@ -633,7 +633,8 @@
       ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
     }).then(
       (res) => {
-        if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
+        if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
