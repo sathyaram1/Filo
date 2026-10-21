@@ -2893,7 +2893,7 @@
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false } } : settings);
       // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
-      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
+      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close({ davvero: true });
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
