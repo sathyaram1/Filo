@@ -1,6 +1,6 @@
 // Le risposte di Filo arrivate a pannello chiuso o ridotto, per scheda e per fonte (#1432): la striscia della barra
 // laterale resta accesa finché l'utente non le apre. Il documento nuovo, o la scheda chiusa, le porta via.
-// Regole: patterns/una-risposta-arrivata-a-pannello-chiuso-accende-la-striscia.md
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 // Chi può dire «c'è una risposta da leggere»: l'Aiuto della pagina, e il pannello di destra delle app di Filo.
 const FONTI = Object.freeze(['aiuto', 'app']);

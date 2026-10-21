@@ -80,3 +80,22 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
 - **Chi aveva spostato le globali non perde niente**: alla prima apertura con la
   barra, le globali rimaste in «Altro…» vanno nella barra; quelle che l'utente
   aveva portato nella riga restano lì.
+
+## L'Aiuto nella barra, e la risposta che accende la striscia (#1432)
+
+- **L'icona Aiuto dice cosa farà il clic**: punto di domanda ad Aiuto chiuso o ridotto (lo apre), microfono ad Aiuto
+  aperto (detta, lo stesso microfono della casella), microfono acceso mentre ascolta (ferma). Col mouse la barra
+  resta aperta: due clic nello stesso punto e si parla. Lo stato lo riferisce la pagina (`MSG.AIUTO_STATO`), il clic
+  lo decide lei sul suo stato vero; l'aspetto sta in `aspettoAiuto` (`src/shared/disposizioneIcone.js`), lo stesso
+  per la barra e per la riga del tasto destro. Dove la voce «Aiuto» non c'è l'icona è spenta e il suggerimento dice
+  perché; sotto l'avviso del sito fa la domanda a Filo su quel sito, come la scorciatoia.
+- **Una risposta arrivata a pannello ridotto o chiuso dall'utente non si apre da sola e non si perde**: la striscia
+  si accende ferma, d'accento, e l'icona che apre il pannello porta un punto, finché la risposta non si apre. Chi
+  riduce o chiude mentre Filo pensa sta dicendo «non adesso». La regola è di ogni pannello dove Filo risponde
+  (l'Aiuto, il pannello di destra delle app): la pagina manda `MSG.RISPOSTA_IN_ATTESA` con la sua `fonte`, il main
+  la tiene per scheda e per fonte (`src/main/risposteInAttesa.js`, una fonte nuova va in `FONTI`), la striscia
+  segue la scheda davanti. La fine la constata il main: documento nuovo, pagina caduta, scheda chiusa.
+- **Ridotto dall'utente vince sul modello**, ridotto dal modello (un passo da cliccare sulla pagina) non accende
+  niente: lì la risposta è il segno sulla pagina. **Chiuso a metà di un turno**, il pannello si nasconde invece di
+  sparire: la risposta ci entra, i passi da solo e i segni sulla pagina no, e ogni strada che riapre l'Aiuto mostra
+  quella conversazione. Prova: `tests/barra-laterale-aiuto.spec.mjs`.
