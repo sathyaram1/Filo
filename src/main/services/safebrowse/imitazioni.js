@@ -395,7 +395,8 @@ const TIPO_VERDETTO = {
 // microsoft.com.altro.net), con un numero o «my» (amazon24, myapple), o a una lettera da un marchio di almeno cinque.
 function formaCerta(c) {
   if (c.mut) return false;
-  if (c.tipo === 'esatto') return true;
+  // Davanti a un altro sito conta solo col finto suffisso dopo (paypal.com.altro.net): booking.hotel.com è una parola.
+  if (c.tipo === 'esatto') return c.zona !== 'sotto' || (c.segue.length <= 3 && /^[a-z]+$/.test(c.segue));
   const lungo = c.mc.token.length >= 5;
   if (c.tipo === 'typo') return lungo && c.d === 1 && c.zona === 'sld';
   if (c.tipo !== 'esattodentro') return false;
