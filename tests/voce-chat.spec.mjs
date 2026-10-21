@@ -625,9 +625,10 @@ test('editor: una richiesta lunghissima ferma la casella entro la chat, e l\'ult
   const m = await misure();
   expect(m.sh).toBeGreaterThan(m.ch);
   expect(m.h).toBeGreaterThan(vuota);
-  expect(m.h).toBeGreaterThan(m.chat * 0.5);
   expect(m.fondoCasella).toBeLessThanOrEqual(m.fondoModulo);
+  // Al registro restano poche righe, il resto del modulo va alla casella, con i tasti accanto o sotto.
   expect(m.log).toBeGreaterThan(20);
+  expect(m.log).toBeLessThan(90);
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-tetto.png` });
   await casella.fill('');
