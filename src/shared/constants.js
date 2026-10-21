@@ -3066,7 +3066,7 @@
     },
     // §2.1 — auto-archiviazione/riordino delle tab. Filo riordina e archivia da
     // sé le schede non più necessarie (l'LLM decide su TUTTE le tab insieme). Le
-    // schede archiviate restano sempre riapribili dalla cronologia (filo://archive).
+    // schede archiviate restano nel filo della home.
     // - enabled: interruttore generale della funzione.
     // - onIdle: archivia quando Filo resta inattivo (nessuna interazione) a lungo.
     // - idleHours: soglia di inattività in ore (modificabile).
