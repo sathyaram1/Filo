@@ -46,12 +46,12 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  // L'Aiuto della scheda e le sue risposte da leggere (#1432), anche dalle schede dietro: valgono quando tornano
-  // davanti. Dal solo frame principale, e del messaggio restano solo parole di un elenco.
+  // L'Aiuto della scheda e le sue risposte da leggere (#1432), anche dalle schede dietro e dalla riserva della scheda
+  // nuova: valgono quando tornano davanti. Dal solo frame principale, e del messaggio restano solo parole di un elenco.
   const schedaDi = (sender) => {
     const tabs = winOf(sender)?._filoTabs;
     if (!tabs || !sender?.tab?.id || (sender.frame && sender.frame.parent)) return null;
-    const tab = tabs.tabs.find((t) => t.id === sender.tab.id);
+    const tab = tabs._perScheda(sender.tab.id);
     return tab ? { tabs, tab } : null;
   };
   const PANNELLI = new Set(['chiuso', 'ridotto', 'aperto']);
