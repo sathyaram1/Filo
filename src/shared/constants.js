@@ -2198,8 +2198,30 @@
           (pp ? `Prima del campo:\n${esterno().imbusta({ tipo: 'DATI_PAGINA', testo: pp, max: 20000 })}\n` : '') +
           (pd ? `Dopo il campo:\n${esterno().imbusta({ tipo: 'DATI_PAGINA', testo: pd, max: 20000 })}\n` : '') + `\n`
         : `La pagina intorno al campo non ha altro testo.\n\n`;
-      // Il campo arriva intero; «prima» e «dopo» ci sono solo se chi chiama ne manda una parte.
-      return `Oggi è ${GIORNI[d.getDay()]} ${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()} (orologio del computer dell'utente): serve per «domani», «venerdì prossimo» e simili.\n` +
+      return `Rileggi un testo che l'utente sta scrivendo in un campo di una pagina web, prima che lo mandi, e proponi SUGGERIMENTI: decide lui. ` +
+        `Ortografia, grammatica e parole sbagliate le guarda già un altro controllo: non segnalarle.\n\n` +
+        `Segnala:\n` +
+        `1. contraddizione: il testo dice una cosa diversa da quella che la pagina ha già stabilito (giorni, date, orari, nomi, numeri, luoghi, cose concordate). Nella conversazione si era detto martedì e l'utente scrive «sì, ci vediamo mercoledì». Non è una contraddizione chi propone di cambiare, chi fa una domanda, chi parla d'altro.\n` +
+        `2. frase poco chiara o fuori tono: rotta, che si legge in due modi, o con un tono che stona con dove si scrive (brusca in una mail di lavoro, solenne in una chat fra amici). Mai per gusto, lunghezza o punteggiatura.\n` +
+        `3. data e giorno che non tornano: i candidati del controllo automatico qui sotto; confermali o dì che sono giusti.\n` +
+        (ripetizioni ? `4. ripetizione di una parola piena a breve distanza che non sembra voluta. L'italiano ripete apposta («piano piano», «quasi quasi», «sì sì»): quelle no.\n` : '') +
+        `${ripetizioni ? 5 : 4}. fatti: un fatto noto sbagliato («l'America scoperta nel 1429», «il virus della peste») o un valore impossibile («un filo di rame spesso 2 m»).\n` +
+        (segnaposti
+          ? `${ripetizioni ? 6 : 5}. segnaposto: delle x al posto di un dato che l'utente non ricorda e chiede a te («l'America l'hanno scoperta nel 14xx», «un p/e di soli xx»). I candidati del controllo automatico con «segnaposto» li ha trovati il codice, decidi tu: non lo sono «x te» (per te), «3x4», i baci in fondo a un messaggio, una x di matematica o di un nome. Per ogni segnaposto, col pezzo che comprende le x:\n` +
+            `   - il dato lo conosci con certezza e non cambia nel tempo (una data storica, una costante, una misura geografica): [pezzo][pezzo col valore al posto delle x][motivo][segnaposto], col valore nella forma che il testo vuole («1492» per «14xx»), e nel motivo cos'è il dato e da dove viene;\n` +
+            `   - cambia nel tempo (prezzi, quotazioni, popolazioni, classifiche, chi ricopre una carica) o non ne sei sicuro: [pezzo][][ricerca][cerca][dove], con la ricerca da fare in poche parole nella lingua in cui il dato si trova meglio, e dove «wiki:it» o «wiki:en» per storia, scienza e geografia, «web» per i dati di adesso come finanza e prezzi;\n` +
+            `   - un candidato che non è un segnaposto: [candidato][][motivo][giusto].\n`
+          : '') + `\n` +
+        `Rispondi con una riga per segno e nient'altro, senza blocchi di codice:\n` +
+        `[pezzo da sostituire][correzione][motivo][tipo]\n` +
+        `- tipo: «errore» solo per un fatto o un valore che sai sbagliato con certezza; «suggerimento» per il resto, fatti dubbi compresi; «contraddizione» per il caso 1, e allora la riga ha una quinta parte con la frase della pagina copiata LETTERALMENTE: [pezzo][correzione][motivo][contraddizione][frase della pagina]; «giusto» per un candidato che va bene: [candidato][][motivo][giusto].\n` +
+        `- pezzo: copiato esattamente dal TESTO NUOVO, il più corto che basta. Se nel campo compare più di una volta, aggiungi le parole intorno finché compare una volta sola.\n` +
+        `- correzione: solo se sei sicuro di cosa voleva dire; altrimenti vuota.\n` +
+        `- motivo: in italiano, al massimo 90 caratteri.\n` +
+        `L'ultima frase può essere ancora in scrittura: non segnalarla perché è incompleta. ` +
+        `Precisione prima di tutto: un segno sbagliato costa più di dieci mancati, nel dubbio taci. «[dato riservato]» sta al posto di un dato che non esce dal computer: non segnalarlo. ` +
+        `Se non c'è niente da segnalare rispondi soltanto: [][][][nessuno]\n\n` +
+        `Oggi è ${GIORNI[d.getDay()]} ${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()} (orologio del computer dell'utente): serve per «domani», «venerdì prossimo» e simili.\n` +
         (l.sito ? `Si scrive sul sito ${unaRigaDiDati(l.sito, 120)}.\n` : '') + `\n` +
         pagina +
         (String(prima || '') ? `Testo del campo prima, già riletto (solo contesto):\n${esterno().imbusta({ tipo: 'TESTO_IN_PAGINA', testo: String(prima), conIntestazione: true, max: 20000 })}\n` : '') +
