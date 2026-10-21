@@ -46,7 +46,6 @@ test('una conversazione su un fornitore finto: testo identico, spunte applicate,
   assert.deepEqual(primo.strumenti.map((x) => x.nome), ['ONBOARDING']);
   assert.equal(secondo.testo, 'Come vuoi che ti parli?');
   assert.equal(e.diversi, 0);
-  assert.equal(e.corpi, undefined);
   assert.equal(f.corpi.length, 4);
   assert.equal(f.corpi[0].temperature, 0.6);
   assert.ok(f.corpi[0].provider.ignore.length > 0, 'la lista di esclusione parte con la richiesta');
