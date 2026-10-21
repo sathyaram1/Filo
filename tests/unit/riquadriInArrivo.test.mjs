@@ -24,7 +24,7 @@ function finestraFinta(origine = 'https://sito.example') {
   const osservatori = [];
   const doc = {
     frames: [],
-    location: { origin: origine },
+    URL: `${origine}/pagina`,
     baseURI: `${origine}/pagina`,
     querySelectorAll() { return this.frames.filter((f) => f.ownerDocument === doc); },
     contains(el) { return this.frames.includes(el); },
@@ -94,16 +94,34 @@ test('dopo il suo load si tocca, e torna in arrivo se cambia indirizzo o rientra
   assert.equal(R.inArrivo(f), true, 'rimesso dentro un contenitore');
 });
 
-test('un riquadro vuoto o about:blank non ha un preload da perdere: si tocca subito', () => {
+test('vuoto, about:, srcdoc o d\'altra origine non ha niente da perdere: si tocca subito', () => {
   const R = carica();
   const win = finestraFinta();
   R.osserva(win);
-  for (const src of [null, '', 'about:blank', '  ABOUT:BLANK ']) {
+  for (const src of [null, '', 'about:blank', '  ABOUT:BLANK ', 'https://altro.example/x', 'data:text/html,ciao']) {
     const f = riquadro(win, { src });
     assert.equal(R.inArrivo(f), false, `src ${JSON.stringify(src)}`);
     assert.ok(R.finestra(f));
   }
-  assert.equal(R.inArrivo(riquadro(win, { srcdoc: '<p>ciao</p>' })), true, 'srcdoc: il suo documento arriva dopo');
+  assert.equal(R.inArrivo(riquadro(win, { src: '/x', srcdoc: '<p>ciao</p>' })), false, 'srcdoc vince su src e non ha un preload');
+  assert.equal(R.inArrivo(riquadro(win, { src: 'https://sito.example/assoluto' })), true, 'stessa origine scritta per intero');
+});
+
+test('il preload del riquadro, appena parte, dice a chi lo ospita che da adesso lo può toccare', () => {
+  const R = carica();
+  const win = finestraFinta();
+  R.osserva(win);
+  const f = riquadro(win, { src: '/commenti' });
+  assert.equal(R.inArrivo(f), true);
+  // Il figlio accende il suo conto: si presenta al padre con il suo elemento.
+  const RFiglio = carica();
+  const docFiglio = { URL: 'https://sito.example/commenti', baseURI: 'https://sito.example/commenti', querySelectorAll: () => [] };
+  RFiglio.osserva({
+    document: docFiglio, frameElement: f, parent: { SN_RIQUADRI_IN_ARRIVO: R },
+    addEventListener() {}, MutationObserver: class { observe() {} },
+  });
+  assert.equal(R.inArrivo(f), false, 'arrivato prima del suo load: la parola di tradurre lo raggiunge');
+  assert.equal(f.tocchi, 0);
 });
 
 test('in una radice ombra il load non si vede: si fa come prima, e lo dice', () => {
