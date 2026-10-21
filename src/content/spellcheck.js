@@ -1683,13 +1683,19 @@
     const zona = viaggio && !viaggio.perso ? (viaggio.nuovo === undefined ? viaggio : viaggio.nuovo) : null;
     const nuovo = zona ? { start: d.verso(zona.start), end: d.verso(zona.end) } : null;
     const { segni, giusti } = Rg.segniDaRisposta(raw, d.testo, {
-      tipi: rapido ? ['errore'] : ['errore', 'suggerimento', 'contraddizione'],
-      // Una riga che ha perso il tipo: nel ragionato vale il segno che decide l'utente, non un errore.
-      senzaTipo: rapido ? 'errore' : 'suggerimento',
+      tipi: rapido ? ['errore'] : ['errore', 'suggerimento', 'contraddizione', ...(segnapostiAttivi() ? ['segnaposto', 'cerca'] : [])],
       citata: (c) => !!contesto && !!Coerenza() && Coerenza().citazioneNelContesto(c, contesto),
       fonte,
       nuovo: nuovo && nuovo.start >= 0 && nuovo.end > nuovo.start ? nuovo : null,
     });
+    // Ogni segnaposto ha il suo valore («p/e di soli xx» e «p/e di xx»): non diventa il giudizio di un candidato, che
+    // varrebbe per tutte le stesse x del campo. Quello da cercare porta la frase in cui sta.
+    for (const s of segni) {
+      if (!s.cerca) continue;
+      const f = Rg.aFrasiIntere(d.testo, s.start, s.end);
+      s.cerca = { ...s.cerca, frase: d.testo.slice(f.start, f.end).slice(0, 2000) };
+      s.cerca.chiave = `${s.segment}\u0000${s.cerca.frase}`;
+    }
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const ora = Date.now();
     const suo = rapido ? 'errore' : 'suggerimento';
