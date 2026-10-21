@@ -223,6 +223,8 @@
 
     function premi() {
       if (c.stato === 'pronto') { ascolta(); return; }
+      // Ripremuto mentre il microfono si accende: non parte (ascolta() vede il giro cambiato e chiude la sessione).
+      if (c.stato === 'avvio') { c.giro++; imposta('pronto'); return; }
       if (c.stato === 'ascolta' && c.sessione) { c.sessione.ferma('utente'); return; }
       if (c.stato === 'attesa') annullaInvio();
     }
