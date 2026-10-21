@@ -244,15 +244,22 @@ test('col filtro acceso «Approva tutti gli allineati» e «Ri-valuta» toccano 
   expect(scritte.find((u) => u.type === 'feedback_reevaluate')).toMatchObject({ feedbackIds: [biancaNon._id] });
 });
 
-test('aprire una pratica fidata da un numero la mostra anche col filtro acceso', async ({ openTab }) => {
+test('aprire una pratica fidata dal suo numero in una domanda la mostra anche col filtro acceso', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page);
+  const fidata = COPPIE.queue[0];
+  await page.evaluate(({ l, r }) => window.__mgTest.setDomande(l, { riferimenti: r }), {
+    l: [domanda(40, { fiducia: 'non_fidato', origine: { tipo: 'feedback', id: fidata._id } })],
+    r: { [fidata._id]: { num: '#911' } },
+  });
   await apriScheda(page, 'queue');
   await page.locator('#mgFiduciaFiltro').click();
-  await expect(riga(page, COPPIE.queue[0])).toHaveCount(0);
-  await page.evaluate(() => window.__mgTest.openFeedbackByNum('911'));
+  await expect(riga(page, fidata)).toHaveCount(0);
+  await apriScheda(page, 'domande');
+  await page.locator('#mgDomandaDettaglio [data-feedback="#911"]').click();
   await expect(page.locator('#mgFiduciaFiltro')).toHaveAttribute('aria-pressed', 'false');
-  await expect(riga(page, COPPIE.queue[0])).toHaveClass(/mg-item--selected/);
+  await expect(riga(page, fidata)).toHaveClass(/mg-item--selected/);
+  await expect(page.locator('#mgDetail')).toBeVisible();
 });
 
 test('Domande: le righe portano lo stesso segno, la pastiglia aperta gli stessi colori, e il filtro le conta', async ({ openTab }) => {
