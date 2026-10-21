@@ -3315,6 +3315,12 @@
       || (Number.isFinite(p) ? `pertinenza ${Math.round(p * 100)}%` : '');
     item.title = (num ? `#${num} · ` : '') + title + (reason ? ` — ${reason}` : '');
     item.classList.toggle('mg-item--selected', fb._id === selectedId);
+    // La card resta, la fiducia può cambiare mentre la si guarda: il segno si riscrive al suo posto.
+    const fidata = MR.isFidato(fb);
+    item.classList.toggle('mg-fiducia--fidata', fidata);
+    item.classList.toggle('mg-fiducia--nonfidata', !fidata);
+    const scudo = item.querySelector('.mg-fiducia-segno');
+    if (scudo) scudo.outerHTML = fiduciaSegnoHtml(fb);
     return item;
   }
 
