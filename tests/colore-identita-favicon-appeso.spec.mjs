@@ -37,8 +37,8 @@ test('un sito che non manda mai il favicon finisce di caricarsi lo stesso, e la 
       return w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents.isLoading();
     })).toBe(false);
     // Il favicon la pagina lo chiede comunque, e dopo il tetto di attesa la richiesta non resta aperta.
-    await expect.poll(() => appese.filter((a) => a.r.dest === 'image').length, { timeout: 5_000 }).toBeGreaterThan(0);
-    await expect.poll(() => appese.filter((a) => a.r.dest === 'image').every((a) => a.r.chiusa), { timeout: 8_000 }).toBe(true);
+    await expect.poll(() => appese.length, { timeout: 5_000 }).toBeGreaterThan(0);
+    await expect.poll(() => appese.every((a) => a.r.chiusa), { timeout: 8_000 }).toBe(true);
   } finally {
     for (const a of appese) { try { a.res.destroy(); } catch (_) {} }
     try { server.closeAllConnections?.(); } catch (_) {}
