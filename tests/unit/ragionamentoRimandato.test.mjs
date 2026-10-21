@@ -97,13 +97,15 @@ test('una parte fissa o strumenti diversi: nessun turno passato porta il ragiona
   assert.deepEqual(conRagionamento(altriStrumenti.corpo), []);
 });
 
-test('un ragionamento tolto non si rimette: chi è nato senza resta valido, chi segue un buco no', async () => {
+test('i ragionamenti davanti contano come il testo: chi è nato senza resta valido, rimessi lo invalidano', async () => {
   const messages = await conversazione(2);
-  // Il turno 3 nasce col ragionamento del turno 1 già tolto.
+  // Il turno 3 nasce col ragionamento del turno 1 già tolto. Il turno 2 l'aveva davanti e non parte più: Anthropic
+  // ammetterebbe un taglio dalla testa, la regola è più stretta e non manda mai un blocco in dubbio.
   const senzaPrimo = messages.map((m, i) => (i === 2 ? { role: m.role, content: m.content } : m));
   const terzo = await chiama({ messages: [...senzaPrimo, { role: 'user', content: 'domanda 3' }], n: 3 });
+  assert.deepEqual(conRagionamento(terzo.corpo), []);
   const quarta = [...senzaPrimo, { role: 'user', content: 'domanda 3' }, risposta(terzo.r), { role: 'user', content: 'domanda 4' }];
-  assert.deepEqual(conRagionamento((await chiama({ messages: quarta, n: 4 })).corpo), [4, 6]);
+  assert.deepEqual(conRagionamento((await chiama({ messages: quarta, n: 4 })).corpo), [6]);
   // Rimesso il ragionamento del turno 1, il turno 3 (nato senza) non vale più; il turno 2 invece lo aveva davanti.
   const rimesso = quarta.map((m, i) => (i === 2 ? messages[2] : m));
   assert.deepEqual(conRagionamento((await chiama({ messages: rimesso, n: 4 })).corpo), [2, 4]);
