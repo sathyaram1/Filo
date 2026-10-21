@@ -115,11 +115,13 @@ test('il nome intero di un marchio dove non è suo dà l’avviso, all’apertur
       `www.${b}.it.sicurezza-conto.com`, `${b}.com.x7241.ru`, `${b}.net.area-clienti.info`],
     numero: (b) => [`${b}24.com`, `${b}-2024.com`, `my${b}.com`, `${b}365.it`, `${b}2.net`],
   };
+  const male = [];
   for (const [nome, f] of Object.entries(forme)) {
     const tutti = marchi.flatMap(f);
     const senza = tutti.filter((h) => livello('https://' + h + '/') === 'safe' || !imitazioneNelMenu('https://' + h + '/'));
-    assert.ok(senza.length / tutti.length < 0.05, `${nome}: ${senza.length}/${tutti.length} senza avviso: ${senza.slice(0, 20).join(', ')}`);
+    if (senza.length / tutti.length >= 0.05) male.push(`${nome}: ${senza.length}/${tutti.length} senza avviso: ${senza.slice(0, 20).join(', ')}`);
   }
+  assert.deepEqual(male, []);
 });
 
 test('un marchio corto caduto per caso in un nome generato (cloud, anteprime) non è un’imitazione', () => {
