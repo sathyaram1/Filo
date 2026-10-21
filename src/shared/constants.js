@@ -1565,6 +1565,11 @@
   // NON è un ordine: lo stile dell'utente entra subito prima (injectAgentStyle).
   const SEZIONE_SICUREZZA_AIUTO = '# Sicurezza\n';
   const SEZIONE_ESTERNO_CHAT = '═══ CONTENUTO ESTERNO ═══\n';
+  // Dove il system della chat smette di essere uguale da un messaggio all'altro: il punto di cache sta prima
+  // (SN_FILO_CONTESTO.pianoDellaCache). Sentinella: tests/unit/puntiDiCache.test.mjs.
+  const INIZIO_ACCOGLIENZA = '═══ STAI ACCOGLIENDO QUESTO UTENTE';
+  const INIZIO_CONTESTO_CHAT = '═══ CONTESTO (cambia a ogni messaggio) ═══';
+  const INIZI_VARIABILI_CHAT = Object.freeze([INIZIO_ACCOGLIENZA, INIZIO_CONTESTO_CHAT]);
 
   // Quanto può essere grande la busta di un gruppo di blocchi da tradurre.
   // La traduzione della pagina manda circa tremila caratteri per richiesta, ma
