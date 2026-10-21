@@ -152,7 +152,7 @@ test('feedback su un sito: le modifiche dell\'utente passano tutte (cancella, pa
   const v = () => valore(app, page, '.sn-fb-text');
   await scrivi(app, page, '.sn-fb-text', 'uno due tre');
   await page.keyboard.press('Backspace');
-  expect(await v()).toBe('uno due t');
+  expect(await v()).toBe('uno due tr');
   await page.keyboard.press('Control+Backspace');
   expect(await v()).toBe('uno due ');
   await page.keyboard.press('Home');
