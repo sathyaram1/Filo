@@ -105,7 +105,7 @@ test('il titolo di passaggio dopo un cambio d’indirizzo interno lascia il post
   let titoloPagina = 'Caricamento…';
   wc.getTitle = () => titoloPagina;
   wc.push('https://video.test/42');
-  v.navigata(wc, 1, 'https://video.test/42', { inPagina: true });
+  v.navigata(wc, 1, 'https://video.test/42', { inPagina: true, ...gesto() });
   v.titolo(wc, titoloPagina);
   await attendi(5);
   titoloPagina = 'Orche al tramonto';
