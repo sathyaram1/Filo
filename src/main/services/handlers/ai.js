@@ -170,6 +170,7 @@ module.exports = function register(on, ctx) {
     if (u.blocca) return { text: SENZA_VALORE };
     const F = globalThis.SN_FONTI_SEGNAPOSTO;
     let ultima = null;
+    let fallita = '';
     for (const giro of F.giri(sp.dove, corr.segnapostiWeb !== false)) {
       let fonti = [];
       try {
@@ -177,7 +178,8 @@ module.exports = function register(on, ctx) {
           ? await F.web(sp.domanda, settings.apiKeys?.tavily || '')
           : await F.wikipedia(sp.domanda, giro.replace(/^wiki:/, ''));
       } catch (e) {
-        console.warn('[SN] segnaposto, fonti:', e?.message || e);
+        fallita = String(e?.message || e);
+        console.warn('[SN] segnaposto, fonti:', fallita);
       }
       if (!fonti.length) continue;
       const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti }, origin });
@@ -185,6 +187,8 @@ module.exports = function register(on, ctx) {
       const riga = F.ricomponi(r && r.text, fonti);
       if (riga) return { ...r, text: riga };
     }
+    // Fonti che non hanno risposto non dicono che il dato non c'è: la ricerca è fallita, e si può rifare.
+    if (!ultima && fallita) return { ok: false, code: 'FONTI_NON_RAGGIUNTE', error: fallita };
     return { ...(ultima || {}), text: SENZA_VALORE };
   }
 
