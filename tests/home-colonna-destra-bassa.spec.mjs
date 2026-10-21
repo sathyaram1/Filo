@@ -18,9 +18,9 @@ const misura = (page) => page.evaluate(() => {
   return {
     scorre: col.scrollHeight > col.clientHeight + 1,
     inFondo: col.scrollTop + col.clientHeight >= col.scrollHeight - 1,
-    opacita: Number(sfuma.opacity),
+    // Uno pseudo-elemento che non c'è risponde comunque opacità 1: conta solo se ha un contenuto.
+    opacita: sfuma.content === 'none' ? 0 : Number(sfuma.opacity),
     altezza: parseFloat(sfuma.height) || 0,
-    sopraOrologio: sfuma.bottom === '100%' || sfuma.content !== 'none',
     // Le voci sotto l'orologio quando la colonna è in fondo: devono stare tutte sopra di lui.
     copertaInFondo: voci.some((r) => r.bottom > s.top + 1 && r.top < s.bottom),
   };
@@ -28,7 +28,8 @@ const misura = (page) => page.evaluate(() => {
 
 async function finestra(app, page, w, h) {
   await app.evaluate(({ BrowserWindow }, d) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(d.w, d.h), { w, h });
-  await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 }).toBeLessThan(h);
+  // La home sta sotto la fila delle schede (40 punti): si aspetta che la pagina abbia preso la misura nuova.
+  await expect.poll(() => page.evaluate((alta) => Math.abs(window.innerHeight - alta) <= 4, h - 40), { timeout: 5000 }).toBe(true);
   await page.waitForTimeout(300);
 }
 
