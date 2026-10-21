@@ -52,6 +52,18 @@ const IS_SUBFRAME = (() => {
   try { return window.top !== window.self; } catch (_) { return true; }
 })();
 
+// Un riquadro con un indirizzo suo, toccato prima del suo load, perde il preload (#1568): chi cerca fra i riquadri
+// chiede qui se è arrivato. Si ascolta da subito, così valgono anche i load di prima che Filo si monti.
+const riquadriArrivati = new WeakSet();
+try {
+  const segna = (e) => { const t = e && e.target; if (t && (t.localName === 'iframe' || t.localName === 'frame')) riquadriArrivati.add(t); };
+  const ascolta = () => window.addEventListener('load', segna, true);
+  ascolta();
+  // La riscrittura da capo (document.open) toglie gli ascolti della finestra: si rimettono.
+  new MutationObserver(ascolta).observe(document, { childList: true });
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+globalThis.SN_RIQUADRO_ARRIVATO = (f) => riquadriArrivati.has(f);
+
 // ─── #145 — blocco autoplay sulle schede RIPRISTINATE al boot ───────────────
 //
 // Le schede riaperte all'avvio di Filo nascono con il flag
