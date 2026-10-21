@@ -21,6 +21,22 @@ test('un dominio degli elenchi di serie è delicato, anche nei sottodomini, col 
   assert.equal(PD.nome('banche'), 'banca');
 });
 
+// #1274 — ci si entra con SPID o CIE: la password si scrive sul sito del fornitore, e qui il campo non compare mai.
+test('le aree riservate della pubblica amministrazione sono delicate di serie', () => {
+  assert.equal(PD.classifica('https://serviziweb2.inps.it/PassiWeb/jsp/AreaRiservata/home.jsp'), 'pa');
+  assert.equal(PD.classifica('https://www.inps.it/it/it/dati-e-bilanci.html'), 'pa');
+  assert.equal(PD.classifica('https://portale.agenziaentrate.gov.it/PortaleWeb/servizi/cassetto-fiscale'), 'pa');
+  assert.equal(PD.classifica('https://telematici.agenziaentrate.gov.it/Servizi/CassettoFiscale.jsp'), 'pa');
+  assert.equal(PD.classifica('https://checkout.pagopa.it/'), 'pa');
+  assert.equal(PD.classifica('https://www.inail.it/portale/it.html'), 'pa');
+  assert.equal(PD.nome('pa'), 'pubblica amministrazione');
+  assert.equal(PD.classifica('https://inps.it.truffa.example/'), null);
+  assert.equal(PD.classifica('https://pa', { attivo: true }), null);
+  // L'elenco remoto la allarga sostituendola per intero, come le altre categorie.
+  assert.equal(PD.classifica('https://www.comune.esempio.it/', { elenco: PD.elenco({ pa: ['comune.esempio.it'] }) }), 'pa');
+  assert.equal(PD.classifica('https://www.inps.it/', { attivo: false }), null);
+});
+
 test('un nome che contiene quello di una banca non è la banca, e una pagina qualunque non è delicata', () => {
   assert.equal(PD.classifica('https://notpaypal.com/'), null);
   assert.equal(PD.classifica('https://paypal.com.truffa.example/'), null);
