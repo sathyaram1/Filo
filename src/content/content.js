@@ -2413,9 +2413,30 @@
       label: I18n.t('menu_valuta'),
       onClick: () => {
         if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
-        Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) });
+        if (!IS_SUBFRAME) { Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) }); return; }
+        // Il campo lo ritrova la pagina dal fuoco: il ponte fra i riquadri non porta elementi.
+        try { campo.focus({ preventScroll: true }); } catch (_) {}
+        openSurface('valuta', () => {});
       },
     };
+  }
+
+  // Ogni riquadro fra qui e la pagina è dello stesso sito: per uno di un altro sito `frameElement` è null.
+  function paginaArrivaQui() {
+    try {
+      for (let w = window; w !== w.top; w = w.parent) if (!w.frameElement) return false;
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // Nella pagina: il campo del riquadro dove «Valuta» ha lasciato il fuoco.
+  function valutaDalRiquadro() {
+    let el = document.activeElement;
+    try {
+      while (el && /^(IFRAME|FRAME)$/.test(el.tagName)) el = el.contentDocument ? el.contentDocument.activeElement : null;
+    } catch (_) { el = null; }
+    const campo = el && el.ownerDocument !== document ? campoDaValutare(el) : null;
+    if (campo) Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) });
   }
 
   function buildHelpItem() {
