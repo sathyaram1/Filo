@@ -4187,7 +4187,8 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (action.locale) {
         const segno = { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() };
-        Object.assign(locale, { localOnly: segno, localApproval: { ...segno } });
+        locale.localOnly = segno;
+        if (action.approva) locale.localApproval = { ...segno };
       }
       Object.assign(fb, locale);
       updateTabCounts();
