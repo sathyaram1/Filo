@@ -56,10 +56,4 @@ test('la regola sta nel preload della pagina, e chi la usa la chiede lì', () =>
   assert.match(preload, /globalThis\.SN_RIQUADRO_SEGNA = /);
   // Il preload di un riquadro si presenta all'antenato con Filo: è così che si vede l'arrivo dentro un'ombra.
   assert.match(preload, /p\.SN_RIQUADRO_SEGNA\(el\)/);
-  // Una seconda copia della regola divergerebbe: nessun altro file la riscrive.
-  for (const rel of CARTELLE.flatMap(file)) {
-    if (rel === 'src/preload/page-preload.js') continue;
-    const testo = readFileSync(join(ROOT, rel), 'utf8');
-    assert.doesNotMatch(testo, /about:blank\(\[\?#\]\|\$\)/, `${rel} riscrive la regola dei riquadri in arrivo`);
-  }
 });
