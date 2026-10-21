@@ -37,6 +37,7 @@ const L2 = Number(arg('--l2', 1e-6));
 // Il tetto dei falsi allarmi sui siti noti con cui si sceglie la soglia: uno su duecento.
 const FALSI_AMMESSI = Number(arg('--falsi', 0.005));
 const PESO_MANO = Number(arg('--peso-mano', 6));
+const PESO_SINTETICI = Number(arg('--peso-sintetici', 6));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
@@ -138,7 +139,7 @@ function sinteticiRefusi(etichetta) {
     const nomi = [...new Set(varianti)].filter((v) => v !== t).map((v) => v + suff);
     // E il suffisso sbagliato di una lettera (github.co, paypal.cm), dove il marchio non l'ha preso per sé.
     if (suff === '.com') nomi.push(...['.co', '.cm', '.om'].map((x) => t + x).filter((h) => !b.domains.includes(h)));
-    for (const h of nomi) if (!etichetta.has(h) && !etichetta.has('www.' + h)) out.push({ h, url: 'https://' + h + '/', marchio: t });
+    for (const h of nomi) if (!etichetta.has(h) && !etichetta.has('www.' + h)) out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
   }
   return out;
 }
@@ -276,6 +277,7 @@ function conCandidati(etichetta) {
   return out;
 }
 
+let refusiTolti = 0;
 function costruisci() {
   const prova = new Set(leggiTsv(PROVA).map((r) => r.h));
   const etichetta = new Map();
@@ -308,7 +310,7 @@ function costruisci() {
     if (!es.length) return;
     // Un refuso del dominio vero di un marchio sta fra i siti più visitati per le visite sbagliate, non perché sia un
     // altro sito (googlee.com, gmaill.com): da un elenco non si impara che è innocuo, lo decide solo un'etichetta scritta.
-    if (fonte === 'elenco' && y === 0 && es.some(({ c }) => c.zona === 'sld' && c.tipo === 'typo'
+    if (fonte === 'elenco' && y === 0 && es.some(({ c }) => c.zona === 'sld' && IM.distanza(c.sk.testo, c.mc.lettura) <= 1
       && c.mc.brand.domains.includes(c.mc.token + '.' + norm.publicSuffix))) { refusiTolti++; return; }
     const mask = (1 << BIT) - 1;
     if (y === 1) {
@@ -320,10 +322,12 @@ function costruisci() {
     } else gruppi.push({ h, y, fonte, ix: es.map((e) => indici(e.feats, mask)) });
     // Un'etichetta scritta vale più di una riga di un elenco, che può sbagliare.
     if (fonte === 'mano') gruppi[gruppi.length - 1].peso = PESO_MANO;
+    if (fonte === 'sintetico') gruppi[gruppi.length - 1].peso = PESO_SINTETICI;
+    if (fonte === 'casuale') gruppi[gruppi.length - 1].peso = Number(process.env.PESO_CASUALI || 1);
   };
   const utili = conCandidati(etichetta);
   for (const [h, y] of etichetta) if (utili.has(h) && !scritte.has(h)) aggiungi(h, y, null, 'elenco');
-  for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, 'mano', r.url);
+  for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, r.sintetico ? 'sintetico' : 'mano', r.url);
   for (const r of sinteticiCasuali()) if (!scritte.has(r.h)) aggiungi(r.h, 0, null, 'casuale', r.url);
   return gruppi;
 }
@@ -355,7 +359,7 @@ async function avvia() {
   if (process.argv.includes('--solo-prova')) { provaModello(); return; }
   const t0 = Date.now();
   const gruppi = costruisci();
-  console.log(`esempi: ${gruppi.filter((g) => g.y === 1).length} imitazioni, ${gruppi.filter((g) => g.y === 0).length} siti noti (${Date.now() - t0} ms)`);
+  console.log(`esempi: ${gruppi.filter((g) => g.y === 1).length} imitazioni, ${gruppi.filter((g) => g.y === 0).length} siti noti, ${refusiTolti} refusi di marchi tolti dagli elenchi (${Date.now() - t0} ms)`);
   // Un decimo da parte per scegliere la soglia su nomi che il modello non ha visto.
   const caso = rng(11);
   const parte = gruppi.map(() => caso() < 0.1);
@@ -365,6 +369,7 @@ async function avvia() {
   const mq0 = quantizza(addestra(esempiDi(allena)));
   const pv = perHost(valida, mq0);
   const soglia = sogliaPer(pv, FALSI_AMMESSI);
+  if (process.env.DEBUGNEG) console.log(pv.filter((g) => g.y === 0).sort((a, b) => b.p - a.p).slice(0, 40).map((g) => g.h + " " + g.fonte + " " + g.p.toFixed(3)).join("\n"));
   const mv = misura(pv, soglia);
   console.log(`validazione: soglia ${soglia.toFixed(3)}, prese ${mv.presi}/${mv.truffe} (${(100 * mv.richiamo).toFixed(1)}%), falsi ${mv.falsi}/${mv.noti} (${(100 * mv.tassoFalsi).toFixed(2)}%)`);
   const sogliaForte = Math.max(soglia, sogliaPer(pv, FALSI_AMMESSI / 5));
