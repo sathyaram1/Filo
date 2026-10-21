@@ -41,6 +41,8 @@ const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 // Le icone che un'azione della pagina può cambiare (lo stesso bottone traduce o riporta all'originale).
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
+// Perché l'icona Aiuto è spenta, nel suggerimento: chiavi i18n per i motivi che la pagina riferisce.
+const MOTIVI_AIUTO_SPENTO = { aiuto: 'aiuto_spento_barra', sito: 'aiuto_spento_sito', pagina: 'aiuto_spento_pagina' };
 const PAGINE_DAL_MENU = {
   ai: 'filo://history/history.html',
   preferenze: 'filo://preferences/preferences.html',
