@@ -136,8 +136,18 @@
     return out;
   }
 
+  // L'icona Aiuto dice cosa farà il clic (#1432): chiuso o ridotto apre, aperto detta, mentre detta ferma.
+  // `pannello` e `voce` sono quelli che la scheda riferisce; le etichette sono chiavi i18n.
+  const VOCE_IN_CORSO = Object.freeze({ avvio: 'voce_ferma', ascolta: 'voce_ferma', trascrive: 'voce_trascrivo', attesa: 'voce_annulla_invio' });
+  function aspettoAiuto({ pannello = 'chiuso', voce = 'pronto', risposta = false } = {}) {
+    const inCorso = Object.prototype.hasOwnProperty.call(VOCE_IN_CORSO, voce) ? VOCE_IN_CORSO[voce] : '';
+    if (pannello !== 'chiuso' && inCorso) return { icona: 'mic', etichetta: inCorso, ascolta: voce !== 'attesa' };
+    if (pannello === 'aperto') return { icona: 'mic', etichetta: 'voce_parla', ascolta: false };
+    return { icona: 'help', etichetta: risposta ? 'aiuto_leggi_risposta' : 'menu_help', ascolta: false };
+  }
+
   global.SN_DISPOSIZIONE_ICONE = {
-    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, DOVE,
-    noto, nome, valida, migra, applicaPosa,
+    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
+    noto, nome, valida, migra, applicaPosa, aspettoAiuto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
