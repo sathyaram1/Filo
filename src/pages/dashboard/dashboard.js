@@ -2441,7 +2441,7 @@
     const apri = await window.SN_CONFIRM_UI.confirm({
       title: a.title, text: a.text, okLabel: 'Apri Inviti e utenti', cancelLabel: 'Più tardi',
     });
-    if (apri) send({ type: MSG.OPEN_URL, url: 'filo://credits/owner.html' });
+    if (apri) send({ type: MSG.OPEN_URL, url: 'filo://manage/manage.html#utenti' });
   }
   async function chiediBenvenuto() {
     await quandoVisibile();

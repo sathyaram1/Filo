@@ -367,9 +367,9 @@
     {
       id: 'ricarica-openrouter', nome: 'La pagina dei crediti di OpenRouter',
       base: ['https://openrouter.ai/settings/credits'],
-      occasione: 'solo per il proprietario di Filo, quando dalla sua pagina «Inviti e utenti» apre la ricarica del conto',
+      occasione: 'solo per il proprietario di Filo, quando da «Inviti e utenti» in Gestione apre la ricarica del conto',
       riceve: 'la visita, come ogni sito',
-      dove: ['src/pages/credits/owner.js'],
+      dove: ['src/pages/manage/manageUtenti.js'],
     },
     {
       id: 'sito-filo', nome: 'Il sito di Filo',

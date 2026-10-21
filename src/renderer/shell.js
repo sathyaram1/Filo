@@ -253,10 +253,10 @@
   // dell'owner: da quando i feedback li legge solo chi li gestisce (#583) a un
   // utente comune aprirebbero una pagina che non ha niente da mostrare, con un
   // invito ad accedere come amministratore che non porta da nessuna parte
-  // (amministratori non si diventa accedendo). Compaiono solo all'admin, come
-  // già fa "Modelli predefiniti" nel menu Impostazioni. Chi vuole MANDARE un
-  // feedback non passa di qui: passa dal menu del tasto destro, che il
-  // cambiamento non tocca.
+  // (amministratori non si diventa accedendo). Compaiono solo all'admin.
+  // Gestione è l'ingresso unico delle pagine dell'owner (#1414): Modelli
+  // predefiniti e Inviti e utenti stanno lì, non in altri menu. Chi vuole MANDARE
+  // un feedback non passa di qui: passa dal menu del tasto destro.
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
@@ -273,12 +273,10 @@
     }
     return entries;
   }
-  // Voci del menu Impostazioni (ingranaggio): Modelli, Sicurezza, Preferenze —
-  // tre pagine interne dedicate. La voce "Modelli predefiniti" appare SOLO agli
-  // admin (gli utenti comuni non la vedono affatto). `buildSettings()` ricostruisce
-  // la lista ad ogni apertura del menu, così riflette lo stato auth corrente.
+  // Voci del menu Impostazioni (ingranaggio): uguali per tutti. Le impostazioni
+  // predefinite dell'owner stanno in Gestione (#1414).
   function buildSettings() {
-    const entries = [
+    return [
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
       { label: 'Altro', icon: 'options', url: 'filo://options/altro.html' },
       { label: 'Sicurezza', icon: 'lock', url: 'filo://security/security.html' },
@@ -288,11 +286,6 @@
       { type: 'separator' },
       { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
     ];
-    if (isAdmin) {
-      entries.push({ type: 'separator' });
-      entries.push({ label: 'Modelli predefiniti', icon: 'models', url: 'filo://admin-defaults/admin-defaults.html' });
-    }
-    return entries;
   }
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
@@ -336,9 +329,8 @@
   // con "Esci"; quando non loggato, il click avvia il login.
   let authProfile = null;
   let authBusy = false;
-  // Gate UX della voce admin "Modelli predefiniti". La garanzia forte resta nel
-  // main (handler DEFAULTS_*) e nelle regole Firestore: qui decidiamo solo se
-  // mostrare la voce di menu.
+  // Gate UX delle voci dell'owner nel menu App. La garanzia forte resta nel main
+  // e nelle regole Firestore: qui decidiamo solo se mostrare la voce.
   let isAdmin = false;
   // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
   let authRemembered = true;
@@ -1481,7 +1473,6 @@
     'options/altro.html': 'Altro',
     'security/security.html': 'Sicurezza',
     'preferences/preferences.html': 'Preferenze',
-    'admin-defaults/admin-defaults.html': 'Modelli predefiniti',
     'editor/editor.html': 'Editor',
     'feedback/feedback.html': 'Feedback',
     'history/history.html': 'Cronologia AI',

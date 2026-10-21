@@ -3,9 +3,7 @@
 // predefiniti il bottone accanto lo esclude; la lista e i suoi cambi decidono l'avviso.
 
 import { test, expect } from './fixtures/electron.mjs';
-
-const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
-const MANAGE_URL = 'filo://manage/manage.html';
+import { GESTIONE as MANAGE_URL, ricaricaSu } from './helpers/gestione.mjs';
 
 const CATALOGO = [
   { name: 'Xiaomi', slug: 'xiaomi' },
@@ -17,7 +15,7 @@ const CATALOGO = [
 ];
 
 async function apriModelliPredefiniti(openTab, cfg) {
-  const page = await openTab(ADMIN_URL);
+  const page = await openTab(MANAGE_URL);
   await page.addInitScript(({ cfg, CATALOGO }) => {
     window.__sent = [];
     const stub = async (msg) => {
@@ -33,7 +31,7 @@ async function apriModelliPredefiniti(openTab, cfg) {
     if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
     else window.chrome = { runtime: { sendMessage: stub } };
   }, { cfg, CATALOGO });
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   return page;
 }

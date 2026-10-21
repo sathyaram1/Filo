@@ -5,6 +5,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const SEGRETO = 'Saldo disponibile 12.345,67 euro bonifico a Mario Rossi';
 
@@ -247,7 +248,7 @@ test('dalla chat della home una scheda aperta diventa delicata col suo titolo, s
 test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità, e salva solo quello che ha toccato', async ({ app, openTab }) => {
   const [elenco, diSerie] = await app.evaluate(() => [
     globalThis.SN_PAGINE_DELICATE.elenco(null), globalThis.SN_PAGINE_DELICATE.elenco(null)]);
-  const page = await openTab('filo://admin-defaults/admin-defaults.html');
+  const page = await openTab(GESTIONE);
   // La pagina vuole un owner loggato, che qui non c'è: le risposte del main sono finte, i messaggi si registrano.
   await page.addInitScript(({ elenco: el, diSerie: ds }) => {
     window.__sent = [];
@@ -262,7 +263,7 @@ test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità,
     if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
     else window.chrome = { runtime: { sendMessage: stub } };
   }, { elenco, diSerie });
-  await page.reload();
+  await ricaricaSu(page, 'predefiniti');
   await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
   await expect(page.locator('#h-delicate')).toHaveText('Pagine delicate');
   await expect(page.locator('#delicate-banche')).toHaveValue(/intesasanpaolo\.com/);
