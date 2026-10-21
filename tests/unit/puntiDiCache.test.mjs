@@ -219,3 +219,29 @@ test('il cancello fa il piano sui messaggi già oscurati: il taglio cade giusto 
   assert.ok(!visto.messages[0].content.includes(segreto), 'il segreto è uscito');
   assert.equal(visto.cache.punti[0].caratteri, visto.messages[0].content.indexOf(C.INIZI_VARIABILI_CHAT[0]));
 });
+
+test('la durata della parte fissa segue le impostazioni: cinque minuti tolgono il ttl, un valore strano torna all\'ora', async () => {
+  const msgs = richiestaChat();
+  assert.deepEqual(FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: '5m' }).punti[0], { indice: 0 });
+  assert.deepEqual(FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: 'sempre' }).punti[0], { indice: 0, durata: '1h' });
+  const corpo5m = OR.conPuntiDiCache(HAIKU, msgs, FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: '5m' }));
+  assert.deepEqual(corpo5m[0].content[0].cache_control, { type: 'ephemeral' });
+
+  let visto = null;
+  const prima = globalThis.SN_PROVIDERS;
+  globalThis.SN_PROVIDERS = {
+    ...prima,
+    completeWithFallback: async ({ attempts, cache }) => { visto = cache; return { text: 'ok', provider: attempts[0].provider, model: attempts[0].model, usage: {} }; },
+  };
+  try {
+    const gate = globalThis.SN_MODEL_GATE.create({
+      getSettings: async () => ({ contestoFilo: { cache: '5m' } }),
+      buildChain: () => [{ provider: 'openrouter', apiKey: 'k', model: HAIKU }],
+      modelFor: () => 'haiku',
+      costs: { isOverLimit: async () => false, record: async () => 0 },
+      durataCache: (s) => FC.tetti(s.contestoFilo, { cache: '1h' }).cache,
+    });
+    await gate.complete({ action: ACTIONS.FILO_CHAT, messages: msgs });
+  } finally { globalThis.SN_PROVIDERS = prima; }
+  assert.deepEqual(visto.punti[0], { indice: 0 });
+});

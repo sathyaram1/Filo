@@ -119,6 +119,7 @@
     $('l-contesto-cache').textContent = I18n.t('admin_defaults_contesto_cache');
     $('contestoCache5m').textContent = I18n.t('admin_defaults_contesto_cache_5m');
     $('contestoCache1h').textContent = I18n.t('admin_defaults_contesto_cache_1h');
+    $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_codice');
     $('h-lunghezza').textContent = I18n.t('admin_defaults_lunghezza');
     $('lunghezza-desc').textContent = I18n.t('admin_defaults_lunghezza_desc');
     for (const [f] of CAMPI_LUNGHEZZA) $(`l-lunghezza-${f}`).textContent = I18n.t(`admin_defaults_lunghezza_${f}`);
