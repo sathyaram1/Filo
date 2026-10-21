@@ -1827,12 +1827,11 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 
 /* Controlli del browser dentro la home: in tinta con la "carta calda", così sembrano parte della
-   pagina e non una barra a sé. */
+   pagina e non una barra a sé. Stanno in cima alla colonna destra e non le scorrono via. */
 .dash-controls {
-  position: fixed;
-  top: 10px;
-  right: 16px;
-  z-index: 50;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 2px;
