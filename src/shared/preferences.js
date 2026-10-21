@@ -959,7 +959,7 @@
     // Il canale (SPEC-DOMANDE.md §4.2): la scelta vale su ogni sistema, anche dove l'installazione è a mano.
     {
       scrive: ['aggiornamenti.canale'],
-      aiuto: '"veloce" | "stabile", o true per "stabile" (veloce: ogni versione di Filo appena esce, anche più volte al giorno; stabile: una versione a settimana, il lunedì, che non esce se c\'è un problema di sicurezza ancora aperto)',
+      aiuto: '"veloce" | "stabile", o true per "stabile" (veloce prende ogni versione di Filo appena esce, anche più volte al giorno, stabile una versione a settimana, il lunedì, che non esce se c\'è un problema di sicurezza ancora aperto)',
       keys: ['canale_aggiornamenti', 'canale aggiornamenti', 'canale degli aggiornamenti', 'canale di aggiornamento',
         'canale stabile', 'canale veloce', 'aggiornamenti stabili', 'versione stabile', 'aggiornamenti settimanali',
         'quali versioni'],
