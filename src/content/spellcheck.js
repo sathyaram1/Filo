@@ -1413,6 +1413,7 @@
     const nascosto = (c) => c.attende && modelloErrori();
     const codice = [];
     for (const c of state.codice) {
+      if (c.fonte === 'segnaposto' && !segnapostiAttivi()) continue;
       const v = verdetto(state, c);
       if (!v) { if (!nascosto(c)) codice.push(c); continue; }
       if (v.stato === 'scartato') {
