@@ -1,6 +1,6 @@
 // Chiavi, password, codici e numeri di carta scritti in un campo non partono verso i modelli del correttore (#1446): al
 // loro posto va un segnaposto e il resto si controlla lo stesso. Le forme le riconoscono guardianoStatico.js e urlExfil.js.
-// Prove: tests/unit/correttoreRiservati.test.mjs.
+// Si cercano nel campo intero, mai pezzo per pezzo. Prove: tests/unit/correttoreRiservati.test.mjs.
 'use strict';
 
 const SEGNAPOSTO = '[dato riservato]';
@@ -16,23 +16,57 @@ function riservati(testo) {
 }
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
-function oscura(testo) {
+const formaDi = (valore) => new RegExp(/^\d+$/.test(valore) ? valore.split('').map(esc).join('[\\s-]?') : esc(valore), 'gi');
+const valoriDi = (testo) => [...new Set(riservati(testo))].sort((a, b) => b.length - a.length);
+
+function oscura(testo, valori = null) {
   let v = String(testo == null ? '' : testo);
   if (!v.trim()) return v;
-  const valori = [...new Set(riservati(v))].sort((a, b) => b.length - a.length);
-  for (const valore of valori) {
-    const forma = /^\d+$/.test(valore) ? valore.split('').map(esc).join('[\\s-]?') : esc(valore);
-    v = v.replace(new RegExp(forma, 'gi'), SEGNAPOSTO);
-  }
+  for (const valore of valori || valoriDi(v)) v = v.replace(formaDi(valore), SEGNAPOSTO);
   return v;
 }
 
-// Le parti di una richiesta del correttore che portano testo: quello del campo, i candidati, la pagina intorno.
+// I pezzi contigui del campo (prima, nuovo, dopo), oscurati sul campo intero: la parola che presenta una password, o
+// metà di un numero di carta, può stare in un pezzo diverso dal valore, o fuori dai pezzi. `campo` e `campoDa` (dove
+// comincia il primo pezzo) li manda la pagina; se non tornano coi pezzi vale il loro testo unito.
+function pezziOscurati(pezzi, campo, campoDa) {
+  const unito = pezzi.join('');
+  const daCampo = typeof campo === 'string' && Number.isInteger(campoDa) && campoDa >= 0
+    && campo.slice(campoDa, campoDa + unito.length) === unito;
+  const base = daCampo ? campo : unito;
+  const scarto = daCampo ? campoDa : 0;
+  const valori = valoriDi(base);
+  const coperti = [];
+  for (const valore of valori) for (const m of base.matchAll(formaDi(valore))) coperti.push([m.index - scarto, m.index - scarto + m[0].length]);
+  let a = 0;
+  const out = pezzi.map((pezzo) => {
+    const da = a;
+    a += pezzo.length;
+    const qui = coperti.map(([x, y]) => [Math.max(x, da) - da, Math.min(y, a) - da]).filter(([x, y]) => y > x).sort((p, q) => p[0] - q[0]);
+    let v = '';
+    let i = 0;
+    for (const [x, y] of qui) {
+      if (y <= i) continue;
+      v += x < i ? '' : pezzo.slice(i, x) + SEGNAPOSTO;
+      i = y;
+    }
+    return v + pezzo.slice(i);
+  });
+  return { pezzi: out, valori };
+}
+
+// Le parti di una richiesta del correttore che portano testo: quello del campo, i candidati, la pagina intorno. Il campo
+// intero serve solo qui: non parte.
 function richiestaSenzaRiservati(payload) {
   const p = payload && typeof payload === 'object' ? payload : {};
   const out = { ...p };
-  for (const k of ['prima', 'nuovo', 'dopo']) if (typeof p[k] === 'string') out[k] = oscura(p[k]);
-  if (Array.isArray(p.candidati)) out.candidati = p.candidati.map((c) => (c && typeof c === 'object' ? { ...c, pezzo: oscura(c.pezzo) } : c));
+  delete out.campo;
+  delete out.campoDa;
+  const chiavi = ['prima', 'nuovo', 'dopo'];
+  const { pezzi, valori } = pezziOscurati(chiavi.map((k) => (typeof p[k] === 'string' ? p[k] : '')), p.campo, p.campoDa);
+  chiavi.forEach((k, i) => { if (typeof p[k] === 'string') out[k] = pezzi[i]; });
+  const delCampo = (t) => oscura(oscura(t, valori));
+  if (Array.isArray(p.candidati)) out.candidati = p.candidati.map((c) => (c && typeof c === 'object' ? { ...c, pezzo: delCampo(c.pezzo) } : c));
   if (p.luogo && typeof p.luogo === 'object') {
     out.luogo = { ...p.luogo };
     for (const k of ['titolo', 'conversazione']) if (typeof p.luogo[k] === 'string') out.luogo[k] = oscura(p.luogo[k]);
@@ -44,4 +78,4 @@ function richiestaSenzaRiservati(payload) {
   return out;
 }
 
-module.exports = { SEGNAPOSTO, oscura, richiestaSenzaRiservati };
+module.exports = { SEGNAPOSTO, oscura, pezziOscurati, richiestaSenzaRiservati };
