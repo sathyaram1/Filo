@@ -153,7 +153,8 @@ async function web(domanda, tavilyKey) {
 
 const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 function giorno(d) {
-  const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(d instanceof Date ? d.toISOString() : String(d || ''));
+  if (d instanceof Date) return Number.isNaN(d.getTime()) ? '' : `${d.getDate()} ${MESI[d.getMonth()]} ${d.getFullYear()}`;
+  const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(d || ''));
   return m ? `${Number(m[3])} ${MESI[Number(m[2]) - 1]} ${m[1]}` : '';
 }
 
