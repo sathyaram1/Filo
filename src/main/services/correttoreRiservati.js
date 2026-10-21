@@ -17,6 +17,7 @@ const FINE_FRASE = /[.!?]+(?=\s|$)|\n/g;
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
   'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks']);
+const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
 const PAROLE_RISPOSTA = 12;
 const RISPOSTA_MAX = 600;
 // Il campo risponde all'ultima richiesta del testo sopra finché dopo di lei non c'è un'altra domanda né molto altro
