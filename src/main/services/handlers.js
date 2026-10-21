@@ -986,6 +986,17 @@ async function lessonsBufferText() {
   return buf.map((l) => `- ${l.text}`).join('\n');
 }
 
+// Il contesto dell'utente che «Valuta» porta all'Aiuto (#1449): la stessa memoria della chat. Senza, il parere parte lo stesso.
+async function memoriaPerValuta() {
+  try {
+    const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(await FiloMem.getMemory());
+    return { profilo, preferenze, espansioni, lezioni: await lessonsBufferText() };
+  } catch (e) {
+    console.warn('[Filo] memoria per «Valuta»:', e?.message || e);
+    return {};
+  }
+}
+
 // Le lezioni che Filo si scrive da solo dopo un turno passano dalla regola di SALVA_LEZIONE: se a questo livello,
 // con quello che il compito ha letto, una lezione non partirebbe da sola, l'agente non la scrive (#530).
 async function lezioniAutomaticheConsentite({ sender = null, contesto = null, fontiLette = null } = {}) {
