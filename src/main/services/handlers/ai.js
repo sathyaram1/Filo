@@ -117,15 +117,20 @@ module.exports = function register(on, ctx) {
     return Boolean(s && s.descriviImmagini && s.descriviImmagini.enabled === false);
   }
 
-  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: il controllo di coerenza
-  // (#1115) parte col solo testo di chi scrive, e lo dice alla pagina, che allora non ha citazioni da confrontare.
+  // Il testo di una pagina delicata (#1004) non va a nessun modello da un lavoro automatico: i due controlli del
+  // correttore (#1446) partono col solo testo di chi scrive e il nome del sito, e lo dicono alla pagina, che allora non
+  // ha citazioni da confrontare.
+  const DEL_CORRETTORE = new Set([SN_CONST.ACTIONS.SPELLCHECK_SEMANTIC, SN_CONST.ACTIONS.SPELLCHECK_CONTEXT]);
   async function senzaPaginaDelicata(msg, sender) {
-    if (!msg || msg.action !== SN_CONST.ACTIONS.SPELLCHECK_CONTEXT || !msg.payload) return false;
+    if (!msg || !DEL_CORRETTORE.has(msg.action) || !msg.payload || typeof msg.payload !== 'object') return false;
     const url = String(sender?.tab?.url || sender?.url || '');
     if (!/^https?:/i.test(url)) return false;
     let delicata = true;
     try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
-    if (delicata) msg.payload = { ...msg.payload, contesto: {} };
+    if (delicata) {
+      const sito = msg.payload.luogo && typeof msg.payload.luogo.sito === 'string' ? msg.payload.luogo.sito : '';
+      msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {} };
+    }
     return delicata;
   }
 
@@ -150,6 +155,8 @@ module.exports = function register(on, ctx) {
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
     const senzaContesto = await senzaPaginaDelicata(msg, sender);
+    // Chiavi, password e carte scritte nel campo restano sul computer (#1446).
+    if (msg && DEL_CORRETTORE.has(msg.action)) msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
     // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
     const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
     if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
