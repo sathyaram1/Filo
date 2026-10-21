@@ -71,6 +71,16 @@ function relIsUnsafe(rel) {
   return /(^|[\\/])\.\.([\\/]|$)/.test(String(rel || ''));
 }
 
+// Le pagine dell'owner entrate in Gestione (#1414): l'indirizzo di prima, da un link, un avviso salvato o una scheda
+// riaperta, porta alla sezione. Qui e non nelle pagine: è l'unico punto da cui passano tutte le strade.
+const INDIRIZZI_SPOSTATI = Object.freeze({
+  'admin-defaults/admin-defaults.html': 'filo://manage/manage.html#predefiniti',
+  'credits/owner.html': 'filo://manage/manage.html#utenti',
+});
+function indirizzoSpostato(host, rel) {
+  return INDIRIZZI_SPOSTATI[`${host}/${rel || `${host}.html`}`.toLowerCase()] || null;
+}
+
 // Risolutore della richiesta filo:// → Response. Estratto come funzione pura
 // così possiamo registrarlo sia sulla sessione di default sia sulle sessioni
 // effimere delle finestre incognito (vedi registerFiloProtocolForSession).
