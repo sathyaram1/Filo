@@ -96,6 +96,27 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   riquadri senza indirizzo: in quelli con un indirizzo vero il content script
   c'è e traduce da sé, e leggerli anche da fuori è pagare due volte.
 
+- **Un riquadro della stessa origine non si tocca prima del suo primo load** (#1429).
+  Finché la sua pagina non arriva c'è il documento vuoto iniziale: basta leggerne
+  `contentWindow` dal mondo di Filo, o eseguirci codice dal main, perché quel
+  documento prenda vita, e la pagina della stessa origine che arriva ne eredita
+  la finestra: il preload non parte più. Un'altra origine fa una finestra nuova,
+  e nel srcdoc il preload non entra comunque: quelli si toccano. Dentro, Filo non c'è: tasto
+  destro muto, niente Spiegazione, niente accesso riconosciuto. Succedeva una
+  volta su dieci (Filo che all'avvio della pagina scorreva i riquadri, il
+  puntatore che ci passava sopra) e sempre col riquadro lento, e nella suite
+  tingeva di rosso a caso le prove coi riquadri. Chi guarda dentro un riquadro
+  chiede `SN_RIQUADRO_TOCCABILE(f)` (`src/preload/riquadri-in-arrivo.js`, che
+  ascolta il load in cattura sul documento dall'avvio del preload); nel main,
+  `riquadroArrivato(f)` (`src/main/services/riquadroArrivato.js`: prima del
+  primo commit `url` è vuoto). Il riquadro saltato si riprende al suo load.
+  «Arrivato» non è per sempre: un riquadro che la pagina toglie o sposta si
+  ricarica da capo e torna in arrivo, sia nel mondo di Filo sia nel corpo che
+  Filo mette nella pagina (`moveBefore` no: tiene il documento). Resta aperta la
+  porta della pagina stessa: un sito che tocca il suo riquadro prima del load
+  gli toglie Filo uguale, e da qui non si impedisce.
+  Sentinella: `tests/unit/riquadriInArrivo.test.mjs`.
+
 Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
 diventa scorrevole invece di essere tagliato.
 

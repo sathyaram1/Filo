@@ -217,6 +217,7 @@ test('nella scheda: una pagina ospitata che cambia indirizzo da sola, anche vers
   const schede = new Schede();
   let adesso = '';
   const campo = { executeJavaScript: async () => ({ hasPassword: true, hasPayment: false, shownPassword: true, shownPayment: false }) };
+  campo.top = campo;
   const wc = { getURL: () => adesso, isDestroyed: () => false, send() {}, mainFrame: { framesInSubtree: [campo] } };
   const tab = { id: 1, view: { webContents: wc } };
   schede.tabs = [tab];

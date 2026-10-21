@@ -136,6 +136,15 @@ jobs:
           set -o pipefail
           node scripts/suite-verdict.mjs suite-risultati.json --out rossi-nuovi.txt --chiavi chiavi-allarme.txt --parti 4 --esiti blob-report 2>&1 | tee verdetto.log
 
+      # Dalla cloud registro e allegati non si scaricano: l'elenco si legge dalle annotazioni, con l'API.
+      - name: Rossi nuovi come annotazioni
+        if: always() && steps.verdetto.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [ -s rossi-nuovi.txt ]; then node scripts/annotazioni-github.mjs rossi-nuovi.txt "Rossi nuovi della suite"
+          else node scripts/annotazioni-github.mjs verdetto.log "Suite senza esito"; fi
+
       # Un allegato che non si carica non dice niente del commit: rosso, farebbe di una suite verde una «non partita».
       - name: Conserva esito e verdetto (7 giorni)
         if: always()
@@ -251,6 +260,21 @@ jobs:
         continue-on-error: true
         shell: bash
         run: node scripts/unit-con-riprova.mjs --registro unit.log
+
+      # Come per la suite: dalla cloud il registro non si scarica, le annotazioni sì.
+      - name: Unit rossi come annotazioni
+        if: always() && steps.unit.outcome == 'failure'
+        continue-on-error: true
+        shell: bash
+        run: |
+          grep -E '^[[:space:]]*(not ok|location:)' unit.log > unit-rossi.txt 2>/dev/null || true
+          if [ -s unit-rossi.txt ]; then node scripts/annotazioni-github.mjs unit-rossi.txt "Unit rossi su Windows"
+          else
+            # Nessun caso rosso: la corsa si è fermata prima (lanciatore caduto, tetto). Il perché sta in coda al registro.
+            tail -n 60 unit.log > unit-coda.txt 2>/dev/null || true
+            [ -s unit-coda.txt ] || echo "Nessun registro degli unit: il lanciatore non e partito." > unit-coda.txt
+            node scripts/annotazioni-github.mjs unit-coda.txt "Unit senza esito su Windows (coda del registro)"
+          fi
 
       # Le chiavi sono quelle del cancello (`unit:<file>`): lo stesso rosso visto qui e là apre un feedback solo.
       - name: Unit rossi su Windows in main - apri un feedback

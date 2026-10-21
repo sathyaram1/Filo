@@ -4,6 +4,7 @@
 
 const { pageHints } = require('../../content/safebrowseHints.js');
 const Permessi = require('../services/permessiPagine');
+const { riquadroArrivato } = require('../services/riquadroArrivato');
 
 // Un programma che parte entro questo tempo dall'ultimo clic o tasto vero nella scheda (in qualunque riquadro, o sul link
 // che l'ha aperta), anche dopo pagine di passaggio, è voluto. Oltre, o senza, è partito da solo (#814).
@@ -594,7 +595,7 @@ const safebrowseMethods = {
     if (tab._sbCampiUrl === url || !(ospitata || this._sbCampiContano(SB, url))) return;
     const hints = { hasPassword: false, hasPayment: false, insecureForm: false, budgetUrl: tab._urlNavigato };
     let frames = [];
-    try { frames = wc.mainFrame.framesInSubtree; } catch (_) {}
+    try { frames = wc.mainFrame.framesInSubtree.filter(riquadroArrivato); } catch (_) {}
     await Promise.all(frames.map(async (f) => {
       try {
         // Un riquadro ostile non deve tenere ferma l'analisi.

@@ -4,6 +4,7 @@
 
 const { BrowserWindow } = require('electron');
 const Cookies = require('../services/cookies');
+const { riquadroArrivato } = require('../services/riquadroArrivato');
 const Sito = require('../../shared/stessoSito');
 const Google = require('../../shared/dominiGoogle');
 const { looksLikeLoginCookie } = require('../services/geoBlockRules');
@@ -63,7 +64,7 @@ function passoIntermedio(url) {
 
 async function moduloNeiRiquadri(wc) {
   let frames = [];
-  try { frames = wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame); } catch (_) { return false; }
+  try { frames = wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame && riquadroArrivato(f)); } catch (_) { return false; }
   for (const f of frames) {
     try { if (await f.executeJavaScript(MODULO_RIQUADRO) === true) return true; } catch (_) {}
   }

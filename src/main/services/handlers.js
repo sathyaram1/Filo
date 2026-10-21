@@ -12,6 +12,7 @@ const { BrowserWindow } = require('electron');
 const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const PageRead = require('./pageRead');
+const { riquadroArrivato } = require('./riquadroArrivato');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
@@ -1522,7 +1523,7 @@ async function testoDellaPagina(sender) {
   try { riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || []; } catch (_) {}
   for (const f of riquadri) {
     if (letture.length > MAX_RIQUADRI) break;
-    if (f === wc.mainFrame || f.detached) continue;
+    if (f === wc.mainFrame || !riquadroArrivato(f)) continue;
     letture.push(leggi(() => f.executeJavaScript(LEGGI_PAGINA_JS)));
   }
   const testo = (await Promise.all(letture)).map((t) => String(t || '')).filter((t) => t.trim()).join('\n\n');
