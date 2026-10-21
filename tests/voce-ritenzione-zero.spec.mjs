@@ -10,7 +10,7 @@ const VOCE_CHIUSA = 'deepgram/aura-2';
 
 // Il router finto nel main: DeepInfra è l'unico host della voce e il catalogo a ritenzione zero non lo elenca.
 async function preparaRouter(app, sorgente, modello = VOCE) {
-  await app.evaluate(async (_e, { modello, sorgente }) => {
+  await app.evaluate(async (_e, { modello, sorgente, chiusa }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
