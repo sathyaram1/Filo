@@ -105,6 +105,20 @@ async function provaLaCasella(app, page, nome) {
   expect(vuota.larghezzaSuggerimento).toBeLessThan(vuota.spazio);
   try { await page.screenshot({ path: `tests/.shots/popup-casella-${nome}-vuota.png` }); } catch (_) {}
 
+  // Un suggerimento più largo della casella (riquadro stretto, testo più lungo) resta su una riga: niente frecce.
+  const lungo = await nelMondoDiFilo(app, page, () => {
+    const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+    const el = T ? T.trova('.sn-popup-input') : document.querySelector('.sn-popup-input');
+    const prima = el.placeholder;
+    el.placeholder = 'Un suggerimento lunghissimo '.repeat(8);
+    const eccesso = el.scrollHeight - el.clientHeight;
+    const barra = el.offsetWidth - el.clientWidth - 2;
+    el.placeholder = prima;
+    return { eccesso, barra };
+  });
+  expect(lungo.eccesso).toBeLessThanOrEqual(0);
+  expect(lungo.barra).toBeLessThanOrEqual(0);
+
   // Una riga scritta: stessa altezza, niente frecce.
   await scriviNellaCasella(app, page, 'e in inglese?');
   await expect.poll(async () => (await misura(app, page)).alto).toBeGreaterThan(0);
