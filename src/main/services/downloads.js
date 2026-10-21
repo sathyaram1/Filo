@@ -12,8 +12,8 @@
 // immagine/video come…" (handlers/misc.js) NON passa di qui — deve scaricare i
 // byte a mano per presentare il Referer della pagina — ma dal #436 si iscrive
 // allo STESSO registro via beginManual(): per l'utente i due cammini sono la
-// stessa cosa, quindi devono avere la stessa barra, lo stesso pannello e la
-// stessa cronologia.
+// stessa cosa, quindi devono avere la stessa barra, lo stesso pannello, la
+// stessa cronologia e la stessa domanda sui programmi (#1311).
 //
 // Filosofia: "l'attrito è negativo" + "non salvare mai [a mano]". Per questo NON
 // apriamo un dialogo "Salva come" a ogni file: salviamo direttamente nella
