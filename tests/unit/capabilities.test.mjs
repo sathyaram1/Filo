@@ -96,6 +96,33 @@ test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né acc
   assert.match(CAP.renderDetailForPrompt(['red-team'], aperto), /filo:\/\/redteam\/redteam\.html/);
 });
 
+test('#1592 — Bacheca e Deck builder in pausa non esistono per l’agente: né voce, né accenno nelle altre', () => {
+  const pause = { bacheca: /bacheca|filo:\/\/board\/board\.html(?!#segnalazioni)|filo:\/\/board\/(?!board)|ancora rotto|votand|votare/i,
+    mazzi: /\bmazz|deck|filo:\/\/decks/i };
+  const voce = { bacheca: 'board', mazzi: 'deck-builder' };
+  for (const aperti of [undefined, { bacheca: false, mazzi: false }]) {
+    for (const nome of Object.keys(pause)) {
+      assert.equal(CAP.get(voce[nome], aperti), undefined, `${voce[nome]} esiste per chi non la vede`);
+      assert.match(CAP.renderDetailForPrompt([voce[nome]], aperti), /nessuna capacità con questo id/i);
+    }
+    assert.doesNotMatch(CAP.renderIndexForPrompt(aperti), /bacheca|deck/i, 'l’indice per il prompt le nomina ancora');
+    for (const c of CAP.all(aperti)) {
+      const testo = `${c.title} ${c.desc} ${c.invoke} ${c.doesNot || ''}`;
+      assert.doesNotMatch(testo, /\{se:|\{altrimenti\}|\{\/se\}/, `nella voce "${c.id}" è rimasto un segnaposto`);
+      for (const [nome, re] of Object.entries(pause)) {
+        assert.doesNotMatch(testo, re, `la voce "${c.id}" nomina ${nome} anche a chi non la vede`);
+      }
+    }
+  }
+  // Le segnalazioni mandate restano raccontate a tutti, con la strada che c'è a Bacheca chiusa.
+  assert.match(CAP.get('segnalazioni-mie').invoke, /Menu App → "Le tue segnalazioni"/);
+  const aperte = { bacheca: true, mazzi: true };
+  assert.ok(CAP.get('board', aperte) && CAP.get('deck-builder', aperte));
+  assert.match(CAP.get('segnalazioni-mie', aperte).invoke, /Menu App → "Bacheca"/);
+  assert.match(CAP.get('home-cards', aperte).desc, /i Mazzi coi mazzi \(filo:\/\/decks\/decks\.html\)/);
+  assert.match(CAP.get('home-cards', aperte).desc, /la Bacheca \(filo:\/\/board\/board\.html\)/);
+});
+
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
 
 test('ogni comando delle scorciatoie di Filo è coperto dal manifesto, coi tasti scelti', () => {
