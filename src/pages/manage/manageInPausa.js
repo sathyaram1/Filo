@@ -11,12 +11,26 @@
   const root = document.getElementById('mgIpRoot');
   if (!root) return;
 
-  // Come si dice ognuna: il nome per le frasi e la pagina che il tasto destro apre.
+  // Come si dice ognuna, con l'effetto: chi la vede adesso. E la pagina che il tasto destro apre.
   const FUNZIONI = {
-    bacheca: { nome: 'la Bacheca', aperta: 'Aperta', pausa: 'In pausa', url: 'filo://board/board.html',
-      altri: 'gli altri trovano solo le loro segnalazioni' },
-    mazzi: { nome: 'il Deck builder', aperta: 'Aperto', pausa: 'In pausa', url: 'filo://decks/decks.html',
-      altri: 'gli altri non lo trovano da nessuna parte' },
+    bacheca: {
+      url: 'filo://board/board.html', apri: 'Apri la Bacheca',
+      soloOwner: 'Solo l’owner apre o mette in pausa la Bacheca.',
+      aperta: 'Aperta: la vede chiunque usi Filo.',
+      pausa: 'In pausa: la vedi solo tu. Gli altri trovano solo le segnalazioni che hanno mandato.',
+      dopoAperta: 'Aperta: la vede chiunque usi Filo. Chi ha Filo già aperto la ritrova entro un quarto d’ora.',
+      dopoPausa: 'In pausa: la vedi solo tu. Da chi ha Filo già aperto sparisce entro un quarto d’ora.',
+      rimasta: (aperta) => `Salvataggio non riuscito: la Bacheca è rimasta ${aperta ? 'aperta a tutti' : 'in pausa'}.`,
+    },
+    mazzi: {
+      url: 'filo://decks/decks.html', apri: 'Apri il Deck builder',
+      soloOwner: 'Solo l’owner apre o mette in pausa il Deck builder.',
+      aperta: 'Aperto: lo vede chiunque usi Filo.',
+      pausa: 'In pausa: lo vedi solo tu. I mazzi di chi ne aveva restano sul suo computer.',
+      dopoAperta: 'Aperto: lo vede chiunque usi Filo. Chi ha Filo già aperto lo ritrova entro un quarto d’ora.',
+      dopoPausa: 'In pausa: lo vedi solo tu. Da chi ha Filo già aperto sparisce entro un quarto d’ora.',
+      rimasta: (aperto) => `Salvataggio non riuscito: il Deck builder è rimasto ${aperto ? 'aperto a tutti' : 'in pausa'}.`,
+    },
   };
 
   let owner = false;
@@ -48,9 +62,9 @@
 
   // Lo stato si dice sempre con l'effetto: chi la vede, adesso.
   function frase(lv) {
-    if (!owner) return `Solo l’owner apre o mette in pausa ${lv.f.nome}.`;
+    if (!owner) return lv.f.soloOwner;
     if (!lv.letto) return 'Non riesco a leggere l’interruttore: finché non torna, per tutti gli altri vale «in pausa».';
-    return lv.aperto ? `${lv.f.aperta}: lo vede chiunque usi Filo.` : `${lv.f.pausa}: lo vedi solo tu, ${lv.f.altri}.`;
+    return lv.aperto ? lv.f.aperta : lv.f.pausa;
   }
 
   function riflette(lv) {
@@ -96,16 +110,13 @@
       lv.salva = false;
       riflette(lv);
       // Le altre installazioni lo rileggono da sole entro un quarto d'ora; questa subito.
-      dici(lv, lv.aperto
-        ? `${lv.f.aperta}: lo vede chiunque usi Filo. Chi ha Filo già aperto lo ritrova entro un quarto d’ora.`
-        : `${lv.f.pausa}: lo vedi solo tu. Da chi ha Filo già aperto sparisce entro un quarto d’ora.`);
+      dici(lv, lv.aperto ? lv.f.dopoAperta : lv.f.dopoPausa);
     } catch (err) {
       // Non scritto = non cambiato: la levetta non deve dire il contrario.
       lv.aperto = prima;
       lv.salva = false;
       riflette(lv);
-      dici(lv, `Salvataggio non riuscito: ${lv.f.nome} è rimast${lv.chiave === 'bacheca' ? 'a' : 'o'} ${prima ? 'aperto a tutti' : 'in pausa'}.`
-        .replace('aperto a tutti', lv.chiave === 'bacheca' ? 'aperta a tutti' : 'aperto a tutti'), 'err');
+      dici(lv, lv.f.rimasta(prima), 'err');
       console.error('[manage] interruttore non salvato:', lv.chiave, err);
     }
   }
@@ -119,7 +130,7 @@
       e.preventDefault();
       menu.apri(e.clientX, e.clientY, [
         { testo: lv.aperto ? 'Metti in pausa' : 'Apri a tutti', azione: () => imposta(lv, !lv.aperto) },
-        { testo: `Apri ${lv.f.nome.replace(/^(la|il) /, '')}`, azione: () => { send({ type: MSG.OPEN_URL || 'open_url', url: lv.f.url }).catch(() => {}); } },
+        { testo: lv.f.apri, azione: () => { send({ type: MSG.OPEN_URL || 'open_url', url: lv.f.url }).catch(() => {}); } },
         { testo: 'Rileggi dal server', titolo: 'Se l’hai cambiato da un’altra installazione', azione: () => { caricaUna(lv); } },
       ]);
     });

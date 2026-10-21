@@ -1042,6 +1042,7 @@
 
   global.SN_DASH_CARTE = {
     init,
+    aperta: (nome) => dati.aperte[nome] === true,
     setVive({ timers, notifiche }) {
       dati.timers = Array.isArray(timers) ? timers : [];
       dati.notifiche = Array.isArray(notifiche) ? notifiche : [];
