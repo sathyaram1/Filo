@@ -796,5 +796,6 @@
   global.SN_URL_EXFIL = {
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
     taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens, segretiDetti,
+    PRESENTA_PASSWORD, PRESENTA_CODICE,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
