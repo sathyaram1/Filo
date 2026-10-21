@@ -236,13 +236,20 @@ module.exports = function register(on, ctx) {
   // L'ultima lettura resta a chi deve DIRE il saldo fuori da quella pagina
   // (la chat, #816): lo stesso numero, senza un giro dal server a ogni turno.
   let ultimaLettura = null; // { at, state }
+  // Vale la lettura partita per ultima: una partita prima e finita dopo (un server lento) non prende il posto della
+  // nuova, né in memoria né su disco, e non passa per fresca (#1353).
+  let letturePartite = 0;
+  let letturaValida = 0;
   async function readState() {
-    const state = await leggiStato();
+    const mia = ++letturePartite;
+    const state = await leggiStato(() => mia > letturaValida);
+    if (mia <= letturaValida) return state;
+    letturaValida = mia;
     ultimaLettura = { at: Date.now(), state };
     try { globalThis.SN_AVVISO_CREDITI_MAIN?.dopoLettura(state); } catch (_) {}
     return state;
   }
-  async function leggiStato() {
+  async function leggiStato(piuNuova = () => true) {
     const own = await ownKey();
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
