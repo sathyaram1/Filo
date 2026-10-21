@@ -257,15 +257,19 @@
   // Gestione è l'ingresso unico delle pagine dell'owner (#1414): Modelli
   // predefiniti e Inviti e utenti stanno lì, non in altri menu. Chi vuole MANDARE
   // un feedback non passa di qui: passa dal menu del tasto destro.
+  // Bacheca e Deck builder in pausa (#1592): li vede l'owner, o tutti se l'owner li ha aperti. Con la Bacheca in
+  // pausa le segnalazioni mandate restano raggiungibili: la voce porta alla sola parte che è dell'utente.
   function buildApps() {
     const entries = [
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
-      { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
+      ...(inPausaVisibili.mazzi ? [{ label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' }] : []),
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
       { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
       { label: 'Memorie', icon: 'memory', url: 'filo://quaderno/quaderno.html' },
       { type: 'separator' },
-      { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
+      inPausaVisibili.bacheca
+        ? { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' }
+        : { label: 'Le tue segnalazioni', icon: 'feedback', url: 'filo://board/board.html#segnalazioni' },
     ];
     if (isAdmin) {
       entries.push({ label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' });
