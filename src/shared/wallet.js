@@ -526,6 +526,64 @@
     return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
 
+  // ── Il saldo che dice la chat (#816, #1353) ───────────────────────────────
+  // Il turno non aspetta mai il server: vale l'ultima lettura finita, e una più vecchia di un minuto si rifà in
+  // sottofondo. «Il server non risponde» solo se quella lettura è fallita: un server lento non lo diventa.
+  const SALDO_CHAT_VALIDO_MS = 60 * 1000;
+
+  // `lettura`: l'ultima finita, { at, state } (lo stato della pagina Crediti), o null; `disco`: l'ultimo stato del
+  // server salvato qui. null = nessun portafoglio, e vale il conteggio locale.
+  function saldoPerChat({ lettura = null, disco = null, now = Date.now() } = {}) {
+    const st = lettura && lettura.state ? lettura.state : null;
+    let lettaIl = st ? Number(lettura.at) || null : null;
+    if (st && st.identity && st.identity.lost) return null;
+    if (st && st.server && st.server.hasWallet === false) return null;
+    let server = st && st.server && st.server.hasWallet ? st.server : null;
+    if (!server) {
+      // Una lettura finita senza lo stato del server è fallita; senza nessuna lettura il disco è solo vecchio.
+      if (!disco || !disco.hasWallet) return { balance: null, nonRisponde: Boolean(st) };
+      server = { ...disco, cached: Boolean(st) };
+      lettaIl = Date.parse(String(disco.readAt || '')) || null;
+    }
+    const b = server.balance || {};
+    // Perché non è il saldo di adesso: la lettura fallita, il servizio dei modelli che non ha detto il consumo (come
+    // la pagina), o una lettura solo vecchia.
+    const lastKnown = server.cached ? 'server'
+      : server.stale ? 'models'
+        : !lettaIl || now - lettaIl > SALDO_CHAT_VALIDO_MS ? 'old' : '';
+    const readAt = server.cached ? server.readAt
+      : server.stale ? server.usageReadAt
+        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
+    const numero = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+    return {
+      balance: numero(b.credits),
+      dailyCredits: numero(server.dailyCredits),
+      lastKnown, readAt: readAt || null,
+      usingOwnKey: Boolean(st && st.usingOwnKey),
+      keyMissing: Boolean(st && st.hasPersonalKey === false),
+    };
+  }
+
+  // Le riletture per la chat: una alla volta, solo se l'ultima finita (`ultima()`, { at } o null) ha più di un
+  // minuto, e chi le chiede non le aspetta. `leggi` è la lettura vera, che aggiorna l'ultima da sé.
+  function rilettoreSaldo({ leggi, ultima, now = () => Date.now(), validoMs = SALDO_CHAT_VALIDO_MS } = {}) {
+    let inVolo = null;
+    function rileggi() {
+      const u = ultima();
+      if (u && now() - Number(u.at) <= validoMs) return null;
+      if (!inVolo) inVolo = Promise.resolve().then(leggi).catch(() => null).finally(() => { inVolo = null; });
+      return inVolo;
+    }
+    return { rileggi };
+  }
+
+  // Il conteggio locale sta a schermo come saldo solo senza portafoglio e con una chiave che parte davvero, la
+  // propria o quella di fabbrica (#1138). Chi lo vedeva, al riscatto sente dire dove va (#1353).
+  function conteggioLocaleInVista({ hasWallet = false, keySource = '', identityLost = false } = {}) {
+    return !hasWallet && !identityLost && (keySource === 'own' || keySource === 'factory');
+  }
+  const CONTEGGIO_LOCALE_LASCIA = 'Prendono il posto dei crediti di prova che Filo teneva su questo computer.';
+
   // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────
   // Il premio vero lo accredita il server, e solo a una segnalazione RISOLTA
   // (`done`) mandata col portafoglio. Il riquadro annuncia la cifra del
