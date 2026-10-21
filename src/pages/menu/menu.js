@@ -252,6 +252,9 @@
     else if (d.cosa === 'correzione' && Number.isInteger(d.n)) applicaCorrezione(d.n, d);
     else if (d.cosa === 'riga') Menu.refreshIconRow(costruisci(d.items, []));
     else if (d.cosa === 'griglia') Menu.refreshIconGrid(costruisci(d.items, []));
+    else if (d.cosa === 'fuori') {
+      Menu.trascinaDaFuori({ fase: String(d.fase || ''), id: String(d.icona || ''), x: Number(d.x) || 0, y: Number(d.y) || 0, icon: pulisciIcona(String(d.svg || '')) });
+    }
     else if (d.cosa === 'griglia-apri') {
       m.inVolo.clear();
       const el = m.ancore.get(String(d.ancora || ''));
