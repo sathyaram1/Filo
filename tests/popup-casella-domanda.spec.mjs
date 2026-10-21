@@ -118,7 +118,8 @@ async function provaLaCasella(app, page, nome) {
     const prima = el.placeholder;
     el.placeholder = 'Un suggerimento lunghissimo '.repeat(8);
     const eccesso = el.scrollHeight - el.clientHeight;
-    const barra = el.offsetWidth - el.clientWidth - 2;
+    const cs = getComputedStyle(el);
+    const barra = el.offsetWidth - el.clientWidth - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth);
     el.placeholder = prima;
     return { eccesso, barra };
   });
