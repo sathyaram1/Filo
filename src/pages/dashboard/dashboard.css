@@ -611,7 +611,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex;
   flex-direction: column;
   gap: var(--dash-filo-gap);
-  padding: 40px 8px 8px;
+  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. */
+  padding: 40px 8px calc(8px + var(--dash-vuoto, 0px));
 }
 
 .dash-bubble {

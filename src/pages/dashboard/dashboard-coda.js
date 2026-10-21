@@ -374,7 +374,7 @@
     bottoneRisali();
     aggiornaRisali(lista.length);
     segnaGiorni();
-    d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+    daCapo();
     return res.chatCorrente || null;
   }
 
@@ -431,7 +431,7 @@
       messi++;
     }
     if (messi) segnaGiorni();
-    if (messi && giu) d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+    if (messi) seguiNuove(giu);
   }
 
   // Una bolla disegnata dal turno prende il nome che ha nel filo, così una ricerca la ritrova.
@@ -493,7 +493,7 @@
     if (!primo) { primo = v.ts; aggiornaRisali(); }
     if (scorri) {
       segnaGiorni();
-      if (giu) d.bubblesEl.scrollTop = d.bubblesEl.scrollHeight;
+      seguiNuove(giu);
     }
   }
 
@@ -508,6 +508,7 @@
       n = trova();
     }
     if (!n) return false;
+    fissa = false;
     n.scrollIntoView({ block: 'center' });
     n.classList.remove('dash-trovato');
     void n.offsetWidth;
@@ -576,6 +577,16 @@
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
+    const occhio = new ResizeObserver(() => misura());
+    occhio.observe(d.bubblesEl, { box: 'border-box' });
+    new MutationObserver((cambi) => {
+      for (const c of cambi) {
+        for (const n of c.removedNodes) if (n.nodeType === 1) occhio.unobserve(n);
+        for (const n of c.addedNodes) if (n.nodeType === 1) occhio.observe(n);
+      }
+      misura();
+    }).observe(d.bubblesEl, { childList: true });
+    for (const ev of ['wheel', 'touchstart', 'pointerdown', 'keydown']) d.bubblesEl.addEventListener(ev, () => { fissa = false; }, { passive: true });
     d.bubblesEl.addEventListener('scroll', () => {
       const a = d.bubblesEl;
       if (a.scrollTop < 40 && a.scrollHeight > a.clientHeight + 40 && !finito && primo) sali().catch(() => {});
@@ -596,5 +607,5 @@
     } catch (_) {}
   }
 
-  global.SN_DASH_CODA = { init, carica, sali, allinea, metti, vaiA, togliChat, togliIndirizzo, segnaGiorni, nomeDelGiorno };
+  global.SN_DASH_CODA = { init, carica, sali, allinea, metti, vaiA, daCapo, togliChat, togliIndirizzo, segnaGiorni, nomeDelGiorno };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

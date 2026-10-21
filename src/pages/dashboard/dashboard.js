@@ -158,6 +158,7 @@
     righe: Righe,
     chatId: () => chatId,
     occupata: () => sending || Accoglienza.isActive(),
+    conversa: () => body.dataset.state === 'thread',
   });
   const Cerca = self.SN_DASH_CERCA;
   Cerca.init({ send, coda: Coda, input: $('cercaFilo') });
@@ -2632,7 +2633,8 @@
     if (Accoglienza.isActive()) Accoglienza.riprendiAllaComparsa().catch(() => {});
     else {
       aggiornaDashboardInSilenzio().catch(() => {});
-      Coda.allinea({ daAltrove: true }).catch(() => {});
+      // Arrivata davanti è una home che si apre: l'ultimo messaggio in cima (#1487).
+      Coda.allinea({ daAltrove: true }).catch(() => {}).then(() => Coda.daCapo());
     }
   }
 
