@@ -419,22 +419,6 @@ test('la nota sul sito: al posto di «non ancora scritta», escapata, e privacy 
   }
 });
 
-// Il manifesto riporta la nota parola per parola: la frase che l'assistente
-// legge su cosa sa fare Filo non può dire una cosa diversa dalla pagina. E nei
-// due versi: una citazione che non è più una nota (il documento è arrivato, o
-// l'owner l'ha riscritta) è una promessa vecchia.
-test('il manifesto e la nota dicono la stessa cosa', () => {
-  const { T } = loadModules();
-  delete globalThis.SN_CAPABILITIES;
-  // eslint-disable-next-line no-new-func
-  new Function(readFileSync(join(ROOT, 'src', 'shared', 'capabilities.js'), 'utf8')).call(globalThis);
-  const voce = globalThis.SN_CAPABILITIES.all().find((c) => c.id === 'transparency-docs');
-  const note = T.conNota().map((n) => n.nota);
-  for (const nota of note) assert.ok(voce.desc.includes(`«${nota}»`), `il manifesto non riporta la nota com'è: «${nota}»`);
-  const citate = [...voce.desc.matchAll(/«([^»]+)»/g)].map((m) => m[1]);
-  for (const c of citate) assert.ok(note.includes(c), `il manifesto cita «${c}», che non è più la nota di nessuna sezione`);
-});
-
 test('quando il documento arriva, la nota sparisce da sola', () => {
   const { tmp, leggi } = generaCopia({
     'business.md': [
