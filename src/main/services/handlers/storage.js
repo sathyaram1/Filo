@@ -175,6 +175,7 @@ module.exports = function register(on, ctx) {
   let PENDING_IMPORT = null;
   // Le chat e le pagine visitate non stanno in data.json ma nel filo (#866); un export di prima porta le chat qui.
   const FILO_CHATS_KEY = SN_CONST.STORAGE_KEYS.FILO_CHATS;
+  const DOWNLOADS_KEY = SN_CONST.STORAGE_KEYS.DOWNLOADS;
 
   // Quello che c'è adesso, comprese le liste che vivono in file propri: l'anteprima e la scrittura fondono sullo stesso.
   async function datiCorrenti() {
@@ -192,6 +193,8 @@ module.exports = function register(on, ctx) {
   function opzioniFusione() {
     return {
       tettoPagine: SN_CONST.SAVED_PAGES_LIMIT,
+      tettoAppunti: SN_CONST.CLIPBOARD_HISTORY_MAX,
+      tettoDownload: require('../downloads').HISTORY_LIMIT,
       prossimaSveglia: globalThis.SN_FILO_MEMORY?.nextAlarmOccurrence,
     };
   }
@@ -243,9 +246,18 @@ module.exports = function register(on, ctx) {
         images: parsed.imageCount,
         immaginiPerse: parsed.immaginiPerse,
         filoPerso: parsed.filoPerso,
+        vociPerse: parsed.vociPerse,
         pagineFuori: stats.pagineFuori,
         pagineMieFuori: stats.pagineMieFuori,
         tettoPagine: SN_CONST.SAVED_PAGES_LIMIT,
+        appuntiFuori: stats.appuntiFuori,
+        appuntiMieFuori: stats.appuntiMieFuori,
+        tettoAppunti: SN_CONST.CLIPBOARD_HISTORY_MAX,
+        downloadFuori: stats.downloadFuori,
+        downloadMieFuori: stats.downloadMieFuori,
+        tettoDownload: opzioniFusione().tettoDownload,
+        tettoSpesa: stats.tettoSpesa,
+        tettoSceso: stats.tettoSceso,
         chats: filo.chats,
         pagine: filo.pagine,
         chiavi: haSegreti(parsed.data),
@@ -263,6 +275,38 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: invalid ? 'invalid_file' : code };
     }
   });
+
+  // L'importazione scrive sotto chi tiene una lista in memoria e sotto le pagine aperte (#1256): le liste del main la
+  // rileggono, se no il loro prossimo salvataggio cancella il backup, e le pagine la ridisegnano, come le impostazioni.
+  async function rileggiInMemoria(scritte) {
+    const K = SN_CONST.STORAGE_KEYS;
+    const attese = [];
+    if (scritte.has(K.SITI_CON_CAMPI)) attese.push(globalThis.SN_DELICATE?.rileggi?.());
+    if (scritte.has('sitePermissions')) attese.push(require('../permessiPagine').carica());
+    if (scritte.has(K.FILO_PROXY_RULES)) {
+      for (const win of require('electron').BrowserWindow.getAllWindows()) {
+        if (win._filoTabs && typeof win._filoTabs.loadProxyRules === 'function') attese.push(win._filoTabs.loadProxyRules());
+      }
+    }
+    await Promise.allSettled(attese);
+  }
+  async function annunciaAllePagine(scritte, sender) {
+    const K = SN_CONST.STORAGE_KEYS;
+    const annunci = [
+      () => ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }),
+      () => ctx.broadcastLiveUpdate(),
+      () => scritte.has(K.CLIPBOARD_HISTORY) && clipboardChanged(),
+      () => scritte.has('sitePermissions') && ctx.broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI }),
+      () => scritte.has(K.FILO_CARTE_HOME) && require('../carteHome').leggi().then((l) => ctx.annunciaCarteHome(l, sender)),
+      () => scritte.has(K.ICON_LAYOUT) && require('../layoutIcone').leggi().then((l) => l && require('../layoutIcone').annuncia(l)),
+      () => [K.FILO_MEMORY, K.FILO_MEMORY_FONTI, K.FILO_LESSONS_BUFFER].some((k) => scritte.has(k))
+        && globalThis.SN_FILO_MEMORY.viewForUser().then((v) => ctx.broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED, ...v })),
+      () => ctx.broadcastToFiloPages({ type: MSG.DATI_IMPORTATI }),
+    ];
+    for (const annuncia of annunci) {
+      try { await annuncia(); } catch (e) { console.warn('[Filo import] riallineamento:', e?.message || e); }
+    }
+  }
 
   // Il contenuto in attesa di conferma scade: se l'utente apre l'anteprima e
   // poi se ne dimentica, un dump completo dei suoi dati (chiavi API comprese)
@@ -286,7 +330,6 @@ module.exports = function register(on, ctx) {
       const chatVecchie = pending.data[FILO_CHATS_KEY];
       if (pending.filo) await IlFilo.importa(pending.filo);
       if (Array.isArray(chatVecchie) && chatVecchie.length) await IlFilo.importaChatSalvate(chatVecchie);
-      try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
 
       const current = await datiCorrenti();
       const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
@@ -309,23 +352,31 @@ module.exports = function register(on, ctx) {
       if (A && settings && typeof settings === 'object') {
         settings.autonomia = A.unisciPiuStretta((current[SETTINGS_KEY] || {}).autonomia, ((pending.data || {})[SETTINGS_KEY] || {}).autonomia);
       }
+      // Il tetto di spesa del backup, più largo di quello di qui, entra solo col bottone che lo offre (#1050).
+      if (msg.tettoDelBackup === true && stats.tettoSpesa && settings && typeof settings === 'object') {
+        settings.monthlyLimitEur = stats.tettoSpesa.backup;
+      }
       const rest = {};
       for (const k of Object.keys(merged)) {
-        if (k === SETTINGS_KEY || k === ARCHIVE_KEY || k === HISTORY_KEY || k === MIE_KEY) continue;
+        if (k === SETTINGS_KEY || k === ARCHIVE_KEY || k === HISTORY_KEY || k === MIE_KEY || k === DOWNLOADS_KEY) continue;
         if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
       }
       // I cambi che l'importazione porta entrano nel filo come suoi, e si annullano come gli altri (#867).
       await require('../registroCambi').con({ via: 'importazione' }, async () => {
         if (Object.keys(rest).length) await DiskStorage.set(rest);
+        await rileggiInMemoria(new Set(Object.keys(rest)));
         await ArchivedTabs.importa(merged[ARCHIVE_KEY]);
         // Le schede chiuse di un backup entrano anche nel filo, alla loro data (#872): la Cronologia non c'è più.
         try { await globalThis.SN_SCHEDE_NEL_FILO?.({ unaVolta: false }); } catch (e) { console.warn('[Filo] schede del backup nel filo:', e?.message || e); }
         await History.importa(merged[HISTORY_KEY]);
+        // L'elenco dei download vive nella memoria del suo modulo, che lo salva da lì: entra da lui (#1256).
+        if (JSON.stringify(merged[DOWNLOADS_KEY]) !== JSON.stringify(current[DOWNLOADS_KEY])) require('../downloads').importa(merged[DOWNLOADS_KEY]);
         if (Mie) await Mie.importa(merged[MIE_KEY]);
         if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
       });
       // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).
       globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {});
+      await annunciaAllePagine(new Set(Object.keys(rest)), sender);
 
       return { ok: true, added: stats.added, updated: stats.updated, unchanged: stats.unchanged };
     } catch (e) {

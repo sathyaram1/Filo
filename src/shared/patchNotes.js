@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.244', date: '2026-10-21',
+      features: [],
+      fixes: [
+        'Dopo «Importa dati» quello che arriva dal backup compare subito anche nelle schede già aperte, come pagine salvate, Cronologia AI e download, e non sparisce più al primo download o alla prima copia. Se un elenco è pieno, la conferma dice prima quante voci restano fuori. Un backup con un limite di spesa più alto, o senza limite, non te lo cambia più da solo, e nella conferma c\'è un pulsante per usarlo. Un archivio rovinato in qualche byte si importa lo stesso, e la conferma dice cosa non si legge.',
+      ],
+    },
+    {
       version: '0.2.243', date: '2026-10-16',
       features: [
         'Con un modello Claude la chat costa meno: le istruzioni fisse si pagano per intero una volta e poi si rileggono a prezzo basso. In Preferenze, sotto «Quanto ricorda la chat», scegli per quanto restano da parte, cinque minuti o un\'ora. Lo puoi chiedere anche a Filo.',
