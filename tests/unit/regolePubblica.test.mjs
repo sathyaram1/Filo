@@ -35,6 +35,9 @@ test('ogni scostamento rifiuta col suo motivo', () => {
     [{ toccati: ['storage.rules'] }, /modificati e non fusi: storage\.rules/],
     [{ progetto: '' }, /\.firebaserc/],
     [{ errore: 'rete giù' }, /rete giù/],
+    [{ testa: 'b'.repeat(40), diversi: ['firestore.rules'] }, /non è origin\/main \(aaaaaaaaa\) e lì cambiano firestore\.rules/],
+    [{ testa: 'b'.repeat(40), diversi: ['firebase.json', 'site/approvazioni/index.html'] }, /lì cambiano firebase\.json, site\/approvazioni\/index\.html/],
+    [{ testa: 'b'.repeat(40), diversi: [], toccati: ['storage.rules'] }, /modificati e non fusi: storage\.rules/],
   ];
   for (const [delta, atteso] of casi) {
     const d = mod.decidi({ ...buono(), ...delta });
