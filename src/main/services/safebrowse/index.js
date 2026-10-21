@@ -351,7 +351,8 @@ function analyze(url, ctx = {}, onUpdate) {
   // l'età: un sito vecchio con una password perde l'indizio senza spendere giudizio e finestra, e il giudizio la riceve.
   const bKey = budgetKey(norm, url, ctx.budgetUrl);
   const deepTasks = (verdict) => {
-    if (!deepWorth(verdict)) return [];
+    // Chi legge una pagina per il modello (LEGGI_PAGINA) li salta: la sandbox farebbe girare il codice di un sito scelto dal modello (#553).
+    if (ctx.senzaApprofondire || !deepWorth(verdict)) return [];
     const siteKey = key + '|' + cluesOf(norm, ctx, verdict);
     const out = [];
     // In incognito nessun lavoro che consuma crediti o visita il sito di nuovo (#1081).

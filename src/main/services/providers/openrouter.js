@@ -153,7 +153,8 @@
   // provider: la richiesta FALLISCE in modo evidente invece di passare da un host
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
-  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
+  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`, e
+  // nessun ripiego: se il produttore non risponde l'errore deve vedersi (#1059).
   // `ownKey`: la chiamata è pagata con la chiave propria (la lista la sceglie excludedFor).
   function providerBlock(routing, model, { tools = false, ownKey = false } = {}) {
     const p = {};
@@ -169,7 +170,10 @@
     if (tools) p.require_parameters = true;
     const C = global.SN_CONST;
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
-    if (rule) p.only = rule.only.slice();
+    if (rule) {
+      p.only = rule.only.slice();
+      p.allow_fallbacks = false;
+    }
     if (zdrApplies(model, ownKey)) p.zdr = true;
     return Object.keys(p).length ? p : null;
   }
@@ -322,8 +326,50 @@
     };
   }
 
-  // `cached_tokens` è la sola prova che il prefisso immutabile dei prompt viene riusato; il
-  // costo in dollari arriva da `usage.cost`, 0 se assente e allora si stima.
+  // I punti di cache del piano (SN_FILO_CONTESTO.pianoDellaCache) li vogliono espliciti solo i modelli Anthropic: gli
+  // altri riconoscono da soli il prefisso ripetuto e ricevono i messaggi tali e quali. Anthropic ne accetta al più 4.
+  const MAX_PUNTI_CACHE = 4;
+  function vuoleCacheEsplicita(model) {
+    return String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '').startsWith('anthropic/');
+  }
+
+  function partiConPunto(content, caratteri, cacheControl) {
+    if (typeof content === 'string') {
+      const n = Number.isInteger(caratteri) && caratteri > 0 && caratteri < content.length ? caratteri : content.length;
+      if (!content.slice(0, n).trim()) return null;
+      const parti = [{ type: 'text', text: content.slice(0, n), cache_control: cacheControl }];
+      if (n < content.length) parti.push({ type: 'text', text: content.slice(n) });
+      return parti;
+    }
+    if (!Array.isArray(content)) return null;
+    let k = -1;
+    content.forEach((p, i) => { if (p && p.type === 'text' && String(p.text || '').trim()) k = i; });
+    return k < 0 ? null : content.map((p, i) => (i === k ? { ...p, cache_control: cacheControl } : p));
+  }
+
+  // Il testo resta lo stesso, carattere per carattere: cambia solo la forma (parti di testo) dei messaggi col punto.
+  function conPuntiDiCache(model, messages, piano) {
+    const punti = piano && Array.isArray(piano.punti) ? piano.punti : [];
+    if (!punti.length || !Array.isArray(messages) || !vuoleCacheEsplicita(model)) return messages;
+    const out = messages.slice();
+    for (const p of punti.slice(0, MAX_PUNTI_CACHE)) {
+      const m = out[p && p.indice];
+      if (!m || typeof m !== 'object') continue;
+      const cc = p.durata === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' };
+      const parti = partiConPunto(m.content, p.caratteri, cc);
+      if (parti) out[p.indice] = { ...m, content: parti };
+    }
+    return out;
+  }
+
+  // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata
+  // (#422). OpenRouter riporta i token letti dalla cache del fornitore in
+  // `usage.prompt_tokens_details.cached_tokens` (0 o campo assente = nessun
+  // riuso). È la sola prova che il prefisso immutabile dei prompt sta davvero
+  // funzionando: senza questo numero "riuso a zero" e "riuso pieno" sono
+  // indistinguibili.
+  // Il costo in dollari che il router dichiara (`usage.cost`, con
+  // `usage.include`). 0 se assente: chi lo legge sa che deve stimare.
   function costUsdOf(usage) {
     const c = usage && Number(usage.cost);
     return Number.isFinite(c) && c > 0 ? c : 0;
@@ -339,8 +385,16 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
-  // Chi ha DAVVERO servito: il router lo riporta sulla risposta, ma si guarda anche nella
-  // choice.
+  // I token SCRITTI in cache (i modelli coi punti espliciti): con le letture dicono se la cache scatta davvero.
+  function cacheWriteTokens(usage) {
+    if (!usage || typeof usage !== 'object') return 0;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || {};
+    const n = Number(d.cache_write_tokens != null ? d.cache_write_tokens : d.cacheWriteTokens);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  // Chi ha DAVVERO servito la risposta (#421). OpenRouter lo riporta a livello di
+  // risposta come `provider`; per robustezza guardiamo anche dentro la choice.
   function extractServedBy(obj) {
     if (!obj || typeof obj !== 'object') return null;
     const v = obj.provider || obj.choices?.[0]?.provider || null;
@@ -370,11 +424,11 @@
     return Number.isFinite(n) && n > 0 ? { max_tokens: n } : {};
   }
 
-  async function complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
+  async function complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
     // personale (#598). Senza, il costo si stima dal listino.
-    const body = { model, messages, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+    const body = { model, messages: conPuntiDiCache(model, messages, cache), stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal, providerRouting);
@@ -396,6 +450,7 @@
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
+        cacheWriteTokens: cacheWriteTokens(usage),
         costUsd: costUsdOf(usage),
         servedBy: extractServedBy(data),
         keySource, keyFallback,
@@ -407,8 +462,8 @@
   // onReasoning(chunk) per il ragionamento, onToolCall({ id, name }) appena si
   // conosce il nome di una chiamata a uno strumento. Ritorna
   // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
-  async function streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    const reqBody = { model, messages, stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+  async function streamComplete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    const reqBody = { model, messages: conPuntiDiCache(model, messages, cache), stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
@@ -427,7 +482,7 @@
     let finishReason = null;
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
-    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0 };
+    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0, cacheWriteTokens: 0 };
     let generationId = null;
 
     // Una risposta rotta a metà si paga per quanto il modello aveva scritto: l'errore porta con sé l'id per chiederne il costo.
@@ -477,6 +532,7 @@
               promptTokens: obj.usage.prompt_tokens || 0,
               completionTokens: obj.usage.completion_tokens || 0,
               cachedPromptTokens: cachedPromptTokens(obj.usage),
+              cacheWriteTokens: cacheWriteTokens(obj.usage),
               costUsd: costUsdOf(obj.usage),
               servedBy: servedBy || extractServedBy(obj),
             };
@@ -1044,7 +1100,7 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
+    cachedPromptTokens, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals, zdrApplies, zdrHostsOf,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,

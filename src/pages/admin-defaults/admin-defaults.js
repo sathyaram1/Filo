@@ -103,6 +103,10 @@
     $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
     $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
     $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
+    $('l-contesto-cache').textContent = I18n.t('admin_defaults_contesto_cache');
+    $('contestoCache5m').textContent = I18n.t('admin_defaults_contesto_cache_5m');
+    $('contestoCache1h').textContent = I18n.t('admin_defaults_contesto_cache_1h');
+    $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_codice');
     $('h-lunghezza').textContent = I18n.t('admin_defaults_lunghezza');
     $('lunghezza-desc').textContent = I18n.t('admin_defaults_lunghezza_desc');
     for (const [f] of CAMPI_LUNGHEZZA) $(`l-lunghezza-${f}`).textContent = I18n.t(`admin_defaults_lunghezza_${f}`);
@@ -133,6 +137,7 @@
   }
 
   function ricontrollaAvvisi() {
+    for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) avvisaProduttore(row);
     if (modelChains) ModelChain.ricontrolla(modelChains);
     // Una riga del registro cambiata o tolta può essere il sostituto aperto di qualche funzione.
     renderOpenWeightsImpact();
@@ -292,6 +297,11 @@
     const msg = document.createElement('div');
     msg.className = 'sn-model-row-msg';
 
+    const warn = document.createElement('div');
+    warn.className = 'sn-model-row-warn';
+    warn.setAttribute('role', 'status');
+    warn.hidden = true;
+
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
@@ -301,6 +311,9 @@
     row.appendChild(test);
     row.appendChild(status);
     row.appendChild(msg);
+    row.appendChild(warn);
+    idIn.addEventListener('input', () => avvisaProduttore(row));
+    avvisaProduttore(row);
 
     // Una misura parla della configurazione con cui è stata presa: toccare la
     // riga la rimette in discussione subito, non al prossimo caricamento.
@@ -580,6 +593,7 @@
   // "l'ho svuotata", per i nomi e per i motivi separatamente.
   let loadedExcluded = [];
   let loadedReasons = '[]';
+  let excludedLoaded = false;
 
   function renderExcluded(list, reasons) {
     const host = $('excludedList');
@@ -594,6 +608,7 @@
     }
     loadedExcluded = collectExcluded();
     loadedReasons = JSON.stringify(collectExcludedReasons());
+    excludedLoaded = true;
     renderExcludedDrift();
   }
 
@@ -646,6 +661,37 @@
     if (!d) return;
     kind.value = d.kind || '';
     note.value = d.note || '';
+  }
+
+  // Un soprannome che porta a un modello il cui produttore questa lista lascia servire (#1059): lo si dice sulla
+  // riga, mentre lo si imposta, col bottone che lo esclude. Prima che la lista sia in pagina non c'è niente da dire.
+  function avvisaProduttore(row) {
+    const warn = row.querySelector('.sn-model-row-warn');
+    const C = window.SN_CONST;
+    if (!warn || !C || typeof C.unexcludedProducer !== 'function') return;
+    const model = row.querySelector('.sn-model-id').value.trim();
+    const nome = excludedLoaded ? C.unexcludedProducer(model, collectExcluded(), providerCatalog) : '';
+    if (warn.dataset.nome === nome) return;
+    warn.dataset.nome = nome;
+    warn.replaceChildren();
+    warn.hidden = !nome;
+    if (!nome) return;
+    const text = document.createElement('span');
+    text.textContent = I18n.t('admin_defaults_producer_not_excluded', nome);
+    const fix = document.createElement('button');
+    fix.type = 'button';
+    fix.className = 'sn-excluded-guess';
+    fix.textContent = I18n.t('admin_defaults_producer_exclude', nome);
+    fix.addEventListener('click', () => escludiProduttore(nome));
+    warn.append(text, fix);
+  }
+
+  function escludiProduttore(nome) {
+    if (!collectExcluded().some((x) => x.toLowerCase() === nome.toLowerCase())) {
+      $('excludedList').appendChild(makeExcludedRow(nome, { kind: 'producer', note: '' }));
+      segnalaModifica();
+    }
+    renderExcludedDrift();
   }
 
   function renderExcludedDrift() {
@@ -799,6 +845,9 @@
       $(id).value = contestoCaricato[k] != null ? String(contestoCaricato[k]) : '';
       $(id).placeholder = diSerie && diSerie[k] != null ? String(diSerie[k]) : '';
     }
+    $('contestoCache').value = contestoCaricato.cache === '5m' || contestoCaricato.cache === '1h' ? contestoCaricato.cache : '';
+    const serie = diSerie && diSerie.cache === '5m' ? 'admin_defaults_contesto_cache_5m' : 'admin_defaults_contesto_cache_1h';
+    $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_serie', I18n.t(serie));
   }
   // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
   function collectContesto() {
@@ -807,6 +856,7 @@
       const v = $(id).value.trim();
       if (v !== '' && Number.isFinite(Number(v))) ora[k] = Number(v);
     }
+    if ($('contestoCache').value) ora.cache = $('contestoCache').value;
     return JSON.stringify(ora) === JSON.stringify(contestoCaricato) ? null : ora;
   }
 

@@ -167,9 +167,12 @@
       const chip = document.createElement('span');
       chip.className = 'sn-history-reuse';
       chip.textContent = I18n.t('history_reuse', String(pct));
-      chip.title = reused > 0
+      // Le scritture le riportano i modelli coi punti di cache espliciti: dicono che la richiesta dopo potrà riusare.
+      const written = Number(it.usage?.cacheWriteTokens) || 0;
+      chip.title = (reused > 0
         ? I18n.t('history_reuse_title', formatTokens(reused), formatTokens(inTok))
-        : I18n.t('history_reuse_none_title', formatTokens(inTok));
+        : I18n.t('history_reuse_none_title', formatTokens(inTok)))
+        + (written > 0 ? ` ${I18n.t('history_cache_written', formatTokens(written))}` : '');
       right.appendChild(chip);
     }
     // Tempi del turno: inizio del ragionamento, prima parola (o prima azione nominata), fine.

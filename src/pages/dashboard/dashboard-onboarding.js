@@ -33,6 +33,7 @@
   let beginSending = null;
   let runTurnAndContinue = null;
   let nienteInCorso = null;
+  let chatInCorso = null;
   let allApertura = null;
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
@@ -44,14 +45,33 @@
   // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
   let onboardingActive = false;
 
+  // Rifatta o ripresa, l'intervista sta solo nelle pagine che l'hanno chiesta (Preferenze, «Riprendiamola»): le altre,
+  // ricaricate o aperte da un collegamento, restano il filo dell'utente (#1297). Il segno sta nell'indirizzo.
+  const SEGNO = 'accoglienza';
+  function paginaDellIntervista() {
+    if (onboardingActive) return true;
+    try { return new URLSearchParams(global.location.search).has(SEGNO); } catch (_) { return false; }
+  }
+  function segnaPagina(si) {
+    try {
+      const u = new URL(global.location.href);
+      if (u.searchParams.has(SEGNO) === si) return;
+      if (si) u.searchParams.set(SEGNO, '1');
+      else u.searchParams.delete(SEGNO);
+      global.history.replaceState(global.history.state, '', u.href);
+    } catch (_) {}
+  }
+
   async function fetchOnboarding() {
     try {
-      const r = await send({ type: MSG.FILO_GET_ONBOARDING });
+      const fuori = !paginaDellIntervista();
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING, ...(fuori ? { fuori: true } : {}) });
       // `ready: false` = nessun modello disponibile ancora (niente accesso,
       // niente chiave): l'intervista aspetta e la home spiega come attivare
       // Filo, invece di accoglierlo con una chat che non può rispondere.
       if (!r?.ok || !r.onboarding || !r.ready) return null;
       if (r.onboarding.done) return null;
+      if (r.onboarding.rifatta && fuori) return null;
       // `resume` lo decide il main: di schede nuove se ne aprono due insieme, e
       // il turno rimasto a metà lo deve riprendere UNA sola.
       return { ...r.onboarding, resume: !!r.resume };
@@ -97,6 +117,7 @@
   async function openOnboarding(state) {
     onboardingActive = true;
     hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
+    segnaPagina(!!state.rifatta);
     if (allApertura) allApertura();
     goThread();
     renderOnboardingThread(state);
@@ -113,10 +134,10 @@
   // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
   // stiamo scrivendo noi — le bolle in corso sono già la verità.
   function onboardingUpdated(state) {
-    if (!state || state.done) return;
-    // Qui l'intervista non è a schermo, ma da qualche parte è di nuovo aperta:
-    // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
-    if (!onboardingActive) { hideOnboardingNotice(); return; }
+    if (!state) return;
+    // Qui l'intervista non è a schermo: la riga segue l'intervista com'è adesso, anche tolta o letta altrove.
+    if (!onboardingActive) { if (!closingShownAt) aggiornaRiga(state); return; }
+    if (state.done) return;
     if (isSending()) return;
     // L'annuncio del turno appena finito QUI arriva anche dopo la risposta: ridisegnare la stessa conversazione
     // butterebbe via il blocco di attività e i bottoni delle azioni.
@@ -354,7 +375,13 @@
   let closingShownAt = 0;
   let closingDwellTimer = null;
 
+  // L'annuncio arriva a tutte le schede, ma torna alla home solo quella che mostrava l'intervista: nelle altre c'è la
+  // conversazione dell'utente, e rilanciare l'accoglienza non la tocca (#1297).
   function onboardingDone(msg) {
+    if (!onboardingActive && !closingShownAt) {
+      refreshOnboardingNotice().catch(() => {});
+      return;
+    }
     onboardingActive = false;
     clearTimeout(onboardingHomeFallback);
     const atteso = closingShownAt ? Date.now() - closingShownAt : CLOSING_DWELL_MS;
@@ -374,6 +401,7 @@
     closingShownAt = 0;
     clearTimeout(onboardingHomeFallback);
     hideSkipOnboarding();
+    segnaPagina(false);
     // Il filo si rilegge da capo: l'intervista ne è il primo tratto, e il primo messaggio di Filo sta in coda (#869).
     goHome();
     setSuggestions(Array.isArray(msg?.suggestions) ? msg.suggestions : []);
@@ -397,7 +425,16 @@
       const r = await send({ type: MSG.FILO_GET_ONBOARDING, peek: true });
       st = r?.ok ? r.onboarding : null;
     } catch (_) { return; }
-    if (st && st.done && st.notice === 'early') showOnboardingNotice();
+    aggiornaRiga(st);
+  }
+
+  // 'chiusa': finita prima della fine. 'aperta': rifatta e lasciata a metà in un'altra scheda, che magari non c'è più;
+  // da qui si riprende come una chiusa.
+  function aggiornaRiga(st) {
+    if (onboardingActive || !st) { hideOnboardingNotice(); return; }
+    const risposto = Array.isArray(st.thread) && st.thread.some((m) => m && m.role === 'user');
+    if (st.done && st.notice === 'early') showOnboardingNotice('chiusa');
+    else if (!st.done && st.rifatta && risposto) showOnboardingNotice('aperta');
     else hideOnboardingNotice();
   }
 
@@ -406,21 +443,23 @@
     if (!box) return;
     box.innerHTML = '';
     box.hidden = true;
+    delete box.dataset.tipo;
   }
 
-  function showOnboardingNotice() {
+  function showOnboardingNotice(tipo = 'chiusa') {
     const box = $('onbNotice');
-    if (!box || !box.hidden) return; // già a schermo: non la ricostruiamo
+    if (!box || (!box.hidden && box.dataset.tipo === tipo)) return; // già a schermo: non la ricostruiamo
     box.innerHTML = '';
+    box.dataset.tipo = tipo;
     const text = document.createElement('span');
     text.className = 'dash-onb-notice-text';
-    text.textContent = 'Abbiamo chiuso la presentazione a metà.';
+    text.textContent = tipo === 'aperta' ? 'La presentazione è rimasta a metà.' : 'Abbiamo chiuso la presentazione a metà.';
     const redo = document.createElement('button');
     redo.type = 'button';
     redo.id = 'onbNoticeRedo';
     redo.textContent = 'Riprendiamola';
-    redo.title = 'Riapre l’intervista di benvenuto qui, da capo. La trovi anche in Preferenze.';
-    redo.addEventListener('click', restartOnboardingHere);
+    redo.title = 'Riapre l’intervista da dove l’avevamo lasciata. Per rifarla da capo c’è Preferenze.';
+    redo.addEventListener('click', riprendiQui);
     const ok = document.createElement('button');
     ok.type = 'button';
     ok.id = 'onbNoticeDismiss';
@@ -433,18 +472,27 @@
     box.hidden = false;
   }
 
+  // Su un'intervista rimasta aperta «No, va bene così» la chiude, come «Salta l'accoglienza» nella sua scheda.
   async function dismissOnboardingNotice() {
-    hideOnboardingNotice();
-    try { await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN }); } catch (_) {}
-  }
-
-  // Rifarla da qui: la stessa cosa del pulsante in Preferenze, ma senza mandare
-  // l'utente a cercarlo — l'intervista riparte nella scheda che ha davanti.
-  async function restartOnboardingHere() {
+    const box = $('onbNotice');
+    const aperta = !!box && box.dataset.tipo === 'aperta';
     hideOnboardingNotice();
     try {
-      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING });
-      if (r?.ok && r.onboarding) await openOnboarding({ ...r.onboarding, resume: false });
+      await send(aperta ? { type: MSG.FILO_CLOSE_ONBOARDING, senzaRiga: true } : { type: MSG.FILO_ONBOARDING_NOTICE_SEEN });
+    } catch (_) {}
+  }
+
+  // Riprenderla da qui, nella scheda che l'utente ha davanti: la stessa intervista, dalla domanda rimasta in sospeso e
+  // con quello che Filo ha già imparato (#1297). Da capo la si rifà da Preferenze. Una scheda con una conversazione
+  // sua la tiene: l'intervista riparte in una scheda nuova, come da Preferenze, e il turno in sospeso lo prende lei.
+  async function riprendiQui() {
+    hideOnboardingNotice();
+    const altrove = !!(chatInCorso && chatInCorso());
+    try {
+      const r = await send({ type: MSG.FILO_RESTART_ONBOARDING, riprendi: true, ...(altrove ? { altrove: true } : {}) });
+      if (!r?.ok || !r.onboarding || r.onboarding.done) return;
+      if (altrove) await send({ type: MSG.OPEN_URL, url: `filo://newtab/?${SEGNO}=1` });
+      else await openOnboarding({ ...r.onboarding, resume: !!r.resume });
     } catch (_) {}
   }
 
@@ -466,6 +514,7 @@
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
     nienteInCorso = deps.nienteInCorso;
+    chatInCorso = deps.chatInCorso || null;
     allApertura = deps.allApertura;
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;

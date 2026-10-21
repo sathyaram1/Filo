@@ -229,6 +229,22 @@ test('nelle sessioni su disco le risposte si condividono, si salvano, si elencan
   Permessi.togliScelta('https://riunione.example', 'audio');
 });
 
+// Il controllo dice sì anche a chi nessuno ha risposto: la pagina legge «da chiedere» finché `siDato` non vede un sì vero,
+// del suo sito e solo per fotocamera, microfono e posizione (#1057).
+test('siDato: sì solo dopo Consenti, per quel sito e per quella parte', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://riunione.example/stanza');
+  assert.equal(ses.controllo(wc, 'media', 'https://riunione.example', { mediaType: 'audio' }), true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/stanza', 'audio'), false, 'mai deciso');
+  chiedi(ses, wc, 'media', { mediaTypes: ['audio'] });
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/altra', 'audio'), true);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'video'), false, 'la fotocamera resta da chiedere');
+  assert.equal(Permessi.siDato(ses, 'https://altro.example/', 'audio'), false, 'un altro sito');
+  assert.equal(Permessi.siDato(ses, 'about:blank', 'audio'), false);
+  assert.equal(Permessi.siDato(ses, 'https://riunione.example/', 'appunti'), false, 'solo le parti lette dalla pagina');
+});
+
 // Ogni nome che Electron può mandare ai gestori ha una regola: un nome nuovo, qui, è un rosso e non un no silenzioso.
 test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una ragione scritta', () => {
   // Risolto come un pacchetto: nella prova degli unit sulla fusione node_modules sta una cartella più su (#929).

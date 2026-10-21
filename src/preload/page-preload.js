@@ -242,36 +242,36 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
-// Lo schermo alla maniera vecchia, in ogni frame web: la domanda di sempre e poi un no, senza far morire la pagina
-// (#586). Regole in preload/schermo-vecchio.js; un avviso finto della pagina fa negare solo la sua prossima domanda.
+// Nel mondo della pagina, e nei riquadri vuoti che lei si crea (#1057, regole in preload/riquadri-vuoti.js): lo schermo
+// alla maniera vecchia fa la domanda di sempre e poi riceve un no, senza far morire la scheda (#586, preload/
+// schermo-vecchio.js; un avviso finto della pagina fa negare solo la sua prossima domanda), e nel frame principale i
+// permessi mai decisi si leggono «da chiedere» (#591, preload/stato-permessi.js).
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (!/^(filo|devtools):/i.test(loc)) {
-    const { buildSchermoVecchioSource, EVENTO_SCHERMO_VECCHIO } = require('./schermo-vecchio.js');
-    window.addEventListener(EVENTO_SCHERMO_VECCHIO, () => {
-      try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {}
-    }, true);
-    webFrame.executeJavaScript(buildSchermoVecchioSource(), false).catch(() => {});
-  }
-} catch (e) { /* come sopra: mai bloccare il caricamento */ }
-
-// Le notifiche si leggono «da chiedere» finché l'utente non ha deciso (#591): regole in preload/stato-permessi.js.
-if (!IS_SUBFRAME) try {
-  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
-  if (/^(https?|blob):/i.test(loc)) {
-    const { buildStatoPermessiSource, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE } = require('./stato-permessi.js');
-    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
-    webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});
-    // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
-    const scrittura = () => {
-      ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
-        .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
-    };
+    const { buildSchermoVecchioCorpo, EVENTO_SCHERMO_VECCHIO } = require('./schermo-vecchio.js');
+    const { buildRiquadriVuotiSource } = require('./riquadri-vuoti.js');
+    const corpi = [buildSchermoVecchioCorpo()];
+    const ascolti = [[EVENTO_SCHERMO_VECCHIO, () => { try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {} }]];
+    // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
+    if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
+      const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
+      corpi.push(buildStatoPermessiCorpo(ipcRenderer.sendSync('filo:permessi-stato', loc)));
+      // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
+      ascolti.push([SCRITTURA, () => {
+        ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
+          .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
+      }]);
+      for (const parte of new Set(Object.values(PARTI_LETTE))) {
+        ascolti.push([SI_DATO + parte, (e) => { try { if (ipcRenderer.sendSync('filo:permessi-si', parte) === true) e.preventDefault(); } catch (_) {} }]);
+      }
+    } catch (_) {}
     // La riscrittura da capo (document.open) toglie gli ascolti della finestra: si rimettono.
-    const ascoltaScrittura = () => window.addEventListener(SCRITTURA, scrittura, true);
-    ascoltaScrittura();
-    new MutationObserver(ascoltaScrittura).observe(document, { childList: true });
+    const ascolta = () => { for (const [tipo, f] of ascolti) window.addEventListener(tipo, f, true); };
+    ascolta();
+    new MutationObserver(ascolta).observe(document, { childList: true });
+    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
+    webFrame.executeJavaScript(buildRiquadriVuotiSource(corpi), false).catch(() => {});
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
@@ -734,6 +734,12 @@ try {
   } catch (_) {}
   try { Object.defineProperty(window, PRELOAD_PROPRIO, { value: true }); } catch (_) {}
   segui(window);
+  // Il menu del tasto destro si disegna nello strato sopra la scheda (#1054)? Lo dice il main, una volta per riquadro.
+  let stratoMenu = null;
+  globalThis.SN_STRATO_MENU_ACCESO = () => {
+    if (stratoMenu === null) { try { stratoMenu = ipcRenderer.sendSync('filo:strato-menu') === true; } catch (_) { stratoMenu = false; } }
+    return stratoMenu;
+  };
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
   globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
 } catch (_) {}
@@ -864,6 +870,8 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
+  try { require(path.join(SHARED_DIR, 'menuDescritto.js')); } catch (e) { console.error('[Filo CS] menuDescritto', e); } // #1054 — il menu come dati per lo strato
+  try { require(path.join(CONTENT_DIR, 'menuNelloStrato.js')); } catch (e) { console.error('[Filo CS] menuNelloStrato', e); } // #1054 — DOPO menu.js, PRIMA di chi lo usa
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js

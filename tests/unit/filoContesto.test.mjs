@@ -160,7 +160,10 @@ test('un messaggio enorme resta testa e coda, e dice dove si rilegge intero', ()
 });
 
 test('i tetti: vince l\'utente, poi l\'owner, poi il codice; fuori scala si riportano dentro', () => {
-  assert.deepEqual(FC.tetti(null, null), { giorni: 3, token: 100000, da: { giorni: 'codice', token: 'codice' } });
+  assert.deepEqual(FC.tetti(null, null), { giorni: 3, token: 100000, cache: '1h', da: { giorni: 'codice', token: 'codice', cache: 'codice' } });
+  assert.equal(FC.tetti({}, { cache: '5m' }).cache, '5m');
+  assert.equal(FC.tetti({ cache: '1h' }, { cache: '5m' }).cache, '1h');
+  assert.equal(FC.tetti({ cache: '3 giorni' }, { cache: 'mai' }).cache, '1h');
   assert.equal(FC.tetti({}, { giorni: 5 }).giorni, 5);
   assert.equal(FC.tetti({ giorni: 1 }, { giorni: 5 }).giorni, 1);
   assert.equal(FC.tetti({ giorni: '' }, { giorni: 5 }).giorni, 5);

@@ -168,6 +168,16 @@ function registerIpcHandlers() {
     }
   });
 
+  // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
+  ipcMain.on('filo:permessi-si', (event, parte) => {
+    try {
+      const url = (event.senderFrame && event.senderFrame.url) || event.sender.getURL();
+      event.returnValue = require('./services/permessiPagine').siDato(event.sender.session, url, parte);
+    } catch (_) {
+      event.returnValue = false;
+    }
+  });
+
   // Scrivere su un file o una cartella che la pagina ha già (#1069): la domanda, regole in services/permessiPagine.js.
   ipcMain.handle('filo:permessi-scrittura', (event) => {
     const wc = event.sender;
@@ -223,6 +233,21 @@ function registerIpcHandlers() {
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
       if (win) win._filoTabs.indirizzoRifiutatoDallaPagina(wc, url);
     } catch (_) {}
+  });
+
+  // #1054 — il menu del tasto destro di questa scheda, o della finestrella di accesso, si disegna nello strato sopra?
+  ipcMain.on('filo:strato-menu', (event) => {
+    let si = false;
+    try {
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      if (win) si = !!(win._filoTabs.strato && win._filoTabs.strato.acceso);
+      else {
+        const propria = BrowserWindow.fromWebContents(wc);
+        si = !!(propria && propria.webContents === wc && propria._filoStrato && propria._filoStrato.acceso);
+      }
+    } catch (_) {}
+    event.returnValue = si;
   });
 
   // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).

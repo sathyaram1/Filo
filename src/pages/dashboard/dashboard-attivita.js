@@ -397,11 +397,11 @@
       fineDiretta() { inDiretta = false; },
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»), dentro il nodo della sua azione.
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la conta.
-      addRow(type, rowIcon, text, failed = false, cambi = null, a = null) {
+      addRow(type, rowIcon, text, failed = false, cambi = null, a = null, title = '') {
         closeTurnReasoning();
         const gia = contaAzione(type, a, failed);
         const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
-        const riga = makeActivityRow(rowIcon, text, cambi);
+        const riga = makeActivityRow(rowIcon, text, cambi, title);
         // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
         if (gia && gia.prima === global.SN_ESITO.PROPOSTO && gia.voce.riga && gia.voce.riga.isConnected) gia.voce.riga.replaceWith(riga);
         else aggiungiEsito(seg, riga);
@@ -557,6 +557,7 @@
     CERCA_CHAT: (n) => (n > 1 ? `cercato nel filo ${n} volte` : 'cercato nel filo'),
     RICORDO_FILO: () => 'ripescato un ricordo dal filo',
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    LEGGI_PAGINA: (n) => (n > 1 ? `letto ${n} pagine` : 'letto una pagina'),
     VEDI_SCHERMO: (n) => (n > 1 ? `guardato lo schermo ${n} volte` : 'guardato lo schermo'),
     CERCA_DOCUMENTI: (n) => (n > 1 ? `cercato fra i tuoi documenti ${n} volte` : 'cercato fra i tuoi documenti'),
     CERCA_SALVATE: (n) => (n > 1 ? `cercato fra le pagine salvate ${n} volte` : 'cercato fra le pagine salvate'),
@@ -650,11 +651,12 @@
   // e non deve sembrarlo.
   // `cambi`: gli id degli eventi del filo che la riga racconta; il tasto destro e lo stato
   // «annullato» li leggono da lì (dashboard-cambi.js).
-  function makeActivityRow(rowIcon, text, cambi = null) {
+  function makeActivityRow(rowIcon, text, cambi = null, title = '') {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
     const ids = Array.isArray(cambi) ? cambi.filter(Boolean) : [];
     if (ids.length) el.dataset.cambi = ids.join(' ');
+    if (title) el.title = title;
     const ic = document.createElement('span');
     ic.className = 'dash-activity-row-icon';
     ic.setAttribute('aria-hidden', 'true');
@@ -781,6 +783,7 @@
       return { icon: '↗', text: `Aperta «${t}»${o.tolta ? ' · tolta da «Aperti per dopo»' : ' · resta in «Aperti per dopo»'}` };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
+    LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
@@ -929,6 +932,7 @@
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
+    LEGGI_PAGINA: 'Pagina non letta',
     VEDI_SCHERMO: 'Finestra non guardata',
     CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
     CERCA_SALVATE: 'Ricerca fra le pagine salvate non riuscita',
@@ -1027,6 +1031,24 @@
     if (a._traccia || a._executed) return { icon: '•', text: 'Azione eseguita' };
     return null;
   }
+  // «Leggo la pagina: <titolo>». Il titolo lo scrive il sito: una riga sola e corta, e senza titolo si nomina il sito.
+  // Il titolo se lo scrive il sito, quindi da solo non dice dove è andato Filo: accanto il sito, e se la pagina era
+  // la scheda dell'utente (dentro il suo accesso) lo si dice. L'indirizzo intero sta sotto il puntatore.
+  function rigaLetturaPagina(a) {
+    const o = (a && a._output) || {};
+    let titolo = String(o.titolo || '').replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (titolo.length > 60) titolo = `${titolo.slice(0, 57)}…`;
+    let sito = '';
+    try { sito = new URL(o.url || a.url || '').hostname.replace(/^www\./, ''); } catch (_) { sito = ''; }
+    const seguito = Number(o.da || a.da || 0) > 0;
+    const verbo = seguito ? 'Leggo il seguito della pagina' : 'Leggo la pagina';
+    const parti = [titolo, sito !== titolo ? sito : '', o.fonte === 'scheda' ? 'dalla tua scheda' : ''].filter(Boolean);
+    return parti.length ? `${verbo}: ${parti.join(' · ')}` : verbo;
+  }
+  function indirizzoLetto(a) {
+    const o = (a && a._output) || {};
+    return String(o.url || (a && a.url) || '').slice(0, 300);
+  }
   // Il main ha detto no prima di toccare niente (#530): l'azione non è partita, e il diario non la racconta come fatta.
   function rifiutataDallaRegola(a) {
     return !!(a && a._output && a._output.no);
@@ -1059,6 +1081,7 @@
     if (o.found === false) return 'non trovato';
     if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
+    if (o.ok === false && o.dettaglio) return String(o.dettaglio);
     if (o.error) return String(o.error);
     return '';
   }
@@ -1078,7 +1101,7 @@
     }
     const row = activityRowFor(a);
     if (row) {
-      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a);
+      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
       if (rifiutataDallaRegola(a) && activity.mostra) activity.mostra(a);
       return true;
     }
@@ -1129,6 +1152,45 @@
       btn.disabled = false;
       // Già annullato dal segno sul messaggio: il risultato è quello voluto.
       if (r && (r.ok || r.error === 'già annullato')) { o.annullato = true; mostra(); return; }
+      btn.textContent = 'Annulla non riuscito: riprova';
+      btn.title = (r && r.error) || '';
+    });
+    mostra();
+    riga.append(testo, btn);
+    return riga;
+  }
+
+  // #1297 — quello che Filo impara su chi è l'utente nel benvenuto: la stessa riga dello stile. Annulla la toglie dalla
+  // memoria come «dimentica» (resta fra le nascoste del quaderno, da dove si rimette).
+  function lezioneAccoglienza(a) {
+    const r = a && a._output && a._output.ricordo;
+    return isType(a, 'SALVA_LEZIONE') && a._executed !== false && !!r && typeof r.text === 'string' && !!r.text.trim();
+  }
+
+  function rigaLezioneAccoglienza(a) {
+    const o = a._output;
+    const riga = document.createElement('div');
+    riga.className = 'dash-stile-accoglienza dash-lezione-accoglienza';
+    const testo = document.createElement('span');
+    testo.className = 'dash-stile-accoglienza-testo';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = 'Annulla';
+    btn.title = 'Non ricordarlo';
+    const mostra = () => {
+      testo.textContent = o.dimenticato === 'si' ? 'Non me lo ricordo più.'
+        : (o.dimenticato === 'tardi' ? 'Ormai è nel tuo profilo: lo togli dal quaderno delle memorie.'
+          : `Mi ricorderò: «${o.ricordo.text.trim()}»`);
+      btn.hidden = !!o.dimenticato;
+    };
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      let r = null;
+      try { r = await send({ type: MSG.FILO_MEMORY_FORGET, lezione: { ts: o.ricordo.ts, text: o.ricordo.text } }); } catch (_) { r = null; }
+      btn.disabled = false;
+      if (r && r.ok) { o.dimenticato = r.tolta ? 'si' : 'tardi'; mostra(); return; }
       btn.textContent = 'Annulla non riuscito: riprova';
       btn.title = (r && r.error) || '';
     });
@@ -1210,7 +1272,7 @@
     const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
     if (chip && apribileComunque(a)) {
       const row = activityRowFor(a);
-      if (row) chip.before(makeActivityRow(row.icon, row.text, row.cambi));
+      if (row) chip.before(makeActivityRow(row.icon, row.text, row.cambi, row.title || ''));
       chip.replaceWith(bottoneApriComunque(a));
     }
     return true;
@@ -1252,7 +1314,7 @@
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
       const anche = aspettaUtente(a) || rigaEBottone(a)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || sceltaAutonomia(a)
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a)
         || salvateDaMostrare(a).length > 0;
       if (activity) {
         if (told) {
@@ -1264,7 +1326,7 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          wrap.appendChild(makeActivityRow(row.icon, row.text, row.cambi));
+          wrap.appendChild(makeActivityRow(row.icon, row.text, row.cambi, row.title || ''));
           if (!anche) continue;
         }
       }
@@ -1835,7 +1897,7 @@
           a._executed = false;
           delete a._confirm;
           const row = activityRowFor(a);
-          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a);
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
           return;
         }
@@ -1848,6 +1910,12 @@
         // #778 — l'OK a guardare una finestra, o ad accendere la funzione che lo permette, risponde a una domanda
         // rimasta in sospeso: Filo riprende da solo, anche per dire che non è riuscito.
         if (type === 'VEDI_SCHERMO' && r && !r.rejected) {
+          if (!r.executed) segnaNonRiuscita(a, r.output, activity, btn);
+          proseguiQuandoLibero();
+          if (!r.executed) return;
+        }
+        // #553 — dopo l'OK a leggere una pagina il testo serve al modello: Filo riprende da solo, anche se non è riuscito.
+        if (type === 'LEGGI_PAGINA' && r && !r.rejected && r.output) {
           if (!r.executed) segnaNonRiuscita(a, r.output, activity, btn);
           proseguiQuandoLibero();
           if (!r.executed) return;
@@ -1948,6 +2016,7 @@
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (type === 'CERCA_SALVATE') return bottoniSalvate(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
+    if (lezioneAccoglienza(a)) return rigaLezioneAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
@@ -2023,6 +2092,12 @@
       // (auto-continue), dove compare la risposta.
       const nome = (a._output && a._output.name) || '';
       return stepTrace(nome ? `📄 Leggo il documento: ${nome}` : '📄 Leggo il documento');
+    }
+    if (type === 'LEGGI_PAGINA') {
+      // Traccia, non bottone: la pagina l'ha letta Filo per sé, e la risposta cita i link che contano.
+      const traccia = stepTrace(`🌐 ${rigaLetturaPagina(a)}`);
+      traccia.title = indirizzoLetto(a);
+      return traccia;
     }
     if (type === 'LEGGI_IMPOSTAZIONI') {
       const c = String(a.cerca || '').trim();
@@ -2136,7 +2211,7 @@
       if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
     }
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a, row.title || '');
     // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
     try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id), a); } catch (_) {}
   }
@@ -2147,7 +2222,7 @@
     a._executed = false;
     delete a._confirm;
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a, row.title || '');
     btn.textContent = `✗ ${row ? row.text : 'Non eseguita'}`;
     if (permessoDaConcedere(a)) btn.after(bottonePermesso(a));
   }

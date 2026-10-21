@@ -28,9 +28,10 @@
       && Boolean(global.SN_DICTATION_SEGMENTER);
   }
 
-  function avvisa(frase) {
+  // `rimedio`: la risposta d'errore del main, quando la frase nomina dove si rimedia (l'avviso porta il tasto, #663).
+  function avvisa(frase, rimedio = null) {
     if (!frase) return;
-    try { global.SN_POPUP.showToast(frase, { duration: 9000 }); } catch (_) { console.warn('[Filo voce]', frase); }
+    try { global.SN_POPUP.showToast(frase, { duration: 9000, rimedio }); } catch (_) { console.warn('[Filo voce]', frase); }
   }
 
   // Il posto dove si dà il permesso cambia col sistema.
@@ -46,7 +47,9 @@
   function fraseTrascrizione(res) {
     if (res && res.error && SPIEGATI.includes(res.code)) return res.error;
     const E = global.SN_CHAT_ERRORS;
-    const motivo = E ? E.friendly({ message: (res && res.error) || '', code: res && res.code }) : '';
+    // Ricomposta come ogni altra risposta d'errore: col solo codice si perdevano il rifiuto della chiave e la frase
+    // che il main scrive sui crediti finiti.
+    const motivo = E ? E.friendly(E.fromResponse(res, '')) : '';
     return t('voce_err_trascrizione', motivo || t('voce_riprova'));
   }
 
@@ -137,7 +140,7 @@
     const guasto = (res) => {
       if (s.errore || s.annullata) return;
       s.errore = true;
-      avvisa(fraseTrascrizione(res));
+      avvisa(fraseTrascrizione(res), res);
       sessione.ferma('errore');
     };
 

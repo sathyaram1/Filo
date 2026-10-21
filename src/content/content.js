@@ -2362,7 +2362,8 @@
       if (IS_SUBFRAME) return;
       try {
         if (document.visibilityState === 'visible' && document.hasFocus()) {
-          Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800 });
+          // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
+          Popup?.showToast?.(String(msg.text || ''), { duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null });
         }
       } catch (_) {}
       return;

@@ -38,6 +38,9 @@
   // Riprendendo un'intervista a metà la conversazione ricompare com'era e l'ultima bolla di
   // Filo È la domanda in sospeso: questa riga la introduce, così non sembra un déjà vu.
   const RESUME_NOTE = 'Bentornato. Eravamo rimasti qui.';
+  // Il clic su «Riprendiamola» detto con le parole del pulsante, quando a chiudere era stato il modello: è la risposta
+  // dell'utente al congedo, e Filo prosegue da lì.
+  const RESUME_REPLY = 'Riprendiamola.';
 
   // Quando a chiudere è l'APP e non il modello l'ultima bolla è questa: fissa e disponibile
   // anche senza rete, perché è l'unica cosa che l'utente vede prima della home.
@@ -65,7 +68,7 @@
       kind: 'scoprire',
       label: 'Chi è l’utente e a cosa gli serve il computer',
       detail: 'Lavoro, studio, svago, quali siti frequenta.',
-      applica: 'Appena lo sai, emetti SALVA_LEZIONE con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO.',
+      applica: 'Appena lo sai, emetti SALVA_LEZIONE con quello che hai imparato su di lui, in terza persona: alla fine dell’intervista finisce nel suo PROFILO. Si salva subito e l’utente vede cosa ricorderai con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
       id: 'stile',
@@ -104,7 +107,7 @@
       id: 'crediti',
       kind: 'dire',
       label: 'I crediti, in due righe',
-      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare, non per i crediti.',
+      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare e per dare inviti ad altri, non per usare i crediti.',
     },
   ];
 
@@ -201,10 +204,12 @@
 
   // `daFuori`: nel turno è entrato testo di altri. `autonomia`: sotto quel turno di Filo c'era la scelta del
   // livello, e chi riprende l'intervista la ritrova lì.
+  // `congedo`: è il congedo scritto dall'app, che «Riprendiamola» toglie.
   function segni(m) {
     return {
       ...(m && m.daFuori === true ? { daFuori: true } : {}),
       ...(m && m.role === 'filo' && m.autonomia === true ? { autonomia: true } : {}),
+      ...(m && m.role === 'filo' && m.congedo === true ? { congedo: true } : {}),
     };
   }
 
@@ -250,6 +255,9 @@
       notice: s.notice === 'early' ? 'early' : '',
       ...(s.fermato ? { fermato: true } : {}),
       ...(s.autonomiaInSospeso === true ? { autonomiaInSospeso: true } : {}),
+      ...(Number(s.scambiPrima) > 0 ? { scambiPrima: Math.floor(Number(s.scambiPrima)) } : {}),
+      // Rifatta o ripresa: non è più il primo avvio, e la home la mostra solo nelle pagine che l'hanno chiesta (#1297).
+      ...(s.rifatta === true ? { rifatta: true } : {}),
     };
   }
 
@@ -312,7 +320,64 @@
         thread: cur.thread,
       }].slice(-PAST_CAP)
       : cur.past;
-    return { ...emptyState(), past, startedAt: at };
+    return { ...emptyState(), past, startedAt: at, rifatta: true };
+  }
+
+  // «Riprendiamola» (#1297): l'intervista chiusa a metà si riapre dov'era, con le spunte e la stessa targa. Il congedo
+  // dell'app e la frase che l'ha chiesto escono, così l'ultima battuta torna la domanda in sospeso; se a chiudere era
+  // stato il modello, il clic diventa la risposta dell'utente e Filo prosegue. Il tetto degli scambi riparte da qui.
+  function riprendi(state) {
+    const cur = normalize(state);
+    if (!cur.done) return cur;
+    const thread = cur.thread.slice();
+    const last = thread[thread.length - 1];
+    const congedoApp = !!last && last.role === 'filo' && (last.congedo === true || last.text.trim() === CLOSING_MESSAGE);
+    if (congedoApp) {
+      thread.pop();
+      const chiesto = thread[thread.length - 1];
+      if (chiesto && chiesto.role === 'user' && (isStopRequest(chiesto.text) || isDecline(chiesto.text))) thread.pop();
+    }
+    const prima = thread.filter((m) => m.role === 'user').length;
+    const ultimo = thread[thread.length - 1];
+    if (!congedoApp && ultimo && ultimo.role === 'filo' && prima > 0) {
+      thread.push({ role: 'user', text: RESUME_REPLY });
+    }
+    const { autonomiaInSospeso: _sospesa, fermato: _fermato, scambiPrima: _prima, ...resto } = cur;
+    const fine = thread[thread.length - 1];
+    const riaperta = {
+      ...resto, done: false, closedAt: null, notice: '', thread, rifatta: true,
+      ...(fine && fine.role === 'filo' && fine.autonomia ? { autonomiaInSospeso: true } : {}),
+    };
+    return prima > 0 ? { ...riaperta, scambiPrima: prima } : riaperta;
+  }
+
+  // Ogni intervista conservata ha una chiave sua, per toglierla da Preferenze senza toccare le altre.
+  function chiaveConversazione(conv) {
+    const c = conv && typeof conv === 'object' ? conv : {};
+    return `${c.startedAt || ''}|${c.closedAt || ''}|${Array.isArray(c.thread) ? c.thread.length : 0}`;
+  }
+
+  // La × in Preferenze (#1297). Quella in corso non si toglie da qui: finché è aperta è ancora la conversazione in
+  // corso, e si chiude dalla home. Tolta quella corrente, la riga «abbiamo chiuso a metà» non ha più niente da riprendere.
+  function togliConversazione(state, chiave) {
+    const cur = normalize(state);
+    const k = String(chiave || '');
+    if (cur.done && cur.thread.length && chiaveConversazione(cur) === k) {
+      return { state: { ...cur, thread: [], notice: '' }, tolta: true };
+    }
+    const past = cur.past.filter((p) => chiaveConversazione(p) !== k);
+    return past.length === cur.past.length
+      ? { state: cur, tolta: false }
+      : { state: { ...cur, past }, tolta: true };
+  }
+
+  // «Dimentica tutto» passa anche di qui: le parole dell'intervista sono memoria quanto il profilo. Resta solo il segno
+  // «già accolto», così Filo non ricomincia a presentarsi.
+  function dimentica(state) {
+    const cur = normalize(state);
+    return cur.done
+      ? { ...emptyState(), done: true, closedAt: cur.closedAt }
+      : { ...emptyState(), ...(cur.rifatta ? { rifatta: true } : {}) };
   }
 
   // Le interviste conservate, dalla più recente: la corrente (appena ha una conversazione) e
@@ -382,9 +447,10 @@
     return normalize(state).thread.some((m) => m.daFuori === true);
   }
 
-  // Quanti messaggi ha scritto l'utente: è il conto degli "scambi" del tetto.
+  // Quanti messaggi ha scritto l'utente: è il conto degli "scambi" del tetto. Dopo una ripresa si conta da lì.
   function userTurns(state) {
-    return normalize(state).thread.filter((m) => m.role === 'user').length;
+    const cur = normalize(state);
+    return Math.max(0, cur.thread.filter((m) => m.role === 'user').length - (cur.scambiPrima || 0));
   }
 
   // Turno rimasto a metà (l'ultima cosa è un messaggio dell'utente): chi riapre lo trova
@@ -428,10 +494,11 @@
   }
 
   global.SN_ONBOARDING = {
-    WELCOME_MESSAGE, RESUME_NOTE, CLOSING_MESSAGE,
+    WELCOME_MESSAGE, RESUME_NOTE, RESUME_REPLY, CLOSING_MESSAGE,
     MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
     ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
-    emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
+    emptyState, normalize, isActive, isTicked, tick, close, restart, riprendi, conversations,
+    chiaveConversazione, togliConversazione, dimentica,
     remaining, isComplete, appendTurn, haTestoDiAltri, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
     mostraSceltaAutonomia, autonomiaInSospeso,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,

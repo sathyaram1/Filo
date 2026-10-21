@@ -163,11 +163,14 @@ module.exports = function register(on, ctx) {
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
   // Con un portafoglio il premio lo dà il server dopo i controlli (#816): il
   // conteggio locale non si muove. `inArrivo`: la segnalazione porta lo
-  // pseudonimo, senza il quale il server non sa a chi darlo.
+  // pseudonimo, senza il quale il server non sa a chi darlo. `senzaPremio`:
+  // oltre il tetto del giorno il server non paga (#1077), e lo si dice.
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
     const WM = globalThis.SN_WALLET_MAIN;
     if (WM && WM.haPortafoglio && WM.haPortafoglio()) {
-      return { ok: true, wallet: true, credits: 0, inArrivo: Boolean(WM.pseudonym && WM.pseudonym()) };
+      const conPseudonimo = Boolean(WM.pseudonym && WM.pseudonym());
+      const senzaPremio = conPseudonimo && WM.notaInvio ? WM.notaInvio(msg && msg.ref) : '';
+      return { ok: true, wallet: true, credits: 0, inArrivo: conPseudonimo && !senzaPremio, senzaPremio };
     }
     const { SN_CONST } = globalThis;
     const amount = (msg && Number(msg.credits)) || SN_CONST.CREDIT.FEEDBACK_SEND;

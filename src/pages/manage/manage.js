@@ -376,6 +376,8 @@
   // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
   let impostazioniAvviate = false;
   function caricaImpostazioni() {
+    // Le pause non trattengono gli altri controlli «in lettura»: sono una riga in più, non un valore da scegliere.
+    loadPause();
     return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
       .finally(fineLetturaAutomazioni);
   }
@@ -1042,6 +1044,90 @@
       saveSessions({ [campo]: !el.checked }, mgAccountsMsg);
     });
   }
+
+  // ── Le pause in corso (#996) ───────────────────────────────────────────────
+  // Sola lettura dal server: A, B o la routine server fermi dopo un'accensione rifiutata, col motivo. Nessun tetto
+  // giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
+  const PAUSE_GET = (window.SN_MSG?.MSG?.AUTOMATION_PAUSE_GET) || 'automation_pause_get';
+  const mgAccountsPausa = document.getElementById('mgAccountsPausa');
+  const mgServerPausa = document.getElementById('mgServerPausa');
+  // null = non chiesto o non per te; { errore } = non letto; { pause, scartoMs } = letto (scarto: orologio locale − server).
+  let pauseLette = null;
+  let pauseTick = 0;
+  let pauseTimer = null;
+
+  function rigaPausa(classe, testo, dettaglio) {
+    const p = document.createElement('p');
+    p.className = classe;
+    p.textContent = testo;
+    if (dettaglio) p.title = dettaglio;
+    return p;
+  }
+
+  function reflectPause() {
+    if (!RS) return;
+    clearTimeout(pauseTimer);
+    const ora = Date.now();
+    const righe = [];
+    const righeServer = [];
+    let prossima = Infinity;
+    const leggi = (chi, voce) => {
+      if (!voce || typeof voce !== 'object') return null;
+      const v = Object.assign({}, voce, { finoMs: Number(voce.finoMs) + pauseLette.scartoMs });
+      const p = RS.pausaInParole(chi, v, ora);
+      if (p) prossima = Math.min(prossima, v.finoMs);
+      return p;
+    };
+    if (pauseLette && pauseLette.errore) {
+      righe.push(rigaPausa('mg-auto-block-desc', 'Non ho potuto leggere dal server se un account è in pausa.'));
+    } else if (pauseLette) {
+      for (const k of ['A', 'B']) {
+        const p = leggi(`Account ${k}`, pauseLette.pause[k]);
+        if (p) righe.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+      }
+      // Una routine server per account (#1426): ognuna ha la sua pausa.
+      for (const k of ['A', 'B']) {
+        const p = leggi(`La routine server dell'account ${k}`, pauseLette.pause[`server${k}`]);
+        if (p) righeServer.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+      }
+    }
+    if (mgAccountsPausa) {
+      mgAccountsPausa.replaceChildren(...righe);
+      mgAccountsPausa.hidden = righe.length === 0;
+    }
+    if (mgServerPausa) {
+      mgServerPausa.replaceChildren(...righeServer);
+      mgServerPausa.hidden = righeServer.length === 0;
+    }
+    // Una pausa che scade sparisce da sola, senza ricaricare la pagina.
+    if (prossima < Infinity) pauseTimer = setTimeout(reflectPause, Math.min(Math.max(0, prossima - ora) + 1000, 2 ** 31 - 1));
+  }
+
+  function loadPause() {
+    const nato = ++pauseTick;
+    return (async () => {
+      let r = null;
+      try { r = await sendToMain({ type: PAUSE_GET }); } catch (_) { /* come una lettura fallita */ }
+      if (nato !== pauseTick) return;
+      if (r && (r.code === 'forbidden' || r.code === 'not_admin')) pauseLette = null;
+      else if (!r || !r.ok) {
+        pauseLette = { errore: true };
+        if (r && r.error) console.error('[manage] pause delle routine:', r.error);
+      } else {
+        const oraServer = Number(r.oraMs);
+        pauseLette = {
+          pause: r.pause && typeof r.pause === 'object' ? r.pause : {},
+          scartoMs: Number.isFinite(oraServer) && oraServer > 0 ? Date.now() - oraServer : 0,
+        };
+      }
+      reflectPause();
+    })();
+  }
+
+  // A ogni apertura di Automazioni: una pausa nasce e scade mentre la pagina resta aperta.
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab === 'automation') loadPause();
+  });
 
   // ── Modello e sforzo per fase (config/routines.roleModels, #1193) ──────────
   // Ogni tendina salva la sua sola foglia appena cambia. Stesse regole delle sessioni qui sopra: mai un valore
@@ -2592,8 +2678,9 @@
     if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
-  // Un lavoro server passato e le sue attese (#1159): la suite di filo-security, il PC.
+  // Le attese che segue il server: gli unit sulla fusione (#1207); per un lavoro server la suite di filo-security, il PC (#1159).
   const ATTESE_SERVER = Object.freeze({
+    unit: ['Unit sulla fusione', 'Verifica e controllo di sicurezza sono passati: il server fa girare in GitHub gli unit test sul ramo fuso con main di adesso, e con l’esito verde lo porta al cancello e su main. Ricontrolla da solo ogni cinque minuti.'],
     pc: ['Pronto: aspetta il PC', 'Il cancello non può portare il ramo su main di filo-security: il lavoro aspetta il tuo PC. Lo porta su main npm run orchestra -- fusioni-server, che parte anche con avvia, prima la parte dell’app e poi quella del server.'],
     suite: ['Aspetta le prove del server', 'Il cancello porta su main la parte dell’app e poi il ramo di filo-security quando la suite di GitHub è verde su quel commit. Riprova da solo ogni dieci minuti.'],
   });
@@ -5192,8 +5279,10 @@
     segnaForma('l2');
     giudiceAperto = i;
 
-    // Un giudice che non ha votato: il cerchio è tratteggiato e cliccarlo dice PERCHÉ. Un buco si
-    // spiega, non si tace.
+    // Giudice che non ha votato in quella run: il cerchio è tratteggiato e
+    // cliccarlo dice PERCHÉ, invece di non fare niente. È la stessa regola dei
+    // livelli grigi: un buco si spiega, non si tace.
+    const nonVisteRow = MR.immaginiNonViste(fb).map((t) => `<div class="mg-judge-model mg-judge-nonviste">${esc(t)}</div>`).join('');
     if (!v) {
       const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
       const saltati = MR.judgesSkippedText(fb);
@@ -5201,6 +5290,7 @@
         <div class="mg-judge-detail">
           <div class="mg-liv-testo">${saltati ? esc(saltati) : 'Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.'}</div>
           ${nota && nota.text && !saltati ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
+          ${nonVisteRow}
         </div>
       `);
       return;
@@ -5222,6 +5312,7 @@
       <div class="mg-judge-detail">
         <span class="mg-class-badge ${badgeClass}">${esc(cls || '—')}</span>
         ${modelRow}
+        ${nonVisteRow}
         <div class="mg-reasoning">${
           v.reasoning ? esc(v.reasoning) : '<em>Nessun ragionamento disponibile.</em>'
         }</div>
@@ -5700,6 +5791,8 @@
     loadCaps,
     // Ri-legge le scelte sulle sessioni delle routine (IPC) — per i test.
     loadSessions,
+    // Ri-legge le pause in corso degli account e della routine server (IPC) — per i test.
+    loadPause,
     // Ri-legge modello e sforzo per fase (IPC) — per i test.
     loadRoleModels,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
@@ -5873,14 +5966,35 @@
     del.textContent = 'Rimuovi';
     del.addEventListener('click', () => { row.remove(); populateSmNicknames(); });
 
-    // Un nickname compare fra i suggerimenti solo quando ha anche un modello.
+    const warn = document.createElement('div');
+    warn.className = 'sn-model-row-warn';
+    warn.setAttribute('role', 'status');
+    warn.hidden = true;
+
+    // Aggiornare nickname o modello ridisegna i suggerimenti dei selettori
+    // (un nickname compare tra i suggerimenti solo quando ha anche un modello).
     nickIn.addEventListener('input', () => populateSmNicknames());
-    modelIn.addEventListener('input', () => populateSmNicknames());
+    modelIn.addEventListener('input', () => { populateSmNicknames(); avvisaProduttoreGiudice(row); });
 
     row.appendChild(nickIn);
     row.appendChild(modelWrap);
     row.appendChild(del);
+    row.appendChild(warn);
+    avvisaProduttoreGiudice(row);
     return row;
+  }
+
+  // I giudici girano sul server con la lista di esclusione del codice, la stessa di build qui (un test del server le
+  // confronta): un modello il cui produttore resta fra gli host lo si dice sulla riga (#1059).
+  function avvisaProduttoreGiudice(row) {
+    const warn = row.querySelector('.sn-model-row-warn');
+    const C = window.SN_CONST;
+    if (!warn || !C || typeof C.unexcludedProducer !== 'function') return;
+    const nome = C.unexcludedProducer(row.querySelector('.sn-model-id').value.trim(), C.DEFAULT_EXCLUDED_PROVIDERS);
+    warn.textContent = nome
+      ? `${nome} produce questo modello e i giudici non lo escludono come fornitore: le richieste possono arrivare a lui.`
+      : '';
+    warn.hidden = !nome;
   }
 
   function renderJudgeRegistry(registry) {

@@ -752,8 +752,8 @@
         let awarded = 5;
         let premio = null;
         try {
-          const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK });
-          if (ar?.ok && ar.wallet) premio = { inArrivo: !!ar.inArrivo };
+          const ar = await chrome.runtime.sendMessage({ type: MSG.CREDITS_AWARD_FEEDBACK, ref: res.id || null });
+          if (ar?.ok && ar.wallet) premio = { inArrivo: !!ar.inArrivo, senzaPremio: String(ar.senzaPremio || '') };
           else if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
         } catch (_) {}
         if (!premio) flyCredits(originRect, awarded);
@@ -761,13 +761,14 @@
         // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
         // sono andati persi, così non resta convinto che siano stati inviati.
         const failed = Array.isArray(res.failed) ? res.failed : [];
-        const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.' : '';
+        const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.'
+          : (premio?.senzaPremio ? ` ${premio.senzaPremio}` : '');
         if (failed.length) {
           const names = failed.map((f) => f?.name || 'allegato').join(', ');
           const inviato = premio ? 'Feedback inviato' : `Feedback inviato (+${awarded} crediti)`;
           Popup?.showToast?.(`${inviato}, ma non sono riuscito a caricare: ${names}${dopo ? `.${dopo}` : ''}`, { duration: 6000 });
         } else {
-          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio ? 4000 : 2800 });
+          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio?.senzaPremio ? 5500 : (premio ? 4000 : 2800) });
         }
       } catch (e) {
         console.error('[SN feedback] submit', e);

@@ -744,6 +744,18 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
+  // Le pause in corso degli account e della routine server, col motivo (#996). Lo stato del pacemaker non lo legge
+  // nessun client: passa dal registro delle routine, con le credenziali dell'owner (mai dalla callable dello storico).
+  on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
+    try {
+      const r = await callSecurityFunction('routineLog', { op: 'pause' });
+      const pause = r && r.pause && typeof r.pause === 'object' ? r.pause : {};
+      return { ok: true, pause, oraMs: Number(r && r.oraMs) || Date.now() };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Modello e sforzo del worker per fase (config/routines.roleModels). Owner-only. Le legge il server
   // quando consegna un biglietto: cambiarle qui vale dal prossimo.
   on(MSG.AUTOMATION_ROLE_MODELS_GET, ownerOnly(async () => {

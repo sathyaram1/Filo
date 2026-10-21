@@ -213,7 +213,7 @@
     popup_estimated_cost: 'Costo stimato',
     popup_calc_local: 'Calcolatrice locale (nessun costo)',
     popup_calc_result: 'Risultato',
-    popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
+    popup_followup_placeholder: 'Chiedi altro…',
     popup_send: 'Invia',
     popup_copy: 'Copia',
     popup_copied: 'Copiato',
@@ -297,6 +297,7 @@
     clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
+    clipboard_image_senza_descrizione: 'Immagine',
 
     // Categorie default
     category_default: 'Da vedere',
@@ -488,16 +489,22 @@
     // Pagine delicate (#1004)
     admin_defaults_delicate: 'Pagine delicate',
     admin_defaults_delicate_desc:
-      'I siti di posta, banche e sanità di cui il riassunto delle schede chiuse e la pulizia automatica non mandano il testo ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
+      'I siti di posta, banche, sanità e pubblica amministrazione da cui le funzioni automatiche non mandano niente ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
     admin_defaults_delicate_posta: 'Posta',
     admin_defaults_delicate_banche: 'Banche',
     admin_defaults_delicate_sanita: 'Sanità',
+    admin_defaults_delicate_pa: 'Pubblica amministrazione',
     // Quanto filo ha davanti la chat (#868)
     admin_defaults_contesto: 'Quanto ricorda la chat',
     admin_defaults_contesto_desc:
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    admin_defaults_contesto_cache: 'Durata della cache',
+    admin_defaults_contesto_cache_5m: '5 minuti',
+    admin_defaults_contesto_cache_1h: 'un\'ora',
+    admin_defaults_contesto_cache_serie: 'Come il codice (%s)',
+    admin_defaults_contesto_cache_codice: 'Come il codice',
     // Quanto può essere lunga una risposta dei modelli (#1097.3)
     admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
     admin_defaults_lunghezza_desc:
@@ -510,6 +517,8 @@
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_producer_not_excluded: '%s produce questo modello e non è fra i fornitori esclusi: le richieste possono arrivare a lui.',
+    admin_defaults_producer_exclude: 'Escludi %s',
     admin_defaults_open_weights_title: 'Per chi accende «Solo modelli a pesi aperti»',
     admin_defaults_open_weights_to: 'Passano a %s: %s',
     admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',
@@ -630,8 +639,11 @@
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
     options_security_delicate_desc:
-      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi queste ' +
-      'schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+      'Posta, banca, sanità, pubblica amministrazione e le pagine dove hai visto un campo password o carta. ' +
+      'Quando chiudi queste schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a ' +
+      'nessun modello. La chat ne vede solo il nome del sito, i loro screenshot e le immagini copiate da lì non ' +
+      'vanno al modello delle immagini, nemmeno incollati altrove, e la spiegazione di quello che selezioni parte ' +
+      'solo dal tasto destro.',
     options_security_delicate_sites_label:
       'Altri siti delicati, uno per riga',
     options_security_delicate_sites_invalid:
@@ -897,6 +909,7 @@
     history_reuse: 'riuso %s%',
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
+    history_cache_written: '%s token messi da parte per le richieste che seguono.',
     history_policy_violation: '⚠ fornitore non ammesso',
     // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
     // pezzo di ragionamento, la prima parola, e quando è finito.

@@ -252,7 +252,7 @@ function get() {
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
     }
-    // #1004 — gli elenchi delle pagine delicate (posta, banche, sanità): ogni categoria remota sostituisce la sua.
+    // #1004 — gli elenchi delle pagine delicate (posta, banche, sanità, pa): ogni categoria remota sostituisce la sua.
     if (remoteModels.sitiDelicati && typeof remoteModels.sitiDelicati === 'object') {
       out.sitiDelicati = remoteModels.sitiDelicati;
     }
@@ -333,6 +333,8 @@ function tettiContesto(o) {
     const v = FC ? FC.numeroIn(o && o[k], FC.LIMITI[k]) : null;
     if (v != null) out[k] = k === 'token' ? Math.round(v) : v;
   }
+  const cache = FC ? FC.durataIn(o && o.cache) : null;
+  if (cache) out.cache = cache;
   return out;
 }
 function contestoDiSerie() {

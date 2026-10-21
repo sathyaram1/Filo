@@ -482,6 +482,8 @@ html, body {
   line-height: 1.5;
 }
 .dash-thread > .dash-onb-notice { align-self: center; margin: 6px 0; }
+/* L'intervista rifatta rimasta aperta altrove si ricorda sulla home, non in fondo a un'altra conversazione. */
+body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; }
 
 /* ── La coda del filo (#869) ── */
 /* Cercare nel filo: un campo discreto in cima al centro, i risultati sopra il filo. */
@@ -559,6 +561,8 @@ html, body {
   transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
 }
 .dash-cambio { align-self: stretch; }
+/* Le righe sottili di fila stanno strette come le righe di un registro (#1490): lo spazio pieno resta intorno alle bolle. */
+:is(.dash-cambio, .dash-pagine) + :is(.dash-cambio, .dash-pagine) { margin-top: calc(2px - var(--dash-filo-gap, 14px)); }
 .dash-cambio:hover, .dash-pagine-testa:hover, .dash-pagine-testa:focus-visible { background: var(--dash-line); color: var(--dash-ink-soft); outline: none; }
 .dash-cambio-ora, .dash-pagine-ora { flex: none; font-variant-numeric: tabular-nums; opacity: 0.75; }
 .dash-cambio-ico, .dash-pagine-ico { display: inline-flex; flex: none; }
@@ -601,12 +605,14 @@ html, body {
   overflow: hidden;
 }
 .dash-bubbles {
+  --dash-filo-gap: 14px;
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 40px 8px 8px;
+  gap: var(--dash-filo-gap);
+  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. */
+  padding: 40px 8px calc(8px + var(--dash-vuoto, 0px));
 }
 
 .dash-bubble {
@@ -623,6 +629,15 @@ html, body {
   background: var(--dash-ink);
   color: var(--dash-paper);
   border-bottom-right-radius: 6px;
+  transition: background calc(0.25s * var(--sn-motion, 1)) ease, color calc(0.25s * var(--sn-motion, 1)) ease;
+}
+/* #1296 — il seguito scritto mentre Filo lavora, in attesa: un foglietto tratteggiato non ancora consegnato, che si
+   riempie d'inchiostro quando Filo lo legge. */
+.dash-bubble-user.dash-bubble-attesa {
+  background: transparent;
+  color: var(--dash-ink-soft);
+  outline: 1.5px dashed var(--dash-ink-mute);
+  outline-offset: -1.5px;
 }
 /* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
    (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
@@ -1350,6 +1365,25 @@ html, body {
   padding: 8px 0 4px 14px;
   background: var(--dash-paper);
 }
+/* Su una finestra bassa la colonna scorre sotto l'orologio: quello che resta sotto sfuma invece di uscire tagliato a
+   metà, e la sfumatura c'è solo finché sotto c'è altro (senza scorrimento la timeline è spenta e l'opacità resta 0). */
+.dash-sistema::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, var(--dash-paper) 85%);
+  pointer-events: none;
+  opacity: 0;
+  animation: dash-sotto-c-e-altro linear both;
+  animation-timeline: scroll(nearest block);
+}
+@keyframes dash-sotto-c-e-altro {
+  0%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
 .dash-sis-icone {
   display: flex;
   flex-wrap: wrap;
@@ -1562,6 +1596,11 @@ html, body {
 /* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
 .dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform calc(160ms * var(--sn-motion, 1)) ease, opacity calc(160ms * var(--sn-motion, 1)) ease; }
 .dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
+/* Appena comparso sotto il dito che ha mandato, il quadrato ignora i clic per mezzo secondo: si accende in quel tempo
+   vero, che la pagina gli scrive in --dash-pausa-quadrato (PAUSA_QUADRATO). Non è un token estetico. */
+.dash-send.dash-stop:not([disabled]) { animation: dash-stop-arma var(--dash-pausa-quadrato, 500ms) ease-in; }
+@keyframes dash-stop-arma { from { opacity: 0.45; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dash-send.dash-stop:not([disabled]) { animation-timing-function: step-end; } }
 
 .dash-img-preview {
   position: relative;

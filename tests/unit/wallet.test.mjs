@@ -71,7 +71,7 @@ test('il messaggio di crediti finiti distingue chiave di Filo e chiave propria',
 });
 
 test('ogni esito del server ha una frase; uno sconosciuto cade su quella generica', () => {
-  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable']) {
+  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable', 'inviter_not_linked', 'network_cap']) {
     assert.ok(W.redeemMessage(s).length > 10, s);
   }
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
@@ -366,16 +366,19 @@ test('un movimento del portafoglio si legge in italiano, anche con l’id attacc
   assert.equal(W.grantLabel(null), 'Crediti ricevuti');
 });
 
-// #652 — le sette manopole della pagina dell'owner. La tabella sta qui perché
+// #652 — le manopole della pagina dell'owner. La tabella sta qui perché
 // la usano sia la pagina (per disegnare i campi) sia il main (per rifiutare un
 // numero storto prima di scriverlo): se divergessero, il main accetterebbe
 // quello che la pagina rifiuta.
-test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => {
-  assert.equal(W.OWNER_KNOBS.length, 8);
+test('le manopole dei crediti sono undici, hanno un nome e limiti sensati', () => {
+  assert.equal(W.OWNER_KNOBS.length, 11);
   assert.deepEqual(W.OWNER_KNOB_KEYS, [
     'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses', 'invitesRemaining',
-    'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackClosed',
+    'maxGrantCredits', 'rewardFeedbackSent', 'rewardSentPerDay', 'rewardFeedbackClosed', 'redeemsPerNetwork', 'redeemsPerNetworkHours',
   ]);
+  // #1077 — il tetto giornaliero dei premi d'invio si può chiudere (zero) e aprire a molti.
+  assert.equal(W.knobOf('rewardSentPerDay').min, 0);
+  assert.ok(W.knobOf('rewardSentPerDay').max >= 1000);
   for (const k of W.OWNER_KNOBS) {
     assert.ok(k.etichetta && k.etichetta.length > 2, `${k.chiave}: serve un nome leggibile`);
     assert.ok(k.aiuto && k.aiuto.length > 10, `${k.chiave}: serve una spiegazione`);
@@ -392,6 +395,31 @@ test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => 
   assert.equal(ingressi.aiuto, 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.');
   assert.equal(ingressi.min, 0);
   assert.ok(ingressi.max >= 1000000);
+  // #1120 — il tetto per rete si spegne a zero; la finestra dura almeno un'ora e arriva a un anno.
+  assert.equal(W.knobOf('redeemsPerNetwork').min, 0);
+  assert.match(W.knobOf('redeemsPerNetwork').aiuto, /A zero nessun limite/);
+  assert.equal(W.knobOf('redeemsPerNetworkHours').min, 1);
+  assert.ok(W.knobOf('redeemsPerNetworkHours').max >= 24 * 365);
+});
+
+// #1120 — chi trova il tetto per rete deve sapere quando riprovare, coi numeri del server, e che il codice resta buono.
+test('tetto per rete: la frase dice quante persone, in quante ore, e l\'ora in cui riprovare', () => {
+  const ora = (iso) => new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const ieri = new Date(2026, 9, 21, 9, 0).getTime();
+  const domani = new Date(2026, 9, 22, 8, 30).toISOString();
+  const f = W.redeemMessage('network_cap', { status: 'network_cap', reopensAt: domani, cap: 3, hours: 24 });
+  assert.equal(f, W.networkCapMessage({ reopensAt: domani, cap: 3, hours: 24 }));
+  const g = W.networkCapMessage({ reopensAt: domani, cap: 3, hours: 24 }, ieri);
+  assert.equal(g, `Da questa connessione sono già entrate 3 persone nelle ultime 24 ore. Il tuo codice resta valido, riprova domani dopo le ${ora(domani)}.`);
+  const oggi = new Date(2026, 9, 21, 17, 5).toISOString();
+  assert.match(W.networkCapMessage({ reopensAt: oggi, cap: 1, hours: 1 }, ieri), new RegExp(`è già entrata una persona nell’ultima ora\\. .* riprova dopo le ${ora(oggi)}\\.$`));
+  const fra3 = new Date(2026, 9, 24, 10, 0).toISOString();
+  assert.match(W.networkCapMessage({ reopensAt: fra3, cap: 3, hours: 24 }, ieri), /riprova da sabato 24 ottobre alle 10:00\.$/);
+  for (const storto of [{}, { reopensAt: 'mai' }, null, undefined]) {
+    assert.equal(W.redeemMessage('network_cap', storto), W.REDEEM_MESSAGES.network_cap, JSON.stringify(storto));
+  }
+  assert.match(W.REDEEM_MESSAGES.network_cap, /resta valido/);
+  assert.match(W.redeemMessage('inviter_not_linked'), /Google/);
 });
 
 // #854 — il main rifà il controllo della pagina con la stessa tabella: un numero storto per gli ingressi
@@ -462,4 +490,44 @@ test('il clic sull\'invito dal preload delle pagine usa il messaggio giusto', as
   const preload = readFileSync(new URL('../../src/preload/page-preload.js', import.meta.url), 'utf8');
   assert.ok(globalThis.SN_MSG.MSG.WALLET_INVITE_OPEN, 'il messaggio esiste');
   assert.ok(preload.includes(`type: '${globalThis.SN_MSG.MSG.WALLET_INVITE_OPEN}'`), 'il preload lo chiama col suo nome');
+});
+
+// #1077 — il server paga al più N premi d'invio al giorno (UTC) per portafoglio: il messaggio d'invio non
+// promette un premio oltre il tetto. Contano i premi già arrivati oggi più gli invii di oggi ancora senza premio.
+test('premio d\'invio: oltre il tetto del giorno non si promette, e la frase dice perché', () => {
+  const ORA = Date.parse('2026-10-06T19:00:00Z');
+  const oggi = (h) => `2026-10-06T${String(h).padStart(2, '0')}:00:00.000Z`;
+  const arrivati = (n) => Array.from({ length: n }, (_, i) => ({ at: oggi(8 + i), credits: 10, why: `feedback_sent:f${i}` }));
+  assert.deepEqual(W.premioInvio({ grants: arrivati(4), perDay: 5, now: ORA }), { esaurito: false, perDay: 5 });
+  assert.deepEqual(W.premioInvio({ grants: arrivati(5), perDay: 5, now: ORA }), { esaurito: true, perDay: 5 });
+  // Gli invii il cui premio non è ancora arrivato contano; quelli già pagati non contano due volte.
+  const invii = [{ id: 'f2', at: ORA - 3000 }, { id: 'n1', at: ORA - 2000 }, { id: 'n2', at: ORA - 1000 }];
+  assert.equal(W.premioInvio({ grants: arrivati(3), perDay: 5, invii, now: ORA }).esaurito, true, '3 pagati + 2 in attesa');
+  assert.equal(W.premioInvio({ grants: arrivati(3), perDay: 6, invii, now: ORA }).esaurito, false, 'f2 è già fra i pagati');
+  assert.equal(W.premioInvio({ grants: arrivati(3), perDay: 5, invii: [{ at: ORA - 1000 }, { id: '', at: ORA - 500 }], now: ORA }).esaurito, true, 'un invio senza id conta come in attesa');
+  // Ieri non conta, né i premi che non sono d'invio.
+  const ieri = [
+    ...Array.from({ length: 5 }, (_, i) => ({ at: '2026-10-05T10:00:00.000Z', credits: 10, why: `feedback_sent:v${i}` })),
+    { at: oggi(3), credits: 100, why: 'daily' }, { at: oggi(4), credits: 50, why: 'feedback_closed:x' }, null,
+  ];
+  assert.equal(W.premioInvio({ grants: ieri, perDay: 5, invii: [{ id: 'y', at: Date.parse('2026-10-05T23:00:00Z') }, null], now: ORA }).esaurito, false);
+  // Senza tetto noto (server vecchio, stato mai letto) non si nega niente.
+  for (const perDay of [undefined, null, 'cinque', -1, 2.5]) {
+    assert.deepEqual(W.premioInvio({ grants: arrivati(9), perDay, now: ORA }), { esaurito: false, perDay: null }, String(perDay));
+  }
+  // Tetto a zero: nessun invio paga.
+  assert.equal(W.premioInvio({ grants: [], perDay: 0, now: ORA }).esaurito, true);
+  assert.equal(W.premioInvioEsauritoTesto(5), 'Il premio vale per i primi 5 feedback del giorno. Questo non ne riceve.');
+  assert.equal(W.premioInvioEsauritoTesto(1), 'Il premio vale solo per il primo feedback del giorno. Questo non ne riceve.');
+  assert.equal(W.premioInvioEsauritoTesto(0), 'Per ora i feedback inviati non ricevono premi.');
+});
+
+// #1077 — la chat risponde dal manifesto: se non sa del tetto dei premi d'invio, non sa spiegare un premio mancato.
+test('il manifesto delle capacità dice che i premi d\'invio hanno un tetto al giorno, e quelli di risoluzione no', () => {
+  require('../../src/shared/capabilities.js');
+  const C = globalThis.SN_CAPABILITIES;
+  const crediti = C.get('credits').desc;
+  assert.match(crediti, /solo per le prime del giorno/);
+  assert.match(crediti, /risolta non ha questo tetto/);
+  assert.match(C.get('feedback').desc, /solo per le prime segnalazioni del giorno/);
 });

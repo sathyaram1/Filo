@@ -101,6 +101,8 @@
       funzioneDi = () => '',
       rimedioDi = () => '',
       contatore = () => null,
+      // La durata della cache della parte fissa della chat, dalle impostazioni ('5m' o '1h'); null = quella di serie.
+      durataCache = () => null,
     } = deps;
 
     // I contatori giornalieri (#969): ogni chiamata è un uso della sua funzione, con l'attesa fino alla prima cosa
@@ -145,6 +147,14 @@
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
       return G.oscuraSegreti(messages, lista);
+    }
+
+    // Il piano si fa sui messaggi già oscurati: sono quelli che partono, e un taglio a caratteri deve cadere su di loro.
+    function pianoCache(action, messages, s) {
+      const FC = global.SN_FILO_CONTESTO;
+      let durata = null;
+      try { durata = durataCache(s); } catch (_) { durata = null; }
+      try { return FC && typeof FC.pianoDellaCache === 'function' ? FC.pianoDellaCache(action, messages, { durata }) : null; } catch (_) { return null; }
     }
 
     async function ensureUnderLimit(settings) {
@@ -194,8 +204,9 @@
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
+        const daMandare = await senzaSegreti(messages);
         r = await providers().completeWithFallback({
-          attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
         });
       } catch (e) {
         throw conLaFunzione(e, s, action);
@@ -223,8 +234,9 @@
       const { s, chain } = await chainFor({ action, settings, attempts });
       let r;
       try {
+        const daMandare = await senzaSegreti(messages);
         r = await providers().streamCompleteWithFallback({
-          attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal,
+          attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal,
           onDelta: vedendo(m, onDelta), onReasoning: vedendo(m, onReasoning), onToolCall: vedendo(m, onToolCall),
           onFallback, onReset, onTentativoFallito: m.errore,
         });

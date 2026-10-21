@@ -1795,6 +1795,22 @@
         return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
       },
     },
+    {
+      scrive: ['contestoFilo.cache'],
+      aiuto: '"5 minuti", "un\'ora" o "predefinito" (quanto il modello tiene da parte le istruzioni fisse della chat; vale coi modelli Anthropic)',
+      keys: ['durata_cache', 'durata della cache', 'cache della chat', 'durata della cache della chat', 'cache del prompt', 'contestofilo.cache'],
+      costo: 2,
+      risk: 'Un\'ora: metterle da parte costa il doppio, ma le rilegge a prezzo basso anche chi scrive un messaggio ogni tanto. Cinque minuti: metterle da parte costa meno, e dopo una pausa più lunga si ripagano per intero.',
+      build(v) {
+        if (predefinito(v)) return { partial: { contestoFilo: { cache: null } }, label: 'Durata della cache della chat → come i predefiniti' };
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const cache = contestoFilo().durataIn(s)
+          || (/\b(1|un|una)\s*(h|or[ae])\b|un'ora|\b60\s*(m|min)/.test(s) ? '1h' : null)
+          || (/\b5\s*(m|min|minuti)?\b|cinque\s*minuti/.test(s) ? '5m' : null);
+        if (!cache) return null;
+        return { partial: { contestoFilo: { cache } }, label: `Durata della cache della chat → ${cache === '1h' ? 'un\'ora' : '5 minuti'}` };
+      },
+    },
     // ── #1097.3: quanto può essere lunga una risposta, per famiglia di funzioni ──
     setterLunghezza('conversazioni', 'la chat e le conversazioni', ['lunghezza_risposte_chat', 'lunghezza delle risposte della chat',
       'risposte della chat', 'tetto delle risposte della chat', 'lunghezzarisposte.conversazioni']),
@@ -1847,6 +1863,19 @@
       },
     },
     {
+      scrive: ['descriviImmagini.enabled'],
+      aiuto: 'true | false (ogni screenshot, intero o di una parte, e ogni immagine copiata da una pagina va intera al modello delle immagini, che ne scrive il nome del file e la riga della cronologia appunti; spenta, l\'immagine non parte e il file si chiama con data e ora. Da una pagina delicata non parte mai)',
+      costo: 1,
+      keys: ['descrizione_immagini', 'descrizione automatica delle immagini', 'descrivi le immagini', 'descrivi gli screenshot',
+        'nome degli screenshot', 'nomi degli screenshot', 'descrizione degli screenshot', 'descrizione delle immagini copiate',
+        'descriviimmagini', 'descriviimmagini.enabled'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { descriviImmagini: { enabled: b } }, label: `Descrizione di screenshot e immagini copiate → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
       scrive: ['security.riquadriRotti.modello'],
       aiuto: 'true | false (un contenuto incorporato di un altro sito rimasto vuoto, che Filo non riconosce da solo, va in foto a un modello per capire se sono i cookie rifiutati; spento, nessuna foto parte e quel riquadro si riattiva col tasto destro)',
       costo: 1,
@@ -1864,20 +1893,26 @@
       percorso: 'security.pagineDelicate.enabled',
       nome: 'Pagine delicate tenute lontane dai modelli',
       stati: ['sì', 'no'],
-      aiuto: 'true | false (posta, banche, sanità, pagine con un campo password o carta e i siti delicati scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli; acceso di serie)',
-      risk: 'Decide se il riassunto delle schede chiuse e la pulizia automatica delle schede mandano ai modelli anche il '
-        + 'testo delle pagine delicate: posta, banca, sanità, pagine dove hai visto un campo password o carta. Spegnerlo '
-        + 'fa arrivare al modello saldi, movimenti, mail e referti delle schede che chiudi.',
+      aiuto: 'true | false (posta, banche, sanità, pubblica amministrazione, pagine con un campo password o carta e i siti delicati '
+        + 'scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli, la chat ne vede '
+        + 'solo il nome del sito, screenshot e immagini copiate da lì non vanno al modello delle immagini neanche incollati '
+        + 'altrove, la spiegazione parte solo dal tasto destro; acceso di serie)',
+      risk: 'Decide se le funzioni che partono da sole mandano ai modelli anche le pagine delicate: posta, banca, sanità, '
+        + 'pubblica amministrazione, pagine dove hai visto un campo password o carta. Spegnerlo fa arrivare al modello '
+        + 'saldi, movimenti, mail e referti delle schede che chiudi; la chat torna a vedere i titoli delle schede di banca '
+        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, e la '
+        + 'spiegazione si prepara anche lì appena selezioni un testo.',
     }),
     elenco({
       keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],
       percorso: 'security.pagineDelicate.siti',
       allentaSe: 'togli',
       nome: 'Siti delicati aggiunti da te',
-      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche e sanità: il loro testo non va ai modelli nei lavori automatici. '
+      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche, sanità e pubblica amministrazione: niente di loro va ai modelli nei lavori automatici. '
         + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
-      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine il riassunto e la '
-        + 'pulizia automatica delle schede non mandano il testo ai modelli. Un sito tolto torna a mandarlo.',
+      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine le funzioni che partono '
+        + 'da sole (riassunto e pulizia delle schede, screenshot, spiegazione preparata) non mandano niente ai modelli. Un '
+        + 'sito tolto torna a mandarlo.',
     }),
     elenco({
       keys: ['siti_non_delicati', 'siti non delicati', 'sito non delicato', 'non delicati'],
@@ -1885,10 +1920,11 @@
       allentaSe: 'aggiungi',
       nome: 'Siti non delicati per te',
       aiuto: 'siti che Filo aveva segnato come delicati perché ci ha visto un campo password o carta, e che per l\'utente non lo '
-        + 'sono (es. google.com dopo un accesso): tornano a mandare il testo al riassunto e alla pulizia. Non toglie posta, '
-        + 'banche, sanità né i siti delicati aggiunti dall\'utente',
+        + 'sono (es. google.com dopo un accesso): tornano a mandare ai modelli quello che parte da solo. Non toglie posta, '
+        + 'banche, sanità, pubblica amministrazione né i siti delicati aggiunti dall\'utente',
       risk: 'Toglie un sito da quelli che Filo tratta come delicati perché ci ha visto un campo password o carta: delle sue '
-        + 'pagine il riassunto e la pulizia automatica delle schede tornano a mandare il testo ai modelli.',
+        + 'pagine le funzioni che partono da sole (riassunto e pulizia delle schede, screenshot, spiegazione preparata) '
+        + 'tornano a mandare ai modelli.',
     }),
 
     // Il livello di autonomia lo cambia solo l'utente, in Preferenze: dalla chat è nell'elenco fisso.

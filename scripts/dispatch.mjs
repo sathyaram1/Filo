@@ -1065,7 +1065,7 @@ function guardIdentity(id) {
  * Una transizione ACCETTATA lascia un punto fermo: l'identità del contenuto in
  * quel momento. È il valore a cui D riporta il branch dopo un'interruzione.
  * Rilascia anche l'identità attesa: dopo la consegna non c'è più niente da
- * proteggere su questo branch (ed è ciò che lascia lavorare il merge-gate).
+ * proteggere su questo branch.
  */
 function sealTransition(state, by) {
   const sealed = clearRejects(withCheckpoint(state, headSha(ROOT), by));
@@ -1499,8 +1499,8 @@ async function recordSecaudit(id, verdict, testo = '') {
   }
 
   sealTransition(next, `secaudit:${verdict}`);
-  // Su fail il server porta già in `design`; su pass il passaggio a `done` lo
-  // fa il ruolo dopo il cancello di fusione.
+  // Su fail il server porta già in `design`; su pass la fusione e la chiusura
+  // le porta il server, dopo gli unit sulla fusione (#1207).
   return next;
 }
 

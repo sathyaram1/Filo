@@ -31,10 +31,19 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   rifanno le righe delle pagine su quelle che il filo ha adesso. Un gruppo si chiama come la sua prima pagina, quindi
   tolta quella la riga prende il nome nuovo invece di doppiarsi.
 - **I cambi**: quelli chiesti in chat hanno il segno sulla bolla; tutti gli altri sono una riga col loro «annulla».
+  Le righe sottili (cambi, pagine) di fila stanno strette come le righe di un registro; lo spazio pieno resta intorno
+  alle bolle. Ritocchi ripetuti della stessa cosa sono una riga sola (#1490): il registro li fonde, la home riscrive la
+  riga che ha già e la toglie se si è tornati com'era.
 - **La conversazione che una scheda continua** (`chatCorrente`): l'ultima della home se non è passata un'ora di
   silenzio, o se l'ultima parola è di Filo che ha scritto da sé. L'accoglienza, le chat delle altre app e quella che
   l'utente ha chiuso apposta (il bottone sotto la risposta, `/clear`: il segno `fine` sulla chiusura) non si
   continuano da qui; una scheda che si chiude o si ricarica non è una chiusura voluta. La scheda la adotta (storico per il turno dopo), ma le bolle le ha già disegnate la coda.
+- **All'apertura l'ultimo messaggio sta in cima** (#1487), col segno del suo giorno, e sotto è vuoto: chi apre una home
+  non vuole rivedere ieri, che resta sopra a una rotella. Vale per la scheda nuova, la home ricaricata e la riserva alla
+  consegna. Il vuoto è un margine in fondo al filo misurato apposta, così «in fondo» vuol dire proprio quel punto e
+  tutto il codice che segue il fondo continua a funzionare; quello che arriva dopo lo consuma, e uno scambio che riempie
+  lo schermo torna a seguire il fondo. Finché l'utente non scorre e non scrive, un messaggio che Filo scrive da sé
+  (il saluto della giornata) prende la cima.
 - **Le righe che arrivano dopo** (`allinea`): i messaggi della conversazione di questa scheda li ha già disegnati il
   turno; tornano solo quando la scheda era nascosta e li ha scritti un'altra. Il resto entra al suo posto nel tempo.
 - **Filo parla per primo** (`src/main/services/filoParla.js`): timer e sveglie che suonano, download finiti, avvisi,
@@ -57,4 +66,4 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
 - Non disegnare una riga del filo con markup arrivato dal filo: le risposte di Filo passano dal markdown che escapa,
   tutto il resto è testo.
 
-Sentinella: `tests/unit/filoCoda.test.mjs`. Prove dell'app: `tests/home-coda-del-filo.spec.mjs`.
+Sentinella: `tests/unit/filoCoda.test.mjs`. Prove dell'app: `tests/home-coda-del-filo.spec.mjs`, `tests/home-ultimo-messaggio-in-cima.spec.mjs`.

@@ -398,8 +398,10 @@ test('l’intervista di benvenuto resta una conversazione anche se il modello di
   });
   await stubProvider(app, { Utente: { tipo: 'comando', titolo: 'Due parole' } });
 
-  await turno(app, 'c-accoglienza', 'Ciao, mi chiamo Ada');
-  await chiudi(app, 'c-accoglienza');
+  // La targa è quella dell'intervista, come la manda la home: un'altra chat aperta intanto resta sua (#1297).
+  const id = await app.evaluate(async () => globalThis.SN_ONBOARDING.chatId(await globalThis.SN_FILO_MEMORY.getOnboarding()));
+  await turno(app, id, 'Ciao, mi chiamo Ada');
+  await chiudi(app, id);
 
   const chats = await leggiArchivio(app);
   expect(chats[0].onboarding).toBe(true);

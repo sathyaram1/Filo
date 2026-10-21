@@ -864,6 +864,7 @@ module.exports = {
   RUMORE_TOLLERATO,
   QUOTA_NON_TESTO,
   capText,
+  extractPdf,
   MAX_TEXT_CHARS,
   MAX_FILE_BYTES,
 };

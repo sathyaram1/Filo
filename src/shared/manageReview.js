@@ -69,9 +69,10 @@
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
-  // Le attese di un lavoro server passato (#1159): il PC dell'owner, la suite di filo-security. Gemello di select.ATTESA
-  // nel server; fuori dalla revisione il segno vecchio non conta.
-  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite' });
+  // Le attese che segue il server, non le routine: gli unit sulla fusione lanciati da GitHub (#1207) e, per un lavoro
+  // server (#1159), il PC dell'owner e la suite di filo-security. Gemello di select.ATTESA nel server; fuori dalla
+  // revisione il segno vecchio non conta.
+  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite', unit_fusione: 'unit' });
   function attesaServer(fb) {
     if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
     return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
@@ -123,6 +124,13 @@
       return 'Allarme aperto dal server: i giudici non servono.';
     }
     return GIUDICI_SALTATI[k];
+  }
+  // Le immagini che i giudici non hanno visto, col motivo scritto dal server (#597): un buco si spiega, non si tace.
+  function immaginiNonViste(fb) {
+    const p = fb && fb.pipeline;
+    const l = p && typeof p === 'object' && Array.isArray(p.immaginiNonAperte) ? p.immaginiNonAperte : [];
+    return l.filter((x) => x && Number.isInteger(x.n) && x.n > 0)
+      .map((x) => `Immagine ${x.n} non vista dai giudici: ${String(x.motivo || '').trim() || 'motivo non registrato'}.`);
   }
   // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
   // il server non lo ri-giudica; entra in coda da solo. Il motivo lo scrive solo il server, fidato o già giudicato.
@@ -1713,7 +1721,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,

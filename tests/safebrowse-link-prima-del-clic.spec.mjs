@@ -17,7 +17,8 @@ async function foto(avviso, nome) {
 const MODULO = '<title>Accedi</title><form><input name="email" placeholder="Email">'
   + '<input type="password" id="pw" name="pw" placeholder="Password"><button>Accedi</button></form>';
 
-// Ogni richiesta della sessione passa di qui e si conta; i siti finti si servono, il resto (il mini server) prosegue.
+// Ogni richiesta della sessione passa di qui e si conta; i siti finti si servono, il mini server prosegue, il resto non
+// esce: un nome finto (paypa1.com) su internet esiste davvero, e può non rispondere mai (#1456).
 // I fornitori di rete del rilevatore sono finti e contano le chiamate.
 async function contaLaRete(app, pagine = {}) {
   await app.evaluate(async ({ session, net }, pg) => {
@@ -28,7 +29,8 @@ async function contaLaRete(app, pagine = {}) {
       const u = new URL(req.url);
       const html = pg[u.hostname + u.pathname];
       if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
-      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.hostname === '127.0.0.1') return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      return Response.error();
     };
     for (const s of ['http', 'https']) {
       try { session.defaultSession.protocol.unhandle(s); } catch (_) {}

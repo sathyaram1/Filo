@@ -210,8 +210,8 @@
           } catch (_) { finish(null); }
         };
         img.src = href;
-        // Failsafe: se l'immagine non carica entro 3s, rinuncia.
-        setTimeout(() => finish(null), 3000);
+        // Failsafe: se l'immagine non carica entro 3s, rinuncia e chiude la richiesta, che appesa resterebbe aperta.
+        setTimeout(() => { if (!done) { finish(null); img.removeAttribute('src'); } }, 3000);
       });
     }
 
@@ -240,9 +240,14 @@
       } catch (_) {}
     }
 
-    send();
-    setTimeout(send, 800);
-    setTimeout(send, 2000);
+    // A pagina caricata: un'immagine chiesta prima trattiene il «load» della pagina finché il sito non la manda, e un
+    // favicon che non arriva lascerebbe la scheda in caricamento. Una pagina che il suo «load» non lo dà mai aspetta 5 s.
+    const parti = () => { send(); setTimeout(send, 800); setTimeout(send, 2000); };
+    if (document.readyState === 'complete') { parti(); return; }
+    let partito = false;
+    const una = () => { if (!partito) { partito = true; parti(); } };
+    global.addEventListener('load', una, { once: true });
+    setTimeout(una, 5000);
   }
 
   global.SN_PAGE_COLOR = { startTabColorSampler, reportTabIdentityColor };

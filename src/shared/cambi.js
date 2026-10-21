@@ -1,5 +1,5 @@
 // I cambi di stato come eventi del filo (#867): il nome di ogni impostazione, il confronto fra due
-// scritture, la frase in parole, la fusione dei passi di un cursore e cosa scrivere per annullare.
+// scritture, la frase in parole, la fusione dei ritocchi ripetuti e cosa scrivere per annullare.
 // Logica pura: chi osserva le scritture è src/main/services/registroCambi.js; regole in tests/unit/cambi.test.mjs.
 
 (function (global) {
@@ -90,6 +90,11 @@
       valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
       livello: 2,
     },
+    'contestoFilo.cache': {
+      nome: 'durata della cache della chat',
+      valore: (v) => (v === '1h' ? 'un\'ora' : (v === '5m' ? '5 minuti' : 'come i predefiniti')),
+      livello: 2,
+    },
     ...Object.fromEntries([
       ['conversazioni', 'della chat e delle conversazioni'],
       ['testi', 'di traduzioni, riscritture e riassunti'],
@@ -109,6 +114,7 @@
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'descriviImmagini.enabled': { nome: 'descrizione di screenshot e immagini copiate', valore: ATTIVA, livello: 1 },
     'contatori.attivi': { nome: 'contatori anonimi d\'uso', valore: ATTIVI, livello: 2 },
     'avvisoCrediti.attivo': { nome: 'avviso prima che i crediti finiscano', valore: ATTIVO, livello: 1 },
     'avvisoCrediti.giorni': { nome: 'giorni dell\'avviso dei crediti', valore: numero, livello: 1 },
@@ -457,8 +463,10 @@
     }
   }
 
-  // ── Fusione: un cursore trascinato è UN cambio ─────────────────────────────
-  const FINESTRA_FUSIONE_MS = 4000;
+  // ── Fusione: ritocchi ripetuti della stessa cosa sono UN cambio ────────────
+  // Non solo i passi di un cursore: anche chi cerca il valore giusto a più riprese (lo zoom 125 → 114 → 87 → 100) ha
+  // fatto un cambio solo, «125% → 100%» (#1490). La finestra si misura dall'ultimo ritocco.
+  const FINESTRA_FUSIONE_MS = 2 * 60 * 1000;
   const FONDIBILI = new Set(['interfaccia', 'pagina', 'filo']);
   function fondibile(ultimo, nuovo) {
     if (!ultimo || !nuovo || ultimo.annulla || nuovo.annulla) return false;

@@ -17,7 +17,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -105,5 +107,44 @@ test('il bake scrive la chiave Safe Browsing nel file che finisce nell’eseguib
     assert.ok(!('safeBrowsingKey' in j.apiKeys));
   } finally {
     togliCartella(dir);
+  }
+});
+
+// #1074: la rotazione dell'admin non arrivava mai alle versioni, perché il server non la consegnava; con la
+// risposta del server com'è adesso, la sua chiave deve vincere su quella di riserva del job.
+test('la chiave Safe Browsing ruotata dall’admin arriva dal server e vince sul segreto del job', async () => {
+  const srv = createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(req.url === '/buildKeys'
+        ? { ok: true, apiKeys: { tavily: 'tav-ruotata' }, safeBrowsingKey: 'gsb-ruotata' }
+        : { ok: true }));
+    });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  const dir = cartellaTemporanea('filo-bake-1074-');
+  const out = join(dir, 'default-keys.generated.json');
+  try {
+    await promisify(execFile)(process.execPath, [BAKE], {
+      env: {
+        ...process.env,
+        FILO_BAKE_OUT: out,
+        FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`,
+        FILO_BUILD_PASSPHRASE: 'parola-build',
+        FILO_DEFAULT_TAVILY_KEY: 'tav-di-riserva',
+        FILO_DEFAULT_SAFEBROWSING_KEY: 'gsb-di-riserva',
+        NO_PROXY: '127.0.0.1,localhost',
+        no_proxy: '127.0.0.1,localhost',
+      },
+      encoding: 'utf8',
+    });
+    const j = JSON.parse(readFileSync(out, 'utf8'));
+    assert.equal(j.safeBrowsingKey, 'gsb-ruotata');
+    assert.equal(j.apiKeys.tavily, 'tav-ruotata');
+    assert.ok(!('safeBrowsing' in j.apiKeys) && !('safeBrowsingKey' in j.apiKeys));
+  } finally {
+    togliCartella(dir);
+    await new Promise((ok) => srv.close(ok));
   }
 });

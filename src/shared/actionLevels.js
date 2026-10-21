@@ -19,6 +19,15 @@
     + 'memorie. Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
     + 'documento potrebbe provare a fargliela ricordare.';
 
+  // La regola dell'indirizzo scritto (#553, decisione dell'owner su D-20): `_nonCompare` lo scrive il main
+  // (src/main/services/handlers.js → controllaUscita), mai l'LLM, e può solo alzare.
+  const RISCHIO_INVENTATO = 'Non compare da nessuna parte: non nelle tue parole, non nei risultati, non nelle pagine lette. '
+    + 'Un indirizzo inventato può portare fuori tuoi dati anche scritto con parole normali. Conferma solo se l\'hai chiesto tu.';
+  function costoIndirizzo(a, base) {
+    if (a && a._nonCompare) return 3;
+    return a && a._exfil ? Math.max(base, 2) : base;
+  }
+
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
 
@@ -50,7 +59,15 @@
     return built && !built.rifiuto && built.testo && built.partial && 'agentStyle' in built.partial ? built.testo : '';
   }
 
-  // Token e valore di un'azione estetica, con i sinonimi che un LLM può produrre.
+  // Stessa regola per quello che Filo impara su chi è l'utente nel benvenuto (#1297): riga corta e Annulla, senza
+  // riquadro, finché nel contesto non c'è testo di altri. Torna il testo, o ''.
+  function lezioneDellAccoglienza(action) {
+    if (!action || action._accoglienza !== true) return '';
+    const l = lezione(action);
+    return l.testo && !l.rifiuto ? l.testo : '';
+  }
+
+  // Token + valore di un'azione estetica (più sinonimi che un LLM può produrre).
   function estTok(action) {
     return action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
   }
@@ -208,18 +225,22 @@
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
       // La ricerca dell'Aiuto (`cerca`) porta fuori testo della pagina: costo 2, deciso qui una volta sola
       // (#530). Il campo può solo alzare il costo, quindi chi lo forgia non ottiene niente.
-      costo: (a) => (a && (a._exfil || a.cerca) ? 2 : 1),
+      costo: (a) => costoIndirizzo(a, a && a.cerca ? 2 : 1),
       campo: 'web',
-      uscita: (a) => String((a && (a.url ?? a.href ?? a.link)) || ''),
+      uscita: (a) => indirizzoDi(a),
       describe: (a) => {
-        const url = a.url || a.href || a.link || 'una pagina';
+        const url = indirizzoDi(a) || 'una pagina';
+        if (a && a._nonCompare) {
+          const primo = a._exfilReason ? `Aprire un link che ${a._exfilReason}, scritto a memoria da Filo` : 'Aprire un indirizzo scritto a memoria da Filo';
+          return [`${primo}:\n`, cit(url, true), `\n\n${RISCHIO_INVENTATO}`];
+        }
         if (a && a._exfil) {
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
           return [`Aprire un link${why}:\n`, cit(url, true),
             '\n\nPotrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.'];
         }
         if (a && typeof a.cerca === 'string' && a.cerca.trim()) return ['Cercare sul web:\n', cit(a.cerca.trim())];
-        return a.url || a.href || a.link ? ['Aprire ', cit(url, true)] : 'Aprire una pagina';
+        return indirizzoDi(a) ? ['Aprire ', cit(url, true)] : 'Aprire una pagina';
       },
     },
     // Mette in chat il bottone del file e basta: ad aprirlo è il clic dell'utente (#947) → resta in chat, costo 0.
@@ -314,7 +335,7 @@
       // Una lezione entra in ogni conversazione e ci resta, come lo stile: se la
       // propone il modello, l'utente ne conferma il testo esatto (#592). Vuota
       // o oltre il tetto → 1: niente da confermare, il dispatch la respinge.
-      costo: (a) => { const l = lezione(a); return l.testo && !l.rifiuto ? 2 : 1; },
+      costo: (a) => { const l = lezione(a); return l.testo && !l.rifiuto && !lezioneDellAccoglienza(a) ? 2 : 1; },
       campo: null,
       describe: (a) => {
         const l = lezione(a);
@@ -504,6 +525,35 @@
         return p ? ['Leggere il documento ', cit(p, true), ...motivo] : ['Leggere il documento', ...motivo];
       },
     },
+    LEGGI_PAGINA: {
+      // Leggere è sola lettura, ma scaricare è una richiesta che esce: costa come aprire lo stesso indirizzo (NAVIGA).
+      // La scheda già aperta si legge senza uscire: resta in chat. `_nonCompare` ed `_exfil` li scrive il main, mai l'LLM.
+      costo: (a) => costoIndirizzo(a, indirizzoDi(a) ? 1 : 0),
+      campo: 'web',
+      uscita: (a) => indirizzoDi(a),
+      // Chi scrive la pagina è un autore ignoto, anche quando la pagina è una scheda dell'utente.
+      fonte: (a, out) => (out && (out.testo || out.text)
+        ? { classe: 5, campo: 'web', chiave: 'web:pagina', motivo: out.fonte === 'scheda' ? 'ho letto una pagina aperta in una tua scheda' : 'ho letto una pagina web' }
+        : null),
+      describe: (a) => {
+        const url = indirizzoDi(a);
+        if (!url && a && a.scheda) return ['Leggere la pagina aperta nella scheda ', cit(a.scheda)];
+        if (a && a._nonCompare) {
+          const primo = a._exfilReason ? `Leggere una pagina il cui indirizzo ${a._exfilReason}, scritto a memoria da Filo` : 'Leggere un indirizzo scritto a memoria da Filo';
+          return [`${primo}:\n`, cit(url, true), `\n\n${RISCHIO_INVENTATO}`];
+        }
+        if (a && a._exfil) {
+          const why = a._exfilReason ? ` (${a._exfilReason})` : '';
+          return [`Filo sta per leggere una pagina il cui indirizzo${why}:\n`, cit(url, true),
+            '\n\nPotrebbe inviare tuoi dati a un sito esterno. Conferma solo se l\'hai chiesto tu.'];
+        }
+        return url ? ['Leggere la pagina ', cit(url, true)] : 'Leggere una pagina';
+      },
+      describeDone: (a) => {
+        const url = indirizzoDi(a);
+        return url ? `Letta la pagina ${url}` : 'Letta una pagina';
+      },
+    },
     VEDI_SCHERMO: {
       // #778 — guardare una finestra non cambia niente: costo 0. Leggere fuori da Filo è un fatto di privacy, quindi
       // la prima lettura di ogni finestra esterna (o di una pagina delicata in Filo) in una richiesta sta fuori dal
@@ -636,12 +686,13 @@
       costo: 3,
       campo: null,
       elenco: () => 'cancella-definitivo',
-      dove: 'Le righe della memoria le può togliere l\'utente, una per una, nel quaderno delle memorie (filo://quaderno/quaderno.html).',
+      dove: 'Le righe della memoria le può togliere l\'utente, una per una, nel quaderno delle memorie (filo://quaderno/quaderno.html); '
+        + 'le interviste di benvenuto conservate, con la × accanto a ciascuna in Preferenze (filo://preferences/preferences.html).',
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
-        + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
+        + 'profilo utente, preferenze apprese, lezioni non ancora salvate e interviste di benvenuto conservate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
       // A cosa fatta, la ricevuta: senza, il bottone confermato ripeteva la domanda («Eliminare…»).
-      describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese e lezioni',
+      describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese, lezioni e interviste di benvenuto',
     },
     DIMENTICA: {
       // Le righe indicate a voce le risolve il main in `_righe` prima del gate, mai l'LLM. Toglierle le nasconde nel
@@ -1107,7 +1158,7 @@
   // Sola lettura: non cambiano niente e nessuna aspetta l'esito di un'altra, quindi il giro della chat le lancia insieme
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
-    'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+    'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
     'VEDI_SCHERMO', 'CERCA_SALVATE',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
@@ -1185,5 +1236,17 @@
     try { return entry.describeDone(action) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza };
+  // L'indirizzo di un'azione che esce in rete, preso da tutti i campi che l'esecuzione accetta: il freno contro
+  // l'esfiltrazione, il popup e chi esegue leggono lo stesso campo, o un campo in più diventa una porta (#553).
+  const CAMPI_INDIRIZZO = ['url', 'href', 'link', 'indirizzo'];
+  function indirizzoDi(action) {
+    if (!action || typeof action !== 'object') return '';
+    for (const k of CAMPI_INDIRIZZO) {
+      const v = action[k];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return '';
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

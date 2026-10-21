@@ -99,6 +99,8 @@
     .onb-conv > summary:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.12)); }
     .onb-conv-when { font-weight: 600; }
     .onb-conv-turns { opacity: 0.65; font-size: 0.9em; }
+    .onb-via { margin-left: auto; align-self: center; }
+    .onb-conv > summary:hover .onb-via { opacity: 0.85; }
     .onb-lines { padding: 6px 10px 12px 26px; display: flex; flex-direction: column; gap: 8px; }
     .onb-line { display: flex; gap: 8px; line-height: 1.45; }
     .onb-who { flex: 0 0 auto; font-weight: 600; opacity: 0.75; }
@@ -391,6 +393,12 @@
           <span>Dai da solo un nome sensato ai file scaricati</span>
         </label>
       </div>
+      <div class="sn-toggle-row">
+        <label title="L'immagine va intera al modello delle immagini, che ne scrive il nome del file e la riga nella cronologia degli appunti. Spento, lo screenshot si chiama con data e ora. Da una pagina delicata non parte mai.">
+          <input type="checkbox" id="descriviImmagini" />
+          <span>Dai un nome a screenshot e immagini copiate guardandole</span>
+        </label>
+      </div>
     </section>
 
     <section id="sec-documenti">
@@ -500,6 +508,14 @@
           <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di quello che Filo ha davanti. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
             <span>Tetto in token</span>
             <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Quanto il modello tiene da parte le istruzioni fisse della chat, per rileggerle a prezzo basso. Un'ora costa il doppio a metterle da parte e regge le pause lunghe. Vale coi modelli Anthropic.">
+            <span>Durata della cache</span>
+            <select id="contestoCache" style="width:240px;">
+              <option value="" id="contestoCachePredefinita">Come i predefiniti</option>
+              <option value="5m">5 minuti</option>
+              <option value="1h">Un'ora</option>
+            </select>
           </label>
         </div>
       </section>

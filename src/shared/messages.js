@@ -123,7 +123,7 @@
     // ripeterebbe non parte. Da ogni superficie, siti compresi. { } → { ok }.
     KEY_FALLBACK_SHOWN: 'key_fallback_shown',
     // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }.
-    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo }.
+    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo, senzaPremio }.
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
     // Recap aggiornamento: le note delle versioni saltate dall'ultima vista.
     // Al primo avvio marca la versione come vista e non torna note: niente popup a sorpresa.
@@ -169,10 +169,12 @@
     //   chiave OpenRouter personale meno consumo), pseudonimo, codici d'invito
     //   propri, se c'è la chiave personale, se l'utente usa una chiave sua.
     //   { } → { ok, identity:{ok,error?}, hasPersonalKey, pseudonym, usingOwnKey,
-    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits, … }|null, error? }
+    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits,
+    //   canInvite, invitesLocked:'need_google'|'google_used'|null, … }|null, error? }
     WALLET_STATE: 'wallet_state',
-    // Riscatta un codice d'invito: il server crea la chiave personale e la consegna UNA volta,
-    // il main la salva cifrata. { code } → { ok, status, message, credits?, … }
+    // WALLET_REDEEM: riscatta un codice d'invito. Il server crea la chiave
+    //   personale e la consegna UNA volta: il main la salva cifrata.
+    //   { code } → { ok, status, message, credits?, inviteCodes?, invitesLocked?, state? }
     WALLET_REDEEM: 'wallet_redeem',
     // Il portafoglio c'è sul server ma la chiave personale non è su questo computer: il server
     // ne emette un'altra, la vecchia si spegne e il saldo resta. { } → { ok, status, message }
@@ -456,6 +458,13 @@
     CASELLE_IN_SOSPESO: 'caselle_in_sospeso',        // { inSospeso } → { ok }
     // Incolla di Filo: gli appunti li legge il main, la pagina non riceve il permesso (#586).
     APPUNTI_DI_FILO: 'appunti_di_filo',              // {} → { ok, testo, immagine (data URL png) }
+    // Il menu del tasto destro nello strato sopra la scheda (#1054): il content script lo descrive, lo strato lo disegna.
+    STRATO_MENU_APRI: 'strato_menu_apri',            // { id, menu: { items, keepOnScroll } } → { ok }
+    STRATO_MENU_AGGIORNA: 'strato_menu_aggiorna',    // { id, cosa: riga|griglia|griglia-apri|correzione|inline, … }
+    STRATO_MENU_CHIUDI: 'strato_menu_chiudi',        // { id }
+    STRATO_MENU_ESEGUI: 'strato_menu_esegui',        // main → content script { id, n, args, chiude } | { id, inline, cammino }
+    STRATO_MENU_INCOLLA: 'strato_menu_incolla',      // main → content script { id, testo, immagine } | { id, voce }
+    STRATO_MENU_CHIUSO: 'strato_menu_chiuso',        // main → content script { id }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
@@ -606,6 +615,9 @@
     // `freni`: 'attivi', o 'numeri_assenti' (senza riserva di A né tetto di B i crediti non frenano niente).
     ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
     ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
+    // Le pause in corso di A, B e della routine server, col motivo del rifiuto (#996): sola lettura, dal server
+    // (routineLog op:'pause'). Owner-only, solo pagine di Filo.
+    AUTOMATION_PAUSE_GET: 'automation_pause_get', // → { ok, pause: { A?, B?, serverA?, serverB? }, oraMs } | { ok:false, error }
     // Modello e sforzo del worker per fase (doc config/routines, campo
     // `roleModels` = { ruolo: { model?, effort? } }; regole in
     // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore
@@ -797,12 +809,19 @@
     MERGE_CATEGORIES: 'merge_categories',       // { fromId, toId }
     MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId } o { pageId, nome } per una categoria nuova
 
-    // === Filo dashboard === Filo Chat: messaggio dell'utente all'agente conversazionale.
-    // { userMessage, threadHistory } → { ok, text, actions, model, costEur }
+    // === Filo dashboard ===
+    // Filo Chat: invio messaggio utente all'agente conversazionale
+    // { userMessage, threadHistory: [{role, text, actions?}] }
+    // Risposta: { ok, text, actions: [...], model, costEur }
+    // Solo dalle pagine di Filo: la risposta porta quello che Filo ha letto (pagine, documenti, comandi).
     FILO_CHAT: 'filo_chat',
     // Ferma il turno di chat in corso (#578): { reqId } è il `reasoningReqId` del turno. Solo pagine di Filo, e solo
     // la scheda che l'ha avviato. Le azioni già partite finiscono, nessuna nuova parte. → { ok, fermato }
     FILO_CHAT_STOP: 'filo_chat_stop',
+    // Un seguito scritto mentre il turno lavora (#1296): { reqId, id, testo } lo affida al turno, che lo legge al passo
+    // dopo → { ok, accolto }; { reqId, id, togli: true } lo ritira se il modello non l'ha ancora letto → { ok, tolto, letto }.
+    // Solo pagine di Filo, solo la scheda del turno.
+    FILO_CHAT_SEGUITO: 'filo_chat_seguito',
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
@@ -924,11 +943,19 @@
     // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
     // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
     FILO_GET_ONBOARDING: 'filo_get_onboarding',
-    // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte, conversazione e il
-    // segno «già accolto». La precedente NON si perde, viene archiviata in `past`. Solo filo://.
+    // Rilancia l'intervista da capo (pulsante in Preferenze): azzera spunte,
+    // conversazione e il segno "già accolto". Solo pagine filo://.
+    // L'intervista precedente NON si perde: viene archiviata in `past`.
+    // Con { riprendi: true } («Riprendiamola» della home) riapre invece quella
+    // chiusa a metà, dov'era. Risposta: { ok, onboarding, resume? }
     FILO_RESTART_ONBOARDING: 'filo_restart_onboarding',
-    // Chiude l'intervista SENZA passare dal modello: è la via d'uscita che funziona anche a
-    // modello muto (rete assente, provider giù, crediti finiti). Solo filo://.
+    // Toglie un'intervista conservata { chiave } (la × in Preferenze). Solo
+    // pagine filo://. Risposta: { ok, onboarding, tolta }
+    FILO_ONBOARDING_TOGLI: 'filo_onboarding_togli',
+    // Chiude l'intervista SENZA passare dal modello: è il pulsante "Salta
+    // l'accoglienza" della chat, la via d'uscita che funziona anche quando il
+    // modello non risponde (rete assente, provider giù, crediti finiti). Solo
+    // pagine filo://. Risposta: { ok, onboarding }
     FILO_CLOSE_ONBOARDING: 'filo_close_onboarding',
     // L'utente ha letto la riga che la home mostra dopo un'accoglienza chiusa a metà: si spegne.
     // Solo filo://. → { ok, onboarding }
@@ -972,8 +999,13 @@
     // chiamarlo farebbe aprire un file al sistema operativo.
     CALENDAR_ADD: 'calendar_add',
 
-    // Primo dispatch (non ancora confermato) di UNA azione, dall'agente «Aiuto»: passa dallo
-    // stesso registro dei livelli di sicurezza della chat. { action } → { executed, kept, … }
+    // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
+    // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di
+    // Filo — es. inviare un feedback — passando dallo stesso registro dei
+    // livelli di sicurezza della chat dashboard. Torna { executed, kept,
+    // needsConfirm, describe }: se needsConfirm il client mostra il popup di
+    // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
+    // Da un sito visitato (con FILO_CONFIRM_ACTION) torna senza `output`: quello che l'azione ha letto resta a Filo.
     FILO_RUN_ACTION: 'filo_run_action',
     // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
     // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche, no? }.

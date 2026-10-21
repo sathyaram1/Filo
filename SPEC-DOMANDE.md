@@ -156,10 +156,13 @@ lo può scrivere anche un agente pulito.
   dei figli, poi l'età. Finché i compiti (§ 13, punto 5) non ci sono, lo
   stesso ordine fa da spareggio provvisorio a pari priorità, al posto di
   `senderClass` in `selectTodoWinner` (filo-security
-  `functions/src/routine/select.js`); fino ad allora non si tocca nemmeno la
-  precedenza assoluta dei rami in revisione (`REVIEW_RANK`). Con i compiti
-  spariscono tutti e due: un feedback iniziato passa davanti a uno nuovo solo
-  con un gradino di priorità in più, e la priorità 3 passa sopra tutto.
+  `functions/src/routine/select.js`). I rami in revisione non hanno più la
+  precedenza assoluta (#1451): la priorità viene prima, rami e nuovi insieme;
+  a pari priorità i rami prima dei nuovi e fra i rami l'ordine per ruolo
+  (`REVIEW_RANK`); il controllo di sicurezza di un ramo finito passa a
+  qualunque priorità. Con i compiti spariscono spareggio e ordine per ruolo:
+  un feedback iniziato passa davanti a uno nuovo solo con un gradino di
+  priorità in più, e la priorità 3 passa sopra tutto.
 
 ### 1.7 Dati
 
@@ -648,16 +651,25 @@ scrive: con i compiti quella lettura si toglie.
     riceve solo lavori server fidati; le altre chiavi non
     ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
     diff dal server senza clonare;
-  - il pacemaker la accende con una voce sua (`routineIdServer` in config,
-    segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
-    se c'è un lavoro server che nascerebbe pulito. Decide prima di A/B, che
-    altrimenti riempirebbero ogni posto, e prende i
-    posti che le spettano nell'ordine di priorità della coda: a pari priorità
-    il server, e un lavoro normale più urgente non lo ferma se A/B non
-    possono accendere. Conta nel
-    tetto dell'account della sua parola d'ordine (senza, `accountServer`;
-    assente = B), si ferma con `accountServerOff`, con l'account escluso o in
-    riserva dei crediti; il tetto delle sessioni è comune.
+  - ce n'è una per account (#1426), e il pacemaker le accende con voci sue,
+    fuori dall'alternanza della routine normale: A con `routineIdServer` e il
+    segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`, B con `routineIdServerB` e
+    `CC_ROUTINE_FIRE_TOKEN_SERVER_B`. Una voce senza id o senza segreto non
+    esiste, e accende solo con la sua parola d'ordine server (`lavori: server`,
+    rete limitata) sul suo account; una parola d'ordine server senza account
+    vale per A. Una parola d'ordine server a rete aperta viva sul suo account
+    la ferma, e il log del pacemaker la nomina a ogni giro (#1251);
+  - accende solo se c'è un lavoro server che nascerebbe pulito. Decide prima
+    di A/B, che altrimenti riempirebbero ogni posto, e prende i posti che
+    spettano ai lavori server nell'ordine di priorità della coda: a pari
+    priorità il server, e un lavoro normale più urgente non lo ferma se A/B non
+    possono accendere;
+  - fra le due voci sceglie con le regole di A/B, senza tetto giornaliero
+    (#996): pausa a chi fallisce o nasce morta, riserva dei crediti, account
+    prioritario, alternanza. La pausa di ogni voce, col motivo, si legge in
+    Gestione → Automazioni. Una voce si ferma con l'account
+    escluso o con la sua esclusione (`accountServerOff`, `accountServerBOff`);
+    il tetto delle sessioni è comune.
 - **Su `main` di filo-security** scrive solo il cancello di fusione (regola come
   per Filo):
   - una suite su GitHub Actions prova i rami;
@@ -784,8 +796,9 @@ migrazione le mappa. Il codice che decide in base al prefisso
   - la coda è vuota;
   - il suo contesto supera il 70%;
   - c'è un guasto o arriva un limite di sessione.
-- Il pacemaker ne riaccende un altro dai battiti. Ogni accensione conta nel
-  tetto giornaliero (12 per account).
+- Il pacemaker ne riaccende un altro dai battiti. Nessun tetto giornaliero
+  (#996): un'accensione che claude.ai rifiuta mette l'account in pausa, e
+  Gestione → Automazioni ne dice il motivo.
 - L'orchestratore gira col modello della sessione, e la sua rilettura del
   contesto fra un biglietto e l'altro è buona parte del 40% di consumo che i
   biglietti non contano.

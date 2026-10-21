@@ -1254,9 +1254,12 @@
     el.style.maxWidth = ferma;
 
     const p = el._parti;
-    p.ico.className = d.icona === null ? 'spinner' : 'favicon';
+    // Un sito senza icona prende il globo, come nella home: il posto vuoto sembrava un'icona che non si è caricata.
+    const senzaIcona = d.icona === '';
+    p.ico.className = d.icona === null ? 'spinner' : senzaIcona ? 'favicon senza-icona' : 'favicon';
     const nota = d.icona ? iconeNote.get(id) : null;
     p.ico.style.backgroundImage = nota && nota.dato ? `url("${nota.dato}")` : '';
+    p.ico.innerHTML = senzaIcona && typeof ICONS.globe === 'function' ? ICONS.globe(14) : '';
 
     // Indicatore "aperta da un altro paese": globo + codice paese accanto al
     // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.

@@ -16,6 +16,13 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   interrotto) → CONTESTO DI ADESSO (stato, memorie, file, ricordi ripescati) → domanda. Tutto ciò che cambia a ogni
   turno sta dopo il tratto: su un prefisso da 100k token senza cache si paga tutto a ogni messaggio. Sentinella
   `tests/unit/filoContesto.test.mjs` (due turni hanno lo stesso prefisso; i ricordi stanno dopo gli eventi recenti).
+- **I punti di cache stanno sui confini di quell'ordine** (#1412): fine della parte fissa (prima dell'accoglienza,
+  durata un'ora), fine del tratto, ultimo messaggio. Se un messaggio del tratto al turno dopo perde esito o
+  ragionamento (esce dagli ultimi venti), il punto della storia va sul messaggio prima: più avanti non verrebbe mai
+  riletto. Il piano lo fa il cancello dei modelli sui messaggi già
+  oscurati; lo scrive nel corpo solo il fornitore, e solo per i modelli Anthropic: gli altri la cache la fanno da
+  soli e ricevono i messaggi tali e quali. Un pezzo variabile nuovo nel system si apre con uno degli inizi di
+  `INIZI_VARIABILI_CHAT`, se no finisce nella parte in cache. Sentinella `tests/unit/puntiDiCache.test.mjs`.
 - **Il prefisso non si muove fra due turni.** Ore assolute, mai «2 ore fa»; un nome di chat fisso (quattro caratteri
   dell'id), non «questa scheda»; il taglio per giorni si sposta a scatti (da un'ora a sei); oltre il tetto in token
   si taglia un quarto sotto e l'inizio si tiene finché basta. Il ragionamento allegato a una risposta vive quanto i

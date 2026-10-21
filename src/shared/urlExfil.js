@@ -437,6 +437,10 @@
     } catch (_) { return raw.replace(/#.*$/, '').replace(/\/+$/, ''); }
   }
 
+  function hostDi(url) {
+    try { return new URL(url).hostname; } catch (_) { return String(url || '').slice(0, 80); }
+  }
+
   // Cosa hanno portato nel contesto le azioni viste dal modello (turni passati
   // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
   // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca, `esterni` = i
@@ -494,6 +498,12 @@
         const pagine = (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
         for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
         daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.url)}\n${testo(p.riassunto)}`).join('\n'), 'dalle pagine visitate');
+      } else if (type === 'LEGGI_PAGINA') {
+        // Una pagina letta è testo di sconosciuti (#553): i suoi codici non escono, e il suo indirizzo il modello l'ha visto.
+        if (!out.ok) continue;
+        nonFidato = true;
+        if (out.url) linkNoti.add(chiaveLink(out.url));
+        daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, out.url ? `dalla pagina ${hostDi(out.url)}` : 'da una pagina letta');
       } else if (type === 'CERCA_SALVATE' || type === 'APRI_SALVATA') {
         // #845 — cosa ha salvato l'utente, con titoli scritti dai siti. Una pagina si riapre tale e quale, come i link di
         // una ricerca; i suoi pezzi dentro un altro indirizzo chiedono l'OK (`salvate`, in assess). Gli indirizzi non
@@ -540,7 +550,7 @@
     return { exfil: false, reason: '' };
   }
 
-  // NAVIGA nel turno: memoria + azioni viste dal modello + parole dell'utente + chi ha mandato.
+  // NAVIGA e LEGGI_PAGINA nel turno: memoria + azioni viste dal modello + parole dell'utente + chi ha mandato.
   // `daPagina` = l'agente vive su una pagina web, che è già nel suo contesto.
   function valutaNaviga(url, { memoria = '', azioni = [], daPagina = false, parole = '', domanda = '' } = {}) {
     const ctx = contestoDaAzioni(azioni);
@@ -575,6 +585,7 @@
   // «far uscire un segreto» del capitolo 9: nessun livello e nessun OK lo sblocca.
   const USCITE = Object.freeze({
     NAVIGA: "non ho aperto l'indirizzo",
+    LEGGI_PAGINA: 'non ho letto la pagina',
     CERCA_WEB: 'non ho fatto la ricerca',
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
@@ -767,8 +778,9 @@
 
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
   function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
-    if (tipo === 'NAVIGA') {
-      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+    if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') {
+      const L = global.SN_ACTION_LEVELS;
+      const url = L && L.indirizzoDi ? L.indirizzoDi(action) : String(action.url ?? action.href ?? action.link ?? '').trim();
       const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
       if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
