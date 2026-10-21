@@ -2368,6 +2368,10 @@
     e.preventDefault();
     const num = FB.formatNum(fb.seq, fb.subSeq);
     const voci = [{ testo: 'Apri', azione: () => openDetail(fb._id) }];
+    const domandaId = MR.aspettaDomanda(fb);
+    if (domandaId) {
+      voci.push({ testo: `Rispondi alla domanda ${domandaId}`, titolo: 'Si risponde in un posto solo: la domanda, con le sue opzioni.', azione: () => apriDomandaDelFeedback(domandaId, fb._id) });
+    }
     const segnabile = isAdmin && !MR.isLocalOnly(fb) ? MR.localSignCheck(fb, true) : { ok: false };
     if (isAdmin && MR.isLocalOnly(fb)) {
       const chiusa = MR.praticaChiusa(fb, { releasedVersion, fusioni });

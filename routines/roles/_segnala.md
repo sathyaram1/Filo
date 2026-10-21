@@ -7,7 +7,10 @@ l'owner si scrive per lui», e passalo alla consegna con `--domanda <file.json>`
 Le opzioni sono le scelte, ognuna col suo pro, il suo contro e l'azione
 `{ "tipo": "riprendi", "feedbackId": "<payload.id>" }`; il consiglio è quella che
 prenderesti tu, col perché; in `notePerAgenti` va quello che hai già esplorato,
-per chi riprende. L'owner risponde nella sezione Domande della Gestione.
+per chi riprende. Ogni opzione deve sbloccare questo lavoro (`riprendi`,
+`archivia`, `approva_locale` su `<payload.id>`): una priorità o un'automazione
+vanno in una domanda a parte. L'owner risponde nella sezione Domande della
+Gestione.
 
 **Una domanda così FERMA il lavoro.** Il feedback aspetta la sua risposta e
 non riparte prima; poi riprende da dove era, con la risposta davanti. Quindi ci

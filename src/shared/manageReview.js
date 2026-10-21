@@ -111,7 +111,8 @@
   // Senza scheda pubblica solo il lavoro dell'owner e delle sessioni: il feedback di un utente approvato come lavoro
   // locale (#913) la tiene, è da lì che chi l'ha mandato vede la risoluzione. Gemello: isPrivateLocalWork sul server.
   function isPrivateLocalWork(fb) {
-    return isLocalOnly(fb) && !isLocalApproved(fb);
+    // Il segno messo da una routine (#1358, il lavoro passato ai lavori server) non toglie la scheda a chi l'aveva.
+    return isLocalOnly(fb) && !isLocalApproved(fb) && String(fb.localOnly.by || '') !== 'routine';
   }
   // Un utente approvato (#913) vede la risoluzione con la sola frase per lui: la chiusura locale non la porta, la scrive la sessione.
   function fraseAttesa(fb) {
@@ -688,7 +689,7 @@
     // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
-    if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
+    if (tab === 'inbox' && aspettaDomanda(fb)) return isLocalOnly(fb) ? 'local' : 'queue';
     // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
     // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
     if (tab === 'queue' && isLocalOnly(fb)) return 'local';

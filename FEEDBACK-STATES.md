@@ -451,7 +451,8 @@ risponde in un posto solo. La risposta con l'opzione `riprendi` (o col solo test
 riporta `todo` con la decisione in `payload.decisioni`, `notePerAgenti` comprese; una
 domanda archiviata o superata non sblocca niente. Restano nei Ricevuti, anche con un
 `domandaId`: `secaudit`, `l5`, `guasto`, `fidato`, attacchi, spam e file sospetti. Le
-attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti.
+attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti
+(`npm run domande:migra`, a secco; `-- --dal-vero` per creare).
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
 dashboard (un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel

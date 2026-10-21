@@ -78,6 +78,16 @@ test('il clic sul segno apre la domanda nella sezione Domande, non il dettaglio 
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-8"]')).toBeVisible();
 });
 
+test('tasto destro sulla scheda: «Rispondi alla domanda» fa la stessa cosa del segno', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  await riga(page, 'Colore del tema').click({ button: 'right' });
+  await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rispondi alla domanda D-7' }).click();
+  await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-7"]')).toBeVisible();
+});
+
 test('nel dettaglio si risponde in un posto solo: niente casella, il tasto porta alla domanda', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page);
