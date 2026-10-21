@@ -1744,8 +1744,17 @@
     const delCampo = d.riporta(nuovi);
     const giustiCampo = d.riporta(giusti);
     const giudicato = viaggio && !viaggio.perso ? viaggio : null;
+    const rinnovato = (m) => delCampo.some((n) => tocca(m, n)) || giustiCampo.some((n) => tocca(m, n));
+    // Un segnaposto che la rilettura non nomina resta, se la sua frase fino alle x è quella di prima: il modello che
+    // nel dubbio tace non toglie un valore già dato. Un «giusto» o un segno nuovo sulle stesse x lo sostituiscono.
+    const restaSegnaposto = (m) => {
+      if (m.tipo !== 'segnaposto' || !m.identita) return false;
+      const a = d.verso(m.start);
+      const b = d.verso(m.end);
+      return a >= 0 && b > a && Rg.identitaSegnaposto(d.testo, a, b) === m.identita;
+    };
     state.modello = state.modello.filter((m) => m.fonte !== fonte
-      || !((giudicato && tocca(m, giudicato)) || delCampo.some((n) => tocca(m, n)) || giustiCampo.some((n) => tocca(m, n))));
+      || (!rinnovato(m) && (!(giudicato && tocca(m, giudicato)) || restaSegnaposto(m))));
     state.modello.push(...delCampo);
     avviaRicerche(state);
     const base = rapido ? state.baseRapido : state.baseRagionato;
