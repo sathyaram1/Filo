@@ -166,7 +166,7 @@ test('chi ha scritto: dalla sua finestra se è della stessa origine, senza tocca
   assert.equal(arriva.tocchi + mittente.tocchi, 0);
 });
 
-test('chi ha scritto da un\'altra origine mentre arriva si trova lo stesso, e quelli della stessa origine restano intatti', () => {
+test('chi ha scritto da un\'altra origine si trova, e quelli della stessa origine in arrivo restano intatti', () => {
   const R = carica();
   const win = finestraFinta();
   R.osserva(win);
