@@ -15,6 +15,7 @@ const FRASE = 'Prendono il posto dei crediti di prova che Filo teneva su questo 
 let server;
 let base = '';
 let redeemed = false;
+let ritardoMs = 0;
 const prompt = [];
 
 function json(res, status, body) {
@@ -37,7 +38,7 @@ test.beforeAll(async () => {
         return json(res, 200, { id_token: 'anon-id-token', refresh_token: 'anon-refresh', expires_in: '3600', user_id: 'anon-uid-1353' });
       }
       if (url === '/walletState') {
-        if (!redeemed) return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
+        if (!redeemed) { setTimeout(() => json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } }), ritardoMs); return; }
         return json(res, 200, {
           result: {
             hasWallet: true, pseudonym: 'abcdef0123456789',
@@ -87,6 +88,7 @@ test.afterAll(async () => {
 
 test.beforeEach(() => {
   redeemed = false;
+  ritardoMs = 0;
   prompt.length = 0;
 });
 
@@ -157,6 +159,25 @@ test('chiave propria: Crediti e chat dicono che paga la chiave e che il conteggi
   await expect(page.locator('#walletNote')).toHaveText(`Invito riscattato: hai 5.000 crediti d’ingresso. ${FRASE}`);
   await expect(page.locator('#balance')).toHaveText('5.000', { timeout: 15_000 });
   await page.screenshot({ path: 'tests/.shots/1353-riscatto-chiave-propria.png' });
+});
+
+// La pagina si ridisegna a ogni chiamata pagata con la chiave: mentre rilegge, la riga resta quella della chiave propria.
+test('chiave propria: mentre la pagina Crediti rilegge lo stato, la riga sotto il conteggio non torna quella di serie', async ({ app, openTab }) => {
+  await app.evaluate(async (_, k) => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: k } }); }, OWN_KEY);
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#refillHint')).toContainText('Le richieste le paga la tua chiave OpenRouter.', { timeout: 15_000 });
+  await page.evaluate(() => {
+    window.__righe = [];
+    const el = document.getElementById('refillHint');
+    new MutationObserver(() => window.__righe.push(el.hidden ? '(nascosta)' : el.textContent))
+      .observe(el, { childList: true, characterData: true, subtree: true, attributes: true });
+  });
+  ritardoMs = 1_500;
+  await app.evaluate(() => globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED, ownKeyUsed: true }));
+  await page.waitForTimeout(2_500);
+  const righe = await page.evaluate(() => window.__righe);
+  expect(righe.length, 'la pagina si è ridisegnata').toBeGreaterThan(0);
+  for (const t of righe) expect(t).toContain('Le richieste le paga la tua chiave OpenRouter.');
 });
 
 test.describe('chiave di fabbrica', () => {
