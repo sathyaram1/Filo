@@ -1,0 +1,9 @@
+name: prova-permesso-1140
+on: workflow_dispatch
+permissions: {}
+jobs:
+  niente:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo niente
