@@ -1870,6 +1870,9 @@
           <div class="mg-col-head mg-dom-head">
             <input type="checkbox" class="mg-dom-sel" id="mgDomandeTutte" aria-label="Scegli tutte" title="Scegli tutte" hidden>
             <span class="mg-dom-head-nome" id="mgDomandeTitolo">Da rispondere</span>
+            <!-- Lo stesso «Solo non fidate» della lista dei feedback (#1575): uno stato solo, lo tiene manage.js. -->
+            <button type="button" class="mg-livello-btn mg-fiducia-filtro" id="mgDomandeFiduciaFiltro" aria-pressed="false"
+              title="Mostra solo le domande non fidate" hidden>Solo non fidate<span class="mg-livello-count"></span></button>
             <button type="button" class="mg-dom-consiglio" id="mgDomandeConsiglioSel" hidden>Applica il consiglio</button>
           </div>
           <div class="mg-col-body">
