@@ -310,8 +310,24 @@
     campo.setSelectionRange(campo.value.length, campo.value.length);
     let finito = false;
     const tieni = (e) => { if (e.target !== campo) e.preventDefault(); };
-    const fuori = (e) => { if (!finito && !(e.relatedTarget && r.el.contains(e.relatedTarget))) chiudi(true); };
-    const smonta = () => { r.el.removeEventListener('mousedown', tieni); r.el.removeEventListener('focusout', fuori); r.smonta = null; };
+    // Il fuoco che va nel menu del tasto destro di Filo non esce dalla riga: le sue voci agiscono sul campo o sulla
+    // riga. Dopo, il fuoco non torna da sé, e uscire è il primo clic fuori dalla riga.
+    const nostra = (el) => { try { return !!(el && window.SN_FILO_UI && window.SN_FILO_UI.inside(el)); } catch (_) { return false; } };
+    const fuori = (e) => {
+      const verso = e.relatedTarget;
+      if (!finito && !(verso && (r.el.contains(verso) || nostra(verso)))) chiudi(true);
+    };
+    const clicFuori = (e) => {
+      if (finito || r.el.contains(document.activeElement)) return;
+      const t = e.composedPath()[0];
+      if (!r.el.contains(t) && !nostra(t)) chiudi(true);
+    };
+    const smonta = () => {
+      r.el.removeEventListener('mousedown', tieni);
+      r.el.removeEventListener('focusout', fuori);
+      document.removeEventListener('mousedown', clicFuori, true);
+      r.smonta = null;
+    };
     const chiudi = async (salva) => {
       if (finito) return;
       finito = true;
