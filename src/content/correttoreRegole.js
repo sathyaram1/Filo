@@ -506,7 +506,7 @@
     if (!prima.length) return false;
     return prima.every((w, i) => ora.some((u) => u === w
       || (i === prima.length - 1 && u.startsWith(w))
-      || (!/\d/.test(w) && w.length >= 4 && !lontane(w, u, w.length >= 8 ? 2 : 1))));
+      || (!/\d/.test(w) && !/\d/.test(u) && !lontane(w, u, w.length >= 8 ? 2 : 1))));
   }
 
   // La risposta della ricerca di un segnaposto, una riga [valore][motivo][fonte][data][indirizzo] che il main ha
