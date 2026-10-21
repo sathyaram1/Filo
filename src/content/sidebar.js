@@ -284,10 +284,12 @@
     try { ascoltaCambi(stato()); } catch (_) {}
   }
 
-  // L'icona Aiuto della barra: chiuso o ridotto lo apre, aperto detta, mentre detta ferma.
+  // L'icona Aiuto (barra, riga del tasto destro): il clic fa quello che l'icona mostra, decisi dalla stessa regola.
   function passo(context) {
-    if (!isOpen() || nascosto || collapsed) { open(context); return; }
-    if (voce) voce.premi();
+    const aspetto = global.SN_DISPOSIZIONE_ICONE?.aspettoAiuto?.(stato());
+    const detta = aspetto ? aspetto.icona === 'mic' : (isOpen() && !nascosto && !collapsed);
+    if (detta && voce) { voce.premi(); return; }
+    open(context);
   }
 
   // ---------- Drag header ----------
