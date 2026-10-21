@@ -310,7 +310,7 @@
     let finito = false;
     const tieni = (e) => { if (e.target !== campo) e.preventDefault(); };
     const fuori = (e) => { if (!finito && !(e.relatedTarget && r.el.contains(e.relatedTarget))) chiudi(true); };
-    const smonta = () => { r.el.removeEventListener('mousedown', tieni); r.el.removeEventListener('focusout', fuori); };
+    const smonta = () => { r.el.removeEventListener('mousedown', tieni); r.el.removeEventListener('focusout', fuori); r.smonta = null; };
     const chiudi = async (salva) => {
       if (finito) return;
       finito = true;
@@ -320,11 +320,13 @@
         const fonti = (Array.isArray(r.it.fonti) ? r.it.fonti : []).map((f) => f && f.id).filter(Boolean);
         const res = await send({ type: MSG.FILO_MEMORY_EDIT, via: r.it.via, testo: nuovo, fonti });
         if (!res || !res.ok) {
+          const errore = res && res.rifiuto && res.error ? String(res.error) : 'Non sono riuscito a salvarla: riprova.';
+          if (!campo.isConnected) { smonta(); esito(errore); return; }
           // Resta lei la riga in correzione, anche se intanto si era aperto il campo di un'altra.
           finito = false;
           r.chiudi = chiudi;
           inModifica = k;
-          r.errore.textContent = res && res.rifiuto && res.error ? String(res.error) : 'Non sono riuscito a salvarla: riprova.';
+          r.errore.textContent = errore;
           r.errore.hidden = false;
           campo.focus();
           return;
