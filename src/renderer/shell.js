@@ -315,7 +315,25 @@
   }
 
   settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
-  appsBtn.addEventListener('click', () => showNativeMenu(appsBtn, buildApps()));
+  // Lo stato di adesso; una copia scaduta il main la rilegge in sottofondo e annuncia il cambio.
+  let inPausaVisibili = { bacheca: false, mazzi: false };
+  function rifletteInPausa(r) {
+    if (!r || !r.ok) return;
+    inPausaVisibili = { bacheca: !!(r.bacheca && r.bacheca.visible), mazzi: !!(r.mazzi && r.mazzi.visible) };
+  }
+  function refreshInPausa() {
+    if (!MSG_FILO.IN_PAUSA_STATO) return Promise.resolve();
+    return api.message({ type: MSG_FILO.IN_PAUSA_STATO }).then(rifletteInPausa).catch(() => {});
+  }
+  refreshInPausa();
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.IN_PAUSA_CAMBIATO && m.nome in inPausaVisibili) {
+        inPausaVisibili = { ...inPausaVisibili, [m.nome]: m.visible === true };
+      } else if (m?.type === MSG_FILO.AUTH_CHANGED) refreshInPausa();
+    });
+  }
+  appsBtn.addEventListener('click', () => { showNativeMenu(appsBtn, buildApps()); refreshInPausa(); });
 
   // "Nuova finestra incognito" vive ora nel menu dell'account (icona profilo),
   // non più nel menu Impostazioni → apre la finestra incognito nel main.
