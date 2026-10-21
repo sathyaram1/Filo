@@ -236,7 +236,8 @@ module.exports = function register(on, ctx) {
     }
     const win = winOf(sender);
     if (!win) return { ok: false, error: 'nessuna finestra' };
-    try { win.webContents.send('shell:trigger-button', { command }); }
+    const anchor = daFilo(origin, sender) ? ancoraNellaFinestra(win, sender && sender.wc, msg.anchor) : null;
+    try { win.webContents.send('shell:trigger-button', anchor ? { command, anchor } : { command }); }
     catch (_) { return { ok: false, error: 'invio alla shell fallito' }; }
     return { ok: true };
   });
