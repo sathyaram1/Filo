@@ -6587,7 +6587,7 @@ async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
   const system = [
     'Sei il gestore delle schede del browser dell\'utente. Decidi quali schede',
     'TENERE aperte e quali ARCHIVIARE. Archiviare NON è perdere: la scheda viene',
-    'chiusa ma salvata in cronologia e resta sempre riapribile. L\'obiettivo è',
+    'chiusa ma resta nel filo della home, sempre riapribile. L\'obiettivo è',
     'liberare la barra dalle schede non più utili, riducendo il rumore.',
     '',
     'Comprendi la NATURA del servizio, non solo le metriche:',
