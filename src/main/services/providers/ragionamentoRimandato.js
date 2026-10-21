@@ -13,17 +13,18 @@ const eImpronta = (d) => !!d && typeof d === 'object' && d.type === TIPO_IMPRONT
 const firma = (h) => h.digest('base64url');
 
 // Il messaggio come lo confronta Anthropic: i punti di cache non contano, un testo semplice vale la sua parte di testo.
+function parti(c) {
+  if (typeof c === 'string') return [{ type: 'text', text: c }];
+  if (!Array.isArray(c)) return c == null ? [] : [c];
+  return c.map((p) => {
+    if (!p || typeof p !== 'object') return p;
+    const { cache_control: _punto, ...resto } = p;
+    return resto;
+  });
+}
 function forma(m) {
   if (!m || typeof m !== 'object') return m;
-  const c = m.content;
-  const parti = typeof c === 'string' ? [{ type: 'text', text: c }]
-    : Array.isArray(c) ? c.map((p) => {
-      if (!p || typeof p !== 'object') return p;
-      const { cache_control: _punto, ...resto } = p;
-      return resto;
-    })
-      : (c == null ? [] : [c]);
-  return [m.role || '', parti, m.tool_calls || null, m.tool_call_id || null, m.name || null, m.reasoning_details || null];
+  return [m.role || '', parti(m.content), m.tool_calls || null, m.tool_call_id || null, m.name || null, m.reasoning_details || null];
 }
 
 // `messaggi`: quelli che partono, punti di cache compresi. Con `controlla` (i modelli Anthropic) il ragionamento di un
