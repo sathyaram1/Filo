@@ -452,15 +452,16 @@ test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e t
 test('una pagina che riscrive il proprio indirizzo (una mappa spostata) resta una pagina visitata', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
-  const page = await openTab(testServer.html('<!doctype html><title>Mappa</title><p>mappa</p>'));
+  const page = await openTab(testServer.html('<!doctype html><title>Mappa</title><p>mappa</p>'
+    + '<a id="altro" href="/altro-video" onclick="history.pushState(null,\'\',\'/altro-video\');document.title=\'Altro video\';return false">altro</a>'));
   const visite = () => eventi(userData).filter((e) => e.tipo === 'navigazione');
   await expect.poll(() => visite().length, { timeout: 20_000 }).toBe(1);
   for (let i = 0; i < 20; i++) {
     await page.evaluate((k) => history.replaceState(null, '', location.pathname + '?@41.9,12.' + k + ',15z'), i);
     await page.waitForTimeout(80);
   }
-  // Una pagina nuova dentro la stessa (pushState, come un video dopo l'altro) resta invece una visita in più.
-  await page.evaluate(() => { history.pushState(null, '', '/altro-video'); document.title = 'Altro video'; });
+  // Una pagina nuova dentro la stessa scelta dall'utente (pushState, come un video dopo l'altro) è una visita in più.
+  await page.locator('#altro').click();
   await expect.poll(() => visite().length, { timeout: 10_000 }).toBe(2);
   await page.waitForTimeout(1000);
   await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
@@ -502,13 +503,11 @@ test('una pagina che si dà il titolo dopo il caricamento, o lo cambia dopo un c
   await openTab(testServer.html('<!doctype html><title>Caricamento…</title><p>app</p><script>setTimeout(()=>{document.title="Ordine 1234 confermato"},700)</script>'));
   await expect.poll(titoli, { timeout: 20_000 }).toEqual(['Ordine 1234 confermato', 'Posta in arrivo (3)']);
 
-  const page = await openTab(testServer.html('<!doctype html><title>Home video</title><p>x</p>'));
+  const page = await openTab(testServer.html('<!doctype html><title>Home video</title><p>x</p><a id="video" href="/video/42">video</a><script>'
+    + 'document.getElementById("video").onclick=()=>{history.pushState(null,"","/video/42");document.title="Caricamento…";'
+    + 'setTimeout(()=>{document.title="Orche al tramonto - Video"},600);return false};</script>'));
   await expect.poll(async () => (await titoli()).includes('Home video'), { timeout: 20_000 }).toBe(true);
-  await page.evaluate(() => {
-    history.pushState(null, '', '/video/42');
-    document.title = 'Caricamento…';
-    setTimeout(() => { document.title = 'Orche al tramonto - Video'; }, 600);
-  });
+  await page.locator('#video').click();
   await expect.poll(titoli, { timeout: 20_000 }).toEqual(['Home video', 'Orche al tramonto - Video', 'Ordine 1234 confermato', 'Posta in arrivo (3)']);
   // Il titolo nuovo è una riga in coda, e riletto dal file vale quello.
   await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
@@ -549,4 +548,32 @@ test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle ri
   expect(dove.tenuto).not.toContain('filo_raw_log');
   expect(dove.segnate).toBeGreaterThan(0);
   expect(await voci()).toBe(prima);
+});
+
+// #1525 — una pagina lasciata aperta che cambia indirizzo da sola non riempie il filo: senza un gesto i cambi restano
+// una visita; un clic vero nella pagina seguito da un cambio è una pagina che l'utente ha scelto.
+test('una pagina che cambia indirizzo in ciclo senza input lascia al più 30 visite; un clic vero seguito da un cambio ne aggiunge una', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  const url = testServer.html('<!doctype html><title>Giostra</title><p>giostra</p>'
+    + '<a id="scegli" href="/scelta" style="display:block;padding:20px">scegli</a><script>'
+    + 'let i=0;window.giro=setInterval(()=>{i++;history.pushState(null,"","/giro/"+i);document.title="Giro "+i},40);'
+    + 'document.getElementById("scegli").onclick=()=>{clearInterval(window.giro);history.pushState(null,"","/scelta");document.title="Scelta";return false};'
+    + '</script>');
+  const origine = new URL(url).origin;
+  const visite = () => eventi(userData).filter((e) => e.tipo === 'navigazione' && e.url.startsWith(origine));
+  const page = await openTab(url);
+  // Più di due finestre del gesto: centinaia di cambi d'indirizzo che nessuno ha chiesto.
+  await page.waitForTimeout(11_000);
+  const giri = await page.evaluate(() => Number(location.pathname.split('/').pop()) || 0);
+  expect(giri).toBeGreaterThan(100);
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  const prima = visite().length;
+  expect(prima).toBeGreaterThanOrEqual(1);
+  expect(prima).toBeLessThanOrEqual(30);
+  await page.locator('#scegli').click();
+  await expect.poll(() => visite().map((e) => new URL(e.url).pathname).at(-1), { timeout: 10_000 }).toBe('/scelta');
+  await page.waitForTimeout(1000);
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  expect(visite().length).toBe(prima + 1);
 });

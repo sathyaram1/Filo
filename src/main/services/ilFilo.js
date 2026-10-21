@@ -36,7 +36,7 @@ function causaDi(e) {
   if (c === 'EISDIR') return 'al posto del file c’è una cartella';
   if (c === 'ENOMEM' || e instanceof RangeError) return 'non c’è abbastanza memoria per leggerle';
   const m = String((e && e.message) || '').trim();
-  return m ? `errore «${m.slice(0, 200)}»` : 'un errore sconosciuto';
+  return m ? `c’è stato un errore («${m.slice(0, 200)}»)` : 'c’è stato un errore sconosciuto';
 }
 
 function disco() {
@@ -166,7 +166,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     const ora = Date.now();
     if (ora - avvisi.illeggibile < RIPETI_ILLEGGIBILE_MS) return;
     avvisi.illeggibile = ora;
-    avvisa(`Filo non riesce a leggere le chat e le pagine visitate: ${causaDi(e)}. Finché non ci riesce non salva niente di nuovo, e riprova a ogni richiesta.`,
+    avvisa(`Filo non riesce a leggere le chat e le pagine visitate, perché ${causaDi(e)}. Finché non ci riesce non salva niente di nuovo, e riprova a ogni richiesta.`,
       { chiave: 'filo-illeggibile' });
   }
 
@@ -176,7 +176,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     try { byte = (await fsp.stat(fileEventi())).size; } catch (_) { return; }
     if (byte <= SOGLIA_AVVISO) return;
     avvisi.peso = true;
-    avvisa(`Le chat e le pagine visitate occupano ${Math.round(byte / (1024 * 1024))} MB sul disco: cancellare le pagine di un periodo le alleggerisce.`,
+    avvisa(`Le chat e le pagine visitate occupano ${Math.round(byte / (1024 * 1024))} MB sul disco. Cancellare le pagine di un periodo le alleggerisce.`,
       { chiave: 'filo-pesante', azioni: [{ label: 'Cancella pagine', openUrl: CANCELLA_PAGINE_URL }] });
   }
 

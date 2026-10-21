@@ -6,7 +6,8 @@ La linea del tempo di Filo (chat della home, pagine visitate, e ciò che entrer�
 **solo in coda** e **da un modulo solo** (`src/main/services/ilFilo.js`). Ogni riga è un evento intero con id,
 ora, dispositivo, autore e tipo. Una cancellazione è anche lei una riga in coda, e subito dopo il file si
 riscrive **senza le righe che copre e con tutte le altre identiche**. Dall'incognito niente arriva su disco.
-Nessun tetto e nessun taglio.
+Nessun tetto e nessun taglio su messaggi e numero di eventi: l'unica misura tocca indirizzo e titolo che scrive una
+pagina, ed è segnata accanto.
 
 ## Perché
 

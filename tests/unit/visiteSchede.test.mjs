@@ -213,3 +213,21 @@ test('anche le pagine intere caricate senza gesto si fermano a 30 visite, e la p
   assert.ok(scritte.length <= 31, `${scritte.length} visite`);
   assert.ok(scritte.length >= 30, `${scritte.length} visite`);
 }));
+
+test('un gesto vale per la pagina che segue, non per i cambi che la pagina fa dopo da sola', () => conOrologioFinto(async () => {
+  const { v, scritte } = preparaTitoli();
+  const wc = schedaFinta();
+  const clic = Date.now();
+  await attendi(10);
+  wc.push('https://giostra.test/scelta');
+  v.navigata(wc, 1, 'https://giostra.test/scelta', { gesto: clic });
+  v.caricata(wc);
+  for (let i = 1; i <= 40; i++) {
+    await attendi(50);
+    wc.push(`https://giostra.test/${i}`);
+    v.navigata(wc, 1, `https://giostra.test/${i}`, { inPagina: true, gesto: clic });
+    v.titolo(wc, `Giro ${i}`);
+  }
+  await attendi(6_000);
+  assert.deepEqual(scritte.map((s) => s.url), ['https://giostra.test/scelta']);
+}));
