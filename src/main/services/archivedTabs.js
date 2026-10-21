@@ -84,15 +84,22 @@
   // Archivia una tab chiusa. `meta` contiene i campi catturati al momento della
   // chiusura (vedi tabs.js _archiveClosedTab). Ritorna l'entry creata, o null se
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
+  // Indirizzi e titolo li sceglie il sito: oltre la misura si tagliano e la voce lo segna (un indirizzo a metà non si riapre).
   async function archive(meta) {
     if (!meta || typeof meta.url !== 'string' || !meta.url || Disco.inIncognito()) return null;
-    const prova = { url: meta.url, openedAt: meta.openedAt || null, closedAt: meta.closedAt || new Date().toISOString() };
+    const u = taglia(meta.url, MISURA.url);
+    const t = taglia(meta.title || meta.url, MISURA.titolo);
+    const insieme = (Array.isArray(meta.coOpenUrls) ? meta.coOpenUrls.slice(0, 30) : []).map((x) => taglia(x, MISURA.url));
+    const insiemeTagliati = insieme.map((x, i) => (x.tagliato ? i : -1)).filter((i) => i >= 0);
+    const prova = { url: u.testo, openedAt: meta.openedAt || null, closedAt: meta.closedAt || new Date().toISOString() };
     if (dimenticate.some((r) => coperta(prova, r))) return null;
     const d = await apri();
     const entry = {
       id: uuid(),
-      url: meta.url,
-      title: meta.title || meta.url,
+      url: u.testo,
+      title: t.testo,
+      ...(u.tagliato ? { urlTagliato: true } : {}),
+      ...(t.tagliato ? { titleTagliato: true } : {}),
       favicon: meta.favicon || '',
       // Colore identità del sito (§1.2): serve all'ordine cromatico in archivio.
       identityColor: meta.identityColor || null,
