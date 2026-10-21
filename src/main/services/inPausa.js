@@ -31,6 +31,7 @@ function stati() {
   return Object.fromEntries(NOMI.map((n) => [n, cancelli[n].aggiorna()]));
 }
 
+/** Come stati(), ma alla prima lettura la aspetta un poco: per chi deve decidere adesso. */
 async function statiSicuri() {
   const coppie = await Promise.all(NOMI.map(async (n) => [n, await cancelli[n].assicura()]));
   return Object.fromEntries(coppie);
