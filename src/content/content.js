@@ -1801,8 +1801,45 @@
     return items;
   }
 
+  // Su un segnaposto (#1448): il valore in cima, un clic; il perché con la fonte e la data; «Ignora». Mentre Filo cerca,
+  // la riga del valore aspetta e si riempie quando la ricerca risponde.
+  function vociSegnaposto(editableEl, sp) {
+    if (!sp.dubbio) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
+    const riga = (s) => {
+      if (s.cercando) return { hidden: false, label: I18n.t('spell_segnaposto_cerco'), loading: true, onClick: null };
+      const v = s.correzioni && s.correzioni[0];
+      return v ? { hidden: false, label: v, loading: false, onClick: () => SpellCheck.riempi(editableEl, s) } : { hidden: true, label: '', loading: false, onClick: null };
+    };
+    const ascolti = [];
+    let staccato = null;
+    const segui = (fn) => {
+      ascolti.push(fn);
+      if (!staccato) staccato = SpellCheck.seguiSegno(editableEl, sp, (nuovo) => { if (nuovo && !nuovo.cercando) for (const f of ascolti) f(nuovo); });
+    };
+    const righe = [
+      {
+        type: 'correction', ...riga(sp), senzaFreccia: true,
+        onMount: (_root, update) => {
+          if (sp.cercando) segui((nuovo) => update(riga(nuovo)));
+          return () => { if (staccato) staccato(); };
+        },
+      },
+      rigaDelPerche(sp, sp.cercando ? segui : null),
+    ];
+    if (sp.fonteDato && sp.fonteDato.url) {
+      righe.push({ type: 'item', label: I18n.t('spell_segnaposto_apri_fonte'), onClick: () => Actions.apriInSchedaNuova(sp.fonteDato.url) });
+    }
+    if (sp.ricercaFallita) righe.push({ type: 'item', label: I18n.t('spell_segnaposto_riprova'), onClick: () => SpellCheck.cercaDiNuovo(editableEl, sp) });
+    righe.push(
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sp) },
+      { type: 'separator' },
+    );
+    return righe;
+  }
+
   // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
   function vociSuggerimento(editableEl, sugg) {
+    if (sugg.tipo === 'segnaposto') return vociSegnaposto(editableEl, sugg);
     if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
     const righe = [rigaDelPerche(sugg)];
     for (const c of sugg.correzioni || []) {
