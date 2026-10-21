@@ -1564,7 +1564,7 @@
     try { return location.protocol === 'filo:' ? 'Filo' : (location.hostname || ''); } catch (_) { return ''; }
   }
 
-  const perche = (c) => c.motivo || (c.fonte === 'dizionario' ? t('spell_perche_dizionario') : '');
+  const perche = (c) => (c.fonte === 'segnaposto' ? 'segnaposto' : c.motivo || (c.fonte === 'dizionario' ? t('spell_perche_dizionario') : ''));
 
   // Una risposta senza righe leggibili che non dice «nessuno» si chiede una volta ancora (#1580, D8).
   async function chiediERipeti(action, payload, opz = {}) {
