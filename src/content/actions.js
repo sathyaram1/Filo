@@ -661,12 +661,15 @@
     };
     const pre = prefetchedExplain;
     if (pre && pre.key === key && !pre.fermata) {
-      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
-      if (pre.anticipata && !pre.usata) {
-        pre.usata = true;
-        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
-      }
-      return pre.promise.then((res) => (pre.fermata ? chiedi() : { ...res, giaChiesta: true }));
+      return pre.promise.then((res) => {
+        if (pre.fermata) return chiedi();
+        // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
+        if (pre.anticipata && !pre.usata) {
+          pre.usata = true;
+          Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+        }
+        return { ...res, giaChiesta: true };
+      });
     }
     return chiedi();
   }
