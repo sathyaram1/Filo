@@ -372,17 +372,55 @@ async function battiNelCampo(page, testo) {
   await page.keyboard.press('Enter');
 }
 
-test('pagina a frame: la rotella premuta su un frame mostra il riquadro, e il numero battuto vale', async ({ app, openTab, testServer }) => {
-  const a = testServer.html('<!doctype html><html><body style="margin:0;height:3000px"><h2>indice</h2></body></html>');
-  const b = testServer.html('<!doctype html><html><body style="margin:0;height:3000px"><h2>contenuto</h2></body></html>');
-  const page = await openTab(testServer.html(`<html><frameset cols="70%,*"><frame src="${a}"><frame src="${b}"></frameset></html>`));
-  await page.waitForTimeout(1500);
-  await manda(app, page, clicIn(300, 300));
-  await manda(app, page, clicIn(300, 300, 'middle'));
-  await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
-  await battiNelCampo(page, '130');
-  await expect.poll(async () => percentOf(app, page)).toBe(130);
-});
+// I riquadri dello stesso sito arrivano solo quando il Filo della pagina è già montato: toccati
+// prima del loro load perdevano il preload, e il gesto lì dentro non arrivava a nessuno (#1568).
+async function riquadriInRitardo(cornice) {
+  const attese = [];
+  let aperti = false;
+  let serviti = 0;
+  const server = createServer((req, res) => {
+    const manda = (html) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(html); };
+    if (!req.url.startsWith('/riquadro')) { manda(cornice); return; }
+    const servi = () => { serviti += 1; manda('<!doctype html><html><body style="margin:0;height:3000px"><h2>riquadro</h2></body></html>'); };
+    if (aperti) servi(); else attese.push(servi);
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  return {
+    url: `http://127.0.0.1:${server.address().port}/`,
+    serviti: () => serviti,
+    apri() { aperti = true; for (const f of attese.splice(0)) f(); },
+    chiudi: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),
+  };
+}
+const casiRiquadri = {
+  'pagina a frame: la rotella premuta su un frame mostra il riquadro, e il numero battuto vale':
+    { cornice: '<html><frameset cols="70%,*"><frame src="/riquadro/1"><frame src="/riquadro/2"></frameset></html>', quanti: 2 },
+  'riquadro dello stesso sito arrivato dopo la pagina: la rotella premuta lì mostra il riquadro, e il numero battuto vale':
+    { cornice: '<!doctype html><html><body style="margin:0"><iframe src="/riquadro/1" style="border:0;width:100vw;height:100vh;display:block"></iframe></body></html>', quanti: 1 },
+};
+for (const [nome, { cornice, quanti }] of Object.entries(casiRiquadri)) {
+  test(nome, async ({ app, openTab }) => {
+    const sito = await riquadriInRitardo(cornice);
+    try {
+      const page = await openTab(sito.url);
+      await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 15_000 });
+      expect(sito.serviti(), 'i riquadri devono essere ancora in volo quando Filo si monta nella pagina').toBe(0);
+      sito.apri();
+      await expect.poll(async () => {
+        const pronti = await Promise.all(page.frames().filter((f) => f.url().includes('/riquadro'))
+          .map((f) => f.evaluate(() => document.readyState).catch(() => '')));
+        return pronti.filter((s) => s === 'complete').length;
+      }).toBe(quanti);
+      await manda(app, page, clicIn(300, 300));
+      await manda(app, page, clicIn(300, 300, 'middle'));
+      await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
+      await battiNelCampo(page, '130');
+      await expect.poll(async () => percentOf(app, page)).toBe(130);
+    } finally {
+      await sito.chiudi();
+    }
+  });
+}
 
 test('immagine SVG aperta da sola: la rotella premuta mostra il riquadro, e il numero battuto vale', async ({ app, openTab }) => {
   const server = createServer((_req, res) => {
