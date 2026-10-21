@@ -45,14 +45,33 @@
   // Niente flag scritto qui: il segno "già accolto" lo scrive la CHIUSURA.
   let onboardingActive = false;
 
+  // Rifatta o ripresa, l'intervista sta solo nelle pagine che l'hanno chiesta (Preferenze, «Riprendiamola»): le altre,
+  // ricaricate o aperte da un collegamento, restano il filo dell'utente (#1297). Il segno sta nell'indirizzo.
+  const SEGNO = 'accoglienza';
+  function paginaDellIntervista() {
+    if (onboardingActive) return true;
+    try { return new URLSearchParams(global.location.search).has(SEGNO); } catch (_) { return false; }
+  }
+  function segnaPagina(si) {
+    try {
+      const u = new URL(global.location.href);
+      if (u.searchParams.has(SEGNO) === si) return;
+      if (si) u.searchParams.set(SEGNO, '1');
+      else u.searchParams.delete(SEGNO);
+      global.history.replaceState(global.history.state, '', u.href);
+    } catch (_) {}
+  }
+
   async function fetchOnboarding() {
     try {
-      const r = await send({ type: MSG.FILO_GET_ONBOARDING });
+      const fuori = !paginaDellIntervista();
+      const r = await send({ type: MSG.FILO_GET_ONBOARDING, ...(fuori ? { fuori: true } : {}) });
       // `ready: false` = nessun modello disponibile ancora (niente accesso,
       // niente chiave): l'intervista aspetta e la home spiega come attivare
       // Filo, invece di accoglierlo con una chat che non può rispondere.
       if (!r?.ok || !r.onboarding || !r.ready) return null;
       if (r.onboarding.done) return null;
+      if (r.onboarding.rifatta && fuori) return null;
       // `resume` lo decide il main: di schede nuove se ne aprono due insieme, e
       // il turno rimasto a metà lo deve riprendere UNA sola.
       return { ...r.onboarding, resume: !!r.resume };
