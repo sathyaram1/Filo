@@ -147,12 +147,61 @@ module.exports = function register(on, ctx) {
     return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
   }
 
+  // #1448 — la ricerca di un segnaposto del correttore: le fonti le prende il main (Wikipedia e Wikidata, poi il web se
+  // è acceso), il modello del controllo ragionato ne legge il valore, e la riga torna con la fonte vera. Da una pagina
+  // delicata, o con un dato riservato nella ricerca, non si cerca. Regole: tests/unit/fontiSegnaposto.test.mjs.
+  const SENZA_VALORE = '[][][][nessuno]';
+  function segnapostoDaPagina(payload) {
+    const s = payload && payload.segnaposto;
+    if (!s || typeof s !== 'object') return null;
+    const R = require('../correttoreRiservati');
+    const testo = (v, max) => R.oscura(typeof v === 'string' ? v : '').slice(0, max);
+    const dove = typeof s.dove === 'string' && /^(?:web|wiki:[a-z]{2,3})$/.test(s.dove) ? s.dove : 'wiki:en';
+    return { pezzo: testo(s.pezzo, 40), frase: testo(s.frase, 2000), domanda: testo(s.domanda, 200), dove };
+  }
+  async function cercaSegnaposto(sp, { sender, origin, delicata }) {
+    const settings = await getEffectiveSettings();
+    const corr = settings.correttore || {};
+    if (settings.featureFlags?.spellcheckContext === false || corr.segnaposti === false) return { ok: false, code: 'SEGNAPOSTI_SPENTI' };
+    const R = require('../correttoreRiservati');
+    if (delicata || !sp.domanda.trim() || sp.domanda.includes(R.SEGNAPOSTO)) return { text: SENZA_VALORE };
+    const u = await controllaUscita({ type: 'CERCA_WEB', query: sp.domanda }, { sender });
+    if (u.blocca) return { text: SENZA_VALORE };
+    const F = globalThis.SN_FONTI_SEGNAPOSTO;
+    const web = corr.segnapostiWeb !== false;
+    const giri = sp.dove === 'web' ? [web ? 'web' : sp.dove] : (web ? [sp.dove, 'web'] : [sp.dove]);
+    let ultima = null;
+    for (const giro of giri) {
+      let fonti = [];
+      try {
+        fonti = giro === 'web'
+          ? await F.web(sp.domanda, SN_CONST.effectiveApiKeys ? SN_CONST.effectiveApiKeys(settings).tavily : (settings.apiKeys?.tavily || ''))
+          : await F.wikipedia(sp.domanda, giro === 'web' ? 'en' : giro.replace(/^wiki:/, '') || 'en');
+      } catch (e) {
+        console.warn('[SN] segnaposto, fonti:', e?.message || e);
+      }
+      if (!fonti.length) continue;
+      const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti }, origin });
+      ultima = r;
+      const riga = F.ricomponi(r && r.text, fonti);
+      if (riga) return { ...r, text: riga };
+    }
+    return { ...(ultima || {}), text: SENZA_VALORE };
+  }
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     if (await descrizioneSpenta(msg)) return { ok: false, code: 'DESCRIZIONE_SPENTA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
     const senzaContesto = await senzaPaginaDelicata(msg, sender);
+    const segnaposto = msg && msg.action === SN_CONST.ACTIONS.SPELLCHECK_CONTEXT ? segnapostoDaPagina(msg.payload) : null;
+    if (segnaposto) {
+      const Cont = globalThis.SN_CONTATORI_MAIN;
+      const giro = () => cercaSegnaposto(segnaposto, { sender, origin, delicata: senzaContesto });
+      const r = await (msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, giro) : giro());
+      return r && r.ok === false ? r : { ok: true, ...r };
+    }
     // Chiavi, password e carte scritte nel campo restano sul computer (#1446); il sito lo dice chi ha mandato, non la pagina.
     if (msg && DEL_CORRETTORE.has(msg.action) && msg.payload && typeof msg.payload === 'object') {
       msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
