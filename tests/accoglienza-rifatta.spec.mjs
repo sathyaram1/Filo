@@ -186,6 +186,8 @@ test.describe('utente già accolto', () => {
     expect(prompt).toContain('DA SCOPRIRE');
     expect(prompt).toContain('Ciao, sono Filo');
     expect(prompt, 'l’intervista ha davanti la chat della carbonara').not.toMatch(/carbonara|Guanciale/);
+    expect(prompt, 'all’intervista rifatta il prompt dice che è il primo incontro').not.toContain('prima conversazione');
+    expect(prompt).toContain('Ha già usato Filo');
 
     await queueChat(app, { text: 'Per quattro: 400 g di spaghetti.', actions: [] });
     await carb.locator('#sendBtn').click();
