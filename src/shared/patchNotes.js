@@ -62,6 +62,7 @@
         'Fra i siti dove resti connesso puoi scrivere il nome che vedi o incollare l\'indirizzo dalla barra, come mail.google.com: l\'elenco mostra il sito che resta connesso, qui google.com. E se avevi aggiunto gmail.com, adesso ti tiene davvero connesso a Gmail.',
         'Su Windows, se un programma lanciato dal terminale esce con un errore, il comando risulta fallito anche quando dopo c\'è altro che riesce, come una compilazione fallita seguita da un messaggio di fine o uno script che termina con quella compilazione. Prima risultava riuscito, sia a Filo sia nel terminale che usi tu.',
         'Con il computer sotto sforzo il blocco del lavoro di Filo poteva perdere la nota scritta a metà turno o l\'ultimo ragionamento prima della risposta. Adesso li tiene tutti.',
+        'Un sito che non manda mai la sua icona finisce di caricarsi lo stesso. Prima Filo aspettava l\'icona per dare il colore alla scheda, e la pagina poteva restare in caricamento a lungo.',
       ],
     },
     {
