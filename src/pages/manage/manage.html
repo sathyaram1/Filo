@@ -417,6 +417,9 @@
       display: flex; flex-direction: column;
       flex: 1 1 auto; min-height: 0;
     }
+    /* Le pagine spostate dentro Gestione (#1414) tengono la misura che avevano da sole: campi larghi tutta la
+       finestra non si leggono. Allineate a sinistra, sotto le sezioni da cui si aprono. */
+    .mg-pagina { max-width: 960px; }
 
     /* La lente vive in fondo alla barra delle schede e apre la barra di ricerca sotto: i risultati, da QUALUNQUE
        scheda, rimpiazzano la lista a sinistra, mentre il dettaglio al centro resta il solito. */
