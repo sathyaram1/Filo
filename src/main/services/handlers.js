@@ -5892,7 +5892,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       if (partite.fermato) { fermato = true; break; }
       // Un comando secco riuscito o fermo sulla conferma parla da sé (#1130): niente secondo giro. Solo al primo giro con
       // azioni: dopo una lettura il modello ha ancora da dire cosa ha trovato. L'intervista finisce ogni turno con una battuta.
-      const chiude = passi === 1 && !onbActive
+      // Un seguito già scritto (#1296) va letto al passo dopo, insieme all'esito: il turno resta uno.
+      const chiude = passi === 1 && !onbActive && !turno.seguiti.length
         && GiroAzioni.chiudeIlTurno(results, { testo: text, daLeggere: (x) => !!observationsForPrompt([x.rendered]) });
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
