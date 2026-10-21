@@ -327,8 +327,7 @@
       const x = annunciato ? atteso(a) : null;
       if (annunciato) st.annuncio = null;
       if (x !== null) {
-        const fine = UN_PASSO.test(a.tipo) ? (a.tipo.endsWith('Backward') ? a.sel[0] - (a.valore.length - x.length) : a.sel[0])
-          : x.length - a.valore.length + a.sel[1];
+        const fine = a.tipo === 'deleteContentForward' ? a.sel[0] : x.length - (a.valore.length - a.sel[1]);
         c.value = x;
         try { c.setSelectionRange(fine, fine); } catch (_) {}
         st.inCorso.push({ e, livello: nostraScrittura });
