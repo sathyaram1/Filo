@@ -4052,7 +4052,7 @@
   };
   const ACTION_PROGRESS = {
     accept: 'Metto in coda…',
-    accept_local: 'Lo passo nei Lavori server…',
+    accept_local: 'Lo passo ai lavori server…',
     confirm_attack: 'Conferma in corso…',
     confirm_spam: 'Conferma in corso…',
     archive: 'Archivio…',
