@@ -5684,10 +5684,11 @@
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
       const color = cl ? cl.color : 'var(--sn-border)';
       listHtml += `
-        <div class="mg-sender-item" data-id="${esc(fb._id)}" style="border-left-color:${color}">
+        <div class="mg-sender-item mg-fiducia--${MR.segnoFiducia(fb).classe}" data-id="${esc(fb._id)}" style="border-left-color:${color}">
           ${num ? `<span class="mg-sender-item-num">#${esc(num)}</span>` : ''}
           ${statoLeggibile(fb) ? segnoFermataHtml(fb) : ''}
           <span class="mg-sender-item-title">${esc(title)}</span>
+          ${fiduciaSegnoHtml(fb)}
         </div>
       `;
     }
