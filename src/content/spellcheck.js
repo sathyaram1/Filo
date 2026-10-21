@@ -1732,6 +1732,7 @@
     state.modello = state.modello.filter((m) => m.fonte !== fonte
       || !((giudicato && tocca(m, giudicato)) || delCampo.some((n) => tocca(m, n)) || giustiCampo.some((n) => tocca(m, n))));
     state.modello.push(...delCampo);
+    avviaRicerche(state);
     const base = rapido ? state.baseRapido : state.baseRagionato;
     const sigla = rapido ? 'r' : 'g';
     if (base === d.testo && !state.inViaggio.some((v) => v.id[0] === sigla)) ricordaGiudicato(state, fonte);
