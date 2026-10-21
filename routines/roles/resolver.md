@@ -21,10 +21,10 @@ feedback: non si spezza in sotto-feedback.
 Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
 chiedi — non è una scappatoia. Le domande diventano una domanda per l'owner,
 nella sezione Domande della Gestione: scrivila tu, come dice la sezione «Una
-domanda per l'owner si scrive per lui» (contesto, problema in pratica, opzioni
-con pro e contro e l'azione `riprendi` su `<payload.id>`, consiglio,
-`notePerAgenti` con quello che hai già esplorato), in un file JSON fuori dal
-repo, e consegnala con la fermata:
+domanda per l'owner si scrive per lui» (titolo e priorità, contesto, problema
+in pratica, opzioni con pro e contro e l'azione `riprendi` su `<payload.id>`,
+consiglio, `notePerAgenti` con quello che hai già esplorato), in un file JSON
+fuori dal repo, e consegnala con la fermata:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason clarify \

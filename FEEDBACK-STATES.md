@@ -91,7 +91,7 @@ functions. Qui sotto il perché dei passaggi, per attore.
   lo scrive solo il server alla nascita) e la domanda come turno di Filo nella conversazione.
   Ogni esito che lo metterebbe in coda o ad aspettare l'origine (sicuro dei giudici, salto dei
   fidati, origine fusa, chiusa, sparita o non ancora fusa), e anche il verdetto `design` dei
-  giudici, diventa `design` (`statusReason: decisione`): nei Ricevuti, col rombo e la casella. Attacco, spam, origine bloccata e
+  giudici, diventa `design` (`statusReason: decisione`) con la sua domanda (`domandaId`): In coda col segno «aspetta D-n», e si risponde nella sezione Domande (§5). Attacco, spam, origine bloccata e
   giudizio incompleto vincono come per gli altri; con l'origine si blocca e si sblocca, ma la
   sua fusione non lo mette in coda. Dopo la risposta va in coda come un feedback normale (non
   ha un ramo da riprendere) e chi lo prende trova domanda e risposta (`decisioni`). Un
@@ -131,7 +131,7 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
   server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità uguale al livello (quello col `?` aspetta la risposta nei Ricevuti: sopra,
+  priorità uguale al livello (quello col `?` aspetta la risposta alla sua domanda: sopra,
   Pipeline); UNO solo per tutti gli altri (interni messi da parte
   dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
   fra loro); —critica con rilievi
@@ -261,9 +261,11 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 - Il segno si mette solo su un feedback **fidato** (#1148; lo fa l'owner con «🤝 Segna fidato»
   in Gestione, da riga di comando no), a pratica aperta, non segnalata come
   attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
-  solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
-  (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
-  --serve-locale`, e lì l'owner lo approva come lavoro locale (#913, sotto).
+  solo col sì dell'owner: da una sessione dell'owner un feedback torna nei Ricevuti (`design`,
+  motivo `locale` senza `domandaId`, nota «Richiede lavoro locale») con `owner-feedback.mjs
+  --serve-locale`, e lì l'owner lo approva (#913, sotto). Dalle routine `design`+`locale` senza
+  domanda non nasce più: il lavoro server va ai lavori server o chiede la fiducia (§3), e il
+  motivo `locale` con `domandaId` è un passo che solo l'owner può fare, chiesto con la domanda.
 - **L'approvazione dell'owner (#913)**: `localApproval: { by, at }` (stessa forma di
   `localOnly`, scrive solo l'admin, `localApprovalValido` nelle regole). La scrive
   «💻 Lavoro locale» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
@@ -332,11 +334,11 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     un anonimo che si firma `agent:costruzione` è un utente. L'allarme porta la sua priorità
     (`priorityManual`, 3): il giudice di priorità non la riscrive.
   - un derivato col `?` fa eccezione: dove gli altri andrebbero in coda o ad aspettare, lui va nei
-    Ricevuti fermo sulla domanda (`design`, `decisione`: §3, Pipeline).
+    fermo sulla sua domanda (`design`, `decisione`, `domandaId`: §3, Pipeline; In coda col segno).
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
-  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi è tornato nei Ricevuti
+  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi aspetta la sua domanda
   con l'origine chiusa (`aligned`, `origine_chiusa`) la aspetta di nuovo (`aligned → unlabeled`)
   se l'owner la ripristina, ed entra in coda (`aligned → todo`) quando si fonde. Sono le sole uscite
   della pipeline da `design` e da `aligned`, e solo per quei motivi; un derivato che l'owner ha già

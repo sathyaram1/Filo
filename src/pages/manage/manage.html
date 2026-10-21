@@ -28,6 +28,7 @@
   <script src="filo://shared/feedbackTransitions.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
+  <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/feedbackAttese.js"></script>
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/domande.js"></script>
@@ -335,6 +336,19 @@
     }
     .mg-dq-testo:focus { outline: none; border-color: var(--sn-accent); }
     .mg-dq-tasti { display: flex; flex-wrap: wrap; gap: 8px; }
+    /* Gli allegati della risposta: i nomi in pillole, la × per toglierli, il tasto per aggiungerne. */
+    .mg-dq-allegati { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .mg-dq-allegato {
+      display: inline-flex; align-items: center; gap: 4px; max-width: 220px;
+      font-size: 11.5px; padding: 2px 8px; border-radius: 9px; border: 1px solid var(--sn-border);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mg-dq-allegato-x {
+      border: 0; background: transparent; color: var(--sn-muted); cursor: pointer; font: inherit; padding: 0 2px;
+      transition: color calc(0.12s * var(--sn-motion, 1));
+    }
+    .mg-dq-allegato-x:hover, .mg-dq-allegato-x:focus-visible { color: var(--sn-accent); }
+    .mg-dq-allega { font-size: 12px; padding: 3px 10px; }
     .mg-dq-msg { margin: 0; min-height: 1.4em; font-size: 12.5px; color: var(--sn-muted); }
     .mg-dq-msg--ok { color: #2e9e5b; }
     .mg-dq-msg--err { color: #c0392b; }

@@ -219,9 +219,9 @@ In testa alla colonna, cinque pulsanti **L1 L2 L3 L4 L5**:
 
 Ogni pulsante porta il suo conteggio.
 
-Se oggi un worker non può segnare un feedback come attacco o spam (solo
-`clarify`, `decisione`, `locale`), si aggiunge: è lo stesso giudizio dei
-giudici, dato da chi ha letto il feedback da vicino.
+Chi risolve, corregge o verifica può segnare un feedback come attacco o spam
+(#1358, motivo `worker`, Ricevuti L3): è lo stesso giudizio dei giudici, dato
+da chi ha letto il feedback da vicino.
 
 ## 3. Domande
 
@@ -347,7 +347,7 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 | Oggi | Dove va |
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
-| `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede un passo dell'owner (segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
+| `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede il suo PC o un suo passo (una prova sulla sua macchina, segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
 | `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241) |
 | `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | domanda, azioni `riprendi` / `archivia` |
 | `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti |

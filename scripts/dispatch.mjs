@@ -1214,8 +1214,10 @@ export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 // ferma la dice lo strumento, o chi corregge non la scopre mai.
 export const FERMA_NOTE = [
   'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
-  'prodotto), scrivi la segnalazione e consegna quello che hai fatto:',
+  'prodotto), scrivi la domanda (o la segnalazione) e consegna quello che hai fatto:',
+  '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --domanda <file.json>',
   '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --segnala <file.md>',
+  '  (dal markdown il server compone la domanda da sé, senza pro, contro e consiglio)',
   'Una segnalazione FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
   'risposto. Senza segnalazione torna in coda per un\'altra verifica. Un difetto non è una segnalazione.',
 ].join('\n');
@@ -1734,7 +1736,7 @@ export function usageText() {
     '  --segnala <file.md>    un trade-off vero o una domanda di design trovati',
     '                         lavorando: NON deciderlo, segnalalo (Problema / Scelte',
     '                         col loro trade-off / Cosa ho fatto nel frattempo); è quello',
-    '                         che l\'owner legge cliccando il rombo in dashboard. Una',
+    '                         da cui il server compone la domanda nella sezione Domande. Una',
     '                         segnalazione FERMA il lavoro: aspetta l’owner, e riprende',
     '                         da lì quando ha risposto. Un difetto non è una segnalazione',
     '  --domanda <file.json>  la stessa scelta già scritta come domanda (SPEC-DOMANDE §3.1:',

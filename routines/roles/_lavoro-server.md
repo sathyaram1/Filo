@@ -29,8 +29,8 @@ credenziali. La parte del server da qui non si fa, e per qualunque ruolo è un g
 è per regola (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro): nessuno lo
 riprende sul PC dell'owner. Vale la sezione «Un guasto dell'ambiente si dice con una domanda» (il controllo di sicurezza
 salta la domanda), col testo esatto di git o del rifiuto e la riga su chi ha respinto il token in `notePerAgenti`. Il
-gruppo è `guasto: filo-security`. Chi verifica non passa il lavoro guardando solo l'app: senza la parte del server il
-giro non si chiude, e il lavoro aspetta la risposta dell'owner al guasto.
+gruppo è `guasto: filo-security`. Chi verifica non passa il lavoro guardando solo l'app: rilascia col guasto senza
+registrare la critica, e il lavoro torna in coda da sé per un'altra verifica quando il guasto è passato.
 
 ### Il ramo
 

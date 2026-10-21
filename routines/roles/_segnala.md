@@ -2,15 +2,17 @@
 
 Velocità contro costo, semplicità contro potenza, dati dell'utente, una scelta
 di gusto: decide l'owner. Scrivi la domanda in un file JSON **fuori dal repo**
-(per esempio `../domanda-<numero>.json`), come dice la sezione «Una domanda per
-l'owner si scrive per lui», e passalo alla consegna con `--domanda <file.json>`.
-Le opzioni sono le scelte, ognuna col suo pro, il suo contro e l'azione
+(per esempio `../domanda-<numero>.json`), coi campi e le regole della sezione
+«Una domanda per l'owner si scrive per lui» (titolo e priorità compresi), e
+passalo alla consegna con `--domanda <file.json>`. Le opzioni sono le scelte,
+ognuna col suo pro, il suo contro e l'azione
 `{ "tipo": "riprendi", "feedbackId": "<payload.id>" }`; il consiglio è quella che
 prenderesti tu, col perché; in `notePerAgenti` va quello che hai già esplorato,
-per chi riprende. Ogni opzione deve sbloccare questo lavoro (`riprendi`,
-`archivia`, `approva_locale` su `<payload.id>`): una priorità o un'automazione
-vanno in una domanda a parte. L'owner risponde nella sezione Domande della
-Gestione.
+per chi riprende. Ogni opzione deve sbloccare questo lavoro (`riprendi` o
+`archivia` su `<payload.id>`): una priorità o un'automazione vanno in una
+domanda a parte, e un lavoro che serve sul server lo passi tu ai lavori server
+(«Se il lavoro si fa solo in locale»). L'owner risponde nella sezione Domande
+della Gestione.
 
 **Una domanda così FERMA il lavoro.** Il feedback aspetta la sua risposta e
 non riparte prima; poi riprende da dove era, con la risposta davanti. Quindi ci
@@ -19,6 +21,6 @@ verificando, lo scrivi come rilievo col suo livello), non lo chiedi. Consegna
 comunque tutto quello che hai fatto: è da lì che si riprende.
 
 Una domanda per consegna: due scelte stanno nella stessa domanda, come opzioni
-o nel problema. `--segnala <file.md>` con le tre parti di prima (Problema,
+o nel problema. `--segnala <file.md>` col markdown in tre parti (Problema,
 Scelte, Cosa ho fatto nel frattempo) vale ancora, e il server ne compone la
 domanda da sé: senza pro, contro e consiglio, però.

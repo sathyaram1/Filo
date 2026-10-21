@@ -8312,8 +8312,18 @@
     await loadData();
     await domandePronte;
     sceltaApertura();
+    apriDomandaDallIndirizzo();
     startLive();
   }
+
+  // `#domanda=D-12`: arriva dal segno «aspetta D-12» della pagina dei feedback, che porta dove si risponde.
+  function apriDomandaDallIndirizzo() {
+    const m = /^#domanda=(D-[1-9]\d{0,8})$/.exec(String(location.hash || ''));
+    if (!m) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    apriDomandaDelFeedback(m[1]);
+  }
+  window.addEventListener('hashchange', apriDomandaDallIndirizzo);
 
   // Un avvio rotto prima della lettura non deve lasciare le automazioni senza valori per sempre.
   const bootDone = init().catch((e) => { console.error('[manage] init:', e); }).finally(fineLetturaAutomazioni);

@@ -138,3 +138,75 @@ test('pagina dei feedback: stessa scheda In coda, e il segno «aspetta D-n» acc
   await expect(fb.locator('.fb-card', { hasText: 'Bloccato dalla sicurezza' })).toHaveCount(1);
   await expect(fb.locator('.fb-card', { hasText: 'Colore del tema' })).toHaveCount(0);
 });
+
+test('pagina dei feedback: il segno «aspetta D-n» è un tasto che apre la domanda in Gestione', async ({ openTab }) => {
+  const fb = await openTab('filo://feedback/feedback.html');
+  await fb.waitForLoadState('domcontentloaded');
+  await fb.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
+  await fb.evaluate(() => window.__fbTest.whenReady());
+  await fb.evaluate(() => {
+    window.__aperti = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'open_url') { window.__aperti.push(msg.url); return { ok: true }; }
+      return orig(msg);
+    };
+  });
+  await fb.evaluate(() => window.__fbTest.setAdmin(true));
+  await fb.evaluate((items) => window.__fbTest.setData(items), [ATTESA]);
+  await fb.locator('#tabs [data-tab="queue"]').click();
+  const segno = fb.locator('.fb-card', { hasText: 'Colore del tema' }).locator('button.fb-domanda');
+  await expect(segno).toHaveText('aspetta D-7');
+  await segno.click();
+  expect(await fb.evaluate(() => window.__aperti)).toEqual(['filo://manage/manage.html#domanda=D-7']);
+});
+
+test('Gestione aperta con #domanda=D-n apre quella domanda', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate(() => { location.hash = '#domanda=D-8'; });
+  await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-8"]')).toBeVisible();
+});
+
+test('la risposta alla domanda porta allegati: si caricano, si tolgono, e partono col testo', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate(() => {
+    window.__risposte = [];
+    let n = 0;
+    window.SN_FEEDBACK.uploadAttachment = async (file, name) => ({ kind: /^image\//.test(file.type) ? 'img' : 'file', url: `https://firebasestorage.googleapis.com/v0/b/x/o/${++n}`, name, type: file.type });
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'domanda_rispondi') {
+        window.__risposte.push(msg);
+        const d = window.__mgTest.domandeStato().domande.find((x) => x.id === msg.id);
+        return { ok: true, domanda: Object.assign({}, d, { stato: 'chiusa', esito: { ok: true, applicataIl: Date.now() } }), esito: { ok: true } };
+      }
+      return orig(msg);
+    };
+  });
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  await riga(page, 'Colore del tema').locator('.mg-domanda-badge').click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-7"]');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await dq.locator('.mg-dq-file').setInputFiles([
+    { name: 'schermata.png', mimeType: 'image/png', buffer: png },
+    { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('ciao') },
+  ]);
+  await expect(dq.locator('.mg-dq-allegato')).toHaveCount(2);
+  await expect(dq.locator('.mg-dq-allegato').first()).toContainText('Immagine 1');
+  await dq.locator('.mg-dq-allegato', { hasText: 'note.txt' }).locator('.mg-dq-allegato-x').click();
+  await expect(dq.locator('.mg-dq-allegato')).toHaveCount(1);
+  await dq.locator('.mg-dq-file').setInputFiles([{ name: 'pagina.html', mimeType: 'text/html', buffer: Buffer.from('<p>') }]);
+  await expect(dq.locator('.mg-dq-msg')).toContainText('non supportato');
+  await dq.locator('.mg-dq-testo').fill('Caldo, come nella schermata.');
+  await page.screenshot({ path: 'tests/.shots/manage-attesa-domanda-allegati.png' });
+  await dq.locator('button[data-fai="testo"]').click();
+  await expect.poll(() => page.evaluate(() => window.__risposte.length)).toBe(1);
+  const r = await page.evaluate(() => window.__risposte[0]);
+  expect(r.id).toBe('D-7');
+  expect(r.testo.split('\n')[0]).toBe('Caldo, come nella schermata.');
+  expect(r.testo).toContain('@@filo-attachment {"kind":"img","url":"https://firebasestorage.googleapis.com/v0/b/x/o/1"}');
+  expect(r.testo).not.toContain('note.txt');
+});

@@ -289,11 +289,16 @@
     return `<span class="fb-attesa" title="Nessuna routine lo prende finché non sono tutti fusi. Si cambia in Gestione.">⏳ aspetta ${escapeHtml(testo)}</span>`;
   }
 
-  // «Aspetta D-12», gemello del segno in Gestione (SPEC-DOMANDE §3.8): si risponde lì, nella sezione Domande.
+  // «Aspetta D-12», gemello del segno in Gestione (SPEC-DOMANDE §3.8): si risponde in un posto solo, e il clic ci porta.
   function domandaChipHtml(f) {
     const id = MR.aspettaDomanda(f);
     if (!id) return '';
-    return `<span class="fb-attesa fb-domanda" title="Aspetta la tua risposta alla domanda ${escapeHtml(id)}: si risponde in Gestione, sezione Domande.">aspetta ${escapeHtml(id)}</span>`;
+    const titolo = `Aspetta la tua risposta alla domanda ${id}: aprila in Gestione`;
+    return `<button type="button" class="fb-attesa fb-domanda" data-domanda="${escapeHtml(id)}" title="${escapeHtml(titolo)}" aria-label="${escapeHtml(titolo)}">aspetta ${escapeHtml(id)}</button>`;
+  }
+
+  function apriDomandaInGestione(id) {
+    return sendToMain({ type: 'open_url', url: `filo://manage/manage.html#domanda=${encodeURIComponent(id)}` });
   }
 
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
@@ -1472,6 +1477,10 @@
     // Composer "Invia risposta" del tab Chiarimenti: appende la risposta
     // dell'utente come turno (conservando la domanda di Filo nello storico) e
     // rimette il feedback in "Da risolvere" perché una routine lo riprenda.
+    root.querySelectorAll('.fb-domanda[data-domanda]').forEach((b) => {
+      b.addEventListener('click', (e) => { e.stopPropagation(); apriDomandaInGestione(b.dataset.domanda); });
+    });
+
     root.querySelectorAll('.fb-reply-send').forEach((btn) => {
       const id = btn.dataset.id;
       const card = btn.closest('.fb-card');

@@ -279,7 +279,7 @@
     if (!r) return null;
     if (a.tipo === 'riprendi') return `Riprendi ${r.num} con questa scelta`;
     if (a.tipo === 'archivia') return `Archivia ${r.num}`;
-    if (a.tipo === 'approva_locale') return `Approva come lavoro locale ${r.num}`;
+    if (a.tipo === 'approva_locale') return `Affida ${r.num} ai lavori server`;
     if (a.tipo === 'priorita') return Number.isInteger(r.priorita) ? `Priorità di ${r.num}: ${r.priorita} → ${a.valore}` : null;
     return null;
   }

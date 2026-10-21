@@ -44,6 +44,13 @@
   let tieni = null;
   const scelte = new Set();
   const bozze = new Map();
+  // Gli allegati della risposta, per domanda: partono col testo come righe d'allegato, che il server apre per chi
+  // riprende (immagini `rK.j`), come quelli della risposta dalla pagina dei feedback.
+  const allegati = new Map();
+  const caricando = new Map();
+  const ALLEGATI_MAX = { img: 5, file: 5 };
+  const ALLEGATO_MAX_BYTE = 4 * 1024 * 1024;
+  const ALLEGATI_ACCETTA = 'image/*,application/pdf,application/json,text/*,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml';
   const avvisi = new Map();
   const inCorso = new Set();
   let conferma = null;
@@ -440,7 +447,7 @@
       const ora = quando(t.ora, true);
       if (ora) head.appendChild(el('span', 'mg-dq-data', ora));
       li.appendChild(head);
-      if (t.testo) li.appendChild(tipoAutore === 'owner' ? el('div', 'mg-dq-turno-tuo', t.testo) : md(t.testo));
+      if (t.testo) li.appendChild(tipoAutore === 'owner' ? testoConAllegati(t.testo) : md(t.testo));
       ol.appendChild(li);
     }
     return sezione('mg-dq-conv', 'Conversazione', ol);
@@ -458,6 +465,7 @@
       ta.dataset.id = d.id;
       ta.disabled = occupata;
       box.appendChild(ta);
+      box.appendChild(rigaAllegati(d.id, occupata));
     }
     const tasti = el('div', 'mg-dq-tasti');
     const tasto = (testo, fai, cls, titolo) => {
@@ -477,6 +485,95 @@
     const msg = el('p', `mg-dq-msg${a && a.tipo ? ` mg-dq-msg--${a.tipo}` : ''}`, a ? a.testo : '');
     msg.setAttribute('role', 'status');
     box.appendChild(msg);
+    return box;
+  }
+
+  function etichettaAllegato(a, i) {
+    return a.kind === 'img' ? `Immagine ${i + 1}` : (a.name || 'allegato');
+  }
+
+  function rigaAllegati(id, occupata) {
+    const riga = el('div', 'mg-dq-allegati');
+    const lista = allegati.get(id) || [];
+    let immagini = 0;
+    lista.forEach((a, i) => {
+      if (a.kind === 'img') immagini += 1;
+      const chip = el('span', 'mg-dq-allegato', a.kind === 'img' ? `Immagine ${immagini}` : (a.name || 'allegato'));
+      chip.title = a.name || '';
+      const x = el('button', 'mg-dq-allegato-x', '×');
+      x.type = 'button';
+      x.dataset.fai = 'togli-allegato';
+      x.dataset.indice = String(i);
+      x.title = 'Togli';
+      x.setAttribute('aria-label', `Togli ${a.name || 'l’allegato'}`);
+      x.disabled = occupata;
+      chip.appendChild(x);
+      riga.appendChild(chip);
+    });
+    const b = el('button', 'sn-btn sn-btn-secondary mg-dq-allega', caricando.get(id) ? 'Caricamento…' : '+ Allega');
+    b.type = 'button';
+    b.dataset.fai = 'allega';
+    b.title = 'Immagini o file per chi riprende il lavoro; puoi anche incollarli nel testo';
+    b.disabled = occupata || !!caricando.get(id);
+    const input = el('input', 'mg-dq-file');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = ALLEGATI_ACCETTA;
+    input.hidden = true;
+    input.dataset.id = id;
+    riga.append(b, input);
+    return riga;
+  }
+
+  async function aggiungiAllegati(id, files) {
+    const AT = window.SN_FEEDBACK_ATTACH;
+    const FB = window.SN_FEEDBACK;
+    for (const file of files) {
+      const lista = allegati.get(id) || [];
+      const tipo = AT && typeof AT.classify === 'function' ? AT.classify(file) : (/^image\/(png|jpe?g|gif|webp|bmp)$/i.test(file.type || '') ? 'image' : null);
+      let errore = '';
+      if (!tipo) errore = 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+      else if (lista.filter((a) => (a.kind === 'img') === (tipo === 'image')).length >= ALLEGATI_MAX[tipo === 'image' ? 'img' : 'file']) errore = `Massimo ${ALLEGATI_MAX.img} immagini e ${ALLEGATI_MAX.file} file per risposta.`;
+      else if (file.size > ALLEGATO_MAX_BYTE) errore = `«${file.name || 'file'}» è troppo grande (massimo 4 MB).`;
+      else if (!FB || typeof FB.uploadAttachment !== 'function') errore = 'Il caricamento degli allegati non è disponibile qui.';
+      if (errore) { avvisi.set(id, { testo: errore, tipo: 'err' }); disegnaDettaglio(); continue; }
+      caricando.set(id, (caricando.get(id) || 0) + 1);
+      disegnaDettaglio();
+      try {
+        const att = await FB.uploadAttachment(file, file.name);
+        if (att && att.url) allegati.set(id, (allegati.get(id) || []).concat([att]));
+        if (avvisi.has(id) && avvisi.get(id).tipo === 'err') avvisi.delete(id);
+      } catch (e) {
+        avvisi.set(id, { testo: `Allegato non caricato: ${(e && e.message) || e}`, tipo: 'err' });
+      } finally {
+        const n = (caricando.get(id) || 1) - 1;
+        if (n > 0) caricando.set(id, n); else caricando.delete(id);
+        disegnaDettaglio();
+      }
+    }
+  }
+
+  // Il turno dell'owner porta gli allegati come righe-marcatore: a schermo diventano i loro nomi.
+  function testoConAllegati(testo) {
+    const TH = window.SN_FEEDBACK_THREAD;
+    const box = el('div', 'mg-dq-turno-tuo');
+    const parole = [];
+    const trovati = [];
+    for (const riga of String(testo || '').split('\n')) {
+      const a = TH && typeof TH.parseAttachmentLine === 'function' ? TH.parseAttachmentLine(riga) : null;
+      if (a) trovati.push(a); else parole.push(riga);
+    }
+    const t = parole.join('\n').trim();
+    if (t) box.appendChild(el('div', '', t));
+    if (trovati.length) {
+      const riga = el('div', 'mg-dq-allegati');
+      let immagini = 0;
+      for (const a of trovati) {
+        if (a.kind === 'img') immagini += 1;
+        riga.appendChild(el('span', 'mg-dq-allegato', a.kind === 'img' ? `Immagine ${immagini}` : (a.name || 'allegato')));
+      }
+      box.appendChild(riga);
+    }
     return box;
   }
 
@@ -506,7 +603,8 @@
     if (!box) return;
     const ds = aperta ? aperta.ids.map(trova).filter(Boolean) : [];
     const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.esito, d.titolo, d.illeggibile,
-      ...(d.opzioni || []).map((o) => etichettaDi(o))]), [...inCorso], [...avvisi], stato.lette]);
+      ...(d.opzioni || []).map((o) => etichettaDi(o))]), [...inCorso], [...avvisi], stato.lette,
+      [...allegati].map(([k, v]) => [k, v.map((a) => a.url)]), [...caricando]]);
     if (firma === firmaDettaglio) return;
     firmaDettaglio = firma;
     // Chi stava scrivendo ritrova il cursore dov'era: il dettaglio si ridisegna anche per un esito altrui.
@@ -642,7 +740,13 @@
   }
 
   async function rispondi(id, scelta) {
-    const testo = (bozze.get(id) || '').trim();
+    if (caricando.get(id)) {
+      avvisi.set(id, { testo: 'Aspetta che gli allegati finiscano di caricarsi.', tipo: 'err' });
+      disegnaDettaglio();
+      return;
+    }
+    const righe = window.SN_FEEDBACK_THREAD ? window.SN_FEEDBACK_THREAD.attachmentsBlock(allegati.get(id) || []) : '';
+    const testo = [(bozze.get(id) || '').trim(), righe].filter(Boolean).join('\n');
     const req = { type: T.rispondi, id };
     if (Number.isInteger(scelta)) req.scelta = scelta;
     if (testo) req.testo = testo;
@@ -653,7 +757,7 @@
     }
     const r = await manda(id, req, 'Invio…');
     if (!r) return;
-    if (r.ok) bozze.delete(id);
+    if (r.ok) { bozze.delete(id); allegati.delete(id); }
     const d = r.domanda || trova(id);
     dopo(id, r, d && d.stato === 'in_lavorazione' ? 'Mandata: la prende un agente.' : 'Fatto.');
   }
@@ -661,7 +765,7 @@
   async function consiglioUna(id) {
     // Col testo scritto il consiglio è una scelta come le altre: le parole partono con lei.
     const d = trova(id);
-    if ((bozze.get(id) || '').trim() && d && d.consiglio) return rispondi(id, d.consiglio.opzione);
+    if (((bozze.get(id) || '').trim() || (allegati.get(id) || []).length) && d && d.consiglio) return rispondi(id, d.consiglio.opzione);
     if (inCorso.has(id)) return;
     inCorso.add(id);
     avvisi.set(id, { testo: 'Applico il consiglio…', tipo: '' });
@@ -882,6 +986,31 @@
       else if (fai === 'discuti') discuti(id);
       else if (fai === 'chiudi') archivia(id, false);
       else if (fai === 'riapri') archivia(id, true);
+      else if (fai === 'allega') { const f = b.closest('.mg-dq-allegati').querySelector('.mg-dq-file'); if (f) f.click(); }
+      else if (fai === 'togli-allegato') {
+        const lista = (allegati.get(id) || []).slice();
+        lista.splice(Number(b.dataset.indice), 1);
+        if (lista.length) allegati.set(id, lista); else allegati.delete(id);
+        disegnaDettaglio();
+      }
+    });
+    det.addEventListener('change', (e) => {
+      const f = e.target.closest('.mg-dq-file');
+      if (!f) return;
+      const files = Array.from(f.files || []);
+      f.value = '';
+      if (files.length) aggiungiAllegati(f.dataset.id, files);
+    });
+    // Incolla: un'immagine negli appunti diventa un allegato, il testo resta testo.
+    det.addEventListener('paste', (e) => {
+      const ta = e.target.closest('.mg-dq-testo');
+      const items = ta && e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      const files = [];
+      for (const it of items) if (it.kind === 'file') { const b = it.getAsFile(); if (b) files.push(b); }
+      if (!files.length) return;
+      e.preventDefault();
+      aggiungiAllegati(ta.dataset.id, files);
     });
   }
 
