@@ -117,7 +117,11 @@
     // calcolano), lascia abilitati: meglio rispetto al falso "disabilitato".
     const canBack = navState ? !!navState.canBack : true;
     const canFwd = navState ? !!navState.canFwd : true;
+    // Come nella barra laterale: l'icona dice cosa farà il clic sul pannello Aiuto di questa pagina (#1432).
+    const statoAiuto = (typeof deps.aiutoStato === 'function' && deps.aiutoStato()) || {};
+    const aiuto = Disp.aspettoAiuto({ ...statoAiuto, risposta: !!statoAiuto.nonLetta });
     const registry = {
+      help:          { id: 'help',          icon: I(aiuto.icona),   iconName: aiuto.icona, label: I18n.t(aiuto.etichetta), onClick: () => deps.aiutoPasso && deps.aiutoPasso() },
       translate:     { id: 'translate',     icon: translateIcon,    iconName: restore ? 'showOriginal' : 'translate', label: translateLabel, onClick: () => (restore ? Translate.restoreOriginal() : Translate.translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => Actions.takeScreenshot() },
       screenshotCrop:{ id: 'screenshotCrop',icon: I('screenshotCrop'),label: I18n.t('menu_screenshot_crop'), onClick: () => Actions.takePartialScreenshot() },
