@@ -1131,8 +1131,8 @@
   function listArchiveTab(feedbacks, opts) {
     const starredOnly = !!(opts && opts.starredOnly);
     const confirmedOnly = !!(opts && opts.confirmedOnly);
-    let items = (feedbacks || []).filter((f) =>
-      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived');
+    let items = filtraFiducia((feedbacks || []).filter((f) =>
+      starredOnly ? isStarred(f) : manageTabFor(f) === 'archived'), opts && opts.soloNonFidate);
     if (confirmedOnly) {
       items = items.filter((f) => String(normalizeStatus(f).status).endsWith('_confirmed'));
     }
