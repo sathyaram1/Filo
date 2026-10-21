@@ -107,14 +107,17 @@ function createDetonator({
   // è applicato non si carica niente, e se fallisce la pagina non si apre.
   function impostaRete(ses, partition, rete) {
     const chiave = rete ? JSON.stringify([rete.proxyRules, rete.proxyBypassRules || '']) : '';
-    if (rete) ProxyTab.registraRete(partition, ses, { proxyRules: rete.proxyRules, bypassRules: rete.proxyBypassRules, auth: rete.auth });
+    // Lo stesso proxy con le credenziali di un altro paese: le vecchie si dimenticano prima di caricare.
+    let dimentica = null;
+    if (rete) dimentica = ProxyTab.registraRete(partition, ses, { proxyRules: rete.proxyRules, bypassRules: rete.proxyBypassRules, auth: rete.auth });
     else ProxyTab.clearPartitionAuth(partition);
-    if ((retiDeiPosti.get(partition) || '') === chiave) return null;
+    if ((retiDeiPosti.get(partition) || '') === chiave) return dimentica;
     if (typeof ses.setProxy !== 'function') return Promise.reject(new Error('proxy non applicabile'));
     const config = rete ? { proxyRules: rete.proxyRules, ...(rete.proxyBypassRules ? { proxyBypassRules: rete.proxyBypassRules } : {}) } : { mode: 'system' };
     retiDeiPosti.delete(partition);
     return Promise.resolve(ses.setProxy(config))
       .then(() => (typeof ses.closeAllConnections === 'function' ? ses.closeAllConnections() : null))
+      .then(() => dimentica)
       .then(() => { retiDeiPosti.set(partition, chiave); });
   }
 
