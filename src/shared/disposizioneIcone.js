@@ -104,7 +104,8 @@
     for (const id of AGGIUNTE) {
       if (visti.has(id)) continue;
       visti.add(id);
-      if (GLOBALI.includes(id)) barra.push(id);
+      if (IN_CIMA.includes(id)) barra.unshift(id);
+      else if (GLOBALI.includes(id)) barra.push(id);
       else secondary.unshift(id);
     }
     const layout = { primary, secondary, bar: barra };
