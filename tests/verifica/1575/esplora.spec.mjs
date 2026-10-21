@@ -72,9 +72,9 @@ test('esplora', async ({ openTab }) => {
   // filtro + stelle
   await apriScheda(page, 'queue');
   await page.locator('#mgFiduciaFiltro').click();
-  await page.locator('#mgStarFilter').check({ force: true });
+  await page.evaluate(() => { const c = document.getElementById('mgStarFilter'); c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
   console.log('stelle+filtro', await page.locator('#mgList .mg-item').count(), await tabBtn(page, 'queue').textContent(), await page.locator('#mgFiduciaFiltro').textContent(), await page.locator('#mgListHead').textContent());
-  await page.locator('#mgStarFilter').uncheck({ force: true });
+  await page.evaluate(() => { const c = document.getElementById('mgStarFilter'); c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); });
   // Segna fidato col filtro acceso: cosa succede alla riga aperta
   await riga(page, wN).click();
   await page.locator('#mgFiduciaBtn').click();
