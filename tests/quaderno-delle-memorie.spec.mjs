@@ -488,7 +488,7 @@ test('svuoto una riga e la confermo: si toglie e si rimette; una correzione trop
   await campo.fill('x'.repeat(900));
   await campo.press('Enter');
   const errore = page.locator('.qd-errore:not([hidden])');
-  await expect(errore).toHaveText('La correzione è lunga 900 caratteri e il massimo è 800: accorciala per salvarla.');
+  await expect(errore).toHaveText('La correzione è lunga 900 caratteri e il massimo è 800. Accorciala per salvarla.');
   await expect(campo).toBeFocused();
   await page.screenshot({ path: 'tests/.shots/quaderno-correzione-lunga.png' });
   await campo.press('Escape');
