@@ -175,6 +175,14 @@ test('feedback su un sito: le modifiche dell\'utente passano tutte (cancella, pa
   await s.send('Input.imeSetComposition', { text: 'にほ', selectionStart: 2, selectionEnd: 2 });
   await s.send('Input.insertText', { text: '日本' });
   await expect.poll(v).toBe('no due riga 1\n日本');
+  // Backspace su un'emoji composta: va via, il resto resta.
+  await page.keyboard.insertText(' 👨‍👩‍👧');
+  await page.keyboard.press('Backspace');
+  const dopo = await v();
+  expect(dopo.startsWith('no due riga 1\n日本 ') && dopo.length < 'no due riga 1\n日本 👨‍👩‍👧'.length).toBe(true);
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.insertText('no due riga 1\n日本');
   await expect.poll(() => bozza(app, testServer.origin)).toBe('no due riga 1\n日本');
 });
 
