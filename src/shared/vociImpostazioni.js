@@ -58,6 +58,7 @@
         propostaEmailIncognito: 'propostaEmail.incognito',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
+        contestoCache: 'contestoFilo.cache',
         lunghezzaConversazioni: 'lunghezzaRisposte.conversazioni',
         lunghezzaTesti: 'lunghezzaRisposte.testi',
         lunghezzaBrevi: 'lunghezzaRisposte.brevi',
