@@ -6167,6 +6167,11 @@
       if (Array.isArray(livelli)) { livelliScelti = livelli.filter((l) => MR.LIVELLI_RICEVUTI.includes(l)); renderList(); }
       return livelliScelti.slice();
     },
+    // «Solo non fidate»: con un booleano lo imposta, sempre ritorna com'è.
+    fiduciaFiltro(v) {
+      if (typeof v === 'boolean') impostaSoloNonFidate(v);
+      return soloNonFidate;
+    },
     // Ordinamento della lista (menu tasto destro): impostalo e rirender.
     setSortMode(mode) { if (SORT_MODES[mode]) { sortMode = mode; reflectSortBtn(); renderList(); } },
     getSortMode() { return sortMode; },
