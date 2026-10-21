@@ -119,9 +119,7 @@ test('senza l\'accesso del proprietario «Annulla» ferma la segnalazione prima 
   expect(await chiedi(app, { type: 'AUTO_FEEDBACK_PARTI', id: terzo.biglietto }, BARRA)).toEqual({ ok: true });
   await expect.poll(() => inviate(app).then((l) => l.length), { timeout: 10_000 }).toBe(2);
   await terzo.toast.locator('.shell-notif-action', { hasText: 'Annulla' }).click();
-  await expect(terzo.vista.locator('.shell-notif.show', { hasText: 'La segnalazione è già partita e non posso più ritirarla' })).toBeVisible({ timeout: 10_000 });
-  await terzo.vista.screenshot({ path: 'tests/.shots/784-6-annulla-tardi.png' });
-  expect(await scritture(app), 'chi non è l\'owner non ha il permesso di scrivere lo stato').toEqual([]);
+  await expect(terzo.vista.locator('.shell-notif.show', { hasText: 'La segnalazione è già partita e non posso più ritirarla' })).toBeVisible({ timeout: 10_000 });  expect(await scritture(app), 'chi non è l\'owner non ha il permesso di scrivere lo stato').toEqual([]);
 });
 
 test('con la sessione del proprietario «Annulla» ferma la segnalazione, e una già partita la segna «ignorata»', async ({ app, shell, avvisi }) => {
