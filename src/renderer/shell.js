@@ -434,8 +434,11 @@
     // sloggato mostra "Accedi con Google" + incognito.
     accountBtn.addEventListener('click', async () => {
       if (authBusy) return;
+      // L'ancora la toglie chi aziona il bottone appena il clic torna: dopo l'attesa il menu finiva nell'angolo.
+      const ancora = ancoraMenu;
       // Google nelle schede cambia senza avvisi (un accesso o un'uscita fatti in una scheda): si chiede adesso.
       if (authProfile) await refreshAuth({ senzaRete: true });
+      ancoraMenu = ancora;
       if (authProfile) {
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
