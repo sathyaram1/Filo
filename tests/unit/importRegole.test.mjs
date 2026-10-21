@@ -196,9 +196,13 @@ test('tetto di spesa: resta il più stretto fra qui e il backup, e quello più l
   const piuStrettoNelBackup = caso({ monthlyLimitEur: 20 }, { monthlyLimitEur: 3 });
   assert.equal(piuStrettoNelBackup.merged[S].monthlyLimitEur, 3);
   assert.equal(piuStrettoNelBackup.stats.tettoSpesa, null, 'niente da offrire: vale già il più stretto');
+  assert.deepEqual(piuStrettoNelBackup.stats.tettoSceso, { prima: 20, dopo: 3 }, 'il tetto che scende la conferma lo dice coi numeri');
 
   const quiSenzaTetto = caso({ monthlyLimitEur: 0 }, { monthlyLimitEur: 8 });
   assert.equal(quiSenzaTetto.merged[S].monthlyLimitEur, 8);
+  assert.deepEqual(quiSenzaTetto.stats.tettoSceso, { prima: 0, dopo: 8 });
+  assert.equal(caso({ monthlyLimitEur: 5 }, { monthlyLimitEur: 5 }).stats.tettoSceso, null, 'uguale: niente da dire');
+  assert.equal(senzaTetto.stats.tettoSceso, null);
 
   // Il computer nuovo: le impostazioni non hanno ancora il tetto, che vale quello di serie.
   const nuovo = caso(undefined, { monthlyLimitEur: 50, theme: 'dark' });
