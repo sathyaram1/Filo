@@ -236,7 +236,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     ora,
     giorni: tetti.giorni,
     token: tetti.token,
-    ancora: ancore[lato],
+    ancora: solo ? null : ancore[lato],
     chatCorrente: chatId,
     esiti: (m) => {
       const k = FC().chiave(m);
