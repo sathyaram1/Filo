@@ -282,6 +282,7 @@
     // Quello del server vince: è il nome con cui la persona compare all'owner.
     renderPseudonym(has ? String(server.pseudonym || w.pseudonym || '') : '');
     if (!w || !w.ok) { box.hidden = true; return; }
+    ultimoStato = w;
     box.hidden = false;
     const note = $('walletNote');
     note.hidden = true;
