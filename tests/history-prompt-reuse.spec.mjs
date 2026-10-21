@@ -68,7 +68,7 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
     expect(page, 'la pagina cronologia deve aprirsi').toBeTruthy();
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(page.locator('.sn-history-item')).toHaveCount(2);
+    await expect(page.locator('.sn-history-item')).toHaveCount(3);
 
     // La voce con riuso lo dichiara con la sua percentuale…
     const reused = page.locator('.sn-history-item', { hasText: 'messaggio con riuso' });
