@@ -575,6 +575,16 @@ export function checkDelivery(root, assignedBranch, { da } = {}) {
     };
   }
   const v = identityVerdict(currentBranch(root), assignedBranch);
+  if (v.ok && v.assigned) {
+    const fuori = lavoroInUnAltroWorktree(root, { dal: dal ?? (readExpectation(root) || {}).since });
+    if (fuori) {
+      const lista = fuori.commit.map((c) => c.slice(0, 12)).join(' ');
+      return {
+        ...v, ok: false, altrove: fuori,
+        reason: `il ramo "${v.assigned}" non contiene ${fuori.commit.length === 1 ? 'un commit fatto' : `${fuori.commit.length} commit fatti`} dopo l'inizio di questo lavoro nella cartella "${fuori.cartella}"${fuori.ramo ? ` (ramo "${fuori.ramo}")` : ''}, e la verifica non li troverebbe: portali qui (\`git -C "${fuori.radice}" cherry-pick ${lista}\`) e registra di nuovo; se non sono di questo lavoro, togli quella cartella (\`git worktree remove "${fuori.cartella}"\`, il suo ramo resta)`,
+      };
+    }
+  }
   if (v.ok || v.current) return v;
   // Durante il rebase del ramo assegnato la cartella è staccata per forza: il rifiuto resta, ma non è una
   // deriva (`rebase: true`). Il rebase di un altro ramo lo è.

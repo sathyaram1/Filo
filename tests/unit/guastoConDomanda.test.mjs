@@ -192,3 +192,20 @@ test('se il server rifiuta la domanda, chi chiede legge il motivo esatto: è que
   const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'));
   assert.match(pezzo, /con `RIFIUTATO dal server: …`, al posto del numero va quel messaggio esatto/);
 });
+
+// #1241.1: il server prende domande solo da chi risolve, corregge o verifica; il controllo di sicurezza riceverebbe
+// un no certo, e il guasto lo dice nel solo rilascio.
+test('il controllo di sicurezza salta la domanda di guasto e rilascia col guasto; chi la può aprire non la salta', () => {
+  const sec = piatto(readRoleInstructions('secaudit', {}));
+  const sezione = sec.slice(sec.indexOf(SEZIONE));
+  assert.match(sezione, /Il controllo di sicurezza salta il passo 1\*\*: il server prende domande solo da chi risolve, corregge o verifica/);
+  assert.match(sezione, /basta il rilascio del passo 3, con `--guasto "<gruppo>: <messaggio>"`/);
+  const ruolo = piatto(readFileSync(join(RUOLI, 'secaudit.md'), 'utf8'));
+  assert.doesNotMatch(ruolo, /guasto, con la sua domanda/, 'il testo del ruolo non lo manda alla domanda');
+  assert.match(ruolo, /tu la domanda non la apri/);
+  assert.match(piatto(readFileSync(join(RUOLI, '_contratto-worker.md'), 'utf8')), /il controllo di sicurezza: il solo rilascio/);
+  for (const [ruolo2, opts] of [...CHI_RISOLVE, ['verifier', { scope: 'pieno' }]]) {
+    const t = piatto(readRoleInstructions(ruolo2, opts));
+    assert.match(t, /1\. La domanda, coi campi di SPEC-DOMANDE/, `${ruolo2}: la domanda resta il primo passo`);
+  }
+});
