@@ -1650,12 +1650,8 @@
       candidati: candidati.slice(0, 20).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
       contesto,
       ripetizioni: ripetizioniAttive(),
-      luogo: { sito: sitoDellaPagina() },
-    };
-    const [regioneCampo, nuovoCampo] = d.riporta([{ start: g.start, end: g.end }, g.nuovo]);
-    const viaggio = {
-      id: `g${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0,
-      nuovo: nuovoCampo || null,
+      segnaposti: segnapostiAttivi(),
+      luogo: { sito: luogoDi(state).sito },
     };
     state.inViaggio.push(viaggio);
     let res = null;
