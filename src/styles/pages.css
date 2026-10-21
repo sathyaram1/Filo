@@ -336,11 +336,15 @@ html, body {
   margin-top: 16px;
 }
 
+/* Le voci fuori schermo non si impaginano: ogni lettera della ricerca e ogni lotto disegnato scorrendo impaginavano
+   cento risposte lunghe per mostrarne otto. L'altezza stimata vale finché la voce non è stata vista. */
 .sn-history-item {
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
   padding: 12px;
   background: var(--sn-bg);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
 }
 
 .sn-history-meta {

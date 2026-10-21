@@ -31,6 +31,19 @@
     items = r?.items || [];
     buildFilterOptions();
     render();
+    preparaRicerca();
+  }
+
+  // La prima lettera della ricerca non deve comporre il testo di migliaia di voci: lo si fa mentre la pagina è ferma.
+  function preparaRicerca() {
+    if (typeof requestIdleCallback !== 'function') return;
+    const lista = items;
+    let i = 0;
+    const passo = (scadenza) => {
+      while (i < lista.length && scadenza.timeRemaining() > 1) { if (lista[i]) haystackOf(lista[i]); i++; }
+      if (i < lista.length && lista === items) requestIdleCallback(passo);
+    };
+    requestIdleCallback(passo);
   }
   // Un backup importato in un'altra scheda porta voci sue: compaiono senza riaprire la pagina (#1256).
   try {
@@ -222,6 +235,7 @@
       e.stopPropagation();
       const r = await chrome.runtime.sendMessage({ type: MSG.REMOVE_HISTORY_ENTRY, id: it.id });
       items = r?.items || items.filter((x) => x.id !== it.id);
+      preparaRicerca();
       // Un tipo d'azione può essere scomparso del tutto: riallinea il filtro.
       const prima = $('filter').value;
       buildFilterOptions();
