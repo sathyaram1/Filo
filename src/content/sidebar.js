@@ -84,8 +84,10 @@
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
   function isOpen() { return !!(root && root.isConnected); }
 
-  function close() {
+  // `davvero`: anche con una risposta in arrivo (l'Aiuto spento in Preferenze).
+  function close({ davvero = false } = {}) {
     if (!root) return;
+    if (!davvero && inVolo > 0) { if (!nascosto) nascondi(); return; }
     Highlight.clear();
     try { Highlight.clearForceHover?.(); } catch (_) {}
     if (docClickHandler) {
