@@ -333,11 +333,18 @@
     };
   }
 
+  function daAnthropic(model) {
+    return String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '').startsWith('anthropic/');
+  }
+
   // I punti di cache del piano (SN_FILO_CONTESTO.pianoDellaCache) li vogliono espliciti solo i modelli Anthropic: gli
   // altri riconoscono da soli il prefisso ripetuto e ricevono i messaggi tali e quali. Anthropic ne accetta al più 4.
   const MAX_PUNTI_CACHE = 4;
-  function vuoleCacheEsplicita(model) {
-    return String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '').startsWith('anthropic/');
+  const vuoleCacheEsplicita = daAnthropic;
+
+  // I messaggi che partono: punti di cache e, per Claude, solo il ragionamento col prefisso intatto (ragionamentoRimandato.js).
+  function messaggiDaMandare(model, messages, cache, tools) {
+    return Ragionamento.daRimandare(conPuntiDiCache(model, messages, cache), { strumenti: tools, controlla: daAnthropic(model) });
   }
 
   function partiConPunto(content, caratteri, cacheControl) {
