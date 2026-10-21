@@ -73,7 +73,13 @@ A ogni risposta Filo registra chi l'ha servita davvero, e lo vedi nella Cronolog
 
 ## Il server di Filo
 
-Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Per chi usa l'app fa cinque cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback e i contatori, gestisce i crediti, ospita il red team e conserva i percorsi dell'Aiuto, cioè i passi che hanno funzionato su un sito.
+Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Per chi usa l'app fa cinque cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback e i contatori, gestisce i crediti, ospita il red team e conserva i percorsi dell'Aiuto, cioè i passi che hanno funzionato su un sito.
+
+Le parti del server non stanno tutte nello stesso posto:
+
+- **Il codice** gira in Europa, in Belgio (la regione europe-west1 di Google). Le richieste che Filo manda al server arrivano lì.
+- **Il database** sta negli Stati Uniti, su più regioni (Google lo chiama nam5). Lì c'è quasi tutto quello che il server conserva: i feedback, l'elenco dei mittenti, i documenti dei crediti (compreso quello dei consumi, con email e nome di chi fa il login), il registro d'uso, i contatori e il red team. Ho deciso di portarlo in Europa: quando lo spostamento sarà fatto, questa riga cambierà.
+- **Le identità** stanno negli Stati Uniti, e ci restano anche dopo il database. Le tiene il servizio di accesso di Firebase, che gira solo lì e non si può spostare: l'identità anonima di ogni installazione e, se fai il login con Google, la tua email e il tuo nome.
 
 All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; il primo giorno chiede anche se c'è un invito che lo aspetta. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
 
