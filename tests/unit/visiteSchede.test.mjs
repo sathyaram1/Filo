@@ -45,17 +45,20 @@ test('venti replaceState su una mappa sono una visita sola, con l’indirizzo pi
   assert.equal(scritte[0].url, 'https://mappe.test/?@21');
 });
 
+// Il gesto (un clic sulla scheda, la barra, indietro): senza, una pagina che cambia indirizzo da sola si frena (#1525).
+const gesto = () => ({ gesto: Date.now() });
+
 test('pushState è una pagina nuova, anche a cronologia piena; tornare indietro dentro la pagina pure', async () => {
   const { v, scritte, fermo } = prepara();
   const wc = schedaFinta();
   for (let i = 0; i < 55; i++) {
     wc.push(`https://video.test/watch?v=${i}`);
-    v.navigata(wc, 1, `https://video.test/watch?v=${i}`, { inPagina: i > 0 });
+    v.navigata(wc, 1, `https://video.test/watch?v=${i}`, { inPagina: i > 0, ...gesto() });
     v.titolo(wc, `Video ${i}`);
     v.caricata(wc);
   }
   wc.back();
-  v.navigata(wc, 1, 'https://video.test/watch?v=53', { inPagina: true });
+  v.navigata(wc, 1, 'https://video.test/watch?v=53', { inPagina: true, ...gesto() });
   v.titolo(wc, 'Video 53');
   await fermo();
   assert.equal(scritte.length, 56);
