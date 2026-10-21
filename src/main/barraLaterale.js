@@ -482,6 +482,7 @@ class BarraLaterale {
     for (const id of this.layout.bar) {
       const d = D.ICONE[id];
       if (!d || (d.soloOwner && !owner)) continue;
+      if (d.tipo === 'aiuto') { out.push(this._iconaAiuto(id, nav.aiuto)); continue; }
       let icona = d.icona;
       let chiave = d.etichetta;
       if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
