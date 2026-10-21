@@ -3808,9 +3808,13 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
     });
 }
 
-// Le capacità che l'agente conosce dipendono da chi usa Filo: il Red Team in pausa solo a chi lo vede (#896).
+// Le capacità che l'agente conosce dipendono da chi usa Filo: Red Team (#896), Bacheca e Mazzi (#1592) in pausa
+// solo a chi li vede.
 function cancelliAperti() {
-  try { return { redteam: require('./redteamGate').visibile() }; } catch (_) { return {}; }
+  const aperti = {};
+  try { aperti.redteam = require('./redteamGate').visibile(); } catch (_) {}
+  try { Object.assign(aperti, require('./inPausa').aperti()); } catch (_) {}
+  return aperti;
 }
 
 function broadcastLiveUpdate() {
