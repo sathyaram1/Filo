@@ -2667,11 +2667,14 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni({ livelli: livelliScelti }));
+      base = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni({ livelli: livelliScelti }));
       if (currentTab === 'inbox' && livelliScelti.length) {
         mgListEmpty.textContent = `Nessun feedback fermo a ${livelliScelti.slice().sort().map((l) => l.toUpperCase()).join(' o ')}.`;
       }
     }
+    currentList = MR.filtraFiducia(base, soloNonFidate);
+    if (soloNonFidate && base.length && !currentList.length) mgListEmpty.textContent = 'Qui sono tutte fidate.';
+    aggiornaFiltroFiducia(base);
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
     // destro sull'intestazione). In 'smart' resta l'ordine predefinito sopra.
