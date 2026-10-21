@@ -86,7 +86,8 @@ const PRELUDIO = `/*${ETICHETTA}*/const VALIDITA_MS=${VALIDITA_MS},DURATA_VOCE_M
   + `MOTIVO_SOTTOFONDO=${JSON.stringify(MOTIVO_SOTTOFONDO)},MOTIVO_LANCIO=${JSON.stringify(MOTIVO_LANCIO)},`
   + `MOTIVO_IMPOSTAZIONI=${JSON.stringify(MOTIVO_IMPOSTAZIONI)},MOTIVO_SENZA_BIGLIETTO=${JSON.stringify(MOTIVO_SENZA_BIGLIETTO)},`
   + `MOTIVO_DUE_BIGLIETTI=${JSON.stringify(MOTIVO_DUE_BIGLIETTI)},MOTIVO_REGISTRO=${JSON.stringify(MOTIVO_REGISTRO)},`
-  + `MOTIVO_SCONOSCIUTO=${JSON.stringify(MOTIVO_SCONOSCIUTO)},MOTIVO_IGNOTO=${JSON.stringify(MOTIVO_IGNOTO)};`;
+  + `MOTIVO_SCONOSCIUTO=${JSON.stringify(MOTIVO_SCONOSCIUTO)},MOTIVO_IGNOTO=${JSON.stringify(MOTIVO_IGNOTO)},`
+  + `MOTIVO_NOTIFICA=${JSON.stringify(MOTIVO_NOTIFICA)};`;
 
 // Le barre di Windows diventano normali (Node le accetta), così il corpo resta senza barre rovesciate.
 export function comando({ sessione = '', creato, registro = '' }) {
