@@ -90,8 +90,8 @@ test('la striscia e la maniglia la aprono, la scorciatoia la apre e la chiude, E
   await premi(app, 'scheda', 'B', ['control', 'shift']);
   await expect.poll(() => aperta(app)).toBe(true);
   expect((await statoBarra(app)).motivo).toBe('tasto');
-  // Aperta da tastiera prende il fuoco sulla prima icona che fa qualcosa.
-  await expect.poll(() => barra.evaluate(() => document.activeElement && document.activeElement.dataset.id)).toBe('reload');
+  // Aperta da tastiera prende il fuoco sulla prima icona che fa qualcosa: l'Aiuto, in cima (#1432).
+  await expect.poll(() => barra.evaluate(() => document.activeElement && document.activeElement.dataset.id)).toBe('help');
   await premi(app, 'barra', 'Escape');
   await expect.poll(() => aperta(app)).toBe(false);
   // …e la tastiera torna alla pagina.
@@ -564,8 +564,9 @@ test('dentro la barra le icone si riordinano trascinandole, e l\'ordine resta', 
   await barra.mouse.move(back.x + back.width / 2, back.y + 4, { steps: 6 });
   await expect(barra.locator('#nav .segno')).toHaveCount(1);
   await barra.mouse.up();
-  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['home', 'back']);
-  await expect.poll(() => barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id).slice(0, 2))).toEqual(['home', 'back']);
+  // Sopra di loro resta l'Aiuto, che per partenza sta in cima (#1432).
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 3)).toEqual(['help', 'home', 'back']);
+  await expect.poll(() => barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id).slice(0, 3))).toEqual(['help', 'home', 'back']);
   // Il clic che chiude il trascinamento non preme l'icona: la scheda resta dov'era.
   expect(await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
