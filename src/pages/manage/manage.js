@@ -3807,40 +3807,6 @@
     });
   }
 
-  async function setLocalSign(id, valore) {
-    const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb) return;
-    const check = MR.localSignCheck(fb, valore);
-    const num = FB.formatNum(fb.seq, fb.subSeq);
-    const chi = num ? ` (#${num})` : '';
-    if (!check.ok) { setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${check.motivo}.`, 'err'); return; }
-    if (selectedId === id && mgLocalBtn) mgLocalBtn.disabled = true;
-    setManageMsg(valore ? 'Segno la pratica come lavoro server…' : (check.chiusa ? 'Tolgo il segno…' : 'La tolgo dai lavori server…'), '');
-    try {
-      const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
-      if (selectedId === id) reflectLocal(fb);
-      renderList();
-      const dove = MR.manageTabFor(fb, opzSezioni());
-      const fatto = !valore
-        ? (check.chiusa ? `Da ora${chi} non è più un lavoro server${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} è un lavoro come gli altri.`)
-        : check.chiusa ? `Segnata${chi} come lavoro server${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
-          : `Da ora${chi} è un lavoro server${dove === 'local' ? ': la trovi nei Lavori server' : ''}.`;
-      setManageMsg(fatto, 'ok');
-    } catch (e) {
-      setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${e.message || 'Errore'}`, 'err');
-    } finally {
-      if (mgLocalBtn) mgLocalBtn.disabled = false;
-    }
-  }
-  if (mgLocalBtn) {
-    mgLocalBtn.addEventListener('click', () => {
-      const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
-      if (fb) setLocalSign(fb._id, !MR.isLocalOnly(fb));
-    });
-  }
-
   // ── «Aspetta #N» (#903) ───────────────────────────────────────────────────
   // I feedback da fondere prima: finché uno non lo è nessuna routine lo prende, e qui sta fra quelli che aspettano.
   // Numeri, esistenza e giri li controlla il main (MSG.FEEDBACK_UPDATE); la regola sta in SN_FB_ATTESE.
