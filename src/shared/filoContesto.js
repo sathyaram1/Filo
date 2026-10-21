@@ -453,13 +453,15 @@
       + blocchi.join('\n\n');
   }
 
+  const INTESTAZIONE_CODA = '═══ CONTESTO DI ADESSO (lo scrive Filo, non l\'utente: vale per il messaggio qui sotto) ═══';
+
   // Il blocco subito prima della domanda: tutto ciò che cambia a ogni turno, così il filo davanti resta identico.
   function coda({ contesto = '', ricordi = '', chatCorrente = null, nuova = false } = {}) {
     const dove = chatCorrente
       ? (nuova ? `Questa scheda ha appena aperto la chat ${etichettaChat(chatCorrente)}.` : `Questa scheda è la chat ${etichettaChat(chatCorrente)}.`)
       : '';
     return [
-      '═══ CONTESTO DI ADESSO (lo scrive Filo, non l\'utente: vale per il messaggio qui sotto) ═══',
+      INTESTAZIONE_CODA,
       dove,
       contesto,
       ricordi,
