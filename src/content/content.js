@@ -1960,7 +1960,7 @@
   }
 
   // Helper: costruisce gli item del menu normale per un determinato evento mouse.
-  async function buildBaseItemsAt(mouseEvent) {
+  async function buildBaseItemsAt(mouseEvent, { senzaValuta = false } = {}) {
     const target = realTarget(mouseEvent);
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
@@ -1978,7 +1978,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target, senzaValuta,
     });
   }
 
@@ -2115,8 +2115,9 @@
     return items;
   }
 
-  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
-  function vociSuggerimento(editableEl, sugg) {
+  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora», e «Valuta» per il parere
+  // sul testo intero (#1449). Mai applicato da solo.
+  function vociSuggerimento(editableEl, sugg, valutaQui = null) {
     if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
     const righe = [rigaDelPerche(sugg)];
     for (const c of sugg.correzioni || []) {
@@ -2128,10 +2129,9 @@
         senzaFreccia: true,
       });
     }
-    righe.push(
-      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) },
-      { type: 'separator' },
-    );
+    righe.push({ type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) });
+    if (valutaQui) righe.push(buildValutaItem(valutaQui));
+    righe.push({ type: 'separator' });
     return righe;
   }
 
@@ -2149,10 +2149,12 @@
   }
 
   async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
-    const items = await buildBaseItemsAt(mouseEvent);
+    // Su un suggerimento «Valuta» sta col suggerimento, e una volta sola nel menu.
+    const valutaQui = suggerimento ? campoDaValutare(editableEl) : null;
+    const items = await buildBaseItemsAt(mouseEvent, { senzaValuta: !!valutaQui });
     const sopra = [];
     if (errore) sopra.push(...vociErrore(editableEl, errore));
-    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
+    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento, valutaQui));
     const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
     if (tutti) sopra.push(tutti, { type: 'separator' });
     items.unshift(...sopra);
@@ -2242,6 +2244,7 @@
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
+    senzaValuta = false,
   }) {
     const items = [];
 
@@ -2291,7 +2294,7 @@
     const contextItems = [
       ...vociDellaPagina(target),
       ...buildContextualItems({
-        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
+        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
       }),
       ...vociRiquadro,
     ];
@@ -2382,6 +2385,33 @@
       label: `Dimensione reale (ora ${p}%)`,
       shortcut: Tasti.etichetta('Ctrl+0'),
       onClick: () => { try { zoomPagina()?.azzera(); } catch (_) {} },
+    };
+  }
+
+  // «Valuta» (#1449): il campo di testo sotto il tasto destro, se c'è qualcosa da valutare. Mai una password né un pezzo
+  // di Filo, e solo nel frame principale: l'Aiuto vive lì, e il ponte fra i riquadri non porta testo.
+  function campoDaValutare(target) {
+    if (IS_SUBFRAME || !target || !aiutoAcceso() || !Sidebar?.valuta || !SpellCheck?.testoDelCampo) return null;
+    if (self.SN_FILO_UI?.inside?.(target)) return null;
+    let campo = target.closest?.('input, textarea') || null;
+    if (campo) {
+      if (!isEditable(campo) || Extract.campoSegreto?.(campo)) return null;
+      const tipo = String(campo.getAttribute('type') || '').toLowerCase();
+      if (campo.tagName === 'INPUT' && !['', 'text', 'search'].includes(tipo)) return null;
+    } else {
+      for (let el = target.nodeType === 1 ? target : target.parentElement; el && el.isContentEditable; el = el.parentElement) campo = el;
+    }
+    return campo && SpellCheck.testoDelCampo(campo).trim() ? campo : null;
+  }
+
+  function buildValutaItem(campo) {
+    return {
+      type: 'item',
+      label: I18n.t('menu_valuta'),
+      onClick: () => {
+        if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+        Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) });
+      },
     };
   }
 
@@ -2484,8 +2514,10 @@
   // casella input / niente.
   function buildContextualItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
+    senzaValuta = false,
   }) {
     const items = [];
+    const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
 
     if (selInfo && editable) {
       // Testo selezionato dentro casella di input
@@ -2502,6 +2534,7 @@
         label: I18n.t('menu_edit_selection'),
         onClick: () => EditBox.openEditBox(selInfo.selection),
       });
+      if (valutaQui) items.push(buildValutaItem(valutaQui));
       return items;
     }
 
@@ -2623,9 +2656,10 @@
     }
 
     if (editable) {
-      // Casella input senza selezione: incolla + detta.
+      // Casella input senza selezione: incolla + detta, e il parere sul testo se ce n'è uno.
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
+      if (valutaQui) items.push({ type: 'separator' }, buildValutaItem(valutaQui));
       return items;
     }
 

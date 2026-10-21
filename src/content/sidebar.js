@@ -80,6 +80,9 @@
   const MAX_PASSI_DA_SOLO = 20;
   let passiDaSolo = 0;
   let continuaAperto = null;
+  // «Valuta» (#1449): il campo dell'ultima valutazione e il testo che il modello ne ha visto. Da lì la conversazione
+  // risponde col modello della chat, e le correzioni proposte si scrivono in quel campo.
+  let valutazione = null;
 
   // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
   function isOpen() { return !!(root && root.isConnected); }
@@ -109,6 +112,7 @@
     nonLetta = false;
     voce = null;
     statoVoce = 'pronto';
+    valutazione = null;
     cambiato();
   }
 
@@ -141,6 +145,7 @@
     aiPrefersOpen = true;
     passiDaSolo = 0;
     continuaAperto = null;
+    valutazione = null;
     session = newSession();
     // Ogni apertura è una conversazione sua anche nel filo.
     convFilo = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
@@ -292,6 +297,29 @@
     const detta = aspetto ? aspetto.icona === 'mic' : (isOpen() && !nascosto && !collapsed);
     if (detta && voce) { voce.premi(); return; }
     open(context);
+  }
+
+  // «Valuta» del tasto destro su un campo (#1449): il testo intero del campo e la richiesta di giudicarlo, nella
+  // conversazione aperta o in una nuova.
+  function valuta({ campo, testo } = {}) {
+    const t = String(testo || '');
+    if (!campo || !t.trim()) return;
+    open({ source: 'valuta' });
+    if (!root) return;
+    valutazione = { campo, mandato: t };
+    submit({ valuta: t, daGesto: true });
+  }
+
+  // Il testo del campo valutato, se è cambiato da quando il modello l'ha visto: la domanda dopo lo porta con sé.
+  function testoCambiato() {
+    if (!valutazione) return null;
+    const ora = global.SN_SPELLCHECK?.testoDelCampo?.(valutazione.campo) || '';
+    return ora.trim() && ora !== valutazione.mandato ? ora : null;
+  }
+
+  function estratto(testo) {
+    const s = Array.from(String(testo || '').replace(/\s+/g, ' ').trim());
+    return s.length > 120 ? `${s.slice(0, 119).join('')}…` : s.join('');
   }
 
   // ---------- Drag header ----------
@@ -459,6 +487,66 @@
     afterEl.insertAdjacentElement('afterend', wrap);
     const conv = convEl();
     if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
+  // Le correzioni di «Valuta» (#1449): un clic scrive la correzione nel campo valutato, un altro la toglie. Escono verso
+  // il sito, quindi passano prima dalla porta delle uscite, come il testo di un «fill» (#810).
+  async function mostraCorrezioni(afterEl, correzioni, { campo, mandato }) {
+    if (!afterEl || !campo || !correzioni.length) return;
+    const fermi = await Promise.all(correzioni.map((c) => campoFermato(c.dopo)));
+    const frase = fermi.find(Boolean);
+    if (frase) fermata(frase);
+    const buone = correzioni.filter((_, i) => !fermi[i]);
+    if (!buone.length || !afterEl.isConnected) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-correzioni';
+    for (const c of buone) wrap.appendChild(bottoneCorrezione(c, campo, Math.max(0, String(mandato || '').indexOf(c.prima))));
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
+  function bottoneCorrezione(c, campo, vicinoA) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-correzione';
+    const pezzo = (cls, testo) => {
+      const el = document.createElement('span');
+      el.className = cls;
+      el.textContent = testo;
+      return el;
+    };
+    const riga = pezzo('sn-sidebar-correzione-riga', '');
+    riga.append(pezzo('sn-sidebar-correzione-prima', c.prima));
+    if (c.dopo) riga.append(pezzo('sn-sidebar-correzione-freccia', '→'), pezzo('sn-sidebar-correzione-dopo', c.dopo));
+    btn.appendChild(riga);
+    if (c.perche) btn.appendChild(pezzo('sn-sidebar-correzione-perche', c.perche));
+    // Dove comincia, nel testo del campo, il pezzo scritto da questo bottone; null finché non l'ha scritto.
+    let scritta = null;
+    const stato = () => {
+      btn.classList.toggle('sn-sidebar-correzione-fatta', scritta !== null);
+      btn.setAttribute('aria-pressed', scritta !== null ? 'true' : 'false');
+      btn.title = I18n.t(scritta !== null ? 'help_correzione_togli' : 'help_correzione_applica');
+    };
+    const diLa = (chiave, ...arg) => appendActionLog(I18n.t(chiave, ...arg))?.classList.add('sn-sidebar-log-intera');
+    stato();
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
+      const SC = global.SN_SPELLCHECK;
+      if (!SC || !campo.isConnected) { diLa('help_correzione_sparito'); return; }
+      if (scritta === null) {
+        const r = SC.sostituisciNelCampo(campo, c.prima, c.dopo, vicinoA);
+        if (r.dove === undefined) { diLa(r.manca ? 'help_correzione_manca' : 'help_correzione_ferma', estratto(c.prima)); return; }
+        scritta = r.dove;
+      } else {
+        const r = c.dopo ? SC.sostituisciNelCampo(campo, c.dopo, c.prima, scritta) : {};
+        if (r.dove === undefined) { diLa('help_correzione_non_tolta', global.SN_TASTI?.etichetta?.('Ctrl+Z') || 'Ctrl+Z'); return; }
+        vicinoA = r.dove;
+        scritta = null;
+      }
+      stato();
+    });
+    return btn;
   }
 
   // Indicatore "sta pensando": 3 righe di reasoning che scorrono e svaniscono.
@@ -840,6 +928,10 @@
       const file = (Array.isArray(obj.file) ? obj.file : [obj.file])
         .map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
         .filter((n, i, a) => a.indexOf(n) === i).slice(0, 3);
+      // Le correzioni di «Valuta» (#1449), tutte: quante ne propone il modello lo decide la lunghezza della risposta.
+      const correzioni = (Array.isArray(obj.correzioni) ? obj.correzioni : [])
+        .filter((c) => c && typeof c.prima === 'string' && c.prima && typeof c.dopo === 'string' && c.prima !== c.dopo)
+        .map((c) => ({ prima: c.prima, dopo: c.dopo, perche: typeof c.perche === 'string' ? c.perche.trim() : '' }));
       return {
         display: typeof obj.text === 'string' ? obj.text : '',
         highlight,
@@ -847,6 +939,7 @@
         status,
         collapse: collapseFlag,
         file,
+        correzioni,
       };
     } catch (_) {
       return fallback;
@@ -1573,7 +1666,7 @@
     }
   }
 
-  async function turno({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
+  async function turno({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}) {
     if (!root) return;
     // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
     if (userMessage || daGesto) {
@@ -1587,15 +1680,24 @@
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
     // (dopo un click sul target) mantieni lo stato attuale: evita che il box
     // si riapra mentre il modello sta elaborando.
-    if (userMessage) expand({ ai: false });
+    if (userMessage || valuta) expand({ ai: false });
 
-    if (userMessage) {
+    // «Valuta» (#1449): il testo del campo, o quello cambiato da allora che una domanda dopo porta con sé.
+    const testoCampo = valuta || (userMessage ? testoCambiato() : null);
+    if (userMessage || valuta) {
       fermataDetta = false;
-      appendChatMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
+      appendChatMessage('user', valuta ? I18n.t('help_valuta_richiesta', estratto(valuta)) : userMessage);
+      if (testoCampo === null) history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
       // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
-      if (session) session.rawUserMessages.push(userMessage);
+      if (session && userMessage) session.rawUserMessages.push(userMessage);
+    }
+    if (testoCampo !== null) {
+      esterno = { ...(esterno || {}), testoDaValutare: { testo: testoCampo } };
+      const tetto = global.SN_CONST.VALUTA_MAX_CARATTERI;
+      if (testoCampo.length > tetto) {
+        appendActionLog(I18n.t('help_valuta_lungo', tetto.toLocaleString('it-IT')))?.classList.add('sn-sidebar-log-intera');
+      }
     }
 
     const thinking = appendThinking();
@@ -1615,6 +1717,15 @@
     const payload = buildPayload(userMessage, userAction, esterno);
     payload.screenshot = screenshot || undefined;
     payload.origineImmagini = origineImmagini || undefined;
+    if (valutazione) payload.valuta = true;
+    // Il testo del campo entra nella cronologia dopo il payload: questo turno lo porta una volta sola, nel messaggio che parte.
+    if (testoCampo !== null) {
+      history.push({
+        role: 'user', kind: 'real', ...(daScelta ? { daScelta: true } : {}),
+        content: PROMPTS.richiestaValuta({ testo: testoCampo, domanda: userMessage }),
+      });
+      if (valutazione) valutazione.mandato = testoCampo;
+    }
 
     try {
       const res = await chrome.runtime.sendMessage({
@@ -1849,7 +1960,9 @@
           kind: 'action',
         });
       }
-      history.push({ role: 'assistant', content: parsed.display || res.text });
+      // Con delle correzioni il modello deve ritrovare nei turni dopo quali ha proposto: gli torna la sua risposta intera.
+      const conCorrezioni = !!(valutazione && parsed.correzioni && parsed.correzioni.length);
+      history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text) });
 
       // Choices: bottoni sotto al messaggio dell'assistente
       if (parsed.choices && parsed.choices.length) {
@@ -1857,6 +1970,8 @@
       }
       // Dopo le scelte: inserito subito sotto il messaggio, il documento resta sopra di loro.
       mostraFile(assistantEl, daMostrare);
+      // Le correzioni stanno subito sotto il parere, sopra documento e scelte.
+      if (conCorrezioni) await mostraCorrezioni(assistantEl, parsed.correzioni, valutazione);
 
       // Highlight. Il tooltip on-page usa SOLO highlight.note (testo dedicato),
       // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
@@ -2029,7 +2144,7 @@
   }
 
   global.SN_SIDEBAR = {
-    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato,
+    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato, valuta,
     suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
   };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
