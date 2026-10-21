@@ -98,10 +98,11 @@ test('aprendo la home in cima c’è solo l’ultimo messaggio e sotto è vuoto;
   // Ieri c'è: la rotella lo riporta a vista, e la home non ci rimette le mani.
   await page.locator('#bubbles').hover();
   for (let i = 0; i < 4; i++) await page.mouse.wheel(0, -300);
-  await expect.poll(async () => (await vista(page)).bolle.some((b) => b.testo === 'risposta di ieri 11' && b.giu > 0 && b.su < v.alto)).toBe(true);
-  const risalito = (await vista(page)).scrollTop;
+  const ieri11 = async () => (await vista(page)).bolle.find((b) => b.testo === 'risposta di ieri 11');
+  await expect.poll(async () => { const b = await ieri11(); return b.giu > 0 && b.su < v.alto; }).toBe(true);
+  const risalito = (await ieri11()).su;
   await page.waitForTimeout(400);
-  expect(Math.abs((await vista(page)).scrollTop - risalito)).toBeLessThan(2);
+  expect(Math.abs((await ieri11()).su - risalito)).toBeLessThan(2);
 });
 
 test('con la finestra che cambia misura l’ultimo messaggio resta in cima', async ({ app, openTab }) => {
