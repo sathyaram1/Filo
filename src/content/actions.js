@@ -814,7 +814,8 @@
         origine.className = 'sn-menu-origine';
         origine.hidden = true;
         el.appendChild(origine);
-        if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
+        const indirizzo = indirizzoDelLink(linkEl);
+        if (indirizzo) mostraAvvisoLink(el, indirizzo);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
         body.textContent = I18n.t('menu_explain_loading');
