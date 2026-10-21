@@ -459,7 +459,7 @@
     return {
       text,
       toolCalls: flatToolCalls(message.tool_calls),
-      reasoningDetails: Array.isArray(message.reasoning_details) ? message.reasoning_details : [],
+      reasoningDetails: Ragionamento.conImpronta(message.reasoning_details, inviati.impronta),
       finishReason: data.choices?.[0]?.finish_reason || null,
       servedBy: extractServedBy(data),
       keyUsed, keyFallback,
