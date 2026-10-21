@@ -1873,7 +1873,16 @@
     inputEl.style.height = `${inputEl.scrollHeight}px`;
   }
 
-  inputEl.addEventListener('focus', () => Sistema.scrive({ entra: true }));
+  // Chi entra nel campo o ci scrive manderà presto un turno: il saldo dei crediti si rilegge adesso, così il turno
+  // non lo aspetta (#1353). Il main non rilegge una lettura di meno di un minuto.
+  let saldoChiestoAlle = 0;
+  function preparaSaldo() {
+    const adesso = Date.now();
+    if (adesso - saldoChiestoAlle < 20 * 1000) return;
+    saldoChiestoAlle = adesso;
+    send({ type: MSG.WALLET_SALDO_PREPARA });
+  }
+  inputEl.addEventListener('focus', () => { Sistema.scrive({ entra: true }); preparaSaldo(); });
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
