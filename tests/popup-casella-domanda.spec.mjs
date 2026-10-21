@@ -7,6 +7,8 @@ import { menuDi } from './helpers/menuContestuale.mjs';
 import { nelMondoDiFilo, clicca } from './helpers/riquadri.mjs';
 
 const RISPOSTA = 'La fotosintesi trasforma la luce in zuccheri.';
+// Una barra di scorrimento è larga almeno una decina di px; sotto i 4 è l'arrotondamento dei bordi a scala 125%.
+const BARRA = 4;
 const FRASE = 'La fotosintesi clorofilliana trasforma la luce in zuccheri.';
 
 async function preparaModello(app) {
@@ -104,7 +106,7 @@ async function provaLaCasella(app, page, nome) {
   const vuota = await misura(app, page);
   expect(vuota.suggerimento.trim().length).toBeGreaterThan(0);
   expect(vuota.eccesso).toBeLessThanOrEqual(0);
-  expect(vuota.barra).toBeLessThanOrEqual(0);
+  expect(vuota.barra).toBeLessThan(BARRA);
   expect(Math.abs(vuota.alto - vuota.altoInvio)).toBeLessThanOrEqual(1);
   expect(vuota.larghezzaSuggerimento).toBeLessThan(vuota.spazio);
   try { await page.screenshot({ path: `tests/.shots/popup-casella-${nome}-vuota.png` }); } catch (_) {}
@@ -121,7 +123,7 @@ async function provaLaCasella(app, page, nome) {
     return { eccesso, barra };
   });
   expect(lungo.eccesso).toBeLessThanOrEqual(0);
-  expect(lungo.barra).toBeLessThanOrEqual(0);
+  expect(lungo.barra).toBeLessThan(BARRA);
 
   // Una riga scritta: stessa altezza, niente frecce.
   await scriviNellaCasella(app, page, 'e in inglese?');
@@ -129,14 +131,14 @@ async function provaLaCasella(app, page, nome) {
   const una = await misura(app, page);
   expect(Math.abs(una.alto - vuota.alto)).toBeLessThanOrEqual(1);
   expect(una.eccesso).toBeLessThanOrEqual(0);
-  expect(una.barra).toBeLessThanOrEqual(0);
+  expect(una.barra).toBeLessThan(BARRA);
 
   // Tre righe: la casella si allunga per tutte e tre, sempre senza frecce.
   await page.keyboard.insertText('\nseconda riga\nterza riga');
   const tre = await misura(app, page);
   expect(tre.alto).toBeGreaterThanOrEqual(vuota.alto + 2 * tre.rigaPx - 1);
   expect(tre.eccesso).toBeLessThanOrEqual(0);
-  expect(tre.barra).toBeLessThanOrEqual(0);
+  expect(tre.barra).toBeLessThan(BARRA);
   try { await page.screenshot({ path: `tests/.shots/popup-casella-${nome}-tre-righe.png` }); } catch (_) {}
 
   // Oltre il tetto la casella smette di crescere e scorre al suo interno.
@@ -150,7 +152,7 @@ async function provaLaCasella(app, page, nome) {
   await expect.poll(async () => (await misura(app, page)).alto).toBeLessThanOrEqual(vuota.alto + 1);
   const dopo = await misura(app, page);
   expect(dopo.eccesso).toBeLessThanOrEqual(0);
-  expect(dopo.barra).toBeLessThanOrEqual(0);
+  expect(dopo.barra).toBeLessThan(BARRA);
 }
 
 test('#853.1 Editor: la riga per la domanda dopo sta in una riga, senza frecce', async ({ app, openTab }) => {
