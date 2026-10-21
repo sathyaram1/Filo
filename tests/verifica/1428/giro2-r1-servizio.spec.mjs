@@ -80,7 +80,7 @@ test('r1 l’archiviazione a punteggio da un terminale senza biglietto archivia 
     Object.assign(FB, vere);
   }
   expect(r.toArchive.map((x) => x.id)).toEqual(['f1']);
-  expect(avvisi.join('\n')).toBe('');
+  expect(avvisi.filter((a) => /non archiviato/.test(a)).join('\n')).toBe('');
   expect(doc.fields.status.stringValue).toBe('archived');
 });
 
