@@ -123,7 +123,7 @@ test('il titolo della pagina dopo, scritto un istante prima di cambiare indirizz
   v.caricata(wc);
   v.titolo(wc, 'Video due');
   wc.push('https://video.test/2');
-  v.navigata(wc, 1, 'https://video.test/2', { inPagina: true });
+  v.navigata(wc, 1, 'https://video.test/2', { inPagina: true, ...gesto() });
   await attendi(80);
   assert.deepEqual(aggiornate, []);
 }));
