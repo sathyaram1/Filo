@@ -214,7 +214,7 @@
     // Chiedere subito il testo intero di otto chat riempirebbe il contesto di
     // roba che non serve.
     CERCA_CHAT: {
-      description: 'Cerca in tutto il filo, salvato sul computer dell\'utente: le conversazioni con te di ogni scheda e di ogni giorno (anche quelle nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito), le pagine visitate (anche il contenuto delle schede chiuse) e i cambi di impostazioni, aspetto, sveglie e zoom. Usalo per ciò che non hai già davanti: una chat di giorni fa ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?"), una pagina ("quella pagina sulle orche che ho chiuso ieri": poi la riapri con NAVIGA e il suo indirizzo), un cambio da rimettere com\'era (ANNULLA_CAMBIO con l\'id). Due passi per le chat: con `query` ti tornano chat, pagine e cambi che combaciano; poi, se ti serve leggere una chat per intero, richiamalo con `id`. Sola lettura: non modifica e non cancella niente.',
+      description: 'Cerca in tutto il filo, salvato sul computer dell\'utente: le conversazioni con te di ogni scheda e di ogni giorno (anche quelle nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito), le pagine visitate (anche il contenuto delle schede chiuse) e i cambi di impostazioni, aspetto, sveglie e zoom. Usalo per ciò che non hai già davanti: una chat di giorni fa ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?"), una pagina ("quella pagina sulle orche che ho chiuso ieri": poi la riapri con NAVIGA e il suo indirizzo), un cambio da rimettere com\'era (ANNULLA_CAMBIO con l\'id). Due passi per le chat: con `query` ti tornano chat, pagine e cambi che combaciano; poi, se ti serve leggere una chat per intero, richiamalo con `id`. Le conversazioni che l\'utente ha nascosto tornano a parte, solo col nome: quelle che combaciano, o tutte se la `query` è vuota o le chiede («quali chat ho nascosto?»). Sola lettura: non modifica e non cancella niente.',
       properties: {
         query: S('Le parole da cercare nel filo (argomento, nomi, titolo o sito di una pagina, frasi). Ometti solo quando passi `id`.'),
         id: S('L\'id di una chat trovata prima: la fa tornare per intero.'),
@@ -430,6 +430,21 @@
         per_sempre: { type: 'boolean', description: 'true solo se l\'utente chiede di cancellarla per sempre, non solo di toglierla.' },
       },
       required: ['testo'],
+    },
+    TOGLI_CHAT: {
+      description: 'Toglie dalla vista una conversazione con te quando l\'utente lo chiede ("cancella questa chat", "togli la chat sullo Zen", "elimina la conversazione di ieri sui soldi"): la NASCONDE, cioè esce dalla home, dalla ricerca e da quello che ricordi, ma resta salvata e l\'utente la rimette quando vuole. Senza `id` vale la conversazione di adesso; per un\'altra prima trovala con CERCA_CHAT e passa il suo id. Con `per_sempre` la cancella davvero, testo compreso: solo se l\'utente lo chiede con parole sue («per sempre», «definitivamente», «che non resti niente»), mai di tua iniziativa; il sistema gli fa scrivere «conferma», non chiederlo tu. Una conversazione alla volta.',
+      properties: {
+        id: S('L\'id della conversazione, preso da CERCA_CHAT. Ometti per quella di adesso.'),
+        per_sempre: B('true solo se l\'utente chiede di cancellarla per sempre, non solo di toglierla.'),
+      },
+      required: [],
+    },
+    RIMETTI_CHAT: {
+      description: 'Rimette nel filo una conversazione che l\'utente aveva nascosto ("rimetti la chat sullo Zen", "fammi rivedere la conversazione che avevo tolto"): la trovi con CERCA_CHAT, che elenca a parte le nascoste che combaciano (tutte, se la `query` è vuota o chiede proprio delle nascoste: «quelle che ho tolto»), e passi il suo id. Dopo la puoi rileggere con CERCA_CHAT e l\'id.',
+      properties: {
+        id: S('L\'id della conversazione nascosta, preso da CERCA_CHAT.'),
+      },
+      required: ['id'],
     },
     CORREGGI_MEMORIA: {
       description: () => 'Corregge UNA riga della memoria di Filo quando l\'utente dice che è sbagliata o cambiata ("non sono vegetariano, sono vegano", "correggi: vivo a Porto, non a Lisbona"): `testo` è la riga com\'è nella memoria (basta un pezzo che la identifichi), `nuovo` la riga giusta, breve e in terza persona come le altre. La riga tiene la conversazione da cui era nata e la correzione vale dal messaggio dopo. Se serve l\'OK il sistema mostra prima e dopo e lo chiede da sé. Al massimo ' + tettoLezione() + '. Per togliere una riga c\'è DIMENTICA.',

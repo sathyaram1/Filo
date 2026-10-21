@@ -38,8 +38,14 @@
   line-height: 1.2;
 }
 
-.sn-menu-item:hover:not(.sn-disabled) {
+.sn-menu-item:hover:not(.sn-disabled),
+.sn-menu-item:focus-visible:not(.sn-disabled) {
   background: rgba(var(--sn-accent-rgb), 0.35);
+}
+/* Da tastiera (#1295) si vede dove si è: le voci piene come all'hover, gli altri tasti del menu con l'anello. */
+.sn-menu button:not(.sn-menu-item):focus-visible {
+  outline: 2px solid rgba(var(--sn-accent-rgb), 0.7);
+  outline-offset: -2px;
 }
 
 .sn-menu-item.sn-disabled {
@@ -66,7 +72,8 @@
   height: 18px;
   color: var(--sn-muted);
 }
-.sn-menu-item:hover:not(.sn-disabled) .sn-menu-item-icon { color: var(--sn-fg); }
+.sn-menu-item:hover:not(.sn-disabled) .sn-menu-item-icon,
+.sn-menu-item:focus-visible:not(.sn-disabled) .sn-menu-item-icon { color: var(--sn-fg); }
 .sn-menu-item-icon svg { display: block; }
 
 .sn-menu-shortcut {

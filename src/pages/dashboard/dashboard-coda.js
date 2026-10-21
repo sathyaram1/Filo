@@ -284,6 +284,34 @@
       }
       n.classList.toggle('dash-vecchio', vecchio && giorno != null);
     }
+    unoDaTab();
+  }
+
+  // Il filo è una fermata sola del Tab (#1295): una bolla ce l'ha, le frecce passano alle altre, e da lì Shift+F10 apre
+  // il suo menu. Cento fermate in fila separerebbero il campo di ricerca da quello per scrivere.
+  const BOLLA = '.dash-bubble[data-chat]';
+  function unoDaTab() {
+    if (!d) return;
+    const bolle = [...d.bubblesEl.querySelectorAll(BOLLA)];
+    let zero = null;
+    for (const b of bolle) {
+      if (b.getAttribute('tabindex') === '0' && !zero) { zero = b; continue; }
+      if (b.getAttribute('tabindex') !== '-1') b.tabIndex = -1;
+    }
+    if (!zero && bolle.length) bolle[bolle.length - 1].tabIndex = 0;
+  }
+  function frecceNelFilo(e) {
+    const b = e.target;
+    if (!b || !b.matches || !b.matches(BOLLA)) return;
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key) || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    const bolle = [...d.bubblesEl.querySelectorAll(BOLLA)];
+    const i = bolle.indexOf(b);
+    const j = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : e.key === 'Home' ? 0 : bolle.length - 1;
+    e.preventDefault();
+    if (j < 0 || j >= bolle.length || j === i) return;
+    b.tabIndex = -1;
+    bolle[j].tabIndex = 0;
+    bolle[j].focus();
   }
 
   function inFondo() {
@@ -431,6 +459,8 @@
       const c = conChiave(v.key);
       if (c) { aggiorna(c, v); continue; }
       if (v.k === 'msg' && v.chat === qui && !daAltrove) { riconosci(v); continue; }
+      // La riga tardiva di una chat lasciata da qui (#1295): se la sua bolla è già a schermo non se ne disegna un'altra.
+      if (v.k === 'msg' && d.chatLasciata && d.chatLasciata(v.chat) && riconosci(v)) continue;
       metti(v, { scorri: false });
       messi++;
     }
@@ -441,13 +471,17 @@
   // Una bolla disegnata dal turno prende il nome che ha nel filo, così una ricerca la ritrova.
   function riconosci(v) {
     const testo = String(v.text || '').trim();
-    if (!testo) return;
+    if (!testo) return false;
     for (const b of d.bubblesEl.querySelectorAll(`.dash-bubble-${v.role === 'user' ? 'user' : 'filo'}:not([data-key])`)) {
       if (String((b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent) || '').trim() !== testo) continue;
       b.dataset.key = v.key;
       b.dataset.chat = v.chat;
-      return;
+      // Con l'ora la bolla fa da segno: una riga tardiva posata dopo si mette prima di lei, non in fondo (#1295).
+      if (v.ts && !b.dataset.ts) b.dataset.ts = v.ts;
+      unoDaTab();
+      return true;
     }
+    return false;
   }
 
   function aggiorna(n, v) {
@@ -526,6 +560,70 @@
     segnaGiorni();
   }
 
+  // #1295 — una conversazione rimessa nel filo torna al suo posto nel tempo, se quel tratto è già a schermo.
+  async function rimettiChat(id) {
+    if (!d || !id) return;
+    for (const n of [...d.bubblesEl.querySelectorAll('.dash-nascosta')]) if (n.dataset.nascosta === id) n.remove();
+    if (!primo) { segnaGiorni(); return; }
+    const res = await d.send({ type: MSG.FILO_CODA, fino: primo });
+    const da = ms(primo);
+    for (const v of (res && res.ok && res.elementi) || []) {
+      if (v.chat === id && (v.k === 'msg' || v.k === 'app') && ms(v.ts) >= da && !conChiave(v.key)) metti(v, { scorri: false });
+    }
+    segnaGiorni();
+  }
+
+  function rigaNascosta(id, prima) {
+    const riga = el('div', 'dash-nascosta');
+    riga.dataset.nascosta = id;
+    riga.dataset.ts = prima.dataset.ts || '';
+    const ic = el('span', 'dash-nascosta-ico');
+    ic.innerHTML = icona('eyeOff', 13);
+    const b = el('button', 'dash-nascosta-rimetti', 'Rimetti');
+    b.type = 'button';
+    b.title = 'Rimetti la conversazione nel filo';
+    b.addEventListener('click', () => {
+      b.disabled = true;
+      d.send({ type: MSG.FILO_CHAT_NASCONDI, id, nascosta: false })
+        .then((r) => (r && r.ok ? rimettiChat(id) : null))
+        .catch(() => {})
+        .finally(() => { b.disabled = false; });
+    });
+    riga.append(ic, el('span', 'dash-nascosta-testo', 'Conversazione nascosta'), b);
+    prima.parentNode.insertBefore(riga, prima);
+    return riga;
+  }
+
+  // Nascosta altrove (a parole, da un'altra scheda): resta la stessa riga che lascia il tasto destro, una sola.
+  function nascostaAltrove(id) {
+    if (!d || !id) return;
+    const gia = [...d.bubblesEl.querySelectorAll('.dash-nascosta')].some((n) => n.dataset.nascosta === id);
+    const primo = [...d.bubblesEl.querySelectorAll('[data-chat]')].find((n) => n.dataset.chat === id);
+    if (!gia && primo && primo.parentNode) rigaNascosta(id, primo);
+    togliChat(id);
+  }
+
+  // Nascondere si disfa (#1295): al posto della conversazione resta una riga che la rimette, finché la pagina è aperta.
+  // La riga nasce prima della risposta: l'annuncio del main toglie le bolle anche da qui, e potrebbe arrivare prima.
+  // `vicino`: la riga di un'altra app (#974), che può stare nel filo senza la targa della chat.
+  async function nascondiConversazione(id, { vicino = null } = {}) {
+    const nodi = [...d.bubblesEl.querySelectorAll('[data-chat]')].filter((n) => n.dataset.chat === id);
+    if (vicino && vicino.isConnected && !nodi.includes(vicino)) nodi.unshift(vicino);
+    // Chi l'ha nascosta da tastiera ritrova il fuoco su «Rimetti», non sulla pagina.
+    const daTastiera = nodi.some((n) => n.contains(document.activeElement));
+    const riga = nodi[0] && nodi[0].parentNode ? rigaNascosta(id, nodi[0]) : null;
+    const b = riga && riga.querySelector('button');
+    if (riga) riga.hidden = true;
+    let res = null;
+    try { res = await d.send({ type: MSG.FILO_CHAT_NASCONDI, id, nascosta: true }); } catch (_) { res = null; }
+    if (!res || !res.ok) { if (riga) riga.remove(); return; }
+    togliChat(id);
+    if (riga) {
+      riga.hidden = false;
+      if (daTastiera) b.focus();
+    }
+  }
+
   // ── Tasto destro ──────────────────────────────────────────────────────────
 
   function vociMenu(target) {
@@ -559,7 +657,15 @@
     // Una conversazione della home si toglie dal filo da una sua bolla: la Cronologia, che lo faceva, non c'è più (#872).
     const bolla = e.closest('.dash-bubble[data-chat]');
     if (bolla && bolla.dataset.chat) {
-      return [{ type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', onClick: () => { togliConversazione(bolla.dataset.chat).catch(() => {}); } }];
+      const id = bolla.dataset.chat;
+      return [
+        { type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', onClick: () => { nascondiConversazione(id).catch(() => {}); } },
+        { type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', onClick: () => { togliConversazione(id).catch(() => {}); } },
+      ];
+    }
+    const nascosta = e.closest('.dash-nascosta');
+    if (nascosta && nascosta.dataset.nascosta) {
+      return [{ type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', onClick: () => { nascosta.querySelector('button').click(); } }];
     }
     return [];
   }
@@ -591,6 +697,13 @@
       misura();
     }).observe(d.bubblesEl, { childList: true });
     for (const ev of ['wheel', 'touchstart', 'pointerdown', 'keydown']) d.bubblesEl.addEventListener(ev, () => { fissa = false; }, { passive: true });
+    d.bubblesEl.addEventListener('keydown', frecceNelFilo);
+    d.bubblesEl.addEventListener('focusin', (e) => {
+      const b = e.target;
+      if (!b || !b.matches || !b.matches(BOLLA) || b.tabIndex === 0) return;
+      for (const x of d.bubblesEl.querySelectorAll(`${BOLLA}[tabindex="0"]`)) x.tabIndex = -1;
+      b.tabIndex = 0;
+    });
     d.bubblesEl.addEventListener('scroll', () => {
       const a = d.bubblesEl;
       // Uno scorrimento che non è quello dell'ancora (barra, tasti, un'altra pagina che porta qui) la lascia andare.
@@ -613,5 +726,7 @@
     } catch (_) {}
   }
 
-  global.SN_DASH_CODA = { init, carica, sali, allinea, metti, vaiA, daCapo, togliChat, togliIndirizzo, segnaGiorni, nomeDelGiorno };
+  global.SN_DASH_CODA = {
+    init, carica, sali, allinea, metti, vaiA, daCapo, togliChat, rimettiChat, nascondi: nascondiConversazione, nascostaAltrove, togliIndirizzo, segnaGiorni, nomeDelGiorno,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

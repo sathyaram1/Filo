@@ -13,6 +13,8 @@
     CHAT_TITOLO: 'chat.titolo',
     // Ciò che la chat ha letto, come classi di fonte (#530): ripresa dall'archivio non riparte pulita.
     CHAT_FONTI: 'chat.fonti',
+    // Nascosta dall'utente (#1295): esce dalla home e da ciò che Filo ha davanti, resta nel filo e si rimette.
+    CHAT_NASCOSTA: 'chat.nascosta',
     NAVIGAZIONE: 'navigazione',
     TITOLO_PAGINA: 'navigazione.titolo',
     CANCELLAZIONE: 'cancellazione',
@@ -42,6 +44,8 @@
         return stringa(ev.chat);
       case TIPI.CHAT_FONTI:
         return stringa(ev.chat) && Array.isArray(ev.fonti);
+      case TIPI.CHAT_NASCOSTA:
+        return stringa(ev.chat) && typeof ev.nascosta === 'boolean';
       case TIPI.MESSAGGIO:
         return stringa(ev.chat) && !!ev.msg && typeof ev.msg === 'object' && typeof ev.msg.text === 'string'
           && (ev.msg.role === 'user' || ev.msg.role === 'filo');
@@ -211,6 +215,10 @@
         if (ev.kindByUser) c.kindByUser = true;
         if (Number.isFinite(ev.triagedCount)) c.triagedCount = ev.triagedCount;
         if (typeof ev.soggetto === 'string') c.soggetto = ev.soggetto;
+        break;
+      case TIPI.CHAT_NASCOSTA:
+        if (!c) break;
+        if (ev.nascosta) c.nascosta = true; else delete c.nascosta;
         break;
       case TIPI.CHAT_FONTI: {
         if (!c) break;

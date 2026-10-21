@@ -51,6 +51,8 @@
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
     DIMENTICA: 'eraser',
+    TOGLI_CHAT: 'trash',
+    RIMETTI_CHAT: 'restore',
     CORREGGI_MEMORIA: 'pencil',
     CANCELLA_PAGINE: 'eraser',
     IMPOSTA_PREFERENZA: 'options',

@@ -502,6 +502,12 @@
     globe +
     `<path d="M4 4l16 16"/>`;
 
+  // --- Nascondi (#1295): l'occhio barrato, una conversazione tolta dalla vista ma non buttata.
+  const eyeOff =
+    `<path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/>` +
+    `<circle cx="12" cy="12" r="2.8"/>` +
+    `<path d="M4 4l16 16"/>`;
+
   // --- Il sistema (#873): batteria, rete, Bluetooth. La batteria è un corpo con il polo a destra;
   //     la carica la dice una barra dentro, il fulmine quando è in carica.
   const batteryBody =
@@ -778,6 +784,7 @@
     terminal:     (size) => wrap(terminal, { size }),
     globe:        (size) => wrap(globe, { size }),
     globeOff:     (size) => wrap(globeOff, { size }),
+    eyeOff:       (size) => wrap(eyeOff, { size }),
     globePinned:  (size) => wrap(globePinned, { size }),
     // `livello` (0-100) disegna la carica dentro il corpo; senza, la batteria è vuota.
     battery:      (size, livello) => wrap(batteryBody + batteryLevel(livello), { size }),

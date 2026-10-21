@@ -630,7 +630,7 @@
   // (src/shared/chatArchive.js): «cambio tema scuro» trova il tema messo ieri come «tema scuro» (#868.1).
   function cercaPerChat(eventi, query, { max = 6 } = {}) {
     const CA = global.SN_CHAT_ARCHIVE;
-    if (!CA || !CA.terminiCheDistinguono(CA.paroleDi(query)).length) return { cambi: [], termini: [], allargata: false };
+    if (!CA || !CA.terminiCheDistinguono(CA.paroleDi(query), query).length) return { cambi: [], termini: [], allargata: false };
     const lista = Array.isArray(eventi) ? eventi : [];
     const candidati = [];
     for (let i = lista.length - 1; i >= 0; i--) {

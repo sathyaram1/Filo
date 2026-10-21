@@ -157,6 +157,32 @@ test('il testo di un no: «a nessun livello» solo per l\'elenco fisso; quello d
   assert.match(A.fraseNo({ regola: 'elenco', elenco: 'segreto', segreto: 'password' }).breve, /una password/);
 });
 
+test('#1295 — «parola»: un\'azione che la dichiara vuole «conferma» a ogni livello, senza dire che abbassa una difesa', () => {
+  for (const livello of Object.keys(A.TABELLA)) {
+    for (const stato of ['pulito', 'contaminato']) {
+      const d = A.decideDettaglio({ livello, stato, costo: 3, parola: true, guardiano: true });
+      if (d.risposta === 'no') continue;
+      assert.equal(d.risposta, 'conferma', `${livello}/${stato}`);
+      assert.equal(d.digita, true);
+      assert.notEqual(d.regola, 'difesa');
+    }
+  }
+  const auto = A.decideDettaglio({ livello: 'yolo', stato: 'pulito', costo: 3, parola: true, origine: 'automazione' });
+  assert.deepEqual([auto.risposta, auto.digita], ['propone', true]);
+});
+
+test('#1295 — TOGLI_CHAT: nascondere parte da sé a Normale (costo 1), il «per sempre» vuole la parola anche a compito pulito', () => {
+  assert.equal(AL.costoFor({ type: 'TOGLI_CHAT', id: 'c1' }), 1);
+  assert.equal(AL.costoFor({ type: 'TOGLI_CHAT', id: 'c1', per_sempre: true }), 3);
+  assert.equal(AL.costoFor({ type: 'RIMETTI_CHAT', id: 'c1' }), 1);
+  assert.equal(risposta({ type: 'TOGLI_CHAT', id: 'c1' }), 'si');
+  assert.equal(risposta({ type: 'RIMETTI_CHAT', id: 'c1' }), 'si');
+  for (const livello of ['conservativo', 'default', 'automatico']) {
+    assert.equal(risposta({ type: 'TOGLI_CHAT', id: 'c1', per_sempre: true }, { livello }), 'conferma', livello);
+  }
+  assert.equal(AL.ingressi({ type: 'TOGLI_CHAT', id: 'c1' }, {}).parola, false);
+});
+
 test('sopra la tabella (d): abbassare una difesa vuole «conferma» a ogni livello', () => {
   for (const livello of Object.keys(A.TABELLA)) {
     for (const stato of ['pulito', 'contaminato']) {
@@ -290,7 +316,7 @@ function risposta(action, { azioni = [], livello = 'default', richiesta = '', im
   const extra = paginaWeb ? [{ classe: 5, campo: 'web', motivo: 'ho letto una pagina web' }] : [];
   const st = A.stato({ fonti: daAzioni(azioni, extra), livello });
   return A.decide({
-    livello, stato: st.stato, costo: ing.costo, campo: ing.campo, elenco: ing.elenco, difesa: ing.difesa, dentroPerimetro: ing.dentroPerimetro,
+    livello, stato: st.stato, costo: ing.costo, campo: ing.campo, elenco: ing.elenco, difesa: ing.difesa, parola: ing.parola, dentroPerimetro: ing.dentroPerimetro,
   });
 }
 const ricercaFatta = { type: 'CERCA_WEB', query: 'meteo', _output: { results: [{ url: 'https://x.it' }] } };

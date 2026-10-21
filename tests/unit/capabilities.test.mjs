@@ -63,6 +63,17 @@ test('index() è compatto, get()/byCategory()/all() coerenti', () => {
   assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
 });
 
+test('#1295 — il manifesto non promette che le chat non escono: a ogni messaggio e a fine chat le legge un modello', () => {
+  for (const c of CAP.all()) {
+    const testo = `${c.desc} ${c.invoke} ${c.doesNot || ''}`;
+    if (!/\bchat\b|conversazion/i.test(testo)) continue;
+    assert.doesNotMatch(testo, /nessuna chat esce|le chat non escono|niente di quello che scrivi finisce altrove/i,
+      `la voce "${c.id}" promette il contrario di quello che succede`);
+  }
+  assert.match(CAP.get('chat-archive').doesNot, /restano salvate sul tuo computer/);
+  assert.match(CAP.get('chat-archive').doesNot, /modello/);
+});
+
 test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né accenno nelle altre', () => {
   const chiuso = { redteam: false };
   for (const aperti of [undefined, chiuso]) {
@@ -176,6 +187,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_GET: 'chat-archive',
     FILO_CHAT_CLOSE: 'chat-archive',
     FILO_CHAT_DELETE: 'chat-archive',
+    FILO_CHAT_NASCONDI: 'chat-archive',
     FILO_CHATS_SEARCH: 'chat-archive',
     // La riga che Filo scrive rispondendo a un comando con lo slash finisce
     // nella stessa chat, e «torna dov'è aperta» è il clic su una chat ancora in
@@ -554,5 +566,24 @@ test('il manifesto nomina ogni modulo dell\'Editor che prende una scorciatoia, e
   const tutti = [...src.matchAll(/^\s+'?([a-z-]+)'?:\s*\{\s*label: '([^']+)'/gm)].map((m) => m[2]);
   for (const altro of tutti.filter((l) => !tipi.map(etichetta).includes(l))) {
     assert.ok(!frase[0].includes(altro), `il manifesto promette una scorciatoia a «${altro}», che non la prende`);
+  }
+});
+
+// #1295 — il manifesto non dice insieme «la cancella per sempre» e «non cancella mai per sempre»: dove promette di
+// non cancellare dati in modo definitivo, nella stessa voce dice che una cosa sola la cancella se la chiedi tu.
+test('dove il manifesto promette di non cancellare mai per sempre, nomina la cancellazione che chiedi tu', () => {
+  const tutto = JSON.stringify(CAP);
+  assert.ok(tutto.includes('cancellala per sempre'), 'la voce delle chat dice che si cancellano per sempre');
+  const testi = [];
+  const giro = (x) => {
+    if (typeof x === 'string') testi.push(x);
+    else if (x && typeof x === 'object') for (const v of Object.values(x)) giro(v);
+  };
+  giro(CAP);
+  assert.ok(!tutto.includes('cancellare dati in modo definitivo'), 'nessuna voce promette di non cancellare mai per sempre');
+  const promesse = testi.filter((t) => /non le fa (mai|a nessun livello)/.test(t) && /per sempre i tuoi dati in blocco/.test(t));
+  assert.ok(promesse.length >= 2, 'le voci dell’elenco fisso dicono che il no vale per le cancellazioni in blocco');
+  for (const t of promesse) {
+    assert.match(t, /per sempre solo se glielo chiedi tu e scrivi «conferma»/, `e nomina l'eccezione: ${t.slice(0, 120)}`);
   }
 });

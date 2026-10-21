@@ -580,6 +580,8 @@
     SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
     SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
     DIMENTICA: (n) => (n > 1 ? `dimenticato ${n} cose` : 'dimenticato una cosa'),
+    TOGLI_CHAT: (n) => (n > 1 ? `tolto ${n} conversazioni` : 'tolto una conversazione'),
+    RIMETTI_CHAT: (n) => (n > 1 ? `rimesso ${n} conversazioni nel filo` : 'rimesso una conversazione nel filo'),
     CORREGGI_MEMORIA: (n) => (n > 1 ? `corretto ${n} cose` : 'corretto una cosa'),
     CANCELLA_MEMORIA: () => 'cancellato la memoria',
     NAVIGA: (n) => (n > 1 ? `aperto ${n} pagine` : 'aperto una pagina'),
@@ -809,6 +811,15 @@
       const t = tolte.join(', ') || String(a.testo || '').trim();
       return { icon: '🧠', text: `Dimenticato · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
     },
+    // #1295 — una conversazione nascosta o cancellata a parole: la riga dice quale, e se si rimette.
+    TOGLI_CHAT: (a) => {
+      const t = pulito(a._titolo) || 'una conversazione';
+      return { icon: '💬', text: `${a.per_sempre === true ? 'Cancellata per sempre' : 'Nascosta'} · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
+    },
+    RIMETTI_CHAT: (a) => {
+      const t = pulito(a._titolo) || 'una conversazione';
+      return { icon: '💬', text: `Rimessa nel filo · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
+    },
     CORREGGI_MEMORIA: (a) => {
       const t = String((a._output && a._output.corretta) || a.nuovo || '').trim();
       return { icon: '🧠', text: `Corretto · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
@@ -937,6 +948,7 @@
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
     SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
     DIMENTICA: 'Niente da dimenticare',
+    TOGLI_CHAT: 'Conversazione non trovata', RIMETTI_CHAT: 'Conversazione nascosta non trovata',
     CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
@@ -983,6 +995,7 @@
   // Detto di un'azione che la regola ha fermato prima di cominciare: dove l'etichetta di sopra parla di un esito.
   const NO_LABELS = {
     ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato', CORREGGI_MEMORIA: 'Non corretto',
+    TOGLI_CHAT: 'Conversazione non tolta', RIMETTI_CHAT: 'Conversazione non rimessa',
     CANCELLA_SVEGLIA: 'Non cancellata', MODIFICA_SVEGLIA: 'Non spostata',
     CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
