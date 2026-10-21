@@ -747,7 +747,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   const bearer = opts.bearer || await acquireBearer();
   // La pratica coi campi di ogni altro passaggio (CAMPI_PRATICA: senza il sì dell'owner un approvato
   // sembra un utente, #913) più le note da fondere. La lettura va nel conto di chi ci ha mandato qui (#680).
-  const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes']);
+  const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes', 'seq', 'subSeq']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
 

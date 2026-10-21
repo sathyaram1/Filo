@@ -180,6 +180,89 @@ test('la nota di un giro (verify-local, orchestratore, server:fondi) passa dalla
   });
 });
 
+// Una pratica chiusa: il server finto applica le scritture e toglie la fiducia con la regola della Gestione (solo a una
+// pratica aperta), come quello vero.
+function chiusa(id) {
+  const doc = pratica(id, { status: 'done' });
+  doc.fields.statusPublic = { stringValue: 'closed' };
+  of.sessione.togliFiducia = async (x) => {
+    ordine.push(`togli:${x}`);
+    const c = globalThis.SN_MANAGE_REVIEW.fiduciaTogliCheck({ fiducia: doc.fields.fiducia.stringValue, statusPublic: doc.fields.statusPublic.stringValue });
+    if (!c.ok) return { ok: false, motivo: c.motivo };
+    if (esitoTogli.ok) doc.fields.fiducia = { stringValue: 'non_fidato' };
+    return esitoTogli;
+  };
+  return doc;
+}
+async function conReteViva(doc, fn) {
+  return conRete(doc, async (scritture) => {
+    const finta = globalThis.fetch;
+    globalThis.fetch = async (url, init = {}) => {
+      const r = await finta(url, init);
+      if ((init.method || 'GET') === 'PATCH') Object.assign(doc.fields, JSON.parse(init.body).fields);
+      return r;
+    };
+    return fn(scritture);
+  });
+}
+
+test('riaprire con la nota una pratica chiusa e fidata, da una sessione sporca: si riapre, poi cade la fiducia, poi la nota', async () => {
+  biglietto = SPORCO;
+  const doc = chiusa('f1');
+  const detti = [];
+  await conReteViva(doc, async (scritture) => {
+    const r = await of.scrivi('f1', 'todo', 'Riaperta da finish su claude/x: manca il server', { ...OPTS, avviso: (t) => detti.push(t) });
+    assert.equal(r.ok, true, r.motivo);
+    assert.deepEqual(ordine, ['scrittura', 'togli:f1', 'scrittura']);
+    assert.ok(!scritture[0].maschera.includes('notes'), 'la riapertura parte senza la nota');
+    assert.ok(scritture[0].maschera.includes('status'));
+    assert.deepEqual(scritture[1].maschera, ['notes', 'updatedAt']);
+  });
+  assert.equal(doc.fields.status.stringValue, 'todo');
+  assert.match(doc.fields.notes.stringValue, /manca il server/);
+  assert.equal(doc.fields.fiducia.stringValue, 'non_fidato');
+  assert.match(detti[0], /^Ho tolto la fiducia a #553 /, 'senza rif nomina la pratica col numero, non col codice interno');
+});
+
+test('riaperta ma la fiducia non cade: la nota non parte, e il motivo dice che la pratica è già riaperta', async () => {
+  biglietto = SPORCO;
+  esitoTogli = { ok: false, motivo: 'il server non risponde' };
+  const doc = chiusa('f1');
+  await conReteViva(doc, async (scritture) => {
+    const r = await of.scrivi('f1', 'todo', 'Riaperta: istruzioni', { ...OPTS, avviso: () => assert.fail('non è stata tolta') });
+    assert.equal(r.ok, false);
+    assert.match(r.motivo, /Ho già riaperto la pratica \(«done» → «todo»\): rilancia lo stesso comando/);
+    assert.equal(scritture.length, 1);
+    assert.ok(!scritture[0].maschera.includes('notes'));
+  });
+  assert.equal(doc.fields.notes.stringValue, '');
+  assert.equal(doc.fields.fiducia.stringValue, 'fidato');
+});
+
+test('una nota su una pratica chiusa e fidata che resta chiusa, da una sessione sporca: rifiutata senza toccare niente, e dice come fare', async () => {
+  biglietto = SPORCO;
+  for (const to of ['done', 'archived']) {
+    ordine = [];
+    const doc = chiusa('f1');
+    await conReteViva(doc, async (scritture) => {
+      for (const dryRun of [true, false]) {
+        const r = await of.scrivi('f1', to, 'Nota', { ...OPTS, dryRun, avviso: () => assert.fail('niente da dire') });
+        assert.equal(r.ok, false, to);
+        assert.match(r.motivo, /la pratica è chiusa e fidata/);
+        assert.match(r.motivo, /Non ho toccato niente/);
+        assert.match(r.motivo, /riaprila con la stessa nota/);
+      }
+      assert.equal(scritture.length, 0);
+    });
+    assert.deepEqual(ordine, []);
+  }
+  biglietto = PULITO;
+  await conReteViva(chiusa('f1'), async (scritture) => {
+    assert.equal((await of.scrivi('f1', 'done', 'Nota', OPTS)).ok, true, 'da una sessione pulita la nota si scrive');
+    assert.equal(scritture.length, 1);
+  });
+});
+
 // ── La chiamata al server ─────────────────────────────────────────────────────
 
 function rispondi(status, corpo, visto) {
