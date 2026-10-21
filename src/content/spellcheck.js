@@ -1836,7 +1836,14 @@
   function conRicerca(m) {
     if (!m.cerca) return m;
     const r = ricerche.get(m.cerca.chiave);
-    if (!r || r.stato === 'cerca') return { ...m, cercando: true };
+    if (!r || r.stato === 'cerca') {
+      // Rifatta con un'altra domanda: finché non risponde resta il valore di prima, non i puntini.
+      const p = m.cerca.prima && ricerche.get(m.cerca.prima.chiave);
+      if (p && p.stato === 'trovato') {
+        return { ...m, aggiornando: true, correzioni: [p.valore], motivo: p.motivo, fonteDato: { nome: p.fonte, data: p.data, url: p.url } };
+      }
+      return { ...m, cercando: true };
+    }
     if (r.stato === 'trovato') {
       return { ...m, correzioni: [r.valore], motivo: r.motivo, fonteDato: { nome: r.fonte, data: r.data, url: r.url } };
     }
