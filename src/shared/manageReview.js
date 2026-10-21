@@ -1945,12 +1945,15 @@
 
   // ── Sezioni di Gestione (SPEC-DOMANDE §2.1) ───────────────────────────────
   // Le sezioni raggruppano SCHEDE, non stati: lo stato → scheda resta in feedbackStatus.js.
-  // Una scheda o sezione nuova (Risposte automatiche, Crediti, Impostazioni predefinite…) entra qui quando esiste la
-  // cosa che mostra: un pulsante che non apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110).
+  // Una scheda o sezione nuova (Risposte automatiche…) entra qui quando esiste la cosa che mostra: un pulsante che non
+  // apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110). Utenti e Impostazioni predefinite sono
+  // le pagine dell'owner che avevano un ingresso loro (#1414): i loro vecchi indirizzi li rigira il protocollo.
   const SEZIONI = Object.freeze([
     { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
     { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
     { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
+    { id: 'utenti', nome: 'Utenti', schede: ['utenti'] },
+    { id: 'predefinite', nome: 'Impostazioni predefinite', schede: ['predefiniti'] },
   ]);
 
   function sezioneDiScheda(tab) {
