@@ -30,6 +30,13 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // La lista dei soprannomi per i menu delle catene: in Gestione `nicknames-list` è dei Modelli di supporto.
+  const NICKNAMES = 'nicknames-list-predefiniti';
+  function leggiSoprannomi() {
+    const dl = $(NICKNAMES);
+    return dl ? Array.from(dl.options).map((o) => ({ value: o.value, label: o.label && o.label !== o.value ? o.label : '' })) : [];
+  }
+
   // Id della datalist (combobox) associata a un provider.
   function datalistIdFor(provider) {
     return `models-list-${provider}`;
