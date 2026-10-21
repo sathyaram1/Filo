@@ -3793,7 +3793,7 @@
       renderList();
       updateTabCounts();
       setManageMsg(valore
-        ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito fra i lavori server.` : `Da ora${chi} è fidato.`)
+        ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito: In coda, come lavoro server.` : `Da ora${chi} è fidato.`)
         : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
     } catch (e) {
       setManageMsg(`${valore ? 'Non segnato fidato' : 'Fiducia non tolta'}${chi}: ${e.message || 'Errore'}`, 'err');
