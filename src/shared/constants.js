@@ -2732,6 +2732,25 @@
       `- Se NESSUNA carta è pertinente, rispondi {"keep": []}.`,
   };
 
+  // I tempi dei due controlli del correttore (#1446), coi loro limiti: Preferenze → Avanzate e IMPOSTA_PREFERENZA.
+  const CORRETTORE_TEMPI = Object.freeze({
+    pausaRapidoMs: Object.freeze({ min: 200, max: 5000, predefinito: 500 }),
+    ogniRapidoMs: Object.freeze({ min: 1000, max: 60000, predefinito: 5000 }),
+    pausaRagionatoMs: Object.freeze({ min: 1000, max: 30000, predefinito: 3500 }),
+  });
+  // Un valore vuoto o non numerico vale il predefinito; uno fuori dai limiti, il limite.
+  function tempiCorrettore(settings) {
+    const c = (settings && settings.correttore) || {};
+    const out = {};
+    for (const [k, l] of Object.entries(CORRETTORE_TEMPI)) {
+      const v = c[k];
+      const n = Number(v);
+      out[k] = v === null || v === undefined || v === '' || !Number.isFinite(n)
+        ? l.predefinito : Math.min(l.max, Math.max(l.min, Math.round(n)));
+    }
+    return out;
+  }
+
   const DEFAULT_SETTINGS = {
     provider: DEFAULT_PROVIDER,
     // #530 — quanto Filo fa da solo (src/shared/autonomia.js). Manopole e fonti spostate: solo dati, finché non arriva la posta.
@@ -2792,13 +2811,18 @@
     // Siti dove il tasto destro apre il menu del sito e quello di Filo sta a Shift (#975).
     menuDelSito: { siti: [] },
     // Interruttori di funzione: Preferenze → Avanzate e IMPOSTA_PREFERENZA. Il vecchio `help: false` di serie dei file
-    // di dati lo riaccende src/main/services/interruttoreAiuto.js (#841). categorize: spenta di serie. spellcheckContext: i puntini ocra (#1115).
+    // di dati lo riaccende src/main/services/interruttoreAiuto.js (#841). categorize: spenta di serie. Il correttore
+    // (#1446): spellcheck sono gli errori, spellcheckContext i suggerimenti; la migrazione da blu e ocra sta in
+    // src/main/services/correttoreMigrazione.js.
     featureFlags: {
       help: true,
       categorize: false,
       spellcheck: true,
       spellcheckContext: true,
     },
+    // #1446 — la parte del modello degli errori (spenta resta il solo codice), le parole grammaticali ripetute del
+    // codice e i tempi dei due controlli (limiti in CORRETTORE_TEMPI).
+    correttore: { modelloErrori: true, ripetizioni: true, pausaRapidoMs: 500, ogniRapidoMs: 5000, pausaRagionatoMs: 3500 },
     // Tema: 'system' | 'light' | 'dark'
     theme: 'system',
     // Override dei token estetici (#146.1): mappa { nomeToken: valore }.
@@ -3295,6 +3319,8 @@
 
   global.SN_CONST = {
     STORAGE_KEYS,
+    CORRETTORE_TEMPI,
+    tempiCorrettore,
     AUTOMATION,
     ACTIONS,
     CREDIT,

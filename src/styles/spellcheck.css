@@ -1,7 +1,6 @@
-/* Correttore AI — overlay esterno con zigzag blu + popup correzione */
+/* Il correttore (#1446): lo strato dei segni sopra il campo e il popup di correzione */
 
-/* L'overlay sta in document.body sopra l'editabile e ne ripete il testo in trasparente: si vede solo
-   lo zigzag blu, mentre il testo vero e il rosso del browser restano sull'editabile sotto. */
+/* Lo strato sta sopra il campo e ne ripete il testo in trasparente: si vedono solo i segni, il testo vero resta sotto. */
 .sn-spell-overlay {
   /* le proprietà dimensionali e di posizione sono settate inline da JS */
   pointer-events: none;
@@ -33,37 +32,63 @@
   text-shadow: none !important;
 }
 
-/* Lo zigzag sta un filo più in basso del rosso nativo del browser: se una parola è marcata sia rossa
-   sia blu i due tratti convivono affiancati invece di sovrapporsi. */
-.sn-spell-overlay .sn-semantic-error {
-  background-repeat: repeat-x;
-  background-position: 0 calc(100% + 2px);
-  background-size: 8px 3px;
-  padding-bottom: 3px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpolyline points='0,3 2,0 4,3 6,0 8,3' fill='none' stroke='%233b82f6' stroke-width='1.2'/%3E%3C/svg%3E");
+/* Lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori» spento anche nelle caselle di una riga.
+   Resta dove il sito chiede di non correggere a Filo e a Grammarly: lì il browser fa da sé. */
+html[data-sn-correttore] textarea:not([data-gramm="false"], [data-gramm="false"] *, [data-enable-grammarly="false"], [data-enable-grammarly="false"] *)::spelling-error,
+html[data-sn-correttore] [contenteditable]:not([data-gramm="false"], [data-gramm="false"] *, [data-enable-grammarly="false"], [data-enable-grammarly="false"] *)::spelling-error,
+html[data-sn-correttore] [contenteditable]:not([data-gramm="false"], [data-gramm="false"] *, [data-enable-grammarly="false"], [data-enable-grammarly="false"] *) *::spelling-error,
+html[data-sn-correttore="senza-errori"] *::spelling-error {
+  text-decoration: none;
 }
 
-/* Dark mode: blu più vivido per restare leggibile */
-.sn-spell-overlay[data-sn-theme="dark"] .sn-semantic-error {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpolyline points='0,3 2,0 4,3 6,0 8,3' fill='none' stroke='%2360a5fa' stroke-width='1.2'/%3E%3C/svg%3E");
-}
-
-/* Il terzo segno (#1115): «controlla qui», non «hai sbagliato». È una sottolineatura, lo zigzag blu uno sfondo: sulla
-   stessa parola convivono. I letterali sono i predefiniti dei token correttore.ocra.*, che la scelta dell'utente scavalca. */
-.sn-spell-overlay .sn-coerenza {
+/* ERRORE, Filo è sicuro: un'onda sottile color mattone. SUGGERIMENTO, decide l'utente: i puntini ocra. I letterali sono i
+   predefiniti dei token correttore.* (themeTokens.js), che la scelta dell'utente scavalca. */
+.sn-spell-overlay .sn-errore {
+  --sn-segno: var(--sn-spell-errore, #b4472c);
   text-decoration-line: underline;
-  text-decoration-style: var(--sn-spell-ocra-stile, dotted);
-  text-decoration-color: var(--sn-spell-ocra, #b07a14);
+  text-decoration-style: var(--sn-spell-errore-stile, wavy);
+  text-decoration-color: var(--sn-segno);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+.sn-spell-overlay[data-sn-theme="dark"] .sn-errore {
+  --sn-segno: var(--sn-spell-errore, #ea8a6b);
+}
+.sn-spell-overlay .sn-suggerimento {
+  --sn-segno: var(--sn-spell-suggerimento, #b07a14);
+  text-decoration-line: underline;
+  text-decoration-style: var(--sn-spell-suggerimento-stile, dotted);
+  text-decoration-color: var(--sn-segno);
   text-decoration-thickness: 2px;
   text-underline-offset: 6px;
   text-decoration-skip-ink: none;
 }
-.sn-spell-overlay[data-sn-theme="dark"] .sn-coerenza {
-  text-decoration-color: var(--sn-spell-ocra, #e2ad4d);
+.sn-spell-overlay[data-sn-theme="dark"] .sn-suggerimento {
+  --sn-segno: var(--sn-spell-suggerimento, #e2ad4d);
 }
-/* Sulla stessa parola i puntini scendono sotto lo zigzag, che altrimenti coprirebbero. */
-.sn-spell-overlay .sn-semantic-error.sn-coerenza {
-  text-underline-offset: 9px;
+/* Sulla stessa parola i puntini scendono sotto l'onda. */
+.sn-spell-overlay .sn-suggerimento:has(> .sn-errore) {
+  text-underline-offset: 8px;
+}
+
+/* Il dubbio (un candidato che nessun controllo ha ancora giudicato) è lo stesso segno, sbiadito. */
+.sn-spell-overlay .sn-dubbio {
+  text-decoration-color: color-mix(in srgb, var(--sn-segno) calc(var(--sn-spell-dubbio, 0.4) * 100%), transparent);
+}
+/* Confermato si riempie, scartato sfuma via: un passaggio breve, che segue la durata delle animazioni. */
+.sn-spell-overlay .sn-conferma {
+  animation: sn-segno-conferma calc(320ms * var(--sn-motion, 1)) ease-out both;
+}
+.sn-spell-overlay .sn-svanisce {
+  animation: sn-segno-svanisce calc(320ms * var(--sn-motion, 1)) ease-in both;
+}
+@keyframes sn-segno-conferma {
+  from { text-decoration-color: color-mix(in srgb, var(--sn-segno) calc(var(--sn-spell-dubbio, 0.4) * 100%), transparent); }
+  to { text-decoration-color: var(--sn-segno); }
+}
+@keyframes sn-segno-svanisce {
+  to { text-decoration-color: transparent; }
 }
 
 /* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */
