@@ -286,6 +286,26 @@ const ALTRI_INDIRIZZI = {
   ],
   gitlab: ['gitlab-org.gitlab.io', 'gitlab-static.net'],
 };
+// Gli indirizzi di paese dei marchi, dagli elenchi dei siti più visitati: lasciati fuori, insegnavano al classificatore
+// che quel marchio nel nome di un sito è quasi sempre innocuo, e spegnevano googlehelp e microsoft-online.
+const PAESI = {
+  google: `ru com.hk co.id com.eg com.pk com.sa co.th com.tw co.kr com.ua com.ng com.co cn com.sg com.ph co.ve com.pe ae dz
+    co.il cl az com.vn com.my lk kz bg com.kw rs by co.nz com.bd com.do com.ec lt tn iq com.gt lv com.pr co.ma com.ly jo
+    com.gh ba com.bo com.lb com.uy ee com.sv com.qa com.bh com.kh com.af com.ni com.cy com.py com.np com.mm hn tt cm co.ke
+    com.om co.tz mg co.cr sn com.cu am ge com.bn mn ci ht al co.hu us in net eu com.pg co.bw mv gm com.pa vg co.ug bi ps
+    com.jm mu bs cat je com.fj com.bz im co.zm sh com.vc kg com.et so bj cd co.ao co.zw pn tl rw mw co.uz co.ls sc co.mz
+    co.ck md ga com.na mk vu tg com.mt co.vi cg dm gl com.sl ad me gy to is sr com.gi li bf ml com.ag gg com.tj la fm sm
+    com.sb gp ws dj ne bt st td nr com.ai com.nf cv as ki tm cf nu tk ms dev ng hk jp ac ai com.ru com.tn`,
+  microsoft: 'us cloud ai cn design',
+  outlook: 'cn de jp fr com.br it es',
+  apple: 'cn com.cn',
+  amazon: 'co.za eu ie at com.sg ch jp',
+  yahoo: 'com.br jp com.tw ca com.hk com.au com.mx gr co.in com.sg com.ar co.id',
+  facebook: 'com.br de',
+};
+ALTRI_INDIRIZZI.microsoft.push('onmicrosoft.com', 'onmicrosoft.us', 'onmicrosoft.de', 'onmicrosoft.cn', 'microsoftonline.us',
+  'microsoftonline.cn');
+for (const [t, s] of Object.entries(PAESI)) (ALTRI_INDIRIZZI[t] = ALTRI_INDIRIZZI[t] || []).push(...s.split(/\s+/).filter(Boolean).map((x) => `${t}.${x}`));
 for (const b of BRANDS) b.domains.push(...(ALTRI_INDIRIZZI[b.token] || []));
 
 // Marchi che sono anche parole, o stanno dentro parole comuni (pineapple, otherwise, purchase, steampunk), con le loro
