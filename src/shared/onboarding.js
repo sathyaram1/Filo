@@ -298,6 +298,8 @@
       ...(s.fermato ? { fermato: true } : {}),
       ...(s.autonomiaInSospeso === true ? { autonomiaInSospeso: true } : {}),
       ...(Number(s.scambiPrima) > 0 ? { scambiPrima: Math.floor(Number(s.scambiPrima)) } : {}),
+      // Rifatta o ripresa: non è più il primo avvio, e la home la mostra solo nelle pagine che l'hanno chiesta (#1297).
+      ...(s.rifatta === true ? { rifatta: true } : {}),
     };
   }
 
