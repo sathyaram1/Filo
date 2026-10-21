@@ -884,16 +884,8 @@
       }
     }
 
-    // Un riquadro con un indirizzo suo, toccato prima del suo load, tiene la finestra all'arrivo e perde il preload:
-    // Filo sparisce da lì (patterns/un-clic-vero-dato-a-una-pagina-e-un-gesto-regalato.md). I load della pagina li
-    // ha visti il preload dall'inizio; quelli dei documenti dentro i riquadri si segnano qui.
-    const arrivati = new WeakSet();
-    function inVolo(f) {
-      if (arrivati.has(f) || self.SN_RIQUADRO_ARRIVATO?.(f)) return false;
-      if (f.hasAttribute('srcdoc')) return true;
-      const src = String(f.getAttribute('src') || '').trim();
-      return !!src && !/^about:blank([?#]|$)/i.test(src);
-    }
+    // Un riquadro ancora in arrivo non si tocca: perderebbe Filo (la regola sta nel preload della pagina).
+    const inVolo = (f) => !!self.SN_RIQUADRO_IN_VOLO?.(f);
     // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
     // pagina: solo al ricontrollo, mai al caricamento.
     function radici(doc) {
