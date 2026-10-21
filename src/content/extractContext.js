@@ -1470,6 +1470,7 @@
     campoSegreto,
     selezioneSegreta,
     campiSegretiInVista,
+    fotoCoperta,
     viewportInfo,
     expandAncestors,
     canRevealElement,
