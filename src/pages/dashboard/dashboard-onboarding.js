@@ -492,7 +492,7 @@
     try {
       const r = await send({ type: MSG.FILO_RESTART_ONBOARDING, riprendi: true, ...(altrove ? { altrove: true } : {}) });
       if (!r?.ok || !r.onboarding || r.onboarding.done) return;
-      if (altrove) await send({ type: MSG.OPEN_URL, url: 'filo://newtab/' });
+      if (altrove) await send({ type: MSG.OPEN_URL, url: `filo://newtab/?${SEGNO}=1` });
       else await openOnboarding({ ...r.onboarding, resume: !!r.resume });
     } catch (_) {}
   }
