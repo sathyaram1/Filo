@@ -828,6 +828,16 @@
           return () => {};
         }
         let cancelled = false;
+        // Il sito in lista lo dice anche l'immagine che fa da link, come il link di testo; la domanda non contatta il sito.
+        if (indirizzo) {
+          chrome.runtime.sendMessage({ type: MSG.LINK_FERMATO, url: indirizzo }).then((r) => {
+            if (cancelled || !r?.bloccato) return;
+            const nota = document.createElement('div');
+            nota.className = 'sn-menu-link-nota';
+            nota.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
+            el.insertBefore(nota, body);
+          }).catch(() => {});
+        }
         (async () => {
           let dataUrl;
           try {
