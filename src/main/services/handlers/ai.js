@@ -673,6 +673,13 @@ module.exports = function register(on, ctx) {
     try { return ['personal', 'factory'].includes(await K.keySourceOf(apiKey)); } catch (_) { return false; }
   }
 
+  // La chiave è di chi usa Filo: la sua o la personale dei crediti, non quella di fabbrica.
+  async function chiaveDellUtente(apiKey) {
+    const K = globalThis.SN_WALLET_MAIN;
+    if (!apiKey || !K || typeof K.keySourceOf !== 'function') return false;
+    try { return ['own', 'personal'].includes(await K.keySourceOf(apiKey)); } catch (_) { return false; }
+  }
+
   // Normalizza una entry del registry (nuovo schema { provider, model } o
   // vecchio duale { openrouter, … }) in { provider, model } — stessa logica
   // delle pagine Opzioni/admin.
