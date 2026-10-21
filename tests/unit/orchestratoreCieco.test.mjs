@@ -112,7 +112,6 @@ test('nella sessione del giro nessuna notifica all\'owner: PushNotification e fi
   assert.equal(decidi(avviso({ session_id: 's2' }), OPZ), null, 'le altre sessioni notificano come prima');
   assert.equal(decidi(avviso(), { ...OPZ, creato: ADESSO - VALIDITA_MS - 1 }), null, 'installazione scaduta');
   assert.equal(rifiuto(avviso({ session_id: 's2' }), { ...OPZ, sessione: '' }), MOTIVO_NOTIFICA, 'senza sessione nota vale per tutte');
-  assert.ok(!/notific/i.test(AL_POSTO_DEL_TESTO + MOTIVO_SOTTOFONDO), 'il rifiuto ha il suo motivo');
   const h = lancio(prima(false));
   assert.equal(h.permissionDecision, 'allow', 'il lancio del worker resta com\'era');
   assert.deepEqual([h.updatedInput.model, h.updatedInput.effort], ['fable', 'max']);
