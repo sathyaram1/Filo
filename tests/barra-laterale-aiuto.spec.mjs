@@ -1,6 +1,6 @@
 // #1432 — L'icona Aiuto della barra laterale: un clic apre l'Aiuto sulla pagina, il secondo nello stesso punto
 // detta nella sua casella, il terzo ferma. Una risposta arrivata ad Aiuto ridotto o chiuso accende la striscia
-// finché non la si apre. Dove la voce «Aiuto» non c'è l'icona è spenta e dice perché.
+// finché non la si apre. Dove la voce «Aiuto» non c'è l'icona è spenta e dice perché; nel menu fa lo stesso.
 // Microfono finto nella cornice (un tono), trascrizione e modello finti nel main: il resto è il codice vero.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -318,4 +318,25 @@ test('l\'icona si toglie dalla barra e nel menu del tasto destro fa lo stesso; l
   // E si rimette nella barra.
   await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'bar', beforeId: 'back' }, {}));
   await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['help', 'back']);
+});
+
+// La scheda nuova nasce già pronta dietro le quinte: quello che la sua pagina ha detto alla barra vale quando arriva.
+test.describe('la scheda nuova già pronta', () => {
+  test.use({ riservaNuovaScheda: true });
+  test('con Ctrl+T l\'icona Aiuto è accesa subito, e il clic apre l\'Aiuto', async ({ app, shell }) => {
+    test.setTimeout(60_000);
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+      const r = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.riserva;
+      const wc = r && r.webContents();
+      return !!(wc && wc.getURL() === 'filo://newtab/' && !wc.isLoading() && r.campi && r.campi.aiuto);
+    }), { timeout: 20_000, message: 'la riserva non ha ancora detto com\'è il suo Aiuto' }).toBe(true);
+    await shell.keyboard.press('Control+t');
+    await expect.poll(async () => (await nelMain(app))?.aiuto?.pannello, { timeout: 5_000 }).toBe('chiuso');
+    const barra = await barraAperta(app);
+    const help = icona(barra);
+    await expect(help).toHaveAttribute('aria-disabled', 'false');
+    await help.click();
+    await expect.poll(async () => (await nelMain(app))?.aiuto?.pannello, { timeout: 8_000 }).toBe('aperto');
+    await expect(help).toHaveAttribute('data-icona', 'mic');
+  });
 });
