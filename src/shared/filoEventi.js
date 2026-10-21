@@ -91,16 +91,23 @@
     return JSON.stringify(ev) + '\n';
   }
 
+  // Una riga sola: l'evento, null se rotta o fuori formato, undefined se vuota. La lettura del file la usa riga per
+  // riga (un file grande non sta in una stringa); `analizza` per un testo intero, come un export.
+  function analizzaRiga(r) {
+    if (!r || !r.trim()) return undefined;
+    try {
+      const ev = JSON.parse(r);
+      return valido(ev) ? ev : null;
+    } catch (_) { return null; }
+  }
+
   // Una riga rotta (scrittura interrotta da un guasto di corrente) si salta e si conta, non ferma la lettura.
   function analizza(testo) {
     const eventi = [];
     let scartate = 0;
     for (const r of String(testo || '').split('\n')) {
-      if (!r.trim()) continue;
-      try {
-        const ev = JSON.parse(r);
-        if (valido(ev)) eventi.push(ev); else scartate++;
-      } catch (_) { scartate++; }
+      const ev = analizzaRiga(r);
+      if (ev) eventi.push(ev); else if (ev === null) scartate++;
     }
     return { eventi, scartate };
   }
