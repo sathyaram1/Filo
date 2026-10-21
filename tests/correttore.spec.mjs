@@ -278,3 +278,30 @@ test('lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.snCorrettore)).toBe('senza-errori');
   await expect.poll(zigzag).toEqual({ ta: 'none', ce: 'none', riga: 'none', gramm: 'none' });
 });
+
+test('una password scritta dopo una pausa e una carta scritta in due tempi non partono verso il modello', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  await app.evaluate(() => {
+    const vero = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.__partiti = [];
+    const spia = async (req) => { globalThis.__partiti.push(String(req.messages[req.messages.length - 1].content)); return vero(req); };
+    globalThis.SN_PROVIDERS.completeWithFallback = spia;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = spia;
+  });
+  const quante = () => app.evaluate(() => globalThis.__rapide.length);
+  await page.locator('#ta').click();
+  await page.keyboard.type('ciao Marco, la password del wifi è ');
+  await expect.poll(quante, { timeout: 5000 }).toBe(1);
+  await page.waitForTimeout(400);
+  await page.keyboard.type('Gatto2024 e la carta è 4111 1111 ');
+  await expect.poll(quante, { timeout: 5000 }).toBe(2);
+  await page.waitForTimeout(400);
+  await page.keyboard.type('1111 1111 grazie');
+  await expect.poll(quante, { timeout: 5000 }).toBe(3);
+  const partiti = await app.evaluate(() => globalThis.__partiti);
+  expect(partiti.some((t) => t.includes('[dato riservato]'))).toBe(true);
+  for (const t of partiti) {
+    expect(t).not.toContain('Gatto2024');
+    expect(t).not.toMatch(/1111/);
+  }
+});

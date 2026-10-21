@@ -12,8 +12,11 @@ function riservati(testo) {
   const out = [];
   try { if (G && G.segretiNelTesto) out.push(...G.segretiNelTesto(testo)); } catch (_) {}
   try { if (X && X.segretiDetti) out.push(...X.segretiDetti(testo.toLowerCase())); } catch (_) {}
+  // Una carta mentre la si scrive: due gruppi da quattro cifre sono già metà numero, e il resto arriva al controllo dopo.
+  for (const m of testo.matchAll(GRUPPI_DI_CARTA)) out.push({ valore: m[0].replace(/ /g, '') });
   return out.map((x) => String((x && x.valore) || '')).filter((v) => v.length >= 4);
 }
+const GRUPPI_DI_CARTA = /(?<![\p{L}\p{N}])\d{4}(?: \d{4})+(?![\p{L}\p{N}])/gu;
 
 // Un numero di carta si scrive anche a gruppi («4111 1111 …»): fra una cifra e l'altra può stare uno spazio o un trattino.
 const formaDi = (valore) => new RegExp(/^\d+$/.test(valore) ? valore.split('').map(esc).join('[\\s-]?') : esc(valore), 'gi');
