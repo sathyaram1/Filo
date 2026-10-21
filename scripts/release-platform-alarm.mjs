@@ -56,13 +56,30 @@ const uscitaPer = (r) => !!r && !r.bozza && !r.anteprima && !!numeri(r.tag);
 export const PAGINE_MAX = 50;
 
 /**
- * Tutte le release del repo, come `{ tag, bozza, anteprima, allegati }`, o `null`
+ * Per piattaforma, se la sezione «Verifica» di una pagina ha le impronte di tutti i suoi file: la legge lo
+ * strumento che la scrive. `null` se quello strumento non si carica: l'avviso parte lo stesso, senza saperlo.
+ */
+export async function lettoreImpronte() {
+  try {
+    const { leggiSezione, SCARICABILI } = await import('./release-impronte.mjs');
+    return (corpo) => {
+      const nomi = leggiSezione(corpo).righe.map((r) => r.nome);
+      return Object.fromEntries(Object.entries(SCARICABILI).map(([p, file]) => [p, file.every((f) => nomi.includes(f))]));
+    };
+  } catch (e) {
+    console.error(`[allarme] non leggo le impronte delle pagine (${e?.message || e}): la chiave di un guasto alle impronte sarà della versione.`);
+    return null;
+  }
+}
+
+/**
+ * Tutte le release del repo, come `{ tag, bozza, anteprima, allegati, impronte }`, o `null`
  * se non si leggono per intero: un elenco monco farebbe dire «non esiste» a una
  * versione che c'è. Non lancia mai: l'avviso parte anche senza.
  */
 export async function leggiRilasci({
   repo, token, api = process.env.GITHUB_API_URL || 'https://api.github.com',
-  fetchImpl = globalThis.fetch, attesaMs = 20_000, log = (m) => console.error(m),
+  fetchImpl = globalThis.fetch, attesaMs = 20_000, log = (m) => console.error(m), impronteDi = null,
 } = {}) {
   if (!/^[\w.-]+\/[\w.-]+$/.test(String(repo || ''))) {
     log('[allarme] repo non indicato: non leggo le release, e il feedback dirà che non ha potuto guardarle.');
