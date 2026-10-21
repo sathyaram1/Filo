@@ -874,6 +874,9 @@
       transition: transform calc(0.1s * var(--sn-motion, 1));
     }
     .mg-fiducia-segno:hover { transform: scale(1.25); }
+    /* Subito dopo il titolo (Risolti, Archiviati, ricerca) lo scudo resta sulla sua riga: il titolo gli cede il posto
+       invece di mandarlo a capo da solo. */
+    .mg-item-title:has(+ .mg-fiducia-segno) { min-width: min(calc(var(--mg-title-min, 8em) - 20px), 100%); }
     /* Quello che sta già a destra (priorità, data) tiene lo spazio libero: lo scudo gli si mette accanto. */
     :is(.mg-priority, .mg-domanda-data, .mg-domanda-prio) ~ .mg-fiducia-segno { margin-left: 0; }
     .mg-fiducia-segno svg { width: 100%; height: 100%; display: block; overflow: visible; }
