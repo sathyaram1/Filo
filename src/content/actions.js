@@ -130,10 +130,12 @@
 
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   // Gli appunti li legge il main per Filo: la pagina non riceve nessun permesso, nemmeno per un attimo (#586).
-  async function pasteFromClipboard() {
+  // `letti`: gli appunti già letti dal main, quando «Incolla» l'ha scelto l'utente nello strato sopra la scheda (#1054).
+  async function pasteFromClipboard(letti = null) {
     deps.restorePasteContext();
     let appunti = null;
-    try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
+    if (letti && typeof letti === 'object') appunti = { ok: true, testo: letti.testo, immagine: letti.immagine };
+    else try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
     if (!appunti || !appunti.ok) { Popup.showToast(I18n.t('toast_paste_failed')); return; }
     const text = typeof appunti.testo === 'string' ? appunti.testo : '';
     let blob = null;
@@ -178,12 +180,13 @@
     pushClipboardEntry({ type: 'text', text }, 'paste');
   }
 
-  async function pasteHistoryEntry(entry) {
+  // `giaInCima`: scelta nello strato, il main l'ha già riportata in cima (#1054).
+  async function pasteHistoryEntry(entry, { giaInCima = false } = {}) {
     if (!entry) return;
     // Riporta in cima alla cronologia: il background fa dedup e promuove.
     // Non passiamo per pushClipboardEntry() per evitare di ri-richiedere
     // all'AI la descrizione di un'immagine già descritta.
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
+    if (!giaInCima) chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
     deps.restorePasteContext();
     const ctx = deps.getPasteContext();
     if (entry.type === 'image') {
@@ -400,6 +403,8 @@
   // Cronologia clipboard + stato navigazione (dati per il menu)
   // ------------------------------------------------------------
   async function getClipboardHistory() {
+    // Col menu nello strato la cronologia la legge lo strato dal main: nella scheda non arriva (#1054).
+    try { if (global.SN_STRATO_MENU_ACCESO?.() === true) return []; } catch (_) {}
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       return r?.items || [];
@@ -580,7 +585,7 @@
   // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
   // - Parte solo dietro un gesto vero che seleziona (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
-  let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
+  let prefetchedExplain = null; // { key, sentence, promise<{text}|{errore: risposta dell'IPC}> }
   let prefetchTimer = null;
   // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
   const PREFETCH_MAX_CHARS = 2000;
@@ -629,11 +634,12 @@
     }).then(
       (res) => {
         if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
-          : { error: Popup.frasePerLUtente(res) };
+          : { errore: res || {} };
       },
-      (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
+      (e) => ({ errore: { message: e?.message } }),
     );
     return entry;
   }
@@ -662,6 +668,11 @@
       return pre.promise.then((res) => (pre.fermata ? chiedi() : { ...res, giaChiesta: true }));
     }
     return chiedi();
+  }
+
+  // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
+  function chiudiMenu() {
+    try { global.SN_MENU?.close?.(); } catch (_) {}
   }
 
   function buildInlineExplain(selInfo, opts = {}) {
@@ -700,10 +711,9 @@
           if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
-          if (!res || res.error || !res.text) {
+          if (!res || res.errore || !res.text) {
             el.classList.add('sn-menu-inline-error');
-            // Già tradotto da startExplainRequest: qui si mostra, non si ritraduce.
-            body.textContent = (res && res.error) || I18n.t('err_provider_failed');
+            Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });
             return;
           }
           const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
@@ -823,7 +833,7 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(res);
+              Popup.scriviErrore(body, res, { dopo: chiudiMenu });
               return;
             }
             testoChiuso(body, res.text);
@@ -903,7 +913,7 @@
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(m);
+              Popup.scriviErrore(body, m, { dopo: chiudiMenu });
             }
           });
           port.postMessage({
@@ -1739,7 +1749,7 @@
         action: ACTIONS.TRANSCRIBE_IMAGE,
         payload: { dataUrl: region.dataUrl },
       });
-      if (!res?.ok) { Popup.showToast(Popup.frasePerLUtente(res), { duration: 9000 }); return; }
+      if (!res?.ok) { Popup.avvisoErrore(res); return; }
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
@@ -1788,14 +1798,15 @@
   // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
   // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
   // colore in formato hex nella clipboard. Esc annulla.
-  async function pickColor() {
-    if (typeof window.EyeDropper !== 'function') {
+  // `scelto`: il colore l'ha già preso lo strato del menu sopra la scheda, che ha il gesto dell'utente (#1054).
+  async function pickColor(scelto) {
+    const giaScelto = typeof scelto === 'string' && /^#[0-9a-f]{6}$/i.test(scelto);
+    if (!giaScelto && typeof window.EyeDropper !== 'function') {
       Popup.showToast(I18n.t('err_color_picker_unsupported'), { duration: 3000 });
       return;
     }
     try {
-      const ep = new window.EyeDropper();
-      const result = await ep.open();
+      const result = giaScelto ? { sRGBHex: scelto } : await new window.EyeDropper().open();
       const hex = (result?.sRGBHex || '').toUpperCase();
       if (!hex) return;
       try {

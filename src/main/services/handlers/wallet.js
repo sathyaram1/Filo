@@ -441,7 +441,7 @@ module.exports = function register(on, ctx) {
     if (status === 'invalid_code' && codes.length > daProvare.length) {
       return { ok: false, status, message: W.tooManyCodesMessage(codes.length, daProvare.length) };
     }
-    if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
+    if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status, r) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     try { await globalThis.SN_AVVISO_CREDITI_MAIN?.ricordaIngresso(r.entryCredits != null ? r.entryCredits : r.credits); } catch (_) {}
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
@@ -450,7 +450,7 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     const state = await readState();
-    return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, state };
+    return { ok: true, status, message: W.redeemOkMessage(r), credits: r.credits, inviteCodes: r.inviteCodes, invitesLocked: r.invitesLocked || null, state };
   }
 
   on(MSG.WALLET_REDEEM, filoOnly(async (msg) => doRedeem((msg && msg.code) || '')));
@@ -489,10 +489,11 @@ module.exports = function register(on, ctx) {
   // CHIEDE anche, con WALLET_NOTICE_PENDING: l'avviso è scritto in locale e
   // chiederlo non costa un giro dal server, a differenza dello stato del
   // portafoglio.
-  async function setNotice(kind, text) {
-    const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
+  // `invitesLocked`: entrato senza Google collegato, quindi senza inviti da dare (#1120): la home non li promette.
+  async function setNotice(kind, text, { invitesLocked = null } = {}) {
+    const rec = { kind, text: String(text || ''), invitesLocked: invitesLocked || null, at: new Date().toISOString(), seenHome: false, seenCredits: false };
     await inFilaAvviso(async () => { try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {} });
-    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text } }); } catch (_) {}
+    try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text, invitesLocked: rec.invitesLocked } }); } catch (_) {}
     return rec;
   }
 
@@ -535,7 +536,7 @@ module.exports = function register(on, ctx) {
       const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
       if (!r || visto) return null;
       if (msg && msg.claim) await segnaVisto(where);
-      return { kind: r.kind, text: r.text };
+      return { kind: r.kind, text: r.text, invitesLocked: r.invitesLocked || null };
     });
     return { ok: true, notice };
   }));
@@ -587,7 +588,10 @@ module.exports = function register(on, ctx) {
     const out = await doRedeem(r.code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits }), { invitesLocked: out.invitesLocked });
+    } else if (out && out.status === 'network_cap') {
+      // L'invito resta in attesa e si riprova al prossimo avvio, ma chi l'ha scaricato apposta deve sapere perché non è entrato.
+      await setNotice('failed', out.message);
     }
     return out;
   }
@@ -610,7 +614,7 @@ module.exports = function register(on, ctx) {
     const out = await doRedeem(code);
     if (out && out.ok) {
       await markPending({ done: true });
-      await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+      await setNotice('entry', W.entryNoticeText({ credits: out.credits }), { invitesLocked: out.invitesLocked });
     } else {
       await setNotice('failed', (out && out.message) || W.redeemMessage('internal'));
     }
@@ -942,7 +946,8 @@ module.exports = function register(on, ctx) {
     const now = Date.now();
     if (now - lastNoticeAt < 10 * 60 * 1000) return;
     lastNoticeAt = now;
-    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000 }); } catch (_) {}
+    // L'avviso nomina la pagina Crediti: porta il tasto per andarci, come ogni frase sui crediti (#663).
+    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000, rimedio: { keyRefused: true } }); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 

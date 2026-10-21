@@ -623,6 +623,10 @@
   color: var(--sn-muted);
   font-style: italic;
 }
+/* Il motivo per cui la proposta non è arrivata: col colore dell'errore, mai con quello dell'attesa (#663). */
+.sn-editbox-proposed.sn-editbox-errore {
+  color: var(--sn-error);
+}
 .sn-editbox-footer {
   display: flex;
   justify-content: flex-end;

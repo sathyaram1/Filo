@@ -144,6 +144,13 @@
     }
     return GIUDICI_SALTATI[k];
   }
+  // Le immagini che i giudici non hanno visto, col motivo scritto dal server (#597): un buco si spiega, non si tace.
+  function immaginiNonViste(fb) {
+    const p = fb && fb.pipeline;
+    const l = p && typeof p === 'object' && Array.isArray(p.immaginiNonAperte) ? p.immaginiNonAperte : [];
+    return l.filter((x) => x && Number.isInteger(x.n) && x.n > 0)
+      .map((x) => `Immagine ${x.n} non vista dai giudici: ${String(x.motivo || '').trim() || 'motivo non registrato'}.`);
+  }
   // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
   // il server non lo ri-giudica; entra in coda da solo. Il motivo lo scrive solo il server, fidato o già giudicato.
   function inAttesaOrigine(fb) {
@@ -1997,7 +2004,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,

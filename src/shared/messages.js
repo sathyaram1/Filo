@@ -200,11 +200,12 @@
     //   chiave OpenRouter personale meno consumo), pseudonimo, codici d'invito
     //   propri, se c'è la chiave personale, se l'utente usa una chiave sua.
     //   { } → { ok, identity:{ok,error?}, hasPersonalKey, pseudonym, usingOwnKey,
-    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits, … }|null, error? }
+    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits,
+    //   canInvite, invitesLocked:'need_google'|'google_used'|null, … }|null, error? }
     WALLET_STATE: 'wallet_state',
     // WALLET_REDEEM: riscatta un codice d'invito. Il server crea la chiave
     //   personale e la consegna UNA volta: il main la salva cifrata.
-    //   { code } → { ok, status, message, credits?, inviteCodes?, state? }
+    //   { code } → { ok, status, message, credits?, inviteCodes?, invitesLocked?, state? }
     WALLET_REDEEM: 'wallet_redeem',
     // WALLET_REISSUE: il portafoglio c'è sul server ma la chiave personale non
     //   è su questo computer: il server ne emette un'altra (la vecchia si
@@ -515,6 +516,13 @@
     CASELLE_IN_SOSPESO: 'caselle_in_sospeso',        // { inSospeso } → { ok }
     // Incolla di Filo: gli appunti li legge il main, la pagina non riceve il permesso (#586).
     APPUNTI_DI_FILO: 'appunti_di_filo',              // {} → { ok, testo, immagine (data URL png) }
+    // Il menu del tasto destro nello strato sopra la scheda (#1054): il content script lo descrive, lo strato lo disegna.
+    STRATO_MENU_APRI: 'strato_menu_apri',            // { id, menu: { items, keepOnScroll } } → { ok }
+    STRATO_MENU_AGGIORNA: 'strato_menu_aggiorna',    // { id, cosa: riga|griglia|griglia-apri|correzione|inline, … }
+    STRATO_MENU_CHIUDI: 'strato_menu_chiudi',        // { id }
+    STRATO_MENU_ESEGUI: 'strato_menu_esegui',        // main → content script { id, n, args, chiude } | { id, inline, cammino }
+    STRATO_MENU_INCOLLA: 'strato_menu_incolla',      // main → content script { id, testo, immagine } | { id, voce }
+    STRATO_MENU_CHIUSO: 'strato_menu_chiuso',        // main → content script { id }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }

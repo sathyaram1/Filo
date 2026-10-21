@@ -1239,7 +1239,13 @@
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
     if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
     if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
-    if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
+    if (m.error) {
+      // La frase nomina la pagina dove si rimedia: il tasto per andarci viene prima di «Riprova», che finché
+      // l'ostacolo resta rimanda la stessa domanda allo stesso muro (#663, #828.1). Come «Riprova», sull'ultima bolla.
+      const pagina = isLast && m.rimedio ? window.SN_CHAT_ERRORS?.rimedioPagina?.(m.rimedio) : null;
+      const via = pagina ? `<button class="dk-retry dk-rimedio" data-rimedio="1" title="${esc(pagina.title || '')}">${esc(pagina.label)}</button>` : '';
+      return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${via}${retry}</div>`;
+    }
     const parts = [cotHtml(m)];
     // Risposta fermata a metà: la riga lo dice da nota, non da risposta, e l'ultima bolla offre «Continua».
     const CE = window.SN_CHAT_ERRORS;
@@ -1497,6 +1503,8 @@
       bot.stopped = true;
     } else if (!r || !r.ok) {
       bot.error = (r && r.error) || 'nessuna risposta';
+      const rimedio = r && { code: r.code, keyRefused: !!r.keyRefused, maxTokens: r.maxTokens, finishReason: r.finishReason };
+      if (window.SN_CHAT_ERRORS?.rimedioPagina?.(rimedio)) bot.rimedio = rimedio;
     } else {
       bot.reply = r.reply || '';
       bot.cardIds = r.cardIds || [];
@@ -2567,6 +2575,14 @@
     log.addEventListener('click', (e) => {
       if (toggleCot(e.target)) return;
       if (e.target.closest('[data-retry]')) { retryLastTurn(); return; }
+      const via = e.target.closest('[data-rimedio]');
+      if (via) {
+        const bubble = via.closest('[data-msg-i]');
+        const m = bubble && chatMsgs()[Number(bubble.dataset.msgI)];
+        const pagina = m && m.rimedio ? window.SN_CHAT_ERRORS?.rimedioPagina?.(m.rimedio) : null;
+        if (pagina) send({ type: MSG.OPEN_URL, url: pagina.url });
+        return;
+      }
       if (e.target.closest('[data-continua]')) { sendChat(window.SN_CHAT_ERRORS.CHIEDI_SEGUITO); return; }
       if (e.target.closest('[data-clear-chat]')) { clearChat(); return; }
       const impAll = e.target.closest('[data-import-all]');

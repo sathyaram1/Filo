@@ -1123,11 +1123,10 @@
       row.className = 'dash-bubble-actions';
       const retry = document.createElement('button');
       retry.type = 'button';
-      retry.className = 'dash-action-btn dash-action-btn-primary';
+      retry.className = 'dash-action-btn';
       retry.textContent = '↻ Riprova';
       retry.title = 'Rimanda lo stesso messaggio';
       retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal }));
-      row.appendChild(retry);
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
@@ -1141,15 +1140,20 @@
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
       const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason }) : null;
+      // Il tasto in evidenza è quello che toglie l'ostacolo (#828.1): finché c'è, «Riprova» rimanda lo stesso messaggio
+      // allo stesso muro, e resta accanto per dopo, quando l'ostacolo è tolto.
       if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
-        via.className = 'dash-action-btn';
+        via.className = 'dash-action-btn dash-action-btn-primary';
         via.textContent = pagina.label;
         via.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : pagina.title;
         via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
         row.appendChild(via);
+      } else {
+        retry.classList.add('dash-action-btn-primary');
       }
+      row.appendChild(retry);
       if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
       // modello non risponde (rete assente, provider giù, crediti finiti) alla
@@ -2301,7 +2305,13 @@
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
       title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
-      text: entrato ? `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.` : n.text,
+      text: entrato
+        ? (n.invitesLocked === 'need_google'
+          ? `${n.text} Li trovi nella pagina Crediti, dove colleghi Google per avere anche inviti da dare.`
+          : (n.invitesLocked
+            ? `${n.text} Li trovi nella pagina Crediti.`
+            : `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.`))
+        : n.text,
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
     return true;
