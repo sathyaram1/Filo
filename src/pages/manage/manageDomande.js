@@ -269,6 +269,15 @@
       btn.textContent = `Applica il consiglio (${scelte.size})`;
       btn.disabled = !!(conferma && conferma.inviando);
     }
+    // Il numero dice quante ne resterebbero col filtro acceso, come quello della lista dei feedback.
+    const filtro = $('mgDomandeFiduciaFiltro');
+    if (filtro) {
+      filtro.hidden = !stato.lette;
+      filtro.setAttribute('aria-pressed', soloNonFidate() ? 'true' : 'false');
+      filtro.title = soloNonFidate() ? 'Mostra anche le domande fidate' : 'Mostra solo le domande non fidate';
+      const c = filtro.querySelector('.mg-livello-count');
+      if (c) c.textContent = stato.lette ? ` (${MR.contaNonFidate(tutteDiScheda(scheda))}${stato.altre && scheda === 'domande-archivio' ? '+' : ''})` : '';
+    }
   }
 
   // ── Domanda aperta ────────────────────────────────────────────────────────
