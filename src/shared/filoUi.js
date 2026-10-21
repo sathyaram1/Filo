@@ -404,14 +404,24 @@
   // La selezione spostata mentre il sito riceve un tasto o un inserimento dell'utente (fra l'ascolto di Filo, che viene
   // prima, e la fine del giro) l'ha spostata il sito: torna. Fuori da quei giri la sposta anche la barra dei menu (Cmd+A
   // su Mac), che la pagina non vede: lì resta il limite del pattern.
+  // Un messaggio, non un timer: i timer di una scheda nascosta aspettano fino a un secondo, e il controllo cadrebbe
+  // sopra il gesto seguente.
+  const dopoIlGiro = (() => {
+    try {
+      const coda = [];
+      const canale = new MessageChannel();
+      canale.port1.onmessage = () => { const f = coda.shift(); if (f) f(); };
+      return (f) => { coda.push(f); canale.port2.postMessage(0); };
+    } catch (_) { return (f) => setTimeout(f, 0); }
+  })();
   function vigila(c, st, sel) {
     const v = { sel };
     st.vigila = v;
-    setTimeout(() => {
+    dopoIlGiro(() => {
       if (st.vigila !== v) return;
       st.vigila = null;
       if (c.value === st.buono && !st.componendo) rimettiSelezione(c, v.sel);
-    }, 0);
+    });
   }
   // Il gesto seguente dell'utente può arrivare prima del controllo (il browser passa i tasti avanti ai tempi): lo fa lui.
   function sciogli(c, st) {

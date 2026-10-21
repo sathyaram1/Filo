@@ -291,7 +291,13 @@ test('Aiuto su un sito: la selezione spostata dal sito nei suoi ascolti dei tast
   await ascolti(false);
   // «Seleziona tutto» della barra dei menu (Cmd+A su Mac) non passa dalla pagina: vale anche lui.
   await page.keyboard.press('End');
-  await app.evaluate(({ webContents }, url) => webContents.getAllWebContents().find((w) => w.getURL() === url).selectAll(), page.url());
+  // Il menu è un gesto a parte: arriva dopo che Filo ha chiuso il giro del tasto.
+  await page.waitForTimeout(100);
+  await app.evaluate(({ webContents }, url) => {
+    const w = webContents.getAllWebContents().find((x) => x.getURL() === url);
+    w.focus();
+    w.selectAll();
+  }, page.url());
   await expect.poll(() => ta.evaluate((t) => t.selectionEnd - t.selectionStart)).toBe('dove si cambia la password?'.length);
   await page.keyboard.type('y');
   await expect(ta).toHaveValue('y');
