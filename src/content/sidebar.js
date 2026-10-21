@@ -1545,7 +1545,19 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
+  // Chiudere a metà di un turno nasconde il pannello invece di buttare la risposta; i passi che l'Aiuto farebbe da
+  // solo, chiuso, non partono.
+  async function submit(op = {}) {
+    if (!root || (nascosto && !op.userMessage)) return;
+    inVolo += 1;
+    try { await turno(op); } finally {
+      inVolo -= 1;
+      // Chiuso mentre pensava e niente da leggere: allora era chiuso davvero.
+      if (nascosto && !inVolo && !nonLetta) close({ davvero: true });
+    }
+  }
+
+  async function turno({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false } = {}) {
     if (!root) return;
     // Il contatore lo azzera solo un gesto vero: scrivere, una scelta, il clic sul passo indicato, «Continua».
     if (userMessage || daGesto) {
