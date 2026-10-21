@@ -2,6 +2,10 @@
 // pastiglia, alla stessa distanza da sopra, da sotto e dal bordo destro; con più righe restano sull'ultima.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
