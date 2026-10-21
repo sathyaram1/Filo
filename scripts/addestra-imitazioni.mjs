@@ -352,7 +352,7 @@ function costruisci() {
   };
   const utili = conCandidati(etichetta);
   for (const [h, y] of etichetta) if (utili.has(h) && !scritte.has(h)) aggiungi(h, y, null, 'elenco');
-  for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, r.sintetico ? 'sintetico' : 'mano', r.url);
+  for (const [h, r] of scritte) aggiungi(h, r.marchio ? 1 : 0, r.marchio, r.sintetico ? 'sintetico' : 'mano', r.url, r.peso);
   return gruppi;
 }
 
