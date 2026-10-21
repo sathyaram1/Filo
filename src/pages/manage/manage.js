@@ -3316,11 +3316,11 @@
     item.title = (num ? `#${num} · ` : '') + title + (reason ? ` — ${reason}` : '');
     item.classList.toggle('mg-item--selected', fb._id === selectedId);
     // La card resta, la fiducia può cambiare mentre la si guarda: il segno si riscrive al suo posto.
-    const fidata = MR.isFidato(fb);
-    item.classList.toggle('mg-fiducia--fidata', fidata);
-    item.classList.toggle('mg-fiducia--nonfidata', !fidata);
+    const classe = MR.segnoFiducia(fb).classe;
+    item.classList.toggle('mg-fiducia--fidata', classe === 'fidata');
+    item.classList.toggle('mg-fiducia--nonfidata', classe !== 'fidata');
     const scudo = item.querySelector('.mg-fiducia-segno');
-    if (scudo) scudo.outerHTML = fiduciaSegnoHtml(fb);
+    if (scudo && !scudo.classList.contains(`mg-fiducia-segno--${classe}`)) scudo.outerHTML = fiduciaSegnoHtml(fb);
     return item;
   }
 
