@@ -374,24 +374,6 @@ async function battiNelCampo(page, testo) {
 
 // I riquadri dello stesso sito arrivano solo quando il Filo della pagina è già montato: toccati
 // prima del loro load perdevano il preload, e il gesto lì dentro non arrivava a nessuno (#1568).
-async function riquadriInRitardo(cornice) {
-  const attese = [];
-  let aperti = false;
-  let serviti = 0;
-  const server = createServer((req, res) => {
-    const rispondi = (html) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(html); };
-    if (!req.url.startsWith('/riquadro')) { rispondi(cornice); return; }
-    const servi = () => { serviti += 1; rispondi('<!doctype html><html><body style="margin:0;height:3000px"><h2>riquadro</h2></body></html>'); };
-    if (aperti) servi(); else attese.push(servi);
-  });
-  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
-  return {
-    url: `http://127.0.0.1:${server.address().port}/`,
-    serviti: () => serviti,
-    apri() { aperti = true; for (const f of attese.splice(0)) f(); },
-    chiudi: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),
-  };
-}
 const casiRiquadri = {
   'pagina a frame: la rotella premuta su un frame mostra il riquadro, e il numero battuto vale':
     { cornice: '<html><frameset cols="70%,*"><frame src="/riquadro/1"><frame src="/riquadro/2"></frameset></html>', quanti: 2 },
