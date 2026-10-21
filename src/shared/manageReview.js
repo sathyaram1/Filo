@@ -80,10 +80,10 @@
     return isUnprovenSender(fb) ? 'non-provato:' + c : c;
   }
 
-  // ── Lavori locali (#908) ─────────────────────────────────────────────────
-  // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno da solo la toglie alle routine;
-  // si mette su un feedback fidato (#1148) o approvato dall'owner come lavoro locale (`localApproval { by, at }`,
-  // #913: lo scrive solo l'admin). Saltare L5 lo decide il server con la fiducia del ramo (fiduciaRamo.js).
+  // ── Lavori server (#908, #1358) ──────────────────────────────────────────
+  // `localOnly { by, at }` toglie la pratica alla coda normale delle routine; in lista resta nella scheda del suo stato
+  // con l'etichetta «server» (#1575). Lo mette il server quando chi lavora lo chiede, o «💻 Lavoro server» su un rombo
+  // azzurro (`localApproval { by, at }`, #913: lo scrive solo l'admin). Saltare L5 lo decide il server (fiduciaRamo.js).
   function isLocalOnly(fb) {
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
