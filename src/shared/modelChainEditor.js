@@ -41,7 +41,6 @@
       [A.TRANSCRIBE_AUDIO, 'options_action_transcribe_audio'],
       [A.TTS, 'options_action_tts'],
       [A.SPELLCHECK_SEMANTIC, 'spell_action_semantic_label'],
-      [A.SPELLCHECK_WORD, 'spell_action_word_label'],
       [A.SPELLCHECK_CONTEXT, 'spell_action_coerenza_label'],
       [A.HELP_INTENT_GUESS, 'options_action_help_intent_guess'],
       [A.HELP_INTENT_JUDGE, 'options_action_help_intent_judge'],

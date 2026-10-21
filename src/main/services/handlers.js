@@ -263,12 +263,13 @@ async function buildMessages(action, payload) {
     ] }];
   }
 
+  // I due controlli del correttore (#1446): il rapido trova gli errori, il ragionato i suggerimenti e i fatti.
   if (action === ACTIONS.SPELLCHECK_SEMANTIC) {
-    return [{ role: 'user', content: PROMPTS.spellcheckSemantic({ text: payload.text, context: payload.context }) }];
+    return [{ role: 'user', content: PROMPTS.spellcheckErrori(payload || {}) }];
   }
   if (action === ACTIONS.SPELLCHECK_CONTEXT) {
     // La data la dà l'orologio di qui, non la pagina.
-    return [{ role: 'user', content: PROMPTS.spellcheckContext({ text: payload.text, contesto: payload.contesto, oggi: new Date() }) }];
+    return [{ role: 'user', content: PROMPTS.spellcheckSuggerimenti({ ...(payload || {}), oggi: new Date() }) }];
   }
   if (action === ACTIONS.EDIT_TEXT) {
     return [{ role: 'user', content: PROMPTS.editText({ original: payload.original, instruction: payload.instruction }) }];
@@ -278,12 +279,6 @@ async function buildMessages(action, payload) {
       url: payload.url, anchorText: payload.anchorText,
       ogTitle: payload.ogTitle, ogDescription: payload.ogDescription,
       suspiciousFlags: payload.suspiciousFlags,
-    }) }];
-  }
-  if (action === ACTIONS.SPELLCHECK_WORD) {
-    return [{ role: 'user', content: PROMPTS.spellcheckWord({
-      word: payload.word, sentence: payload.sentence || payload.word,
-      prev: payload.prev || '', next: payload.next || '',
     }) }];
   }
   if (action === ACTIONS.HELP_INTENT_GUESS) {
@@ -873,7 +868,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
 
   if (
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
-    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_WORD && action !== ACTIONS.SPELLCHECK_CONTEXT
+    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_CONTEXT
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
     // La ricerca fra i feedback è un passaggio interno di una ricerca, non una
     // richiesta dell'utente: come quando prendeva in prestito «Categorizza»,

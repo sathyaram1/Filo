@@ -152,10 +152,10 @@ test('i rimedi: modelli più economici per le funzioni che consumano, automatich
       { azione: A.FILO_CHAT, crediti: 200, prompt: 200000, completion: 20000 },
       { azione: A.EXPLAIN, tag: CA.ANTICIPATA, crediti: 40, prompt: 40000, completion: 8000 },
       { azione: A.FILO_TAB_SUMMARY, crediti: 30, prompt: 30000, completion: 3000 },
-      { azione: A.SPELLCHECK_WORD, crediti: 30, prompt: 30000, completion: 3000 },
+      { azione: A.SPELLCHECK_SEMANTIC, crediti: 30, prompt: 30000, completion: 3000 },
     ],
   });
-  const impostazioni = { spiegaAnticipata: { enabled: true }, riassuntoSchede: { enabled: true }, featureFlags: { spellcheck: false, categorize: false }, autoArchive: { enabled: true }, nomiSensati: { scaricamenti: false } };
+  const impostazioni = { spiegaAnticipata: { enabled: true }, riassuntoSchede: { enabled: true }, featureFlags: { spellcheck: false, spellcheckContext: false, categorize: false }, correttore: { modelloErrori: false }, autoArchive: { enabled: true }, nomiSensati: { scaricamenti: false } };
   const lista = CA.rimedi({
     diario, oggi: OGGI, perGiorno: 300, quota: 100, prossima: { quando: 'stanotte verso le 2:00' },
     config: config(), impostazioni,

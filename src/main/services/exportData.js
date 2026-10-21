@@ -617,6 +617,7 @@ const REGOLE_ALTRE_CHIAVI = {
   'filo.editor.notesMigrated': 'stato',
   sn_qr_in_primary_migrated: 'stato',
   sn_aiuto_di_serie_migrated: 'stato',
+  sn_correttore_due_segni_migrated: 'stato',
 };
 
 let regolePerChiave = null;
@@ -724,7 +725,8 @@ function tettoSpesa(qui, backup) {
 
 function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
-  const imp = senzaSegretiVuoti(require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {}), cur);
+  const prima = require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {});
+  const imp = senzaSegretiVuoti(require('./correttoreMigrazione').perImportazione(prima), cur);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = {

@@ -1,6 +1,6 @@
-// Il terzo segno del correttore (#1115), la parte senza DOM: date e giorni controllati in codice, e la risposta del
-// modello filtrata in codice (una contraddizione vale solo se la sua citazione sta, alla lettera, nella pagina mandata).
-// Lo usano spellcheck.js e i test; il disegno, il menu e la chiamata stanno in spellcheck.js e content.js.
+// I suggerimenti del correttore che non chiedono DOM (#1115, #1446): date e giorni controllati in codice, e la prova di
+// una contraddizione (la sua citazione deve stare, alla lettera, nella pagina mandata). Lo usano spellcheck.js e i
+// test; il resto delle regole del correttore sta in correttoreRegole.js.
 
 (function (global) {
   'use strict';
@@ -348,75 +348,6 @@
     return normalizza(contestoComeTesto(contesto)).includes(c);
   }
 
-  function leggiJson(raw) {
-    const pulito = String(raw == null ? '' : raw).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-    const a = pulito.indexOf('{');
-    const b = pulito.lastIndexOf('}');
-    if (a < 0 || b <= a) return null;
-    try { return JSON.parse(pulito.slice(a, b + 1)); } catch (_) { return null; }
-  }
-
-  const SPIEGAZIONE_MAX = 160;
-  function corta(s, max) {
-    const v = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
-    return v.length > max ? `${v.slice(0, max - 1).trimEnd()}…` : v;
-  }
-
-  // Il pezzo segnato si cerca nel testo com'è: un pezzo riscritto dal modello non si sa dove sta, e si lascia cadere.
-  function trova(testo, pezzo, presi) {
-    const libero = (a, b) => !presi.some((p) => a < p.end && b > p.start);
-    for (const fonte of [testo, testo.toLowerCase()]) {
-      const cerca = fonte === testo ? pezzo : pezzo.toLowerCase();
-      let da = 0;
-      for (;;) {
-        const i = fonte.indexOf(cerca, da);
-        if (i < 0) break;
-        if (libero(i, i + cerca.length)) return { start: i, end: i + cerca.length };
-        da = i + 1;
-      }
-    }
-    return null;
-  }
-
-  const TIPI_MODELLO = new Set(['contraddizione', 'poco_chiara']);
-
-  function leggiRisposta(raw, testo, contesto) {
-    const obj = leggiJson(raw);
-    const lista = obj && Array.isArray(obj.issues) ? obj.issues : [];
-    const out = [];
-    for (const it of lista.slice(0, 20)) {
-      if (!it || typeof it !== 'object' || !TIPI_MODELLO.has(it.tipo)) continue;
-      const pezzo = typeof it.testo === 'string' ? it.testo : '';
-      if (!pezzo.trim()) continue;
-      let citazione = '';
-      if (it.tipo === 'contraddizione') {
-        citazione = pulisciCitazione(it.citazione);
-        if (!citazioneNelContesto(citazione, contesto)) continue;
-      }
-      const r = trova(testo, pezzo.trim(), out);
-      if (!r) continue;
-      const segment = testo.slice(r.start, r.end);
-      const correzione = typeof it.correzione === 'string' ? it.correzione.trim() : '';
-      out.push({
-        ...r, segment, fonte: 'modello', tipo: it.tipo,
-        citazione: corta(citazione, 240),
-        spiegazione: corta(it.spiegazione, SPIEGAZIONE_MAX) || t('spell_ocra_controlla'),
-        correzioni: correzione && correzione !== segment ? [correzione] : [],
-      });
-    }
-    return senzaSovrapposti(out);
-  }
-
-  // I segni del codice vincono su quelli del modello che li toccano: sono certi.
-  function unisci(date, modello) {
-    const libero = (it) => !date.some((d) => it.start < d.end && it.end > d.start);
-    return senzaSovrapposti([...date, ...(modello || []).filter(libero)]);
-  }
-
-  // «Ignora» vale per quel segno su quel testo: stessa porzione, stesso tipo. Non la citazione, che il modello al giro
-  // dopo può prendere da un'altra riga della stessa conversazione.
-  const chiaveIgnora = (it) => [it.fonte, it.tipo, normalizza(it.segment)].join('\u0001');
-
   // Un segno ignorato copre anche quelli dello stesso tipo che toccano il suo pezzo nel testo di adesso: al giro dopo
   // il modello può segnare qualche parola in più o in meno della stessa frase. `ignorate`: [{ fonte, tipo, segment }].
   function ignorato(it, ignorate, testo) {
@@ -431,18 +362,5 @@
     return false;
   }
 
-  // FNV-1a: l'impronta del contesto nella chiave della cache, non una difesa.
-  function impronta(s) {
-    let h = 0x811c9dc5;
-    const v = String(s == null ? '' : s);
-    for (let i = 0; i < v.length; i++) {
-      h ^= v.charCodeAt(i);
-      h = Math.imul(h, 0x01000193) >>> 0;
-    }
-    return `${v.length.toString(36)}.${h.toString(36)}`;
-  }
-
-  global.SN_COERENZA = {
-    dateDi, leggiRisposta, citazioneNelContesto, normalizza, unisci, chiaveIgnora, ignorato, impronta, contestoComeTesto,
-  };
+  global.SN_COERENZA = { dateDi, citazioneNelContesto, normalizza, ignorato, contestoComeTesto };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

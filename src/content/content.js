@@ -433,7 +433,7 @@
     // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
     // isBlocked() quando scatta. Il ponte del tasto destro lo legge da qui, prima di dare l'evento al menu.
     seguiSpento();
-    SpellCheck.init(isBlocked() ? { ...settings, featureFlags: { ...(settings.featureFlags || {}), spellcheck: false } } : settings);
+    SpellCheck.init(impostazioniDelCorrettore());
 
     // window + capture: fase più precoce possibile, così intercettiamo il
     // contextmenu prima di eventuali handler della pagina ospite (alcune pagine
@@ -1233,56 +1233,38 @@
     const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
     if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
 
-    // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
-    // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
-    // parola sotto il cursore (zigzag rosso del browser).
+    // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
+    // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
     try {
-      const bluAttivo = settings?.featureFlags?.spellcheck !== false;
-      // Il segno ocra (#1115) ha il suo interruttore: col blu spento il suo menu resta.
-      const ocra = SpellCheck && SpellCheck.ocraAttiva?.() ? SpellCheck.findSupportedEditable(realTarget(e)) : null;
-      const ocraIssue = ocra ? SpellCheck.getContextIssueAt(ocra, e.clientX, e.clientY) : null;
-      if (ocraIssue && !bluAttivo) {
-        await openSpellBlueMenu(ocra, null, e, sito, ocraIssue);
-        return;
-      }
-      if (bluAttivo && SpellCheck) {
+      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi())) {
         const rt = realTarget(e);
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
-          const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
-          if (blueIssue || ocraIssue) {
-            await openSpellBlueMenu(editableEl, blueIssue, e, sito, ocraIssue);
+          const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
+          if (sotto.errore || sotto.suggerimento) {
+            await openSpellMarksMenu(editableEl, sotto, e, sito);
             return;
           }
-          const wordCtx = SpellCheck.getWordAt(editableEl, e.clientX, e.clientY);
-          if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
+          // Una parola che il browser segna e Filo no (il dizionario non ancora pronto, un campo mai entrato col fuoco):
+          // la proposta del browser, come nelle caselle di una riga.
+          const wordCtx = SpellCheck.erroriAttivi() ? SpellCheck.getWordAt(editableEl, e.clientX, e.clientY) : null;
+          if (wordCtx && !SpellCheck.parolaGiusta(editableEl, wordCtx.word)
+            && (SpellCheck.getNativeSuggestions(wordCtx.word).length || SpellCheck.sbagliataPerIlBrowser(wordCtx.word))) {
             await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
           }
         }
-        // Su `<input>` testuali (non "supportati" dal nostro overlay): la
-        // parola sotto il cursore va comunque corretta. La vecchia estensione
-        // mostrava il suggerimento in cima e la nuova app no, perché si
-        // affidava ai SOLI suggerimenti nativi di Electron (che non sempre
-        // arrivano — dipende dal dizionario della lingua attiva). Ora, come per
-        // textarea/contenteditable, estraiamo la parola e chiediamo la
-        // correzione all'LLM (affidabile a prescindere dal dizionario nativo),
-        // tenendo i suggerimenti nativi come base immediata quando ci sono.
-        const inputEl = rt?.closest?.('input');
-        if (inputEl && isTextLikeInput(inputEl)) {
+        const inputEl = SpellCheck.erroriAttivi() ? rt?.closest?.('input') : null;
+        if (inputEl && isTextLikeInput(inputEl) && !SpellCheck.campoEscluso(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
             await openSpellWordMenu(inputEl, wordCtx, e, sito);
             return;
           }
-          // Nessuna parola sotto il cursore (es. click su area vuota): menu
-          // normale, che riserva comunque lo slot per il nativo se arriva.
-          await openNormalMenuAt(e, sito);
-          return;
         }
       }
     } catch (err) {
-      console.error('[SN] spellcheck detection fallita, apro menu normale:', err);
+      console.error('[SN] correttore, tasto destro: apro il menu normale', err);
     }
 
     await openNormalMenuAt(e, sito);
@@ -1315,6 +1297,11 @@
     const sc = el.getAttribute('spellcheck');
     if (sc === 'false') return false;
     return true;
+  }
+
+  // Sul sito dove Filo è spento il correttore tace e il browser torna a sottolineare da sé (#589.2, #1446).
+  function impostazioniDelCorrettore() {
+    return isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false }, sitoSpento: true } : settings;
   }
 
   async function openNormalMenuAt(e, sito = null) {
@@ -1355,8 +1342,13 @@
     // applyNativeCorrection, che agisce sul campo a fuoco senza doverlo
     // identificare dalla pagina. Resta appeso al correttore: se l'utente lo ha
     // spento, niente slot e niente suggerimenti.
-    const wantCorrection = settings?.featureFlags?.spellcheck !== false && !!SpellCheck;
+    // Nei campi dove i segni li disegna Filo (#1446) decide il correttore: una parola che sa giusta (un cognome scartato
+    // dal modello, una parola ignorata) non riprende dal browser la sua «correzione».
+    const campoDiFilo = SpellCheck?.findSupportedEditable?.(target) || null;
+    const wantCorrection = !!SpellCheck && SpellCheck.erroriAttivi();
     let updateCorrection = null;
+    const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
+    if (tutti) items.unshift(tutti, { type: 'separator' });
     if (wantCorrection) {
       items.unshift(
         {
@@ -1396,7 +1388,7 @@
       // (vincoli di timing con l'await getClipboardHistory sopra), il modulo
       // spellcheck ce lo consegna subito invece di lasciarci aspettare.
       SpellCheck.onNextNativeSuggestion?.(({ word, suggestions }) => {
-        if (!suggestions?.length) return;
+        if (!suggestions?.length || (campoDiFilo && SpellCheck.parolaGiusta(campoDiFilo, word))) return;
         revealNativeCorrection(word, suggestions);
       }, { since: openedAt });
     }
@@ -1980,12 +1972,10 @@
     });
   }
 
-  // Sub-menu per una correzione "rosso" (parola): aggiungi al dizionario,
-  // correggi automaticamente, gestisci correttore.
-  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = []) {
+  // La freccetta di una correzione: le altre proposte del dizionario, poi aggiungi, correggi da sé, gestisci.
+  // `parola`: il segno è una parola sola, e allora si può aggiungere al dizionario o correggere da sé d'ora in poi.
+  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true) {
     const items = [];
-    // Suggerimenti alternativi (dal correttore nativo): righe "applica" sopra le
-    // azioni di gestione. Saltiamo quello già mostrato come correzione primaria.
     const seen = new Set([String(correction || '').toLowerCase()]);
     for (const s of altSuggestions) {
       const v = String(s || '').trim();
@@ -1997,274 +1987,201 @@
           expectedSegment: wordCtx.word,
         }),
       });
+      if (items.length >= 4) break;
     }
     if (items.length) items.push({ type: 'separator' });
-    items.push(
-      {
+    if (parola) {
+      items.push({
         label: I18n.t('spell_add_dict'),
         onClick: () => {
           SpellCheck.addToDictionary(wordCtx.word);
           Popup.showToast(I18n.t('toast_added_to_dict'));
         },
-      },
-      {
+      });
+    }
+    if (parola && correction) {
+      items.push({
         label: I18n.t('spell_autocorrect'),
         onClick: async () => {
           await SpellCheck.setAutocorrect(wordCtx.word, correction);
-          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction);
+          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction, { expectedSegment: wordCtx.word });
           Popup.showToast(I18n.t('toast_autocorrect_saved'));
         },
-      },
-      {
-        label: I18n.t('spell_manage'),
-        onClick: () => {
-          chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE });
-        },
-      },
-    );
+      });
+    }
+    items.push({ label: I18n.t('spell_manage'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE }) });
     return items;
   }
 
-  // Sub-menu per una correzione "blu" (errore contestuale): mostra la spiegazione
-  // dell'errore come riga informativa, poi link a "Gestisci correttore".
-  function buildBlueSubItems(issue) {
-    return [
-      {
-        type: 'info',
-        label: issue.explanation || I18n.t('spell_semantic_issue'),
-      },
-      { type: 'separator' },
-      {
-        label: I18n.t('spell_manage'),
-        onClick: () => {
-          chrome.runtime.sendMessage({ type: MSG.OPEN_SPELLCHECK_PAGE });
-        },
-      },
-    ];
-  }
+  // Una parola sola, senza spazi intorno: « il» ripetuto non è una parola da mettere nel dizionario.
+  const unaParola = (s) => /^[^\s]+$/.test(String(s || ''));
 
-  // Click destro su parola in editabile (errore "rosso", non coperta da issue blu).
-  //
-  // Regole (feedback alpha):
-  // - Non mostriamo MAI il flash "Cerco una correzione…": la riga compare solo se
-  //   sappiamo che la parola è davvero sbagliata.
-  // - Se la cache locale ha già marcato la parola come errata, mostriamo subito
-  //   la correzione cached (anche quando il contesto è cambiato).
-  // - Se il contesto è cambiato dal calcolo originale, rilanciamo la richiesta in
-  //   background e aggiorniamo la riga quando arriva (eventualmente sostituendo
-  //   la correzione visibile).
-  // - Se non c'è cache, riserviamo uno slot nascosto e firiamo la richiesta in
-  //   background: lo slot si rivela SOLO se la risposta dice misspelled=true.
-  //   Niente cache ≈ niente prefetch coperto la parola (testo pre-esistente o
-  //   editor che non emette input event attesi): garantisce che il suggerimento
-  //   appaia comunque entro la latenza dell'LLM.
-  // La logica di prefetch proattivo (al completamento di una parola durante la
-  // digitazione e dopo gli scan blu) sta in spellcheck.js — qui ci limitiamo a
-  // consumare la cache e a coprire i casi non prefetchati.
-  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
-    const items = await buildBaseItemsAt(mouseEvent);
-
-    const cached = SpellCheck.getCachedSuggestion(editableEl, wordCtx.word);
-    const cachedUsable = cached && cached.misspelled && cached.correction && cached.correction !== wordCtx.word;
-    const contextChanged = cached && cached.sentence !== wordCtx.sentence;
-    // Rilanciamo in background quando: (a) non c'è cache, oppure (b) c'è cache ma
-    // il contesto è cambiato. In entrambi i casi potremmo finire per mostrare una
-    // correzione che inizialmente non era visibile.
-    const refireInBackground = !cached || contextChanged;
-    // La correzione preparata mentre si scriveva, mostrata adesso: è qui che la persona usa il correttore (#969).
-    if (!refireInBackground) {
-      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action: ACTIONS.SPELLCHECK_WORD, attesaMs: 0 })).catch(() => {}); } catch (_) {}
-    }
-
-    let updateCorrection = null;
-
-    // Suggerimenti del correttore NATIVO (Electron) per questa parola: immediati
-    // e affidabili (sono quelli dietro lo zigzag rosso). Il main li spinge al
-    // click destro; di solito sono già in cache quando il menu si compone (c'è il
-    // round-trip della clipboard history prima), altrimenti li riveliamo appena
-    // arrivano. Sono la base che garantisce "qualcosa appare" anche senza LLM.
-    const nativeSugg = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
-    const nativeTop = nativeSugg[0] || '';
-
-    const applyAt = (corr) => SpellCheck.applyFix(
-      editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word },
-    );
-
-    // Correzione mostrata inizialmente: la cache LLM se usabile, altrimenti il
-    // primo suggerimento nativo. `shown` traccia se una riga è visibile.
-    let visibleCorrection = cachedUsable ? cached.correction : nativeTop;
-    let shown = !!visibleCorrection;
-
-    const buildCorrectionItem = (initialLabel, initialOnClick, initialSubItems, hidden) => ({
-      type: 'correction',
-      label: initialLabel,
-      loading: false,
-      hidden,
-      onClick: initialOnClick,
-      subItems: initialSubItems,
-      onMount: (_root, update) => { updateCorrection = update; },
-    });
-
-    if (shown) {
-      items.unshift(
-        buildCorrectionItem(
-          visibleCorrection,
-          () => applyAt(visibleCorrection),
-          buildRedSubItems(editableEl, wordCtx, visibleCorrection, nativeSugg),
-          /* hidden */ false,
-        ),
-        { type: 'separator' },
-      );
-    } else {
-      // Slot riservato, ma invisibile finché non sappiamo se la parola è errata.
-      // Lo riserviamo SEMPRE (non solo quando rilanciamo l'LLM): il correttore
-      // nativo può marcare la parola — e quindi avere suggerimenti — anche
-      // quando la cache LLM dice "non errata" o quando il broadcast `_spell:native`
-      // arriva con qualche ms di ritardo dopo l'apertura del menu. Senza uno slot
-      // montato, onNativeSuggestions non avrebbe dove rivelare la correzione e il
-      // suggerimento (es. "ciiao" → "ciao", quello dietro lo zigzag rosso) non
-      // comparirebbe mai — proprio il sintomo del feedback.
-      items.unshift(
-        buildCorrectionItem('', null, [], /* hidden */ true),
-        { type: 'separator', hidden: true },
-      );
-    }
-
-    conMenuDelSito(items, sito);
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
-
-    // Rivela/aggiorna la riga di correzione con `corr` (e relative alternative).
-    const revealCorrection = (corr, alts) => {
-      if (!updateCorrection || !corr) return;
-      visibleCorrection = corr;
-      shown = true;
-      updateCorrection({
-        hidden: false,
-        label: corr,
-        loading: false,
-        onClick: () => applyAt(corr),
-        subItems: buildRedSubItems(editableEl, wordCtx, corr, alts || []),
-      });
-    };
-
-    // Se i suggerimenti nativi non erano ancora arrivati al momento dell'apertura,
-    // rivela appena arrivano (a meno che non si stia già mostrando qualcosa).
-    if (!shown) {
-      SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => {
-        if (shown || !sugg?.length) return;
-        revealCorrection(sugg[0], sugg);
-      });
-    }
-
-    // Helper: applica la risposta dell'LLM. Quando l'LLM declina ma esiste un
-    // suggerimento nativo, manteniamo comunque quest'ultimo visibile.
-    const applyResponse = (res) => {
-      // Cache SOLO un verdetto definitivo dell'LLM. Se `res` è null la chiamata è
-      // FALLITA (nessuna chiave/errore provider, parse fallito): NON va cachata
-      // come "non errata", altrimenti il prossimo click destro sulla stessa parola
-      // non rilancerebbe più nulla e — peggio — soffocherebbe il suggerimento
-      // nativo. È esattamente lo scenario del feedback: senza chiave LLM la parola
-      // resta segnata in rosso dal nativo ma il menu non mostrava più la correzione.
-      if (res) {
-        SpellCheck.setCachedSuggestion(editableEl, wordCtx.word, { ...res, sentence: wordCtx.sentence });
-      }
-      if (!updateCorrection) return;
-      const usable = res && res.misspelled && res.correction && res.correction !== wordCtx.word;
-      if (!usable) {
-        // Rileggi i suggerimenti nativi ADESSO: il broadcast `_spell:native` può
-        // essere arrivato dopo l'apertura del menu (lo snapshot in `nativeSugg`
-        // era vuoto). È la fonte affidabile quando l'LLM non risponde.
-        const freshNative = (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || [];
-        const freshTop = freshNative[0] || '';
-        if (freshTop) {
-          // Il correttore nativo ha comunque marcato la parola: mostra il nativo.
-          if (!shown || visibleCorrection !== freshTop) revealCorrection(freshTop, freshNative);
-        } else if (shown) {
-          updateCorrection({ remove: true });
-        } else {
-          updateCorrection({ hidden: true });
-        }
-        return;
-      }
-      // Correzione LLM (contestuale): preferiscila, mantenendo i nativi come alternative.
-      revealCorrection(res.correction, (SpellCheck.getNativeSuggestions?.(wordCtx.word)) || nativeSugg);
-    };
-
-    if (refireInBackground) {
-      SpellCheck.requestWordSuggestion(wordCtx, { suRichiesta: true }).then(applyResponse).catch(() => {});
-    }
-  }
-
-  // Click destro su un range "blu" (issue contestuale già rilevata): la correzione
-  // (o l'esplicazione del problema) è già pronta, niente loading. Click sulla riga
-  // = applica; freccetta = box con la spiegazione completa.
-  async function openSpellBlueMenu(editableEl, issue, mouseEvent, sito = null, ocra = null) {
-    const items = await buildBaseItemsAt(mouseEvent);
-
-    if (issue) {
-      // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
-      // Per le ripetizioni (correction === '') etichettiamo con un'azione esplicita.
-      let label;
-      if (issue.correction) {
-        label = issue.correction;
-      } else if (issue.type === 'repetition') {
-        label = I18n.t('spell_resolve');
-      } else {
-        label = (issue.explanation || I18n.t('spell_semantic_issue')).slice(0, 60);
-      }
-
-      items.unshift(
-        {
-          type: 'correction',
-          label,
-          loading: false,
-          onClick: () => {
-            SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, issue.correction || '', {
-              expectedSegment: issue.segment,
-            });
-          },
-          subItems: buildBlueSubItems(issue),
-        },
-        { type: 'separator' },
-      );
-    }
-    if (ocra) items.unshift(...buildOcraItems(editableEl, ocra));
-    conMenuDelSito(items, sito);
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
-  }
-
-  // Il segno ocra (#1115): perché c'è (con la citazione che lo motiva), la correzione se c'è, «Ignora». Mai applicato
-  // da solo: lo applica solo il clic sulla sua riga.
-  function buildOcraItems(editableEl, issue) {
-    const righe = [{
+  // Il perché di un segno, col bordo del suo colore; per un suggerimento con la frase della pagina che lo motiva.
+  function rigaDelPerche(segno, cambia) {
+    return {
       type: 'inline',
       onMount(el) {
-        el.classList.add('sn-menu-coerenza');
-        const perche = document.createElement('div');
-        perche.textContent = issue.spiegazione || I18n.t('spell_ocra_controlla');
-        el.appendChild(perche);
-        if (issue.citazione) {
-          const prova = document.createElement('div');
-          prova.className = 'sn-menu-coerenza-citazione';
-          prova.textContent = I18n.t('spell_ocra_prima', issue.citazione);
-          el.appendChild(prova);
-        }
+        el.classList.add('sn-menu-segno', segno.segno === 'errore' ? 'sn-menu-segno-errore' : 'sn-menu-segno-suggerimento');
+        const scrivi = (s) => {
+          el.textContent = '';
+          const perche = document.createElement('div');
+          const ripiego = s.segno !== 'errore' ? 'spell_ocra_controlla' : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
+          perche.textContent = s.motivo || I18n.t(ripiego);
+          el.appendChild(perche);
+          if (s.citazione) {
+            const prova = document.createElement('div');
+            prova.className = 'sn-menu-segno-citazione';
+            prova.textContent = I18n.t('spell_ocra_prima', s.citazione);
+            el.appendChild(prova);
+          }
+        };
+        scrivi(segno);
+        if (cambia) cambia(scrivi);
       },
-    }];
-    for (const c of issue.correzioni || []) {
+    };
+  }
+
+  // Su un errore (#1446): la correzione in cima, un clic; il perché; «Ignora»; «Aggiungi al dizionario» per una parola.
+  // Un candidato ancora da giudicare mostra la proposta del dizionario e chiede il controllo rapido, che quando risponde
+  // aggiorna la riga nel menu aperto.
+  function vociErrore(editableEl, errore) {
+    const parola = { word: errore.segment, start: errore.start, end: errore.end };
+    // Le proposte del dizionario: quelle che il browser ha mandato col tasto destro, o chieste adesso; arrivate dopo
+    // l'apertura del menu, prendono il posto di quelle chieste.
+    const mandate = unaParola(errore.segment) ? SpellCheck.getNativeSuggestions(errore.segment) : [];
+    let native = mandate.length ? mandate : (unaParola(errore.segment) ? SpellCheck.proposteDelBrowser(errore.segment) : []);
+    let giudicato = null;
+    const proposta = (s) => (s.correzioni && s.correzioni.length ? s.correzioni[0] : (s.dubbio ? native[0] : undefined));
+    const etichetta = (s, c) => (c === '' ? I18n.t('spell_togli', s.segment.trim()) : c);
+    const riga = (s) => {
+      const c = proposta(s);
+      return {
+        hidden: c === undefined,
+        label: c === undefined ? '' : etichetta(s, c),
+        loading: false,
+        onClick: c === undefined ? null : () => SpellCheck.correggi(editableEl, s, c),
+        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment)),
+      };
+    };
+    const ascolti = [];
+    const segui = (fn) => { ascolti.push(fn); };
+    let staccato = null;
+    const avvia = () => {
+      if (staccato || !ascolti.length) return;
+      staccato = SpellCheck.seguiSegno(editableEl, errore, (nuovo) => { if (nuovo && !nuovo.dubbio) for (const fn of ascolti) fn(nuovo); });
+      SpellCheck.giudicaOra(editableEl, errore);
+    };
+    if (!errore.dubbio && (errore.fonte === 'rapido' || errore.giudicatoDa === 'rapido')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_SEMANTIC);
+    const items = [
+      {
+        type: 'correction', ...riga(errore),
+        onMount: (_root, update) => {
+          let stacca = null;
+          if (errore.dubbio) {
+            segui((nuovo) => { giudicato = nuovo; update(riga(nuovo)); });
+            if (!mandate.length && unaParola(errore.segment)) {
+              stacca = SpellCheck.onNativeSuggestions(errore.segment, (sugg) => {
+                if (giudicato || !sugg || !sugg.length) return;
+                native = sugg;
+                update(riga(errore));
+              });
+            }
+          }
+          avvia();
+          return () => { if (staccato) staccato(); if (stacca) stacca(); };
+        },
+      },
+      { type: 'separator', hidden: proposta(errore) === undefined },
+      rigaDelPerche(errore, errore.dubbio ? (scrivi) => { segui(scrivi); avvia(); } : null),
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, errore) },
+    ];
+    if (unaParola(errore.segment)) {
+      items.push({
+        type: 'item', label: I18n.t('spell_add_dict'),
+        onClick: () => { SpellCheck.aggiungiAlDizionario(editableEl, errore); Popup.showToast(I18n.t('toast_added_to_dict')); },
+      });
+    }
+    items.push({ type: 'separator' });
+    return items;
+  }
+
+  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
+  function vociSuggerimento(editableEl, sugg) {
+    if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
+    const righe = [rigaDelPerche(sugg)];
+    for (const c of sugg.correzioni || []) {
       righe.push({
         type: 'correction',
-        label: c,
+        label: c === '' ? I18n.t('spell_togli', sugg.segment.trim()) : c,
         loading: false,
-        onClick: () => SpellCheck.applyFix(editableEl, { start: issue.start, end: issue.end }, c, { expectedSegment: issue.segment }),
+        onClick: () => SpellCheck.correggi(editableEl, sugg, c),
         senzaFreccia: true,
       });
     }
     righe.push(
-      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignoraCoerenza(editableEl, issue) },
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) },
       { type: 'separator' },
     );
     return righe;
+  }
+
+  // «Correggi tutti gli errori» sul campo: solo gli errori confermati, mai i suggerimenti né i candidati in dubbio.
+  // `minimo`: sul menu di un errore la voce serve solo se ce n'è almeno un altro.
+  function voceCorreggiTutti(editableEl, minimo = 1) {
+    const n = SpellCheck.erroriDaCorreggere(editableEl).length;
+    if (n < minimo) return null;
+    return { type: 'item', label: I18n.t('spell_correggi_tutti', n), onClick: () => SpellCheck.correggiTutti(editableEl) };
+  }
+
+  // Una correzione preparata mentre si scriveva, mostrata adesso: è qui che la persona usa il correttore (#969).
+  function contaUsoDelCorrettore(action) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs: 0 })).catch(() => {}); } catch (_) {}
+  }
+
+  async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
+    const items = await buildBaseItemsAt(mouseEvent);
+    const sopra = [];
+    if (errore) sopra.push(...vociErrore(editableEl, errore));
+    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
+    const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
+    if (tutti) sopra.push(tutti, { type: 'separator' });
+    items.unshift(...sopra);
+    conMenuDelSito(items, sito);
+    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+  }
+
+  // Una parola di una casella di una riga, che Filo non segna: le proposte del dizionario subito, e il controllo rapido
+  // chiesto adesso, che quando dice che è un errore mette la sua correzione in cima. Se non è un errore la riga resta
+  // nascosta, o la proposta del dizionario se il dizionario non la conosce.
+  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
+    const items = await buildBaseItemsAt(mouseEvent);
+    let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
+    if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
+    let updateCorrection = null;
+    const applyAt = (corr) => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    const riga = (corr, alts) => ({
+      hidden: !corr, label: corr || '', loading: false,
+      onClick: corr ? () => applyAt(corr) : null,
+      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || []),
+    });
+    let mostrata = native[0] || '';
+    items.unshift(
+      { type: 'correction', ...riga(mostrata, native.slice(1)), onMount: (_root, update) => { updateCorrection = update; } },
+      { type: 'separator', hidden: !mostrata },
+    );
+    conMenuDelSito(items, sito);
+    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+
+    const mostra = (corr, alts) => {
+      if (!updateCorrection || !corr || corr === wordCtx.word) return;
+      mostrata = corr;
+      updateCorrection(riga(corr, alts));
+    };
+    if (!mostrata) {
+      SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => { if (!mostrata && sugg?.length) mostra(sugg[0], sugg.slice(1)); });
+    }
+    const esito = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
+    if (esito && esito.errore && esito.correzione) mostra(esito.correzione, native.filter((p) => p !== esito.correzione));
   }
 
   function buildFeedbackItem() {
@@ -2859,7 +2776,7 @@
       if (!IS_SUBFRAME) { try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {} }
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
-      SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false, spellcheckContext: false } } : settings);
+      SpellCheck.updateSettings(impostazioniDelCorrettore());
       // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
       if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
       return;

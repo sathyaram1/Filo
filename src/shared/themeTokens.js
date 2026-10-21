@@ -236,19 +236,37 @@
       dashCss: ['--dash-filo-gomitolo'],
       default: '850ms',
     },
-    // Il terzo segno del correttore (#1115): «controlla qui», non «hai sbagliato». Ocra, puntinato, diverso dagli zigzag
-    // rosso e blu. Le gemelle letterali stanno in spellcheck.css e menu.css (tests/unit/correttoreOcra.test.mjs).
-    'correttore.ocra.color': {
-      label: 'Colore della sottolineatura ocra del correttore',
+    // I due segni del correttore (#1446): l'errore, di cui Filo è sicuro, e il suggerimento, che decide l'utente; il
+    // dubbio è lo stesso segno sbiadito. Le gemelle letterali stanno in spellcheck.css e menu.css (tests/unit/correttoreSegni.test.mjs).
+    'correttore.errori.color': {
+      label: 'Colore degli errori del correttore',
       type: 'color',
-      css: '--sn-spell-ocra',
+      css: '--sn-spell-errore',
+      default: { light: '#b4472c', dark: '#ea8a6b' },
+    },
+    'correttore.errori.stile': {
+      label: 'Forma della sottolineatura degli errori del correttore',
+      type: 'linea',
+      css: '--sn-spell-errore-stile',
+      default: 'wavy',
+    },
+    'correttore.suggerimenti.color': {
+      label: 'Colore dei suggerimenti del correttore',
+      type: 'color',
+      css: '--sn-spell-suggerimento',
       default: { light: '#b07a14', dark: '#e2ad4d' },
     },
-    'correttore.ocra.stile': {
-      label: 'Stile della sottolineatura ocra del correttore',
+    'correttore.suggerimenti.stile': {
+      label: 'Forma della sottolineatura dei suggerimenti del correttore',
       type: 'linea',
-      css: '--sn-spell-ocra-stile',
+      css: '--sn-spell-suggerimento-stile',
       default: 'dotted',
+    },
+    'correttore.dubbio.opacita': {
+      label: 'Quanto si vede un segno del correttore ancora in dubbio',
+      type: 'opacity',
+      css: '--sn-spell-dubbio',
+      default: '0.4',
     },
   };
 

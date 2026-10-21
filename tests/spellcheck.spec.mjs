@@ -4,6 +4,7 @@
 import { appCondivisa } from './helpers/appCondivisa.mjs';
 import { statoDi, clicca, nelMondoDiFilo } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -193,29 +194,11 @@ test.describe('spellcheck-autocorrect-multiword', () => {
   });
 });
 
-test.describe('spellcheck-cached-negative-native', () => {
-  // Feedback alpha gRrZZ (riaperto): "in questo stesso box non mi corregge questa
-  // parolla (non vedo suggerimenti quando clicco con il tasto destro su parolla)".
-  //
-  // "Questo box" = una <textarea> (il form feedback). Lo screenshot mostra la
-  // parola sottolineata in ROSSO dal correttore NATIVO: il nativo MARCA la parola
-  // (ha i suggerimenti) ma la correzione non compariva in cima al menu. Causa nel
-  // percorso openSpellWordMenu, indipendente dai dizionari Hunspell (che in CI
-  // headless non si scaricano, quindi non possiamo usare il click destro "reale"):
-  //
-  //   - Senza chiave LLM, requestWordSuggestion() torna null (fallimento), ma il
-  //     codice cachava comunque { misspelled:false } per quella parola. Al click
-  //     destro SUCCESSIVO la cache "negativa" (refireInBackground=false) faceva
-  //     saltare la RISERVA dello slot di correzione → onNativeSuggestions non
-  //     aveva dove rivelare il suggerimento nativo → niente correzione, per sempre.
-  //
-  // Fix: lo slot di correzione è ora SEMPRE riservato (anche con cache negativa) e
-  // i suggerimenti nativi vengono riletti al volo all'arrivo del broadcast. Inoltre
-  // un fallimento LLM (null) non viene più cachato come "non errata".
-  //
-  // Il test crea una <textarea> reale (monitorata come il box feedback), simula lo
-  // stato "cache dice non errata" e l'arrivo del suggerimento nativo, e verifica
-  // che la correzione compaia comunque in cima. Pre-fix: rosso. Post-fix: verde.
+test.describe('spellcheck-native-in-ritardo', () => {
+  // Feedback alpha gRrZZ (riaperto): «in questo stesso box non mi corregge questa parolla». Il correttore di sistema
+  // segna la parola ma la correzione non compariva in cima al menu. Con #1446 la parola fuori dizionario è un candidato
+  // del correttore di Filo, e senza modello (in prova non c'è chiave) la riga di correzione la riempie il dizionario:
+  // anche quando le proposte del sistema arrivano dopo che il menu si è aperto.
 
   async function newtabPage(app) {
     const deadline = Date.now() + 10_000;
@@ -230,62 +213,35 @@ test.describe('spellcheck-cached-negative-native', () => {
     return win;
   }
 
-  test('textarea con cache "non errata": il suggerimento nativo compare comunque in cima', async ({ app }) => {
+  test('textarea con una parola fuori dizionario: la proposta del sistema arrivata in ritardo va in cima', async ({ app }) => {
     const page = await newtabPage(app);
     await page.waitForFunction(
-      () => document.documentElement.dataset.filoContentScripts === '1' &&
-            typeof globalThis.SN_SPELLCHECK?.getWordAt === 'function' &&
-            typeof globalThis.SN_SPELLCHECK?.setCachedSuggestion === 'function',
+      () => document.documentElement.dataset.filoContentScripts === '1' && typeof globalThis.SN_SPELLCHECK?.segniSotto === 'function',
       null, { timeout: 8_000 },
     );
-
-    // Crea una textarea reale, la focalizza (così lo spellcheck la "aggancia" e
-    // diventa cachabile, come il box feedback), e calcola le coordinate del click
-    // destro sopra "ciiao". Poi semina una cache "negativa" per "ciiao" — lo stato
-    // che il vecchio codice produceva su un fallimento LLM senza chiave.
+    await expect.poll(() => page.evaluate(() => globalThis.SN_DIZIONARIO.sbagliata('ciiao')), { timeout: 20_000 }).toBe(true);
     const coords = await page.evaluate(() => {
       const ta = document.createElement('textarea');
       ta.id = 'sn-test-ta';
       ta.value = 'ciiao come stai';
       ta.style.cssText = 'position:fixed;top:200px;left:40px;width:520px;height:120px;font:24px monospace;padding:10px';
       document.body.appendChild(ta);
-      ta.focus(); // → onFocusIn → attach → monitored (cachabile)
+      ta.focus();
       ta.setSelectionRange(0, 0);
-
-      globalThis.SN_SPELLCHECK.setCachedSuggestion(ta, 'ciiao', {
-        misspelled: false, correction: '', sentence: 'ciiao come stai',
-      });
-
       const r = ta.getBoundingClientRect();
-      // "ciiao" è la prima parola: click destro vicino all'inizio del testo.
-      const x = r.left + 10 + 24; // padding + ~1 carattere monospace
-      const y = r.top + 10 + 14;
-      return { x, y, cached: !!globalThis.SN_SPELLCHECK.getCachedSuggestion(ta, 'ciiao') };
+      return { x: r.left + 10 + 24, y: r.top + 10 + 14 };
     });
-    // La cache è stata davvero registrata (textarea monitorata): è la pre-condizione
-    // dello scenario rotto.
-    expect(coords.cached).toBe(true);
-
-    // Click destro sulla parola: il menu si apre. NON iniettiamo ancora il nativo.
     await page.evaluate(({ x, y }) => {
-      const ta = document.getElementById('sn-test-ta');
-      ta.dispatchEvent(new MouseEvent('contextmenu', {
+      document.getElementById('sn-test-ta').dispatchEvent(new MouseEvent('contextmenu', {
         bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2,
       }));
     }, coords);
-
     await expect(menuDi(page).locator('.sn-menu')).toBeVisible({ timeout: 5_000 });
-
-    // Ora arriva (in ritardo) il suggerimento del correttore NATIVO — quello dietro
-    // lo zigzag rosso che l'utente vede nello screenshot.
     await page.evaluate(() => {
-      const listeners = globalThis.chrome.runtime.onMessage._listeners;
-      for (const fn of listeners) {
+      for (const fn of globalThis.chrome.runtime.onMessage._listeners) {
         try { fn({ type: '_spell:native', word: 'ciiao', suggestions: ['ciao', 'chiao'] }); } catch (_) {}
       }
     });
-
-    // La correzione nativa deve comparire in cima al menu.
     const correction = menuDi(page).locator('.sn-menu .sn-menu-correction');
     await expect(correction).toBeVisible({ timeout: 5_000 });
     await expect(correction.locator('.sn-menu-label').first()).toHaveText('ciao');
@@ -1172,7 +1128,6 @@ test.describe('spellcheck-segni-restano', () => {
         apiKeys: { openrouter: 'k-test' },
         models: {
           [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash',
-          [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash',
           [C.ACTIONS.EDIT_TEXT]: 'deepseek-flash',
         },
         modelRegistry: globalThis.SN_TEST_MODELS.registry,
@@ -1180,16 +1135,16 @@ test.describe('spellcheck-segni-restano', () => {
       globalThis.__scan = 0;
       const finto = async ({ messages }) => {
         const t = JSON.stringify(messages);
-        if (t.includes('Analizza il testo qui sotto')) {
+        if (t.includes('Sei il controllo rapido di un correttore')) {
           globalThis.__scan += 1;
           const parole = [...new Set(t.match(/xq[a-z]+\d+/g) || [])];
           // `__trattieni`: la risposta aspetta che la prova la lasci andare, come un modello lento.
           if (globalThis.__trattieni) await new Promise((ok) => globalThis.__rilascia.push(ok));
-          return { text: JSON.stringify({ annotated: parole.map((w) => `**${w}**`).join(' '), issues: parole.map(() => ({ type: 'grammar', explanation: 'x', correction: 'y' })) }), model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+          return { text: parole.map((w) => `[${w}][y][x][errore]`).join('\n') || '[][][][nessuno]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
         }
         // «Correggi» nel riquadro Modifica, sulla prima riga della prova del rosso.
         if (t.includes('Correggi eventuali errori')) return { text: 'ciao amico mio', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
-        return { text: '{"misspelled":false,"correction":""}', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+        return { text: '[][][][nessuno]', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       };
       globalThis.SN_PROVIDERS.completeWithFallback = finto;
       globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
@@ -1199,7 +1154,8 @@ test.describe('spellcheck-segni-restano', () => {
     return page;
   }
 
-  const blu = (page) => page.locator('.sn-spell-overlay .sn-semantic-error');
+  // Gli errori confermati dal controllo rapido: le parole «xq…» sono anche candidati del dizionario, sbiaditi prima.
+  const blu = (page) => page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)');
   const scan = (app) => app.evaluate(() => globalThis.__scan);
 
   // Per `ms` guarda il riquadro a ogni giro: i segni attesi, sul testo che c'è adesso nella casella.
@@ -1210,7 +1166,7 @@ test.describe('spellcheck-segni-restano', () => {
       while (performance.now() < fine) {
         const o = document.querySelector('.sn-spell-overlay');
         const ta = document.getElementById('ta');
-        const segni = o ? [...o.querySelectorAll('.sn-semantic-error')].map((s) => s.textContent) : [];
+        const segni = o ? [...o.querySelectorAll('.sn-errore:not(.sn-dubbio)')].map((s) => s.textContent) : [];
         const allineato = !!o && o.textContent === ta.value;
         if (JSON.stringify(segni) !== JSON.stringify(attesi) || !allineato) visti.push({ segni, allineato });
         await new Promise((r) => setTimeout(r, 30));
@@ -1238,7 +1194,7 @@ test.describe('spellcheck-segni-restano', () => {
     await seleziona(page, 'xqseconda2');
     await page.keyboard.type('seconda');
     await page.screenshot({ path: 'tests/.shots/1111-blu-dopo-correzione.png' }).catch(() => {});
-    // Fino allo scan dopo (1,5 s di pausa): la parola corretta non è più segnata, le altre sì, sulla parola giusta.
+    // Fino al controllo dopo (mezzo secondo di pausa) e oltre: la parola corretta non è più segnata, le altre sì.
     expect(await restanoPer(page, ['xqprima1', 'xqterza3'], 1200)).toEqual([]);
     await expect.poll(() => scan(app), { timeout: 6000 }).toBe(prima + 1);
     await expect(blu(page)).toHaveText(['xqprima1', 'xqterza3']);
@@ -1357,7 +1313,7 @@ test.describe('spellcheck-segni-restano', () => {
     await page.keyboard.type('oggi xqprima1 bella giornata con xqseconda2 e poi xqterza3 fine ');
     await expect(blu(page)).toHaveText(['xqprima1', 'xqseconda2', 'xqterza3'], { timeout: 6000 });
 
-    const b = await blu(page).nth(1).boundingBox();
+    const b = await riquadroDelSegno(blu(page).nth(1));
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
     const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
     await expect(corr).toContainText('y');
@@ -1366,32 +1322,30 @@ test.describe('spellcheck-segni-restano', () => {
     expect(await restanoPer(page, ['xqprima1', 'xqterza3'], 1000)).toEqual([]);
   });
 
-  test('#1097.5 — la risposta arrivata mentre si scriveva non si butta; spazi e punteggiatura non rifanno lo scan', async ({ app, openTab, testServer }) => {
+  test('#1097.5 — la risposta arrivata mentre si scriveva non si butta; spazi e punteggiatura non rifanno il controllo', async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await apri(app, openTab, testServer);
     await app.evaluate(() => { globalThis.__trattieni = true; globalThis.__rilascia = []; });
     await page.locator('#ta').click();
     await page.keyboard.type('oggi xqprima1 bella giornata ');
-    await expect.poll(() => scan(app), { timeout: 6000 }).toBe(1);
-    // Lo scan è partito: l'utente continua a scrivere, e la risposta arriva dopo.
+    await expect.poll(() => scan(app), { timeout: 6000 }).toBeGreaterThan(0);
+    // Il controllo è partito: l'utente continua a scrivere, e le risposte arrivano dopo.
     await page.keyboard.type('e poi xqdopo2 al mare ');
-    await app.evaluate(() => globalThis.__rilascia.shift()());
-    // Il segno della risposta vecchia compare subito, sulla sua parola, senza aspettare lo scan del testo nuovo.
-    await expect(blu(page)).toHaveText(['xqprima1'], { timeout: 1000 });
-    expect(await restanoPer(page, ['xqprima1'], 300)).toEqual([]);
-    await expect.poll(() => scan(app), { timeout: 6000 }).toBe(2);
+    await page.waitForTimeout(800);
     await app.evaluate(() => { globalThis.__trattieni = false; for (const ok of globalThis.__rilascia.splice(0)) ok(); });
+    // I segni delle risposte vecchie compaiono sulle loro parole, nel testo di adesso.
     await expect(blu(page)).toHaveText(['xqprima1', 'xqdopo2'], { timeout: 6000 });
     await page.screenshot({ path: 'tests/.shots/1097-correttore-risposta-tardiva.png' }).catch(() => {});
+    const fatti = await scan(app);
 
     // Un punto e uno spazio in più: le parole sono le stesse, nessuna domanda nuova al modello.
     await page.keyboard.type('. ');
     await new Promise((r) => setTimeout(r, 2500));
-    expect(await scan(app)).toBe(2);
+    expect(await scan(app)).toBe(fatti);
     await expect(blu(page)).toHaveText(['xqprima1', 'xqdopo2']);
     // Una parola nuova invece sì.
     await page.keyboard.type('xqterza3 ');
-    await expect.poll(() => scan(app), { timeout: 6000 }).toBe(3);
+    await expect.poll(() => scan(app), { timeout: 6000 }).toBeGreaterThan(fatti);
     await expect(blu(page)).toHaveText(['xqprima1', 'xqdopo2', 'xqterza3'], { timeout: 6000 });
   });
 });

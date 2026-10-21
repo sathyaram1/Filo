@@ -31,7 +31,7 @@ async function fornitoreFinto(app) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash' },
+      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__chieste = [];

@@ -10,7 +10,7 @@ module.exports = function register(on, ctx) {
   const A = globalThis.SN_CONST.ACTIONS;
   const contatori = Servizio.crea({
     // Le funzioni che preparano una risposta prima che la persona la chieda: l'uso lo conta la pagina che la mostra.
-    dallaPagina: [A.EXPLAIN, A.SPELLCHECK_WORD],
+    dallaPagina: [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_CONTEXT],
     esclusi: async () => {
       const out = [];
       try { out.push(await globalThis.SN_STORAGE.getRaw('sn_feedback_client_id', null)); } catch (_) {}

@@ -17,7 +17,7 @@
     $('title').textContent = I18n.t('options_other');
     $('backToModels').textContent = I18n.t('options_back_to_models');
     $('h-correttore').textContent = 'Correttore';
-    for (const [id, chiave] of [['spellcheckBlu', 'spell_switch_blu'], ['spellcheckOcra', 'spell_switch_ocra']]) {
+    for (const [id, chiave] of [['spellcheckErrori', 'spell_switch_errori'], ['spellcheckSuggerimenti', 'spell_switch_suggerimenti']]) {
       $(`${id}-label`).textContent = I18n.t(chiave);
       $(`${id}-desc`).textContent = I18n.t(`${chiave}_desc`);
     }
@@ -196,7 +196,7 @@
   }
 
   // I due segni del correttore stanno insieme qui e nella chat (#1115): ognuno si spegne da solo.
-  const INTERRUTTORI = [['spellcheckBlu', 'spellcheck'], ['spellcheckOcra', 'spellcheckContext']];
+  const INTERRUTTORI = [['spellcheckErrori', 'spellcheck'], ['spellcheckSuggerimenti', 'spellcheckContext']];
   async function salvaInterruttore(id, flag) {
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { featureFlags: { [flag]: $(id).checked } } });
     mostraSalvato();
