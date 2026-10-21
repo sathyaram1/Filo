@@ -180,9 +180,9 @@ test('server dei crediti lento: il turno parte subito con l\'ultimo saldo, e scr
   saldo = 3900;
   ritardoMs = 1_500;
   await passaUnMinuto(app);
+  const prima = lettureSaldo;
   await home.reload();
   await home.waitForLoadState('domcontentloaded');
-  const prima = lettureSaldo;
   await home.locator('#input').click();
   await home.locator('#input').pressSequentially('quanti crediti ho?', { delay: 20 });
   await expect.poll(() => lettureSaldo, { message: 'scrivere fa rileggere il saldo' }).toBeGreaterThan(prima);
