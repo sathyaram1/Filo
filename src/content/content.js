@@ -37,6 +37,7 @@
     isContentFullscreen: () => contentFullscreen,
     aiutoPasso: () => aiutoPasso(),
     aiutoStato: () => Sidebar.stato(),
+    aiutoAcceso: () => aiutoAcceso(),
   });
   TTS.init({
     getSettings: () => settings,
