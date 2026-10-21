@@ -169,10 +169,8 @@ module.exports = function register(on, ctx) {
     const u = await controllaUscita({ type: 'CERCA_WEB', query: sp.domanda }, { sender });
     if (u.blocca) return { text: SENZA_VALORE };
     const F = globalThis.SN_FONTI_SEGNAPOSTO;
-    const web = corr.segnapostiWeb !== false;
-    const giri = sp.dove === 'web' ? [web ? 'web' : 'wiki:en'] : (web ? [sp.dove, 'web'] : [sp.dove]);
     let ultima = null;
-    for (const giro of giri) {
+    for (const giro of F.giri(sp.dove, corr.segnapostiWeb !== false)) {
       let fonti = [];
       try {
         fonti = giro === 'web'
