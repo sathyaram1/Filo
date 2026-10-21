@@ -46,6 +46,15 @@
     seguiAncora();
   }
 
+  // La riga sotto il conteggio locale. Con la chiave propria quel numero non paga niente, e lo dice prima (#1353).
+  function rigaRicarica(chiavePropria = false) {
+    const refill = window.SN_CONST?.CREDIT?.DAILY_REFILL;
+    const ricarica = `Ricevi ${refill != null ? `+${formatInt(refill)}` : 'altri'} crediti ogni giorno a mezzanotte.`;
+    return chiavePropria
+      ? `Le richieste le paga la tua chiave OpenRouter. Questi sono crediti di prova che Filo tiene su questo computer, non soldi che spendi. ${ricarica}`
+      : ricarica;
+  }
+
   // ── L'avviso prima che i crediti finiscano (#818) ──────────────────────────
   // C'è finché le soglie lo dicono, o finché c'è un rimedio applicato da poter rimettere com'era. La frase
   // dell'ultimo clic resta sotto il suo rimedio anche quando la pagina si ridisegna da sola.
