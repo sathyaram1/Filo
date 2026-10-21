@@ -475,6 +475,8 @@ module.exports = function register(on, ctx) {
       entry.fail(); await dropPart();
       return { ok: false, error: (dest && dest.error) || 'destinazione non disponibile' };
     }
+    // Conta il nome scelto nel dialogo: un nome da programma scritto lì chiede anche lui, e un sì già dato vale.
+    if (!(await entry.permesso(path.basename(dest.filePath)))) { await dropPart(); return { ok: false, cancelled: true }; }
 
     try {
       await moveInto(result.partPath, dest.filePath);
