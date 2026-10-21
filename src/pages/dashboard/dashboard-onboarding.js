@@ -425,7 +425,16 @@
       const r = await send({ type: MSG.FILO_GET_ONBOARDING, peek: true });
       st = r?.ok ? r.onboarding : null;
     } catch (_) { return; }
-    if (st && st.done && st.notice === 'early') showOnboardingNotice();
+    aggiornaRiga(st);
+  }
+
+  // 'chiusa': finita prima della fine. 'aperta': rifatta e lasciata a metà in un'altra scheda, che magari non c'è più;
+  // da qui si riprende come una chiusa.
+  function aggiornaRiga(st) {
+    if (onboardingActive || !st) { hideOnboardingNotice(); return; }
+    const risposto = Array.isArray(st.thread) && st.thread.some((m) => m && m.role === 'user');
+    if (st.done && st.notice === 'early') showOnboardingNotice('chiusa');
+    else if (!st.done && st.rifatta && risposto) showOnboardingNotice('aperta');
     else hideOnboardingNotice();
   }
 
@@ -434,15 +443,17 @@
     if (!box) return;
     box.innerHTML = '';
     box.hidden = true;
+    delete box.dataset.tipo;
   }
 
-  function showOnboardingNotice() {
+  function showOnboardingNotice(tipo = 'chiusa') {
     const box = $('onbNotice');
-    if (!box || !box.hidden) return; // già a schermo: non la ricostruiamo
+    if (!box || (!box.hidden && box.dataset.tipo === tipo)) return; // già a schermo: non la ricostruiamo
     box.innerHTML = '';
+    box.dataset.tipo = tipo;
     const text = document.createElement('span');
     text.className = 'dash-onb-notice-text';
-    text.textContent = 'Abbiamo chiuso la presentazione a metà.';
+    text.textContent = tipo === 'aperta' ? 'La presentazione è rimasta a metà.' : 'Abbiamo chiuso la presentazione a metà.';
     const redo = document.createElement('button');
     redo.type = 'button';
     redo.id = 'onbNoticeRedo';
