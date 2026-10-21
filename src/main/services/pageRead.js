@@ -176,6 +176,7 @@ function serializzaVisibile(opz) {
     const tag = String(nodo.tagName || '').toUpperCase();
     if (SALTA[tag]) return;
     elementi++;
+    if ((elementi & 63) === 0 && n >= minimo && Date.now() > scadenza) { fuoriTempo = true; tagliata = true; return; }
     let cs = null;
     try { cs = stile(nodo); } catch (_) {}
     if (cs && (cs.display === 'none' || cs.contentVisibility === 'hidden' || invisibile(cs))) return;
