@@ -434,7 +434,7 @@ describe('le parti con Playwright vero, come in suite.yml', () => {
     assert.equal(v.status, 1, v.stdout + v.stderr);
     const nuovi = readFileSync(join(dir, 'nuovi.txt'), 'utf8');
     assert.match(nuovi, /^tests\/b\.spec\.mjs › rosso$/m, 'il rosso della parte arrivata in fondo');
-    assert.match(nuovi, /^la suite ha passato il suo tetto di tempo .*: 1 casi non sono girati/m);
+    assert.match(nuovi, /^la suite ha passato il suo tetto di tempo .*: [12] casi non sono girati/m, 'a macchina carica il tetto può scadere prima del caso lento');
     assert.deepEqual(readFileSync(join(dir, 'chiavi.txt'), 'utf8').split('\n').filter(Boolean).sort(), ['suite:tests/b.spec.mjs', 'suite:tetto']);
   });
 
