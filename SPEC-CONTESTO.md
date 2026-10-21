@@ -30,7 +30,9 @@ documenti letti passa i 100 000. In più:
 
 - **Niente cache esplicita.** Il contesto variabile (STATO con l'ora al
   minuto) sta nel system, prima della storia: fra un turno e l'altro la storia
-  non è mai in cache.
+  non è mai in cache. Dal 15/10 (#868) lo STATO sta in un messaggio subito
+  prima della domanda e il tratto del filo viene dopo la parte fissa; da #1412
+  ci sono i punti di cache per i modelli Anthropic.
 - **La conversazione non si compatta**: restano gli ultimi 20 messaggi, i più
   vecchi spariscono.
 - **La memoria compattata non ha tetto** (busta da 200 KB, ~90 000 token
