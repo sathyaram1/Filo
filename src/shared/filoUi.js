@@ -233,7 +233,9 @@
   function atteso(a) {
     const [s, e] = a.sel;
     const d = typeof a.dato === 'string' ? a.dato.replace(/\r\n?/g, '\n') : (/^insert(LineBreak|Paragraph)$/.test(a.tipo) ? '\n' : null);
-    return d === null ? null : a.valore.slice(0, s) + d + a.valore.slice(e);
+    // Una casella di una riga toglie gli a capo a modo suo: lì vale solo che testa e coda restino.
+    if (d === null || (a.riga && d.includes('\n'))) return null;
+    return a.valore.slice(0, s) + d + a.valore.slice(e);
   }
   function combacia(a, n) {
     const v = a.valore;
