@@ -1490,6 +1490,7 @@
         type: MSG.DOWNLOAD_MEDIA,
         url: src,
         kind: audio ? 'audio' : 'video',
+        politiche: politicheReferrer(el),
       });
       if (res?.ok) Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved'));
       else if (!res?.cancelled) Popup.showToast(I18n.t(failToast));
