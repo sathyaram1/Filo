@@ -140,6 +140,20 @@ module.exports = function register(on, ctx) {
     return delicata;
   }
 
+  // «Valuta» dell'Aiuto (#1449) risponde col modello della chat. Se quello non vede le immagini la pagina gli arriva
+  // senza la foto: outline, indirizzo e testo del campo bastano a giudicare.
+  async function chiediValuta(payload, origin) {
+    const chiedi = (p) => handleAIRequest({ action: SN_CONST.ACTIONS.HELP, payload: p, origin, modelloDi: SN_CONST.ACTIONS.FILO_CHAT });
+    try {
+      return await chiedi(payload);
+    } catch (e) {
+      const FC = globalThis.SN_FILO_CONTESTO;
+      if (!payload.screenshot || !FC || !FC.rifiutaImmagini(e)) throw e;
+      const { screenshot, ...senzaFoto } = payload;
+      return chiedi(senzaFoto);
+    }
+  }
+
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
   // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
