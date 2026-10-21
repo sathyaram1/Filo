@@ -1707,7 +1707,7 @@
     const nuovi = [];
     const confermati = new Set();
     for (const s of segni) {
-      const c = candidati.find((x) => x.start === s.start && x.end === s.end)
+      const c = s.tipo === 'segnaposto' ? null : candidati.find((x) => x.start === s.start && x.end === s.end)
         || (!rapido && s.segno === 'suggerimento' ? candidati.find((x) => tocca(x, s)) : null);
       if (!c) { nuovi.push({ ...s, confermatoAlle: ora }); continue; }
       confermati.add(Rg.chiaveVerdetto(c));
