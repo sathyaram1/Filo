@@ -44,6 +44,11 @@ test('cronologia AI: mostra quanta parte del prompt è stata riusata', async () 
       provider: 'openrouter', model: 'gemini-3.1-flash-lite', input: { userMessage: 'messaggio senza riuso' },
       output: 'risposta B', origin: 'filo://dashboard', costEur: 0.0002,
       usage: { promptTokens: 8000, completionTokens: 40, cachedPromptTokens: 0 } },
+    // #1412 — prima chiamata su Claude coi punti di cache: niente riuso, ma la scrittura in cache si vede.
+    { id: 'h-write', timestamp: new Date(now - 2000).toISOString(), action: 'filo_chat',
+      provider: 'openrouter', model: 'anthropic/claude-haiku-5.5', servedBy: 'Anthropic', input: { userMessage: 'messaggio che scrive in cache' },
+      output: 'risposta C', origin: 'filo://dashboard', costEur: 0.004,
+      usage: { promptTokens: 41000, completionTokens: 40, cachedPromptTokens: 0, cacheWriteTokens: 38500 } },
   ];
 
   const userData = cartellaTemporanea('filo-hist-reuse-');
