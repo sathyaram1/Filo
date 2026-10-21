@@ -8,9 +8,10 @@ const crypto = require('crypto');
 // Rete per un avviso che non dice mai di essersi chiuso (shell ricaricata, durata infinita nelle Preferenze).
 const TETTO_MS = 10 * 60 * 1000;
 const NON_DA_QUI = 'non è una segnalazione partita da qui';
+const TARDI = 'Ormai è partita: non posso più ritirarla';
 
 const inAttesa = new Map();
-// Solo quelle partite con un documento: le altre non hanno niente da ritirare.
+// biglietto → Promise dell'esito: { id } col documento scritto, { inCoda } aspetta l'owner, {} non è partita.
 const partite = new Map();
 
 function sgancia(biglietto) {
@@ -41,12 +42,10 @@ function parti(biglietto) {
   const b = String(biglietto || '');
   const voce = sgancia(b);
   if (!voce) return false;
-  const partenza = Promise.resolve()
+  partite.set(b, Promise.resolve()
     .then(voce.spedisci)
-    .then((r) => (r && r.id && !r.queued ? String(r.id) : ''))
-    .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', (e && e.message) || e); return ''; });
-  partenza.then((id) => { if (!id) partite.delete(b); });
-  partite.set(b, partenza);
+    .then((r) => (r && r.queued ? { inCoda: true } : { id: r && r.id ? String(r.id) : '' }))
+    .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', (e && e.message) || e); return {}; }));
   return true;
 }
 
@@ -56,19 +55,22 @@ async function annulla(biglietto) {
   if (sgancia(b)) return { ok: true };
   const partenza = partite.get(b);
   if (!partenza) return { ok: false, error: NON_DA_QUI };
-  const id = await partenza;
-  // Tolta prima di scrivere: un doppio clic non scrive due volte; se la scrittura fallisce torna ritirabile.
-  if (!id || partite.get(b) !== partenza) return { ok: false, error: NON_DA_QUI };
+  const esito = await partenza;
+  // Un altro «Annulla» l'ha già ritirata (o la sta ritirando): non si scrive due volte.
+  if (partite.get(b) !== partenza) return { ok: false, error: NON_DA_QUI };
+  if (esito.inCoda) return { ok: false, tardi: true, frase: TARDI };
+  // Non è arrivata da nessuna parte: non c'è niente da ritirare, ed è quello che l'utente voleva.
+  if (!esito.id) { partite.delete(b); return { ok: true }; }
   const auth = require('../auth/google-auth');
   let owner = false;
   try { owner = !!auth.isAdmin(); } catch (_) {}
-  if (!owner) return { ok: false, tardi: true, frase: 'Ormai è partita: non posso più ritirarla' };
+  if (!owner) return { ok: false, tardi: true, frase: TARDI };
   const FB = globalThis.SN_FEEDBACK;
   if (!FB || typeof FB.updateStatus !== 'function') return { ok: false, error: 'FB non disponibile' };
   partite.delete(b);
   try {
     const idToken = await auth.getIdToken().catch(() => null);
-    await FB.updateStatus(id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
+    await FB.updateStatus(esito.id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
     return { ok: true };
   } catch (e) {
     partite.set(b, partenza);
