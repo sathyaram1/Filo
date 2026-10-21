@@ -23,8 +23,9 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
   release <biglietto> --role <il tuo ruolo>`): il ruolo firma il rapporto di
   fine sessione che il rilascio allega da solo; senza, il rapporto esce anonimo;
 - un guasto che ti impedisce di lavorare → una domanda e il rilascio con
-  `--guasto`, come nella sezione qui sotto: è così che il server smette di dare
-  lavoro per questo giro. Non "riportarlo" a parole: registralo.
+  `--guasto` (il controllo di sicurezza: il solo rilascio), come nella sezione
+  qui sotto: è così che il server smette di dare lavoro per questo giro. Non
+  "riportarlo" a parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase non conta niente. Se non l'hai
 registrato, non esiste.
