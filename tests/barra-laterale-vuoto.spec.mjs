@@ -184,6 +184,26 @@ test('sopra l\'avviso del sito pericoloso le icone della pagina nella barra sono
   await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 5000 });
 });
 
+// L'Aiuto starebbe sotto l'avviso: l'icona della barra fa quello che fanno Alt+H e la voce sulla scheda (#1432).
+test('sopra l\'avviso del sito pericoloso l\'icona Aiuto fa la domanda a Filo su quel sito', async ({ app, shell }) => {
+  const { page } = await apriSegnalata(app, shell);
+  const barra = await barraPage(app);
+  const help = barra.locator('#nav .ico[data-id="help"]');
+  await expect(help).toHaveAttribute('aria-disabled', 'false');
+  await expect(help).toHaveAttribute('aria-label', 'Aiuto');
+  const schede = () => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    return { n: tm.tabs.length, url: tm.tabs.find((t) => t.id === tm.activeId).url };
+  });
+  const prima = (await schede()).n;
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await help.click();
+  await expect.poll(async () => (await schede()).n, { timeout: 8000 }).toBe(prima + 1);
+  expect((await schede()).url).toMatch(/^filo:\/\/newtab\//);
+  expect(await page.locator('.sn-sidebar').count()).toBe(0);
+});
+
 // Il puntatore sull'avviso conta come quello sulla pagina: un clic chiude la barra, uscendoci sopra si chiude.
 test('sopra l\'avviso del sito pericoloso un clic sull\'avviso chiude la barra, e il puntatore che ci va sopra pure', async ({ app, shell }) => {
   await apriSegnalata(app, shell);

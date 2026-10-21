@@ -6,6 +6,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 const DETTO = 'dove si cambia la password';
@@ -283,4 +284,38 @@ test('dove la voce «Aiuto» non c\'è l\'icona è spenta e dice perché; senza 
   await imposta(app, { featureFlags: { help: true } });
   await expect(help).toHaveAttribute('aria-disabled', 'false', { timeout: 8_000 });
   await expect(help).toHaveAttribute('aria-label', 'Aiuto');
+});
+
+test('l\'icona si toglie dalla barra e nel menu del tasto destro fa lo stesso; la voce «Aiuto» riapre l\'Aiuto ridotto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await prepara(app);
+  const page = await sito(app, openTab, testServer);
+  const barra = await barraPage(app);
+  // Nella riga del tasto destro, in testa: in fondo sarebbe lei a scendere in «Altro…».
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'primary', beforeId: 'translate' }, {}));
+  await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('help');
+  await expect(icona(barra)).toHaveCount(0);
+
+  await page.locator('h1').click({ button: 'right' });
+  const nelMenu = menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]');
+  await expect(nelMenu).toBeVisible({ timeout: 8_000 });
+  await expect(nelMenu).toHaveAttribute('aria-label', 'Aiuto');
+  await nelMenu.click();
+  const aiuto = page.locator('.sn-sidebar');
+  await expect(aiuto).toBeVisible({ timeout: 8_000 });
+  // Con l'Aiuto aperto la stessa icona è il microfono.
+  await page.locator('h1').click({ button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu [data-sn-icon-id="help"]')).toHaveAttribute('aria-label', 'Parla', { timeout: 8_000 });
+  await page.keyboard.press('Escape');
+
+  // Ridotto, la voce «Aiuto» lo riapre intero (prima non faceva niente).
+  await aiuto.locator('.sn-sidebar-collapse').click();
+  await expect(aiuto).toHaveClass(/sn-sidebar-collapsed/);
+  await page.locator('h1').click({ button: 'right' });
+  await menuDi(page).voce('Aiuto').first().click();
+  await expect(aiuto).not.toHaveClass(/sn-sidebar-collapsed/);
+
+  // E si rimette nella barra.
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'help', target: 'bar', beforeId: 'back' }, {}));
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['help', 'back']);
 });

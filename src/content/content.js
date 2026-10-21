@@ -2789,6 +2789,13 @@
     } catch (_) {}
   }
   try { Sidebar?.suCambio?.(riferisciAiuto); } catch (_) {}
+  // Tornata dalla cache di navigazione: per il main è un documento nuovo, e il suo Aiuto va ridetto.
+  window.addEventListener('pageshow', (e) => {
+    if (!e.persisted) return;
+    aiutoRiferito = '';
+    rispostaRiferita = null;
+    riferisciAiuto();
+  });
 
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update

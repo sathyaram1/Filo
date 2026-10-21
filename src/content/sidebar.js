@@ -380,14 +380,18 @@
     } catch (_) {}
   }
 
+  // Filo ha detto qualcosa che l'utente, che ha ridotto o chiuso il pannello, non vede: la barra lo annuncia (#1432).
+  function rispostaArrivata() {
+    if (nonLetta || !(nascosto || (collapsed && ridottoDallUtente))) return;
+    nonLetta = true;
+    cambiato();
+  }
+
   function appendChatMessage(role, text, { nelFilo = true } = {}) {
     if (nelFilo) nelFiloAiuto(role, text);
     const conv = convEl();
     if (!conv) return null;
-    if (role === 'assistant' && (nascosto || (collapsed && ridottoDallUtente)) && !nonLetta) {
-      nonLetta = true;
-      cambiato();
-    }
+    if (role === 'assistant') rispostaArrivata();
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
     // #418 — le risposte di Filo (assistant) vanno rese con la stessa
@@ -1536,6 +1540,7 @@
     });
     riga.append(`mi sono fermato dopo ${MAX_PASSI_DA_SOLO} passi fatti da solo `, btn);
     continuaAperto = btn;
+    rispostaArrivata();
     expand({ ai: true });
   }
 
