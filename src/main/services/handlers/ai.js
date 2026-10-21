@@ -10,6 +10,7 @@ module.exports = function register(on, ctx) {
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
+  require('../fontiSegnaposto');
 
   // Cache audio in memoria: rileggere lo stesso testo con la stessa voce e lo stesso modello
   // è istantaneo invece di rifare la chiamata lenta. Dura quanto la sessione.
