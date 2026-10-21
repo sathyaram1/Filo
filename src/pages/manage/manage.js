@@ -1986,10 +1986,37 @@
     });
   }
 
-  // Aprire una pratica precisa (avviso, statistiche, ricerca) la deve far vedere anche col filtro acceso.
+  // Aprire una pratica precisa (avviso, statistiche, ricerca, una domanda) la deve far vedere anche coi filtri accesi.
   function mostraNelFiltro(fb) {
-    if (!fb || !livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
+    if (!fb) return;
+    if (soloNonFidate && MR.isFidato(fb)) impostaSoloNonFidate(false);
+    if (!livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
     if (!MR.filtraLivelli([fb], livelliScelti, { releasedVersion, fusioni }).length) livelliScelti = [];
+  }
+
+  // ── «Solo non fidate» (#1575): un tasto nella testa della lista e uno in quella delle Domande, uno stato ─────
+  function impostaSoloNonFidate(valore) {
+    const v = !!valore;
+    if (v === soloNonFidate) return;
+    soloNonFidate = v;
+    renderList();
+    if (DOMANDE && typeof DOMANDE.ridisegna === 'function') DOMANDE.ridisegna();
+  }
+  for (const b of [mgFiduciaFiltro, mgDomandeFiduciaFiltro]) {
+    if (!b) continue;
+    b.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${MR.FORME_SVG.scudo}"/></svg>`);
+    b.addEventListener('click', () => impostaSoloNonFidate(!soloNonFidate));
+  }
+  // `base` è la lista che la scheda mostrerebbe a filtro spento: il numero dice quante ne resterebbero accendendolo.
+  function aggiornaFiltroFiducia(base) {
+    if (!mgFiduciaFiltro) return;
+    const show = !searchMode && sezioniAttendibili() && LIST_TABS.includes(currentTab);
+    mgFiduciaFiltro.hidden = !show;
+    if (!show) return;
+    mgFiduciaFiltro.setAttribute('aria-pressed', soloNonFidate ? 'true' : 'false');
+    mgFiduciaFiltro.title = soloNonFidate ? 'Mostra anche le pratiche fidate' : 'Mostra solo le pratiche non fidate';
+    const c = mgFiduciaFiltro.querySelector('.mg-livello-count');
+    if (c) c.textContent = dataLoaded && Array.isArray(base) ? ` ${countText(MR.contaNonFidate(base))}` : '';
   }
 
   function updateLivelliFiltro() {
@@ -1997,7 +2024,7 @@
     const show = currentTab === 'inbox' && !searchMode && sezioniAttendibili();
     mgLivelliFiltro.hidden = !show;
     if (!show) return;
-    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni }) : null;
+    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni, soloNonFidate }) : null;
     mgLivelliFiltro.querySelectorAll('.mg-livello-btn').forEach((b) => {
       const l = b.dataset.livello;
       b.setAttribute('aria-pressed', livelliScelti.includes(l) ? 'true' : 'false');
