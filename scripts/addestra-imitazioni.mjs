@@ -145,7 +145,7 @@ function sinteticiRefusi(etichetta) {
 
 // I nomi che servizi cloud e anteprime generano a caso: un marchio corto ci cade dentro per caso (dh1, n26, bunq), uno
 // su duemila, e non imita nessuno. Restano solo quelli che portano un candidato.
-function sinteticiCasuali(quanti = 4000) {
+function sinteticiCasuali(quanti = Number(process.env.CASUALI ?? 4000)) {
   const caso = rng(23);
   const segni = 'abcdefghijklmnopqrstuvwxyz0123456789';
   const pezzo = (k) => Array.from({ length: k }, () => segni[Math.floor(caso() * segni.length)]).join('');
@@ -306,6 +306,10 @@ function costruisci() {
     }
     const es = IM.esempi(norm, IM.escaDi(url));
     if (!es.length) return;
+    // Un refuso del dominio vero di un marchio sta fra i siti più visitati per le visite sbagliate, non perché sia un
+    // altro sito (googlee.com, gmaill.com): da un elenco non si impara che è innocuo, lo decide solo un'etichetta scritta.
+    if (fonte === 'elenco' && y === 0 && es.some(({ c }) => c.zona === 'sld' && c.tipo === 'typo'
+      && c.mc.brand.domains.includes(c.mc.token + '.' + norm.publicSuffix))) { refusiTolti++; return; }
     const mask = (1 << BIT) - 1;
     if (y === 1) {
       const e = principale(es, marchio);
