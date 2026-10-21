@@ -2033,15 +2033,38 @@
     return items.filter((fb) => scelti.includes(livelloRicevuti(fb, opts)));
   }
 
-  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, a filtro spento; `senza` = nessun livello. PURA. */
+  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, coi livelli spenti e la fiducia di `opts`; `senza` = nessun livello. PURA. */
   function contaLivelliRicevuti(feedbacks, opts) {
     const n = { l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, senza: 0 };
-    for (const fb of (feedbacks || [])) {
+    for (const fb of filtraFiducia(feedbacks, opts && opts.soloNonFidate)) {
       if (manageTabFor(fb, opts) !== 'inbox') continue;
       const l = livelloRicevuti(fb, opts);
       n[l || 'senza']++;
     }
     return n;
+  }
+
+  // ── La fiducia in lista (#1575) ───────────────────────────────────────────
+  // Un filtro solo per pratiche e domande (le due portano `fiducia`), così lista e numeri non divergono: quello che
+  // nasconde non si conta (patterns/contenuto-nascosto-sezioni-chiuse-filtri-collassi-rivelalo.md).
+  /** Con `soloNonFidate` le sole non fidate, altrimenti tutte. PURA. */
+  function filtraFiducia(lista, soloNonFidate) {
+    const items = Array.isArray(lista) ? lista : [];
+    return soloNonFidate ? items.filter((x) => !isFidato(x)) : items.slice();
+  }
+  function contaNonFidate(lista) {
+    return filtraFiducia(lista, true).length;
+  }
+  // Il cancello guarda anche il registro del ramo, che la pagina non legge (#1554, #1555): l'hover non promette di più.
+  const SEGNI_FIDUCIA = Object.freeze({
+    fidata: Object.freeze({ classe: 'fidata', parola: 'Fidata',
+      testo: 'Fidata: è la fiducia del feedback, non quella del ramo. Se il registro del ramo è rotto, la fusione si ferma lo stesso al cancello, e da qui il registro non si legge.' }),
+    nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Non fidata',
+      testo: 'Non fidata: è la fiducia del feedback. Se il cancello ferma il lavoro, la fusione aspetta il tuo sì.' }),
+  });
+  /** Il segno della fiducia su una riga: la classe del colore, la parola e l'hover. Senza campo vale non fidata. PURA. */
+  function segnoFiducia(x) {
+    return isFidato(x) ? SEGNI_FIDUCIA.fidata : SEGNI_FIDUCIA.nonfidata;
   }
 
   /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
