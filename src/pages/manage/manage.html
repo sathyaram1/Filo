@@ -2077,8 +2077,8 @@
                   <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                 </label>
                 <span class="mg-action-msg" id="mgLavoriServerMsg" role="status"></span>
-                <!-- La routine server ferma dopo un'accensione rifiutata, col motivo (#996): la scrive manage.js. -->
-                <p class="mg-auto-warn" id="mgServerPausa" role="status" hidden></p>
+                <!-- Le routine server ferme dopo un rifiuto, una per account, col motivo (#996): le scrive manage.js. -->
+                <div class="mg-auto-pause" id="mgServerPausa" role="status" hidden></div>
               </section>
 
               <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un

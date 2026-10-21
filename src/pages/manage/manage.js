@@ -1108,7 +1108,7 @@
     clearTimeout(pauseTimer);
     const ora = Date.now();
     const righe = [];
-    let server = null;
+    const righeServer = [];
     let prossima = Infinity;
     const leggi = (chi, voce) => {
       if (!voce || typeof voce !== 'object') return null;
@@ -1124,18 +1124,19 @@
         const p = leggi(`Account ${k}`, pauseLette.pause[k]);
         if (p) righe.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
       }
-      const s = pauseLette.pause.server;
-      const acc = s && (s.account === 'A' || s.account === 'B') ? ` (account ${s.account})` : '';
-      server = leggi(`La routine server${acc}`, s);
+      // Una routine server per account (#1426): ognuna ha la sua pausa.
+      for (const k of ['A', 'B']) {
+        const p = leggi(`La routine server dell'account ${k}`, pauseLette.pause[`server${k}`]);
+        if (p) righeServer.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+      }
     }
     if (mgAccountsPausa) {
       mgAccountsPausa.replaceChildren(...righe);
       mgAccountsPausa.hidden = righe.length === 0;
     }
     if (mgServerPausa) {
-      mgServerPausa.textContent = server ? server.testo : '';
-      mgServerPausa.title = server ? server.dettaglio : '';
-      mgServerPausa.hidden = !server;
+      mgServerPausa.replaceChildren(...righeServer);
+      mgServerPausa.hidden = righeServer.length === 0;
     }
     // Una pausa che scade sparisce da sola, senza ricaricare la pagina.
     if (prossima < Infinity) pauseTimer = setTimeout(reflectPause, Math.min(Math.max(0, prossima - ora) + 1000, 2 ** 31 - 1));

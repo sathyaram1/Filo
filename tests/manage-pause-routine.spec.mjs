@@ -1,5 +1,5 @@
 // Gestione → Automazioni, le pause in corso (#996): senza tetto giornaliero è la pausa dopo un'accensione rifiutata
-// a fermare un account o la routine server, e qui se ne legge il motivo. Il server è finto (risposte del main).
+// a fermare un account o una routine server (una per account, #1426), e qui se ne legge il motivo. Il server è finto (risposte del main).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';
@@ -31,24 +31,26 @@ async function apri(openTab, risposta) {
   return page;
 }
 
-test('un account e la routine server in pausa dopo un rifiuto: la riga dice fino a quando e perché, l’hover il resto', async ({ openTab }) => {
+test('un account e le due routine server in pausa dopo un rifiuto: la riga dice fino a quando e perché, l’hover il resto', async ({ openTab }) => {
   const ora = Date.now();
   const page = await apri(openTab, {
     ok: true,
     oraMs: ora,
     pause: {
       B: { finoMs: ora + 3 * H, perche: 'http_429', dettaglio: 'Daily routine run limit reached', strikes: 2, oggi: 17 },
-      server: { finoMs: ora + 6 * H, perche: 'dead_round', dettaglio: '', strikes: 1, account: 'A', oggi: 4 },
+      serverA: { finoMs: ora + 6 * H, perche: 'dead_round', dettaglio: '', strikes: 1, account: 'A', oggi: 4 },
+      serverB: { finoMs: ora + 3 * H, perche: 'http_402', dettaglio: 'Credit balance is too low', strikes: 1, account: 'B', oggi: 17 },
     },
   });
   const righe = page.locator('#mgAccountsPausa .mg-auto-warn');
   await expect(righe).toHaveCount(1);
   await expect(righe.first()).toHaveText(/^Account B in pausa fino (alle|a domani alle) \d{2}:\d{2}: troppe accensioni per claude\.ai \(HTTP 429\)\. «Daily routine run limit reached»$/);
   await expect(righe.first()).toHaveAttribute('title', /2 rifiuti di fila.*Accensioni di oggi su quell'account: 17\./);
-  const server = page.locator('#mgServerPausa');
-  await expect(server).toBeVisible();
-  await expect(server).toHaveText(/^La routine server \(account A\) in pausa fino (alle|a domani alle) \d{2}:\d{2}: accesa, ma la sessione non è partita\.$/);
-  await expect(server).toHaveAttribute('title', /oggi su quell'account: 4/);
+  const server = page.locator('#mgServerPausa .mg-auto-warn');
+  await expect(server).toHaveCount(2);
+  await expect(server.nth(0)).toHaveText(/^La routine server dell'account A in pausa fino (alle|a domani alle) \d{2}:\d{2}: accesa, ma la sessione non è partita\.$/);
+  await expect(server.nth(0)).toHaveAttribute('title', /oggi su quell'account: 4/);
+  await expect(server.nth(1)).toHaveText(/^La routine server dell'account B in pausa fino (alle|a domani alle) \d{2}:\d{2}: .*\(HTTP 402\)\. «Credit balance is too low»$/);
 
   // L'aspetto, nei due temi: le righe stanno sotto gli interruttori a cui si riferiscono.
   for (const tema of ['light', 'dark']) {

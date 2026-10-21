@@ -654,15 +654,17 @@ scrive: con i compiti quella lettura si toglie.
     `CC_ROUTINE_FIRE_TOKEN_SERVER_B`. Una voce senza id o senza segreto non
     esiste, e accende solo con la sua parola d'ordine server (`lavori: server`,
     rete limitata) sul suo account; una parola d'ordine server senza account
-    vale per A;
+    vale per A. Una parola d'ordine server a rete aperta viva sul suo account
+    la ferma, e il log del pacemaker la nomina a ogni giro (#1251);
   - accende solo se c'è un lavoro server che nascerebbe pulito. Decide prima
     di A/B, che altrimenti riempirebbero ogni posto, e prende i posti che
     spettano ai lavori server nell'ordine di priorità della coda: a pari
     priorità il server, e un lavoro normale più urgente non lo ferma se A/B non
     possono accendere;
-  - fra le due voci sceglie con le regole di A/B: tetto dell'account (lo stesso
-    della sua routine normale), pausa a chi fallisce o nasce morta, riserva dei
-    crediti, account prioritario, alternanza. Una voce si ferma con l'account
+  - fra le due voci sceglie con le regole di A/B, senza tetto giornaliero
+    (#996): pausa a chi fallisce o nasce morta, riserva dei crediti, account
+    prioritario, alternanza. La pausa di ogni voce, col motivo, si legge in
+    Gestione → Automazioni. Una voce si ferma con l'account
     escluso o con la sua esclusione (`accountServerOff`, `accountServerBOff`);
     il tetto delle sessioni è comune.
 - **Su `main` di filo-security** scrive solo il cancello di fusione (regola come
