@@ -270,6 +270,10 @@ function caratteristiche(c, zone, info) {
   f.push('l=' + lun + k, 'd=' + c.d + k + lun, 'm=' + c.mut + k, 'pz=' + pezzo + k, 'pzz=' + pezzo + c.zona);
   f.push('pa=' + parola + k, 'pal=' + parola + lun + pezzo);
   f.push('tld=' + tld, 'ps=' + suff, 'kt=' + k + '|' + tld, 'kps=' + k + '|' + suff, 'bt=' + t + '|' + tld);
+  // Un suffisso di paese è spesso del marchio stesso (ebay.in), uno generico quasi mai (amazon.online): anche per i
+  // suffissi che fra gli esempi non ci sono.
+  const generico = tld.length > 2 && !['com', 'net', 'org', 'edu', 'gov'].includes(tld) ? 'g' : tld.length > 2 ? 'v' : 'p';
+  f.push('tg=' + generico + k + c.zona + (info.ospitato ? 1 : 0), 'tgp=' + generico + parola + k);
   const truffa = !!resto && soloTruffa(sx) && soloTruffa(dx);
   f.push('tr=' + (resto ? (truffa ? 1 : 0) : 'v') + k, 'trl=' + (truffa ? 1 : 0) + lun + parola);
   // Il marchio insieme al resto da truffa: imposte e proposte insegnano che «poste» dentro una parola è innocuo, e da
