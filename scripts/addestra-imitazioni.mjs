@@ -149,6 +149,41 @@ function sinteticiRefusi(etichetta) {
   return out;
 }
 
+// Le radici italiane di PAROLE_TRUFFA, finite come le scrive chi registra il sosia (rimborso, fattura, pacco).
+const FINALI = { rimbors: 'o', pagament: 'o', fattur: 'a', aggiornament: 'o', sblocc: 'o', recuper: 'o', conferm: 'a',
+  notific: 'a', spedizion: 'e', pacc: 'o', giacenz: 'a', consegn: 'a', ufficial: 'e' };
+const SUFFISSI_SOSIA = ['com', 'net', 'info', 'online', 'xyz', 'it', 'co.uk', 'de', 'wixsite.com', 'github.io', 'web.app',
+  'weebly.com', 'netlify.app'];
+
+// Il marchio attaccato a una parola da truffa (posteonline, secure-google, appleid-verifica), la forma più comune dei
+// sosia: un marchio che è anche una parola dagli elenchi non s'impara (evidente()), e senza questi il modello lasciava
+// passare un nome così su tre. Parole e suffissi li sceglie il caso: il modello deve riconoscere la forma, non i nomi.
+function sinteticiParole(etichetta) {
+  const { BRANDS, PAROLE_TRUFFA, LEGIT_DOMAINS } = require('./src/main/services/safebrowse/brands.js');
+  const parole = PAROLE_TRUFFA.filter((w) => w.length >= 3).map((w) => w + (FINALI[w] || ''));
+  const caso = rng(1375);
+  const pesca = (l) => l[Math.floor(caso() * l.length)];
+  const out = [];
+  const visti = new Set();
+  for (const b of BRANDS) {
+    const t = b.token;
+    if (visti.has(t) || !/^[a-z0-9]+$/.test(t)) continue;
+    visti.add(t);
+    // Un marchio corto attaccato a una parola sta dentro troppe parole vere (ing in login): solo col trattino.
+    const forme = t.length <= 4 ? [(w) => `${w}-${t}`, (w) => `${t}-${w}`]
+      : [(w) => `${w}-${t}`, (w) => `${t}-${w}`, (w) => w + t, (w) => t + w];
+    const propri = b.domains.filter((d) => d.startsWith(t + '.')).map((d) => d.slice(t.length + 1));
+    for (const forma of forme) {
+      for (let k = 0; k < 3; k++) {
+        const h = `${forma(pesca(parole))}.${pesca(k === 0 && propri.length ? propri : SUFFISSI_SOSIA)}`;
+        if (LEGIT_DOMAINS.has(h) || etichetta.has(h) || etichetta.has('www.' + h)) continue;
+        out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
+      }
+    }
+  }
+  return out;
+}
+
 function displayDi(token) {
   const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
   return (BRANDS.find((b) => b.token === token) || {}).display;
