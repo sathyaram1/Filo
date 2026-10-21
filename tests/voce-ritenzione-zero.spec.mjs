@@ -27,7 +27,7 @@ async function preparaRouter(app, sorgente) {
     globalThis.fetch = async (url, init) => {
       const u = String(url);
       if (u.endsWith('/api/v1/endpoints/zdr')) return json({ data: [{ name: 'Altro | altro/modello', provider_name: 'Altro', tag: 'altro' }] });
-      if (/openrouter\.ai\/api\/v1\/models\/.+\/endpoints$/.test(u)) return json({ data: { endpoints: [{ provider_name: 'Deepgram', tag: 'deepgram' }] } });
+      if (/openrouter\.ai\/api\/v1\/models\/.+\/endpoints$/.test(u)) return json({ data: { endpoints: [{ provider_name: 'DeepInfra', tag: 'deepinfra' }] } });
       if (u.includes('openrouter.ai/api/v1/audio/speech')) {
         globalThis.__voci++;
         return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'content-type': 'audio/pcm;rate=24000' } });
