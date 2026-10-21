@@ -1554,7 +1554,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   border: 1px solid var(--dash-line-strong);
   border-radius: var(--dash-radius-pill);
   box-shadow: 0 1px 0 rgba(0, 0, 0, calc(0.02 * var(--sn-ombra, 1)));
-  margin: 0 auto;
+  margin: var(--dash-gap) auto 0;
   width: 100%;
   max-width: 720px;
   box-sizing: border-box;
