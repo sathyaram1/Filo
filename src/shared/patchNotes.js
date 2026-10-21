@@ -74,6 +74,7 @@
       version: '0.2.244', date: '2026-10-21',
       features: [
         'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
+        'Se non ricordi un dato, scrivi delle x al suo posto: «l\'America l\'hanno scoperta nel 14xx», «Google ha un p/e di soli xx». Il correttore lo trova e te lo mostra in piccolo sopra le x, e un clic lo mette. Un dato che cambia nel tempo, come un prezzo, lo cerca su Wikipedia o sul web, e col tasto destro vedi da dove viene e di quando è. Si spegne in Opzioni → Altro, alla voce «Segnaposto».',
       ],
       fixes: [
         'Se in chat qualcuno ti chiede la password del wifi o un pin e tu rispondi, il correttore non manda più al modello la password o il pin. Il resto del messaggio lo controlla come sempre.',
