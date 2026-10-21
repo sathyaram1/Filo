@@ -555,7 +555,7 @@
         return { text: 'Il controllo di sicurezza ha bocciato il fix: decidi tu.', color: REASONS.secaudit.color };
       }
       if (statusReason === 'l5') {
-        return { text: 'Il ramo è fermo al cancello di fusione: decidi tu nel quadrato.', color: REASONS.l5.color };
+        return { text: 'Il ramo è fermo al cancello di fusione. Decidi tu nel quadrato.', color: REASONS.l5.color };
       }
       if (statusReason === 'origine_bloccata') {
         return { text: `Fermo perché ${origineText(fb)} è stato bloccato: decidi tu.`, color: REASONS.origine_bloccata.color };
@@ -1683,8 +1683,8 @@
 
   // Fermata al cancello senza una richiesta da approvare (#1556): il motivo è la nota con cui il server l'ha fermata,
   // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
-  const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta: non c’è un via libera da dare.';
-  const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata: le richieste di fusione non sono ancora arrivate a questa pagina.';
+  const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta, quindi non c’è un via libera da dare.';
+  const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
   const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
   function l5SenzaRichiesta(fb, opts) {
     const letto = !(opts && opts.dettaglioLetto === false);
@@ -1847,7 +1847,7 @@
       const l5 = livelloL5(fb, opts);
       return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
         ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
-        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta aperta: decidi tu se rifarlo o archiviarlo'
+        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta aperta. Decidi tu se rifarlo o archiviarlo'
           : 'Fermo al cancello di fusione: aspetta il tuo via libera');
     }
     const { status, statusReason } = normalizeStatus(fb);

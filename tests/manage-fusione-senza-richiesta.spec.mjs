@@ -1,11 +1,6 @@
-// UNA PRATICA FERMA AL CANCELLO SENZA RICHIESTA DI FUSIONE (#1556).
-//
-// COSA DEVE ESSERE VERO
-//   1. Il quadrato aperto dice perché è ferma (la nota con cui il server l'ha fermata) e offre le due strade:
-//      «Rimanda in lavorazione» e «Archivia», che arrivano al main come le stesse azioni della riga dell'owner.
-//   2. Senza nota dice che nessuna richiesta è aperta, e non fa aspettare una richiesta che non arriverà.
-//   3. In lista la scheda non promette un via libera da dare.
-//   4. Con una richiesta aperta il quadrato resta com'era: Approva/Scarta, niente strade.
+// Una pratica ferma al cancello senza richiesta di fusione (#1556): il quadrato dice il perché (la nota del server, o
+// che nessuna richiesta è aperta) e offre «Rimanda in lavorazione» e «Archivia», le stesse azioni della riga
+// dell'owner. In lista niente «via libera» promesso; con una richiesta aperta il quadrato resta Approva/Scarta.
 
 import { test, expect } from './fixtures/electron.mjs';
 
