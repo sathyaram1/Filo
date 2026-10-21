@@ -69,10 +69,11 @@ async function apri(app, openTab, testServer, opz) {
   return page;
 }
 
-async function valutaSu(page, selettore) {
+async function valutaSu(page, selettore, foto = '') {
   await page.locator(selettore).click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.voce('Valuta')).toHaveCount(1, { timeout: 5000 });
+  if (foto) await menu.superficie.screenshot({ path: foto }).catch(() => {});
   await menu.voce('Valuta').click();
 }
 
@@ -81,7 +82,7 @@ test('«Valuta» apre l’Aiuto col testo del campo, col modello della chat, e l
   const page = await apri(app, openTab, testServer, { risposte: [['', PARERE]] });
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Scrive ai clienti tedeschi della sua azienda.', PREFERENZE: '' }));
 
-  await valutaSu(page, '#ta');
+  await valutaSu(page, '#ta', 'tests/.shots/1449-menu-campo.png');
   await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
   await expect(page.locator('.sn-sidebar-msg-user')).toContainText('Valuta «Ieri sono andato al mare');
   await expect(page.locator('.sn-sidebar-msg-assistant')).toContainText('C\'è un refuso.', { timeout: 20_000 });
@@ -187,6 +188,7 @@ test('sul suggerimento del correttore «Valuta» c’è una volta sola e apre l�
   const menu = menuDi(page);
   await expect(menu.locator('.sn-menu-segno')).toContainText('Alle 18 di quale giorno?', { timeout: 5000 });
   await expect(menu.voce('Valuta')).toHaveCount(1);
+  await menu.superficie.screenshot({ path: 'tests/.shots/1449-menu-suggerimento.png' }).catch(() => {});
   await menu.voce('Valuta').click();
   await expect(page.locator('.sn-sidebar-msg-user')).toContainText('Valuta «Ci vediamo alle 18.', { timeout: 8000 });
   await expect(page.locator('.sn-sidebar-msg-assistant')).toContainText('C\'è un refuso.', { timeout: 20_000 });

@@ -2401,7 +2401,8 @@
     } else {
       for (let el = target.nodeType === 1 ? target : target.parentElement; el && el.isContentEditable; el = el.parentElement) campo = el;
     }
-    return campo && SpellCheck.testoDelCampo(campo).trim() ? campo : null;
+    // Il testo vero si legge al clic: qui basta sapere che non è vuoto, senza misurare ogni riga del campo.
+    return campo && String(campo.value ?? campo.textContent ?? '').trim() ? campo : null;
   }
 
   function buildValutaItem(campo) {

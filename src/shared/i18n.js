@@ -239,7 +239,7 @@
     help_valuta_lungo: 'Il testo è lungo: Filo ne valuta i primi %s caratteri.',
     help_correzione_applica: 'Scrivi nel campo',
     help_correzione_togli: 'Togli dal campo',
-    help_correzione_manca: 'Nel campo non c\'è più «%s»: il testo è cambiato.',
+    help_correzione_manca: 'Nel campo non trovo «%s»: forse il testo è cambiato.',
     help_correzione_ferma: 'Il campo non si è lasciato scrivere.',
     help_correzione_sparito: 'Il campo non c\'è più nella pagina.',
     help_correzione_non_tolta: 'Il testo è cambiato: per togliere la correzione usa %s nel campo.',
