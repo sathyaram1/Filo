@@ -1900,6 +1900,8 @@
     DOMANDE.collega({
       apriFeedback: (num) => openFeedbackByNum(String(num || '').replace(/^#/, '')),
       apriScheda: (tab) => selectTab(tab),
+      soloNonFidate: () => soloNonFidate,
+      impostaSoloNonFidate: (v) => impostaSoloNonFidate(v),
     });
   }
 
