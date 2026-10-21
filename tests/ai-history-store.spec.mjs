@@ -49,11 +49,12 @@ const registra = (app, n, prefisso) => app.evaluate(async (_e, { n, prefisso, pa
 }, { n, prefisso, pagina: PAGINA });
 
 // La pagina disegna le voci a lotti mentre si scorre: «le mostra tutte» vuol dire che scorrendo fino in fondo ci sono tutte.
+// Un lotto per giro: con le pause di un secondo di expect.poll, 3000 voci erano trenta secondi di attesa della prova (#1115.1).
 async function scorriFinoInFondo(page, n) {
   await expect.poll(async () => {
     await page.locator('.sn-history-item').last().scrollIntoViewIfNeeded();
     return page.locator('.sn-history-item').count();
-  }, { timeout: 30_000 }).toBe(n);
+  }, { timeout: 60_000, intervals: [50] }).toBe(n);
 }
 
 test('dopo 300 richieste la pagina le mostra tutte, e storage.json non contiene la cronologia', async ({ app, openTab }) => {
