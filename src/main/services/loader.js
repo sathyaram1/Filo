@@ -50,6 +50,8 @@ require(path.join(SHARED, 'themeTokens.js'));
 require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
+require(path.join(SHARED, 'stessoSito.js')); // #876 — «stesso sito» e Public Suffix List: prima di eseguibili e preferences
+require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google sono un accesso solo (dopo stessoSito)
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
 require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
@@ -61,6 +63,7 @@ require(path.join(SHARED, 'paths.js'));
 // Elenco e stato della micro-intervista di benvenuto (#524): logica pura, va
 // PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
 require(path.join(SHARED, 'onboarding.js'));
+require(path.join(SHARED, 'quaderno.js')); // #872 — fonti delle memorie e righe tolte (logica pura), prima di filoMemory
 require(path.join(SHARED, 'filoMemory.js'));
 // Ora, batteria, rete e Bluetooth a parole: lo legge filoState per lo STATO, e la home per le sue voci.
 require(path.join(SHARED, 'sistema.js'));
@@ -71,6 +74,7 @@ require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalo
 require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
 require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
+require(path.join(SHARED, 'filoCoda.js'));  // #869 — la home come coda del filo: righe, pezzi, ricerca (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
 require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
 require(path.join(SHARED, 'dashboardRefresh.js'));
@@ -80,6 +84,7 @@ require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione p
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
 require(path.join(SHARED, 'domande.js')); // #1149 — azioni delle domande all'owner come dati (fonte unica, incorporata dal server)
+require(path.join(SHARED, 'mittenti.js')); // #1162 — classe del mittente, solo statistica (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
 require(path.join(SHARED, 'feedbackAttese.js')); // #903 — «aspetta #N»: prima di manageReview, che ne fa una sezione
 require(path.join(SHARED, 'manageReview.js'));
@@ -87,10 +92,12 @@ require(path.join(SHARED, 'manageSearch.js')); // #1118 — la ricerca fra i fee
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
 require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback hanno una scheda pubblica, e con quali campi (dopo manageReview: la usa)
 require(path.join(SHARED, 'preferences.js'));
+require(path.join(SHARED, 'calendarEvent.js')); // evento proposto in chat → .ics per il calendario del computer
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
 require(path.join(SHARED, 'urlExfil.js'));
+require(path.join(SHARED, 'sitiComuni.js')); // #553 — gli indirizzi che il modello può scrivere a memoria
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli

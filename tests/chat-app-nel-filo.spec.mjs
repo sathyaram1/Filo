@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiamateAlModello, chiedi } from './helpers/chatFinta.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -78,7 +79,7 @@ test('un messaggio nella chat dell’Editor: nella home la riga ripiegata col nu
   await chatDellEditor(openTab, 'tesi', 'Cosa ne pensi del capitolo sui licheni?');
   await attiva(shell, 'filo://newtab');
 
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
   await expect(riga.locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi");
   await expect(riga.locator('.dash-riga-app-testa')).toHaveAttribute('title', 'Mostra lo scambio');
@@ -130,7 +131,7 @@ test('la conversazione di un mazzo: la riga col nome del mazzo, e svuotando la c
   await expect(mazzi.locator('.dk-msg-bot').last()).toContainText('servono più pescate', { timeout: 15_000 });
 
   await attiva(shell, 'filo://newtab');
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga.locator('.dash-riga-app-testo')).toHaveText('2 messaggi nei Mazzi su Niv-Mizzet, Parun', { timeout: 10_000 });
   await riga.locator('.dash-riga-app-testa').click();
   await expect(riga.locator('.dash-riga-app-msg-user')).toHaveText('che ne pensi del mazzo?');
@@ -158,7 +159,7 @@ test('una conversazione con l’Aiuto sopra un sito: la riga col nome del sito, 
   await expect(sito.locator('.sn-sidebar-msg-assistant').last()).toContainText('Iscriviti è in alto', { timeout: 10_000 });
 
   await attiva(shell, 'filo://newtab');
-  const righe = casa.locator('#righeApp .dash-riga-app');
+  const righe = casa.locator('#bubbles .dash-riga-app');
   await expect(righe).toHaveCount(1, { timeout: 10_000 });
   await expect(righe.first().locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Aiuto su 127.0.0.1");
   await righe.first().locator('.dash-riga-app-testa').click();
@@ -214,26 +215,21 @@ test('con modello finto la chat della home ha davanti la riga, non lo scambio, e
   expect(ordine.indexOf('dash-riga-app')).toBeLessThan(ordine.indexOf('dash-bubble'));
 });
 
-test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col nome dell’app', async ({ app, shell, openTab }) => {
+test('la riga si toglie dal filo col tasto destro, e la ricerca del filo la trova dal testo dello scambio', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
   await chatDellEditor(openTab, 'appunti', 'Mi riassumi i licheni?');
 
-  const archivio = await openTab('filo://archive/archive.html');
-  const voce = archivio.locator('.arc-chat[data-app="editor"]');
-  await expect(voce.locator('.arc-chat-title')).toHaveText('Editor · appunti', { timeout: 10_000 });
-  await expect(voce.locator('.arc-chat-date')).not.toHaveText('In corso');
-  // La ricerca della Cronologia la trova dal testo dello scambio.
-  await archivio.fill('#search', 'licheni');
-  await expect(voce).toBeVisible({ timeout: 10_000 });
-  await archivio.fill('#search', '');
-
   await attiva(shell, 'filo://newtab');
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  // La ricerca del filo la trova dal testo dello scambio (la Cronologia, che lo faceva, non c'è più: #872).
+  await casa.locator('#cercaInput').fill('licheni');
+  await expect(casa.locator('.dash-cerca-msg', { hasText: 'licheni' }).first()).toBeVisible({ timeout: 10_000 });
+  await casa.locator('#cercaInput').press('Escape');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await expect(riga).toHaveCount(1, { timeout: 10_000 });
   await riga.locator('.dash-riga-app-testa').click({ button: 'right' });
-  const menu = casa.locator('.sn-menu');
+  const menu = menuDi(casa).locator('.sn-menu');
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Mostra lo scambio', { exact: true })).toBeVisible();
   await expect(menu.getByText("Apri nell'Editor", { exact: true })).toBeVisible();
@@ -245,8 +241,6 @@ test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col
   await clickConfirm(casa, 'ok');
   await expect(riga).toHaveCount(0);
   await expect.poll(async () => (await righeFilo(app)).length).toBe(0);
-  // La Cronologia aperta si riallinea da sola.
-  await expect(voce).toBeHidden({ timeout: 10_000 });
 });
 
 test('da un sito parla solo l’Aiuto, e il sito lo dice l’indirizzo di chi manda; righe e cancellazioni solo da Filo', async ({ app }) => {
@@ -297,7 +291,7 @@ test('rinominato dopo la chat, il documento o il mazzo: la riga e la ricerca dic
   await editor.locator('.ed-doc-item-input').press('Enter');
   await editor.keyboard.press('Escape');
   await attiva(shell, 'filo://newtab');
-  await expect(casa.locator('#righeApp .dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi definitiva", { timeout: 10_000 });
+  await expect(casa.locator('#bubbles .dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi definitiva", { timeout: 10_000 });
   const [conv] = await righeFilo(app);
   expect(conv.title).toBe('Editor · tesi definitiva');
 
@@ -335,7 +329,7 @@ test('le risposte di Filo nello scambio aperto restano formattate, e il loro lin
   await expect(sito.locator('.sn-sidebar-msg-assistant strong').last()).toHaveText('Iscriviti', { timeout: 10_000 });
 
   await attiva(shell, 'filo://newtab');
-  const riga = casa.locator('#righeApp .dash-riga-app');
+  const riga = casa.locator('#bubbles .dash-riga-app');
   await riga.locator('.dash-riga-app-testa').click();
   const msg = riga.locator('.dash-riga-app-msg-filo');
   await expect(msg.locator('strong')).toHaveText('Iscriviti');

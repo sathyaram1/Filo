@@ -17,4 +17,5 @@ il passo se `e.defaultPrevented` è già vero.
   nell'handler dell'elemento; NON serve `stopPropagation`. Se non chiami
   `preventDefault`, il tasto destro apre il normale menu di Filo.
 - **Dove:** registrazione in `src/content/content.js` (ramo pagine interne);
-  esempi in `src/pages/archive/archive.js` e `src/pages/decks/decks.js`.
+  esempio in `src/pages/decks/decks.js`. Chi vuole le sue voci DENTRO il menu di Filo
+  (il quaderno delle memorie, la home) le dà a `SN_VOCI_PAGINA` invece di aprirne uno suo.

@@ -54,7 +54,7 @@
   const VOCI = {
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
-    showHomeMessage: { nome: 'commento nella home', valore: sino('mostrato', 'nascosto'), livello: 1 },
+    showHomeMessage: { nome: 'Filo scrive per primo nella home', valore: sino('sì', 'no'), livello: 1 },
     'homeSistema.*': { nome: (k) => `voce «${k === 'bluetooth' ? 'Bluetooth' : k}» nella home`, valore: sino('mostrata', 'nascosta'), livello: 1 },
     'tabPreview.enabled': { nome: 'anteprima delle schede', valore: ATTIVA, livello: 1 },
     'tabPreview.size': { nome: 'dimensione dell\'anteprima delle schede', livello: 1 },
@@ -67,6 +67,8 @@
     'schermo.guarda': { nome: 'guardare lo schermo', valore: sino('acceso', 'spento'), livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
+    'propostaEmail.attiva': { nome: 'email del tuo account proposta nei siti', valore: ATTIVA, livello: 1 },
+    'propostaEmail.incognito': { nome: 'email proposta anche in incognito', valore: ATTIVA, livello: 1 },
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
     },
@@ -116,6 +118,7 @@
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'notifications.soundVolume': { nome: 'volume del suono delle notifiche', valore: (v) => `${numero(v)}%`, livello: 1 },
     'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
+    'featureFlags.spellcheckContext': { nome: 'controllo di coerenza col contesto', valore: ATTIVO, livello: 1 },
     'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
     'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
@@ -125,6 +128,7 @@
     useDefaultModels: { nome: 'modelli predefiniti', valore: sino('in uso', 'spenti'), livello: 2 },
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },
     ownKeyAllProviders: { nome: 'fornitori esclusi con la tua chiave', valore: sino('usati', 'esclusi'), livello: 2 },
+    ordineHost: { nome: 'host dei modelli', valori: { '': 'scelti da Filo', throughput: 'più veloci', latency: 'risposta più pronta', price: 'più economici' }, livello: 2 },
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
     'scorciatoie.*': { nome: (k) => `scorciatoia di «${nomeAzioneFilo(k)}»`, valore: scorciatoiaLeggibile, livello: 1 },
@@ -437,6 +441,7 @@
     dashboard: 'dalla home',
     shell: 'dalla barra delle schede',
     'menu-scheda': 'dal menu della scheda',
+    'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
   };
   function provenienza(evento) {

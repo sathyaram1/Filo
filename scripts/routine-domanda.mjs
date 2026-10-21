@@ -8,7 +8,7 @@ import { rigaSporco } from './lib/biglietto-locale.mjs';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
 // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
-const SLOT = 'orchestrator, worker, new-work, fixer, verifier, secaudit, prober';
+const SLOT = 'orchestrator, worker, new-work, fixer, verifier, secaudit';
 const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]'
   + `\nslot: ${SLOT}`;
 

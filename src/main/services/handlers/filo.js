@@ -3,7 +3,7 @@
 
 module.exports = function register(on, ctx) {
   const {
-    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
+    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, autoFeedbackAnnullabili,
@@ -37,7 +37,18 @@ module.exports = function register(on, ctx) {
     try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
   };
 
+  // La risposta di un invoke può arrivare alla scheda prima degli ultimi eventi in diretta, che viaggiano su un'altra
+  // coda: il segno di fine li segue, e la scheda chiude la diretta solo quando lo vede (#1321).
+  const chiudiDiretta = (msg, sender) => {
+    const wc = sender && sender.wc;
+    if (!msg || !msg.reasoningReqId || !wc || (wc.isDestroyed && wc.isDestroyed())) return false;
+    try { wc.send('filo:action', { reqId: msg.reasoningReqId, kind: 'fine' }); return true; } catch (_) { return false; }
+  };
   on(MSG.FILO_CHAT, soloFilo(async (msg, sender) => {
+    const r = await turnoDellaChat(msg, sender);
+    return chiudiDiretta(msg, sender) ? { ...r, diretta: true } : r;
+  }));
+  async function turnoDellaChat(msg, sender) {
     let fineLavoro = () => {};
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
@@ -70,10 +81,12 @@ module.exports = function register(on, ctx) {
     } finally {
       fineLavoro();
     }
-  }));
+  }
 
   // Il quadrato al posto dell'invio (#578): ferma il turno di questa scheda, non quello di un'altra.
-  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
+  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: await fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
+  // Il seguito scritto mentre Filo lavora (#1296): entra nel turno di questa scheda, o lo manda lei a turno finito.
+  on(MSG.FILO_CHAT_SEGUITO, soloFilo(async (msg, sender) => ({ ok: true, ...seguitoFiloChat(msg || {}, sender && sender.wc) })));
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
   // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello
@@ -118,6 +131,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // #965 — la scheda da cui parte un collegamento che Filo apre per lei: l'avviso di un sito da avviso compare lì, prima.
+  const schedaDi = (tm, sender) => (tm && tm.tabs.find((t) => t.id === sender?.tab?.id && t.view && t.view.webContents === sender.wc)) || null;
+
   // Un indirizzo che un modello ha proposto in una pagina di Filo (un collegamento in una risposta, anche di posta, un
   // bottone, un suggerimento della home) si apre solo dopo la porta delle uscite (#810). La frase torna a chi ha cliccato.
   on(MSG.FILO_APRI_PROPOSTA, async (msg, sender, origin) => {
@@ -126,8 +142,17 @@ module.exports = function register(on, ctx) {
     const web = /^https?:/i.test(url);
     if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const win = winOf(sender);
+    // Il clic sul collegamento vale per la pagina d'arrivo come un clic su un sito: si legge prima della porta, che può attendere.
+    const origine = { tipo: 'filo', gesto: require('../permessiPagine').gestoDellUtente(sender?.wc) };
     const r = await apriDaFilo(url, {
-      wc: sender?.wc, parole: paroleDa(msg), avvisa: false, apri: () => { if (win?._filoTabs) win._filoTabs.openTab(url); },
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: false,
+      apri: () => {
+        const tm = win?._filoTabs;
+        if (!tm) return;
+        const apri = (segna) => { const id = tm.openTab(url, { origine }); if (segna) segna(tm.tabs.find((t) => t.id === id)); };
+        const da = schedaDi(tm, sender);
+        if (!(da && tm._sbPrimaDelClic(da, url, apri, { daFilo: true }))) apri();
+      },
       chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true,
     });
     return { ok: true, ...r };
@@ -142,9 +167,10 @@ module.exports = function register(on, ctx) {
     const avvisato = isFilo(origin);
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+    const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
-      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo) }); },
+      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), daScheda: schedaDi(tm, sender), gesto }); },
     });
     return { ok: true, ...r, avvisato };
   });
@@ -231,6 +257,41 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // Filo non ha un calendario suo: scrive l'evento in un .ics e lo passa al
+  // programma dell'utente, che è la porta che ogni calendario sa aprire. Se il
+  // sistema non lo apre torna il percorso, così il bottone non finisce nel nulla.
+  on(MSG.CALENDAR_ADD, soloDaFilo(async (msg) => {
+    const C = globalThis.SN_CALENDAR;
+    const ev = C && C.normalize(msg && msg.evento);
+    if (!ev) return { ok: false, error: 'evento incompleto' };
+    const path = require('node:path');
+    const fs = require('node:fs');
+    const { app, shell } = require('electron');
+    let file = '';
+    try {
+      const dir = path.join(app.getPath('temp'), 'filo-eventi');
+      await fs.promises.mkdir(dir, { recursive: true });
+      // Un evento consegnato al calendario di ieri non serve più a nessuno:
+      // senza questa ripulita la cartella cresce a ogni uso e non la svuota nessuno.
+      const limite = Date.now() - 24 * 60 * 60 * 1000;
+      for (const nome of await fs.promises.readdir(dir)) {
+        if (!nome.endsWith('.ics')) continue;
+        const vecchio = path.join(dir, nome);
+        try {
+          const st = await fs.promises.stat(vecchio);
+          if (st.mtimeMs < limite) await fs.promises.unlink(vecchio);
+        } catch (_) {}
+      }
+      file = path.join(dir, `${Date.now().toString(36)}-${C.fileName(ev)}`);
+      await fs.promises.writeFile(file, C.buildIcs(ev, { uid: `${C.uidPer(ev)}@filo` }), 'utf8');
+    } catch (e) {
+      return { ok: false, error: e?.message || 'file non scritto' };
+    }
+    let apertura = '';
+    try { apertura = await shell.openPath(file); } catch (e) { apertura = e?.message || 'apertura non riuscita'; }
+    return { ok: true, file, aperto: !apertura, error: apertura || '', quando: ev.quando, titolo: ev.titolo };
+  }));
+
   on(MSG.FILO_GET_MEMORY, soloFilo(async () => ({ ok: true, memory: await FiloMem.getMemory() })));
 
   // Rileggere e togliere una riga di memoria alla volta (#592): è il posto dove
@@ -247,8 +308,70 @@ module.exports = function register(on, ctx) {
     const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
     const sempreAperta = msg && typeof msg.sempreAperta === 'string';
     if (!lezione && !riga && !sempreAperta) return { ok: false, error: 'bad_request' };
-    return { ok: true, tolta: await FiloMem.forgetLine(msg) };
+    if (sempreAperta) return { ok: true, tolta: await FiloMem.forgetLine({ sempreAperta: msg.sempreAperta }) };
+    // La riga resta fra le nascoste del quaderno (#872): l'id serve al suo «Rimetti».
+    const id = await FiloMem.hideLine(lezione ? { lezione: msg.lezione } : { modulo: msg.modulo, riga: msg.riga });
+    return { ok: true, tolta: !!id, id: id || null };
   });
+
+  // ── Il quaderno delle memorie (#872) ─────────────────────────────────────
+  // Ogni riga con la data in cui è nata e i punti del filo da cui viene: quelli che il filo non ha più (una chat
+  // cancellata) restano fuori, e una riga senza nessuno si legge e si corregge lo stesso, senza collegamento.
+  const IlFilo = () => globalThis.SN_IL_FILO;
+  async function fontiNelFilo(ids) {
+    const out = [];
+    for (const id of Array.isArray(ids) ? ids : []) {
+      let d = null;
+      try { d = await IlFilo().dove(id, { incognito: false }); } catch (_) {}
+      if (d && d.tipo === 'messaggio') out.push({ id, ts: d.ts, chat: d.chat, i: d.i, role: d.role, app: d.app || null });
+    }
+    return out.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  }
+  const conFonti = async (r) => ({ ...r, fonti: await fontiNelFilo(r.fonti) });
+
+  on(MSG.FILO_QUADERNO, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const q = await FiloMem.quaderno();
+    const moduli = [];
+    for (const m of q.moduli) moduli.push({ nome: m.nome, righe: await Promise.all(m.righe.map(conFonti)) });
+    return {
+      ok: true, moduli, lezioni: await Promise.all(q.lezioni.map(conFonti)),
+      sempreAperte: q.sempreAperte, nascoste: await Promise.all(q.nascoste.map(conFonti)),
+    };
+  });
+
+  const viaValida = (via) => !!via && ((via.lezione && typeof via.lezione === 'object'
+    && typeof via.lezione.ts === 'string' && typeof via.lezione.text === 'string')
+    || (typeof via.modulo === 'string' && typeof via.riga === 'string'));
+
+  // La correzione passa dagli stessi controlli di una lezione (tetto, caratteri che non si vedono): entra in ogni prompt.
+  on(MSG.FILO_MEMORY_EDIT, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!viaValida(msg && msg.via) || typeof msg.testo !== 'string') return { ok: false, error: 'bad_request' };
+    const l = globalThis.SN_PREF.lezioneDaAzione({ testo: msg.testo.replace(/\s*[\r\n]+\s*/g, ' ') });
+    if (l.rifiuto) return { ok: false, error: l.rifiuto, rifiuto: true };
+    if (!l.testo) return { ok: false, error: 'vuota' };
+    const fonti = Array.isArray(msg.fonti) ? msg.fonti.filter((x) => typeof x === 'string') : [];
+    return { ok: true, corretta: await FiloMem.editLine(msg.via, l.testo, { fonti }), testo: l.testo };
+  });
+
+  on(MSG.FILO_MEMORY_RESTORE, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
+    return { ok: true, rimessa: await FiloMem.restoreHidden(msg.id) };
+  });
+
+  on(MSG.FILO_MEMORY_FOREVER, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string') return { ok: false, error: 'bad_request' };
+    return { ok: true, cancellata: await FiloMem.forgetHiddenForever(msg.id) };
+  });
+
+  // Il salto al punto del filo: la home chiede dove sta un evento, e ci va. Dall'incognito il filo è quello in memoria.
+  on(MSG.FILO_DOVE, soloFilo(async (msg) => {
+    if (!msg || typeof msg.id !== 'string' || !msg.id) return { ok: false, error: 'bad_request' };
+    return { ok: true, dove: await IlFilo().dove(msg.id) };
+  }));
 
   // Compattazione FORZATA: porta subito il buffer delle lezioni dentro
   // PROFILO/PREFERENZE senza aspettare la soglia. Prima non esisteva alcun modo
@@ -287,7 +410,7 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const id = msg.id;
     if (!id) return { ok: false, error: 'id mancante' };
-    closeAndTriageChat(id)
+    closeAndTriageChat(id, { fine: msg.fine === true })
       // La Cronologia può essere aperta in un'altra scheda mentre qui si
       // finisce di chattare: l'annuncio la fa riallineare da sola, invece di
       // lasciarla ferma a com'era e far credere che la chat non si sia
@@ -424,6 +547,23 @@ module.exports = function register(on, ctx) {
 
   on(MSG.FILO_RIGHE_APP, soloFilo(async (msg) => (
     { ok: true, righe: await globalThis.SN_CONVERSAZIONI_APP.righe({ chat: msg.chat || null }) })));
+
+  // #869 — la home come coda del filo: a pezzi, la ricerca, le pagine tolte. La prima apertura della giornata è una
+  // cosa successa: Filo la saluta (una volta).
+  const Coda = require('../codaFilo');
+  const isoO = (x) => (typeof x === 'string' && !Number.isNaN(Date.parse(x)) ? x : null);
+  on(MSG.FILO_CODA, soloFilo(async (msg) => {
+    const r = await Coda.pezzo({ prima: isoO(msg.prima), fino: isoO(msg.fino), dopo: isoO(msg.dopo), quanti: Number(msg.quanti) || undefined });
+    // L'incognito non saluta: il saluto sta nel filo di disco, che da lì non si vede.
+    if (!msg.prima && !msg.fino && !msg.dopo && !require('../../shim/storage').inIncognito()) require('../filoParla').forseGiornata().catch(() => {});
+    return { ok: true, ...r };
+  }));
+  on(MSG.FILO_CERCA, soloFilo(async (msg) => ({ ok: true, ...(await Coda.cerca(String((msg && msg.q) || '').slice(0, 500))) })));
+  on(MSG.FILO_CODA_TOGLI_PAGINE, soloFilo(async (msg) => {
+    const url = msg && typeof msg.url === 'string' ? msg.url : '';
+    const tolte = url ? await Coda.togliIndirizzo(url) : await Coda.togliPagine(Array.isArray(msg && msg.ids) ? msg.ids : []);
+    return { ok: true, tolte };
+  }));
 
   // #866 — le pagine visitate del filo: quante sono in un periodo, e cancellarle (pagina Sicurezza).
   const periodoDa = (msg) => globalThis.SN_FILO_EVENTI.periodo(msg && msg.periodo);

@@ -14,6 +14,7 @@
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/modelCaps.js"></script>
   <script src="filo://shared/modelUsage.js"></script>
@@ -30,6 +31,7 @@
   <script src="filo://shared/feedbackAttese.js"></script>
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/domande.js"></script>
+  <script src="filo://shared/mittenti.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
@@ -669,6 +671,7 @@
     .mg-fs-drill-num { font-variant-numeric: tabular-nums; color: var(--sn-muted); flex: 0 0 auto; min-width: 56px; }
     .mg-fs-drill-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mg-fs-drill-cat { margin-left: auto; color: var(--sn-muted); font-size: 11.5px; flex: 0 0 auto; padding-left: 10px; }
+    .mg-fs-drill-giri { font-size: 11.5px; flex: 0 0 auto; font-variant-numeric: tabular-nums; min-width: 68px; text-align: right; }
 
     /* Le superfici che si aprono su cosa hanno contato lo dicono col puntatore. */
     .mg-fs-legend li[data-group] { cursor: pointer; padding: 3px 6px; margin: 0 -6px; border-radius: 6px; }
@@ -683,6 +686,7 @@
       cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
     }
     .mg-fs-quanti:hover { color: var(--sn-accent); }
+    .mg-fs-quanti:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 3px; }
 
     /* Le sezioni sotto i riquadri. */
     .mg-fs-sec { margin-bottom: 30px; }
@@ -2029,8 +2033,8 @@
                 </label>
                 <p class="mg-auto-block-desc">
                   Spente, le sessioni automatiche partono ma non fanno niente: nessun
-                  lavoro sul codice, nessuna verifica, nessuna esplorazione. I feedback
-                  restano in coda e ti aspettano.
+                  lavoro sul codice, nessuna verifica. I feedback restano in coda e ti
+                  aspettano.
                   <span class="mg-action-msg" id="mgRoutinesMsg" role="status"></span>
                 </p>
               </section>
@@ -2049,64 +2053,20 @@
                   <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
                 </p>
 
-                <!-- Chi può entrare in coda da solo, per categoria di mittente: conta solo con l'automatica accesa. -->
+                <!-- Chi entra in coda da solo, per fiducia (mai per mittente): conta solo con l'automatica accesa. -->
                 <div class="mg-auto-sub" id="mgAutoApproveBlock">
                   <p class="mg-auto-sub-title">Entrano in coda da soli</p>
-                  <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
-                    <span class="mg-switch-text">👑 I tuoi</span>
-                    <input type="checkbox" id="mgAutoApproveOwner" checked />
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti delle routine e allarmi nati da un lavoro rimasto pulito. I tuoi feedback e quelli delle tue sessioni pulite entrano comunque">
+                    <span class="mg-switch-text">🤝 Fidati</span>
+                    <input type="checkbox" id="mgAutoApproveFidato" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
-                  <label class="mg-switch mg-switch--sm" title="Feedback inviati dagli alpha tester">
-                    <span class="mg-switch-text">👤 Altri utenti</span>
-                    <input type="checkbox" id="mgAutoApproveUser" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di Claude mentre lavora con te sul tuo computer">
-                    <span class="mg-switch-text">💻 Claude (sessione locale)</span>
-                    <input type="checkbox" id="mgAutoApproveLocal" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
-                    <span class="mg-switch-text">🔧 Claude (sviluppo)</span>
-                    <input type="checkbox" id="mgAutoApproveWorker" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
-                    <span class="mg-switch-text">🧪 Claude (verifica)</span>
-                    <input type="checkbox" id="mgAutoApproveVerifier" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro. Conta per quelli di un lavoro non fidato: gli altri seguono il lavoro da cui nascono">
-                    <span class="mg-switch-text">🧹 Claude (rilievi residui)</span>
-                    <input type="checkbox" id="mgAutoApproveResiduo" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Automazioni che non dichiarano il proprio ruolo (feedback storici)">
-                    <span class="mg-switch-text">🤖 Claude (ruolo non indicato)</span>
-                    <input type="checkbox" id="mgAutoApproveClaude" checked />
-                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                  </label>
-                  <label class="mg-switch mg-switch--sm" title="Segnalazioni che Filo scrive per conto di un utente">
-                    <span class="mg-switch-text">🧵 Filo (per conto di un utente)</span>
-                    <input type="checkbox" id="mgAutoApproveFilo" checked />
+                  <label class="mg-switch mg-switch--sm" title="Utenti, Filo per conto di un utente, e quello che scrive un lavoro che ha letto testo di utenti">
+                    <span class="mg-switch-text">👤 Non fidati</span>
+                    <input type="checkbox" id="mgAutoApproveNonFidato" checked />
                     <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                   </label>
                 </div>
-              </section>
-
-              <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
-              <section class="mg-auto-block" id="mgProberIdleBlock">
-                <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
-                  <span class="mg-switch-text">Esplora quando la coda è vuota</span>
-                  <input type="checkbox" id="mgProberIdle" checked />
-                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                </label>
-                <p class="mg-auto-block-desc">
-                  Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
-                  nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
-                  <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
-                </p>
               </section>
 
               <!-- I lavori server alle routine (#1159): spento, restano alle sessioni locali. -->

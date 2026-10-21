@@ -11,6 +11,7 @@
 const { BrowserWindow } = require('electron');
 const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
+const PageRead = require('./pageRead');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
@@ -20,6 +21,7 @@ const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
+const FiloParla = require('./filoParla');
 const Schermo = require('./schermo').crea();
 const SempreAperte = require('./sempreAperte');
 
@@ -32,7 +34,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   getSettings: () => getEffectiveSettings(),
   buildChain: (s, ref, action) => buildAttemptChain(s, ref, action),
   modelFor: (s, action) => modelForAction(s, action),
-  routing: (s) => providerRouting(s),
+  routing: (s, a) => providerRouting(s, a && a.sort),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
   segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
@@ -66,10 +68,6 @@ const FiloState = globalThis.SN_FILO_STATE;
 const Onboarding = globalThis.SN_ONBOARDING;
 const DashboardRefresh = globalThis.SN_DASHBOARD_REFRESH;
 
-// #155 — intervallo minimo tra due ricalcoli in background della home: la nuova
-// scheda serve sempre la cache all'istante; il ricalcolo (costoso, con l'LLM)
-// avviene al massimo una volta ogni 2 minuti, accorpando le modifiche.
-const DASHBOARD_MIN_INTERVAL_MS = 2 * 60 * 1000;
 
 // Finestra principale di Filo, quella che possiede il TabManager. NON usare
 // getAllWindows()[0]: le finestre figlie (tooltip, popup-menu — create con
@@ -90,6 +88,25 @@ function filoWin() {
 function winOf(sender) {
   const w = sender && sender.win;
   return (w && w._filoTabs) ? w : filoWin();
+}
+
+// Le schede web in cui LEGGI_PAGINA cerca la pagina prima di scaricarla: prima la finestra di chi chiede, poi le
+// altre dello stesso tipo. Una finestra in incognito non presta le sue schede a una normale, e viceversa.
+function schedeLeggibili(sender) {
+  const prima = winOf(sender);
+  const incognito = !!(prima && prima._filoTabs && prima._filoTabs.incognito);
+  let finestre = [];
+  try { finestre = BrowserWindow.getAllWindows(); } catch (_) {}
+  const out = [];
+  for (const w of [prima, ...finestre.filter((x) => x !== prima)]) {
+    const tm = w && !(w.isDestroyed && w.isDestroyed()) && w._filoTabs;
+    if (!tm || !!tm.incognito !== incognito) continue;
+    for (const t of tm.tabs || []) {
+      const wc = t && t.view && t.view.webContents;
+      if (wc && /^https?:/i.test(String(t.url || ''))) out.push({ wc, url: t.url });
+    }
+  }
+  return out;
 }
 
 // ─── helpers (identici al background.js originale) ──────────────────────────
@@ -246,6 +263,10 @@ async function buildMessages(action, payload) {
   if (action === ACTIONS.SPELLCHECK_SEMANTIC) {
     return [{ role: 'user', content: PROMPTS.spellcheckSemantic({ text: payload.text, context: payload.context }) }];
   }
+  if (action === ACTIONS.SPELLCHECK_CONTEXT) {
+    // La data la dà l'orologio di qui, non la pagina.
+    return [{ role: 'user', content: PROMPTS.spellcheckContext({ text: payload.text, contesto: payload.contesto, oggi: new Date() }) }];
+  }
   if (action === ACTIONS.EDIT_TEXT) {
     return [{ role: 'user', content: PROMPTS.editText({ original: payload.original, instruction: payload.instruction }) }];
   }
@@ -356,7 +377,9 @@ function withDefaults(settings) {
   // sourced dai default condivisi (costante ⊕ override Firestore config/models),
   // MAI dallo storage utente — così l'owner la aggiorna senza rilasciare codice.
   const baseExcluded = Array.isArray(d.excludedProviders) ? d.excludedProviders : [];
-  const providerSort = typeof d.providerSort === 'string' ? d.providerSort : '';
+  // L'ordinamento degli host invece lo può scegliere chi usa Filo: la sua scelta vale sopra quella condivisa.
+  const sortPersonale = SN_CONST.normalizeProviderSort(settings.ordineHost);
+  const providerSort = sortPersonale || (typeof d.providerSort === 'string' ? d.providerSort : '');
 
   // "Solo modelli a pesi aperti" (#461) è invece una scelta di CHI USA Filo, e
   // sta sopra alla config condivisa: vale anche quando si usano i crediti di
@@ -387,7 +410,7 @@ function withDefaults(settings) {
     ...settings,
     provider: d.provider,
     models: SN_CONST.effectiveModels(d.models, settings.modelliScelti, d.modelRegistry),
-    modelRegistry: d.modelRegistry,
+    modelRegistry: sortPersonale ? SN_CONST.registroSenzaOrdinamento(d.modelRegistry) : d.modelRegistry,
     openWeightsOnly,
     excludedProviders,
     excludedProvidersOwnKey,
@@ -538,11 +561,10 @@ function buildAttemptChain(settings, modelRef, action) {
   // campo. Se dopo l'esclusione OpenRouter non trova un host ammesso, risponde
   // con un errore: la richiesta fallisce in modo evidente invece di essere
   // servita da un fornitore escluso.
-  const routing = providerRouting(settings);
-  if (routing) {
-    for (const a of out) {
-      if (a.provider === 'openrouter') a.providerRouting = routing;
-    }
+  for (const a of out) {
+    if (a.provider !== 'openrouter') continue;
+    const routing = providerRouting(settings, a.sort);
+    if (routing) a.providerRouting = routing;
   }
   // Il tetto della risposta per la famiglia della funzione (#1097.3): Preferenze, poi Modelli predefiniti, poi il codice.
   const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
@@ -559,8 +581,9 @@ function buildAttemptChain(settings, modelRef, action) {
 // una richiesta vera che finisce su un host, e senza queste istruzioni sarebbe
 // l'unica richiesta di Filo libera di essere servita da un fornitore escluso.
 // Ritorna null se non c'è niente da dire.
-function providerRouting(settings) {
-  return SN_CONST.providerRoutingFor(settings);
+// La regola (la voce vince sul globale, `ignore` resta com'è) sta in SN_CONST.
+function providerRouting(settings, entrySort) {
+  return SN_CONST.providerRoutingFor(settings, entrySort);
 }
 
 // Cancello della politica per le chiamate che NON passano da buildAttemptChain:
@@ -846,7 +869,7 @@ async function chiamaIlModello({ action, payload, origin, onReasoning = null, on
 
   if (
     action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
-    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_WORD
+    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_WORD && action !== ACTIONS.SPELLCHECK_CONTEXT
     && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
     // La ricerca fra i feedback è un passaggio interno di una ricerca, non una
     // richiesta dell'utente: come quando prendeva in prestito «Categorizza»,
@@ -968,7 +991,14 @@ async function lezioniAutomaticheConsentite({ sender = null, contesto = null, fo
   } catch (_) { return false; }
 }
 
-async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
+// Le righe che l'utente ha tolto dal quaderno: lezioni e compattatore le vedono per non riscriverle (#872).
+async function testoRigheTolte() {
+  const tolte = (await FiloMem.righeTolte()).filter((t) => t.testo);
+  return tolte.map((t) => `- ${t.testo}`).join('\n');
+}
+
+// `fonti`: gli eventi del filo di questo scambio (la domanda e la risposta), che le lezioni ricordano (#872).
+async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = [] }) {
   try {
     const settings = await getEffectiveSettings();
     if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_LESSON)) return;
@@ -976,9 +1006,10 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
     const { profilo, preferenze } = FiloMem.renderMemoryForPrompt(memory);
     const lezioniText = await lessonsBufferText();
     const interazione = `UTENTE: ${userMessage || ''}\nFILO: ${filoReply || ''}`;
+    const tolte = await testoRigheTolte();
     const r = await handleAIRequest({
       action: ACTIONS.FILO_LESSON,
-      payload: { profilo, preferenze, lezioni: lezioniText, interazione, stato: stateText },
+      payload: { profilo, preferenze, lezioni: lezioniText, interazione, stato: stateText, tolte },
       origin: 'filo:lesson',
       intera: true,
     });
@@ -991,7 +1022,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
       // Il tetto vale anche per le lezioni che Filo si scrive da solo (#592).
       const l = global.SN_PREF.lezioneDaAzione({ testo: m[1] });
       if (l.rifiuto) { console.warn('[Filo] lezione automatica scartata:', l.rifiuto); continue; }
-      if (l.testo) await FiloMem.appendLesson(l.testo);
+      if (l.testo) await FiloMem.appendLesson(l.testo, { fonti });
     }
     if (await FiloMem.lessonsBufferShouldCompact()) {
       maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -1011,26 +1042,35 @@ async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
     if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
+    const inizio = new Date().toISOString();
+    // Le fonti per prime: la loro versione dice se l'utente ha cambiato qualcosa dopo questa lettura (#872).
+    const meta = await FiloMem.getFonti();
     const memory = await FiloMem.getMemory();
-    const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
     if (!buf.length) return false;
-    const lezioniText = buf.map((l) => `- ${l.text}`).join('\n');
+    // Ogni riga e ogni lezione col suo segno: il compattatore cita i segni, e le fonti passano alle note (#872).
+    const Q = globalThis.SN_QUADERNO;
+    const { moduli, lezioni, rif } = Q.perCompattatore(memory, meta, buf);
     const r = await handleAIRequest({
       action: ACTIONS.FILO_COMPACT,
-      payload: { moduli: moduliText, lezioni: lezioniText },
+      payload: { moduli, lezioni, tolte: await testoRigheTolte() },
       origin: 'filo:compact',
       intera: true,
     });
     const text = (r?.text || '').trim();
+    const versione = meta.versione || 0;
+    let applicata;
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
-      await FiloMem.clearLessonsBuffer();
-      return true;
+      applicata = await FiloMem.applicaCompattazione({ patch: {}, usate: buf, versione });
+    } else {
+      const letto = Q.leggiCompattatore(FiloMem.parseCompactorOutput(text), {
+        rif, meta, tolte: meta.nascoste, ora: inizio,
+      });
+      if (letto.scartate.length) console.warn(`[Filo] compattatore: ${letto.scartate.length} righe tolte dall'utente non rimesse`);
+      applicata = await FiloMem.applicaCompattazione({ patch: letto.patch, righe: letto.righe, usate: buf, versione });
     }
-    const patch = FiloMem.parseCompactorOutput(text);
-    if (Object.keys(patch).length) await FiloMem.patchMemory(patch);
-    await FiloMem.clearLessonsBuffer();
-    return true;
+    if (!applicata) console.warn('[Filo] compattatore: l\'utente ha cambiato la memoria mentre lavorava, riparte al giro dopo');
+    return applicata;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
     return false;
@@ -1115,6 +1155,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   }
   try { require('../movimento').segui(merged); } catch (_) {}
   try { require('../shortcuts').configura(merged); } catch (_) {}
+  try { require('../confermeSopraPagina').seguiTema(merged); } catch (_) {}
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   avvisaSeLaProntezzaCambia().catch(() => {});
   try {
@@ -1152,6 +1193,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     if (require('./adSkip').configureFromSettings(merged)) broadcastToTabs({ type: MSG.AD_SKIP_CONFIG_UPDATE });
   } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
+  try { require('../propostaEmail').impostazioni(merged); } catch (_) {}
   // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
   try {
     for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.({ mentreScrive });
@@ -1556,22 +1598,147 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-async function controllaUscita(action, { sender = null, contesto = null, parole = '', domanda = '' } = {}) {
+async function controllaUscita(action, { sender = null, contesto = null, provenienza = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
   const origine = sender?.tab?.url || sender?.url || '';
   const daPagina = /^https?:/i.test(origine);
-  return Exfil.valutaUscita(action, {
+  const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
+  let memoria = '';
+  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'LEGGI_PAGINA') {
+    memoria = [await navExfilCorpus(), indirizzo ? PageRead.materialeRiservato(indirizzo) : ''].filter(Boolean).join('\n');
+  }
+  const azioni = Array.isArray(contesto) ? contesto : [];
+  const testoParole = typeof parole === 'string' ? parole : '';
+  const v = Exfil.valutaUscita(action, {
     segreti: await segretiCustoditi(),
-    azioni: Array.isArray(contesto) ? contesto : [],
+    azioni,
     pagina: daPagina ? await testoDellaPagina(sender) : null,
     letti: (daPagina ? lettiDallAiuto(sender) : []).concat(SegretiLetti.tutti()),
-    parole: typeof parole === 'string' ? parole : '',
+    parole: testoParole,
     domanda: typeof domanda === 'string' ? domanda : '',
-    memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
+    memoria,
     daPagina,
   });
+  if (v.blocca || !indirizzo || !provenienza) return v;
+  // Si giudica l'indirizzo che partirà: senza «https://», fra virgolette o con due barre, lettura e apertura lo completano.
+  const web = indirizzoCaricato(tipo, indirizzo);
+  if (!/^https?:/i.test(web)) return v;
+  // La regola dell'indirizzo scritto (#553, decisione su D-20) vale solo dopo che nella chat è entrato testo di
+  // sconosciuti: prima nessuno può aver dettato al modello dove portare i dati. Compare → costo 1; dall'elenco dei siti
+  // o dal modulo di ricerca di un sito → le parole come una ricerca sul web; scritto dal modello → costo 3, con un OK.
+  if (!testoDiSconosciuti(azioni)) return v;
+  const schede = schedeLeggibili(sender);
+  // Una pagina che la lettura trova aperta in una scheda si legge da lì: niente esce.
+  if (tipo === 'LEGGI_PAGINA' && PageRead.trovaScheda(web, schede)) return { ...v, exfil: false, reason: '' };
+  if (!provenienza.cronologia) provenienza.cronologia = PageRead.chiaviCronologia(await indirizziDellaCronologia());
+  const ver = PageRead.verificaIndirizzo(provenienza, web, {
+    schede: schede.flatMap((x) => [x.url, urlDellaScheda(x)]), cronologia: provenienza.cronologia, parole: testoParole,
+    scaricata: tipo === 'LEGGI_PAGINA',
+  });
+  if (ver.compare) return { ...v, exfil: false, reason: '' };
+  if (ver.sito) {
+    const r = Exfil.valutaRicerca(ver.sito.parole, { memoria, azioni });
+    return { ...v, exfil: r.exfil, reason: r.reason };
+  }
+  // Se il controllo di prima ci vede dei dati, il pannello lo dice.
+  return { ...v, exfil: false, reason: '', nonCompare: true, insiste: ver.insiste, datiReason: v.exfil ? v.reason : '' };
+}
+
+function testoDiSconosciuti(azioni) {
+  try { return !!globalThis.SN_URL_EXFIL.contestoDaAzioni(Array.isArray(azioni) ? azioni : []).nonFidato; } catch (_) { return true; }
+}
+
+function indirizzoCaricato(tipo, indirizzo) {
+  if (tipo === 'LEGGI_PAGINA') return PageRead.normalizzaUrl(indirizzo).url || '';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(indirizzo)) return indirizzo;
+  return (globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.normalizeUrl && globalThis.SN_URL_NAV.normalizeUrl(indirizzo)) || '';
+}
+
+function urlDellaScheda(s) {
+  try { return String(s.wc.getURL() || ''); } catch (_) { return ''; }
+}
+
+// Le pagine della cronologia (il filo delle visite): un indirizzo già visitato non è scritto dal modello (#553).
+async function indirizziDellaCronologia() {
+  try {
+    const F = globalThis.SN_IL_FILO;
+    const pagine = F && F.pagine ? await F.pagine({ da: null, a: null }) : [];
+    return pagine.map((p) => p && p.url).filter(Boolean);
+  } catch (_) { return []; }
+}
+
+// Il rilevatore dei siti pericolosi per una lettura: la porta della finestra di chi chiede, che sa dell'incognito.
+function analizzaPer(sender) {
+  const tm = winOf(sender)?._filoTabs;
+  return tm && typeof tm._sbAnalizza === 'function' ? (u, ctx) => tm._sbAnalizza(u, ctx) : null;
+}
+
+// Cosa sente il modello quando l'indirizzo che ha scritto non compare da nessuna parte (#553).
+function rifiutoNonCompare(type) {
+  const verbo = type === 'LEGGI_PAGINA' ? 'letto' : 'aperto';
+  return `Azione ${type} NON fatta: l'indirizzo l'hai scritto tu e non compare da nessuna parte (nelle parole dell'utente, `
+    + 'nei risultati, nelle pagine lette o nei loro link, nelle schede, nella cronologia). Non l\'ho ' + verbo + '. Trovalo: '
+    + 'cercalo con CERCA_WEB o segui un link di una pagina letta, e usa l\'indirizzo esatto. Per un sito comune puoi '
+    + 'usare la sua home o la sua ricerca (vedi la descrizione di LEGGI_PAGINA), oppure cerca_nel_sito con la home del sito '
+    + 'che l\'utente ha nominato. Se richiami lo stesso indirizzo, lo chiedo all\'utente. Se non lo trovi, diglielo: '
+    + 'sotto la risposta resta il bottone per aprirlo lui, se vuole.';
+}
+
+// «Cerca X sul sito Y» (#553): dall'elenco dei siti comuni, o dal modulo di ricerca della home del sito. L'indirizzo
+// che ne esce lo costruisce Filo, e le parole passano dal controllo della ricerca sul web. Senza modulo, o con un sito
+// che dopo testo di sconosciuti l'utente non ha nominato, il modello può scrivere lui l'indirizzo: arriva il pannello.
+async function ricercaNelSito(action, { provenienza, contesto = null, parole = '', sender = null } = {}) {
+  const q = String(action.cerca_nel_sito ?? action.cercaNelSito ?? '').replace(/\s+/g, ' ').trim();
+  if (!q) return null;
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  const home = Levels.indirizzoDi(action);
+  const type = String(action.type || '').toUpperCase();
+  if (!/^https?:\/\//i.test(home)) {
+    return { executed: false, kept: false, rejected: true, error: 'per cerca_nel_sito metti in url la home del sito (https://…)' };
+  }
+  const dallElenco = globalThis.SN_SITI_COMUNI.costruisci(home, q);
+  if (dallElenco) {
+    for (const k of ['url', 'href', 'link', 'indirizzo']) delete action[k];
+    action.url = dallElenco;
+    return null;
+  }
+  // Le parole vanno a chi possiede il sito. Dopo testo di sconosciuti il sito deve averlo nominato l'utente: uno che
+  // compare solo in una pagina letta o nei risultati può averlo scelto chi ha scritto quella pagina.
+  if (testoDiSconosciuti(contesto)) {
+    const sue = PageRead.contestoChat();
+    PageRead.annotaLink(sue, parole);
+    if (!PageRead.verificaIndirizzo(sue, home, { parole }).compare) {
+      return {
+        executed: false,
+        kept: false,
+        rejected: true,
+        senzaModulo: true,
+        error: `Azione ${type} NON fatta: cerca_nel_sito vale per i siti comuni e per i siti che l'utente ha nominato, e ${home} `
+          + 'non è fra questi. Se serve, scrivi tu l\'indirizzo della ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. '
+          + 'Oppure cerca la pagina con CERCA_WEB.',
+        output: { senzaModulo: true, url: home },
+      };
+    }
+  }
+  const modulo = await PageRead.moduloDellaHome(home, { analizza: analizzaPer(sender) });
+  if (!modulo) {
+    return {
+      executed: false,
+      kept: false,
+      rejected: true,
+      senzaModulo: true,
+      error: `Azione ${type} NON fatta: nella home ${home} non trovo un modulo di ricerca. Se serve, scrivi tu l'indirizzo della `
+        + 'ricerca di quel sito: prima di aprirlo lo chiedo all\'utente. Oppure cerca la pagina con CERCA_WEB.',
+      output: { senzaModulo: true, url: home },
+    };
+  }
+  const url = PageRead.urlConParole(modulo, q);
+  PageRead.annotaRicerca(provenienza, url, q);
+  for (const k of ['url', 'href', 'link', 'indirizzo']) delete action[k];
+  action.url = url;
+  return null;
 }
 
 // Un indirizzo che una pagina di Filo apre o passa al sistema l'ha scelto quasi sempre un modello (#810): passa dalla
@@ -1586,6 +1753,12 @@ const chiaveLinkUscita = (url) => {
   const raw = String(url || '').trim();
   try { const u = new URL(raw); return `${u.protocol}//${u.username}:${u.password}@${u.host.toLowerCase()}${u.pathname}${u.search}`; } catch (_) { return raw; }
 };
+function indirizzoWebAperto(grezzo) {
+  try {
+    const u = new URL(String(typeof grezzo === 'string' ? grezzo : '').trim());
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : '';
+  } catch (_) { return ''; }
+}
 function segnaLinkDaConfermare(url, motivo) {
   const k = chiaveLinkUscita(url);
   LINK_DA_CONFERMARE.delete(k);
@@ -1621,24 +1794,27 @@ function indirizziCliccabili(testo) {
 }
 // I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
 // `indirizzi` = quelli dei bottoni che il modello ha messo sotto la risposta, cliccabili come i collegamenti.
-async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
+async function linkCheChiedonoOk(testo, { sender = null, contesto = null, provenienza = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
   const out = [];
   const visti = new Set();
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
   for (const grezzo of [...indirizzi, ...indirizziCliccabili(testo)]) {
-    const url = typeof grezzo === 'string' ? grezzo.trim() : '';
-    if (!/^https?:\/\//i.test(url)) continue;
+    // Si giudica l'indirizzo che il browser aprirà: «https:sito/…» o con le barre rovesciate è lo stesso indirizzo web.
+    const url = indirizzoWebAperto(grezzo);
+    if (!url) continue;
     const k = chiaveLinkUscita(url);
     if (visti.has(k) || visti.size >= 200) continue;
     visti.add(k);
     let u = null;
-    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, parole, domanda }); } catch (_) { u = null; }
-    if (!u || u.blocca || !u.exfil) continue;
+    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, provenienza, parole, domanda }); } catch (_) { u = null; }
+    if (!u || u.blocca || (!u.exfil && !u.nonCompare)) continue;
+    if (u.nonCompare) u = { ...u, reason: u.datiReason || 'ha scritto Filo e che non compare da nessuna parte' };
     let chiede = sempre;
     if (!chiede && Levels) {
       if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
-      const ing = Levels.ingressi({ type: 'NAVIGA', url, _exfil: true, _exfilReason: u.reason }, { richiesta, impostazioni });
+      const verdetto = u.nonCompare ? { _nonCompare: true } : { _exfil: true };
+      const ing = Levels.ingressi({ type: 'NAVIGA', url, ...verdetto, _exfilReason: u.reason }, { richiesta, impostazioni });
       chiede = !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
     }
     if (!chiede) continue;
@@ -1682,7 +1858,7 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
       if (chiesti && !confermato) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
       const Levels = globalThis.SN_ACTION_LEVELS;
       const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
-      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
+      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo, ...(Levels ? { parti: Levels.describeParts(azione) } : {}) };
     }
   }
   if (typeof apri === 'function') apri();
@@ -1906,6 +2082,37 @@ function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false
   return fonti;
 }
 
+// #953 — la segnalazione che Filo scrive e l'owner conferma è sua (fidata, senza giudici) solo se il compito non ha
+// letto testo di altri: lo stato dei livelli di autonomia, mai più largo della classe 2; dall'Aiuto di un sito mai.
+function compitoSenzaTestoDiAltri(sender, { contesto = null, fontiLette = null, assistente = false, impostazioni = null } = {}) {
+  try {
+    if (/^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))) return false;
+    const A = globalThis.SN_AUTONOMIA;
+    const aut = (impostazioni && impostazioni.autonomia) || {};
+    const attivo = A.livelloAttivo(aut.livello);
+    const livello = A.SOGLIA_PULITO[attivo] <= A.SOGLIA_PULITO.default ? attivo : 'default';
+    const fonti = fontiDelCompito(sender, contesto, fontiLette, assistente);
+    return A.stato({ fonti, livello, spostamenti: aut.fonti, manopole: aut.manopole }).stato === 'pulito';
+  } catch (_) { return false; }
+}
+// L'OK arriva senza il contesto del turno: vale il segno preso quando la proposta è stata mostrata, legato al suo
+// testo. Senza segno (scaduto, altra scheda, proposta mai vista) è contaminata.
+const segnalazioniPulite = new Map(); // pendingConfirmKey → scade
+const SEGNALAZIONE_PULITA_TTL = 24 * 60 * 60 * 1000;
+function ricordaSegnalazione(sender, action, pulita) {
+  const key = pendingConfirmKey(sender, action);
+  segnalazioniPulite.delete(key);
+  if (!pulita) return;
+  const now = Date.now();
+  for (const [k, scade] of segnalazioniPulite) if (scade <= now) segnalazioniPulite.delete(k);
+  segnalazioniPulite.set(key, now + SEGNALAZIONE_PULITA_TTL);
+}
+function segnalazioneConfermataPulita(sender, action) {
+  const key = pendingConfirmKey(sender, action);
+  const scade = segnalazioniPulite.get(key);
+  return !!scade && scade > Date.now();
+}
+
 // Ciò che una chat ha letto resta suo anche fuori dallo storico che la pagina rimanda a ogni turno (riaperta
 // dall'archivio, oltre gli ultimi venti messaggi): lo tiene il main, per la sessione e nell'archivio (#530).
 const fontiPerChat = new Map();   // chatId → fonti lette dalla chat
@@ -1983,7 +2190,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   if (d.risposta !== 'si' && d.risposta !== 'no') {
     const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
     if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
-    else if (d.regola === 'difesa') perche = 'Te lo chiedo perché abbassa una difesa di Filo.';
+    // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
     else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
   return { ...d, livello, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
@@ -2021,9 +2228,9 @@ async function executeFiloAction(action, opzioni = {}) {
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in questo turno, turni passati
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function eseguiAzioneFilo(action, {
-  confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
+  confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
-  domanda = '',
+  domanda = '', soloConferma = false,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -2126,17 +2333,32 @@ async function eseguiAzioneFilo(action, {
     action.tieni = action.tieni === true || /^(true|1|si|sì|yes)$/i.test(String(action.tieni ?? ''));
   }
 
+  // «Cerca X sul sito Y» (#553): l'indirizzo lo costruisce Filo, dall'elenco dei siti o dal modulo di ricerca della home.
+  if ((type === 'NAVIGA' || type === 'LEGGI_PAGINA') && provenienza && !confirmed && !soloConferma) {
+    const esito = await ricercaNelSito(action, { provenienza, contesto, parole, sender });
+    if (esito) return esito;
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
   try {
-    const u = await controllaUscita(action, { sender, contesto, parole, domanda });
+    const u = await controllaUscita(action, { sender, contesto, provenienza, parole, domanda });
     if (u.blocca) {
       const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
       return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
     }
     if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
+    if (u.nonCompare) {
+      action._nonCompare = true;
+      if (u.datiReason) action._exfilReason = u.datiReason;
+      // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
+      // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
+      if (!confirmed && !u.insiste && !soloConferma) {
+        return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
+      }
+    }
   } catch (e) {
     console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
   }
@@ -2176,6 +2398,28 @@ async function eseguiAzioneFilo(action, {
       }
     } catch (_) {}
     action._righe = righeDaDimenticare.map((r) => r.testo);
+    // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
+    action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+  }
+
+  // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
+  let rigaDaCorreggere = null;
+  if (type === 'CORREGGI_MEMORIA') {
+    if (/^https?:/i.test(sender?.tab?.url || sender?.url || '')) {
+      return { executed: false, kept: false, rejected: true, error: 'la memoria si tocca solo dalle pagine di Filo' };
+    }
+    let trovate = [];
+    try {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        trovate = await FiloMem.linesWithText(visti && Array.isArray(visti.righe) ? visti.righe : []);
+      } else {
+        trovate = (await FiloMem.findLines(action.testo ?? action.text ?? action.riga ?? ''))
+          .filter((r) => r.via && typeof r.via.sempreAperta !== 'string');
+      }
+    } catch (_) {}
+    action._righe = trovate.map((r) => r.testo);
+    rigaDaCorreggere = trovate.length === 1 ? trovate[0] : null;
   }
 
   // «Tieni sempre aperto X» (#823): il sito lo risolve il main (detto, o la scheda web davanti), così il popup e
@@ -2325,7 +2569,10 @@ async function eseguiAzioneFilo(action, {
     console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
-  const decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
+  let decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
+  // L'indirizzo scritto dal modello si conferma con un OK (decisione su D-20): aprire o leggere una pagina si disfa,
+  // e il riquadro da digitare direbbe il contrario.
+  if (action._nonCompare && decisione.digita) decisione = { ...decisione, digita: false };
   if (decisione.risposta === 'no') {
     const no = fraseNo(ing, decisione, sender);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
@@ -2346,20 +2593,25 @@ async function eseguiAzioneFilo(action, {
   // L'attesa della risposta dell'utente, la stessa per il popup generico e per i pannelli di riordino e archivio.
   const sospesa = () => {
     const describe = Levels.describe(action);
+    const parti = Levels.describeParts(action);
     return {
       executed: false,
       kept: true,
       needsConfirm: decisione.digita ? 3 : 2,
       ...(decisione.risposta === 'propone' ? { proposta: true } : {}),
       describe: decisione.perche ? `${describe}\n\n${decisione.perche}` : describe,
+      parti: decisione.perche ? [...parti, `\n\n${decisione.perche}`] : parti,
       // Il box da digitare dice «non è reversibile»: per una difesa abbassata non è vero.
       ...(decisione.digita && decisione.regola === 'difesa' ? { avviso: 'Abbassa una difesa di Filo.' } : {}),
     };
   };
+  // Solo la domanda, per l'indirizzo che il modello ha lasciato dopo il rifiuto (#553): mai eseguita da qui.
+  if (soloConferma && (!daChiedere || confirmed || hasBespokeConfirm)) return { executed: false, kept: false };
   if (daChiedere && !confirmed && !hasBespokeConfirm) {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
     recordPendingConfirm(sender, action);
+    if (type === 'INVIA_FEEDBACK') ricordaSegnalazione(sender, action, compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni }));
     return sospesa();
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -2384,7 +2636,7 @@ async function eseguiAzioneFilo(action, {
         // aprire → vuole arrivarci) — a meno che l'azione chieda il SECONDO
         // PIANO (#376, vedi sotto). La bolla conserva comunque un riferimento
         // cliccabile per riaprirlo (kept:true).
-        const url = String(action.url ?? action.href ?? action.link ?? '').trim();
+        const url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
         if (!url) return { executed: false, kept: false };
         // SICUREZZA: l'agente non apre schemi non-web. Una pagina ostile può
         // iniettare istruzioni nel modello (prompt injection) per fargli aprire
@@ -2414,7 +2666,14 @@ async function eseguiAzioneFilo(action, {
           const win = winOf(sender);
           const tm = win && win._filoTabs;
           if (tm && typeof tm.openTab === 'function') {
-            tabId = tm.openTab(url, { activate: !background });
+            // Per il giudizio sui siti chiedere a parole vale un clic (la pagina di ringraziamento scarica per richiesta), e
+            // l'assistente di una pagina apre un indirizzo che quella pagina gli ha messo davanti: arriva da quel sito.
+            // Vale anche il clic vero sull'interfaccia di Filo sopra la pagina (il tasto destro «Apri in nuova tab»).
+            const chiesto = !!String(parole || '').trim() || require('./permessiPagine').gestoDellUtente(sender && sender.wc);
+            let daPagina = '';
+            try { daPagina = assistente && sender && sender.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+            const origine = /^https?:/i.test(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
+            tabId = tm.openTab(url, { activate: !background, origine });
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
             // L'assistente sulla pagina può poi chiedere «Apri comunque» solo per quello che gli è stato fermato.
@@ -2434,6 +2693,9 @@ async function eseguiAzioneFilo(action, {
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
               tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
             }
+            // Prima dell'attesa qui sotto: un rinvio della pagina arriva durante, e la rilettura deve conoscerlo (#553).
+            const t = (tm.tabs || []).find((x) => x && x.id === tabId);
+            if (t && t.view) PageRead.ricordaApertura(t.view.webContents, url);
             // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato, un rinvio della pagina).
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
@@ -2569,7 +2831,9 @@ async function eseguiAzioneFilo(action, {
         let fissata = false;
         if (l.testo) {
           try {
-            await FiloMem.appendLesson(l.testo);
+            let fonte = '';
+            try { fonte = chatId ? await globalThis.SN_IL_FILO.ultimaDomanda(chatId) : ''; } catch (_) {}
+            await FiloMem.appendLesson(l.testo, { fonti: fonte ? [fonte] : [] });
             fissata = true;
             if (await FiloMem.lessonsBufferShouldCompact()) {
               maybeRunCompactor().catch((e) => console.warn('[Filo] compact failed', e));
@@ -2585,7 +2849,7 @@ async function eseguiAzioneFilo(action, {
         // questo punto la conferma è già passata (il gate sopra ha lasciato
         // procedere solo con confirmed:true). Il feedback parte come quelli
         // inviati dal box: stesso schema, ma clientId 'filo:chat' così in
-        // dashboard si vede che l'ha mandato Filo.
+        // dashboard si vede che l'ha mandato Filo. Dall'owner porta la sua prova; è suo solo a compito pulito (#953).
         const testo = String(action.testo ?? action.text ?? action.messaggio ?? '').trim();
         if (!testo) return { executed: false, kept: false };
         const FB = globalThis.SN_FEEDBACK;
@@ -2595,7 +2859,18 @@ async function eseguiAzioneFilo(action, {
         let userAgent = 'Filo desktop';
         try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
         try {
-          const r = await FB.submit({ text: testo, name: titolo, clientId: 'filo:chat', userAgent });
+          const Mittente = require('./feedbackMittente');
+          const pulita = confirmed
+            ? segnalazioneConfermataPulita(sender, action)
+            : compitoSenzaTestoDiAltri(sender, { contesto, fontiLette, assistente, impostazioni });
+          const firmato = Mittente.firma('filo:chat', { perConto: !pulita });
+          const payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
+          // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
+          if (r && r.queued) {
+            try { await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({ id: r.id, testo, titolo }); } catch (_) {}
+            return { executed: true, kept: false };
+          }
           // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
           if (r && r.id) {
             try {
@@ -2618,7 +2893,8 @@ async function eseguiAzioneFilo(action, {
         // subito nella dashboard, che ascolta SETTINGS_UPDATED).
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
-        const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
+        const correnti = await Storage.getSettings();
+        const built = global.SN_PREF.buildPreferencePartial(chiave, valore, { attuali: correnti });
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
         // `perModello` (le chiavi, i valori ammessi) va solo al modello.
@@ -2629,7 +2905,7 @@ async function eseguiAzioneFilo(action, {
         let partial = built.partial;
         let dimenticate = 0;
         if (built.elenco) {
-          const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          const r = global.SN_PREF.applicaElenco(built.elenco, correnti);
           if (built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli') {
             const Indice = require('./documentiIndice');
             for (const c of await Indice.occasionaliFra(built.elenco.voci)) dimenticate += (await Indice.dimentica(c)).tolta ? 1 : 0;
@@ -2642,7 +2918,8 @@ async function eseguiAzioneFilo(action, {
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
         const costo = typeof action._costoModello === 'string' && action._costoModello ? { costoModello: action._costoModello } : {};
-        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo } };
+        const avviso = built.avviso ? { avviso: built.avviso } : {};
+        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo, ...avviso } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -2746,8 +3023,15 @@ async function eseguiAzioneFilo(action, {
         broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
         return { executed: true, kept: false, output: { tolte: r.tolte } };
       }
-      case 'EVENTO_CALENDARIO':
-        return { executed: false, kept: true };
+      case 'EVENTO_CALENDARIO': {
+        // Filo PROPONE: nel calendario l'evento entra col bottone. `proposta`
+        // lo dice alla chat, che senza lo racconterebbe come non riuscito; data
+        // e ora si controllano qui, non nel calendario dell'utente.
+        const C = globalThis.SN_CALENDAR;
+        const v = C ? C.verifica(action) : { errore: 'calendario non disponibile' };
+        if (!v.evento) return { executed: false, kept: false, output: { event: 'invalid', error: v.errore } };
+        return { executed: false, kept: true, output: { proposta: true, evento: v.evento } };
+      }
       case 'CAPACITA_DETTAGLIO': {
         // Lookup del manifesto delle capacità (F2): l'agente chiede il dettaglio
         // di una o più voci per id; glielo restituiamo come output, che il client
@@ -2782,6 +3066,9 @@ async function eseguiAzioneFilo(action, {
               cap = Math.max(cap, Math.floor(token * FC.CARATTERI_PER_TOKEN));
             } catch (_) {}
             const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
+            // Per la regola dell'indirizzo scritto (#553) contano solo le parole dell'utente: quelle di Filo le ha scritte il modello.
+            const scrittoDallUtente = (Array.isArray(chat.messages) ? chat.messages : [])
+              .filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
             return {
               executed: true,
               kept: true,
@@ -2793,6 +3080,7 @@ async function eseguiAzioneFilo(action, {
                 // La trascrizione arriva già nella forma "Utente: … / Filo: …",
                 // con testa e coda se è lunghissima (mai un taglio muto): il mezzo si chiede con `da`.
                 transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da, cap }),
+                linkUtente: PageRead.linkNelTesto(scrittoDallUtente),
                 ...(daFuori.length ? { daFuori } : {}),
               },
             };
@@ -2932,6 +3220,7 @@ async function eseguiAzioneFilo(action, {
             },
           };
         }
+        if (r.ok) PageRead.ricordaLetturaRiservata(r.text);
         return {
           executed: !!r.ok,
           kept: true,
@@ -2958,6 +3247,32 @@ async function eseguiAzioneFilo(action, {
             detail: r.detail || '',
           },
         };
+      }
+      case 'LEGGI_PAGINA': {
+        // #553 — il testo di una pagina web torna al modello (dalla scheda se è aperta, se no scaricato):
+        // prima poteva solo cercare e aprire, e ogni dato DENTRO una pagina restava da indovinare dagli snippet.
+        let url = globalThis.SN_ACTION_LEVELS.indirizzoDi(action);
+        const da = Number(action.da ?? action.offset ?? action.from ?? 0) || 0;
+        // «Cosa dice la pagina che ho aperto?»: nello STATO il modello vede le schede per titolo e numero, non per
+        // indirizzo. Il numero si risolve qui, sullo stesso elenco nello stesso ordine.
+        const numero = Number(action.scheda ?? action.tab ?? 0);
+        let r = null;
+        if (!String(url || '').trim() && Number.isInteger(numero) && numero > 0) {
+          let schede = [];
+          try { schede = await globalThis.SN_FILO_STATE.listTabs(); } catch (_) {}
+          const t = schede[numero - 1];
+          if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
+          else url = t.url || '';
+        }
+        if (!r) {
+          try {
+            r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender), analizza: analizzaPer(sender) });
+          } catch (e) {
+            console.warn('[Filo] lettura pagina fallita', e?.message || e);
+          }
+        }
+        if (!r) r = { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
+        return { executed: !!r.ok, kept: true, output: r };
       }
       case 'CERCA_DOCUMENTI': {
         // #947 — la richiesta a parole («la bolletta della luce di marzo») contro l'indice dei documenti che Filo tiene
@@ -3004,7 +3319,13 @@ async function eseguiAzioneFilo(action, {
           if (!tm) return { executed: false, kept: confirmed, output: { error: 'nessuna finestra con schede' } };
           try {
             const r = await tm.runAutoTriage({ trigger: 'manual' });
-            return { executed: true, kept: confirmed, output: { archived: (r && r.archived) || 0 } };
+            const archived = (r && r.archived) || 0;
+            // Un riordino mai partito (già in corso, o senza giudizio e niente archiviato) non si racconta come riuscito.
+            if (!archived && r && (r.giaInCorso || r.giudizioMancato)) {
+              const error = r.giaInCorso ? 'un riordino è già in corso' : 'Filo non è riuscito a valutare le schede';
+              return { executed: false, kept: false, output: { archived: 0, giaInCorso: !!r.giaInCorso, giudizioMancato: !!r.giudizioMancato, error } };
+            }
+            return { executed: true, kept: confirmed, output: { archived } };
           } catch (e) {
             return { executed: false, kept: false, output: { error: String(e?.message || e) } };
           }
@@ -3031,6 +3352,8 @@ async function eseguiAzioneFilo(action, {
         try {
           await FiloMem.setMemory({ PROFILO: '', PREFERENZE: '' });
           await FiloMem.clearLessonsBuffer();
+          // Anche le righe nascoste del quaderno: «tutto» comprende quello che l'utente aveva solo tolto (#872).
+          await FiloMem.svuotaQuaderno();
           broadcastLiveUpdate();
           return { executed: true, kept: false };
         } catch (e) {
@@ -3038,15 +3361,31 @@ async function eseguiAzioneFilo(action, {
           return { executed: false, kept: false };
         }
       }
+      case 'CORREGGI_MEMORIA': {
+        const l = global.SN_PREF.lezioneDaAzione({ testo: String(action.nuovo ?? '').replace(/\s*[\r\n]+\s*/g, ' ') });
+        if (l.rifiuto) return { executed: false, kept: false, output: { error: l.rifiuto, rifiuto: true } };
+        if (!rigaDaCorreggere || !l.testo) {
+          return { executed: false, kept: false, output: { corrette: 0, trovate: (action._righe || []).length } };
+        }
+        const ok = await FiloMem.editLine(rigaDaCorreggere.via, l.testo);
+        return { executed: ok, kept: false, output: ok ? { corretta: l.testo, prima: rigaDaCorreggere.testo } : { corrette: 0, trovate: 0 } };
+      }
       case 'DIMENTICA': {
         if (!righeDaDimenticare.length) {
           return { executed: false, kept: false, output: { dimenticate: [] } };
         }
         const tolte = [];
         for (const r of righeDaDimenticare) {
-          if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
+          if (r.via && typeof r.via.sempreAperta === 'string') {
+            if (await FiloMem.forgetLine(r.via)) tolte.push(r.testo);
+            continue;
+          }
+          const id = await FiloMem.hideLine(r.via);
+          if (!id) continue;
+          if (action.per_sempre === true) await FiloMem.forgetHiddenForever(id);
+          tolte.push(r.testo);
         }
-        return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
+        return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte, perSempre: action.per_sempre === true } };
       }
       case 'APRI_FILE': {
         // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
@@ -3091,6 +3430,7 @@ async function eseguiAzioneFilo(action, {
         const cwd = getAssistantCwd(sender);
         const out = await runCommand(cmd, { shell, cwd, trackCwd: true });
         if (out.cwd) setAssistantCwd(sender, out.cwd);
+        PageRead.ricordaLetturaRiservata(`${out.stdout || ''}\n${out.stderr || ''}`);
         return { executed: out.code === 0, kept: true, output: out };
       }
       case 'VEDI_SCHERMO': {
@@ -3318,6 +3658,12 @@ async function eseguiAzioneFilo(action, {
         }
         const win = winOf(sender);
         if (!win) return { executed: false, kept: false };
+        // Chi è già nella home non ci si porta: ricaricarla butterebbe via il
+        // lavoro e la risposta prima che l'utente li legga (il bottone per
+        // svuotare la conversazione lo mette la chat).
+        if (cmd === 'home' && /^filo:\/\/(newtab|dashboard)\b/i.test(String(sender?.tab?.url || sender?.url || ''))) {
+          return { executed: true, kept: true, output: { window: 'home', already: true } };
+        }
         if (cmd === 'fullscreen') {
           // Schermo intero "immersivo": la view attiva copre l'intera finestra e
           // le barre (schede + indirizzo) spariscono — è ciò che l'utente intende
@@ -3392,21 +3738,22 @@ function releaseOnboardingResume() { onbResumeClaimedAt = 0; }
 // La chiusura dell'intervista, in un posto solo. L'ordine non è un dettaglio:
 // prima l'agente-lezioni estrae quello che l'ultimo turno ha insegnato, POI la
 // compattazione lo porta dentro PROFILO/PREFERENZE (forzata: senza aspettare la
-// soglia), e solo allora Filo genera la PRIMA home personale — che è l'ultimo
-// atto dell'accoglienza, al posto di un "fatto".
+// soglia), e solo allora Filo scrive il primo messaggio della home personale — che è
+// l'ultimo atto dell'accoglienza, al posto di un "fatto".
 // Vale per tutte e tre le strade che la chiudono: il modello che dichiara
 // `fine`, la parola di stop riconosciuta dall'app, il pulsante «Salta».
-function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true } = {}) {
+function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', lessons = true, fonti = [] } = {}) {
   const done = (d) => broadcastToTabs({
     type: MSG.FILO_ONBOARDING_DONE,
     message: d?.message || '', suggestions: d?.suggestions || [], ts: d?.ts || new Date().toISOString(),
   });
   const first = lessons
-    ? maybeRunLessonAgent({ userMessage, filoReply, stateText })
+    ? maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti })
     : Promise.resolve();
   first
     .then(() => maybeRunCompactor())
-    .then(() => handleFiloGenerateDashboard({ force: true }))
+    // Il primo messaggio della home personale è il primo turno di Filo nel filo (#869), dopo l'accoglienza.
+    .then(() => FiloParla.giro({ subito: [{ tipo: 'accoglienza' }] }))
     .then(done)
     .catch((e) => {
       console.warn('[Filo] chiusura onboarding', e);
@@ -3702,11 +4049,13 @@ async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = tru
   const tm = win && win._filoTabs;
   if (!tm || typeof tm.openTab !== 'function') return { ok: false, trovata: true, error: 'no_window' };
   let tabId = null;
+  // Per il giudizio sui siti la pagina salvata la chiede l'utente, col clic o a parole (#814).
+  const origine = { tipo: 'filo', gesto: true };
   if (porta) {
-    const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
-    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+    const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true, origine }); } });
+    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma, parti: r.parti } : {}), ...(r.frase ? { frase: r.frase } : {}) };
   } else {
-    tabId = tm.openTab(voce.url, { activate: true });
+    tabId = tm.openTab(voce.url, { activate: true, origine });
   }
   if (!tabId) {
     let d = null;
@@ -3977,6 +4326,97 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// Cosa fare di una pagina che non si è lasciata leggere: il motivo decide se riprovare, passare dalla scheda o cambiare fonte.
+function consiglioPaginaNonLetta(out) {
+  const stato = Number(out.stato) || 0;
+  switch (out.errore) {
+    case 'rete-locale':
+      return 'È un indirizzo della rete di casa o dell\'ufficio: Filo non lo scarica. Se l\'utente l\'ha aperto in una scheda, richiamando LEGGI_PAGINA con lo stesso indirizzo lo leggi da lì.';
+    case 'pericoloso':
+      return 'Il rilevatore di siti pericolosi di Filo l\'ha segnalato: non leggerlo, non proporlo all\'utente come fonte e cercane un\'altra.';
+    case 'schema':
+    case 'indirizzo':
+      return 'Serve un indirizzo http o https preso dai risultati, dall\'utente o da una pagina letta, oppure il numero di una scheda web in TAB APERTE. Le pagine di Filo non si leggono così.';
+    case 'scheda':
+      return 'Controlla il numero nell\'elenco TAB APERTE dello STATO.';
+    case 'http':
+      if (stato === 404 || stato === 410) return 'Prova un altro risultato. Non inventare il contenuto.';
+      if (stato === 401 || stato === 403 || stato === 429 || stato === 503) {
+        return 'Il sito non si lascia leggere dai programmi: se il dato serve davvero, aprilo con NAVIGA con background: true e poi rileggilo con LEGGI_PAGINA, che lo legge dalla scheda; altrimenti prova un\'altra fonte. Non inventare il contenuto.';
+      }
+      return 'Prova un\'altra fonte, o riprova una volta. Non inventare il contenuto.';
+    case 'tempo':
+    case 'rete':
+      return 'Riprova una volta o prova un\'altra fonte. Non inventare il contenuto.';
+    default:
+      return 'Prova un\'altra fonte. Non inventare il contenuto.';
+  }
+}
+
+// Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
+// imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
+function pageReadsForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_PAGINA') continue;
+    const out = a._output;
+    if (!out || !('pageRead' in out)) continue;
+    const indirizzo = E.perCanaleSistema(tagliaInteri(String(out.url || out.pageRead || ''), 500));
+    if (!out.ok) {
+      blocks.push(`[Pagina "${indirizzo}" non letta: ${E.perCanaleSistema(out.dettaglio || 'lettura non riuscita')}. ${consiglioPaginaNonLetta(out)}]`);
+      continue;
+    }
+    const totale = Number(out.totale) || 0;
+    const da = Number(out.da) || 0;
+    const fino = Number(out.fino) || 0;
+    if (!out.testo) {
+      if (totale > 0 && da >= totale) {
+        blocks.push(`[La pagina "${indirizzo}" finisce al carattere ${totale}: non c'è altro da leggere.]`);
+      } else if (out.fonte === 'scheda') {
+        blocks.push(`[La scheda aperta su "${indirizzo}" non mostra testo da leggere (un video, un'immagine, un'app): `
+          + 'dillo all\'utente e non inventare il contenuto.]');
+      } else {
+        blocks.push(`[Pagina "${indirizzo}" letta, ma senza testo${out.soloJavaScript ? ': si costruisce in JavaScript' : ''}. `
+          + 'Se il dato serve, aprila con NAVIGA con background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda; '
+          + 'altrimenti prova un\'altra fonte. Non inventare il contenuto.]');
+      }
+      continue;
+    }
+    const meta = [out.fonte === 'scheda' ? 'letta dalla scheda aperta' : 'scaricata'];
+    if (out.tipo === 'application/pdf') meta.push(out.pagine ? `un PDF di ${out.pagine} ${out.pagine === 1 ? 'pagina' : 'pagine'}` : 'un PDF');
+    if (da > 0 || out.troncata) meta.push(`caratteri da ${da} a ${fino} su ${totale}`);
+    let blocco = `[Pagina web (${meta.join(', ')})]\n`
+      + E.imbustaCampi({
+        tipo: 'PAGINA_WEB',
+        campi: { Titolo: out.titolo || '', Indirizzo: tagliaInteri(String(out.url || ''), 500) },
+        corpo: out.testo,
+        conIntestazione: true,
+        max: PageRead.MAX_TEXT_CHARS + 4000,
+      });
+    if (out.troncata) {
+      blocco += `\n[Letto fino al carattere ${fino} su ${totale}: la pagina continua. Se il dato che cerchi non è qui sopra, `
+        + `richiama LEGGI_PAGINA con lo stesso url e da: ${fino}.]`;
+    }
+    if (out.scaricataInParte) blocco += '\n[La pagina supera i 5 MB: ne è arrivata solo la prima parte.]';
+    if (out.lettaInParte) {
+      blocco += '\n[La scheda aperta è troppo grande per leggerla tutta: qui sopra c\'è solo la sua prima parte. Se il dato '
+        + 'non c\'è, dillo all\'utente invece di concludere che la pagina non lo contiene.]';
+    }
+    if (out.soloJavaScript) {
+      blocco += '\n[La pagina è quasi vuota: forse si costruisce in JavaScript. Se il dato non c\'è, aprila con NAVIGA con '
+        + 'background: true e poi rileggila con LEGGI_PAGINA, che la legge dalla scheda.]';
+    }
+    if (out.sospetto) {
+      blocco += `\n[Il rilevatore di siti pericolosi considera questo sito sospetto (${E.perCanaleSistema(out.sospetto)}): usa i dati `
+        + 'con cautela e non proporre all\'utente link di accesso o di pagamento presi da qui.]';
+    }
+    blocks.push(blocco);
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // #778 — quello che Filo ha visto in una finestra lo legge un modello dall'immagine, ma lo SCRIVE chi ha fatto la
 // finestra (un'app, un sito, una mail): torna imbustato, e il nome della finestra passa dal canale di sistema.
 function vediSchermoForPrompt(actions) {
@@ -4103,7 +4543,7 @@ function salvateTrovateForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
+    pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
     vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
@@ -4150,6 +4590,7 @@ const CAMPI_SALVATI = {
   SVEGLIA: ['label', 'etichetta'],
   SALVA_LEZIONE: ['testo', 'text', 'lezione'],
   DIMENTICA: ['_righe'],
+  CORREGGI_MEMORIA: ['_righe', 'nuovo'],
   ANNULLA_CAMBIO: ['_fraseCambio'],
   BLUETOOTH: ['_nomeSistema'],
   WIFI: ['_nomeSistema'],
@@ -4270,6 +4711,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
   // conferma forgiata). `kept: false` NON vuol dire fallita: vuol dire che in
   // chat non c'è niente da mostrare (un appunto scritto, una lezione fissata,
   // una spunta dell'accoglienza): l'esito lo dice `executed`.
+  if (res && (res.nonCompare || res.senzaModulo)) return res.error;
   if (res && res.no) return `Azione ${type} NON fatta: ${res.error}.`;
   if (!res || res.rejected) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
@@ -4350,9 +4792,17 @@ function toolResultText({ action, res, rendered }, giro = null) {
   if (type === 'CANCELLA_SVEGLIA' && res.output && Array.isArray(res.output.removed)) {
     return res.output.removed.length ? `Tolte:\n${nomiSalvati(res.output.removed)}` : 'Nessuna sveglia o timer corrispondeva: niente da togliere. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
+  if (type === 'CORREGGI_MEMORIA' && res.output) {
+    if (res.output.corretta) return `Corretta (vale dal prossimo messaggio; l'utente la rilegge nel quaderno delle memorie):\n${nomiSalvati([res.output.corretta])}`;
+    if (res.output.rifiuto) return `Non corretta: ${res.output.error}`;
+    return res.output.trovate > 1
+      ? 'Più righe della memoria corrispondono: non ne ho corretta nessuna. Copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.'
+      : 'Nella memoria nessuna riga corrispondeva: niente da correggere. Se è una cosa nuova, usa SALVA_LEZIONE.';
+  }
   if (type === 'DIMENTICA' && res.output && Array.isArray(res.output.dimenticate)) {
     return res.output.dimenticate.length
-      ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
+      ? (res.output.perSempre ? `Cancellate per sempre:\n${nomiSalvati(res.output.dimenticate)}`
+        : `Dimenticate (escono dalle conversazioni; l'utente le ritrova nascoste nel quaderno delle memorie, da dove può rimetterle):\n${nomiSalvati(res.output.dimenticate)}`)
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
   if (type === 'TOGLI_PERMESSO_SITO' && res.executed && res.output && Array.isArray(res.output.tolte)) {
@@ -4402,6 +4852,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
+  // La home chiesta da chi è già nella home: non è stato ricaricato niente, e
+  // il modello non deve dire di averlo portato da qualche parte.
+  if (type === 'COMANDO_FINESTRA' && res.output && res.output.already) {
+    return 'La home È la pagina da cui l\'utente ti sta scrivendo: non ho ricaricato niente, perché ricaricarla '
+      + 'cancellerebbe questa conversazione. Diglielo in una riga; sotto la tua risposta trova un bottone per svuotarla lui.';
+  }
   if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
     const A = globalThis.SN_AUTONOMIA;
     const ora = A ? A.infoLivello(res.output.livello).nome : '';
@@ -4424,8 +4880,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
       const costo = res.output && typeof res.output.costoModello === 'string' && res.output.costoModello
         ? ` Nella stessa risposta riporta il costo, con le stesse cifre: «${res.output.costoModello}»` : '';
+      const avviso = res.output && typeof res.output.avviso === 'string' && res.output.avviso
+        ? ` Attenzione: ${res.output.avviso}. Dillo all'utente e proponigli di riaccenderlo; non riaccenderlo da te.` : '';
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
-        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}`;
+        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}${avviso}`;
     }
     return `Eseguita: ${done}.`;
   }
@@ -4540,15 +4998,22 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     let userAgent = 'Filo desktop auto';
     try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
 
-    const result = await FB.submit({
+    // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
+    // confermata: il nome resta `auto:`). Senza un accesso valido aspetta in coda il suo rientro, come quella della chat:
+    // da anonima sembrerebbe di un estraneo, e buttata si perderebbe.
+    const Mittente = require('./feedbackMittente');
+    const voce = {
       text: payload.text,
       name: payload.name,
       clientId: payload.clientId,
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
-    }).catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
+    };
+    const result = await (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
+      .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
 
-    if (!result || !result.id) return;
+    // In coda non c'è ancora un documento da annullare.
+    if (!result || !result.id || result.queued) return;
     const feedbackId = result.id;
     autoFeedbackAnnullabili.add(String(feedbackId));
 
@@ -4595,13 +5060,36 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-// I turni di chat in corso, per chi li vuole fermare (#578): reqId → { wcId, ctrl, fermato }. Solo in memoria.
+// I turni di chat in corso, per chi li vuole fermare o aggiungere un seguito (#578, #1296): reqId → turno. Solo in
+// memoria. Un turno si registra appena il messaggio arriva, prima di preparare la richiesta, e `chiuso` vuol dire che ha
+// già la sua risposta: da lì uno stop non scrive più niente.
 const turniInCorso = new Map();
-// Uno stop arrivato mentre il turno prepara ancora la richiesta (saldo, batteria, rete: anche mezzo secondo) vale lo
-// stesso: lo si tiene da parte e il turno lo trova quando si registra. Scadono, per i turni che non arrivano mai.
+// Uno stop arrivato prima che il turno si registri vale lo stesso: lo si tiene da parte e il turno lo trova quando si
+// registra. Scadono, per i turni che non arrivano mai.
 const stopPrimaDelTurno = new Map();
 const STOP_PRIMA_TTL_MS = 10 * 60 * 1000;
-function fermaFiloChat(reqId, wc) {
+function registraTurno(reqId, wc) {
+  const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false, chiuso: false, accoglienza: false, seguiti: [], letti: new Set() };
+  if (!reqId) return turno;
+  turniInCorso.set(String(reqId), turno);
+  const prima = stopPrimaDelTurno.get(String(reqId));
+  stopPrimaDelTurno.delete(String(reqId));
+  if (prima && prima.wcId === turno.wcId) turno.fermato = true;
+  return turno;
+}
+function togliTurno(reqId, turno) {
+  if (reqId && turniInCorso.get(String(reqId)) === turno) turniInCorso.delete(String(reqId));
+}
+// L'accoglienza riparte da sola su un messaggio dell'utente senza risposta: lo stop si scrive quando si preme, non
+// quando l'azione fermata finisce, o una pagina ricaricata in quei secondi rifà il turno (#1296).
+async function segnaStopAccoglienza(turno) {
+  const stato = await FiloMem.getOnboarding();
+  if (turno.chiuso) return;
+  await saveOnboarding(Onboarding.segnaFermato(stato));
+}
+// Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
+// finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
+async function fermaFiloChat(reqId, wc) {
   if (!reqId) return false;
   const t = turniInCorso.get(String(reqId));
   if (!t) {
@@ -4614,8 +5102,29 @@ function fermaFiloChat(reqId, wc) {
   if (t.wcId !== (wc && wc.id)) return false;
   t.fermato = true;
   try { t.ctrl.abort(); } catch (_) {}
+  if (t.accoglienza && !t.chiuso) {
+    try { await segnaStopAccoglienza(t); } catch (e) { console.warn('[Filo] stop dell\'accoglienza non scritto', e?.message || e); }
+  }
   return true;
 }
+// Un seguito scritto mentre il turno lavora (#1296) entra al suo passo dopo; se il turno non ne ha, lo manda la scheda a
+// turno finito. Lo prende solo il turno della scheda che lo scrive, non fermato, non chiuso, non dell'accoglienza (lei
+// tiene la conversazione nel suo stato, e il seguito la aspetta). `togli`: ritirato prima che il modello lo legga.
+function seguitoFiloChat({ reqId, id, testo, togli = false } = {}, wc) {
+  const t = reqId ? turniInCorso.get(String(reqId)) : null;
+  const chiave = String(id || '');
+  if (!t || t.wcId !== (wc && wc.id) || !chiave) return { accolto: false, tolto: !!togli };
+  if (togli) {
+    const i = t.seguiti.findIndex((s) => s.id === chiave);
+    if (i >= 0) t.seguiti.splice(i, 1);
+    return t.letti.has(chiave) ? { letto: true, tolto: false } : { tolto: true };
+  }
+  const parole = String(testo || '').trim();
+  if (!parole || t.fermato || t.chiuso || t.accoglienza || t.letti.has(chiave)) return { accolto: false };
+  if (!t.seguiti.some((s) => s.id === chiave)) t.seguiti.push({ id: chiave, testo: parole });
+  return { accolto: true };
+}
+const NOTA_SEGUITO = '[L\'utente ha scritto questo mentre lavoravi alla sua richiesta di prima.]';
 
 // I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
 // modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
@@ -4748,7 +5257,8 @@ function ricordoComeAzione(ricordi) {
 }
 
 async function handleFiloChat(richiesta) {
-  const volo = { accoglienza: false };
+  const reqId = richiesta && richiesta.reasoningReqId;
+  const volo = { accoglienza: false, turno: registraTurno(reqId, richiesta && richiesta.sender && richiesta.sender.wc) };
   try {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
@@ -4756,6 +5266,7 @@ async function handleFiloChat(richiesta) {
     return await unUsoContato(ACTIONS.FILO_CHAT, () => (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno()));
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
+    togliTurno(reqId, volo.turno);
   }
 }
 
@@ -4783,6 +5294,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // archiviata la domanda con cui Filo l'ha aperta: è per questo che il
   // salvataggio sta qui sotto e non in cima, dove lo stato dell'intervista
   // non si era ancora letto.
+  // Gli eventi del filo con cui questo turno ci entra: le lezioni che ne nascono li ricordano come fonti (#872).
+  const fontiTurno = [];
   if (chatId && !internal) {
     // Da adesso questa chat è di questa scheda: quando la scheda sparisce, la
     // chat è finita (vedi `affidaChat`). L'intervista di benvenuto fa
@@ -4800,6 +5313,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
     const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
     if (imageList.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, imageList);
+    const eidDomanda = domanda && domanda.role === 'user' && archiviata.eids ? archiviata.eids[archiviata.eids.length - 1] : '';
+    if (eidDomanda) fontiTurno.push(eidDomanda);
   }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
@@ -4816,7 +5331,14 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   // «Riprendi» toglie il segno dello stop: da qui il turno è di nuovo in corso, e se la scheda muore riparte come gli altri.
   if (onbActive && internal && onbBefore && onbBefore.fermato) onbBefore = await saveOnboarding(Onboarding.togliFermato(onbBefore));
+  // Da qui lo stop si scrive nell'intervista quando si preme; uno arrivato mentre il messaggio entrava si scrive adesso.
+  const turno = volo.turno;
+  if (onbActive) {
+    turno.accoglienza = true;
+    if (turno.fermato) onbBefore = await saveOnboarding(Onboarding.segnaFermato(onbBefore));
+  }
   if (onbActive && !internal && Onboarding.isExitRequest(onbBefore, userMessage)) {
+    turno.chiuso = true;
     // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
     // testo fisso — l'unica risposta che si può garantire anche senza modello.
     // Un «no grazie» invece NON passa di qui: rifiuta la proposta che Filo ha
@@ -4904,8 +5426,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
   // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
-  const paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+  let paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
     .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
+  // Gli indirizzi che il modello ha davanti, per la regola dell'indirizzo scritto (#553, src/main/services/pageRead.js).
+  const provenienza = PageRead.contestoChat();
+  PageRead.annotaLink(provenienza, paroleUtente);
+  for (const a of azioniViste) PageRead.annotaAzione(provenienza, a);
   // Quello che la chat ha davanti e non ha scritto l'utente entra nel registro dei segreti letti (#810). Anche
   // le frasi di Filo: riaperta dalla Cronologia, la chat non ha più l'esito che aveva portato il codice.
   ricordaLettoInChat(azioniViste, [...vistiDalFilo, ...codaScheda]);
@@ -4918,11 +5444,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
   // Il compito è la conversazione di questa scheda come la vede il modello: nel filo, più la coda.
   const conversazioneScheda = filo && chatId ? [...vistiDalFilo.filter((m) => m && m.chat === chatId), ...codaScheda] : codaScheda;
-  const richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
+  let richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
   // Le parole di adesso: un indirizzo può portarle fuori, quelle dette prima no senza un OK (#868.6). Un turno che riprende
   // rifà l'ultima richiesta della scheda; il testo di un suggerimento l'ha scritto un modello.
   const ultimaDellaScheda = conversazioneScheda.filter((m) => m && m.role !== 'filo' && !m.daModello).pop();
-  const domandaDiAdesso = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
+  let domandaDiAdesso = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
   for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     const fuori = FCx.letturaDaFuori(m);
@@ -5021,6 +5547,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const MAX_ROUNDS = 12;
   const rawActions = [];
   const renderedActions = [];
+  // Gli indirizzi scritti dal modello e rifiutati, che il modello non ha poi trovato altrove (#553): a fine turno
+  // restano sotto la risposta come bottone da confermare, senza popup.
+  const lasciati = new Map();
   const notes = [];
   // I testi dei giri di soli bottoni, in ordine: aprono la risposta (#1167). Una nota scritta prima dell'ultimo di
   // loro non diventa risposta a giro finale muto.
@@ -5043,15 +5572,28 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let exhausted = true;
   // I giri con azioni: i «passi» della frase che dice che Filo si è fermato senza risposta.
   let passi = 0;
-  // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
-  // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
-  const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false };
-  if (reasoningReqId) {
-    turniInCorso.set(String(reasoningReqId), turno);
-    const prima = stopPrimaDelTurno.get(String(reasoningReqId));
-    stopPrimaDelTurno.delete(String(reasoningReqId));
-    if (prima && prima.wcId === turno.wcId) turno.fermato = true;
-  }
+  // I seguiti (#1296) entrano prima di ogni chiamata al modello, dopo gli esiti del passo prima: sono parole
+  // dell'utente come la domanda, e lo sanno le uscite (#810, #530, #868.6), l'archivio e la scheda.
+  const seguitiLetti = [];
+  const testiDeiSeguiti = [];
+  const leggiSeguiti = async () => {
+    for (const s of turno.seguiti.splice(0)) {
+      turno.letti.add(s.id);
+      seguitiLetti.push(s.id);
+      testiDeiSeguiti.push(s.testo);
+      threadMessages.push({ role: 'user', content: `${s.testo}\n\n${NOTA_SEGUITO}` });
+      paroleUtente = `${paroleUtente}\n${s.testo}`;
+      richiesta = `${richiesta}\n${s.testo}`;
+      domandaDiAdesso = domandaDiAdesso ? `${domandaDiAdesso}\n${s.testo}` : s.testo;
+      push('filo:action', { kind: 'seguito', id: s.id });
+      if (!chatId) continue;
+      try {
+        const dopo = await appendToChatArchive(chatId, { role: 'user', text: s.testo });
+        const eid = dopo && Array.isArray(dopo.eids) ? dopo.eids[dopo.eids.length - 1] : '';
+        if (eid) fontiTurno.push(eid);
+      } catch (e) { console.warn('[Filo] seguito non archiviato', e?.message || e); }
+    }
+  };
   // I pezzi vecchi ripescati entrano in coda al contesto, e il blocco di attività lo dice come una ricerca (#868).
   const ricordi = await entroIl(ricordiP, ATTESA_RICORDI_MS, []);
   if (ricordi.length) {
@@ -5123,6 +5665,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       if (turno.fermato) { fermato = true; break; }
+      if (turno.seguiti.length) await leggiSeguiti();
       // La scheda scrive la riga del ripiego sotto la risposta: niente avviso in più (#662).
       const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
@@ -5190,7 +5733,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const avvia = (a, { contesto, fonti }) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -5208,7 +5751,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
+        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', parti: res.parti, ...(res.avviso ? { avviso: res.avviso } : {}) };
         if (res.domanda) rendered._domanda = res.domanda;
         if (res.domanda && res.perche) rendered._perche = res.perche;
         // Output di un comando eseguito subito (livello 1) o esito bloccato
@@ -5229,7 +5772,16 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           renderedActions.push(rendered);
           roundRendered.push(rendered);
         }
-        push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        // Un indirizzo rifiutato prima di partire torna al modello, che lo cerca: nel diario non c'è niente da dire (#553).
+        if (!res.nonCompare && !res.senzaModulo) push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
+        PageRead.annotaAzione(provenienza, rendered);
+        const tipoUscita = String(a.type || '').toUpperCase();
+        if (tipoUscita === 'NAVIGA' || tipoUscita === 'LEGGI_PAGINA') {
+          const dove = globalThis.SN_ACTION_LEVELS.indirizzoDi(a);
+          if (res.nonCompare) lasciati.set(dove, a);
+          else if (res.executed) lasciati.clear();
+          else if (res.needsConfirm) lasciati.delete(dove);
+        }
         results.push({ action: a, res, rendered });
         azioniViste.push(rendered);
         ricordaLettoInChat([rendered]);
@@ -5287,16 +5839,35 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     throw e;
   } finally {
-    if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
+    turno.chiuso = !fermato;
+    togliTurno(reasoningReqId, turno);
+  }
+  if (!fermato && lasciati.size) {
+    for (const a of lasciati.values()) {
+      let res = null;
+      try {
+        res = await executeFiloAction(a, {
+          sender, contesto: azioniViste, provenienza, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette, richiesta, soloConferma: true,
+        });
+      } catch (_) { res = null; }
+      if (!res || !res.needsConfirm) continue;
+      const rendered = { ...a };
+      delete rendered._argsError;
+      rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
+      if (res.domanda) rendered._domanda = res.domanda;
+      rendered._executed = false;
+      renderedActions.push(rendered);
+      push('filo:action', { kind: 'done', action: rendered, kept: true, executed: false });
+    }
   }
   if (fermato) {
-    // Lo stop resta scritto nell'intervista: una scheda nuova o una pagina ricaricata non rifà il turno fermato.
+    // Già scritto al clic (segnaStopAccoglienza); riscritto qui per uno stop che il turno ha visto da sé.
     if (onbActive) await saveOnboarding(Onboarding.segnaFermato(await FiloMem.getOnboarding()));
     if (onbActive && !internal) releaseOnboardingResume();
     await archiviaGiaFatto();
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
-      model: r && r.model, provider: r && r.provider,
+      model: r && r.model, provider: r && r.provider, seguitiLetti,
     };
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
@@ -5359,7 +5930,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     if (res.kept) {
       const rendered = res.needsConfirm
-        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) } }
+        ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', parti: res.parti, ...(res.avviso ? { avviso: res.avviso } : {}) } }
         : { ...proposal };
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);
@@ -5379,7 +5950,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let linkDaConfermare = [];
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
-      sender, contesto: azioniViste, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
+      sender, contesto: azioniViste, provenienza, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
       indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
     });
   } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }
@@ -5404,6 +5975,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Gli esiti di questo turno restano davanti al modello anche dalle altre schede, finché il messaggio è recente.
     const risposta = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
     if (risposta && risposta.role === 'filo') ContestoFilo.ricordaEsiti(chatId, risposta.ts, { azioni: renderedActions, reasoningDetails });
+    const eidRisposta = risposta && risposta.role === 'filo' && dopo.eids ? dopo.eids[dopo.eids.length - 1] : '';
+    if (eidRisposta) fontiTurno.push(eidRisposta);
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
     // ha chiesto qualcosa ed è tornato alla home (o ha chiuso la scheda) prima
     // di leggere. La risposta si salva lo stesso, ma poi la chat va RICHIUSA,
@@ -5439,10 +6012,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (filo) statoLezioni = `${stateText}\n\n${FiloState.testoConversazioni(FiloState.conversazioniRecenti(filo.tutti))}`;
   } catch (_) {}
   if (onboardingClosed) {
-    finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni });
+    finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno });
   } else {
+    // I seguiti letti sono parte della domanda a cui la risposta risponde.
+    const domandaIntera = [String(userMessage || ''), ...testiDeiSeguiti].filter(Boolean).join('\n');
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
-      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni }) : null))
+      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage: domandaIntera, filoReply: textReply, stateText: statoLezioni, fonti: fontiTurno }) : null))
       .catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
@@ -5465,6 +6040,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
     ...(onboardingClosed ? { onboardingClosed: true } : {}),
+    seguitiLetti,
   };
 }
 
@@ -5678,12 +6254,6 @@ function savedSuggestions(saved) {
   }));
 }
 
-// Saluto neutro mentre la home vera si calcola: Filo può rispondere, il
-// messaggio su misura no. La nuova scheda non aspetta mai l'LLM.
-function buildWaitingDashboard(saved) {
-  return { message: 'Buongiorno. Filo è qui.', suggestions: savedSuggestions(saved) };
-}
-
 // Home senza AI: istantanea, dalle pagine salvate. Dice PERCHÉ Filo non parla,
 // perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
 function buildNoKeyDashboard(settings, saved) {
@@ -5719,14 +6289,14 @@ function buildNoKeyDashboard(settings, saved) {
   return { message, suggestions };
 }
 
-// Genera il messaggio della home con l'LLM e lo mette in cache (con la firma).
-// Questa è la parte COSTOSA: non va mai sul cammino di apertura di una scheda
-// (tranne il primissimo caricamento, quando non c'è ancora nulla in cache).
-async function generateDashboardFromInputs(inputs) {
+// Genera il messaggio di Filo e i suggerimenti della home con l'LLM, e li mette in cache. È la parte COSTOSA: parte solo
+// quando è successo qualcosa (src/main/services/filoParla.js) o quando l'utente chiede suggerimenti nuovi, mai
+// all'apertura di una scheda (#869). `precedente`: il messaggio di Filo che questo sostituisce, se si fondono.
+async function generateDashboardFromInputs(inputs, { precedente = null } = {}) {
   const cached = await FiloMem.getDashboardCache();
   const r = await handleAIRequest({
     action: ACTIONS.FILO_DASHBOARD,
-    payload: { ...inputs.payload, ultimoMessaggio: cached?.message || '' },
+    payload: { ...inputs.payload, ultimoMessaggio: precedente != null ? precedente : (cached?.message || '') },
     origin: 'filo:dashboard',
     intera: true,
   });
@@ -5746,7 +6316,6 @@ async function generateDashboardFromInputs(inputs) {
         .filter((s) => s.text);
     }
   }
-  if (!message) message = 'Filo è in ascolto.';
   // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): la home
   // chiede l'icona del sito appena lo mostra, prima di ogni clic, e al clic deve dire cosa ha fermato.
   for (let i = 0; i < suggestions.length; i++) {
@@ -5761,81 +6330,74 @@ async function generateDashboardFromInputs(inputs) {
     try { chiede = await linkCheChiedonoOk('', { parole: inputs.parole || '', sempre: true, indirizzi: [url] }); } catch (_) { chiede = []; }
     if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
-  await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
+  await FiloMem.setDashboardCache({ message: message || cached?.message || '', suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
 }
 
-// Scheduler throttle+coalesce per il ricalcolo in background (#155): al massimo
-// un ricalcolo ogni DASHBOARD_MIN_INTERVAL_MS, accorpando tutte le richieste.
-// Creato pigramente (SN_DASHBOARD_REFRESH è caricato dal loader).
-let _dashboardScheduler = null;
-function dashboardScheduler() {
-  if (_dashboardScheduler) return _dashboardScheduler;
-  _dashboardScheduler = DashboardRefresh.createScheduler({
-    minIntervalMs: DASHBOARD_MIN_INTERVAL_MS,
-    now: () => Date.now(),
-    setTimer: (fn, ms) => setTimeout(fn, ms),
-    clearTimer: (h) => clearTimeout(h),
-    run: async (openTabsCount) => {
-      // Ri-raccoglie gli input ORA: accorpa tutte le modifiche della finestra.
-      await FiloMem.gcTimers();
-      const inputs = await gatherDashboardInputs({ openTabsCount: openTabsCount || 0 });
-      if (!inputs.canServe) return;
-      const cached = await FiloMem.getDashboardCache();
-      // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
-      if (cached && !cached.senzaChiave && cached.signature === inputs.signature) return;
-      // Un giro fallito (rete giù, modello che rifiuta) lascia la home com'è e
-      // basta: qui siamo dentro un timer, e rilanciare porterebbe giù il main.
-      let result = null;
-      try { result = await generateDashboardFromInputs(inputs); }
-      catch (e) { console.warn('[Filo] ricalcolo home fallito', e); return; }
-      // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
-      broadcastToTabs({
-        type: MSG.FILO_DASHBOARD_UPDATED,
-        message: result.message, suggestions: result.suggestions, ts: result.ts,
-      });
-    },
-  });
-  return _dashboardScheduler;
+function schedeWebAperte() {
+  let n = 0;
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      const tabs = win && win._filoTabs && Array.isArray(win._filoTabs.tabs) ? win._filoTabs.tabs : [];
+      n += tabs.filter((t) => !t.isInternal && /^https?:\/\//i.test(t.url || '')).length;
+    }
+  } catch (_) {}
+  return n;
 }
 
-async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
-  // Pulisce i timer scaduti PRIMA di leggere la cache: gcTimers() invalida
-  // la cache dashboard quando rimuove qualcosa, così evitiamo di riservire
-  // un messaggio cached che parlava di un timer ormai scaduto (bug alpha
-  // tester: "Filo non dovrebbe menzionare il timer in alto a sinistra").
+// Le cose successe come le legge il modello: i nomi (un file scaricato, un avviso, una sveglia messa da un modello) li
+// scrivono altri, e restano imbustati come ogni testo salvato (#592.4).
+const COSA_E_SUCCESSO = {
+  timer: 'è suonato',
+  download: 'è finito il download di',
+  avviso: 'è arrivato un avviso:',
+  giornata: 'è l\'inizio della giornata: l\'utente apre Filo per la prima volta oggi',
+  accoglienza: 'l\'utente ha appena finito di presentarsi a te: da qui comincia la vostra conversazione di tutti i giorni',
+};
+function testoEventi(eventi) {
+  const E = globalThis.SN_ESTERNO;
+  const righe = (Array.isArray(eventi) ? eventi : []).filter((e) => e && COSA_E_SUCCESSO[e.tipo])
+    .map((e) => `- ${COSA_E_SUCCESSO[e.tipo]}${e.testo ? ` ${E.neutralizza(e.testo, { unaRiga: true })}` : ''}`);
+  return righe.length ? E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: righe.join('\n') }) : '';
+}
+
+// Il turno di Filo nel filo (#869): messaggio e suggerimenti nascono dalla stessa chiamata.
+async function generaPerFiloParla({ eventi, fondi, precedente }) {
   await FiloMem.gcTimers();
-  const inputs = await gatherDashboardInputs({ openTabsCount });
+  const inputs = await gatherDashboardInputs({ openTabsCount: schedeWebAperte() });
+  if (!inputs.canServe) return null;
+  inputs.payload = { ...inputs.payload, eventi: testoEventi(eventi), fondi: !!fondi };
+  const r = await generateDashboardFromInputs(inputs, { precedente: fondi ? precedente : null });
+  broadcastToTabs({ type: MSG.FILO_DASHBOARD_UPDATED, suggestions: r.suggestions, ts: r.ts });
+  return r;
+}
+
+async function filoPuoParlare() {
+  const settings = await getEffectiveSettings();
+  if (settings.showHomeMessage === false) return false;
+  if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) return false;
+  const onb = Onboarding ? await FiloMem.getOnboarding().catch(() => null) : null;
+  return !onb || !!onb.done;
+}
+
+// La home chiede i suggerimenti aprendosi: quelli in cache, senza mai chiamare il modello (#869). Il modello parte solo
+// con `force` («Aggiorna» sulla carta, la fine dell'accoglienza, i crediti arrivati). Senza un modello servibile, la
+// frase che dice perché e la strada ai Crediti.
+async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } = {}) {
+  await FiloMem.gcTimers();
+  const settings = await getEffectiveSettings();
+  if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD)) {
+    const saved = await SavedPages.list();
+    const payload = buildNoKeyDashboard(settings, saved);
+    return { ...payload, senzaChiave: true, cached: false, ts: new Date().toISOString() };
+  }
+  if (force) {
+    const inputs = await gatherDashboardInputs({ openTabsCount });
+    const result = await generateDashboardFromInputs(inputs);
+    return { suggestions: result.suggestions, cached: false, ts: result.ts };
+  }
   const cached = await FiloMem.getDashboardCache();
-
-  // Senza un modello servibile: messaggio istantaneo dalle pagine salvate.
-  if (!inputs.canServe) {
-    const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
-    await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature, senzaChiave: true });
-    return { ...payload, cached: false, ts: new Date().toISOString() };
-  }
-
-  // La chiave è arrivata dopo (#651): la firma non la vede. Il messaggio vero si chiede in background,
-  // ma non a chi deve ancora fare l'intervista, che parte nella home aperta.
-  if (cached && cached.senzaChiave && !force) {
-    const onb = Onboarding ? await FiloMem.getOnboarding() : null;
-    if (!onb || onb.done) dashboardScheduler().request(openTabsCount);
-    return { ...buildWaitingDashboard(inputs.saved), cached: false, ts: new Date().toISOString() };
-  }
-
-  // C'è già una cache e non è un refresh esplicito: la serviamo SUBITO — la
-  // nuova scheda non aspetta MAI l'LLM. Se gli input sono cambiati, accodiamo
-  // un ricalcolo in background (throttle + coalesce); quando è pronto, la home
-  // si aggiorna da sola via FILO_DASHBOARD_UPDATED.
-  if (cached && cached.message && !force) {
-    if (cached.signature !== inputs.signature) dashboardScheduler().request(openTabsCount);
-    return { message: cached.message, suggestions: cached.suggestions, cached: true, ts: cached.ts };
-  }
-
-  // Primo caricamento (nessuna cache) o refresh forzato: genera ora.
-  const result = await generateDashboardFromInputs(inputs);
-  dashboardScheduler().markRan(); // il run sincrono conta per il throttle
-  return { ...result, cached: false };
+  return { suggestions: (cached && !cached.senzaChiave && cached.suggestions) || [], cached: !!cached, ts: cached?.ts || null };
 }
 
 async function maybeCategorizeAsync(savedEntry, pageInput) {
@@ -5907,6 +6469,7 @@ const handlerCtx = {
   archivioDaCancellare,
   handleFiloChat,
   fermaFiloChat,
+  seguitoFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
   controllaUscita,
@@ -5952,6 +6515,7 @@ require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
+require('./handlers/propostaEmail')(on, handlerCtx); // #1124 — l'email dell'account nei campi di accesso dei siti
 require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/filoSpento')(on, handlerCtx); // #843 — Filo spento o riacceso su un sito dal tasto destro
 require('./handlers/redteam')(on, handlerCtx);
@@ -6326,10 +6890,10 @@ async function triageChat(chat) {
 // la conversazione completa; sovrapposte, pagavano due volte il modello per
 // scrivere lo stesso titolo.
 const codeDiChiusura = new Map();      // chatId → chiusura in corso
-function closeAndTriageChat(chatId) {
+function closeAndTriageChat(chatId, opz = {}) {
   if (!chatId || !FiloChats) return Promise.resolve(null);
   const prima = codeDiChiusura.get(chatId) || Promise.resolve();
-  const ora = prima.then(() => chiudiEClassifica(chatId), () => chiudiEClassifica(chatId));
+  const ora = prima.then(() => chiudiEClassifica(chatId, opz), () => chiudiEClassifica(chatId, opz));
   const muta = ora.then(() => {}, () => {});
   codeDiChiusura.set(chatId, muta);
   muta.then(() => {
@@ -6340,11 +6904,11 @@ function closeAndTriageChat(chatId) {
   return ora;
 }
 
-async function chiudiEClassifica(chatId) {
+async function chiudiEClassifica(chatId, { fine = false } = {}) {
   if (!chatId || !FiloChats) return null;
   // La chat è finita: nessuna pagina la sta più vivendo.
   proprietariDiChat.delete(chatId);
-  const chat = await FiloChats.close(chatId);
+  const chat = await FiloChats.close(chatId, { fine });
   if (!chat) return null;                        // chat vuota o inesistente
   // Già classificata e da allora non è successo niente: non si ripaga.
   if (!FiloChats.needsTriage(chat)) return chat;
@@ -6495,6 +7059,20 @@ try {
   programmaIndiceArchivio(10_000);
   ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
 } catch (_) {}
+
+// #872 — le schede chiuse archiviate prima che il filo esistesse ci entrano alla loro data, una volta sola: la
+// Cronologia non c'è più, e si ritrovano dalla ricerca del filo. Dopo la partenza, per non rallentarla.
+async function schedeChiuseNelFilo({ unaVolta = true } = {}) {
+  if (Disco.inIncognito()) return 0;
+  const IlFilo = globalThis.SN_IL_FILO;
+  if (!IlFilo || !IlFilo.entranoSchedeChiuse) return 0;
+  return IlFilo.entranoSchedeChiuse(await ArchivedTabs.list(), { unaVolta });
+}
+globalThis.SN_SCHEDE_NEL_FILO = schedeChiuseNelFilo;
+if (process.env.NODE_ENV !== 'test' || process.env.FILO_SCHEDE_NEL_FILO === '1') {
+  const t = setTimeout(() => { schedeChiuseNelFilo().catch((e) => console.warn('[Filo] schede chiuse nel filo:', e?.message || e)); }, 4000);
+  t.unref?.();
+}
 
 // Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
 function testoPiano(testo) {
@@ -6811,9 +7389,21 @@ ConversazioniApp.collega({
   tetti: async () => globalThis.SN_FILO_CONTESTO.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo),
 });
 
-function broadcastToTabs(message) {
+// Pagine tolte dal filo, da qualunque strada: le home aperte rifanno le righe delle pagine (#869).
+globalThis.SN_IL_FILO.suPagineTolte(() => broadcastToFiloPages({ type: MSG.FILO_PAGINE_TOLTE }));
+
+// Filo parla per primo (#869): cosa genera il messaggio, quando può farlo, e a chi lo dice.
+FiloParla.collega({
+  genera: (o) => generaPerFiloParla(o),
+  puoParlare: () => filoPuoParlare(),
+  // Il messaggio sta nel filo di disco: una finestra incognito ha il suo, e non lo vede.
+  annuncia: (m) => broadcastToTabs({ type: MSG.FILO_PARLA, ...m }, { soloNormali: true }),
+});
+
+function broadcastToTabs(message, { soloNormali = false } = {}) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
+      if (soloNormali && win._filoIncognito) continue;
       for (const { wc, inVista } of vistePerAnnunci(win._filoTabs)) {
         try { spingiAllaScheda(wc, message, { inVista }); } catch (_) {}
       }

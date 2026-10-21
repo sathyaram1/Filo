@@ -6,7 +6,7 @@
 //   - TAB APERTE (URL/titolo/focus, ultima attività via chrome.tabs)
 //   - PROCESSI ATTIVI (timer, notifiche pending)
 //   - NOTIFICHE NON GESTITE
-//   - DASHBOARD ATTUALE (cache dell'ultimo output del Generatore Dashboard)
+//   - SUGGERIMENTI DELLA HOME (cache dell'ultimo output del Generatore Dashboard)
 //
 // Esposto come funzione che ritorna sia l'oggetto strutturato sia un testo
 // pronto per essere inserito nei prompt LLM.
@@ -414,18 +414,13 @@
       lines.push('');
     }
     if (state.conversazioni) lines.push(testoConversazioni(state.conversazioni, salvati), '');
-    lines.push('DASHBOARD ATTUALE');
-    if (state.dashboard) {
-      const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
-      if (state.dashboard.suggestions?.length) {
-        righe.push('Suggerimenti:');
-        state.dashboard.suggestions.slice(0, 8).forEach((s, i) => {
-          righe.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
-        });
-      }
+    // Il messaggio della home è un turno di Filo nel filo (#869): qui restano i suggerimenti.
+    lines.push('SUGGERIMENTI DELLA HOME');
+    if (state.dashboard && state.dashboard.suggestions?.length) {
+      const righe = state.dashboard.suggestions.slice(0, 8).map((s, i) => `${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
       lines.push(salvati(righe));
     } else {
-      lines.push('(non ancora generata)');
+      lines.push('(nessuno)');
     }
     return lines.join('\n');
   }
@@ -443,5 +438,5 @@
     return out.join('\n');
   }
 
-  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate, conversazioniRecenti, testoConversazioni };
+  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate, conversazioniRecenti, testoConversazioni, listTabs };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

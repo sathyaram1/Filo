@@ -26,8 +26,8 @@
 'use strict';
 
 const { session } = require('electron');
-const Sito = require('./stessoSito');
-const Google = require('./dominiGoogle');
+const Sito = require('../../shared/stessoSito');
+const Google = require('../../shared/dominiGoogle');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -110,13 +110,13 @@ function getMode(settings) {
   return m === MODES.MANUAL || m === MODES.PRIVACY ? m : MODES.DEFAULT;
 }
 
-// Siti "fidati" (eTLD+1) che in Privacy restano connessi (partizione isolata ma
-// persistente). Legge trustedSites; per retrocompatibilità accetta anche la
-// vecchia chiave loginWhitelist.
+// Siti "fidati" che in Privacy restano connessi (partizione isolata ma persistente), ognuno al suo sito: una voce
+// scritta come mail.google.com o come indirizzo vale per google.com, da qualunque strada sia entrata (#876).
+// Per retrocompatibilità accetta anche la vecchia chiave loginWhitelist.
 function getTrustedSites(settings) {
   const c = settings && settings.security && settings.security.cookies;
   const list = (c && (c.trustedSites || c.loginWhitelist)) || [];
-  return Array.isArray(list) ? list : [];
+  return Array.isArray(list) ? Sito.sitiDelleVociIn(list) : [];
 }
 
 // Servizi (eTLD+1) dei contenuti incorporati a cui l'utente ha riattivato i cookie (#760).
@@ -142,7 +142,7 @@ function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
 
-// Il sito dei cookie è quello di services/stessoSito.js: un blog su wordpress.com resta con wordpress.com.
+// Il sito dei cookie è quello di shared/stessoSito.js: un blog su wordpress.com resta con wordpress.com.
 function registrableOf(url) {
   return Sito.sitoDi(url);
 }
@@ -164,16 +164,47 @@ function fidatoIn(sito, trusted) {
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
-  // 'persist:' → jar isolato per-sito ma persistente (resta connesso). È del sito anche quando la voce fidata è un
-  // suffisso (co.uk, gov.it): un jar per voce metterebbe tutti i siti sotto di lei insieme (#796).
-  // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
-  // Google e YouTube stanno in un jar solo: l'accesso fatto su uno vale sull'altro (#1123).
+  return partitionForSite(reg, fidatoIn(url, trusted instanceof Set ? trusted : null));
+}
+
+// 'persist:' → jar isolato per-sito ma persistente (resta connesso). È del sito anche quando la voce fidata è un
+// suffisso (co.uk, gov.it): un jar per voce metterebbe tutti i siti sotto di lei insieme (#796).
+// Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
+// Google e YouTube stanno in un jar solo: l'accesso fatto su uno vale sull'altro (#1123).
+function partitionForSite(site, persistent) {
+  const reg = String(site || '').toLowerCase();
+  if (!reg) return null;
   const sito = Google.sitoDelContenitore(reg);
   const base = baseDelSito(sito);
-  if (fidatoIn(url, trusted instanceof Set ? trusted : null)) return 'persist:' + base;
+  if (persistent) return 'persist:' + base;
   sitoDelJar.set(base, sito);
   const g = jarGen.get(base);
   return g && g.n ? `${base}~${g.n}` : base;
+}
+
+// I cookie di un jar ricopiati in un altro, così l'accesso segue il sito quando passa fra jar effimero e
+// persistente («Resta connesso», #759). `sito`: da un jar che non è quello del sito si prendono solo i suoi.
+async function copiaBarattolo(da, a, sito) {
+  if (!da || !a || da === a || !da.cookies || !a.cookies) return 0;
+  let tutti = [];
+  try { tutti = await da.cookies.get({}); } catch (_) { return 0; }
+  const suo = (c) => {
+    const dom = String(c.domain || '').replace(/^\./, '').toLowerCase();
+    return dom === sito || dom.endsWith('.' + sito);
+  };
+  let copiati = 0;
+  await Promise.all(tutti.map(async (c) => {
+    if (sito && !suo(c)) return;
+    if (await copiaCookie(c, a)) copiati++;
+  }));
+  // Sul disco subito: un'uscita brusca subito dopo il sì non deve perdere l'accesso.
+  try { await a.cookies.flushStore(); } catch (_) {}
+  return copiati;
+}
+
+// La sessione ancora viva del jar effimero del sito (generazione in uso), senza crearla.
+function sessioneEffimera(site) {
+  return siteSessions.get(partitionForSite(site, false)) || null;
 }
 
 // ─── GPC: header Sec-GPC: 1 ───────────────────────────────────────────────
@@ -221,6 +252,14 @@ const blockState = new WeakMap(); // session → { enabled, filtri }
 let hostChiusoFn = null;
 function chiudiHost(fn) { hostChiusoFn = typeof fn === 'function' ? fn : null; }
 
+// Chi guarda le richieste senza deciderne la sorte (il testo dell'utente ricevuto dal sito, #824):
+// `fn` alla partenza, `esitoFn(details, riuscita)` alla fine.
+let osservatoreFn = null;
+let esitoFn = null;
+function osservaRichieste(fn, esito) {
+  osservatoreFn = typeof fn === 'function' ? fn : null;
+  esitoFn = typeof esito === 'function' ? esito : null;
+}
 // Richieste che l'utente ha fatto passare con «Apri comunque» (#590): senza, il sì
 // sulla lista dei siti bloccati si ferma qui e la scheda finisce su una pagina d'errore.
 let permessoFn = null;
@@ -240,6 +279,7 @@ function ensureRequestHook(ses) {
   // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
   // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
   ses.webRequest.onBeforeRequest((details, callback) => {
+    if (osservatoreFn) { try { osservatoreFn(details); } catch (_) {} }
     if (hostChiusoFn && hostChiusoFn(details.url)) {
       callback({ cancel: true });
       return;
@@ -261,6 +301,9 @@ function ensureRequestHook(ses) {
     if (ad && ad.ricordaRichiesta) ad.ricordaRichiesta(details);
     callback({ cancel: false });
   });
+  // Nessun altro ascolta la fine delle richieste: una seconda registrazione sostituirebbe questa.
+  ses.webRequest.onCompleted((details) => { if (esitoFn) { try { esitoFn(details, true); } catch (_) {} } });
+  ses.webRequest.onErrorOccurred((details) => { if (esitoFn) { try { esitoFn(details, false); } catch (_) {} } });
   return state;
 }
 
@@ -372,10 +415,25 @@ function inUso(partition, ses) {
   return false;
 }
 
+// Un sito tolto dai fidati con le schede aperte le vede passare nel jar effimero (tabs/tabRestaConnesso.js): finché
+// quelle restano, il sito è ancora aperto e il jar persistente aspetta, così rimetterlo fra i fidati non perde niente.
+function sitoAperto(partition, ses) {
+  if (inUso(partition, ses)) return true;
+  if (!partition.startsWith('persist:')) return false;
+  const site = sitoDelJar.get(partition);
+  const effimera = site ? partitionForSite(site, false) : null;
+  const eff = effimera && siteSessions.get(effimera);
+  return !!eff && inUso(effimera, eff);
+}
+
 function controllaUscita(partition) {
   if (!daButtare(partition)) return;
   const ses = siteSessions.get(partition);
-  if (ses && !inUso(partition, ses)) buttaJar(partition, ses);
+  if (ses && !sitoAperto(partition, ses)) buttaJar(partition, ses);
+  if (partition.startsWith('persist:')) return;
+  const site = sitoDelJar.get(partition.split('~')[0]);
+  const persistente = site ? 'persist:' + baseDelSito(site) : null;
+  if (persistente && fidatiDaButtare.has(persistente)) controllaUscita(persistente);
 }
 
 // Il sito non è più un'eccezione: quello che aveva salvato se ne va come per gli altri siti, ma mai mentre
@@ -393,7 +451,7 @@ function dimenticaFidato(site, partition = 'persist:' + baseDelSito(site)) {
       if (!wc.isDestroyed() && wc.session === ses) wc.once('destroyed', () => armaUscita(partition));
     }
   } catch (_) {}
-  if (inUso(partition, ses)) return;
+  if (sitoAperto(partition, ses)) return;
   buttaJar(partition, ses);
 }
 
@@ -591,6 +649,33 @@ function setListChangeHandler(fn) { listChange = typeof fn === 'function' ? fn :
 let configChange = null;
 function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? fn : null; }
 
+// Un sito entra o esce dai fidati, da qualunque strada (proposta, menu della scheda, chat, Sicurezza, import,
+// annulla): chi tiene le schede (tabs/tabRestaConnesso.js) sposta l'accesso nel jar giusto. Il sito è quello del
+// jar: Google e YouTube cambiano insieme (#1123).
+let trustChange = null;
+function setTrustChangeHandler(fn) { trustChange = typeof fn === 'function' ? fn : null; }
+function fiduciaCambiata(prev, next) {
+  if (!trustChange) return;
+  const jarDi = (l) => {
+    const out = new Set();
+    for (const d of l) {
+      const s = String(d || '').toLowerCase();
+      if (s) out.add(Google.diGoogle(s) ? Google.SITO_GOOGLE : s);
+    }
+    return out;
+  };
+  const prima = jarDi(prev);
+  const dopo = jarDi(next);
+  for (const s of dopo) if (!prima.has(s)) { try { trustChange(s, true); } catch (_) {} }
+  for (const s of prima) if (!dopo.has(s)) { try { trustChange(s, false); } catch (_) {} }
+}
+
+// `url` ha la sua eccezione «resta connesso», con le stesse regole che scelgono il jar.
+function sitoFidato(url) {
+  if (!/^https?:/i.test(String(url || ''))) return false;
+  return fidatoIn(url, trustedSetOf({ security: { cookies: _cached } }));
+}
+
 // In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
 function keepsSiteData(site) {
   if (_cached.mode !== MODES.PRIVACY) return true;
@@ -622,7 +707,8 @@ function configureFromSettings(settings) {
   }
   const prev = _cached.bannerSites;
   const prevMode = _cached.mode;
-  const prevTrusted = _cached.trustedSites.join('\n');
+  const prevTrustedList = _cached.trustedSites;
+  const prevTrusted = prevTrustedList.join('\n');
   _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings), embedSites: getEmbedSites(settings) };
   configureForMode(_cached.mode);
   const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
@@ -644,6 +730,7 @@ function configureFromSettings(settings) {
       tieniFidati(adesso);
     }
     spazzaFidatiOrfani(adesso);
+    if (_configured) fiduciaCambiata(prevTrustedList, _cached.trustedSites);
   }
   _configured = true;
   if (prevMode !== _cached.mode || prevTrusted !== trustedOra) {
@@ -731,6 +818,11 @@ module.exports = {
   wipeConsentCookies,
   setListChangeHandler,
   setConfigChangeHandler,
+  setTrustChangeHandler,
+  sitoFidato,
+  partitionForSite,
+  copiaBarattolo,
+  sessioneEffimera,
   setJarWipeHandler,
   impostaMargineUscita,
   keepsSiteData,
@@ -747,6 +839,7 @@ module.exports = {
   coverAdblock,
   ensureRequestHook,
   chiudiHost,
+  osservaRichieste,
   permettiRichieste,
   ensureSiteSession,
   sessioneDelleSchede,

@@ -92,15 +92,28 @@
     return C && C.AGENT_STYLE_MAX ? `al massimo ${C.AGENT_STYLE_MAX} caratteri` : 'con un tetto di lunghezza';
   }
 
+  // Una voce che vale solo con un interruttore principale acceso: chiesta con quello spento, Filo lo dice (#835),
+  // così «blocca x.com» non promette un blocco che non c'è.
+  const PRINCIPALI = {
+    bloccoSiti: { percorso: 'security.siteBlock.enabled', nome: 'il blocco dei siti in blacklist', chiave: 'blocco_siti' },
+    sitiPericolosi: { percorso: 'security.safeBrowse.enabled', nome: 'l\'avviso sui siti pericolosi', chiave: 'navigazione_sicura' },
+  };
+  function principaleSpento(sotto, attuali) {
+    const m = sotto && PRINCIPALI[sotto];
+    if (!m || !attuali || dentro(attuali, m.percorso) !== false) return '';
+    return `${m.nome} è spento: finché non si riaccende (chiave ${m.chiave}) questo cambio non ha effetto`;
+  }
+
   // Un interruttore della pagina Sicurezza: a parole sì/no, costo 2 col rischio in chiaro (#949). Spegnerlo
   // abbassa una difesa (#530), tranne dove `spentoAllenta` è falso.
-  function interruttore({ keys, percorso, nome, risk, aiuto, stati = ['attivo', 'disattivato'], spentoAllenta = true }) {
+  function interruttore({ keys, percorso, nome, risk, aiuto, stati = ['attivo', 'disattivato'], spentoAllenta = true, sotto = '' }) {
     return {
       keys,
       scrive: [percorso],
       aiuto: aiuto || 'true | false',
       costo: 2,
       allenta: (r) => spentoAllenta && dentro(r.partial, percorso) === false,
+      avviso: (r, at) => (dentro(r.partial, percorso) === true ? principaleSpento(sotto, at) : ''),
       risk,
       build(v) {
         const b = parsePrefBool(v);
@@ -299,7 +312,42 @@
     const N = nomiSito();
     return N ? N.daScritto(raw) : '';
   }
-  function opElenco(v) {
+  function stessoSito() {
+    return global.SN_STESSO_SITO || (typeof require === 'function' ? require('./stessoSito.js') : null);
+  }
+  function dominiGoogle() {
+    return global.SN_DOMINI_GOOGLE || (typeof require === 'function' ? require('./dominiGoogle.js') : null);
+  }
+  function eseguibili() {
+    if (!global.SN_ESEGUIBILI && typeof require === 'function') require('./eseguibili.js');
+    return global.SN_ESEGUIBILI || null;
+  }
+  // #876 — i siti fidati si salvano come li usa Filo, uguali alla pagina Sicurezza: mail.google.com vale google.com, e fra
+  // i programmi fidati una piattaforma che ospita i siti di chiunque (github.io) non entra, col perché.
+  const RIDUZIONI = {
+    'security.cookies.trustedSites': (d) => {
+      const S = stessoSito();
+      const E = eseguibili();
+      const G = dominiGoogle();
+      if (S && E && S.piattaforma(d)) return { piattaforma: d, rifiuto: E.testoPiattaforma(d) };
+      return { sito: (G && G.sitiDeiFidati([d])[0]) || (S && S.sitoDellaVoce(d)) || d };
+    },
+    'security.downloads.trustedSites': (d) => {
+      const E = eseguibili();
+      const v = E ? E.sitoFidabile(d) : null;
+      if (v && v.piattaforma) return { piattaforma: v.piattaforma, rifiuto: E.testoPiattaforma(v.piattaforma) };
+      return { sito: (v && v.sito) || d };
+    },
+  };
+  // La voce che un elenco salva per `x`: per chi toglie o confronta una voce salvata prima della riduzione.
+  function vocePer(percorso, x) {
+    const riduci = RIDUZIONI[percorso];
+    const d = dominioDa(x);
+    if (!riduci || !d) return x;
+    const r = riduci(d);
+    return (r && r.sito) || d;
+  }
+  function opElenco(v, riduci) {
     const s = String(v == null ? '' : v).trim();
     if (!s) return null;
     if (SVUOTA.test(s)) return { op: 'sostituisci', voci: [] };
@@ -313,8 +361,13 @@
     if (!pezzi.length) return null;
     const voci = [];
     const errati = [];
+    const rifiuti = [];
     for (const p of pezzi) {
-      const d = dominioDa(p);
+      let d = dominioDa(p);
+      // Togliere una piattaforma salvata prima che la si rifiutasse deve riuscire: lì resta com'è.
+      const r = d && riduci ? riduci(d) : null;
+      if (r && r.rifiuto && op !== 'togli') { if (!rifiuti.includes(r.rifiuto)) rifiuti.push(r.rifiuto); continue; }
+      if (r && r.sito) d = r.sito;
       if (!d) errati.push(p);
       else if (!voci.includes(d)) voci.push(d);
     }
@@ -322,16 +375,18 @@
       const mostra = (x) => `«${x.length > 60 ? `${x.slice(0, 59)}…` : x}»`;
       return { rifiuto: `${errati.map(mostra).join(', ')} non ${errati.length > 1 ? 'sono domini' : 'è un dominio'}: scrivi il sito con la sua estensione, come facebook.com` };
     }
+    if (rifiuti.length) return { rifiuto: rifiuti.join(' ') };
     return { op, voci };
   }
   // `allentaSe` (#530): il verso che abbassa una difesa. 'togli' per un elenco che protegge (un sito tolto
   // torna libero), 'aggiungi' per un elenco di eccezioni; senza l'elenco di adesso «solo …» vale come abbassare.
-  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null }) {
+  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null, sotto = '' }) {
     return {
       keys,
       scrive: [percorso],
       aiuto: `"aggiungi <siti>" | "togli <siti>" | "solo <siti>" | "svuota" (${aiuto}; più siti separati da virgole)`,
       costo: 2,
+      avviso: (r, at) => (r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length ? principaleSpento(sotto, at) : ''),
       allenta: (r, at) => {
         const e = r.elenco;
         if (!allentaSe || !e) return false;
@@ -342,7 +397,7 @@
       },
       risk,
       build(v) {
-        const o = opElenco(v);
+        const o = opElenco(v, RIDUZIONI[percorso]);
         if (!o || o.rifiuto) return o;
         const lista = o.voci.map(sitoLeggibile).join(', ');
         const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
@@ -392,15 +447,35 @@
     return N && N.leggibile ? N.leggibile(x) : x;
   }
   const sitoLeggibileDi = sitoLeggibile;
+  // In Automatico un sito dove Filo ti ha visto entrare è «connesso» come un fidato: «non restare connesso su X»
+  // in chat lo toglie da tutti e due gli elenchi, come la voce del menu della scheda (#759).
+  const TOGLIE_ANCHE = {
+    'security.cookies.trustedSites': (correnti) => {
+      const m = dentro(correnti, 'security.cookies.mode');
+      return m === 'privacy' || m === 'manual' ? null : 'security.cookies.loggedSites';
+    },
+  };
   // L'elenco nuovo a partire da quello di adesso: { partial } da salvare, o { invariato } col perché.
   function applicaElenco(e, correnti) {
     const sitoLeggibile = e.percorso === 'documenti.cartelle' ? nomeCartella : sitoLeggibileDi;
     const attuale = (Array.isArray(dentro(correnti, e.percorso)) ? dentro(correnti, e.percorso) : [])
       .filter((x) => typeof x === 'string' && x.trim());
+    // Una voce salvata prima della riduzione (mail.google.com) è la stessa di quella ridotta (google.com).
+    const presente = (voci, x) => voci.includes(x) || voci.includes(vocePer(e.percorso, x));
     let nuovo;
-    if (e.op === 'aggiungi') nuovo = attuale.concat(e.voci.filter((x) => !attuale.includes(x)));
-    else if (e.op === 'togli') nuovo = attuale.filter((x) => !e.voci.includes(x));
+    if (e.op === 'aggiungi') nuovo = attuale.concat(e.voci.filter((x) => !attuale.some((a) => a === x || vocePer(e.percorso, a) === x)));
+    else if (e.op === 'togli') nuovo = attuale.filter((x) => !presente(e.voci, x));
     else nuovo = e.voci.slice();
+    const abbinato = e.op === 'togli' && TOGLIE_ANCHE[e.percorso] ? TOGLIE_ANCHE[e.percorso](correnti) : null;
+    const primaAbbinato = abbinato && Array.isArray(dentro(correnti, abbinato)) ? dentro(correnti, abbinato) : [];
+    const dopoAbbinato = primaAbbinato.filter((x) => !presente(e.voci, x));
+    if (abbinato && dopoAbbinato.length !== primaAbbinato.length) {
+      const partial = nidifica(e.percorso, nuovo);
+      const seg = abbinato.split('.');
+      const padre = seg.slice(0, -1).reduce((o, k) => { o[k] = o[k] || {}; return o[k]; }, partial);
+      padre[seg[seg.length - 1]] = dopoAbbinato;
+      return { partial, lista: nuovo };
+    }
     if (nuovo.length === attuale.length && nuovo.every((x, i) => x === attuale[i])) {
       const ha = attuale.length ? `adesso contiene: ${attuale.map(sitoLeggibile).join(', ')}` : 'adesso è vuoto';
       const voci = e.voci.map(sitoLeggibile).join(', ');
@@ -482,7 +557,9 @@
         const lista = voci.map(nomeCartella).join(', ');
         const label = op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
           : op === 'togli' ? `${nome} → togli ${lista}` : `${nome} → solo ${lista}`;
-        return { partial: nidifica(percorso, voci), label, elenco: { percorso, op, voci, nome } };
+        // Un percorso lo scrive il modello e può contenere quasi ogni carattere: nel popup sta nel riquadro (#592.7).
+        const campo = `${nome}, ${op === 'aggiungi' ? 'aggiungi' : op === 'togli' ? 'togli' : 'solo'}`;
+        return { partial: nidifica(percorso, voci), label, campo, valore: lista, elenco: { percorso, op, voci, nome } };
       },
     };
   }
@@ -614,13 +691,13 @@
     },
     {
       scrive: ['showHomeMessage'],
-      aiuto: 'true | false (commento di Filo al centro della home)',
+      aiuto: 'true | false (Filo scrive per primo nella home quando succede qualcosa)',
       costo: 1,
-      keys: ['commento_home', 'commento nella home', 'commento home', 'messaggio home', 'messaggio nella home', 'showhomemessage', 'commento'],
+      keys: ['scrive_per_primo', 'filo scrive per primo', 'scrive per primo', 'commento_home', 'commento nella home', 'commento home', 'messaggio home', 'messaggio nella home', 'showhomemessage', 'commento'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { showHomeMessage: b }, label: `Commento nella home → ${b ? 'mostrato' : 'nascosto'}` };
+        return { partial: { showHomeMessage: b }, label: `Filo scrive per primo → ${b ? 'sì' : 'no'}` };
       },
     },
     // Ora, batteria, rete, Bluetooth e volume nella home (#873, #874): una voce per chiave, le altre restano come sono.
@@ -837,6 +914,32 @@
         };
       },
     },
+    // #1124 — il sito riceve l'email solo quando l'utente la sceglie: accendere e spegnere non cede niente.
+    {
+      scrive: ['propostaEmail.attiva'],
+      aiuto: 'true | false (nei campi email o nome utente dei siti propone l\'email dell\'account Filo; il sito la riceve solo se la scegli)',
+      keys: ['proposta_email', 'proposta email', 'proponi email', 'proponi la mia email', 'suggerisci email',
+        'suggerimento email', 'email nei siti', 'email nei campi', 'autocompila email', 'autocompilazione email',
+        'compila email', 'email dell\'account nei siti'],
+      costo: 1,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { propostaEmail: { attiva: b } }, label: `La tua email proposta nei siti → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
+      scrive: ['propostaEmail.incognito'],
+      aiuto: 'true | false (la stessa proposta dell\'email anche nelle finestre in incognito; di serie spenta)',
+      keys: ['proposta_email_incognito', 'proposta email incognito', 'proposta email in incognito',
+        'email in incognito', 'suggerisci email in incognito', 'proponi email in incognito'],
+      costo: 1,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { propostaEmail: { incognito: b } }, label: `La tua email proposta anche in incognito → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
     {
       scrive: ['terminal.shell'],
       aiuto: (ctx) => ctx.shellPref,
@@ -897,7 +1000,7 @@
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
         if (voceAutomatica(v)) return { partial: { tts: { voice: '' } }, label: 'Voce di lettura → automatica' };
-        return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"` };
+        return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"`, campo: 'Voce di lettura', valore: s };
       },
     },
     {
@@ -928,20 +1031,31 @@
         const nome = testoVisibile(s);
         if (!nome) return null;
         if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${cifre(nome.length)} caratteri e il massimo è ${VOCE_MAX}` };
-        return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)` };
+        return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)`, campo: 'Voce naturale scritta a mano', valore: nome };
       },
     },
 
     // ── Funzionalità (interruttori) — reversibili, nessun rischio → costo 1 ──
     {
       scrive: ['featureFlags.spellcheck'],
-      aiuto: 'true | false (correttore ortografico AI)',
+      aiuto: 'true | false (correttore AI della lingua: lo zigzag blu)',
       costo: 1,
-      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione'],
+      keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione', 'zigzag blu'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { featureFlags: { spellcheck: b } }, label: `Correttore ortografico → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    {
+      scrive: ['featureFlags.spellcheckContext'],
+      aiuto: 'true | false (coerenza col contesto della pagina: i puntini ocra sotto giorni, date e nomi che non tornano)',
+      costo: 1,
+      keys: ['coerenza', 'controllo coerenza', 'controllo di coerenza', 'coerenza col contesto', 'puntini ocra', 'sottolineatura ocra', 'incoerenze', 'contraddizioni'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { featureFlags: { spellcheckContext: b } }, label: `Controllo di coerenza → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
     {
@@ -1185,6 +1299,26 @@
           partial: { ownKeyAllProviders: b },
           label: `Fornitori esclusi con la tua chiave → ${b ? 'usati' : 'esclusi'}`,
         };
+      },
+    },
+    {
+      scrive: ['ordineHost'],
+      aiuto: '"velocità" | "latenza" | "prezzo" | "filo" (come OpenRouter sceglie chi serve ogni modello: "velocità"=più token al secondo, "latenza"=prima parola più rapida, "prezzo"=il più economico, "filo"=torna alla scelta di Filo; vale anche per i modelli predefiniti, e i fornitori esclusi restano esclusi)',
+      keys: ['ordine_host', 'ordine host', 'host dei modelli', 'host', 'ordinamento host', 'host più veloci',
+        'velocità dei modelli', 'modelli più veloci', 'chat più veloce', 'host più economici', 'provider sort'],
+      costo: 2,
+      risk: 'Cambia quali host servono i modelli: più veloci di solito costano di più, più economici rispondono più lentamente.',
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        if (!s) return null;
+        let sort = null;
+        if (/(filo|auto|predefinit|default|standard|ripristin|reset|nessun)/.test(s)) sort = '';
+        else if (/(latenz|latency|pront|prima parola|reattiv)/.test(s)) sort = 'latency';
+        else if (/(prezz|price|econom|costo|cost|risparm|meno car)/.test(s)) sort = 'price';
+        else if (/(veloc|throughput|rapid|svelt|token)/.test(s)) sort = 'throughput';
+        if (sort === null) return null;
+        const nomi = { '': 'scelti da Filo', throughput: 'più veloci', latency: 'risposta più pronta', price: 'più economici' };
+        return { partial: { ordineHost: sort }, label: `Host dei modelli → ${nomi[sort]}` };
       },
     },
     {
@@ -1447,6 +1581,7 @@
     interruttore({
       keys: ['liste_pubbliche_blocco', 'liste pubbliche', 'liste pubbliche come blacklist', 'usa le liste pubbliche'],
       percorso: 'security.siteBlock.useAdblockLists',
+      sotto: 'bloccoSiti',
       nome: 'Liste pubbliche come blacklist',
       stati: ['in uso', 'spente'],
       aiuto: 'true | false (tratta come bloccati anche i siti di pubblicità e tracciamento delle liste pubbliche)',
@@ -1456,28 +1591,34 @@
     interruttore({
       keys: ['controlli_rete_siti', 'controlli di rete', 'controlli rete', 'età del dominio', 'eta del dominio'],
       percorso: 'security.safeBrowse.networkSignals',
+      sotto: 'sitiPericolosi',
       nome: 'Controlli di rete sui siti',
       stati: ['attivi', 'spenti'],
       aiuto: 'true | false (chiede a servizi pubblici l\'età del dominio e del certificato, per riconoscere le truffe)',
-      risk: 'Controlla le richieste a servizi pubblici sull’età del dominio e del certificato, un forte segnale di truffa. '
-        + 'Spegnerle rende meno probabile l’avviso su un sito nato da pochi giorni per ingannarti.',
+      risk: 'Quando un sito ha già un indizio sospetto, Filo ne manda il nome a due servizi pubblici (rdap.org e crt.sh) '
+        + 'per sapere da quanto esistono il dominio e il suo certificato: un sito nato da pochi giorni è un forte segnale '
+        + 'di truffa. Spenti, quel nome non esce dal computer, ma l’avviso su un sito appena nato per ingannarti diventa meno probabile.',
     }),
     interruttore({
       keys: ['giudizio_ai_siti', 'giudizio ai', 'giudizio ai sui siti', 'giudizio ai sui casi sospetti'],
       percorso: 'security.safeBrowse.llmJudge',
+      sotto: 'sitiPericolosi',
       nome: 'Giudizio AI sui siti sospetti',
       aiuto: 'true | false (un modello valuta gli indizi di identità di un sito rimasto dubbio)',
-      risk: 'Controlla il giudizio di un modello AI sui siti che restano dubbi. Spegnerlo toglie un controllo: '
-        + 'un sito sospetto può aprirsi senza avviso.',
+      risk: 'Quando un sito resta dubbio, Filo ne manda il nome e gli indizi (età, certificato, da dove arriva il link, '
+        + 'se chiede password o pagamento) al modello AI scelto per il giudizio dei siti, mai il testo della pagina. '
+        + 'Spento, niente esce dal computer, ma un sito sospetto può aprirsi senza avviso.',
     }),
     interruttore({
-      keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata'],
+      keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata',
+        'link accorciati', 'destinazione dei link accorciati'],
       percorso: 'security.safeBrowse.sandbox',
-      nome: 'Link sospetti in una finestra isolata',
+      nome: 'Link accorciati in una finestra isolata',
       stati: ['sì', 'no'],
-      aiuto: 'true | false (finestra nascosta per provare un link sospetto prima che si apra; oggi nessuna funzione la usa)',
-      risk: 'Controlla la finestra nascosta e isolata in cui Filo proverebbe un link sospetto prima che tu lo apra. '
-        + 'Oggi nessuna funzione prova i link così: accesa o spenta, non cambia niente.',
+      aiuto: 'true | false (puntatore fermo su un link accorciato: Filo lo apre in una finestra nascosta per scoprire la destinazione prima del clic)',
+      risk: 'Controlla la finestra nascosta e isolata in cui Filo apre un link accorciato su cui tieni fermo il puntatore, '
+        + 'per scoprire la destinazione prima del clic. Spenta, Filo cerca ancora il link nella lista nera, ma dove porta '
+        + 'lo scopre solo quando lo apri.',
     }),
     interruttore({
       keys: ['segnalazione_automatica', 'segnalazione automatica', 'segnalazione automatica dei problemi', 'segnalazioni automatiche', 'feedback automatico'],
@@ -1506,6 +1647,7 @@
       keys: ['siti_bloccati', 'siti bloccati', 'blacklist', 'domini in blacklist', 'elenco dei siti bloccati', 'lista dei siti bloccati'],
       percorso: 'security.siteBlock.blacklist',
       allentaSe: 'togli',
+      sotto: 'bloccoSiti',
       nome: 'Siti bloccati',
       aiuto: 'siti che Filo non apre',
       risk: 'Cambia l’elenco dei siti che Filo non apre. Un sito tolto si riapre da ogni strada; uno aggiunto non si apre '
@@ -1521,11 +1663,13 @@
         + 'e si apre senza domande.',
     }),
     elenco({
-      keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso'],
+      keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso',
+        'siti connessi', 'resta connesso su', 'resta connesso qui', 'non restare connesso'],
       percorso: 'security.cookies.trustedSites',
       allentaSe: 'aggiungi',
       nome: 'Siti fidati dove resti connesso',
-      aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie',
+      aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie, e i cui contenuti incorporati in '
+        + 'Automatico tengono i cookie: «resta connesso su X» è aggiungi X, «togli X dai siti connessi» è togli X',
       risk: 'Cambia i siti che fanno eccezione alla privacy massima dei cookie: lì i dati restano fra una visita e '
         + 'l’altra, così resti connesso, e il sito ti riconosce.',
     }),
@@ -1852,7 +1996,7 @@
   }
 
   // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, elencoFisso, dove,
-  // risk, testo? }; `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
+  // risk, testo?, avviso? }; `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
   // Oppure { rifiuto, perModello? } se va rifiutato spiegando perché (`rifiuto` lo legge l'utente, `perModello` dice al
   // modello come rimediare), o null se chiave/valore non validi (il perché lo dà spiegaNonValida).
   function buildPreferencePartial(rawKey, rawVal, { attuali = null } = {}) {
@@ -1872,11 +2016,14 @@
     try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(b, attuali) : false; } catch (_) { allenta = true; }
     let chiede = false;
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
+    let avviso = '';
+    try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
     return {
       ...b,
       costo: setter.costo,
       allenta,
       ...(chiede ? { chiede: true } : {}),
+      ...(avviso ? { avviso } : {}),
       elencoFisso: setter.elencoFisso || '',
       dove: setter.dove || '',
       risk: setter.risk || '',

@@ -513,16 +513,22 @@
     TAB_IN_VISTA: 'tab_in_vista',                    // broadcast { inVista }
     // Una pagina filo:// ha caselle scritte e non ancora spedite (SN_CASELLE): chiudere la sua scheda aspetta che spedisca.
     CASELLE_IN_SOSPESO: 'caselle_in_sospeso',        // { inSospeso } → { ok }
-    // Detta e Incolla di Filo su una pagina web: microfono o appunti per pochi secondi, senza domanda al sito (#591.1).
-    PERMESSO_FILO: 'permesso_filo',                  // { tipo: 'media'|'appunti' } → { ok }
+    // Incolla di Filo: gli appunti li legge il main, la pagina non riceve il permesso (#586).
+    APPUNTI_DI_FILO: 'appunti_di_filo',              // {} → { ok, testo, immagine (data URL png) }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
     PERMESSI_SITI_CAMBIATI: 'permessi_siti_cambiati', // main → pagine di Filo: la chat ha tolto una risposta ricordata
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
-    // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
+    // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty?, impronte? }
     TAB_ACTIVITY: 'tab_activity',
+    // Main → ogni frame: «rimanda adesso se hai testo da inviare» (la pulizia sta
+    // per decidere, #824). { impronte: del documento di prima } → TAB_ACTIVITY con formDirty.
+    FORM_RECHECK: 'form_recheck',
+    // Main → frame dello stesso sito: una richiesta della scheda ha portato fuori questo testo
+    // (senza spazi, in più forme). Le righe dell'utente che ci stanno dentro sono partite. { testo }
+    FORM_SENT: 'form_sent',
 
     // §2.1 — pulizia/riordino su richiesta esplicita dell'utente (lo invoca
     // l'agente Filo dopo conferma). Esegue il triage su tutte le tab della finestra.
@@ -661,9 +667,9 @@
     //   `enabled` (doc config/automation) → chi entra in coda da solo (filo-security
     //     DESIGN §2);
     //   `routinesEnabled` (doc config/routines) → se le routine autonome lavorano.
-    // Insieme viaggiano `autoApprove` e `proberWhenIdle`.
-    AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer } | { ok:false, error }
-    AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled?, lavoriServer? } → { ok, … } | { ok:false, error }
+    // Insieme viaggiano `autoApprove` e `lavoriServer`.
+    AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, routinesEnabled, lavoriServer } | { ok:false, error }
+    AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, routinesEnabled?, lavoriServer? } → { ok, … } | { ok:false, error }
     // I bilanci dei giri di correzione, uno per livello (doc config/routines,
     // campi `cap3`, `cap2`, `cap1`, `cap0` — feedback #561) e il testo della
     // fase 2 (`fixInstructions`, vuoto = quello del server):
@@ -764,7 +770,11 @@
     // Il content script manda la URL corrente e gli indizi (campo password/pagamento); il main mostra l'avviso in una
     // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
     // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
-    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
+    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment?, insecureForm? }
+    // #965 — i link che la pagina mostra, ai soli controlli locali: il verdetto resta nel main, per il clic. Aperto ai
+    // siti di proposito (lo manda il content script della pagina); la pagina non ne riceve i verdetti, solo il conto.
+    // Oltre LOTTO_MAX link → { ok:false, error:'troppi', max }; un esame già in coda → { ok:false, error:'occupato' }.
+    SAFEBROWSE_LINKS: 'safebrowse_links',          // { urls: string[] } → { ok, esaminati }
     // #1004 — la pagina, o un suo riquadro (il modulo di pagamento di un altro sito), mostra un campo password o carta:
     // il sito della scheda diventa delicato. Il sito lo dà il main, dalla scheda.
     CAMPI_DELICATI: 'campi_delicati', // { hasPassword, hasPayment } (campi a schermo) → { ok }
@@ -801,6 +811,9 @@
     COOKIES_RULE: 'cookies_rule',                   // { name } → { ok, rule }
     COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden'|'unconfirmed'|'answer', cookies?, storage? } → { ok }
     COOKIES_BANNER_TOKENS: 'cookies_banner_tokens', // { ids, classes } → { ok, selectors } (quelli della lista)
+    // Da qualunque frame della scheda: l'utente ha mandato una password scritta da lui. Decide il main se l'accesso è
+    // riuscito e se proporre «Resta connesso» (tabs/tabRestaConnesso.js); vale per il sito della scheda.
+    COOKIES_ACCESSO: 'cookies_accesso',             // {} → { ok }
     // Un riquadro con un banner che non ha «rifiuta» lo dice al main, che passa alla pagina l'indirizzo del riquadro
     // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
     COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }
@@ -834,6 +847,16 @@
     AD_SKIP_HERE: 'ad_skip_here',                   // { id, x, y, tag } | { id, code } → { ok }
     // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
     AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
+
+    // === L'email dell'account proposta nei campi di accesso (#1124, src/content/propostaEmail.js) ===
+    // Aperto ai siti di proposito: lo manda il content script del frame dove l'utente è entrato in un campo email o
+    // nome utente. Porta il campo (misure in px CSS della scheda, valore) e non riceve mai l'email: la proposta la
+    // disegna il main in una vista sopra la scheda (src/main/propostaEmail.js). `segui:false` = qui non si propone.
+    // Dentro un riquadro di un'altra origine `ancora` è il segno mandato al documento sopra, che risponde con 'riquadro'.
+    PROPOSTA_EMAIL: 'proposta_email',               // { fase:'campo', campo, motivo, x, y, w, h, valore, digitato, ancora } | { fase:'via', campo } | { fase:'riquadro', ancora, x, y, s, su } → { ok, segui }
+    // Main→il solo frame del campo, dopo la scelta dell'utente (clic o Invio sulla proposta): l'unico momento in cui
+    // l'email arriva alla pagina.
+    PROPOSTA_EMAIL_RIEMPI: 'proposta_email_riempi', // { campo, email }
 
     // === Il menu che un sito si disegna da sé (#975, src/preload/menu-del-sito.js) ===
     // Aperti ai siti di proposito: li manda il content script dal menu di Filo, e il sito lo ricava il main dal
@@ -880,10 +903,15 @@
     // Filo Chat: invio messaggio utente all'agente conversazionale
     // { userMessage, threadHistory: [{role, text, actions?}] }
     // Risposta: { ok, text, actions: [...], model, costEur }
+    // Solo dalle pagine di Filo: la risposta porta quello che Filo ha letto (pagine, documenti, comandi).
     FILO_CHAT: 'filo_chat',
     // Ferma il turno di chat in corso (#578): { reqId } è il `reasoningReqId` del turno. Solo pagine di Filo, e solo
     // la scheda che l'ha avviato. Le azioni già partite finiscono, nessuna nuova parte. → { ok, fermato }
     FILO_CHAT_STOP: 'filo_chat_stop',
+    // Un seguito scritto mentre il turno lavora (#1296): { reqId, id, testo } lo affida al turno, che lo legge al passo
+    // dopo → { ok, accolto }; { reqId, id, togli: true } lo ritira se il modello non l'ha ancora letto → { ok, tolto, letto }.
+    // Solo pagine di Filo, solo la scheda del turno.
+    FILO_CHAT_SEGUITO: 'filo_chat_seguito',
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
@@ -916,7 +944,7 @@
     FILO_CHAT_GET: 'filo_chat_get',
     // Chiusura di una chat (ritorno alla home, chat nuova, chiusura dell'app):
     // fissa la data di chiusura e fa partire la classificazione (titolo +
-    // conversazione/comando). { id } → { ok }
+    // conversazione/comando). `fine`: chiusa apposta dall'utente, una scheda nuova non la continua. { id, fine? } → { ok }
     FILO_CHAT_CLOSE: 'filo_chat_close',
     // Cancellazione manuale di una chat, dopo la conferma. { id } → { ok, chats }
     FILO_CHAT_DELETE: 'filo_chat_delete',
@@ -946,6 +974,18 @@
     FILO_RIGHE_APP: 'filo_righe_app',
     // ANNUNCIO (main → pagine di Filo, senza dati): le righe sono cambiate, chi le mostra le richiede.
     FILO_RIGHE_APP_CAMBIATE: 'filo_righe_app_cambiate',
+    // #869 — la home è la coda del filo. Solo filo://: è la cronologia dell'utente.
+    // { prima?, fino?, dopo?, quanti? } → { ok, elementi, inizio, ultimo, chatCorrente? } (src/shared/filoCoda.js).
+    FILO_CODA: 'filo_coda',
+    // Cercare nel filo senza passare dal modello: { q } → { ok, messaggi, pagine, termini, tanti }.
+    FILO_CERCA: 'filo_cerca',
+    // Togliere dal filo pagine visitate, per id: { ids } → { ok, tolte }. Con { url }: ogni visita di quell'indirizzo
+    // e le sue schede chiuse (dalla ricerca, dove una pagina è un indirizzo).
+    FILO_CODA_TOGLI_PAGINE: 'filo_coda_togli_pagine',
+    // ANNUNCIO (main → pagine di Filo, senza dati): pagine tolte dal filo, da qualunque strada; chi le mostra le rilegge.
+    FILO_PAGINE_TOLTE: 'filo_pagine_tolte',
+    // ANNUNCIO (main → schede): Filo ha scritto di sua iniziativa. { chat, i, ts, testo, fuso }.
+    FILO_PARLA: 'filo_parla',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato
@@ -977,9 +1017,21 @@
     // in righe e lezioni ancora da riordinare. Solo pagine filo://.
     // Risposta: { ok, moduli: [{ nome, righe }], lezioni: [{ ts, text }] }
     FILO_MEMORY_VIEW: 'filo_memory_view',
-    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }.
+    // Toglie UNA riga: { modulo, riga } oppure { lezione: { ts, text } }. La riga resta nascosta nel quaderno (#872).
     // Solo pagine filo://. Risposta: { ok, tolta } (false: non c'era più).
     FILO_MEMORY_FORGET: 'filo_memory_forget',
+    // Il quaderno delle memorie (#872): righe con data e fonti risolte nel filo, lezioni, siti tenuti aperti e
+    // righe nascoste. Solo pagine filo://.
+    // Risposta: { ok, moduli: [{ nome, righe: [{ testo, via, nata, corretta, fonti: [{ id, ts, chat?, i? }] }] }], lezioni, sempreAperte, nascoste }
+    FILO_QUADERNO: 'filo_quaderno',
+    // La correzione di una riga: { via: { modulo, riga } | { lezione }, testo }. Risposta: { ok, corretta } o { ok:false, error }.
+    FILO_MEMORY_EDIT: 'filo_memory_edit',
+    // Una riga nascosta torna in memoria: { id }. Risposta: { ok, rimessa }.
+    FILO_MEMORY_RESTORE: 'filo_memory_restore',
+    // Una riga nascosta si cancella per sempre: { id }. Risposta: { ok, cancellata }.
+    FILO_MEMORY_FOREVER: 'filo_memory_forever',
+    // Dov'è un evento del filo, per saltarci dalla home (#872): { id }. Risposta: { ok, dove: { tipo, chat, i, ts, app } | null }.
+    FILO_DOVE: 'filo_dove',
     // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
     // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
     FILO_MEMORY_CHANGED: 'filo_memory_changed',
@@ -1030,12 +1082,22 @@
     CAMBI_ANNULLA: 'cambi_annulla',
     CAMBI_AGGIORNATI: 'cambi_aggiornati',           // main → pagine di Filo { ids }: un cambio è nato o è stato annullato
 
+    // L'utente aggiunge al calendario del suo computer l'evento che Filo gli
+    // ha proposto in chat: il main scrive un .ics e lo apre col programma di
+    // calendario. → { ok, file, aperto, error }  { evento: { data, ora, titolo, dettagli } }
+    //
+    // ORIGINE: solo filo:// (scrive un file e chiede al sistema di aprirlo, e
+    // la risposta contiene un percorso assoluto). Una pagina web che potesse
+    // chiamarlo farebbe aprire un file al sistema operativo.
+    CALENDAR_ADD: 'calendar_add',
+
     // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
     // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di
     // Filo — es. inviare un feedback — passando dallo stesso registro dei
     // livelli di sicurezza della chat dashboard. Torna { executed, kept,
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
+    // Da un sito visitato (con FILO_CONFIRM_ACTION) torna senza `output`: quello che l'azione ha letto resta a Filo.
     FILO_RUN_ACTION: 'filo_run_action',
     // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
     // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche, no? }.
@@ -1107,6 +1169,11 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // #589.11 — un riquadro con un menu di Filo aperto chiede alla pagina che lo contiene di sospendere gli effetti
+    // grafici sopra di lui. Va dal riquadro al main { n, si }, e il main lo gira alla SOLA pagina madre come
+    // VISTO_PERMESSO { n, si }: la pagina crede a una richiesta solo se la chiave le arriva anche da qui.
+    VISTO_SOSPENDI: 'visto_sospendi',
+    VISTO_PERMESSO: 'visto_permesso',
     // Contropartita di TRANSLATE_FRAMES: arriva a ogni riquadro della scheda e
     // gli fa tradurre (o riportare all'originale) se stesso. { mode, runId }
     FRAME_TRANSLATE: 'frame_translate',

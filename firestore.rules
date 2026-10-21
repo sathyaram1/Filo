@@ -226,9 +226,7 @@ service cloud.firestore {
     //   - `workerLog` (array di { role, startedAt, num }): il registro dei worker
     //     mostrato in dashboard. Lo scrive il server (functions, Admin SDK) al
     //     rilascio di ogni biglietto (le routine non hanno credenziali: #451).
-    //   - `senderProofSince` ({ local, owner }: ms): storico, non lo legge più
-    //     nessuno. Il ripasso dava la prova per epoca a chi nasceva prima;
-    //     dal #912 non la dà più al solo nome.
+    //   - `senderProofSince` ({ local, owner }: ms): storico, non lo legge nessuno.
     // Le regole NON enumerano i campi (read/write admin-only): nuovi campi non
     // richiedono redeploy. Riservato agli admin: nessun utente normale legge/scrive.
     match /config/automation {
@@ -240,8 +238,6 @@ service cloud.firestore {
     //   - `enabled` (bool; assente = true = comportamento storico): interruttore
     //     MASTER delle routine. Spento, l'orchestratore parte ma il dispatcher
     //     non consegna nulla a nessuno.
-    //   - `proberWhenIdle` (bool; assente = true): a coda vuota le routine
-    //     esplorano l'app in cerca di problemi (#448).
     //   - `cap3`, `cap2`, `cap1`, `cap0` (int 0-10): giri di correzione per
     //     livello di rilievo, e `fixInstructions` (string): il testo della fase
     //     2. Senza default nel codice — assenti, la verifica si ferma (#561).
@@ -255,7 +251,7 @@ service cloud.firestore {
     //   - `accountAOff` / `accountBOff` (bool; assente = false): account
     //     escluso — da lì non parte nessuna sessione nuova.
     //   - `roleModels` ({ ruolo: { model?, effort? } }; ruoli new-work,
-    //     verifier, fixer, secaudit, prober; model opus|sonnet|haiku|fable,
+    //     verifier, fixer, secaudit; model opus|sonnet|haiku|fable,
     //     effort low|medium|high|xhigh|max; assente = definizione
     //     dell'agente): modello e sforzo del worker per fase (#1193).
     //
@@ -315,15 +311,15 @@ service cloud.firestore {
 
       // Creazione admin: senza vincoli di forma. La usano l'app dell'owner e
       // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
-      // (#595), la prova del mittente che il create anonimo sotto NON ammette:
+      // (#595), la prova del mittente che il create anonimo sotto NON ammette, né un update dopo:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
-      // La fiducia (SPEC-DOMANDE.md §1) la scrive solo l'Admin SDK: nessun client,
+      // La fiducia (SPEC-DOMANDE.md §1) e la classe del mittente (§10) le scrive solo l'Admin SDK: nessun client,
       // nemmeno l'admin, che è anche ogni sessione locale. `bigliettoLocale` (impronta
       // del biglietto della sessione) solo qui, alla nascita. Sentinella:
       // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved'])
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo'])
         && bigliettoLocaleValido(request.resource.data)
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
@@ -435,8 +431,7 @@ service cloud.firestore {
                     'localApproval',
                     // #903: i feedback che aspetta (forma: waitsForValido).
                     'waitsFor',
-                    // #595: il ripasso dei documenti vecchi con prefisso riservato.
-                    'senderProof',
+                    // `senderProof` no: la prova nasce col documento, dopo non la scrive nessun client (#1037).
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
         // Enum: stati CANONICI della macchina a stati (FEEDBACK-STATES.md) +
@@ -551,8 +546,6 @@ service cloud.firestore {
         && localMergesValido(request.resource.data)
         && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && (!('senderProof' in request.resource.data)
-            || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
         // per il dedup auto-feedback. Stringa breve.
         && request.resource.data.get('capabilityGapId', '') is string
@@ -896,7 +889,7 @@ service cloud.firestore {
       function funzioniContate() {
         return [
           'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
-          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic',
+          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
           'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
           'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
           'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',

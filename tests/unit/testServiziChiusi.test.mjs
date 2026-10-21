@@ -41,7 +41,7 @@ test('il fetch del main verso le schede fallisce come senza rete, il resto passa
 
 function sessioneFinta() {
   const ses = { listener: null, registrazioni: 0 };
-  ses.webRequest = { onBeforeRequest: (fn) => { ses.registrazioni += 1; ses.listener = fn; } };
+  ses.webRequest = { onBeforeRequest: (fn) => { ses.registrazioni += 1; ses.listener = fn; }, onCompleted: () => {}, onErrorOccurred: () => {} };
   ses.chiedi = (url) => new Promise((r) => ses.listener({ url }, r));
   return ses;
 }

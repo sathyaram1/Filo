@@ -90,9 +90,18 @@ test('dopo aver letto cose scritte da altri: il costo 2 chiede, il 3 vuole «con
   expect(lezione.describe).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
   expect(await lezioni(app)).not.toContain('link in grassetto');
 
+  // Il costo 3 di «dimentica» è il «per sempre», che butta anche il testo (#872).
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Uno.\nDue.\nTre.\nQuattro.', PREFERENZE: '' }));
-  const dimentica = await execAction(app, { type: 'DIMENTICA', testo: '.' }, { contesto: [ricercaFatta] });
-  expect(dimentica.needsConfirm === 3 || dimentica.executed === false).toBe(true);
+  const perSempre = await execAction(app, { type: 'DIMENTICA', testo: '.', per_sempre: true }, { contesto: [ricercaFatta] });
+  expect(perSempre.executed).toBe(false);
+  expect(perSempre.needsConfirm).toBe(3);
+  expect(perSempre.describe).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
+  expect(await lezioni(app)).toContain('Quattro.');
+
+  // Senza «per sempre» la riga si nasconde e dal quaderno si rimette: costo 1, parte anche dopo una lettura.
+  const nasconde = await execAction(app, { type: 'DIMENTICA', testo: 'Quattro' }, { contesto: [ricercaFatta] });
+  expect(nasconde.executed).toBe(true);
+  expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.quaderno()).nascoste.map((n) => n.testo))).toEqual(['Quattro.']);
 });
 
 test('un link coi tuoi dati: chiesto da te in un compito pulito si apre; dall\'assistente su una pagina web chiede, e dice perché', async ({ app, testServer }) => {
@@ -274,13 +283,14 @@ test('Conservativo, dopo una lettura: nel diario un comando e un «dimentica» r
       { text: 'Letto.' },
       { toolCalls: [
         { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'rm prova-530.txt' }) },
-        { id: 'f1', name: 'DIMENTICA', arguments: JSON.stringify({ testo: '.' }) },
+        // Il «per sempre» è il costo 3 di «dimentica» (#872): a Conservativo, dopo una lettura, è un no.
+        { id: 'f1', name: 'DIMENTICA', arguments: JSON.stringify({ testo: '.', per_sempre: true }) },
       ] },
       { text: 'Fine.' },
     ]);
     await chiedi(page, 'leggimi note.txt');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Letto.' })).toBeVisible({ timeout: 15000 });
-    await chiedi(page, 'cancella prova-530.txt e dimentica tutto');
+    await chiedi(page, 'cancella prova-530.txt e dimentica per sempre tutto');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Fine.' })).toBeVisible({ timeout: 15000 });
     // Il motivo si legge senza aprire niente: il blocco del lavoro si apre da solo su un rifiuto.
     const blocco = page.locator('.dash-activity').last();
@@ -409,7 +419,8 @@ test('Conservativo dopo una ricerca: «cerca sul web» dall\'Aiuto chiede una vo
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8000 });
   const testo = await confirmText(page);
   // A Conservativo il costo 2 chiede anche a compito pulito: il perché della lettura qui non serve.
-  expect(testo).toContain('Cercare sul web:\n“gatti”');
+  // Il testo cercato sta nel suo riquadro (#592.7): nel testo del popup arriva sulla riga dopo.
+  expect(testo).toContain('Cercare sul web:\ngatti');
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'ok');
   await expect.poll(() => page.evaluate(() => window.__aperte), { timeout: 8000 }).toBe(1);

@@ -15,8 +15,8 @@ async function apri(openTab) {
   await page.evaluate(() => {
     const attesa = (ms) => new Promise((r) => setTimeout(r, ms || 0));
     window.__auto = {
-      enabled: false, routinesEnabled: true, proberWhenIdle: false,
-      autoApprove: { owner: true, filo: true, claude: true, user: true },
+      enabled: false, routinesEnabled: true,
+      autoApprove: { fidato: true, non_fidato: true },
     };
     window.__doc = { maxSessions: 4, priorityAccount: '', accountAOff: false, accountBOff: false };
     window.__passi = [];
@@ -40,7 +40,6 @@ async function apri(openTab) {
           istantanea = foto();
         }
         if (typeof msg.routinesEnabled === 'boolean') { a.routinesEnabled = msg.routinesEnabled; istantanea = foto(); }
-        if (typeof msg.proberWhenIdle === 'boolean') { a.proberWhenIdle = msg.proberWhenIdle; istantanea = foto(); }
         await attesa(p.dopo);
         window.__arrivate += 1;
         return Object.assign({ ok: true }, istantanea);
@@ -75,27 +74,27 @@ test('due interruttori dell\'auto-approvazione spenti di fila restano spenti tut
   const page = await apri(openTab);
   await page.evaluate(() => { window.__passi = [{ rmw: 600 }, {}]; });
 
-  await cambia(page, 'mgAutoApproveOwner', false);
-  await cambia(page, 'mgAutoApproveUser', false);
+  await cambia(page, 'mgAutoApproveFidato', false);
+  await cambia(page, 'mgAutoApproveNonFidato', false);
 
   await arrivate(page, 2);
-  expect(await page.evaluate(() => window.__auto.autoApprove)).toMatchObject({ owner: false, user: false });
-  await expect(page.locator('#mgAutoApproveOwner')).not.toBeChecked();
-  await expect(page.locator('#mgAutoApproveUser')).not.toBeChecked();
+  expect(await page.evaluate(() => window.__auto.autoApprove)).toMatchObject({ fidato: false, non_fidato: false });
+  await expect(page.locator('#mgAutoApproveFidato')).not.toBeChecked();
+  await expect(page.locator('#mgAutoApproveNonFidato')).not.toBeChecked();
 });
 
-test('la risposta dell\'interruttore generale non riaccende un mittente spento nel frattempo', async ({ openTab }) => {
+test('la risposta dell\'interruttore generale non riaccende una fiducia spenta nel frattempo', async ({ openTab }) => {
   const page = await apri(openTab);
   // L'interruttore generale fotografa la mappa subito e risponde tardi; lo
-  // spegnimento di «Altri utenti» parte dopo e arriva prima.
+  // spegnimento di «Non fidati» parte dopo e arriva prima.
   await page.evaluate(() => { window.__passi = [{ dopo: 800 }, {}]; });
 
   await cambia(page, 'mgAutoToggle', true);
-  await cambia(page, 'mgAutoApproveUser', false);
+  await cambia(page, 'mgAutoApproveNonFidato', false);
 
   await arrivate(page, 2);
-  expect(await page.evaluate(() => window.__auto)).toMatchObject({ enabled: true, autoApprove: { user: false } });
-  await expect(page.locator('#mgAutoApproveUser')).not.toBeChecked();
+  expect(await page.evaluate(() => window.__auto)).toMatchObject({ enabled: true, autoApprove: { non_fidato: false } });
+  await expect(page.locator('#mgAutoApproveNonFidato')).not.toBeChecked();
   await expect(page.locator('#mgAutoToggle')).toBeChecked();
 });
 

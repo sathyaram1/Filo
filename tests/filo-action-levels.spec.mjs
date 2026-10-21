@@ -48,6 +48,8 @@ test('accendere il terminale abbassa una difesa: non esegue senza «conferma»; 
   expect(r.needsConfirm).toBe(3);
   expect(r.avviso).toBe('Abbassa una difesa di Filo.');
   expect(r.describe).toContain('erminale');
+  // Il box dice il motivo una volta: l'avviso precede «Scrivi conferma», la spiegazione non lo ripete.
+  expect(r.describe).not.toMatch(/difesa/i);
   expect((await getSettings(page)).terminal?.enabled || false).toBe(false);
 
   // Con la conferma dell'utente (MSG.FILO_CONFIRM_ACTION): esegue.
@@ -244,7 +246,7 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
   expect(cd.needsConfirm).toBeFalsy();
   const dopo = await execAction(app, scarica, DOPO_UNA_RICERCA);
   expect(dopo.needsConfirm).toBe(3);
-  const cartella = (r) => (String(r.describe).match(/Cartella di lavoro: *(\S+)/) || [])[1];
+  const cartella = (r) => (String(r.describe).match(/Cartella di lavoro:\s*(\S+)/) || [])[1];
   expect(cartella(prima)).toBeTruthy();
   expect(cartella(dopo)).toBeTruthy();
   expect(cartella(dopo)).not.toBe(cartella(prima));

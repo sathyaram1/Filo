@@ -30,10 +30,25 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  // Arriva dai content script di Filo, che la pagina non può chiamare: vale solo per la scheda che l'ha mandato.
-  on(MSG.PERMESSO_FILO, async (msg, sender) => {
+  // Arriva dai content script di Filo, che la pagina non può chiamare: «Incolla» legge qui, e il sito resta senza permesso.
+  on(MSG.APPUNTI_DI_FILO, async (_msg, sender) => {
     if (!sender || !sender.tab || !sender.wc) return { ok: false };
-    return { ok: require('../permessiPagine').lasciapassare(sender.wc, msg && msg.tipo) };
+    const { clipboard } = require('electron');
+    let immagine = '';
+    try {
+      const voci = await clipboard.read();
+      for (const prima of [true, false]) {
+        for (const v of voci) {
+          const t = v.types.find((x) => (prima ? x === 'image/png' : /^image\//.test(x)));
+          if (!t || immagine) continue;
+          const b = Buffer.from(await (await v.getType(t)).arrayBuffer());
+          if (b.length) immagine = `data:${t};base64,${b.toString('base64')}`;
+        }
+      }
+    } catch (_) {}
+    let testo = '';
+    try { testo = String((await clipboard.readText()) || ''); } catch (_) {}
+    return { ok: true, testo, immagine };
   });
 
   // Le scelte ricordate stanno solo nelle pagine di Filo: un sito non le legge e non le cambia.
@@ -70,7 +85,14 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     if (win && win._filoTabs) {
       const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
-      return { ok: true, archived: (res && res.archived) || 0 };
+      return {
+        ok: true,
+        archived: (res && res.archived) || 0,
+        // Chi ha chiesto il riordino deve poter distinguere «non c'era niente
+        // da archiviare» da «il riordino non è partito».
+        giudizioMancato: !!(res && res.giudizioMancato),
+        giaInCorso: !!(res && res.giaInCorso),
+      };
     }
     return { ok: false, archived: 0 };
   }));
@@ -110,7 +132,10 @@ module.exports = function register(on, ctx) {
         lastInteractionAt: msg.lastInteractionAt,
         scrollPct: msg.scrollPct,
         formDirty: msg.formDirty,
-      });
+        impronte: msg.impronte,
+        invioPagina: msg.invioPagina === true,
+        pwPrima: msg.pwPrima === true,
+      }, sender.frame);
     }
     return { ok: true };
   });
@@ -133,18 +158,34 @@ module.exports = function register(on, ctx) {
     },
   })));
 
+  // Una scheda chiusa eliminata se ne va anche dal filo, o la home la mostrerebbe ancora e la sua ricerca la ritroverebbe (#869).
+  const ancheDalFilo = async (scelta) => {
+    const schede = (await ArchivedTabs.list()).filter(scelta);
+    return async () => { try { await require('../codaFilo').togliSchedeChiuse(schede); } catch (_) {} };
+  };
+
   on(MSG.DELETE_ARCHIVED_TABS, soloFilo(async (msg) => {
-    const r = await ArchivedTabs.removeMany(msg.ids || []);
+    const ids = new Set(Array.isArray(msg.ids) ? msg.ids : []);
+    const poi = await ancheDalFilo((t) => ids.has(t.id));
+    const r = await ArchivedTabs.removeMany([...ids]);
+    await poi();
     return { ok: true, removed: r.removed, remaining: r.remaining };
   }));
 
   // Come GET_ARCHIVED_TABS, l'elenco torna senza vettori: con migliaia di schede sarebbero megabyte a ogni cancellazione.
   on(MSG.REMOVE_ARCHIVED_TAB, soloFilo(async (msg) => {
+    const poi = await ancheDalFilo((t) => t.id === msg.id);
     await ArchivedTabs.remove(msg.id);
+    await poi();
     return { ok: true, tabs: await ArchivedTabs.listMeta() };
   }));
 
-  on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => ({ ok: true, tabs: await ArchivedTabs.clear() })));
+  on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => {
+    const poi = await ancheDalFilo(() => true);
+    const tabs = await ArchivedTabs.clear();
+    await poi();
+    return { ok: true, tabs };
+  }));
 
   // Solo le pagine di Filo: a un sito direbbe quali siti hai aperto, salvato o archiviato, e gli farebbe chiedere al main un indirizzo qualunque.
   on(MSG.ICONA_SITO, soloFilo(async (msg, sender) => {
@@ -162,20 +203,29 @@ module.exports = function register(on, ctx) {
     return { ok: true, dato };
   }));
 
-  on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender) => {
-    // Riapre la scheda archiviata, ripristinando lo scroll registrato.
+  // Riapre una scheda chiusa com'era: lo scroll e il paese da cui passava. Dal #872 la chiede la ricerca del filo con
+  // l'id della voce d'archivio, e indirizzo, scroll e paese li legge il main; solo le pagine di Filo.
+  on(MSG.REOPEN_ARCHIVED_TAB, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
-    if (win && win._filoTabs && msg.url) {
-      const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
-      const id = win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
+    let voce = null;
+    if (msg && typeof msg.id === 'string' && msg.id) {
+      try { voce = (await ArchivedTabs.list()).find((t) => t.id === msg.id) || null; } catch (_) {}
+      if (!voce) return { ok: false, error: 'not_found' };
+    }
+    const url = voce ? voce.url : msg.url;
+    if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
+      const scroll = voce ? voce.scrollPosition : msg.scrollPct;
+      const pct = typeof scroll === 'number' ? scroll : null;
+      // Per il giudizio sui siti la riapertura è di Filo: la chiedono solo le sue pagine (#814).
+      const id = win._filoTabs.openTab(url, { activate: true, restoreScrollPct: pct, origine: { tipo: 'filo' } });
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.
-      const px = msg.proxy;
+      const px = voce ? voce.proxy : msg.proxy;
       if (id && px && px.country) {
         try { await win._filoTabs.setTabProxy(id, px.country, { tier: px.tier || undefined }); } catch (_) {}
       }
     }
     return { ok: true };
-  });
+  }));
 };

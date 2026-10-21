@@ -164,7 +164,9 @@
     // L'Aiuto non tiene la sua conversazione: il filo è l'unica copia. Editor e Mazzi la tengono.
     const resta = a && r.vista.app !== 'aiuto' ? ` ${a.nel[0].toUpperCase()}${a.nel.slice(1)} la conversazione resta.` : '';
     const testo = `«${r.vista.testo}» sparisce dal filo, e Filo non la ritrova più cercando.${resta}`;
-    const ok = C ? await C.confirm({ title: 'Togliere la conversazione dal filo?', text: testo, okLabel: 'Togli' }) : false;
+    // Il soggetto lo scrive chi ha dato il nome alla conversazione (per l'Aiuto, il sito): nel suo riquadro (#592.7).
+    const parti = ['La conversazione', { citazione: String(r.vista.testo || '') }, `sparisce dal filo, e Filo non la ritrova più cercando.${resta}`];
+    const ok = C ? await C.confirm({ title: 'Togliere la conversazione dal filo?', text: testo, parti, okLabel: 'Togli' }) : false;
     if (!ok) return;
     await d.send({ type: MSG.FILO_CHAT_DELETE, id: r.vista.id });
     r.el.remove();
@@ -238,6 +240,19 @@
     return true;
   }
 
+  // Una riga che arriva con la coda del filo (#869): resta finché la coda la mostra, anche fuori dalle righe del momento.
+  function daCoda(v) {
+    let r = righe.get(v.id);
+    if (!r) { r = crea(v); righe.set(v.id, r); } else disegna(r, v);
+    fisse.add(v.id);
+    return r.el;
+  }
+
+  function apriRiga(el) {
+    const r = [...righe.values()].find((x) => x.el === el);
+    if (r && !r.aperta) alterna(r, true).catch(() => {});
+  }
+
   function init(deps) {
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
@@ -255,5 +270,5 @@
     } catch (_) {}
   }
 
-  global.SN_DASH_RIGHE = { init, aggiorna, mostraSola, quando };
+  global.SN_DASH_RIGHE = { init, aggiorna, mostraSola, quando, daCoda, apri: apriRiga };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -74,6 +74,7 @@
     user('transcribe-image', 'Leggi il testo di un\'immagine', 'Pagine web', A.TRANSCRIBE_IMAGE),
     user('spellcheck-word', 'Correttore ortografico — parola', 'Scrittura', A.SPELLCHECK_WORD),
     user('spellcheck-semantic', 'Correttore ortografico — frase', 'Scrittura', A.SPELLCHECK_SEMANTIC),
+    user('spellcheck-context', 'Correttore — coerenza col contesto della pagina', 'Scrittura', A.SPELLCHECK_CONTEXT),
     user('transcribe-audio', 'Dettatura dal microfono', 'Scrittura', A.TRANSCRIBE_AUDIO),
     user('tts', 'Lettura ad alta voce', 'Scrittura', A.TTS),
 

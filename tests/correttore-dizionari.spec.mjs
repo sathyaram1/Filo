@@ -4,6 +4,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli alla rete, e correggono l\'italiano', async ({ app, openTab, testServer }) => {
   const prima = await app.evaluate(({ app: a }) => ({
@@ -46,5 +47,5 @@ test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli a
     await page.waitForTimeout(300);
     return app.evaluate(() => globalThis.__suggerimentiNativi);
   }, { timeout: 15_000, intervals: [1000] }).toEqual({ parola: 'funzion', voci: expect.arrayContaining(['funzione']) });
-  await expect(page.locator('.sn-menu-correction:visible').first()).not.toBeEmpty({ timeout: 4000 });
+  await expect(menuDi(page).locator('.sn-menu-correction:visible').first()).not.toBeEmpty({ timeout: 4000 });
 });

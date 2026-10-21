@@ -16,6 +16,7 @@
 // così "è stato tradotto" è verificabile carattere per carattere.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const ARTICLE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
   <header><h1 id="title">The end of an era in European football</h1></header>
@@ -130,7 +131,7 @@ const liveToastTexts = (page) => page.evaluate(() => Array.from(document.querySe
 
 async function clickTranslateIcon(page, anchor = 'body') {
   await page.locator(anchor).first().click({ button: 'right', position: { x: 5, y: 5 } });
-  const btn = page.locator('[data-sn-icon-id="translate"]');
+  const btn = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(btn).toBeVisible();
   await btn.click();
 }
@@ -301,7 +302,7 @@ test('traduzione interrotta: si riprende dal tasto destro e i blocchi già trado
 
   // Il menu propone di RIPRENDERE, non di buttare via quel che c'è.
   await page.locator('#p0').click({ button: 'right', position: { x: 5, y: 5 } });
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toBeVisible();
   await expect(icon).toHaveAttribute('aria-label', 'Riprendi traduzione');
 
@@ -336,7 +337,7 @@ test('traduzione interrotta: si può comunque tornare all’originale', async ({
   // Nello stato "a metà" l'icona serve a riprendere: il ritorno all'originale
   // deve restare raggiungibile come voce del menu.
   await page.locator('#p0').click({ button: 'right', position: { x: 5, y: 5 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   // Traccia ispezionabile: il menu nello stato "traduzione a metà".
   await page.screenshot({ path: 'tests/.shots/translate-page-partial-menu.png' }).catch(() => {});
@@ -347,7 +348,7 @@ test('traduzione interrotta: si può comunque tornare all’originale', async ({
 
   // Tornati all'originale, l'icona ripropone "Traduci" (non "Riprendi").
   await page.locator('#p0').click({ button: 'right', position: { x: 5, y: 5 } });
-  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Traduci');
+  await expect(menuDi(page).locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Traduci');
 });
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -493,7 +494,7 @@ test('pagina più lunga del tetto: lo dice e la ripresa la finisce', async ({ ap
 
   // Il menu offre di RIPRENDERE (non di buttare via i blocchi già tradotti).
   await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toBeVisible();
   await expect(icon).toHaveAttribute('aria-label', 'Riprendi traduzione');
   await icon.click();
@@ -670,9 +671,9 @@ test('il testo comparso dopo la traduzione si traduce dal menu, senza ripagare i
 
   // Il menu se ne accorge e offre di tradurre SOLO quelle.
   await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
   // Anche in questo stato si deve poter rinunciare e tornare all'originale.
   await expect(menu.getByText('Mostra originale', { exact: true }).first()).toBeVisible();
@@ -695,7 +696,7 @@ test('il testo comparso dopo la traduzione si traduce dal menu, senza ripagare i
   // offrire il ritorno all'originale.
   await expect.poll(async () => (await toasts(page)).filter((t) => t === 'Pagina tradotta').length, { timeout: 60000 }).toBeGreaterThan(1);
   await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
-  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
+  await expect(menuDi(page).locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
 });
 
 test('il testo comparso dopo torna in inglese con tutto il resto', async ({ app, openTab, testServer }) => {
@@ -708,7 +709,7 @@ test('il testo comparso dopo torna in inglese con tutto il resto', async ({ app,
 
   await page.evaluate(() => window.__addRows(2));
   await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
   await icon.click();
   await expect(page.locator('#later1')).toHaveText(/^IT /, { timeout: 60000 });
@@ -758,7 +759,7 @@ test('anche il testo che arriva dentro un componente del sito si può tradurre d
   await expect(page.locator('#srow2')).toHaveText(/^Component row 2 /);
 
   await page.locator('#plain').click({ button: 'right', position: { x: 5, y: 5 } });
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
   await icon.click();
 
@@ -861,7 +862,7 @@ test('la sezione ripiegata che si apre DOPO si traduce dal menu, senza rifare il
 
   // Il menu se ne accorge e offre di tradurre quello, non di buttare via tutto.
   await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
   await page.screenshot({ path: 'tests/.shots/translate-page-revealed-menu.png' }).catch(() => {});
   await icon.click();
@@ -908,7 +909,7 @@ const foldedTexts = (page) => page.evaluate(() => ({
 
 async function translateNewFromMenu(page) {
   await page.locator('#head').click({ button: 'right', position: { x: 5, y: 5 } });
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
   await icon.click();
 }
@@ -1109,7 +1110,7 @@ test('chiedere l’originale mentre traduce: la pagina torna indietro e ci RESTA
   // A lavoro in corso l'icona serve a fermare: aprire il menu e trovare solo
   // "Traduci la pagina" (che non fa niente) sarebbe un vicolo cieco.
   await page.locator('#q0').click({ button: 'right', position: { x: 5, y: 5 } });
-  const icon = page.locator('[data-sn-icon-id="translate"]');
+  const icon = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(icon).toHaveAttribute('aria-label', 'Mostra originale');
   await icon.click();
 
@@ -1130,7 +1131,7 @@ test('chiedere l’originale mentre traduce: la pagina torna indietro e ci RESTA
 
   // Tornati all'originale, l'icona ripropone "Traduci".
   await page.locator('#q0').click({ button: 'right', position: { x: 5, y: 5 } });
-  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Traduci');
+  await expect(menuDi(page).locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Traduci');
 });
 
 // ---------------------------------------------------------------------------
@@ -1165,7 +1166,7 @@ test('anche il nome della scheda cambia lingua, e torna indietro con la pagina',
 
   // Se si può cambiare, si deve poter tornare indietro.
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-  await page.locator('[data-sn-icon-id="translate"]').click();
+  await menuDi(page).locator('[data-sn-icon-id="translate"]').click();
   await expect.poll(() => page.evaluate(() => document.title), { timeout: 15000 })
     .toBe('The end of an era in European football');
 });
@@ -1225,7 +1226,7 @@ test('il testo dentro un riquadro incorporato viene tradotto insieme alla pagina
 
   // "Mostra originale" riporta indietro anche il riquadro.
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-  await page.locator('[data-sn-icon-id="translate"]').click();
+  await menuDi(page).locator('[data-sn-icon-id="translate"]').click();
   await expect(inFrame(page, '#fbody')).toHaveText(/^The first comment/, { timeout: 30000 });
   await expect(page.locator('#p1')).toHaveText(/^First paragraph/);
 });
@@ -1258,7 +1259,7 @@ test('tasto destro DENTRO il riquadro: cambia lingua anche quello sotto il curso
   // intera: prima traduceva tutto TRANNE il rettangolo sotto il cursore.
   const frame = page.frameLocator('#emb');
   await frame.locator('#fbody').click({ button: 'right', position: { x: 5, y: 5 } });
-  await frame.locator('[data-sn-icon-id="translate"]').click();
+  await menuDi(frame).locator('[data-sn-icon-id="translate"]').click();
 
   await expect(frame.locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
@@ -1363,7 +1364,7 @@ test('riquadro riempito dalla pagina stessa: tradotto, e nessun falso allarme', 
 
   // E si torna indietro anche lì dentro.
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-  await page.locator('[data-sn-icon-id="translate"]').click();
+  await menuDi(page).locator('[data-sn-icon-id="translate"]').click();
   await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^A comment left/, { timeout: 30000 });
   await expect(page.frameLocator('#doc').locator('#sbody')).toHaveText(/^A short english note/);
 });
@@ -1557,7 +1558,7 @@ test('aperta una sezione ripiegata, il tasto destro offre di tradurre il testo s
     await page.evaluate(apri);
     await page.waitForTimeout(120);
     await page.locator('#vis').click({ button: 'right', position: { x: 5, y: 5 } });
-    const btn = page.locator('[data-sn-icon-id="translate"]');
+    const btn = menuDi(page).locator('[data-sn-icon-id="translate"]');
     await expect(btn).toBeVisible();
     const l = await btn.getAttribute('aria-label');
     await page.keyboard.press('Escape');
@@ -1568,7 +1569,7 @@ test('aperta una sezione ripiegata, il tasto destro offre di tradurre il testo s
 
   // Prima di toccare niente l'icona torna all'originale: è il metro degli altri.
   await page.locator('#vis').click({ button: 'right', position: { x: 5, y: 5 } });
-  await expect(page.locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
+  await expect(menuDi(page).locator('[data-sn-icon-id="translate"]')).toHaveAttribute('aria-label', 'Mostra originale');
   await page.keyboard.press('Escape');
 
   const casi = [
@@ -1962,7 +1963,7 @@ test('un riquadro con script nascosto non si paga; aperta la sua sezione, si tra
   await page.evaluate(() => { document.getElementById('d').open = true; });
   await page.waitForTimeout(150);
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-  const btn = page.locator('[data-sn-icon-id="translate"]');
+  const btn = menuDi(page).locator('[data-sn-icon-id="translate"]');
   await expect(btn).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
   await btn.click();
   await expect(page.frameLocator('#folded').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
@@ -1991,7 +1992,7 @@ for (const [nome, apre, chiusa] of [
     await page.evaluate(`(${apre.toString()})(document.getElementById('tab'))`);
     await page.waitForTimeout(150);
     await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-    const btn = page.locator('[data-sn-icon-id="translate"]');
+    const btn = menuDi(page).locator('[data-sn-icon-id="translate"]');
     await expect(btn).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
     await btn.click();
     await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });

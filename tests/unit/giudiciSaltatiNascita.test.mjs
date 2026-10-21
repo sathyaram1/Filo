@@ -56,7 +56,7 @@ test('il segno senza la fiducia, o un valore sconosciuto, non vale; la prova del
     const nota = MR.judgesNote(fb);
     assert.doesNotMatch((nota && nota.text) || '', /I giudici non servono/);
   }
-  // Mittente provato senza verdetti e senza segno: resta «da ri-giudicare», come prima.
+  // Fidato senza verdetti e senza segno: resta «da ri-giudicare», come prima.
   assert.equal(MR.classifyLegacyBlock(routine({ pipeline: pipeline(undefined) })).reason, 'unfiltered');
   assert.equal(MR.classifyLegacyBlock(routine({ fiducia: undefined })).reason, 'unfiltered', 'il segno senza fiducia non lo toglie dal ri-giudizio');
 });

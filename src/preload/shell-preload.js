@@ -49,7 +49,16 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('tabs:permesso-fine', fine);
       return () => { ipcRenderer.removeListener('tabs:permesso', chiedi); ipcRenderer.removeListener('tabs:permesso-fine', fine); };
     },
-    rispondiPermesso: (id, si) => ipcRenderer.invoke('tabs:permesso-risposta', { id, si }),
+    rispondiPermesso: (id, si, fonte) => ipcRenderer.invoke('tabs:permesso-risposta', { id, si, fonte }),
+    // Il microfono di Filo per una pagina web (#586): si apre qui, e alla pagina vanno solo i campioni.
+    onMicrofono: (fn) => {
+      const w = (_event, info) => { try { fn(info || {}); } catch (_) {} };
+      ipcRenderer.on('shell:microfono', w);
+      return () => ipcRenderer.removeListener('shell:microfono', w);
+    },
+    microfonoEsito: (id, esito) => ipcRenderer.send('shell:microfono-esito', { ...(esito || {}), id }),
+    microfonoDati: (id, dati) => ipcRenderer.send('shell:microfono-dati', { id, dati }),
+    microfonoFine: (id) => ipcRenderer.send('shell:microfono-fine', { id }),
     permessi: (id) => ipcRenderer.invoke('tabs:permessi', { id }),
     dimenticaPermessi: (id) => ipcRenderer.invoke('tabs:permessi-dimentica', { id }),
     // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
@@ -58,6 +67,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
     // Banner dei cookie del sito della scheda: true = mostrali, false = Filo li gestisce di nuovo.
     cookieBanners: (id, show) => ipcRenderer.invoke('tabs:cookie-banners', { id, show }),
+    // «Resta connesso qui»: dalla scheda (id) o dalla proposta dopo un accesso (sito).
+    restaConnesso: (id, on, sito) => ipcRenderer.invoke('tabs:resta-connesso', { id, on, sito }),
   },
   // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
   // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal

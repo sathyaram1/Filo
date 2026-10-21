@@ -172,6 +172,65 @@ test('400 report_malformed: si rilascia senza rapporto, e lo si dice', async () 
   assert.match(r.avviso, /report_malformed: campo x/);
 });
 
+// #882: un server che non conosce ancora il campo `listino` non deve far rilasciare ogni routine senza rapporto.
+const conListino = { ...RAPPORTO, listino: '2026-10-06' };
+const rifiutaListino = (corpi, extra = () => null) => async (u, init) => {
+  const b = JSON.parse(init.body); corpi.push(b);
+  return (b.report && extra(b)) || (b.report && 'listino' in b.report
+    ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo listino' })
+    : reply(200, { ok: true }));
+};
+
+test('400 report_malformed sul listino: il rapporto parte senza il campo, con la versione nelle note', async () => {
+  const corpi = [];
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl: rifiutaListino(corpi), ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.equal('listino' in corpi[1].report, false);
+  assert.deepEqual(corpi[1].report.notes, ['una nota', 'listino 2026-10-06']);
+  assert.equal(corpi[1].report.costUsd, 1, 'il resto del rapporto resta');
+  assert.match(r.avviso, /campo listino.*nelle note/);
+  assert.equal(conListino.listino, '2026-10-06', 'l\'originale non viene mutilato');
+});
+
+test('un server che accetta il listino lo riceve al primo colpo, senza avvisi', async () => {
+  const corpi = [];
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal(r.rapporto, 'allegato');
+  assert.equal(corpi.length, 1);
+  assert.equal(corpi[0].report.listino, '2026-10-06');
+  assert.equal('avviso' in r, false);
+});
+
+test('malformato anche senza listino: si rilascia senza rapporto, col dettaglio del primo rifiuto', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: corpi.length === 1 ? 'campo listino' : 'campo y' }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'scartato');
+  assert.equal(corpi.length, 3);
+  assert.equal('report' in corpi[2], false);
+  assert.match(r.avviso, /report_malformed: campo listino\): rilasciato SENZA rapporto/);
+});
+
+test('troppo grande e poi malformato sul listino: arriva quello snello senza listino', async () => {
+  const corpi = [];
+  const grosso = (b) => (b.report.tools && b.report.tools.byName ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8000 }) : null);
+  const r = await releaseConRapporto('t', '', conListino, { fetchImpl: rifiutaListino(corpi, grosso), ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  const ultimo = corpi[corpi.length - 1].report;
+  assert.ok(ultimo, 'un rapporto è arrivato');
+  assert.equal('listino' in ultimo, false);
+  assert.equal('byName' in ultimo.tools, false);
+  assert.match(r.avviso, /listino/);
+  assert.match(r.avviso, /9000.*8000/);
+});
+
 test('un altro rifiuto del server NON viene ritentato senza rapporto: il no è una risposta', async () => {
   let n = 0;
   const fetchImpl = async () => { n += 1; return reply(401, { ok: false, reason: 'dead_ticket' }); };

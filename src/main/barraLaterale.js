@@ -32,7 +32,8 @@ const PAGINE_NEL_MENU = 15;
 const FISSE = new Set(['history', 'apps', 'redteam', 'settings', 'account']);
 const MENU_DELLA_SHELL = new Set(['apps', 'settings', 'account']);
 const PAGINE_FISSE = {
-  history: 'filo://archive/archive.html',
+  // Il quaderno delle memorie ha preso il posto della Cronologia (#872): il comando tiene il suo nome per le disposizioni salvate.
+  history: 'filo://quaderno/quaderno.html',
   redteam: 'filo://redteam/redteam.html',
 };
 const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
@@ -386,6 +387,9 @@ class BarraLaterale {
     if (sito) daCoprire.add(sito);
     const conferme = this.tabs.conferme;
     try { if (conferme && conferme.vista && conferme.vista.getBounds().width > 0) daCoprire.add(conferme.vista); } catch (_) {}
+    // La barra aperta copre l'email proposta sotto un campo che le sta accanto: è un gesto dell'utente, la proposta no.
+    const proposta = this.tabs.propostaEmail;
+    if (proposta && proposta.mostrata && proposta.vista) daCoprire.add(proposta.vista);
     const mia = figli().indexOf(this.vista);
     if (mia >= 0 && !figli().slice(mia + 1).some((v) => daCoprire.has(v))) return;
     if (mia >= 0) cv.removeChildView(this.vista);
@@ -696,7 +700,7 @@ class BarraLaterale {
     const apriQui = { label: '', action: 'barra:sistema' };
     const voci = [];
     if (comando === 'history') {
-      voci.push({ ...apriQui, label: 'Apri la Cronologia' }, { label: 'Cronologia AI', action: 'barra:pagina:ai' });
+      voci.push({ ...apriQui, label: 'Apri il quaderno delle memorie' }, { label: 'Cronologia AI', action: 'barra:pagina:ai' });
     } else if (comando === 'redteam') {
       voci.push({ ...apriQui, label: 'Apri Red-team' });
     } else if (comando === 'apps') {

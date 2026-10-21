@@ -10,14 +10,15 @@
 //
 // Entrambe hanno la stessa causa e la stessa cura: scrivere il file su disco
 // mentre arriva invece che alla fine. Da lì il tetto sparisce e i byte ricevuti
-// diventano un dato di avanzamento mostrabile — e l'unico posto sensato dove
-// mostrarlo è la barra degli scaricamenti che Filo ha già (#410.1), la stessa
-// che segue i download partiti da un link.
+// diventano un dato di avanzamento mostrabile, nello stesso registro dei
+// download partiti da un link (#410.1). Dal #941 fuori dalla home l'avanzamento
+// sta sull'icona di Filo nella barra delle applicazioni.
 //
 // Gli assert sono di SUCCESSO:
 //  - il file cresce su disco MENTRE il trasferimento è ancora in corso (prima
 //    non esisteva niente fino all'ultimo byte);
-//  - la barra mostra il filmato in arrivo con una percentuale intermedia;
+//  - l'icona nella barra delle applicazioni mostra il filmato in arrivo con
+//    una frazione intermedia, e a fine corsa la barra se ne va;
 //  - un file più grande del vecchio tetto arriva integro;
 //  - "Annulla" ferma davvero il trasferimento.
 // Senza il fix: nessuna voce nella barra, nessun file parziale, e il file oltre
@@ -27,6 +28,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Serve `chunk * chunks` byte a blocchi, con una pausa fra l'uno e l'altro: così
 // il trasferimento dura abbastanza da poter essere osservato MENTRE accade (è
@@ -71,7 +73,7 @@ function pageWithVideo(src) {
 
 async function saveVideo(page) {
   await page.locator('#v').click({ button: 'right', position: { x: 20, y: 20 } });
-  const item = page.locator('.sn-menu button', { hasText: 'Salva video come' });
+  const item = menuDi(page).locator('.sn-menu button', { hasText: 'Salva video come' });
   await expect(item).toBeVisible();
   await item.click();
 }
@@ -83,7 +85,7 @@ const entryNamed = async (shell, name) => {
   return ((r && r.items) || []).find((it) => it.filename === name) || null;
 };
 
-test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanzamento', async ({ app, shell, openTab, testServer }) => {
+test('salvando un filmato il file cresce su disco e l\'icona di Filo ne mostra l\'avanzamento', async ({ app, shell, openTab, testServer }) => {
   // ~7,5MB in 30 blocchi da 200ms: ~6 secondi di trasferimento, abbastanza per
   // osservarlo senza che il test debba correre.
   const media = await slowServer({ chunk: 256 * 1024, chunks: 30, gapMs: 200, contentType: 'video/mp4' });
@@ -92,6 +94,15 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
     const pageUrl = page.url();
     const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
     expect(dir).toBeTruthy();
+
+    // L'icona nella barra delle applicazioni non si fotografa: si ascolta cosa le chiede Filo.
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      globalThis.__barra = [];
+      const orig = w.setProgressBar.bind(w);
+      w.setProgressBar = (value, opts) => { globalThis.__barra.push({ value, mode: opts && opts.mode }); return orig(value, opts); };
+    });
+    const chiamateBarra = () => app.evaluate(() => globalThis.__barra.slice());
 
     await saveVideo(page);
 
@@ -106,26 +117,13 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
     const firstSize = existsSync(part) ? statSync(part).size : 0;
     expect(firstSize).toBeLessThan(media.total); // il file c'è ed è ancora parziale
 
-    // 2) L'AVANZAMENTO È MOSTRATO, e la barra in alto lo sta dicendo all'utente.
+    // 2) L'AVANZAMENTO È MOSTRATO, sull'icona di Filo nella barra delle applicazioni.
     //    Il primo istante utile viene "agganciato": il trasferimento prosegue
     //    mentre il test guarda, quindi ciò che conta è averlo visto in corso.
     let live = null;
-    let bar = null;
     await expect.poll(async () => {
       const e = await entryNamed(shell, 'filmato.mp4');
-      if (e && e.state === 'progressing' && e.receivedBytes > 0 && !live) {
-        live = e;
-        bar = await shell.evaluate(() => {
-          const btn = document.getElementById('dl-indicator');
-          const fill = document.getElementById('dl-ind-fill');
-          if (!btn || !fill) return { missing: true };
-          return {
-            hidden: !!btn.hidden,
-            active: btn.classList.contains('active'),
-            width: fill.style.width,
-          };
-        });
-      }
+      if (e && e.state === 'progressing' && e.receivedBytes > 0 && !live) live = e;
       return live ? 'in corso' : (e ? e.state : 'assente');
     }, { timeout: 20000 }).toBe('in corso');
 
@@ -135,11 +133,8 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
     const percent = Math.round((live.receivedBytes / live.totalBytes) * 100);
     expect(percent).toBeGreaterThan(0);
     expect(percent).toBeLessThan(100);
-    expect(bar.missing, 'l\'indicatore degli scaricamenti non esiste nella shell').toBeFalsy();
-    expect(bar.hidden).toBe(false);
-    expect(bar.active).toBe(true);
-    expect(bar.width).not.toBe('');
-    expect(bar.width).not.toBe('0%');
+    await expect.poll(async () => (await chiamateBarra())
+      .some((c) => c.mode === 'normal' && c.value > 0 && c.value < 1), { timeout: 20000 }).toBe(true);
 
     // 3) A fine corsa: il file completo, integro, e nessun file di lavoro in giro.
     await expect
@@ -152,6 +147,8 @@ test('salvando un filmato il file cresce su disco e la barra ne mostra l\'avanza
     await expect
       .poll(async () => { const e = await entryNamed(shell, 'filmato.mp4'); return e ? e.state : null; }, { timeout: 20000 })
       .toBe('completed');
+    // Finito il filmato la barra sull'icona se ne va, invece di restare piena.
+    await expect.poll(async () => (await chiamateBarra()).at(-1), { timeout: 10000 }).toEqual({ value: -1, mode: 'none' });
 
     // La scheda non è navigata sul filmato e l'utente ha la sua conferma.
     expect(page.url()).toBe(pageUrl);

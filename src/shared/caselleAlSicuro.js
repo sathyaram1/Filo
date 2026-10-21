@@ -1,6 +1,6 @@
 // Caselle senza «Salva» nelle pagine filo://: quello che si scrive parte dopo una pausa, al primo segno di uscita e prima
-// che la scheda si chiuda (#590.2, #590.5, #666). Non salva niente da sé: chiama chi la pagina registra.
-// Regole: patterns/un-testo-scritto-in-una-casella-si-salva-da-solo-o-lo-perdi.md.
+// che la scheda, la finestra o Filo si chiudano (#590.2, #590.5, #666). Non salva niente da sé: chiama chi la pagina registra.
+// Regole: patterns/un-testo-scritto-in-una-casella-si-salva-da-solo-o-lo-perdi.md, tests/unit/caselleAlSicuro.test.mjs.
 
 (function (global) {
   'use strict';
@@ -13,26 +13,71 @@
   // come la lista dei bloccati che le schede aperte seguono dopo tre secondi, o all'uscita.
   const PAUSA_LUNGA_MS = 3000;
 
-  // `uscita` gira all'uscita vera (scheda in secondo piano, ricarica): lì si accendono gli avvisi rimasti in attesa.
+  // Le uscite vere della pagina, una lista sola per tutte le istanze.
+  const alleUscite = new Set();
+  function uscitaVera() {
+    for (const fn of [...alleUscite]) {
+      try { fn(); } catch (_) {}
+    }
+  }
+  // Acceso alla prima casella, non al caricamento: SN_MSG può arrivare dopo questo file.
+  let ascolto = false;
+  function accendi() {
+    if (ascolto || !global.addEventListener || !global.document) return;
+    ascolto = true;
+    global.addEventListener('pagehide', uscitaVera);
+    // In una scheda di Filo il cambio di scheda lo annuncia il main con TAB_IN_VISTA: `document.hidden` resta falso.
+    // Lo stesso avviso arriva prima che la scheda, la finestra o Filo si chiudano, se la pagina ha detto di aspettare.
+    global.document.addEventListener('visibilitychange', () => {
+      if (global.document.visibilityState === 'hidden') uscitaVera();
+    });
+    const MSG = global.SN_MSG && global.SN_MSG.MSG;
+    if (MSG && global.chrome && global.chrome.runtime && global.chrome.runtime.onMessage) {
+      global.chrome.runtime.onMessage.addListener((msg) => {
+        if (msg && msg.type === MSG.TAB_IN_VISTA && !msg.inVista) uscitaVera();
+      });
+    }
+  }
+
+  // Il main sa se nella pagina c'è qualcosa da spedire: chiudendola la avvisa e aspetta il «niente più» (#666). Lo stato
+  // è della pagina, non della singola istanza: due istanze (Opzioni e Altro) non si smentiscono a vicenda. Il «niente
+  // più» parte a fine giro: chi spedisce manda il suo messaggio senza await davanti, così sullo stesso canale arriva prima.
+  const inSospeso = new Set();
+  let segnalato = false;
+  let rimandato = false;
+  function statoPagina() {
+    for (const chi of inSospeso) { if (chi()) return true; }
+    return false;
+  }
+  function manda(ora) {
+    const MSG = global.SN_MSG && global.SN_MSG.MSG;
+    if (ora === segnalato || !MSG || !MSG.CASELLE_IN_SOSPESO) return;
+    segnalato = ora;
+    try {
+      const p = global.chrome.runtime.sendMessage({ type: MSG.CASELLE_IN_SOSPESO, inSospeso: ora });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+  }
+  function segnala() {
+    if (statoPagina()) { manda(true); return; }
+    if (rimandato) return;
+    rimandato = true;
+    Promise.resolve().then(() => { rimandato = false; manda(statoPagina()); });
+  }
+
+  // `uscita` gira all'uscita vera (scheda in secondo piano, ricarica, chiusura): lì si accendono gli avvisi in attesa.
+  // `spegni(nome)` toglie la conferma di prima appena arriva una modifica: «Salvato» non resta acceso su un testo nuovo.
   function crea(opts) {
     const uscita = opts && typeof opts.uscita === 'function' ? opts.uscita : null;
+    const spegni = opts && typeof opts.spegni === 'function' ? opts.spegni : null;
     const spedizioni = new Map();
     const daSpedire = new Set();
+    // Un numero per casella che cresce a ogni modifica e a ogni spedizione: la conferma di un salvataggio vale
+    // solo se dopo non è cambiato niente, altrimenti «Salvato» parlerebbe di uno stato già superato.
+    const giro = new Map();
     let timer = null;
-
-    // Il main sa se c'è qualcosa da spedire: chiudendo la scheda avvisa la pagina e aspetta il «niente più» (#666). Chi
-    // spedisce manda il suo messaggio senza await davanti, così sullo stesso canale arriva prima di questo.
-    const MSG = global.SN_MSG && global.SN_MSG.MSG;
-    let segnalato = false;
-    function segnala() {
-      const ora = daSpedire.size > 0;
-      if (ora === segnalato || !MSG || !MSG.CASELLE_IN_SOSPESO) return;
-      segnalato = ora;
-      try {
-        const p = global.chrome.runtime.sendMessage({ type: MSG.CASELLE_IN_SOSPESO, inSospeso: ora });
-        if (p && typeof p.catch === 'function') p.catch(() => {});
-      } catch (_) {}
-    }
+    const avanza = (nome) => { const n = (giro.get(nome) || 0) + 1; giro.set(nome, n); return n; };
+    inSospeso.add(() => daSpedire.size > 0);
 
     function parti(avvisi) {
       clearTimeout(timer);
@@ -47,17 +92,25 @@
     }
 
     function cambiato(nome, e, o) {
+      avanza(nome);
       daSpedire.add(nome);
       segnala();
+      if (spegni) { try { spegni(nome); } catch (_) {} }
       if (e && e.inputType && !BATTUTA.has(e.inputType)) { parti(false); return; }
       clearTimeout(timer);
       timer = setTimeout(() => parti(false), (o && o.pausa) || PAUSA_MS);
     }
 
+    // Restituisce il biglietto da passare ad `aggiornata` quando la scrittura torna.
     function spedita(nome) {
       daSpedire.delete(nome);
       if (!daSpedire.size) { clearTimeout(timer); timer = null; }
       segnala();
+      return avanza(nome);
+    }
+
+    function aggiornata(nome, biglietto) {
+      return giro.get(nome) === biglietto && !daSpedire.has(nome);
     }
 
     function subito(avvisi) {
@@ -75,23 +128,30 @@
     global.document.addEventListener('keydown', (e) => {
       if (e.key === 'Control' || e.key === 'Meta' || e.key === 'Alt') subito(false);
     }, true);
-    // In una scheda di Filo il cambio di scheda lo annuncia il main con TAB_IN_VISTA: `document.hidden` resta falso.
-    global.document.addEventListener('visibilitychange', () => {
-      if (global.document.visibilityState === 'hidden') esci();
-    });
-    if (MSG && global.chrome && global.chrome.runtime && global.chrome.runtime.onMessage) {
-      global.chrome.runtime.onMessage.addListener((msg) => {
-        if (msg && msg.type === MSG.TAB_IN_VISTA && !msg.inVista) esci();
-      });
-    }
+    alleUscite.add(esci);
+    accendi();
 
     return {
       registra: (nome, fn) => { spedizioni.set(nome, fn); },
       cambiato,
       spedita,
+      aggiornata,
+      inAttesa: (nome) => (nome ? daSpedire.has(nome) : daSpedire.size > 0),
       subito,
     };
   }
 
-  global.SN_CASELLE = { crea, BATTUTA, PAUSA_MS, PAUSA_LUNGA_MS };
+  // Un campo che si conferma quando il cursore lo lascia (una rinomina, la riga di un elenco): a metà non deve
+  // partire, né al Ctrl né alla pausa, ma se la pagina sparisce prima la conferma parte lo stesso.
+  function alVolo() {
+    let conferma = null;
+    inSospeso.add(() => conferma !== null);
+    const fine = () => { const f = conferma; conferma = null; alleUscite.delete(fine); if (f) f(); segnala(); };
+    return {
+      scrivendo(fn) { conferma = fn; alleUscite.add(fine); accendi(); segnala(); },
+      confermato() { conferma = null; alleUscite.delete(fine); segnala(); },
+    };
+  }
+
+  global.SN_CASELLE = { crea, alVolo, BATTUTA, PAUSA_MS, PAUSA_LUNGA_MS };
 })(typeof window !== 'undefined' ? window : globalThis);

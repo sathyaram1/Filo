@@ -251,26 +251,47 @@ if (!IS_SUBFRAME) try {
         try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
       }
     }
+    // «Resta connesso»: la scheda è passata in un altro jar e la memoria della pagina la segue.
+    for (const [chiave, st] of [['semina', 'localStorage'], ['seminaSessione', 'sessionStorage']]) {
+      if (!w || !Array.isArray(w[chiave])) continue;
+      for (const voce of w[chiave]) {
+        try { if (Array.isArray(voce)) window[st].setItem(String(voce[0]), String(voce[1])); } catch (_) {}
+      }
+    }
+    if (w && Array.isArray(w.seminaDb) && w.seminaDb.length) require('./semina-database.js').semina(window.indexedDB, w.seminaDb);
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
-// Le notifiche si leggono «da chiedere» finché l'utente non ha deciso (#591): regole in preload/stato-permessi.js.
-if (!IS_SUBFRAME) try {
+// Nel mondo della pagina, e nei riquadri vuoti che lei si crea (#1057, regole in preload/riquadri-vuoti.js): lo schermo
+// alla maniera vecchia fa la domanda di sempre e poi riceve un no, senza far morire la scheda (#586, preload/
+// schermo-vecchio.js; un avviso finto della pagina fa negare solo la sua prossima domanda), e nel frame principale i
+// permessi mai decisi si leggono «da chiedere» (#591, preload/stato-permessi.js).
+try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
-  if (/^(https?|blob):/i.test(loc)) {
-    const { buildStatoPermessiSource, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE } = require('./stato-permessi.js');
-    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
-    webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});
-    // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
-    const scrittura = () => {
-      ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
-        .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
-    };
+  if (!/^(filo|devtools):/i.test(loc)) {
+    const { buildSchermoVecchioCorpo, EVENTO_SCHERMO_VECCHIO } = require('./schermo-vecchio.js');
+    const { buildRiquadriVuotiSource } = require('./riquadri-vuoti.js');
+    const corpi = [buildSchermoVecchioCorpo()];
+    const ascolti = [[EVENTO_SCHERMO_VECCHIO, () => { try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {} }]];
+    // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
+    if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
+      const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
+      corpi.push(buildStatoPermessiCorpo(ipcRenderer.sendSync('filo:permessi-stato', loc)));
+      // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
+      ascolti.push([SCRITTURA, () => {
+        ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
+          .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
+      }]);
+      for (const parte of new Set(Object.values(PARTI_LETTE))) {
+        ascolti.push([SI_DATO + parte, (e) => { try { if (ipcRenderer.sendSync('filo:permessi-si', parte) === true) e.preventDefault(); } catch (_) {} }]);
+      }
+    } catch (_) {}
     // La riscrittura da capo (document.open) toglie gli ascolti della finestra: si rimettono.
-    const ascoltaScrittura = () => window.addEventListener(SCRITTURA, scrittura, true);
-    ascoltaScrittura();
-    new MutationObserver(ascoltaScrittura).observe(document, { childList: true });
+    const ascolta = () => { for (const [tipo, f] of ascolti) window.addEventListener(tipo, f, true); };
+    ascolta();
+    new MutationObserver(ascolta).observe(document, { childList: true });
+    // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
+    webFrame.executeJavaScript(buildRiquadriVuotiSource(corpi), false).catch(() => {});
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
@@ -620,6 +641,35 @@ try {
     if (!a || !/^file:/i.test(String(a.href))) return;
     try { ipcRenderer.send('filo:indirizzo-rifiutato', String(a.href)); } catch (_) {}
   };
+  // #965 — un link «scarica» verso un file da avviso non parte: l'avviso compare sulla pagina, come per un link che apre.
+  // Dopo la pagina, che può gestire il clic da sé; confermato, il main lo riclicca da qui (SN_RISCARICA).
+  let scaricaDaRifare = null;
+  const scaricaScelto = (e) => {
+    if (!e.isTrusted || e.defaultPrevented || e.button !== 0) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href && n.hasAttribute('download'));
+    if (!a || !/^https?:/i.test(String(a.href))) return;
+    let fermo = false;
+    try { fermo = ipcRenderer.sendSync('filo:scaricamento-scelto', String(a.href), String(a.getAttribute('download') || '')) === true; } catch (_) {}
+    if (!fermo) return;
+    e.preventDefault();
+    scaricaDaRifare = a;
+  };
+  // `nome`: un file che la pagina ha costruito da sé (blob:, data:) e scaricato senza un link cliccato, rifatto col suo nome.
+  globalThis.SN_RISCARICA = (url, nome) => {
+    const a = scaricaDaRifare;
+    scaricaDaRifare = null;
+    if (a && a.isConnected && String(a.href) === String(url)) { a.click(); return true; }
+    if (!nome || !/^(blob|data|filesystem):/i.test(String(url))) return false;
+    const b = document.createElement('a');
+    b.href = String(url);
+    b.download = String(nome);
+    b.style.display = 'none';
+    (document.body || document.documentElement).appendChild(b);
+    b.click();
+    b.remove();
+    return true;
+  };
   const ascolta = (win) => {
     // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
     for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
@@ -631,6 +681,7 @@ try {
       win.addEventListener(ev, scelto, { passive: true });
       win.addEventListener(ev, rifiutato, { passive: true });
     }
+    win.addEventListener('click', scaricaScelto);
     win.addEventListener('pointerover', confine, { capture: true, passive: true });
   };
   // I documenti che la pagina si scrive da sé non hanno un preload loro (il riquadro vuoto riempito dallo script), o
@@ -731,6 +782,31 @@ try {
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
+// Il microfono di Filo su una pagina web lo apre la cornice (#586): qui arrivano i campioni a 16 kHz per SN_ASCOLTO,
+// solo nel mondo di Filo. La pagina non riceve il permesso, nemmeno durante una dettatura. Main: services/microfonoDiFilo.js.
+const microfoniAperti = new Map();
+ipcRenderer.on('microfono:dati', (_event, d) => {
+  const m = d && microfoniAperti.get(d.id);
+  if (!m) return;
+  if (d.fine) { microfoniAperti.delete(d.id); try { m.suFine(); } catch (_) {} return; }
+  if (d.dati) { try { m.suDati(d.dati instanceof Float32Array ? d.dati : Float32Array.from(d.dati)); } catch (_) {} }
+});
+globalThis.SN_MICROFONO_CORNICE = {
+  async apri({ suDati, suFine } = {}) {
+    let r = null;
+    try { r = await ipcRenderer.invoke('microfono:apri'); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.id) throw Object.assign(new Error('microfono'), { name: (r && r.errore) || 'NotAllowedError' });
+    microfoniAperti.set(r.id, { suDati: suDati || (() => {}), suFine: suFine || (() => {}) });
+    return {
+      rate: r.rate,
+      chiudi: () => {
+        if (!microfoniAperti.delete(r.id)) return;
+        ipcRenderer.invoke('microfono:chiudi', { id: r.id }).catch(() => {});
+      },
+    };
+  },
+};
+
 // Adattatore: ascolto shortcut:triggered e ribroadcast come filo:broadcast.
 // `context` è opzionale: lo usa la voce "Aiuto" del menu tasto destro su una
 // tab per dire all'agente da dove è stato invocato (url + titolo della scheda).
@@ -830,9 +906,11 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo CS] gesto', e); } // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
+  try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
+  try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
@@ -841,6 +919,8 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'riquadroRotto.js')); } catch (e) { console.error('[Filo CS] riquadroRotto', e); } // #760 — la proposta sopra il riquadro
   try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
+  try { require(path.join(SHARED_DIR, 'campoAccesso.js')); } catch (e) { console.error('[Filo CS] campoAccesso', e); } // #1124 — quali campi chiedono l'email
+  try { require(path.join(CONTENT_DIR, 'propostaEmail.js')); } catch (e) { console.error('[Filo CS] propostaEmail', e); } // #1124 — anche nei riquadri: il campo può stare lì
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
@@ -944,6 +1024,7 @@ function vediCampiDelicati() {
 function startSafebrowse() {
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+  try { require(path.join(CONTENT_DIR, 'safebrowseLinks.js')); } catch (e) { console.error('[Filo CS] safebrowseLinks', e); } // #965
 }
 
 if (!IS_SUBFRAME) {
@@ -966,5 +1047,15 @@ if (!IS_SUBFRAME) {
       window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });
     } catch (_) {}
   }
+  // #1124 — un campo email in un riquadro qui dentro chiede dove sta: il gesto è stato là, ma la misura tocca a noi.
+  try {
+    window.addEventListener('message', (e) => {
+      const segno = e.data && typeof e.data === 'object' ? e.data.filoPropostaEmail : null;
+      if (contentScriptsStarted || typeof segno !== 'string' || !e.source) return;
+      const sorgente = e.source;
+      ensureContentScripts();
+      waitForContentScripts(() => { try { globalThis.SN_PROPOSTA_EMAIL?.segno?.(segno, sorgente); } catch (_) {} });
+    });
+  } catch (_) {}
 }
 

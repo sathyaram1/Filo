@@ -153,7 +153,8 @@
   // provider: la richiesta FALLISCE in modo evidente invece di passare da un host
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
-  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
+  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`, e
+  // nessun ripiego: se il produttore non risponde l'errore deve vedersi (#1059).
   // `ownKey`: la chiamata è pagata con la chiave propria (la lista la sceglie excludedFor).
   function providerBlock(routing, model, { tools = false, ownKey = false } = {}) {
     const p = {};
@@ -169,8 +170,20 @@
     if (tools) p.require_parameters = true;
     const C = global.SN_CONST;
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
-    if (rule) p.only = rule.only.slice();
+    if (rule) {
+      p.only = rule.only.slice();
+      p.allow_fallbacks = false;
+    }
+    if (zdrApplies(model, ownKey)) p.zdr = true;
     return Object.keys(p).length ? p : null;
+  }
+
+  // Ritenzione zero (#831): quando paga Filo, cioè con ogni chiave che non è la propria, solo host che non conservano
+  // domanda e risposta. I modelli da comprare solo dal produttore hanno già `only` (#904) e restano fuori.
+  function zdrApplies(model, ownKey) {
+    if (ownKey) return false;
+    const C = global.SN_CONST;
+    return !(C && typeof C.producerOnlyRule === 'function' && C.producerOnlyRule(model));
   }
 
   // Il corpo serializzato per la chiave con cui parte, col suo blocco `provider`.
@@ -508,6 +521,7 @@
       err.status = 502;
       err.provider = 'openrouter';
       if (servedBy) err.hostFallito = servedBy;
+      produttoreNonRisponde(err, model);
       throw err;
     }
     return {
@@ -604,6 +618,7 @@
     // Gli host si giudicano con la lista con cui è partita la risposta arrivata (#962).
     const ownKey = res.keySource === 'own';
     if (res.status === 404 && model && await nessunHostAmmesso(err, { apiKey, model, providerRouting, ownKey })) return err;
+    if (res.status === 404 && model && await nessunHostZdr(err, { apiKey, model, providerRouting, ownKey, errText })) return err;
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
@@ -620,14 +635,38 @@
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
+    produttoreNonRisponde(err, model, errText);
     return err;
+  }
+
+  // Un modello da comprare solo dal produttore (#904) non ripiega su altri host: se il produttore non risponde, a catena
+  // finita la richiesta fallisce con la frase del #828 e questo motivo (#829). Il 500 è del router, non dell'host.
+  const PRODUTTORE_GIU = new Set([408, 502, 503, 504, 529]);
+  const NESSUN_AMMESSO = /no allowed providers|provider restrictions/i;
+  function produttoreNonRisponde(err, model, errText = '') {
+    const C = global.SN_CONST;
+    const rule = model && C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
+    if (!rule || (err.code && err.code !== 'NO_PROVIDER_ALLOWED' && err.code !== 'DATA_POLICY')) return false;
+    const filtrati = err.status === 404 && NESSUN_AMMESSO.test(errText) && !/settings\/privacy/i.test(errText);
+    if (!PRODUTTORE_GIU.has(err.status) && !filtrati) return false;
+    const CE = global.SN_CHAT_ERRORS;
+    const motivo = CE && typeof CE.motivoProduttoreGiu === 'function' ? CE.motivoProduttoreGiu(rule.nome) : '';
+    console.warn(`[Filo policy] "${model}" lo serve solo ${rule.nome || rule.only.join(', ')}, che non risponde: ${err.message}`);
+    err.dettaglio = err.message;
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo }) : `NO_ALLOWED_HOST ${model}`;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'produttore';
+    err.motivo = motivo;
+    err.model = model;
+    err.hosts = [];
+    return true;
   }
 
   // Un 404 del router su un modello che servono solo host esclusi (#828). Lo dicono gli host dichiarati, non il testo
   // dell'errore, che il router può cambiare; e vince sugli altri motivi del 404, perché strumenti e tetto non contano più.
   async function nessunHostAmmesso(err, { apiKey, model, providerRouting, ownKey }) {
     let v = null;
-    try { v = await hostVerdict({ apiKey, model, providerRouting, ownKey }); } catch (_) { v = null; }
+    try { v = await hostVerdict({ apiKey, model, providerRouting, ownKey, filoPays: false }); } catch (_) { v = null; }
     if (!v || v.ok || v.reason !== 'excluded') return false;
     console.warn(`[Filo policy] "${model}" lo servono solo host esclusi (${v.excluded.join(', ')}): ${err.message}`);
     const CE = global.SN_CHAT_ERRORS;
@@ -637,6 +676,31 @@
     err.reason = 'excluded';
     err.model = model;
     err.hosts = v.excluded;
+    return true;
+  }
+
+  // Lo stesso 404 quando a svuotare la lista è la ritenzione zero (#831): nessun host che la dichiara è fra gli ammessi.
+  // Lo dice il catalogo; senza, solo un rifiuto che la nomina. Il codice è quello di #828: la frase ha un punto solo.
+  const RIFIUTI_SENZA_HOST = ['DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'PARAMS'];
+  async function nessunHostZdr(err, { apiKey, model, providerRouting, ownKey, errText }) {
+    if (!zdrApplies(model, ownKey)) return false;
+    const nomina = /zero data retention|\bzdr\b/i.test(String(errText || ''));
+    if (!nomina && !RIFIUTI_SENZA_HOST.includes(routerRefusal(errText))) return false;
+    let zdr = null;
+    try { zdr = await zdrHostsOf({ apiKey, model }); } catch (_) { zdr = null; }
+    const C = global.SN_CONST;
+    const excluded = excludedFor(providerRouting, ownKey);
+    const colpa = Array.isArray(zdr) && C && typeof C.hostPolicyViolation === 'function'
+      ? !zdr.some((z) => !C.hostPolicyViolation(z, model, excluded)) : nomina;
+    if (!colpa) return false;
+    console.warn(`[Filo policy] "${model}": nessun host ammesso a ritenzione zero: ${err.message}`);
+    const CE = global.SN_CHAT_ERRORS;
+    err.dettaglio = err.message;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'zdr';
+    err.model = model;
+    err.hosts = [];
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo: CE.motivoNessunHost(err) }) : `NO_ALLOWED_HOST ${model}`;
     return true;
   }
 
@@ -709,7 +773,50 @@
     return entry.hosts || entry.pending;
   }
 
-  function forgetModelHosts() { hostsCache.clear(); }
+  // Gli host che dichiarano la ritenzione zero, dal catalogo del router: Map(id → [{ name, tag }]) o null se non si sa.
+  // Serve dove il corpo non basta: l'audio, che ignora il blocco `provider`, e il perché di un «nessun host».
+  const ZDR_ENDPOINT = `${MODELS_ENDPOINT.replace(/\/models$/, '')}/endpoints/zdr`;
+  let zdrCache = { until: 0, map: null, pending: null };
+
+  function zdrCatalog({ apiKey } = {}) {
+    if (zdrCache.pending) return zdrCache.map || zdrCache.pending;
+    if (Date.now() < zdrCache.until) return Promise.resolve(zdrCache.map);
+    const entry = zdrCache;
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    entry.pending = fetch(ZDR_ENDPOINT, { headers, signal: AbortSignal.timeout(HOSTS_TIMEOUT_MS) })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`OpenRouter zdr ${res.status}`);
+        const C = global.SN_CONST;
+        return C && typeof C.zdrCatalogFrom === 'function' ? C.zdrCatalogFrom(await res.json()) : null;
+      })
+      .then((map) => {
+        entry.map = map || entry.map;
+        entry.until = Date.now() + (map ? HOSTS_FRESH_MS : HOSTS_RETRY_MS);
+        return entry.map;
+      })
+      .catch((e) => {
+        console.warn('[Filo policy] host a ritenzione zero non letti:', (e && e.message) || e);
+        entry.until = Date.now() + HOSTS_RETRY_MS;
+        return entry.map;
+      })
+      .finally(() => { entry.pending = null; });
+    return entry.map || entry.pending;
+  }
+
+  async function zdrHostsOf({ apiKey, model } = {}) {
+    const map = await zdrCatalog({ apiKey });
+    if (!map) return null;
+    return map.get(String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '')) || [];
+  }
+
+  // Lo stesso endpoint di un host: per etichetta quando ce l'hanno tutti e due (un fornitore può averne uno a
+  // ritenzione zero e uno no), altrimenti per nome.
+  function isZdrHost(h, zdr) {
+    const low = (s) => String(s || '').trim().toLowerCase();
+    return zdr.some((z) => (h.tag && z.tag ? low(h.tag) === low(z.tag) : !!low(h.name) && low(h.name) === low(z.name)));
+  }
+
+  function forgetModelHosts() { hostsCache.clear(); zdrCache = { until: 0, map: null, pending: null }; }
 
   function joinNames(names) {
     if (names.length < 2) return names.join('');
@@ -729,27 +836,39 @@
   // router sceglie per prezzo e può dare l'audio proprio a quello escluso.
   // { ok: true } | { ok: false, reason: 'unknown' | 'mixed' | 'excluded', excluded: [nomi] }
   // Senza `ownKey` la lista la sceglie la chiave data (#962).
-  async function hostVerdict({ apiKey, model, providerRouting, ownKey }) {
+  // Quando paga Filo (`filoPays`; senza, lo dice la chiave data) vale anche la ritenzione zero (#831), con la stessa
+  // regola: TUTTI gli host ammessi la dichiarano, perché anche qui la scelta fra loro la fa il router.
+  async function hostVerdict({ apiKey, model, providerRouting, ownKey, filoPays }) {
     const C = global.SN_CONST;
     if (!C || typeof C.hostPolicyViolation !== 'function') return { ok: true };
     const own = ownKey === undefined ? await startsOwn(apiKey, providerRouting) : ownKey;
     const excluded = excludedFor(providerRouting, own);
-    if (!excluded.length && !C.producerOnlyRule(model)) return { ok: true };
+    const paga = filoPays === undefined ? (own ? false : (await keySourceOf(apiKey)) !== 'own') : filoPays;
+    const zdr = paga && zdrApplies(model, false);
+    if (!excluded.length && !C.producerOnlyRule(model) && !zdr) return { ok: true };
     const hosts = await modelHosts({ apiKey, model });
     if (!Array.isArray(hosts) || !hosts.length) return { ok: false, reason: 'unknown', excluded: [] };
     const bad = hosts.filter((h) => C.hostPolicyViolation(h, model, excluded));
-    if (!bad.length) return { ok: true };
-    return { ok: false, reason: bad.length === hosts.length ? 'excluded' : 'mixed', excluded: uniqueNames(bad) };
+    if (bad.length) return { ok: false, reason: bad.length === hosts.length ? 'excluded' : 'mixed', excluded: uniqueNames(bad) };
+    if (!zdr) return { ok: true };
+    const dichiarati = await zdrHostsOf({ apiKey, model });
+    if (!Array.isArray(dichiarati)) return { ok: false, reason: 'zdrunknown', excluded: [] };
+    const senza = hosts.filter((h) => !isZdrHost(h, dichiarati));
+    if (!senza.length) return { ok: true };
+    return { ok: false, reason: senza.length === hosts.length ? 'zdr' : 'zdrmixed', excluded: uniqueNames(senza) };
   }
 
   const NO_HOST_KEYS = {
     unknown: ['err_audio_hosts_unknown', 'err_audio_hosts_unknown'],
     mixed: ['err_audio_mixed_host', 'err_audio_mixed_host_many'],
     excluded: ['err_audio_no_allowed_host', 'err_audio_no_allowed_host_many'],
+    zdrunknown: ['err_audio_zdr_unknown', 'err_audio_zdr_unknown'],
+    zdr: ['err_audio_zdr_host', 'err_audio_zdr_host_many'],
+    zdrmixed: ['err_audio_zdr_mixed', 'err_audio_zdr_mixed_many'],
   };
 
-  async function ensureAllowedHost({ apiKey, model, providerRouting, ownKey }) {
-    const v = await hostVerdict({ apiKey, model, providerRouting, ownKey });
+  async function ensureAllowedHost({ apiKey, model, providerRouting, ownKey, filoPays }) {
+    const v = await hostVerdict({ apiKey, model, providerRouting, ownKey, filoPays });
     if (v.ok) return;
     const I18n = global.SN_I18N;
     const [one, many] = NO_HOST_KEYS[v.reason];
@@ -766,10 +885,12 @@
   // Voce, dettatura e classificatori: il controllo degli host con la lista della chiave di partenza, e il ripiego sui
   // crediti solo se chi serve il modello lo ammette anche la loro (#962).
   async function hostCheckedFetch(url, { apiKey, model, providerRouting, body, signal }) {
-    const own = await startsOwn(apiKey, providerRouting);
-    await ensureAllowedHost({ apiKey, model, providerRouting, ownKey: own });
-    const ripiegoAmmesso = own
-      ? async () => (await hostVerdict({ apiKey, model, providerRouting, ownKey: false })).ok
+    const source = await keySourceOf(apiKey);
+    const own = source === 'own' && !!providerRouting && Array.isArray(providerRouting.ownKeyIgnore);
+    await ensureAllowedHost({ apiKey, model, providerRouting, ownKey: own, filoPays: source !== 'own' });
+    // Il ripiego sui crediti cambia chi paga: lista intera e ritenzione zero.
+    const ripiegoAmmesso = source === 'own'
+      ? async () => (await hostVerdict({ apiKey, model, providerRouting, ownKey: false, filoPays: true })).ok
       : null;
     return fetchWithKey(url, apiKey, (key, { own: o } = {}) => ({
       method: 'POST', headers: buildHeaders(key), body: payloadFor(body, providerRouting, model, o), signal,
@@ -964,9 +1085,9 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
-    modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals,
+    modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals, zdrApplies, zdrHostsOf,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
-    GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT, ZDR_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

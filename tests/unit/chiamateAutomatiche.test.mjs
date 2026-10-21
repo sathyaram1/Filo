@@ -228,7 +228,7 @@ test('gesto: paga solo la cosa che ha toccato; il rilascio del mouse tocca anche
 
 test('tetto: le azioni contate sono quelle automatiche di SN_CONST', () => {
   const A = SN_CONST.ACTIONS;
-  assert.deepEqual(Object.keys(Tetto.GRUPPI).sort(), [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_WORD].sort());
+  assert.deepEqual(Object.keys(Tetto.GRUPPI).sort(), [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_WORD, A.SPELLCHECK_CONTEXT].sort());
   for (const g of Object.values(Tetto.GRUPPI)) assert.ok(Tetto.TETTI[g] > 0, `il gruppo ${g} ha un tetto`);
 });
 

@@ -56,6 +56,9 @@
     $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
     $('ownKeyAllProviders-label').textContent = I18n.t('options_own_key_all_providers');
     $('ownKeyAllProviders-desc').textContent = I18n.t('options_own_key_all_providers_desc');
+    $('ordineHost-label').textContent = I18n.t('options_host_order');
+    $('ordineHost-desc').textContent = I18n.t('options_host_order_desc');
+    riempiOrdineHost();
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -170,7 +173,8 @@
   // centimetri più su.
   function markTestBlocked(btn, blocked) {
     if (!btn) return;
-    btn.disabled = blocked;
+    // Una prova in corso resta spenta: il cancello gira a ogni modifica della pagina e la riaccendeva a metà.
+    btn.disabled = blocked || btn.dataset.inCorso === '1';
     if (blocked) btn.title = I18n.t('options_open_weights_test_blocked');
     else btn.removeAttribute('title');
   }
@@ -263,6 +267,21 @@
   // (costanti o override Firestore) con un pulsante "Prova" che testa il
   // modello usando le chiavi effettive (le predefinite, non quelle dell'utente).
 
+  // Le misure dei modelli predefiniti si salvano da sole: la lista è in sola
+  // lettura e non passa dal salvataggio della pagina, che le azzererebbe quando
+  // la lista non è renderizzata.
+  let defaultModelTests = {};
+
+  async function saveDefaultModelTest(nickname, esito) {
+    defaultModelTests = { ...defaultModelTests, [nickname]: esito };
+    try {
+      await chrome.runtime.sendMessage({
+        type: MSG.UPDATE_SETTINGS,
+        settings: { defaultModelTests },
+      });
+    } catch (_) {}
+  }
+
   async function loadDefaultModels() {
     let registry = {};
     try {
@@ -270,12 +289,38 @@
       if (r && r.ok && r.modelRegistry) {
         registry = r.modelRegistry;
         defaultModelsPublic = { models: r.models || {}, modelRegistry: registry };
+        sceltaGeneraleHost = r.providerSort || '';
       }
     } catch (_) {}
     renderDefaultModels(registry);
     // L'effetto dell'interruttore si calcola sulla config VERA: ora che è
     // arrivata, ricalcolalo.
     renderOpenWeightsImpact();
+    // La scelta generale è arrivata adesso: le righe disegnate prima hanno
+    // giudicato la loro misura senza sapere a cosa rimandava «Automatico».
+    rinfrescaMisure();
+  }
+
+  // «Lo sceglie Filo» al posto di «Automatico»: qui non c'è una scelta generale più in alto a cui rimandare.
+  function riempiOrdineHost() {
+    const sel = $('ordineHost');
+    sel.innerHTML = '';
+    for (const val of window.SN_CONST.PROVIDER_SORTS) {
+      const opt = document.createElement('option');
+      opt.value = val === 'auto' ? '' : val;
+      opt.textContent = I18n.t(val === 'auto' ? 'options_host_order_filo' : 'provider_sort_' + val);
+      sel.appendChild(opt);
+    }
+  }
+
+  // Una riga chiama con l'ordinamento suo, o con quello generale se resta su
+  // «Automatico»: è quello a cui una misura deve corrispondere per valere.
+  let sceltaGeneraleHost = '';
+
+  function rinfrescaMisure() {
+    for (const row of document.querySelectorAll('.sn-model-row')) {
+      if (row.querySelector('.sn-model-row-status')) renderRowTest(row);
+    }
   }
 
   function renderDefaultModels(registry) {
@@ -336,6 +381,8 @@
     row.appendChild(modelEl);
     row.appendChild(testBtn);
     row.appendChild(status);
+    row._test = defaultModelTests[nick] || null;
+    renderRowTest(row);
     return row;
   }
 
@@ -343,19 +390,31 @@
     const statusEl = row.querySelector('.sn-model-row-status');
     statusEl.textContent = I18n.t('options_test_running');
     btn.disabled = true;
+    btn.dataset.inCorso = '1';
+    // Fissata al clic e mandata con la richiesta: la tendina cambiata mentre la prova gira non si prende i suoi numeri.
+    const conf = configurazioneRiga(row);
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.TEST_DEFAULT_MODEL,
         nickname,
+        sort: conf.sort || '',
       });
       if (!res?.ok) {
         statusEl.textContent = I18n.t('options_test_failed', res?.error || '—');
       } else {
-        statusEl.textContent = I18n.t('options_test_result', res.ttftMs ?? '—', res.tokensPerSec ?? '—');
+        row._test = {
+          ttftMs: res.ttftMs ?? null,
+          tokensPerSec: res.tokensPerSec ?? null,
+          at: new Date().toISOString(),
+          ...conf,
+        };
+        renderRowTest(row);
+        saveDefaultModelTest(nickname, row._test);
       }
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
+      delete btn.dataset.inCorso;
       btn.disabled = false;
       // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
       // rimetterebbe premibile un "Prova" che la politica tiene spento.
@@ -374,12 +433,14 @@
     $('openWeightsOnly').checked = settings.openWeightsOnly === true;
     $('ownKeyAllProviders').checked = settings.ownKeyAllProviders === true;
     mostraChiavePropria(settings);
+    $('ordineHost').value = window.SN_CONST.normalizeProviderSort(settings.ordineHost) || '';
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
     // invece di mostrare i modelli scritti nel codice: un elenco inventato è
     // peggio di nessun elenco, perché non corrisponde a ciò che gira.
     applyDefaultModelsVisibility();
+    defaultModelTests = settings.defaultModelTests || {};
     loadDefaultModels();
     $('apiKey').value = settings.apiKeys?.openrouter || '';
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
@@ -471,13 +532,45 @@
     return I18n.t('options_test_result', ttft, tps);
   }
 
+  // Con che modello, ragionamento e ordinamento degli host la riga chiamerebbe
+  // adesso: è la configurazione a cui una misura deve corrispondere per valere.
+  // La scelta personale vince sull'ordinamento delle voci predefinite, non su quello che l'utente dà alle sue.
+  function sortDellaRiga(row, entrySort) {
+    const C = window.SN_CONST;
+    const personale = $('ordineHost') ? $('ordineHost').value : '';
+    return row.classList.contains('sn-default-model-row')
+      ? C.ordinamentoPerUtente(personale, entrySort, sceltaGeneraleHost)
+      : C.ordinamentoEffettivo(entrySort, C.normalizeProviderSort(personale) || sceltaGeneraleHost);
+  }
+
+  function configurazioneRiga(row) {
+    const campo = row.querySelector('.sn-model-id');
+    const e = row._entry || {};
+    return {
+      model: campo ? campo.value.trim() : (e.model || ''),
+      reasoning: e.reasoning,
+      sort: sortDellaRiga(row, e.sort),
+    };
+  }
+
+  // Giorno della misura, ma solo se non è oggi: numeri di settimane fa messi
+  // accanto a quelli appena presi si leggerebbero allo stesso modo.
+  function giornoMisura(at) {
+    const d = at ? new Date(at) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    if (d.toDateString() === new Date().toDateString()) return '';
+    return ` · ${d.toLocaleDateString()}`;
+  }
+
   // Mostra nel div di stato della riga il risultato di test memorizzato
   // (latenza + token/sec), così la misura resta visibile tra le sessioni.
   function renderRowTest(row) {
     const statusEl = row.querySelector('.sn-model-row-status');
     if (!statusEl) return;
-    const hasResult = row._test && (row._test.ttftMs != null || row._test.tokensPerSec != null);
-    statusEl.textContent = hasResult ? formatTestResult(row._test) : I18n.t('options_model_untested');
+    const vale = window.SN_CONST.misuraValePer(row._test, configurazioneRiga(row));
+    statusEl.textContent = vale
+      ? formatTestResult(row._test) + giornoMisura(row._test.at)
+      : I18n.t('options_model_untested');
   }
 
   function makeModelRow(nick, entry) {
@@ -526,6 +619,9 @@
     idWrap.appendChild(idIn);
     // Carica la lista del provider la prima volta che l'utente apre il campo.
     idIn.addEventListener('focus', () => ensureProviderModels(provSel.value));
+    // Riscritto il modello, la misura di prima non riguarda più questa riga:
+    // sparisce mentre si scrive, non al ricaricamento.
+    idIn.addEventListener('input', () => renderRowTest(row));
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
         readOptions: () => readProviderOptions(provSel.value),
@@ -659,7 +755,7 @@
       if (row._test && Object.keys(row._test).length) entry.test = row._test;
       // E ciò che la riga non modifica ma la voce dichiara (pesi aperti,
       // cosa sa masticare): senza, un salvataggio dalle Opzioni lo perderebbe.
-      for (const k of ['weights', 'inputs', 'outputs']) {
+      for (const k of ['weights', 'inputs', 'outputs', 'reasoning', 'sort']) {
         if (row._entry && row._entry[k] != null) entry[k] = row._entry[k];
       }
       out[nick] = entry;
@@ -708,6 +804,9 @@
     if (!apiKey) { statusEl.textContent = I18n.t('options_test_no_key'); return; }
     statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_running')}`;
     btn.disabled = true;
+    btn.dataset.inCorso = '1';
+    // Come per le righe predefinite: la prova chiama, e la misura si attribuisce, con la configurazione del clic.
+    const conf = configurazioneRiga(row);
     try {
       // L'id del registry va passato così com'è: stesso percorso dell'uso reale.
       const res = await chrome.runtime.sendMessage({
@@ -715,16 +814,21 @@
         provider: providerId,
         apiKey,
         model: modelId,
+        sort: conf.sort || '',
+        reasoning: conf.reasoning || '',
       });
       if (!res?.ok) {
         statusEl.textContent = `${providerId} · ${modelId} — ${I18n.t('options_test_failed', res?.error || '—')}`;
       } else {
         // Salva il risultato (latenza + token/sec) nella riga e persistilo nel
         // registry, così resta visibile e confrontabile tra le sessioni.
+        // Con la misura si scrive su COSA è stata presa: senza, cambiando
+        // modello quei numeri resterebbero a parlare di un altro.
         row._test = {
           ttftMs: res.ttftMs ?? null,
           tokensPerSec: res.tokensPerSec ?? null,
           at: new Date().toISOString(),
+          ...conf,
         };
         renderRowTest(row);
         save();
@@ -732,6 +836,7 @@
     } catch (e) {
       statusEl.textContent = I18n.t('options_test_failed', e?.message || String(e));
     } finally {
+      delete btn.dataset.inCorso;
       btn.disabled = false;
       // Il cancello dei pesi aperti ha l'ultima parola: riabilitare alla cieca
       // rimetterebbe premibile un "Prova" che la politica tiene spento.
@@ -866,7 +971,7 @@
 
   // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora.
   async function save(opts) {
-    caselle.spedita('pagina');
+    const biglietto = caselle.spedita('pagina');
     const avvisi = !(opts && opts.avvisi === false);
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
@@ -884,6 +989,7 @@
       useDefaultModels: $('useDefaultModels').checked,
       openWeightsOnly: $('openWeightsOnly').checked,
       ownKeyAllProviders: $('ownKeyAllProviders').checked,
+      ordineHost: $('ordineHost').value,
       apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
@@ -902,6 +1008,9 @@
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
     markRegistryRowIssues(missingNickRows, dupRows, !avvisi);
+
+    // Arrivata un'altra modifica mentre questa viaggiava, la conferma la scrive il salvataggio che chiude la fila.
+    if (!caselle.aggiornata('pagina', biglietto)) return;
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
     if (hasDiscarded && !avvisi) return;
@@ -946,6 +1055,7 @@
       const { missingNickRows, dupRows } = collectModelRegistry();
       markRegistryRowIssues(missingNickRows, dupRows);
     },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
   caselle.registra('pagina', (avvisi) => save({ avvisi }));
   const CASELLA = /^(text|password|number|search|url|email)$/;
@@ -971,6 +1081,7 @@
       // Una chiave messa o tolta cambia crediti e dollari; la soglia cambia gli avvisi.
       if (toccati.includes('apiKey') || toccati.includes('useDefaultModels')) caricaStime();
       else if (toccati.includes('costWarnRatio')) ModelChain.aggiornaCosti(modelChains || {});
+      if (toccati.includes('ordineHost')) rinfrescaMisure();
       // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza riallineare
       // la griglia il salvataggio dopo lo rimanderebbe indietro. Si riscrive solo la catena cambiata, e non quella
       // in cui si sta scrivendo: ridisegnare tutto portava via la spiegazione del modello appena respinto (#667.7).
@@ -1010,6 +1121,8 @@
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
+    // Le misure prese con un altro ordinamento non parlano più di come chiamerebbero le righe.
+    $('ordineHost').addEventListener('change', rinfrescaMisure);
     $('loadModels').addEventListener('click', () => { loadModelsFromProvider(); caricaStime({ forza: true }); });
     $('costWarnRatio').addEventListener('input', () => ModelChain.aggiornaCosti(modelChains || {}));
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));

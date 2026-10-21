@@ -1,4 +1,4 @@
-// «Stesso sito» ha una definizione sola (src/main/services/stessoSito.js): il rumore anti-impronta e i cookie la
+// «Stesso sito» ha una definizione sola (src/shared/stessoSito.js): il rumore anti-impronta e i cookie la
 // chiamano entrambi, così uno script presente su alice.github.io e bob.github.io vede due browser diversi.
 
 import { test } from 'node:test';
@@ -9,7 +9,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const Sito = require('../../src/main/services/stessoSito.js');
+const Sito = require('../../src/shared/stessoSito.js');
 const FP = require('../../src/main/services/fingerprint.js');
 const Cookies = require('../../src/main/services/cookies.js');
 
@@ -95,21 +95,65 @@ test('impronte e cookie chiamano la stessa funzione', () => {
   }
 });
 
-test('una sola lista di suffissi: la Public Suffix List di safebrowse/psl.js', () => {
+// #876 — una lista di suffissi fuori dal modulo è una seconda risposta a «stesso sito»: le due divergono in silenzio.
+// Conta come elenco un suffisso scritto come tale: un suffisso nazionale ('co.uk'), un nome col punto davanti
+// ('.github.io') o un pezzo di espressione (`github\.io`). Un sito che è anche una piattaforma ('vercel.app' fra i siti
+// noti) è un sito, non un suffisso.
+const SUFFISSI_AMMESSI = {
+  'src/shared/stessoSito.js': '*',
+  'src/shared/pslIcann.js': '*',
+  'src/vendor/public-suffix-list/privata.js': '*',
+  // I marchi di safebrowse: i domini ufficiali di ogni marchio, compresi quelli ospitati.
+  'src/main/services/safebrowse/brands.js': '*',
+  // Finché il feedback sul seme anti-impronta non la toglie.
+  'src/main/services/fingerprint.js': '*',
+  // Le voci della whitelist di safebrowse: gov.it vi copre ogni sito dello Stato; i secchi per percorso di Google Cloud;
+  // le pagine che chiunque pubblica per percorso (Google Sites, Documenti), di cui safebrowse cerca il proprietario.
+  'src/main/services/safebrowse/whitelist.js': ['gov.it', 'googleapis.com', 'sites.google.com', 'docs.google.com'],
+  // Gli host d'accesso dei fornitori d'identità, non dei siti: la finestra di login si riconosce dal suo host.
+  'src/shared/authPopup.js': ['firebaseapp.com', 'amazoncognito.com'],
+  // Il nome delle reti di casa (RFC 8375), che non ha un sito.
+  'src/shared/urlNav.js': ['home.arpa'],
+  // La home di Google Drive fra i siti che il modello scrive a memoria: un host esatto da riconoscere, non un suffisso.
+  'src/shared/sitiComuni.js': ['drive.google.com'],
+};
+
+test('una sola lista di suffissi: la Public Suffix List di src/shared/stessoSito.js', () => {
   const radice = fileURLToPath(new URL('../../', import.meta.url));
-  const src = join(radice, 'src');
-  const fuori = [];
+  const T = { tutteLePiattaforme: true };
+  const nazionale = (l) => !!(Sito.getDomainInfo(l, { soloPsl: true }) || {}).suffixOnly;
+  const trovati = {};
   const giro = (dir) => {
     for (const nome of readdirSync(dir)) {
       const p = join(dir, nome);
-      if (statSync(p).isDirectory()) giro(p);
-      else if (/\.(m?js)$/.test(nome) && /['"]co\.uk['"]/.test(readFileSync(p, 'utf8'))) {
-        fuori.push(relative(radice, p).split('\\').join('/'));
+      if (statSync(p).isDirectory()) { giro(p); continue; }
+      if (!/\.(m?js)$/.test(nome)) continue;
+      const rel = relative(radice, p).split('\\').join('/');
+      if (SUFFISSI_AMMESSI[rel] === '*') continue;
+      const testo = readFileSync(p, 'utf8');
+      const visti = new Set();
+      for (const m of testo.matchAll(/['"`](\.?)([a-z0-9-]+(?:\.[a-z0-9-]+)+)['"`]/g)) {
+        if (m[1] ? Sito.piattaforma(m[2], T) : nazionale(m[2])) visti.add(m[2]);
       }
+      for (const m of testo.matchAll(/((?:[a-z0-9-]+\\\.)+[a-z]{2,})/g)) {
+        const l = m[1].replace(/\\\./g, '.');
+        if (Sito.piattaforma(l, T)) visti.add(l);
+      }
+      const ammessi = SUFFISSI_AMMESSI[rel] || [];
+      const nuovi = [...visti].filter((l) => !ammessi.includes(l));
+      if (nuovi.length) trovati[rel] = nuovi;
     }
   };
-  giro(src);
-  assert.deepEqual(fuori, ['src/main/services/safebrowse/psl.js']);
+  giro(join(radice, 'src'));
+  assert.deepEqual(trovati, {}, 'chi deve sapere se due indirizzi sono lo stesso sito chiede a SN_STESSO_SITO');
+});
+
+test('la sentinella dei suffissi riconosce un elenco scritto a mano', () => {
+  const T = { tutteLePiattaforme: true };
+  for (const l of ['github.io', 'vercel.app', 'co.uk', 'com.au', 'blogspot.com', 'wordpress.com']) assert.ok(Sito.piattaforma(l, T), l);
+  for (const l of ['google.com', 'alice.github.io', 'bbc.co.uk', 'mail.google.com', '192.168.1.1', '']) {
+    assert.equal(Sito.piattaforma(l, T), false, l);
+  }
 });
 
 // Una scelta salvata quando gov.it o com.co contavano come un sito solo non deve smettere di valere: la voce copre ancora
@@ -150,4 +194,45 @@ test('la voce scritta col sottodominio vale per il sito; il vaso persistente è 
   const bbc = Cookies.partitionForUrl('https://www.bbc.co.uk/', fidati);
   assert.match(bbc, /^persist:/);
   assert.notEqual(Cookies.partitionForUrl('https://www.argos.co.uk/', fidati), bbc, 'una voce suffisso non unisce i siti sotto di lei');
+});
+
+// #876 — la stessa regola nelle pagine interne: il modulo vive in src/shared e prende i dati dagli <script> che lo precedono.
+test('nelle pagine il modulo legge i dati dagli script caricati prima, senza require', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const radice = new URL('../../', import.meta.url);
+  const pagina = { URL };
+  pagina.globalThis = pagina;
+  for (const f of ['src/shared/pslIcann.js', 'src/vendor/public-suffix-list/privata.js', 'src/shared/stessoSito.js']) {
+    runInNewContext(readFileSync(new URL(f, radice), 'utf8'), pagina, { filename: f });
+  }
+  const S = pagina.SN_STESSO_SITO;
+  assert.equal(S.sitoDi('https://mail.google.com/mail/u/0/'), 'google.com');
+  assert.equal(S.sitoDi('https://news.bbc.co.uk/'), 'bbc.co.uk');
+  assert.equal(S.sitoDi('https://alice.github.io/'), 'alice.github.io');
+  assert.equal(S.piattaforma('github.io'), true);
+  assert.equal(S.sitoDellaVoce('mail.google.com'), Sito.sitoDellaVoce('mail.google.com'));
+});
+
+test('safebrowse riesporta la regola del modulo, non una sua copia', () => {
+  const Psl = require('../../src/main/services/safebrowse/psl.js');
+  assert.equal(Psl.getDomainInfo, Sito.getDomainInfo);
+  assert.equal(Psl.isIpAddress, Sito.isIpAddress);
+  assert.equal(Psl.PRIVATE_AVVISO, Sito.PRIVATE_AVVISO);
+});
+
+test('i fidati dove si resta connessi si leggono al loro sito, scritti come sottodominio o come indirizzo', () => {
+  const settings = (trustedSites) => ({ security: { cookies: { mode: 'privacy', trustedSites } } });
+  assert.deepEqual(Cookies.getTrustedSites(settings(['mail.google.com'])), ['google.com']);
+  assert.deepEqual(Cookies.getTrustedSites(settings(['https://mail.google.com/mail/u/0/'])), ['google.com']);
+  assert.deepEqual(Cookies.getTrustedSites(settings(['news.bbc.co.uk', 'www.bbc.co.uk', 'gov.it', 'alice.github.io'])),
+    ['bbc.co.uk', 'gov.it', 'alice.github.io']);
+  assert.deepEqual(Cookies.getTrustedSites({ security: { cookies: { loginWhitelist: ['webmail.libero.it'] } } }), ['libero.it']);
+  for (const voce of ['mail.google.com', 'https://mail.google.com/mail/u/0/']) {
+    const fidati = new Set(Cookies.getTrustedSites(settings([voce])));
+    assert.equal(Cookies.partitionForUrl('https://mail.google.com/mail/u/0/', fidati), 'persist:filo-priv-google.com', voce);
+    assert.equal(Cookies.partitionForUrl('https://accounts.google.com/', fidati), 'persist:filo-priv-google.com', voce);
+  }
+  const bbc = new Set(Cookies.getTrustedSites(settings(['news.bbc.co.uk'])));
+  assert.equal(Cookies.partitionForUrl('https://www.bbc.co.uk/', bbc), 'persist:filo-priv-bbc.co.uk');
+  assert.doesNotMatch(Cookies.partitionForUrl('https://www.argos.co.uk/', bbc), /^persist:/);
 });

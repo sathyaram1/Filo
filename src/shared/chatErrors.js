@@ -172,11 +172,32 @@
     if (!quanti) return NESSUN_HOST_MOTIVO;
     return `${NESSUN_HOST_MOTIVO}. ${quanti > 1 ? 'Lo servono' : 'Lo serve'} solo ${testo}, che Filo esclude`;
   }
+  // Coi crediti di Filo si chiedono solo host a ritenzione zero (#831): quando sono loro a mancare il motivo è questo.
+  const NESSUN_HOST_ZDR = 'nessun fornitore ammesso lo ospita senza conservare i dati, e coi crediti di Filo è una condizione';
+  // Voce e dettatura sanno anche quali host conservano, e se il router potrebbe sceglierne uno fra altri che no.
+  function motivoNessunHost(err) {
+    const reason = err && err.reason;
+    const { testo, quanti } = elencoNomi(err && err.hosts);
+    const loro = quanti > 1 ? ['Lo servono', 'si impegnano', 'loro'] : ['Lo serve', 'si impegna', 'lui'];
+    if (reason === 'zdr') return quanti ? `${NESSUN_HOST_ZDR}. ${loro[0]} solo ${testo}, che non ${loro[1]} a non conservarli` : NESSUN_HOST_ZDR;
+    if (reason === 'zdrmixed') {
+      return quanti ? `${loro[0].toLowerCase()} anche ${testo}, che non ${loro[1]} a non conservare i dati, e con l'audio non posso impedire che tocchi a ${loro[2]}. Coi crediti di Filo è una condizione` : NESSUN_HOST_ZDR;
+    }
+    if (reason === 'zdrunknown') return 'non so quali dei suoi fornitori si impegnano a non conservare i dati, e coi crediti di Filo è una condizione';
+    return motivoHostEsclusi(err && err.hosts);
+  }
+  // Un modello da comprare solo dal produttore (#904) che il produttore adesso non serve (#829): nessun altro host lo può.
+  function motivoProduttoreGiu(nome) {
+    const n = breve(nome, 60);
+    return `questo modello lo serve solo ${n || 'il suo produttore'}, e adesso non risponde`;
+  }
   // Il rimedio per dove si sceglie il modello ('opzioni' | 'predefiniti' | 'gestione'); se l'ha pagata la chiave
   // propria con l'interruttore dei fornitori esclusi spento (#962), anche la strada di accenderlo.
   function rimedioNessunHost(dove, err, effettive) {
     const base = RIMEDI_NESSUN_HOST[dove] || RIMEDI_NESSUN_HOST.opzioni;
-    const spento = Boolean(err && err.keySource === 'own') && !Array.isArray(effettive && effettive.excludedProvidersOwnKey);
+    // Il vincolo del produttore vale anche con la chiave propria: accendere i fornitori esclusi non lo scioglie.
+    const spento = Boolean(err && err.keySource === 'own') && err.reason !== 'produttore'
+      && !Array.isArray(effettive && effettive.excludedProvidersOwnKey);
     return spento ? `${base} ${RIMEDI_NESSUN_HOST.chiavePropria}` : base;
   }
   function fraseNessunHost({ modello, funzione, motivo, rimedio: dove } = {}) {
@@ -417,7 +438,7 @@
 
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
-    fraseNessunHost, motivoHostEsclusi, NESSUN_HOST_MOTIVO, RIMEDI_NESSUN_HOST, rimedioNessunHost,
+    fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

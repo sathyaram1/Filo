@@ -51,7 +51,10 @@ passati sopra, vedi
 [animazioni che coprono la pagina](animazioni-che-coprono-la-pagina-vivono-nel-content-overlay.md)).
 Essere una riga la lega allo stato della voce: la domanda c'è finché la voce
 aspetta, e sparisce da sola quando qualcuno risponde altrove. Mai dentro la
-pagina stessa: il sito potrebbe toccarla o imitarla.
+pagina stessa: il sito potrebbe toccarla o imitarla. Il pannello si chiude
+con la sua ×, e chiudere non è rispondere: la voce resta in attesa nella
+pagina Download e nella carta della home (nella fila di tab non c'è un tasto
+che lo riapra, #941).
 
 ## Il sì non lo dà il clic che ha fatto comparire la domanda
 

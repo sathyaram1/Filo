@@ -146,7 +146,12 @@ rimette com'era. Regge solo perché il codice la chiede al momento, da un punto 
 prova non arriverebbe più, e il caso Windows girerebbe da Linux. Uno spec in Electron
 fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per ognuna
 (`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
-dà un ramo che la suite in GitHub non corre mai (#1171).
+dà un ramo che la suite in GitHub non corre mai (#1171). Un caso nuovo che non si
+sceglie la piattaforma è rosso anche su Linux: le prove dell'aggiornatore si rifanno
+con Node che si crede Windows e Mac (`tests/unit/aggiornamentiDaOgniSistema.test.mjs`,
+#1146). Da Windows non si finge: un Node di Windows che si crede Linux sceglie
+un'altra shell e il rosso sarebbe della finzione; un caso che presume Windows è già
+rosso su Linux da sé.
 
 **Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
 la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
@@ -240,6 +245,28 @@ Le forme che cadevano, e cosa le ha sostituite:
   l'attesa vera è in viaggio (`tests/helpers/letturaIsolata.mjs`). Un pacchetto che il
   codice provato usa si cerca al caricamento del modulo, così se manca il file cade subito
   col nome del pacchetto.
+
+### Una prova che guarda un momento lo tiene aperto lei (#1321)
+
+Con quattro esecuzioni in parallelo le prove della chat della home cadevano a caso. La
+risposta in streaming usciva in pezzi a 500 ms l'uno dall'altro e la prova doveva vedere la
+testa senza la coda in quel mezzo secondo; il ragionamento in corso durava 3,6 s e la prova
+doveva cliccarci due volte e fare una foto; la riga «Avvio un timer…» restava 2,5 s.
+
+- Il modello finto si ferma dove la prova deve guardare (`await` di una promessa che la
+  prova scioglie con `app.evaluate(() => globalThis.__…())`). Senza il comportamento
+  provato la prova resta rossa: lo stato atteso non arriva mai.
+- La fine del turno si aspetta su un segno della pagina (il tasto d'invio che torna, il
+  bottone dell'azione), con un tetto che copre le attese che l'app fa apposta: aperta una
+  pagina, il turno aspetta fino a 5 s che arrivi (`esitoApertura`), e la prova ne dava 3.
+- Un'azione che apre un sito apre il server di prova (`testServer.html(…, { pubblico: true })`):
+  con example.com il turno aspettava la rete, che nei contenitori non c'è.
+- Un'attesa che prova un'assenza («nessuna scritta, nemmeno dopo un secondo») resta: guarda
+  che non succeda niente, non scommette che qualcosa arrivi prima di un orologio.
+
+Prove: `tests/dashboard-chat-streaming.spec.mjs`, `tests/dashboard-chat-attivita.spec.mjs`
+(A, B), `tests/dashboard-chat-strumenti.spec.mjs` (C). L'altra metà di quei rossi era un
+difetto vero: [Il filo dell'attesa](il-filo-dell-attesa.md), «La diretta si chiude sul segno di fine».
 
 ## Il verso opposto (#937)
 

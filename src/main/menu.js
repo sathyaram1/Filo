@@ -184,7 +184,7 @@ function barraLaterale() {
 
 function apriPagina(url) {
   const win = finestra();
-  try { win && win._filoTabs.openTab(url); } catch (_) {}
+  try { win && win._filoTabs.openTab(url, { origine: { tipo: 'filo' } }); } catch (_) {}
 }
 
 function finestraIncognito() {
@@ -262,7 +262,8 @@ function template(piattaforma) {
       { type: 'separator' },
       { label: 'Vai a un indirizzo', accelerator: 'CommandOrControl+L', click: vaiAScrivereUnIndirizzo, ...SOLO_SCRITTA },
       { label: 'Ricarica', accelerator: 'CommandOrControl+R', click: ricarica, ...SOLO_SCRITTA },
-      { label: 'Cronologia', click: () => apriPagina('filo://history/history.html') },
+      { label: 'Quaderno delle memorie', click: () => apriPagina('filo://quaderno/quaderno.html') },
+      { label: 'Cronologia AI', click: () => apriPagina('filo://history/history.html') },
       { type: 'separator' },
       // Cmd+W chiude la SCHEDA, non la finestra: è quello che Filo promette e
       // quello che fa dovunque non ci sia una barra dei menu di mezzo.

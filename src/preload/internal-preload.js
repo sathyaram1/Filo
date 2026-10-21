@@ -75,7 +75,7 @@ const filoApi = {
   // l'azione completa di esito: { action }) e 'round' (un giro con azioni si è
   // chiuso: il testo scritto in quel giro è una nota di lavoro, non la
   // risposta: { text }; con `risposta: true` è un giro di soli bottoni e il
-  // testo apre la risposta). Il chiamante filtra per reqId. Ritorna un unsubscribe.
+  // testo apre la risposta) e 'fine' (l'ultimo della diretta, #1321). Il chiamante filtra per reqId. Ritorna un unsubscribe.
   onAction: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:action', wrapped);
@@ -330,9 +330,11 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
+  safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
   safe(path.join(CONTENT, 'sidebar.js'));
+  safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));
   safe(path.join(SHARED, 'feedbackClientIdHash.js')); // S1.F2.2

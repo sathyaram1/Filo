@@ -7,6 +7,8 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { menuDi } from './helpers/menuContestuale.mjs';
+import { statoDi } from './helpers/riquadri.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
   <h1>Pagina con un collegamento</h1>
@@ -20,7 +22,7 @@ function shot(page, name) {
 
 // «Copia URL» dal tasto destro vero sul link: produce l'avviso «Copiato» nella pila della pagina.
 async function copiaUrl(page) {
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   for (let i = 0; i < 6; i++) {
     await page.locator('#link').click({ button: 'right', position: { x: 8, y: 8 } });
     const voce = menu.locator('button', { hasText: 'Copia URL' }).filter({ hasNotText: 'immagine' });
@@ -229,18 +231,70 @@ test('tema scuro: l’avviso col puntatore sopra si schiarisce appena e il testo
   expect(luce(testo) - luce(sopra)).toBeGreaterThan(100);
 });
 
+// Le voci del menu con un punto (su una griglia fitta) che non è del menu: qualcosa le copre.
+const vociCoperte = (page) => menuDi(page).valuta(() => [...document.querySelectorAll('.sn-menu .sn-menu-item')].filter((v) => {
+  const r = v.getBoundingClientRect();
+  const punti = [];
+  for (let i = 0; i <= 10; i++) {
+    for (const y of [r.top + 2, (r.top + r.bottom) / 2, r.bottom - 2]) punti.push([r.left + 2 + (r.width - 4) * i / 10, y]);
+  }
+  return punti.some(([x, y]) => !document.elementFromPoint(x, y)?.closest('.sn-menu'));
+}).map((v) => v.textContent.trim()));
+
 // Prendendo il puntatore l'avviso prende anche il tasto destro: il menu deve essere il suo, come nella barra.
-test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la scelta lo chiude', async ({ openTab, testServer }) => {
+// #1453: il menu nasceva sotto l'avviso, che ne copriva «Chiudi», e la guardia dei clic coperti lo fermava.
+test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la scelta lo chiude', async ({ shell, openTab, testServer }) => {
+  // Durata 0: l'avviso se ne va solo se «Chiudi» funziona.
+  await impostaDurata(shell, 0);
   const page = await testServer.openReady(openTab, PAGE);
+  await page.waitForTimeout(300);
   await copiaUrl(page);
   const avviso = page.locator('.sn-toast');
   await puntatoreSopra(page, avviso);
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Chiudi']);
+  await expect.poll(() => vociCoperte(page), { message: 'l’avviso copre il menu nato su di lui' }).toEqual([]);
+  await page.waitForTimeout(300);
+  await shot(page, 'avviso-1453-menu-sopra-l-avviso');
   await voci.first().click();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});
+
+// Stessa causa, altra porta: un menu aperto dalla pagina accanto alla pila le sta sopra, e la voce che cade
+// sull'avviso parte.
+test('un menu aperto accanto a un avviso gli sta sopra, e la voce sopra l’avviso parte', async ({ app, shell, openTab, testServer }) => {
+  await impostaDurata(shell, 0);
+  const page = await testServer.openReady(openTab, PAGE.replace('</body>',
+    '<a id="basso" href="https://example.com/basso" style="position:fixed;right:40px;bottom:3px;font-size:12px;line-height:14px">in fondo</a></body>'));
+  await page.waitForTimeout(300);
+  await copiaUrl(page);
+  const avviso = page.locator('.sn-toast');
+  await expect(avviso).toHaveClass(/sn-toast-visible/);
+  await page.waitForTimeout(250);
+  const a = await avviso.boundingBox();
+  // Il collegamento sta sotto l'avviso: il menu si apre verso l'alto e la sua ultima voce cade sull'avviso.
+  await page.locator('#basso').click({ button: 'right' });
+  const voce = menuDi(page).voce('Invia feedback');
+  await expect(voce).toBeVisible();
+  // La spiegazione del collegamento cambia l'altezza del menu appena arriva: si misura a menu fermo.
+  let v = null;
+  await expect.poll(async () => {
+    const prima = JSON.stringify(v);
+    v = await voce.boundingBox();
+    return prima === JSON.stringify(v);
+  }, { intervals: [300] }).toBe(true);
+  const x = Math.max(a.x, v.x) + 6;
+  const y = (Math.max(a.y, v.y) + Math.min(a.y + a.height, v.y + v.height)) / 2;
+  expect(x < Math.min(a.x + a.width, v.x + v.width) && y > a.y && y < a.y + a.height, 'la voce non cade sull’avviso').toBe(true);
+  await expect.poll(() => vociCoperte(page), { message: 'l’avviso copre il menu' }).toEqual([]);
+  await shot(page, 'avviso-1453-menu-accanto-all-avviso');
+  await page.mouse.move(x, y, { steps: 3 });
+  await page.waitForTimeout(150);
+  await page.mouse.click(x, y);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false).toBe(true);
+  await expect(page.locator('.sn-toast', { hasText: 'Il menu era coperto' })).toHaveCount(0);
 });
 
 test('editor: tasto destro sull’avviso con «Annulla» offre «Annulla» e «Chiudi», e «Annulla» fa quello che fa il pulsante', async ({ openTab }) => {
@@ -255,7 +309,7 @@ test('editor: tasto destro sull’avviso con «Annulla» offre «Annulla» e «C
   await puntatoreSopra(page, avviso);
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText([/Annulla/, 'Chiudi']);
   const testo = (await avviso.locator('span').textContent()).trim();
   await voci.first().click();
@@ -277,7 +331,7 @@ test('mazzi: tasto destro sull’avviso offre «Chiudi», e la scelta lo chiude'
   await puntatoreSopra(page, avviso);
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Chiudi']);
   await voci.first().click();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
@@ -295,7 +349,7 @@ test('tasto destro sulla conferma «Salvata in»: il menu offre «Apri la lista�
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 4 });
   await page.mouse.down({ button: 'right' });
   await page.mouse.up({ button: 'right' });
-  const voci = page.locator('.sn-menu .sn-menu-item');
+  const voci = menuDi(page).locator('.sn-menu .sn-menu-item');
   await expect(voci).toHaveText(['Apri la lista', 'Chiudi']);
   await voci.nth(1).click();
   await expect(pill).toHaveCount(0, { timeout: 1500 });

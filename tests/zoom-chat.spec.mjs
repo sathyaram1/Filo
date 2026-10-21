@@ -11,6 +11,7 @@
 // non si muove di un millimetro.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>zoom</title></head>
 <body><h1>una pagina qualunque</h1><p>testo da ingrandire</p></body></html>`;
@@ -158,19 +159,19 @@ test('tasto destro: quando la pagina non è al 100% il menu lo dice e riporta al
 
   // Al 100% la voce non c'è: il menu non si allunga per dire «va tutto bene».
   await page.locator('h1').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
-  await expect(page.locator('.sn-menu').getByText(/Dimensione reale/)).toHaveCount(0);
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
+  await expect(menuDi(page).locator('.sn-menu').getByText(/Dimensione reale/)).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   await execAction(app, { type: 'ZOOM_PAGINA', percentuale: 150 });
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
   await page.locator('h1').click({ button: 'right' });
-  const voce = page.locator('.sn-menu').getByText(/Dimensione reale \(ora 150%\)/);
+  const voce = menuDi(page).locator('.sn-menu').getByText(/Dimensione reale \(ora 150%\)/);
   await expect(voce).toBeVisible();
   // La scorciatoia accanto alla voce è quella vera, chiesta al registro dei
   // tasti: due strade per la stessa cosa devono dirsi anche con lo stesso nome.
-  const riga = page.locator('.sn-menu-item', { hasText: 'Dimensione reale' });
+  const riga = menuDi(page).locator('.sn-menu-item', { hasText: 'Dimensione reale' });
   await expect(riga.locator('.sn-menu-shortcut')).toHaveText(/Ctrl\+0/);
 
   // E il clic la riporta davvero al 100%: la voce è anche la via d'uscita.
@@ -231,7 +232,7 @@ test('anche una pagina di Filo si ingrandisce a parole, e il tasto destro ne mos
   await expect.poll(async () => percentOf(app, page)).toBe(150);
 
   await page.locator('body').click({ button: 'right', position: { x: 12, y: 12 } });
-  const voce = page.locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
+  const voce = menuDi(page).locator('.sn-menu').first().getByText(/Dimensione reale \(ora 150%\)/);
   await expect(voce).toBeVisible();
   await voce.click();
   await expect.poll(async () => percentOf(app, page)).toBe(100);
@@ -375,7 +376,7 @@ test('editor: il tasto destro dice il livello del foglio e lo riporta alla dimen
   // Prima il menu taceva: leggeva il livello della finestra, fermo al 100%,
   // mentre la chat diceva 150%. Due strade per la stessa cosa, due risposte.
   await page.locator('#doc').click({ button: 'right' });
-  const voce = page.locator('.sn-menu').getByText(/Dimensione reale \(ora 150%\)/);
+  const voce = menuDi(page).locator('.sn-menu').getByText(/Dimensione reale \(ora 150%\)/);
   await expect(voce).toBeVisible();
 
   await voce.click();

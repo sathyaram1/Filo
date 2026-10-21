@@ -12,6 +12,7 @@
 // esisteva solo nei due rami "testo selezionato".
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:18px sans-serif">
   <h1 id="title">Pagina di prova</h1>
@@ -31,7 +32,7 @@ test('la voce "Leggi" usa un\'icona SVG, non un\'emoji', async ({ openTab, testS
     sel.addRange(range);
   });
   await page.locator('#target').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
   // L'item "Leggi" ha un'icona SVG e la sua etichetta NON contiene emoji.
@@ -62,8 +63,8 @@ test('durante la lettura, un menu senza selezione mostra "Interrompi lettura"', 
     sel.addRange(range);
   });
   await page.locator('#target').click({ button: 'right' });
-  await expect(page.locator('.sn-menu').first()).toBeVisible();
-  await page.locator('.sn-menu-item', { hasText: 'Leggi' }).first().click();
+  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible();
+  await menuDi(page).locator('.sn-menu-item', { hasText: 'Leggi' }).first().click();
 
   // Azzera la selezione: il prossimo menu sarà "senza contesto di testo".
   await page.evaluate(() => window.getSelection().removeAllRanges());
@@ -75,7 +76,7 @@ test('durante la lettura, un menu senza selezione mostra "Interrompi lettura"', 
     // chiudi eventuale menu aperto
     await page.keyboard.press('Escape').catch(() => {});
     await page.locator('#empty').click({ button: 'right' });
-    const menu = page.locator('.sn-menu').first();
+    const menu = menuDi(page).locator('.sn-menu').first();
     const visible = await menu.isVisible().catch(() => false);
     if (!visible) return false;
     return await menu.locator('.sn-menu-item', { hasText: 'Interrompi lettura' }).count();
@@ -120,8 +121,8 @@ test('durante la lettura, "Interrompi lettura" compare e ferma anche da un\'ALTR
     sel.addRange(range);
   });
   await pageA.locator('#target').click({ button: 'right' });
-  await expect(pageA.locator('.sn-menu').first()).toBeVisible();
-  await pageA.locator('.sn-menu-item', { hasText: 'Leggi' }).first().click();
+  await expect(menuDi(pageA).locator('.sn-menu').first()).toBeVisible();
+  await menuDi(pageA).locator('.sn-menu-item', { hasText: 'Leggi' }).first().click();
 
   // Scheda B: un'altra pagina, altra scheda. NESSUNA lettura parte qui.
   const urlB = testServer.html(HTML);
@@ -132,7 +133,7 @@ test('durante la lettura, "Interrompi lettura" compare e ferma anche da un\'ALTR
   const stopVisibleInB = async () => {
     await pageB.keyboard.press('Escape').catch(() => {});
     await pageB.locator('#empty').click({ button: 'right' });
-    const menu = pageB.locator('.sn-menu').first();
+    const menu = menuDi(pageB).locator('.sn-menu').first();
     if (!(await menu.isVisible().catch(() => false))) return 0;
     return await menu.locator('.sn-menu-item', { hasText: 'Interrompi lettura' }).count();
   };
@@ -140,7 +141,7 @@ test('durante la lettura, "Interrompi lettura" compare e ferma anche da un\'ALTR
 
   // Cliccando lo stop da B la lettura in A si ferma: lo stato globale torna
   // inattivo e la voce sparisce dai menu di B.
-  await pageB.locator('.sn-menu-item', { hasText: 'Interrompi lettura' }).first().click();
+  await menuDi(pageB).locator('.sn-menu-item', { hasText: 'Interrompi lettura' }).first().click();
 
   await expect.poll(stopVisibleInB, { timeout: 8000, intervals: [200, 300, 500, 800] }).toBe(0);
 });

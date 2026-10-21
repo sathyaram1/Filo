@@ -36,27 +36,27 @@ test('classifyBlock: nessuna pipeline → bianco se aperto (mai giudicato), null
   assert.equal(MR.classifyBlock({ status: 'ignored' }), null);
 });
 
-test('classifyBlock: mittente fidato (routine/owner) bloccato a L1 → unfiltered, non attacco', () => {
-  // Identità dell'owner flaggata per errore: va RI-GIUDICATA, non mostrata come attacco.
-  const r = MR.classifyBlock({ clientId: 'routine:routine', senderProof: 'server', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
+test('classifyBlock: feedback fidato bloccato a L1 → unfiltered, non attacco (§10: la fiducia, non il mittente)', () => {
+  // Un fidato flaggato per errore: va RI-GIUDICATO, non mostrato come attacco.
+  const r = MR.classifyBlock({ clientId: 'caf22093', fiducia: 'fidato', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
   assert.equal(r.reason, 'unfiltered');
+  // Una routine con la prova ma non fidata è giudicata come gli altri, come fa il server.
+  const routine = MR.classifyBlock({ clientId: 'routine:routine', senderProof: 'server', fiducia: 'non_fidato', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
+  assert.equal(routine.reason, 'attack');
   // Un mittente ESTERNO con lo stesso pipeline resta un attacco (rosso).
   const ext = MR.classifyBlock({ clientId: 'caf22093', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
   assert.equal(ext.reason, 'attack');
 });
 
-test('#595 — il prefisso riservato senza prova del mittente è un anonimo', () => {
+test('#595/§10 — il prefisso riservato, con o senza prova, non protegge dal rosso: lo fa solo la fiducia', () => {
   const pipeline = { action: 'human_review', l1Category: 'dangerous', verdicts: [] };
-  // Chiunque può scrivere `owner:` davanti al proprio clientId: senza la prova
-  // che solo admin e server possono mettere, il suo attacco resta rosso.
   for (const clientId of ['owner:abc', 'routine:x', 'agent:m', 'local:claude']) {
     assert.equal(MR.classifyBlock({ clientId, pipeline }).reason, 'attack', `${clientId} senza prova`);
     assert.equal(MR.classifyBlock({ clientId, senderProof: 'utente', pipeline }).reason, 'attack', `${clientId} con prova inventata`);
-    assert.equal(MR.classifyBlock({ clientId, senderProof: 'admin', pipeline }).reason, 'unfiltered', `${clientId} con prova admin`);
+    assert.equal(MR.classifyBlock({ clientId, senderProof: 'admin', pipeline }).reason, 'attack', `${clientId} con prova admin, non fidato`);
+    assert.equal(MR.classifyBlock({ clientId, senderProof: 'admin', fiducia: 'fidato', pipeline }).reason, 'unfiltered', `${clientId} fidato`);
   }
-  assert.equal(MR.isTrustedClient('local:claude', 'server'), true);
-  assert.equal(MR.isTrustedClient('auto:gap', 'admin'), false, 'auto: non è un prefisso riservato');
-  assert.equal(MR.isTrustedClient('owner:abc'), false);
+  assert.equal(MR.isTrustedClient, undefined, 'il «mittente fidato» non esiste più');
 });
 
 test('#595 — senza prova il mittente riservato ha una chiave sua, come sul server', () => {

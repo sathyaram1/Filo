@@ -54,6 +54,8 @@
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        propostaEmailAttiva: 'propostaEmail.attiva',
+        propostaEmailIncognito: 'propostaEmail.incognito',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
         lunghezzaConversazioni: 'lunghezzaRisposte.conversazioni',
@@ -78,8 +80,6 @@
         DOCUMENTI_STATO: 'CERCA_DOCUMENTI',
         DOCUMENTI_DIMENTICA: 'IMPOSTA_PREFERENZA',
         DOCUMENTI_SCEGLI_CARTELLA: 'apre la finestra del sistema per scegliere una cartella: dalla chat la cartella si dice col suo percorso (cartelle_documenti)',
-        FILO_MEMORY_VIEW: 'DIMENTICA',
-        FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
         DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei tetti della chat e delle risposte per mostrarli accanto ai campi: non salva niente',
         FILO_RESTART_ONBOARDING: 'pulsante che fa un’azione (rifà l’intervista di benvenuto): resta nella pagina',
@@ -135,6 +135,7 @@
         COOKIES_SITES: 'mostra i siti dove Filo ha già rifiutato i banner, da passare all’elenco dei banner visibili',
         PAGINE_DELICATE_CAMPI: 'mostra i siti dove Filo ha visto un campo password o carta; toglierne uno è l’elenco siti_non_delicati',
         PROXY_STATUS: 'mostra se la connessione da un altro paese è configurata: non è un valore da cambiare qui',
+        DOWNLOADS_LIST: 'legge i siti da cui sono scesi programmi, per proporre il sito preciso a chi scrive una piattaforma fra i programmi fidati: non è un valore da cambiare',
         EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file, le chiavi solo con la spunta): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
@@ -151,6 +152,7 @@
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
         ownKeyAllProviders: 'ownKeyAllProviders',
+        ordineHost: 'ordineHost',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',
@@ -168,7 +170,11 @@
     },
     altro: {
       titolo: 'Altro',
-      campi: { blocklist: 'blocklist' },
+      campi: {
+        blocklist: 'blocklist',
+        spellcheckBlu: 'featureFlags.spellcheck',
+        spellcheckOcra: 'featureFlags.spellcheckContext',
+      },
       gruppi: {},
       fuori: {},
       messaggi: {
@@ -195,9 +201,6 @@
       parole: 'cartelle cartella documenti ricerca cercato cercata indice archivio letti dimentica',
     },
   };
-
-  // Quando la chiave manca: il valore che la pagina mostra e che il main applica. Il resto viene dai default.
-  const ASSENTE = { 'security.autoFeedback': true };
 
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   function dentro(o, percorso) {
@@ -233,7 +236,6 @@
   function leggi(settings, percorso) {
     const v = dentro(settings, percorso);
     if (v !== undefined && v !== null) return v;
-    if (has(ASSENTE, percorso)) return ASSENTE[percorso];
     const C = global.SN_CONST;
     const d = C && C.DEFAULT_SETTINGS ? dentro(C.DEFAULT_SETTINGS, percorso) : undefined;
     return d === undefined ? v : d;

@@ -60,7 +60,8 @@
         }, { autore: m.role === 'user' ? 'utente' : 'filo', ts });
       });
       if (eventi.length) await t.scrivi(eventi);
-      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId));
+      // `eids`: con quali eventi il turno è entrato nel filo, per le fonti delle memorie (#872).
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId), { ids: true });
     });
   }
 
@@ -81,7 +82,8 @@
   }
 
   // Ritorna la chat chiusa, o null se non c'è niente da chiudere: una home aperta e mai usata non è una conversazione.
-  function close(id) {
+  // `fine`: chiusa apposta dall'utente, non da una scheda che se ne va (src/shared/filoCoda.js, chatCorrente).
+  function close(id, { fine = false } = {}) {
     if (!id) return Promise.resolve(null);
     id = String(id);
     return F().transazione(async (t) => {
@@ -91,7 +93,9 @@
         await t.scrivi([t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' })]);
         return null;
       }
-      if (!c.closedAt) await t.scrivi([t.evento(T().CHAT_CHIUSA, { chat: id }, { autore: 'utente' })]);
+      if (!c.closedAt || (fine && !c.finita)) {
+        await t.scrivi([t.evento(T().CHAT_CHIUSA, { chat: id, fine: fine ? true : undefined }, { autore: 'utente' })]);
+      }
       return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
     });
   }

@@ -14,6 +14,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { statoDi } from './helpers/riquadri.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const RT_URL = 'filo://redteam/redteam.html';
 
@@ -84,7 +85,7 @@ test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due cam
 
   // Apri il menu contestuale Filo.
   await page.locator('#t').click({ button: 'right' });
-  const menu = page.locator('.sn-menu').first();
+  const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
   // La voce "Invia attacco (Red-team)" esiste.

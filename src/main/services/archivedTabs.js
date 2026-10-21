@@ -86,6 +86,8 @@
   // la tab non è archiviabile (manca l'URL, o la chiamata arriva dall'incognito).
   async function archive(meta) {
     if (!meta || typeof meta.url !== 'string' || !meta.url || Disco.inIncognito()) return null;
+    const prova = { url: meta.url, openedAt: meta.openedAt || null, closedAt: meta.closedAt || new Date().toISOString() };
+    if (dimenticate.some((r) => coperta(prova, r))) return null;
     const d = await apri();
     const entry = {
       id: uuid(),
@@ -153,6 +155,36 @@
     return { removed, remaining: d.numero() };
   }
 
+  // Le pagine tolte dal filo se ne vanno anche da qui, o la ricerca nel filo le ritroverebbe (#869): conta una scheda
+  // aperta nel periodo, sul sito detto, e con quell'indirizzo se ne è dato uno (una visita tolta da sola).
+  function regolaDimenticate({ da = null, a = null, sito = null, url = null } = {}, { finoA = Infinity } = {}) {
+    const t0 = da != null ? Date.parse(da) : -Infinity;
+    const t1 = Math.min(a != null ? Date.parse(a) : Infinity, finoA);
+    return { t0, t1, sito, url };
+  }
+  function coperta(t, r) {
+    const E = global.SN_FILO_EVENTI;
+    if (!t || !t.url || (r.url && t.url !== r.url)) return false;
+    if (r.sito && !(E && E.delSito(t.url, r.sito))) return false;
+    const chiusa = Date.parse(t.closedAt);
+    const aperta = Date.parse(t.openedAt);
+    const fine = Number.isFinite(chiusa) ? chiusa : Infinity;
+    const inizio = Number.isFinite(aperta) ? aperta : (r.url ? -Infinity : fine);
+    return inizio <= r.t1 && fine >= r.t0;
+  }
+  // Una scheda ancora aperta quando le sue pagine si tolgono entra qui solo alla chiusura: la regola resta per lei, ma
+  // solo per le schede aperte prima di adesso (una visita di dopo non è stata tolta). Vale finché Filo resta aperto.
+  const dimenticate = [];
+
+  async function dimenticaPagine(periodo = {}) {
+    if (Disco.inIncognito()) return 0;
+    dimenticate.push(regolaDimenticate(periodo, { finoA: Date.now() }));
+    const r = regolaDimenticate(periodo);
+    const d = await apri();
+    const ids = d.tutti().filter((t) => coperta(t, r)).map((t) => t.id);
+    return ids.length ? togli(d, ids) : 0;
+  }
+
   async function clear() {
     if (Disco.inIncognito()) return [];
     (await apri()).svuota();
@@ -171,7 +203,7 @@
   }
 
   global.SN_ARCHIVED_TABS = {
-    list, listMeta, archive, update, remove, removeMany, clear, importa,
+    list, listMeta, archive, update, remove, removeMany, dimenticaPagine, clear, importa,
     suEntrate, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -676,8 +676,10 @@ module.exports = function register(on, ctx) {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
       const FC = globalThis.SN_FILO_CONTESTO;
+      // Anche la scelta generale degli host: senza, una pagina non sa a cosa rimanda «Automatico».
       return {
         ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
+        providerSort: d.providerSort || '',
         contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
         lunghezzaRisposte: d.lunghezzaRisposte || {},
         lunghezzaRisposteDiSerie: globalThis.SN_LUNGHEZZA_RISPOSTE ? { ...globalThis.SN_LUNGHEZZA_RISPOSTE.DI_SERIE } : {},
@@ -708,17 +710,16 @@ module.exports = function register(on, ctx) {
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
       const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
       const lavoriServer = await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   }));
 
-  // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa dei mittenti
-  // ammessi all'auto-approvazione, #446), e tocca SOLO ciò che riceve: la vecchia
+  // Accetta `enabled` (interruttore master) e/o `autoApprove` (mappa per fiducia
+  // dell'auto-approvazione, #446 e §10), e tocca SOLO ciò che riceve: la vecchia
   // pagina feedback manda ancora il solo `enabled` e non deve azzerare la mappa.
   on(MSG.AUTOMATION_SET, ownerOnly(async (msg) => {
     try {
@@ -733,9 +734,6 @@ module.exports = function register(on, ctx) {
       const autoApprove = (msg.autoApprove && typeof msg.autoApprove === 'object')
         ? await Defaults.setAutomationAutoApprove(msg.autoApprove, idToken)
         : await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = (typeof msg.proberWhenIdle === 'boolean')
-        ? await Defaults.setAutomationProberIdle(msg.proberWhenIdle, idToken)
-        : await Defaults.getAutomationProberIdle(idToken);
       // Interruttore master delle routine (config/routines): è ciò che ferma il
       // lavoro autonomo, mentre `enabled` qui sopra riguarda solo chi entra in
       // coda da solo. Due decisioni diverse, due interruttori.
@@ -746,7 +744,7 @@ module.exports = function register(on, ctx) {
       const lavoriServer = (typeof msg.lavoriServer === 'boolean')
         ? await Defaults.setLavoriServer(msg.lavoriServer, idToken)
         : await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -1487,29 +1485,14 @@ module.exports = function register(on, ctx) {
       for (const { id, card } of plan.upsert) await FB.publishPublicCard(id, card, { idToken });
       for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken });
 
-      // Il contatore dei numeri: lo crea e lo rimette in pari l'app
-      // dell'owner, che è l'unica a poterlo scrivere a piacere. Senza, un
-      // feedback nuovo arriverebbe senza numero.
-      //
-      // Il massimo si CHIEDE al server con una query sua (una lettura), non si
-      // ricava dai feedback caricati: quelli sono i 500 più recenti per data, e
-      // il numero più alto potrebbe stare fuori. Con il massimo vero,
-      // `allowLower` è sempre lecito, ed è l'unico modo perché la cura funzioni:
-      // chiunque può far avanzare il contatore di uno, e prima si abbassava solo
-      // quando il caricamento non toccava il tetto, cioè mai più.
+      // Il contatore dei numeri si alza solo fino a un numero provato (#923); il massimo di tutti si
+      // chiede al server (i caricati sono solo i più recenti) e fa da pavimento per riportarlo giù.
+      const provato = FB.maxSeqProvato(raw);
       let piuAlto = null;
       try { piuAlto = await FB.maxSeq({ idToken, timeoutMs: 15000 }); }
       catch (e) { console.warn('[feedback] numero più alto non letto:', e?.message || e); }
-      if (piuAlto === null) {
-        // Non lo sappiamo: al massimo alziamo il contatore fino a quello che
-        // abbiamo visto, mai abbassarlo alla cieca.
-        const visto = feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0);
-        if (visto > 0) {
-          try { await FB.ensureSeqCounter(visto, { idToken }); }
-          catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
-        }
-      } else if (piuAlto > 0) {
-        try { await FB.ensureSeqCounter(piuAlto, { idToken, allowLower: true }); }
+      if (provato > 0 || piuAlto > 0) {
+        try { await FB.ensureSeqCounter(provato, { idToken, pavimento: piuAlto }); }
         catch (e) { console.warn('[feedback] contatore dei numeri non aggiornato:', e?.message || e); }
       }
 

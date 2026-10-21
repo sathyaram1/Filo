@@ -31,11 +31,13 @@
 #   · GITHUB_TOKEN effimero di Actions: crea la bozza e allega i file. I
 #     permessi li dichiara questo file: le impostazioni del repo possono
 #     restare su sola lettura.
-#   · L'app di pubblicazione, se `vars.FILO_RILASCIO_APP_ID` c'e': rende
-#     pubblica la bozza, il passo che crea il tag v*, e la regola su TUTTI i
-#     tag lascia passare solo lei: il download del sito prende la release piu'
-#     recente qualunque tag abbia (l'app rifiuta un tag che non sia
-#     v<versione>, il sito no). Senza variabile resta il GITHUB_TOKEN.
+#   · L'app di pubblicazione, se nell'ambiente c'e' la variabile
+#     `FILO_PUBLISH_APP_ID` (chiave privata nel segreto `FILO_PUBLISH_APP_KEY`):
+#     i nomi che la guida fa creare all'owner, li segue il codice (#1406).
+#     Rende pubblica la bozza, il passo che crea il tag v*, e la regola su
+#     TUTTI i tag lascia passare solo lei: il download del sito prende la
+#     release piu' recente qualunque tag abbia (l'app rifiuta un tag che non
+#     sia v<versione>, il sito no). Senza variabile resta il GITHUB_TOKEN.
 #   · FILO_BUILD_PASSPHRASE: la parola d'ordine di scopo `build`, la stessa che
 #     apre le chiavi di default e l'allarme. Apre SOLO quelle tre cose, e
 #     l'aumento di versione non accetta da qui nessun numero e nessun
@@ -299,11 +301,11 @@ jobs:
       # creare tag: a loro basta il GITHUB_TOKEN.
       - name: Token dell'app di pubblicazione (se configurata)
         id: app
-        if: steps.check.outputs.should_release == 'true' && vars.FILO_RILASCIO_APP_ID != ''
+        if: steps.check.outputs.should_release == 'true' && vars.FILO_PUBLISH_APP_ID != ''
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ vars.FILO_RILASCIO_APP_ID }}
-          private-key: ${{ secrets.FILO_RILASCIO_APP_KEY }}
+          app-id: ${{ vars.FILO_PUBLISH_APP_ID }}
+          private-key: ${{ secrets.FILO_PUBLISH_APP_KEY }}
           permission-contents: write
 
       # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────

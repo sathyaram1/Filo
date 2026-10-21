@@ -34,7 +34,7 @@
   function controlTypeFor(name, Tokens) {
     const t = Tokens && Tokens.get && Tokens.get(name);
     const type = t && t.type;
-    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time' || type === 'factor') return type;
+    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time' || type === 'factor' || type === 'linea') return type;
     return 'color';
   }
 
@@ -46,8 +46,10 @@
     font: 'Cambia il font',
     time: 'Regola la durata',
     factor: 'Regola col cursore',
+    linea: 'Cambia lo stile della linea',
     color: 'Scegli il colore esatto',
   };
+  const NOMI_LINEA = { dotted: 'Puntini', dashed: 'Trattini', wavy: 'Onda', solid: 'Linea', double: 'Doppia' };
   function triggerHint(name, Tokens) {
     return HINTS[controlTypeFor(name, Tokens)] || HINTS.color;
   }
@@ -222,6 +224,13 @@
         lbl.className = 'sn-refine-sample-text';
         lbl.textContent = factorLabel(eff);
         sample.appendChild(lbl);
+      } else if (type === 'linea') {
+        const txt = doc.createElement('span');
+        txt.className = 'sn-refine-sample-text';
+        txt.style.textDecoration = `underline ${eff}`;
+        txt.style.textUnderlineOffset = '4px';
+        txt.textContent = 'Testo di esempio';
+        sample.appendChild(txt);
       } else if (type === 'font') {
         const txt = doc.createElement('span');
         txt.className = 'sn-refine-sample-text';
@@ -291,6 +300,17 @@
         const n = Math.min(max, Math.max(0, Math.round((parseFloat(control.value) || 0) * 4) / 4));
         setValue(String(n));
       });
+    } else if (type === 'linea') {
+      control = doc.createElement('select');
+      control.className = 'sn-refine-input sn-refine-select';
+      control.setAttribute('aria-label', t.label || name);
+      for (const v of Tokens.STILI_LINEA || []) {
+        const o = doc.createElement('option');
+        o.value = v; o.textContent = NOMI_LINEA[v] || v;
+        if (v === startEff) o.selected = true;
+        control.appendChild(o);
+      }
+      control.addEventListener('change', () => setValue(control.value));
     } else { // font
       control = doc.createElement('select');
       control.className = 'sn-refine-input sn-refine-select';

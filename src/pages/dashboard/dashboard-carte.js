@@ -157,7 +157,7 @@
     // Un programma si apre solo col sì dell'utente (#588): le parole le scrive il main.
     if (res.needsConfirm) {
       const ok = global.SN_CONFIRM_UI
-        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        ? await global.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, parti: res.parti, okLabel: 'Apri comunque' })
         : global.confirm(res.text);
       if (ok) await apriDownload(r, true);
       return;

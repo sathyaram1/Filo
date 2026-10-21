@@ -10,6 +10,7 @@
 // quello dell'immagine). Senza il fix la voce non esiste → il click fallisce → rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 // Un PNG 1×1 come sorgente dell'immagine (data URI: nessuna rete).
 const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -24,7 +25,7 @@ function pageHtml(linkHref) {
 
 async function openMenuOn(page, selector) {
   await page.locator(selector).click({ button: 'right', position: { x: 8, y: 8 } });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }

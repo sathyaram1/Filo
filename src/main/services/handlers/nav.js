@@ -80,10 +80,16 @@ module.exports = function register(on, ctx) {
     // Da una pagina di Filo un indirizzo web o di posta passa dalla porta delle uscite (#810); `parole` = scritto dall'utente.
     if (isFilo(origin) && SCHEMI_USCITA.test(url)) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
-      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url) });
+      // `parole` le manda solo la barra della home, con quello che l'utente ha scritto: per il giudizio sui siti è un
+      // indirizzo scritto a mano.
+      // Un clic su un collegamento di Filo vale per la pagina d'arrivo come un clic su un sito; l'Invio di chi scrive no.
+      const origine = parole.trim() ? { tipo: 'scritto' } : { tipo: 'filo', gesto: require('../permessiPagine').gestoDellUtente(sender?.wc) };
+      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url, { origine }) });
       return { ok: true, ...r };
     }
-    win._filoTabs.openTab(url);
+    const daPagina = /^https?:/i.test(String(sender?.url || ''));
+    const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
+    win._filoTabs.openTab(url, daPagina ? { origine: { tipo: 'link', da: sender.url, gesto } } : {});
     return { ok: true };
   });
 
@@ -99,8 +105,12 @@ module.exports = function register(on, ctx) {
       return { ok: true };
     }
     if (!win._filoTabs.apribileDallAssistente(sender && sender.wc, url)) return { ok: false, error: 'forbidden' };
-    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta.
-    win._filoTabs.openTab(url);
+    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta. Per il giudizio sui siti
+    // l'indirizzo arriva dalla pagina dell'assistente, come ogni sua apertura.
+    let da = '';
+    try { da = String(sender.wc.getURL() || ''); } catch (_) {}
+    const gesto = require('../permessiPagine').gestoDellUtente(sender && sender.wc);
+    win._filoTabs.openTab(url, { origine: /^https?:/i.test(da) ? { tipo: 'link', da, gesto } : { tipo: 'filo', gesto } });
     return { ok: true };
   });
 
@@ -287,6 +297,19 @@ module.exports = function register(on, ctx) {
   on(MSG.CLOSE_OTHER_MENUS, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.CLOSE_OTHER_MENUS,
   }));
+
+  // #589.11 — alla sola pagina che contiene il riquadro mittente: è il main a dire chi chiede, non lo script del
+  // riquadro, che da qui non passa.
+  on(MSG.VISTO_SOSPENDI, async (msg, sender) => {
+    const madre = sender && sender.frame && sender.frame.parent;
+    if (!madre || madre.detached) return { ok: false, error: 'no-parent' };
+    try {
+      madre.send('filo:broadcast', { type: MSG.VISTO_PERMESSO, n: String(msg?.n || '').slice(0, 64), si: msg?.si ? 1 : 0 });
+    } catch (e) {
+      return { ok: false, error: e.message || String(e) };
+    }
+    return { ok: true };
+  });
 
   // #407 — «Traduci la pagina» deve arrivare anche dentro i riquadri
   // incorporati (post incorporati, blocchi commenti, moduli di iscrizione).

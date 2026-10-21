@@ -148,6 +148,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   const FILO_MSG_TO_CAP = {
     FILO_CHAT: 'filo-assistant',
     FILO_CHAT_STOP: 'filo-assistant',
+    // #1296 — il seguito scritto mentre Filo lavora.
+    FILO_CHAT_SEGUITO: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
@@ -157,9 +159,15 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
-    // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
+    // #592 — la memoria riga per riga: rileggerla e toglierne una. #872 — il quaderno: correggere, rimettere,
+    // cancellare per sempre, e il salto della home al punto del filo da cui una riga è nata.
     FILO_MEMORY_VIEW: 'filo-memory',
     FILO_MEMORY_FORGET: 'filo-memory',
+    FILO_QUADERNO: 'filo-memory',
+    FILO_MEMORY_EDIT: 'filo-memory',
+    FILO_MEMORY_RESTORE: 'filo-memory',
+    FILO_MEMORY_FOREVER: 'filo-memory',
+    FILO_DOVE: 'filo-memory',
     // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
     // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle
     // azioni (FILO_RUN_ACTION → CERCA_CHAT) ed è la capacità gemella
@@ -183,6 +191,10 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CONVERSAZIONE_APP_DIMENTICA: 'app-chats-in-filo',
     FILO_CONVERSAZIONE_APP_RINOMINA: 'app-chats-in-filo',
     FILO_RIGHE_APP: 'app-chats-in-filo',
+    // #869 — la home è la coda del filo: a pezzi, la ricerca nel campo, le pagine tolte dal tasto destro.
+    FILO_CODA: 'home-filo',
+    FILO_CERCA: 'home-filo',
+    FILO_CODA_TOGLI_PAGINE: 'home-filo',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',
@@ -410,9 +422,10 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
     { re: /barra in alto/i, why: 'la barra in alto (indirizzi/navigazione) è stata rimossa' },
     { re: /barra\s+(degli\s+)?indirizzi/i, why: 'la barra degli indirizzi è sempre nascosta' },
     // "nella barra" generico, TRANNE la barra delle schede (le linguette, che
-    // esiste) o la barra in basso (chat del deck builder): intercetta formule
-    // come "Pulsante Home nella barra" che rimandano alla barra sparita.
-    { re: /nella barra(?!\s+(delle schede|in basso|laterale))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
+    // esiste), la barra in basso (chat del deck builder) o quella delle
+    // applicazioni del sistema (l'avanzamento dei download, #941): intercetta
+    // formule come "Pulsante Home nella barra" che rimandano alla barra sparita.
+    { re: /nella barra(?!\s+(delle schede|in basso|laterale|delle applicazioni))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
   ];
   for (const c of CAP.CAPABILITIES) {
     const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;

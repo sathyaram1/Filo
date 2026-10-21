@@ -493,6 +493,23 @@ app.on('before-quit', () => {
   } catch (_) {}
 });
 
+// Uscire distrugge le schede senza chiudere le loro pagine: chi aveva caselle da spedire perdeva l'ultima modifica.
+// Si aspetta come alla chiusura di una scheda (chiusuraConCaselle), una volta sola.
+let congedoUscitaFatto = false;
+app.on('before-quit', (e) => {
+  if (congedoUscitaFatto) return;
+  congedoUscitaFatto = true;
+  // Tutte le finestre: una che rifiuta di chiudersi mentre aspetta annullerebbe l'uscita (su Mac Filo resterebbe aperto).
+  const { congedaSchede } = require('./tabs/chiusuraConCaselle');
+  const attese = BrowserWindow.getAllWindows()
+    .map((w) => { try { return w.isDestroyed() ? null : congedaSchede(w._filoTabs); } catch (_) { return null; } })
+    .filter(Boolean);
+  if (!attese.length) return;
+  e.preventDefault();
+  const esci = () => { try { app.quit(); } catch (_) {} };
+  Promise.all(attese).then(esci, esci);
+});
+
 // Wipe dei cookie-tracker all'uscita (modalità 'default'): i cookie funzionali e
 // i login restano (le tue scelte non si perdono); rimuoviamo solo eventuali
 // cookie di domini-tracker noti. Il wipe è asincrono: rimandiamo l'uscita finché

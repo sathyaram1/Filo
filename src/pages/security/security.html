@@ -20,6 +20,12 @@
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/nomiSito.js"></script>
+  <!-- #876 — «stesso sito» con la Public Suffix List: i siti fidati si salvano come li usa Filo. -->
+  <script src="filo://shared/pslIcann.js"></script>
+  <script src="filo://src/vendor/public-suffix-list/privata.js"></script>
+  <script src="filo://shared/stessoSito.js"></script>
+  <script src="filo://shared/dominiGoogle.js"></script>
+  <script src="filo://shared/eseguibili.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
@@ -87,7 +93,7 @@
         <div id="sec-dl-exe-sub" style="margin-top: 8px;">
           <label class="sn-muted" id="sec-dl-trusted-label" for="sec-dl-trusted" style="display: block; margin-bottom: 4px;"></label>
           <textarea id="sec-dl-trusted" rows="3" style="width: 100%;"></textarea>
-          <div id="sec-dl-trusted-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px"></div>
+          <div id="sec-dl-trusted-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px;white-space:pre-line"></div>
         </div>
       </div>
 
@@ -127,7 +133,7 @@
           <span class="sn-muted" id="sec-safebrowse-llm-desc"></span>
         </div>
 
-        <div class="sn-toggle-row" id="sec-safebrowse-sandbox-row" hidden>
+        <div class="sn-toggle-row" id="sec-safebrowse-sandbox-row">
           <label>
             <input type="checkbox" id="sec-safebrowse-sandbox" />
             <span id="sec-safebrowse-sandbox-label"></span>

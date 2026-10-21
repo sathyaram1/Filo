@@ -246,7 +246,9 @@ dall'owner e dal server. Campi:
 Il formato per l'owner è quello del report delle 102 domande: contesto,
 problema in pratica, opzioni con pro e contro, scelta consigliata. Nessun nome
 di file o di funzione nel testo per l'owner. Prima di scriverla si applica
-`.claude/skills/unslop/SKILL.md`.
+`.claude/skills/unslop/SKILL.md`. La validazione comune, quella dello script e
+del server, rifiuta nei campi per l'owner un nome di file di codice, una
+lineetta o un pro vuoto, e dice quale campo; `notePerAgenti` resta libero.
 
 ### 3.2 Note per gli agenti
 
@@ -366,16 +368,18 @@ istanze non si accumulano.
 Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
 l'ambito, non il ruolo.
 
-| Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
-|---|---|---|---|---|
-| ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus |
-| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus |
-| ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
-| lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
-| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare |
-| domenica | audit di sicurezza | `lavoro` | 45 | Opus |
+| Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale | Sforzo iniziale |
+|---|---|---|---|---|---|
+| ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus | `high` |
+| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus | `high` |
+| ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus | `high` |
+| lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) | `high` |
+| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare | `high` |
+| domenica | audit di sicurezza | `lavoro` | 45 | Opus | `high` |
 
-Si vedono e si cambiano in Routine → Compiti ricorrenti.
+Lo sforzo parte da `high`, come nelle fasi di un feedback dopo il primo lavoro
+(§ 6.4), perché nessun ricorrente costruisce codice da zero. Modello e sforzo si
+vedono e si cambiano su ciascuno, in Routine → Compiti ricorrenti.
 
 ### 4.2 Due canali di aggiornamento
 
@@ -473,8 +477,9 @@ Due oggetti, decisi dall'owner il 12/10:
   ciclo: ramo, verifica, controllo cieco, fusione. Non porta un modello.
 - **Compito**: una chiamata di un agente. Ha **urgenza**, **modello**,
   **sforzo**, **ambito**, fiducia e, se c'è, il feedback a cui è legato con la
-  sua **fase**. Il biglietto è un tentativo di eseguire un compito: un compito
-  ne può avere più di uno, per esempio dopo un arenamento.
+  sua **fase**, o il compito padre se è un figlio (§ 12.2). Il biglietto è un
+  tentativo di eseguire un compito: un compito ne può avere più di uno, per
+  esempio dopo un arenamento.
 
 ### 6.1 Da dove nascono i compiti
 
@@ -490,11 +495,18 @@ e controllo cieco. La funzione gira in due momenti:
   avanti si chiude come «superato».
 
 Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
-Invariante, con sentinella: al massimo un compito aperto per feedback.
+Invariante, con sentinella: al massimo un compito di fase aperto per feedback.
+I compiti figli, qui sotto, non contano.
 
 **Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
-(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), l'esplorazione a coda
-vuota, e i compiti creati a mano dall'owner o da una sessione locale.
+(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), e i compiti creati a
+mano dall'owner o da una sessione locale.
+
+**Da un altro compito:** i figli (§ 12.2). Un figlio è legato al compito padre,
+non al feedback, e al feedback arriva attraverso il padre. Così un padre di fase
+con i suoi figli aperti resta, per l'invariante, un compito solo. I figli
+seguono il padre: quando il trigger o il pacemaker ne ricalcola l'urgenza
+o lo chiude come «superato», lo stesso vale per i figli ancora aperti.
 
 **Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
 server), il blocco di sicurezza (diventa una domanda), la segnalazione (diventa
@@ -540,7 +552,6 @@ fidato e figlio. I nipoti contano come figli.
 | Revisione delle domande, posta | 30 |
 | Unione di feedback | 20 |
 | Potatura dei rami | 5 |
-| Esplorazione | sotto tutto, solo a coda vuota |
 
 Cosa garantisce la scala:
 
@@ -566,8 +577,9 @@ trigger ricalcola l'urgenza del suo compito aperto.
   scritto l'orchestratore.
 - **Fasi di un feedback:** modello e sforzo per fase, scelti dall'owner in
   Routine → Automazioni. Oggi: primo lavoro Opus `xhigh`, le altre Opus `high`.
-- **Compiti senza feedback:** dal ricorrente o da chi crea il compito. «Gestisci
-  la risposta» resta Opus (§ 3.5).
+- **Compiti senza feedback:** dal ricorrente (§ 4.1) o da chi crea il compito.
+  «Gestisci la risposta» resta Opus (§ 3.5), sforzo `high`.
+- **Compiti figli** (§ 12.2): modello e sforzo del padre.
 - Ogni agente può lanciare sotto-agenti, fino a tre livelli sotto la sessione
   principale, e sceglierne il modello.
 
@@ -633,13 +645,13 @@ scrive: con i compiti quella lettura si toglie.
   Quindi i lavori server li fa una routine dedicata, con Filo e filo-security
   collegati e la rete limitata:
   - la sua parola d'ordine ha `lavori: server` (`routine-keys.mjs lavori`) e
-    riceve solo lavori server fidati, mai l'esplorazione; le altre chiavi non
+    riceve solo lavori server fidati; le altre chiavi non
     ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
     diff dal server senza clonare;
   - il pacemaker la accende con una voce sua (`routineIdServer` in config,
     segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
     se c'è un lavoro server che nascerebbe pulito. Decide prima di A/B, che
-    altrimenti riempirebbero ogni posto anche con l'esplorazione, e prende i
+    altrimenti riempirebbero ogni posto, e prende i
     posti che le spettano nell'ordine di priorità della coda: a pari priorità
     il server, e un lavoro normale più urgente non lo ferma se A/B non
     possono accendere. Conta nel
@@ -819,9 +831,10 @@ Da sistemare prima dei worker in parallelo:
   posti e hanno un biglietto loro (una revisione grande, per esempio), il worker
   chiede al server dei compiti figli (§ 6), col ruolo e i numeri, mai testo
   libero, come per l'unione (§ 1.3). Ognuno ha il suo biglietto, e
-  l'orchestratore li lancia come gli altri, dentro N e K. I figli ereditano
-  l'urgenza del padre e la sua fiducia in quel momento. Il padre aspetta i loro
-  esiti dal server.
+  l'orchestratore li lancia come gli altri, dentro N e K. I figli sono legati
+  al padre, non al feedback (§ 6.1), e ne ereditano urgenza, modello e
+  sforzo, e la fiducia che il padre ha in quel momento. Il padre aspetta i loro esiti
+  dal server.
   Le chiusure a metà e i crash li segue il monitoraggio.
 - **Le prove** non devono contendersi display virtuali, porte o cartelle: vanno
   provate con 2, 3 e 4 worker insieme.

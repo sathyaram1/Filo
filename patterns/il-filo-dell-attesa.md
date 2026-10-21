@@ -19,7 +19,9 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   mentre il modello ragiona ondeggia pieno; mentre uno strumento lavora si
   tende e quasi si ferma (il lavoro è altrove); fermato dall'utente si taglia
   e la punta si affloscia. Ondeggia solo sotto l'ultimo nodo: quello che è già
-  annodato è già successo e sta fermo.
+  annodato è già successo e sta fermo. Fermo (tagliato o chiuso) non esce dal
+  blocco: senza righe sotto, la lunghezza dell'attesa lo portava sopra la riga
+  «Fermato prima della risposta» (#1296, prova D di `tests/secondo-gesto.spec.mjs`).
 - **La trama.** Sulla riga viva scorre una riga sola di ragionamento grezzo,
   piccola, sfumata ai bordi, opacità intorno a 0.5: non si legge, si
   intravede, e ogni tanto ci si becca una parola. Un clic apre la sezione.
@@ -65,25 +67,43 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   azione nel giro, «riscrivilo per intero se era la risposta» (una volta per
   giro, in coda all'ultimo esito).
 - **Fermare.** Mentre Filo lavora il posto dell'invio lo prende un quadrato
-  (`#stopBtn`, stesso posto, colore d'accento) e Invio fa la stessa cosa:
-  fermare è urgente, e sul telefono il passaggio del mouse non esiste. Il filo
+  (`#stopBtn`, stesso posto, colore d'accento) e Invio a casella vuota fa la
+  stessa cosa: fermare è urgente, e sul telefono il passaggio del mouse non
+  esiste. Il filo
   si taglia subito, senza aspettare il main; la riga in corso diventa «Fermato
   qui» col ragionamento a metà aperto, e al posto della risposta resta una riga
   che lo dice. Il blocco NON si arrotola: chi ferma ha visto qualcosa che non
   gli torna. Nel main (`MSG.FILO_CHAT_STOP`, solo la scheda che ha avviato il
   turno) la chiamata in volo si interrompe e nessuna azione nuova parte; quelle
   già partite finiscono e restano raccontate. Una risposta già finita invece
-  arriva: fermare riguarda il lavoro che resta. Uno stop arrivato mentre il
-  turno prepara ancora la richiesta (saldo, batteria, rete) si tiene da parte
-  e vale quando il turno si registra: il modello non parte (prova K).
+  arriva: fermare riguarda il lavoro che resta. Il turno si registra appena il
+  messaggio arriva: uno stop dato mentre prepara ancora la richiesta (saldo,
+  batteria, rete) lo trova già lì, uno arrivato prima ancora si tiene da parte
+  e vale quando si registra. Il modello non parte (prova K).
 - **Fermato vuol dire finito, per la scheda.** Al clic il turno chiude subito
   la sua parte a schermo (voce nello storico, riga «fermato», posto per le
   azioni ancora in volo) e la chat torna dell'utente: riprendi e seguito si
   possono dare subito. L'azione già partita finisce nel main e il suo esito
   arriva nel blocco, che si chiude allora; il turno dopo parte solo quando
-  quell'esito è nello storico, così non la rifà (prove L, L2). Lo stato «sta
-  lavorando» della scheda non deve mai sopravvivere al clic: è la regola su
-  cui sono caduti tre giri di verifica.
+  quell'esito è nello storico, così non la rifà (prove L, L2). L'attesa vale
+  solo per la stessa conversazione: una nuova, o un'altra riaperta, risponde
+  subito (#1296, prova F). Lo stato «sta lavorando» della scheda non deve mai
+  sopravvivere al clic: è la regola su cui sono caduti tre giri di verifica.
+- **Con qualcosa nella casella Invio manda, anche mentre Filo lavora** (#1296,
+  decisione dai principi: Filo regge un uso maldestro e non butta il lavoro
+  dell'utente). Il lavoro continua; il seguito compare subito in fondo, come
+  foglietto tratteggiato (`.dash-bubble-attesa`), e il turno lo legge prima
+  della sua chiamata dopo al modello (`MSG.FILO_CHAT_SEGUITO`), dopo gli esiti
+  del passo prima: da lì è un messaggio come gli altri, nello storico,
+  nell'archivio e fra le parole dell'utente per le uscite. Se il turno non ha
+  un passo dopo, il seguito parte appena finisce, con la sua risposta sotto
+  quella di prima. Allegati, testo incollato, comandi con la barra e
+  l'accoglienza aspettano sempre la fine e partono dalla strada di sempre.
+  Fermato, fallito o con l'accoglienza chiusa, il seguito non parte da solo:
+  torna nella casella (il main lo ritira, se il modello non l'ha già letto).
+  Dal tasto destro: «Rimetti nella casella». Il microfono fa quello di Invio:
+  dettato mentre Filo lavora, parte come seguito (prove B, B2, B3, B4, B5 e
+  la prova del seguito in `tests/voce-chat.spec.mjs`).
 - **Riprendere non riesegue niente.** Finché l'utente non scrive altro, il
   tasto d'invio offre «riprendi»: il turno fermato sta nello storico con le
   azioni fatte (`interrotto`, `fermato`), il modello le vede come già fatte e
@@ -100,17 +120,43 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
 - **Lo stop resta scritto dove si decide di riprendere.** Ogni meccanismo che
   ricostruisce il lavoro in sospeso deve sapere che è stato fermato, o lo rifà
   da solo. L'accoglienza riparte da sé quando trova in fondo un messaggio
-  dell'utente senza risposta: lo stop si segna nel suo stato (`fermato`), una
+  dell'utente senza risposta: lo stop si segna nel suo stato (`fermato`) nel
+  momento del clic, anche con un'azione lenta ancora in volo o mentre il turno
+  prepara la richiesta (il turno si registra appena il messaggio arriva), una
   scheda nuova o la pagina ricaricata mostrano «fermato» e «riprendi» invece di
-  ripartire, e il segno cade con «riprendi» o con un messaggio nuovo (prova M).
-- **Il secondo colpo non riprende.** Chi ferma insiste (doppio clic, Invio due
-  volte o tenuto): per un attimo dopo lo stop il posto resta un quadrato spento
-  e Invio a vuoto non riprende; la ripetizione del tasto non conta mai. Il
-  «Riprendi» del tasto destro è una scelta deliberata e vale subito.
+  ripartire, e il segno cade con «riprendi» o con un messaggio nuovo (prova M;
+  prove E, E2 di `tests/secondo-gesto.spec.mjs`).
+- **Il secondo colpo non riprende, e non ferma.** Chi ferma insiste (doppio
+  clic, Invio due volte o tenuto): per un attimo dopo lo stop il posto resta un
+  quadrato spento e Invio a vuoto non riprende; la ripetizione del tasto non
+  conta mai. Al contrario, il quadrato compare sotto il dito che ha appena
+  mandato o ripreso: per mezzo secondo (`PAUSA_QUADRATO`) ignora clic e Invio a
+  vuoto, e si accende in quel tempo (#1296, prova A); un seguito appena mandato
+  riarma la stessa pausa (prova B6). «Ferma» e «Riprendi» del
+  tasto destro sono scelte deliberate e valgono subito. Lo stesso per i
+  riquadri di conferma: il clic fuori nel primo mezzo secondo non annulla, Esc
+  e Annulla sì (prova C).
 - **Preferenze.** Con `prefers-reduced-motion` il filo non ondeggia, niente si
   anima e il gomitolo compare già fatto. Opacità della trama e durate del
   cappio e dell'avvolgimento sono token estetici (`filo.trama.opacity`,
   `filo.nodo.durata`, `filo.gomitolo.durata`): nelle impostazioni avanzate e
   chiedendolo a Filo.
+- **La diretta si chiude sul segno di fine, non sulla risposta (#1321).** Il
+  main racconta il turno con `webContents.send` e alla fine risponde
+  all'invoke; nella scheda i due arrivano su code diverse, e con la scheda
+  occupata la risposta passa davanti agli eventi rimasti in coda (bloccata due
+  secondi, tre volte su tre). La chat chiudeva la diretta alla risposta e il
+  blocco perdeva la nota a metà turno o l'ultimo pensiero, mentre la bolla
+  della nota diventava la risposta e nient'altro lo tradiva. Il main manda
+  `filo:action` `{ kind: 'fine' }` dietro all'ultimo evento e scrive
+  `diretta: true` nella risposta (`chiudiDiretta`, handlers/filo.js); la scheda
+  aspetta quel segno prima di chiudere (`direttaFinita`, `runFiloTurn`). Senza
+  la promessa nella risposta non aspetta, così un turno caduto prima di
+  cominciare non appende la chat. Una pagina che riceve eventi in diretta
+  durante un invoke fa così, o si fa portare tutto dalla risposta (la chat dei
+  mazzi rimanda il ragionamento intero). Prova: «A2» in
+  `tests/dashboard-chat-strumenti.spec.mjs`, che trattiene gli eventi nel main
+  finché la risposta è arrivata; senza la correzione la nota manca.
 - Test: `tests/filo-attesa.spec.mjs` (filo, nodi, gomitolo, fermare e
-  riprendere, con screenshot), `tests/dashboard-chat-attivita.spec.mjs`.
+  riprendere, con screenshot), `tests/secondo-gesto.spec.mjs` (secondi gesti,
+  seguiti, stop dell'accoglienza), `tests/dashboard-chat-attivita.spec.mjs`.

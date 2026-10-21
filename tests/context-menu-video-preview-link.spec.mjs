@@ -28,6 +28,7 @@
 // menu le voci di quel link.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const LINK_LABELS = ['Apri in nuova tab', 'Copia URL', 'Salva link per dopo', 'Condividi link'];
@@ -49,7 +50,7 @@ function overlayPreviewHtml(linkHref) {
 
 async function openMenuOn(page, selector, position) {
   await page.locator(selector).click({ button: 'right', ...(position ? { position } : {}) });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }
@@ -290,7 +291,7 @@ async function expectNessunaVoceDelLink(menu) {
 // elemento): serve perché il punto è scelto su ciò che sta SOTTO alla barra.
 async function rightClickAt(page, x, y) {
   await page.mouse.click(x, y, { button: 'right' });
-  const menu = page.locator('.sn-menu');
+  const menu = menuDi(page).locator('.sn-menu');
   await expect(menu).toBeVisible();
   return menu;
 }

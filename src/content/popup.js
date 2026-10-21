@@ -90,7 +90,7 @@
     // Un dato dell'utente in un link scritto sopra una pagina chiede l'OK, come se lo aprisse l'assistente (#868.6).
     if (r && r.conferma) {
       const Ui = global.SN_CONFIRM_UI;
-      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : false;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma), parti: r.parti }) : false;
       if (!ok) return;
       try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
     }
@@ -1392,10 +1392,19 @@
     if (!toastHostEl || !toastHostEl.isConnected) {
       toastHostEl = document.createElement('div');
       toastHostEl.className = 'sn-toasts';
+      toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
       global.SN_FILO_UI?.mark(toastHostEl);
       document.documentElement.appendChild(toastHostEl);
     }
     return toastHostEl;
+  }
+
+  // Il menu del tasto destro è l'ultima cosa chiesta dall'utente: finché è aperto la pila gli sta sotto, o un
+  // avviso gli coprirebbe le voci e la guardia dei clic le fermerebbe (#1453).
+  let pilaSottoMenu = false;
+  function sottoIlMenu(on) {
+    pilaSottoMenu = !!on;
+    if (toastHostEl) toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
   }
 
   // Sfratta subito (senza attendere il timeout) gli avvisi più vecchi oltre il
@@ -1521,6 +1530,7 @@
     showToast,
     mountToast,
     unmountToast,
+    sottoIlMenu,
     tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,

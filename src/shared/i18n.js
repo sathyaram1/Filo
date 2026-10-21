@@ -36,6 +36,8 @@
     menu_paste_clear_confirm_n: 'Vuoi svuotare la cronologia degli appunti? Spariscono tutte e %d le voci copiate finora, e non si possono riavere.',
     menu_paste_clear_confirm_hidden: 'La ricerca che hai scritto ne mostra %d: spariscono anche le altre.',
     menu_paste_removed: 'Rimossa',
+    // #589.11 — il clic su una voce che il sito copriva non parte.
+    menu_click_covered: 'Il menu era coperto: clic ignorato',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
@@ -114,7 +116,18 @@
     audio_host_warn_excluded_many: 'Con «%s» %s non parte: lo servono solo %s, che Filo esclude.',
     audio_host_warn_mixed: 'Con «%s» %s non parte: lo serve anche %s, che Filo esclude.',
     audio_host_warn_mixed_many: 'Con «%s» %s non parte: lo servono anche %s, che Filo esclude.',
-    audio_host_warn_unknown: 'Con «%s» %s non parte finché non so chi lo serve, e ora non riesco a saperlo.',
+    // Coi crediti di Filo l'audio parte solo se tutti gli host dichiarano la ritenzione zero (#831).
+    err_audio_zdr_host: 'Il modello «%s» lo serve solo %s, che non si impegna a non conservare quello che gli mandi, e coi crediti di Filo è una condizione. Non ho mandato niente: scegli un altro modello.',
+    err_audio_zdr_host_many: 'Il modello «%s» lo servono solo %s, che non si impegnano a non conservare quello che gli mandi, e coi crediti di Filo è una condizione. Non ho mandato niente: scegli un altro modello.',
+    err_audio_zdr_mixed: 'Il modello «%s» lo serve anche %s, che non si impegna a non conservare quello che gli mandi, e con l\'audio non posso impedire che tocchi a lui. Coi crediti di Filo è una condizione: non ho mandato niente, scegli un altro modello.',
+    err_audio_zdr_mixed_many: 'Il modello «%s» lo servono anche %s, che non si impegnano a non conservare quello che gli mandi, e con l\'audio non posso impedire che tocchi a loro. Coi crediti di Filo è una condizione: non ho mandato niente, scegli un altro modello.',
+    err_audio_zdr_unknown: 'Non so quali fornitori del modello «%s» si impegnano a non conservare quello che gli mandi, e coi crediti di Filo è una condizione. Non ho mandato niente: riprova fra poco o scegli un altro modello.',
+    audio_host_warn_zdr: 'Con «%s» %s non parte coi crediti di Filo: lo serve solo %s, che non si impegna a non conservare i dati.',
+    audio_host_warn_zdr_many: 'Con «%s» %s non parte coi crediti di Filo: lo servono solo %s, che non si impegnano a non conservare i dati.',
+    audio_host_warn_zdrmixed: 'Con «%s» %s non parte coi crediti di Filo: lo serve anche %s, che non si impegna a non conservare i dati.',
+    audio_host_warn_zdrmixed_many: 'Con «%s» %s non parte coi crediti di Filo: lo servono anche %s, che non si impegnano a non conservare i dati.',
+    audio_host_warn_zdrunknown: 'Con «%s» %s non parte coi crediti di Filo finché non so quali fornitori non conservano i dati, e ora non riesco a saperlo.',
+    audio_host_warn_unknown:'Con «%s» %s non parte finché non so chi lo serve, e ora non riesco a saperlo.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -458,6 +471,21 @@
     reasoning_low: 'Basso',
     reasoning_medium: 'Medio',
     reasoning_high: 'Alto',
+    admin_defaults_sort: 'host',
+    admin_defaults_sort_desc:
+      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi.',
+    admin_defaults_sort_general: 'Scelta generale degli host',
+    admin_defaults_sort_general_desc:
+      'Vale per i modelli lasciati su «Automatico». Di serie Filo non chiede nessun ordine e l\'host lo sceglie OpenRouter.',
+    provider_sort_general_auto: 'Lo sceglie OpenRouter',
+    options_host_order: 'Host dei modelli',
+    options_host_order_desc:
+      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti. I fornitori esclusi restano esclusi.',
+    options_host_order_filo: 'Li sceglie Filo',
+    provider_sort_auto: 'Automatico',
+    provider_sort_throughput: 'Più veloce',
+    provider_sort_latency: 'Risposta più pronta',
+    provider_sort_price: 'Più economico',
     // Fornitori esclusi (politica sui modelli, #421 / #518)
     admin_defaults_excluded: 'Fornitori esclusi',
     admin_defaults_excluded_desc:
@@ -495,6 +523,8 @@
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_producer_not_excluded: '%s produce questo modello e non è fra i fornitori esclusi: le richieste possono arrivare a lui.',
+    admin_defaults_producer_exclude: 'Escludi %s',
     admin_defaults_open_weights_title: 'Per chi accende «Solo modelli a pesi aperti»',
     admin_defaults_open_weights_to: 'Passano a %s: %s',
     admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',
@@ -503,6 +533,9 @@
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
+    admin_defaults_saved_partial:
+      'Salvato — una riga evidenziata sotto non è stata propagata.',
+    admin_defaults_unsaved: 'Modifiche non ancora propagate.',
     admin_defaults_save_fail: 'Salvataggio fallito: %s',
 
     // Sicurezza (pagina dedicata in filo://security/)
@@ -596,10 +629,15 @@
       'a cui somiglia, l\'età, il certificato, se la pagina chiede una password), mai il contenuto della ' +
       'pagina. Può solo renderlo sospetto, mai dichiararlo sicuro o pericoloso, e in incognito non parte. ' +
       'Usa il modello scelto in Modelli alla voce «Rilevamento siti pericolosi — giudizio».',
-    options_security_safebrowse_sandbox: 'Prova i link sospetti in una finestra isolata',
+    options_security_safebrowse_sandbox: 'Scopri in una finestra isolata dove portano i link accorciati',
     options_security_safebrowse_sandbox_desc:
-      'La finestra nascosta e senza i tuoi dati in cui Filo proverebbe un link sospetto prima che tu lo ' +
-      'apra. Oggi nessuna funzione la usa, e una pagina che hai già aperto non ci torna mai.',
+      'Quando tieni fermo il puntatore per mezzo secondo su un link accorciato (bit.ly e simili) o su un ' +
+      'rimando noto, o ci arrivi col tasto Tab, Filo controlla dove porta prima che tu clicchi. Cerca il ' +
+      'link e la sua destinazione nella lista nera di Google e, se la destinazione non è scritta nel link, ' +
+      'lo apre in una finestra nascosta e senza i tuoi dati. La finestra si chiude appena il rimando rivela ' +
+      'la destinazione, così il sito d\'arrivo non riceve visite prima del tuo clic. Una finestra alla ' +
+      'volta, mai in incognito, mai su una pagina che hai già aperto. Spento, resta solo la lista nera. ' +
+      'Sugli altri link, e col dito su uno schermo touch, prima del clic non parte niente.',
     options_security_safebrowse_key_managed:
       'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma. ' +
       'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
@@ -649,13 +687,14 @@
     options_cookies_whitelist_desc:
       'I siti che aggiungi qui restano connessi: in "Privacy massima" vivono in uno spazio isolato ma persistente, ' +
       'e in "Automatico" tengono i loro cookie anche quando un loro contenuto compare dentro un\'altra pagina. ' +
-      'Aggiungi il sito (es. gmail.com) e premi Invio; se poi lo togli, in "Privacy massima" Filo butta via ' +
+      'Scrivi il sito o incolla l\'indirizzo di una sua pagina (es. google.com per Gmail) e premi Invio; se poi ' +
+      'lo togli, in "Privacy massima" Filo butta via ' +
       'quello che aveva salvato.',
-    options_cookies_whitelist_placeholder: 'es. gmail.com',
+    options_cookies_whitelist_placeholder: 'es. google.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
-    options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
+    options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. google.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
       'In "Automatico" i tuoi accessi restano salvati comunque. Qui serve aggiungere un sito solo se ne vedi i ' +
@@ -791,10 +830,10 @@
     security_visite_nessuna: 'Nessuna pagina da cancellare',
     security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto,
-    // %6 = security_import_nulla_perso o security_import_escono_mie
+    // %1 = nome file (nel popup va nel suo riquadro: la riga sta da sola), %2 = " (del …)" o vuoto,
+    // %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto, %6 = security_import_nulla_perso o _escono_mie
     security_import_confirm_text:
-      'Da "%1"%2: %3 e %4%5.\n\n' +
+      'Dal file%2:\n"%1"\n%3 e %4%5.\n\n' +
       '%6le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
@@ -899,6 +938,17 @@
     spell_action_semantic_label: 'Correttore contestuale (zigzag blu)',
     spell_action_word_label: 'Suggerimento ortografico (zigzag rosso, on demand)',
     spell_feature_label: 'Correttore AI (zigzag blu per errori contestuali)',
+    spell_action_coerenza_label: 'Coerenza col contesto (puntini ocra)',
+    spell_switch_blu: 'Errori di lingua (zigzag blu)',
+    spell_switch_blu_desc: 'Parole giuste nel posto sbagliato, grammatica, ripetizioni.',
+    spell_switch_ocra: 'Coerenza col contesto (puntini ocra)',
+    spell_switch_ocra_desc: 'Giorni, date, nomi e numeri che non tornano con la pagina, frasi che si leggono in due modi.',
+    spell_ocra_ignora: 'Ignora',
+    spell_ocra_prima: 'prima: «%s»',
+    spell_ocra_controlla: 'Controlla qui',
+    spell_ocra_data: '%s è %s.',
+    spell_ocra_relativa: '%s è %s.',
+    spell_ocra_inesistente: '%s non esiste: %s ha %s giorni.',
 
     // Pagina Gestisci correttore
     spell_page_title: 'Filo — Correttore',
