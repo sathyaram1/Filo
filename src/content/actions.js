@@ -467,7 +467,7 @@
       res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
-        payload: { dataUrl, automatica: true },
+        payload: { dataUrl, automatica: true, ...(originale && originale !== dataUrl ? { originale } : {}) },
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
