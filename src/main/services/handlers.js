@@ -4897,15 +4897,12 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 // F4 — invia un feedback autonomo in background se la risposta segnala un gap
 // di capacità o una lamentela. Non blocca mai il flusso della chat.
 // Privacy: invia solo una descrizione GENERICA (nessun URL, nessun testo utente).
-// Undo: manda un toast con azione "Annulla" che cancella il feedback appena creato.
+// Parte quando si chiude il suo avviso: «Annulla» la ferma prima (autoFeedbackAttesa.js, #784.6).
 //
 // `proposed`: in questo turno Filo ha già messo in chat una segnalazione da
 // confermare (#360). In quel caso NON mandiamo anche quella anonima: sarebbero
 // due segnalazioni per lo stesso buco, e quella che l'utente autorizza è più
 // utile (dice cosa aveva chiesto) di quella generica.
-//
-// «Annulla» ignora solo gli id partiti da qui: quelli della bacheca li legge chiunque (#784.3).
-const autoFeedbackAnnullabili = new Set();
 async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false }) {
   try {
     if (proposed) return;
@@ -4946,31 +4943,19 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
     };
-    const result = await (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce))
-      .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
-
-    // In coda non c'è ancora un documento da annullare.
-    if (!result || !result.id || result.queued) return;
-    const feedbackId = result.id;
-    autoFeedbackAnnullabili.add(String(feedbackId));
-
-    // Toast non bloccante con undo: l'utente può annullare entro la durata del toast.
+    const spedisci = () => (Mittente.dallOwner() ? Mittente.spedisciDallOwner(voce) : FB.submit(voce));
+    const Attesa = require('./autoFeedbackAttesa');
     const win = winOf(sender);
-    if (win) {
-      try {
-        win.webContents.send('shell:toast', {
-          text: 'L\'ho segnalato a chi sviluppa Filo',
-          opts: {
-            durationSec: 8,
-            actions: [{
-              label: 'Annulla',
-              // L'azione è dichiarativa (openUrl non è il meccanismo giusto qui):
-              // usiamo un canale custom che la shell interpreta come "cancella feedback".
-              cancelAutoFeedback: feedbackId,
-            }],
-          },
-        });
-      } catch (_) {}
+    const biglietto = Attesa.trattieni(spedisci, win);
+    try {
+      win.webContents.send('shell:toast', {
+        text: 'L\'ho segnalato a chi sviluppa Filo',
+        // La shell traduce `cancelAutoFeedback`: Annulla la ferma, la chiusura dell'avviso la fa partire.
+        opts: { durationSec: 8, actions: [{ label: 'Annulla', cancelAutoFeedback: biglietto }] },
+      });
+    } catch (_) {
+      // Nessun avviso a schermo: nessuno può dire no.
+      Attesa.parti(biglietto);
     }
   } catch (e) {
     console.warn('[F4] maybeAutoFeedback errore:', e?.message || e);
@@ -6519,7 +6504,6 @@ const handlerCtx = {
   finishOnboarding,
   claimOnboardingResume,
   releaseOnboardingResume,
-  autoFeedbackAnnullabili,
 };
 
 require('./handlers/nav')(on, handlerCtx);

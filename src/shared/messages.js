@@ -575,10 +575,11 @@
     // differito dell'invio di un feedback, #341). Lo mostra solo la scheda in
     // primo piano. { text, duration? }
     SHOW_TOAST: 'show_toast',                      // { text, duration? }
-    // F4 — Annulla un auto-feedback appena inviato (undo dal toast). Marca il
-    // feedback come `ignored` così non compare nel triage. { id } → { ok }
-    // Solo da una superficie di Filo, e solo per un id che questo Filo ha appena mandato (#784.3).
+    // F4 — l'avviso della segnalazione automatica (#784.6): la segnalazione aspetta che si chiuda. «Annulla» la ferma
+    // (partita, la ritira solo l'owner; `frase` dice perché no); chiuso senza Annulla, parte. Solo dalle superfici di
+    // Filo e solo per un `id` che questo Filo ha messo nell'avviso (#784.3). { id } → { ok, frase? }
     CANCEL_AUTO_FEEDBACK: 'cancel_auto_feedback', // { id }
+    AUTO_FEEDBACK_PARTI: 'auto_feedback_parti',   // { id }
     // Entra/esce dalla "modalità annotazione" del box feedback: il box vive in
     // un content script sulla pagina (WebContentsView) e da lì non può oscurare
     // la barra in alto di Filo (renderizzata dalla shell). Questo messaggio fa
