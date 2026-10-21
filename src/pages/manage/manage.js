@@ -5517,7 +5517,7 @@
   };
   function titoloStrada(fb, key) {
     if (key !== 'accept') return ACTION_TITLE[key] || '';
-    return MR.isLocalOnly(fb) ? 'Torna nei Lavori server e il lavoro si rifà' : 'Torna in coda e le routine rifanno il lavoro';
+    return MR.isLocalOnly(fb) ? 'Torna In coda come lavoro server e il lavoro si rifà' : 'Torna in coda e le routine rifanno il lavoro';
   }
   function pannelloStradeFusione(fb, liv) {
     if (!isAdmin) return null;

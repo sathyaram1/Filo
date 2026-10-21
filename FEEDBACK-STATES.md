@@ -278,7 +278,7 @@ c'è più.
   `tests/unit/lavoroLocaleApprovato.test.mjs`). Lo stesso clic segna anche fidato il
   feedback (#1148, callable `ownerFiducia`): è la fiducia, non il segno, a far registrare L5
   senza fermare (§4b); la sessione lo lega a `start`/`finish --feedback`. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
-  un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
+  un dato. Il sì si scrive solo su chi non è fidato né già approvato; su un
   segnalato l'hover lo dice e serve guardarlo prima.
   Togliere il segno locale lascia l'approvazione. Risolto, il feedback di un
   utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
