@@ -1924,7 +1924,10 @@
           e.stopPropagation();
           if (!e.isTrusted) return;
           const vivo = b._snSegno;
-          if (vivo && !riempi(state.el, vivo)) renderOverlayContent(state);
+          if (!vivo) return;
+          if (!riempi(state.el, vivo)) { renderOverlayContent(state); return; }
+          // Il valore usato col clic è un uso del correttore, come la correzione scelta dal menu (#969).
+          try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action: ACTIONS.SPELLCHECK_CONTEXT, attesaMs: 0 })).catch(() => {}); } catch (_) {}
         });
         state.badge.set(k, b);
         v.appendChild(b);

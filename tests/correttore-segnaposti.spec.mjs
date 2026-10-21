@@ -24,7 +24,7 @@ async function apri(app, openTab, testServer, opz = {}) {
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_CONTEXT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
-      featureFlags: { spellcheck: true, spellcheckContext: true },
+      featureFlags: { spellcheck: true, spellcheckContext: opz.suggerimenti !== false },
       correttore: { modelloErrori: true, ripetizioni: true, pausaRagionatoMs: 1000, segnaposti: opz.segnaposti !== false, segnapostiWeb: opz.web !== false },
     });
     Object.assign(globalThis, {
@@ -194,4 +194,21 @@ test('con «Segnaposto» spento le x non hanno segni e il modello non riceve la 
   await expect(page.locator('.sn-spell-overlay .sn-suggerimento')).toHaveCount(0);
   await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(0);
   expect((await globale(app, '__ragionate'))[0].prompt).not.toContain('segnaposto:');
+});
+
+test('coi suggerimenti spenti i segnaposti restano: il controllo parte solo dove ci sono delle x, e chiede solo di loro', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    suggerimenti: false,
+    ragionato: { '14xx': [COLOMBO, '[ci vediamo][][Frase poco chiara][suggerimento]'] },
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('Ciao, ci vediamo domani. ');
+  await page.waitForTimeout(1800);
+  expect(await globale(app, '__ragionate')).toEqual([]);
+  await page.keyboard.type("l'America l'hanno scoperta nel 14xx. ");
+  await expect(valore(page, '1492')).toBeVisible({ timeout: 8000 });
+  const [r] = await globale(app, '__ragionate');
+  expect(r.prompt).toContain('1. segnaposto:');
+  expect(r.prompt).not.toContain('contraddizione: il testo dice');
+  await expect(ocra(page, 'ci vediamo')).toHaveCount(0);
 });
