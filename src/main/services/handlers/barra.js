@@ -44,4 +44,36 @@ module.exports = function register(on, ctx) {
     barra.etichette(sender.tab.id, msg && msg.voci);
     return { ok: true };
   });
+
+  // L'Aiuto della scheda e le sue risposte da leggere (#1432), anche dalle schede dietro: valgono quando tornano
+  // davanti. Dal solo frame principale, e del messaggio restano solo parole di un elenco.
+  const schedaDi = (sender) => {
+    const tabs = winOf(sender)?._filoTabs;
+    if (!tabs || !sender?.tab?.id || (sender.frame && sender.frame.parent)) return null;
+    const tab = tabs.tabs.find((t) => t.id === sender.tab.id);
+    return tab ? { tabs, tab } : null;
+  };
+  const PANNELLI = new Set(['chiuso', 'ridotto', 'aperto']);
+  const VOCI = new Set(['pronto', 'avvio', 'ascolta', 'trascrive', 'attesa']);
+  const SPENTI = new Set(['', 'aiuto', 'sito', 'pagina']);
+  const tra = (v, ammessi, base) => (ammessi.has(String(v)) ? String(v) : base);
+
+  on(MSG.AIUTO_STATO, async (msg, sender) => {
+    const s = schedaDi(sender);
+    if (!s) return { ok: false };
+    s.tab.aiuto = {
+      pannello: tra(msg?.pannello, PANNELLI, 'chiuso'),
+      voce: tra(msg?.voce, VOCI, 'pronto'),
+      spento: tra(msg?.spento, SPENTI, ''),
+    };
+    s.tabs.barra?.aggiornaNav();
+    return { ok: true };
+  });
+
+  on(MSG.RISPOSTA_IN_ATTESA, async (msg, sender) => {
+    const s = schedaDi(sender);
+    if (!s) return { ok: false };
+    if (RisposteInAttesa.segna(s.tab, String(msg?.fonte || ''), msg?.attesa === true)) s.tabs.barra?.aggiornaNav();
+    return { ok: true };
+  });
 };
