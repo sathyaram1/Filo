@@ -52,7 +52,7 @@ const rileggiTutte = async () => {
 
 test('#1592 — mai letto, documento assente o spento: in pausa per chi non è owner, una per una', async () => {
   assert.deepEqual(InPausa.NOMI, ['bacheca', 'mazzi']);
-  assert.deepEqual(InPausa.aperti(), { bacheca: false, mazzi: false }, 'mai letto = in pausa');
+  for (const n of InPausa.NOMI) assert.equal(InPausa.cancello(n).stato().visible, false, 'mai letto = in pausa');
   await conFirestore({ docs: {} }, async ({ letture }) => {
     await rileggiTutte();
     assert.deepEqual(InPausa.aperti(), { bacheca: false, mazzi: false });
@@ -70,7 +70,18 @@ test('#1592 — mai letto, documento assente o spento: in pausa per chi non è o
 
 test('#1592 — l’owner le vede sempre, e non aspetta la prima lettura', async () => {
   await conFirestore({ docs: {}, owner: true }, async () => {
+    for (const n of InPausa.NOMI) InPausa.cancello(n)._setAdesso(() => Date.now() + 365 * 24 * 3600 * 1000);
+    const lento = global.fetch;
+    const inAttesa = [];
+    // Il server risponde solo quando la prova lo lascia andare.
+    global.fetch = (...a) => new Promise((r) => inAttesa.push(() => r(lento(...a))));
+    const t0 = Date.now();
     const s = await InPausa.statiSicuri();
+    assert.ok(Date.now() - t0 < 1000, 'l’owner ha aspettato la lettura');
+    assert.ok(inAttesa.length >= 1, 'la lettura per gli altri parte lo stesso');
+    global.fetch = lento;
+    for (const via of inAttesa) via();
+    for (const n of InPausa.NOMI) { await InPausa.cancello(n).rileggiOra(); InPausa.cancello(n)._setAdesso(null); }
     assert.equal(s.bacheca.visible, true);
     assert.equal(s.mazzi.visible, true);
     assert.equal(s.bacheca.openToAll, false);

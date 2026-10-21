@@ -110,12 +110,13 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
-    /* Il Red Team (#896): la levetta risponde al passaggio del puntatore e, mentre salva, pulsa. */
-    #mgRtRoot label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
+    /* Le funzioni in pausa, Red Team (#896), Bacheca e Deck builder (#1592): la levetta risponde al passaggio del
+       puntatore e, mentre salva, pulsa. */
+    :is(#mgRtRoot, #mgIpRoot) label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--sn-accent) 22%, transparent);
     }
-    #mgRtRoot .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
-    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
+    :is(#mgRtRoot, #mgIpRoot) .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
+    :is(#mgRtRoot, #mgIpRoot) label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
     @keyframes mg-rt-pulsa { 50% { opacity: 0.55; } }
     .mg-rt-stato:empty { display: none; }
     .mg-rt-stato.mg-err { color: #c0392b; }
@@ -1496,8 +1497,9 @@
       /* Nella terza colonna i modelli tornano uno sotto l'altro. */
       .mg-sm-cols { grid-template-columns: minmax(0, 1fr); }
     }
-    /* Il Red Team ha un riquadro solo: la griglia di Automazioni lo stirerebbe a due terzi della finestra. */
-    #mgRtRoot { display: block; max-width: 640px; }
+    /* Un riquadro per levetta, uno sotto l'altro: la griglia di Automazioni li stirerebbe a due terzi della finestra. */
+    #mgRtRoot, #mgIpRoot { display: block; max-width: 640px; }
+    #mgIpRoot .mg-auto-block { margin-top: 12px; }
     /* Crediti: un riquadro per account più la taratura, affiancati finché c'è posto. */
     .mg-crediti {
       padding: 24px 0 32px;
@@ -1668,7 +1670,8 @@
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
-      <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
+      <button type="button" class="mg-tab" data-tab="stats" role="tab"
+        title="Red Team, Bacheca e Deck builder: chi li vede oltre a te">In pausa</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
       <button type="button" class="mg-tab" data-tab="crediti" role="tab" hidden>Crediti</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
@@ -1972,7 +1975,8 @@
       </div>
     </section>
 
-    <!-- Il Red Team in pausa (#896): l'interruttore lo legge e lo scrive manageRedteam.js. -->
+    <!-- Le funzioni in pausa: il Red Team (#896) lo legge e lo scrive manageRedteam.js, Bacheca e Deck builder (#1592)
+         manageInPausa.js. -->
     <section class="mg-panel" id="panel-stats" data-panel="stats">
       <div class="mg-automation" id="mgRtRoot">
         <section class="mg-auto-block">
@@ -1984,6 +1988,28 @@
             <span class="mg-switch-state" id="mgRtOpenState">Off</span>
           </label>
           <p class="mg-auto-block-desc mg-rt-stato" id="mgRtOpenMsg" role="status"></p>
+        </section>
+      </div>
+      <div class="mg-automation" id="mgIpRoot">
+        <section class="mg-auto-block" data-in-pausa="bacheca">
+          <label class="mg-switch mg-switch--disabled" id="mgIpSwitch-bacheca"
+            title="Spenta, la Bacheca la vedi solo tu: gli altri trovano solo le loro segnalazioni. Accesa, torna a tutti senza una versione nuova.">
+            <span class="mg-switch-text">Bacheca aperta a tutti</span>
+            <input type="checkbox" id="mgIpToggle-bacheca" disabled />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            <span class="mg-switch-state" id="mgIpState-bacheca">Off</span>
+          </label>
+          <p class="mg-auto-block-desc mg-rt-stato" id="mgIpMsg-bacheca" role="status"></p>
+        </section>
+        <section class="mg-auto-block" data-in-pausa="mazzi">
+          <label class="mg-switch mg-switch--disabled" id="mgIpSwitch-mazzi"
+            title="Spento, il Deck builder dei Mazzi lo vedi solo tu. Acceso, torna a tutti senza una versione nuova.">
+            <span class="mg-switch-text">Deck builder aperto a tutti</span>
+            <input type="checkbox" id="mgIpToggle-mazzi" disabled />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            <span class="mg-switch-state" id="mgIpState-mazzi">Off</span>
+          </label>
+          <p class="mg-auto-block-desc mg-rt-stato" id="mgIpMsg-mazzi" role="status"></p>
         </section>
       </div>
     </section>
@@ -2664,6 +2690,7 @@
   <script src="manageDomande.js"></script>
   <script src="manage.js"></script>
   <script src="manageRedteam.js"></script>
+  <script src="manageInPausa.js"></script>
   <script src="manageCrediti.js"></script>
   <script src="manageUtenti.js"></script>
   <script src="managePredefiniti.js"></script>
