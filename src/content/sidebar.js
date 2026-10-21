@@ -1425,7 +1425,17 @@
       ctx.textBaseline = 'middle';
       ctx.fillText('••••••••', x + 3 * sx, y + h / 2, Math.max(1, w - 6 * sx));
     }
-    return canvas.toDataURL('image/png');
+    const f = Number.isFinite(fattore) && fattore > 1 ? fattore : 1;
+    let uscita = canvas;
+    if (f > 1) {
+      uscita = document.createElement('canvas');
+      uscita.width = Math.max(1, Math.round(img.width / f));
+      uscita.height = Math.max(1, Math.round(img.height / f));
+      const u = uscita.getContext('2d');
+      u.imageSmoothingQuality = 'high';
+      u.drawImage(canvas, 0, 0, uscita.width, uscita.height);
+    }
+    return uscita.toDataURL('image/jpeg', Math.min(1, Math.max(0.1, qualita / 100)));
   }
 
   // Aspetta che la pagina si "stabilizzi" dopo un'azione utente: utile per
