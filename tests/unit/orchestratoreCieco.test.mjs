@@ -99,6 +99,25 @@ test('i sotto-agenti dei worker restano intatti: con agent_id non si tocca nient
   assert.equal(decidi(prima(undefined, { agent_id: 'w1' }, { prompt: 'esplora' }), opz({ errore: 'ENOENT' })), null);
 });
 
+// #1496: un giro chiuso per guasto è avanzamento normale; il motivo sta nei log, l'intervento chiesto all'owner è una domanda.
+test('nella sessione del giro nessuna notifica all\'owner: PushNotification e file proactive rifiutati, worker compresi', () => {
+  assert.equal(rifiuto(avviso()), MOTIVO_NOTIFICA);
+  assert.equal(rifiuto(avviso({ agent_id: 'w1' })), MOTIVO_NOTIFICA, 'i worker girano nella stessa sessione');
+  assert.equal(rifiuto(avviso({ tool_input: undefined })), MOTIVO_NOTIFICA);
+  assert.equal(rifiuto(avviso({}, { message: 'x', status: 'proactive' }), opz({ errore: 'ENOENT' })), MOTIVO_NOTIFICA, 'non dipende dal registro');
+  assert.equal(rifiuto(avviso({ tool_name: 'SendUserFile' }, { files: ['report.md'], status: 'proactive' })), MOTIVO_NOTIFICA);
+  assert.equal(rifiuto(avviso({ tool_name: 'SendUserFile', agent_id: 'w1' }, { files: ['report.md'], status: 'proactive' })), MOTIVO_NOTIFICA);
+  assert.equal(decidi(avviso({ tool_name: 'SendUserFile' }, { files: ['report.md'], status: 'normal' }), OPZ), null, 'senza proactive non arriva al telefono');
+  assert.equal(decidi(avviso({ hook_event_name: 'PostToolUse' }), OPZ), null);
+  assert.equal(decidi(avviso({ session_id: 's2' }), OPZ), null, 'le altre sessioni notificano come prima');
+  assert.equal(decidi(avviso(), { ...OPZ, creato: ADESSO - VALIDITA_MS - 1 }), null, 'installazione scaduta');
+  assert.equal(rifiuto(avviso({ session_id: 's2' }), { ...OPZ, sessione: '' }), MOTIVO_NOTIFICA, 'senza sessione nota vale per tutte');
+  assert.ok(!/notific/i.test(AL_POSTO_DEL_TESTO + MOTIVO_SOTTOFONDO), 'il rifiuto ha il suo motivo');
+  const h = lancio(prima(false));
+  assert.equal(h.permissionDecision, 'allow', 'il lancio del worker resta com\'era');
+  assert.deepEqual([h.updatedInput.model, h.updatedInput.effort], ['fable', 'max']);
+});
+
 test('fuori dal giro è inerte: altra sessione o installazione scaduta; senza sessione nota vale per tutte', () => {
   assert.equal(decidi(dopo({ session_id: 's2' }), OPZ), null);
   assert.equal(decidi(prima(false, { session_id: 's2' }, { prompt: 'niente' }), OPZ), null);
