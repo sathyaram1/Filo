@@ -583,7 +583,7 @@
         // giudizio, quindi i feedback già in attesa restano dove sono. Senza
         // dirlo, accendere lo switch sembra di nuovo non fare niente — e i già in
         // attesa hanno il loro pulsante, due righe più in là.
-        const pending = r.enabled ? alignedFeedbacks().length : 0;
+        const pending = r.enabled ? alignedFeedbacks(true).length : 0;
         setAutoModeMsg(
           pending
             ? `Salvato. I ${pending} già in attesa restano nei Ricevuti: usa «Approva tutti gli allineati».`
