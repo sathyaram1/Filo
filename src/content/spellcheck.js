@@ -2033,13 +2033,15 @@
     if (state) aggiornaCodice(state);
   }
 
-  // Gli errori confermati che hanno una correzione: «Correggi tutti gli errori» non tocca i candidati né i suggerimenti.
+  // Gli errori confermati che hanno una correzione, e i segnaposti che hanno un valore (#1448): «Correggi tutti gli
+  // errori» non tocca i candidati né gli altri suggerimenti.
   function erroriDaCorreggere(el) {
     const state = el && monitored.get(el);
     if (!state) return [];
     seguiIlTesto(state);
     return segniInVista(state, { ignoraScrittura: true })
-      .filter((s) => s.segno === 'errore' && !s.dubbio && !s.svanisce && Array.isArray(s.correzioni) && s.correzioni.length);
+      .filter((s) => (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando)) && !s.dubbio && !s.svanisce
+        && Array.isArray(s.correzioni) && s.correzioni.length);
   }
 
   // Dal fondo all'inizio: ogni correzione lascia al loro posto quelle prima. Quante ne ha fatte.
@@ -2048,7 +2050,8 @@
     let fatte = 0;
     for (const s of lista) {
       const prima = getEditableText(el);
-      correggi(el, s, s.correzioni[0]);
+      if (s.tipo === 'segnaposto') riempi(el, s);
+      else correggi(el, s, s.correzioni[0]);
       if (getEditableText(el) !== prima) fatte++;
     }
     return fatte;
