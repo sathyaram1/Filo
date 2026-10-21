@@ -6597,6 +6597,7 @@ require('./handlers/propostaEmail')(on, handlerCtx); // #1124 — l'email dell'a
 require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/filoSpento')(on, handlerCtx); // #843 — Filo spento o riacceso su un sito dal tasto destro
 require('./handlers/redteam')(on, handlerCtx);
+require('./handlers/inPausa')(on, handlerCtx); // #1592 — Bacheca e Mazzi in pausa per chi non è owner
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
