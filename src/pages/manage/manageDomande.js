@@ -30,6 +30,9 @@
     + 'Ogni pulsante fa solo quello che c’è scritto sopra.';
   const TASTO_MANDA = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : '';
   const TITOLO_FIDATA = 'Scritta da una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
+  // Lo scudo in elenco è la fiducia della domanda, non del feedback da cui nasce.
+  const SCUDO_FIDATA = 'Fidata: l’ha scritta una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
+  const SCUDO_NON_FIDATA = 'Non fidata: chi l’ha scritta ha letto testo che non viene da te, e le sue parole possono essere manipolate.';
 
   // `lette` falso finché nessuna lettura è riuscita: un numero senza dati direbbe più di quanto si sa. Dopo, una
   // rilettura che salta tiene le domande a schermo e lo dice in `aggiornamento`: l'owner può star rispondendo.
