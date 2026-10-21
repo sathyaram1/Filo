@@ -210,7 +210,7 @@ module.exports = function register(on, ctx) {
       const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti }, origin });
       ultima = r;
       const riga = F.ricomponi(r && r.text, fonti);
-      if (riga) return { ...r, text: riga };
+      if (riga) { ricorda(fonti); return { ...r, text: riga }; }
     }
     // Fonti che non hanno risposto non dicono che il dato non c'è: la ricerca è fallita, e si può rifare.
     if (!ultima && fallita) return { ok: false, code: 'FONTI_NON_RAGGIUNTE', error: fallita };
