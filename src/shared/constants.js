@@ -2527,7 +2527,7 @@
       (!onboarding ? '' :
         `${INIZIO_ACCOGLIENZA} (intervista in corso) ═══\n`
         + (onboardingRifatta
-          ? `Ha già usato Filo e ha chiesto di rifare l'intervista di benvenuto: è una conversazione a sé, non il seguito delle altre. `
+          ? `Ha già usato Filo, e questa intervista di benvenuto l'ha chiesta lui: è una conversazione a sé, non il seguito delle altre. `
           : `È appena arrivato su Filo e questa è la sua prima conversazione. `)
         + `Hai un elenco di cose da scoprire e di cose da dire. L'utente NON deve accorgersi dell'elenco: per lui è una chat normale.\n`
         + `Regole:\n`
