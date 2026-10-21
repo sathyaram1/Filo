@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
+import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
@@ -80,7 +81,7 @@ const rapide = (app) => app.evaluate(() => globalThis.__rapide);
 const coloreDelSegno = (loc) => loc.evaluate((el) => getComputedStyle(el).textDecorationColor);
 
 async function tastoDestroSu(page, loc) {
-  const b = await loc.boundingBox();
+  const b = await riquadroDelSegno(loc);
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
   await expect(menuDi(page).pannelli.first()).toBeVisible({ timeout: 5000 });
   return menuDi(page);

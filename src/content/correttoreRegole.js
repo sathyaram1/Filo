@@ -7,10 +7,11 @@
 
   const t = (k, ...a) => (global.SN_I18N ? global.SN_I18N.t(k, ...a) : k);
 
-  const LETTERA = /[\p{L}\p{M}]/u;
+  // Un pezzo da giudicare ha lettere o cifre: «alle 18» → «alle 19» è un cambio vero, uno spazio o una virgola no.
+  const CONTENUTO = /[\p{L}\p{M}\p{N}]/u;
   const DI_PAROLA = /[\p{L}\p{M}\p{N}'’-]/u;
   const diParola = (c) => !!c && DI_PAROLA.test(c);
-  const conLettere = (s) => LETTERA.test(String(s || ''));
+  const conContenuto = (s) => CONTENUTO.test(String(s || ''));
 
   // Le parole come le conta il dizionario: lettere, con apostrofi e trattini dentro («l'America», «e-mail», «po'»).
   const PAROLA = /[\p{L}\p{M}]+(?:['’-][\p{L}\p{M}]+)*['’]?/gu;
@@ -165,7 +166,7 @@
     while (s < corto - p && base[base.length - 1 - s] === adesso[adesso.length - 1 - s]) s++;
     let a = p;
     let b = adesso.length - s;
-    if (!conLettere(adesso.slice(a, b))) {
+    if (!conContenuto(adesso.slice(a, b))) {
       while (a > 0 && !diParola(adesso[a - 1])) a--;
       while (b < adesso.length && !diParola(adesso[b])) b++;
       if (a > 0) a--;
@@ -173,7 +174,7 @@
     }
     if (diParola(adesso[a])) while (a > 0 && diParola(adesso[a - 1])) a--;
     if (diParola(adesso[b - 1])) while (b < adesso.length && diParola(adesso[b])) b++;
-    if (!conLettere(adesso.slice(a, b))) return null;
+    if (!conContenuto(adesso.slice(a, b))) return null;
     return { start: a, end: b };
   }
 
@@ -196,7 +197,7 @@
       end = taglio > start ? taglio : start + max;
       resta = Math.max(resta, r.end);
     }
-    if (end <= start || !conLettere(adesso.slice(start, end))) return null;
+    if (end <= start || !conContenuto(adesso.slice(start, end))) return null;
     return { start, end, base: adesso.slice(0, end) + adesso.slice(resta) };
   }
 

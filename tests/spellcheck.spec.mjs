@@ -4,6 +4,7 @@
 import { appCondivisa } from './helpers/appCondivisa.mjs';
 import { statoDi, clicca, nelMondoDiFilo } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
 
 const { test, expect } = appCondivisa();
 
@@ -1312,7 +1313,7 @@ test.describe('spellcheck-segni-restano', () => {
     await page.keyboard.type('oggi xqprima1 bella giornata con xqseconda2 e poi xqterza3 fine ');
     await expect(blu(page)).toHaveText(['xqprima1', 'xqseconda2', 'xqterza3'], { timeout: 6000 });
 
-    const b = await blu(page).nth(1).boundingBox();
+    const b = await riquadroDelSegno(blu(page).nth(1));
     await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
     const corr = menuDi(page).locator('.sn-menu-correction:visible').first();
     await expect(corr).toContainText('y');

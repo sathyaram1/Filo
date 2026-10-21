@@ -57,6 +57,7 @@ test('il pezzo nuovo è a parole intere, e i soli spazi o punteggiatura non cont
   assert.deepEqual(C.regioneNuova('ciao a tutti', 'ciao a tuttissimi voi'), { start: 7, end: 21 });
   assert.equal(C.regioneNuova('ciao a tutti', 'ciao, a tutti!'), null);
   assert.deepEqual(C.regioneNuova('un amico', "un'amico"), { start: 0, end: 8 }, 'l\'apostrofo cambia le parole');
+  assert.deepEqual(C.regioneNuova('alle 18', 'alle 19'), { start: 5, end: 7 }, 'una cifra cambiata è un cambio vero');
   const r = C.regioneNuova('la grande zaino', 'la zaino');
   assert.equal('la zaino'.slice(r.start, r.end), 'la zaino', 'una cancellazione porta le due parole che fa toccare');
 });

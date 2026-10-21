@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
@@ -67,7 +68,7 @@ const contraddizione = (citazione) => JSON.stringify({ issues: [{
 }] });
 
 async function tastoDestroSu(page, segno) {
-  const b = await segno.boundingBox();
+  const b = await riquadroDelSegno(segno);
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
   const menu = menuDi(page).pannelli;
   await expect(menu).toBeVisible({ timeout: 5000 });
@@ -271,7 +272,7 @@ test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla 
     return null;
   }, parola);
   for (const [k, parola] of [[0, 'mercoledì'], [1, 'lui gli']]) {
-    const b = await ocra(page).nth(k).boundingBox();
+    const b = await riquadroDelSegno(ocra(page).nth(k));
     const v = await dove(parola);
     expect({ parola, dx: Math.abs(b.x - v.x) < 3, dy: Math.abs(b.y - v.y) < 3 }).toEqual({ parola, dx: true, dy: true });
   }
@@ -446,7 +447,7 @@ test('campo modificabile su più righe: i controlli leggono le righe separate, n
   expect(testo).toContain('ci vediamo venerdì 1\n2 ottobre?');
   expect(testo).toContain('sì ci vediamo mercoledì');
   // Attaccate, «venerdì 1» e «2 ottobre» farebbero «venerdì 12 ottobre», che è lunedì.
-  const b = await ocra(page).first().boundingBox();
+  const b = await riquadroDelSegno(ocra(page).first());
   const v = await page.evaluate(() => {
     const w = document.createTreeWalker(document.getElementById('ce'), NodeFilter.SHOW_TEXT);
     for (let n = w.nextNode(); n; n = w.nextNode()) {
