@@ -1698,18 +1698,12 @@
       nuovo: nuovo && nuovo.start >= 0 && nuovo.end > nuovo.start ? nuovo : null,
     });
     // Ogni segnaposto ha il suo valore («p/e di soli xx» e «p/e di xx»): non diventa il giudizio di un candidato, che
-    // varrebbe per tutte le stesse x del campo. Quello da cercare porta la frase in cui sta; la ricerca già chiesta per
-    // le stesse x nella stessa frase resta quella, anche se il modello ora la scrive con altre parole.
+    // varrebbe per tutte le stesse x del campo. Porta la frase in cui il suo dato è stato deciso (correttoreRegole.stessaFrase).
     for (const s of segni) {
       if (s.tipo !== 'segnaposto') continue;
-      s.identita = Rg.identitaSegnaposto(d.testo, s.start, s.end);
-      if (!s.cerca) continue;
-      const gia = s.identita && cerchePerIdentita.get(s.identita);
-      if (gia) { s.cerca = gia; continue; }
       const f = Rg.aFrasiIntere(d.testo, s.start, s.end);
-      s.cerca = { ...s.cerca, frase: d.testo.slice(f.start, f.end).slice(0, 2000) };
-      s.cerca.chiave = Rg.chiaveRicerca(s.segment, s.cerca);
-      if (s.identita) ricordaCerca(s.identita, s.cerca);
+      s.frase = d.testo.slice(f.start, f.end).slice(0, 2000);
+      if (s.cerca) s.cerca = { ...s.cerca, frase: s.frase, chiave: Rg.chiaveRicerca(s.segment, s.cerca) };
     }
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const ora = Date.now();
