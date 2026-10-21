@@ -158,7 +158,7 @@ const SUFFISSI_SOSIA = ['com', 'net', 'info', 'online', 'xyz', 'it', 'co.uk', 'd
 
 // Il marchio attaccato a una parola da truffa (posteonline, secure-google, appleid-verifica), la forma più comune dei
 // sosia: un marchio che è anche una parola dagli elenchi non s'impara (evidente()), e senza questi il modello lasciava
-// passare un nome così su tre. Parole e suffissi li sceglie il caso: il modello deve riconoscere la forma, non i nomi.
+// passare un nome così su tre. Forma e suffisso li sceglie il caso: il modello deve riconoscere la forma, non i nomi.
 function sinteticiParole(etichetta) {
   const { BRANDS, PAROLE_TRUFFA, LEGIT_DOMAINS } = require('./src/main/services/safebrowse/brands.js');
   const parole = PAROLE_TRUFFA.map((w) => w + (FINALI[w] || ''));
