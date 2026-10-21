@@ -559,6 +559,8 @@ html, body {
   transition: background calc(0.16s * var(--sn-motion, 1)) ease, color calc(0.16s * var(--sn-motion, 1)) ease;
 }
 .dash-cambio { align-self: stretch; }
+/* Le righe sottili di fila stanno strette come le righe di un registro (#1490): lo spazio pieno resta intorno alle bolle. */
+:is(.dash-cambio, .dash-pagine) + :is(.dash-cambio, .dash-pagine) { margin-top: calc(2px - var(--dash-filo-gap, 14px)); }
 .dash-cambio:hover, .dash-pagine-testa:hover, .dash-pagine-testa:focus-visible { background: var(--dash-line); color: var(--dash-ink-soft); outline: none; }
 .dash-cambio-ora, .dash-pagine-ora { flex: none; font-variant-numeric: tabular-nums; opacity: 0.75; }
 .dash-cambio-ico, .dash-pagine-ico { display: inline-flex; flex: none; }
@@ -601,11 +603,12 @@ html, body {
   overflow: hidden;
 }
 .dash-bubbles {
+  --dash-filo-gap: 14px;
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--dash-filo-gap);
   padding: 40px 8px 8px;
 }
 

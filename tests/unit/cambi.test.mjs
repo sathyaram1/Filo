@@ -163,6 +163,30 @@ test('criterio 4: i passi di un cursore si fondono in UN evento, e tornare all\'
   assert.equal(K.fondibile(ev(0, 1, 2), { ...ev(1, 2, 3), ts: new Date(t0 + K.FINESTRA_FUSIONE_MS + 1000).toISOString() }), false);
 });
 
+test('#1490: lo zoom ritoccato tre volte a secondi di distanza è UN cambio, «125% → 100%», e si annulla fino a 125%', () => {
+  const t0 = Date.parse('2026-10-21T09:50:00Z');
+  const zoom = (s, prima, dopo, extra = {}) => ({
+    id: `z${s}`, ts: new Date(t0 + s * 1000).toISOString(), tipo: 'zoom', via: 'interfaccia', dove: 'zoom',
+    cambi: [{ chiave: 'zoom:youtube.com', prima, dopo }], ...extra,
+  });
+  let ultimo = zoom(0, 125, 114);
+  for (const [s, prima, dopo] of [[12, 114, 87], [40, 87, 100]]) {
+    const n = zoom(s, prima, dopo);
+    assert.ok(K.fondibile(ultimo, n), `il ritocco dopo ${s} s non si fonde`);
+    ultimo = K.fondi(ultimo, n);
+  }
+  assert.equal(ultimo.id, 'z0');
+  assert.equal(ultimo.ts, zoom(0, 0, 0).ts, 'la riga resta all’ora del primo ritocco');
+  assert.equal(ultimo.agg, zoom(40, 0, 0).ts);
+  assert.equal(K.frase(ultimo), 'zoom di youtube.com: 125% → 100%');
+  assert.deepEqual(ultimo.cambi, [{ chiave: 'zoom:youtube.com', prima: 125, dopo: 100 }]);
+  // Un altro sito, un'altra strada o un annullo in mezzo sono un cambio a parte.
+  assert.equal(K.fondibile(ultimo, { ...zoom(50, 100, 90), cambi: [{ chiave: 'zoom:example.org', prima: 100, dopo: 90 }] }), false);
+  assert.equal(K.fondibile(ultimo, zoom(50, 100, 90, { via: 'chat' })), false);
+  assert.equal(K.fondibile(ultimo, zoom(50, 100, 125, { annulla: 'z0' })), false);
+  assert.equal(K.fondibile(ultimo, zoom(40 + K.FINESTRA_FUSIONE_MS / 1000 + 1, 100, 90)), false, 'dopo una pausa lunga è un cambio nuovo');
+});
+
 test('annullare rimette i valori di prima, anche dentro le mappe sostituite intere', () => {
   const evento = { cambi: [
     { chiave: 'theme', prima: 'light', dopo: 'dark' },

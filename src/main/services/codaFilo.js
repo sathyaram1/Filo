@@ -16,8 +16,20 @@ async function tutte(opts) {
   // Un ritocco fuso nel cambio di prima non ne cambia né il numero né l'id: lo dice la sua ora (`agg`).
   const firma = `${incog ? 'i' : 'n'}|${dati.pos}|${cambi.length}|${cambi.map((c) => `${c.id}${c.agg || ''}${c.annullatoDa ? '~' : ''}`).join(',').slice(-4000)}`;
   if (memo && memo.firma === firma) return memo;
-  memo = { firma, dati, cambi, elementi: C().elementi({ chats: dati.chats, pagine: dati.pagine, cambi, qui: dati.qui }) };
+  const elementi = C().elementi({ chats: dati.chats, pagine: dati.pagine, cambi, qui: dati.qui });
+  memo = { firma, dati, cambi, elementi, ultimo: piuRecente(elementi) };
   return memo;
+}
+
+// Il più recente non è sempre l'ultimo: un cambio ritoccato sta all'ora del primo ritocco.
+function piuRecente(elementi) {
+  let ultimo = null;
+  let t0 = -Infinity;
+  for (const e of elementi) {
+    const t = Date.parse(e.fine || e.ts);
+    if (t > t0) { t0 = t; ultimo = e.fine || e.ts; }
+  }
+  return ultimo;
 }
 
 // Le foto mandate in chat restano in memoria finché Filo è aperto (#1166): tornano anche nella coda.
@@ -39,14 +51,8 @@ function conFoto(elementi, chats) {
 }
 
 async function pezzo({ prima = null, fino = null, dopo = null, quanti } = {}, opts) {
-  const { dati, elementi } = await tutte(opts);
+  const { dati, elementi, ultimo } = await tutte(opts);
   const r = C().pezzo(elementi, { prima, fino, dopo, quanti });
-  // Il più recente non è sempre l'ultimo: un cambio ritoccato sta all'ora del primo ritocco.
-  let ultimo = null;
-  for (const e of elementi) {
-    const t = e.fine || e.ts;
-    if (ultimo == null || Date.parse(t) > Date.parse(ultimo)) ultimo = t;
-  }
   const out = {
     elementi: conFoto(r.elementi, dati.chats),
     inizio: r.inizio,

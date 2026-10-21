@@ -71,20 +71,21 @@
   function rigaCambio(v) {
     const r = el('div', 'dash-cambio');
     r.dataset.id = v.id;
-    r.append(el('span', 'dash-cambio-ora', ora(v.ts)));
     const ic = el('span', 'dash-cambio-ico');
     ic.innerHTML = icona(ICONE_CAMBIO[v.tipo] || 'check', 13);
-    r.append(ic, el('span', 'dash-cambio-testo', `${v.annulla ? 'rimesso com’era · ' : ''}${v.frase || 'era già così'} · ${v.provenienza}`));
     const stato = el('span', 'dash-cambio-stato');
     const btn = el('button', 'dash-cambio-annulla');
     btn.type = 'button';
     btn.addEventListener('click', (e) => { e.stopPropagation(); annullaCambio(r).catch(() => {}); });
-    r.append(stato, btn);
+    r.append(el('span', 'dash-cambio-ora'), ic, el('span', 'dash-cambio-testo'), stato, btn);
     statoCambio(r, v);
     return r;
   }
+  // Anche la frase: un ritocco fuso nel cambio (cambi.js, fondi) la riscrive, «125% → 114%» diventa «125% → 100%».
   function statoCambio(r, v) {
     r._vista = v;
+    r.querySelector('.dash-cambio-ora').textContent = ora(v.ts);
+    r.querySelector('.dash-cambio-testo').textContent = `${v.annulla ? 'rimesso com’era · ' : ''}${v.frase || 'era già così'} · ${v.provenienza}`;
     const btn = r.querySelector('.dash-cambio-annulla');
     const stato = r.querySelector('.dash-cambio-stato');
     r.classList.toggle('dash-cambi-annullato', !!v.annullatoDa);
@@ -110,11 +111,16 @@
   async function rileggiCambi(righe = [...d.bubblesEl.querySelectorAll('.dash-cambio')]) {
     if (!righe.length) return;
     const res = await d.send({ type: MSG.CAMBI_LEGGI, ids: righe.map((r) => r.dataset.id) });
-    const per = new Map(((res && res.ok && res.eventi) || []).map((v) => [v.id, v]));
+    if (!res || !res.ok) return;
+    const per = new Map((res.eventi || []).map((v) => [v.id, v]));
+    let tolte = false;
     for (const r of righe) {
       const v = per.get(r.dataset.id);
-      if (v) statoCambio(r, { ...r._vista, annullabile: v.annullabile, annullatoDa: v.annullatoDa });
+      if (v) statoCambio(r, { ...r._vista, frase: v.frase, annullabile: v.annullabile, annullatoDa: v.annullatoDa });
+      // Ritoccato fino al valore di partenza, il cambio non c'è più (cambi.js, fondi): nemmeno la sua riga.
+      else if (r.isConnected) { r.remove(); tolte = true; }
     }
+    if (tolte) segnaGiorni();
   }
 
   const sito = (url) => global.SN_FILO_CODA.sito(url);
