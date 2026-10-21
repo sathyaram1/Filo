@@ -5563,6 +5563,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     onboarding: onboardingText,
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
+    onboardingRifatta: onbActive && onbBefore.rifatta === true,
     ...(filo ? { filoTratto: filo.messaggi, indiceDomanda, chatCorrente: chatId, chatNuova: filo.nuova } : {}),
   };
 
