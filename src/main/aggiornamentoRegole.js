@@ -81,6 +81,16 @@ function tagStabile(tag) {
   return m ? `v${Number(m[1])}.${Number(m[2])}.0` : null;
 }
 
+// Dove si scarica a mano `versione`. Il sito dà l'ultima uscita, sullo stabile quasi sempre una patch del veloce:
+// la minor si prende dalla sua pagina, sotto il tag protetto. `nome` è come lo legge l'utente.
+const PAGINA_DOWNLOAD = 'https://filo.red';
+const PAGINA_RELEASE = 'https://github.com/sathyaram1/Filo/releases/tag/';
+function doveScaricare(versione, canale) {
+  const p = parti(versione);
+  const url = canale === 'stabile' && p && p[2] === 0 ? `${PAGINA_RELEASE}v${p[0]}.${p[1]}.0` : PAGINA_DOWNLOAD;
+  return { url, nome: url.replace('https://', '') };
+}
+
 function modoScelto(impostazioni) {
   const m = impostazioni && impostazioni.aggiornamenti && impostazioni.aggiornamenti.installa;
   return MODI.includes(m) ? m : MODO_PREDEFINITO;
@@ -221,6 +231,6 @@ function fileDiRilascio({ versione, urls, owner, repo, host = 'github.com' } = {
 module.exports = {
   MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI, CANALI, CANALE_PREDEFINITO,
   confrontaVersioni, etichettaCoincide, fileDellaRelease, releaseCoerente, modoScelto, piano, sceltaNonVale, haPulsante,
-  canaleScelto, versioneDelCanale, tagStabile,
+  canaleScelto, versioneDelCanale, tagStabile, PAGINA_DOWNLOAD, PAGINA_RELEASE, doveScaricare,
   ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, tagDiGitHubAccettato, fileDiRilascio,
 };
