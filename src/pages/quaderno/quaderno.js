@@ -145,6 +145,7 @@
   }
 
   function riempiRiga(r) {
+    if (r.smonta) r.smonta();
     const it = r.it;
     const el = r.el;
     el.className = `qd-riga${it.tipo === 'nascosta' ? ' qd-nascosta' : ''}`;
