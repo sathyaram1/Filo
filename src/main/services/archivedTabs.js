@@ -101,7 +101,8 @@
       title: t.testo,
       ...(u.tagliato ? { urlTagliato: true } : {}),
       ...(t.tagliato ? { titleTagliato: true } : {}),
-      favicon: meta.favicon || '',
+      // Anche l'icona la sceglie il sito (un data: lungo un mega): oltre la misura non si tiene, a metà non si disegna.
+      favicon: typeof meta.favicon === 'string' && meta.favicon.length <= MISURA.url ? meta.favicon : '',
       // Colore identità del sito (§1.2): serve all'ordine cromatico in archivio.
       identityColor: meta.identityColor || null,
       openedAt: meta.openedAt || null,
