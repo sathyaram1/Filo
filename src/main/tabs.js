@@ -2190,6 +2190,7 @@ class TabManager {
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    tab._gestoFiloAt = Date.now();
     if (!canGoBack(tab.view.webContents)) { this._vaiFuori(tab, 'indietro', 0); return; }
     const meta = this._vocePassoStoria(tab, -1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
