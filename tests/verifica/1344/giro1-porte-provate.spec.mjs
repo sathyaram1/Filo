@@ -1,4 +1,4 @@
-// Verifica #1344, giro 1: le strade che lo spec del lavoro non prova (crediti finiti e funzione senza modello
+// Verifica #1344, giro 1: porte provate e chiuse, le strade che lo spec del lavoro non prova (crediti finiti e funzione senza modello
 // sulle stesse superfici, tema chiaro).
 
 import { test, expect } from '../../fixtures/electron.mjs';
