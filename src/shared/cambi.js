@@ -457,8 +457,10 @@
     }
   }
 
-  // ── Fusione: un cursore trascinato è UN cambio ─────────────────────────────
-  const FINESTRA_FUSIONE_MS = 4000;
+  // ── Fusione: ritocchi ripetuti della stessa cosa sono UN cambio ────────────
+  // Non solo i passi di un cursore: anche chi cerca il valore giusto a più riprese (lo zoom 125 → 114 → 87 → 100) ha
+  // fatto un cambio solo, «125% → 100%» (#1490). La finestra si misura dall'ultimo ritocco.
+  const FINESTRA_FUSIONE_MS = 2 * 60 * 1000;
   const FONDIBILI = new Set(['interfaccia', 'pagina', 'filo']);
   function fondibile(ultimo, nuovo) {
     if (!ultimo || !nuovo || ultimo.annulla || nuovo.annulla) return false;
