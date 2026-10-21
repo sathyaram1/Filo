@@ -38,6 +38,8 @@ const L2 = Number(arg('--l2', 1e-6));
 // anche truffe e refusi, e con uno su duecento la soglia lasciava passare i refusi di una lettera (gmaill.com).
 const FALSI_AMMESSI = Number(arg('--falsi', 0.007));
 const PESO_MANO = Number(arg('--peso-mano', 6));
+// Quanti siti noti in più può dare per imitazioni la soglia bassa delle forme certe: tre su mille.
+const FALSI_CERTE = Number(arg('--falsi-certe', 0.003));
 // I refusi scritti in automatico pesano meno di un'etichetta a mano: a peso pieno spostavano il modello sui refusi e
 // perdeva le imitazioni con altre parole.
 const PESO_SINTETICI = Number(arg('--peso-sintetici', 2));
@@ -322,7 +324,18 @@ function scrivi(mq, soglia, sogliaForte, info) {
 
 // Il punteggio di un host è quello del suo candidato più forte.
 function perHost(gruppi, mq) {
-  return gruppi.map((g) => ({ ...g, p: Math.max(...g.ix.map((ix) => punteggioQ(ix, mq))) }));
+  return gruppi.map((g) => {
+    const ps = g.ix.map((ix) => punteggioQ(ix, mq));
+    return { ...g, p: Math.max(...ps), pc: Math.max(-1, ...ps.filter((_, i) => g.certe[i])) };
+  });
+}
+
+// La soglia delle forme certe (giudica() in imitazioni.js): i siti noti che scagiona in meno della soglia piena sono al
+// più FALSI_CERTE in più, e non scende sotto 0,2 (un modello incerto non scagiona).
+function sogliaCertePer(punti, soglia) {
+  const neg = punti.filter((g) => g.y === 0 && g.p < soglia && g.pc >= 0).map((g) => g.pc).sort((a, b) => b - a);
+  const k = Math.floor(punti.filter((g) => g.y === 0).length * FALSI_CERTE);
+  return Math.min(soglia, Math.max(0.2, (neg[k] ?? 0.2) + 1e-6));
 }
 
 function sogliaPer(punti, falsi) {
@@ -396,8 +409,8 @@ function costruisci() {
       // Da un elenco di truffe si impara solo l'imitazione evidente: un refuso o una parola dentro un'altra lì è spesso
       // un caso (mail.dominio-di-truffa non imita Gmail), e lo decide solo un'etichetta scritta.
       if (!e || (!marchio && !evidente(e.c))) return;
-      gruppi.push({ h, y, fonte, ix: [indici(e.feats, mask)], marchio: e.c.mc.token });
-    } else gruppi.push({ h, y, fonte, ix: es.map((e) => indici(e.feats, mask)) });
+      gruppi.push({ h, y, fonte, ix: [indici(e.feats, mask)], certe: [IM.formaCerta(e.c)], marchio: e.c.mc.token });
+    } else gruppi.push({ h, y, fonte, ix: es.map((e) => indici(e.feats, mask)), certe: es.map((e) => IM.formaCerta(e.c)) });
     // Un'etichetta scritta vale più di una riga di un elenco, che può sbagliare.
     if (fonte === 'mano') gruppi[gruppi.length - 1].peso = PESO_MANO;
     if (fonte === 'sintetico') gruppi[gruppi.length - 1].peso = peso || PESO_SINTETICI;
@@ -449,8 +462,11 @@ async function avvia() {
   const mv = misura(pv, soglia);
   console.log(`validazione: soglia ${soglia.toFixed(3)}, prese ${mv.presi}/${mv.truffe} (${(100 * mv.richiamo).toFixed(1)}%), falsi ${mv.falsi}/${mv.noti} (${(100 * mv.tassoFalsi).toFixed(2)}%)`);
   const sogliaForte = Math.max(soglia, sogliaPer(pv, FALSI_AMMESSI / 5));
+  const sogliaCerte = sogliaCertePer(pv, soglia);
+  const certe = pv.filter((g) => g.p >= soglia || (g.pc >= sogliaCerte));
+  console.log(`forme certe: soglia ${sogliaCerte.toFixed(3)}, prese ${certe.filter((g) => g.y === 1).length}/${mv.truffe}, falsi ${certe.filter((g) => g.y === 0).length}/${mv.noti}`);
   const mq = quantizza(addestra(esempiDi(gruppi)));
-  scrivi(mq, soglia, sogliaForte, { esempi: { imitazioni: gruppi.filter((g) => g.y === 1).length, noti: gruppi.filter((g) => g.y === 0).length } });
+  scrivi(mq, soglia, sogliaForte, { sogliaCerte, esempi: { imitazioni: gruppi.filter((g) => g.y === 1).length, noti: gruppi.filter((g) => g.y === 0).length } });
   console.log(`scritto ${path.relative(RADICE, IM.FILE_MODELLO)} (${fs.statSync(IM.FILE_MODELLO).size} byte)`);
   provaModello();
 }

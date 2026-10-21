@@ -440,4 +440,4 @@ function giudica(norm, { esca } = {}) {
 // Le funzioni da cui dipende chi porta un marchio: lo script di addestramento ne tiene i risultati finché non cambiano.
 const FIRMA_CANDIDATI = [tolleranza, scheletroDi, vista, unisci, dentroConErrori, pezzoGenerato, zoneDi, candidati, esempi].map(String).join('\n');
 
-module.exports = { giudica, esempi, escaDi, impronta, distanza, dentroConErrori, scheletroDi, FILE_MODELLO, FIRMA_CANDIDATI };
+module.exports = { giudica, esempi, formaCerta, escaDi, impronta, distanza, dentroConErrori, scheletroDi, FILE_MODELLO, FIRMA_CANDIDATI };
