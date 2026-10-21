@@ -1851,6 +1851,7 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
+    $('descriviImmagini').addEventListener('change', persist);
     $('contatoriAttivi').addEventListener('change', persist);
     for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
     for (const [, id] of CAMPI_CREDITI) {
