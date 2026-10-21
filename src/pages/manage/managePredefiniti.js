@@ -473,7 +473,7 @@
   }
 
   function populateNicknames(registry) {
-    const dl = $('nicknames-list');
+    const dl = $(NICKNAMES);
     dl.innerHTML = '';
     for (const nick of Object.keys(registry || {})) {
       const opt = document.createElement('option');
