@@ -26,7 +26,10 @@ gruppo scritto come al passo 1.
    aperta.`; con `RIFIUTATO dal server: …`, al posto del numero va quel
    messaggio esatto.
 2. Chi risolve o corregge mette il feedback in attesa (sezione «Il feedback
-   fermo per un guasto»); per gli altri torna in coda da sé.
+   fermo per un guasto»). Per gli altri il feedback torna in coda da sé, e la
+   loro domanda non offre «Riprendi»: il feedback non aspetta nessuno, e il
+   pulsante non avrebbe niente da riprendere. Le opzioni restano quelle con un
+   effetto vero (per esempio la riparazione affidata a un agente), o nessuna.
 3. La domanda di fine sessione, poi `node scripts/routine-channel.mjs release
    <biglietto> --role <il tuo ruolo> --guasto "<gruppo>, D-<n>: <messaggio>"`.
 
