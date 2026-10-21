@@ -619,8 +619,7 @@ export function altraCartellaDelDeposito(root, da = process.cwd()) {
 
 /**
  * Un altro worktree dello stesso deposito con commit nati da `dal` (l'inizio del lavoro) che la cartella posizionata
- * non contiene (#772.1): il controllo guarda da dove parte il comando, e la shell dei sotto-agenti torna da sola alla
- * cartella principale. Non contano la linea principale né i commit già portati qui con un cherry-pick. null se no.
+ * non contiene (#772.1). Non contano la linea principale né i commit già portati qui con un cherry-pick.
  * @returns {null | { cartella: string, ramo: string, radice: string, commit: string[] }} i commit dal più vecchio
  */
 export function lavoroInUnAltroWorktree(root, { dal = '' } = {}) {

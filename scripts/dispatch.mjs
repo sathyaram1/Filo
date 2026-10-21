@@ -1749,7 +1749,7 @@ function emitHalt(kind, message) {
 
 /** Il motivo di un errore imprevisto, da ricopiare dentro `--guasto "…"`: una riga, senza virgolette né `$`. PURA. */
 export function motivoFatale(e) {
-  const testo = unaRiga((e && e.message) || e || 'errore senza messaggio').replace(/["`$\\]/g, "'").slice(0, 300);
+  const testo = unaRiga((e && e.message) || e || 'errore senza messaggio').replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300);
   return `errore imprevisto di dispatch: ${testo}`;
 }
 

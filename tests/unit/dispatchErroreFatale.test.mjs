@@ -103,9 +103,9 @@ test('se manca anche un pezzo del testo del guasto, arriva quello di riserva con
   assert.ok(t.includes(`release <biglietto> --role halt --guasto "${r.json.payload.message}"`), t);
 });
 
-test('il motivo si ricopia dentro le virgolette del rilascio senza romperle', () => {
+test('il motivo si ricopia dentro le virgolette del rilascio senza romperle, e un percorso di Windows resta leggibile', () => {
   const m = motivoFatale(new Error('a "b" `c` $HOME \\ e\nriga due'));
   assert.doesNotMatch(m, /["`$\\\n]/);
-  assert.match(m, /^errore imprevisto di dispatch: a 'b' 'c' 'HOME ' e riga due$/);
+  assert.match(m, /^errore imprevisto di dispatch: a 'b' 'c' 'HOME \/ e riga due$/);
   assert.match(istruzioniGuastoDiRiserva(m, 'C:\\strumenti\\scripts\\routine-channel.mjs'), /node "C:\/strumenti\/scripts\/routine-channel\.mjs" release/);
 });
