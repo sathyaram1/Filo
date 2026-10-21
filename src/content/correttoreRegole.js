@@ -188,16 +188,23 @@
   const VALUTA_PRIMA = /[$€£¥] ?$/u;
   const SEGNO_DOPO = /^ ?(?:%|‰|°|[$€£¥])/u;
   const PAROLA_DOPO = /^ +([\p{L}]+)/u;
+  // Un verbo prima e le cose contate dopo, al plurale: «ha scritto xx sinfonie», «vinse xx scudetti», «released xx albums».
+  // Le due condizioni insieme, perché un saluto («bene xx», «a presto xx») non ha né l'uno né l'altro.
+  const VERBO = /(?:[aiu]t[oaie]|(?:scritt|vint|fatt|pres|mess|lett|dett|vist|pers|spes|cors|chius|apert|prodott|condott|tradott|raccolt|scelt|tolt|rott|compost|dipint|raggiunt|uccis|decis|divis|inclus)[oaie]|[^aeiou]s[ei]|ss[ei]|ò|arono|erono|irono|[^e]ed)$/u;
+  const NON_CONTATE = new Set(['che', 'come', 'bene', 'sempre', 'anche', 'dove', 'mentre', 'oppure', 'grazie', 'baci', 'kisses', 'thanks', 'this', 'his', 'yes', 'xoxo']);
+  const contate = (w) => w.length >= 3 && w === w.toLowerCase() && !NON_CONTATE.has(w) && /[ies]$/.test(w);
 
   function numeroAttorno(testo, start, end) {
     const prima = testo.slice(Math.max(0, start - 40), start);
     if (VALUTA_PRIMA.test(prima)) return true;
     const p = PAROLA_PRIMA.exec(prima);
-    if (p && ANNUNCIANO.has(p[1].replace(/’/g, "'").toLowerCase())) return true;
+    const parolaPrima = p ? p[1].replace(/’/g, "'").toLowerCase() : '';
+    if (parolaPrima && ANNUNCIANO.has(parolaPrima)) return true;
     const dopo = testo.slice(end, end + 30);
     if (SEGNO_DOPO.test(dopo)) return true;
     const d = PAROLA_DOPO.exec(dopo);
-    return !!d && UNITA.has(d[1].toLowerCase());
+    if (!d) return false;
+    return UNITA.has(d[1].toLowerCase()) || (parolaPrima.length >= 4 && VERBO.test(parolaPrima) && contate(d[1]));
   }
 
   function segnaposti(testo) {
