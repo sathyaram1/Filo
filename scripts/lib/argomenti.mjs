@@ -38,6 +38,17 @@ export function apreUnElenco(arg) {
 }
 
 /**
+ * Il rimedio quando sotto npm manca un titolo o un testo: uno che comincia col trattino npm lo prende per suo
+ * opzione se il `--` non arriva (dimenticato, o mangiato dalla conchiglia), senza lasciarne traccia (#1359).
+ * '' fuori da npm. PURA.
+ */
+export function avvisoTrattinoDaNpm(env = {}) {
+  const comando = String((env && env.npm_lifecycle_event) || '');
+  if (!comando) return '';
+  return `Se cominciava con un trattino (un elenco puntato, un inciso), npm l'ha preso per una sua opzione e qui non è arrivato: scrivi i due trattini subito dopo il nome del comando (npm run ${comando} -- "titolo" "- …"), oppure metti "-" al posto del testo e passalo da stdin, che arriva anche dove i due trattini se li mangia la conchiglia.`;
+}
+
+/**
  * Come `sembraOpzione`, per un testo libero (il report di una correzione, il testo di un feedback). La critica
  * resta sulla regola stretta (cosa accetta il verificatore non cambia). PURA.
  */
