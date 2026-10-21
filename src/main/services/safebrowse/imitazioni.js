@@ -209,6 +209,10 @@ function candidati(zone, registrable) {
       }
       if (!meglio) continue;
       const { r, l } = meglio;
+      // Un marchio corto in mezzo a un nome generato (x72qhcrn02dh18, i nomi che cloud e anteprime danno da soli: lettere
+      // e cifre che si alternano) ci è caduto per caso: nessuno lo legge lì.
+      if (t.length <= 4 && !l.tagli.includes(r.inizio) && !l.tagli.includes(r.fine)
+        && (l.crudo.match(/[a-z][0-9]|[0-9][a-z]/g) || []).length >= 3) continue;
       let tipo;
       let d = r.d;
       let [inizio, fine] = [r.inizio, r.fine];

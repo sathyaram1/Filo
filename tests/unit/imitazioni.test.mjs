@@ -76,7 +76,7 @@ test('le imitazioni si fanno riconoscere, col marchio giusto', () => {
 test('i refusi di una lettera sul nome di un marchio, anche in fondo, danno l’avviso all’apertura e nel menu', () => {
   const refusi = [
     'paypaal.com', 'paypali.com', 'paypak.com', 'paypl.com', 'amazone.com', 'amazonm.com', 'amazoon.com', 'amazn.com',
-    'microsofte.com', 'microsotf.com', 'microsoftx.com', 'linkedim.com', 'linkedinr.com', 'netflixe.com', 'netfliks.com',
+    'microsofte.com', 'microsotf.com', 'microsoftx.com', 'linkedim.com', 'linkedinr.com', 'netflixe.com', 'netflx.com',
     'instagrem.com', 'whatsappe.com', 'whatsappt.com', 'facebooc.com', 'facebookr.com', 'yahop.com', 'icloude.com',
     'icluod.com',
   ];
