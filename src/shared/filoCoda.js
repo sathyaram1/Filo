@@ -124,6 +124,15 @@
     try { return new URL(String(url)).hostname.replace(/^www\./, ''); } catch (_) { return String(url || ''); }
   }
 
+  // Cosa apre una pagina del filo: solo una pagina web, e un indirizzo tagliato alla misura (#1525) non come intero
+  // (porterebbe altrove), ma il suo sito. Null se non c'è niente da aprire.
+  function daAprire(p) {
+    const url = String((p && p.url) || '');
+    if (!/^https?:\/\//i.test(url)) return null;
+    if (!p.urlTagliato) return { url, sito: false };
+    try { return { url: new URL(url).origin + '/', sito: true }; } catch (_) { return null; }
+  }
+
   // Un pezzo della coda: gli ultimi `quanti` prima di `prima` (esclusa), o da poco prima di `fino` in poi, o tutto ciò
   // che è arrivato dopo `dopo`. Due elementi con la stessa ora non finiscono in due pezzi diversi.
   function pezzo(lista, { prima = null, fino = null, dopo = null, quanti = PEZZO } = {}) {
