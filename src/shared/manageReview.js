@@ -2106,6 +2106,7 @@
     SEZIONI, sezioneDiScheda, schedaPredefinita, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
+    filtraFiducia, contaNonFidate, segnoFiducia,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
