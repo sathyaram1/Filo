@@ -553,7 +553,9 @@
   // fornitore, a prescindere da quale modello stia servendo (se un'azienda
   // esclusa ospitasse un modello altrui, resta esclusa lo stesso). È quindi una
   // LISTA DI ESCLUSIONE (non di ammessi): regge quando esce un fornitore
-  // indipendente nuovo senza doverlo aggiungere a mano. Il rovescio — un'azienda
+  // indipendente nuovo senza doverlo aggiungere a mano. Ogni produttore di pesi
+  // aperti ci sta (owner, 06/10/2026): il controllo sui modelli di serie è in
+  // tests/unit/produttoriEsclusi.test.mjs. Il rovescio — un'azienda
   // esclusa che compare con un nome nuovo passerebbe inosservata — è coperto
   // registrando chi ha DAVVERO servito ogni risposta (vedi handlers): senza quel
   // riscontro la lista è solo una speranza.
@@ -592,6 +594,9 @@
     'Cohere',
     'Meta',         // produttore di Llama
     'Z.AI',         // Zhipu / GLM
+    'Xiaomi',       // produttore di MiMo
+    'NVIDIA',       // produttore di Nemotron
+    'Hexgrad',      // produttore di Kokoro
     // Non è un produttore: è un host che nel banco di prova del 30/08 ha
     // risposto ad alcune richieste con la risposta di un'ALTRA richiesta in
     // corso (media 0.42 contro 0.84-0.91 degli altri host). Escluso per tutti i
@@ -671,6 +676,52 @@
     const rule = producerOnlyRule(modelId);
     if (rule && !names.some((n) => matchesProviderBase(n, [...rule.hosts, ...rule.only]))) return 'not-producer';
     return '';
+  }
+
+  // I modelli stretti ammessi dalla politica (transparency/models.md, «Ammessi oggi»): pesi chiusi comprati dal
+  // produttore, che quindi non va escluso. Una voce qui va anche nel documento (sentinella in openWeightsOnly.test).
+  const NARROW_MODEL_PRODUCERS = [{ prefix: 'typesafe/', nome: 'TypeSafe' }];
+
+  // Il nome di fornitore di chi pubblica col prefisso di un id OpenRouter. Serve dove il prefisso, tolti spazi e
+  // segni, non è il nome ('meta-llama' è Meta) e per scrivere il nome giusto in un avviso; il resto si confronta da sé.
+  const MODEL_AUTHOR_PROVIDERS = {
+    'meta-llama': 'Meta', mistralai: 'Mistral', 'z-ai': 'Z.AI', moonshotai: 'Moonshot AI', 'x-ai': 'xAI',
+    xiaomi: 'Xiaomi', nvidia: 'NVIDIA', hexgrad: 'Hexgrad', deepseek: 'DeepSeek', minimax: 'MiniMax',
+    qwen: 'Qwen', google: 'Google', openai: 'OpenAI', cohere: 'Cohere', anthropic: 'Anthropic',
+  };
+
+  function compactProviderName(x) {
+    return normalizeProviderName(x).replace(/[^a-z0-9]/g, '');
+  }
+
+  // Chi ha prodotto un modello, dal prefisso dell'id: { slug, nome } o null se l'id non lo dice. Il router
+  // (openrouter/auto) non è un produttore. PURA.
+  function modelProducer(modelId) {
+    const id = String(modelId == null ? '' : modelId).trim().toLowerCase().replace(/^~/, '');
+    const cut = id.indexOf('/');
+    if (cut <= 0) return null;
+    const slug = id.slice(0, cut);
+    if (slug === 'openrouter') return null;
+    return { slug, nome: MODEL_AUTHOR_PROVIDERS[slug] || slug };
+  }
+
+  // Il produttore di un modello che `excluded` lascia fra gli host, col nome da mostrare; '' se è escluso, se la
+  // politica lo compra proprio da lui (Anthropic, modelli stretti) o se l'id non dice chi è. Con `catalog`
+  // ([{ name, slug }] dello smistatore) un produttore che non ospita niente non ha niente da escludere. PURA.
+  function unexcludedProducer(modelId, excluded, catalog) {
+    const p = modelProducer(modelId);
+    if (!p || producerOnlyRule(modelId)) return '';
+    if (NARROW_MODEL_PRODUCERS.some((r) => r.prefix === p.slug + '/')) return '';
+    const list = Array.isArray(excluded) ? excluded : [];
+    const compatti = [compactProviderName(p.slug), compactProviderName(p.nome)];
+    const escluso = (nome) => !!normalizeProviderName(nome) && (isProviderExcluded(nome, list)
+      || list.some((x) => compatti.includes(compactProviderName(x)) || compactProviderName(x) === compactProviderName(nome)));
+    if (escluso(p.nome) || escluso(p.slug)) return '';
+    if (!Array.isArray(catalog)) return p.nome;
+    const host = catalog.find((h) => h && (compatti.includes(compactProviderName(h.slug))
+      || compatti.includes(compactProviderName(h.name)) || catalogProvidersCoveredBy(p.nome, [h]).length));
+    if (!host || escluso(host.name) || escluso(host.slug)) return '';
+    return (typeof host.name === 'string' && host.name.trim()) || p.nome;
   }
 
   // Il catalogo degli host a ritenzione zero (GET /endpoints/zdr) → Map(id modello → [{ name, tag }]). Un elenco da
@@ -930,7 +981,7 @@
   // perché il punto dell'interruttore è poter rifiutare anche quella scelta.
   // I produttori dei «modelli stretti» ammessi dalla politica stanno qui per lo
   // stesso motivo: pesi chiusi comprati dal produttore, l'interruttore li spegne.
-  const OPEN_WEIGHTS_EXTRA_EXCLUDED = [...PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts), 'TypeSafe'];
+  const OPEN_WEIGHTS_EXTRA_EXCLUDED = [...PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts), ...NARROW_MODEL_PRODUCERS.map((r) => r.nome)];
 
   // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
   function effectiveExcludedProviders(excluded, openWeightsOnly) {
@@ -3286,6 +3337,10 @@
     producerOnlyRule,
     servedPolicyViolation,
     hostPolicyViolation,
+    NARROW_MODEL_PRODUCERS,
+    MODEL_AUTHOR_PROVIDERS,
+    modelProducer,
+    unexcludedProducer,
     zdrCatalogFrom,
     DICTATION_LIMITS,
     dictationTimes,
