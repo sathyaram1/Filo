@@ -307,7 +307,7 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
 
   async function vista(opts) {
     const incog = inIncognito(opts);
-    await carica();
+    await caricaPerLeggere();
     return incog ? incognito : normale;
   }
 
