@@ -574,7 +574,11 @@ test('le coordinate bancarie scritte dall\'utente un messaggio prima, nella stes
   const page = await home(app);
   await modelloFinto(app, [
     { text: 'Segnato il tuo IBAN.' },
-    { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://bonifici.example/nuovo?iban=${IBAN}` }) }] },
+    // Una lettura nel giro rimanda l'esito al modello: l'apertura da sola chiuderebbe il turno (#1130).
+    { toolCalls: [
+      { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+      { id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://bonifici.example/nuovo?iban=${IBAN}` }) },
+    ] },
     { text: 'Fatto.' },
   ]);
   try {
@@ -582,7 +586,7 @@ test('le coordinate bancarie scritte dall\'utente un messaggio prima, nella stes
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato il tuo IBAN.' })).toBeVisible({ timeout: 15000 });
     await chiedi(page, 'aprimi la pagina del bonifico con quell\'iban già compilato');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15000 }).toBeGreaterThanOrEqual(3);
-    const esito = (await chiamateAlModello(app))[2].filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+    const esito = (await chiamateAlModello(app))[2].filter((m) => m.role === 'tool' && m.tool_call_id === 'n1').map((m) => String(m.content)).join('\n');
     expect(esito).toContain('Eseguita');
     expect(esito).not.toMatch(/coordinate bancarie/i);
   } finally {

@@ -209,9 +209,9 @@ test('Preferenze: «1,5» nella velocità delle animazioni e «0,1» nelle ombre
 
 test('chat: «togli le animazioni» col valore passato come numero dal modello le toglie', async ({ app }) => {
   const page = await homeChat(app);
+  // Un cambio estetico riuscito chiude il turno (#1130): la frase va scritta insieme.
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"motion","valore":0}' }] },
-    { text: 'Fatto, animazioni tolte.' },
+    { text: 'Fatto, animazioni tolte.', toolCalls: [{ id: 't1', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"motion","valore":0}' }] },
   ]);
   await chiedi(page, 'togli le animazioni');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'animazioni tolte' })).toBeVisible({ timeout: 10_000 });

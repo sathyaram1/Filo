@@ -55,7 +55,9 @@ export async function copione(app, passi) {
       if (p.strumenti && p.strumenti.length) {
         for (const s of p.strumenti) { try { onToolCall && onToolCall({ id: s.id, name: s.name }); } catch (_) {} }
         await aspetta(p.finoAlFermo ? 2 ** 31 - 1 : (p.dopoStrumenti || 200));
-        return { ...base, text: '', toolCalls: p.strumenti, finishReason: 'tool_calls' };
+        // Un comando secco chiude il turno (#1130): la frase va scritta insieme.
+        if (p.testo) { try { onDelta && onDelta(p.testo); } catch (_) {} }
+        return { ...base, text: p.testo || '', toolCalls: p.strumenti, finishReason: 'tool_calls' };
       }
       const testo = p.testo || 'Fatto.';
       try { onDelta && onDelta(testo); } catch (_) {}

@@ -267,8 +267,12 @@ test('in una chat pulita la pagina che l\'utente chiede si apre anche se il suo 
     { finale: { cerca: '(x)', testo: 'FATTO.' } },
   ]);
   await chiedi(page, 'aprimi la pagina del quartiere Navile sul sito del comune di Bologna');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'FATTO.' })).toBeVisible({ timeout: 20_000 });
-  expect(await schedaVerso(app, 'comune.bologna.it')).toBe(true);
+  await expect.poll(() => schedaVerso(app, 'comune.bologna.it'), { timeout: 20_000 }).toBe(true);
+  await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
+  // Un'apertura riuscita parla da sé (#1130): il turno si chiude senza richiamare il modello.
+  expect((await chiamate(app)).length).toBe(1);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'FATTO.' })).toHaveCount(0);
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
 // Il canale dei messaggi arriva anche ai content script dei siti: se quello strato cedesse, un sito non deve poter
@@ -504,8 +508,10 @@ test('in una chat pulita «aprimi la pagina dei prezzi di OpenAI» apre la sched
     { finale: { cerca: '(x)', testo: 'APERTA.' } },
   ]);
   await chiedi(page, 'aprimi la pagina dei prezzi di OpenAI');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'APERTA.' })).toBeVisible({ timeout: 20_000 });
-  expect(await schedaVerso(app, 'openai.com')).toBe(true);
+  await expect.poll(() => schedaVerso(app, 'openai.com'), { timeout: 20_000 }).toBe(true);
+  await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
+  expect((await chiamate(app)).length).toBe(1);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'APERTA.' })).toHaveCount(0);
   await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
@@ -647,10 +653,12 @@ test('dopo aver letto una pagina, «aprimi la pagina ufficiale dei prezzi» apre
   await chiedi(page, 'leggi notizie.example/listino-modelli: quanto costa gemini 2.5 pro?');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'PRIMA: 1,25 dollari' })).toBeVisible({ timeout: 20_000 });
   await chiedi(page, 'aprimi la pagina ufficiale dei prezzi');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'SECONDA:' })).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
   await expect.poll(() => app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows()
-    .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => String(t.url || '').startsWith(u))), url), { timeout: 10_000 }).toBe(true);
+    .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => String(t.url || '').startsWith(u))), url), { timeout: 20_000 }).toBe(true);
+  await expect(page.locator('.dash-bubble-filo.dash-bubble-actions-only')).toBeVisible({ timeout: 20_000 });
+  expect((await chiamate(app)).length, 'due giri per la lettura, uno per l\'apertura').toBe(3);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'SECONDA:' })).toHaveCount(0);
+  await expect(page.locator('.dash-bubble-actions .dash-action-btn-primary')).toHaveCount(0);
 });
 
 test('una lettura confermata dall\'utente torna al modello da sola, e la risposta arriva senza riscrivere', async ({ app, openTab }) => {

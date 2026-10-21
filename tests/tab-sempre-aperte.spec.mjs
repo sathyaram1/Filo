@@ -38,24 +38,28 @@ const pulisci = (app) => app.evaluate(async ({ BrowserWindow }) => {
   return win._filoTabs.runAutoTriage({ trigger: 'manual' });
 });
 
+// Il testo arriva in streaming prima che l'azione sia fatta: la fine del turno la dice l'invio che torna al posto del
+// quadrato.
+const turnoFinito = (chat) => expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 15_000 });
+
 const urlAperte = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.url));
 
 test('«tienimi sempre aperta example.org»: la chat salva la regola, la pulizia archivia le altre e lei resta', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
+  // Una regola salvata chiude il turno (#1130): la frase va scritta insieme, e l'esito resta nel diario.
   await modelloFinto(app, [
-    { toolCalls: [{ id: 't1', name: 'TIENI_APERTA', arguments: JSON.stringify({ dominio: 'example.org' }) }] },
-    { text: 'Fatto: example.org resta sempre aperto.' },
+    { text: 'Fatto: example.org resta sempre aperto.', toolCalls: [{ id: 't1', name: 'TIENI_APERTA', arguments: JSON.stringify({ dominio: 'example.org' }) }] },
   ]);
   await puliziaCheArchiviaTutto(app);
   const chat = await home(app);
   await chiedi(chat, 'tienimi sempre aperta example.org');
   await expect(chat.locator('.dash-bubble-filo')).toContainText('example.org resta sempre aperto', { timeout: 15_000 });
+  await turnoFinito(chat);
   await chat.locator('.dash-activity-head').click();
   await expect(chat.locator('.dash-activity-row', { hasText: 'Sempre aperto · example.org' })).toHaveCount(1);
   await chat.screenshot({ path: 'tests/.shots/sempre-aperte-chat.png' });
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['example.org']);
-  const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
-  expect(esito.content).toContain('non archivia example.org');
+  expect(await chiamateAlModello(app)).toHaveLength(1);
   await ripristina(app);
 
   const tenuta = testServer.html(pagina('Tenuta')).replace('127.0.0.1', 'example.org');
@@ -102,14 +106,12 @@ test('«tienimi sempre aperta questa scheda» davanti a un sito locale (localhos
   test.setTimeout(90_000);
   await openTab(testServer.html(pagina('Locale')).replace('127.0.0.1', 'localhost'));
   await expect.poll(async () => (await urlAperte(shell)).some((u) => u.startsWith('http://localhost:'))).toBe(true);
-  await modelloFinto(app, [
-    { toolCalls: [{ id: 'l1', name: 'TIENI_APERTA', arguments: JSON.stringify({}) }] },
-    { text: 'Fatto.' },
-  ]);
+  await modelloFinto(app, [{ text: 'Fatto.', toolCalls: [{ id: 'l1', name: 'TIENI_APERTA', arguments: JSON.stringify({}) }] }]);
   await puliziaCheArchiviaTutto(app);
   const chat = await home(app);
   await chiedi(chat, 'tienimi sempre aperta questa scheda');
   await expect(chat.locator('.dash-bubble-filo')).toContainText('Fatto.', { timeout: 15_000 });
+  await turnoFinito(chat);
   await ripristina(app);
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['localhost']);
 
@@ -152,13 +154,11 @@ test('le regole si vedono nel quaderno delle memorie, la × le toglie, e «non t
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['web.whatsapp.com']);
 
   // Detto in chat: «non tenere più aperto WhatsApp» col dominio largo toglie la regola più precisa salvata.
-  await modelloFinto(app, [
-    { toolCalls: [{ id: 'n1', name: 'NON_TENERE_APERTA', arguments: JSON.stringify({ dominio: 'whatsapp.com' }) }] },
-    { text: 'Fatto.' },
-  ]);
+  await modelloFinto(app, [{ text: 'Fatto.', toolCalls: [{ id: 'n1', name: 'NON_TENERE_APERTA', arguments: JSON.stringify({ dominio: 'whatsapp.com' }) }] }]);
   const chat = await home(app);
   await chiedi(chat, 'non tenere più aperto whatsapp');
   await expect(chat.locator('.dash-bubble-filo')).toContainText('Fatto.', { timeout: 15_000 });
+  await turnoFinito(chat);
   await chat.locator('.dash-activity-head').click();
   await expect(chat.locator('.dash-activity-row', { hasText: 'Non più tenuto aperto · web.whatsapp.com' })).toHaveCount(1);
   await ripristina(app);
