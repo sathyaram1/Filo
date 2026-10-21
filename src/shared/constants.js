@@ -2544,9 +2544,9 @@
         + `Hai uno strumento in più, disponibile solo adesso: ONBOARDING (spunta le voci fatte, mostra la scelta dell'autonomia con autonomia: true e/o chiude l'intervista con fine: true).\n\n`
         + `${onboarding}\n\n`),
 
-    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax }) =>
+    filoChatContext: ({ profilo, preferenze, espansioni, lezioni, stato, cambi, history, modelName, files, onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) =>
       `${INIZIO_CONTESTO_CHAT}\n` +
-      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax }) +
+      PROMPTS.filoChatOnboarding({ onboarding, onboardingTurns, onboardingMax, onboardingRifatta }) +
       rigaNomeModello(modelName) +
       `${memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n\n` +
       `STATO:\n${stato || '(vuoto)'}\n\n` +
