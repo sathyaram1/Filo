@@ -264,6 +264,7 @@ test.describe('utente già accolto', () => {
     const home = intervista;
     await expect(home.locator('#onbNotice')).toContainText('La presentazione è rimasta a metà', { timeout: 15_000 });
     await expect(home.locator('body')).not.toHaveAttribute('data-state', 'thread');
+    await home.screenshot({ path: 'tests/.shots/1297-rimasta-a-meta.png' }).catch(() => {});
     await home.locator('#onbNoticeRedo').click();
     await expect(home.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
     await expect(home.locator('.dash-bubble-user', { hasText: 'sono Anna' })).toBeVisible();
