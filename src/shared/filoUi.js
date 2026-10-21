@@ -292,7 +292,7 @@
           try { c.setSelectionRange(t.sel[0], t.sel[1]); } catch (_) {}
         }
       }
-      const a = { e, tipo: e.inputType, dato: e.data, valore: c.value, sel: selezioneDi(c) };
+      const a = { e, tipo: e.inputType, dato: e.data, valore: c.value, sel: selezioneDi(c), riga: c.tagName !== 'TEXTAREA' };
       st.annuncio = a;
       setTimeout(() => { if (st.annuncio === a) st.annuncio = null; }, 0);
     }, true);
