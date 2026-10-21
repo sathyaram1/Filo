@@ -3880,11 +3880,15 @@
     // I tasti scendono sotto quando lì la richiesta si legge intera e accanto no (#256.4): una soglia di sola larghezza
     // lasciava la casella a tre parole per riga, e scorreva, in una chat alta abbastanza per mostrarla.
     const riga = input.parentNode;
+    // Le due misure muovono il registro: chi era in fondo ci resta.
     const disponi = () => {
+      const fondo = logInFondo;
       riga.classList.remove('ed-chat-sotto');
-      if (!input.isConnected || input.scrollHeight <= input.clientHeight) return;
-      riga.classList.add('ed-chat-sotto');
-      if (input.scrollHeight > input.clientHeight) riga.classList.remove('ed-chat-sotto');
+      if (input.isConnected && input.scrollHeight > input.clientHeight) {
+        riga.classList.add('ed-chat-sotto');
+        if (input.scrollHeight > input.clientHeight) riga.classList.remove('ed-chat-sotto');
+      }
+      if (fondo) log.scrollTop = log.scrollHeight;
     };
     input.addEventListener('input', disponi);
     if (typeof ResizeObserver === 'function') new ResizeObserver(disponi).observe(pad);
