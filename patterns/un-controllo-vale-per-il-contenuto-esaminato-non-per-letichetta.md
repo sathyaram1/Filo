@@ -113,8 +113,9 @@ ogni volta era già stato chiuso di sotto:
 
 Dove vive: `ROUTINE-AUTH-SPEC.md` §11 («Un esito vale per la versione
 esaminata»), `scripts/dispatch.mjs`, `scripts/routine-channel.mjs`,
-`scripts/merge-gate.mjs`, `scripts/lib/dirty-tree.mjs`; la guardia sempre
-accesa è `tests/unit/esitoPerCommit.test.mjs`.
+`scripts/lib/dirty-tree.mjs` (fino al #1207 anche il citofono della fusione,
+che non c'è più: la fusione la porta il server); la guardia sempre accesa è
+`tests/unit/esitoPerCommit.test.mjs`.
 
 Da ricordare: il muro vero è il posto che non si può convincere, cioè il
 server. Il lato che consegna può chiudere il **cammino onesto** e far arrivare

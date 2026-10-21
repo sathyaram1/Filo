@@ -17,8 +17,8 @@
 #   sessioni locali dell'owner quel file non c'è e la guardia è inerte: l'owner
 #   cambia ramo quando gli pare.
 #
-#   Dopo la consegna il file sparisce apposta: da lì in poi il merge-gate DEVE
-#   poter cambiare ramo per fondere, ed è legittimo.
+#   Dopo la consegna il file sparisce apposta: da lì in poi cambiare ramo è
+#   legittimo.
 #
 # COSA NON È
 #   Ferma le derive e gli errori, non un'istanza determinata ad aggirarla (può
