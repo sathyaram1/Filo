@@ -194,6 +194,12 @@
     if (msg.inline != null) {
       const el = m.inline.get(Number(msg.inline));
       const b = el && D.trova(el, msg.cammino);
+      // Un collegamento scritto dal modello lo apre la porta delle uscite, come nella pagina: qui non c'è una finestra
+      // che lo segua.
+      if (b && b.matches && b.matches('a.filo-md-link') && global.SN_POPUP && global.SN_POPUP.apriCollegamento) {
+        global.SN_POPUP.apriCollegamento(b, { sfondo: msg.sfondo === true });
+        return;
+      }
       if (b && typeof b.click === 'function') b.click();
       return;
     }
