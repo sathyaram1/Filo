@@ -117,6 +117,7 @@
   async function openOnboarding(state) {
     onboardingActive = true;
     hideOnboardingNotice(); // l'intervista è di nuovo qui: la riga non serve più
+    segnaPagina(!!state.rifatta);
     if (allApertura) allApertura();
     goThread();
     renderOnboardingThread(state);
