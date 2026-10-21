@@ -143,13 +143,32 @@ function wireLoginHandler() {
   });
 }
 
-// La partition proxata con regole e credenziali di `resolved` (quello di resolve()).
+// Le ultime regole e credenziali date a ogni sessione, anche dopo clearPartitionAuth: la sessione le ricorda lei.
+const ultimaReteDi = new WeakMap();
+
+// Chromium ricorda la password del proxy per indirizzo: un fornitore col paese nel nome utente ha lo stesso indirizzo
+// per ogni paese, e senza dimenticare le credenziali vecchie si uscirebbe dal paese di prima (#1272).
+function dimenticaSeCambia(ses, chiave) {
+  if (!ses || typeof ses !== 'object') return null;
+  const prima = ultimaReteDi.get(ses);
+  ultimaReteDi.set(ses, chiave);
+  if (prima === undefined || prima === chiave) return null;
+  return Promise.resolve()
+    .then(() => (typeof ses.clearAuthCache === 'function' ? ses.clearAuthCache() : null))
+    .then(() => (typeof ses.closeAllConnections === 'function' ? ses.closeAllConnections() : null))
+    .catch(() => {});
+}
+
+// La partition proxata con regole e credenziali di `resolved` (quello di resolve()). Torna la promessa da aspettare
+// prima di caricare quando le credenziali vecchie vanno dimenticate, altrimenti null.
 function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null } = {}) {
   const conAuth = auth && auth.username ? auth : null;
   const rete = proxyRules ? { proxyRules, ...(bypassRules ? { proxyBypassRules: bypassRules } : {}) } : null;
-  if (!conAuth && !rete) { authBySession.delete(partition); return; }
+  const dimentica = dimenticaSeCambia(ses, JSON.stringify([proxyRules, bypassRules, conAuth && conAuth.username, conAuth && conAuth.password]));
+  if (!conAuth && !rete) { authBySession.delete(partition); return dimentica; }
   authBySession.set(partition, { ses, auth: conAuth, rete });
   if (conAuth) wireLoginHandler();
+  return dimentica;
 }
 
 function clearPartitionAuth(partition) {
