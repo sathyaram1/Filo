@@ -1083,6 +1083,12 @@
     try {
       if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi())) {
         const rt = realTarget(e);
+        // Il valore sopra un segnaposto (#1448) ha il menu del suo segnaposto.
+        const valore = SpellCheck.valoreSotto(rt);
+        if (valore) {
+          await openSpellMarksMenu(valore.el, { errore: null, suggerimento: valore.segno }, e, sito);
+          return;
+        }
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
           const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
