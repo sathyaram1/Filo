@@ -166,7 +166,7 @@ test('«Valuta» non c’è in un campo vuoto né in una password; dall’Aiuto 
     await expect(menu.pannelli).toHaveCount(0);
   }
   // Senza «Valuta» la conversazione resta dell'Aiuto, col suo modello.
-  await page.locator('body').click({ button: 'right', position: { x: 600, y: 400 } });
+  await page.mouse.click(700, 500, { button: 'right' });
   await menuDi(page).voce('Aiuto').click();
   await page.fill('.sn-sidebar-input textarea', 'ciao');
   await page.press('.sn-sidebar-input textarea', 'Enter');
