@@ -194,6 +194,41 @@ test('sul suggerimento del correttore «Valuta» c’è una volta sola e apre l�
   await expect(page.locator('.sn-sidebar-msg-assistant')).toContainText('C\'è un refuso.', { timeout: 20_000 });
 });
 
+test('in un editor dentro un riquadro dello stesso sito «Valuta» apre l’Aiuto della pagina e la correzione si scrive nel riquadro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app, { risposte: [['', PARERE]] });
+  const dentro = '<textarea id=ta style=width:500px;height:60px></textarea><div id=ce contenteditable=true style=width:500px;min-height:40px;border:1px solid #999><div>Vado con i mei amici.</div></div>';
+  const page = await testServer.openReady(openTab,
+    `<!doctype html><meta charset="utf-8"><body style="margin:0;padding:20px"><iframe id="ed" width="620" height="220" srcdoc="${dentro}"></iframe></body>`);
+  const fr = page.frameLocator('#ed');
+  await fr.locator('#ta').fill(TESTO);
+  for (const [sel, atteso] of [['#ta', /i miei amici\. L'acqua era calda\./], ['#ce', /Vado con i miei amici\./]]) {
+    await fr.locator(sel).click({ button: 'right' });
+    const menu = menuDi(fr);
+    await expect(menu.voce('Valuta')).toHaveCount(1, { timeout: 5000 });
+    await menu.voce('Valuta').click();
+    const ultima = page.locator('.sn-sidebar-correzione').last();
+    await expect(page.locator('.sn-sidebar-msg-user').last()).toContainText(sel === '#ta' ? 'Ieri sono andato' : 'Vado con i mei', { timeout: 8000 });
+    await expect(ultima).toContainText('i miei amici', { timeout: 20_000 });
+    await ultima.click();
+    if (sel === '#ta') await expect(fr.locator(sel)).toHaveValue(atteso);
+    else await expect(fr.locator(sel)).toHaveText(atteso);
+    expect((await chiamate(app)).at(-1).model).toBe(MODELLO_CHAT);
+  }
+});
+
+test('in un riquadro di un altro sito «Valuta» non c’è', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await prepara(app, { risposte: [['', PARERE]] });
+  const dentro = testServer.html('<!doctype html><meta charset="utf-8"><textarea id="ta">Testo scritto qui.</textarea>').replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, `<!doctype html><body><iframe id="ed" src="${dentro}" width="600" height="200"></iframe></body>`);
+  const fr = page.frameLocator('#ed');
+  await fr.locator('#ta').click({ button: 'right' });
+  const menu = menuDi(fr);
+  await expect(menu.pannelli.first()).toBeVisible({ timeout: 5000 });
+  await expect(menu.voce('Valuta')).toHaveCount(0);
+});
+
 test('di un testo oltre il tetto l’Aiuto dice fin dove arriva la valutazione', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer, { risposte: [['', PARERE]] });

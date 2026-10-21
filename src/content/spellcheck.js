@@ -603,7 +603,7 @@
         aCapo();
         return;
       }
-      const blocco = !/^inline/.test(window.getComputedStyle(n).display);
+      const blocco = !/^inline/.test((n.ownerDocument.defaultView || window).getComputedStyle(n).display);
       if (blocco) serveACapo = true;
       for (const c of n.childNodes) visita(c);
       if (blocco) serveACapo = true;
@@ -1805,8 +1805,10 @@
       if (radice.activeElement !== el) el.focus({ preventScroll: true });
       if (radice.activeElement !== el) return false;
       el.setSelectionRange(range.start, range.end);
-      if (testo) document.execCommand('insertText', false, testo);
-      else if (range.end > range.start) document.execCommand('delete', false);
+      // Il documento del campo: quello di un riquadro, quando lo corregge la pagina («Valuta», #1449).
+      const doc = el.ownerDocument || document;
+      if (testo) doc.execCommand('insertText', false, testo);
+      else if (range.end > range.start) doc.execCommand('delete', false);
     } catch (_) {}
     if (el.value === prima) return false;
     if (cursorMode === 'preserve' && typeof caret === 'number') {
@@ -1867,7 +1869,8 @@
       // Salva l'offset originale del caret, per ripristinarlo in modalità 'preserve'.
       const caretBefore = cursorMode === 'preserve' ? contenteditableCaretOffset(el) : -1;
       // Trova i text node di start e end via walker.
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const doc = el.ownerDocument || document;
+      const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       let cur = 0, startNode = null, startOff = 0, endNode = null, endOff = 0, n;
       while ((n = walker.nextNode())) {
         const len = n.nodeValue.length;
@@ -1883,8 +1886,8 @@
       if (!startNode || !endNode) return;
 
       // Posiziona la selezione sul range da rimpiazzare.
-      const sel = window.getSelection();
-      const r = document.createRange();
+      const sel = (doc.defaultView || window).getSelection();
+      const r = doc.createRange();
       try {
         r.setStart(startNode, startOff);
         r.setEnd(endNode, endOff);
@@ -1903,9 +1906,9 @@
       let ok = false;
       try {
         if (safeReplacement.length > 0) {
-          ok = document.execCommand('insertText', false, safeReplacement);
+          ok = doc.execCommand('insertText', false, safeReplacement);
         } else {
-          ok = document.execCommand('delete', false);
+          ok = doc.execCommand('delete', false);
         }
       } catch (_) {}
 
@@ -1917,10 +1920,10 @@
           r.deleteContents();
           let newNode = null;
           if (safeReplacement.length > 0) {
-            newNode = document.createTextNode(safeReplacement);
+            newNode = doc.createTextNode(safeReplacement);
             r.insertNode(newNode);
           }
-          const cr = document.createRange();
+          const cr = doc.createRange();
           if (cursorMode === 'preserve' && caretBefore >= 0) {
             const delta = safeReplacement.length - (range.end - range.start);
             const target = caretBefore >= range.end ? caretBefore + delta : caretBefore;
