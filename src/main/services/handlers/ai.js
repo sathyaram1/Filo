@@ -175,8 +175,8 @@ module.exports = function register(on, ctx) {
       let fonti = [];
       try {
         fonti = giro === 'web'
-          ? await F.web(sp.domanda, SN_CONST.effectiveApiKeys ? SN_CONST.effectiveApiKeys(settings).tavily : (settings.apiKeys?.tavily || ''))
-          : await F.wikipedia(sp.domanda, giro === 'web' ? 'en' : giro.replace(/^wiki:/, '') || 'en');
+          ? await F.web(sp.domanda, settings.apiKeys?.tavily || '')
+          : await F.wikipedia(sp.domanda, giro.replace(/^wiki:/, ''));
       } catch (e) {
         console.warn('[SN] segnaposto, fonti:', e?.message || e);
       }
