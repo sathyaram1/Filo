@@ -2,7 +2,7 @@
 id: security
 title: Sicurezza
 subtitle: Come cerco i problemi, cosa succede quando li trovo, e i limiti di tutto questo.
-updated: 2026-10-11
+updated: 2026-10-21
 order: 3
 ---
 
