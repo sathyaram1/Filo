@@ -1081,6 +1081,8 @@
       disegna();
     },
     alCambio(fn) { if (typeof fn === 'function') ascoltatori.push(fn); },
+    // Un filtro della pagina è cambiato: lista, testa e numeri si rifanno.
+    ridisegna() { cambia(); },
     // Quello che la pagina possiede: aprire un feedback nella sua scheda, accendere una scheda di Domande.
     collega(d) { Object.assign(dip, d || {}); },
     // Solo per le prove: domande finte (o un guasto finto) al posto del main, che da lì non le rimpiazza più.
