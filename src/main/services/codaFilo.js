@@ -13,7 +13,8 @@ async function tutte(opts) {
   try { cambi = await globalThis.SN_REGISTRO_CAMBI.tutti(); } catch (_) { cambi = []; }
   let incog = !!(opts && opts.incognito);
   try { if (!opts || opts.incognito == null) incog = require('../shim/storage').inIncognito(); } catch (_) {}
-  const firma = `${incog ? 'i' : 'n'}|${dati.pos}|${cambi.length}|${cambi.map((c) => `${c.id}${c.annullatoDa ? '~' : ''}`).join(',').slice(-4000)}`;
+  // Un ritocco fuso nel cambio di prima non ne cambia né il numero né l'id: lo dice la sua ora (`agg`).
+  const firma = `${incog ? 'i' : 'n'}|${dati.pos}|${cambi.length}|${cambi.map((c) => `${c.id}${c.agg || ''}${c.annullatoDa ? '~' : ''}`).join(',').slice(-4000)}`;
   if (memo && memo.firma === firma) return memo;
   memo = { firma, dati, cambi, elementi: C().elementi({ chats: dati.chats, pagine: dati.pagine, cambi, qui: dati.qui }) };
   return memo;
