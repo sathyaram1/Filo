@@ -258,7 +258,12 @@
     for (const p of Array.isArray(pagine) ? pagine : []) {
       if (!p || !p.url || !contiene(`${p.titolo || ''} ${p.url}`, ts, largo)) continue;
       const prima = perUrl.get(p.url);
-      if (!prima || ms(p.ts) > ms(prima.ts)) perUrl.set(p.url, { k: 'pagina', id: p.id, url: p.url, titolo: String(p.titolo || ''), ts: p.ts, ...(p.archivio ? { archivio: p.archivio } : {}) });
+      if (!prima || ms(p.ts) > ms(prima.ts)) {
+        perUrl.set(p.url, {
+          k: 'pagina', id: p.id, url: p.url, titolo: String(p.titolo || ''), ts: p.ts,
+          ...(p.archivio ? { archivio: p.archivio } : {}), ...(p.urlTagliato ? { urlTagliato: true } : {}),
+        });
+      }
     }
     for (const s of Array.isArray(schede) ? schede : []) {
       if (!s || !s.url) continue;
