@@ -176,6 +176,39 @@ test('«spiega» con un modello chiuso pagato coi crediti: la frase lo dice e il
   expect(seen.completions.some((c) => c.key === PERSONAL_KEY && c.model !== CHIUSO)).toBe(true);
 });
 
+// Preme il «Prova» della riga col modello `id` e torna il testo della riga a prova finita.
+async function provaRiga(page, id) {
+  await page.waitForFunction((m) => [...document.querySelectorAll('#modelRegistryList .sn-model-id')].some((i) => i.value === m), id, { timeout: 10_000 });
+  await page.evaluate((m) => {
+    document.querySelectorAll('[data-in-prova]').forEach((r) => r.removeAttribute('data-in-prova'));
+    const input = [...document.querySelectorAll('#modelRegistryList .sn-model-id')].find((i) => i.value === m);
+    input.closest('.sn-model-row').dataset.inProva = '1';
+  }, id);
+  const riga = page.locator('#modelRegistryList .sn-model-row[data-in-prova="1"]');
+  await riga.locator('.sn-model-test').click();
+  const stato = riga.locator('.sn-model-row-status');
+  await expect.poll(async () => (await stato.textContent()) || '', { timeout: 20_000 }).not.toMatch(/in corso|^\s*$/i);
+  return { riga, testo: (await stato.textContent()) || '' };
+}
+
+test('il «Prova» premuto nelle Opzioni senza una chiave propria paga coi crediti: sul modello chiuso la frase, su quello aperto la prova riesce', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app, 'deepseek-flash');
+  const page = await openTab('filo://options/options.html');
+  const chiuso = await provaRiga(page, CHIUSO);
+  expect(chiuso.testo).toContain(`Filo non può usare «${CHIUSO}» perché coi crediti di Filo questo modello non si usa. `);
+  expect(seen.completions.filter((c) => c.model === CHIUSO)).toEqual([]);
+  await chiuso.riga.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/830-prova-opzioni.png' }).catch(() => {});
+
+  const aperto = await app.evaluate(() => globalThis.SN_TEST_MODELS.registry['deepseek-flash'].model);
+  const esito = await provaRiga(page, aperto);
+  expect(esito.testo).not.toMatch(/API key|fallita/i);
+  expect(seen.completions.some((c) => c.key === PERSONAL_KEY && c.model === aperto)).toBe(true);
+});
+
 test('cambiare nelle Opzioni il modello di una riga dichiarata a pesi aperti: la dichiarazione non segue il modello chiuso', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
