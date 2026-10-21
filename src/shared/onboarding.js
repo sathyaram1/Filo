@@ -380,7 +380,7 @@
         thread: cur.thread,
       }].slice(-PAST_CAP)
       : cur.past;
-    return { ...emptyState(), past, startedAt: at };
+    return { ...emptyState(), past, startedAt: at, rifatta: true };
   }
 
   // «Riprendiamola» (#1297): l'intervista chiusa a metà si riapre dov'era, con le spunte e la stessa targa. Il congedo
