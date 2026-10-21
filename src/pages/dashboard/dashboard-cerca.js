@@ -50,7 +50,8 @@
     if (r.k === 'pagina') {
       corpo.append(el('span', 'dash-cerca-titolo', r.titolo || global.SN_FILO_CODA.sito(r.url)));
       corpo.append(el('span', 'dash-cerca-sotto', r.estratto || global.SN_FILO_CODA.sito(r.url)));
-      b.title = r.url;
+      const dove = global.SN_FILO_CODA.daAprire(r);
+      b.title = dove && dove.sito ? `${dove.url} · indirizzo troppo lungo, si apre il sito` : r.url;
     } else if (r.k === 'nascosta') {
       ic.innerHTML = icona('eyeOff', 13);
       corpo.append(el('span', 'dash-cerca-titolo', r.titolo || r.testo));
