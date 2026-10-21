@@ -53,6 +53,37 @@ test('tasto destro nel riquadro dello stesso sito arrivato dopo la pagina: compa
   }
 });
 
+// Gli altri pezzi di Filo che toccano i riquadri: il puntatore che si muove sulla pagina, una pubblicità bloccata.
+const toccatiMentreArriva = {
+  'il puntatore si muove sulla pagina mentre il riquadro arriva: il tasto destro lì dentro apre il menu di Filo':
+    'for (const [x, y] of [[5, 5], [100, 20], [200, 22]]) wc.sendInputEvent({ type: \'mouseMove\', x, y });',
+  'una pubblicità bloccata nella pagina mentre il riquadro arriva: il tasto destro lì dentro apre il menu di Filo':
+    'wc.send(\'filo:adblock-chiudi\', [\'http://127.0.0.1:9/ad.png\']);',
+};
+for (const [nome, gesto] of Object.entries(toccatiMentreArriva)) test(nome, async ({ app, openTab }) => {
+  const sito = await riquadriInRitardo(outer('/riquadro/1'), INNER);
+  try {
+    const page = await openTab(sito.url);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 15_000 });
+    expect(sito.serviti()).toBe(0);
+    await app.evaluate(({ webContents }, { u, gesto }) => {
+      const fai = new Function('wc', gesto);
+      for (const wc of webContents.getAllWebContents()) if (wc.getURL() === u) fai(wc);
+    }, { u: sito.url, gesto });
+    await page.waitForTimeout(500);
+    sito.apri();
+    await expect.poll(() => page.frames().find((f) => f.url().includes('/riquadro'))?.evaluate(() => document.readyState).catch(() => ''),
+      { timeout: 10_000 }).toBe('complete');
+    const frame = page.frameLocator('#embed');
+    await frame.locator('#inner-text').click({ button: 'right' });
+    const menu = menuDi(frame).locator('.sn-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  } finally {
+    await sito.chiudi();
+  }
+});
+
 test('il riquadro di un ALTRO sito (origine diversa) ha comunque il menu', async ({ openTab, testServer }) => {
   // blocked.test è mappato su 127.0.0.1 dal fixture: stesso server, ORIGINE
   // diversa — cioè il caso vero (il video di YouTube dentro l'articolo).
