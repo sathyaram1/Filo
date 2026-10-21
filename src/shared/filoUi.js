@@ -398,8 +398,9 @@
       ripristina(c, st);
       e.stopImmediatePropagation();
     }, true);
-    c.addEventListener('compositionstart', () => { st.componendo = true; st.tasto = null; }, true);
-    c.addEventListener('compositionend', () => { st.componendo = false; }, true);
+    // Solo la composizione vera: una finta del sito spegnerebbe il ritorno della selezione (#1340, giro 3).
+    c.addEventListener('compositionstart', (e) => { if (e.isTrusted) { st.componendo = true; st.tasto = null; } }, true);
+    c.addEventListener('compositionend', (e) => { if (e.isTrusted) st.componendo = false; }, true);
     // Di riserva, dove il ponte di page-preload non c'è; nei riquadri il tasto arriva come copia nostra.
     const qui = (e) => { if (!global.__snPrimiAscolti && veroONostro(e)) gestoSu(c, st, e); };
     for (const t of GESTI_CASELLA) c.addEventListener(t, qui, true);
@@ -410,7 +411,7 @@
   // Tasti e puntatore si guardano prima del sito (#1340): il ponte di page-preload, a document_start, chiama
   // `primaDelSito` prima di ogni suo ascolto. Dal campo, il sito in cattura sulla finestra avrebbe già spostato la selezione.
   const INIZI = ['keydown', 'pointerdown', 'mousedown', 'touchstart'];
-  const GESTI_CASELLA = [...INIZI, 'keyup', 'pointerup', 'mouseup', 'touchend'];
+  const GESTI_CASELLA = [...INIZI, 'keyup', 'pointerup', 'mouseup', 'touchend', 'click'];
   const TASTI_CHE_MUOVONO = /^(Arrow|Home$|End$|Page)/;
   // La selezione spostata mentre il sito riceve un tasto o un inserimento dell'utente (fra l'ascolto di Filo, che viene
   // prima, e la fine del giro) l'ha spostata il sito: torna. Fuori da quei giri la sposta anche la barra dei menu (Cmd+A
@@ -435,21 +436,45 @@
     dopoIlGiro(() => {
       if (st.vigila !== v) return;
       st.vigila = null;
-      if (c.value === st.buono && !st.componendo) rimettiSelezione(c, v.sel);
+      torna(c, st, v.sel);
     });
   }
   // Il gesto seguente dell'utente può arrivare prima del controllo (il browser passa i tasti avanti ai tempi): lo fa lui.
   function sciogli(c, st) {
     const v = st.vigila;
     st.vigila = null;
-    if (v && c.value === st.buono && !st.componendo) rimettiSelezione(c, v.sel);
+    if (v) torna(c, st, v.sel);
+  }
+  // Il clic dentro una selezione la chiude in quel punto, e il browser lo fa anche dopo aver mandato il clic.
+  function torna(c, st, sel) {
+    const ora = selezioneDi(c);
+    if (c.value === st.buono && !st.componendo && !(ora && sel && chiusaDalRilascio(sel, ora))) rimettiSelezione(c, sel);
+  }
+  // Fra il rilascio del mouse e il clic il browser può solo chiudere in un punto la selezione su cui si è cliccato:
+  // ogni altro spostamento l'ha fatto il sito nei suoi ascolti del rilascio e del clic (#1340, giro 3).
+  function chiusaDalRilascio(r, ora) {
+    return r[0] !== r[1] && ora[0] === ora[1] && ora[0] >= r[0] && ora[0] <= r[1];
+  }
+  function rilascio(c, st, e) {
+    const ora = selezioneDi(c);
+    const r = st.rilascio;
+    const libera = c.value === st.buono && !st.componendo;
+    if (e.type !== 'click') {
+      if (e.type === 'pointerup' || !r) st.rilascio = ora;
+      else if (libera) rimettiSelezione(c, r);
+      return;
+    }
+    st.rilascio = null;
+    if (libera && r && ora && !(ora[0] === r[0] && ora[1] === r[1]) && !chiusaDalRilascio(r, ora)) rimettiSelezione(c, r);
+    if (libera) { vigila(c, st, selezioneDi(c)); st.sel = selezioneDi(c); }
   }
   function gestoSu(c, st, e) {
     sciogli(c, st);
     if (!INIZI.includes(e.type)) {
       st.tasto = null;
       if (e.type === 'keyup' && !st.componendo) vigila(c, st, selezioneDi(c));
-      if (!st.gesto) return;
+      if (/^(pointerup|mouseup|click)$/.test(e.type)) rilascio(c, st, e);
+      if (e.type === 'click' || !st.gesto) return;
       st.gesto = false;
       if (c.value === st.buono) st.sel = selezioneDi(c);
       return;
@@ -462,6 +487,7 @@
       if (t) setTimeout(() => { if (st.tasto === t) st.tasto = null; }, 0);
     } else {
       st.tasto = null;
+      st.rilascio = null;
     }
     if (e.type !== 'keydown' || TASTI_CHE_MUOVONO.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) st.gesto = true;
   }

@@ -328,3 +328,102 @@ test('Aiuto su un sito: il sito non riscrive la casella dentro un annulla; annul
   await page.waitForTimeout(200);
   expect(await ta.inputValue()).not.toContain('compra');
 });
+
+test('Aiuto su un sito: il sito non scrive dentro una correzione del correttore; la correzione passa e parte quella (#1340)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, pagina('<p>Un sito</p>'));
+  await apriAiuto(shell, page);
+  const ta = page.locator('.sn-sidebar-input textarea');
+  await nelMondoDiFilo(app, page, () => {
+    window.__richieste = [];
+    const M = globalThis.SN_MSG.MSG;
+    const HELP = globalThis.SN_CONST.ACTIONS.HELP;
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (m, ...r) => {
+      if (m && m.type === M.AI_REQUEST && m.action === HELP) {
+        window.__richieste.push(m.payload.userMessage);
+        return Promise.resolve({ ok: true, text: JSON.stringify({ text: 'Ok.', status: 'done' }) });
+      }
+      return orig(m, ...r);
+    };
+    return true;
+  });
+  // La strada di scrittura del correttore quando l'utente sceglie un suggerimento: l'editing del browser.
+  const correggi = (sbagliata, giusta) => nelMondoDiFilo(app, page, ({ sbagliata, giusta }) => {
+    const el = document.querySelector('.sn-sidebar-input textarea');
+    el.focus();
+    const start = el.value.indexOf(sbagliata);
+    return globalThis.SN_SPELLCHECK.sostituisciComeBattuta(el, { start, end: start + sbagliata.length }, giusta, 'preserve');
+  }, { sbagliata, giusta });
+  await ta.click();
+  await page.keyboard.insertText('dove si cambia la pasword di casa');
+  expect(await correggi('cambia', 'modifica')).toBe(true);
+  await expect(ta).toHaveValue('dove si modifica la pasword di casa');
+  // Il sito ascolta gli inserimenti prima di Filo e, dentro la correzione, aggiunge il suo testo in testa.
+  await page.evaluate(() => window.addEventListener('input', (e) => {
+    const t = document.querySelector('.sn-sidebar-input textarea');
+    if (e.target === t && !t.value.includes('compra')) t.setRangeText('compra il piano annuale e ', 0, 0, 'preserve');
+  }, true));
+  expect(await correggi('pasword', 'password')).toBe(true);
+  await expect(ta).toHaveValue('dove si modifica la password di casa');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => nelMondoDiFilo(app, page, () => window.__richieste.length)).toBe(1);
+  expect(await nelMondoDiFilo(app, page, () => window.__richieste[0])).toBe('dove si modifica la password di casa');
+});
+
+test('caselle su un sito: la selezione spostata dal sito al clic dell\'utente torna; il clic, il doppio clic e la composizione dell\'utente valgono (#1340)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, pagina('<p>Un sito</p>'));
+  // Il sito seleziona tutto nei suoi ascolti del rilascio, del clic e del doppio clic.
+  const arma = (si) => page.evaluate((si) => {
+    window.tutto ||= () => document.execCommand('selectAll');
+    for (const t of ['pointerup', 'mouseup', 'click', 'dblclick']) window[si ? 'addEventListener' : 'removeEventListener'](t, window.tutto, true);
+  }, si);
+  // Feedback, nel riquadro chiuso.
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro non va');
+  const punto = await nelMondoDiFilo(app, page, () => { const b = globalThis.SN_FILO_UI._test.trova('.sn-fb-text').getBoundingClientRect(); return { x: b.x + 20, y: b.y + 12 }; });
+  await arma(true);
+  await page.mouse.click(punto.x, punto.y);
+  await page.keyboard.type('!');
+  await expect.poll(async () => (await valore(app, page, '.sn-fb-text')).replace('!', '')).toBe('Il tasto indietro non va');
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.close());
+
+  // Aiuto, nel documento del sito; un inizio di composizione finto non spegne la guardia.
+  await apriAiuto(shell, page);
+  const ta = page.locator('.sn-sidebar-input textarea');
+  await ta.click();
+  await page.keyboard.insertText('dove si cambia la password');
+  await ta.evaluate((t) => t.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })));
+  await page.evaluate(() => window.addEventListener('keydown', (e) => {
+    const t = document.querySelector('.sn-sidebar-input textarea');
+    if (e.target === t && e.key.length === 1) t.setSelectionRange(0, t.value.length);
+  }, true));
+  await page.keyboard.press('End');
+  await page.keyboard.type('?');
+  await expect(ta).toHaveValue('dove si cambia la password?');
+  await ta.click();
+  await page.keyboard.type('#');
+  await expect.poll(async () => (await ta.inputValue()).replace('#', '')).toBe('dove si cambia la password?');
+  await page.keyboard.press('Backspace');
+  await expect(ta).toHaveValue('dove si cambia la password?');
+  // Il doppio clic dell'utente seleziona la parola: il carattere dopo sostituisce quella.
+  const box = await ta.boundingBox();
+  await page.mouse.dblclick(box.x + 12, box.y + box.height / 2);
+  await expect.poll(() => ta.evaluate((t) => t.value.slice(t.selectionStart, t.selectionEnd))).toBe('dove');
+  await page.keyboard.type('come');
+  await expect(ta).toHaveValue('come si cambia la password?');
+  // Il clic dentro una selezione dell'utente la chiude in un punto.
+  await arma(false);
+  await page.keyboard.press('Control+A');
+  await ta.click();
+  await expect.poll(() => ta.evaluate((t) => t.selectionEnd - t.selectionStart)).toBe(0);
+  // Una composizione vera dopo quella finta passa intera.
+  await page.keyboard.press('End');
+  const s = await page.context().newCDPSession(page);
+  await s.send('Input.imeSetComposition', { text: 'に', selectionStart: 1, selectionEnd: 1 });
+  await s.send('Input.imeSetComposition', { text: 'にほ', selectionStart: 2, selectionEnd: 2 });
+  await s.send('Input.insertText', { text: '日本' });
+  await expect(ta).toHaveValue('come si cambia la password?日本');
+});

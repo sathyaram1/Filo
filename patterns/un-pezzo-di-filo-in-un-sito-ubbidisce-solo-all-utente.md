@@ -215,6 +215,12 @@ faceva spendere una chiamata.
   il rilascio di un trascinamento e la sostituzione del correttore solo se il loro
   testo è entrato in un punto e il resto è rimasto.
 
+  **Anche Filo annuncia.** Un suo `execCommand` (la correzione del correttore, il
+  suggerimento del correttore di sistema) dice cosa scrive e dove, e il cambio
+  vale solo se combacia, come quello dell'utente (#1340, giro 3: nell'Aiuto il
+  sito aggiungeva il suo testo dentro la correzione, e partiva come di Filo).
+  Prima del comando un cambio silenzioso del sito torna indietro.
+
   **Filo guarda la selezione prima del sito.** Il ponte di `page-preload.js`,
   registrato a document_start, chiama `SN_FILO_UI.primaDelSito` su tasti,
   puntatore, `beforeinput` e `input` prima di ogni ascolto del sito, anche in
@@ -222,7 +228,11 @@ faceva spendere una chiamata.
   selezionava tutto nel suo ascolto del tasto). La selezione spostata mentre il
   sito riceve un tasto, un annuncio o un inserimento dell'utente torna: subito
   prima dell'annuncio, o alla fine del giro (al più tardi al gesto seguente,
-  che il browser può far passare avanti ai tempi). Fuori da quei giri la
+  che il browser può far passare avanti ai tempi). Il clic è un gesto come il
+  tasto: dal rilascio al clic (e al doppio clic) il browser può solo chiudere in
+  un punto la selezione su cui si è cliccato, anche dopo aver mandato il clic; il
+  resto torna. La composizione conta solo se è vera: un inizio finto del sito
+  spegneva il ritorno della selezione (#1340, giro 3). Fuori da quei giri la
   selezione la sposta anche «Seleziona tutto» della barra dei menu (Cmd+A su
   Mac), che la pagina non vede: lì vale, e resta il limite qui sotto.
 - **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
