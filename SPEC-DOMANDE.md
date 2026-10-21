@@ -156,10 +156,13 @@ lo può scrivere anche un agente pulito.
   dei figli, poi l'età. Finché i compiti (§ 13, punto 5) non ci sono, lo
   stesso ordine fa da spareggio provvisorio a pari priorità, al posto di
   `senderClass` in `selectTodoWinner` (filo-security
-  `functions/src/routine/select.js`); fino ad allora non si tocca nemmeno la
-  precedenza assoluta dei rami in revisione (`REVIEW_RANK`). Con i compiti
-  spariscono tutti e due: un feedback iniziato passa davanti a uno nuovo solo
-  con un gradino di priorità in più, e la priorità 3 passa sopra tutto.
+  `functions/src/routine/select.js`). I rami in revisione non hanno più la
+  precedenza assoluta (#1451): la priorità viene prima, rami e nuovi insieme;
+  a pari priorità i rami prima dei nuovi e fra i rami l'ordine per ruolo
+  (`REVIEW_RANK`); il controllo di sicurezza di un ramo finito passa a
+  qualunque priorità. Con i compiti spariscono spareggio e ordine per ruolo:
+  un feedback iniziato passa davanti a uno nuovo solo con un gradino di
+  priorità in più, e la priorità 3 passa sopra tutto.
 
 ### 1.7 Dati
 
