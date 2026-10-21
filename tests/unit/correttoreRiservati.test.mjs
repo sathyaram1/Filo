@@ -77,6 +77,12 @@ test('la password scritta in risposta a chi la chiede non parte; il resto della 
   assert.equal(risposta('certo, gattonero').nuovo, 'certo, [dato riservato]');
   assert.equal(risposta('Ciao Marco! Eccola: Tr7#kq29Lm, a dopo').nuovo.includes('Tr7#kq29Lm'), false);
   assert.equal(risposta('Gatto2024', 'Marco: mandami la password del wifi\n16:58').nuovo, '[dato riservato]');
+  assert.equal(risposta('Ciao Marco! Certo: gattonero').nuovo, 'Ciao Marco! Certo: [dato riservato]');
+});
+
+test('dopo la frase che porta la password il resto della risposta parte intero, e si controlla', () => {
+  assert.equal(risposta('certo, Gatto2024. Ieri sonno andato al mare').nuovo, 'certo, [dato riservato]. Ieri sonno andato al mare');
+  assert.equal(risposta('gattonero\nieri sonno andato al mare').nuovo, '[dato riservato]\nieri sonno andato al mare');
 });
 
 test('un pin chiesto parte senza le sue cifre; per un codice le parole senza cifre restano', () => {
