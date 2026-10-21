@@ -35,7 +35,9 @@ test('r1 la finestrella di accesso aperta da un sito non ha il menu nel suo docu
   await pop.locator('#pw').click({ button: 'right' });
   // Il menu compare (da qualche parte): poi si guarda dove.
   await expect.poll(async () => {
-    const strato = (await statoDelloStrato(app))?.aperto === true;
+    // Lo strato della finestrella è suo, non quello della finestra principale.
+    const strato = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .some((w) => [w._filoStrato, w._filoTabs && w._filoTabs.strato].some((s) => s && s.stato().aperto)));
     const nelSito = await pop.evaluate(() => document.documentElement.innerText.includes('Incolla'));
     return strato || nelSito;
   }, { timeout: 5000 }).toBe(true);
