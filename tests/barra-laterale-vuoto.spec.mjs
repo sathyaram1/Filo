@@ -197,7 +197,9 @@ test('sopra l\'avviso del sito pericoloso un clic sull\'avviso chiude la barra, 
   await sullAvviso([{ type: 'mouseMove', x: 700, y: 500 }, ...clic(700, 500)]);
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 3000 }).toBe(false);
 
-  await comandaBarra(app, 'spinta');
+  await puntatoreCheSegue(app);
+  await barra.mouse.move(0, 300);
+  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('spinta');
   await pannelloFermo(barra);
   for (let i = 0; i < 10; i++) { await sullAvviso([{ type: 'mouseMove', x: 600 + i * 10, y: 400 }]); await barra.waitForTimeout(150); }
   await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 4000 }).toBe(false);
