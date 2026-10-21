@@ -135,6 +135,13 @@ export function pushArgs(branch) {
   return ['push', 'origin', `refs/heads/${branch}:refs/heads/${branch}`];
 }
 
+/** Il no di GitHub a una credenziale senza il permesso sulle automazioni (#1140): la riga che dice cosa fare, o ''. PURA. */
+export function rifiutoAutomazioni(uscitaGit) {
+  if (!/create or update workflow/i.test(String(uscitaGit || ''))) return '';
+  return 'Il ramo cambia le automazioni (.github/workflows), e la credenziale di tutti i giorni non le spedisce, per scelta. '
+    + 'Spingilo a mano con quella delle automazioni (patterns/le-automazioni-le-cambia-solo-l-owner.md), poi rilancia npm run finish.';
+}
+
 function git(args, opts = {}) {
   try {
     // stderr CATTURATO, non a schermo: quando una lettura fallisce l'esito lo
@@ -806,6 +813,8 @@ async function main() {
     if (!pushed.ok) {
       console.error(`\n✗ Non riesco a spedire '${branch}':\n${pushed.out.slice(0, 300)}`);
       console.error('  Senza il ramo su origin il server non ha niente da fondere.');
+      const automazioni = rifiutoAutomazioni(pushed.out);
+      if (automazioni) console.error(`  ${automazioni}`);
       process.exit(1);
     }
     // L'esito di questa lettura VA GUARDATO: se `origin/<ramo>` non si risolve,

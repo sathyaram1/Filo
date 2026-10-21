@@ -59,6 +59,12 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
 - **Su `main` il tuo lavoro non viene salvato**: gli automatismi locali non
   committano su un ramo protetto, lo scrivono nei log e proseguono. Spostati su
   un ramo: `git worktree add .claude/worktrees/<nome> -b claude/<nome>`.
+- **Le automazioni (`.github/workflows`) le cambia solo l'owner**: un file lì
+  dentro gira appena un ramo arriva su GitHub, senza fusione. Una routine che
+  ne ha bisogno non lo scrive e manda il lavoro ai lavori locali; in locale il
+  ramo con quel cambio lo spinge l'owner a mano, con una credenziale a parte.
+  Chi spinge con cosa, e i passi dell'owner:
+  `patterns/le-automazioni-le-cambia-solo-l-owner.md`.
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
   `tests/agent/.out/`…). Se un PNG risulta tracciato: `git rm --cached <file>`.
 - **Fine riga: LF ovunque.** `.gitattributes` (`* text=auto eol=lf`) vince su

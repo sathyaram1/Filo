@@ -67,7 +67,7 @@ test('il gruppo di un guasto non dipende dalle parole di chi cade', () => {
 test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando in locale), e il rimando non vieta più il server', () => {
   const pezzo = readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8');
   assert.match(piatto(pezzo), /«Non posso perché è rotto» è un guasto/);
-  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) è il rimando in locale/);
+  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub di Filo e del server[^)]*macchina dell'owner\) è il rimando in locale/);
   for (const [ruolo, opts] of CHI_RISOLVE) {
     const t = piatto(readRoleInstructions(ruolo, opts));
     const locale = t.slice(t.indexOf('## Se il lavoro si fa solo in locale'), t.indexOf(ATTESA));

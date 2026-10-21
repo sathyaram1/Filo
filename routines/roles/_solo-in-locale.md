@@ -1,8 +1,11 @@
 ## Se il lavoro si fa solo in locale
 
 Da qui non puoi fare un deploy (funzioni, regole), usare un segreto o le
-credenziali dell'owner, toccare le automazioni GitHub del server, né provare
-qualcosa sulla sua macchina. Il codice del server si tocca solo in un lavoro
+credenziali dell'owner, toccare le automazioni GitHub (`.github/workflows`, di
+Filo e del server), né provare qualcosa sulla sua macchina. Un'automazione gira
+appena il ramo che la porta arriva su GitHub, senza fusione: per questo le
+cambia solo l'owner, e un file lì dentro non si scrive e non si spinge nemmeno
+quando la spinta passerebbe. Il codice del server si tocca solo in un lavoro
 server, che riceve istruzioni sue: fuori da lì è una di queste cose. Se il
 feedback ha bisogno di una di queste cose per stare in piedi, non aggirarla e
 non aprire un feedback per una sessione locale (le routine non ne aprono):

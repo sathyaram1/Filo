@@ -51,7 +51,9 @@ anche quel commit del server: lo sa il server, non devi passarlo.
    - shell command con input utente; scritture su file sensibili;
    - modifica di hook/workflow/script di deploy (`.claude/hooks/*`,
      `.github/workflows/*`, `firestore.rules`, `storage.rules`, `scripts/*` di
-     triage/claim/merge);
+     triage/claim/merge). Un file toccato in `.github/workflows` è `fail` da
+     solo, qualunque cosa faccia: le automazioni le cambia solo l'owner, in
+     locale (#1140);
    - chiavi o segreti in chiaro; `eval`/`require` dinamico su input non fidato;
    - bypass di controlli di auth; XSS; SSRF; path traversal.
 3. Valuta la **coerenza interna del diff**. Non conosci l'obiettivo del lavoro

@@ -228,6 +228,12 @@ spedisci_ramo() {
     # e un rebase non lo cura: si dice per quello che e', col motivo del
     # remoto, e non si ritenta col lease (verifica del giro 4).
     *"[remote rejected]"*)
+      # GitHub nega le automazioni a chi non ne ha il permesso, ed e' voluto (#1140): ritentare o cercare un'altra credenziale e' aggirarlo.
+      case "$esito" in
+        *"create or update workflow"*)
+          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: porta un cambio alle automazioni (.github/workflows), che questa credenziale non puo' spedire, per scelta. Le automazioni le cambia solo l'owner (patterns/le-automazioni-le-cambia-solo-l-owner.md): in una routine il lavoro va ai lavori locali, in locale il ramo lo spinge lui a mano. $(motivo_git "$esito")"
+          return 1 ;;
+      esac
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
       return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
@@ -500,6 +506,8 @@ if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
   # Con una copia dei dati nei commit il push e' proprio cio' che non va fatto: prima la copia esce dalla storia.
   grep -q 'NON spedisco il ramo:' "$FALLIMENTI_FILE" 2>/dev/null \
     && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: prima togli la copia dalla storia come detto sopra, poi il salvataggio spedisce da solo; un push a mano viene fermato dallo stesso controllo."
+  grep -q 'porta un cambio alle automazioni' "$FALLIMENTI_FILE" 2>/dev/null \
+    && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin, e finche' quel commit non ci arriva anche i salvataggi dopo restano qui: un push da questa sessione viene rifiutato allo stesso modo. Fermati e dillo all'owner."
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s%s"}}\n' "$HOOK_EVENT" "$TESTO" "$CODA"
 fi
 rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null
