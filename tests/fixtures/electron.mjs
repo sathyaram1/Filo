@@ -149,6 +149,7 @@ export const test = base.extend({
         FILO_TEST_ACCOLTO: accoglienzaFatta ? '1' : '0',
         ...(riservaNuovaScheda ? { FILO_RISERVA_NUOVA_SCHEDA: '1' } : {}),
         FILO_STRATO_MENU: stratoDelMenu ? '1' : '0',
+        FILO_TEST_IN_PAUSA_APERTE: inPausaAperte ? '1' : '0',
         // I download ("Salva immagine come…") finiscono qui SENZA dialogo
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.
