@@ -1071,8 +1071,22 @@
     }
   }
 
+  // Si legge quando la scheda si mostra, e di nuovo solo dopo una porta chiusa (l'accesso può essere arrivato nel
+  // frattempo): una seconda lettura riscriverebbe le modifiche non ancora salvate.
+  let letta = false;
+  function aMostra() {
+    if (letta && $('sec-denied').hidden) return;
+    letta = true;
+    load().catch((e) => { letta = false; console.error('[manage/predefiniti] lettura fallita', e); });
+  }
+  const mostrata = () => !!document.querySelector('.mg-tab[data-tab="predefiniti"].mg-tab--active');
+  document.addEventListener('mg-scheda', (e) => { if (e.detail && e.detail.tab === 'predefiniti') aMostra(); });
+  if (window.filo && window.filo.onBroadcast) {
+    window.filo.onBroadcast((m) => { if (m && m.type === (MSG.AUTH_CHANGED || 'auth_changed') && mostrata()) aMostra(); });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
-    load();
+    if (mostrata()) aMostra();
     // Una regola sola per tutta la pagina, campi di oggi e righe aggiunte dopo:
     // ciò che cambia sullo schermo spegne la conferma dell'ultimo salvataggio.
     for (const evento of ['input', 'change']) {
