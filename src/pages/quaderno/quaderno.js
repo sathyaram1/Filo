@@ -346,6 +346,7 @@
       disegna();
     };
     r.chiudi = chiudi;
+    r.smonta = smonta;
     r.el.addEventListener('mousedown', tieni);
     r.el.addEventListener('focusout', fuori);
     campo.addEventListener('input', () => { adatta(); r.errore.hidden = true; });
