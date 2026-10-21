@@ -79,5 +79,5 @@ test('microfono e invio stanno al centro della pastiglia, e ci restano con più 
     document.getElementById('sendBtn').hidden = false;
     document.getElementById('stopBtn').hidden = true;
   });
-  await page.locator('#inputForm').screenshot({ path: 'tests/.shots/1489-campo-home.png' });
+  await page.locator('#inputForm').screenshot({ path: join(SHOTS, '1489-campo-home.png') });
 });
