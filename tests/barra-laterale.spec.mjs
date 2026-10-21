@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, puntatoreCheSegue } from './helpers/barra.mjs';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
