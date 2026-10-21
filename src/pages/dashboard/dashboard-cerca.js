@@ -72,10 +72,11 @@
     if (r.k === 'significato') return significato(r);
     if (r.k === 'nascosta') return rimetti(r);
     if (r.k === 'pagina') {
-      if (!/^https?:\/\//i.test(String(r.url || ''))) return;
+      const dove = global.SN_FILO_CODA.daAprire(r);
+      if (!dove) return;
       // Una scheda chiusa si riapre com'era (scroll, paese); se la sua voce non c'è più, come una pagina qualunque.
-      const riaperta = r.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio }) : null;
-      if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: r.url });
+      const riaperta = r.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio }) : null;
+      if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
       return;
     }
     chiudi();
