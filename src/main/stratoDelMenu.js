@@ -255,7 +255,7 @@ class StratoDelMenu {
       if (d.inline != null) {
         const cammino = interi(d.cammino);
         if (!unClic || !Number.isInteger(d.inline) || !cammino) return;
-        this._alContent(m, { type: M.STRATO_MENU_ESEGUI, id: m.id, inline: d.inline, cammino });
+        this._alContent(m, { type: M.STRATO_MENU_ESEGUI, id: m.id, inline: d.inline, cammino, sfondo: d.sfondo === true });
         return;
       }
       if (!Number.isInteger(d.n) || d.n < 0) return;
