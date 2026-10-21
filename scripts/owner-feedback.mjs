@@ -784,10 +784,12 @@ export async function scrivi(id, to, nota, opts = {}) {
   // I DUE TESTI (spec ROUTINE-AUTH-SPEC.md §8): il report per te viaggia
   // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
   // sulla sua macchina, che la chiave non ce l'ha.
+  let notaNuova = false;
   if (typeof nota === 'string' && nota.trim()) {
     // Si fonde e si taglia sul testo IN CHIARO, poi si cifra.
     const esistenti = await notePrecedentiInChiaro(doc);
     const fuse = THREAD ? THREAD.mergeModelReport(esistenti, nota) : nota;
+    notaNuova = fuse !== esistenti;
     const capped = THREAD?.capNotes ? THREAD.capNotes(fuse) : fuse;
     if (CRYPTO?.isEnabled?.()) {
       try { set('notes', await CRYPTO.encryptForOwner(capped)); }
