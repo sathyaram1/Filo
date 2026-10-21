@@ -85,7 +85,6 @@
         'In chat Filo non aspetta più il server dei crediti prima di risponderti. Usa l\'ultimo saldo letto, lo aggiorna mentre scrivi e, se il server è solo lento, non ti dice più che non risponde. Se paghi con la tua chiave OpenRouter, la pagina Crediti e la chat ti dicono che le richieste le paga la chiave e che quei crediti sono di prova, non soldi che spendi. Quando riscatti un invito, la conferma dice che i crediti di prova lasciano il posto a quelli d\'ingresso.',
         'Una chat che parla di qualcosa con un nome corto, come lo Zen, SQL o l’AI, adesso si ritrova anche con una frase intera («la chat sullo Zen»), sia chiedendolo a Filo sia in «Cerca nel filo».',
         'Se un comando lento finisce dopo che hai cambiato discorso, il suo esito si legge una volta sola, sotto il comando che l’ha chiesto, e non in mezzo alla conversazione nuova.',
-        'Dopo «Importa dati» quello che arriva dal backup compare subito anche nelle schede già aperte, come pagine salvate, Cronologia AI e download, e non sparisce più al primo download o alla prima copia. Se un elenco è pieno, la conferma dice prima quante voci restano fuori. Un backup con un limite di spesa più alto, o senza limite, non te lo cambia più da solo, e nella conferma c\'è un pulsante per usarlo. Un archivio rovinato in qualche byte si importa lo stesso, e la conferma dice cosa non si legge.',
       ],
     },
     {
