@@ -104,6 +104,10 @@ function principale(es, marchio) {
 // I refusi di chi digita il dominio vero di un marchio (gooogle.com, micrsoft.com, linkedln.com), come li registra chi
 // aspetta l'errore: negli elenchi di truffe sono pochi, perché vivono di traffico sbagliato più che di messaggi. Uno per
 // tipo di errore e per marchio; resta fuori un nome che sta fra i siti noti.
+const ACCANTO = {
+  q: 'wa', w: 'qe', e: 'wr', r: 'et', t: 'ry', y: 'tu', u: 'yi', i: 'uo', o: 'ip', p: 'ol', a: 'sq', s: 'ad', d: 'sf',
+  f: 'dg', g: 'fh', h: 'gj', j: 'hk', k: 'jl', l: 'kp', z: 'xa', x: 'zc', c: 'xv', v: 'cb', b: 'vn', n: 'bm', m: 'nj',
+};
 function sinteticiRefusi(etichetta) {
   const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
   const SIMILI = [['i', 'l'], ['l', 'i'], ['m', 'rn'], ['w', 'vv'], ['g', 'q'], ['n', 'm'], ['o', 'a']];
