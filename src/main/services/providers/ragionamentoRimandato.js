@@ -29,18 +29,26 @@ function forma(m) {
 
 // `messaggi`: quelli che partono, punti di cache compresi. Con `controlla` (i modelli Anthropic) il ragionamento di un
 // messaggio parte solo se la sua impronta è quella di quanto lo precede adesso; i blocchi già tolti entrano nel
-// confronto, così un buco o un blocco rimesso non passano mai. Torna anche l'impronta dell'intera richiesta: è il
-// prefisso della risposta che sta per nascere.
+// confronto, così un buco o un blocco rimesso non passano mai. `impronta()` è quella dell'intera richiesta, il prefisso
+// della risposta che sta per nascere: si calcola solo se la risposta ragiona, una pagina da tradurre non paga niente.
 function daRimandare(messaggi, { strumenti = null, controlla = false } = {}) {
   const h = crypto.createHash('sha256');
   h.update(`${JSON.stringify(Array.isArray(strumenti) && strumenti.length ? strumenti : null)}\n`);
   const out = [];
+  let contati = 0;
+  const conta = () => {
+    for (; contati < out.length; contati++) h.update(`${JSON.stringify(forma(out[contati]))}\n`);
+  };
   for (const m of Array.isArray(messaggi) ? messaggi : []) {
     let msg = m;
     if (m && typeof m === 'object' && Array.isArray(m.reasoning_details)) {
       const segno = m.reasoning_details.find(eImpronta);
       const blocchi = m.reasoning_details.filter((d) => !eImpronta(d));
-      const vale = blocchi.length > 0 && (!controlla || (!!segno && segno.impronta === firma(h.copy())));
+      let vale = blocchi.length > 0;
+      if (vale && controlla) {
+        conta();
+        vale = !!segno && segno.impronta === firma(h.copy());
+      }
       if (vale) msg = segno ? { ...m, reasoning_details: blocchi } : m;
       else {
         const { reasoning_details: _tolto, ...resto } = m;
@@ -48,14 +56,23 @@ function daRimandare(messaggi, { strumenti = null, controlla = false } = {}) {
       }
     }
     out.push(msg);
-    h.update(`${JSON.stringify(forma(msg))}\n`);
   }
-  return { messaggi: out, impronta: firma(h) };
+  let finale = null;
+  const impronta = () => {
+    if (finale == null) {
+      conta();
+      finale = firma(h);
+    }
+    return finale;
+  };
+  return { messaggi: out, impronta };
 }
 
+// `impronta`: il valore o la funzione che lo calcola.
 function conImpronta(dettagli, impronta) {
   const blocchi = (Array.isArray(dettagli) ? dettagli : []).filter((d) => !eImpronta(d));
-  return blocchi.length && impronta ? [...blocchi, { type: TIPO_IMPRONTA, impronta }] : blocchi;
+  if (!blocchi.length || !impronta) return blocchi;
+  return [...blocchi, { type: TIPO_IMPRONTA, impronta: typeof impronta === 'function' ? impronta() : impronta }];
 }
 
 module.exports = { TIPO_IMPRONTA, daRimandare, conImpronta };
