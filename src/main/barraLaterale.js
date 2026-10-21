@@ -617,6 +617,23 @@ class BarraLaterale {
     if (daTastiera) this.chiudi();
   }
 
+  // Col mouse la barra resta aperta: il secondo clic, senza spostarsi, detta. La pagina decide dal suo stato vero, e
+  // la consegna aspetta i suoi pezzi di Filo se si sta ancora caricando.
+  _passoAiuto(attiva) {
+    if (!attiva) return;
+    const a = this._aiuto(attiva);
+    if (a.spenta) return;
+    const daTastiera = this.motivo === 'tasto';
+    if (this.tabs.vistaSottoIlVuoto() !== attiva.view) {
+      require('./services/interruttoreAiuto').seAcceso(this.win, () => this.tabs._sbScelta(attiva, 'chiedi'));
+      if (daTastiera) this.chiudi();
+      return;
+    }
+    this._restituisciTastiera();
+    try { attiva.view.webContents.send('shortcut:triggered', { command: 'aiuto-dalla-barra' }); } catch (_) {}
+    if (daTastiera) this.chiudi();
+  }
+
   sistema(comando, dati) {
     if (!FISSE.has(comando)) return;
     if (comando === 'redteam' && !RedteamGate.visibile()) return;
