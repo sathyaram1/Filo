@@ -59,6 +59,7 @@ test('a barra chiusa si vede la striscia; spingere sul bordo la apre, passarci d
   await pausa(100);
 
   // La spinta: il puntatore resta contro il bordo.
+  await puntatoreCheSegue(app);
   await barra.mouse.move(0, 300);
   await expect.poll(() => aperta(app)).toBe(true);
   const s1 = await statoBarra(app);
