@@ -696,6 +696,39 @@ async function notePrecedentiInChiaro(doc) {
   } catch (_) { return ''; }
 }
 
+/** Il biglietto di chi scrive e la fiducia tolta: oggetto, perché le prove li sostituiscono (i veri vanno in rete). */
+export const sessione = {
+  async biglietto() {
+    const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
+    return trovaBiglietto();
+  },
+  async togliFiducia(id) {
+    const { togliFiducia } = await import('./lib/togli-fiducia.mjs');
+    return togliFiducia(id);
+  },
+};
+
+/** Perché il biglietto di chi scrive non è pulito; '' se lo è. Assente, sporco, in attesa o illeggibile non lo sono. PURA. */
+export function bigliettoNonPulito(b) {
+  if (!b || !b.fp) return 'questa sessione non ha un biglietto';
+  if (b.inAttesa) return 'il biglietto ha una lettura esterna che il server non ha ancora ricevuto';
+  if (b.errore) return `il biglietto non si legge sul server (${b.errore})`;
+  if (b.fiducia !== 'fidato') return 'il biglietto della sessione è sporco';
+  return '';
+}
+
+/** Cosa dice il terminale quando una nota toglie la fiducia (#1428). PURA. */
+export function avvisoFiduciaTolta(rif, motivo, { dryRun = false } = {}) {
+  const chi = String(rif ?? '').trim();
+  const prima = dryRun ? `(prova a vuoto) toglierei la fiducia a ${chi} prima della nota` : `Fiducia di ${chi} tolta prima della nota`;
+  return `${prima}: ${motivo}, e chi lavora un feedback legge le note come decisioni dell’owner. `
+    + 'La rimette solo l’owner, in Gestione, col tasto «🤝 Segna fidato» dopo aver letto la nota.';
+}
+
+async function bigliettoDiChiScrive() {
+  try { return await sessione.biglietto(); } catch (e) { return { fp: 'x', fiducia: 'non_fidato', errore: String((e && e.message) || e) }; }
+}
+
 export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
   if (typeof opts.frase === 'string') {
