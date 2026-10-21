@@ -567,6 +567,7 @@ test('spenta in Preferenze la descrizione di screenshot e immagini, lo screensho
   await expect(pref.locator('#descriviImmagini')).toBeChecked({ timeout: 8000 });
   await pref.locator('#descriviImmagini').uncheck();
   await expect.poll(async () => (await impostazioni(shell)).descriviImmagini.enabled, { timeout: 4000 }).toBe(false);
+  await pref.locator('#sec-nomi-file').screenshot({ path: 'tests/.shots/pagine-delicate-preferenze-immagini.png' });
 
   const ricetta = await testServer.openReady(openTab, '<!doctype html><title>Ricetta</title><body style="background:#27a;font:30px sans-serif"><p>Pane</p></body>');
   const spento = await screenshotDi(app, ricetta, 'Ricetta');
