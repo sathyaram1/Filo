@@ -1015,6 +1015,9 @@ function confirmDownload(id, allow, scope = '') {
   if (!rec || rec.state !== 'pending') {
     return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords(scope) };
   }
+  // «Salva immagine come»: i byte e il file li muove chi l'ha chiesto, che aspetta questa risposta (#1311).
+  const manual = liveManual.get(id);
+  if (manual && manual.rispondi) { manual.rispondi(!!allow); return { ok: true, items: listRecords(scope) }; }
   if (!allow) {
     const item = liveItems.get(id);
     rec._final = true;   // il 'done' che segue cancel() non deve riscrivere l'esito
