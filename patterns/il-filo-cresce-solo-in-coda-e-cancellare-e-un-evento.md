@@ -44,6 +44,21 @@ pagina, ed è segnata accanto.
   solo. Cancellarla per sempre resta la `cancellazione` di sopra.
 - **Un tetto è una cancellazione automatica.** Il vecchio registro grezzo (5000 voci, testi a 200 caratteri)
   è esattamente il taglio silenzioso che le regole del repo vietano.
+- **Una pagina non scrive il filo da sola** (#1525). Una visita nuova chiede un gesto: un input vero sulla scheda
+  negli ultimi 5 s, o una navigazione chiesta a Filo (barra, indietro e avanti, preferiti, agente). Il gesto vale per
+  la navigazione che lo segue, non per i cambi che la pagina fa dopo. Senza gesto un cambio entro 5 s dal precedente
+  resta la visita aperta (in attesa ne segue l'indirizzo, già scritta lo assorbe), e dopo 30 visite di fila senza
+  gesto tutto resta una visita finché l'utente non tocca la scheda. Vale per i cambi dentro la pagina e per le pagine
+  intere. Sentinella `tests/unit/visiteSchede.test.mjs`.
+- **Indirizzo e titolo hanno una misura**: 8192 e 1024 caratteri (`src/main/services/misurePagine.js`, la stessa
+  per l'archivio delle schede chiuse). Li sceglie il sito, e una riga da megabyte a ogni visita farebbe un file che
+  non si legge più. Il taglio si segna (`urlTagliato`, `titoloTagliato`), e un indirizzo tagliato non si offre da
+  riaprire come intero: si apre il suo sito (`SN_FILO_CODA.daAprire`, e al modello va il sito detto come tale).
+- **Il file si legge a righe, mai intero in una stringa** (`src/main/services/leggiARighe.js`), anche nella
+  compattazione, che scrive il temporaneo a pezzi: oltre il tetto di una stringa di V8 il filo non si aprirebbe più.
+  Se il file non si legge, chi scrive riceve un rifiuto e l'utente un toast con la causa; chi legge soltanto vede il
+  filo vuoto, e la richiesta dopo riprova. Sopra 256 MB un avviso per avvio porta alla Sicurezza, dove le pagine si
+  cancellano per periodo: non è un tetto.
 
 ## Come si usa
 
