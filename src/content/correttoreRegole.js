@@ -205,7 +205,7 @@
     if (SEGNO_DOPO.test(dopo)) return true;
     const d = PAROLA_DOPO.exec(dopo);
     if (!d) return false;
-    return UNITA.has(d[1].toLowerCase()) || (parolaPrima.length >= 4 && VERBO.test(parolaPrima) && contate(d[1]));
+    return UNITA.has(d[1].toLowerCase()) || (((parolaPrima.length >= 4 && VERBO.test(parolaPrima)) || VERBI_BREVI.has(parolaPrima)) && contate(d[1]));
   }
 
   function segnaposti(testo) {
