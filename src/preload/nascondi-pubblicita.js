@@ -82,9 +82,9 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
   const cercaDentro = (root, livello) => {
     let frames = [];
     try { frames = root.querySelectorAll('iframe,frame'); } catch (_) {}
+    // Uno che carica ancora il suo indirizzo ha un preload suo che chiude da sé, se nessuno lo tocca prima (#1560).
     for (const f of frames) {
-      let doc = null;
-      try { doc = f.contentDocument; } catch (_) {}
+      const doc = globalThis.SN_RIQUADRI_IN_ARRIVO?.documento(f);
       if (doc && doc.documentElement) giroDentro(f, doc, livello);
     }
   };
