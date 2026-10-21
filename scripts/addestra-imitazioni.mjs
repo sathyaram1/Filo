@@ -179,7 +179,7 @@ function sinteticiParole(etichetta) {
       for (let k = 0; k < PER_FORMA; k++) {
         const h = `${forma(pesca(parole))}.${pesca(k === 0 && propri.length ? propri : SUFFISSI_SOSIA)}`;
         if (LEGIT_DOMAINS.has(h) || etichetta.has(h) || etichetta.has('www.' + h)) continue;
-        out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true });
+        out.push({ h, url: 'https://' + h + '/', marchio: t, sintetico: true, peso: PESO_PAROLE });
       }
     }
   }
