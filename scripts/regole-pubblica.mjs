@@ -41,7 +41,8 @@ export function fileToccati(statusZ) {
 
 /**
  * Si pubblica? PURA. Ogni no porta il motivo da stampare.
- * @param {{ errore?: string, ramo: string, testa: string, origine: string, file: string[], progetto: string, toccati: string[] }} s
+ * `diversi`: i file pubblicati che cambiano fra la testa e origin/main (assente se coincidono o non si sa).
+ * @param {{ errore?: string, ramo: string, testa: string, origine: string, diversi?: string[], file: string[], progetto: string, toccati: string[] }} s
  */
 export function decidi(s) {
   const corto = (sha) => String(sha || '?').slice(0, 9);
@@ -50,8 +51,11 @@ export function decidi(s) {
   if (!s.progetto) return { ok: false, motivo: '.firebaserc non dice su quale progetto pubblicare' };
   if (s.ramo !== 'main') return { ok: false, motivo: `il checkout è su «${s.ramo || 'testa staccata'}», non su main: si pubblica solo ciò che è stato fuso` };
   if (!s.origine) return { ok: false, motivo: 'origin/main non si legge' };
-  if (s.testa !== s.origine) {
-    return { ok: false, motivo: `main locale (${corto(s.testa)}) non è origin/main (${corto(s.origine)}): allinealo (git pull --ff-only) o porta prima il lavoro su main` };
+  // Una fusione fra il checkout e la fetch sposta origin/main (#1557): se non tocca ciò che si pubblica, si pubblica
+  // proprio ciò che è fuso. Se lo tocca, la copia vecchia riporterebbe indietro regole già più strette.
+  if (s.testa !== s.origine && (!Array.isArray(s.diversi) || s.diversi.length)) {
+    const cambia = Array.isArray(s.diversi) ? ` e lì cambiano ${s.diversi.join(', ')}` : '';
+    return { ok: false, motivo: `main locale (${corto(s.testa)}) non è origin/main (${corto(s.origine)})${cambia}: allinealo (git pull --ff-only) o porta prima il lavoro su main` };
   }
   if (s.toccati && s.toccati.length) return { ok: false, motivo: `file da pubblicare modificati e non fusi: ${s.toccati.join(', ')}` };
   return { ok: true };
