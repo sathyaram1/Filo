@@ -297,7 +297,9 @@
         // chiuso non serve ricostruire i div finché non si riapre.
       });
     });
-    mo.observe(select, { childList: true });
+    // Anche la scritta di un'opzione cambiata dopo (la scelta di serie che si completa col valore letto): senza, la
+    // tendina chiusa mostrava quella di prima (#1412).
+    mo.observe(select, { childList: true, subtree: true, characterData: true });
 
     buildOptions();
   }
