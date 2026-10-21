@@ -214,9 +214,13 @@ function sinteticiNomi(etichetta) {
     const suoi = b.domains.filter((d) => d.startsWith(t + '.')).map((d) => d.slice(t.length + 1));
     const nomi = [];
     for (let i = 0; i < 5; i++) nomi.push(`${t}.${pesca(SUFFISSI_NOME)}`);
-    nomi.push(`${t}.${pesca(suoi.length ? suoi : FINTI_TLD)}.${finto()}`, `${pesca(['login', 'www', 'secure', 'account', 'auth'])}.${t}.${pesca(FINTI_TLD)}.${finto()}`);
-    nomi.push(`${t}${pesca(['24', '365', '1', '2', '247', '360', '7'])}.${pesca(SUFFISSI_NOME)}`,
-      `${t}-${2020 + Math.floor(caso() * 8)}.${pesca(['com', 'it', 'net', 'online'])}`, `my${t}.${pesca(['com', 'it', 'net', 'app'])}`);
+    for (let i = 0; i < 2; i++) {
+      nomi.push(`${t}.${pesca(suoi.length && caso() < 0.6 ? suoi : FINTI_TLD)}.${finto()}`,
+        `${pesca(['login', 'www', 'secure', 'account', 'auth', 'my', 'id'])}.${t}.${pesca(FINTI_TLD)}.${finto()}`);
+    }
+    const tld = () => pesca(['com', 'it', 'net', 'online', 'app', 'co.uk', 'de', 'info', 'xyz']);
+    nomi.push(`${t}${pesca(['24', '365', '1', '2', '247', '360', '7', '10', '99'])}.${tld()}`, `${t}${Math.floor(caso() * 100)}.${tld()}`,
+      `${t}-${2020 + Math.floor(caso() * 8)}.${tld()}`, `my${t}.${tld()}`, `my-${t}.${tld()}`);
     for (const h of nomi) {
       const reg = normalize('https://' + h + '/').registrable;
       if (LEGIT_DOMAINS.has(h) || LEGIT_DOMAINS.has(reg) || (b.omonimi || []).includes(reg) || etichetta.has(h)) continue;
