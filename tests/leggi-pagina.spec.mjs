@@ -371,6 +371,34 @@ test('una scheda troppo grande per leggerla tutta lo dichiara al modello invece 
   expect(letto).toContain('solo la sua prima parte');
 });
 
+// #1574: su una macchina lenta la lettura di una scheda enorme scadeva e al modello non arrivava niente. Qui la scadenza
+// è già passata quando la lettura parte: arriva comunque il primo pezzo intero, e il modello sa che è solo l'inizio.
+test('una scheda che non si finisce di leggere in tempo consegna il suo primo pezzo intero e lo dichiara', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await openTab(NEWTAB);
+  const righe = Array.from({ length: 4000 }, (_, i) => `<p>Spedizione ${i + 1} partita da Bologna e consegnata a Verona.</p>`).join('');
+  const url = testServer.html(`<!doctype html><html><head><title>Spedizioni</title></head><body><main><h1>Spedizioni</h1>${righe}
+<p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await reteDiProva(app, { vietata: true });
+  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._tempi.scheda = -1; });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(prima parte)', testo: 'RISPOSTA: letta la $1.' } },
+  ]);
+  await chiedi(page, 'quando è stata consegnata l\'ultima spedizione della pagina che ho aperto?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: letta la prima parte.' })).toBeVisible({ timeout: 30_000 });
+  const letto = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(letto).toContain('letta dalla scheda aperta');
+  expect(letto).toContain('Spedizione 1 partita da Bologna');
+  expect(letto).not.toContain('ULTIMA_RIGA');
+  const pezzo = (await leggi(app, { type: 'LEGGI_PAGINA', url })).output;
+  expect(pezzo.fonte).toBe('scheda');
+  expect(pezzo.lettaInParte).toBe(true);
+  expect(pezzo.testo.length, 'il primo pezzo arriva pieno, non tagliato dalla scadenza').toBeGreaterThan(25_000);
+  expect(await app.evaluate(() => globalThis.__scaricati.length), 'la rete non sostituisce la scheda in ritardo').toBe(0);
+});
+
 test('aperta in una scheda come consiglia Filo, la pagina che rimanda si rilegge dalla scheda con l\'indirizzo di partenza', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await openTab(NEWTAB);
