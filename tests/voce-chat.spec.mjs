@@ -615,7 +615,7 @@ test('editor: una richiesta lunghissima ferma la casella entro la chat, e l\'ult
     const r = (el) => el.getBoundingClientRect();
     const ultima = [...l.querySelectorAll('.ed-chat-msg.assistant')].pop();
     return {
-      sh: t.scrollHeight, ch: t.clientHeight, h: t.offsetHeight, chat: mod.querySelector('.ed-chat').clientHeight,
+      sh: t.scrollHeight, ch: t.clientHeight, h: t.offsetHeight,
       fondoCasella: r(t).bottom, fondoModulo: r(mod).bottom, log: l.clientHeight,
       ultimaInVista: r(ultima).bottom <= r(l).bottom + 1 && r(ultima).top >= r(l).top - 1,
     };
