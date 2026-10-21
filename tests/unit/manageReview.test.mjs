@@ -1559,11 +1559,20 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   const fb = {
     status: 'design', statusReason: 'l5',
     notes: `Report di chi ha risolto.\n\n--- Aggiornamento dell'agente del 21/10/26, 15:43 ---\n${nota}`,
+    // L'audit passato nello stesso minuto della nota: i marcatori non hanno i secondi.
+    livelli: { l4: { esito: 'pass', at: new Date(2026, 9, 21, 15, 43, 40).toISOString() } },
   };
   const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
   const l5 = MR.livelloL5(fb, lette);
   assert.equal(l5.esito, 'bloccato', 'resta una decisione dell’owner');
   assert.equal(l5.pannello.testo, nota);
+
+  // Una nota di agente nata prima dell'audit (un report, una domanda già risposta) non è il motivo della fermata.
+  const vecchia = { ...fb, notes: "--- Aggiornamento dell'agente del 20/10/26, 09:00 ---\nReport: tasto spostato a destra." };
+  assert.match(MR.livelloL5(vecchia, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  assert.deepEqual(MR.livelloL5(vecchia, lette).pannello.righe, []);
+  // Senza l'ora dell'audit nessuna nota si può dire del cancello.
+  assert.match(MR.livelloL5({ ...fb, livelli: {} }, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
   assert.deepEqual(l5.pannello.azioni, ['rimanda', 'archivia']);
   assert.equal(l5.fusione, 'senza');
   assert.ok(l5.pannello.righe.some((r) => r.etichetta === 'Quando'));
