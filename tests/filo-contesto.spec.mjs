@@ -293,8 +293,6 @@ test('la durata della cache scelta in Preferenze o chiesta a Filo arriva nella r
   await chiedi('come va?');
   expect(await durataParteFissa()).toBe('5m');
 
-  const r = globalThis.SN_PREF_TEST;
-  void r;
   const cambio = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('durata della cache', 'un\'ora'));
   expect(cambio && cambio.partial).toEqual({ contestoFilo: { cache: '1h' } });
   await app.evaluate(async (_e, p) => globalThis.SN_STORAGE.updateSettings(p), cambio.partial);
