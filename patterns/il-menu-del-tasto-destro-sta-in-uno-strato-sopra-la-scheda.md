@@ -18,8 +18,9 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
   si prenderebbe la tastiera di chi scrive); ci entra alla prima apertura. Niente finestra nuova a ogni
   clic, come invece fa `src/main/popup-menu.js` (fuoco a un'altra finestra, trasparenza che su Linux
   dipende dal compositore).
-- **Grande quanto la scheda, in cima a tutto.** Un clic fuori dal menu cade sullo strato: lo chiude e
-  basta, alla pagina sotto non arriva. Diversa dalle viste grandi quanto il contenuto
+- **Grande quanto la scheda, in cima a tutto tranne la barra laterale**, che resta raggiungibile a menu aperto
+  e ci porta le sue icone (#871). Un clic fuori dal menu cade sullo strato: lo chiude e basta, alla pagina sotto
+  non arriva. Diversa dalle viste grandi quanto il contenuto
   (`patterns/la-shell-non-disegna-sopra-la-pagina.md`), che rigirano i gesti del vuoto alla pagina.
 - **Il punto viene dal `context-menu` della scheda**, `params.x/y`: px della vista, già fuori da zoom e
   riquadri incorporati (Chromium li riporta alla vista principale), uguali con lo schermo al 125%. Mai
@@ -33,11 +34,13 @@ WebContentsView trasparente per finestra, posata sopra la scheda attiva, con la 
 - **Segue la scheda sotto come il menu nella pagina.** La stessa scheda con l'area cambiata (finestra accorciata,
   barra compatta) non lo chiude: lo strato prende la nuova area e il menu rientra da sé (#500). La pagina che scorre
   chiude il menu normale e lascia quello di una selezione: lo strato non scorre con lei.
+- **Anche la finestrella di accesso aperta da un sito ha il suo strato**, grande quanto la finestra: è lì che si
+  incollano le password.
 - **Il menu ci entra come dati (#1054).** Il content script capisce il contesto come sempre e, a strato acceso,
   `src/content/menuNelloStrato.js` manda al main una descrizione delle voci (`src/shared/menuDescritto.js`): le
-  funzioni restano lì, tenute per numero, e il clic torna come numero. Lo strato disegna con `src/content/menu.js` e
-  `src/styles/menu.css` (le guardie contro i siti lì non servono e si spengono da sole). Le sezioni che crescono dopo
-  (spiegazioni) nascono in un documento senza finestra e arrivano allo strato come HTML ripulito; le righe che cambiano
+  funzioni restano lì, tenute per numero, e il clic torna come numero. Lo strato disegna con `src/content/menu.js`,
+  `src/styles/menu.css` e `src/styles/popup.css` per la spiegazione (le guardie contro i siti lì non servono e si spengono da sole). Le sezioni che crescono dopo
+  (spiegazioni) nascono in un documento senza finestra e arrivano allo strato come HTML ripulito, e un suo collegamento lo apre il content script dalla porta delle uscite; le righe che cambiano
   (correttore, icone, griglia «Altro…») come aggiornamenti dello stesso menu.
 - **Il menu si apre solo dal riquadro del tasto destro appena visto dal main**, entro pochi secondi: un sito non apre lo
   strato. Una voce vale solo dopo un gesto sullo strato che il main ha visto (`input-event`), non per quello che la
