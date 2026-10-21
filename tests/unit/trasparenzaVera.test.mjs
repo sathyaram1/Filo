@@ -142,7 +142,7 @@ test('il tasto destro su un link chiede da solo titolo e descrizione al sito e s
     && /const ferma = anteprimaFerma\(url\);/.test(misc) && /redirectAmmesso: \(_da, prossimo\) => !\(rinvio = anteprimaFerma\(prossimo\.href\)\)/.test(misc);
   legame(ferma, privacy, 'Non lo fa se Filo ti avvisa che il link è sospetto', 'niente visita ai link sospetti');
   legame(ferma, privacy, 'Non lo fa se il sito, o uno a cui il link rimanda, è fra quelli che Filo blocca', 'niente visita ai siti bloccati');
-  legame(!/if \(!flags\.includes\('side_effect'\)\)/.test(azioni) && ferma, privacy, 'Se il sito è fra quelli che Filo blocca, al modello non va niente', 'il sito bloccato non va al modello');
+  legame(/else if \(r\?\.bloccato\) \{[^}]*menu_link_blocked[^}]*return;\s*\}/.test(azioni), privacy, 'Se il sito è fra quelli che Filo blocca, al modello non va niente', 'il sito bloccato non va al modello');
 });
 
 test('il lavoro sui feedback va sul repository pubblico mentre si fa, e i due documenti lo dicono', () => {
