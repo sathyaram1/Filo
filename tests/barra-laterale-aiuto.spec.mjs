@@ -69,6 +69,10 @@ const nelMain = (app) => app.evaluate(({ BrowserWindow }) => {
   return t ? { aiuto: t.aiuto || null, risposta: !!(t._risposteInAttesa && t._risposteInAttesa.size) } : null;
 });
 
+// Come dalle Preferenze: la porta delle impostazioni è delle pagine di Filo.
+const DALLE_PREFERENZE = { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' };
+const imposta = (app, settings) => app.evaluate(async (_e, { s, da }) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: s }, da), { s: settings, da: DALLE_PREFERENZE });
+
 async function sito(app, openTab, testServer, html = SITO) {
   const page = await testServer.openReady(openTab, html);
   // La pagina ha detto alla barra com'è il suo Aiuto.
@@ -223,6 +227,9 @@ test('chiuso mentre Filo risponde: la risposta non si perde, e riaprendo l\'Aiut
   // Letta, la × chiude davvero: la volta dopo l'Aiuto riparte da capo.
   await aiuto.locator('.sn-sidebar-close').click();
   await expect(aiuto).toHaveCount(0);
+  // Il clic sulla pagina ha chiuso la barra.
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   await help.click();
   await expect(page.locator('.sn-sidebar')).toBeVisible();
   await expect(page.locator('.sn-sidebar-msg-assistant')).toHaveCount(0);
@@ -257,7 +264,7 @@ test('dove la voce «Aiuto» non c\'è l\'icona è spenta e dice perché; senza 
 
   // Filo spento su questo sito.
   const host = new URL(page.url()).hostname;
-  await app.evaluate(async (_e, h) => { await globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { blocklist: [h] } }, {}); }, host);
+  await imposta(app, { blocklist: [host] });
   await expect(help).toHaveAttribute('aria-disabled', 'true', { timeout: 8_000 });
   await expect(help).toHaveAttribute('data-sugg', 'Filo è spento su questo sito');
   await help.click({ force: true });
@@ -265,7 +272,7 @@ test('dove la voce «Aiuto» non c\'è l\'icona è spenta e dice perché; senza 
   await expect(page.locator('.sn-sidebar')).toBeVisible();
 
   // L'Aiuto spento in Preferenze: il pannello se ne va e l'icona lo dice.
-  await app.evaluate(async () => { await globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { blocklist: [], featureFlags: { help: false } } }, {}); });
+  await imposta(app, { blocklist: [], featureFlags: { help: false } });
   await expect(help).toHaveAttribute('data-sugg', 'Aiuto spento in Preferenze', { timeout: 8_000 });
   await expect(help).toHaveAttribute('aria-disabled', 'true');
   await expect(page.locator('.sn-sidebar')).toHaveCount(0);
@@ -273,7 +280,7 @@ test('dove la voce «Aiuto» non c\'è l\'icona è spenta e dice perché; senza 
   await barra.screenshot({ path: `${SHOTS}/barra-aiuto-spento.png` });
 
   // Riacceso, si riaccende anche l'icona.
-  await app.evaluate(async () => { await globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { featureFlags: { help: true } } }, {}); });
+  await imposta(app, { featureFlags: { help: true } });
   await expect(help).toHaveAttribute('aria-disabled', 'false', { timeout: 8_000 });
   await expect(help).toHaveAttribute('aria-label', 'Aiuto');
 });

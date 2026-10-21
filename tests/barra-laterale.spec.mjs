@@ -274,7 +274,7 @@ test('«Altro…» non ha più le voci globali, e la barra le ha', async ({ app,
   await expect(grid.locator('[data-sn-icon-id="openOptions"]')).toHaveCount(1);
   const barra = await barraPage(app);
   const ids = await barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
-  expect(ids).toEqual(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  expect(ids).toEqual(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
 });
 
 test('un sito non apre la barra e non la comanda con eventi finti', async ({ app, openTab, testServer }) => {
@@ -409,7 +409,7 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
     await page.mouse.move(30, home.y + 4, { steps: 8 });
     await expect(barra.locator('#nav')).toHaveClass(/mira/);
     await page.mouse.up();
-    await expect.poll(async () => (await statoBarra(app)).bar).toEqual(['back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab']);
+    await expect.poll(async () => (await statoBarra(app)).bar).toEqual(['help', 'back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab']);
     await expect(barra.locator('#nav .ico[data-id="screenshot"]')).toBeVisible();
     // Il menu aperto non ce l'ha più.
     await expect(menuDi(page).locator('.sn-menu [data-sn-icon-id="screenshot"]')).toHaveCount(0);
@@ -543,7 +543,7 @@ test('Nuova finestra incognito dalla barra: anche lei ha la sua barra, con le st
   expect(privata, 'la finestra incognito non ha la barra').toBeTruthy();
   await privata.waitForFunction(() => document.querySelectorAll('#nav .ico').length > 0, null, { timeout: 5000 });
   const ids = await privata.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
-  expect(ids).toEqual(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  expect(ids).toEqual(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
   const { larga, chiusa } = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && x._filoIncognito);
     return { larga: w._filoTabs.barra.vista.getBounds().width, chiusa: w._filoTabs.barra._larghezzaChiusa() };
@@ -632,7 +632,7 @@ test('a parole: Filo mette un\'icona del tasto destro nella barra e la toglie, c
 
   let r = await esegui({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra', prima_di: 'home' });
   expect(r.executed).toBe(true);
-  await expect.poll(async () => (await statoBarra(app)).bar).toEqual(['back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  await expect.poll(async () => (await statoBarra(app)).bar).toEqual(['help', 'back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab']);
   await expect(barra.locator('#nav .ico[data-id="screenshot"]')).toHaveCount(1);
   // Il menu del tasto destro non ce l'ha più.
   await page.locator('#p').click({ button: 'right' });
