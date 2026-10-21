@@ -2090,7 +2090,7 @@
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, aspettaDomanda, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
-    SEZIONI, sezioneDiScheda, schedaPredefinita, leggiSceltaSezione, sezioneDiApertura,
+    SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
   };
