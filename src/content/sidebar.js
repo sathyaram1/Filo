@@ -2012,7 +2012,10 @@
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto };
+  global.SN_SIDEBAR = {
+    open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto, passo, stato,
+    suCambio: (fn) => { ascoltaCambi = typeof fn === 'function' ? fn : null; },
+  };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {
