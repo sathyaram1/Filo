@@ -155,6 +155,7 @@ const FINALI = { rimbors: 'o', pagament: 'o', fattur: 'a', aggiornament: 'o', sb
   notific: 'a', spedizion: 'e', pacc: 'o', giacenz: 'a', consegn: 'a', ufficial: 'e' };
 const SUFFISSI_SOSIA = ['com', 'net', 'info', 'online', 'xyz', 'it', 'co.uk', 'de', 'wixsite.com', 'github.io', 'web.app',
   'weebly.com', 'netlify.app'];
+const ALNUM = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const PIATTAFORME = ['vercel.app', 'netlify.app', 'pages.dev', 'web.app', 'firebaseapp.com', 'herokuapp.com', 'github.io'];
 
 // Il marchio attaccato a una parola da truffa (posteonline, secure-google, appleid-verifica), la forma più comune dei
