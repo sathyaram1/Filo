@@ -710,9 +710,9 @@ export const sessione = {
 
 /** Perché il biglietto di chi scrive non è pulito; '' se lo è. Assente, sporco, in attesa o illeggibile non lo sono. PURA. */
 export function bigliettoNonPulito(b) {
+  if (b && b.inAttesa) return 'il biglietto ha una lettura esterna che il server non ha ancora ricevuto';
+  if (b && b.errore) return `il biglietto non si legge (${b.errore})`;
   if (!b || !b.fp) return 'questa sessione non ha un biglietto';
-  if (b.inAttesa) return 'il biglietto ha una lettura esterna che il server non ha ancora ricevuto';
-  if (b.errore) return `il biglietto non si legge sul server (${b.errore})`;
   if (b.fiducia !== 'fidato') return 'il biglietto della sessione è sporco';
   return '';
 }
