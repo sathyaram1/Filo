@@ -23,6 +23,8 @@
   const CONVERSAZIONE_MAX = 1500;
   // Conferma e scarto si vedono come un passaggio breve, non come uno scatto.
   const PASSAGGIO_MS = 320;
+  // Il lampo sul valore che Filo ha appena messo al posto delle x: si vede dove è cambiato il testo, poi sfuma.
+  const LAMPO_MS = 900;
   // Oltre, i candidati del codice si ricalcolano a una pausa breve invece che a ogni tasto.
   const LUNGO = 20000;
   const RICALCOLO_LUNGO_MS = 300;
