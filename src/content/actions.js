@@ -454,7 +454,8 @@
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
-  async function requestImageDescription(dataUrl) {
+  // `originale`: la foto che l'utente tiene, quando al modello va una copia coperta.
+  async function requestImageDescription(dataUrl, originale = null) {
     // NIENTE modello di ripiego scritto qui: gli unici modelli ammessi sono
     // quelli configurati per questa funzione (il ripiego VOLUTO fra i modelli
     // della catena vive nel main, dentro la catena). Se la funzione non ha un
