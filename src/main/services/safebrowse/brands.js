@@ -1,18 +1,6 @@
-// Brand ad alto valore per il phishing: i bersagli che gli attaccanti imitano
-// più spesso (banche/pagamenti, email, cloud, social, shopping, crypto).
-//
-// Ogni voce:
-//   token   — la "parola del brand" minuscola, usata per:
-//               • matching combosquat (token come label/sottostringa)
-//               • matching confusable/typo (scheletro e distanza di edit sulla
-//                 sola label di brand del dominio candidato)
-//   display — nome leggibile per i messaggi d'avviso ("Questo non è PayPal")
-//   domains — gli eTLD+1 LEGITTIMI del brand. Se il dominio candidato è uno di
-//             questi, NON è impersonazione (è il sito vero).
-//
-// La lista è volutamente corta e curata: pochi brand ad altissimo valore, per
-// tenere bassi i falsi positivi. Allungarla è sicuro finché i token restano
-// parole distintive (evita token generici tipo "pay" o "mail" da soli).
+// I marchi che le truffe imitano più spesso, coi loro indirizzi veri (`domains`, mai un'imitazione e fidati per
+// identità in whitelist.js) e gli altri che ne portano il nome di diritto (`omonimi`, non fidati). L'elenco unico per
+// l'apertura e per l'avviso sui link: chi imita chi lo giudica imitazioni.js. Un indirizzo qui si scrive solo se certo.
 
 'use strict';
 
@@ -98,8 +86,8 @@ const BRANDS = [
   { token: 'bnpparibas', display: 'BNP Paribas', domains: ['bnpparibas.com', 'bnpparibas.fr', 'bnpparibas.it', 'bnpparibas.be', 'bnpparibas.de', 'bnpparibas.es', 'bnpparibas.pl', 'bnpparibas.co.uk', 'bnl.it', 'bnpparibasfortis.be', 'bnpparibas-am.com', 'bnpparibas-pf.com'] },
   { token: 'creditagricole', display: 'Crédit Agricole', domains: ['credit-agricole.fr', 'credit-agricole.com', 'credit-agricole.it', 'ca-cib.com', 'credit-agricole.pl'] },
   { token: 'societegenerale', display: 'Société Générale', domains: ['societegenerale.com', 'societegenerale.fr', 'sg.fr'] },
-  { token: 'laposte', display: 'La Poste', domains: ['laposte.fr', 'laposte.net', 'labanquepostale.fr', 'labanquepostale.com', 'lapostegroupe.com'] },
-  { token: 'labanquepostale', display: 'La Banque Postale', domains: ['labanquepostale.fr', 'labanquepostale.com'] },
+  { token: 'laposte', display: 'La Poste', domains: ['laposte.fr', 'laposte.net', 'labanquepostale.fr', 'lapostegroupe.com'] },
+  { token: 'labanquepostale', display: 'La Banque Postale', domains: ['labanquepostale.fr'] },
   { token: 'ameli', display: 'Assurance Maladie (ameli)', domains: ['ameli.fr'] },
   { token: 'impots', display: 'impots.gouv.fr', domains: ['impots.gouv.fr'] },
   { token: 'hmrc', display: 'HMRC', domains: ['hmrc.gov.uk', 'tax.service.gov.uk'] },
@@ -113,7 +101,7 @@ const BRANDS = [
   { token: 'satispay', display: 'Satispay', domains: ['satispay.com'] },
   { token: 'westernunion', display: 'Western Union', domains: ['westernunion.com', 'wu.com', 'westernunion.it', 'westernunion.co.uk', 'westernunion.de', 'westernunion.fr'] },
   { token: 'moneygram', display: 'MoneyGram', domains: ['moneygram.com'] },
-  { token: 'cashapp', display: 'Cash App', domains: ['cash.app', 'cashapp.com', 'squareup.com', 'block.xyz'] },
+  { token: 'cashapp', display: 'Cash App', domains: ['cash.app', 'squareup.com', 'block.xyz'] },
   { token: 'zelle', display: 'Zelle', domains: ['zellepay.com'] },
   { token: 'interac', display: 'Interac', domains: ['interac.ca'] },
   { token: 'desjardins', display: 'Desjardins', domains: ['desjardins.com'] },
@@ -300,9 +288,8 @@ const ALTRI_INDIRIZZI = {
 };
 for (const b of BRANDS) b.domains.push(...(ALTRI_INDIRIZZI[b.token] || []));
 
-// Marchi che sono anche parole, o stanno dentro parole comuni (pineapple, otherwise, purchase, steampunk): contano
-// solo da soli fra punti e trattini, o in una delle loro forme tipiche; gli altri anche attaccati (paypallogin) (#732).
-// Elenco unico per il controllo all'apertura e per l'avviso sui link: un marchio nuovo che è una parola va aggiunto qui.
+// Marchi che sono anche parole, o stanno dentro parole comuni (pineapple, otherwise, purchase, steampunk), con le loro
+// forme tipiche: per il classificatore sono un indizio, non una regola. Un marchio nuovo che è una parola va qui.
 const MARCHI_PAROLA = new Map([
   ['apple', ['appleid', 'applepay', 'applesupport', 'applecare', 'appleaccount']],
   ['wise', ['transferwise', 'wisetransfer']],
@@ -326,8 +313,8 @@ const MARCHI_PAROLA = new Map([
   ['opensea', []], ['robinhood', []], ['telepass', []], ['mediolanum', []], ['wetransfer', []], ['salesforce', []],
   ['namecheap', []], ['mcafee', []], ['playstation', []], ['spid', []], ['interac', []], ['evri', []],
 ]);
-// La forma tipica di un sosia, per tutti i marchi-parola: il marchio con accanto solo queste parole, intere
-// (krakenlogin, securechase, postespedizioni). Le radici italiane prendono la desinenza (rimborso, notifiche).
+// Le parole che accompagnano un marchio in un sosia (krakenlogin, securechase, postespedizioni): un indizio per il
+// classificatore. Le radici italiane prendono la desinenza (rimborso, notifiche).
 const PAROLE_TRUFFA = [
   'login', 'logon', 'signin', 'accedi', 'accesso', 'access', 'auth', 'verify', 'verifica', 'verification', 'secure',
   'security', 'sicurezza', 'account', 'conto', 'support', 'supporto', 'assistenza', 'help', 'service', 'servizi',
@@ -360,91 +347,6 @@ function soloTruffa(s, soloItaliane = false, visti = new Map()) {
   return visti.get(s);
 }
 
-// Un marchio-parola di quattro lettere sta dentro troppe parole, e wise è anche un suffisso (shopwise, likewise):
-// conta solo davanti a parole da truffa, senza plurale inglese (wiselogin e nexirimborso sì, shopwise e wisecards no).
-// Un numero da solo non è una parola da truffa: steam2024 è una festa della scienza, steamlogin2024 un sosia.
-function attaccatoATruffa(pezzo, tok) {
-  const parola = (x) => !/^\d*$/.test(x);
-  if (tok.length < 5) {
-    const dopo = pezzo.slice(tok.length);
-    return pezzo.startsWith(tok) && parola(dopo) && soloTruffa(dopo, true);
-  }
-  for (let i = pezzo.indexOf(tok); i >= 0; i = pezzo.indexOf(tok, i + 1)) {
-    const prima = pezzo.slice(0, i);
-    const dopo = pezzo.slice(i + tok.length);
-    if ((parola(prima) || parola(dopo)) && soloTruffa(prima) && soloTruffa(dopo)) return true;
-  }
-  return false;
-}
-
-// Gli errori di chi scrive in fretta, o di chi vuole sembrare il sito vero: una lettera in più o in meno, due vicine
-// scambiate, una raddoppiata al posto della seguente, o una che a schermo ne sembra un'altra (communlty, povered).
-const SOMIGLIANTI = new Set(['il', 'li', 'ij', 'ji', 'lj', 'jl', 'iy', 'yi', 'vw', 'wv', 'uv', 'vu', 'mn', 'nm']);
-function costoScambio(f, j, c) {
-  return SOMIGLIANTI.has(f[j] + c) || f[j - 1] === c || f[j + 1] === c ? 1 : 2;
-}
-function distanzaErrori(p, f) {
-  const d = Array.from({ length: p.length + 1 }, (_, i) => [i]);
-  for (let j = 1; j <= f.length; j++) d[0][j] = j;
-  for (let i = 1; i <= p.length; i++) {
-    for (let j = 1; j <= f.length; j++) {
-      const sub = p[i - 1] === f[j - 1] ? 0 : costoScambio(f, j - 1, p[i - 1]);
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + sub);
-      if (i > 1 && j > 1 && p[i - 1] === f[j - 2] && p[i - 2] === f[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
-    }
-  }
-  return d[p.length][f.length];
-}
-
-// La forma tipica conta col seguito che vuole (steamcommunityoffer), ma davanti solo parole da truffa: in
-// purchaseonline c'è chaseonline, ed è un'altra parola.
-function formaIntera(pezzo, forma) {
-  for (let i = pezzo.indexOf(forma); i >= 0; i = pezzo.indexOf(forma, i + 1)) {
-    if (soloTruffa(pezzo.slice(0, i))) return true;
-  }
-  return false;
-}
-
-// La forma tipica con un errore, col marchio intero (steamcommunlty, posteitalia), e intorno solo parole da truffa
-// (posteitaliaonline). Quante lettere può sbagliare dipende da quante ne ha oltre il marchio; con due sole, solo una
-// al posto di un'altra, così posted non è posteid.
-function formaConErrore(pezzo, forma, token) {
-  const oltre = forma.length - token.length;
-  const soglia = oltre >= 8 ? 2 : oltre >= 2 ? 1 : 0;
-  if (!soglia || !pezzo.includes(token)) return false;
-  const inizi = [];
-  const fini = [];
-  for (let k = 0; k <= pezzo.length; k++) {
-    if (soloTruffa(pezzo.slice(0, k))) inizi.push(k);
-    if (soloTruffa(pezzo.slice(k))) fini.push(k);
-  }
-  for (const a of inizi) {
-    for (const b of fini) {
-      const parte = pezzo.slice(a, b);
-      if (parte === forma || !parte.includes(token) || Math.abs(parte.length - forma.length) > soglia) continue;
-      if (oltre === 2 && parte.length !== forma.length) continue;
-      if (distanzaErrori(parte, forma) <= soglia) return true;
-    }
-  }
-  return false;
-}
-
-// Vero se `nome` (un'etichetta o più, separate da punti) porta il marchio `token` secondo la regola sopra.
-// `scheletro` porta ogni pezzo alla forma con cui si legge a schermo (omoglifi, sosia).
-function nominaMarchio(nome, token, scheletro = (x) => x) {
-  if (!nome || !token || token.length < 3) return false; // un nome di una o due lettere sta in ogni parola (x-plane)
-  const tok = scheletro(token);
-  const forme = MARCHI_PAROLA.get(token);
-  if (forme) {
-    // Ogni pezzo com'è scritto (i numeri restano numeri) e come si legge (app1e è apple); marchi e forme sono già così.
-    const letture = nome.split(/[.-]/).filter(Boolean).flatMap((p) => [p, scheletro(p)]);
-    return letture.some((p) => p === token || attaccatoATruffa(p, token))
-      || forme.some((f) => letture.some((p) => formaIntera(p, f) || formaConErrore(p, f, token)));
-  }
-  // Il trattino non spezza un marchio distintivo: pay-pal resta paypal.
-  return nome.split('.').some((l) => { const unito = l.replace(/-/g, ''); return unito.includes(token) || scheletro(unito).includes(tok); });
-}
-
 // Indice per lookup veloce: eTLD+1 legittimo → brand (per non flaggare il vero).
 const LEGIT_DOMAINS = new Map();
 for (const b of BRANDS) {
@@ -456,4 +358,4 @@ function isLegitBrandDomain(registrable) {
   return LEGIT_DOMAINS.has(registrable);
 }
 
-module.exports = { BRANDS, LEGIT_DOMAINS, isLegitBrandDomain, MARCHI_PAROLA, nominaMarchio, soloTruffa };
+module.exports = { BRANDS, LEGIT_DOMAINS, isLegitBrandDomain, MARCHI_PAROLA, soloTruffa };

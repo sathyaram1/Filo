@@ -1,15 +1,12 @@
-// Addestra il classificatore delle imitazioni di marchi (src/main/services/safebrowse/imitazioni.js) e lo scrive in
-// imitazioni.bin. Impara da elenchi pubblici di truffe e di siti noti e dalle etichette scritte a mano in
-// scripts/imitazioni/etichette.tsv, mai dalle risposte di un servizio di terzi. Misura sulle prove di tests/unit/dati.
-//
-//   node scripts/addestra-imitazioni.mjs --scarica      scarica gli elenchi (in --dati, di base nella cartella temporanea)
-//   node scripts/addestra-imitazioni.mjs                addestra con gli elenchi già scaricati
-//   node scripts/addestra-imitazioni.mjs --solo-prova   misura il modello attuale sulle prove, senza riaddestrare
+// Addestra il classificatore delle imitazioni di marchi (src/main/services/safebrowse/imitazioni.js) e scrive imitazioni.bin.
+// Impara da elenchi pubblici di truffe e di siti noti e dalle etichette scritte in scripts/imitazioni/etichette.tsv, mai
+// dalle risposte di un servizio di terzi; misura sulle prove di tests/unit/dati, che restano fuori dall'addestramento.
 
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const RADICE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,6 +27,8 @@ const FONTI = [
   { file: 'noti-umbrella.csv', etichetta: 0, url: 'https://s3-us-west-1.amazonaws.com/umbrella-static/top-1m.csv.zip', zip: true },
 ];
 
+// --scarica: prima scarica gli elenchi in --dati (di base nella cartella temporanea); --solo-prova: misura il modello
+// che c'è, senza riaddestrare; --dettagli: elenca falsi allarmi e imitazioni perse. Il primo giro dura qualche minuto.
 const arg = (nome, base) => { const i = process.argv.indexOf(nome); return i > 0 ? process.argv[i + 1] : base; };
 const DATI = path.resolve(arg('--dati', path.join(os.tmpdir(), 'filo-imitazioni')));
 const BIT = Number(arg('--bit', 20));
@@ -37,7 +36,7 @@ const EPOCHE = Number(arg('--epoche', 8));
 const L2 = Number(arg('--l2', 1e-6));
 // Il tetto dei falsi allarmi sui siti noti con cui si sceglie la soglia: uno su duecento.
 const FALSI_AMMESSI = Number(arg('--falsi', 0.005));
-const PESO_MANO = Number(arg('--peso-mano', 3));
+const PESO_MANO = Number(arg('--peso-mano', 6));
 
 async function scarica() {
   fs.mkdirSync(DATI, { recursive: true });
@@ -45,14 +44,23 @@ async function scarica() {
     const r = await fetch(f.url);
     if (!r.ok) throw new Error(`${f.url}: ${r.status}`);
     const buf = Buffer.from(await r.arrayBuffer());
-    if (f.zip) {
-      const { execFileSync } = await import('node:child_process');
-      const zip = path.join(DATI, f.file + '.zip');
-      fs.writeFileSync(zip, buf);
-      fs.writeFileSync(path.join(DATI, f.file), execFileSync('unzip', ['-p', zip], { maxBuffer: 1 << 30 }));
-    } else fs.writeFileSync(path.join(DATI, f.file), buf);
+    fs.writeFileSync(path.join(DATI, f.file), f.zip ? primoDelloZip(buf) : buf);
     console.log('scaricato', f.file, buf.length, 'byte');
   }
+}
+
+// Il primo file di uno zip, senza programmi esterni (su Windows `unzip` non c'è): la directory centrale dice dove sta.
+function primoDelloZip(buf) {
+  const fine = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (fine < 0) throw new Error('zip senza directory centrale');
+  const centrale = buf.readUInt32LE(fine + 16);
+  if (buf.readUInt32LE(centrale) !== 0x02014b50) throw new Error('zip illeggibile');
+  const metodo = buf.readUInt16LE(centrale + 10);
+  const compresso = buf.readUInt32LE(centrale + 20);
+  const locale = buf.readUInt32LE(centrale + 42);
+  const dati = locale + 30 + buf.readUInt16LE(locale + 26) + buf.readUInt16LE(locale + 28);
+  const pezzo = buf.subarray(dati, dati + compresso);
+  return metodo === 8 ? zlib.inflateRawSync(pezzo) : pezzo;
 }
 
 function host(riga) {
@@ -91,6 +99,39 @@ function principale(es, marchio) {
   if (marchio) return es.find((e) => e.c.mc.token === marchio) || es.find((e) => e.c.mc.brand.display === displayDi(marchio)) || null;
   return [...es].sort((a, b) => ORDINE.indexOf(a.c.tipo) - ORDINE.indexOf(b.c.tipo)
     || b.c.mc.token.length - a.c.mc.token.length || (a.c.zona === 'sld' ? -1 : 1))[0];
+}
+
+// I refusi di chi digita il dominio vero di un marchio (gooogle.com, micrsoft.com, linkedln.com), come li registra chi
+// aspetta l'errore: negli elenchi di truffe sono pochi, perché vivono di traffico sbagliato più che di messaggi. Uno per
+// tipo di errore e per marchio; resta fuori un nome che sta fra i siti noti.
+function sinteticiRefusi(etichetta) {
+  const { BRANDS } = require('./src/main/services/safebrowse/brands.js');
+  const SIMILI = [['i', 'l'], ['l', 'i'], ['m', 'rn'], ['w', 'vv'], ['g', 'q'], ['n', 'm'], ['o', 'a']];
+  const out = [];
+  const visti = new Set();
+  for (const b of BRANDS) {
+    const t = b.token;
+    if (t.length < 5 || !/^[a-z]+$/.test(t) || visti.has(t)) continue;
+    visti.add(t);
+    const dom = b.domains.find((d) => d.startsWith(t + '.')) || '';
+    if (!dom) continue;
+    const suff = dom.slice(t.length);
+    const m = Math.floor(t.length / 2);
+    const doppia = [...t].findIndex((c, i) => c === t[i + 1]);
+    const varianti = [
+      t.slice(0, m) + t[m] + t.slice(m),
+      doppia >= 0 ? t.slice(0, doppia) + t.slice(doppia + 1) : t.slice(0, t.length - 2) + t.slice(t.length - 1),
+      t.slice(0, t.length - 3) + t[t.length - 2] + t[t.length - 3] + t.slice(t.length - 1),
+      t.slice(0, 1) + t.slice(2),
+    ];
+    const simile = SIMILI.find(([da]) => t.indexOf(da, 1) > 0);
+    if (simile) varianti.push(t.replace(new RegExp('(?<=.)' + simile[0]), simile[1]));
+    const nomi = [...new Set(varianti)].filter((v) => v !== t).map((v) => v + suff);
+    // E il suffisso sbagliato di una lettera (github.co, paypal.cm), dove il marchio non l'ha preso per sé.
+    if (suff === '.com') nomi.push(...['.co', '.cm', '.om'].map((x) => t + x).filter((h) => !b.domains.includes(h)));
+    for (const h of nomi) if (!etichetta.has(h) && !etichetta.has('www.' + h)) out.push({ h, url: 'https://' + h + '/', marchio: t });
+  }
+  return out;
 }
 
 function displayDi(token) {
@@ -210,7 +251,6 @@ function conCandidati(etichetta) {
 
 function costruisci() {
   const prova = new Set(leggiTsv(PROVA).map((r) => r.h));
-  const scritte = new Map([...leggiTsv(ETICHETTE), ...sinteticiEsca()].map((r) => [r.h, r]));
   const etichetta = new Map();
   const conflitto = new Set();
   for (const f of FONTI) {
@@ -225,6 +265,7 @@ function costruisci() {
     }
   }
   for (const h of conflitto) etichetta.delete(h);
+  const scritte = new Map([...sinteticiRefusi(etichetta), ...leggiTsv(ETICHETTE), ...sinteticiEsca()].map((r) => [r.h, r]));
   const gruppi = [];
   const perSito = new Map();
   const aggiungi = (h, y, marchio, fonte, url = 'https://' + h + '/') => {
@@ -257,7 +298,7 @@ function costruisci() {
 
 function provaModello() {
   const righe = leggiTsv(PROVA);
-  const m = { ok: 0, presi: 0, truffe: 0, falsi: [], noti: 0, marchioSbagliato: [] , persi: [] };
+  const m = { presi: 0, truffe: 0, falsi: [], noti: 0, marchioSbagliato: [], persi: [] };
   for (const r of righe) {
     const v = IM.giudica(normalize(r.url), { esca: IM.escaDi(r.url) });
     if (r.marchio) {
@@ -277,7 +318,7 @@ function provaModello() {
   return m;
 }
 
-async function principale_() {
+async function avvia() {
   if (process.argv.includes('--scarica')) await scarica();
   if (process.argv.includes('--solo-prova')) { provaModello(); return; }
   const t0 = Date.now();
@@ -301,4 +342,4 @@ async function principale_() {
   provaModello();
 }
 
-principale_().catch((e) => { console.error(e); process.exit(1); });
+avvia().catch((e) => { console.error(e); process.exit(1); });

@@ -140,7 +140,7 @@ test('un marchio che è una parola, dentro una parola sua, non fa sosia un sito 
   for (const url of [
     'https://pineapple-bakery.wixsite.com/', 'https://steampunk-fiera.weebly.com/', 'https://proposte-viaggi.webflow.io/',
     'https://purchase-tickets.carrd.co/', 'https://otherwise-studio.framer.app/', 'https://streetwise.wixsite.com/',
-    'https://applecross.weebly.com/',
+    'https://applecross.weebly.com/', 'https://amazonas-tours.wixsite.com/',
   ]) assert.equal(livello(url), 'safe', url);
   // Se chiede la password, lo giudica il modello.
   assert.equal(evaluate('https://pineapple-bakery.wixsite.com/', { hasPassword: true }).needsLlm, true);
@@ -153,7 +153,6 @@ test('un marchio che è una parola, dentro una parola sua, non fa sosia un sito 
     'paypalresolution.vercel.app', 'paypaldispute.netlify.app', 'paypalinc.github.io', 'amazonprimevideo.netlify.app',
     'netflixpremium.vercel.app', 'coinbasepro.github.io', 'binancefutures.netlify.app', 'instagramcopyright.vercel.app',
     'facebookbusiness.netlify.app', 'metamaskrestore.netlify.app', 'metamaskextension.github.io', 'paypalresolution.weebly.com',
-    'amazonas-tours.wixsite.com',
   ]) assert.notEqual(livello('https://' + host + '/'), 'safe', host);
 });
 

@@ -746,9 +746,16 @@
     const locali = LinkSospetto.analizza(url);
     const w = document.createElement('div');
     w.className = 'sn-menu-link-warn';
-    const scrivi = (codici) => { const a = LinkSospetto.avviso(codici); w.textContent = a; w.hidden = !a; };
+    // Il posto dell'avviso resta tenuto anche finché non c'è niente da dire: arriva sopra la spiegazione, non sotto.
+    const posto = document.createComment('');
+    el.appendChild(posto);
+    const scrivi = (codici) => {
+      const a = LinkSospetto.avviso(codici);
+      w.textContent = a;
+      if (a && !w.isConnected && posto.isConnected) posto.replaceWith(w);
+      else if (!a && w.isConnected) w.replaceWith(posto);
+    };
     scrivi(locali);
-    el.appendChild(w);
     if (locali.includes('url_invalido')) return Promise.resolve(locali);
     return chrome.runtime.sendMessage({ type: MSG.LINK_IMITAZIONE, url })
       .then((r) => LinkSospetto.conImitazione(locali, r && r.codice))

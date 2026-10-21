@@ -244,7 +244,7 @@ test('i nomi scritti per intero in un’altra lingua, e i siti che usano un nome
     'https://appleinsider.com/', 'https://x-plane.com/', 'https://googleblog.com/', 'https://amazonaws.com/',
     'https://www.youtube-nocookie.com/embed/abc',
     'https://login.microsoftonline.com/', 'https://aws.amazon.com/', 'https://www.amazon.co.uk/',
-    'https://paypal.com.co/', 'https://utente:segreto@esempio.it/',
+    'https://utente:segreto@esempio.it/',
   ];
   for (const u of innocenti) {
     assert.deepEqual(completo(u), [], `avviso a sproposito su ${u}`);

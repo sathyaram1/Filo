@@ -8,8 +8,9 @@
 // La tabella confusables.txt completa di Unicode ha migliaia di voci; qui c'è
 // un sottoinsieme mirato agli attacchi reali sui domini: lookalike cross-script
 // (cirillico, greco, armeno), forme fullwidth, e gli omoglifi ASCII più comuni
-// (0→o, 1→l). Tutto ciò che resta (leetspeak, refusi) lo cattura la distanza
-// di edit in signals.js. Mappiamo sempre verso lettere latine minuscole.
+// (0→o, 1→l). Tutto ciò che resta (refusi, rn/vv, coppie di lettere simili) lo
+// pesa imitazioni.js. Mappiamo sempre verso lettere latine minuscole: cambiare
+// una voce cambia le letture su cui il classificatore è addestrato (rigenerarlo).
 
 'use strict';
 

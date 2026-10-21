@@ -31,7 +31,7 @@ test('sui domini di prova prende le imitazioni e lascia stare i siti veri', () =
   assert.ok(imitazioni.length > 500 && veri.length > 800, 'le prove sono sparite');
   const prese = imitazioni.filter(([h]) => evaluate('https://' + h + '/').imp);
   const falsi = veri.filter(([h]) => evaluate('https://' + h + '/').imp).map(([h]) => h);
-  // Le regole di prima, sulle stesse prove: 42% delle imitazioni, falso allarme su un sito vero su cinque e mezzo.
+  // Le regole di prima, sulle stesse prove, prendevano il 42% delle imitazioni e davano l'avviso al 18% dei siti veri.
   assert.ok(prese.length / imitazioni.length >= 0.85, `imitazioni prese ${prese.length}/${imitazioni.length}`);
   assert.ok(falsi.length / veri.length <= 0.015, `falsi allarmi ${falsi.length}/${veri.length}: ${falsi.join(', ')}`);
 });

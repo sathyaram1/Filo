@@ -36,7 +36,8 @@ test('motore: impersonazioni → pericoloso, domini legittimi → safe', async (
       cyrillicApple: v('https://xn--80ak6aa92e.com/', { hasPassword: true }),
       paypalTypo: v('https://paypa1.com/', { hasPassword: true }),
       parolaComune: v('https://team.com/'),
-      parolaComuneConPassword: v('https://team.com/', { hasPassword: true }),
+      somiglianza: v('https://paypak.com/'),
+      somiglianzaConPassword: v('https://paypak.com/', { hasPassword: true }),
     };
   });
 
@@ -52,10 +53,11 @@ test('motore: impersonazioni → pericoloso, domini legittimi → safe', async (
   expect(verdicts.paypalTypo.level).toBe('pericoloso');
   expect(verdicts.paypalTypo.hasMsg).toBe(true);
 
-  // #728 — una parola comune a una lettera da un marchio corto avvisa e basta;
-  // il blocco torna appena un secondo segnale lo conferma.
-  expect(verdicts.parolaComune.level).toBe('sospetto');
-  expect(verdicts.parolaComuneConPassword.level).toBe('pericoloso');
+  // #728, #1375 — una parola comune vicina a un marchio non è un sosia; il refuso di un marchio corto avvisa e basta,
+  // e il blocco torna appena un secondo segnale lo conferma.
+  expect(verdicts.parolaComune.level).toBe('safe');
+  expect(verdicts.somiglianza.level).toBe('sospetto');
+  expect(verdicts.somiglianzaConPassword.level).toBe('pericoloso');
 });
 
 test('pagina Sicurezza: controlli personali default ON e persistenti; nessun campo chiave (è condivisa)', async ({ openTab }) => {
@@ -140,11 +142,11 @@ test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (s
 const SEGNALATO = 'Sito segnalato come pericoloso';
 
 test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, shell }) => {
-  await serviInCaricamento(app, { 'conto-paypa1.com/login': MODULO + '<input id="campo">' }, { gsbListed: true });
-  const page = await apriSenzaAspettare(app, shell, 'https://conto-paypa1.com/login');
+  await serviInCaricamento(app, { 'conto-segnalato.com/login': MODULO + '<input id="campo">' }, { gsbListed: true });
+  const page = await apriSenzaAspettare(app, shell, 'https://conto-segnalato.com/login');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
-  await expect(avviso.getByText(/Google Safe Browsing classifica conto-paypa1\.com/)).toBeVisible();
+  await expect(avviso.getByText(/Google Safe Browsing classifica conto-segnalato\.com/)).toBeVisible();
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
   // Nella pagina del sito non c'è niente di Filo da coprire, spostare o premere.
   await page.waitForLoadState('domcontentloaded');
@@ -167,8 +169,8 @@ test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo"
 
 // #871 — la barra laterale resta raggiungibile sopra l'avviso: Indietro serve proprio lì.
 test('interstitial "pericoloso": la barra laterale sta sopra l\'avviso e si apre', async ({ app, shell }) => {
-  await serviInCaricamento(app, { 'conto-paypa1.com/login': MODULO }, { gsbListed: true });
-  await apriSenzaAspettare(app, shell, 'https://conto-paypa1.com/login');
+  await serviInCaricamento(app, { 'conto-segnalato.com/login': MODULO }, { gsbListed: true });
+  await apriSenzaAspettare(app, shell, 'https://conto-segnalato.com/login');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
@@ -994,20 +996,31 @@ test('finestrella del sito in lista che cambia indirizzo sul posto prima del ver
   expect(await accesso.evaluate(() => ({ k: window.__k, pw: document.getElementById('pw').value }))).toEqual({ k: '', pw: '' });
 });
 
-test('parola comune vicina a un marchio: avviso richiudibile, non il blocco a pagina piena (#728)', async ({ app, openTab }) => {
-  // team.com dista una lettera da "steam": prima l'utente trovava il blocco che si toglie solo scrivendo "confermo".
-  await servi(app, { 'team.com': '<title>SB_PAROLA_COMUNE</title><h1>Team</h1><p>contenuto della pagina</p>' });
-  const page = await openTab('https://team.com/');
+test('somiglianza con un marchio corto: avviso richiudibile, non il blocco a pagina piena (#728)', async ({ app, openTab }) => {
+  // amazn.com dista una lettera da "amazon": prima l'utente trovava il blocco che si toglie solo scrivendo "confermo".
+  await servi(app, { 'amazn.com': '<title>SB_SOMIGLIANZA</title><h1>Negozio</h1><p>contenuto della pagina</p>' });
+  const page = await openTab('https://amazn.com/');
   const avviso = await vistaAvviso(app, 12_000);
   const continua = avviso.getByRole('button', { name: 'Continua' });
   await expect(continua).toBeVisible({ timeout: 12_000 });
   await expect(avviso.getByRole('button', { name: 'Procedi comunque' })).toHaveCount(0);
-  await expect(avviso.getByText(/assomiglia all'indirizzo di Steam/)).toBeVisible();
+  await expect(avviso.getByText(/assomiglia all'indirizzo di Amazon/)).toBeVisible();
 
   // Un clic e l'utente è sulla pagina che voleva.
   await continua.click();
   await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
-  await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Negozio' })).toBeVisible();
+});
+
+test('una parola comune vicina a un marchio si apre senza avviso (#1375)', async ({ app, openTab }) => {
+  // team.com dista una lettera da "steam", telegraph.co.uk due da "telegram": sono siti veri, non sosia.
+  await serviSenzaRete(app, { 'team.com': '<h1>Team</h1>', 'www.telegraph.co.uk': '<h1>The Telegraph</h1>' });
+  for (const [url, titolo] of [['https://team.com/', 'Team'], ['https://www.telegraph.co.uk/', 'The Telegraph']]) {
+    const page = await openTab(url);
+    await expect(page.getByRole('heading', { name: titolo })).toBeVisible();
+    await page.waitForTimeout(1500);
+    expect((await copertura(app)).coperta).toBe(false);
+  }
 });
 
 // #728 — un sosia di un marchio corto blocca solo se chiede la password: il campo va visto anche quando arriva dopo
@@ -1076,13 +1089,13 @@ test('il blocco già a schermo non si ridisegna quando un\'altra analisi lo rima
   await expect(campo).toHaveValue('conf');
 });
 
-// #728 — conta il campo a schermo: un modulo d'accesso tenuto nascosto dietro «Accedi» non fa del sito vero un sosia.
-test('parola comune vicina a un marchio col modulo d\'accesso nascosto: popup, non il blocco (#728)', async ({ app, openTab }) => {
+// #728 — conta il campo a schermo: un modulo d'accesso tenuto nascosto dietro «Accedi» non trasforma una somiglianza in un blocco.
+test('somiglianza con un marchio corto col modulo d\'accesso nascosto: popup, non il blocco (#728)', async ({ app, openTab }) => {
   await serviSenzaRete(app, {
-    'email.com': '<h1>Posta gratuita</h1><button onclick="document.getElementById(\'m\').hidden=false">Accedi</button>'
+    'amazn.com': '<h1>Posta gratuita</h1><button onclick="document.getElementById(\'m\').hidden=false">Accedi</button>'
       + `<div id="m" hidden>${ACCESSO}</div>`,
   });
-  await openTab('https://email.com/');
+  await openTab('https://amazn.com/');
   const avviso = await vistaAvviso(app, 12_000);
   await expect(avviso.getByRole('button', { name: 'Continua' })).toBeVisible({ timeout: 12_000 });
   // Più di un giro sui campi della pagina.
@@ -1126,12 +1139,12 @@ const conModulo = (stile, titolo) => `${stile}<h1>${titolo}</h1><button id="apri
   + `<div class="m">${ACCESSO}</div>`;
 
 for (const [modo, [stile]] of Object.entries(NASCOSTI_728)) {
-  test(`parola comune vicina a un marchio, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
-    await serviSenzaRete(app, { 'email.com': conModulo(stile, 'Posta gratuita') });
-    await openTab('https://email.com/');
-    expect(await livelloScheda(app, 'email.com', 12_000)).toBe('sospetto');
+  test(`somiglianza con un marchio corto, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, { 'amazn.com': conModulo(stile, 'Posta gratuita') });
+    await openTab('https://amazn.com/');
+    expect(await livelloScheda(app, 'amazn.com', 12_000)).toBe('sospetto');
     await new Promise((r) => setTimeout(r, 4500));
-    expect(await livelloScheda(app, 'email.com', 1000)).toBe('sospetto');
+    expect(await livelloScheda(app, 'amazn.com', 1000)).toBe('sospetto');
   });
 
   test(`sosia di un marchio corto, modulo d'accesso nascosto (${modo}) che si apre: blocco (#728)`, async ({ app, openTab }) => {
@@ -1162,7 +1175,7 @@ test('sosia di un marchio corto col modulo d\'accesso in un componente incapsula
 });
 
 // #728 — a schermo lo dice il motore, non un elenco di trucchi: un ritaglio di qualunque forma, o la pagina che nasconde
-// il riquadro col modulo (dello stesso sito o di un altro), lasciano il sito vero al popup.
+// il riquadro col modulo (dello stesso sito o di un altro), lasciano la somiglianza al popup.
 const NASCOSTI_DAL_MOTORE_728 = {
   'tendina ritagliata (clip-path)': `<div style="clip-path:inset(0 0 100% 0);position:absolute;top:60px;right:0">${ACCESSO}</div>`,
   'riquadro dello stesso sito in una tendina trasparente':
@@ -1171,16 +1184,16 @@ const NASCOSTI_DAL_MOTORE_728 = {
     '<div style="opacity:0;position:absolute;top:60px;right:0"><iframe src="https://accesso-posta.net/login" width="400" height="200"></iframe></div>',
 };
 for (const [modo, corpo] of Object.entries(NASCOSTI_DAL_MOTORE_728)) {
-  test(`parola comune vicina a un marchio, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
+  test(`somiglianza con un marchio corto, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
     await serviSenzaRete(app, {
-      'email.com/login': `<!doctype html><body>${ACCESSO}</body>`,
+      'amazn.com/login': `<!doctype html><body>${ACCESSO}</body>`,
       'accesso-posta.net/login': `<!doctype html><body>${ACCESSO}</body>`,
-      'email.com': `<h1>Posta gratuita</h1><button>Accedi</button>${corpo}`,
+      'amazn.com': `<h1>Posta gratuita</h1><button>Accedi</button>${corpo}`,
     });
-    await openTab('https://email.com/');
-    expect(await livelloScheda(app, 'email.com', 12_000)).toBe('sospetto');
+    await openTab('https://amazn.com/');
+    expect(await livelloScheda(app, 'amazn.com', 12_000)).toBe('sospetto');
     await new Promise((r) => setTimeout(r, 5000));
-    expect(await livelloScheda(app, 'email.com', 1000)).toBe('sospetto');
+    expect(await livelloScheda(app, 'amazn.com', 1000)).toBe('sospetto');
   });
 }
 

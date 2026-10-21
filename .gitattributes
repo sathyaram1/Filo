@@ -51,6 +51,8 @@
 *.pdf binary
 *.avif binary
 *.heic binary
+# Il modello del classificatore delle imitazioni (src/main/services/safebrowse/imitazioni.bin): pesi, non testo.
+*.bin binary
 
 # I dizionari del correttore e le loro sorgenti (GPL: vanno distribuite com'erano, CRLF e Latin-1 compresi).
 assets/dizionari/** binary

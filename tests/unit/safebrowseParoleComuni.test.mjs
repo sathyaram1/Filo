@@ -1,5 +1,6 @@
-// #728 — una parola comune che dista una lettera da un marchio corto (team/steam,
-// email/gmail) non è un sosia: avvisa, non blocca. Regola in safebrowse/signals.js.
+// #728 — una parola comune vicina a un marchio (team/steam, email/gmail) non è un sosia. Dal #1375 lo giudica il
+// classificatore delle imitazioni (safebrowse/imitazioni.js): la parola resta pulita, il refuso vero avvisa e da solo
+// non blocca, a meno che non sia un travestimento o un refuso a una lettera di un marchio lungo.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,29 +13,40 @@ const VECCHIO = { ageDays: 900 };          // dominio con anni alle spalle
 const GIOVANE = { ageDays: 2 };
 const CERT_ROTTO = { ageDays: 900, cert: { status: 'expired' } };
 
-// Parole comuni a una lettera dai marchi di 5-7 lettere citati nella segnalazione.
+// Parole comuni a una lettera dai marchi di 5-7 lettere citati nella segnalazione, e a due da quelli lunghi.
 const PAROLE_COMUNI = [
-  ['https://team.com/', 'Steam'],
-  ['https://email.com/', 'Gmail'],
-  ['https://photon.com/', 'Proton'],
-  ['https://posts.com/', 'Poste Italiane'],
-  ['https://apply.com/', 'Apple'],
-  ['https://stripes.com/', 'Stripe'],
-  ['https://tictok.com/', 'TikTok'],
+  'https://team.com/', 'https://email.com/', 'https://photon.com/', 'https://posts.com/', 'https://apply.com/',
+  'https://stripes.com/', 'https://www.telegraph.co.uk/', 'https://telegramma.it/', 'https://www.telegrafo.it/',
+  'https://linked.com/', 'https://codebase.com/', 'https://macbook.com/',
 ];
 
-test('una parola comune vicina a un marchio corto non manda il blocco a tutta pagina', () => {
-  for (const [url] of PAROLE_COMUNI) {
+test('una parola comune vicina a un marchio non si prende l’avviso del marchio', () => {
+  for (const url of PAROLE_COMUNI) {
     const v = evaluate(url, {}, VECCHIO);
-    assert.notEqual(v.level, 'pericoloso', url);
+    assert.equal(v.level, 'safe', url);
+    assert.equal(v.imp, undefined, url);
   }
 });
 
-test('resta un avviso da chiudere, e non dà del falso a un sito vero', () => {
-  for (const [url, marchio] of PAROLE_COMUNI) {
+test('col secondo segnale la parola comune resta senza marchio: il dominio giovane si dice per quello che è', () => {
+  for (const url of PAROLE_COMUNI) {
+    const v = evaluate(url, {}, GIOVANE);
+    assert.notEqual(v.level, 'pericoloso', url);
+    assert.ok(!v.imp, url);
+  }
+});
+
+// Refusi veri di marchi corti: somigliano, e basta.
+const SOMIGLIANZE = [
+  ['https://paypak.com/', 'PayPal'],
+  ['https://gooogle.com/', 'Google'],
+  ['https://amazn.com/', 'Amazon'],
+];
+
+test('il refuso di un marchio corto resta un avviso da chiudere, e non dà del falso a nessuno', () => {
+  for (const [url, marchio] of SOMIGLIANZE) {
     const v = evaluate(url, {}, VECCHIO);
     assert.equal(v.level, 'sospetto', url);
-    assert.ok(v.message && v.message.body, url);
     assert.match(v.message.body, /assomiglia/, url);
     assert.ok(v.message.body.includes(marchio), url);
     assert.doesNotMatch(v.message.title, /^Attenzione: questo non è/, url);
@@ -42,7 +54,7 @@ test('resta un avviso da chiudere, e non dà del falso a un sito vero', () => {
 });
 
 test('col secondo segnale il blocco torna: dominio giovane, certificato rotto, password chiesta', () => {
-  for (const [url, marchio] of PAROLE_COMUNI) {
+  for (const [url, marchio] of SOMIGLIANZE) {
     for (const [ctx, asyncData] of [
       [{}, GIOVANE],
       [{}, CERT_ROTTO],
@@ -78,34 +90,6 @@ test('i marchi veri e i domini senza somiglianza restano puliti', () => {
     'https://poste.it/', 'https://apple.com/', 'https://stripe.com/',
     'https://wikipedia.org/', 'https://enciclopedia.it/',
   ]) assert.equal(evaluate(url, {}, VECCHIO).level, 'safe', url);
-});
-
-// Sui marchi lunghi il nome può distare due lettere, e a due lettere stanno le parole comuni.
-const DUE_LETTERE = [
-  ['https://www.telegraph.co.uk/', 'Telegram'],
-  ['https://telegramma.it/', 'Telegram'],
-  ['https://www.telegrafo.it/', 'Telegram'],
-  ['https://linked.com/', 'LinkedIn'],
-  ['https://codebase.com/', 'Coinbase'],
-  ['https://whatsup.com/', 'WhatsApp'],
-  ['https://macbook.com/', 'Facebook'],
-];
-
-test('una parola comune a due lettere da un marchio lungo avvisa, non blocca', () => {
-  for (const [url, marchio] of DUE_LETTERE) {
-    const v = evaluate(url, {}, VECCHIO);
-    assert.equal(v.level, 'sospetto', url);
-    assert.ok(v.message.body.includes(marchio), url);
-    assert.doesNotMatch(v.message.title, /^Attenzione: questo non è/, url);
-  }
-});
-
-test('a due lettere da un marchio lungo il blocco torna col secondo segnale', () => {
-  for (const [url] of DUE_LETTERE) {
-    for (const [ctx, asyncData] of [[{}, GIOVANE], [{}, CERT_ROTTO], [{ hasPassword: true }, VECCHIO]]) {
-      assert.equal(evaluate(url, ctx, asyncData).level, 'pericoloso', url + ' ' + JSON.stringify(asyncData));
-    }
-  }
 });
 
 test('«rn» per «m» e «vv» per «w» contano una lettera sola: il sosia di un marchio lungo resta bloccato', () => {

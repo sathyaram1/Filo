@@ -1,6 +1,6 @@
-// Imitazioni di un marchio nel nome di un sito: i candidati li dà l'elenco dei marchi (brands.js), il verdetto un
-// classificatore sulle lettere, locale e sincrono (il nome non esce dal computer). Un verdetto solo per l'apertura della
-// pagina e per l'avviso sui link. Rigenerare il modello: scripts/addestra-imitazioni.mjs; prove: tests/unit/imitazioni.test.mjs.
+// Imitazioni di un marchio nel nome di un sito: i candidati dall'elenco dei marchi (brands.js), il verdetto da un
+// classificatore sulle lettere, locale e sincrono; uno solo per apertura e menu del link. Un falso allarme si cura con un
+// esempio in scripts/imitazioni/etichette.tsv e rigenerando (scripts/addestra-imitazioni.mjs), mai con una regola qui.
 
 'use strict';
 
@@ -21,11 +21,12 @@ const MARCHI = BRANDS.map((b) => ({
   brand: b,
   token: b.token,
   // Come il marchio si legge a schermo: office365 lì è officee6s, come ogni etichetta che lo porta.
-  lettura: null,
+  lettura: scheletroDi(b.token).testo,
   soglia: tolleranza(b.token.length),
   parola: MARCHI_PAROLA.has(b.token),
   forme: (MARCHI_PAROLA.get(b.token) || []).filter((x) => x !== b.token),
   omonimi: new Set(b.omonimi || []),
+  suffissi: b.domains.filter((d) => d.startsWith(b.token + '.')).map((d) => d.slice(b.token.length + 1)),
 }));
 
 // Un'etichetta letta come a schermo (confusables.js), a pezzi fra i trattini. Per ogni lettera: `testo` è come si
@@ -77,8 +78,6 @@ function unisci(pezzi) {
     tagli,
   };
 }
-
-for (const mc of MARCHI) mc.lettura = scheletroDi(mc.token).testo;
 
 // Le coppie di lettere che a schermo si scambiano: un refuso fra queste è un travestimento (lcloud, appie, gooqle).
 const SOMIGLIANTI = new Set(['il', 'li', 'lj', 'jl', 'ij', 'ji', 'iy', 'yi', 'vw', 'wv', 'uv', 'vu', 'mn', 'nm', 'gq', 'qg', 'ao', 'oa', 'ce', 'ec', 'rn', 'nr']);
@@ -169,6 +168,8 @@ function dentroConErrori(s, t, max) {
   return { d, inizio, fine };
 }
 
+const ESCA_MAX = 8;
+
 // Le etichette del nome divise per zona: il nome del sito (sld), quelle davanti (sotto) e le parole prima della
 // chiocciola (esca), che a schermo aprono l'indirizzo ma il browser scarta.
 function zoneDi(norm, esca) {
@@ -182,7 +183,8 @@ function zoneDi(norm, esca) {
   // `segue`: l'etichetta subito dopo, che in paypal.com.altro.net è il finto dominio di primo livello.
   if (sld) zone.push({ zona: 'sld', etichetta: sld, segue: '' });
   sotto.forEach((e, i) => zone.push({ zona: 'sotto', etichetta: e, segue: i + 1 < sotto.length ? sotto[i + 1] : sld }));
-  const parole = (esca || []).map((e) => String(e || '').toLowerCase()).filter(Boolean);
+  // Davanti alla chiocciola si scrive quello che si vuole e quanto si vuole: bastano le prime parole, come a schermo.
+  const parole = (esca || []).slice(0, ESCA_MAX).map((e) => String(e || '').toLowerCase().slice(0, 63)).filter(Boolean);
   parole.forEach((e, i) => zone.push({ zona: 'esca', etichetta: e, segue: parole[i + 1] || '' }));
   return zone;
 }
@@ -264,7 +266,9 @@ function caratteristiche(c, zone, info) {
   if (c.simile) f.push('si=' + k, 'sil=' + k + lun);
   if (c.errore) f.push('er=' + c.errore + k, 'erl=' + c.errore + lun);
   // Lo stesso suffisso di un indirizzo vero del marchio (gooogle.com accanto a google.com): l'errore di chi digita.
-  if (c.zona === 'sld' && c.mc.brand.domains.includes(t + '.' + suff)) f.push('uf=' + k);
+  if (c.zona === 'sld' && c.mc.brand.domains.includes(t + '.' + suff)) f.push('uf=' + k + c.d);
+  // Il nome giusto con un refuso nel suffisso (github.co per github.com).
+  if (k === 'esatto' && c.zona === 'sld' && !c.mc.suffissi.includes(suff) && c.mc.suffissi.some((x) => distanza(x, suff) === 1)) f.push('ut=' + k);
   f.push('rl=' + fascia(resto.length, [0, 2, 4, 6, 9, 13, 20]) + k);
   f.push('nh=' + Math.min(4, c.sk.tagli.length - 2) + c.zona);
   f.push('nd=' + fascia((crudo.match(/[0-9]/g) || []).length, [0, 1, 3, 6]));
@@ -311,7 +315,13 @@ function impronta(s) {
 let modello = null;
 function caricaModello() {
   if (modello) return modello;
-  const buf = fs.readFileSync(FILE_MODELLO);
+  let buf;
+  // Senza modello il controllo tace sui marchi invece di far cadere tutto il verdetto; lo dice una volta, nel log.
+  try { buf = fs.readFileSync(FILE_MODELLO); } catch (e) {
+    console.error('[safebrowse] modello delle imitazioni illeggibile:', e.message);
+    modello = { bias: -Infinity, scala: 0, pesi: new Int8Array(1), maschera: 0, soglia: 1, sogliaForte: 1 };
+    return modello;
+  }
   const lungTesta = buf.readUInt32LE(4);
   const testa = JSON.parse(buf.toString('utf8', 8, 8 + lungTesta));
   const inizio = 8 + lungTesta;

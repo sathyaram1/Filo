@@ -67,6 +67,20 @@ test('un indirizzo di tutti i giorni non si prende l’avviso', async ({ openTab
   await expect(menuDi(page).locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
 });
 
+test('i siti veri che le regole di prima prendevano per imitazioni non si prendono l’avviso (#1375)', async ({ openTab, testServer }) => {
+  const veri = ['https://www.laposte.fr/', 'https://www.telegraph.co.uk/news/', 'https://spid.register.it/login', 'https://www.cloud.it/'];
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+    ${veri.map((u, i) => `<p><a id="v${i}" href="${u}">Sito ${i}</a></p>`).join('')}</body></html>`);
+  for (let i = 0; i < veri.length; i++) {
+    await page.locator('#v' + i).click({ button: 'right' });
+    await expect(menuDi(page).locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
+    await page.waitForTimeout(600);
+    await expect(menuDi(page).locator('.sn-menu .sn-menu-link-warn'), veri[i]).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(menuDi(page).locator('.sn-menu')).toHaveCount(0);
+  }
+});
+
 test('la spiegazione arriva da sola: nel menu non c’è niente da cliccare', async ({ openTab, testServer }) => {
   // Il manifesto prometteva «Spiega link» e «Spiegazione», voci che non
   // esistono: la sezione si riempie da sola all'apertura del menu (#725).
@@ -148,6 +162,8 @@ const IMITAZIONI = {
   'legato col trattino': ['https://secure-paypal.com/', /paypal\.com.*secure-paypal\.com/],
   'nome e dominio col trattino': ['https://paypal-com.net/', /paypal\.com.*paypal-com\.net/],
   'lettere cirilliche': ['https://раураl.com/', /paypal\.com.*lettere/],
+  // #1375 — un marchio che il menu prima non conosceva: il giudizio è quello dell'apertura, chiesto al main.
+  'di un marchio italiano': ['https://inps-rimborso.com/', /inps\.it.*inps-rimborso\.com/],
 };
 
 for (const [forma, [href, atteso]] of Object.entries(IMITAZIONI)) {
@@ -164,5 +180,6 @@ for (const [forma, [href, atteso]] of Object.entries(IMITAZIONI)) {
     if (forma === 'davanti a un altro dominio') {
       await page.screenshot({ path: 'tests/.shots/725-2-nome-davanti.png' });
     }
+    if (forma === 'di un marchio italiano') await page.screenshot({ path: 'tests/.shots/1375-marchio-italiano.png' });
   });
 }
