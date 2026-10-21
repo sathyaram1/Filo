@@ -1179,7 +1179,7 @@
 
   async function copyImage(imgEl) {
     try {
-      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src);
+      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src, imgEl);
       const blob = dataUrlToBlob(originale);
       let pngBlob = blob;
       // Clipboard API supporta image/png; converte se serve
