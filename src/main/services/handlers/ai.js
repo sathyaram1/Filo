@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto, segnaLetturaAiuto,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
