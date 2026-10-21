@@ -113,6 +113,13 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   assert.equal(p.costo, 2);
   assert.equal(p.allenta, true, 'spegnere la protezione abbassa una difesa (#530)');
   assert.match(p.risk, /saldi, movimenti, mail e referti/);
+  // #1274 — chi lo spegne sa tutto quello che torna ai modelli, non solo il riassunto.
+  for (const cosa of [/titoli delle schede di banca e posta/, /screenshot/, /spiegazione si prepara/]) assert.match(p.risk, cosa);
+  require('../../src/shared/i18n.js');
+  const desc = globalThis.SN_I18N.t('options_security_delicate_desc');
+  for (const cosa of [/pubblica amministrazione/, /chat/, /screenshot/, /spiegazione/]) assert.match(desc, cosa);
+  const d = P.buildPreferencePartial('descrizione automatica delle immagini', 'no');
+  assert.deepEqual(d.partial, { descriviImmagini: { enabled: false } });
   const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
   assert.deepEqual(s.elenco.voci, ['studiorossi.it']);
   assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi commercialista').rifiuto, /«commercialista» non è un dominio/);
