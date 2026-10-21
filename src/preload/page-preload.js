@@ -84,12 +84,10 @@ function riquadroInVolo(f) {
 // Nel documento e nelle sue ombre aperte; una chiusa non si vede (lo stesso limite dei gesti, più sotto).
 function riquadriInVolo(doc = document) {
   try {
-    const passi = doc.createTreeWalker(doc, NodeFilter.SHOW_ELEMENT);
     const radici = [doc];
-    for (let el = passi.currentNode; el; el = passi.nextNode()) if (el.shadowRoot) radici.push(el.shadowRoot);
     for (let i = 0; i < radici.length; i++) {
-      if (i) for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot);
       for (const f of radici[i].querySelectorAll('iframe, frame')) if (riquadroInVolo(f)) return true;
+      for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot);
     }
   } catch (_) {}
   return false;
