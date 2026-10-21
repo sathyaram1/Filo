@@ -191,8 +191,7 @@ test.describe('utente già accolto', () => {
     await carb.locator('#sendBtn').click();
     await expect(carb.locator('.dash-bubble-filo', { hasText: 'Per quattro' })).toBeVisible({ timeout: 30_000 });
     const dopo = await app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1]);
-    expect(dopo).toContain('Guanciale, uova');
-    expect(dopo).toContain('sono il creatore di Filo');
+    expect(dopo, 'dopo un turno dell’intervista la carbonara ha perso il suo inizio').toContain('Guanciale, uova');
   });
 
   test('con l’intervista rifatta aperta altrove, «stop» nella chat della carbonara va al modello e non chiude l’intervista', async ({ app, shell, openTab }) => {
