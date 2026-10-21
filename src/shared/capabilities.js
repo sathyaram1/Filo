@@ -770,8 +770,11 @@
   // `aperti` = i cancelli aperti per chi chiede, es. { redteam: true }. Una voce con `cancello` chiuso non esiste:
   // l'agente non la propone e non la racconta (#896). Senza `aperti` i cancelli sono chiusi.
 
+  // Dentro i testi, `{se:<cancello>}…{altrimenti}…{/se}` dice una cosa solo a chi ha quel cancello aperto (#1592):
+  // le voci che restano non nominano una funzione in pausa, ma la raccontano a chi la vede.
+  const aperto = (aperti, nome) => !!(aperti && aperti[nome] === true);
   function visibili(aperti) {
-    return CAPABILITIES.filter((c) => !c.cancello || (aperti && aperti[c.cancello] === true)).map(conTasti);
+    return CAPABILITIES.filter((c) => !c.cancello || aperto(aperti, c.cancello)).map((c) => conTasti(c, aperti));
   }
 
   // I tasti di Spiega, Traduci, Salva per dopo e Aiuto li sceglie l'utente (#842): nei testi stanno come
