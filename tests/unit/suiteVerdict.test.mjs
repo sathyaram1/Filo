@@ -407,7 +407,7 @@ describe('le parti con Playwright vero, come in suite.yml', () => {
   // Dentro tests/.smoke (ignorata da git): gli spec di prova trovano @playwright/test risalendo ai node_modules.
   const dir = resolve(ROOT, 'tests', '.smoke', 'suite-verdict-parti');
   const pulito = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(PLAYWRIGHT_|PW_|TEST_WORKER_INDEX|TEST_PARALLEL_INDEX)/.test(k)));
-  const pw = (args, env = {}) => spawnSync(process.execPath, [CLI_PW, ...args], { cwd: dir, encoding: 'utf8', env: { ...pulito(), ...env }, timeout: 120_000 });
+  const pw = (args, env = {}) => spawnSync(process.execPath, [CLI_PW, ...args], { cwd: dir, encoding: 'utf8', env: { ...pulito(), ...env }, timeout: TETTO_ATTESA_MS });
 
   test('una parte fermata dal tetto lascia l\'esito, e il verdetto unito dice il tetto e il rosso dell\'altra', { skip: !existsSync(CLI_PW) && 'manca @playwright/test' }, () => {
     togliCartella(dir);
