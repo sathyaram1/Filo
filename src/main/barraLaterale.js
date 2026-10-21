@@ -431,7 +431,21 @@ class BarraLaterale {
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
+      aiuto: this._aiuto(t),
+      risposta: !!t && RisposteInAttesa.inAttesa(t),
     };
+  }
+
+  // L'icona Aiuto (#1432) da quello che la scheda davanti riferisce del suo pannello. `spenta` dove la voce «Aiuto» del
+  // tasto destro non c'è; sotto l'avviso del sito il clic è la domanda a Filo su quel sito, come dalla scorciatoia.
+  _aiuto(t) {
+    if (!t) return { spenta: 'pagina' };
+    const a = t.aiuto;
+    if (this.tabs.vistaSottoIlVuoto() !== t.view) return { pannello: 'chiuso', spenta: a && a.spento === 'aiuto' ? 'aiuto' : '' };
+    // Nessuna notizia dalla pagina: si sta ancora caricando, o Filo lì dentro non c'è (il visore PDF).
+    if (!a) return t.loading ? { pannello: 'chiuso' } : { spenta: 'pagina' };
+    if (a.spento) return { spenta: a.spento };
+    return { pannello: a.pannello, voce: a.voce, risposta: RisposteInAttesa.inAttesa(t, 'aiuto') };
   }
 
   _attiva() {
