@@ -950,5 +950,7 @@ module.exports = {
   setCreditsKnobs,
   getRedteamOpen,
   setRedteamOpen,
+  getApertoATutti,
+  setApertoATutti,
   getWorkerLog,
 };
