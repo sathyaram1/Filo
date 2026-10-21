@@ -2976,8 +2976,9 @@
     const cl = MR.classifyBlock(fb);
     return !!(cl && cl.reason === 'unfiltered');
   }
+  // Le due barre agiscono solo su quello che si vede: col filtro della fiducia acceso, sulle non fidate.
   function unfilteredFeedbacks() {
-    return allFeedbacks.filter(isUnfiltered);
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate).filter(isUnfiltered);
   }
   function setReevalMsg(text, kind) {
     if (!mgReevalMsg) return;
