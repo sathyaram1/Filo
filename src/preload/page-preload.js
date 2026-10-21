@@ -700,10 +700,11 @@ try {
   // Il segno lo mette solo il preload di un frame per sé; lo vedono i preload degli altri frame dello stesso sito.
   const PRELOAD_PROPRIO = Symbol.for('filo:gesto-preload-proprio');
   const seguiti = new WeakSet();
-  const inArrivo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
+  // Visto per la prima volta con un indirizzo, si presume in arrivo: in una radice ombra il conto dei load non c'è.
+  const conIndirizzo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
   const senzaPreload = (f, caricato) => {
-    if (!caricato && inArrivo(f)) return null;
-    try { const w = f.contentWindow; return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
+    if (!caricato && conIndirizzo(f)) return null;
+    try { const w = globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f); return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
   };
   // Riquadri che aspettano il primo load: finché c'è, nessuna finestra si tocca alla cieca.
   const inAttesa = new Set();
