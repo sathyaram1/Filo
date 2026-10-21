@@ -544,10 +544,10 @@ module.exports = function register(on, ctx) {
     return '';
   }
 
-  on(MSG.TEST_PROVIDER, async (msg) => {
+  on(MSG.TEST_PROVIDER, async (msg, sender, origin) => {
     try {
       const provider = msg.provider;
-      const apiKey = (msg.apiKey || '').trim();
+      let apiKey = (msg.apiKey || '').trim();
       // "Solo modelli a pesi aperti" (#461): la prova è una chiamata VERA, quindi
       // passa dallo stesso cancello delle funzioni. Il fornitore si controlla
       // prima del modello: chiedergli quale modello proverebbe non ha senso se
