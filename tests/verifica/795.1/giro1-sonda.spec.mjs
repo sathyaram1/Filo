@@ -78,6 +78,11 @@ test('Normale, pagina letta: «dimentica per sempre» vuole la parola «conferma
     await chiedi(page, `leggi ${url}`);
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Letta.' })).toBeVisible({ timeout: 15000 });
     await chiedi(page, 'dimentica per sempre il tè');
+    // Il costo 3 resta a clic esplicito: il bottone apre il box con la parola.
+    const btn = page.locator('button', { hasText: 'Filo sta per cancellare per sempre' });
+    await expect(btn).toBeVisible({ timeout: 15000 });
+    console.log('DIARIO prima del clic:', JSON.stringify(await page.locator('.dash-activity').last().innerText()));
+    await btn.click();
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
     const s = await confirmState(page);
     expect(s.hasInput).toBe(true);
