@@ -39,7 +39,7 @@
   const DEFAULT = Object.freeze({
     primary: Object.freeze(['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
     secondary: Object.freeze(['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']),
-    bar: Object.freeze(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']),
+    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']),
   });
 
   const MAX_PRIMARY = 6;
