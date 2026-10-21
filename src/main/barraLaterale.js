@@ -497,6 +497,21 @@ class BarraLaterale {
     return out;
   }
 
+  _iconaAiuto(id, a) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const I18n = globalThis.SN_I18N;
+    const t = (k) => (I18n ? I18n.t(k) : k);
+    const aspetto = D.aspettoAiuto(a);
+    const spenta = !!a.spenta;
+    const T = globalThis.SN_TASTI;
+    const tasto = !spenta && aspetto.icona === 'help' && T ? T.etichettaFilo(T.scorciatoiaFilo('open-help-sidebar')) : '';
+    return {
+      id, icona: aspetto.icona, etichetta: t(aspetto.etichetta), tasto, spenta,
+      motivo: spenta ? t(MOTIVI_AIUTO_SPENTO[a.spenta] || MOTIVI_AIUTO_SPENTO.pagina) : '',
+      accesa: !spenta && aspetto.ascolta, ascolta: !spenta && aspetto.ascolta, risposta: !spenta && !!a.risposta, pagina: false,
+    };
+  }
+
   // ── le azioni della pagina, col nome che hanno sulla pagina ──────────────
 
   _etichetteAttive() {
