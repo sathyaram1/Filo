@@ -437,7 +437,7 @@
     const cur = normalize(state);
     return cur.done
       ? { ...emptyState(), done: true, closedAt: cur.closedAt }
-      : emptyState();
+      : { ...emptyState(), ...(cur.rifatta ? { rifatta: true } : {}) };
   }
 
   // Le interviste conservate, dalla più recente: quella corrente (appena ha una
