@@ -283,18 +283,24 @@ test('il manifesto delle capacità nomina le sezioni scritte e annuncia le manca
 
 // Il manifesto fermo e i documenti che cambiano: il confronto deve accorgersene in ogni verso.
 test('il confronto col manifesto si accorge di un documento scritto o tolto', () => {
+  const { T } = loadModules();
   const voce = voceManifesto();
+  const doc = (id, titolo, ...meta) => ['---', `id: ${id}`, `title: ${titolo}`, ...meta, 'updated: 2026-12-01', '---',
+    '', 'Testo.', '', '## Una sezione', '', 'Altro testo.', ''];
+  const ultimo = T.all()[T.all().length - 1];
+  const fileDi = (id) => readdirSync(join(ROOT, 'transparency')).filter((f) => f.endsWith('.md'))
+    .find((f) => (/^id:\s*(\S+)/m.exec(readFileSync(join(ROOT, 'transparency', f), 'utf8')) || [])[1] === id);
   const casi = [
-    { cosa: 'scritta «Come si sostiene»', etichetta: 'Come si sostiene', extra: {
-      'business.md': ['---', 'id: business', 'title: Come si sostiene Filo', 'updated: 2026-12-01', '---',
-        '', 'Filo costa tanto così.', '', '## Dove vanno i soldi', '', 'Qui.', ''],
-    } },
-    { cosa: 'scritto un documento che nessuno aveva annunciato', etichetta: 'Dati', extra: {
-      'dati.md': ['---', 'id: dati', 'title: I tuoi dati', 'nav: Dati', 'updated: 2026-12-01', 'order: 5', '---',
-        '', 'Filo tiene i tuoi dati sul tuo computer.', '', '## Cosa esce da qui', '', 'Solo quello che chiedi tu.', ''],
-    } },
-    { cosa: 'tolto il documento sulla sicurezza', etichetta: 'Sicurezza', togli: ['security.md'] },
+    { cosa: 'scritto un documento che nessuno aveva annunciato', etichetta: 'Dati',
+      extra: { 'zz-dati.md': doc('zz-dati', 'I tuoi dati', 'nav: Dati', 'order: 50') } },
+    { cosa: `tolto il documento "${ultimo.id}"`, etichetta: T.NAV.find((n) => n.id === ultimo.id).label,
+      togli: [fileDi(ultimo.id)] },
   ];
+  const annunciata = T.NAV.find((n) => !T.ids().includes(n.id));
+  if (annunciata) {
+    casi.push({ cosa: `scritta la sezione annunciata "${annunciata.label}"`, etichetta: annunciata.label,
+      extra: { [`zz-${annunciata.id}.md`]: doc(annunciata.id, annunciata.label) } });
+  }
   for (const c of casi) {
     const { tmp, leggi } = generaCopia(c.extra || {}, c.togli);
     const ctx = {};
