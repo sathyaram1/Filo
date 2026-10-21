@@ -796,7 +796,13 @@ module.exports = function register(on, ctx) {
     try {
       const limit = Number(msg && msg.limit);
       const r = await callSecurityFunction('routineLog', Number.isFinite(limit) ? { limit } : {});
-      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [], proveFusione: (r && r.proveFusione) || null };
+      return {
+        ok: true,
+        rejections: (r && r.rejections) || [],
+        comparisons: (r && r.comparisons) || [],
+        proveFusione: (r && r.proveFusione) || null,
+        stabile: Array.isArray(r && r.stabile) ? r.stabile : [],
+      };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }

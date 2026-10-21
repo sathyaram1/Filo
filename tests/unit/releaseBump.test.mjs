@@ -25,6 +25,7 @@ import {
   exitCodeForBump,
   messageForBump,
   askServerBump,
+  argomentiBump,
 } from '../../scripts/release-bump.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -142,12 +143,12 @@ function fintoServer(risposta, status = 200) {
  * ⚠️ spawn ASINCRONO, mai spawnSync: il server finto vive in QUESTO processo,
  * e spawnSync bloccherebbe l'event loop.
  */
-function cli(port, { passphrase = 'segreto-di-prova' } = {}) {
+function cli(port, { passphrase = 'segreto-di-prova', argomenti = [] } = {}) {
   const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
   if (passphrase) env.FILO_BUILD_PASSPHRASE = passphrase;
   else delete env.FILO_BUILD_PASSPHRASE;
   return new Promise((risolvi) => {
-    const p = spawn(process.execPath, [CLI], { env });
+    const p = spawn(process.execPath, [CLI, ...argomenti], { env });
     let stdout = ''; let stderr = '';
     p.stdout.on('data', (c) => { stdout += c; });
     p.stderr.on('data', (c) => { stderr += c; });
@@ -223,6 +224,73 @@ describe('il CLI', () => {
       const r = await cli(port, { passphrase: '' });
       assert.equal(r.status, 2);
       assert.equal(richieste.length, 0, 'senza credenziale non si bussa nemmeno');
+    } finally { srv.close(); }
+  });
+});
+
+// ─── il canale stabile (SPEC-DOMANDE.md §4.2): la minor del lunedì la decide il server ─────────────────────────────
+
+describe('la minor del canale stabile', () => {
+  test('gli argomenti: patch di serie, --minor, --controlla-minor; uno sconosciuto non diventa una patch', () => {
+    assert.deepEqual(argomentiBump([]), { tipo: 'patch', soloControllo: false });
+    assert.deepEqual(argomentiBump(['--minor']), { tipo: 'minor', soloControllo: false });
+    assert.deepEqual(argomentiBump(['--controlla-minor']), { tipo: 'minor', soloControllo: true });
+    assert.ok(argomentiBump(['--major']).errore);
+  });
+
+  test('nel corpo della minor c’è il tipo e basta: il numero lo calcola sempre il server', async () => {
+    const corpi = [];
+    const fetchImpl = async (_u, opts) => { corpi.push(JSON.parse(opts.body)); return { status: 200, text: async () => JSON.stringify({ ok: true, version: '0.3.0' }) }; };
+    await askServerBump({ passphrase: 's', tipo: 'minor', fetchImpl });
+    await askServerBump({ passphrase: 's', tipo: 'minor', soloControllo: true, fetchImpl });
+    assert.deepEqual(corpi, [{ passphrase: 's', tipo: 'minor' }, { passphrase: 's', tipo: 'minor', soloControllo: true }]);
+  });
+
+  test('«non dovuta» (409) è un esito suo: uscita 4, non un rifiuto né un guasto', () => {
+    const r = classifyBump(409, { ok: false, reason: 'minor_saltata', detail: 'minor della settimana del 2026-10-26 non dovuta: #12' });
+    assert.equal(r.outcome, 'not_due');
+    assert.equal(exitCodeForBump(r), 4);
+    assert.match(messageForBump(r), /saltata per un feedback di sicurezza/);
+  });
+
+  test('--controlla-minor stampa si o no, e il motivo su stderr', async () => {
+    const { srv, richieste, port } = await fintoServer({ ok: true, controllo: true, dovuta: false, motivo: 'minor_sicurezza', lunedi: '2026-10-26', aperti: ['#12'] });
+    try {
+      const r = await cli(port, { argomenti: ['--controlla-minor'] });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout, 'no\n');
+      assert.match(r.stderr, /#12/);
+      assert.deepEqual(richieste[0].body, { passphrase: 'segreto-di-prova', tipo: 'minor', soloControllo: true });
+    } finally { srv.close(); }
+    const dovuta = await fintoServer({ ok: true, controllo: true, dovuta: true, lunedi: '2026-10-26' });
+    try {
+      const r = await cli(dovuta.port, { argomenti: ['--controlla-minor'] });
+      assert.equal(r.stdout, 'si\n');
+    } finally { dovuta.srv.close(); }
+  });
+
+  test('--minor: il numero su stdout se esce, uscita 4 e stdout vuoto se non è dovuta', async () => {
+    const esce = await fintoServer({ ok: true, version: '0.3.0', previous: '0.2.242' });
+    try {
+      const r = await cli(esce.port, { argomenti: ['--minor'] });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout, '0.3.0\n');
+      assert.deepEqual(esce.richieste[0].body, { passphrase: 'segreto-di-prova', tipo: 'minor' });
+    } finally { esce.srv.close(); }
+    const no = await fintoServer({ ok: false, reason: 'minor_gia_uscita' }, 409);
+    try {
+      const r = await cli(no.port, { argomenti: ['--minor'] });
+      assert.equal(r.status, 4);
+      assert.equal(r.stdout, '');
+    } finally { no.srv.close(); }
+  });
+
+  test('un argomento sbagliato non chiede niente al server', async () => {
+    const { srv, richieste, port } = await fintoServer({ ok: true, version: '0.2.197' });
+    try {
+      const r = await cli(port, { argomenti: ['--minr'] });
+      assert.equal(r.status, 2);
+      assert.equal(richieste.length, 0);
     } finally { srv.close(); }
   });
 });

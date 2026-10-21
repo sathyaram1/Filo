@@ -72,6 +72,9 @@
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
     },
+    'aggiornamenti.canale': {
+      nome: 'canale degli aggiornamenti', valori: { veloce: 'veloce, ogni versione', stabile: 'stabile, una versione il lunedì' }, livello: 1,
+    },
     'terminal.shell': { nome: 'shell del terminale', valori: { powershell: 'PowerShell', cmd: 'Prompt dei comandi', bash: 'Bash' }, livello: 2 },
     'tts.voice': { nome: 'voce di riserva della lettura', valore: (v) => v || 'automatica', livello: 1 },
     'tts.rate': { nome: 'velocità di lettura', valore: (v) => `${numero(v)}×`, livello: 1 },

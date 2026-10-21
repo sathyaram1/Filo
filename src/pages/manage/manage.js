@@ -1550,9 +1550,25 @@
       + `</li>`;
   }
 
-  function renderChannelLog(rejections, comparisons, prove = null) {
+  // La minor del lunedì (SPEC-DOMANDE.md §4.2): uscita, o saltata coi feedback di sicurezza che l'hanno fermata.
+  function righeStabile(settimane) {
+    return (Array.isArray(settimane) ? settimane : []).map((w) => {
+      const saltata = !w || w.esito !== 'uscita';
+      const aperti = Array.isArray(w && w.aperti) ? w.aperti.map(String).join(', ') : '';
+      return {
+        at: w && w.at,
+        kind: saltata ? 'deny' : 'cmp',
+        label: 'Canale stabile',
+        text: saltata
+          ? `settimana del ${String((w && w.lunedi) || '?')} saltata: sicurezza aperta${aperti ? ` (${aperti})` : ''}`
+          : `uscita la ${String((w && w.versione) || '?')}`,
+      };
+    });
+  }
+
+  function renderChannelLog(rejections, comparisons, prove = null, stabile = []) {
     if (!mgChannelSection || !mgChannelList) return;
-    const rows = righeSenzaProva(prove);
+    const rows = righeSenzaProva(prove).concat(righeStabile(stabile));
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
       rows.push({
         at: r && r.at,
@@ -1840,7 +1856,7 @@
     try {
       const r = await sendToMain({ type: ROUTINE_LOG_GET });
       if (!r || r.ok === false) { mgChannelSection.hidden = true; return; }
-      renderChannelLog(r.rejections, r.comparisons, r.proveFusione);
+      renderChannelLog(r.rejections, r.comparisons, r.proveFusione, r.stabile);
     } catch (err) {
       console.error('[manage] caricamento registri canale fallito:', err);
       mgChannelSection.hidden = true;

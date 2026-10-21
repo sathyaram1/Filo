@@ -89,6 +89,7 @@
     {
       version: '0.2.244', date: '2026-10-21',
       features: [
+        'Puoi scegliere quali versioni di Filo ricevere. «Veloce» le prende appena escono, anche più volte al giorno. «Stabile» ne prende una a settimana, il lunedì, e quella settimana la salta se c\'è un problema di sicurezza ancora aperto. Lo trovi in Preferenze, sotto Aggiornamenti, oppure chiedilo a Filo. Le novità delle versioni saltate le leggi tutte insieme quando arriva quella del lunedì.',
         'In cima alla barra laterale c\'è l\'icona Aiuto. Un clic apre l\'Aiuto sulla pagina, un secondo clic nello stesso punto ti fa parlare e un terzo ferma la dettatura. Se riduci o chiudi l\'Aiuto mentre Filo risponde, la risposta resta lì e la striscia sul bordo sinistro si accende finché non la apri. Puoi spostare o togliere l\'icona come le altre.',
       ],
       fixes: [

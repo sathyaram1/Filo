@@ -831,6 +831,11 @@
   // legge e cambia ogni preferenza (#949).
   const CAMPO_DI = window.SN_VOCI_IMPOSTAZIONI.campi('preferences');
 
+  function canaleScelto() {
+    const r = document.querySelector('input[name="aggiornamenti-canale"]:checked');
+    return r && r.value === 'stabile' ? 'stabile' : 'veloce';
+  }
+
   function valoreDelCampo(k) {
     switch (k) {
       case 'theme': return $('theme').value;
@@ -854,6 +859,7 @@
       case 'propostaEmail.incognito': return $('propostaEmailIncognito').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
+      case 'aggiornamenti.canale': return canaleScelto();
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
       case 'tts.pitch': return parseFloat($('ttsPitch').value) || 1;
@@ -945,6 +951,7 @@
       case 'propostaEmail.attiva': return !(s.propostaEmail && s.propostaEmail.attiva === false);
       case 'propostaEmail.incognito': return !!(s.propostaEmail && s.propostaEmail.incognito === true);
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+      case 'aggiornamenti.canale': return s.aggiornamenti && s.aggiornamenti.canale === 'stabile' ? 'stabile' : 'veloce';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -1143,6 +1150,10 @@
     $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+    }
+    if (vuole('aggiornamenti.canale')) {
+      const canale = settings.aggiornamenti && settings.aggiornamenti.canale === 'stabile' ? 'stabile' : 'veloce';
+      for (const r of document.querySelectorAll('input[name="aggiornamenti-canale"]')) r.checked = r.value === canale;
     }
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
@@ -1909,6 +1920,7 @@
       $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs);
     });
     $('aggiornamentiInstalla').addEventListener('change', persist);
+    $('aggiornamentiCanale').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
     if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {

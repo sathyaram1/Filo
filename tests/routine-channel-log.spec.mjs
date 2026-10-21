@@ -133,3 +133,30 @@ test('le fusioni senza prova degli unit compaiono all owner, e quando sono frequ
   await expect(rows).toHaveCount(2);
   await expect(page.locator('#mgChannelList')).not.toContainText('delle ultime');
 });
+
+// SPEC-DOMANDE.md §4.2: una settimana del canale stabile saltata per la sicurezza la dice il registro, senza domande.
+test('il canale stabile: la minor uscita e la settimana saltata, coi feedback che l\'hanno fermata', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderChannelLog);
+  await apriScheda(page, 'log');
+
+  const stabile = [
+    { id: '2026-10-26', at: '2026-10-25T23:02:00.000Z', lunedi: '2026-10-26', esito: 'saltata', aperti: ['#1201', '#1207.2'] },
+    { id: '2026-10-19', at: '2026-10-18T22:03:00.000Z', lunedi: '2026-10-19', esito: 'uscita', versione: '0.3.0' },
+    { id: '2026-10-12', at: '2026-10-11T22:01:00.000Z', lunedi: '2026-10-12', esito: 'saltata', aperti: ['<img src=x onerror=alert(1)>'] },
+  ];
+  await page.evaluate((s) => window.__mgTest.renderChannelLog([], [], null, s), stabile);
+
+  const rows = page.locator('#mgChannelList .mg-log-row');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText('Canale stabile');
+  await expect(rows.nth(0)).toContainText('settimana del 2026-10-26 saltata');
+  await expect(rows.nth(0)).toContainText('#1201, #1207.2');
+  await expect(rows.nth(0).locator('.mg-log-role--deny')).toHaveCount(1);
+  await expect(rows.nth(1)).toContainText('uscita la 0.3.0');
+  await expect(rows.nth(1).locator('.mg-log-role--deny')).toHaveCount(0);
+  // Un numero che arriva dal registro resta testo.
+  await expect(rows.nth(2)).toContainText('<img src=x onerror=alert(1)>');
+  await expect(page.locator('#mgChannelList img')).toHaveCount(0);
+});

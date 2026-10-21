@@ -651,6 +651,23 @@
             <span>Installa gli aggiornamenti da solo</span>
           </label>
         </div>
+        <p class="sn-muted" id="aggiornamentiCanaleTitolo" style="margin-top:12px;margin-bottom:0;">Quali versioni</p>
+        <div class="sn-cookie-modes" id="aggiornamentiCanale" role="radiogroup" aria-labelledby="aggiornamentiCanaleTitolo">
+          <label class="sn-cookie-mode">
+            <input type="radio" name="aggiornamenti-canale" value="veloce" />
+            <span>
+              <span class="sn-cookie-mode-label">Veloce</span>
+              <span class="sn-muted sn-cookie-mode-desc">Ogni versione appena esce, anche più volte al giorno.</span>
+            </span>
+          </label>
+          <label class="sn-cookie-mode">
+            <input type="radio" name="aggiornamenti-canale" value="stabile" />
+            <span>
+              <span class="sn-cookie-mode-label">Stabile</span>
+              <span class="sn-muted sn-cookie-mode-desc">Una versione a settimana, il lunedì. Se c'è un problema di sicurezza ancora aperto, quella settimana non esce.</span>
+            </span>
+          </label>
+        </div>
         <!-- Solo su Windows: su Mac e Linux all'apertura non si installa niente (src/main/aggiornamentoRegole.js). -->
         <div id="aggiornamentiQuando" hidden>
           <p class="sn-muted" style="margin-top:12px;">Installata alla chiusura non si vede: se riapri Filo in quei dieci secondi, Windows dice che il collegamento non funziona.</p>

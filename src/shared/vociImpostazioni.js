@@ -55,6 +55,7 @@
         avvisoSchermoPienoDurata: 'avvisoSchermoPieno.durataMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        aggiornamentiCanale: 'aggiornamenti.canale',
         propostaEmailAttiva: 'propostaEmail.attiva',
         propostaEmailIncognito: 'propostaEmail.incognito',
         contestoGiorni: 'contestoFilo.giorni',

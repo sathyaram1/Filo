@@ -956,6 +956,32 @@
         };
       },
     },
+    // Il canale (SPEC-DOMANDE.md §4.2): la scelta vale su ogni sistema, anche dove l'installazione è a mano.
+    {
+      scrive: ['aggiornamenti.canale'],
+      aiuto: '"veloce" | "stabile", o true per "stabile" (veloce: ogni versione di Filo appena esce, anche più volte al giorno; stabile: una versione a settimana, il lunedì, che non esce se c\'è un problema di sicurezza ancora aperto)',
+      keys: ['canale_aggiornamenti', 'canale aggiornamenti', 'canale degli aggiornamenti', 'canale di aggiornamento',
+        'canale stabile', 'canale veloce', 'aggiornamenti stabili', 'versione stabile', 'aggiornamenti settimanali',
+        'quali versioni'],
+      costo: 1,
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+        const map = {
+          veloce: 'veloce', rapido: 'veloce', subito: 'veloce', 'ogni versione': 'veloce', tutte: 'veloce', frequente: 'veloce',
+          predefinito: 'veloce', 'di serie': 'veloce',
+          stabile: 'stabile', settimanale: 'stabile', 'una a settimana': 'stabile', lunedì: 'stabile', lunedi: 'stabile',
+          'il lunedì': 'stabile', tranquillo: 'stabile', 'meno spesso': 'stabile',
+        };
+        // «canale stabile: sì» / «aggiornamenti stabili: no».
+        const stabile = parsePrefBool(v);
+        const canale = map[s] || map[s.replace(/^canale /, '')] || (stabile === null ? null : (stabile ? 'stabile' : 'veloce'));
+        if (!canale) return null;
+        return {
+          partial: { aggiornamenti: { canale } },
+          label: `Canale degli aggiornamenti → ${canale === 'stabile' ? 'stabile, una versione il lunedì' : 'veloce, ogni versione'}`,
+        };
+      },
+    },
     // #1124 — il sito riceve l'email solo quando l'utente la sceglie: accendere e spegnere non cede niente.
     {
       scrive: ['propostaEmail.attiva'],

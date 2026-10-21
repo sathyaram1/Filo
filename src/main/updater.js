@@ -62,6 +62,7 @@ function nuovoStato() {
     percentuale: null,
     pronto: null,         // il ricordo della versione scaricata, con l'installatore verificato
     modo: R.MODO_PREDEFINITO,
+    canale: R.CANALE_PREDEFINITO,
     automatici: true,
     chiesto: false,       // l'utente ha premuto «Installa»: si installa anche da spento
     chiesta: null,        // la versione di quel «Installa», ricordata fra un avvio e l'altro
@@ -71,6 +72,7 @@ function nuovoStato() {
     scaricamento: null,   // { versione, percento } finché scarica
     pronta: null,         // la versione scaricata
     agganciata: false,    // electron-updater la installerà alla chiusura (vedi regola)
+    nelMotore: null,      // la versione che electron-updater ha scaricato in questa sessione, del canale o no
     errore: null,
     annuncia: () => {},
   };
@@ -88,6 +90,8 @@ function automaticiDa(settings) {
 function siInstalla() {
   return stato.automatici || stato.chiesto;
 }
+
+const delCanale = (versione) => R.versioneDelCanale(versione, stato.canale);
 
 // ── Il ricordo della versione scaricata: update-info.json di electron-updater non dice quale versione è ──
 
@@ -187,7 +191,7 @@ async function installaAllAvvioSeServe(impostazioni, { forza = false } = {}) {
     // Una seconda apertura mentre Filo è acceso non lancia niente: l'installatore chiuderebbe la prima.
     if (app && typeof app.hasSingleInstanceLock === 'function' && !app.hasSingleInstanceLock()) return false;
   } catch (_) {}
-  const tolti = togliAvvisiSuperati(versioneInUso());
+  const tolti = togliAvvisiSuperati(versioneInUso()).then(() => togliAvvisiFuoriCanale(R.canaleScelto(impostazioni)));
   // Chi apre Filo da un collegamento d'invito lo vuole adesso: l'installatore riaprirebbe Filo senza il collegamento.
   if ((dip.argv() || []).some((a) => /^filo:\/\//i.test(String(a)))) return false;
   const base = {
@@ -197,6 +201,7 @@ async function installaAllAvvioSeServe(impostazioni, { forza = false } = {}) {
     automatici: automaticiDa(impostazioni),
     chiesta: await richiestaValida(versioneInUso()),
     pronto: leggiRicordo(),
+    canale: R.canaleScelto(impostazioni),
   };
   let d = R.decidiAllAvvio({ ...base, installatoreValido: true });
   if (d.azione === 'installa' && !(await installatoreValido(d.pronto))) {
@@ -237,7 +242,9 @@ function regola() {
     // Lo scaricamento lo chiede sempre Filo, dopo il confronto fra numero ed etichetta (#1119): da solo
     // electron-updater partirebbe prima che Filo veda la versione.
     u.autoDownload = false;
-    u.autoInstallOnAppQuit = siInstalla() && R.piano(dip.piattaforma(), stato.modo).allaChiusura;
+    // Quello che electron-updater ha in mano lo installa alla chiusura chiunque l'abbia chiesto: fuori canale, mai.
+    u.autoInstallOnAppQuit = siInstalla() && R.piano(dip.piattaforma(), stato.modo).allaChiusura
+      && (stato.nelMotore == null || delCanale(stato.nelMotore));
     // electron-updater aggancia l'installazione alla chiusura solo a scaricamento finito: una versione già pronta
     // quando l'installazione si riaccende va riagganciata. Richiedere lo scaricamento di una versione già scaricata
     // la ritrova in cache e rifà l'aggancio, senza rete.
@@ -261,6 +268,8 @@ function scaricaVerificata(u) {
     rifiuta(info);
     return Promise.reject(new Error('versione rifiutata: il numero non è quello della sua etichetta'));
   }
+  // Trovata prima di passare al canale stabile: lì non esce, e non si scarica.
+  if (!delCanale(info.version)) return Promise.reject(new Error(`versione ${info.version} fuori dal canale ${stato.canale}`));
   return u.downloadUpdate();
 }
 
@@ -277,6 +286,8 @@ function rifiuta(info) {
 function seguiImpostazioni(settings) {
   const automatici = automaticiDa(settings);
   const modo = R.modoScelto(settings);
+  const canale = R.canaleScelto(settings);
+  if (canale !== stato.canale) cambiaCanale(canale);
   if (automatici === stato.automatici && modo === stato.modo) return;
   const cambiaAutomatici = automatici !== stato.automatici;
   stato.automatici = automatici;
@@ -292,6 +303,35 @@ function seguiImpostazioni(settings) {
   stato.annuncia();
 }
 
+// Passare al canale stabile toglie ciò che lì non esce: la versione trovata, quella pronta (e il suo ricordo, che
+// l'avvio installerebbe), le loro carte. Poi si richiede: sul veloce la versione nuova può esserci già.
+function cambiaCanale(canale) {
+  stato.canale = canale;
+  if (stato.versioneTrovata && !delCanale(stato.versioneTrovata)) {
+    stato.versioneTrovata = null;
+    stato.info = null;
+    stato.scaricamento = null;
+    if (stato.fase === 'scarica' || stato.fase === 'controllo') stato.fase = 'fermo';
+  }
+  if (stato.chiesta && !delCanale(stato.chiesta)) dimenticaRichiesta();
+  if (stato.pronta && !delCanale(stato.pronta)) {
+    stato.pronta = null;
+    stato.pronto = null;
+    stato.agganciata = false;
+    if (stato.fase === 'pronto') stato.fase = 'fermo';
+  }
+  const r = leggiRicordo();
+  if (r && !delCanale(r.versione)) scriviRicordo(null);
+  regola();
+  togliAvvisiFuoriCanale();
+  stato.annuncia();
+  if (updater) {
+    Promise.resolve().then(() => updater.checkForUpdates()).catch((e) => {
+      console.error('[updater] controllo dopo il cambio di canale fallito:', e?.message || e);
+    });
+  }
+}
+
 function shaDalFeed(info, file) {
   const nome = path.basename(String(file || ''));
   const voce = Array.isArray(info?.files) ? info.files.find((f) => path.basename(String(f?.url || '')) === nome) : null;
@@ -302,6 +342,14 @@ function quandoScaricato(info) {
   const versione = info?.version || stato.versioneTrovata || null;
   const file = info?.downloadedFile || null;
   contaAggiornamento('scaricato', String(versione || '?'));
+  stato.nelMotore = versione;
+  // Partito prima del passaggio al canale stabile: resta nella cache di electron-updater, ma non si installa.
+  if (!delCanale(versione)) {
+    stato.scaricamento = null;
+    regola();
+    stato.annuncia();
+    return;
+  }
   // electron-updater aggancia l'installazione alla chiusura subito dopo questo evento, solo se è accesa adesso.
   if (updater && updater.autoInstallOnAppQuit) stato.agganciata = true;
   stato.scaricamento = null;
@@ -356,6 +404,26 @@ function rifiutoDelCancello(messaggio, info) {
   return Object.assign(new Error(messaggio), { rifiutata: String((info && info.version) || '?') });
 }
 
+// Il latest.yml della release `tag`, letto come electron-updater legge quello della più recente: è lui a chiedere il tag
+// a getLatestTagName. Una copia del provider, non lui: un controllo in corso nello stesso momento non ne risente.
+// null se quella release non ha il file (una minor la cui pubblicazione si è fermata).
+async function leggiStabile(provider, tag) {
+  const lettore = Object.create(provider);
+  lettore.getLatestTagName = async () => tag;
+  try {
+    return await lettore.getLatestVersion();
+  } catch (e) {
+    if (e && e.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND') return null;
+    throw e;
+  }
+}
+
+// «Niente di nuovo» nella forma di electron-updater: la versione in uso, che non è più nuova di sé stessa.
+function nienteDiNuovo(au) {
+  const v = String((au && au.currentVersion && au.currentVersion.version) || versioneInUso() || '0.0.0');
+  return { version: v, files: [], path: '', sha512: '', releaseDate: '' };
+}
+
 function soloTagDiRilascio(au) {
   if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
   if (!dalMotore(au)) return;
@@ -368,19 +436,32 @@ function soloTagDiRilascio(au) {
   const originale = au.getUpdateInfoAndProvider;
   const cancello = async function (...args) {
     const r = await originale.apply(this, args);
-    const info = r && r.info;
-    if (!R.tagAccettato(info)) {
-      throw rifiutoDelCancello(`release ${info.tag} rifiutata: il tag non è v${info.version}`, info);
-    }
+    let info = r && r.info;
     const opz = r.provider && r.provider.options;
-    if (opz && opz.provider === 'github') {
+    const github = !!(opz && opz.provider === 'github');
+    let vero = null;
+    if (github) {
       // electron-updater lascia che il «tag:» di latest.yml copra quello vero: si richiede a GitHub, come fa lui.
       // Una release di prova, che Filo non pubblica, non è sotto /latest e viene rifiutata.
       if (typeof r.provider.getLatestTagName !== 'function') {
         throw new Error('aggiornamenti fermi: il provider GitHub di electron-updater non ha getLatestTagName');
       }
       const { CancellationToken } = require('electron-updater');
-      const vero = await r.provider.getLatestTagName(new CancellationToken());
+      vero = await r.provider.getLatestTagName(new CancellationToken());
+      if (stato.canale === 'stabile') {
+        const stabile = R.tagStabile(vero);
+        if (!stabile) throw rifiutoDelCancello(`release ${vero} rifiutata: il suo tag non è una versione`, info);
+        if (stabile !== vero) info = await leggiStabile(r.provider, stabile);
+        vero = stabile;
+      }
+    }
+    // La stabile della serie non c'è (la sua pubblicazione non è riuscita), o un provider che non si sa puntare:
+    // per il canale stabile non c'è niente di nuovo, ed electron-updater lo dice come lo dice sempre.
+    if (stato.canale === 'stabile' && (!info || !delCanale(info.version))) return Object.assign({}, r, { info: nienteDiNuovo(this) });
+    if (!R.tagAccettato(info)) {
+      throw rifiutoDelCancello(`release ${info.tag} rifiutata: il tag non è v${info.version}`, info);
+    }
+    if (github) {
       if (!R.tagDiGitHubAccettato(vero, info.version)) {
         throw rifiutoDelCancello(`release ${vero} rifiutata: il tag non è v${info.version}`, info);
       }
@@ -391,16 +472,16 @@ function soloTagDiRilascio(au) {
         throw rifiutoDelCancello(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`, info);
       }
     }
-    return r;
+    return info === r.info ? r : Object.assign({}, r, { info });
   };
   cancello.filoTag = true;
   au.getUpdateInfoAndProvider = cancello;
 }
 
-function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO } = {}) {
+function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO, canale = R.CANALE_PREDEFINITO } = {}) {
   updater = au;
   soloTagDiRilascio(au);
-  Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo });
+  Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo, canale });
   regola();
   au.on('checking-for-update', () => { if (stato.fase !== 'pronto') stato.fase = 'controllo'; });
   au.on('update-available', (info) => {
@@ -413,6 +494,11 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
       return;
     }
     stato.rifiutata = null;
+    // Un controllo partito prima del passaggio al canale stabile: per chi l'ha scelto questa versione non c'è.
+    if (!delCanale(info.version)) {
+      if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
+      return;
+    }
     stato.versione = info?.version || null;
     stato.versioneTrovata = info?.version || null;
     contaAggiornamento('trovato', String(info?.version || '?'));
@@ -497,9 +583,10 @@ function initAutoUpdater(impostazioni) {
     let settings = impostazioni || null;
     if (!settings) { try { settings = await globalThis.SN_STORAGE.getSettings(); } catch (_) {} }
     await togliAvvisiSuperati(versioneInUso());
+    await togliAvvisiFuoriCanale(R.canaleScelto(settings));
     const chiesta = await richiestaValida(versioneInUso());
     await avviaAggiornatore(autoUpdater, {
-      automatici: automaticiDa(settings), chiesta, annuncia: annunciaHome, modo: R.modoScelto(settings),
+      automatici: automaticiDa(settings), chiesta, annuncia: annunciaHome, modo: R.modoScelto(settings), canale: R.canaleScelto(settings),
     });
   })().catch((e) => console.error('[updater] avvio fallito:', e?.message || e));
 }
@@ -644,7 +731,7 @@ async function prontoDaInstallare() {
   if (dip.piattaforma() !== 'win32') return null;
   const r = leggiRicordo();
   const cmp = r ? R.confrontaVersioni(r.versione, versioneInUso()) : null;
-  if (cmp == null || cmp <= 0 || !(await installatoreValido(r))) return null;
+  if (cmp == null || cmp <= 0 || !delCanale(r.versione) || !(await installatoreValido(r))) return null;
   return r;
 }
 
@@ -728,7 +815,9 @@ function esitoScarica(versione, { gia = false } = {}) {
 // com'è. `riavvio`: l'utente ha confermato il riavvio; una versione arrivata dopo la conferma non riavvia senza chiedere.
 async function aggiornaDaChat({ riavvio = true } = {}) {
   const inUso = versioneInUso() || '?';
-  const aggiornato = { eseguito: true, esito: 'aggiornato', frase: `Filo è aggiornato: la ${inUso} è l'ultima versione.` };
+  const aggiornato = stato.canale === 'stabile'
+    ? { eseguito: true, esito: 'aggiornato', frase: `Filo è aggiornato per il canale stabile: hai la ${inUso}, e la prossima versione stabile esce di lunedì.` }
+    : { eseguito: true, esito: 'aggiornato', frase: `Filo è aggiornato: la ${inUso} è l'ultima versione.` };
   const senzaRete = { eseguito: false, esito: 'errore', frase: `Non sono riuscito a controllare se c'è una versione nuova (ora hai la ${inUso}): forse manca la rete. Riprova fra poco.` };
   const rifiutata = { eseguito: false, esito: 'rifiutata', frase: `${FRASE_RIFIUTATA} Resti sulla ${inUso}.` };
   if (!stato.attivo) {
@@ -775,6 +864,7 @@ async function statoAggiornamento() {
     versioneInUso: versioneInUso(),
     piattaforma: dip.piattaforma(),
     modo: stato.modo,
+    canale: stato.canale,
     automatici: stato.automatici,
     riavvio: !!p && puoInstallare(),
   };
@@ -966,6 +1056,11 @@ function togliAvvisiSuperati(inUso) {
   }, { acted: true, tipi: TIPI_AVVISO });
 }
 
+// Le carte di una versione che il canale scelto non installa (trovata o scaricata sul veloce) se ne vanno da sole.
+function togliAvvisiFuoriCanale(canale = stato.canale) {
+  return togliCarte((n) => !!n.action?.versione && !R.versioneDelCanale(n.action.versione, canale), { tipi: TIPI_AVVISO });
+}
+
 // Solo nelle prove: un autoUpdater finto guidato dallo spec, e lancio/uscita registrati invece di eseguiti.
 function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null, cartella = null, avvisoVero = true } = {}) {
   const { EventEmitter } = require('node:events');
@@ -991,7 +1086,7 @@ function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null
   dip.avviso = avvisoVero ? (t) => { registro.avvisi.push(t); mandaAvviso(t); } : (t) => { registro.avvisi.push(t); };
   dip.argv = () => registro.argv || [];
   riavvioInCorso = false;
-  collega(finto, { chiesta: null, annuncia: annunciaHome });
+  collega(finto, { chiesta: null, annuncia: annunciaHome, canale: stato.canale });
   return { finto, registro };
 }
 
@@ -1004,6 +1099,7 @@ module.exports = {
   conStatoAggiornamento,
   avvisaVersioneNuova,
   togliAvvisiSuperati,
+  togliAvvisiFuoriCanale,
   richiestaValida,
   riavviaEAggiorna,
   riavviaDallaHome,

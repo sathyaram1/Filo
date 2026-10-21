@@ -828,12 +828,22 @@ ma a scriverlo è il server.
   6. scrive il commit `release: vX.Y.Z [skip ci]` con l'identità dell'App,
      legandolo allo `sha` del blob letto: se `main` si è mossa nel mezzo,
      GitHub risponde 409 e non si scrive.
+- **La minor del canale stabile** (SPEC-DOMANDE.md §4.2): `{ passphrase, tipo:
+  'minor' }` alza la seconda cifra e azzera la patch, solo se è dovuta: lunedì a
+  Roma, una a settimana (`routine-stabile/<lunedì>`, prenotata prima del commit
+  e liberata se il commit non avviene), nessun feedback aperto marcato
+  `sicurezza` a priorità 3. Se ce n'è uno la settimana si registra saltata e
+  non si ritenta; il Log di Gestione la mostra. Con `soloControllo: true`
+  risponde `{ ok, controllo, dovuta, motivo, aperti }` senza toccare main. Una
+  minor non dovuta è un 409 (`minor_*`), e lo script esce `4`. Il marchio
+  `sicurezza` lo scrive il giudice di priorità accanto alla priorità.
 - **Perché non si accetta il contenuto dal chiamante**: sarebbe un push diretto
   su `main` travestito da aumento di versione — cioè il buco che §11 ha chiuso,
   riaperto da un'altra porta.
 - **`scripts/release-bump.mjs`** è il citofono: chiede, stampa il numero nuovo
   su stdout e basta. Exit `0` fatto · `2` rifiutato (freno, parola d'ordine,
-  manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
+  manifesto) · `3` server non raggiungibile o funzione assente · `4` minor non
+  dovuta. Il lavoro di
   pubblicazione costruisce il commit **provato dalla suite**, non la punta di
   `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
   locale al suo manifesto, senza commit né push, e si ferma se non è più alto

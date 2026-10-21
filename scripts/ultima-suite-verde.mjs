@@ -1,5 +1,6 @@
 // ultima-suite-verde.mjs — il commit da pubblicare: il più nuovo di main (primo genitore) con la suite verde.
 // Non pubblica e non scrive su git; se la pubblicazione è ferma da troppo tempo, per qualunque motivo, apre un feedback.
+// `--stabile`: la minor del lunedì, che esce anche sullo stesso commit dell'ultima versione.
 // Garanzie: tests/unit/ultimaSuiteVerde.test.mjs e tests/unit/releaseSuite.test.mjs.
 
 import { execFileSync } from 'node:child_process';
@@ -70,6 +71,15 @@ export function verdePiuNuovoDelTag(verde, tagSha, eAntenato) {
   if (!verde) return false;
   if (!tagSha) return true;
   return verde !== tagSha && Boolean(eAntenato(tagSha, verde));
+}
+
+/**
+ * Il commit da pubblicare, '' se niente. La minor del canale stabile (`--stabile`) esce anche senza codice nuovo dopo
+ * l'ultima versione, ma mai da un verde più vecchio di lei: a chi sta sul canale veloce tornerebbe indietro. PURA.
+ */
+export function shaDaPubblicare({ verde, tagSha, eAntenato, stabile = false }) {
+  if (verdePiuNuovoDelTag(verde, tagSha, eAntenato)) return verde;
+  return stabile && verde && verde === tagSha ? verde : '';
 }
 
 /**
@@ -213,7 +223,8 @@ async function main() {
   const oreDallUltima = pubblicataIl ? (Date.now() - Date.parse(pubblicataIl)) / 3.6e6 : NaN;
   const commitDopoTag = tag ? soloCodice(tag, 'HEAD') : 0;
   const verdeDopoTag = verdePiuNuovoDelTag(verde, tagSha, eAntenato);
-  const sha = verdeDopoTag ? verde : '';
+  const stabile = process.argv.includes('--stabile');
+  const sha = shaDaPubblicare({ verde, tagSha, eAntenato, stabile });
   const corsaVerde = verde ? corseVerdi(runs).get(verde) : null;
   const soloPlaywright = scegliUltimoVerde(runs, primoGenitore);
   const corsaSoloPlaywright = soloPlaywright ? corseVerdi(runs).get(soloPlaywright) : null;
@@ -231,7 +242,8 @@ async function main() {
     '## Quale commit si pubblica',
     '',
     sha
-      ? `- Si pubblica \`${sha}\`, il commit più nuovo di main con la suite verde${corsaVerde?.html_url ? ` ([corsa](${corsaVerde.html_url}))` : ''}.`
+      ? `- Si pubblica \`${sha}\`, il commit più nuovo di main con la suite verde${corsaVerde?.html_url ? ` ([corsa](${corsaVerde.html_url}))` : ''}`
+        + `${stabile ? `, come minor del canale stabile${verdeDopoTag ? '' : ` (lo stesso codice di ${tag})`}` : ''}.`
       : verde
         ? `- Niente da pubblicare: il commit più nuovo con la suite verde è \`${verde}\`, non più nuovo di ${tag}.`
         : '- Niente da pubblicare: nessun commit di main ha la suite verde fra le ultime corse riuscite.',
