@@ -818,7 +818,24 @@ export async function scrivi(id, to, nota, opts = {}) {
   mask.push('updatedAt');
   fields.updatedAt = firmaOra();
 
-  if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask };
+  // #1428: chi lavora legge le note come decisioni dell'owner, e un fidato salta giudici e L5. Da una sessione senza
+  // biglietto pulito la nota non si distingue da una falsa: il feedback perde prima la fiducia, e senza questo niente nota.
+  let fiduciaTolta = '';
+  if (notaNuova && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
+    fiduciaTolta = bigliettoNonPulito(await bigliettoDiChiScrive());
+  }
+  const avviso = typeof opts.avviso === 'function' ? opts.avviso : (t) => console.error(t);
+  if (opts.dryRun) {
+    if (fiduciaTolta) avviso(avvisoFiduciaTolta(opts.rif || id, fiduciaTolta, { dryRun: true }));
+    return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+  }
+  if (fiduciaTolta) {
+    const t = await sessione.togliFiducia(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
+    if (!t || !t.ok) {
+      return { ok: false, motivo: `la fiducia non si è tolta (${(t && t.motivo) || 'senza motivo'}): ${fiduciaTolta}, e su un feedback fidato la nota da qui non la scrivo. Non ho toccato niente`, from };
+    }
+    avviso(avvisoFiduciaTolta(opts.rif || id, fiduciaTolta));
+  }
 
   const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
   const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
