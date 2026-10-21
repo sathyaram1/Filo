@@ -406,14 +406,18 @@
   // su Mac), che la pagina non vede: lì resta il limite del pattern.
   // Un messaggio, non un timer: i timer di una scheda nascosta aspettano fino a un secondo, e il controllo cadrebbe
   // sopra il gesto seguente.
-  const dopoIlGiro = (() => {
+  const coda = [];
+  let canale = null;
+  function dopoIlGiro(f) {
     try {
-      const coda = [];
-      const canale = new MessageChannel();
-      canale.port1.onmessage = () => { const f = coda.shift(); if (f) f(); };
-      return (f) => { coda.push(f); canale.port2.postMessage(0); };
-    } catch (_) { return (f) => setTimeout(f, 0); }
-  })();
+      if (!canale) {
+        canale = new MessageChannel();
+        canale.port1.onmessage = () => { const g = coda.shift(); if (g) g(); };
+      }
+      coda.push(f);
+      canale.port2.postMessage(0);
+    } catch (_) { setTimeout(f, 0); }
+  }
   function vigila(c, st, sel) {
     const v = { sel };
     st.vigila = v;
