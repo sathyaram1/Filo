@@ -97,7 +97,8 @@ for (const campo of ['#ta', '#ce']) {
     expect(Math.abs((sopra.x + sopra.width / 2) - (segno.x + segno.width / 2))).toBeLessThan(6);
     expect((await globale(app, '__ragionate'))[0].candidati).toContain('14xx (segnaposto)');
     await v.click();
-    const testo = () => page.locator(campo).evaluate((el) => (el.value !== undefined && el.tagName === 'TEXTAREA' ? el.value : el.textContent));
+    // Un campo modificabile scrive lo spazio in fondo come spazio unificatore.
+    const testo = () => page.locator(campo).evaluate((el) => (el.tagName === 'TEXTAREA' ? el.value : el.textContent).replace(/ /g, ' '));
     await expect.poll(testo).toBe("l'America l'hanno scoperta nel 1492. ");
     await expect(page.locator('.sn-spell-valori .sn-spell-lampo').first()).toBeAttached({ timeout: 1000 });
     await expect(page.locator('.sn-spell-valori .sn-spell-lampo')).toHaveCount(0, { timeout: 3000 });
