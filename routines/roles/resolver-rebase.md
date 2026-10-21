@@ -47,7 +47,7 @@ scrivi l'elenco dei test rossi dopo il rebase.
 ## Consegna
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--segnala <file.md>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--domanda <file.json>]
 ```
 
 Frase e riga di changelog del primo passaggio restano valide: cambiale solo se

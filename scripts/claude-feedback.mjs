@@ -282,7 +282,7 @@ const SENZA_SCELTA = [
 const IN_ROUTINE = [
   'RIFIUTATO: sei una routine, e da qui non apro niente: un feedback nato qui salterebbe i giudici come uno dell\'owner.',
   '  Un ritrovamento: node scripts/routine-channel.mjs deliver feedback --name "…" --text "…"',
-  '  Un lavoro che si fa solo in locale: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
+  '  Un lavoro che chiede il server: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
 ].join('\n');
 
 /** Siamo dentro una routine? Oggetto e non funzione, come `credenziale`, perché i test lo sostituiscono. */

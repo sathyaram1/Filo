@@ -289,6 +289,13 @@
     return `<span class="fb-attesa" title="Nessuna routine lo prende finché non sono tutti fusi. Si cambia in Gestione.">⏳ aspetta ${escapeHtml(testo)}</span>`;
   }
 
+  // «Aspetta D-12», gemello del segno in Gestione (SPEC-DOMANDE §3.8): si risponde lì, nella sezione Domande.
+  function domandaChipHtml(f) {
+    const id = MR.aspettaDomanda(f);
+    if (!id) return '';
+    return `<span class="fb-attesa fb-domanda" title="Aspetta la tua risposta alla domanda ${escapeHtml(id)}: si risponde in Gestione, sezione Domande.">aspetta ${escapeHtml(id)}</span>`;
+  }
+
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
   function segnoFermataHtml(f) {
     const s = MR.segnoFermata(f, { fusioni });
@@ -1281,6 +1288,7 @@
             ${stateBadgeHtml(f)}
             ${fusioneChipHtml(f)}
             ${attesaChipHtml(f)}
+            ${domandaChipHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}

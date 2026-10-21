@@ -347,15 +347,16 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 | Oggi | Dove va |
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
-| `design` + `locale` | domanda «lavoro server?» se il feedback è fidato; Ricevuti («rendere fidato») se non lo è |
+| `design` + `locale` | nessuna domanda per il codice del server: un lavoro fidato prende il segno dei lavori server e lo fa la loro routine (#1253); uno non fidato va in Ricevuti L3 come richiesta di renderlo fidato (motivo `fidato`), e «Segna fidato» lo rimette in coda. Diventa domanda solo ciò che chiede un passo dell'owner (segreti, automazioni GitHub), scritta da chi si ferma (#1358) |
 | `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241) |
-| `attesa_chiusa`, `loop`, `arenato` | domanda, azioni `riprendi` / `archivia` |
-| `design` + `secaudit`, `l5`; attacchi, spam, sospetti | Ricevuti |
+| `design` + `attesa_chiusa`, `loop`, `arenato`; `aligned` + `origine_chiusa`/`origine_mancante` | domanda, azioni `riprendi` / `archivia` |
+| `design` + `secaudit`, `l5`, `fidato`; attacchi, spam (anche segnati dal worker, L3), sospetti | Ricevuti |
 
-Il feedback in attesa resta `design` col suo motivo e prende `domandaId`: la
-macchina a stati non cambia. Per l'owner, però, un `design` con una domanda
+Il feedback in attesa resta `design` (o `aligned`) col suo motivo e prende
+`domandaId`: la macchina a stati non cambia. Per l'owner, però, un `design` con una domanda
 aperta si vede nella scheda **In coda**, col segno «aspetta una domanda» che
-porta alla domanda, e non in Ricevuti.
+porta alla domanda, e non in Ricevuti. Il dettaglio di come nasce, si risponde e
+si migra sta in FEEDBACK-STATES.md §5.
 
 ## 4. Compiti ricorrenti, pubblicazione, monitoraggio
 

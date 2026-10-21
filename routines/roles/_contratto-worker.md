@@ -11,12 +11,12 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
   file-ruolo;
 - i testi per l'owner e per chi ha segnalato → nelle `notes` via canale;
 - un trade-off vero o una domanda di design (CLAUDE.md § Iniziativa: non lo
-  decidi tu) → `--segnala <file.md>` sulla consegna (`--record-fixed`,
+  decidi tu) → `--domanda <file.json>` sulla consegna (`--record-fixed`,
   `--record-verifier`). Nel report da solo si perde;
 - l'esito del controllo di sicurezza → sempre con la sua nota
   (`--record-secaudit … --nota <file.md>`), anche quando passa. I file di
-  `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
-  del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
+  `--domanda` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
+  del sistema (per esempio `../domanda-<numero>.json`): la consegna rifiuta una
   directory con file non committati;
 <!-- includi: _domanda-fine-sessione.md -->
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs

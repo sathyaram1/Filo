@@ -2797,6 +2797,7 @@
         ${leggibile ? '' : statePublicHtml(fb)}
         ${localBadgeHtml(fb)}
         ${attesaBadgeHtml(fb)}
+        ${leggibile ? domandaBadgeHtml(fb) : ''}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
@@ -2806,10 +2807,29 @@
         // Il click su un pallino priorità non apre il dettaglio (lo gestisce il
         // listener delegato di mgList).
         if (e.target.closest('.mg-dot')) return;
+        const dom = e.target.closest('.mg-domanda-badge[data-domanda]');
+        if (dom) { apriDomandaDelFeedback(dom.dataset.domanda, fb._id); return; }
         openDetail(fb._id);
       });
       mgList.appendChild(item);
     }
+  }
+
+  // «Aspetta una domanda» (SPEC-DOMANDE §3.8): il lavoro fermo sta In coda, e il segno porta dove si risponde.
+  function domandaBadgeHtml(fb) {
+    const id = MR.aspettaDomanda(fb);
+    if (!id) return '';
+    const motivo = MR.reasonText(MR.normalizeStatus(fb).statusReason);
+    const titolo = `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
+    return `<button type="button" class="mg-domanda-badge" data-domanda="${esc(id)}" title="${esc(titolo)}" aria-label="${esc(titolo)}">aspetta ${esc(id)}</button>`;
+  }
+
+  // La domanda si apre nella sua sezione; se non si trova si apre il feedback, che lo dice, invece di non fare niente.
+  async function apriDomandaDelFeedback(id, feedbackId) {
+    const ok = !!DOMANDE && typeof DOMANDE.apriDomanda === 'function' && await DOMANDE.apriDomanda(id);
+    if (ok) return;
+    if (feedbackId && selectedId !== feedbackId) openDetail(feedbackId);
+    setManageMsg(`La domanda ${id} non si apre adesso: riprova fra poco, o cercala nella sezione Domande.`, 'err');
   }
 
   // Il segno dei Ricevuti (D93): la forma del livello che ha fermato la pratica, il motivo sotto il puntatore.
@@ -3759,9 +3779,14 @@
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
       ora.fiducia = valore ? 'fidato' : 'non_fidato';
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
-      if (selectedId === id) reflectManage(ora);
+      // Chi aspettava la fiducia per il server è ripartito nello stesso gesto, come lavoro server (#1358).
+      if (r.rimessoInCoda) Object.assign(ora, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
+      if (selectedId === id) { if (r.rimessoInCoda) openDetail(id, { ridisegno: true }); else reflectManage(ora); }
       renderList();
-      setManageMsg(valore ? `Da ora${chi} è fidato.` : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
+      updateTabCounts();
+      setManageMsg(valore
+        ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito fra i lavori server.` : `Da ora${chi} è fidato.`)
+        : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
     } catch (e) {
       setManageMsg(`${valore ? 'Non segnato fidato' : 'Fiducia non tolta'}${chi}: ${e.message || 'Errore'}`, 'err');
     } finally {
@@ -4069,7 +4094,20 @@
     setActionMsg('', '');
     mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
     const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
-    mgActions.hidden = !azioni.length;
+    // Chi aspetta una domanda si sblocca rispondendo lì: è la prima azione, e la sola strada per farlo ripartire.
+    const domandaId = (isAdmin && fb) ? MR.aspettaDomanda(fb) : '';
+    mgActions.hidden = !azioni.length && !domandaId;
+    if (domandaId) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-btn';
+      b.id = 'mgDomandaBtn';
+      b.dataset.domanda = domandaId;
+      b.textContent = `Rispondi alla domanda ${domandaId}`;
+      b.title = 'Si risponde in un posto solo: la domanda, con le sue opzioni. La risposta fa ripartire il lavoro.';
+      b.addEventListener('click', () => apriDomandaDelFeedback(domandaId));
+      mgActionsRow.appendChild(b);
+    }
     if (!azioni.length) {
       if (mgAcceptComment) mgAcceptComment.hidden = true;
       return;

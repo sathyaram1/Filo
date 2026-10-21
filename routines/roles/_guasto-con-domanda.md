@@ -3,7 +3,7 @@
 Guasto è ciò che da qui dovrebbe funzionare e non va, e ti ferma. «Non posso
 perché è rotto» è un guasto; «dalla cloud non si fa, per regola»
 (segreti, deploy, automazioni GitHub del server, prove sulla macchina
-dell'owner) è il rimando in locale.
+dell'owner) non lo è: è un passo dell'owner, che si chiede con una domanda.
 Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
 
 **Il controllo di sicurezza salta il passo 1**: il server prende domande solo

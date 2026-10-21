@@ -871,14 +871,7 @@
       const fb = e.target.closest('[data-feedback]');
       if (fb) { if (dip.apriFeedback) dip.apriFeedback(fb.dataset.feedback); return; }
       const dom = e.target.closest('[data-domanda]');
-      if (dom) {
-        const d = trova(dom.dataset.domanda);
-        if (!d) return;
-        apri([d.id]);
-        const tab = MR.schedaDomanda(d);
-        if (tab && tab !== scheda && dip.apriScheda) dip.apriScheda(tab); else disegna();
-        return;
-      }
+      if (dom) { apriDomanda(dom.dataset.domanda); return; }
       const b = e.target.closest('button[data-scelta], button[data-fai]');
       if (!b || b.disabled) return;
       const id = b.closest('.mg-dq').dataset.id;
@@ -892,8 +885,33 @@
     });
   }
 
+  /**
+   * Una domanda per id, da qualunque sezione (il segno «aspetta una domanda» di un feedback): si accende la sua scheda
+   * con lei aperta. Una domanda che la pagina non ha ancora letto si chiede al main. @returns {Promise<boolean>}
+   */
+  async function apriDomanda(id) {
+    const chiave = String(id || '').trim();
+    if (D.numeroDi(chiave) === null) return false;
+    let d = trova(chiave);
+    if (!d && !finte) {
+      const m = await chiedi({ type: T.mostra, id: chiave });
+      if (m && m.ok && m.domanda) {
+        aggiorna(m.domanda);
+        Object.assign(stato.riferimenti, (m.riferimenti && typeof m.riferimenti === 'object') ? m.riferimenti : {});
+        d = trova(chiave);
+      }
+    }
+    if (!d) return false;
+    // Prima di cambiare scheda: la scheda nuova apre da sé la prima, se quella aperta non è fra le sue.
+    apri([d.id]);
+    const tab = MR.schedaDomanda(d) || 'domande';
+    if (dip.apriScheda) dip.apriScheda(tab); else { scheda = tab; disegna(); }
+    return true;
+  }
+
   window.SN_MG_DOMANDE = {
     carica,
+    apriDomanda,
     stato: () => stato,
     mostra(tab) {
       if (VUOTO[tab] === undefined) return;

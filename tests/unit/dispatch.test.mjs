@@ -50,6 +50,7 @@ const {
   writeState,
   clearState,
   fixedPayload,
+  leggiOpzioniRegistrazione,
   fermaSenzaSegnalazione,
   fixedReplyText,
   FERMA_NOTE,
@@ -503,6 +504,16 @@ test('fixedPayload: stop viaggia solo se chiesto, e mai come valore falso', () =
   assert.equal(fixedPayload({ report: 'r', ferma: true, segnalazione: 's' }).stop, true);
   assert.ok(!('stop' in fixedPayload({ report: 'r' })), 'una consegna normale non porta il campo');
   assert.ok(!('stop' in fixedPayload({ report: 'r', ferma: 'sì' })), 'solo il true vero ferma un lavoro');
+});
+
+test('fixedPayload e le opzioni dei --record-*: la domanda (#1358) viaggia come oggetto, accanto alla segnalazione', () => {
+  const d = { titolo: 'Quale?', priorita: 'importante' };
+  assert.deepEqual(fixedPayload({ report: 'r', domanda: d }).domanda, d);
+  assert.ok(!('domanda' in fixedPayload({ report: 'r', domanda: 'percorso.json' })), 'un percorso non è una domanda');
+  const o = leggiOpzioniRegistrazione(['--record-fixed', 'id1', 'report lungo', '--domanda', 'd.json']);
+  assert.equal(o.error, '');
+  assert.equal(o.valori['--domanda'], 'd.json');
+  assert.match(leggiOpzioniRegistrazione(['--record-secaudit', 'id1', 'pass', '--domanda', 'd.json']).error, /--domanda non vale con --record-secaudit/);
 });
 
 test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senza chi decide non saprebbe cosa decidere', () => {

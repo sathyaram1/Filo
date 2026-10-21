@@ -64,10 +64,10 @@ test('il gruppo di un guasto non dipende dalle parole di chi cade', () => {
   assert.ok(server.includes('`guasto: filo-security`'), 'il lavoro server usa lo stesso nome della lista');
 });
 
-test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando in locale), e il rimando non vieta più il server', () => {
+test('le istruzioni separano «è rotto» (guasto) da «per regola» (un passo dell’owner o il lavoro server), e niente torna al PC', () => {
   const pezzo = readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8');
   assert.match(piatto(pezzo), /«Non posso perché è rotto» è un guasto/);
-  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) è il rimando in locale/);
+  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) non lo è: è un passo dell'owner, che si chiede con una domanda/);
   for (const [ruolo, opts] of CHI_RISOLVE) {
     const t = piatto(readRoleInstructions(ruolo, opts));
     const locale = t.slice(t.indexOf('## Se il lavoro si fa solo in locale'), t.indexOf(ATTESA));
@@ -75,7 +75,10 @@ test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando i
     assert.doesNotMatch(locale, /non puoi[^.]*codice del server/i, `${ruolo}: il codice del server si tocca nei lavori server`);
     assert.match(locale, /per regola/);
     assert.ok(locale.includes('«Un guasto dell\'ambiente si dice con una domanda»'), `${ruolo}: un guasto rimanda alla sua sezione`);
-    assert.match(locale, /--reason locale \\ --notes "Lavoro locale per regola:/, `${ruolo}: la nota dice che è lavoro locale davvero`);
+    assert.match(locale, /--reason locale \\ --notes "Per regola:/, `${ruolo}: la nota dice che è per regola, non un guasto`);
+    // #1226.1: dal 14/10 sul PC dell'owner non lavora nessuno, e nessun ruolo glielo rimanda.
+    assert.doesNotMatch(locale, /approva come lavoro locale|riparte da lì|sessione sulla sua macchina|nei Ricevuti/, `${ruolo}: niente lavoro rimandato al PC`);
+    assert.match(locale, /--domanda <file\.json>/, `${ruolo}: il passo dell'owner si chiede con una domanda`);
   }
 });
 
@@ -97,7 +100,6 @@ test('il modello della domanda passa i controlli del server, con le strade, la r
   assert.deepEqual(v.domanda.opzioni.map((o) => o.azione), [
     { tipo: 'riprendi', feedbackId: FEEDBACK_ID },
     { tipo: 'compito' },
-    { tipo: 'approva_locale', feedbackId: FEEDBACK_ID },
     { tipo: 'archivia', feedbackId: FEEDBACK_ID },
   ]);
   assert.deepEqual(v.domanda.collegamenti, [{ tipo: 'feedback', id: FEEDBACK_ID }]);
