@@ -91,8 +91,6 @@
   }
 
   function fillStaticText() {
-    document.title = I18n.t('admin_defaults_title');
-    $('title').textContent = I18n.t('admin_defaults_title');
     $('denied-msg').textContent = I18n.t('admin_defaults_denied');
     $('intro').textContent = I18n.t('admin_defaults_intro');
     $('h-keys').textContent = I18n.t('admin_defaults_keys');
