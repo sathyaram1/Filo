@@ -256,9 +256,11 @@
   }
   // La frase del riscatto riuscito dice solo i crediti d'ingresso: il conteggio
   // locale non passa (#1138), e «nessuno dei 1.000 che avevi» si leggeva come un furto.
-  function redeemOkMessage({ entryCredits } = {}) {
+  // `conteggioLocale`: era a schermo come saldo, e la frase dice dove va, senza contarlo (#1353).
+  function redeemOkMessage({ entryCredits, conteggioLocale = false } = {}) {
     const entry = Math.max(0, Math.floor(Number(entryCredits) || 0));
-    return entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
+    const frase = entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
+    return conteggioLocale ? `${frase} ${CONTEGGIO_LOCALE_LASCIA}` : frase;
   }
 
   // Il codice dentro quello che l'utente incolla. Il codice arriva per
