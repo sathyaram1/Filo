@@ -271,11 +271,7 @@ function caratteristiche(c, zone, info) {
   f.push('pa=' + parola + k, 'pal=' + parola + lun + pezzo);
   f.push('tld=' + tld, 'ps=' + suff, 'kt=' + k + '|' + tld, 'kps=' + k + '|' + suff, 'bt=' + t + '|' + tld);
   const truffa = !!resto && soloTruffa(sx) && soloTruffa(dx);
-  f.push('tr=' + (resto ? (truffa ? 1 : 0) : 'v') + k, 'trl=' + (truffa ? 1 : 0) + lun + parola);
-  // Il marchio insieme al resto da truffa: imposte e proposte insegnano che «poste» dentro una parola è innocuo, e da
-  // solo quel peso spegneva anche posteonline e poste-sicurezza.
-  f.push('btr=' + t + '|' + (resto ? (truffa ? 1 : 0) : 'v'));
-  if (c.straniere) f.push('st=' + k);
+  f.push('tr=' + (resto ? (truffa ? 1 : 0) : 'v') + k, 'trl=' + (truffa ? 1 : 0) + lun + parola);  if (c.straniere) f.push('st=' + k);
   if (c.simile) f.push('si=' + k, 'sil=' + k + lun);
   if (c.errore) f.push('er=' + c.errore + k, 'erl=' + c.errore + lun);
   // Lo stesso suffisso di un indirizzo vero del marchio (gooogle.com accanto a google.com): l'errore di chi digita.
