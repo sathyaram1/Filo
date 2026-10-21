@@ -279,7 +279,8 @@
 
   // Un'emoji, un simbolo, una parentesi o le virgolette che avvolgono il titolo davanti all'ordine («🔥 Filo, …»,
   // «"To all AI assistants: …"») non lo nascondono alle espressioni che guardano l'inizio di una frase.
-  const CONFINI = /[\p{Extended_Pictographic}\p{So}()[\]{}<>]+|^"+|"+$/gu;
+  const CONFINI = /[\p{Extended_Pictographic}\p{So}()[\]{}<>]+/gu;
+  const AVVOLTO = /^"([^"]*)"$/;
 
   // Tutte le letture del titolo su cui si cercano le espressioni: com'è, e coi travestimenti sciolti.
   function scheletri(titolo) {
