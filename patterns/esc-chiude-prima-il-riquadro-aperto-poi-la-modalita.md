@@ -286,8 +286,8 @@ regola generale: **un'attesa messa lì per chi non risponderà mai non va usata
 come tetto per chi risponde**, o si finisce a scommettere su quanto è veloce il
 computer di chi sta davanti.
 
-**Il nome della voce cambia con lo stato, anche a menu aperto.** Se la modalità
-si spegne per un'altra strada mentre il menu è sotto gli occhi, la voce va
-ridisegnata sul posto (`SN_MENU_ICONS.redrawIconRows`): «Esci da schermo
-intero» su uno schermo che intero non è più promette il contrario di quello che
-fa.
+**Il nome della voce cambia con lo stato, anche a barra aperta.** Se la
+modalità si spegne per un'altra strada mentre l'icona è sotto gli occhi, va
+ridisegnata sul posto (la barra laterale la ridice a ogni cambio, `aggiornaNav`):
+«Esci da schermo intero» su uno schermo che intero non è più promette il
+contrario di quello che fa.

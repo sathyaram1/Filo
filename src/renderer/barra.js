@@ -20,7 +20,7 @@
 
   const svg = (nome, px) => (typeof ICONS[nome] === 'function' ? ICONS[nome](px) : '');
 
-  let stato = { aperta: false, icone: [], opzioni: { spinta: true, attesaMs: 250, striscia: true } };
+  let stato = { aperta: false, icone: [], altro: [], altroAperto: false, opzioni: { spinta: true, attesaMs: 250, striscia: true } };
   const opzioni = () => stato.opzioni || {};
   let firma = null;
   let eraAperta = false;
@@ -67,7 +67,7 @@
   let trascina = null;
   pannello.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.dentro(); });
   pannello.addEventListener('pointerleave', (e) => {
-    if (!e.isTrusted || trascina) return;
+    if (!e.isTrusted || trascina || colore) return;
     nascondiSuggerimento();
     api.fuori();
   });
@@ -117,7 +117,7 @@
     api.suggerimento({ testo: '' });
   }
 
-  // ── le icone del primo gruppo ────────────────────────────────────────────
+  // ── le icone del primo gruppo, e il loro «Altro…» ────────────────────────
   function bottone(classe) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -141,6 +141,7 @@
     b.setAttribute('aria-label', it.etichetta);
     // Spenta, il suggerimento dice perché.
     if (it.spenta && it.motivo) b.dataset.sugg = it.motivo;
+    else if (it.perche) b.dataset.sugg = `${it.etichetta}: ${it.perche}`;
     else if (it.tasto) b.dataset.sugg = `${it.etichetta} (${it.tasto})`;
     else delete b.dataset.sugg;
     b.setAttribute('aria-disabled', it.spenta ? 'true' : 'false');
@@ -155,56 +156,127 @@
     }
   }
 
-  function disegnaIcone(icone, animaNuove) {
-    const ids = icone.map((i) => i.id).join('|');
+  // Il contagocce vuole il gesto vero, che qui c'è e nella pagina no: si apre dalla barra, che resta finché si sceglie.
+  let colore = false;
+  function prendiColore(id) {
+    if (typeof window.EyeDropper !== 'function') { api.azione({ id }); return; }
+    colore = true;
+    new window.EyeDropper().open()
+      .then((r) => { if (r && r.sRGBHex) api.azione({ id, colore: String(r.sRGBHex) }); }, () => {})
+      .finally(() => {
+        colore = false;
+        if (!pannello.matches(':hover')) api.fuori();
+      });
+  }
+
+  // Il confine fra le icone in vista e quelle messe da parte: si apre e si chiude col clic, e si apre da solo
+  // quando ci si ferma sopra trascinando un'icona.
+  const tastoAltro = bottone('ico altro-tasto');
+  tastoAltro.dataset.sugg = 'Altro…';
+  tastoAltro.innerHTML = svg('caretDown', 16);
+  tastoAltro.addEventListener('click', (e) => {
+    if (!e.isTrusted) return;
+    api.altro({ aperto: !stato.altroAperto });
+  });
+
+  let altroEraAperto = false;
+  function disegnaTastoAltro(aperto, quante) {
+    tastoAltro.setAttribute('aria-expanded', aperto ? 'true' : 'false');
+    const nome = aperto ? 'Nascondi «Altro…»' : (quante ? `Altro… (${quante})` : 'Altro…');
+    tastoAltro.setAttribute('aria-label', nome);
+    tastoAltro.dataset.sugg = nome;
+  }
+
+  function nuovaIcona(it, zona) {
+    const b = bottone('ico');
+    b.dataset.zona = zona;
+    aggiornaIcona(b, it);
+    b.addEventListener('click', (e) => {
+      if (!e.isTrusted || b.getAttribute('aria-disabled') === 'true') return;
+      if (it.contagocce) prendiColore(it.id);
+      else api.azione({ id: it.id });
+    });
+    b.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (!e.isTrusted) return;
+      api.menu({ id: it.id, x: e.clientX, y: e.clientY });
+    });
+    b.addEventListener('pointerdown', (e) => iniziaTrascina(e, b));
+    b.addEventListener('animationend', () => b.classList.remove('nuova'));
+    // L'etichetta di un'azione della pagina dipende dalla pagina («Traduci» o «Mostra originale»): si richiede al passaggio.
+    if (it.pagina) b.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.chiedi(); });
+    return b;
+  }
+
+  function disegnaIcone(icone, altro, aperto, animaNuove) {
+    const ids = `${icone.map((i) => i.id).join('|')}#${aperto ? altro.map((i) => i.id).join('|') : '-'}`;
+    disegnaTastoAltro(aperto, altro.length);
     if (ids === firma) {
       // Stessi pulsanti: si aggiornano al loro posto, così un clic a metà non si perde.
-      icone.forEach((it) => { const b = nav.querySelector(`[data-id="${it.id}"]`); if (b) aggiornaIcona(b, it); });
+      for (const it of [...icone, ...(aperto ? altro : [])]) {
+        const b = nav.querySelector(`.ico[data-id="${it.id}"]`);
+        if (b) aggiornaIcona(b, it);
+      }
       return;
     }
-    const prima = new Set([...nav.querySelectorAll('.ico')].map((b) => b.dataset.id));
+    const esistenti = new Map([...nav.querySelectorAll('.ico[data-id]')].map((b) => [b.dataset.id, b]));
+    const prima = new Set(esistenti.keys());
     firma = ids;
-    nav.replaceChildren();
-    for (const it of icone) {
-      const b = bottone('ico');
+    // I bottoni che restano sono gli stessi: quello che si sta trascinando tiene il puntatore («Altro…» che si apre a
+    // metà gesto), e un clic a metà non si perde.
+    const icona = (it, zona) => {
+      const b = esistenti.get(it.id) || nuovaIcona(it, zona);
+      b.dataset.zona = zona;
       aggiornaIcona(b, it);
-      if (animaNuove && !prima.has(it.id)) b.classList.add('nuova');
-      b.addEventListener('click', (e) => {
-        if (!e.isTrusted || b.getAttribute('aria-disabled') === 'true') return;
-        api.azione({ id: it.id });
-      });
-      b.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (!e.isTrusted) return;
-        api.menu({ id: it.id, x: e.clientX, y: e.clientY });
-      });
-      b.addEventListener('pointerdown', (e) => iniziaTrascina(e, b));
-      // L'etichetta di un'azione della pagina dipende dalla pagina («Traduci» o «Mostra originale»): si richiede al passaggio.
-      if (it.pagina) b.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.chiedi(); });
-      nav.appendChild(b);
-    }
+      return b;
+    };
+    const figli = icone.map((it) => icona(it, 'bar'));
+    figli.push(tastoAltro);
+    if (aperto) for (const it of altro) figli.push(icona(it, 'secondary'));
+    if (animaNuove) for (const b of figli) if (b.dataset.id && !prima.has(b.dataset.id)) b.classList.add('nuova');
+    metti(figli);
     if (suggDi && !suggDi.isConnected) nascondiSuggerimento();
-    // L'icona appena arrivata si fa vedere anche se il gruppo scorre: senza, sembra che il trascinamento non abbia fatto niente.
-    const arrivata = prima.size ? [...nav.querySelectorAll('.ico')].find((b) => !prima.has(b.dataset.id)) : null;
-    if (arrivata) {
-      // Misure di impaginazione, non del riquadro: l'icona nuova entra rimpicciolita dall'animazione.
-      const su = arrivata.offsetTop - nav.offsetTop;
-      const giu = su + arrivata.offsetHeight;
-      if (giu > nav.scrollTop + nav.clientHeight) nav.scrollTop = giu - nav.clientHeight + 4;
-      else if (su < nav.scrollTop) nav.scrollTop = su - 4;
+    const appenaAperto = aperto && !altroEraAperto;
+    altroEraAperto = aperto;
+    if (appenaAperto && altro.length) {
+      // «Altro…» appena aperto: se il gruppo scorre, si vede quanto più si può di lui, con la piega in cima.
+      const fondo = figli[figli.length - 1];
+      const giu = fondo.offsetTop - nav.offsetTop + fondo.offsetHeight + 4;
+      nav.scrollTop = Math.min(tastoAltro.offsetTop - nav.offsetTop - 4, Math.max(nav.scrollTop, giu - nav.clientHeight));
+    } else {
+      // L'icona appena arrivata si fa vedere anche se il gruppo scorre: senza, sembra che il trascinamento non abbia fatto niente.
+      const arrivata = prima.size ? figli.find((b) => b.dataset.id && !prima.has(b.dataset.id)) : null;
+      if (arrivata) mostraNelGruppo(arrivata);
     }
     misura();
   }
 
+  // Mette i figli nell'ordine voluto spostando solo chi è fuori posto: un nodo spostato perde la cattura del puntatore.
+  // Il segno di un trascinamento in corso resta dov'è: lo rimette il movimento dopo.
+  function metti(figli) {
+    const voluti = new Set(figli);
+    for (const el of [...nav.children]) if (!voluti.has(el) && !el.classList.contains('segno')) el.remove();
+    let prec = null;
+    for (const el of figli) {
+      let atteso = prec ? prec.nextElementSibling : nav.firstElementChild;
+      while (atteso && atteso.classList.contains('segno')) atteso = atteso.nextElementSibling;
+      if (atteso !== el) nav.insertBefore(el, atteso);
+      prec = el;
+    }
+  }
+
+  // Misure di impaginazione, non del riquadro: l'icona nuova entra rimpicciolita dall'animazione.
+  function mostraNelGruppo(el) {
+    const su = el.offsetTop - nav.offsetTop;
+    const giu = su + el.offsetHeight;
+    if (giu > nav.scrollTop + nav.clientHeight) nav.scrollTop = giu - nav.clientHeight + 4;
+    else if (su < nav.scrollTop) nav.scrollTop = su - 4;
+  }
+
+  // Il gruppo che scorre sfuma dal lato dove ci sono altre icone: la barra di scorrimento non c'è.
   function misura() {
-    const icone = [...nav.querySelectorAll('.ico')].map((b) => {
-      const r = b.getBoundingClientRect();
-      return { id: b.dataset.id, alto: Math.round(r.top), basso: Math.round(r.bottom) };
-    });
-    // Il gruppo che scorre sfuma dal lato dove ci sono altre icone: la barra di scorrimento non c'è.
     nav.classList.toggle('altre-sopra', nav.scrollTop > 1);
     nav.classList.toggle('altre-sotto', nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
-    api.misure({ icone });
   }
   window.addEventListener('resize', misura);
   nav.addEventListener('scroll', () => {
@@ -285,34 +357,48 @@
     lista[j].focus();
   });
 
-  // ── trascinare: dentro la barra si riordina, fuori si posa nel menu aperto ──
+  // ── trascinare: dentro la barra si riordina, oltre «Altro…» si mette da parte ──
+  const APRI_ALTRO_MS = 450;
   function iniziaTrascina(e, b) {
     if (!e.isTrusted || e.button !== 0) return;
     const partenza = { x: e.clientX, y: e.clientY };
     const id = b.dataset.id;
     let fantasma = null;
     let segno = null;
-    let fuori = false;
-    let raf = 0;
-    let ultimo = null;
+    let attesaAltro = null;
     try { b.setPointerCapture(e.pointerId); } catch (_) {}
 
-    const dentroPannello = (x) => x <= pannello.getBoundingClientRect().right;
-    const primaDi = (y) => {
-      for (const altro of nav.querySelectorAll('.ico')) {
-        if (altro === b) continue;
-        const r = altro.getBoundingClientRect();
-        if (y < r.top + r.height / 2) return altro;
-      }
-      return null;
+    const dentroPannello = (x, y) => {
+      const r = pannello.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    };
+    const voci = () => [...nav.children].filter((el) => el !== b && el.classList.contains('ico'));
+    const primaDi = (y) => voci().find((el) => { const r = el.getBoundingClientRect(); return y < r.top + r.height / 2; }) || null;
+    // Il posto dove cade, detto come lo scrive il main: davanti a un'icona della barra, in fondo alla barra (davanti
+    // al tasto «Altro…»), o fra quelle messe da parte; a «Altro…» chiuso, in cima a loro.
+    const posto = (prima) => {
+      if (prima === tastoAltro) return { target: 'bar', beforeId: null };
+      if (prima) return { target: prima.dataset.zona === 'secondary' ? 'secondary' : 'bar', beforeId: prima.dataset.id };
+      const altro = Array.isArray(stato.altro) ? stato.altro.filter((x) => x.id !== id) : [];
+      return { target: 'secondary', beforeId: stato.altroAperto || !altro.length ? null : altro[0].id };
     };
     const mostraSegno = (y) => {
       if (!segno) { segno = document.createElement('div'); segno.className = 'segno'; }
       const prima = primaDi(y);
       if (prima) nav.insertBefore(segno, prima);
       else nav.appendChild(segno);
+      const sopraAltro = !stato.altroAperto && !prima;
+      tastoAltro.classList.toggle('mira', sopraAltro);
+      // Fermi sopra «Altro…» chiuso: si apre, così si sceglie il posto fra le icone messe da parte.
+      if (sopraAltro && !attesaAltro) attesaAltro = setTimeout(() => { attesaAltro = null; if (trascina) api.altro({ aperto: true }); }, APRI_ALTRO_MS);
+      else if (!sopraAltro && attesaAltro) { clearTimeout(attesaAltro); attesaAltro = null; }
+      return prima;
     };
-    const togliSegno = () => { if (segno) { segno.remove(); segno = null; } };
+    const togliSegno = () => {
+      if (segno) { segno.remove(); segno = null; }
+      tastoAltro.classList.remove('mira');
+      if (attesaAltro) { clearTimeout(attesaAltro); attesaAltro = null; }
+    };
 
     const muovi = (ev) => {
       if (!ev.isTrusted) return;
@@ -330,14 +416,9 @@
       const r = b.getBoundingClientRect();
       fantasma.style.left = `${ev.clientX - r.width / 2}px`;
       fantasma.style.top = `${ev.clientY - r.height / 2}px`;
-      const esce = !dentroPannello(ev.clientX);
-      fantasma.hidden = esce;
-      if (esce) togliSegno(); else mostraSegno(ev.clientY);
-      if (esce || fuori) {
-        ultimo = { fase: esce ? 'muovi' : 'annulla', id, x: Math.round(ev.clientX), y: Math.round(ev.clientY) };
-        if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (ultimo) api.trascinaFuori(ultimo); ultimo = null; });
-      }
-      fuori = esce;
+      const dentro = dentroPannello(ev.clientX, ev.clientY);
+      fantasma.classList.toggle('fuori', !dentro);
+      if (dentro) mostraSegno(ev.clientY); else togliSegno();
     };
 
     const fine = (ev, annullato) => {
@@ -345,22 +426,20 @@
       b.removeEventListener('pointerup', su);
       b.removeEventListener('pointercancel', annulla);
       try { b.releasePointerCapture(e.pointerId); } catch (_) {}
-      if (raf) { cancelAnimationFrame(raf); raf = 0; }
       if (!trascina) return;
       const prima = segno ? segno.nextElementSibling : null;
+      const caduta = !!segno && !annullato && dentroPannello(ev.clientX, ev.clientY);
       togliSegno();
       if (fantasma) { fantasma.remove(); fantasma = null; }
       b.classList.remove('trascinata');
       trascina = null;
-      const x = Math.round(ev.clientX);
-      const y = Math.round(ev.clientY);
-      if (annullato) {
-        if (fuori) api.trascinaFuori({ fase: 'annulla', id, x, y });
-      } else if (!dentroPannello(ev.clientX)) {
-        api.trascinaFuori({ fase: 'rilascia', id, x, y });
-      } else {
-        const beforeId = prima && prima.classList.contains('ico') ? prima.dataset.id : null;
-        if (beforeId !== id) api.posa({ id, beforeId });
+      if (caduta) {
+        const p = posto(prima);
+        const zona = b.dataset.zona === 'secondary' ? 'secondary' : 'bar';
+        const lista = [...nav.querySelectorAll(`.ico[data-zona="${zona}"]`)];
+        const seguente = lista[lista.indexOf(b) + 1];
+        const fermo = p.target === zona && (p.beforeId || null) === (seguente ? seguente.dataset.id : null);
+        if (!fermo) api.posa({ id, target: p.target, beforeId: p.beforeId });
       }
       // Il clic che segue il rilascio non è un clic sull'icona.
       const ingoia = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
@@ -375,24 +454,9 @@
     b.addEventListener('pointercancel', annulla);
   }
 
-  // Un'icona trascinata dal menu del tasto destro: dove cadrebbe.
-  let segnoMira = null;
-  function disegnaMira(mira, attivo) {
-    nav.classList.toggle('mira', !!attivo);
-    if (!attivo || !mira) { if (segnoMira) { segnoMira.remove(); segnoMira = null; } return; }
-    if (!segnoMira) { segnoMira = document.createElement('div'); segnoMira.className = 'segno'; }
-    let prima = null;
-    for (const b of nav.querySelectorAll('.ico')) {
-      const r = b.getBoundingClientRect();
-      if (mira.y < r.top + r.height / 2) { prima = b; break; }
-    }
-    if (prima) nav.insertBefore(segnoMira, prima);
-    else nav.appendChild(segnoMira);
-  }
-
   // ── lo stato dal main ────────────────────────────────────────────────────
   api.onStato((s) => {
-    stato = s || { aperta: false, icone: [] };
+    stato = s || { aperta: false, icone: [], altro: [] };
     applicaTema(stato.tema);
     root.classList.toggle('aperta', !!stato.aperta);
     root.classList.toggle('senza-striscia', opzioni().striscia === false);
@@ -403,10 +467,9 @@
     else nascondiSuggerimento();
     striscia.setAttribute('aria-label', `Barra laterale (${stato.tasto || ''})`);
     striscia.style.width = `${Number(stato.strisciaPx) || LINEA}px`;
-    disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], eraAperta);
+    disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], Array.isArray(stato.altro) ? stato.altro : [], !!stato.altroAperto, eraAperta);
     disegnaAccount(stato.account || null);
     fissi.redteam.hidden = stato.redteam !== true;
-    disegnaMira(stato.mira, stato.trascinamento);
     if (stato.fuoco) {
       const primo = tuttiIBottoni().find((b) => b.getAttribute('aria-disabled') !== 'true');
       if (primo) primo.focus();

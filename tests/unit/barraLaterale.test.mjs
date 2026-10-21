@@ -25,67 +25,94 @@ test('«Altro…» non ha più le voci globali: stanno nella barra', () => {
   for (const id of D.GLOBALI) {
     assert.ok(D.DEFAULT.bar.includes(id), `${id} manca dalla barra`);
     assert.ok(!D.DEFAULT.secondary.includes(id), `${id} è ancora in «Altro…»`);
-    assert.ok(!D.DEFAULT.primary.includes(id), `${id} è nella riga del tasto destro`);
   }
   // In cima l'Aiuto (#1432), poi le globali.
   assert.deepEqual(D.DEFAULT.bar.slice(0, 5), ['help', 'back', 'forward', 'reload', 'home']);
 });
 
-test('chi aveva la disposizione di prima ritrova le globali nella barra e il resto dov\'era', () => {
-  const r = D.migra(VECCHIO_DEFAULT, { qrPromosso: true });
-  assert.equal(r.scrivi, true);
-  assert.deepEqual(r.layout.primary, VECCHIO_DEFAULT.primary);
-  assert.deepEqual(r.layout.secondary, ['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']);
-  assert.deepEqual(r.layout.bar, ['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
+test('#1246: le icone che stavano in cima al tasto destro sono nella barra, e la riga non c\'è più', () => {
+  for (const id of ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']) {
+    assert.ok(D.DEFAULT.bar.includes(id), `${id} manca dalla barra`);
+  }
+  assert.deepEqual(D.DEFAULT.primary, []);
+  assert.deepEqual([...D.ZONE].sort(), ['bar', 'secondary']);
+  assert.equal(D.applicaPosa(D.DEFAULT, { id: 'translate', target: 'primary' }), null, 'nella riga non si posa più');
 });
 
-test('chi aveva portato una globale nella riga la ritrova nella riga, e non perde niente', () => {
+test('chi aveva la disposizione di prima della barra ritrova le globali e la riga nella barra, il resto dov\'era', () => {
+  const r = D.migra(VECCHIO_DEFAULT);
+  assert.equal(r.scrivi, true);
+  assert.deepEqual(r.layout.primary, []);
+  assert.deepEqual(r.layout.secondary, ['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']);
+  assert.deepEqual(r.layout.bar, ['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab',
+    'translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']);
+});
+
+test('#1246: chi si era disposto riga e barra ritrova la barra com\'era e, in fondo, la riga nel suo ordine', () => {
+  const salvato = {
+    primary: ['qrCode', 'back', 'translate'],
+    secondary: ['screenshot', 'share', 'saveForLater', 'newTab', 'openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker'],
+    bar: ['reload', 'forward', 'home', 'incognito', 'fullscreen', 'closeTab'],
+  };
+  const r = D.migra(salvato);
+  assert.equal(r.scrivi, true);
+  assert.deepEqual(r.layout.bar, ['help', 'reload', 'forward', 'home', 'incognito', 'fullscreen', 'closeTab', 'qrCode', 'back', 'translate']);
+  assert.deepEqual(r.layout.secondary, salvato.secondary);
+  assert.deepEqual(r.layout.primary, []);
+});
+
+test('chi non aveva mai avuto la barra non perde niente, e nessuna icona sta in due posti', () => {
   const salvato = {
     primary: ['back', 'translate', 'reload'],
     secondary: ['forward', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab', 'openOptions', 'home', 'editorApp', 'feedbackApp', 'incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen'],
   };
-  const { layout } = D.migra(salvato, { qrPromosso: true });
-  assert.deepEqual(layout.primary, ['back', 'translate', 'reload']);
-  assert.deepEqual(layout.bar, ['help', 'forward', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  const { layout } = D.migra(salvato);
+  assert.deepEqual(layout.primary, []);
+  assert.deepEqual(layout.bar, ['help', 'forward', 'home', 'incognito', 'fullscreen', 'closeTab', 'back', 'translate', 'reload']);
   const prima = new Set([...salvato.primary, ...salvato.secondary]);
   const dopo = [...layout.primary, ...layout.secondary, ...layout.bar];
   assert.equal(dopo.length, new Set(dopo).size, 'un\'icona in due posti');
   for (const id of prima) assert.ok(dopo.includes(id), `${id} è sparita`);
 });
 
-test('una disposizione che ha già la barra non si tocca, e la migrazione è idempotente', () => {
-  const r1 = D.migra(VECCHIO_DEFAULT, { qrPromosso: true });
-  const r2 = D.migra(r1.layout, { qrPromosso: true });
+test('la migrazione è idempotente, e una scelta fatta nella barra resta', () => {
+  const r1 = D.migra(VECCHIO_DEFAULT);
+  const r2 = D.migra(r1.layout);
   assert.equal(r2.scrivi, false);
   assert.deepEqual(r2.layout, r1.layout);
-  const scelta = { primary: ['translate'], secondary: ['back'], bar: ['screenshot', 'forward'] };
-  const r3 = D.migra(scelta, { qrPromosso: true });
+  const scelta = { primary: [], secondary: ['back'], bar: ['screenshot', 'forward'] };
+  const r3 = D.migra(scelta);
   // L'Aiuto, nato dopo, arriva in cima una volta; l'ordine scelto resta sotto di lui.
   assert.deepEqual(r3.layout.bar.slice(0, 3), ['help', 'screenshot', 'forward']);
-  assert.ok(r3.layout.secondary.includes('back'), 'indietro rimesso nel menu dall\'utente torna nella barra');
+  assert.ok(r3.layout.secondary.includes('back'), 'indietro messo in «Altro…» dall\'utente resta lì');
 });
 
-test('niente di salvato: la disposizione di serie, con la barra', () => {
-  const r = D.migra(undefined, { qrPromosso: false });
-  assert.deepEqual(r.layout, { primary: [...D.DEFAULT.primary], secondary: [...D.DEFAULT.secondary], bar: [...D.DEFAULT.bar] });
-  assert.equal(r.segnaQr, true);
+test('niente di salvato: la disposizione di serie', () => {
+  const r = D.migra(undefined);
+  assert.deepEqual(r.layout, { primary: [], secondary: [...D.DEFAULT.secondary], bar: [...D.DEFAULT.bar] });
+  assert.equal(r.scrivi, false);
 });
 
 test('id sconosciuti, ritirati o doppi escono dal salvato', () => {
-  const { layout } = D.migra({ primary: ['translate', 'translate', 'nonEsiste'], secondary: ['openForLater', '__proto__'], bar: ['back', 'translate'] }, { qrPromosso: true });
+  const { layout } = D.migra({ primary: ['translate', 'translate', 'nonEsiste'], secondary: ['openForLater', '__proto__'], bar: ['back', 'translate'] });
   const tutte = [...layout.primary, ...layout.secondary, ...layout.bar];
   assert.equal(tutte.filter((id) => id === 'translate').length, 1);
   for (const id of ['nonEsiste', 'openForLater', '__proto__']) assert.ok(!tutte.includes(id), id);
 });
 
-test('trascinare «schermata» nella barra la toglie dal menu, riportarla la toglie dalla barra', () => {
-  const nella = D.applicaPosa(D.DEFAULT, { id: 'screenshot', target: 'bar', beforeId: 'home' });
-  assert.ok(!nella.primary.includes('screenshot'));
-  assert.equal(nella.bar.indexOf('screenshot'), nella.bar.indexOf('home') - 1);
-  const riportata = D.applicaPosa(nella, { id: 'screenshot', target: 'primary', beforeId: null });
-  assert.ok(!riportata.bar.includes('screenshot'));
-  assert.ok(riportata.primary.includes('screenshot') || riportata.secondary.includes('screenshot'));
-  assert.ok(riportata.primary.length <= D.MAX_PRIMARY);
+test('portare «Screenshot» in «Altro…» lo toglie dalla barra, riportarlo lo rimette dove si posa', () => {
+  const altro = D.applicaPosa(D.DEFAULT, { id: 'screenshot', target: 'secondary', beforeId: 'editorApp' });
+  assert.ok(!altro.bar.includes('screenshot'));
+  assert.equal(altro.secondary.indexOf('screenshot'), altro.secondary.indexOf('editorApp') - 1);
+  const riportata = D.applicaPosa(altro, { id: 'screenshot', target: 'bar', beforeId: 'home' });
+  assert.ok(!riportata.secondary.includes('screenshot'));
+  assert.equal(riportata.bar.indexOf('screenshot'), riportata.bar.indexOf('home') - 1);
+});
+
+test('una posa su un salvato mai migrato non perde le icone della riga', () => {
+  const vecchio = { primary: ['translate', 'qrCode'], secondary: ['openOptions'], bar: ['back'] };
+  const dopo = D.applicaPosa(vecchio, { id: 'openOptions', target: 'bar', beforeId: null });
+  assert.deepEqual(dopo, { primary: [], secondary: [], bar: ['back', 'translate', 'qrCode', 'openOptions'] });
 });
 
 test('una posa con un id o una zona che non esistono non scrive niente', () => {
@@ -127,16 +154,17 @@ const C = globalThis.SN_CONST;
 const P = globalThis.SN_PREF;
 
 test('le regolazioni della barra: un valore fuori dai limiti torna dentro, uno mancante prende il predefinito', () => {
-  assert.deepEqual(C.opzioniBarraLaterale(undefined), { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true });
-  assert.deepEqual(C.DEFAULT_SETTINGS.barraLaterale, { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true });
-  const o = C.opzioniBarraLaterale({ spinta: false, attesaMs: 5, uscitaMs: '99999', striscia: false });
-  assert.deepEqual(o, { spinta: false, attesaMs: 100, uscitaMs: 5000, striscia: false });
+  assert.deepEqual(C.opzioniBarraLaterale(undefined), { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schedeInAlto: true });
+  assert.deepEqual(C.DEFAULT_SETTINGS.barraLaterale, { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schedeInAlto: true });
+  const o = C.opzioniBarraLaterale({ spinta: false, attesaMs: 5, uscitaMs: '99999', striscia: false, schedeInAlto: false });
+  assert.deepEqual(o, { spinta: false, attesaMs: 100, uscitaMs: 5000, striscia: false, schedeInAlto: false });
   assert.equal(C.opzioniBarraLaterale({ attesaMs: 'boh' }).attesaMs, 250);
 });
 
 test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai limiti è un rifiuto col numero', () => {
   assert.deepEqual(P.buildPreferencePartial('barra_spinta', 'no').partial, { barraLaterale: { spinta: false } });
   assert.deepEqual(P.buildPreferencePartial('barra_striscia', 'nascondi').partial, { barraLaterale: { striscia: false } });
+  assert.deepEqual(P.buildPreferencePartial('barra_schede', 'no').partial, { barraLaterale: { schedeInAlto: false } });
   assert.deepEqual(P.buildPreferencePartial('barra_attesa', '0,5 secondi').partial, { barraLaterale: { attesaMs: 500 } });
   assert.deepEqual(P.buildPreferencePartial('barra_uscita', '800 ms').partial, { barraLaterale: { uscitaMs: 800 } });
   assert.match(P.buildPreferencePartial('barra_attesa', '10 secondi').rifiuto, /10\.000 ms.*100 a 3\.000/);
@@ -145,7 +173,7 @@ test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai lim
   assert.deepEqual(P.buildPreferencePartial('barra_attesa', '1').partial, { barraLaterale: { attesaMs: 1000 } });
   // L'elenco che legge il modello le nomina tutte.
   const righe = P.righeDescrizione({ sistema: 'win32', shellPref: '' }).join('\n');
-  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita']) assert.ok(righe.includes(`• ${k}: `), k);
+  for (const k of ['barra_spinta', 'barra_striscia', 'barra_schede', 'barra_attesa', 'barra_uscita']) assert.ok(righe.includes(`• ${k}: `), k);
 });
 
 test('il manifesto non manda più l\'utente dove le voci della barra non ci sono più', () => {
@@ -178,15 +206,15 @@ test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice 
 
 // ── l'icona Aiuto (#1432) ──
 test('l\'Aiuto arriva in cima alla barra anche a chi aveva già la sua, e chi lo toglie non se lo ritrova', () => {
-  const mia = { primary: ['translate'], secondary: ['screenshot'], bar: ['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab'] };
-  const r = D.migra(mia, { qrPromosso: true });
+  const mia = { primary: [], secondary: ['screenshot'], bar: ['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab'] };
+  const r = D.migra(mia);
   assert.equal(r.scrivi, true);
   assert.deepEqual(r.layout.bar, ['help', ...mia.bar]);
-  assert.equal(D.migra(r.layout, { qrPromosso: true }).scrivi, false, 'la seconda volta non cambia niente');
-  // Rimesso nel menu col tasto destro: lì resta, e la migrazione non lo riporta su.
+  assert.equal(D.migra(r.layout).scrivi, false, 'la seconda volta non cambia niente');
+  // Messo in «Altro…» col tasto destro: lì resta, e la migrazione non lo riporta su.
   const tolto = D.applicaPosa(r.layout, { id: 'help', target: 'secondary', beforeId: null });
   assert.ok(!tolto.bar.includes('help') && tolto.secondary.includes('help'));
-  const dopo = D.migra(tolto, { qrPromosso: true });
+  const dopo = D.migra(tolto);
   assert.ok(!dopo.layout.bar.includes('help'));
   assert.equal(dopo.scrivi, false);
   // E si rimette dove lo si trascina.

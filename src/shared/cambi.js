@@ -110,6 +110,7 @@
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
     'barraLaterale.spinta': { nome: 'apertura della barra laterale dal bordo', valore: ATTIVA, livello: 1 },
     'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
+    'barraLaterale.schedeInAlto': { nome: 'schede dal bordo in alto a schermo intero', valore: ATTIVE, livello: 1 },
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
@@ -333,6 +334,74 @@
   }
 
   // ── Le frasi ────────────────────────────────────────────────────────────────
+  // ── Icone della barra laterale (#867.1) ────────────────────────────────────
+  // La disposizione si salva intera; un trascinamento ne sposta una sola, e l'annullo rimette solo quella.
+  const ZONE_ICONE = ['bar', 'secondary', 'primary'];
+  function disposizioneDi(l) {
+    const o = l && typeof l === 'object' ? l : {};
+    const out = {};
+    for (const z of ZONE_ICONE) out[z] = Array.isArray(o[z]) ? o[z].map(String) : [];
+    return out;
+  }
+  // Niente di salvato prima vuol dire la disposizione di serie: è quella che l'utente aveva sotto gli occhi.
+  function cambiIcone(prima, dopo) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    const a = disposizioneDi(D && !D.valida(prima) ? D.DEFAULT : prima);
+    const b = disposizioneDi(dopo);
+    if (uguale(a, b)) return [];
+    return [{ chiave: 'icone', prima: a, dopo: b }];
+  }
+  const senza = (l, id) => {
+    const out = {};
+    for (const z of ZONE_ICONE) out[z] = l[z].filter((x) => x !== id);
+    return out;
+  };
+  // L'icona che, tolta da tutte e due le disposizioni, le lascia uguali: quella che si è mossa.
+  function iconaSpostata(c) {
+    const a = disposizioneDi(c && c.prima);
+    const b = disposizioneDi(c && c.dopo);
+    if (uguale(a, b)) return null;
+    const ids = new Set(ZONE_ICONE.flatMap((z) => [...a[z], ...b[z]]));
+    for (const id of ids) {
+      const zonaA = ZONE_ICONE.find((z) => a[z].includes(id));
+      const zonaB = ZONE_ICONE.find((z) => b[z].includes(id));
+      if (zonaA && zonaB && uguale(senza(a, id), senza(b, id))) return { id, a, b, zonaA, zonaB };
+    }
+    return null;
+  }
+  function nomeIcona(id) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    return `«${D && D.nome ? D.nome(id) : id}»`;
+  }
+  function fraseIcone(c) {
+    const m = iconaSpostata(c);
+    if (!m) return 'disposizione delle icone della barra laterale';
+    const { id, b, zonaA, zonaB } = m;
+    const inAltro = zonaB === 'secondary';
+    const lista = b[zonaB];
+    const seguente = lista[lista.indexOf(id) + 1];
+    if ((zonaA === 'secondary') !== inAltro) {
+      const verso = inAltro ? 'dalla barra laterale ad «Altro…»' : 'da «Altro…» alla barra laterale';
+      return `icona ${nomeIcona(id)}: ${verso}, ${seguente ? `prima di ${nomeIcona(seguente)}` : 'in fondo'}`;
+    }
+    if (seguente) return `icona ${nomeIcona(id)} spostata prima di ${nomeIcona(seguente)} ${inAltro ? 'in «Altro…»' : 'nella barra laterale'}`;
+    return `icona ${nomeIcona(id)} spostata in fondo ${inAltro ? 'ad «Altro…»' : 'alla barra laterale'}`;
+  }
+  // La disposizione che rimette com'era l'icona mossa dall'evento, a partire da quella di adesso: le altre icone
+  // restano dove sono, anche se spostate dopo. Un evento che non è un solo spostamento rimette tutto com'era.
+  function annulloIcone(evento, attuale) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    const c = ((evento && evento.cambi) || []).find((x) => x && x.chiave === 'icone');
+    if (!c || !D) return null;
+    const m = iconaSpostata(c);
+    if (!m) return disposizioneDi(c.prima);
+    const zona = m.zonaA === 'secondary' ? 'secondary' : 'bar';
+    const ora = disposizioneDi(D.valida(attuale) ? attuale : D.DEFAULT);
+    const vicine = m.a[m.zonaA].slice(m.a[m.zonaA].indexOf(m.id) + 1);
+    const beforeId = vicine.find((x) => x !== m.id && ora[zona].includes(x)) || null;
+    return D.applicaPosa(ora, { id: m.id, target: zona, beforeId });
+  }
+
   const PAESI = {
     us: 'Stati Uniti', gb: 'Regno Unito', fr: 'Francia', de: 'Germania', es: 'Spagna', nl: 'Paesi Bassi', jp: 'Giappone', it: 'Italia',
   };
@@ -402,6 +471,7 @@
       if (c.prima && !c.dopo) return `${dom}: tolta la regola su ${nomePaese(c.prima.country)}`;
       return `${dom}: da ${nomePaese(c.prima && c.prima.country)} → da ${nomePaese(c.dopo && c.dopo.country)}`;
     }
+    if (k === 'icone') return fraseIcone(c);
     if (k.startsWith('zoom:')) {
       const p = (x) => (Number.isFinite(Number(x)) ? `${Math.round(Number(x))}%` : '?');
       return `zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`;
@@ -451,6 +521,7 @@
     newtab: 'dalla home',
     dashboard: 'dalla home',
     shell: 'dalla barra delle schede',
+    barra: 'dalla barra laterale',
     'menu-scheda': 'dal menu della scheda',
     'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
@@ -477,6 +548,8 @@
     if (!ultimo || !nuovo || ultimo.annulla || nuovo.annulla) return false;
     if (ultimo.tipo !== nuovo.tipo || ultimo.via !== nuovo.via || (ultimo.dove || '') !== (nuovo.dove || '')) return false;
     if (!FONDIBILI.has(nuovo.via)) return false;
+    // Ogni icona posata è un gesto suo: fusi, «rimetti come prima» disferebbe anche quello di prima.
+    if (nuovo.tipo === 'icone') return false;
     const da = new Date(ultimo.agg || ultimo.ts).getTime();
     if (!(new Date(nuovo.ts).getTime() - da <= FINESTRA_FUSIONE_MS)) return false;
     const chiavi = (e) => e.cambi.map((c) => c.chiave).sort().join('\n');
@@ -515,7 +588,7 @@
     let max = cambi.filter((c) => String(c.chiave || '').startsWith('timer:')).length > 1 ? 2 : 1;
     for (const c of cambi) {
       const k = String(c.chiave || '');
-      if (k.startsWith('timer:') || k.startsWith('zoom:')) continue;
+      if (k.startsWith('timer:') || k.startsWith('zoom:') || k === 'icone') continue;
       if (k.startsWith('proxy:')) { max = Math.max(max, 1); continue; }
       const v = voce(k);
       max = Math.max(max, v && v.livello === 1 ? 1 : 2);
@@ -659,6 +732,7 @@
     cambiImpostazioni,
     cambiTimer,
     cambiRegoleProxy,
+    cambiIcone,
     fraseCambio,
     valore: (chiave, x) => valoreDi(voce(chiave), x),
     frasi,
@@ -672,6 +746,7 @@
     annulloImpostazioni,
     annulloTimer,
     annulloRegoleProxy,
+    annulloIcone,
     righePerModello,
     nomePaese,
   };

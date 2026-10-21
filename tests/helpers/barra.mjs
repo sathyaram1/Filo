@@ -1,5 +1,5 @@
-// La barra laterale nelle prove (#871): la sua vista, il suo stato nel main, e le icone da
-// rimettere nel menu per chi prova le strade del tasto destro che un utente può ancora avere.
+// La barra laterale nelle prove (#871): la sua vista, il suo stato nel main, le icone da spostare e da premere come
+// farebbe l'utente (da #1246 le icone delle azioni sulla pagina stanno solo qui).
 
 export async function barraPage(app, { tetto = 10_000 } = {}) {
   const scadenza = Date.now() + tetto;
@@ -29,6 +29,7 @@ export function statoBarra(app) {
       bar: b.layout ? [...b.layout.bar] : null,
       primary: b.layout ? [...b.layout.primary] : null,
       secondary: b.layout ? [...b.layout.secondary] : null,
+      altroAperto: !!b.altroAperto,
       schermoIntero: !!w._filoTabs.contentFullscreen,
       chiusa: b._larghezzaChiusa(),
       alto: w._filoTabs._altezzaCornice(),
@@ -80,12 +81,32 @@ export function premi(app, dove, keyCode, modifiers = []) {
   }, { dove, keyCode, modifiers });
 }
 
-// Sposta le icone nel menu del tasto destro come farebbe l'utente trascinandole.
-export async function mettiNelMenu(app, ids, zona = 'secondary') {
+// Sposta le icone come farebbe l'utente trascinandole: 'bar' in fondo alla barra, 'secondary' in «Altro…».
+export async function spostaIcone(app, ids, zona = 'secondary') {
   for (const id of ids) {
-    const r = await app.evaluate(async (_, dati) => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: dati.id, target: dati.zona }, {}), { id, zona });
-    if (!r || !r.ok) throw new Error(`mettiNelMenu: ${id} non spostata`);
+    const r = await app.evaluate(async (_, d) => globalThis.SN_LAYOUT_ICONE.posa({ id: d.id, target: d.zona, beforeId: null }), { id, zona });
+    if (!r) throw new Error(`spostaIcone: ${id} non spostata`);
   }
+}
+
+// «Altro…» aperto o chiuso, come lo lascerebbe un clic sulla sua piega.
+export function apriAltro(app, aperto = true) {
+  return app.evaluate(({ BrowserWindow }, v) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w._filoTabs.barra.apriAltro(v);
+  }, aperto);
+}
+
+// Un'icona della barra aperta, pronta da premere: per una che sta in «Altro…» lo apre prima.
+export async function iconaDellaBarra(app, id) {
+  const barra = await barraPage(app);
+  const s = await statoBarra(app);
+  if (!s.aperta) await comandaBarra(app, 'clic');
+  if (s.secondary.includes(id)) await apriAltro(app, true);
+  await pannelloFermo(barra);
+  const b = barra.locator(`#nav .ico[data-id="${id}"]`);
+  await b.waitFor({ state: 'visible', timeout: 5000 });
+  return b;
 }
 
 // Il menu di Filo aperto adesso (una finestra data: con le voci; anche il suggerimento è data:, ma senza .menu).

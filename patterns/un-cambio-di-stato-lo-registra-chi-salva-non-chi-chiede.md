@@ -3,8 +3,8 @@
 [← Tutti i pattern](../PATTERNS.md)
 
 **La regola.** Un cambio allo stato di Filo (impostazioni, aspetto, timer e
-sveglie, regole del proxy, zoom) diventa un evento del filo nel punto in cui si
-salva. Chi lo chiede dichiara solo da dove viene.
+sveglie, regole del proxy, zoom, icone della barra laterale) diventa un evento
+del filo nel punto in cui si salva. Chi lo chiede dichiara solo da dove viene.
 
 **Perché (#867).** «Tema scuro» in chat lasciava una conversazione con dentro
 un comando e un «fatto»; lo stesso cambio dalle Preferenze non lasciava niente,
@@ -45,6 +45,11 @@ porte divergono, e la prossima porta si dimentica di registrare.
   annullo rifà il cambio.
 - Lo zoom non passa dallo storage (lo tiene Chromium per sito): il suo
   salvataggio è dove il main lo viene a sapere, in `src/main/tabs.js`.
+- La disposizione delle icone si salva intera, ma un trascinamento ne sposta una
+  sola: il registro la ricava confrontando le due disposizioni, e l'annullo
+  rimette quella sola dalla porta della disposizione (`layoutIcone.js`), così
+  le barre di tutte le finestre lo ricevono (#867.1). Una posa è un gesto: non
+  si fonde con quella dopo.
 
 Vicini: [Ripristini e annullamenti: riportano indietro SOLO ciò che il pannello mostra](ripristini-e-annullamenti-riportano-indietro.md),
 [Chi rilegge tutto e riscrive tutto mette le scritture in fila](chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).

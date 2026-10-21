@@ -8,10 +8,13 @@
 // !important (theme.css). Questo test riproduce un sito ostile e asserisce il
 // COMPORTAMENTO: le icone outline del menu restano NON riempite (fill: none)
 // anche quando la pagina forza `svg { fill: red }`. Senza il fix, la fill
-// computata sarebbe rossa → test rosso.
+// computata sarebbe rossa → test rosso. Da #1246 le icone delle azioni stanno
+// nella barra laterale (una pagina di Filo, fuori dalla portata del sito): nel
+// menu resta l'icona della voce «Invia attacco (Red-team)».
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { apriRedteamATutti } from './helpers/redteam.mjs';
 
 // Pagina "ostile": forza fill/stroke rossi su tutti gli svg, come fanno molti
 // framework di icone. Simula la condizione di magnific.com.
@@ -23,14 +26,14 @@ const HOSTILE = `<!doctype html><html><head><style>
   <p>Click destro per il menu Filo.</p>
 </body></html>`;
 
-test('le icone del menu restano outline anche se il sito forza svg{fill:red}', async ({ openTab, testServer }) => {
+test('le icone del menu restano outline anche se il sito forza svg{fill:red}', async ({ app, openTab, testServer }) => {
+  await apriRedteamATutti(app);
   const page = await testServer.openReady(openTab, HOSTILE);
   await page.locator('p').click({ button: 'right' });
   const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
 
-  // Prendo un'icona outline del menu (un bottone della riga icone con SVG).
-  const iconSvg = menu.locator('.sn-menu-row-btn svg').first();
+  const iconSvg = menuDi(page).voce('Invia attacco').locator('.sn-menu-item-icon svg').first();
   await expect(iconSvg).toBeVisible();
 
   const fill = await iconSvg.evaluate((el) => getComputedStyle(el).fill);
@@ -40,21 +43,4 @@ test('le icone del menu restano outline anche se il sito forza svg{fill:red}', a
   const stroke = await iconSvg.evaluate((el) => getComputedStyle(el).stroke);
   // Deve restare currentColor (NON il rosso forzato dal sito).
   expect(stroke).not.toBe('rgb(255, 0, 0)');
-});
-
-test('i puntini pieni (fill=currentColor) di un\'icona restano pieni', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, HOSTILE);
-  await page.locator('p').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-
-  // Cerco un elemento interno con fill="currentColor" (es. i puntini dell'icona
-  // App). Deve restare riempito col colore del testo, NON azzerato dal fix né
-  // rosso dal sito.
-  const dot = menu.locator('svg [fill="currentColor"]').first();
-  const count = await menu.locator('svg [fill="currentColor"]').count();
-  if (count === 0) test.skip(true, 'nessuna icona con riempimenti espliciti nella riga corrente');
-  const dotFill = await dot.evaluate((el) => getComputedStyle(el).fill);
-  expect(dotFill).not.toBe('none');
-  expect(dotFill).not.toBe('rgb(255, 0, 0)');
 });

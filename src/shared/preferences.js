@@ -831,6 +831,17 @@
       },
     },
     {
+      scrive: ['barraLaterale.schedeInAlto'],
+      costo: 1,
+      aiuto: 'true | false (a schermo intero le schede compaiono portando il mouse contro il bordo in alto)',
+      keys: ['barra_schede', 'schede in alto', 'schede a schermo intero', 'schede dal bordo in alto', 'mostra le schede a schermo intero'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { schedeInAlto: b } }, label: `Schede dal bordo in alto a schermo intero → ${b ? 'compaiono' : 'non compaiono'}` };
+      },
+    },
+    {
       scrive: ['terminal.enabled'],
       aiuto: 'true | false',
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],

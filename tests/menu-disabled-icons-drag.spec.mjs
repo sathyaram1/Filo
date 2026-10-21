@@ -1,89 +1,63 @@
-// Feedback yqgFIs: i tasti "avanti" e "indietro" della riga icone sono
-// correttamente grigi quando non avrebbero effetto, MA:
+// Feedback yqgFIs: i tasti "avanti" e "indietro" sono correttamente grigi quando
+// non avrebbero effetto, MA:
 //   1. non si potevano trascinare per spostarli (l'attributo `disabled` nativo
 //      azzerava i pointer event → niente drag);
-//   2. spostando un'altra icona tornavano non grigi (il redraw post-drop girava
-//      senza navState, quindi canBack/canFwd ripiombavano a `true`).
-//
-// Questo test apre il menu su una tab appena aperta (nessuna cronologia →
-// avanti/indietro disabilitati), entra nella griglia "Altro…" e verifica:
-//   - back/forward sono grigi (classe soft) ma NON hanno l'attributo `disabled`
-//     nativo e restano trascinabili (data-sn-draggable="1");
-//   - dopo aver trascinato un'altra icona, restano grigi.
+//   2. spostando un'altra icona tornavano non grigi (il ridisegno dopo la posa
+//      perdeva lo stato della navigazione).
+// Da #1246 le icone stanno nella barra laterale: lì, su una scheda appena aperta
+// (nessuna cronologia), si verifica che restino spente, trascinabili e spente
+// anche dopo lo spostamento di un'altra icona.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { mettiNelMenu } from './helpers/barra.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
-
-// Da #871 queste icone stanno nella barra laterale: qui si prova la strada del tasto destro,
-// quella di chi le ha rimesse nel menu.
-test.beforeEach(async ({ app }) => { await mettiNelMenu(app, ['reload', 'back', 'forward']); });
+import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo drag test</h1>
-  <p>Click destro qui.</p>
+  <p>Una pagina appena aperta.</p>
 </body></html>`;
 
-async function openOverflowGrid(page) {
-  await page.locator('p').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  const overflow = menu.locator('.sn-menu-row-overflow').first();
-  await expect(overflow).toBeVisible();
-  await overflow.hover();
-  const grid = menuDi(page).locator('.sn-menu-icon-grid');
-  await expect(grid).toBeVisible({ timeout: 2000 });
-  return grid;
+async function barraAperta(app) {
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  return barra;
 }
 
-test('avanti/indietro grigi sono trascinabili (niente attributo disabled nativo)', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, HTML);
-  const grid = await openOverflowGrid(page);
+// Trascina `id` e lo posa nella metà alta di `sopra`: finisce davanti a lei.
+async function trascina(barra, id, sopra) {
+  const da = await barra.locator(`#nav .ico[data-id="${id}"]`).boundingBox();
+  const a = await barra.locator(`#nav .ico[data-id="${sopra}"]`).boundingBox();
+  await barra.mouse.move(da.x + da.width / 2, da.y + da.height / 2);
+  await barra.mouse.down();
+  await barra.mouse.move(da.x + da.width / 2 + 2, da.y + da.height / 2 + 10, { steps: 3 });
+  await barra.mouse.move(a.x + a.width / 2, a.y + 4, { steps: 6 });
+  await expect(barra.locator('#nav .segno')).toHaveCount(1);
+  await barra.mouse.up();
+}
 
+test('avanti/indietro spenti si trascinano lo stesso (niente attributo disabled nativo)', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, HTML);
+  const barra = await barraAperta(app);
   for (const id of ['back', 'forward']) {
-    const btn = grid.locator(`.sn-menu-icon-btn[data-sn-icon-id="${id}"]`);
-    await expect(btn).toBeVisible();
-    // Grigio (classe soft), ma trascinabile e senza il `disabled` nativo che
-    // bloccherebbe i pointer event.
-    await expect(btn).toHaveClass(/sn-menu-btn-disabled/);
-    await expect(btn).toHaveAttribute('data-sn-draggable', '1');
-    const nativeDisabled = await btn.evaluate((el) => el.disabled === true);
-    expect(nativeDisabled, `${id} non deve avere l'attributo disabled nativo`).toBe(false);
+    const btn = barra.locator(`#nav .ico[data-id="${id}"]`);
+    await expect(btn).toHaveAttribute('aria-disabled', 'true');
+    expect(await btn.evaluate((el) => el.disabled === true), `${id} non deve avere l'attributo disabled nativo`).toBe(false);
   }
+  await trascina(barra, 'forward', 'home');
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 4)).toEqual(['back', 'reload', 'forward', 'home']);
+  await expect(barra.locator('#nav .ico[data-id="forward"]')).toHaveAttribute('aria-disabled', 'true');
 });
 
-test('trascinare un\'altra icona non fa tornare colorati avanti/indietro', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, HTML);
-  const grid = await openOverflowGrid(page);
+test('trascinare un\'altra icona non fa tornare attivi avanti/indietro', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, HTML);
+  const barra = await barraAperta(app);
+  await expect(barra.locator('#nav .ico[data-id="back"]')).toHaveAttribute('aria-disabled', 'true');
+  await expect(barra.locator('#nav .ico[data-id="forward"]')).toHaveAttribute('aria-disabled', 'true');
 
-  const back = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]');
-  const forward = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]');
-  await expect(back).toHaveClass(/sn-menu-btn-disabled/);
-  await expect(forward).toHaveClass(/sn-menu-btn-disabled/);
-
-  // Trascino un'altra icona (reload) verso colorPicker, dentro la stessa griglia.
-  const source = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="reload"]');
-  const target = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="colorPicker"]');
-  const sBox = await source.boundingBox();
-  const tBox = await target.boundingBox();
-  expect(sBox && tBox).toBeTruthy();
-
-  const sx = sBox.x + sBox.width / 2;
-  const sy = sBox.y + sBox.height / 2;
-  const tx = tBox.x + tBox.width / 2;
-  const ty = tBox.y + tBox.height / 2;
-
-  await page.mouse.move(sx, sy);
-  await page.mouse.down();
-  // Supera la soglia di drag (4px) e muoviti a step verso il target.
-  await page.mouse.move(sx + 8, sy + 8, { steps: 3 });
-  await page.mouse.move(tx, ty, { steps: 6 });
-  await page.mouse.up();
-
-  // La griglia si ridisegna in-place dopo il drop: avanti/indietro DEVONO
-  // restare grigi (prima del fix tornavano colorati).
-  const grid2 = menuDi(page).locator('.sn-menu-icon-grid');
-  await expect(grid2).toBeVisible();
-  await expect(grid2.locator('.sn-menu-icon-btn[data-sn-icon-id="back"]')).toHaveClass(/sn-menu-btn-disabled/, { timeout: 3000 });
-  await expect(grid2.locator('.sn-menu-icon-btn[data-sn-icon-id="forward"]')).toHaveClass(/sn-menu-btn-disabled/);
+  await trascina(barra, 'home', 'back');
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 2)).toEqual(['home', 'back']);
+  await expect.poll(() => barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id).slice(0, 2))).toEqual(['home', 'back']);
+  // Ridisegnate dopo la posa, restano spente: prima del fix tornavano colorate.
+  await expect(barra.locator('#nav .ico[data-id="back"]')).toHaveAttribute('aria-disabled', 'true');
+  await expect(barra.locator('#nav .ico[data-id="forward"]')).toHaveAttribute('aria-disabled', 'true');
 });

@@ -17,12 +17,12 @@
 // asseriscono quell'invariante:
 //   3) i controlli in alto a destra nella home sono ESATTAMENTE quelli del
 //      browser — nessuna voce che apra un elenco appunti separato;
-//   4) la voce Editor del menu App e l'icona Editor del menu tasto destro
+//   4) la voce Editor del menu App e l'icona Editor della barra laterale
 //      disegnano il foglio degli appunti (stesso SVG), non più la penna;
 //   5) da lì l'editor si apre davvero.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { iconaDellaBarra } from './helpers/barra.mjs';
 
 const EDITOR = 'filo://editor/editor.html';
 
@@ -191,7 +191,7 @@ test('nella home i controlli sono solo quelli del browser: nessuna porta agli ap
   await page.screenshot({ path: 'tests/.shots/379-12-home-controlli.png' }).catch(() => {});
 });
 
-test('l’Editor porta l’icona degli appunti nel menu App e nel menu tasto destro', async ({ shell, app, openTab, testServer }) => {
+test('l’Editor porta l’icona degli appunti nel menu App e nella barra laterale', async ({ shell, app, openTab, testServer }) => {
   // 1) Menu App (launcher della shell) — registro icone di popup-menu.js.
   const popup = await openLauncherPopup(shell, app);
   const item = popup.locator('.item', { hasText: 'Editor' }).first();
@@ -200,20 +200,11 @@ test('l’Editor porta l’icona degli appunti nel menu App e nel menu tasto des
   expect(launcherSvg, 'la voce Editor del menu App non disegna il foglio appunti').toContain(NOTE_PATH);
   await popup.keyboard.press('Escape').catch(() => {});
 
-  // 2) Menu tasto destro su una pagina esterna — registro src/shared/icons.js.
-  const page = await testServer.openReady(openTab, PAGE_HTML);
-  await page.locator('p').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  const overflow = menu.locator('.sn-menu-row-overflow').first();
-  await expect(overflow).toBeVisible();
-  await overflow.hover();
-  const grid = menuDi(page).locator('.sn-menu-icon-grid');
-  await expect(grid).toBeVisible({ timeout: 2_000 });
-  const btn = grid.locator('.sn-menu-icon-btn[data-sn-icon-id="editorApp"]');
-  await expect(btn).toBeVisible();
+  // 2) «Altro…» della barra laterale su una pagina esterna — registro src/shared/icons.js.
+  await testServer.openReady(openTab, PAGE_HTML);
+  const btn = await iconaDellaBarra(app, 'editorApp');
   const menuSvg = await btn.locator('svg').first().innerHTML();
-  expect(menuSvg, 'l’icona Editor del menu tasto destro non disegna il foglio appunti').toContain(NOTE_PATH);
+  expect(menuSvg, 'l’icona Editor della barra laterale non disegna il foglio appunti').toContain(NOTE_PATH);
 
   // Le due superfici devono disegnare la STESSA icona (registri diversi, un
   // solo significato): niente editor "penna" da una parte e "foglio" dall'altra.

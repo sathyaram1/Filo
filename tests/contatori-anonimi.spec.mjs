@@ -7,6 +7,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
+import { iconaDellaBarra } from './helpers/barra.mjs';
 
 const SHOTS = 'tests/.shots';
 
@@ -342,8 +343,7 @@ test('tradurre una pagina lunga è un uso, non uno per blocco', async ({ app, op
   const paragrafi = Array.from({ length: 12 }, (_, i) => `<p>Paragraph ${i} ${'the quick brown fox jumps over the lazy dog '.repeat(25)}</p>`).join('');
   const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><meta charset="utf-8"><body>${paragrafi}</body></html>`, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
-  await page.locator('body').click({ button: 'right', position: { x: 5, y: 5 } });
-  await menuDi(page).locator('[data-sn-icon-id="translate"]').click();
+  await (await iconaDellaBarra(app, 'translate')).click();
   await expect(page.locator('p').last()).toHaveText(/^IT /, { timeout: 20_000 });
   const chiamate = await app.evaluate(() => globalThis.__chiamate.traduci);
   expect(chiamate, 'la pagina è abbastanza lunga da partire a più blocchi').toBeGreaterThan(2);

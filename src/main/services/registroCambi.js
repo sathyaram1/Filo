@@ -1,5 +1,5 @@
 // Il registro dei cambi (#867): ogni scrittura dello stato (impostazioni, timer e sveglie, regole del
-// proxy) diventa un evento del filo nel momento in cui si salva, chiunque l'abbia chiesta. Chi chiede
+// proxy, icone della barra laterale) diventa un evento del filo nel momento in cui si salva, chiunque l'abbia chiesta. Chi chiede
 // dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
@@ -16,6 +16,8 @@ const app = {
   aggiornaVivo: () => {},
   aggiornaRegoleProxy: () => {},
   zoomSu: null,
+  // Riscrive la disposizione delle icone dalla sua porta (layoutIcone.js), così tutte le barre la ricevono.
+  rimettiIcone: null,
   annuncia: () => {},
 };
 function collega(f) { Object.assign(app, f || {}); }
@@ -103,12 +105,14 @@ function osserva(changes, { incognito }) {
   if (t && Array.isArray(t.newValue)) registra({ tipo: 'timer', cambi: K().cambiTimer(t.oldValue, t.newValue, adesso) }, { incognito });
   const r = changes[C.FILO_PROXY_RULES];
   if (r && r.newValue && typeof r.newValue === 'object') registra({ tipo: 'proxy', cambi: K().cambiRegoleProxy(r.oldValue, r.newValue) }, { incognito });
+  const i = changes[C.ICON_LAYOUT];
+  if (i && i.newValue && typeof i.newValue === 'object') registra({ tipo: 'icone', cambi: K().cambiIcone(i.oldValue, i.newValue) }, { incognito });
 }
 
 let staccato = null;
 function avvia() {
   const C = CHIAVI();
-  if (!staccato) staccato = Disco.onScrittura(osserva, [C.SETTINGS, C.FILO_TIMERS, C.FILO_PROXY_RULES]);
+  if (!staccato) staccato = Disco.onScrittura(osserva, [C.SETTINGS, C.FILO_TIMERS, C.FILO_PROXY_RULES, C.ICON_LAYOUT]);
 }
 
 // Lo zoom non passa dallo storage: lo salva Chromium per sito. Il punto in cui il main lo viene a
@@ -230,6 +234,8 @@ async function annullaOra(id, prov = {}) {
     } else if (e.tipo === 'zoom') {
       const c = e.cambi[0];
       riuscito = !!(app.zoomSu && await app.zoomSu(String(c.chiave).slice(5), c.prima));
+    } else if (e.tipo === 'icone') {
+      riuscito = !!(app.rimettiIcone && await app.rimettiIcone((attuale) => K().annulloIcone(e, attuale), { incognito: Disco.inIncognito() }));
     }
     // Lo stato era già quello di prima (rimesso a mano nel frattempo): l'annullo resta come evento.
     if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, { vuoto: true });

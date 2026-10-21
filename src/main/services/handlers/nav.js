@@ -162,15 +162,6 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.NAV_STATE, async (msg, sender) => {
-    if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
-    const win = winOf(sender);
-    const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
-    if (!tab?.view?.webContents) return { ok: false, canBack: false, canFwd: false };
-    const tabs = win._filoTabs;
-    return { ok: true, canBack: tabs.puoTornare(tab, 'indietro'), canFwd: tabs.puoTornare(tab, 'avanti') };
-  });
-
   on(MSG.TOGGLE_FULLSCREEN, async (msg, sender) => {
     // Il `document.requestFullscreen()` dal renderer di una WebContentsView
     // non porta la BrowserWindow a tutto schermo: la WebContentsView resta
@@ -273,15 +264,15 @@ module.exports = function register(on, ctx) {
   // #405 — ponte fra un riquadro incorporato e la pagina che lo ospite.
   // Un iframe non può parlare con il frame che lo contiene (origini diverse,
   // e gli eventi non attraversano il confine): passa da qui. Due usi:
-  //   - RUN_IN_TOP_FRAME: azione di pagina (traduci, condividi, salva, QR,
-  //     screenshot…) scelta dal menu aperto dentro il riquadro → va eseguita
-  //     dal frame principale, che è l'unico a conoscere la pagina intera;
+  //   - RUN_IN_TOP_FRAME: pannello della pagina (feedback, red-team, Aiuto)
+  //     chiesto dal menu aperto dentro il riquadro → lo apre il frame
+  //     principale, che è l'unico a conoscere la pagina intera;
   //   - FRAME_TRANSLATE_DONE (#407): il riquadro riferisce com'è andata la sua
   //     traduzione → va al solo frame principale, che tiene il conto del giro;
   //   - CLOSE_OTHER_MENUS: il riquadro ha appena aperto il suo menu → gli
   //     altri frami della stessa scheda chiudono il loro.
-  // Il messaggio non porta dati arbitrari: solo l'id di un'icona del registro
-  // del menu, che il frame principale risolve nel proprio registro.
+  // Il messaggio non porta dati arbitrari: solo il nome di un pannello, che il
+  // frame principale riconosce o ignora.
   const frameBridge = (msg, sender, payload) => {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };
@@ -304,7 +295,6 @@ module.exports = function register(on, ctx) {
 
   on(MSG.RUN_IN_TOP_FRAME, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.TOP_FRAME_COMMAND,
-    iconId: String(msg?.iconId || ''),
     surface: String(msg?.surface || ''),
   }));
 

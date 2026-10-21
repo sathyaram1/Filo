@@ -58,7 +58,6 @@ const SPINTE_WEB = Object.freeze(new Set([
   'fullscreen_changed',
   'form_recheck',
   'form_sent',
-  'icon_layout_changed',
 ]));
 
 // Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno
@@ -71,8 +70,6 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
   'settings',
   'sn_personal_dict',
   'sn_autocorrect',
-  'sn_icon_layout',
-  'sn_qr_in_primary_migrated',
   'sn_feedback_client_id',
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));

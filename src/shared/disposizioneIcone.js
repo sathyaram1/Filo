@@ -1,18 +1,20 @@
-// Dove sta ogni icona globale: riga del tasto destro, «Altro…» o barra laterale (#871).
-// Solo dati e funzioni pure: la scrive il main (una porta sola), la leggono menu e barra.
+// Dove sta ogni icona della barra laterale: nella barra o nel suo «Altro…» (#871, #1246).
+// Solo dati e funzioni pure: la scrive il main (una porta sola), la legge la barra.
 // Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 (function (global) {
   'use strict';
 
-  const ZONE = Object.freeze(['primary', 'secondary', 'bar']);
+  // `primary` era la riga in cima al menu del tasto destro (#1246): resta vuota nel salvato, così un
+  // Filo di prima che lo rilegge lo trova valido, ma un'icona non ci si posa più.
+  const ZONE = Object.freeze(['bar', 'secondary']);
 
-  // Della finestra e del sistema, non dell'elemento: stanno nella barra, non in «Altro…».
+  // Della finestra e del sistema: chi arriva da una disposizione senza barra le ritrova lì.
   const GLOBALI = Object.freeze(['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
 
   // `tipo`: chi esegue. 'finestra' la fa il main, 'pagina' il content script della scheda, 'aiuto' il pannello
   // Aiuto della scheda, con l'aspetto che dice cosa farà il clic (aspettoAiuto).
-  // Le etichette sono quelle del menu (menuIcons.js): la sentinella le tiene uguali.
+  // Le etichette sono quelle del registro della pagina (menuIcons.js): la sentinella le tiene uguali.
   const ICONE = Object.freeze({
     help: { icona: 'help', etichetta: 'menu_help', tipo: 'aiuto' },
     translate: { icona: 'translate', etichetta: 'menu_global_translate', tipo: 'pagina' },
@@ -22,7 +24,8 @@
     share: { icona: 'share', etichetta: 'menu_share', tipo: 'pagina' },
     saveForLater: { icona: 'saveForLater', etichetta: 'menu_save_for_later', tipo: 'pagina' },
     qrCode: { icona: 'qrCode', etichetta: 'menu_qr_code', tipo: 'pagina' },
-    colorPicker: { icona: 'colorPicker', etichetta: 'menu_color_picker', tipo: 'pagina' },
+    // Il contagocce chiede un gesto vero: lo apre la barra, dove c'è il clic, e alla pagina arriva solo il colore.
+    colorPicker: { icona: 'colorPicker', etichetta: 'menu_color_picker', tipo: 'pagina', contagocce: true },
     fullscreen: { icona: 'zoom', etichetta: 'menu_fullscreen', tipo: 'finestra' },
     back: { icona: 'back', etichetta: 'menu_back', tipo: 'finestra' },
     forward: { icona: 'forward', etichetta: 'menu_forward', tipo: 'finestra' },
@@ -30,19 +33,19 @@
     closeTab: { icona: 'close', etichetta: 'menu_close_tab', tipo: 'finestra' },
     newTab: { icona: 'filoLogo', etichetta: 'menu_new_tab', tipo: 'finestra' },
     incognito: { icona: 'incognito', etichetta: 'menu_incognito', tipo: 'finestra' },
-    openOptions: { icona: 'options', etichetta: 'menu_open_options', tipo: 'finestra' },
+    // Non l'ingranaggio: nella barra c'è già quello di Impostazioni, che fa un'altra cosa (#1343 r4).
+    openOptions: { icona: 'models', etichetta: 'menu_open_options', tipo: 'finestra' },
     home: { icona: 'home', etichetta: 'menu_open_home', tipo: 'finestra' },
     editorApp: { icona: 'editor', etichetta: 'menu_open_editor', tipo: 'finestra' },
     feedbackApp: { icona: 'feedback', etichetta: 'menu_open_feedback', tipo: 'finestra', soloOwner: true },
   });
 
   const DEFAULT = Object.freeze({
-    primary: Object.freeze(['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
+    primary: Object.freeze([]),
     secondary: Object.freeze(['openOptions', 'editorApp', 'feedbackApp', 'screenshotCrop', 'transcribe', 'colorPicker']),
-    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']),
+    bar: Object.freeze(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab',
+      'translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab']),
   });
-
-  const MAX_PRIMARY = 6;
 
   // Ritirate dal registro: restando nel salvato farebbero bottoni fantasma.
   const RITIRATE = Object.freeze(['openForLater']);
@@ -62,10 +65,10 @@
   const uguali = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
   const noto = (id) => typeof id === 'string' && Object.prototype.hasOwnProperty.call(ICONE, id);
 
-  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra, la riga del tasto destro, «Altro…».
-  const DOVE = Object.freeze({ barra: 'bar', menu: 'primary', altro: 'secondary' });
+  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra e il suo «Altro…».
+  const DOVE = Object.freeze({ barra: 'bar', altro: 'secondary' });
 
-  // Il nome che l'utente legge nel menu, per la chat.
+  // Il nome che l'utente legge sull'icona, per la chat e per il registro dei cambi.
   function nome(id) {
     if (!noto(id)) return String(id || '');
     const I = global.SN_I18N;
@@ -77,12 +80,11 @@
     return !!(v && typeof v === 'object' && Array.isArray(v.primary) && Array.isArray(v.secondary));
   }
 
-  // Disposizione salvata → disposizione da usare, e se va riscritta. `qrPromosso` è il segno
-  // della promozione una tantum del QR nella riga: senza, il QR sale una volta sola.
-  function migra(salvato, { qrPromosso = false } = {}) {
-    if (!valida(salvato)) return { layout: copia(DEFAULT), scrivi: false, segnaQr: !qrPromosso };
+  // Disposizione salvata → disposizione da usare, e se va riscritta.
+  function migra(salvato) {
+    if (!valida(salvato)) return { layout: copia(DEFAULT), scrivi: false };
     if (uguali(salvato.primary, DEFAULT_ANTICO.primary) && uguali(salvato.secondary, DEFAULT_ANTICO.secondary) && !Array.isArray(salvato.bar)) {
-      return { layout: copia(DEFAULT), scrivi: true, segnaQr: true };
+      return { layout: copia(DEFAULT), scrivi: true };
     }
     const visti = new Set();
     const pulisci = (arr) => (Array.isArray(arr) ? arr : []).filter((id) => {
@@ -92,15 +94,16 @@
     });
     // Prima la barra: chi l'ha già se l'è disposta, e una doppia vince sul posto scelto per ultimo.
     const bar = Array.isArray(salvato.bar) ? pulisci(salvato.bar) : null;
-    const primary = pulisci(salvato.primary);
+    const riga = pulisci(salvato.primary);
     let secondary = pulisci(salvato.secondary);
     let barra = bar;
     if (!barra) {
-      // Prima volta con la barra: le globali rimaste in «Altro…» ci vanno, quelle che
-      // l'utente aveva portato nella riga restano dov'erano.
-      barra = DEFAULT.bar.filter((id) => secondary.includes(id));
+      // Prima volta con la barra: le globali rimaste in «Altro…» ci vanno.
+      barra = GLOBALI.filter((id) => secondary.includes(id));
       secondary = secondary.filter((id) => !barra.includes(id));
     }
+    // La riga del tasto destro non c'è più (#1246): le sue icone scendono in fondo alla barra, nel loro ordine.
+    barra.push(...riga);
     for (const id of AGGIUNTE) {
       if (visti.has(id)) continue;
       visti.add(id);
@@ -108,31 +111,24 @@
       else if (GLOBALI.includes(id)) barra.push(id);
       else secondary.unshift(id);
     }
-    const layout = { primary, secondary, bar: barra };
-    if (!qrPromosso && !layout.primary.includes('qrCode') && layout.secondary.includes('qrCode')
-        && layout.primary.length < MAX_PRIMARY) {
-      layout.primary.push('qrCode');
-      layout.secondary = layout.secondary.filter((id) => id !== 'qrCode');
-    }
+    const layout = { primary: [], secondary, bar: barra };
     const cambiata = !uguali(layout.primary, salvato.primary) || !uguali(layout.secondary, salvato.secondary)
       || !uguali(layout.bar, salvato.bar);
-    return { layout, scrivi: cambiata || !qrPromosso, segnaQr: true };
+    return { layout, scrivi: cambiata };
   }
 
-  // Sposta `id` davanti a `beforeId` (null: in fondo) nella zona `target`. La riga ha un
-  // tetto: chi trabocca scende in cima ad «Altro…».
+  // Sposta `id` davanti a `beforeId` (null: in fondo) nella zona `target`.
   function applicaPosa(layout, { id, target, beforeId = null } = {}) {
     if (!noto(id) || !ZONE.includes(target)) return null;
     const out = copia(valida(layout) ? { ...layout, bar: Array.isArray(layout.bar) ? layout.bar : [] } : DEFAULT);
+    // Un salvato mai migrato con la riga piena: le sue icone non si perdono, vanno in fondo alla barra.
+    out.bar.push(...out.primary.filter((x) => !out.bar.includes(x) && !out.secondary.includes(x)));
+    out.primary = [];
     for (const z of ZONE) out[z] = out[z].filter((x) => x !== id);
     const zona = out[target];
     const i = beforeId ? zona.indexOf(beforeId) : -1;
     if (i >= 0) zona.splice(i, 0, id);
     else zona.push(id);
-    while (out.primary.length > MAX_PRIMARY) {
-      const fuori = out.primary.pop();
-      if (fuori && !out.secondary.includes(fuori)) out.secondary.unshift(fuori);
-    }
     return out;
   }
 
@@ -147,7 +143,7 @@
   }
 
   global.SN_DISPOSIZIONE_ICONE = {
-    ZONE, GLOBALI, ICONE, DEFAULT, MAX_PRIMARY, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
+    ZONE, GLOBALI, ICONE, DEFAULT, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
     noto, nome, valida, migra, applicaPosa, aspettoAiuto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

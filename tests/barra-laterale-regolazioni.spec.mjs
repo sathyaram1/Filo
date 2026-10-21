@@ -20,6 +20,7 @@ test('da Preferenze: l\'attesa sul bordo, la chiusura, la striscia e l\'apertura
   await expect(pref.locator('#barraUscita')).toHaveValue('400');
   await expect(pref.locator('#barraSpinta')).toBeChecked();
   await expect(pref.locator('#barraStriscia')).toBeChecked();
+  await expect(pref.locator('#barraSchede')).toBeChecked();
 
   await pref.locator('#barraAttesa').fill('900');
   await pref.locator('#barraAttesa').blur();
@@ -28,7 +29,8 @@ test('da Preferenze: l\'attesa sul bordo, la chiusura, la striscia e l\'apertura
   // Fuori dai limiti torna dentro, a vista: il campo dice il valore in uso.
   await expect(pref.locator('#barraUscita')).toHaveValue('100');
   await pref.locator('#barraStriscia').uncheck();
-  await expect.poll(() => opzioni(app)).toEqual({ spinta: true, attesaMs: 900, uscitaMs: 100, striscia: false });
+  await pref.locator('#barraSchede').uncheck();
+  await expect.poll(() => opzioni(app)).toEqual({ spinta: true, attesaMs: 900, uscitaMs: 100, striscia: false, schedeInAlto: false });
 
   const sito = await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);

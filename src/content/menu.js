@@ -142,7 +142,6 @@
   }
 
   function close() {
-    try { dismissTooltip?.(); } catch (_) {}
     clearSubCloseTimer();
     if (activeMenu) {
       const torna = activeMenu.opener;
@@ -163,8 +162,6 @@
       try { allaChiusura?.(); } catch (_) {}
     }
     try { global.SN_POPUP?.sottoIlMenu?.(false); } catch (_) {}
-    // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
-    dropZones.length = 0;
   }
 
   // Lo strato sopra la scheda (#1054) sa così che il menu si è chiuso da sé: una voce, un clic fuori, Esc.
@@ -270,23 +267,13 @@
       visH: root.offsetHeight * scale,
       vw, vh, from,
     });
-    const primaLeft = parseFloat(root.style.left);
-    const primaTop = parseFloat(root.style.top);
     root.style.left = `${p.left}px`;
     root.style.top = `${p.top}px`;
-    // #500 — se il menu è SCIVOLATO, l'etichetta che spiegava un'icona è
-    // rimasta ferma dov'era: adesso parla di un bottone che non è più sotto al
-    // puntatore e copre le voci. Stesso trattamento che riceve quando il menu
-    // scorre. Solo se si è mosso davvero: un menu che cresce restando fermo non
-    // deve far sparire l'etichetta sotto il naso di chi la sta leggendo.
-    const mosso = (Number.isFinite(primaTop) && Math.abs(p.top - primaTop) > 0.5)
-      || (Number.isFinite(primaLeft) && Math.abs(p.left - primaLeft) > 0.5);
-    if (mosso) dismissTooltip();
     repositionSub();
   }
 
-  // Dove posare un pannello ancorato (la griglia "Altro…", la cronologia
-  // incolla, i sotto-menu a lista). Pura, come computeOffset.
+  // Dove posare un pannello ancorato (la cronologia incolla, i sotto-menu a
+  // lista). Pura, come computeOffset.
   //
   // `mode`:
   // - `'anchor'` (predefinito): a fianco della voce che l'ha aperto, con un
@@ -340,7 +327,7 @@
     placeSub(sub, anchor, activeMenu.subMode);
   }
 
-  // items: array di { type: 'item'|'separator'|'row'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
+  // items: array di { type: 'item'|'separator'|'inline'|'paste', label, shortcut, disabled, onClick, items? }
   // - 'inline': sezione che mostra contenuto dinamico (es. spiegazione AI). { content?: string, onMount?: (el) => cleanup }
   // - 'paste': come 'item' ma con freccetta a destra che apre il sotto-menu della cronologia
   function open({ x, y, items, keepOnScroll }) {
@@ -378,15 +365,6 @@
           sep.dataset.snHiddenSep = '1';
         }
         root.appendChild(sep);
-        continue;
-      }
-      if (it.type === 'row') {
-        const row = document.createElement('div');
-        row.className = 'sn-menu-row';
-        if (it.dropTarget) row.dataset.snDropTarget = it.dropTarget;
-        populateRow(row, it.items, { dropTarget: it.dropTarget });
-        if (it.dropTarget) attachDropZone(row, { target: it.dropTarget, onDrop: it.onDrop });
-        root.appendChild(row);
         continue;
       }
       if (it.type === 'inline') {
@@ -668,9 +646,7 @@
         if (root.contains(t)) {
           // #500 — il menu ha scorso sotto al pannello ancorato: la freccetta
           // che l'ha aperto si è spostata, e il pannello va con lei (o si
-          // chiude, se la freccetta è uscita dal bordo). Anche il tooltip, che
-          // parlava di un bottone che ora non è più sotto al cursore.
-          try { dismissTooltip?.(); } catch (_) {}
+          // chiude, se la freccetta è uscita dal bordo).
           repositionSub();
           return;
         }
@@ -1204,447 +1180,8 @@
     attachSubmenuHover(sub);
   }
 
-  // ============================================================================
-  // Sotto-menu a griglia di icone (per il pannello "Altro…" della riga icone).
-  // Si ancora a un bottone del menu principale ma NON chiude il menu padre.
-  // Supporta drag-and-drop fra griglia secondaria e riga principale.
-  // ============================================================================
-  function openIconGridSubmenu(anchorEl, items, opts = {}) {
-    if (!activeMenu) return;
-    if (activeMenu.subRoot) {
-      staccaSub();
-      return;
-    }
-    const cols = opts.cols || 4;
-    const sub = document.createElement('div');
-    sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
-    global.SN_FILO_UI?.mark(sub);
-    global.SN_FILO_UI?.soloGestiVeri(sub);
-    sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    sub.style.setProperty('--sn-icon-cols', String(cols));
-    if (opts.dropTarget) sub.dataset.snDropTarget = opts.dropTarget;
-
-    populateGrid(sub, items, { dropTarget: opts.dropTarget });
-    if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
-
-    monta(sub);
-    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
-    activeMenu.cleanups.push(cleanupZoom);
-    activeMenu.subRoot = sub;
-    activeMenu.subAnchor = anchorEl;
-    activeMenu.subMode = 'anchor';
-
-    placeSub(sub, anchorEl, 'anchor');
-    sorveglia(sub);
-    // Senza questo, il timer di mouseleave sull'ancora (overflow) chiude il
-    // sub-menu appena il cursore entra nella griglia (feedback alpha).
-    attachSubmenuHover(sub);
-  }
-
-  // ============================================================================
-  // Tooltip custom (stile coerente col menu). Usa un singleton globale.
-  // ============================================================================
-  let tooltipEl = null;
-  let tooltipHideTimer = null;
-  function ensureTooltipEl() {
-    if (tooltipEl && document.documentElement.contains(tooltipEl)) return tooltipEl;
-    tooltipEl = document.createElement('div');
-    tooltipEl.className = 'sn-tooltip';
-    global.SN_FILO_UI?.mark(tooltipEl);
-    tooltipEl.style.display = 'none';
-    monta(tooltipEl);
-    return tooltipEl;
-  }
-  function showTooltip(target, text) {
-    if (!text) return;
-    const el = ensureTooltipEl();
-    // Sopra i pannelli aperti dopo di lei (stesso piano: vale l'ordine), sotto le sonde (#589.11).
-    const host = menuHost();
-    annullaZoom(el, host);
-    host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
-    el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    el.textContent = text;
-    el.style.display = '';
-    const r = target.getBoundingClientRect();
-    const tw = el.offsetWidth, th = el.offsetHeight;
-    let left = r.left + r.width / 2 - tw / 2;
-    let top = r.bottom + 6;
-    if (top + th + 8 > window.innerHeight) top = r.top - th - 6;
-    if (left + tw + 4 > window.innerWidth) left = window.innerWidth - tw - 4;
-    if (left < 4) left = 4;
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-  }
-  function hideTooltip() {
-    if (!tooltipEl) return;
-    tooltipEl.style.display = 'none';
-  }
-  // Toglie l'etichetta E l'attesa che sta per farla comparire. Serve quando a
-  // muoversi non è il puntatore ma il menu (scivola, scorre, viene trascinato):
-  // l'attesa lasciata correre farebbe comparire fra un attimo l'etichetta di un
-  // bottone che nel frattempo si è spostato altrove.
-  function dismissTooltip() {
-    clearTimeout(tooltipHideTimer);
-    tooltipHideTimer = null;
-    hideTooltip();
-  }
-  function attachTooltip(el, text) {
-    el.addEventListener('mouseenter', () => {
-      clearTimeout(tooltipHideTimer);
-      tooltipHideTimer = setTimeout(() => showTooltip(el, text), 250);
-    });
-    el.addEventListener('mouseleave', () => {
-      dismissTooltip();
-    });
-    el.addEventListener('mousedown', () => {
-      dismissTooltip();
-    });
-  }
-
-  // ============================================================================
-  // Costruzione bottoni della riga icone / griglia secondaria (estratti per
-  // poter rigenerare in-place dopo un drag senza chiudere il menu).
-  // ============================================================================
-  // Chi apre un pannello sostando sopra durante un trascinamento: chiamato da qui, perché un clic
-  // fabbricato da codice non passerebbe da `soloGestiVeri`.
-  const apritori = new WeakMap();
-
-  // Il suggerimento di un'icona nomina anche il suo tasto, se ne ha uno (`tasto`, chiesto a SN_TASTI).
-  function conTasto(it) { return it.tasto ? `${it.label} (${it.tasto})` : it.label; }
-
-  function makeRowButton(sub, opts = {}) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'sn-menu-row-btn';
-    if (sub.kind === 'overflow') b.classList.add('sn-menu-row-overflow');
-    if (sub.kind === 'empty') b.classList.add('sn-menu-row-empty');
-    // Disabilitazione "soft": classe invece dell'attributo nativo `disabled`,
-    // che azzera i pointer event e impedirebbe di trascinare l'icona per
-    // riordinarla (feedback alpha: avanti/indietro grigi non si potevano
-    // spostare). Il click resta neutralizzato dal guard più sotto.
-    if (sub.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
-    // L'overflow apre subito un sotto-menu su hover: non mostrare il tooltip
-    // "Altro…" che altrimenti coprirebbe/preannuncerebbe la stessa cosa.
-    if (sub.kind !== 'empty' && sub.kind !== 'overflow' && sub.label) attachTooltip(b, conTasto(sub));
-    setIconContent(b, sub.icon || sub.label);
-    // Il bottone contiene solo un disegno: senza nome accessibile è un bottone
-    // muto per chi legge lo schermo (e invisibile a chi lo cerca per etichetta).
-    if (sub.label) b.setAttribute('aria-label', sub.label);
-    if (sub.id) b.dataset.snIconId = sub.id;
-    if (sub.kind === 'overflow') {
-      // L'overflow apre la griglia delle icone secondarie come sotto-menu
-      // ancorato, SENZA chiudere il menu principale (feedback alpha). Marcato
-      // come hover-target durante drag per aprirsi automaticamente.
-      b.dataset.snDragHoverOpen = '1';
-      const openOverflow = () => {
-        if (sub.disabled) return;
-        try { sub.onClick && sub.onClick(b); } catch (er) { console.error(er); }
-        if (activeMenu) activeMenu.subOwner = b;
-      };
-      b.addEventListener('mouseenter', () => {
-        clearSubCloseTimer();
-        if (activeMenu?.subRoot && activeMenu.subOwner !== b) {
-          activeMenu.subLocked = false;
-          closeSubmenu();
-        }
-        if (!activeMenu?.subRoot) openOverflow();
-      });
-      b.addEventListener('mouseleave', () => {
-        if (activeMenu?.subLocked) return;
-        clearSubCloseTimer();
-        subCloseTimer = setTimeout(() => closeSubmenu(), 500);
-      });
-      const apriFermo = () => {
-        clearSubCloseTimer();
-        if (activeMenu?.subRoot && activeMenu.subOwner === b) {
-          activeMenu.subLocked = true;
-        } else {
-          if (activeMenu?.subRoot) closeSubmenu();
-          openOverflow();
-          if (activeMenu) activeMenu.subLocked = true;
-        }
-      };
-      apritori.set(b, apriFermo);
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        apriFermo();
-      });
-    } else {
-      b.addEventListener('click', () => {
-        if (sub.kind === 'empty') return;
-        if (sub.disabled) return; // greyed: niente azione (ma resta trascinabile)
-        close();
-        try { sub.onClick && sub.onClick(); } catch (er) { console.error(er); }
-      });
-    }
-    if (sub.draggable && sub.id) attachDrag(b, { id: sub.id, source: opts.dropTarget || 'row' });
-    return b;
-  }
-
-  function populateRow(row, items, opts = {}) {
-    row.innerHTML = '';
-    row.__snRowOpts = opts;
-    for (const sub of items) row.appendChild(makeRowButton(sub, opts));
-    global.SN_FILO_UI?.soloGestiVeri(row);
-  }
-
-  function makeGridButton(it, opts = {}) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'sn-menu-icon-btn';
-    // Vedi makeRowButton: disabilitazione via classe per restare trascinabile.
-    if (it.disabled) { b.classList.add('sn-menu-btn-disabled'); b.dataset.snDisabled = '1'; }
-    setIconContent(b, it.icon || it.label || '');
-    if (it.id) b.dataset.snIconId = it.id;
-    // Vedi makeRowButton: nome accessibile su un bottone di sola icona.
-    if (it.label) { b.setAttribute('aria-label', it.label); attachTooltip(b, conTasto(it)); }
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (it.disabled) return;
-      close();
-      try { it.onClick && it.onClick(); } catch (er) { console.error(er); }
-    });
-    if (it.draggable !== false && it.id) attachDrag(b, { id: it.id, source: opts.dropTarget || 'grid' });
-    return b;
-  }
-
-  function populateGrid(sub, items, opts = {}) {
-    sub.innerHTML = '';
-    sub.__snGridOpts = opts;
-    if (!items || items.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'sn-menu-empty';
-      empty.textContent = '—';
-      sub.appendChild(empty);
-    } else {
-      for (const it of items) sub.appendChild(makeGridButton(it, opts));
-    }
-    global.SN_FILO_UI?.soloGestiVeri(sub);
-  }
-
-  // Aggiorna in-place i bottoni della riga primaria (senza chiudere il menu).
-  function refreshIconRow(items) {
-    if (!activeMenu) return;
-    const row = activeMenu.root.querySelector('.sn-menu-row');
-    if (!row) return;
-    populateRow(row, items, row.__snRowOpts || {});
-  }
-
-  // Aggiorna in-place i bottoni della griglia secondaria, se aperta.
-  function refreshIconGrid(items) {
-    if (!activeMenu || !activeMenu.subRoot) return;
-    populateGrid(activeMenu.subRoot, items, activeMenu.subRoot.__snGridOpts || {});
-  }
-
   function isSubMenuOpen() {
     return !!(activeMenu && activeMenu.subRoot && activeMenu.subRoot.isConnected);
-  }
-
-  // ============================================================================
-  // Drag & drop fra zone (es. riga primaria ↔ griglia secondaria).
-  // Implementazione pointer-based: il drag HTML5 nativo non si attiva in modo
-  // affidabile quando il menu ha un transform applicato (compensazione zoom)
-  // o quando l'elemento è un <button>, e su molte pagine ospite il drag image
-  // non risulta visibile. Qui muoviamo un'anteprima clonata che segue il
-  // cursore e gestiamo noi la logica di drop.
-  // ============================================================================
-  const dropZones = [];
-
-  // La barra laterale come zona in più (#871): la installa menuIcons.js. Il puntatore resta della
-  // pagina per tutto il gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
-  let ponteBarra = null;
-  function setPonteBarra(p) { ponteBarra = p || null; }
-  // Dove comincia il menu aperto: se sta dove si apre la barra, lei aspetta che il puntatore vada al bordo.
-  function sinistraDelMenu() {
-    const els = [activeMenu?.root, activeMenu?.subRoot].filter((e) => e && e.isConnected);
-    return els.length ? Math.min(...els.map((e) => e.getBoundingClientRect().left)) : null;
-  }
-
-  function attachDrag(el, { id, source }) {
-    el.dataset.snDraggable = '1';
-    el.addEventListener('pointerdown', (ev) => {
-      // Solo gesti veri: un trascinamento finto aprirebbe la barra a comando di un sito.
-      if (!ev.isTrusted || ev.button !== 0) return;
-      if (el.disabled) return;
-      const startX = ev.clientX, startY = ev.clientY;
-      let dragging = false;
-      let preview = null;
-      let lastHoverZone = null;
-      let lastHoverOpener = null;
-      let hoverOpenTimer = null;
-      const THRESHOLD = 4;
-      const HOVER_OPEN_DELAY = 350;
-
-      const updatePreview = (x, y) => {
-        if (!preview) return;
-        const w = preview.offsetWidth || 0;
-        const h = preview.offsetHeight || 0;
-        preview.style.left = (x - w / 2) + 'px';
-        preview.style.top = (y - h / 2) + 'px';
-      };
-
-      const setHover = (zone) => {
-        if (lastHoverZone === zone) return;
-        if (lastHoverZone) lastHoverZone.zoneEl.classList.remove('sn-drop-hover');
-        lastHoverZone = zone;
-        if (zone) zone.zoneEl.classList.add('sn-drop-hover');
-      };
-
-      const startDrag = (x, y) => {
-        dragging = true;
-        try { dismissTooltip?.(); } catch (_) {}
-        el.classList.add('sn-dragging');
-        preview = el.cloneNode(true);
-        preview.classList.add('sn-drag-preview');
-        const r = el.getBoundingClientRect();
-        preview.style.width = r.width + 'px';
-        preview.style.height = r.height + 'px';
-        monta(preview);
-        updatePreview(x, y);
-        try { ponteBarra?.inizio(id, sinistraDelMenu()); } catch (_) {}
-      };
-
-      const checkHoverOpen = (x, y) => {
-        // Apre automaticamente l'overflow (e simili) se l'utente sosta sopra
-        // il loro bottone durante un drag.
-        if (preview) preview.style.visibility = 'hidden';
-        const elAt = document.elementFromPoint(x, y);
-        if (preview) preview.style.visibility = '';
-        const opener = elAt && elAt.closest ? elAt.closest('[data-sn-drag-hover-open="1"]') : null;
-        if (opener === lastHoverOpener) return;
-        lastHoverOpener = opener;
-        if (hoverOpenTimer) { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
-        if (opener && !isSubMenuOpen()) {
-          hoverOpenTimer = setTimeout(() => {
-            if (lastHoverOpener === opener && !isSubMenuOpen()) {
-              try { apritori.get(opener)?.(); } catch (_) {}
-            }
-          }, HOVER_OPEN_DELAY);
-        }
-      };
-
-      const onMove = (e) => {
-        if (!e.isTrusted) return;
-        if (!dragging) {
-          if (Math.hypot(e.clientX - startX, e.clientY - startY) < THRESHOLD) return;
-          startDrag(e.clientX, e.clientY);
-        }
-        e.preventDefault();
-        updatePreview(e.clientX, e.clientY);
-        let sopraBarra = false;
-        try { sopraBarra = !!ponteBarra?.sopra(e.clientX, e.clientY); } catch (_) {}
-        setHover(sopraBarra ? null : findZoneAt(e.clientX, e.clientY));
-        checkHoverOpen(e.clientX, e.clientY);
-      };
-
-      const cleanup = () => {
-        window.removeEventListener('pointermove', onMove, true);
-        window.removeEventListener('pointerup', onUp, true);
-        window.removeEventListener('pointercancel', onCancel, true);
-        if (hoverOpenTimer) { clearTimeout(hoverOpenTimer); hoverOpenTimer = null; }
-        el.classList.remove('sn-dragging');
-        setHover(null);
-        if (preview) { try { preview.remove(); } catch (_) {} preview = null; }
-        if (dragging) { try { ponteBarra?.fine(); } catch (_) {} }
-      };
-
-      const onUp = (e) => {
-        if (!e.isTrusted) return;
-        if (!dragging) { cleanup(); return; }
-        let inBarra = false;
-        try { inBarra = !!ponteBarra?.posa(id, e.clientX, e.clientY); } catch (_) {}
-        const zone = inBarra ? null : findZoneAt(e.clientX, e.clientY);
-        cleanup();
-        if (zone) {
-          const beforeBtn = findInsertBefore(zone.zoneEl, e.clientX, e.clientY, el);
-          const beforeId = beforeBtn?.dataset?.snIconId || null;
-          try { zone.onDrop && zone.onDrop({ id, source, target: zone.target, beforeId }); } catch (er) { console.error(er); }
-        }
-        // Sopprime il click che segue il pointerup dopo un drag.
-        const swallow = (ce) => { ce.stopPropagation(); ce.preventDefault(); };
-        window.addEventListener('click', swallow, { capture: true, once: true });
-        setTimeout(() => { try { window.removeEventListener('click', swallow, true); } catch (_) {} }, 50);
-      };
-
-      const onCancel = () => cleanup();
-
-      window.addEventListener('pointermove', onMove, true);
-      window.addEventListener('pointerup', onUp, true);
-      window.addEventListener('pointercancel', onCancel, true);
-    });
-  }
-
-  // Un'icona trascinata fuori dalla barra laterale, sopra questa pagina: il gesto è della barra,
-  // qui arrivano solo le coordinate. Se il menu è aperto, cade nelle sue zone.
-  let esterno = null;
-  function trascinaDaFuori({ fase, id, x, y, icon }) {
-    const via = () => {
-      if (!esterno) return;
-      if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
-      try { esterno.preview.remove(); } catch (_) {}
-      esterno = null;
-    };
-    if (fase === 'muovi') {
-      if (!esterno || esterno.id !== id) {
-        via();
-        const preview = document.createElement('div');
-        preview.className = 'sn-drag-preview';
-        preview.style.width = '36px';
-        preview.style.height = '36px';
-        preview.innerHTML = icon || '';
-        monta(preview);
-        esterno = { id, preview, zona: null };
-      }
-      esterno.preview.style.left = (x - 18) + 'px';
-      esterno.preview.style.top = (y - 18) + 'px';
-      const zona = findZoneAt(x, y);
-      if (zona !== esterno.zona) {
-        if (esterno.zona) esterno.zona.zoneEl.classList.remove('sn-drop-hover');
-        if (zona) zona.zoneEl.classList.add('sn-drop-hover');
-        esterno.zona = zona;
-      }
-      return true;
-    }
-    if (fase === 'rilascia') {
-      const zona = findZoneAt(x, y);
-      via();
-      if (!zona) return false;
-      const prima = findInsertBefore(zona.zoneEl, x, y, null);
-      try { zona.onDrop && zona.onDrop({ id, source: 'bar', target: zona.target, beforeId: prima?.dataset?.snIconId || null }); } catch (er) { console.error(er); }
-      return true;
-    }
-    via();
-    return false;
-  }
-
-  function attachDropZone(zoneEl, { target, onDrop }) {
-    dropZones.push({ zoneEl, target, onDrop });
-  }
-
-  function findZoneAt(x, y) {
-    for (let i = dropZones.length - 1; i >= 0; i--) {
-      const z = dropZones[i];
-      if (!document.documentElement.contains(z.zoneEl)) {
-        dropZones.splice(i, 1);
-        continue;
-      }
-      const r = z.zoneEl.getBoundingClientRect();
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return z;
-    }
-    return null;
-  }
-
-  // Trova il bottone davanti al quale inserire l'elemento, in reading order
-  // (top→bottom, left→right). Salta l'elemento sorgente per non auto-collidere.
-  function findInsertBefore(zoneEl, x, y, skipEl) {
-    const btns = Array.from(zoneEl.querySelectorAll('[data-sn-icon-id]'))
-      .filter((b) => b !== skipEl);
-    for (const b of btns) {
-      const r = b.getBoundingClientRect();
-      if (y < r.top) return b;
-      if (y >= r.top && y <= r.bottom && x < r.left + r.width / 2) return b;
-    }
-    return null;
   }
 
   // Per gli spec: lo shadow root chiuso della cronologia non lo attraversa nessun locator. Sui siti SN_MENU
@@ -1708,14 +1245,9 @@
     computeOffset: Place.computeOffset,
     computeSubOffset,
     openGenericSubmenu,
-    openIconGridSubmenu,
     closeSubmenu,
     allaChiusura: (fn) => { allaChiusura = typeof fn === 'function' ? fn : null; },
-    refreshIconRow,
-    refreshIconGrid,
     isSubMenuOpen,
-    setPonteBarra,
-    trascinaDaFuori,
     testoNascosto,
     // C'è un menu aperto adesso? Lo chiede content.js per decidere di chi è
     // l'Esc quando si è a tutto schermo (#514).

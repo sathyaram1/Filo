@@ -1,17 +1,12 @@
-// Riga icone globali del menu contestuale: registro delle icone (con ID
-// stabili), layout persistente primaria/secondaria, migrazioni del layout
-// salvato e drag-and-drop fra le due zone.
-//
-// Estratto da content.js — viene caricato prima di lui dai preload (dopo
-// actions.js, da cui prende gli onClick delle icone). content.js chiama
-// init() passando lo stato "contenuto a tutto schermo" che resta suo.
+// Il lato pagina delle icone della barra laterale (#871, #1246): nomi, disegni e azioni delle icone, eseguite qui
+// quando la barra le preme. Nel menu del tasto destro non entrano più. Caricato dopo actions.js.
+// Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 (function (global) {
   'use strict';
 
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
-  const Menu = global.SN_MENU;
   const Translate = global.SN_TRANSLATE_PAGE;
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
@@ -19,32 +14,10 @@
     isContentFullscreen: () => false,
   };
 
-  // Registro delle icone globali, con ID stabili per drag-and-drop + persistenza
-  // della disposizione utente. Le icone primarie occupano la riga in alto del
-  // menu; le secondarie vivono nel sotto-menu "Altro…" (griglia 4 colonne).
-  // #405 — girando dentro un riquadro incorporato (video, mappa, modulo) le
-  // icone della riga globale continuano a rappresentare azioni sulla PAGINA:
-  // "traduci", "condividi", "salva per dopo", il QR, lo screenshot. Eseguirle
-  // qui dentro le applicherebbe al rettangolo dell'embed — si condividerebbe
-  // l'indirizzo del player invece dell'articolo. Le rimandiamo quindi al frame
-  // principale, che le esegue come se il menu fosse stato aperto sulla pagina.
+  // Le azioni sono della PAGINA (#405): risponde e agisce solo il frame principale, mai un riquadro incorporato.
   const IS_SUBFRAME = (() => {
     try { return window.top !== window.self; } catch (_) { return true; }
   })();
-
-  function buildIconRegistry(navState) {
-    const registry = buildLocalIconRegistry(navState);
-    if (!IS_SUBFRAME) return registry;
-    const out = {};
-    for (const id of Object.keys(registry)) {
-      // Il colore preso dallo strato (#1054) vale per lo schermo, non per la pagina: si copia da qui.
-      const conColore = registry[id].nelloStrato === 'contagocce';
-      out[id] = { ...registry[id], onClick: (scelto) => (conColore && scelto ? registry[id].onClick(scelto) : runInTopFrame(id)) };
-    }
-    // Il pannello Aiuto vive nel frame principale e qui il suo stato non si vede: da un riquadro l'icona lo apre, come la voce «Aiuto».
-    if (out.help) out.help = { ...out.help, onClick: () => runInTopFrame(null, 'help') };
-    return out;
-  }
 
   // #583 — «Feedback» fra le icone apre la POSTA delle segnalazioni, che da
   // quando i feedback li legge solo chi li gestisce non ha niente da mostrare a
@@ -59,33 +32,27 @@
       Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }))
         .then((r) => {
           const now = !!(r && r.ok && r.signedIn && r.isAdmin);
-          if (now === isOwner) return;
           isOwner = now;
-          // Il menu può essere già aperto: le icone si ridisegnano da sole.
-          try { redrawIconRows(); } catch (_) {}
         })
         .catch(() => {});
     } catch (_) {}
   }
 
-  function runInTopFrame(iconId, surface = null) {
-    try {
-      Promise.resolve(chrome.runtime.sendMessage(surface ? { type: MSG.RUN_IN_TOP_FRAME, surface } : { type: MSG.RUN_IN_TOP_FRAME, iconId })).catch(() => {});
-    } catch (_) {}
-  }
-
-  // Eseguita NEL frame principale quando un riquadro rimanda qui un'azione di
-  // pagina. `iconId` è un id del registro, niente di più: nessun dato arbitrario
-  // attraversa il ponte.
-  function runIconAction(iconId) {
-    const entry = buildLocalIconRegistry(lastNavState)[String(iconId || '')];
-    if (entry && typeof entry.onClick === 'function') entry.onClick();
+  // Eseguita NEL frame principale quando la barra preme un'azione della pagina. `iconId` è un id del registro, e
+  // `colore` solo un #rrggbb preso dal contagocce della barra, che ha il gesto vero: nient'altro attraversa il ponte.
+  function runIconAction(iconId, colore) {
+    if (IS_SUBFRAME) return;
+    const entry = buildLocalIconRegistry(null)[String(iconId || '')];
+    if (!entry || typeof entry.onClick !== 'function') return;
+    const scelto = entry.nelloStrato === 'contagocce' && /^#[0-9a-f]{6}$/i.test(String(colore || '')) ? String(colore) : undefined;
+    if (scelto) entry.onClick(scelto);
+    else entry.onClick();
   }
 
   function buildLocalIconRegistry(navState) {
     const Icons = global.SN_ICONS;
     const Actions = global.SN_ACTIONS;
-    // Tutte le icone della riga primaria/griglia sono SVG renderizzate a 18px.
+    // Tutte le icone sono SVG renderizzate a 18px.
     // Vedi src/shared/icons.js e src/styles/ICONS.md per la guida di stile.
     const I = (name) => Icons[name](18);
     // Quattro stati, non due: senza traduzione → "Traduci"; con traduzione
@@ -93,8 +60,8 @@
     // (#408) → "Riprendi traduzione"; con traduzione completa ma testo comparso
     // dopo (#407: scorrimento infinito, schermate che cambiano senza ricaricare)
     // → "Traduci il testo nuovo". Negli ultimi due l'icona serve a CONTINUARE, e
-    // il ritorno all'originale resta raggiungibile come voce etichettata (vedi
-    // buildMenuItems in content.js). In tutti e due la traduzione completa solo
+    // il ritorno all'originale resta raggiungibile come voce etichettata del tasto
+    // destro (vedi buildMenuItems in content.js). In tutti e due la traduzione completa solo
     // ciò che manca: quel che è già tradotto non torna al modello.
     const partialTranslation = typeof Translate.isPartial === 'function' && Translate.isPartial();
     const newContent = typeof Translate.hasNewContent === 'function' && Translate.hasNewContent();
@@ -140,193 +107,38 @@
       newTab:        { id: 'newTab',        icon: I('filoLogo'),    label: I18n.t('menu_new_tab'),           onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB }) },
       qrCode:        { id: 'qrCode',        icon: I('qrCode'),      label: I18n.t('menu_qr_code'),           onClick: () => Actions.showPageQrCode() },
       incognito:     { id: 'incognito',     icon: I('incognito'),   label: I18n.t('menu_incognito'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_INCOGNITO }) },
-      // Scorciatoie a impostazioni, home e alle app interne (editor, feedback)
-      // direttamente fra le icone del menu (feedback alpha).
-      openOptions:   { id: 'openOptions',   icon: I('options'),     label: I18n.t('menu_open_options'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS }) },
+      // Scorciatoie a impostazioni, home e alle app interne (editor, feedback).
+      openOptions:   { id: 'openOptions',   icon: I('models'),      label: I18n.t('menu_open_options'),      onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_OPTIONS }) },
       home:          { id: 'home',          icon: I('home'),        label: I18n.t('menu_open_home'),         onClick: () => chrome.runtime.sendMessage({ type: MSG.GO_HOME }) },
       editorApp:     { id: 'editorApp',     icon: I('editor'),      label: I18n.t('menu_open_editor'),       onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }) },
     };
     // Solo all'owner (vedi refreshOwner sopra): a chiunque altro quella pagina
-    // non ha niente da mostrare. Un id assente dal registro sparisce da solo
-    // anche dai layout che l'utente si era salvato: i builder filtrano su
-    // `registry[id]`.
+    // non ha niente da mostrare.
     if (isOwner) {
       registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
     }
     return registry;
   }
 
-  // Dove sta ogni icona (riga, «Altro…», barra laterale) lo decide src/shared/disposizioneIcone.js,
-  // e lo scrive il main, uno solo: qui c'è la copia per disegnare subito (#871).
   const Disp = global.SN_DISPOSIZIONE_ICONE;
-  const DEFAULT_ICON_LAYOUT = Disp.DEFAULT;
-
-  let iconLayoutCache = null;
-  // Stato di navigazione (canBack/canFwd) dell'ultima apertura menu: riusato
-  // dai redraw post-drag per non perdere il grigio di avanti/indietro.
-  let lastNavState = null;
-
-  function setLayout(v) {
-    if (!Disp.valida(v)) return false;
-    iconLayoutCache = { primary: [...v.primary], secondary: [...v.secondary], bar: [...(v.bar || [])] };
-    return true;
-  }
-
-  function loadIconLayout() {
-    try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.ICON_LAYOUT_GET }))
-        .then((r) => { if (r && r.ok) setLayout(r.layout); })
-        .catch(() => {});
-    } catch (_) {}
-  }
-  loadIconLayout();
   refreshOwner();
 
-  function getIconLayout() {
-    return iconLayoutCache || DEFAULT_ICON_LAYOUT;
-  }
-
-  // Cambiata altrove (un'altra scheda, la barra laterale): il menu aperto si ridisegna.
-  function layoutCambiato(v) {
-    if (setLayout(v)) { try { redrawIconRows(); } catch (_) {} }
-  }
-
-  // Il drop si vede subito qui, poi vale quello che il main ha scritto.
-  function applyIconDrop({ id, target, beforeId }) {
-    if (!id) return;
-    const locale = Disp.applicaPosa(getIconLayout(), { id, target, beforeId: beforeId || null });
-    if (locale) setLayout(locale);
-    try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.ICON_LAYOUT_DROP, id, target, beforeId: beforeId || null }))
-        .then((r) => { if (r && r.ok) layoutCambiato(r.layout); })
-        .catch(() => {});
-    } catch (_) {}
-  }
-
-  // Costruisce gli item della riga primaria (icone + bottone overflow).
-  function buildPrimaryRowItems(navState) {
-    const registry = buildIconRegistry(navState);
-    const layout = getIconLayout();
-    const primaryIds = (layout.primary || []).filter((id) => registry[id]);
-    const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
-    const items = primaryIds.map((id) => ({ ...registry[id], draggable: true }));
-    items.push({
-      kind: 'overflow',
-      icon: '▸',
-      label: I18n.t('menu_overflow'),
-      onClick: (anchorEl) => {
-        const gridItems = secondaryIds.map((id) => ({ ...registry[id], draggable: true }));
-        Menu.openIconGridSubmenu(anchorEl, gridItems, {
-          cols: 4,
-          dropTarget: 'secondary',
-          onDrop: (e) => { applyIconDrop(e); redrawIconRows(); },
-        });
-      },
-    });
-    return items;
-  }
-
-  function buildSecondaryGridItems(navState) {
-    const registry = buildIconRegistry(navState);
-    const layout = getIconLayout();
-    const secondaryIds = (layout.secondary || []).filter((id) => registry[id]);
-    return secondaryIds.map((id) => ({ ...registry[id], draggable: true }));
-  }
-
-  // Riga globale: prende le icone "primary" dal layout utente. L'overflow apre
-  // la griglia secondaria come sotto-menu ancorato (senza chiudere il primo).
-  // Memorizza anche lo stato di navigazione dell'apertura corrente, che serve
-  // a redrawIconRows() per i rebuild post-drag.
-  function buildGlobalIconRow(navState) {
-    lastNavState = navState || null;
-    // Chi apre il menu può essere entrato (o uscito) da quando la pagina è
-    // stata caricata: si richiede, e se cambia le icone si ridisegnano.
-    refreshOwner();
-    return {
-      type: 'row',
-      dropTarget: 'primary',
-      onDrop: (e) => { applyIconDrop(e); redrawIconRows(); },
-      items: buildPrimaryRowItems(navState),
-    };
-  }
-
-  // Dopo un drop, rigenera in-place i bottoni delle due zone (riga primaria e
-  // griglia secondaria) senza chiudere il menu, così l'utente può continuare a
-  // riordinare. La griglia secondaria viene aggiornata solo se è aperta.
-  function redrawIconRows() {
-    try { Menu.refreshIconRow?.(buildPrimaryRowItems(lastNavState)); } catch (_) {}
-    try { Menu.refreshIconGrid?.(buildSecondaryGridItems(lastNavState)); } catch (_) {}
-  }
-
-  // ── la barra laterale, terza zona (#871) ─────────────────────────────────
-  // Solo nel frame principale: le coordinate di un riquadro non sono quelle della barra.
-  let barraAperta = null;
-  let miraInviata = null;
-  const trascina = (dati) => {
-    try { return Promise.resolve(chrome.runtime.sendMessage({ type: MSG.BARRA_TRASCINA, ...dati })).catch(() => null); } catch (_) { return Promise.resolve(null); }
-  };
-  if (!IS_SUBFRAME) {
-    Menu.setPonteBarra?.({
-      inizio(id, menuSinistra) {
-        barraAperta = null;
-        miraInviata = null;
-        trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barraAperta = { larghezza: Number(r.larghezza) || 0 }; });
-      },
-      sopra(x, y) {
-        const dentro = !!barraAperta && x <= barraAperta.larghezza;
-        const mira = dentro ? Math.round(y) : null;
-        if (mira !== miraInviata) { miraInviata = mira; trascina({ fase: 'sopra', y: mira }); }
-        return dentro;
-      },
-      posa(id, x, y) {
-        if (!barraAperta || x > barraAperta.larghezza) return false;
-        trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
-        return true;
-      },
-      fine() {
-        barraAperta = null;
-        miraInviata = null;
-        trascina({ fase: 'fine' });
-      },
-    });
-  }
-
   // Come si chiamano adesso, su questa pagina, le sue azioni che stanno nella barra laterale: la barra le
-  // mostra con lo stesso nome e la stessa icona del menu («Traduci» o «Mostra originale»).
+  // mostra col nome e l'icona di adesso («Traduci» o «Mostra originale»).
   function statoPerBarra(ids) {
     if (IS_SUBFRAME) return [];
-    const reg = buildLocalIconRegistry(lastNavState);
+    if ((Array.isArray(ids) ? ids : []).includes('translate')) { try { Translate.rivedi?.(); } catch (_) {} }
+    const reg = buildLocalIconRegistry(null);
     return (Array.isArray(ids) ? ids : []).map(String)
       .filter((id) => Disp.noto(id) && Disp.ICONE[id].tipo === 'pagina' && reg[id])
       .map((id) => ({ id, etichetta: String(reg[id].label || ''), icona: reg[id].iconName || Disp.ICONE[id].icona }));
-  }
-
-  // Un'icona portata fuori dalla barra sopra questa pagina: se il menu è aperto ci cade dentro.
-  function dallaBarra(msg) {
-    if (IS_SUBFRAME || !msg) return;
-    const id = String(msg.id || '');
-    const entry = Disp.noto(id) ? buildLocalIconRegistry(lastNavState)[id] : null;
-    Menu.trascinaDaFuori?.({
-      fase: String(msg.fase || ''), id,
-      x: Number(msg.x) || 0, y: Number(msg.y) || 0,
-      icon: entry ? entry.icon : '',
-    });
   }
 
   function init(d) { deps = { ...deps, ...d }; }
 
   global.SN_MENU_ICONS = {
     init,
-    buildGlobalIconRow,
     runIconAction,
     statoPerBarra,
-    // Ridisegna le icone del menu già aperto. Serve quando lo stato che
-    // decide il NOME di una voce cambia mentre il menu è sotto gli occhi: lo
-    // schermo intero si spegne per un'altra strada (l'assistente, un gesto di
-    // sistema, un'altra scheda) e la voce continuerebbe a promettere «Esci da
-    // schermo intero» quando non c'è più niente da cui uscire (#514).
-    redrawIconRows,
-    layoutCambiato,
-    dallaBarra,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

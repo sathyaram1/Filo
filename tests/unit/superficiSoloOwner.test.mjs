@@ -43,7 +43,7 @@ test('il menu App mostra Feedback e Gestione solo all\'owner', () => {
     'il Deck builder segue il suo interruttore');
 });
 
-test('l\'icona «Feedback» del menu del tasto destro esiste solo per l\'owner', () => {
+test('l\'icona «Feedback» del registro delle icone esiste solo per l\'owner', () => {
   const icons = leggi('src', 'content', 'menuIcons.js');
   assert.match(icons, /if \(isOwner\)\s*\{[\s\S]{0,400}?registry\.feedbackApp/,
     'feedbackApp deve entrare nel registro solo con isOwner: un id assente dal registro '

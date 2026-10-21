@@ -892,6 +892,7 @@
       case 'notifications.sound': return $('notifSound').value || 'default';
       case 'barraLaterale.spinta': return $('barraSpinta').checked;
       case 'barraLaterale.striscia': return $('barraStriscia').checked;
+      case 'barraLaterale.schedeInAlto': return $('barraSchede').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
@@ -974,6 +975,7 @@
       case 'notifications.sound': return notif.sound || 'default';
       case 'barraLaterale.spinta': return opzioniBarraLaterale(s.barraLaterale).spinta;
       case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
+      case 'barraLaterale.schedeInAlto': return opzioniBarraLaterale(s.barraLaterale).schedeInAlto;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
@@ -1137,6 +1139,7 @@
     const barra = opzioniBarraLaterale(settings.barraLaterale);
     if (vuole('barraLaterale.spinta')) $('barraSpinta').checked = barra.spinta;
     if (vuole('barraLaterale.striscia')) $('barraStriscia').checked = barra.striscia;
+    if (vuole('barraLaterale.schedeInAlto')) $('barraSchede').checked = barra.schedeInAlto;
     if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
     if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
 
@@ -1897,6 +1900,7 @@
     $('terminalShell').addEventListener('change', persist);
     $('barraSpinta').addEventListener('change', persist);
     $('barraStriscia').addEventListener('change', persist);
+    $('barraSchede').addEventListener('change', persist);
     for (const [id, campo] of [['barraAttesa', 'attesaMs'], ['barraUscita', 'uscitaMs']]) {
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.

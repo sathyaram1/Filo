@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const require = createRequire(import.meta.url);
 const { buildExportZip } = require('../src/main/services/exportData.js');
@@ -38,7 +39,8 @@ async function configura(app, extra = {}) {
 }
 
 // Il modello finto: un giro per elemento di `giri`. `annullaTema: true` cerca nel prompt l'id del
-// cambio del tema e lo annulla, come farebbe il modello leggendo i CAMBI RECENTI.
+// cambio del tema e lo annulla, come farebbe il modello leggendo i CAMBI RECENTI; `annullaUltimo: true` l'id
+// dell'ultima riga, quella che «rimetti come prima» intende.
 // Un comando secco chiude il turno al primo giro (#1130): la frase va scritta insieme alle azioni.
 async function modelloFinto(app, giri) {
   await app.evaluate(async (_e, g) => {
@@ -55,6 +57,11 @@ async function modelloFinto(app, giri) {
       if (giro.annullaTema) {
         const m = testo.match(/(c[0-9a-f]{10}): tema: chiaro → scuro/);
         calls = [{ id: 'u1', name: 'ANNULLA_CAMBIO', arguments: JSON.stringify({ id: m ? m[1] : 'nessuno' }) }];
+      }
+      if (giro.annullaUltimo) {
+        const blocco = testo.slice(testo.indexOf('CAMBI RECENTI'));
+        const ids = [...blocco.matchAll(/\] (c[0-9a-f]{10}):/g)].map((x) => x[1]);
+        calls = [{ id: 'u1', name: 'ANNULLA_CAMBIO', arguments: JSON.stringify({ id: ids.at(-1) || 'nessuno' }) }];
       }
       for (const c of calls) { try { onToolCall && onToolCall({ id: c.id, name: c.name }); } catch (_) {} }
       if (giro.text) { try { onDelta && onDelta(giro.text); } catch (_) {} }
@@ -548,5 +555,45 @@ test('O — tema e accento chiesti com\'erano già: le righe lo dicono coi nomi 
   await expect(page.locator('.dash-activity-row', { hasText: 'Aspetto già così · Colore d\'accento: #3a7d44' })).toHaveCount(1);
   await expect(page.locator('.dash-activity-row', { hasText: '=' })).toHaveCount(0);
   await expect(page.locator('.dash-activity-row', { hasText: 'accent:' })).toHaveCount(0);
+  await ripristina(app);
+});
+
+test('P — un\'icona spostata nella barra laterale: «rimetti come prima» la rimette, e il tema cambiato prima resta (#867.1)', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await configura(app);
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#theme').selectOption('dark');
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
+
+  // Il riordino come lo fa l'utente: Home trascinata sopra Indietro.
+  const prima = (await statoBarra(app)).bar;
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const home = await barra.locator('#nav .ico[data-id="home"]').boundingBox();
+  const back = await barra.locator('#nav .ico[data-id="back"]').boundingBox();
+  await barra.mouse.move(home.x + home.width / 2, home.y + home.height / 2);
+  await barra.mouse.down();
+  await barra.mouse.move(home.x + home.width / 2 + 2, home.y - 10, { steps: 3 });
+  await barra.mouse.move(back.x + back.width / 2, back.y + 4, { steps: 6 });
+  await barra.mouse.up();
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 3)).toEqual(['help', 'home', 'back']);
+  const spostata = (await registro(app)).filter((e) => e.tipo === 'icone').pop();
+  expect(spostata).toMatchObject({ via: 'interfaccia', dove: 'barra' });
+  await comandaBarra(app, 'chiudi');
+
+  const page = await homeDi(app);
+  await shell.locator('.tab').first().click();
+  await modelloFinto(app, [{ annullaUltimo: true, text: 'Rimesso.' }]);
+  await scrivi(page, 'rimetti come prima', 'Rimesso.');
+  const prompt = await app.evaluate(() => globalThis.__finto_prompt[0]);
+  expect(prompt).toMatch(/dalla barra laterale\] c[0-9a-f]{10}: icona «Home» spostata prima di «Indietro» nella barra laterale/);
+  await expect.poll(async () => (await statoBarra(app)).bar).toEqual(prima);
+  expect((await impostazioni(app)).theme, 'il cambio di prima non si tocca').toBe('dark');
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'rimetti come prima' });
+  await bolla.locator('.dash-cambi-segno').hover();
+  // Il segno sulla bolla dice l'annullo: Home tornata al suo posto.
+  await expect(bolla.locator('.dash-cambi-pop')).toContainText('icona «Home» spostata prima di «Nuova finestra incognito»');
   await ripristina(app);
 });

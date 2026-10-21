@@ -556,7 +556,7 @@
       required: [],
     },
     ANNULLA_CAMBIO: {
-      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
+      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito, un\'icona spostata nella barra laterale. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
       properties: { id: S('L\'id del cambio da annullare, dai CAMBI RECENTI (per esempio "c1a2b3c4d5").') },
       required: [],
     },
@@ -602,7 +602,7 @@
       required: ['comando'],
     },
     SPOSTA_ICONA: {
-      description: 'Sposta un\'icona fra la barra laterale (bordo sinistro), la riga di icone del menu del tasto destro e «Altro…» dello stesso menu: la stessa cosa che l\'utente fa trascinandola, e resta anche dopo un riavvio. Per "metti Screenshot nella barra laterale", "togli Chiudi scheda dalla barra", "rimetti Indietro nel tasto destro". Togliere dalla barra senza dire dove = "altro". Esegue subito.',
+      description: 'Sposta un\'icona della barra laterale (bordo sinistro) fra la barra e il suo «Altro…», o la riordina: la stessa cosa che l\'utente fa trascinandola, e resta anche dopo un riavvio. Per "metti Screenshot nella barra laterale", "togli Chiudi scheda dalla barra", "metti il QR sopra Indietro". Togliere dalla barra = "altro". Il menu del tasto destro non ha icone: chi chiede di metterne una lì la vuole nella barra. Esegue subito.',
       properties: () => {
         const D = global.SN_DISPOSIZIONE_ICONE;
         const ids = D ? Object.keys(D.ICONE) : [];
@@ -610,7 +610,7 @@
         const icona = ids.length ? { enum: ids } : {};
         return {
           icona: S(`L'icona, per id${elenco ? `: ${elenco}` : ''}.`, icona),
-          dove: S('"barra" = la barra laterale; "menu" = la riga di icone in cima al menu del tasto destro (al massimo 6: chi trabocca scende in «Altro…»); "altro" = dentro «Altro…» del tasto destro.', { enum: ['barra', 'menu', 'altro'] }),
+          dove: S('"barra" = in vista nella barra laterale; "altro" = dentro «Altro…», in fondo alla barra laterale.', { enum: ['barra', 'altro'] }),
           prima_di: S('Facoltativo: l\'id dell\'icona davanti alla quale metterla; senza, va in fondo.', icona),
         };
       },

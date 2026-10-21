@@ -1,6 +1,6 @@
 // #1054 — col menu nello strato acceso, il tasto destro su una pagina web apre il menu di Filo nello strato sopra la
-// scheda e funziona come quello di oggi: Incolla e la sua cronologia, Detta, una spiegazione, la griglia «Altro…», le
-// icone che si trascinano. E un sito ostile non legge la cronologia né si fa incollare gli appunti (#586 giro 16).
+// scheda e funziona come quello di oggi: Incolla e la sua cronologia, Detta, una spiegazione, la barra laterale
+// raggiungibile sopra. E un sito ostile non legge la cronologia né si fa incollare gli appunti (#586 giro 16).
 // Regole: patterns/il-menu-del-tasto-destro-sta-in-uno-strato-sopra-la-scheda.md
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -279,42 +279,17 @@ test.describe('il menu nello strato', () => {
     await expect.poll(() => app.evaluate(() => globalThis.__chieste.length), { timeout: 8000 }).toBeGreaterThan(prima);
   });
 
-  test('la griglia «Altro…» si apre dall\'icona, le sue voci partono, e un\'icona trascinata cambia posto', async ({ app, openTab, testServer, shell }) => {
-    test.setTimeout(60_000);
+  test('nello strato il menu non ha icone: le azioni sulla pagina stanno nella barra laterale (#1246)', async ({ app, openTab, testServer }) => {
     await pronto(app);
     const page = await apriPagina(openTab, testServer, '<!doctype html><body style="margin:0;height:100vh"><p style="margin:60px">pagina</p></body>');
     await page.mouse.click(200, 200, { button: 'right' });
     await apertoNelloStrato(app, page);
     const menu = menuDi(page);
-    const strato = menu.superficie;
-    await menu.locator('.sn-menu-row-overflow').hover();
-    await expect(menu.griglia).toBeVisible();
-    await expect(menu.griglia.locator('[data-sn-icon-id="openOptions"]')).toBeVisible();
-
-    // L'etichetta dell'icona compare passandoci sopra, come nel menu di oggi.
-    await menu.icona('qrCode').hover();
-    await expect(menu.etichetta).toBeVisible();
-
-    // Trascinata dalla riga alla griglia: la riga si ridisegna senza di lei, la griglia con lei, e resta così.
-    await menu.locator('.sn-menu-row-overflow').hover();
-    await expect(menu.griglia).toBeVisible();
-    const da = await menu.icona('qrCode').first().boundingBox();
-    const a = await menu.griglia.boundingBox();
-    await strato.mouse.move(da.x + da.width / 2, da.y + da.height / 2);
-    await strato.mouse.down();
-    await strato.mouse.move(da.x + da.width / 2 + 10, da.y + da.height / 2 + 6, { steps: 3 });
-    await expect(menu.trascinamento).toBeVisible();
-    await strato.mouse.move(a.x + a.width - 6, a.y + a.height - 6, { steps: 8 });
-    await strato.mouse.up();
-    await expect(menu.principale.locator('.sn-menu-row [data-sn-icon-id="qrCode"]')).toHaveCount(0);
-    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('sn_icon_layout', null))?.secondary?.includes('qrCode') === true))
-      .toBe(true);
-    await expect(menu.griglia.locator('[data-sn-icon-id="qrCode"]')).toBeVisible();
-
-    // Una voce della griglia parte: le Impostazioni in una scheda nuova.
-    await menu.griglia.locator('[data-sn-icon-id="openOptions"]').click();
+    await expect(menu.principale).toBeVisible();
+    await expect(menu.locator('[data-sn-icon-id]')).toHaveCount(0);
+    await expect(menu.locator('.sn-menu-row')).toHaveCount(0);
+    await menu.superficie.keyboard.press('Escape');
     await chiusoLoStrato(app);
-    await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab')].length), { timeout: 8000 }).toBeGreaterThan(1);
   });
 
   test('il correttore riempie la riga in cima a menu aperto, e la correzione scelta va nel campo', async ({ app, openTab, testServer }) => {
@@ -427,8 +402,6 @@ test.describe('il menu nello strato', () => {
       await page.locator('#campo').click({ button: 'right' });
       await apertoNelloStrato(app, page);
       await expect.poll(() => menu.valuta(() => document.documentElement.dataset.snTheme)).toBe(tema);
-      await menu.locator('.sn-menu-row-overflow').hover();
-      await expect(menu.griglia).toBeVisible();
       await pausa(300);
       await menu.superficie.screenshot({ path: `tests/.shots/menu-nello-strato-${tema}.png` });
       await page.screenshot({ path: `tests/.shots/menu-nello-strato-${tema}-scheda.png` });
@@ -577,19 +550,14 @@ test.describe('il menu nello strato', () => {
     await expect.poll(urlSchede, { timeout: 8000 }).toContain(dest);
   });
 
-  test('un\'icona trascinata dalla barra laterale entra nel menu aperto, che resta aperto mentre la barra si usa', async ({ app, openTab, testServer }) => {
+  test('a menu aperto la barra laterale sta sopra lo strato, e le sue azioni agiscono sulla pagina', async ({ app, openTab, testServer }) => {
     test.setTimeout(60_000);
     await pronto(app);
     const page = await apriPagina(openTab, testServer, `<!doctype html><body style="margin:0;padding:40px;height:1400px">
       <p id="p">Clic destro qui.</p></body>`);
     const barra = await barraPage(app);
-    const mossa = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'screenshot', target: 'bar' }, {}));
-    expect(mossa && mossa.ok).toBe(true);
-    await expect.poll(async () => (await statoBarra(app)).bar).toContain('screenshot');
     await page.locator('#p').click({ button: 'right' });
     await apertoNelloStrato(app, page);
-    const riga = menuDi(page).locator('.sn-menu .sn-menu-row[data-sn-drop-target="primary"]').first();
-    await expect(riga).toBeVisible();
     await comandaBarra(app, 'clic');
     await pannelloFermo(barra);
     // La barra aperta sta sopra lo strato: il puntatore la raggiunge.
@@ -599,23 +567,9 @@ test.describe('il menu nello strato', () => {
       const figli = w.contentView.children;
       return figli[figli.length - 1] === w._filoTabs.barra.vista;
     })).toBe(true);
-    const src = await barra.locator('#nav .ico[data-id="screenshot"]').boundingBox();
-    const dst = await riga.boundingBox();
-    const s = await statoBarra(app);
-    const alto = s.bounds.y - s.alto;
-    // Più di cinque secondi dopo il tasto destro: vale il gesto fatto nella barra.
-    await pausa(5500);
-    await barra.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
-    await barra.mouse.down();
-    await barra.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
-    await barra.mouse.move(dst.x + dst.width - 20, dst.y + dst.height / 2 - alto, { steps: 10 });
-    await expect(menuDi(page).trascinamento).toHaveCount(1);
-    await barra.mouse.up();
-    await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('screenshot');
-    const dopo = await statoBarra(app);
-    expect([...dopo.primary, ...dopo.secondary]).toContain('screenshot');
-    await expect(menuDi(page).trascinamento).toHaveCount(0);
-    await expect(menuDi(page).principale.locator('[data-sn-icon-id="screenshot"]')).toHaveCount(1);
+    await barra.locator('#nav .ico[data-id="qrCode"]').click();
+    await expect(page.locator('.sn-qr-overlay')).toBeVisible();
+    await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
   });
 
   test('nella finestrella di accesso aperta da un sito il menu sta nel suo strato, e Incolla scrive nel campo', async ({ app, openTab, testServer }) => {

@@ -253,7 +253,9 @@ test('un sito chiede al magazzino solo gli scomparti dei content script, in ogni
   assert.deepEqual(W.chiaviStoragePerOrigine(null, web), [...W.CHIAVI_STORAGE_WEB]);
   assert.deepEqual(W.chiaviStoragePerOrigine('filo_memory', web), []);
   assert.equal(W.chiaviStoragePerOrigine('sn_personal_dict', web), 'sn_personal_dict');
-  assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory', 'savedPages', 'sn_icon_layout', 7], web), ['sn_icon_layout']);
+  assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory', 'savedPages', 'sn_personal_dict', 7], web), ['sn_personal_dict']);
+  // #1246: le icone non stanno più nel menu della pagina, e la loro disposizione la scrive solo il main.
+  assert.deepEqual(W.chiaviStoragePerOrigine(['sn_icon_layout', 'sn_qr_in_primary_migrated'], web), []);
   assert.deepEqual(W.chiaviStoragePerOrigine({ clipboardHistory: [], sn_autocorrect: {} }, web), { sn_autocorrect: {} });
   assert.equal(W.chiaviStoragePerOrigine(null, 'filo://options/options.html'), null);
   assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory'], 'filo://options/options.html'), ['filo_memory']);

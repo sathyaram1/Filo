@@ -50,6 +50,7 @@
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
         barraSpinta: 'barraLaterale.spinta',
         barraStriscia: 'barraLaterale.striscia',
+        barraSchede: 'barraLaterale.schedeInAlto',
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',

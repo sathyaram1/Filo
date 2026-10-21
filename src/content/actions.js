@@ -58,6 +58,17 @@
     return global.SN_URL_NAV.isShareableAddress(raw);
   }
 
+  // L'indirizzo della pagina per chi lo condivide o lo salva: sulla pagina «sito non raggiungibile» è il sito che
+  // si voleva aprire, non l'indirizzo interno dell'errore (#1343 r3).
+  function indirizzoDellaPagina() {
+    const qui = String(location.href || '');
+    if (!qui.startsWith('filo://error/')) return qui;
+    let voluto = '';
+    try { voluto = new URL(qui).searchParams.get('url') || ''; } catch (_) { voluto = ''; }
+    return /^https?:\/\//i.test(voluto) && isAddress(voluto) ? voluto : qui;
+  }
+  const paginaDErrore = () => indirizzoDellaPagina() !== String(location.href || '');
+
   // Ritorna true se ha davvero copiato.
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
@@ -409,16 +420,6 @@
       const r = await chrome.runtime.sendMessage({ type: MSG.GET_CLIPBOARD_HISTORY });
       return r?.items || [];
     } catch (_) { return []; }
-  }
-
-  // Stato di navigazione (canBack/canFwd) del tab corrente: serve per
-  // mostrare le icone avanti/indietro del menu in grigio quando la cronologia
-  // non lo consente, come già accade per i tasti analoghi nella barra in alto.
-  async function getNavState() {
-    try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
-      return { canBack: !!r?.canBack, canFwd: !!r?.canFwd };
-    } catch (_) { return { canBack: true, canFwd: true }; }
   }
 
   // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
@@ -1020,6 +1021,8 @@
   }
 
   function buildSavePayload() {
+    // Del sito non raggiungibile si salva solo dove sta: il testo qui è quello dell'errore.
+    if (paginaDErrore()) return { url: indirizzoDellaPagina(), title: document.title, favicon: '', description: '', excerpt: '' };
     const meta = Extract.pageMeta();
     return {
       url: location.href,
@@ -1296,11 +1299,12 @@
   }
 
   async function shareCurrentPage() {
-    const data = { title: document.title, url: location.href };
+    const url = indirizzoDellaPagina();
+    const data = { title: document.title, url };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
-    copyToClipboard(location.href);
+    copyToClipboard(url);
   }
 
   // Condividere un link finisce, senza sistema di condivisione nativo, in una
@@ -1897,7 +1901,7 @@
   // garantire il contrasto richiesto dagli scanner.
   function showPageQrCode() {
     const QR = global.SN_QR;
-    const url = String(location.href || '');
+    const url = indirizzoDellaPagina();
     if (!QR || typeof QR.toMatrix !== 'function') {
       Popup.showToast(I18n.t('qr_error'), { duration: 3000 });
       return;
@@ -2113,7 +2117,6 @@
     insertDictatedText,
     buildPasteItem,
     getClipboardHistory,
-    getNavState,
     pushClipboardEntry,
     requestImageDescription,
     descriptionToFilename,

@@ -10,10 +10,15 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.245', date: '2026-10-22',
-      features: [],
+      features: [
+        'Traduci, Screenshot, Condividi, Salva per dopo, il QR della pagina e Nuova scheda non stanno più in cima al menu del tasto destro: li trovi nella barra laterale, sotto Indietro e Ricarica, e agiscono sulla pagina che hai davanti. Le icone che usi meno vanno sotto la piega «Altro…» in fondo alla barra: le sposti trascinandole, o col tasto destro sull\'icona.',
+        'A schermo intero ritrovi le schede portando il mouse contro il bordo in alto per un attimo. Quando torni sulla pagina spariscono. Se non lo vuoi, lo spegni in Preferenze, alla voce «Barra laterale».',
+      ],
       fixes: [
         'Una pagina lasciata aperta che cambia indirizzo da sola, come un sito che fa scorrere le notizie, non riempie più la home di pagine visitate. Finché non la tocchi, quei cambi restano una visita sola. Anche con anni di chat e di pagine Filo le apre. Se un giorno non riesce a leggerle te lo dice col motivo, e aspetta a salvare finché non ci riesce.',
         'Nelle schede aperte da un altro paese passa dal paese scelto anche quello che Filo chiede per la pagina: titolo e descrizione dei link, le immagini che descrive, copia o salva, le istruzioni che legge l\'Aiuto e la finestra nascosta dei link accorciati. Le immagini di altri siti si leggono anche dietro il proxy obbligatorio di una rete aziendale, e il sito che le ospita sa al massimo su quale sito eri, mai la pagina con le tue ricerche. Se cambi paese a una scheda, le pagine arrivano davvero dal paese nuovo.',
+        'Quando un sito non risponde, Condividi, il QR code e Salva per dopo usano l\'indirizzo del sito che volevi aprire, non quello della pagina d\'errore di Filo.',
+        'Se riordini le icone della barra laterale e poi chiedi a Filo «rimetti come prima», rimette la disposizione di prima e lascia stare il cambio che avevi fatto prima ancora.',
       ],
     },
     {

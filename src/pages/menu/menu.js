@@ -29,27 +29,10 @@
     api.chiedi(canale, { seq, id: m.id, ...dati, chiude });
   }
 
-  function segno(el) {
-    let s = m.segni.get(el);
-    if (!s) {
-      s = `a${m.ancore.size + 1}`;
-      m.segni.set(el, s);
-      m.ancore.set(s, el);
-    }
-    return s;
-  }
-
-  // Una voce del content script: la si chiama per numero. Chi apre un pannello passa il bottone, che qui diventa il suo
-  // segno; mentre la risposta viaggia la stessa voce non riparte (hover e clic sullo stesso «Altro…»).
+  // Una voce del content script: la si chiama per numero. Un elemento dello strato non viaggia: là non vuol dire niente.
   const chiamata = (n) => Object.assign((...args) => {
     if (!m) return;
-    const conAncora = args.some((a) => a instanceof Element);
-    if (conAncora) {
-      const t = m.inVolo.get(n);
-      if (t && Date.now() - t < 1000) { chiusoOra = false; return; }
-      m.inVolo.set(n, Date.now());
-    }
-    const op = { speciale: (v) => (v instanceof Element ? { $ancora: segno(v) } : undefined) };
+    const op = { speciale: (v) => (v instanceof Element ? null : undefined) };
     chiedi('esegui', { n, args: D.descrivi(args, op) });
   }, { n });
 
@@ -216,8 +199,8 @@
     m = null;
     if (!d.menu || typeof d.menu.id !== 'string') return;
     m = {
-      id: d.menu.id, ancore: new Map(), segni: new WeakMap(), inline: new Map(), correzioni: new Map(),
-      attese: new Map(), inVolo: new Map(), restaAperto: !!d.menu.keepOnScroll,
+      id: d.menu.id, inline: new Map(), correzioni: new Map(),
+      attese: new Map(), restaAperto: !!d.menu.keepOnScroll,
     };
     applicaTema(d.tema, d.tokens);
     const cronologia = Array.isArray(d.cronologia) ? d.cronologia.filter((e) => e && typeof e === 'object') : [];
@@ -250,21 +233,6 @@
     if (!m || !d || d.id !== m.id) return;
     if (d.cosa === 'inline' && Number.isInteger(d.n)) applicaInline(d.n, d);
     else if (d.cosa === 'correzione' && Number.isInteger(d.n)) applicaCorrezione(d.n, d);
-    else if (d.cosa === 'riga') Menu.refreshIconRow(costruisci(d.items, []));
-    else if (d.cosa === 'griglia') Menu.refreshIconGrid(costruisci(d.items, []));
-    else if (d.cosa === 'fuori') {
-      // L'anteprima finisce in innerHTML: passa solo un SVG ripulito, il resto come testo.
-      const ic = pulisciIcona(String(d.svg || ''));
-      const icon = /^<svg[\s>]/.test(ic) ? ic : ic.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-      Menu.trascinaDaFuori({ fase: String(d.fase || ''), id: String(d.icona || ''), x: Number(d.x) || 0, y: Number(d.y) || 0, icon });
-    }
-    else if (d.cosa === 'griglia-apri') {
-      m.inVolo.clear();
-      const el = m.ancore.get(String(d.ancora || ''));
-      // Arrivata tardi, con un altro pannello già aperto dall'utente: vale quello.
-      if (!el || !el.isConnected || Menu.isSubMenuOpen()) return;
-      Menu.openIconGridSubmenu(el, costruisci(d.items, []), D.ricostruisci(d.opts || {}, { funzione: chiamata }));
-    }
   });
 
   api.onVia(() => {
@@ -281,34 +249,6 @@
     if (c && c !== cerca) chiedi('tastiera');
     cerca = c;
   }).observe(document.documentElement, { childList: true });
-
-  // Le icone trascinate dal menu verso la barra laterale: i px dello strato sono quelli della scheda (#871).
-  let barra = null;
-  let mira = null;
-  const trascina = (d) => Promise.resolve(api.barra(d)).catch(() => null);
-  Menu.setPonteBarra({
-    inizio(id, menuSinistra) {
-      barra = null;
-      mira = null;
-      trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barra = { larghezza: Number(r.larghezza) || 0 }; });
-    },
-    sopra(x, y) {
-      const dentro = !!barra && x <= barra.larghezza;
-      const nuova = dentro ? Math.round(y) : null;
-      if (nuova !== mira) { mira = nuova; trascina({ fase: 'sopra', y: nuova }); }
-      return dentro;
-    },
-    posa(id, x, y) {
-      if (!barra || x > barra.larghezza) return false;
-      trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
-      return true;
-    },
-    fine() {
-      barra = null;
-      mira = null;
-      trascina({ fase: 'fine' });
-    },
-  });
 
   // Fuori dal menu c'è solo lo strato vuoto: chiude, e un tasto destro lì apre il menu nuovo sulla scheda (il Ctrl+clic
   // del Mac arriva già come tasto destro).

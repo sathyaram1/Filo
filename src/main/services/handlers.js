@@ -1169,7 +1169,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
       if (w._filoTabs && typeof w._filoTabs.setSecurity === 'function') {
         w._filoTabs.setSecurity(merged.security || {});
       }
-      try { w._filoTabs?.barra?.impostazioni(merged.barraLaterale); } catch (_) {}
+      try { w._filoTabs?.barra?.impostazioni(merged.barraLaterale, merged.blocklist); } catch (_) {}
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
@@ -3648,8 +3648,8 @@ async function eseguiAzioneFilo(action, {
         };
       }
       case 'SPOSTA_ICONA': {
-        // #871 — la disposizione delle icone (barra laterale, riga e «Altro…» del tasto destro) a parole: stessa
-        // porta del trascinamento, così menu aperti e barre di tutte le finestre la ricevono uguale.
+        // #871 — la disposizione delle icone della barra laterale a parole: stessa porta del trascinamento, così le
+        // barre di tutte le finestre la ricevono uguale.
         const D = globalThis.SN_DISPOSIZIONE_ICONE;
         const id = String(action.icona ?? action.id ?? '').trim();
         const dove = String(action.dove ?? '').trim().toLowerCase();
@@ -3661,9 +3661,7 @@ async function eseguiAzioneFilo(action, {
         const layout = await require('./layoutIcone').posa(
           { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito });
         if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
-        // La riga del tasto destro ha sei posti: chi ci entra per ultimo può spingerne fuori un'altra.
-        const finita = ['bar', 'primary', 'secondary'].find((z) => layout[z].includes(id));
-        return { executed: true, kept: false, output: { icona: id, dove, finita, layout } };
+        return { executed: true, kept: false, output: { icona: id, dove, layout } };
       }
       case 'CARTA_HOME': {
         const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
@@ -7504,6 +7502,7 @@ Registro.collega({
     }
     return false;
   },
+  rimettiIcone: (calcola, opz) => require('./layoutIcone').cambia(calcola, opz),
   annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
 });
 Registro.avvia();

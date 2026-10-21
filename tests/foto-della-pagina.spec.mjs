@@ -3,7 +3,7 @@
 // l'immagine del sito che l'utente sta guardando. Regola: src/main/services/fotoDellaPagina.js.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { iconaDellaBarra } from './helpers/barra.mjs';
 
 const MONDO_CONTENT_SCRIPT = 999;
 const pagina = (colore, testo) => `<style>html,body{background:${colore};height:100%;margin:0}</style><h1>${testo}</h1>`;
@@ -104,10 +104,8 @@ async function immagineNegliAppunti(shell) {
   return immagine;
 }
 
-async function screenshotDalMenu(dove) {
-  await dove.locator('h1').click({ button: 'right' });
-  await expect(menuDi(dove).locator('.sn-menu')).toBeVisible();
-  await menuDi(dove).locator('.sn-menu [data-sn-icon-id="screenshot"]').click();
+async function screenshotDallaBarra(app) {
+  await (await iconaDellaBarra(app, 'screenshot')).click();
 }
 
 test('un popup di accesso fotografa sé stesso, anche dopo che l\'utente è passato a un\'altra scheda', async ({ app, openTab, testServer }) => {
@@ -121,15 +119,14 @@ test('un popup di accesso fotografa sé stesso, anche dopo che l\'utente è pass
   expect(barra).toMatchObject({ ok: false, code: 'fuori_vista' });
 });
 
-test('Screenshot dal menu fotografa la pagina dove l\'utente l\'ha chiesto: la scheda in vista e il popup di accesso', async ({ app, shell, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, pagina('#ff00ff', 'pagina da fotografare'));
-  await screenshotDalMenu(page);
+// La barra è della finestra: lo Screenshot fotografa la scheda in vista, mai un popup aperto sopra o lo sfondo.
+test('Screenshot dalla barra fotografa la scheda in vista, anche con un popup di accesso aperto', async ({ app, shell, openTab, testServer }) => {
+  await testServer.openReady(openTab, pagina('#ff00ff', 'pagina da fotografare'));
+  await screenshotDallaBarra(app);
   expect(await coloreDi(app, await immagineNegliAppunti(shell))).toBe('magenta');
 
   await shell.evaluate(() => window.filoShell.message({ type: 'clear_clipboard_history' }));
   await apriPopupDiAccesso(app, openTab, testServer);
-  const finestra = app.windows().find((w) => w.url().includes('client_id=filo5895'));
-  expect(finestra, 'la pagina del popup non si trova').toBeTruthy();
-  await screenshotDalMenu(finestra);
-  expect(await coloreDi(app, await immagineNegliAppunti(shell))).toBe('verde');
+  await screenshotDallaBarra(app);
+  expect(await coloreDi(app, await immagineNegliAppunti(shell))).toBe('blu');
 });

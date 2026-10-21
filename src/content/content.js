@@ -322,12 +322,6 @@
     } catch (_) {}
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) restituisciEsc();
-      // Il nome della voce del menu guarda anche lo schermo pieno della PAGINA,
-      // non solo la modalità di Filo: quando finisce quello, ridisegnarla è
-      // affar nostro. L'annuncio del main non basta, perché arriva mentre il
-      // documento sta ancora uscendo e la voce si ridisegnerebbe identica
-      // (#514, giro 10).
-      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
     });
 
     // Il tasto lo rimettiamo in circolo com'era: parte dal documento, sale fino
@@ -1001,7 +995,7 @@
   }
 
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
-  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
 
   // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
   // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
@@ -1328,12 +1322,9 @@
     } = detectContext(target, e.clientX, e.clientY);
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const [clipboardHistory, navState] = await Promise.all([
-      Actions.getClipboardHistory(),
-      Actions.getNavState(),
-    ]);
+    const clipboardHistory = await Actions.getClipboardHistory();
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -1973,12 +1964,9 @@
     // sulle immagini (feedback alpha).
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const [clipboardHistory, navState] = await Promise.all([
-      Actions.getClipboardHistory(),
-      Actions.getNavState(),
-    ]);
+    const clipboardHistory = await Actions.getClipboardHistory();
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
     });
   }
 
@@ -2236,25 +2224,25 @@
   }
 
   // ------------------------------------------------------------
-  // Composizione del menu (nuova struttura: globale + Aiuto + contestuale + Feedback)
+  // Composizione del menu: Aiuto → zona contestuale → Feedback
   // ------------------------------------------------------------
-  // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
-  // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
+  // Le icone delle azioni sulla pagina stanno nella barra laterale (#1246): qui solo ciò che riguarda il punto cliccato.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
   }) {
     const items = [];
+    // Un separatore sta solo FRA due sezioni: il menu non comincia con una linea.
+    const sezione = (voci) => {
+      if (!voci.length) return;
+      if (items.length) items.push({ type: 'separator' });
+      items.push(...voci);
+    };
 
-    // 1. Riga icone globali (max 5 + overflow). Tutte mute, etichetta in tooltip.
-    // Registro, layout persistente e drag-and-drop vivono in
-    // src/content/menuIcons.js (SN_MENU_ICONS), caricato prima di questo file.
-    items.push(MenuIcons.buildGlobalIconRow(navState));
-
-    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    // 1. Aiuto, se è acceso, e le voci di stato qui sotto.
     const sezioneAiuto = [];
     if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
-    // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
+    // 1b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
     // vocale è in riproduzione, anche senza selezione/contesto, così la
     // lettura si può sempre fermare da dove si è (richiesta alpha). isAnyReading
     // è true anche se a leggere è un'ALTRA scheda: lo stop chiede al main di
@@ -2263,12 +2251,12 @@
       sezioneAiuto.push(TTS.buildStopReadingItem());
     }
 
-    // 2c. Mostra originale — solo quando alla traduzione di pagina manca ancora
+    // 1c. Mostra originale — solo quando alla traduzione di pagina manca ancora
     // qualcosa: si è interrotta a metà (#408), oppure è finita ma il sito ha
-    // aggiunto altro testo dopo (#407). In quegli stati l'icona serve a
-    // CONTINUARE, quindi il ritorno all'originale deve restare raggiungibile da
-    // qualche parte. A traduzione completa e ferma la voce non compare: la
-    // offre già l'icona.
+    // aggiunto altro testo dopo (#407). In quegli stati l'icona «Traduci» della
+    // barra laterale serve a CONTINUARE, quindi il ritorno all'originale deve
+    // restare raggiungibile da qualche parte. A traduzione completa e ferma la
+    // voce non compare: la offre già l'icona.
     const iconIsRestore = TranslatePage && typeof TranslatePage.showsRestore === 'function'
       && TranslatePage.showsRestore();
     if (TranslatePage && typeof TranslatePage.canContinue === 'function'
@@ -2276,16 +2264,16 @@
       sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
-    // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
+    // 1d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
     // lo stato meno visibile che il tasto destro può raccontare: una pagina
     // rimasta zoomata da un'altra visita spiega da sé perché è così, e la voce
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
     if (zoomItem) sezioneAiuto.push(zoomItem);
-    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
+    sezione(sezioneAiuto);
 
-    // 3. Zona contestuale — assente se non c'è contesto utile.
+    // 2. Zona contestuale — assente se non c'è contesto utile.
     // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
     const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
     const contextItems = [
@@ -2295,21 +2283,18 @@
       }),
       ...vociRiquadro,
     ];
-    if (contextItems.length > 0) {
-      items.push({ type: 'separator' });
-      // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
-      const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
-      contextItems.forEach((it, i) => items.push(i === prima ? { ...it, primaDaTastiera: true } : it));
-    }
+    // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
+    const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
+    sezione(contextItems.map((it, i) => (i === prima ? { ...it, primaDaTastiera: true } : it)));
 
-    // 4. Feedback (alpha) + Red-team (invia attacco)
-    items.push({ type: 'separator' });
-    items.push(buildFeedbackItem());
+    // 3. Feedback (alpha) + Red-team (invia attacco)
+    const finale = [buildFeedbackItem()];
     const spegni = buildSpegniFiloItem();
-    if (spegni) items.push(spegni);
+    if (spegni) finale.push(spegni);
     // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
     refreshRedteamVisibile();
-    if (redteamVisibile) items.push(buildRedteamAttackItem());
+    if (redteamVisibile) finale.push(buildRedteamAttackItem());
+    sezione(finale);
 
     return items;
   }
@@ -2758,15 +2743,6 @@
   }
 
   function onRuntimeMessage(msg, sender, sendResponse) {
-    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
-    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
-      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
-      return;
-    }
-    if (msg?.type === MSG.BARRA_FUORI) {
-      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
-      return;
-    }
     if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
       rispondiEtichetteBarra(msg.ids);
       return;
@@ -2774,10 +2750,6 @@
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
-      // Se un menu è aperto proprio adesso, la sua voce dello schermo intero
-      // sta dicendo una cosa che non è più vera: ridisegnala sul posto invece
-      // di lasciarla mentire finché il menu non si chiude (#514).
-      try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
       return;
     }
     // Il main ci consegna un Esc che il browser ci avrebbe mangiato (schermo
@@ -2803,15 +2775,14 @@
       try { Menu.close(); } catch (_) {}
       return;
     }
-    // #405 — azione di PAGINA scelta dal menu aperto dentro un riquadro
-    // (tradurre, condividere, salvare, QR, screenshot…): il riquadro l'ha
-    // rimandata qui perché solo il frame principale è "la pagina".
+    // Un pannello chiesto da un riquadro (#405), o un'azione di PAGINA premuta nella barra laterale (tradurre,
+    // condividere, salvare, QR, screenshot…): solo il frame principale è "la pagina".
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
         else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
-        else MenuIcons.runIconAction(msg.iconId);
+        else if (msg.iconId) MenuIcons.runIconAction(msg.iconId, msg.colore);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
       if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);

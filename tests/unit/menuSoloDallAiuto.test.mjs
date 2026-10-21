@@ -12,8 +12,7 @@ import ts from 'typescript';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TESTS = join(ROOT, 'tests');
 const AIUTO = 'menuContestuale.mjs';
-// Oltre a `sn-menu…`, ogni classe che solo il menu assegna (etichetta delle icone, immagine del trascinamento…): un
-// pezzo nuovo del menu entra da sé. Una classe assegnata anche altrove (sn-disabled) è uno stato condiviso, non il menu.
+// Oltre a `sn-menu…`, ogni classe che solo il menu assegna (la voce con l'icona…): un pezzo nuovo del menu entra da sé. Una classe assegnata anche altrove (sn-disabled) è uno stato condiviso, non il menu.
 const SORGENTI_MENU = ['src/content/menu.js', 'src/content/menuIcons.js'];
 const ASSEGNATE = /(?:className\s*=\s*|classList\.(?:add|toggle)\(\s*|class=\\?)(['"`])([^'"`\\]*)/g;
 function classiAssegnate(testo) {
@@ -210,15 +209,14 @@ test('la sentinella riconosce chi cerca il menu senza l\'aiuto', () => {
     [`${imp}const voce = (p, sel) => p.locator(sel);\nawait voce(page, '.sn-menu-item').click();`, 1],
     ["// menu-dal-sito: lo script della pagina prova a premere Incolla\nawait page.evaluate(() => document.querySelector('.sn-menu-paste-main')?.click());", 0],
     ["await expect(riga).toHaveClass('sn-menu-row');", 0],
-    ["await expect(page.locator('.sn-drag-preview')).toHaveCount(1);", 1],
-    ["await expect(page.locator('.sn-tooltip')).toBeVisible();", 1],
-    [`${imp}await expect(menuDi(page).locator('.sn-drag-preview')).toHaveCount(0);`, 0],
+    ["await expect(page.locator('.sn-has-icon')).toHaveCount(1);", 1],
+    [`${imp}await expect(menuDi(page).locator('.sn-has-icon')).toHaveCount(0);`, 0],
     ["await expect(pop.locator('.sn-select-option')).toHaveClass(/sn-disabled/);", 0],
   ];
   for (const [codice, attese] of casi) assert.equal(cercheFuoriDallAiuto(codice).length, attese, codice);
 });
 
-test('i pezzi del menu fuori dalle voci (etichetta delle icone, immagine del trascinamento) contano come menu', () => {
-  for (const c of ['sn-tooltip', 'sn-drag-preview']) assert.ok(CLASSI_DEL_MENU.includes(c), c);
+test('le classi che solo il menu assegna, anche senza il prefisso sn-menu, contano come menu', () => {
+  assert.ok(CLASSI_DEL_MENU.includes('sn-has-icon'), 'sn-has-icon');
   assert.ok(!CLASSI_DEL_MENU.includes('sn-disabled'), 'sn-disabled la assegnano anche altri riquadri');
 });

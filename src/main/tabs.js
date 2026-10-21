@@ -41,6 +41,7 @@ const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
 const RisposteInAttesa = require('./risposteInAttesa');
+const { SchedeInAlto } = require('./schedeInAlto');
 const { AnteprimeSchede } = require('./tabs/anteprime');
 const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
 const { VisiteSchede } = require('./tabs/visite');
@@ -448,6 +449,7 @@ class TabManager {
       sottoIlVuoto: () => this.vistaSottoIlVuoto(),
     });
     this.barra = new BarraLaterale(window, this, { alto: () => this._altezzaCornice() });
+    this.schedeInAlto = new SchedeInAlto(window, this);
     // L'email dell'account sotto il campo di accesso della scheda davanti (#1124): sopra gli avvisi, sotto la conferma.
     this.propostaEmail = new PropostaEmail(window, {
       area: (wc) => {
@@ -478,7 +480,10 @@ class TabManager {
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       inCima: () => { if (this.barra) this.barra._inCima(); },
       cambiata: () => { if (this.barra) this.barra.aggiornaNav(); },
-      input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
+      input: (wc, input) => {
+        if (this.barra) this.barra.inputDa(wc, input);
+        if (this.schedeInAlto) this.schedeInAlto.inputDa(wc, input);
+      },
     });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
@@ -652,6 +657,7 @@ class TabManager {
     this.azzeraRivendicazioniEsc();
     if (this.contentFullscreen === on) return on;
     this.contentFullscreen = on;
+    this.schedeInAlto.azzera();
     this.strato.nascondi();
     this.layout();
     try {
@@ -2439,11 +2445,11 @@ class TabManager {
 
   // ─── layout ─────────────────────────────────────────────────────────────
 
-  // Altezza di chrome riservata in alto: 0 a tutto schermo, solo la fila di tab
-  // se in chrome compatto (barra indirizzi nascosta), altrimenti l'intera shell.
+  // Altezza di chrome riservata in alto: 0 a tutto schermo (salvo le schede chiamate dal bordo in alto), solo la
+  // fila di tab se in chrome compatto (barra indirizzi nascosta), altrimenti l'intera shell.
   // A questo si somma l'eventuale topInset dei dropdown.
   _altezzaCornice() {
-    if (this.contentFullscreen) return 0;
+    if (this.contentFullscreen && !(this.schedeInAlto && this.schedeInAlto.visibili)) return 0;
     return (this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset;
   }
 
@@ -2452,7 +2458,9 @@ class TabManager {
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
         const top = this._altezzaCornice();
-        const b = { x: 0, y: top, width: w, height: Math.max(0, h - top) };
+        // Le schede chiamate a schermo intero spingono giù la pagina senza cambiarle misura: niente si ridispone.
+        const alta = this.contentFullscreen ? h : Math.max(0, h - top);
+        const b = { x: 0, y: top, width: w, height: alta };
         tab.view.setBounds(b);
         if (process.env.FILO_SMOKE) {
           console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
@@ -2616,6 +2624,8 @@ class TabManager {
     wc.on('enter-html-full-screen', () => {
       this.pageFullscreen = true;
       this.pageFullscreenTabId = tab.id;
+      // Le schede chiamate dall'alto lasciano il posto al video, che lì in alto ha i suoi comandi.
+      this.schedeInAlto.nascondi();
       this.setContentFullscreen(true);
     });
     wc.on('leave-html-full-screen', () => {
@@ -3046,6 +3056,9 @@ class TabManager {
       if (isMainFrame === true) this._accessoDopoCarico(tab);
       if (isMainFrame === true) segnaPagina(tab, url);
     });
+    // Il bordo in alto a schermo intero (#1343 r1): `input-event` vede solo il riquadro principale, e una pagina
+    // che in cima ha il riquadro di un altro sito le schede non le scoprirebbe mai; questo passa da ogni riquadro.
+    wc.on('before-mouse-event', (_e, input) => this.schedeInAlto.inputDa(wc, input));
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
     // dal main (non dal content script, che manda un campione di attività anche

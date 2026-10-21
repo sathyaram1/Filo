@@ -1,4 +1,4 @@
-// "Salva per dopo" dal menu del tasto destro NON deve perdersi in silenzio se
+// "Salva per dopo" dalla barra laterale NON deve perdersi in silenzio se
 // la pagina cambia (redirect / reload) subito dopo il click (#334).
 //
 // Prima del fix: savePage attendeva ~120ms la cattura della miniatura PRIMA di
@@ -13,9 +13,9 @@
 // prima di ogni attesa, e la miniatura è best-effort).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { iconaDellaBarra } from './helpers/barra.mjs';
 
-test('Salva per dopo resiste al redirect immediato dopo il click', async ({ openTab, testServer }) => {
+test('Salva per dopo resiste al redirect immediato dopo il click', async ({ app, openTab, testServer }) => {
   const urlA = testServer.html(
     `<!doctype html><html><head><title>Pagina da salvare</title></head>
      <body style="margin:0;height:100vh;background:#fff"></body></html>`,
@@ -32,10 +32,7 @@ test('Salva per dopo resiste al redirect immediato dopo il click', async ({ open
     { timeout: 8000 },
   );
 
-  // Apre il menu tasto destro e clicca l'icona "Salva per dopo".
-  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(btn).toBeVisible();
+  const btn = await iconaDellaBarra(app, 'saveForLater');
   await btn.click();
 
   // Redirect IMMEDIATO: simula un sito che si ricarica / reindirizza nel decimo

@@ -11,18 +11,14 @@
 // fix — misura unica all'apertura — il menu resta dov'è, l'ultima voce sfora e
 // Playwright non riesce nemmeno a portarci sopra il puntatore: rosso.
 //
-// Un menu che si muove porta con sé due conseguenze, provate in fondo al file:
+// Un menu che si muove porta con sé una conseguenza, provata in fondo al file:
 // quando è così alto da doversi scorrere, lo scorrimento deve fermarsi dentro
 // al menu (se passa alla pagina, la pagina scorre e il menu sparisce proprio a
-// chi stava leggendo fino in fondo); e il pannello ancorato a una sua voce
-// (la griglia "Altro…") deve muoversi insieme a lui, o chiudersi quando la
-// voce a cui è appeso scorre via.
+// chi stava leggendo fino in fondo).
 //
 // Lo stesso difetto ha un secondo verso, in fondo al file: non è il menu ad
 // allungarsi ma la FINESTRA ad accorciarsi sotto di lui. Il fondo esce dal
-// bordo esattamente allo stesso modo, e il conto va rifatto uguale. Con lui
-// viaggia l'etichetta che spiega un'icona: se il menu le scivola via da sotto,
-// l'etichetta parla di un bottone che non è più lì e va tolta.
+// bordo esattamente allo stesso modo, e il conto va rifatto uguale.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
@@ -246,85 +242,6 @@ test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non po
   await expect(menu).toHaveCount(0);
 });
 
-// --- il pannello delle altre icone segue il menu ---------------------------
-
-// Apre la griglia "Altro…" dalla freccetta in cima al menu.
-async function apriPannelloIcone(page, menu) {
-  const freccetta = menu.locator('.sn-menu-row-overflow');
-  await expect(freccetta).toBeVisible();
-  await freccetta.click();
-  await expect(menuDi(page).locator('.sn-menu-icon-grid')).toBeVisible();
-}
-
-// Dove sta la freccetta e dove sta il pannello che le è appeso.
-async function ancoraEPannello(page) {
-  return menuDi(page).valuta(() => {
-    const menu = document.querySelector('.sn-menu:not(.sn-menu-sub)');
-    const freccetta = menu && menu.querySelector('.sn-menu-row-overflow');
-    const grid = document.querySelector('.sn-menu-icon-grid');
-    return {
-      menuTop: menu ? Math.round(menu.getBoundingClientRect().top) : null,
-      ancoraTop: freccetta ? Math.round(freccetta.getBoundingClientRect().top) : null,
-      pannelloTop: grid ? Math.round(grid.getBoundingClientRect().top) : null,
-      pannelloAperto: !!grid,
-    };
-  });
-}
-
-// Il pannello è rimasto appeso alla sua freccetta: la distanza fra i due è la
-// stessa di prima. Tolleranza di 2px, che è il subpixel dell'arrotondamento —
-// il difetto che stiamo escludendo vale decine di pixel (nella verifica: 180).
-function restaAttaccato(prima, dopo) {
-  const deriva = (dopo.pannelloTop - dopo.ancoraTop) - (prima.pannelloTop - prima.ancoraTop);
-  expect(dopo.pannelloAperto).toBe(true);
-  expect(Math.abs(deriva)).toBeLessThanOrEqual(2);
-}
-
-test('#500 la spiegazione fa scivolare il menu: il pannello delle altre icone scivola con lui', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, paginaLink());
-  const menu = await apriMenuSu(page, '#link');
-  await apriPannelloIcone(page, menu);
-
-  const prima = await ancoraEPannello(page);
-  expect(prima.pannelloAperto).toBe(true);
-
-  const cresciuto = await cresciOltreIlBordo(page, 40);
-  expect(cresciuto.error).toBeFalsy();
-  await attendiRientro(page);
-
-  const dopo = await ancoraEPannello(page);
-  // Il menu si è mosso davvero (senza, il resto non proverebbe niente)…
-  expect(dopo.menuTop).toBeLessThan(prima.menuTop);
-  // …e il pannello si è mosso con lui: stessa distanza dalla freccetta di prima.
-  restaAttaccato(prima, dopo);
-  expect(dopo.pannelloTop).toBeLessThan(prima.pannelloTop);
-});
-
-test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e sparisce con lei', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, paginaLunga());
-  const menu = await apriMenuSu(page, '#link');
-  await rendiScorrevole(page);
-  await apriPannelloIcone(page, menu);
-
-  const prima = await ancoraEPannello(page);
-
-  // Uno scorrimento breve: la freccetta è ancora lì, il pannello la segue.
-  // (Lo scorrimento arriva come evento, quindi si aspetta invece di misurare
-  // subito: senza il fix il pannello non si muove MAI e l'attesa scade.)
-  await menuDi(page).valuta(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 20; });
-  await expect.poll(async () => {
-    const s = await ancoraEPannello(page);
-    const deriva = (s.pannelloTop - s.ancoraTop) - (prima.pannelloTop - prima.ancoraTop);
-    return { scorso: s.ancoraTop < prima.ancoraTop, attaccato: Math.abs(deriva) <= 2 };
-  }, { timeout: 3000 }).toEqual({ scorso: true, attaccato: true });
-
-  // Scorrimento lungo: la freccetta esce oltre il bordo alto. Il pannello non ha
-  // più niente a cui stare appeso e si chiude, invece di galleggiare da solo.
-  await menuDi(page).valuta(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)'); m.scrollTop = m.scrollHeight; });
-  await expect(menuDi(page).locator('.sn-menu-icon-grid')).toHaveCount(0, { timeout: 3000 });
-  await expect(menu).toBeVisible();
-});
-
 // --- la FINESTRA si accorcia sotto al menu ---------------------------------
 // L'altro verso dello stesso difetto: il menu sta fermo ed è la finestra a
 // perdere altezza. Prima non succedeva niente — col menu di una selezione,
@@ -441,81 +358,4 @@ test('#500 la finestra scende sotto l\'altezza del menu: il menu diventa scorrev
   } finally {
     await ripristina();
   }
-});
-
-// --- l'etichetta di un'icona non resta appesa a mezz'aria ------------------
-
-// Porta il puntatore su un'icona della fila in cima e aspetta l'etichetta.
-// Ritorna dove sta l'etichetta e dove sta l'icona di cui parla.
-async function mostraEtichetta(page, menu) {
-  const icona = menu.locator('.sn-menu-row-btn:not(.sn-menu-row-overflow):not(.sn-menu-row-empty)').first();
-  await expect(icona).toBeVisible();
-  const box = await icona.boundingBox();
-  await page.mouse.move(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2));
-  const etichetta = menuDi(page).etichetta;
-  await expect(etichetta).toBeVisible({ timeout: 3000 });
-  return { icona, etichetta };
-}
-
-// Fa crescere la spiegazione quel tanto che serve a far scivolare il menu di
-// POCHI pixel: l'icona resta sotto al puntatore, quindi il browser non manda
-// nessun mouseleave e la sparizione dell'etichetta deve deciderla Filo. È
-// esattamente il caso raccontato — l'etichetta ferma dov'era mentre l'icona di
-// cui parla se n'è andata — misurato in piccolo perché sia riproducibile.
-async function scivolaDiPoco(page, px) {
-  return menuDi(page).valuta((slide) => {
-    const menu = document.querySelector('.sn-menu');
-    const box = menu.querySelector('.sn-menu-inline');
-    const cs = getComputedStyle(box);
-    // `min-height` morde il box del CSS: in content-box bordo e imbottitura
-    // restano fuori dal conto e la crescita vera sarebbe più alta di quella
-    // chiesta.
-    const extra = cs.boxSizing === 'border-box' ? 0
-      : parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
-        + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
-    const bottom = menu.getBoundingClientRect().bottom;
-    const cresci = Math.round(window.innerHeight - bottom) + slide;
-    box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) - extra + cresci}px`;
-  }, px);
-}
-
-test('#500 il menu scivola sotto al puntatore: l\'etichetta dell\'icona sparisce invece di restare appesa', async ({ openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, paginaLink());
-  const menu = await apriMenuSu(page, '#link');
-  const { icona, etichetta } = await mostraEtichetta(page, menu);
-
-  const menuPrima = (await geometria(page)).menuTop;
-  const iconaPrima = (await icona.boundingBox()).y;
-
-  // Arriva la spiegazione: il menu scivola in su e si porta dietro l'icona.
-  await scivolaDiPoco(page, 6);
-  await attendiRientro(page);
-
-  const menuDopo = (await geometria(page)).menuTop;
-  expect(menuDopo, 'il menu non si è mosso: il test non prova niente').toBeLessThan(menuPrima);
-  expect((await icona.boundingBox()).y, 'l\'icona non si è mossa col menu').toBeLessThan(iconaPrima);
-
-  await expect(etichetta).toBeHidden({ timeout: 3000 });
-});
-
-test('#500 il menu cresce senza muoversi: l\'etichetta resta, non sparisce sotto il naso', async ({ openTab, testServer }) => {
-  // Bersaglio in ALTO: il menu ha spazio sotto, cresce e resta dov'è. Qui
-  // togliere l'etichetta sarebbe un dispetto, non una correzione.
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
-    <a id="link" href="${LINK}" style="display:inline-block;padding:8px">un collegamento in cima</a>
-    <div style="height:80vh"></div>
-  </body></html>`);
-  const menu = await apriMenuSu(page, '#link');
-  const { etichetta } = await mostraEtichetta(page, menu);
-
-  const prima = await geometria(page);
-  await menuDi(page).valuta(() => {
-    const box = document.querySelector('.sn-menu .sn-menu-inline');
-    box.style.minHeight = `${Math.round(box.getBoundingClientRect().height) + 40}px`;
-  });
-  await page.waitForTimeout(400);
-
-  const dopo = await geometria(page);
-  expect(Math.abs(dopo.menuTop - prima.menuTop), 'il menu si è mosso: scenario sbagliato').toBeLessThanOrEqual(2);
-  await expect(etichetta).toBeVisible();
 });

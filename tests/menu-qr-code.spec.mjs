@@ -1,5 +1,6 @@
 // Feedback alpha: "aggiungi fra le azioni rapide nel box tasto destro un'opzione
-// per generare un QR code della pagina."
+// per generare un QR code della pagina." Da #1246 le azioni rapide stanno nella
+// barra laterale.
 //
 // Verifica il SUCCESSO della feature: dopo il click sull'azione "QR code", un
 // overlay mostra un QR code generato in locale (un <img> con un SVG che contiene
@@ -8,34 +9,21 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { roundTrip, SN_QR } from './helpers/qr-decode.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { iconaDellaBarra } from './helpers/barra.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo QR test</h1>
-  <p id="p">Click destro qui per generare il QR code dalle azioni rapide.</p>
+  <p id="p">Il QR code si genera dalle azioni rapide.</p>
 </body></html>`;
 
-async function openMenu(page) {
-  await page.locator('#p').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  return menu;
-}
-
-test('l\'azione "QR code" mostra un overlay con il QR e l\'URL della pagina', async ({ openTab, testServer }) => {
+test('l\'azione "QR code" mostra un overlay con il QR e l\'URL della pagina', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   const pageUrl = page.url();
-  const menu = await openMenu(page);
 
-  // Feedback alpha: il QR deve stare FRA LE AZIONI RAPIDE (riga icone primaria),
-  // non sepolto nell'overflow "Altro…". Lo cerchiamo direttamente nella riga,
-  // fuori dalla griglia secondaria.
-  const grid = menuDi(page).locator('.sn-menu-icon-grid');
-  const qrBtn = menu.locator('.sn-menu-row [data-sn-icon-id="qrCode"]').first();
-  await expect(qrBtn, 'qrCode deve essere fra le azioni rapide, non in "Altro…"').toBeVisible();
-  // Sanity: l'overflow "Altro…" non è ancora aperto (la griglia secondaria non
-  // esiste finché non si fa hover su "Altro…") → l'icona è davvero nella riga.
-  await expect(grid).toHaveCount(0);
+  // Feedback alpha: il QR deve stare FRA LE AZIONI RAPIDE, in vista nella barra,
+  // non sepolto in "Altro…".
+  const qrBtn = await iconaDellaBarra(app, 'qrCode');
+  await expect(qrBtn, 'qrCode deve essere fra le azioni rapide, non in "Altro…"').toHaveAttribute('data-zona', 'bar');
   await qrBtn.click();
 
   // L'overlay del QR deve comparire con un'immagine e l'URL corrente.

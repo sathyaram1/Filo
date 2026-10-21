@@ -1143,8 +1143,12 @@
     return { type: 'item', icon, label: I18n.t('menu_show_original'), onClick: () => restoreOriginal() };
   }
 
+  // La barra laterale chiede come si chiama l'icona quando la si apre: è un gesto dell'utente, e un pannello aperto
+  // dal sito senza toccare il documento (uno stile, un attributo) lì va visto come lo vedeva il menu (#1246).
+  function rivedi() { revealedDirty = true; }
+
   global.SN_TRANSLATE_PAGE = {
     translatePage, restoreOriginal, hasTranslation,
-    isPartial, hasNewContent, canContinue, showsRestore, missing, total, buildRestoreOriginalItem,
+    isPartial, hasNewContent, canContinue, showsRestore, missing, total, buildRestoreOriginalItem, rivedi,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

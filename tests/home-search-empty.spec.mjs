@@ -1,6 +1,6 @@
 // Feedback #220: nella pagina "Aperti per dopo", cercare una parola che non
 // corrisponde a nessuna pagina salvata mostrava il messaggio di archivio vuoto
-// ("Nessuna scheda salvata. Click destro su una pagina → 'Salva per dopo'."),
+// ("Nessuna scheda salvata. Su una pagina, «Salva per dopo» nella barra laterale la mette qui."),
 // come se la ricerca avesse cancellato le pagine salvate. Stessa causa già
 // corretta su 'Tab archiviate' e 'Cronologia AI' (stato vuoto #empty unico
 // riusato per 'davvero vuoto' e 'ricerca senza risultati').
@@ -13,22 +13,20 @@
 // diventerebbe rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { iconaDellaBarra } from './helpers/barra.mjs';
 
 const HOME = 'filo://home/home.html';
 
-test('ricerca senza risultati mostra "Nessun risultato", non l\'archivio vuoto', async ({ openTab, testServer }) => {
+test('ricerca senza risultati mostra "Nessun risultato", non l\'archivio vuoto', async ({ app, openTab, testServer }) => {
   const url = testServer.html(
     `<!doctype html><html><head><title>Pagina salvata di prova</title></head>
      <body style="padding:40px"><h1>Contenuto salvato</h1></body></html>`,
   );
 
-  // Salva via il flusso utente REALE: tasto destro → "Salva per dopo".
+  // Salva via il flusso utente REALE: «Salva per dopo» dalla barra laterale.
   const page = await openTab(url);
-  await page.waitForLoadState('domcontentloaded');
-  await page.click('body', { button: 'right' });
-  const saveBtn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(saveBtn).toBeVisible();
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  const saveBtn = await iconaDellaBarra(app, 'saveForLater');
   await saveBtn.click();
   await page.waitForTimeout(1500).catch(() => {});
 

@@ -16,6 +16,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { iconaDellaBarra } from './helpers/barra.mjs';
 
 const PAGE = `<!doctype html><html><body style="margin:0;padding:24px;font:16px sans-serif;height:100vh">
   <h1>Pagina con un collegamento</h1>
@@ -132,14 +133,12 @@ test('una raffica di avvisi non si accavalla e non straripa dalla finestra', asy
   expect(maxLive, 'la pila di avvisi cresce senza tetto').toBeLessThanOrEqual(5);
 });
 
-test('la conferma cliccabile di "Salva per dopo" sta nella pila con gli avvisi', async ({ openTab, testServer }) => {
+test('la conferma cliccabile di "Salva per dopo" sta nella pila con gli avvisi', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGE);
 
   // "Salva per dopo" mostra una conferma cliccabile ancorata allo STESSO angolo
   // dei toast: prima si sovrapponeva a qualunque avviso arrivasse nel frattempo.
-  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const saveBtn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(saveBtn).toBeVisible();
+  const saveBtn = await iconaDellaBarra(app, 'saveForLater');
   await saveBtn.click();
   await expect(page.locator('.sn-save-confirm')).toBeVisible({ timeout: 5000 });
 

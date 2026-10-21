@@ -25,8 +25,6 @@ const SONDA_MS = 50;
 const SONDA_LONTANO_MS = 150;
 // Dopo un ridimensionamento o uno spostamento della finestra il bordo non spinge: era il sistema al lavoro.
 const QUIETE_MS = 600;
-// Dopo un trascinamento dal menu la barra resta un attimo, per vedere dove è finita l'icona.
-const DOPO_POSA_MS = 900;
 // Le pagine elencate dal tasto destro su Indietro e Avanti; le altre si contano in fondo, non spariscono.
 const PAGINE_NEL_MENU = 15;
 
@@ -37,7 +35,6 @@ const PAGINE_FISSE = {
   history: 'filo://quaderno/quaderno.html',
   redteam: 'filo://redteam/redteam.html',
 };
-const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 // Le icone che un'azione della pagina può cambiare (lo stesso bottone traduce o riporta all'originale).
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
@@ -53,7 +50,7 @@ const numero = (v, min = -10000, max = 10000) => Math.max(min, Math.min(max, Mat
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const opzioniDi = (v) => (globalThis.SN_CONST && globalThis.SN_CONST.opzioniBarraLaterale
   ? globalThis.SN_CONST.opzioniBarraLaterale(v)
-  : { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true });
+  : { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, schedeInAlto: true });
 
 class BarraLaterale {
   constructor(win, tabs, { alto = () => 0 } = {}) {
@@ -66,15 +63,15 @@ class BarraLaterale {
     this.motivo = null;
     this.dentro = false;
     this.layout = null;
+    // «Altro…» aperto o chiuso: vale per la finestra finché resta aperta, come lo lascia l'utente.
+    this.altroAperto = false;
     this.tema = {};
     this.account = null;
-    this.misure = [];
-    this.mira = null;
-    this.trascinamento = null;
     this.suggerimento = false;
-    this.timer = { uscita: null, stringi: null, fine: null, trascina: null, sonda: null };
+    this.timer = { uscita: null, stringi: null, sonda: null };
     this.ultimoNav = '';
     this.opzioni = opzioniDi(null);
+    this.spentiSu = [];
     this.bordo = false;
     this.bordoDal = 0;
     this.tasti = { scheda: false, shell: false };
@@ -106,13 +103,15 @@ class BarraLaterale {
     Layout.leggi({ incognito: this._incognito() }).then((l) => this.disposizione(l)).catch(() => {});
     try {
       const letta = globalThis.SN_STORAGE?.getSettings?.();
-      if (letta && typeof letta.then === 'function') letta.then((st) => this.impostazioni(st && st.barraLaterale)).catch(() => {});
+      if (letta && typeof letta.then === 'function') letta.then((st) => this.impostazioni(st && st.barraLaterale, st && st.blocklist)).catch(() => {});
     } catch (_) {}
   }
 
   // Preferenze → Avanzate, la chat e il tasto destro sulla striscia: tutte le scritture passano da applySettingsUpdate.
-  impostazioni(v) {
+  // `spentiSu`: i siti dove l'utente ha spento Filo (#843), dove le azioni sulla pagina non partono.
+  impostazioni(v, spentiSu) {
     this.opzioni = opzioniDi(v);
+    if (Array.isArray(spentiSu)) this.spentiSu = spentiSu.filter((x) => typeof x === 'string');
     if (!this.opzioni.spinta) { this._ferma('sonda'); this._segnaBordo(false); } else this._guarda();
     this._invia();
   }
@@ -121,7 +120,7 @@ class BarraLaterale {
 
   // ── apertura e chiusura ──────────────────────────────────────────────────
 
-  // motivo: 'spinta' | 'clic' | 'tasto' | 'chat' | 'trascina'. Da tastiera la barra prende il fuoco.
+  // motivo: 'spinta' | 'clic' | 'tasto' | 'chat'. Da tastiera la barra prende il fuoco.
   apri(motivo = 'clic') {
     RedteamGate.aggiorna();
     this._ferma('stringi');
@@ -141,14 +140,12 @@ class BarraLaterale {
 
   chiudi() {
     this._ferma('uscita');
-    this._ferma('fine');
     if (!this.aperta) return;
     // Da tastiera il fuoco l'ha preso lei: torna alla scheda anche se il sistema non lo dice ancora.
     const avevaFuoco = this._haFuoco() || this.motivo === 'tasto';
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;
-    this.mira = null;
     this._nascondiSuggerimento();
     this._invia();
     this._ferma('stringi');
@@ -196,15 +193,6 @@ class BarraLaterale {
       if (input.type === 'mouseLeave') this._guarda();
       else if (input.type === 'mouseMove') this._forseBordo();
     }
-    // Il rilascio di un trascinamento dal menu arriva sempre qui: se la pagina non dice più
-    // «fine» (ha navigato, è caduta), la barra non resta ferma ad aspettarla.
-    if (this.trascinamento) {
-      if (input.type === 'mouseUp') {
-        this._ferma('trascina');
-        this.timer.trascina = setTimeout(() => { this.timer.trascina = null; this._fineTrascinamento(); }, 500);
-      }
-      return;
-    }
     if (!this.aperta) return;
     if (input.type === 'mouseDown' && (input.button || 'left') === 'left') { this.chiudi(); return; }
     if (input.type !== 'mouseMove') return;
@@ -215,10 +203,10 @@ class BarraLaterale {
   }
 
   _programmaUscita() {
-    if (this.timer.uscita || this.trascinamento) return;
+    if (this.timer.uscita) return;
     this.timer.uscita = setTimeout(() => {
       this.timer.uscita = null;
-      if (!this.dentro && !this.trascinamento) this.chiudi();
+      if (!this.dentro) this.chiudi();
     }, this.opzioni.uscitaMs);
   }
 
@@ -261,7 +249,7 @@ class BarraLaterale {
       const quiete = Date.now() < this.quieteFino;
       // Finito un ridimensionamento dal bordo il puntatore è ancora lì: conta solo quando si muove di nuovo.
       if (quiete && punto) this.puntoFermo = punto;
-      const fermo = !!this.trascinamento || this.tasti.scheda || this.tasti.shell || quiete;
+      const fermo = this.tasti.scheda || this.tasti.shell || quiete;
       if (dove === 'bordo' && !fermo && this._mosso(punto)) {
         if (!this.bordoDal) this.bordoDal = Date.now();
         this._segnaBordo(true);
@@ -411,6 +399,33 @@ class BarraLaterale {
     this._invia();
   }
 
+  _zonaDi(id) {
+    if (!this.layout) return null;
+    if (this.layout.bar.includes(id)) return 'bar';
+    if (this.layout.secondary.includes(id)) return 'secondary';
+    return null;
+  }
+
+  // Le azioni della pagina che si vedono adesso: quelle della barra, e quelle di «Altro…» se è aperto.
+  _idInVista() {
+    if (!this.layout) return [];
+    return [...this.layout.bar, ...(this.altroAperto ? this.layout.secondary : [])];
+  }
+
+  apriAltro(aperto) {
+    const v = !!aperto;
+    if (v === this.altroAperto) return;
+    this.altroAperto = v;
+    this._invia();
+    if (v && this.aperta) this._chiediEtichette();
+  }
+
+  // Ogni posa fatta qui è un cambio dell'utente (#867.1): il registro lo scrive dicendo da dove viene.
+  _posa(drop) {
+    const R = require('./services/registroCambi');
+    return R.con({ via: 'interfaccia', dove: 'barra' }, () => Layout.posa(drop, { incognito: this._incognito() })).catch(() => null);
+  }
+
   // La scheda è cambiata (navigazione, caricamento, schermo intero): si ridice solo se cambia qualcosa.
   aggiornaNav() {
     const t = this._attiva();
@@ -430,6 +445,8 @@ class BarraLaterale {
       scheda: !!t,
       // Sotto l'avviso del sito pericoloso la pagina non si vede: le sue azioni aspettano la conferma (regola del vuoto).
       pagina: !!t && this.tabs.vistaSottoIlVuoto() === t.view,
+      // Lì il content script non le esegue (#843): accese, sembrerebbero premute a vuoto (#1343 r2).
+      spento: !!t && this._spentoSu(t),
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
@@ -454,6 +471,13 @@ class BarraLaterale {
     return this.tabs.tabs.find((t) => t.id === this.tabs.activeId) || null;
   }
 
+  _spentoSu(t) {
+    if (!this.spentiSu || !this.spentiSu.length) return false;
+    let url = '';
+    try { url = String(t.view.webContents.getURL() || ''); } catch (_) { url = ''; }
+    try { return require('./services/handlers/filoSpento').vociCheSpengono(this.spentiSu, [url]).length > 0; } catch (_) { return false; }
+  }
+
   // Tema e profilo li tiene la shell, come per gli avvisi: qui arrivano già calcolati.
   dallaShell(dati) {
     const vars = {};
@@ -473,7 +497,7 @@ class BarraLaterale {
     try { return !!require('./auth/google-auth').isAdmin(); } catch (_) { return false; }
   }
 
-  _icone() {
+  _icone(zona = 'bar') {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const I18n = globalThis.SN_I18N;
     if (!D || !this.layout) return [];
@@ -481,7 +505,7 @@ class BarraLaterale {
     const owner = this._owner();
     const dallaPagina = this._etichetteAttive();
     const out = [];
-    for (const id of this.layout.bar) {
+    for (const id of this.layout[zona] || []) {
       const d = D.ICONE[id];
       if (!d || (d.soloOwner && !owner)) continue;
       if (d.tipo === 'aiuto') { out.push(this._iconaAiuto(id, nav.aiuto)); continue; }
@@ -492,9 +516,10 @@ class BarraLaterale {
       const sp = dallaPagina && dallaPagina[id];
       if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
       const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
-        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && !nav.pagina);
+        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || nav.spento));
       const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
-      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
+      const perche = d.tipo === 'pagina' && nav.spento ? 'Filo è spento su questo sito' : '';
+      out.push({ id, icona, etichetta, tasto, perche, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina', contagocce: !!d.contagocce });
     }
     return out;
   }
@@ -526,7 +551,7 @@ class BarraLaterale {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const t = this._attiva();
     if (!D || !t || !this.layout) return;
-    const ids = this.layout.bar.filter((id) => D.ICONE[id] && D.ICONE[id].tipo === 'pagina');
+    const ids = this._idInVista().filter((id) => D.ICONE[id] && D.ICONE[id].tipo === 'pagina');
     if (!ids.length) return;
     const tipo = globalThis.SN_MSG?.MSG?.BARRA_ETICHETTE_CHIEDI || 'barra_etichette_chiedi';
     try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, ids }); } catch (_) {}
@@ -543,7 +568,7 @@ class BarraLaterale {
     for (const v of (Array.isArray(voci) ? voci : []).slice(0, 50)) {
       const id = testo(v && v.id);
       const d = D.noto(id) ? D.ICONE[id] : null;
-      if (!d || d.tipo !== 'pagina' || !this.layout.bar.includes(id)) continue;
+      if (!d || d.tipo !== 'pagina' || !this._zonaDi(id)) continue;
       const ammesse = ICONE_DELLA_PAGINA[id];
       const icona = ammesse && ammesse.has(testo(v.icona)) ? testo(v.icona) : d.icona;
       mappa[id] = { etichetta: testo(v.etichetta).slice(0, 200), icona };
@@ -558,13 +583,13 @@ class BarraLaterale {
       aperta: this.aperta,
       tastiera: this.motivo === 'tasto',
       incognito: this._incognito(),
-      icone: this._icone(),
+      icone: this._icone('bar'),
+      altro: this._icone('secondary'),
+      altroAperto: this.altroAperto,
       owner: this._owner(),
       redteam: RedteamGate.visibile(),
       account: this.account,
       tema: this.tema,
-      mira: this.mira,
-      trascinamento: !!this.trascinamento,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
       // Una risposta di Filo da leggere nella scheda davanti (#1432).
@@ -581,20 +606,26 @@ class BarraLaterale {
 
   // ── azioni ──────────────────────────────────────────────────────────────
 
-  esegui(id) {
+  // `colore`: il #rrggbb che il contagocce della barra ha preso, per l'icona che lo chiede.
+  esegui(id, { colore = '' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
-    if (!d || !this.layout || !this.layout.bar.includes(id)) return;
+    if (!d || !this._zonaDi(id)) return;
     if (d.soloOwner && !this._owner()) return;
     const tabs = this.tabs;
     const attiva = this._attiva();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
-      if (!attiva || !this._nav().pagina) return;
+      const nav = this._nav();
+      if (!attiva || !nav.pagina || nav.spento) return;
       this.chiudi();
       this._restituisciTastiera();
+      // Il clic è nella barra, non nella pagina: vale come un gesto dato a Filo su quella scheda (i suoi appunti), mai
+      // come un gesto della pagina, che non apre finestre né permessi.
+      try { require('./services/permessiPagine').gestoDiFilo(attiva.view.webContents); } catch (_) {}
       const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
-      try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: id, daBarra: true }); } catch (_) {}
+      const conColore = d.contagocce && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? { colore: testo(colore) } : {};
+      try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: id, daBarra: true, ...conColore }); } catch (_) {}
       return;
     }
     const daTastiera = this.motivo === 'tasto';
@@ -665,7 +696,8 @@ class BarraLaterale {
       ({ voci, scegli } = this._vociFisse(testo(d.comando), d));
     } else {
       const id = testo(d.id);
-      const icona = this._icone().find((i) => i.id === id);
+      const zona = this._zonaDi(id);
+      const icona = zona ? this._icone(zona).find((i) => i.id === id) : null;
       if (!icona) return;
       voci = [];
       const scheda = this._attiva();
@@ -682,10 +714,13 @@ class BarraLaterale {
       if (pagine.length) voci.push({ type: 'separator' });
       else if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
       else if (icona.motivo) voci.push({ label: icona.motivo, disabled: true });
-      voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
+      // Se si può mettere da parte, si può anche riportare in vista: le due voci sono la stessa posa.
+      if (zona === 'bar') voci.push({ label: 'Metti in «Altro…»', action: 'barra:altro' });
+      else voci.push({ label: 'Porta in vista nella barra', action: 'barra:in-vista' });
       scegli = (a) => {
         if (a === 'barra:esegui') this.esegui(id);
-        else if (a === 'barra:al-menu') Layout.posa({ id, target: 'secondary', beforeId: null }, { incognito: this._incognito() }).catch(() => {});
+        else if (a === 'barra:altro') this._posa({ id, target: 'secondary', beforeId: null });
+        else if (a === 'barra:in-vista') this._posa({ id, target: 'bar', beforeId: null });
         else if (a.startsWith('barra:voce:') && scheda) {
           this.tabs.vaiAllaVoce(scheda.id, Number(a.slice('barra:voce:'.length)));
           if (this.motivo === 'tasto') this.chiudi();
@@ -803,105 +838,6 @@ class BarraLaterale {
     try { require('./popup-tooltip').hideTooltip(); } catch (_) {}
   }
 
-  // ── trascinamenti ────────────────────────────────────────────────────────
-
-  // Da una scheda: il menu del tasto destro trascina un'icona verso la barra. La scheda ha il
-  // puntatore per tutto il trascinamento, quindi le coordinate arrivano da lei (px della pagina).
-  // `zoom`: dallo strato del menu sopra la scheda (#1054) i px sono già della vista, non della pagina.
-  dallaScheda(msg, tabId, { zoom: zoomDato = null } = {}) {
-    const D = globalThis.SN_DISPOSIZIONE_ICONE;
-    const fase = testo(msg.fase);
-    const attiva = this._attiva();
-    if (!attiva || attiva.id !== tabId) return { ok: false };
-    let zoom = 1;
-    try { zoom = zoomDato || attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
-    const yLocale = (y) => {
-      const tb = attiva.view.getBounds();
-      const vb = this.vista ? this.vista.getBounds() : { y: tb.y };
-      return Math.round(tb.y + Number(y || 0) * zoom - vb.y);
-    };
-    if (fase === 'inizio') {
-      const id = testo(msg.id);
-      if (!D || !D.noto(id)) return { ok: false };
-      this._ferma('fine');
-      const piena = Math.ceil((PANNELLO + 8) / zoom);
-      const sinistra = msg.menuSinistra == null ? NaN : Number(msg.menuSinistra);
-      // Il menu sta dove si aprirebbe la barra: aperta subito coprirebbe i posti in cui si riordina. Si apre
-      // quando il puntatore va al bordo, a sinistra del menu, e si richiude se ci torna sopra.
-      const rimandata = !this.aperta && Number.isFinite(sinistra) && sinistra < piena;
-      this.trascinamento = { id, tabId, rimandata };
-      if (!rimandata && !this.aperta) this.apri('trascina');
-      else this._invia();
-      const stretta = Math.max(Math.ceil(12 / zoom), Math.floor(sinistra) - 4);
-      return { ok: true, larghezza: rimandata ? Math.min(piena, stretta) : piena };
-    }
-    if (!this.trascinamento || this.trascinamento.tabId !== tabId) return { ok: false };
-    if (fase === 'sopra') {
-      if (this.trascinamento.rimandata) {
-        if (msg.y != null && !this.aperta) this.apri('trascina');
-        else if (msg.y == null && this.aperta && this.motivo === 'trascina') this.chiudi();
-      }
-      this.mira = msg.y == null ? null : { y: yLocale(msg.y) };
-      this._invia();
-      return { ok: true };
-    }
-    if (fase === 'posa') {
-      const id = this.trascinamento.id;
-      const beforeId = this._primaDi(yLocale(msg.y), id);
-      this.mira = null;
-      this.trascinamento.posata = true;
-      Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
-      return { ok: true };
-    }
-    if (fase === 'fine') {
-      this._fineTrascinamento();
-      return { ok: true };
-    }
-    return { ok: false };
-  }
-
-  _fineTrascinamento() {
-    this._ferma('trascina');
-    if (!this.trascinamento) return;
-    const posata = !!this.trascinamento.posata;
-    this.trascinamento = null;
-    this.mira = null;
-    this._invia();
-    if (this.motivo === 'trascina' && !this.dentro) {
-      this._ferma('fine');
-      this.timer.fine = setTimeout(() => { this.timer.fine = null; if (!this.dentro) this.chiudi(); }, posata ? DOPO_POSA_MS : 0);
-    }
-  }
-
-  // L'icona davanti alla quale posare, dalle misure che la barra ha mandato (px della vista).
-  _primaDi(y, escluso) {
-    for (const m of this.misure) {
-      if (m.id === escluso) continue;
-      if (y < (m.alto + m.basso) / 2) return m.id;
-    }
-    return null;
-  }
-
-  // Dalla barra: un'icona trascinata fuori dal pannello, sopra la pagina. La barra ha il puntatore
-  // per tutto il gesto, e la scheda davanti ne riceve le coordinate per il suo menu aperto.
-  _fuori(dati) {
-    const fase = testo(dati && dati.fase);
-    const id = testo(dati && dati.id);
-    const D = globalThis.SN_DISPOSIZIONE_ICONE;
-    const attiva = this._attiva();
-    if (!FASI_FUORI.has(fase) || !D || !D.noto(id) || !attiva || !this.vista) return;
-    let zoom = 1;
-    try { zoom = attiva.view.webContents.getZoomFactor() || 1; } catch (_) { zoom = 1; }
-    const vb = this.vista.getBounds();
-    const tb = attiva.view.getBounds();
-    const x = (vb.x + numero(dati.x) - tb.x) / zoom;
-    const y = (vb.y + numero(dati.y) - tb.y) / zoom;
-    const tipo = globalThis.SN_MSG?.MSG?.BARRA_FUORI || 'barra_fuori';
-    // Col menu nello strato (#1054) la posa è una voce dello strato: vale per il gesto fatto qui.
-    try { this.tabs.strato?.gestoDallaBarra?.(); } catch (_) {}
-    try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, fase, id, x, y }); } catch (_) {}
-  }
-
   // ── la vista ─────────────────────────────────────────────────────────────
 
   _messaggio(canale, dati) {
@@ -914,7 +850,6 @@ class BarraLaterale {
       case 'barra:dentro':
         this.dentro = true;
         this._ferma('uscita');
-        this._ferma('fine');
         if (this.motivo === 'tasto' && !this._haFuoco()) this.motivo = 'clic';
         break;
       case 'barra:fuori':
@@ -922,24 +857,20 @@ class BarraLaterale {
         this._nascondiSuggerimento();
         if (this.aperta && (this.motivo !== 'tasto' || !this._haFuoco())) this._programmaUscita();
         break;
-      case 'barra:azione': this.esegui(testo(d.id)); break;
+      case 'barra:azione': this.esegui(testo(d.id), { colore: testo(d.colore) }); break;
       case 'barra:sistema': this.sistema(testo(d.comando), d); break;
       case 'barra:menu': this._menu(d); break;
       case 'barra:suggerimento': this._mostraSuggerimento(d); break;
-      case 'barra:misure':
-        this.misure = (Array.isArray(d.icone) ? d.icone : []).slice(0, 200)
-          .map((m) => ({ id: testo(m && m.id), alto: numero(m && m.alto), basso: numero(m && m.basso) }))
-          .filter((m) => m.id);
-        break;
       case 'barra:posa': {
         const D = globalThis.SN_DISPOSIZIONE_ICONE;
         const id = testo(d.id);
-        if (!D || !D.noto(id)) break;
+        const target = testo(d.target) || 'bar';
+        if (!D || !D.noto(id) || !D.ZONE.includes(target)) break;
         const beforeId = d.beforeId ? testo(d.beforeId) : null;
-        Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
+        this._posa({ id, target, beforeId });
         break;
       }
-      case 'barra:trascina-fuori': this._fuori(d); break;
+      case 'barra:altro': this.apriAltro(d.aperto === true); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
       case 'barra:chiedi': this._chiediEtichette(); break;
       default: break;

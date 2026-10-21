@@ -16,6 +16,9 @@
 //   marks:NAME           come shot ma con badge numerati sugli elementi cliccabili
 //   click-shell:SELECT   click su selettore CSS della shell (tab bar/barra ind.)
 //   click-view:SELECT    click su selettore CSS della view attiva
+//   click-barra:SELECT   click su selettore CSS della barra laterale (aperta: click-shell:#barra-maniglia)
+//   hover-view:X,Y       puntatore fermo in un punto della view attiva (es. 400,0: il bordo in alto)
+//   eval-main:JS         esegui JS nel processo main (riceve `electron`; per stati che non hanno un gesto scriptabile)
 //   eval-view:JS         esegui JS nella view attiva (per stati dietro flussi non scriptabili)
 //   main-file:PERCORSO   esegui nel processo main il corpo di funzione del file (un modello finto, una pagina servita)
 //   type:TESTO           digita testo nella view attiva
@@ -97,6 +100,25 @@ async function run() {
         case 'click-view': {
           const v = await d.activeView(app, shell);
           if (v) await v.click(arg).catch((e) => console.log('  click-view err', e.message));
+          await d.sleep(400); break;
+        }
+        case 'click-barra': {
+          const barra = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/barra.html'); } catch (_) { return false; } });
+          if (barra) await barra.click(arg).catch((e) => console.log('  click-barra err', e.message));
+          else console.log('  click-barra: la barra laterale non c\'è');
+          await d.sleep(400); break;
+        }
+        case 'hover-view': {
+          const v = await d.activeView(app, shell);
+          const [x, y] = arg.split(',').map((n) => Number(n) || 0);
+          if (v) { await v.mouse.move(x, y + 30); await v.mouse.move(x, y, { steps: 3 }); }
+          await d.sleep(400); break;
+        }
+        case 'eval-main': {
+          try {
+            const fn = new Function('electron', `return (async () => { ${arg} })()`);
+            console.log('  eval-main:', JSON.stringify(await app.evaluate(fn)));
+          } catch (e) { console.log('  eval-main err', e.message); }
           await d.sleep(400); break;
         }
         case 'rclick-view': {
