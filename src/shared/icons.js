@@ -822,6 +822,7 @@
     bell:         (size) => wrap(bell, { size }),
     repeat:       (size) => wrap(repeat, { size }),
     question:     (size) => wrap(question, { size }),
+    help:         (size) => wrap(help, { size }),
     tabs:         (size) => wrap(tabs, { size }),
     location:     (size) => wrap(location, { size }),
     list:         (size) => wrap(list, { size }),
