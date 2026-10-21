@@ -136,6 +136,9 @@
     // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
     // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
     SITI_CON_CAMPI: 'filo_siti_con_campi',
+    // L'impronta dei pixel di screenshot e immagini copiate su una pagina delicata: incollate altrove, dopo anche un
+    // riavvio, non vanno al modello che le descrive (#1274). Mai l'immagine.
+    IMMAGINI_DELICATE: 'filo_immagini_delicate',
     // { versione } su cui l'utente ha premuto «Installa» da spento (#786): vale anche dopo un riavvio a metà scaricamento.
     AGGIORNAMENTO_CHIESTO: 'filo_aggiornamento_chiesto',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
