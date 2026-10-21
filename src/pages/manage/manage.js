@@ -2837,8 +2837,9 @@
     if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
-  // Un lavoro server passato e le sue attese (#1159): la suite di filo-security, il PC.
+  // Le attese che segue il server: gli unit sulla fusione (#1207); per un lavoro server la suite di filo-security, il PC (#1159).
   const ATTESE_SERVER = Object.freeze({
+    unit: ['Unit sulla fusione', 'Verifica e controllo di sicurezza sono passati: il server fa girare in GitHub gli unit test sul ramo fuso con main di adesso, e con l’esito verde lo porta al cancello e su main. Ricontrolla da solo ogni cinque minuti.'],
     pc: ['Pronto: aspetta il PC', 'Il cancello non può portare il ramo su main di filo-security: il lavoro aspetta il tuo PC. Lo porta su main npm run orchestra -- fusioni-server, che parte anche con avvia, prima la parte dell’app e poi quella del server.'],
     suite: ['Aspetta le prove del server', 'Il cancello porta su main la parte dell’app e poi il ramo di filo-security quando la suite di GitHub è verde su quel commit. Riprova da solo ogni dieci minuti.'],
   });

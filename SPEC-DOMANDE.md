@@ -648,16 +648,23 @@ scrive: con i compiti quella lettura si toglie.
     riceve solo lavori server fidati; le altre chiavi non
     ricevono mai lavoro server, salvo il controllo di sicurezza, che legge il
     diff dal server senza clonare;
-  - il pacemaker la accende con una voce sua (`routineIdServer` in config,
-    segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`), fuori dall'alternanza A/B, solo
-    se c'è un lavoro server che nascerebbe pulito. Decide prima di A/B, che
-    altrimenti riempirebbero ogni posto, e prende i
-    posti che le spettano nell'ordine di priorità della coda: a pari priorità
-    il server, e un lavoro normale più urgente non lo ferma se A/B non
-    possono accendere. Conta nel
-    tetto dell'account della sua parola d'ordine (senza, `accountServer`;
-    assente = B), si ferma con `accountServerOff`, con l'account escluso o in
-    riserva dei crediti; il tetto delle sessioni è comune.
+  - ce n'è una per account (#1426), e il pacemaker le accende con voci sue,
+    fuori dall'alternanza della routine normale: A con `routineIdServer` e il
+    segreto `CC_ROUTINE_FIRE_TOKEN_SERVER`, B con `routineIdServerB` e
+    `CC_ROUTINE_FIRE_TOKEN_SERVER_B`. Una voce senza id o senza segreto non
+    esiste, e accende solo con la sua parola d'ordine server (`lavori: server`,
+    rete limitata) sul suo account; una parola d'ordine server senza account
+    vale per A;
+  - accende solo se c'è un lavoro server che nascerebbe pulito. Decide prima
+    di A/B, che altrimenti riempirebbero ogni posto, e prende i posti che
+    spettano ai lavori server nell'ordine di priorità della coda: a pari
+    priorità il server, e un lavoro normale più urgente non lo ferma se A/B non
+    possono accendere;
+  - fra le due voci sceglie con le regole di A/B: tetto dell'account (lo stesso
+    della sua routine normale), pausa a chi fallisce o nasce morta, riserva dei
+    crediti, account prioritario, alternanza. Una voce si ferma con l'account
+    escluso o con la sua esclusione (`accountServerOff`, `accountServerBOff`);
+    il tetto delle sessioni è comune.
 - **Su `main` di filo-security** scrive solo il cancello di fusione (regola come
   per Filo):
   - una suite su GitHub Actions prova i rami;

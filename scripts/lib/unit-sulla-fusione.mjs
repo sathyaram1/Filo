@@ -1,6 +1,6 @@
-// Gli unit test sul RISULTATO della fusione del ramo con origin/main, prima di chiederla al server (#929).
+// Gli unit test sul RISULTATO della fusione del ramo con main, prima della fusione (#929, #1207).
 // Non fonde e non spinge niente: lavora in cartelle temporanee e le toglie senza mai attraversare il collegamento
-// a node_modules. La usano scripts/merge-gate.mjs e scripts/finish-local.mjs; sentinella: tests/unit/unitSullaFusione.test.mjs.
+// a node_modules. La usano scripts/unit-fusione-azione.mjs e scripts/finish-local.mjs; sentinella: tests/unit/unitSullaFusione.test.mjs.
 
 import { spawnSync, execFileSync } from 'node:child_process';
 import {
@@ -294,11 +294,12 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
 /**
  * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda?, contenuto? } | { saltata, motivo } | { errore, mainSha? }.
  * `ancheContenuto`: con main già dentro il ramo si prova il ramo stesso invece di rispondere `main_contenuto`
- * (serve a giudicare un unit rosso sul ramo, #1009). `lancia` è iniettabile solo per i test.
+ * (serve a giudicare un unit rosso sul ramo, #1009). `mainSha`: il main da provare lo sceglie chi chiede (l'azione del
+ * server, #1207), non la punta di origin di adesso. `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
   root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
-  ancheContenuto = false,
+  ancheContenuto = false, mainSha: mainDato = '',
 } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
@@ -309,16 +310,34 @@ export function provaUnitSullaFusione({
   // fallisce la misura del clone arriva lo stesso al registro.
   const tagliato = git(['rev-parse', '--is-shallow-repository']);
   const misura = tagliato.ok && tagliato.out.trim() === 'true' ? { storia: { superficiale: true, approfondito: 0, intera: false } } : {};
-  const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
-  if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})`, ...misura };
-  const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
-  const mainSha = m.ok ? m.out.trim() : '';
-  if (!/^[0-9a-f]{40}$/i.test(mainSha)) return { errore: 'non riesco a leggere lo sha di main' };
+  const m = mainDato ? mainScelto({ git, gitStoria, mainSha: mainDato }) : mainDiOrigin({ git, gitStoria });
+  if (m.errore) return { errore: m.errore, ...misura };
+  const { mainSha } = m;
   if (!/^[0-9a-f]{40}$/i.test(String(punta || ''))) return { errore: 'punta del ramo non valida', mainSha };
   const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
   if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
   if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
   return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto }), storia: storia.storia };
+}
+
+function mainDiOrigin({ git, gitStoria }) {
+  const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
+  const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
+  const mainSha = m.ok ? m.out.trim() : '';
+  return /^[0-9a-f]{40}$/i.test(mainSha) ? { mainSha } : { errore: 'non riesco a leggere lo sha di main' };
+}
+
+/** Il main nominato da chi chiede: dev'essere un commit, e se qui non c'è si scarica per sha. */
+function mainScelto({ git, gitStoria, mainSha }) {
+  const sha = String(mainSha || '').toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(sha)) return { errore: 'sha di main non valido' };
+  if (git(['cat-file', '-e', `${sha}^{commit}`]).ok) return { mainSha: sha };
+  const f = gitStoria(['fetch', '--quiet', 'origin', sha]);
+  if (!f.ok || !git(['cat-file', '-e', `${sha}^{commit}`]).ok) {
+    return { errore: `non riesco a scaricare main ${sha.slice(0, 12)} da origin (${primaRiga(f.out) || 'commit assente'})` };
+  }
+  return { mainSha: sha };
 }
 
 /** Quanta storia scaricare a ogni passo prima di prenderla tutta. */

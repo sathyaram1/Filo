@@ -181,8 +181,8 @@ is_spedibile() {
 #
 # Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
 # lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
-# qualunque sia il nome del ramo. Si arriva al ramo principale solo attraverso
-# scripts/merge-gate.mjs.
+# qualunque sia il nome del ramo. Al ramo principale le porta solo il server,
+# dopo verifica e controllo di sicurezza.
 #
 # È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
 # marcatura, nella storia il lavoro di una routine e quello di una sessione
@@ -386,7 +386,7 @@ salva_cartella() {
   # Il salvataggio continuo resta — e' cio' che salva il lavoro quando una
   # sessione viene interrotta di colpo — ma al ramo principale ci si arriva UNA
   # VOLTA, a lavoro finito: `npm run finish` in locale (controlli + fusione),
-  # scripts/merge-gate.mjs per le routine.
+  # il server stesso per le routine, dopo verifica e controllo di sicurezza.
   #
   # Perche': una versione viene costruita e distribuita agli utenti ogni 6 ore
   # prendendo il ramo principale COSI' COM'E'. Pubblicando a ogni modifica, quella
@@ -428,7 +428,7 @@ salva_cartella "$CARTELLA"
 # principale. Ci si arriva solo da:
 #
 #   - `npm run finish`            (locale: controlli, poi si chiede la fusione)
-#   - `scripts/merge-gate.mjs`    (routine: dopo verifica e controlli di sicurezza)
+#   - il server                   (routine: dopo verifica, controllo di sicurezza e unit sulla fusione)
 #
 # La regola non dipende da FILO_ROUTINE: quella marcatura distingue le
 # provenienze nella storia, ma appenderci la sicurezza rimetterebbe la

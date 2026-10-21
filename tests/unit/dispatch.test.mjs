@@ -1008,13 +1008,30 @@ test('secaudit: sul fail la ricetta non chiede una consegna di design, che il se
   assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
 });
 
-test('secaudit: la richiesta di fusione fa girare gli unit sulla fusione per minuti, e la ricetta la manda in sottofondo (#929)', () => {
-  // Una chiamata da due minuti la taglia a metà: nessuna richiesta parte e resta la cartella di prova.
-  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
-  const i = t.indexOf('merge-gate.mjs');
-  assert.ok(i > -1);
-  assert.match(t.slice(i, i + 1200), /sottofondo/);
-  assert.ok(!/Qui non gira nessun git/.test(t), 'qui adesso girano git e gli unit');
+test('secaudit: il ruolo consegnato registra il verdetto e rilascia, la fusione non la chiede più (#1207)', () => {
+  // Gli unit sulla fusione li lancia un'azione di GitHub accesa dal server, che porta lui il lavoro al cancello:
+  // dal prompt escono la richiesta di fusione e i suoi esiti.
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit(bucket, serverCtx(bucket, null, { diff: 'diff --git a/x b/x\n+riga\n', base: { ref: 'origin/main', sha: 'a'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
+  const istruzioni = JSON.parse(out).instructions;
+  const t = istruzioni.replace(/\s+/g, ' ');
+  assert.match(t, /Ruolo: secaudit/);
+  assert.match(t, /dispatch\.mjs"? --record-secaudit <id> <pass\|fail> --nota <file\.md>/);
+  assert.match(t, /La fusione non la chiedi tu, e non consegni nessuno stato/);
+  assert.match(t, /Su \*\*pass\*\* il seguito è del server: fa girare gli unit sul risultato della fusione/);
+  assert.match(t, /rilascio del biglietto/);
+  for (const vietato of [/merge-gate/, /--status done/, /--reason l5/, /--clear-state/, /\bexit (?:0|10|20|30)\b/i, /chiedi la fusione:/]) {
+    assert.doesNotMatch(t, vietato, `nel ruolo resta un passo del cancello: ${vietato}`);
+  }
 });
 
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
@@ -1283,7 +1300,7 @@ test('emit secaudit di un lavoro server: anche il diff del server, intero in un 
   try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
   const j = JSON.parse(out);
   assert.match(j.instructions, /diffServerFile/, 'il testo del ruolo dice del diff del server');
-  assert.match(j.instructions.replace(/\s+/g, ' '), /`30` → lavoro server: la parte del server la segue il server[^`]*Non fare niente/, 'e cosa fare con l’uscita 30 del gate');
+  assert.match(j.instructions.replace(/\s+/g, ' '), /Col pass, anche qui il seguito è del server: prima la parte dell'app su main di Filo, poi il ramo del server/, 'e chi porta su main le due parti');
   assert.equal(j.payload.diffServer, undefined);
   assert.ok(isAbsolute(j.payload.diffServerFile));
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');

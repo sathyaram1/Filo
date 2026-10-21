@@ -432,7 +432,7 @@ describe('B — l’identità attesa esposta alla guardia', () => {
     assert.equal(readExpectation(work).branch, 'worker/atteso');
     clearExpectation(work);
     assert.equal(readExpectation(work), null,
-      'dopo la consegna il merge-gate DEVE poter cambiare branch: l’attesa va tolta');
+      'dopo la consegna cambiare branch è legittimo: l’attesa va tolta');
   });
 
   test('la guardia ferma l’istanza sul branch sbagliato e la lascia passare su quello giusto', () => {
