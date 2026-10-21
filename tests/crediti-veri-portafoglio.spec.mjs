@@ -138,20 +138,55 @@ test('la chat dice il saldo e la quota del portafoglio, e a server muto l\'ultim
   expect(testo).not.toContain('mezzanotte');
   expect(testo).not.toContain(`Saldo: ${Math.round(locale)} crediti`);
 
-  // La quota cambia sul server: dopo un minuto la chat la rilegge.
+  // La quota cambia sul server: dopo un minuto il turno dice subito l'ultimo saldo noto (#1353) e lo fa rileggere.
   quota = 250;
   saldo = 4300;
   await passaUnMinuto(app);
   testo = await statoChat(app);
-  expect(testo).toMatch(/Saldo: 4\.?300 crediti/);
-  expect(testo).toContain('Ogni giorno ne arrivano altri 250');
+  expect(testo).toMatch(/Saldo: 4\.?321,5 crediti \(lo tiene il server; letto il .+\)\. È l'ultimo saldo noto/);
+  await expect.poll(() => statoChat(app)).toMatch(/Saldo: 4\.?300 crediti \(lo tiene il server: è il numero della pagina Crediti\)/);
+  expect(await statoChat(app)).toContain('Ogni giorno ne arrivano altri 250');
 
-  // Server muto: l'ultimo saldo letto, dichiarato tale.
+  // Server muto: il turno dopo ha l'ultimo saldo noto, e quando la lettura fallisce davvero lo dice.
   serverDown = true;
   await passaUnMinuto(app);
   testo = await statoChat(app);
-  expect(testo).toMatch(/Saldo: 4\.?300 crediti\. È l'ultimo saldo noto/);
-  expect(testo).toContain('il server dei crediti non risponde');
+  expect(testo).toMatch(/Saldo: 4\.?300 crediti \(lo tiene il server; letto il .+\)\. È l'ultimo saldo noto/);
+  await expect.poll(() => statoChat(app)).toContain('il server dei crediti non risponde');
+  expect(await statoChat(app)).toMatch(/Saldo: 4\.?300 crediti\. È l'ultimo saldo noto/);
+});
+
+// #1353 — un server dei crediti lento (avvio a freddo) non fa aspettare il turno e non diventa «non risponde»;
+// chi scrive nella chat fa rileggere il saldo prima dell'invio.
+test('server dei crediti lento: il turno parte subito con l\'ultimo saldo, e scrivere nella chat lo fa rileggere', async ({ app }) => {
+  const home = await homeDiAvvio(app);
+  await riscatta(app);
+  ritardoMs = 4_000;
+  saldo = 4000;
+  await passaUnMinuto(app);
+
+  const t0 = Date.now();
+  const testo = await statoChat(app);
+  expect(Date.now() - t0, 'il turno non aspetta il server dei crediti').toBeLessThan(1_000);
+  expect(testo).toMatch(/Saldo: 4\.?321,5 crediti \(lo tiene il server; letto il .+\)\. È l'ultimo saldo noto/);
+  expect(testo).not.toContain('non risponde');
+  // Mentre il server ci pensa, un altro turno non chiede una seconda lettura e non accusa il server.
+  const letture = lettureSaldo;
+  expect(await statoChat(app)).not.toContain('non risponde');
+  expect(lettureSaldo).toBe(letture);
+  await expect.poll(() => statoChat(app), { timeout: 10_000 }).toMatch(/Saldo: 4\.?000 crediti \(lo tiene il server: è il numero/);
+
+  // Un minuto dopo l'utente torna nella chat e scrive: la lettura parte mentre scrive, e all'invio il saldo è fresco.
+  saldo = 3900;
+  ritardoMs = 1_500;
+  await passaUnMinuto(app);
+  await home.reload();
+  await home.waitForLoadState('domcontentloaded');
+  const prima = lettureSaldo;
+  await home.locator('#input').click();
+  await home.locator('#input').pressSequentially('quanti crediti ho?', { delay: 20 });
+  await expect.poll(() => lettureSaldo, { message: 'scrivere fa rileggere il saldo' }).toBeGreaterThan(prima);
+  await expect.poll(() => statoChat(app), { timeout: 10_000 }).toMatch(/Saldo: 3\.?900 crediti \(lo tiene il server: è il numero/);
 });
 
 test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale fermo, il premio lo mostra la pagina Crediti', async ({ app, openTab }) => {
