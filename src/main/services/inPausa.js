@@ -26,7 +26,7 @@ function cancello(nome) {
   return cancelli[nome];
 }
 
-/** { bacheca: stato, mazzi: stato }; `fn` è aggiorna (senza attesa) o assicura (aspetta la prima lettura). */
+/** { bacheca: stato, mazzi: stato } senza aspettare; la copia scaduta si rilegge in sottofondo. */
 function stati() {
   return Object.fromEntries(NOMI.map((n) => [n, cancelli[n].aggiorna()]));
 }
