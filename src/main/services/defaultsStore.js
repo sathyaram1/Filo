@@ -51,8 +51,9 @@ const ROUTINES_DOC = 'config/routines';
 // Le manopole dei crediti (#652). Il documento lo legge il server dei crediti a
 // ogni riscatto, quota e premio; da qui lo scrive l'owner dalla sua pagina.
 const CREDITS_DOC = 'config/credits';
-// L'interruttore del Red Team (#896): lettura pubblica, scrittura dell'owner.
-const REDTEAM_DOC = 'config/redteam';
+// Gli interruttori delle funzioni in pausa per chi non è owner (#896 Red Team, #1592 Bacheca e Mazzi):
+// un documento ciascuno, lettura pubblica, scrittura dell'owner.
+const DOC_IN_PAUSA = Object.freeze({ redteam: 'config/redteam', bacheca: 'config/bacheca', mazzi: 'config/mazzi' });
 
 // Cache degli override remoti dall'ultimo refresh.
 // Campi del doc modelli lasciati dal fornitore ritirato: il salvataggio li toglie.
