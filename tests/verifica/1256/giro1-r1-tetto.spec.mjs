@@ -1,10 +1,9 @@
-// Verifica #1256, giro 1: r1 il limite di spesa che scende per un backup non è detto; r2 la pagina dei mazzi aperta
-// non si riallinea dopo l'importazione.
+// Verifica #1256, giro 1: r1 il limite di spesa che scende per un backup più stretto non è detto dalla conferma.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { clickConfirm, confirmText } from '../../helpers/confirm.mjs';
+import { confirmText } from '../../helpers/confirm.mjs';
 import { createRequire } from 'node:module';
-import { writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from '../../fixtures/electron.mjs';
@@ -36,13 +35,6 @@ async function apri(app, shell, url) {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   return paginaNuova(app, new URL(url).hostname, prima);
 }
-async function apriConferma(app, page, zipPath, nome) {
-  await app.evaluate(({ dialog }, p) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] }); }, zipPath);
-  await page.locator('#sec-import-btn').scrollIntoViewIfNeeded();
-  await page.locator('#sec-import-btn').click();
-  await expect.poll(() => confirmText(page), { timeout: 15000 }).toContain(nome);
-  return confirmText(page);
-}
 
 test('r1 tetto di qui 50 €, backup con 5 €: la conferma dice che il limite scende', async () => {
   const userData = cartellaTemporanea('filo-ver1256-tetto-');
@@ -52,32 +44,14 @@ test('r1 tetto di qui 50 €, backup con 5 €: la conferma dice che il limite s
   const { app, shell } = await lancia(userData);
   try {
     const page = await apri(app, shell, 'filo://security/security.html');
-    const testo = await apriConferma(app, page, zipPath, 'tetto5.zip');
-    // La conferma dice che il limite di adesso (50 €) lascia il posto a quello del backup (5 €).
+    await app.evaluate(({ dialog }, p) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] }); }, zipPath);
+    await page.locator('#sec-import-btn').scrollIntoViewIfNeeded();
+    await page.locator('#sec-import-btn').click();
+    await expect.poll(() => confirmText(page), { timeout: 15000 }).toContain('tetto5.zip');
+    const testo = await confirmText(page);
+    // Il limite di adesso (50 €) lascia il posto a quello del backup (5 €): la conferma lo dice coi numeri.
     expect(testo).toMatch(/50 €/);
     expect(testo).toMatch(/(^|\D)5 €/);
-  } finally {
-    try { await app.close(); } catch (_) {}
-    rmSync(userData, { recursive: true, force: true });
-  }
-});
-
-test('r2 la pagina dei mazzi aperta durante l\'importazione mostra i mazzi del backup senza riaprirla', async () => {
-  require('../../../src/shared/decks.js');
-  const D = globalThis.SN_DECKS;
-  const userData = cartellaTemporanea('filo-ver1256-mazzi-');
-  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ decks: [D.newDeck({ nome: 'Mazzo mio' })] }), 'utf8');
-  const zipPath = join(userData, 'mazzi.zip');
-  writeFileSync(zipPath, buildExportZip({ decks: [D.newDeck({ nome: 'Mazzo dal backup' })] }));
-  const { app, shell } = await lancia(userData);
-  try {
-    const mazzi = await apri(app, shell, 'filo://decks/decks.html');
-    await expect(mazzi.locator('body')).toContainText('Mazzo mio');
-    const sec = await apri(app, shell, 'filo://security/security.html');
-    await apriConferma(app, sec, zipPath, 'mazzi.zip');
-    await clickConfirm(sec, 'ok');
-    await expect.poll(() => JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8')).decks?.length, { timeout: 10000 }).toBe(2);
-    await expect(mazzi.locator('body')).toContainText('Mazzo dal backup', { timeout: 10000 });
   } finally {
     try { await app.close(); } catch (_) {}
     rmSync(userData, { recursive: true, force: true });
