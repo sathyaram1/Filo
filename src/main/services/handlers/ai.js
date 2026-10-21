@@ -165,9 +165,13 @@ module.exports = function register(on, ctx) {
     const corr = settings.correttore || {};
     if (corr.segnaposti === false) return { ok: false, code: 'SEGNAPOSTI_SPENTI' };
     const R = require('../correttoreRiservati');
-    if (delicata || !sp.domanda.trim() || sp.domanda.includes(R.SEGNAPOSTO)) return { text: SENZA_VALORE };
+    if (!sp.domanda.trim()) return { text: SENZA_VALORE };
+    // Una ricerca non fatta non è un dato che non c'è: la pagina dice perché. Da una pagina delicata parte solo col
+    // clic di chi scrive; con un dato riservato, o fermata dalla porta delle uscite, non parte mai.
+    if (sp.domanda.includes(R.SEGNAPOSTO)) return { ok: false, code: 'RICERCA_BLOCCATA' };
+    if (delicata && !sp.suRichiesta) return { ok: false, code: 'PAGINA_DELICATA' };
     const u = await controllaUscita({ type: 'CERCA_WEB', query: sp.domanda }, { sender });
-    if (u.blocca) return { text: SENZA_VALORE };
+    if (u.blocca) return { ok: false, code: 'RICERCA_BLOCCATA' };
     const F = globalThis.SN_FONTI_SEGNAPOSTO;
     let ultima = null;
     let fallita = '';
