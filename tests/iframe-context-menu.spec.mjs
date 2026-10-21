@@ -37,6 +37,21 @@ test('tasto destro DENTRO il riquadro incorporato: compare il menu di Filo', asy
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
 });
 
+// #1568 — toccato prima del suo load dal Filo della pagina, il riquadro dello stesso sito perdeva il preload.
+test('tasto destro nel riquadro dello stesso sito arrivato dopo la pagina: compare il menu di Filo', async ({ openTab }) => {
+  const sito = await riquadriInRitardo(outer('/riquadro/1'), INNER);
+  try {
+    const page = await apriConRiquadriInRitardo(openTab, sito, 1);
+    const frame = page.frameLocator('#embed');
+    await frame.locator('#inner-text').click({ button: 'right' });
+    const menu = menuDi(frame).locator('.sn-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  } finally {
+    await sito.chiudi();
+  }
+});
+
 test('il riquadro di un ALTRO sito (origine diversa) ha comunque il menu', async ({ openTab, testServer }) => {
   // blocked.test è mappato su 127.0.0.1 dal fixture: stesso server, ORIGINE
   // diversa — cioè il caso vero (il video di YouTube dentro l'articolo).
