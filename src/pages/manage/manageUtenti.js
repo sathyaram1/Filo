@@ -1,8 +1,6 @@
-// Gestione → Utenti → «Inviti e utenti» (#1414: era la pagina credits/owner.html, spostata intera). Solo owner (#598): codici d'invito da dare,
-// regali di crediti per pseudonimo, tabella degli utenti con saldo, consumo,
-// registro e dettaglio d'uso, esiti di giornaliera e riconciliazione. È una
-// pagina a parte dalla pagina Crediti dell'utente: due lavori diversi, due
-// pagine. Chi non è owner vede solo una riga che lo dice.
+// Gestione → Utenti → «Inviti e utenti», solo owner (#598; pagina a sé, credits/owner.html, fino a #1414): codici
+// d'invito, regali di crediti per pseudonimo, utenti con saldo, consumo, registro e dettaglio d'uso, esiti di
+// giornaliera e riconciliazione. Non è la pagina Crediti dell'utente né Routine → Crediti. Chi non è owner legge una riga.
 
 (function () {
   'use strict';
