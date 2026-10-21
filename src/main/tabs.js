@@ -2313,6 +2313,7 @@ class TabManager {
     const h = tab && tab.view.webContents.navigationHistory;
     const i = Math.round(Number(indice));
     if (!h || !Number.isFinite(i) || i === h.getActiveIndex()) return;
+    tab._gestoFiloAt = Date.now();
     const f = Storia.fuori(i, h.length());
     if (f) { this._vaiFuori(tab, f.verso, f.k); return; }
     tab._passoStoria = true;
