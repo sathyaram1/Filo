@@ -330,7 +330,7 @@
           return;
         }
         smonta();
-        inModifica = null;
+        if (inModifica === k) inModifica = null;
         if ('tolta' in res) tolta(res);
         else esito(res.corretta ? 'Corretta: vale dal prossimo messaggio' : 'Non c\'era più: ecco com\'è adesso');
         await carica();
