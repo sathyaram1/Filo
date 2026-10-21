@@ -128,7 +128,7 @@ test('feedback su un sito: il sito che seleziona tutto dentro il tasto dell\'ute
     await page.keyboard.type('!', { delay: 30 });
     expect(await valore(app, page, '.sn-fb-text'), cattura ? 'in cattura' : 'dopo Filo').toBe('Il tasto indietro non va!');
     await page.keyboard.press('Backspace');
-    expect(await valore(app, page, '.sn-fb-text')).toBe('Il tasto indietro non va');
+    expect(await valore(app, page, '.sn-fb-text'), cattura ? 'Backspace in cattura' : 'Backspace dopo Filo').toBe('Il tasto indietro non va');
   }
 });
 
