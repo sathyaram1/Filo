@@ -101,7 +101,10 @@
     function aggiungiPagina(p) {
       const t = ms(p.ts);
       if (gruppo && giornoDi(ms(gruppo.ts)) !== giornoDi(t)) chiudi();
-      const pagina = { id: p.id, ts: p.ts, url: String(p.url || ''), titolo: String(p.titolo || ''), ...(p.archivio ? { archivio: p.archivio } : {}) };
+      const pagina = {
+        id: p.id, ts: p.ts, url: String(p.url || ''), titolo: String(p.titolo || ''),
+        ...(p.archivio ? { archivio: p.archivio } : {}), ...(p.urlTagliato ? { urlTagliato: true } : {}),
+      };
       if (qui && p.dispositivo && p.dispositivo !== qui) pagina.altrove = true;
       if (!gruppo) gruppo = { k: 'pagine', key: `p:${p.id}`, ts: p.ts, fine: p.ts, pagine: [] };
       gruppo.pagine.push(pagina);
