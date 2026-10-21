@@ -61,6 +61,12 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   Una scheda rimasta su un'intervista rifatta un'altra volta si lega alla nuova
   targa; «Riprendiamola» cliccato in una scheda con una chat aperta riapre
   l'intervista in una scheda nuova.
+  La regola che chiude tutte queste porte insieme: solo il primo benvenuto prende
+  ogni home; rifatta o ripresa (`rifatta` nello stato) l'intervista sta solo nelle
+  pagine che l'hanno chiesta (`?accoglienza` nell'indirizzo, messo da Preferenze,
+  da «Riprendiamola» e dall'apertura). Le altre, ricaricate o aperte da un
+  collegamento, restano il filo; se è rimasta a metà, la home lo ricorda con la
+  stessa riga di sotto («La presentazione è rimasta a metà»).
 - **Chiusa a metà, la home lo dice**: il congedo vive in chat e la chat sparisce
   appena la home è pronta — col modello giù, in un istante. Il segno «già
   accolto» però è definitivo, e chi non fa in tempo a leggerlo non ha modo di
