@@ -81,8 +81,8 @@ function riquadroInVolo(f) {
   // Un altro sito arriva in una finestra nuova: toccare quella vuota di prima non gli toglie niente.
   try { return new URL(src, document.baseURI).origin === location.origin; } catch (_) { return false; }
 }
-// Nel documento, nelle sue ombre aperte e nei riquadri arrivati; un'ombra chiusa non si vede (lo stesso limite dei
-// gesti, più sotto).
+// Nel documento, nelle sue ombre aperte e nei riquadri che la pagina riempie da sé (i loro riquadri si presentano a
+// noi); un'ombra chiusa non si vede (lo stesso limite dei gesti, più sotto).
 function riquadriInVolo(doc = document, livello = 0) {
   try {
     const radici = [doc];
@@ -90,7 +90,7 @@ function riquadriInVolo(doc = document, livello = 0) {
       for (const f of radici[i].querySelectorAll('iframe, frame')) {
         if (riquadroInVolo(f)) return true;
         let d = null;
-        try { d = livello < 4 && f.contentDocument; } catch (_) {}
+        try { if (livello < 4 && f.contentWindow.location.protocol === 'about:') d = f.contentDocument; } catch (_) {}
         if (d && riquadriInVolo(d, livello + 1)) return true;
       }
       for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot);
