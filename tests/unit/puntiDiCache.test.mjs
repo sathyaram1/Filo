@@ -155,7 +155,7 @@ test('Anthropic: i punti arrivano nel corpo come cache_control, e il testo manda
   assert.deepEqual(segnati, [0, indiceCoda(msgs) - 1, msgs.length - 1]);
   assert.deepEqual(corpo.messages.at(-1).content, [{ type: 'text', text: 'Domani sole, 18 gradi.', cache_control: { type: 'ephemeral' } }]);
   assert.equal(corpo.messages.at(-1).tool_call_id, 'c1');
-  assert.deepEqual(corpo.messages[2].reasoning_details, TRATTO[1].reasoning_details, 'il ragionamento rimandato resta intatto');
+  assert.equal(corpo.messages[2].reasoning_details, undefined, 'senza il prefisso con cui è nato il ragionamento non parte verso Claude (#1552)');
   assert.deepEqual(corpo.provider.only, ['anthropic', 'claude-on-aws'], 'Claude lo serve solo Anthropic (#904)');
   // Il registro: chi ha servito e quanto si è scritto in cache.
   assert.equal(r.servedBy, 'Anthropic');

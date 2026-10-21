@@ -23,11 +23,11 @@
 
     if (ICONS && ICONS.credits) $('coin').innerHTML = ICONS.credits(48);
 
-    // La frase legge CREDIT.DAILY_REFILL dal valore in vigore: se cambia, resta veritiera.
-    const refill = window.SN_CONST?.CREDIT?.DAILY_REFILL;
-    if (refill != null) {
-      $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
-    }
+    // La ricarica giornaliera è un importo unico (CREDIT.DAILY_REFILL): la frase
+    // lo legge dal valore in vigore invece di scriverlo a mano, così se l'importo
+    // cambia (o l'owner lo configura) il testo resta veritiero. Stessa simmetria
+    // già applicata al costo di riapertura in bacheca.
+    if (window.SN_CONST?.CREDIT?.DAILY_REFILL != null) $('refillHint').textContent = rigaSottoIlSaldo(ultimoStato);
 
     // Le due letture non dipendono l'una dall'altra: partono insieme. L'avviso viene dopo, dal saldo appena letto.
     const [r, w] = await Promise.all([
@@ -37,6 +37,26 @@
     render(r || {}, w || null);
     renderAvviso(await chrome.runtime.sendMessage({ type: MSG.CREDITS_WARNING_STATE }).catch(() => null));
     seguiAncora();
+  }
+
+  // La riga sotto il conteggio locale. Con la chiave propria quel numero non paga niente, e lo dice prima (#1353).
+  function rigaRicarica(chiavePropria = false) {
+    const refill = window.SN_CONST?.CREDIT?.DAILY_REFILL;
+    const ricarica = `Ricevi ${refill != null ? `+${formatInt(refill)}` : 'altri'} crediti ogni giorno a mezzanotte.`;
+    return chiavePropria
+      ? `Le richieste le paga la tua chiave OpenRouter. Questi sono crediti di prova che Filo tiene su questo computer, non soldi che spendi. ${ricarica}`
+      : ricarica;
+  }
+
+  // La riga per l'ultimo stato letto: mentre la pagina rilegge resta quella, non torna per un attimo a quella di serie.
+  let ultimoStato = null;
+  function rigaSottoIlSaldo(w) {
+    const server = w && w.ok ? w.server : null;
+    if (server && server.hasWallet) {
+      const daily = Number(server.dailyCredits) || 0;
+      return daily > 0 ? `Ricevi +${formatInt(daily)} crediti ogni giorno, e si accumulano.` : 'I crediti li tiene il server.';
+    }
+    return rigaRicarica(Boolean(w && w.ok && w.keySource === 'own'));
   }
 
   // ── L'avviso prima che i crediti finiscano (#818) ──────────────────────────
@@ -249,6 +269,7 @@
     // Quello del server vince: è il nome con cui la persona compare all'owner.
     renderPseudonym(has ? String(server.pseudonym || w.pseudonym || '') : '');
     if (!w || !w.ok) { box.hidden = true; return; }
+    ultimoStato = w;
     box.hidden = false;
     const note = $('walletNote');
     note.hidden = true;
@@ -260,10 +281,11 @@
     // sul server: quella chiave non compra più niente. E con la personale e il
     // server non letto: il saldo è del server, e il conteggio locale al suo
     // posto sarebbe un numero che sparisce alla lettura dopo (#1138).
-    const noKey = !has && (w.keySource === 'none' || w.keySource === 'personal' || Boolean(w.identity && w.identity.lost));
+    const noKey = !has && !W.conteggioLocaleInVista({ keySource: w.keySource, identityLost: Boolean(w.identity && w.identity.lost) });
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
     if (noKey) $('offlineHint').hidden = true;
+    if (!noKey) $('refillHint').textContent = rigaSottoIlSaldo(w);
 
     // La gestione (codici, regali, utenti) è una pagina a parte: qui solo il rimando.
     $('ownerLink').hidden = !w.isOwner;
@@ -274,10 +296,6 @@
       const b = server.balance || {};
       $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
-      const daily = Number(server.dailyCredits) || 0;
-      $('refillHint').textContent = daily > 0
-        ? `Ricevi +${formatInt(daily)} crediti ogni giorno, e si accumulano.`
-        : 'I crediti li tiene il server.';
       $('redeemForm').hidden = true;
       if (w.usingOwnKey) {
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
@@ -321,7 +339,8 @@
           : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
-      note.textContent = noKey
+      // Con la chiave propria il numero qui sopra non è un saldo (#1353).
+      note.textContent = noKey || w.keySource === 'own'
         ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
         : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
       note.hidden = false;

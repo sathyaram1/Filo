@@ -566,7 +566,7 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
  *
  * @returns {{ok:boolean, current:string, assigned:string, reason:string}}
  */
-export function checkDelivery(root, assignedBranch, { da } = {}) {
+export function checkDelivery(root, assignedBranch, { da, dal } = {}) {
   const altra = altraCartellaDelDeposito(root, da);
   if (altra) {
     return {
@@ -575,6 +575,16 @@ export function checkDelivery(root, assignedBranch, { da } = {}) {
     };
   }
   const v = identityVerdict(currentBranch(root), assignedBranch);
+  if (v.ok && v.assigned) {
+    const fuori = lavoroInUnAltroWorktree(root, { dal: dal ?? (readExpectation(root) || {}).since });
+    if (fuori) {
+      const lista = fuori.commit.map((c) => c.slice(0, 12)).join(' ');
+      return {
+        ...v, ok: false, altrove: fuori,
+        reason: `il ramo "${v.assigned}" non contiene ${fuori.commit.length === 1 ? 'un commit fatto' : `${fuori.commit.length} commit fatti`} dopo l'inizio di questo lavoro nella cartella "${fuori.cartella}"${fuori.ramo ? ` (ramo "${fuori.ramo}")` : ''}, e la verifica non li troverebbe: portali qui (\`git -C "${fuori.radice}" cherry-pick ${lista}\`) e registra di nuovo; se non sono di questo lavoro, togli quella cartella (\`git worktree remove "${fuori.cartella}"\`, il suo ramo resta)`,
+      };
+    }
+  }
   if (v.ok || v.current) return v;
   // Durante il rebase del ramo assegnato la cartella è staccata per forza: il rifiuto resta, ma non è una
   // deriva (`rebase: true`). Il rebase di un altro ramo lo è.
@@ -605,6 +615,39 @@ export function altraCartellaDelDeposito(root, da = process.cwd()) {
   const lavoro = qui ? chiedi(root) : null;
   if (!qui || !lavoro || qui.comune !== lavoro.comune || qui.top === lavoro.top) return null;
   return { cartella: qui.top, radice: lavoro.top, ramo: currentBranch(da) };
+}
+
+/**
+ * Un altro worktree dello stesso deposito con commit nati da `dal` (l'inizio del lavoro) che la cartella posizionata
+ * non contiene (#772.1). Non contano la linea principale né i commit già portati qui con un cherry-pick.
+ * @returns {null | { cartella: string, ramo: string, radice: string, commit: string[] }} i commit dal più vecchio
+ */
+export function lavoroInUnAltroWorktree(root, { dal = '' } = {}) {
+  const inizio = Math.floor(Date.parse(String(dal || '')) / 1000);
+  if (!Number.isFinite(inizio)) return null;
+  const g = gitIn(root);
+  const top = g(['rev-parse', '--show-toplevel']);
+  const elenco = g(['worktree', 'list', '--porcelain']);
+  if (!top.ok || !elenco.ok) return null;
+  const radice = percorsoVero(top.out);
+  const def = g(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok && def.out ? def.out.replace(/^origin\//, '') : 'main';
+  const fuori = [principale, `origin/${principale}`].filter((r) => g(['rev-parse', '--verify', '--quiet', `${r}^{commit}`]).ok);
+  for (const blocco of elenco.out.split(/\r?\n\s*\r?\n/)) {
+    const righe = blocco.split(/\r?\n/);
+    const campo = (nome) => (righe.find((r) => r.startsWith(`${nome} `)) || '').slice(nome.length + 1).trim();
+    const cartella = campo('worktree');
+    const testa = campo('HEAD');
+    // Una cartella sparita (worktree da potare) non è dove si lavora adesso.
+    if (!cartella || !/^[0-9a-f]{7,64}$/i.test(testa) || righe.includes('bare') || !existsSync(cartella)) continue;
+    if (percorsoVero(cartella) === radice) continue;
+    const r = g(['log', '--no-merges', '--right-only', '--cherry-pick', '--format=%H %ct', `HEAD...${testa}`, ...fuori.map((x) => `^${x}`)]);
+    if (!r.ok || !r.out) continue;
+    const commit = r.out.split(/\r?\n/).map((l) => l.trim().split(' '))
+      .filter(([sha, ct]) => sha && Number(ct) >= inizio).map(([sha]) => sha).reverse();
+    if (commit.length) return { cartella: percorsoVero(cartella), ramo: campo('branch').replace(/^refs\/heads\//, ''), radice, commit };
+  }
+  return null;
 }
 
 function percorsoVero(p) {
@@ -652,7 +695,7 @@ export function guardTransition(root, id, { escalate, persist, clear, assigned: 
   const assigned = prev?.branch || String(ripiego || '');
   const v = checkDelivery(root, assigned);
   if (v.ok) return { ok: true, state: prev };
-  const dove = { current: v.current, assigned: v.assigned, ...(v.cartella ? { cartella: v.cartella, radice: v.radice } : {}) };
+  const dove = { current: v.current, assigned: v.assigned, ...(v.cartella ? { cartella: v.cartella, radice: v.radice } : {}), ...(v.altrove ? { altrove: v.altrove } : {}) };
   // Il rebase del ramo assegnato si finisce e poi si registra: non conta verso la sospensione per deriva.
   if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, ...dove, message: `registrazione rifiutata su ${id}: ${v.reason}` };
 
@@ -695,8 +738,8 @@ function nomeRamo(s) {
  * Un ramo dichiarato può solo confermare quello della cartella.
  *
  * @returns {{ok:true, branch:string, id:string, assigned:string}
- *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato'|'cartella', current:string, assigned:string,
- *      cartella?:string, radice?:string,
+ *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato'|'cartella'|'altrove', current:string, assigned:string,
+ *      cartella?:string, radice?:string, altrove?:{cartella:string, ramo:string, radice:string, commit:string[]},
  *      declared?:string, rebaseDi?:string, count?:number, escalated?:boolean}}
  */
 export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
@@ -713,8 +756,8 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
       : checkDelivery(root, assigned);
     if (!g.ok) {
       const cur = g.current || '';
-      const motivo = g.cartella ? 'cartella' : g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
-      const dove = g.cartella ? { cartella: g.cartella, radice: g.radice } : {};
+      const motivo = g.cartella ? 'cartella' : g.altrove ? 'altrove' : g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
+      const dove = g.cartella ? { cartella: g.cartella, radice: g.radice } : g.altrove ? { altrove: g.altrove } : {};
       return { ok: false, motivo, current: cur, assigned: g.assigned || assigned, rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated, ...dove };
     }
     if (g.state && g.state.branch) assigned = g.state.branch;

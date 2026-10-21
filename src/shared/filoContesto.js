@@ -209,7 +209,8 @@
     }
     const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a
-    // ogni turno un messaggio che la cache aveva già.
+    // ogni turno un messaggio che la cache aveva già. Verso Claude parte solo col prefisso con cui è nato
+    // (src/main/services/providers/ragionamentoRimandato.js).
     const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
     if (rd) out.reasoning_details = rd;
     return out;
