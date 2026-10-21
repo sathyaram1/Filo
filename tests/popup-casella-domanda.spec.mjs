@@ -15,7 +15,11 @@ async function preparaModello(app) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash', [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
+      models: {
+        [C.ACTIONS.EXPLAIN]: 'deepseek-flash',
+        [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash',
+        [C.ACTIONS.TRANSLATE_SELECTION]: 'deepseek-flash',
+      },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__origProvider8531 = globalThis.__origProvider8531 || globalThis.SN_PROVIDER_OPENROUTER;
