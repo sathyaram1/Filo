@@ -277,6 +277,7 @@
         ...(prima && prima.id ? { id: prima.id } : {}),
         // La scheda chiusa si riapre com'era (scroll, paese): la voce d'archivio la conosce il main (#872).
         ...(s.id ? { archivio: s.id } : {}),
+        ...(s.urlTagliato || (prima && prima.urlTagliato) ? { urlTagliato: true } : {}),
         ...(nelContenuto ? { estratto: estratto(dentro, ts, 70, largo) } : {}),
       };
       if (!prima || nelContenuto) perUrl.set(s.url, voce);
