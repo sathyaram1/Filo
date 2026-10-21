@@ -345,6 +345,9 @@ module.exports = function register(on, ctx) {
 
   on(MSG.WALLET_STATE, filoOnly(async () => readState()));
 
+  // Chi scrive nella chat manderà presto un turno: il saldo si rilegge adesso, così all'invio è pronto (#1353).
+  on(MSG.WALLET_SALDO_PREPARA, filoOnly(async () => { rileggiSaldo(); return { ok: true }; }));
+
   // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
   // zittire per dieci minuti un avviso che ripete una frase.
   on(MSG.KEY_FALLBACK_SHOWN, async () => { ripiegoMostrato(); return { ok: true }; });
