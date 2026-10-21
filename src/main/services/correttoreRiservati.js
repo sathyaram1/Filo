@@ -18,6 +18,7 @@ const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvi
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
   'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks']);
 const PAROLE_RISPOSTA = 12;
+const RISPOSTA_MAX = 600;
 // Il campo risponde all'ultima richiesta del testo sopra finché dopo di lei non c'è un'altra domanda né molto altro
 // (l'ora, «visualizzato», un «aspetta» di chi scrive).
 const DOPO_LA_RICHIESTA = 300;
