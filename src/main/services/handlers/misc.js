@@ -384,7 +384,8 @@ module.exports = function register(on, ctx) {
         return { filePath: path.join(testDir, filename) };
       }
       try {
-        const win = BrowserWindow.fromWebContents(wc) || winOf(sender) || null;
+        // Dopo la domanda sul programma la scheda può essere già chiusa.
+        const win = (!wc.isDestroyed() && BrowserWindow.fromWebContents(wc)) || winOf(sender) || null;
         const opts = { defaultPath: path.join(app.getPath('downloads'), filename) };
         const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
         // Annullato dall'utente: non è un errore, nessun toast.
