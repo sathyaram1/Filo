@@ -137,33 +137,39 @@ function radiciChiuse(radice) {
   return { chiuse, riquadri };
 }
 
-// L'albero intero di una pagina grande costa secondi e ferma Filo: prima si cercano soli i campi, che la ricerca del
-// protocollo trova anche nei componenti chiusi, e l'albero si legge solo se uno di quelli chiusi ha un valore.
-const MAX_CAMPI_CERCATI = 3000;
-const CAMPO_SCRITTO_IN_UN_CHIUSO = 'function () { var r = this.getRootNode && this.getRootNode(); return !!(r && r.mode === \'closed\' && this.value); }';
-async function campoScrittoInUnChiuso(cmd, sid) {
+// L'albero intero di una pagina grande costa secondi e ferma Filo: si legge solo se la ricerca del protocollo, che
+// entra anche nei componenti chiusi, trova più campi di quanti ne vedano gli script della pagina. Nel dubbio si legge.
+const CAMPI_VISIBILI = `(function () {
+  var n = 0;
+  function radice(r, prof) {
+    n += r.querySelectorAll('input, textarea').length;
+    if (prof > 30) return;
+    var tutti = r.querySelectorAll('*');
+    for (var i = 0; i < tutti.length; i++) if (tutti[i].shadowRoot) radice(tutti[i].shadowRoot, prof + 1);
+  }
+  function finestra(w, prof) {
+    radice(w.document, 0);
+    for (var i = 0; prof < 12 && i < w.frames.length; i++) {
+      var f = w.frames[i];
+      try { if (!f.document) continue; } catch (e) { continue; }
+      finestra(f, prof + 1);
+    }
+  }
+  finestra(window, 0);
+  return n;
+})()`;
+async function campoInUnChiuso(cmd, sid) {
   try {
     await cmd('DOM.getDocument', { depth: 0 }, sid);
+    let trovati = 0;
     for (const query of ['<input>', '<textarea>']) {
       const { searchId, resultCount } = await cmd('DOM.performSearch', { query, includeUserAgentShadowDOM: false }, sid);
-      try {
-        if (!resultCount) continue;
-        if (resultCount > MAX_CAMPI_CERCATI) return true;
-        const { nodeIds } = await cmd('DOM.getSearchResults', { searchId, fromIndex: 0, toIndex: resultCount }, sid);
-        const esiti = await Promise.all(nodeIds.map(async (nodeId) => {
-          try {
-            const { object } = await cmd('DOM.resolveNode', { nodeId, objectGroup: 'filo-campi' }, sid);
-            const { result } = await cmd('Runtime.callFunctionOn',
-              { objectId: object.objectId, functionDeclaration: CAMPO_SCRITTO_IN_UN_CHIUSO, returnByValue: true }, sid);
-            return !!(result && result.value === true);
-          } catch (_) { return false; }
-        }));
-        if (esiti.some(Boolean)) return true;
-      } finally {
-        cmd('DOM.discardSearchResults', { searchId }, sid).catch(() => {});
-      }
+      cmd('DOM.discardSearchResults', { searchId }, sid).catch(() => {});
+      trovati += resultCount;
     }
-    return false;
+    if (!trovati) return false;
+    const { result } = await cmd('Runtime.evaluate', { expression: CAMPI_VISIBILI, returnByValue: true }, sid);
+    return !(result && result.value === trovati);
   } catch (_) {
     return true;
   }
