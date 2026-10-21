@@ -8,7 +8,7 @@ const crypto = require('crypto');
 // Rete per un avviso che non dice mai di essersi chiuso (shell ricaricata, durata infinita nelle Preferenze).
 const TETTO_MS = 10 * 60 * 1000;
 const NON_DA_QUI = 'non è una segnalazione partita da qui';
-const TARDI = 'Ormai è partita: non posso più ritirarla';
+const TARDI = 'La segnalazione è già partita e non posso più ritirarla';
 
 const inAttesa = new Map();
 // biglietto → Promise dell'esito: { id } col documento scritto, { inCoda } aspetta l'owner, {} non è partita.
