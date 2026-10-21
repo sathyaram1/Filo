@@ -336,8 +336,8 @@ html, body {
   margin-top: 16px;
 }
 
-/* Le voci fuori schermo non si impaginano: con migliaia di risposte lunghe ogni lettera della ricerca e ogni
-   lotto disegnato scorrendo costavano decine di ms a voce. L'altezza stimata vale finché la voce non è vista. */
+/* Le voci fuori schermo non si impaginano: ogni lettera della ricerca e ogni lotto disegnato scorrendo impaginavano
+   cento risposte lunghe per mostrarne otto. L'altezza stimata vale finché la voce non è stata vista. */
 .sn-history-item {
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
