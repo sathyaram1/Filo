@@ -19,6 +19,11 @@ const FINESTRA_RIMANDO_MS = 15000;
 // Il seguito di una pagina letta dalla scheda si prende dalla stessa lettura: ricopiarla a ogni pezzo costava minuti.
 const SCHEDA_TTL_MS = 2 * 60 * 1000;
 const TEMPO_ESTRAZIONE_MS = 20000;
+// La lettura di una scheda smette da sé prima della scadenza e si dichiara parziale (#1574): su una macchina lenta la
+// scadenza esterna buttava via tutto, e il modello di una pagina enorme non riceveva nemmeno la prima parte.
+const TEMPO_SCHEDA_MS = 6000;
+const SCADENZA_SCHEDA_MS = 15000;
+const tempi = { scheda: TEMPO_SCHEDA_MS };
 // Quello che Filo ha letto dove l'utente ha fatto l'accesso (la sua scheda, un documento, un comando), per il freno.
 const RISERVATE_TTL_MS = 60 * 60 * 1000;
 const RISERVATE_MAX = 20;
