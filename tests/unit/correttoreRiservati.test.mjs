@@ -115,3 +115,16 @@ test('vale la coda del testo sopra, anche lunghissimo; una parola di sole letter
   assert.equal(risposta('certo, Gatto2024', lungo).nuovo, 'certo, [dato riservato]');
   assert.equal(R.oscura('la password è gatto. Il gattopardo dorme'), 'la password è [dato riservato]. Il gattopardo dorme');
 });
+
+test('in chat la richiesta si riconosce anche senza punto di domanda e con le abbreviazioni', () => {
+  for (const domanda of ['mi mandi la password del wifi', 'mi dai la password del wifi', 'mi scrivi la password', 'me la mandi la password',
+    'hai la password del wifi', 'qual è la password del wifi', "ce l'hai la pw", 'la password del wifi per favore', 'mi giri il codice',
+    'mi mandi la pw del wifi?', 'mi dici la pass del wifi?', 'mi dai la chiave del wifi?', 'mi passi le credenziali',
+    "what's the wifi password", 'can you send me the wifi password']) {
+    assert.ok(!risposta('certo, Gatto2024 ', `Marco: ${domanda}`).nuovo.includes('Gatto2024'), domanda);
+  }
+  // Un racconto, un ricordo, l'inglese «pass»: non chiedono niente.
+  for (const detto of ['ho cambiato la password del wifi', 'non mi ricordo la password', 'I need to pass the exam']) {
+    assert.equal(risposta('certo, alle 1830 al bar Gatto2024', `Marco: ${detto}`).nuovo, 'certo, alle 1830 al bar Gatto2024', detto);
+  }
+});
