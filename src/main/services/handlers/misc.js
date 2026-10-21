@@ -431,10 +431,12 @@ module.exports = function register(on, ctx) {
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito, webContents: wc });
+          // #1311 — un programma passa dalla domanda di Filo PRIMA del dialogo di sistema, che non dice né cos'è né da dove arriva.
+          const via = entry.permesso(name);
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
-          askDest = () => pickDestination(name).then((d) => {
+          askDest = () => via.then((si) => (si ? pickDestination(name) : { cancelled: true })).then((d) => {
             // Chi annulla il dialogo non vuole più il file: ferma anche i byte.
             if (d && (d.cancelled || d.error)) { try { entry.cancel(); } catch (_) {} }
             return d;
