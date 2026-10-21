@@ -2263,7 +2263,7 @@
   }
 
   const TESTO_RIORDINO = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-    + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
+    + 'Le schede archiviate restano nel filo della home: le ritrovi cercandole lì.';
   // Il riordino chiesto fuori dalla chat (/pulisci, il suggerimento della home) passa dalla stessa regola della
   // chat: parte nel main, o torna la domanda da fare. `{ annullato }`, o l'esito come lo legge l'utente (`esitoRiordino`).
   async function riordinaSchede() {
