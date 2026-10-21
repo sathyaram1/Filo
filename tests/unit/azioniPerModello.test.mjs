@@ -47,6 +47,9 @@ test('più testi nella stessa azione: la nota li nomina tutti', () => {
   const d = A.descrivi({ type: 'DIMENTICA', _righe: ['ama il jazz', 'vive a Torino', 'ha un gatto'] }, { fatto: true });
   for (const n of [1, 2, 3]) assert.match(d, new RegExp(`voce ${n}: `));
   assert.match(d, /\(«voce 1», «voce 2» e «voce 3» sono segnaposti tuoi per i testi qui sotto[^\n]*non scriverli mai/);
+  const tante = A.descrivi({ type: 'DIMENTICA', _righe: Array.from({ length: 40 }, (_, i) => `riga ${i}`) }, { fatto: true });
+  assert.match(tante, /\(Le etichette da «voce 1» a «voce 40» sono segnaposti tuoi/);
+  assert.match(tante, /voce 40: riga 39\n/);
 });
 
 test('senza testi salvati nella frase non c\'è nessuna nota né recinto', () => {
