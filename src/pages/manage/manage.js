@@ -3005,12 +3005,13 @@
   // L'approvazione È scrivere `todo`: la modalità automatica di oggi non sposta
   // più nulla nelle liste, quindi i blu si mettono in coda da qui (o uno a uno
   // dal dettaglio).
-  function alignedFeedbacks() {
+  // `tutti`: anche quelli che il filtro della fiducia nasconde, per chi li conta fuori dalla lista (Automazioni).
+  function alignedFeedbacks(tutti) {
     // Stesso motivo dei bianchi: "allineato" è una lettura dello status, e
     // approvare in blocco quello che non si è potuto leggere è la scrittura
     // più pesante della pagina.
     if (!sezioniAttendibili()) return [];
-    return allFeedbacks.filter((f) => statoLeggibile(f) && MR.isAligned(f));
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate && !tutti).filter((f) => statoLeggibile(f) && MR.isAligned(f));
   }
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
@@ -3018,10 +3019,7 @@
     const show = isAdmin && currentTab === 'inbox' && l2Visibili() && blues.length > 0;
     mgAlignedBar.hidden = !show;
     if (!show || !mgAlignedBtn) return;
-    // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
-    const locali = blues.filter((f) => MR.isLocalOnly(f)).length;
-    const dove = !locali ? 'In coda' : (locali === blues.length ? 'Lavori server' : 'In coda e Lavori server');
-    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → ${dove}`;
+    mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → In coda`;
   }
   async function approveAllAligned() {
     const blues = alignedFeedbacks();
