@@ -3,6 +3,7 @@
 // Regole: patterns/globale-nella-barra-contestuale-nel-tasto-destro.md
 
 const Layout = require('../layoutIcone');
+const RisposteInAttesa = require('../../risposteInAttesa');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
