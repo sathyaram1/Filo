@@ -7,6 +7,7 @@
 
   const path = require('node:path');
   const { creaDeposito } = require('./depositoAggiunte');
+  const { MISURA, taglia } = require('./misurePagine');
   const Disco = require('../shim/storage');
 
   // La chiave dove l'archivio stava in storage.json: serve solo a migrarlo.
