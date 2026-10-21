@@ -35,6 +35,8 @@
   });
   MenuIcons.init({
     isContentFullscreen: () => contentFullscreen,
+    aiutoPasso: () => aiutoPasso(),
+    aiutoStato: () => Sidebar.stato(),
   });
   TTS.init({
     getSettings: () => settings,
