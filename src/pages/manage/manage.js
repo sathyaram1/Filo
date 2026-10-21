@@ -3303,6 +3303,7 @@
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
+        ${fiduciaSegnoHtml(fb)}
       `;
       item.addEventListener('click', () => openDetail(fb._id));
       resultCards.set(fb._id, item);
