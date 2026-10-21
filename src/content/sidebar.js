@@ -224,10 +224,10 @@
     });
     // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere). Diretta, non dal
     // modulo: il suo invio non manda più niente (#592.6), e il microfono si accende già solo con un gesto vero.
-    global.SN_VOCE_CHAT?.collega({
+    voce = global.SN_VOCE_CHAT?.collega({
       campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
-      invia,
-    });
+      invia, suStato: (s) => { statoVoce = s; cambiato(); },
+    }) || null;
     // Focus o tasto sull'input → riapri la chat
     ta.addEventListener('focus', () => expand({ ai: false }));
     ta.addEventListener('input', () => { if (collapsed) expand({ ai: false }); });
