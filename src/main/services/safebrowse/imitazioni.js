@@ -120,20 +120,24 @@ function candidati(zone) {
     if (vista !== sk.testo) letture.push({ testo: vista, vista: true });
     for (const mc of MARCHI) {
       const t = mc.token;
+      // Fra le due letture vale quella più vicina al marchio: rnicrosoft a occhio è microsoft, non un refuso.
+      let meglio = null;
       for (const l of letture) {
         const r = dentroConErrori(l.testo, t, mc.soglia);
-        if (!r) continue;
-        const intero = r.inizio === 0 && r.fine === l.testo.length;
-        let tipo;
-        if (r.d === 0 && intero) tipo = (sk.straniere ? 'omografo' : (sk.cifre || l.vista) ? 'sosia' : 'esatto');
-        else if (r.d === 0) tipo = (sk.straniere ? 'omografo' : (sk.cifre || l.vista) ? 'sosiadentro' : 'dentro');
-        else if (Math.abs(l.testo.length - t.length) <= mc.soglia && distanza(l.testo, t) <= mc.soglia) tipo = 'typo';
-        else tipo = 'typodentro';
-        // Le letture di una stessa etichetta danno lo stesso candidato: tiene la prima che lo trova.
-        if (out.some((c) => c.mc === mc && c.etichetta === z.etichetta && c.zona === z.zona)) continue;
-        out.push({ mc, zona: z.zona, etichetta: z.etichetta, tipo, d: r.d, inizio: r.inizio, fine: r.fine, sk: { ...sk, testo: l.testo }, vista: l.vista });
-        break;
+        if (r && (!meglio || r.d < meglio.r.d)) meglio = { r, l };
       }
+      if (!meglio) continue;
+      const { r, l } = meglio;
+      const intero = r.inizio === 0 && r.fine === l.testo.length;
+      let tipo;
+      let d = r.d;
+      if (r.d === 0 && intero) tipo = (sk.straniere ? 'omografo' : (sk.cifre || l.vista) ? 'sosia' : 'esatto');
+      else if (r.d === 0) tipo = (sk.straniere ? 'omografo' : (sk.cifre || l.vista) ? 'sosiadentro' : 'dentro');
+      else {
+        const tutto = Math.abs(l.testo.length - t.length) <= mc.soglia ? distanza(l.testo, t) : Infinity;
+        if (tutto <= mc.soglia) { tipo = 'typo'; d = tutto; } else tipo = 'typodentro';
+      }
+      out.push({ mc, zona: z.zona, etichetta: z.etichetta, indice: z.indice, tipo, d, inizio: r.inizio, fine: r.fine, sk: { ...sk, testo: l.testo }, vista: l.vista });
     }
   }
   return out;
