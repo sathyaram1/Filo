@@ -586,6 +586,7 @@ class BarraLaterale {
     if (d.soloOwner && !this._owner()) return;
     const tabs = this.tabs;
     const attiva = this._attiva();
+    if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
       if (!attiva || !this._nav().pagina) return;
       this.chiudi();
