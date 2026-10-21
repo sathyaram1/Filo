@@ -407,7 +407,7 @@ if (IS_SUBFRAME) try {
     // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
     if (!visto) {
       for (const f of riquadriFigli()) {
-        try { f.contentWindow.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
+        try { globalThis.SN_RIQUADRI_IN_ARRIVO?.finestra(f)?.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
       }
     }
     for (const fn of inAttesaDiVerdetto) fn();
