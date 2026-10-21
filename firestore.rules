@@ -872,6 +872,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // I riscatti riusciti per rete (#1120), per impronta: li legge e scrive
+    // solo il server. Nessun client, nemmeno l'admin: un'impronta non dice
+    // niente a chi guarda, e un contatore scritto da fuori aprirebbe il tetto.
+    match /wallet-redeem-nets/{hash} {
+      allow read, write: if false;
+    }
+
     // ── I contatori giornalieri (#969) ───────────────────────────────────────
     //
     // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), quante

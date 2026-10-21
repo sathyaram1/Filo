@@ -71,7 +71,7 @@ test('il messaggio di crediti finiti distingue chiave di Filo e chiave propria',
 });
 
 test('ogni esito del server ha una frase; uno sconosciuto cade su quella generica', () => {
-  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable']) {
+  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable', 'inviter_not_linked', 'network_cap']) {
     assert.ok(W.redeemMessage(s).length > 10, s);
   }
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
@@ -370,11 +370,11 @@ test('un movimento del portafoglio si legge in italiano, anche con l’id attacc
 // la usano sia la pagina (per disegnare i campi) sia il main (per rifiutare un
 // numero storto prima di scriverlo): se divergessero, il main accetterebbe
 // quello che la pagina rifiuta.
-test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => {
-  assert.equal(W.OWNER_KNOBS.length, 8);
+test('le manopole dei crediti sono dieci, hanno un nome e limiti sensati', () => {
+  assert.equal(W.OWNER_KNOBS.length, 10);
   assert.deepEqual(W.OWNER_KNOB_KEYS, [
     'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses', 'invitesRemaining',
-    'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackClosed',
+    'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackClosed', 'redeemsPerNetwork', 'redeemsPerNetworkHours',
   ]);
   for (const k of W.OWNER_KNOBS) {
     assert.ok(k.etichetta && k.etichetta.length > 2, `${k.chiave}: serve un nome leggibile`);
@@ -392,6 +392,31 @@ test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => 
   assert.equal(ingressi.aiuto, 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.');
   assert.equal(ingressi.min, 0);
   assert.ok(ingressi.max >= 1000000);
+  // #1120 — il tetto per rete si spegne a zero; la finestra dura almeno un'ora e arriva a un anno.
+  assert.equal(W.knobOf('redeemsPerNetwork').min, 0);
+  assert.match(W.knobOf('redeemsPerNetwork').aiuto, /A zero nessun limite/);
+  assert.equal(W.knobOf('redeemsPerNetworkHours').min, 1);
+  assert.ok(W.knobOf('redeemsPerNetworkHours').max >= 24 * 365);
+});
+
+// #1120 — chi trova il tetto per rete deve sapere quando riprovare, coi numeri del server, e che il codice resta buono.
+test('tetto per rete: la frase dice quante persone, in quante ore, e l\'ora in cui riprovare', () => {
+  const ora = (iso) => new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const ieri = new Date(2026, 9, 21, 9, 0).getTime();
+  const domani = new Date(2026, 9, 22, 8, 30).toISOString();
+  const f = W.redeemMessage('network_cap', { status: 'network_cap', reopensAt: domani, cap: 3, hours: 24 });
+  assert.equal(f, W.networkCapMessage({ reopensAt: domani, cap: 3, hours: 24 }));
+  const g = W.networkCapMessage({ reopensAt: domani, cap: 3, hours: 24 }, ieri);
+  assert.equal(g, `Da questa connessione sono già entrate 3 persone nelle ultime 24 ore: il tuo codice resta valido, riprova domani dopo le ${ora(domani)}.`);
+  const oggi = new Date(2026, 9, 21, 17, 5).toISOString();
+  assert.match(W.networkCapMessage({ reopensAt: oggi, cap: 1, hours: 1 }, ieri), new RegExp(`è già entrata una persona nell’ultima ora: .* riprova dopo le ${ora(oggi)}\\.$`));
+  const fra3 = new Date(2026, 9, 24, 10, 0).toISOString();
+  assert.match(W.networkCapMessage({ reopensAt: fra3, cap: 3, hours: 24 }, ieri), /riprova da sabato 24 ottobre alle 10:00\.$/);
+  for (const storto of [{}, { reopensAt: 'mai' }, null, undefined]) {
+    assert.equal(W.redeemMessage('network_cap', storto), W.REDEEM_MESSAGES.network_cap, JSON.stringify(storto));
+  }
+  assert.match(W.REDEEM_MESSAGES.network_cap, /resta valido/);
+  assert.match(W.redeemMessage('inviter_not_linked'), /Google/);
 });
 
 // #854 — il main rifà il controllo della pagina con la stessa tabella: un numero storto per gli ingressi

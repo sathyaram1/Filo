@@ -102,6 +102,7 @@
     const bal = credits.balanceExact != null ? credits.balanceExact : (credits.balance || 0);
     $('balance').textContent = formatCredits(bal);
     $('offlineHint').hidden = !!r.signedIn;
+    accessoGoogle = !!r.signedIn;
 
     renderWallet(w);
     renderUsage(credits.byUsage || {});
@@ -310,7 +311,7 @@
         note.hidden = false;
         reissue.hidden = false;
       }
-      renderInvites(server.invites || []);
+      renderInvites(server);
       return;
     }
 
@@ -454,11 +455,54 @@
     });
   }
 
-  function renderInvites(invites) {
+  // Dà inviti solo chi ha collegato Google (#1120): finché il server dice need_google, al posto dei codici c'è
+  // l'accesso. Chi è già dentro con Google e resta scollegato ha l'account legato a un'altra identità di Filo.
+  let accessoGoogle = false;
+  let collegaInCorso = false;
+  let esitoCollega = null;
+
+  function renderCollega() {
+    const btn = $('linkGoogleBtn');
+    const note = $('invitesLockedNote');
+    btn.disabled = collegaInCorso;
+    btn.textContent = collegaInCorso
+      ? 'Continua nella scheda di Google…'
+      : (accessoGoogle ? 'Riprova a collegare Google' : 'Collega Google per dare i tuoi inviti');
+    const frase = esitoCollega || (accessoGoogle && !collegaInCorso
+      ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer: gli inviti si danno da lì.'
+      : '');
+    note.textContent = frase;
+    note.hidden = !frase;
+  }
+
+  async function collegaGoogle() {
+    if (collegaInCorso) return;
+    collegaInCorso = true;
+    esitoCollega = null;
+    renderCollega();
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) { r = null; }
+    collegaInCorso = false;
+    if (!r || !r.ok) esitoCollega = (r && r.error) || 'L’accesso a Google non è riuscito: riprova.';
+    else accessoGoogle = true;
+    renderCollega();
+    // I codici li dà il server alla prima lettura dopo il collegamento.
+    if (r && r.ok) await load();
+  }
+
+  function renderInvites(server) {
     const section = $('invitesSection');
     const list = $('invites');
     list.innerHTML = '';
-    const views = (invites || []).map((inv) => W.inviteView(inv));
+    const locked = Boolean(server && server.invitesLocked === 'need_google');
+    $('invitesLocked').hidden = !locked;
+    if (locked) {
+      section.hidden = false;
+      renderCollega();
+      return;
+    }
+    esitoCollega = null;
+    const views = ((server && server.invites) || []).map((inv) => W.inviteView(inv));
     section.hidden = views.length === 0;
     for (const inv of views) {
       const spento = inv.exhausted || inv.revoked;
@@ -776,9 +820,13 @@
     resetIdentity().catch(() => {});
   });
 
-  // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
+  $('linkGoogleBtn').addEventListener('click', () => { collegaGoogle().catch(() => {}); });
+
+  // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa) e quando cambia l'accesso a
+  // Google da un'altra porta (menu dell'account): collegarsi è ciò che sblocca gli inviti.
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.AUTH_CHANGED) { load().catch(() => {}); return; }
       if (!msg || msg.type !== MSG.CREDITS_CHANGED) return;
       load().catch(() => {});
       // Una chiamata pagata con la chiave propria (o il suo rifiuto superato):

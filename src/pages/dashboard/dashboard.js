@@ -2301,7 +2301,11 @@
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
       title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
-      text: entrato ? `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.` : n.text,
+      text: entrato
+        ? (n.invitesLocked === 'need_google'
+          ? `${n.text} Li trovi nella pagina Crediti, dove colleghi Google per avere anche inviti da dare.`
+          : `${n.text} Li trovi nella pagina Crediti, insieme ai tuoi inviti da dare.`)
+        : n.text,
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
     return true;
