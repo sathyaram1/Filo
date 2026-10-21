@@ -130,7 +130,7 @@
     // ripeterebbe non parte. Da ogni superficie, siti compresi. { } → { ok }.
     KEY_FALLBACK_SHOWN: 'key_fallback_shown',
     // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }.
-    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo }.
+    // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo, senzaPremio }.
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
     // Recap aggiornamento (popup all'avvio): confronta la versione vista
     // l'ultima volta con app.getVersion() e ritorna le note delle versioni
