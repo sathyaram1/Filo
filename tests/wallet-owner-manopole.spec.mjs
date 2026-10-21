@@ -74,6 +74,8 @@ function configDiPartenza() {
     rewardFeedbackSent: 10,
     rewardFeedbackClosed: 50,
     invitesRemaining: 9,
+    redeemsPerNetwork: 3,
+    redeemsPerNetworkHours: 24,
     eurUsd: 1.17,
     totalLimitUsd: 4.2,
   };
@@ -256,10 +258,13 @@ test('le manopole si salvano davvero, un numero storto non arriva al server e «
   const page = await apriOwner(app);
 
   // Ci sono tutte, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(8, { timeout: 15_000 });
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(10, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
+  // #1120 — il tetto degli ingressi dalla stessa connessione e la sua finestra.
+  await expect(page.locator('#knob-redeemsPerNetwork')).toHaveValue('3');
+  await expect(page.locator('#knob-redeemsPerNetworkHours')).toHaveValue('24');
 
   const msg = page.locator('#knob-dailyCredits-msg');
 
@@ -547,7 +552,7 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 10, null, { timeout: 15_000 });
 
   const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -591,7 +596,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 10, null, { timeout: 15_000 });
 
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
@@ -733,7 +738,7 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
     await page.reload();
     await page.waitForFunction(() => {
       const s = document.getElementById('ownerSection');
-      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8;
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 10;
     }, null, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);

@@ -218,10 +218,37 @@
     provider_error: 'Il servizio dei modelli non ha risposto: riprova fra poco.',
     internal: 'Qualcosa è andato storto sul server: riprova.',
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
+    // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
+    inviter_not_linked: 'Chi ti ha mandato questo invito non ha ancora collegato il suo account Google a Filo, e finché non lo fa il suo codice non fa entrare nessuno. Diglielo, o fatti mandare un invito da qualcun altro.',
+    network_cap: 'Da questa connessione sono già entrate troppe persone di recente. Il tuo codice resta valido, riprova più tardi.',
   });
 
-  function redeemMessage(status) {
+  // `info` è la risposta intera del server: il tetto per rete porta l'ora in cui riaprire.
+  function redeemMessage(status, info) {
+    if (status === 'network_cap' && info && info.reopensAt) return networkCapMessage(info);
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
+  }
+
+  // Il tetto dei riscatti dalla stessa rete (#1120), coi numeri del server e l'ora locale in cui si libera un posto.
+  // Un'ora che non si legge non diventa «adesso»: resta la frase senza ora.
+  function networkCapMessage({ reopensAt, cap, hours } = {}, nowMs = Date.now()) {
+    const t = Date.parse(String(reopensAt || ''));
+    if (!Number.isFinite(t)) return REDEEM_MESSAGES.network_cap;
+    const n = Math.floor(Number(cap) || 0);
+    const h = Number(hours) || 0;
+    const chi = n === 1 ? 'è già entrata una persona' : (n > 1 ? `sono già entrate ${fmtInt(n)} persone` : 'sono già entrate troppe persone');
+    const finestra = h === 1 ? ' nell’ultima ora' : (h > 0 ? ` nelle ultime ${Number.isInteger(h) ? fmtInt(h) : String(h).replace('.', ',')} ore` : ' di recente');
+    return `Da questa connessione ${chi}${finestra}. Il tuo codice resta valido, riprova ${quandoRiapre(t, nowMs)}.`;
+  }
+
+  function quandoRiapre(t, nowMs) {
+    const d = new Date(t);
+    const ora = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const giorno = (x) => { const g = new Date(x); g.setHours(0, 0, 0, 0); return g.getTime(); };
+    const giorni = Math.round((giorno(t) - giorno(nowMs)) / 86400000);
+    if (giorni <= 0) return `dopo le ${ora}`;
+    if (giorni === 1) return `domani dopo le ${ora}`;
+    return `da ${d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${ora}`;
   }
 
   function fmtInt(n) {
@@ -464,6 +491,9 @@
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
+    // Il tetto per rete (#1120): una famiglia che condivide la connessione entra, una persona sola che apre portafogli a catena no.
+    { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa connessione', min: 0, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione, nelle ore scritte sotto. Vale anche per i tuoi codici. A zero nessun limite.' },
+    { chiave: 'redeemsPerNetworkHours', etichetta: 'Ore in cui si contano', min: 1, max: 8760, aiuto: 'La finestra in cui si contano gli ingressi dalla stessa connessione: passata, chi era entrato non conta più.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
   function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
@@ -766,7 +796,7 @@
   }
 
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,

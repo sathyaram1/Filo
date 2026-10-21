@@ -200,11 +200,12 @@
     //   chiave OpenRouter personale meno consumo), pseudonimo, codici d'invito
     //   propri, se c'è la chiave personale, se l'utente usa una chiave sua.
     //   { } → { ok, identity:{ok,error?}, hasPersonalKey, pseudonym, usingOwnKey,
-    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits, … }|null, error? }
+    //   server:{ hasWallet, balance:{credits,…}, invites:[…], dailyCredits,
+    //   canInvite, invitesLocked:'need_google'|'google_used'|null, … }|null, error? }
     WALLET_STATE: 'wallet_state',
     // WALLET_REDEEM: riscatta un codice d'invito. Il server crea la chiave
     //   personale e la consegna UNA volta: il main la salva cifrata.
-    //   { code } → { ok, status, message, credits?, inviteCodes?, state? }
+    //   { code } → { ok, status, message, credits?, inviteCodes?, invitesLocked?, state? }
     WALLET_REDEEM: 'wallet_redeem',
     // WALLET_REISSUE: il portafoglio c'è sul server ma la chiave personale non
     //   è su questo computer: il server ne emette un'altra (la vecchia si
