@@ -134,10 +134,10 @@
   // di restare ferma alla conversazione com'era quando l'ha letta. Mai mentre
   // stiamo scrivendo noi — le bolle in corso sono già la verità.
   function onboardingUpdated(state) {
-    if (!state || state.done) return;
-    // Qui l'intervista non è a schermo, ma da qualche parte è di nuovo aperta:
-    // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
-    if (!onboardingActive) { hideOnboardingNotice(); return; }
+    if (!state) return;
+    // Qui l'intervista non è a schermo: la riga segue l'intervista com'è adesso, anche tolta o letta altrove.
+    if (!onboardingActive) { if (!closingShownAt) aggiornaRiga(state); return; }
+    if (state.done) return;
     if (isSending()) return;
     // L'annuncio del turno appena finito QUI arriva anche dopo la risposta: ridisegnare la stessa conversazione
     // butterebbe via il blocco di attività e i bottoni delle azioni.
