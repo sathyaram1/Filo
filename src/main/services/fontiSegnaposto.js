@@ -151,9 +151,16 @@ async function web(domanda, tavilyKey) {
   });
 }
 
+const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+function giorno(d) {
+  const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(d instanceof Date ? d.toISOString() : String(d || ''));
+  return m ? `${Number(m[3])} ${MESI[Number(m[2]) - 1]} ${m[1]}` : '';
+}
+
 // La riga del modello [valore][motivo][numero della fonte][data] ricomposta con la fonte vera: il nome e l'indirizzo
-// li mette il codice, così il motivo non cita una fonte che non c'era. Vuota se il dato non si è trovato.
-function ricomponi(raw, fonti) {
+// li mette il codice, così il motivo non cita una fonte che non c'era. Senza la data del dato vale quella della voce,
+// o per il web il giorno della ricerca. Vuota se il dato non si è trovato.
+function ricomponi(raw, fonti, oggi = new Date()) {
   for (const riga of String(raw || '').split(/\r?\n/)) {
     const r = riga.trim();
     if (!r.startsWith('[') || !r.endsWith(']')) continue;
@@ -162,11 +169,12 @@ function ricomponi(raw, fonti) {
     const f = fonti[Number.parseInt(numero, 10) - 1];
     if (!f) return '';
     const nome = /^Wiki(?:pedia|data):/.test(f.titolo) ? f.titolo : (f.sito || f.titolo);
-    return `[${valore}][${motivo}][${nome}][${data || f.data}][${f.url}]`;
+    const quando = data || (f.data ? `voce del ${giorno(f.data)}` : `cercato il ${giorno(oggi)}`);
+    return `[${valore}][${motivo}][${nome}][${quando}][${f.url}]`;
   }
   return '';
 }
 
-const API = { wikipedia, web, passaggi, datiWikidata, righeWikidata, dataWikidata, ricomponi, LINGUE };
-globalThis.SN_FONTI_SEGNAPOSTO = globalThis.SN_FONTI_SEGNAPOSTO || API;
+const API = { wikipedia, web, passaggi, datiWikidata, righeWikidata, dataWikidata, ricomponi, giorno, LINGUE };
+globalThis.SN_FONTI_SEGNAPOSTO = API;
 module.exports = API;
