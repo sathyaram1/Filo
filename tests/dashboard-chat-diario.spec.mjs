@@ -23,7 +23,9 @@
 //      porta all'interruttore;
 //  (F) «portami alla home» chiesto dalla home non ricarica la pagina: il lavoro
 //      e la risposta restano da leggere, e la conversazione la chiude il bottone
-//      (anche la spunta dell'appunto), per tutte le schede;
+//      (anche la spunta dell'appunto), per tutte le schede; chiusa, lo scambio
+//      resta nel filo (#869). Gli altri comandi della finestra aprono il loro
+//      menu e lasciano la home com'è;
 //  (G) l'evento proposto si aggiunge davvero al calendario, e finché non lo si
 //      aggiunge il diario lo chiama proposta.
 //  (H) l'azione confermata nel popup lascia la sua riga anche quando non è
