@@ -388,7 +388,7 @@ async function main() {
     pagina: paginaDellaVersione(rilasci, versione),
     ultima: ultimaPubblicata(rilasci),
   });
-  await inviaAllarme(titolo, testo, chiaviAllarme(piattaforma, { versione, rilasci }));
+  await inviaAllarme(titolo, testo, chiaviAllarme(piattaforma, { versione, rilasci, impronteLette: !!impronteDi }));
 }
 
 // Il workflow lancia una COPIA di questo file, fuori dalla copia di lavoro: se
