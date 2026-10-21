@@ -1899,8 +1899,9 @@
       nome: 'Siti delicati aggiunti da te',
       aiuto: 'siti che Filo tratta come delicati oltre a posta, banche, sanità e pubblica amministrazione: niente di loro va ai modelli nei lavori automatici. '
         + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
-      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine il riassunto e la '
-        + 'pulizia automatica delle schede non mandano il testo ai modelli. Un sito tolto torna a mandarlo.',
+      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine le funzioni che partono '
+        + 'da sole (riassunto e pulizia delle schede, screenshot, spiegazione preparata) non mandano niente ai modelli. Un '
+        + 'sito tolto torna a mandarlo.',
     }),
     elenco({
       keys: ['siti_non_delicati', 'siti non delicati', 'sito non delicato', 'non delicati'],
@@ -1908,10 +1909,11 @@
       allentaSe: 'aggiungi',
       nome: 'Siti non delicati per te',
       aiuto: 'siti che Filo aveva segnato come delicati perché ci ha visto un campo password o carta, e che per l\'utente non lo '
-        + 'sono (es. google.com dopo un accesso): tornano a mandare il testo al riassunto e alla pulizia. Non toglie posta, '
-        + 'banche, sanità né i siti delicati aggiunti dall\'utente',
+        + 'sono (es. google.com dopo un accesso): tornano a mandare ai modelli quello che parte da solo. Non toglie posta, '
+        + 'banche, sanità, pubblica amministrazione né i siti delicati aggiunti dall\'utente',
       risk: 'Toglie un sito da quelli che Filo tratta come delicati perché ci ha visto un campo password o carta: delle sue '
-        + 'pagine il riassunto e la pulizia automatica delle schede tornano a mandare il testo ai modelli.',
+        + 'pagine le funzioni che partono da sole (riassunto e pulizia delle schede, screenshot, spiegazione preparata) '
+        + 'tornano a mandare ai modelli.',
     }),
 
     // Il livello di autonomia lo cambia solo l'utente, in Preferenze: dalla chat è nell'elenco fisso.
