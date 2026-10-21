@@ -99,7 +99,8 @@ test('da una scheda con un proxy HTTP con password, anteprima del link e byte di
         try { await w.waitForSelector('#foto', { timeout: 2000 }); page = w; break; } catch (_) {}
       }
     }
-    console.log('PROXY', JSON.stringify(proxy.richieste), 'VISTI', JSON.stringify(visti));
+    console.log('PROXY', JSON.stringify(proxy.richieste), 'VISTI', JSON.stringify(visti), JSON.stringify(res));
+    console.log('RESOLVE', await app.evaluate(async ({ session }, a) => session.fromPartition(`proxy:${a.id}`).resolveProxy(a.url), { id, url }));
     expect(page, 'la pagina doveva aprirsi dal proxy con password').toBeTruthy();
     await page.waitForFunction(() => { const i = document.getElementById('foto'); return i.complete && i.naturalWidth > 0; });
 
