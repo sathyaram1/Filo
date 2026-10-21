@@ -286,14 +286,10 @@ test('la durata della cache scelta in Preferenze o chiesta a Filo arriva nella r
 
   const pref = await openTab('filo://preferences/preferences.html');
   await expect(pref.locator('#contestoCachePredefinita')).toHaveText(/un'ora/);
-  // La tendina chiusa mostra la scelta di serie per intero, durata compresa.
-  const misura = await pref.locator('#contestoCache').evaluate((el) => {
-    const c = document.createElement('canvas').getContext('2d');
-    const cs = getComputedStyle(el);
-    c.font = `${cs.fontSize} ${cs.fontFamily}`;
-    return { spazio: el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), testo: c.measureText(el.options[el.selectedIndex].text).width };
-  });
-  expect(misura.testo).toBeLessThanOrEqual(misura.spazio);
+  // La tendina chiusa che l'utente vede (non il <select> nascosto dietro) mostra la scelta di serie per intero.
+  const visibile = pref.locator('.sn-select-wrap', { has: pref.locator('#contestoCache') }).locator('.sn-select-value');
+  await expect(visibile).toHaveText(/un'ora/);
+  expect(await visibile.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   await pref.locator('#contestoCache').selectOption('5m');
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.cache)).toBe('5m');
   await pref.reload();
