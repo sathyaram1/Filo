@@ -373,7 +373,7 @@
       // Niente tradotto: né prima né adesso. Nessuno stato da conservare.
       pageHasTranslation = false;
       pageComplete = false;
-      return { kind: 'failed', reason: reasonFor(lastError) };
+      return { kind: 'failed', reason: reasonFor(lastError), errore: lastError };
     }
 
     pageHasTranslation = true;
@@ -388,7 +388,7 @@
     if (!lastError && truncated) return { kind: 'batch', applied, total: grandTotal };
     // MAI "Pagina tradotta" quando non lo è: si dice che si è interrotta,
     // quanto manca e come riprendere (il motivo tecnico grezzo resta fuori).
-    return { kind: 'stopped', applied, total: grandTotal, reason: reasonFor(lastError) };
+    return { kind: 'stopped', applied, total: grandTotal, reason: reasonFor(lastError), errore: lastError };
   }
 
   // L'esito, detto all'utente. `moreArrived` è l'unica cosa che chi ha fatto il
@@ -414,12 +414,13 @@
         Popup.showToast(I18n.t('toast_nothing_to_translate'));
         return;
       case 'failed':
-        Popup.showToast(I18n.t('toast_page_translate_failed', result.reason), { duration: 7000 });
+        // Il motivo nomina dove si rimedia (crediti, modello): l'avviso porta il tasto per andarci (#663).
+        Popup.showToast(I18n.t('toast_page_translate_failed', result.reason), { duration: 7000, rimedio: result.errore });
         return;
       case 'stopped':
         Popup.showToast(
           I18n.t('toast_page_translate_stopped', result.applied, result.total, result.reason),
-          { duration: 7000 },
+          { duration: 7000, rimedio: result.errore },
         );
         return;
       case 'done':

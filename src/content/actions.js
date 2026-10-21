@@ -585,7 +585,7 @@
   // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
   // - Parte solo dietro un gesto vero che seleziona (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
-  let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
+  let prefetchedExplain = null; // { key, sentence, promise<{text}|{errore: risposta dell'IPC}> }
   let prefetchTimer = null;
   // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
   const PREFETCH_MAX_CHARS = 2000;
@@ -634,11 +634,12 @@
     }).then(
       (res) => {
         if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         return (res?.ok && typeof res.text === 'string')
           ? { text: res.text, keyFallback: res.keyFallback || null }
-          : { error: Popup.frasePerLUtente(res) };
+          : { errore: res || {} };
       },
-      (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
+      (e) => ({ errore: { message: e?.message } }),
     );
     return entry;
   }
@@ -667,6 +668,11 @@
       return pre.promise.then((res) => (pre.fermata ? chiedi() : { ...res, giaChiesta: true }));
     }
     return chiedi();
+  }
+
+  // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
+  function chiudiMenu() {
+    try { global.SN_MENU?.close?.(); } catch (_) {}
   }
 
   function buildInlineExplain(selInfo, opts = {}) {
@@ -705,10 +711,9 @@
           if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
-          if (!res || res.error || !res.text) {
+          if (!res || res.errore || !res.text) {
             el.classList.add('sn-menu-inline-error');
-            // Già tradotto da startExplainRequest: qui si mostra, non si ritraduce.
-            body.textContent = (res && res.error) || I18n.t('err_provider_failed');
+            Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });
             return;
           }
           const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
@@ -828,7 +833,7 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(res);
+              Popup.scriviErrore(body, res, { dopo: chiudiMenu });
               return;
             }
             testoChiuso(body, res.text);
@@ -908,7 +913,7 @@
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              body.textContent = Popup.frasePerLUtente(m);
+              Popup.scriviErrore(body, m, { dopo: chiudiMenu });
             }
           });
           port.postMessage({
@@ -1744,7 +1749,7 @@
         action: ACTIONS.TRANSCRIBE_IMAGE,
         payload: { dataUrl: region.dataUrl },
       });
-      if (!res?.ok) { Popup.showToast(Popup.frasePerLUtente(res), { duration: 9000 }); return; }
+      if (!res?.ok) { Popup.avvisoErrore(res); return; }
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {

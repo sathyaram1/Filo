@@ -694,9 +694,15 @@ module.exports = function register(on, ctx) {
       // l'utente, e il ragionamento raccolto fin lì resta comunque visibile.
       // Il dettaglio tecnico resta nei log per la diagnosi.
       console.warn('[SN] decks chat fallita:', (e && e.message) || e);
+      // Il codice e il rifiuto della chiave dicono alla pagina dove si toglie l'ostacolo: la frase da sola non ci porta (#663).
+      const R = globalThis.SN_WALLET;
       return {
         ok: false,
         error: friendlyChatError(e) || 'chat fallita',
+        ...(e && e.code ? { code: e.code } : {}),
+        ...(R && R.keyRefusalOf && R.keyRefusalOf(e) ? { keyRefused: true } : {}),
+        ...(e && Number(e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {}),
+        ...(e && e.finishReason ? { finishReason: e.finishReason } : {}),
         ...(reasoning ? { reasoning } : {}),
       };
     } finally {

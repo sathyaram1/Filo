@@ -126,6 +126,10 @@
   transition: background calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-msg-rimedio:hover { background: var(--sn-hover); }
+/* Nell'avviso e nel menu --sn-hover è già il fondo sotto il puntatore: il tasto prende l'accento, come le voci. */
+.sn-toast .sn-msg-rimedio:hover,
+.sn-menu .sn-msg-rimedio:hover { background: rgba(var(--sn-accent-rgb), 0.35); }
+.sn-toast .sn-msg-rimedio { margin-top: 8px; }
 /* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
 .sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
 
