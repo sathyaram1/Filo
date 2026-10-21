@@ -478,8 +478,7 @@
     const aperta = !!box && box.dataset.tipo === 'aperta';
     hideOnboardingNotice();
     try {
-      if (aperta) await send({ type: MSG.FILO_CLOSE_ONBOARDING });
-      await send({ type: MSG.FILO_ONBOARDING_NOTICE_SEEN });
+      await send(aperta ? { type: MSG.FILO_CLOSE_ONBOARDING, senzaRiga: true } : { type: MSG.FILO_ONBOARDING_NOTICE_SEEN });
     } catch (_) {}
   }
 
