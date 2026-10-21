@@ -37,6 +37,15 @@
   // Se true, click fuori dal pannello NON lo collassa (es. AI ha richiesto chat aperta)
   let aiPrefersOpen = false;
   let docClickHandler = null;
+  // Chiuso mentre Filo risponde (#1432): il pannello si nasconde invece di sparire, e la risposta resta da aprire.
+  let nascosto = false;
+  // Ridotto dall'utente (▾, clic fuori): la risposta che arriva non lo riapre da sé, la annuncia la barra laterale.
+  let ridottoDallUtente = false;
+  let nonLetta = false;
+  let inVolo = 0;
+  let voce = null;
+  let statoVoce = 'pronto';
+  let ascoltaCambi = null;
 
   // Telemetria sessione per la raccolta dei percorsi (pathsCollector.js), che
   // oggi è spenta: il riquadro con pollice su/giù non compare e niente esce.
