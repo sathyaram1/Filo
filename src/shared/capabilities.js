@@ -788,10 +788,14 @@
     const mac = T.etichettaFilo(accel, 'darwin');
     return pc === mac ? pc : `${pc} (${mac} su Mac)`;
   }
-  function conTasti(c) {
+  function conTasti(c, aperti) {
     const out = { ...c };
     for (const k of ['desc', 'invoke', 'doesNot']) {
-      if (typeof c[k] === 'string') out[k] = c[k].replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id));
+      if (typeof c[k] !== 'string') continue;
+      out[k] = c[k]
+        .replace(/\{se:([a-z-]+)\}([\s\S]*?)(?:\{altrimenti\}([\s\S]*?))?\{\/se\}/g,
+          (_, nome, si, no) => (aperto(aperti, nome) ? si : (no || '')))
+        .replace(/\{tasto:([a-z-]+)\}/g, (_, id) => tastoInUso(id));
     }
     return out;
   }
