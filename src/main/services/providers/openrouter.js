@@ -469,8 +469,8 @@
   // onReasoning(chunk) per il ragionamento, onToolCall({ id, name }) appena si
   // conosce il nome di una chiamata a uno strumento. Ritorna
   // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
-  async function streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    const reqBody = { model, messages, stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
+  async function streamComplete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    const reqBody = { model, messages: conPuntiDiCache(model, messages, cache), stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
